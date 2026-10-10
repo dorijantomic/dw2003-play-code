@@ -28,15 +28,16 @@ def main():
     for i, pack in enumerate(packs):
         sid = pack.stem[:-4]  # s200pack -> s200
         thumb_path = OUT / f"{sid}.png"
-        with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_png = str(Path(tmpdir) / "map.png")
             r = subprocess.run(
-                [sys.executable, "tools/stitch-map.py", str(pack.relative_to(DDW3)),
-                 "-o", tmp.name],
+                [sys.executable, "tools/stitch-map.py", pack.relative_to(DDW3).as_posix(),
+                 "-o", tmp_png],
                 cwd=DDW3, capture_output=True, text=True)
             if r.returncode != 0:
                 print(f"{sid}: stitch failed ({r.stderr.strip().splitlines()[-1] if r.stderr else '?'})")
                 continue
-            img = Image.open(tmp.name)
+            img = Image.open(tmp_png)
             w, h = img.size
             scale = THUMB_W / w
             img.resize((THUMB_W, max(1, round(h * scale)))).save(thumb_path)

@@ -49,8 +49,9 @@ def log(msg: str) -> None:
 
 def check_tools(tools: Path) -> None:
     """Fail with an actionable message when Marko's binaries are not built."""
+    exe = ".exe" if os.name == "nt" else ""
     missing = [t for t in REQUIRED_TOOLS
-               if not (tools / t).is_file() or not os.access(tools / t, os.X_OK)]
+               if not (tools / f"{t}{exe}").is_file() or not os.access(tools / f"{t}{exe}", os.X_OK)]
     if missing:
         raise SystemExit(
             f"byod: Marko's extractor binaries are not built in {tools}\n"
@@ -168,10 +169,10 @@ def sound_step(dec: Decoder, tree: Path) -> None:
             continue
         rel = Path("pack") / "dw2003" / "sound" / group
         args = [dec.tool("ddw3-unvab-sep"),
-                "--vab-header", str(rel / f"mp{group}" / vh[0].name),
-                "--vab-body", str(rel / f"mv{group}" / vb[0].name)]
+                "--vab-header", (rel / f"mp{group}" / vh[0].name).as_posix(),
+                "--vab-body", (rel / f"mv{group}" / vb[0].name).as_posix()]
         for t in tracks:
-            args += ["--tracks", str(rel / f"mp{group}" / t.name)]
+            args += ["--tracks", (rel / f"mp{group}" / t.name).as_posix()]
         args += ["--output", f"sound/dw2003/{group}/",
                  "--toml", f"sound/dw2003/{group}.toml"]
         r = subprocess.run([str(a) for a in args], capture_output=True, text=True,

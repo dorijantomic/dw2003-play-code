@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ESBUILD = ROOT / "node_modules" / ".bin" / "esbuild"
+ESBUILD = ROOT / "node_modules" / "esbuild" / "bin" / "esbuild"
 
 
 def run(cmd):
@@ -35,9 +35,9 @@ def main():
     (ROOT / "web" / "vendor").mkdir(parents=True, exist_ok=True)
     # 1) bundle the TS engine to two browser ESM modules: the production barrel
     #    (no interpreter) and the research-only interpreter entry.
-    run([str(ESBUILD), "engine/index.ts", "--bundle", "--format=esm",
+    run(["node", str(ESBUILD), "engine/index.ts", "--bundle", "--format=esm",
          "--outfile=web/vendor/engine.js"])
-    run([str(ESBUILD), "engine/native-entry.ts", "--bundle", "--format=esm",
+    run(["node", str(ESBUILD), "engine/native-entry.ts", "--bundle", "--format=esm",
          "--outfile=web/vendor/engine-native.js"])
     # 2) convert extracted assets -> the EngineContent blob the browser loads
     run(["node", "tools/engine-convert/convert.ts"])

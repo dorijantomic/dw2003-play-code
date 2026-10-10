@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digimon World 2003 — Setup</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #182033; --ink: #e8ecf5; --muted: #9aa6bf;
+    --accent: #f5a524; --accent-ink: #1a1203; --line: #2a3550; --bad: #ff6b6b; --good: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 32px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 36px 16px; text-align: center;
+          transition: border-color .15s, background .15s; cursor: pointer; }
+  .drop.over { border-color: var(--accent); background: #f5a5240f; }
+  .drop strong { display: block; font-size: 18px; margin-bottom: 6px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 16px; }
+  .hint li { margin: 4px 0; }
+  .bar { height: 12px; background: #0b0f18; border-radius: 6px; overflow: hidden; margin: 16px 0 8px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .row { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; }
+  .err { color: var(--bad); white-space: pre-wrap; margin: 12px 0; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre { background: #0b0f18; border-radius: 8px; padding: 12px; font-size: 12px; max-height: 280px;
+        overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .hidden { display: none; }
+  .done { color: var(--good); font-weight: 600; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Digimon World 2003</h1>
+  <p class="sub">Browser recreation — one-time setup</p>
+
+  <section id="pick" class="card hidden">
+    <div id="drop" class="drop" tabindex="0">
+      <strong>Drop your disc image here</strong>
+      <span>or</span><br><br>
+      <button id="choose" type="button">Choose disc file…</button>
+      <input id="file" type="file" accept=".bin,.iso,.img" class="hidden">
+    </div>
+    <div id="pick-err" class="err hidden"></div>
+    <ul class="hint">
+      <li>You need your own copy of the <b>PAL/EU</b> release (SLES-03936) as a <b>.bin</b> or <b>.iso</b> file, about 600–700 MB.</li>
+      <li>Have a <b>.cue</b> file? Pick the <b>.bin</b> file next to it.</li>
+      <li>Everything is built on this computer from your disc. Nothing from the game is downloaded.</li>
+    </ul>
+  </section>
+
+  <section id="work" class="card hidden">
+    <div id="work-title"><strong>Copying your disc…</strong></div>
+    <div class="bar"><div id="bar"></div></div>
+    <div class="row"><span id="step"></span><span id="pct"></span></div>
+    <p class="hint" id="eta">The first setup takes roughly 15–40 minutes, depending on your computer.
+      You can leave this tab open and come back; the game starts by itself when it is ready.</p>
+    <div id="work-err" class="err hidden"></div>
+    <div id="work-actions" class="hidden">
+      <button id="retry" type="button">Try again</button>
+      <button id="other" type="button" class="ghost">Use a different disc</button>
+    </div>
+    <details><summary>Show details</summary><pre id="log"></pre></details>
+  </section>
+
+  <footer>
+    Built on Marko's (<a href="https://github.com/markisha64/ddw3" target="_blank" rel="noopener">markisha64/ddw3</a>)
+    decompilation. Digimon World 2003 © Bandai Namco / Banpresto. <span id="ver"></span>
+  </footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let uploading = false;
+
+function show(id) { for (const s of ["pick", "work"]) $(s).classList.toggle("hidden", s !== id); }
+function fmtTime(s) { const m = Math.floor(s / 60); return m ? `${m} min ${s % 60}s` : `${s}s`; }
+
+function upload(file) {
+  if (!file) return;
+  $("pick-err").classList.add("hidden");
+  uploading = true;
+  show("work");
+  $("work-title").innerHTML = "<strong>Copying your disc…</strong>";
+  $("work-err").classList.add("hidden");
+  $("work-actions").classList.add("hidden");
+  $("step").textContent = file.name;
+  const xhr = new XMLHttpRequest();
+  xhr.open("PUT", "/__dw2003/disc");
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const p = (100 * e.loaded / e.total);
+    $("bar").style.width = p + "%";
+    $("pct").textContent = p.toFixed(0) + "%";
+  };
+  xhr.onloadend = () => {
+    uploading = false;
+    let res = {};
+    try { res = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status !== 200) {
+      show("pick");
+      $("pick-err").textContent = res.error || `Something went wrong (HTTP ${xhr.status}).`;
+      $("pick-err").classList.remove("hidden");
+    }
+    poll();
+  };
+  xhr.send(file);
+}
+
+$("choose").onclick = (e) => { e.stopPropagation(); $("file").click(); };
+$("drop").onclick = () => $("file").click();
+$("file").onchange = () => upload($("file").files[0]);
+for (const ev of ["dragenter", "dragover"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); });
+$("drop").addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => e.preventDefault());
+$("retry").onclick = () => fetch("/__dw2003/retry", { method: "POST" }).then(poll);
+$("other").onclick = () => fetch("/__dw2003/forget-disc", { method: "POST" }).then(() => { show("pick"); });
+
+let timer = null;
+async function poll() {
+  clearTimeout(timer);
+  if (uploading) return;
+  let s;
+  try { s = await (await fetch("/__dw2003/status")).json(); }
+  catch { timer = setTimeout(poll, 3000); return; }
+  $("ver").textContent = s.version ? `· ${s.version}` : "";
+  if (s.state === "done") { location.replace("/"); return; }
+  if (s.state === "need-disc") { show("pick"); timer = setTimeout(poll, 5000); return; }
+  show("work");
+  $("bar").style.width = s.progress + "%";
+  $("pct").textContent = Math.floor(s.progress) + "%";
+  $("log").textContent = s.log.join("\n");
+  if (s.state === "failed") {
+    $("work-title").innerHTML = "<strong>Setup stopped</strong>";
+    $("step").textContent = s.label;
+    $("work-err").textContent = s.error;
+    $("work-err").classList.remove("hidden");
+    $("work-actions").classList.remove("hidden");
+    $("eta").classList.add("hidden");
+    return;
+  }
+  $("work-err").classList.add("hidden");
+  $("work-actions").classList.add("hidden");
+  $("eta").classList.remove("hidden");
+  $("work-title").innerHTML = s.state === "receiving" ? "<strong>Copying your disc…</strong>"
+                                                      : "<strong>Building the game from your disc…</strong>";
+  $("step").textContent = `${s.label}${s.elapsed ? " · " + fmtTime(s.elapsed) : ""}`;
+  timer = setTimeout(poll, 1500);
+}
+poll();
+</script>
+</body>
+</html>

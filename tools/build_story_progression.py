@@ -49,14 +49,14 @@ try:
 except FileNotFoundError:
     flag_setters = {}
 esdmg = {}
-for f in glob.glob(str(W / "events/esdmg*.json")):
+for f in sorted(glob.glob(str(W / "events/esdmg*.json"))):
     key = Path(f).stem.replace("esdmg", "")
     esdmg[key] = json.load(open(f))
 scenes = {}
-for f in glob.glob(str(W / "scenes/s*.json")):
+for f in sorted(glob.glob(str(W / "scenes/s*.json"))):
     scenes[Path(f).stem] = json.load(open(f))
 estalk = {}
-for f in glob.glob(str(W / "dialogue/estalk*.json")):
+for f in sorted(glob.glob(str(W / "dialogue/estalk*.json"))):
     estalk[Path(f).stem] = json.load(open(f))
 
 UNCOND = (65535, 0)  # cond_a values meaning "no get_flag gate"

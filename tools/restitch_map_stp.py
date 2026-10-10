@@ -43,7 +43,7 @@ import os
 import argparse
 import sys
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from PIL import Image
 
@@ -58,13 +58,13 @@ HALF = 127
 
 def process_path(path: str, base: Path) -> Path:
     """~/ddw3's util.process_path: a leading / means the ddw3 root."""
-    p = Path(path)
-    return DDW3 / p.relative_to("/") if p.is_absolute() else base / p
+    p = PurePosixPath(path)
+    return DDW3.joinpath(*p.parts[1:]) if path.startswith("/") else base.joinpath(*p.parts)
 
 
 def config_of(built: Path) -> Path:
     """A path under build/ names a .toml beside the source it is built from."""
-    return Path(str(built).replace("/build/", "/")).with_suffix(".toml")
+    return Path(built.as_posix().replace("/build/", "/")).with_suffix(".toml")
 
 
 def parse_entry(entry: str):

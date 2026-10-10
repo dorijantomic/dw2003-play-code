@@ -18,6 +18,7 @@ this scanner under the repository overlay resource cap, for example:
 
 from __future__ import annotations
 
+import os
 import argparse
 import bisect
 import hashlib
@@ -895,16 +896,21 @@ def load_semantics_bundle(path: Path | None) -> dict[str, object]:
     return payload
 
 
+def _ddw3_source_label(path: Path) -> str:
+    """'~/ddw3/<rel>' for a file in the data tree ($DDW3_DIR), wherever the tree lives."""
+    root = Path(os.environ.get("DDW3_DIR") or Path.home() / "ddw3")
+    try:
+        return "~/ddw3/" + path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def load_extracted_global_targets(path: Path | None) -> dict[str, dict[str, object]]:
     """Read function-pointer initializers from the extracted EXE data map."""
     if path is None or not path.exists():
         return {}
     source_hash = sha256_file(path)
-    try:
-        relative = path.relative_to(Path.home() / "ddw3")
-        source = "~/ddw3/" + relative.as_posix()
-    except ValueError:
-        source = str(path)
+    source = _ddw3_source_label(path)
     result: dict[str, dict[str, object]] = {}
     array_base: int | None = None
     array_base_symbol: str | None = None
@@ -1006,10 +1012,7 @@ def load_extracted_overlay_pointer_candidates(
         if module is None or module.base is None:
             continue
         source_hash = sha256_file(path)
-        try:
-            source = "~/ddw3/" + path.relative_to(Path.home() / "ddw3").as_posix()
-        except ValueError:
-            source = str(path)
+        source = _ddw3_source_label(path)
         array_address: int | None = None
         array_name: str | None = None
         array_length = 0

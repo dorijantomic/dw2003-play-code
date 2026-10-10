@@ -62,7 +62,7 @@ class Decoder:
     # --- helpers -----------------------------------------------------------
 
     def tool(self, name: str) -> str:
-        p = self.tools / name
+        p = self.tools / (f"{name}.exe" if os.name == "nt" else name)
         if not p.exists():
             raise DecodeError(f"missing ddw3 tool binary: {p}")
         return str(p)

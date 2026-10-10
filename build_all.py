@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import shutil
 import os
 import subprocess
 import sys
@@ -115,6 +116,11 @@ BASE_WITH = ("pillow", "toml", "numpy")
 
 
 def _build_argv(stage, uv):
+    # A self-contained install (the packaged launcher) ships one interpreter with
+    # every stage's packages preinstalled and no uv: run the stage on it directly.
+    direct = os.environ.get("DW2003_PYTHON")
+    if direct and not stage.uv_python:
+        return [direct, *stage.cmd]
     if stage.cmd and stage.cmd[0] == "-c":
         return [uv, *stage.cmd]                       # python -c "<code>"  (tests only)
     with_flags = []
@@ -131,7 +137,7 @@ def run_stage(stage, uv, log_dir):
     if stage.setup:
         try:
             stage.setup()
-        except Exception as e:  # setup is environment-specific; surface, don't crash the run
+        except (Exception, SystemExit) as e:  # setup is environment-specific; surface, don't crash the run
             return StageResult(stage.name, "FAILED", f"setup: {e}", time.time() - t0)
     for out in stage.outputs:  # tools assume their output directories exist
         op = _resolve(stage.cwd, out)
@@ -221,6 +227,8 @@ def setup_lfs() -> None:
     """The ddw3 tree's LFS objects must be real files, not pointers."""
     if lfs_satisfied():
         return
+    if not (DDW3 / ".git").exists():
+        raise RuntimeError(f"{DDW3} is missing pack/dw2003/field/sprite data (an incomplete tree?)")
     git_lfs = str(ddw3_toolchain.git_lfs())
     env = {**os.environ, "PATH": str(Path(git_lfs).parent) + os.pathsep + os.environ.get("PATH", "")}
     subprocess.call(["git", "lfs", "pull"], cwd=str(DDW3), env=env)
@@ -230,6 +238,10 @@ def setup_lfs() -> None:
 
 def setup_fluidsynth() -> None:
     """Build (once) the offline fluidsynth the music stage renders with."""
+    given = os.environ.get("FLUIDSYNTH") or shutil.which("fluidsynth")
+    if given and Path(given).exists():
+        os.environ["FLUIDSYNTH"] = given
+        return
     os.environ["FLUIDSYNTH"] = str(ddw3_toolchain.fluidsynth())
 
 

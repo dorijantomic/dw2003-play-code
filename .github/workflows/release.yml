@@ -1,0 +1,175 @@
+# Builds the one-click downloads (Windows installer, macOS app, Linux archive).
+#
+# None of them contain game data: each holds the game code, a portable
+# Python + Node, and the tools that decode the player's own disc on their
+# machine (Marko's ddw3 extractors, mips objdump, fluidsynth).
+#
+# Runs on every push to main (artifacts only) and on a v* tag (GitHub Release).
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DDW3_REF: b125b3d7471c23d305b27f0b1d7a2353643a3ee3
+  RUST_NIGHTLY: nightly-2026-06-09
+  BINUTILS_VERSION: "2.45"
+  FLUIDSYNTH_VERSION: "2.6.1"
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, target: linux-x64 }
+          - { os: macos-14, target: macos-arm64 }
+          - { os: windows-2022, target: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version
+        id: ver
+        run: |
+          v="$(git describe --tags --always)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          mkdir -p stage/bin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # --- Marko's extractors (ddw3 source + the two byod patches) ------------
+      - uses: actions/cache@v4
+        id: cache-extractors
+        with:
+          path: stage/extractors
+          key: extractors-${{ matrix.target }}-${{ env.DDW3_REF }}-${{ env.RUST_NIGHTLY }}-${{ hashFiles('tools/byod/patches/*') }}
+
+      - name: Build extractors
+        if: steps.cache-extractors.outputs.cache-hit != 'true'
+        run: |
+          rustup toolchain install "$RUST_NIGHTLY" --profile minimal
+          curl -fsSL "https://codeload.github.com/markisha64/ddw3/tar.gz/$DDW3_REF" -o ddw3.tgz
+          mkdir ddw3 && tar xzf ddw3.tgz -C ddw3 --strip-components=1
+          for p in tools/byod/patches/*.patch; do git apply --directory=ddw3 "$p"; done
+          cd ddw3/tools
+          cargo +"$RUST_NIGHTLY" build --release \
+            -p ddw3-pack-tools -p ddw3-map-tools -p ddw3-map-tile-tools -p ddw3-rlen-tools \
+            -p ddw3-tim-tools -p ddw3-lang-file-tools -p ddw3-unvab-sep
+          mkdir -p "$GITHUB_WORKSPACE/stage/extractors"
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=".exe"
+          for b in unpack unmap unrlen unmap-tile untim unlang-file ddw3-unvab-sep; do
+            cp "target/release/$b$ext" "$GITHUB_WORKSPACE/stage/extractors/"
+          done
+
+      # --- mips objdump (byod's asm step) ---------------------------------------
+      - uses: actions/cache@v4
+        id: cache-binutils
+        with:
+          path: stage/binutils
+          key: binutils-${{ matrix.target }}-${{ env.BINUTILS_VERSION }}-v2
+
+      - name: Build mips-elf objdump (Linux/macOS)
+        if: steps.cache-binutils.outputs.cache-hit != 'true' && runner.os != 'Windows'
+        run: |
+          DW2003_TOOLCHAIN="$PWD/stage/tc" python tools/ddw3_toolchain.py binutils
+          mkdir -p stage/binutils && cp stage/tc/binutils/bin/mips-elf-objdump stage/binutils/
+
+      - uses: msys2/setup-msys2@v2
+        if: steps.cache-binutils.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc make bison flex texinfo diffutils
+
+      - name: Build mips-elf objdump (Windows)
+        if: steps.cache-binutils.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          curl -fsSL "https://ftpmirror.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.xz" -o bu.tar.xz \
+            || curl -fsSL "https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.xz" -o bu.tar.xz
+          tar xf bu.tar.xz
+          mkdir bu-build && cd bu-build
+          ../binutils-$BINUTILS_VERSION/configure --target=mips-elf --disable-nls --disable-werror \
+            --disable-gdb --disable-gdbserver --disable-sim --disable-gprofng --disable-libdecnumber \
+            --disable-readline --without-zstd --disable-plugins MAKEINFO=true LDFLAGS="-static"
+          make -j4 all-binutils MAKEINFO=true
+          mkdir -p ../stage/binutils
+          cp binutils/objdump.exe ../stage/binutils/mips-elf-objdump.exe
+
+      # --- fluidsynth (music) ------------------------------------------------------
+      - uses: actions/cache@v4
+        id: cache-fluidsynth
+        with:
+          path: stage/fluidsynth
+          key: fluidsynth-${{ matrix.target }}-${{ env.FLUIDSYNTH_VERSION }}-v2
+
+      - name: Build fluidsynth (Linux/macOS)
+        if: steps.cache-fluidsynth.outputs.cache-hit != 'true' && runner.os != 'Windows'
+        run: |
+          DW2003_TOOLCHAIN="$PWD/stage/tc" python tools/ddw3_toolchain.py fluidsynth
+          mkdir -p stage/fluidsynth && cp stage/tc/fluidsynth/bin/fluidsynth stage/fluidsynth/
+
+      - name: Fetch fluidsynth (Windows)
+        if: steps.cache-fluidsynth.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        run: |
+          curl -fsSL "https://github.com/FluidSynth/fluidsynth/releases/download/v$FLUIDSYNTH_VERSION/fluidsynth-v$FLUIDSYNTH_VERSION-win10-x64-cpp11.zip" -o fs.zip
+          mkdir -p fs stage/fluidsynth && unzip -q fs.zip -d fs
+          cp "$(find fs -name fluidsynth.exe | head -1)" stage/fluidsynth/
+          cp $(find fs -name '*.dll') stage/fluidsynth/
+
+      # --- the bundle ------------------------------------------------------------------
+      - name: Assemble bundle
+        run: |
+          cp stage/extractors/* stage/binutils/* stage/fluidsynth/* stage/bin/
+          python packaging/build_bundle.py --bin stage/bin --out dist/DW2003 \
+            --version "${{ steps.ver.outputs.version }}" --cache "$RUNNER_TEMP/bundle-cache"
+
+      - name: Package (Windows installer)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion="${{ steps.ver.outputs.version }}" `
+            /DSourceDir="$PWD\dist\DW2003" /O"$PWD\out" packaging\windows\dw2003.iss
+          Get-ChildItem out
+
+      - name: Package (macOS app)
+        if: runner.os == 'macOS'
+        run: packaging/macos/make-dmg.sh dist/DW2003 "${{ steps.ver.outputs.version }}" out
+
+      - name: Package (Linux archive)
+        if: runner.os == 'Linux'
+        run: packaging/linux/make-tarball.sh dist/DW2003 "${{ steps.ver.outputs.version }}" out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DW2003-${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true

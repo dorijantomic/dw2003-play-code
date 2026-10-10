@@ -75,7 +75,7 @@ function isTranslated(module: string, address: number): boolean {
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const INVENTORY = join(ROOT, "recovered/ddw3/function-inventory.json");
 const SEMANTICS = join(ROOT, "recovered/ddw3/semantics.json");
-const ASM = join(homedir(), "ddw3/asm/dw2003/pro");
+const ASM = join(process.env.DDW3_DIR ?? join(homedir(), "ddw3"), "asm/dw2003/pro");
 // Tracked screen-root list (mirrors the 2026-09-14 census: allocator call
 // sites with an in-overlay callback + the constructor that owns them).
 // data/ is tracked, so the build extractor and this probe share one
