@@ -345,7 +345,8 @@ class Build:
 
     def _decode(self):
         self._set(step="decode", step_frac=0.0)
-        marker = self.tree / ".byod-tree-ok"
+        # Decoding takes minutes: keep it when only a later step failed.
+        marker = self.tree / ".byod-decoded"
         disc_id = _disc_id(self.disc)
         if marker.is_file() and marker.read_text() == f"{disc_id}|{version()}":
             self.log("disc already decoded")
@@ -356,6 +357,7 @@ class Build:
         self._py(["tools/byod/byod.py", str(self.disc), "--out", str(self.tree),
                   "--tools", str(self.tools["extractors"])],
                  progress=_byod_progress)
+        marker.write_text(f"{disc_id}|{version()}")
 
     def _asm(self):
         self._set(step="asm", step_frac=0.0)
