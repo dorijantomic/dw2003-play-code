@@ -37,6 +37,9 @@ jobs:
       run:
         shell: bash
     steps:
+      # Windows runners convert checkouts to CRLF; the patches and the shipped
+      # game code must stay byte-identical to the repository.
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
