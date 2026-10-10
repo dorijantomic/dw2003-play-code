@@ -20,6 +20,7 @@ import {
 } from "./stage-wipe.js";
 import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
+import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { createSceneEditor } from "./sceneEditor.js";
 import { createBgmPlayer, createSfxPlayer, createExclusiveRegister } from "./audio.js";
 import { sceneBgmTrack } from "./ordinal-scene-variant.js";
@@ -357,6 +358,7 @@ const PACKED_MUSIC = {
 // F0x8008453C, engine EndCardSession); ?legacyEnd=1 keeps web/endscreen.js. Its first callback
 // stops every sound (D0x80055C64), which is sfx.stopAll() here.
 const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
+const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
@@ -8473,6 +8475,12 @@ function render() {
     // EXPERIMENT (3D grass): three.js blades planted on the map's grass pixels,
     // pasted into the y-sorted list as thin strips so the party walks behind
     // blades nearer the camera and in front of farther ones. ?nograss3d turns it off.
+    // EXPERIMENT (3D water): shaded water surface over the map's water pixels,
+    // drawn straight onto the ground (before every entity). ?nowater3d turns it off.
+    if (!NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
+        const wc = renderWater(m.id, mapImg, camX, camY, performance.now() / 1000);
+        if (wc) ctx.drawImage(wc, 0, 0, WATER_VIEW.w, WATER_VIEW.h);
+    }
     if (!NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
         const gc = renderGrass(m.id, mapImg, camX, camY, performance.now() / 1000);
         if (gc) {

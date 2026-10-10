@@ -9,7 +9,7 @@ const frames = +(process.argv[6] ?? 1);
 const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 const logs = [];
-page.on("console", (m) => { const t = m.text(); if (/grass3d|error/i.test(t)) logs.push(t); });
+page.on("console", (m) => { const t = m.text(); if (/grass3d|water3d|error/i.test(t)) logs.push(t); });
 page.on("pageerror", (e) => logs.push("PAGEERROR " + e.message));
 await page.goto("http://127.0.0.1:8743/seam-lab.html", { waitUntil: "load" });
 await page.waitForFunction(() => window.__seamLab?.ready(), null, { timeout: 60000 });
@@ -21,7 +21,7 @@ for (const mode of ["on", "off"]) {
   const png = await page.evaluate(async ([x, y, mode, frames]) => {
     const f = document.getElementById("game"), w = f.contentWindow, d = f.contentDocument;
     if (w.__textbox) w.__textbox.dialogue = null;
-    w.__noGrass3d = mode === "off";
+    w.__noGrass3d = mode === "off"; w.__noWater3d = mode === "off";
     w.__state.x = x; w.__state.y = y; w.__state.dir = "down";
     w.__labCam(x, y);
     for (let i = 0; i < frames + 2; i++) await new Promise((r) => w.requestAnimationFrame(r));
