@@ -4,12 +4,12 @@
 # Python + Node, and the tools that decode the player's own disc on their
 # machine (Marko's ddw3 extractors, mips objdump, fluidsynth).
 #
-# Runs on every push to main (artifacts only) and on a v* tag (GitHub Release).
+# Runs on every push (artifacts only) and on a v* tag (GitHub Release).
 name: release
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
