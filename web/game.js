@@ -19,6 +19,7 @@ import {
     checkerboardQuads,
 } from "./stage-wipe.js";
 import { createEditor } from "./editor.js";
+import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { createSceneEditor } from "./sceneEditor.js";
 import { createBgmPlayer, createSfxPlayer, createExclusiveRegister } from "./audio.js";
 import { sceneBgmTrack } from "./ordinal-scene-variant.js";
@@ -355,6 +356,7 @@ const PACKED_MUSIC = {
 // The card runs the translated title-overlay routines (F0x80082E9C / F0x80082D70 / F0x80084628 /
 // F0x8008453C, engine EndCardSession); ?legacyEnd=1 keeps web/endscreen.js. Its first callback
 // stops every sound (D0x80055C64), which is sfx.stopAll() here.
+const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
@@ -8468,6 +8470,22 @@ function render() {
     // always-over-entities is the faithful order). y=Infinity sorts it after
     // every entity; pushed before drawEffects so the stable sort keeps
     // point-sprite foreground records (also Infinity) ON TOP of the map art.
+    // EXPERIMENT (3D grass): three.js blades planted on the map's grass pixels,
+    // pasted into the y-sorted list as thin strips so the party walks behind
+    // blades nearer the camera and in front of farther ones. ?nograss3d turns it off.
+    if (!NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
+        const gc = renderGrass(m.id, mapImg, camX, camY, performance.now() / 1000);
+        if (gc) {
+            const STRIP = 8, PXS = GRASS_VIEW.px;
+            for (let sy = 0; sy < GRASS_VIEW.h; sy += STRIP) {
+                drawables.push({
+                    y: camY + sy + STRIP,
+                    draw: () => ctx.drawImage(gc, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
+                                              0, sy, GRASS_VIEW.w, STRIP),
+                });
+            }
+        }
+    }
     const fgImg = state.mapFgImgs[m.id];
     if (fgImg instanceof Image) {
         drawables.push({
