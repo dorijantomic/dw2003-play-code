@@ -16,6 +16,7 @@
 // the OrthographicCamera below produces, so a blade planted at (px, py) lands
 // exactly on that map pixel and a blade h tall rises h*cos(PITCH) pixels.
 import * as THREE from "./lib3d/three.module.min.js";
+import { waterPixelTest } from "./water3d.js";
 
 const VIEW_W = 320;          // map pixels visible (game draws at ZOOM 2)
 const VIEW_H = 240;
@@ -29,6 +30,7 @@ const BLADES_PER_CELL = 3;
 const MAX_BLADE_H = 20;      // world units, for band culling margin
 const SOLID_R = 5;           // a cell needs a solid-grass window of (2R+1)^2 pixels...
 const SOLID_MIN = 0.9;       // ...of which at least this fraction is grass-coloured
+const WATER_GAP = 5;         // no blades within this many pixels of water
 
 let renderer = null;
 let scene = null;
@@ -136,22 +138,33 @@ function buildStage(stageId, mapImg) {
     // speckles mixed with dark gaps; real grass is green all the way across. So a
     // cell only counts if nearly every pixel in a (2R+1)^2 window is grass-coloured.
     // A summed-area table makes the window test O(1) per cell.
+    // A second table counts water-coloured pixels (the water3d.js rule), so no
+    // blade is planted on or within WATER_GAP pixels of water.
     const SW = W + 1;
     const sat = new Int32Array(SW * (H + 1));
+    const wsat = new Int32Array(SW * (H + 1));
+    const isWaterPx = waterPixelTest(stageId);
     for (let y = 0; y < H; y++) {
-        let run = 0;
+        let run = 0, wrun = 0;
         for (let x = 0; x < W; x++) {
             const o = (y * W + x) * 4;
             if (isGrass(data[o], data[o + 1], data[o + 2])) run++;
+            if (isWaterPx(data[o], data[o + 1], data[o + 2])) wrun++;
             sat[(y + 1) * SW + (x + 1)] = sat[y * SW + (x + 1)] + run;
+            wsat[(y + 1) * SW + (x + 1)] = wsat[y * SW + (x + 1)] + wrun;
         }
     }
-    const solid = (x, y) => {
-        const x0 = Math.max(0, x - SOLID_R), x1 = Math.min(W, x + SOLID_R + 1);
-        const y0 = Math.max(0, y - SOLID_R), y1 = Math.min(H, y + SOLID_R + 1);
-        const n = sat[y1 * SW + x1] - sat[y0 * SW + x1] - sat[y1 * SW + x0] + sat[y0 * SW + x0];
-        return n >= SOLID_MIN * (x1 - x0) * (y1 - y0);
+    const boxSum = (t, x, y, r) => {
+        const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+        const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+        return [t[y1 * SW + x1] - t[y0 * SW + x1] - t[y1 * SW + x0] + t[y0 * SW + x0],
+                (x1 - x0) * (y1 - y0)];
     };
+    const solid = (x, y) => {
+        const [n, area] = boxSum(sat, x, y, SOLID_R);
+        return n >= SOLID_MIN * area;
+    };
+    const nearWater = (x, y) => boxSum(wsat, x, y, WATER_GAP)[0] > 0;
 
     const bandCount = Math.ceil(H / BAND_H);
     const perBand = Array.from({ length: bandCount }, () => []);
@@ -167,7 +180,7 @@ function buildStage(stageId, mapImg) {
             // a cell is grass only if its centre and two nearby probes all are
             const m = [sample(cxp + 2, cy + 2), sample(cxp, cy), sample(cxp + 4, cy + 4)];
             if (!m.every((p) => isGrass(p[0], p[1], p[2]))) continue;
-            if (!solid(cxp + 2, cy + 2)) continue;
+            if (!solid(cxp + 2, cy + 2) || nearWater(cxp + 2, cy + 2)) continue;
             for (let k = 0; k < BLADES_PER_CELL; k++) {
                 const px = cxp + rand() * CELL;
                 const py = cy + rand() * CELL;

@@ -125,6 +125,13 @@ function isWater(r, g, b, greenMode) {
         && b >= g * 0.4 && b <= g * 0.97 && g - b <= 60 && b >= 20;
 }
 
+// The water test for one stage, so grass3d.js can keep blades out of water
+// with exactly the rule that decides where water is drawn.
+export function waterPixelTest(stageId) {
+    const greenMode = GREEN_WATER_STAGES.has(stageId);
+    return (r, g, b) => isWater(r, g, b, greenMode);
+}
+
 function boxBlur(src, W, H, rad) {
     const tmp = new Float32Array(W * H);
     const out = new Uint8Array(W * H);
