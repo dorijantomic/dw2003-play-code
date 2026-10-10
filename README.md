@@ -1,7 +1,19 @@
 # Digimon World 2003 — Browser Recreation
 
-A fully playable browser recreation of Digimon World 2003 (PS1), built from a
-matching decompilation of the game's original code.
+A playable browser recreation of Digimon World 2003 (PS1), built from a
+matching decompilation of the game's original code. It is still in progress:
+
+## Progress
+
+<!-- progress:start -->
+**Overall: about 69% of the game's systems work** ███████░░░
+
+- 13 of 34 systems work fully, 21 work partly.
+- 105 of 121 game screens are rebuilt from the original game's code (87%).
+- 36% of the 2119 documented facts about the original game are fully checked against its code.
+
+Per-feature breakdown: [PROGRESS.md](PROGRESS.md).
+<!-- progress:end -->
 
 ## Quick Start
 
