@@ -11,7 +11,10 @@ Download the file for your computer from the
 [latest release](https://github.com/dorijantomic/dw2003-play-code/releases/latest)
 (Windows `.exe`, Mac `.dmg`, Linux `.tar.gz`), run it, and choose your disc
 image on the page that opens. Nothing else to install. See the README's Quick
-Start for the details per system.
+Start for the details per system. Windows and macOS show a one-time security
+warning because the downloads are not code-signed; the README's
+[Seeing a security warning?](README.md#seeing-a-security-warning) section shows
+the two clicks that get past it.
 
 The rest of this page is the from-source route.
 

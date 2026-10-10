@@ -15,8 +15,8 @@ computer.
 
 | Computer | File | Then |
 | --- | --- | --- |
-| Windows 10/11 | `DW2003-Setup-windows-x64.exe` | Run it. (If SmartScreen appears: *More info → Run anyway*.) |
-| Mac (Apple Silicon) | `DW2003-macos-arm64.dmg` | Drag the app to Applications, then **right-click → Open** the first time. |
+| Windows 10/11 | `DW2003-Setup-windows-x64.exe` | Run it. Windows will warn you first; see [Seeing a security warning?](#seeing-a-security-warning) |
+| Mac (Apple Silicon) | `DW2003-macos-arm64.dmg` | Drag the app to Applications and open it. The first time, macOS blocks it; see [Seeing a security warning?](#seeing-a-security-warning) |
 | Linux (x64) | `DW2003-linux-x64.tar.gz` | Extract it and run `./DW2003`. |
 
 **2. Start "Digimon World 2003".** Your browser opens.
@@ -32,6 +32,35 @@ while you play; close it to quit. The disc is decoded with Marko's
 permission — see `tools/byod/README.md` and Credits below. On first setup the
 app downloads ddw3's public source text (~11 MB of assembly/tables, no game
 data) that the build reads alongside your disc.
+
+### Seeing a security warning?
+
+That is expected. The downloads are not *code-signed*: signing needs a paid
+certificate from Microsoft or Apple, which this free fan project does not have.
+So Windows and macOS treat the app as coming from an "unknown publisher" and
+ask you to confirm once. Nothing about the app changes; it is the same code as
+this repository, built by GitHub Actions in public (see the release's workflow
+run).
+
+**Windows** shows a blue *"Windows protected your PC"* screen:
+
+1. Click **More info** (the small link under the message).
+2. Click **Run anyway**.
+
+The installer then runs normally and the warning does not come back.
+
+**macOS** says *"Digimon World 2003" Not Opened* or *Apple could not verify "Digimon World 2003" is
+free of malware*:
+
+1. Click **Done** (not *Move to Trash*).
+2. Open **System Settings → Privacy & Security** and scroll down to *Security*.
+3. Next to *"Digimon World 2003" was blocked*, click **Open Anyway**, then confirm with
+   your password or Touch ID.
+
+You only do this once. (On macOS 14 and older, **right-click the app → Open →
+Open** also works; macOS 15 removed that shortcut.)
+
+**Linux** shows no warning.
 
 ### From source (developers)
 
