@@ -268,6 +268,11 @@ The game data — whether built from your own copy of the game or downloaded
 via the opt-in `--fetch-data` flag — is subject to its own terms; we claim no
 ownership over it.
 
+## Community
+
+Join the Discord to test, report bugs, ask for help and follow progress:
+https://discord.gg/6FVuHqjYu4
+
 ## Issues
 
 Found a bug? Open an issue using the template provided, or describe:
