@@ -93,6 +93,36 @@ def run(cmd, **kw):
     subprocess.run([str(c) for c in cmd], check=True, **kw)
 
 
+TRIM = [
+    "app/node_modules/playwright", "app/node_modules/playwright-core",
+    "app/node_modules/typescript", "app/node_modules/@types", "app/node_modules/.bin",
+    "runtime/node/include", "runtime/node/share", "runtime/node/lib/node_modules/npm",
+    "runtime/node/lib/node_modules/corepack", "runtime/node/node_modules/npm",
+    "runtime/node/node_modules/corepack",
+]
+TRIM_PY = ["idlelib", "tkinter", "turtledemo", "ensurepip", "lib2to3", "test", "site-packages/pip"]
+
+
+def trim(out: Path):
+    for rel in TRIM:
+        shutil.rmtree(out / rel, ignore_errors=True)
+    py = out / "runtime/python"
+    stdlib = py / "Lib" if os.name == "nt" else next((py / "lib").glob("python3.*"))
+    for rel in TRIM_PY:
+        shutil.rmtree(stdlib / rel, ignore_errors=True)
+    for pat in ("lib/libtcl*", "lib/libtk*", "lib/tcl*", "lib/tk*", "lib/itcl*", "lib/thread*",
+                "tcl", "DLLs/tcl*.dll", "DLLs/tk*.dll", "DLLs/_tkinter.pyd"):
+        for f in py.glob(pat):
+            shutil.rmtree(f, ignore_errors=True) if f.is_dir() else f.unlink()
+    for f in py.rglob("__pycache__"):
+        shutil.rmtree(f, ignore_errors=True)
+    # python-build-standalone ships libpython with debug symbols (~90 MB of them)
+    if sys.platform.startswith("linux"):
+        for lib in (py / "lib").glob("libpython3*.so*"):
+            if lib.is_file() and not lib.is_symlink():
+                subprocess.run(["strip", "--strip-debug", str(lib)], check=False)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bin", required=True, help="dir with the extractors, mips-elf-objdump and fluidsynth")
@@ -141,6 +171,9 @@ def main(argv=None):
     # --ignore-scripts: playwright's postinstall would download a browser (dev only).
     run([npm, "ci", "--ignore-scripts", "--no-audit", "--no-fund"],
         cwd=out / "app", env=env, shell=os.name == "nt")
+
+    # Nothing below is used at play/build time: dev-only packages, headers, docs, Tk.
+    trim(out)
 
     # 4. tools
     shutil.copytree(bin_src, out / "runtime/bin")
