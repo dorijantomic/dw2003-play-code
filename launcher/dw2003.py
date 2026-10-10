@@ -472,8 +472,8 @@ def check_disc(disc: Path) -> str:
         import byod  # noqa: E402  (stdlib-only)
         byod.check_disc(disc)
     except SystemExit as e:
-        msg = str(e.code or "")
-        return re.sub(r"\s+", " ", msg.replace("byod: ", "")).strip()
+        msg = str(e.code or "").replace("byod: ", "").replace(f"{disc}: ", "").replace(str(disc), "This file")
+        return re.sub(r"\s+", " ", msg).strip()
     finally:
         sys.path.pop(0)
     return ""
