@@ -5,7 +5,17 @@ game's code — the engine, screens, and build scripts. The game's art, sound
 and data are not included; you build them from **your own copy of the game**
 (or, as an explicit opt-in, download a third-party copy — see Options).
 
-## Quick Start
+## Easiest: the one-click download
+
+Download the file for your computer from the
+[latest release](https://github.com/dorijantomic/dw2003-play-code/releases/latest)
+(Windows `.exe`, Mac `.dmg`, Linux `.tar.gz`), run it, and choose your disc
+image on the page that opens. Nothing else to install. See the README's Quick
+Start for the details per system.
+
+The rest of this page is the from-source route.
+
+## Quick Start (from source)
 
 You need your own copy of the game — the PAL/EU **Digimon World 2003**
 (SLES-03936) — as a disc image (`.bin` CD-ROM XA or `.iso`, ~660 MB).

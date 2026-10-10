@@ -6,30 +6,43 @@ matching decompilation of the game's original code.
 ## Quick Start
 
 You need your own copy of the game — the PAL/EU **Digimon World 2003**
-(SLES-03936) — as a disc image (`.bin` CD-ROM XA or `.iso`, ~660 MB).
+(SLES-03936) — as a disc image (`.bin` or `.iso`, ~660 MB). Nothing from the
+game is included or downloaded: everything is built from your disc, on your
+computer.
+
+**1. Download** the file for your computer from the
+[latest release](https://github.com/dorijantomic/dw2003-play-code/releases/latest):
+
+| Computer | File | Then |
+| --- | --- | --- |
+| Windows 10/11 | `DW2003-Setup-windows-x64.exe` | Run it. (If SmartScreen appears: *More info → Run anyway*.) |
+| Mac (Apple Silicon) | `DW2003-macos-arm64.dmg` | Drag the app to Applications, then **right-click → Open** the first time. |
+| Linux (x64) | `DW2003-linux-x64.tar.gz` | Extract it and run `./DW2003`. |
+
+**2. Start "Digimon World 2003".** Your browser opens.
+
+**3. Choose your disc image** on the page that appears. The game is built from
+it once (15–40 minutes, depending on your computer), then it starts. From then
+on, starting the app goes straight to the game.
+
+No Python, Node, Rust, git or admin rights needed; the download carries
+everything it uses. Keep the small window that opens alongside the browser
+while you play; close it to quit. The disc is decoded with Marko's
+([markisha64](https://github.com/markisha64/ddw3)) extractors, reused with
+permission — see `tools/byod/README.md` and Credits below. On first setup the
+app downloads ddw3's public source text (~11 MB of assembly/tables, no game
+data) that the build reads alongside your disc.
+
+### From source (developers)
 
 ```sh
 git clone https://github.com/dorijantomic/dw2003-play-code dw2003
 cd dw2003
-
-# Turn YOUR disc into the game-data tree the build reads, then build and play:
 ./install-play.sh --disc /path/to/your/disc.bin
 ```
 
-The installer decodes your disc into the ~66,000-file data tree with Marko's
-([markisha64](https://github.com/markisha64/ddw3)) extractor binaries — built
-from the ddw3 source with two small patches that ship in
-`tools/byod/patches/` — then builds the browser game from the result.
-The toolchain, the disc tree and the ddw3 source are cached under
-`~/.cache/dw2003-play/` and reused on later runs (Rust installs under
-`~/.cargo`/`~/.rustup`; `node_modules/`, `.venv/` and build outputs live in
-the repository). (Marko's decompilation is the foundation of this whole
-project; the disc decode reuses his tools with permission — see
-`tools/byod/README.md` and Credits below.)
-
-Then open http://localhost:8080 in your browser.
-
-Alternatives:
+This builds the extractors and toolchain from source (Linux; see below), then
+serves the game at http://localhost:8080. Alternatives:
 
 - `./install-play.sh --ddw3 ~/ddw3` — use a ddw3-shaped data tree you
   already have.
@@ -37,12 +50,10 @@ Alternatives:
   the game's data (a fan project; the data remains the original game's
   copyright) — it is never downloaded by default.
 
-The installer installs missing prerequisites (Python 3, Node.js, uv — and
-git/curl/gcc/make via your system package manager, using sudo when it is
-available), builds all assets, and starts the server. It does not install
-Rust: the disc route prints instructions if cargo is missing.
+The one-click downloads are built by `.github/workflows/release.yml`
+(`packaging/`); the launcher they run is `launcher/dw2003.py`.
 
-## Prerequisites
+## Prerequisites (source install only)
 
 The installer handles these automatically, but if you prefer to install them
 manually:
