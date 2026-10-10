@@ -67,6 +67,7 @@ EXTRACTORS = ("unpack", "unmap", "unrlen", "unmap-tile", "untim", "unlang-file",
 BUILD_OUTPUTS = ("web/assets/manifest.json", "web/assets/maps/s200.png",
                  "web/assets/native/screens/resident.bin", "web/vendor/engine.js")
 EXE = ".exe" if os.name == "nt" else ""
+NEEDED_FREE = 4 * 10**9   # a finished build is ~2.5 GB, plus room while it runs
 
 
 def version() -> str:
@@ -279,6 +280,11 @@ class Build:
             raise BuildError("this install is incomplete: " + "; ".join(problems))
         if not self.disc.is_file():
             raise BuildError("no disc image was given")
+        free = shutil.disk_usage(self.data).free
+        if free < NEEDED_FREE:
+            raise BuildError(f"not enough free disk space: the build needs about "
+                             f"{NEEDED_FREE // 10**9} GB, and {free / 1e9:.1f} GB is free on the "
+                             f"drive holding {self.data}. Free some space and try again.")
         err = check_disc(self.disc)
         if err:
             raise BuildError(err)
@@ -584,6 +590,12 @@ def make_handler(build: Build):
                                    "choose the .bin file next to it."}, 400)
             dest = build.data / "disc" / "dw2003.bin"
             dest.parent.mkdir(parents=True, exist_ok=True)
+            free = shutil.disk_usage(dest.parent).free
+            if free < n + NEEDED_FREE:
+                self.rfile.read(n)
+                return self._json({"error": f"Not enough free disk space: setup needs about "
+                                   f"{(n + NEEDED_FREE) / 1e9:.0f} GB and {free / 1e9:.1f} GB is "
+                                   "free. Free some space and try again."}, 507)
             part = dest.with_suffix(".part")
             build._set(state="receiving")
             try:
