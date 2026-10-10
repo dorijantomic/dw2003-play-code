@@ -2,7 +2,7 @@
 # Build Marko's ddw3 extractor binaries for byod (the disc -> tree tool).
 #
 # byod does the routing/decoding; the actual format extractors are Marko's
-# (markisha64/ddw3) Rust tools, reused with permission — credit Marko and ddw3.
+# (markisha64/ddw3) Rust tools, using markisha's work — credit Marko and ddw3.
 # Two patches that ship in tools/byod/patches/ must be applied to the ddw3
 # source before building:
 #   * ddw3-lang-file-decode-loop.patch  — fixes an inverted decode loop
