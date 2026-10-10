@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDW3 System Status</title>
+  <style>
+    :root { color-scheme: dark; font: 15px/1.45 system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #e8edfa; background: #090e1c; }
+    a { color: #9ac7ff; }
+    button, input, select { font: inherit; }
+    header { padding: 22px clamp(16px, 3vw, 42px) 16px; border-bottom: 1px solid #263953; background: #101a2d; }
+    header .eyebrow { color: #8fb5e5; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    header .eyebrow a { color: inherit; }
+    h1 { margin: 3px 0 5px; font-size: clamp(24px, 3vw, 36px); line-height: 1.15; }
+    header p { margin: 0; max-width: 900px; color: #b6c4d9; }
+    .topline { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 17px; }
+    #tabs { display: flex; flex-wrap: wrap; gap: 7px; }
+    #tabs button { color: #c6d8f4; background: #1b2b45; border: 1px solid #38516f; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    #tabs button[aria-selected="true"] { color: #071629; background: #8fc8ff; border-color: #8fc8ff; font-weight: 700; }
+    #search { margin-left: auto; color: #fff; background: #0c1627; border: 1px solid #49617e; border-radius: 8px; padding: 9px 11px; min-width: 210px; }
+    #totals { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .total { background: #14243a; border: 1px solid #2c405c; border-radius: 8px; padding: 7px 11px; font-size: 13px; color: #b9c9df; }
+    .total b { color: #fff; font-size: 17px; margin-right: 4px; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 430px); min-height: calc(100vh - 200px); }
+    #list { padding: 20px clamp(16px, 2vw, 26px); overflow-x: hidden; }
+    .legend { color: #a9bbd2; font-size: 12px; max-width: 980px; margin: 0 0 14px; }
+    .legend strong { color: #e2eaf8; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; color: #94a9c4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 8px; border-bottom: 1px solid #263953; cursor: pointer; white-space: nowrap; }
+    td { padding: 9px 8px; border-bottom: 1px solid #1a2a42; vertical-align: top; font-size: 13px; }
+    tr.row { cursor: pointer; }
+    tr.row:hover td { background: #12203a; }
+    tr.row.active td { background: #1c3558; }
+    .name { font-weight: 700; font-size: 14px; color: #f3f6ff; }
+    .sub { color: #8ea4c2; font-size: 12px; }
+    .bar { display: flex; height: 9px; width: 150px; max-width: 100%; border-radius: 4px; overflow: hidden; background: #1d2b42; margin: 3px 0; }
+    .bar span { display: block; height: 100%; }
+    .c-verified { background: #47c78b; } .c-partially_verified { background: #d0a94b; } .c-candidate { background: #7c88b8; } .c-contradicted { background: #d0566a; }
+    .c-wired { background: #47c78b; } .c-translated { background: #3d8ccf; } .c-read { background: #7c88b8; } .c-unread { background: #2a3a55; }
+    .pill { display: inline-block; border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 750; }
+    .pill.implemented { color: #a8f6d1; background: #155344; }
+    .pill.partial { color: #ffd09a; background: #624026; }
+    .pill.not_applicable, .pill.unknown { color: #c6d0e0; background: #34405a; }
+    .pill.gap { color: #ffbdc1; background: #643644; }
+    .pill.ok { color: #a8f6d1; background: #155344; }
+    .pill.muted { color: #aeb9cc; background: #26344c; }
+    .keys { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #a9bbd2; margin: 0 0 12px; }
+    .keys i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+    #details { border-left: 1px solid #263953; padding: 24px 22px; background: #101a2c; overflow-wrap: anywhere; }
+    #details .eyebrow { color: #8fb5e5; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+    #details h2 { margin: 6px 0 10px; font-size: 23px; }
+    #details h3 { font-size: 12px; color: #8fb5e5; text-transform: uppercase; letter-spacing: .09em; margin: 22px 0 8px; }
+    #details p { color: #c4d0e1; margin: 0 0 12px; font-size: 14px; }
+    #details ul { padding-left: 18px; margin: 0; }
+    #details li { margin: 5px 0; font-size: 13px; color: #c4d0e1; }
+    #details code, .mono { font: 12px/1.35 ui-monospace, monospace; color: #9cbbda; }
+    #details .stage { margin: 10px 0; padding: 10px 11px; border: 1px solid #2c405c; border-radius: 8px; background: #14243a; }
+    #details .stage b { color: #fff; }
+    .claimFilter { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 8px; }
+    .claimFilter button { color: #cbe5ff; background: #1b2b45; border: 1px solid #38516f; border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+    .claimFilter button[aria-pressed="true"] { background: #8fc8ff; color: #071629; }
+    .claim { border-left: 3px solid #2c405c; padding: 3px 0 3px 8px; margin: 7px 0; font-size: 12px; color: #c4d0e1; }
+    .claim .mono { display: block; }
+    .lablink { display: inline-block; margin: 4px 6px 4px 0; padding: 7px 11px; border-radius: 8px; color: #071629; background: #8fc8ff; text-decoration: none; font-weight: 700; font-size: 13px; }
+    .note { color: #8ea4c2; font-size: 12px; margin-top: 26px; }
+    .screens li { margin: 8px 0; font-size: 13px; color: #c4d0e1; }
+    @media (max-width: 900px) {
+      main { display: block; }
+      #details { border-left: 0; border-top: 1px solid #263953; }
+      #search { margin-left: 0; width: 100%; }
+      .hideNarrow { display: none; }
+      .bar { width: 90px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">DDW3 · <a href="ui-flow.html">Screen Map</a> · <a href="ui-lab.html">UI Lab</a> · System Status</div>
+    <h1>How far along is each system?</h1>
+    <p>One row for each system of the original game. Each row shows how much of the original we understand, how much we have translated, what runs in the game, what is checked, and what is still missing. Everything here is generated from the research records; nothing is typed by hand.</p>
+    <div class="topline"><nav id="tabs" aria-label="Views"></nav><input id="search" type="search" placeholder="Find a system, file or claim" aria-label="Find"></div>
+    <div id="totals"></div>
+  </header>
+  <main>
+    <section id="list" aria-label="Status list"></section>
+    <aside id="details" aria-live="polite"></aside>
+  </main>
+  <script type="module" src="systems.js"></script>
+</body>
+</html>

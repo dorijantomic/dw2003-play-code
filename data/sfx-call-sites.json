@@ -1,0 +1,25 @@
+{
+  "note": "Decoded sound call sites found by the phrase-gap pass (2026-10-05) and the rig-sweep pass (2026-10-05), staged here as a build input because the lead owns docs/research/audio/sfx-triggers.json. Rows carry the same fields as that table's rows and are written to fold into it unchanged. build_sfx.py's build_set() and the trigger-table recomputations in tests/sfx-phrase-voices.test.js and tests/sfx-manifest.test.js read this file (tolerantly: delete this file after folding its rows into sfx-triggers.json). PIYOPIYO (2026-10-06) is the third row: the bird chirp the s615/s685 events ask for through SETANIM 813 894. It is a common-bank 2D phrase, played by packed id through the shared sink, so its walker_hook names that sink rather than a play(\"piyopiyo\") literal.",
+  "rows": [
+    {
+      "name": "SUB_MOVE",
+      "id": "0xa0045f4a",
+      "file": "pro/fieldstg.s",
+      "offset": "0x0000b8e8 (play), 0x0000b928 (release stop), 0x0000b87c (Circle path stop)",
+      "status": "decoded",
+      "trigger": "The Submarimon thrust loop. Played on the first tick the player holds the thrust pad bit with the loop handle at [+0xc8] == -1; stopped when thrust is released, on the CIRCLE path, and on form loss, with the handle reset to -1. See docs/research/field/submarimon-buoyancy-decoded-2026-07-28.md SUB-Q003.",
+      "evidence": "RAM 0x8008e45c fn (file 0xb7ac-0xbbf8): `.L0x0000b8c8: lh $v1,0xc8($s1) / li $v0,-1 / bne` skip-if-playing, else `.L0x0000b8d8` plays packed id 0xa0045f4a and stores the handle; release stop at `.L0x0000b928`, Circle-path stop at `.L0x0000b87c`.",
+      "walker_hook": "web/game.js update(): the Submarimon thrust tick drives sfx.playSustained(\"sub_move\") / stopSustained on release, on the Circle interact, and on form loss."
+    },
+    {
+      "name": "PIYOPIYO",
+      "id": "0x00040013",
+      "file": "pro/fieldstg.s",
+      "offset": "0x00000e64 (jump-table slot 0x37e -> play tail 0x80083b74)",
+      "status": "decoded",
+      "trigger": "The bird chirp a field scene event asks for with `SETANIM 813 894` (second operand C = 0x37E), shipped on s615 and s685. The resident field scene object dispatches C through the 0x1f-entry jump table at its tail (fieldstg F0x800837EC): index (C-0x365) = 0x19 selects the slot that loads packed word 0x00040013 and jumps to the shared play tail, which calls the play cell [0x80055c48]. docs/research/audio/emote-sound-table.json names 0x37e PIYOPIYO.",
+      "evidence": "pro/fieldstg.s: file 0xcec `sltiu $v0,$v1,0x1f` / file 0xcf0 `beqz $v0,.L0x00000ecc` guard the table; file 0xcf4 `lui $v0,0x8008` / 0xcf8 `addiu $v0,0x2cb0` / 0xd00 `addu $v1,$v0` / 0xd04 `lw $v0,($v1)` / 0xd0c `jr $v0` dispatch it. Slot 0x37e (file 0xe64-0xe74): `lui $a0,0x4` / `lui $v0,0x8005` / `lw $v0,0x5c48($v0)` / `j 0x80083b74` / `ori $a0,0x13` = packed 0x00040013. Sibling slot 0x369 (file 0xd3c-0xd4c) loads 0x60040002 (DEMO_BGM). engine/systems/emote-sounds.ts:62 pins 0x37e -> 0x00040013; tests/emote-sounds.test.js pins the SETANIM 813 894 events to s615/s685.",
+      "walker_hook": "web/game.js emoteSound (the SETANIM 813 route): engine/systems/emote-sounds.ts resolves C 0x37E to the packed word 0x00040013, and the handler plays it through the shared packed sink sfx.playPacked(id) -- which resolves it against web/assets/sfx/manifest.json because it is a common-bank 2D phrase, not a music start."
+    }
+  ]
+}

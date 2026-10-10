@@ -1,0 +1,41 @@
+{
+  "_comment": "Chapter ladder: derive state.chapter from the banked story-flag store. chapter = the highest rung whose flag is set; default 1. Each rung's flag is a REAL decoded on_complete flag from story_steps.json events[].sets, with the gate event's identity confirmed by the esdmg cutscene text. The flag->chapter assignment (which leader = which chapter) is story-grounded (DW2003 4-team progression) and matches the chapter-advancement spec, which itself read these esdmg lines. See docs/research/scripting/chapter-progression-decode.md. NOTE (honest gap): the runtime mechanism that converts these flags into the NPC n-field comparand is not yet disasm-proven (the FIELDSTG spawn-instantiation loop was not located); this ladder is faithful to the confirmed STORY ORDER, which is what the walker needs.",
+  "default_chapter": 1,
+  "ladder": [
+    {
+      "chapter": 7,
+      "flag": 16414,
+      "flag_hex": "0x401e",
+      "milestone": "s675 Byakko Leader",
+      "evidence": "story_steps s675 evt 410 (flag_key 01430000) sets 0x401e; esdmg600/0 'Byakko Leader: Welcome, challenger. Let's battle.' / esdmg600/1 'You are strong. I like you.'"
+    },
+    {
+      "chapter": 6,
+      "flag": 16386,
+      "flag_hex": "0x4002",
+      "milestone": "s520 Suzaku Leader",
+      "evidence": "story_steps s520 evt 260 (flag_key 013c0001) sets 0x4002; esdmg500/1 'Suzaku Leader: So, what, are you ready to step into my arena?'"
+    },
+    {
+      "chapter": 5,
+      "flag": 16402,
+      "flag_hex": "0x4012",
+      "milestone": "s420 Seiryu Leader",
+      "evidence": "story_steps s420 evt 70 (flag_key 01350002) sets 0x4012; esdmg400/2 player 'Seiryu Leader, I defeated MasterTyranno' -> esdmg400/3 'Seiryu Leader: You're pretty good. What is your name?'"
+    },
+    {
+      "chapter": 3,
+      "flag": 16388,
+      "flag_hex": "0x4004",
+      "milestone": "s212 Digimon download (got your partner)",
+      "evidence": "story_steps s212 evt 271 (flag_key 01120018) sets 0x4004 and 0x4005; esdmg200/24 'Tamer Service: I will download the Digimon data'"
+    }
+  ],
+  "frontier": [
+    {
+      "chapter": 2,
+      "flag": null,
+      "note": "ch2 is diffuse/minor (4 NPCs: a Digimon in Asuka s295, the same Digimon repeated in Byakko s620/621/625). No clean single gate flag identified. Until grounded, the ladder skips ch2: n=2 content first renders at chapter 3 (3 >= 2), i.e. one beat late. Acceptable approximation, documented."
+    }
+  ]
+}

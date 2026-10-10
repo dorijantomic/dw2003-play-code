@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fight Effects Lab — DW2003</title>
+<style>
+  body { background:#101018; color:#cfcfe8; font:13px monospace; margin:0; display:flex; }
+  #side { width: 340px; padding:10px; overflow-y:auto; height:100vh; box-sizing:border-box; }
+  #main { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px; }
+  canvas { background:#05050c; image-rendering: pixelated; border:1px solid #333; }
+  select, input, button { background:#22223a; color:#dfe; border:1px solid #445; font:12px monospace; padding:2px 6px; margin:2px 0; }
+  .row { margin: 6px 0; }
+  #typeList { display:flex; flex-wrap:wrap; gap:3px; }
+  #typeList button { min-width:44px; }
+  #typeList button.active { background:#3a6; color:#000; }
+  #info { white-space:pre-wrap; font-size:11px; color:#9ab; }
+  h3 { margin:8px 0 4px; color:#8cf; }
+  #sheet { max-width: 320px; border:1px solid #333; background:#000; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h3>Fight Effects Lab</h3>
+  <div class="row">tech id (1–443): <input id="tech" type="number" value="59" min="1" max="443" style="width:60px">
+    <button id="playTech">play tech fx</button></div>
+  <div class="row"><label><input id="loop" type="checkbox" checked> loop</label>
+    speed <input id="speed" type="range" min="0.25" max="3" step="0.25" value="1" style="width:90px"><span id="speedv">1</span></div>
+  <div class="row" id="techInfo"></div>
+  <h3>All effect types</h3>
+  <div id="typeList"></div>
+  <h3>Type detail</h3>
+  <div id="info"></div>
+  <h3>Archive sheet</h3>
+  <img id="sheet" alt="">
+</div>
+<div id="main">
+  <canvas id="cv" width="640" height="480"></canvas>
+  <div id="status"></div>
+</div>
+<script type="module">
+import { EffectPlayer, loadEffectAssets, drawEffects } from "./fight/effect-player.js";
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const { manifest, images } = await loadEffectAssets();
+const techTable = await (await fetch("assets/data/fight_tech_table.json")).json();
+const player = new EffectPlayer(manifest);
+
+let current = null;       // {type} being looped
+let speed = 1;
+
+// Lab view: PSX screen mapped to the canvas; world-space spawns drawn from a fixed
+// "attacker" anchor with a simple down-field foreshortening (the real projection lives
+// in battle3d — this page is for judging sprite content/animation, not placement).
+const view = {
+  centerX: cv.width / 2, centerY: cv.height / 2, pxScale: cv.height / 240,
+  worldToScreen(pos, side) {
+    const s = cv.height / 240 / 18;   // PS1 units -> px, arbitrary lab scale
+    const ax = cv.width / 2, ay = cv.height * 0.72;
+    const depth = pos.z * s * 0.55;   // +z = toward the enemy (up-screen)
+    return { x: ax + pos.x * s, y: ay + pos.y * s - depth };
+  },
+};
+
+const typeList = document.getElementById("typeList");
+const types = Object.keys(manifest.types).map(Number).sort((a, b) => a - b);
+for (const t of types) {
+  const b = document.createElement("button");
+  b.textContent = t;
+  b.onclick = () => { selectType(t); play(t); };
+  b.dataset.t = t;
+  typeList.appendChild(b);
+}
+
+function selectType(t) {
+  for (const b of typeList.children) b.classList.toggle("active", +b.dataset.t === t);
+  const rec = manifest.types[String(t)];
+  if (!rec) return;
+  const arch = manifest.archives[String(rec.arch)];
+  document.getElementById("info").textContent =
+    `type ${t}\npack ${rec.file} bin ${rec.bin}\narchive ${rec.arch} (${arch?.dir ?? "?"})\n` +
+    rec.records.map((r, i) =>
+      `rec${i}: mask=0b${r.mask.toString(2)} stride=${r.stride} dur=${r.duration} frames=${r.frames.length}`).join("\n") +
+    `\nop10 sound: 0x${(manifest.op10_sounds[String(t)] ?? 0).toString(16)}`;
+  const img = images[String(rec.arch)];
+  document.getElementById("sheet").src = img ? img.src : "";
+}
+
+function play(t) {
+  current = { type: t };
+  player.clear();
+  player.spawn(t, { x: 0, y: 0, z: 32767 }, "player");
+  document.getElementById("status").textContent = `playing type ${t}`;
+}
+
+document.getElementById("playTech").onclick = () => {
+  const id = +document.getElementById("tech").value;
+  const rec = techTable[String(id)];
+  const el = document.getElementById("techInfo");
+  if (!rec) { el.textContent = "no such tech"; return; }
+  el.textContent = `tech ${id}: clip ${rec.clip} motion ${rec.motion} effect ${rec.effect} sigSlot ${rec.sigEffect} mp ${rec.mp} pow ${rec.power}`;
+  if (player.hasType(rec.effect)) { selectType(rec.effect); play(rec.effect); }
+  else el.textContent += `  (effect type ${rec.effect} not in registry)`;
+};
+
+document.getElementById("speed").oninput = (e) => {
+  speed = +e.target.value;
+  document.getElementById("speedv").textContent = speed;
+};
+
+let last = performance.now(), acc = 0, paused = false;
+function frame(now) {
+  if (paused) { last = now; requestAnimationFrame(frame); return; }
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  acc += dt * 60 * speed;
+  while (acc >= 1) { acc -= 1; player.step(1); }
+  if (!player.active && current && document.getElementById("loop").checked) {
+    player.spawn(current.type, { x: 0, y: 0, z: 32767 }, "player");
+  }
+  ctx.fillStyle = "#05050c"; ctx.fillRect(0, 0, cv.width, cv.height);
+  // PSX screen frame + centre cross for reference
+  ctx.strokeStyle = "#223"; ctx.strokeRect(0, 0, cv.width, cv.height);
+  ctx.beginPath(); ctx.moveTo(cv.width/2, 0); ctx.lineTo(cv.width/2, cv.height);
+  ctx.moveTo(0, cv.height/2); ctx.lineTo(cv.width, cv.height/2); ctx.stroke();
+  drawEffects(ctx, player.renderList(), manifest, images, view);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+if (types.length) { selectType(types[0]); play(types[0]); }
+
+// Headless-probe handle (same role as battle-lab's `window.__r`). The animation above is
+// wall-clock driven, so two runs never land on the same frame; `renderAt` re-spawns a type and
+// steps it an EXACT number of ticks before drawing, which is what makes a before/after capture
+// comparable. `paused` stops the rAF loop from redrawing over the deterministic frame.
+window.__fxlab = {
+  get paused() { return paused; },
+  renderAt(type, ticks) {
+    paused = true;
+    current = null;
+    player.clear();
+    player.spawn(type, { x: 0, y: 0, z: 32767 }, "player");
+    for (let i = 0; i < ticks; i++) player.step(1);
+    ctx.fillStyle = "#05050c"; ctx.fillRect(0, 0, cv.width, cv.height);
+    const list = player.renderList();
+    drawEffects(ctx, list, manifest, images, view);
+    return list.map((s) => ({
+      frame: s.frame,
+      rotX: s.rotX ?? null, rotY: s.rotY ?? null, rotZ: s.rotZ ?? null,
+    }));
+  },
+  resume() { paused = false; last = performance.now(); },
+};
+</script>
+</body>
+</html>

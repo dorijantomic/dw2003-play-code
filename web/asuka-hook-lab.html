@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asuka City — Instant Hook Lab</title>
+<style>
+  :root {
+    color-scheme: dark;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    background: #071018;
+    color: #eef8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 80% 10%, #063c4b 0, transparent 34rem),
+      linear-gradient(145deg, #071018, #0c1823 55%, #071018);
+  }
+  main { width: min(920px, 100%); margin: auto; padding: 38px 18px 60px; }
+  .eyebrow {
+    color: #55f4cf;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  h1 { margin: 8px 0; font-size: clamp(30px, 6vw, 54px); line-height: 1; }
+  .intro { max-width: 650px; color: #9bb0bf; font-size: 17px; }
+  .hooks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 28px 0 20px;
+  }
+  .hook {
+    min-height: 122px;
+    padding: 18px;
+    text-align: left;
+    color: inherit;
+    background: #0d1d29;
+    border: 1px solid #244050;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 120ms, border-color 120ms, background 120ms;
+  }
+  .hook:hover { transform: translateY(-2px); border-color: #4e849c; }
+  .hook.active {
+    color: #041015;
+    background: linear-gradient(135deg, #55f4cf, #70cfff);
+    border-color: #d8fff8;
+  }
+  .number { font-size: 12px; font-weight: 900; opacity: .7; }
+  .name { display: block; margin: 4px 0; font-size: 22px; font-weight: 850; }
+  .description { display: block; opacity: .72; }
+  .transport, .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .transport { margin: 18px 0; }
+  #stop, #favorite {
+    padding: 11px 18px;
+    color: inherit;
+    background: #142734;
+    border: 1px solid #365263;
+    border-radius: 9px;
+    cursor: pointer;
+    font-weight: 750;
+  }
+  #favorite.selected { color: #071018; background: #ffd35c; border-color: #fff0a8; }
+  .now { color: #9bb0bf; }
+  .now strong { color: #fff; }
+  .meter { height: 7px; overflow: hidden; background: #102532; border-radius: 10px; }
+  .meter > div {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #55f4cf, #70cfff);
+  }
+  .controls {
+    margin-top: 22px;
+    padding: 18px;
+    background: rgb(8 23 33 / .78);
+    border: 1px solid #203947;
+    border-radius: 12px;
+  }
+  label { display: grid; gap: 5px; min-width: 180px; color: #b8cad5; font-size: 13px; }
+  input, select { width: 100%; accent-color: #55f4cf; }
+  select { padding: 7px; color: inherit; background: #102532; border: 1px solid #365263; border-radius: 6px; }
+  .tip { margin-top: 24px; color: #708897; font-size: 14px; }
+  @media (max-width: 620px) { .hooks { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">No-build browser prototype</div>
+  <h1>Which hook has life?</h1>
+  <p class="intro">Press 1–4 and listen for a few loops. Ignore production quality. Pick the tune you still hear in your head after pressing Stop.</p>
+
+  <section class="hooks" aria-label="Hook ideas">
+    <button class="hook" data-hook="0"><span class="number">1</span><span class="name">Digi Bounce</span><span class="description">Short, cheeky call-and-response</span></button>
+    <button class="hook" data-hook="1"><span class="number">2</span><span class="name">Server Parade</span><span class="description">Big upward hook with brass answers</span></button>
+    <button class="hook" data-hook="2"><span class="number">3</span><span class="name">Packet Funk</span><span class="description">Bass hook first, melody answers second</span></button>
+    <button class="hook" data-hook="3"><span class="number">4</span><span class="name">Login Spark</span><span class="description">Bright PS1-style octave hook</span></button>
+  </section>
+
+  <div class="meter" aria-hidden="true"><div id="progress"></div></div>
+  <div class="transport">
+    <button id="stop">Stop</button>
+    <button id="favorite">★ This one has something</button>
+    <span class="now" id="now">Nothing playing</span>
+  </div>
+
+  <section class="controls" aria-label="Simple sound controls">
+    <label>Punch
+      <input id="punch" type="range" min="0.65" max="1.6" value="1.15" step="0.05">
+    </label>
+    <label>Speed
+      <input id="tempo" type="range" min="112" max="144" value="128" step="1">
+    </label>
+    <label>Sound colour
+      <select id="colour">
+        <option value="square">PS1 square</option>
+        <option value="sawtooth">Bright saw</option>
+        <option value="triangle">Soft digital</option>
+      </select>
+    </label>
+  </section>
+
+  <p class="tip">Keyboard: 1–4 plays an idea, Space stops. Changing a control restarts the current idea instantly.</p>
+</main>
+<script>
+const hooks = [
+  {
+    name: "Digi Bounce",
+    chords: [[55,59,62,64], [53,57,60,64], [52,55,59,62], [50,54,57,60]],
+    melody: [
+      [0,.5,67,1], [.5,.25,71,.85], [.75,.75,74,1], [1.75,.25,72,.8], [2,.5,71,.9], [3,.5,67,1],
+      [4,.5,69,1], [4.5,.25,72,.85], [4.75,.75,76,1], [5.75,.25,74,.8], [6,.5,72,.9], [7,.75,69,1],
+      [8,.5,67,1], [8.5,.25,71,.85], [8.75,.75,74,1], [9.75,.25,79,1], [10,.5,76,.9], [11,.5,74,.9],
+      [12,.5,72,1], [12.5,.5,69,.9], [13,.5,67,.9], [14,.25,66,.8], [14.25,.25,69,.85], [14.5,1,67,1],
+    ],
+    bass: [[0,43],[.75,50],[1.5,55],[2,43],[2.75,50],[3.5,42]],
+  },
+  {
+    name: "Server Parade",
+    chords: [[55,59,62,69], [57,60,64,67], [59,62,66,69], [53,57,60,64]],
+    melody: [
+      [0,.5,67,1], [.5,.5,69,.85], [1,.5,71,.9], [1.5,1,74,1], [3,.5,71,.8], [3.5,.5,74,.9],
+      [4,.5,76,1], [4.5,.5,74,.85], [5,1,72,1], [6.5,.5,69,.8], [7,.75,67,.95],
+      [8,.25,71,.9], [8.25,.25,74,.9], [8.5,.5,78,1], [9,1,81,1], [10.5,.5,78,.9], [11,.75,74,.9],
+      [12,.5,72,1], [12.5,.25,69,.8], [12.75,.75,67,.95], [14,.5,66,.8], [14.5,1,67,1],
+    ],
+    bass: [[0,43],[1.5,50],[2,55],[3.25,50],[3.5,42]],
+  },
+  {
+    name: "Packet Funk",
+    chords: [[55,59,62,65], [53,57,60,64], [55,59,62,64], [50,54,57,60]],
+    melody: [
+      [1,.25,74,1], [1.25,.25,71,.8], [1.5,.5,67,.95], [2.5,.25,69,.8], [2.75,.75,71,1],
+      [5,.25,76,1], [5.25,.25,72,.8], [5.5,.5,69,.95], [6.5,.25,67,.8], [6.75,.75,69,1],
+      [8,.5,67,.9], [8.75,.25,71,.9], [9,.75,74,1], [10,.25,72,.8], [10.5,.25,71,.8], [11,.75,67,1],
+      [12.5,.25,69,.9], [12.75,.25,72,.9], [13,.5,76,1], [14,.25,74,.8], [14.5,1,67,1],
+    ],
+    bass: [[0,43],[.5,55],[1.25,50],[1.75,53],[2,43],[2.75,55],[3.25,50],[3.5,42]],
+  },
+  {
+    name: "Login Spark",
+    chords: [[55,59,62,64], [53,57,60,64], [52,55,59,62], [50,54,57,60]],
+    melody: [
+      [0,.25,79,1], [.25,.25,74,.75], [.5,.5,83,1], [1.5,.25,81,.8], [1.75,.25,79,.8], [2,.75,74,.95], [3,.5,71,.85],
+      [4,.25,81,1], [4.25,.25,76,.75], [4.5,.5,84,1], [5.5,.25,83,.8], [5.75,.25,81,.8], [6,.75,76,.95], [7,.5,72,.85],
+      [8,.25,79,1], [8.25,.25,74,.75], [8.5,.5,86,1], [9.5,.25,83,.8], [9.75,.25,81,.8], [10,.75,79,.95], [11,.5,74,.85],
+      [12,.5,76,.9], [12.5,.5,72,.85], [13,.5,69,.85], [14,.25,66,.8], [14.25,.25,69,.85], [14.5,1,67,1],
+    ],
+    bass: [[0,43],[.75,50],[1.5,55],[2,43],[3,50],[3.5,42]],
+  },
+];
+
+const SAMPLE_RATE = 22050;
+let audio;
+let audioUrl;
+let activeHook = -1;
+let loopSeconds = 0;
+
+const frequency = (note) => 440 * 2 ** ((note - 69) / 12);
+
+function makeRng(seed) {
+  return () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 0x100000000 * 2 - 1;
+  };
+}
+
+function renderHook(index) {
+  const hook = hooks[index];
+  const bpm = Number(document.getElementById("tempo").value);
+  const punch = Number(document.getElementById("punch").value);
+  const colour = document.getElementById("colour").value;
+  const beat = 60 / bpm;
+  loopSeconds = beat * 16;
+  const frames = Math.ceil(loopSeconds * SAMPLE_RATE);
+  const left = new Float32Array(frames);
+  const right = new Float32Array(frames);
+  const random = makeRng(index + 20260728);
+
+  function add(startSeconds, duration, sample, pan = 0) {
+    const start = Math.round(startSeconds * SAMPLE_RATE);
+    const count = Math.min(Math.round(duration * SAMPLE_RATE), frames - start);
+    const leftGain = 1 - Math.max(0, pan);
+    const rightGain = 1 + Math.min(0, pan);
+    for (let i = 0; i < count; i++) {
+      const value = sample(i / SAMPLE_RATE, i, count);
+      left[start + i] += value * leftGain;
+      right[start + i] += value * rightGain;
+    }
+  }
+
+  function oscillator(note, start, duration, amount, type, pan = 0) {
+    const hz = frequency(note);
+    add(start, duration, (time, _index, count) => {
+      const phase = (time * hz) % 1;
+      const wave = type === "sine" ? Math.sin(phase * Math.PI * 2)
+        : type === "square" ? (phase < .5 ? 1 : -1)
+        : type === "sawtooth" ? phase * 2 - 1
+        : 1 - 4 * Math.abs(phase - .5);
+      const position = time * SAMPLE_RATE / count;
+      const envelope = Math.min(1, time / .006) * (1 - position) ** .65;
+      return wave * envelope * amount;
+    }, pan);
+  }
+
+  function bass(note, start, duration) {
+    const hz = frequency(note);
+    add(start, duration, (time, index, count) => {
+      const phase = (time * hz) % 1;
+      const body = Math.sin(phase * Math.PI * 2) * .68 + (phase * 2 - 1) * .32;
+      const envelope = Math.min(1, time / .002) * Math.exp(-time * 7);
+      const slap = index < SAMPLE_RATE * .018 ? random() * Math.exp(-time * 95) * .22 : 0;
+      return (body * envelope + slap) * .31 * punch;
+    });
+  }
+
+  function kick(start) {
+    let phase = 0;
+    add(start, .22, (time) => {
+      const hz = 46 + 105 * Math.exp(-time * 30);
+      phase += hz / SAMPLE_RATE;
+      return Math.sin(phase * Math.PI * 2) * Math.exp(-time * 18) * .72 * punch;
+    });
+  }
+
+  function noiseHit(start, duration, amount, pan = 0) {
+    let previous = 0;
+    add(start, duration, (time) => {
+      const value = random();
+      const bright = value - previous;
+      previous = value;
+      return bright * Math.exp(-time * (duration < .06 ? 90 : 24)) * amount * punch;
+    }, pan);
+  }
+
+  for (let bar = 0; bar < 4; bar++) {
+    const base = bar * 4 * beat;
+    for (const note of hook.chords[bar]) {
+      oscillator(note, base, beat * .72, .035, "triangle", -.18);
+      oscillator(note, base + beat * 2.5, beat * .42, .026, "triangle", -.18);
+    }
+    for (let step = 0; step < 12; step++)
+      noiseHit(base + step * beat / 3, .035, .022, .28);
+    for (const offset of [0, 2, 2.75]) kick(base + offset * beat);
+    for (const offset of [1, 3]) noiseHit(base + offset * beat, .14, .13, -.15);
+    for (const [offset, note] of hook.bass)
+      bass(note, base + offset * beat, beat * .32);
+  }
+  for (const [offset, duration, note, velocity] of hook.melody) {
+    oscillator(note, offset * beat, duration * beat, .13 * velocity, colour, .16);
+    oscillator(note - 12, offset * beat, duration * beat, .045 * velocity, "sine", .16);
+  }
+
+  let peak = 0;
+  for (let i = 0; i < frames; i++) {
+    left[i] = Math.tanh(left[i] * 1.25);
+    right[i] = Math.tanh(right[i] * 1.25);
+    peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
+  }
+  const gain = .88 / Math.max(peak, .001);
+  const edge = Math.round(SAMPLE_RATE * .004);
+  for (let i = 0; i < frames; i++) {
+    const fade = i < edge ? i / edge : i >= frames - edge ? (frames - i - 1) / edge : 1;
+    left[i] *= gain * Math.max(0, fade);
+    right[i] *= gain * Math.max(0, fade);
+  }
+  return encodeWav(left, right);
+}
+
+function encodeWav(left, right) {
+  const buffer = new ArrayBuffer(44 + left.length * 4);
+  const view = new DataView(buffer);
+  const text = (offset, value) => [...value].forEach((char, i) => view.setUint8(offset + i, char.charCodeAt(0)));
+  text(0, "RIFF"); view.setUint32(4, buffer.byteLength - 8, true);
+  text(8, "WAVE"); text(12, "fmt ");
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 2, true); view.setUint32(24, SAMPLE_RATE, true);
+  view.setUint32(28, SAMPLE_RATE * 4, true); view.setUint16(32, 4, true);
+  view.setUint16(34, 16, true); text(36, "data");
+  view.setUint32(40, left.length * 4, true);
+  let offset = 44;
+  for (let i = 0; i < left.length; i++) {
+    view.setInt16(offset, Math.max(-1, Math.min(1, left[i])) * 32767, true);
+    view.setInt16(offset + 2, Math.max(-1, Math.min(1, right[i])) * 32767, true);
+    offset += 4;
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+function stop() {
+  if (audio) { audio.pause(); audio.src = ""; audio = null; }
+  if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = null; }
+  activeHook = -1;
+  document.querySelectorAll(".hook").forEach((button) => button.classList.remove("active"));
+  document.getElementById("now").textContent = "Nothing playing";
+  document.getElementById("progress").style.width = "0";
+}
+
+async function play(index) {
+  stop();
+  activeHook = index;
+  const hook = hooks[index];
+  audioUrl = URL.createObjectURL(renderHook(index));
+  audio = new Audio(audioUrl);
+  audio.loop = true;
+  audio.volume = .9;
+  await audio.play();
+  document.querySelector(`[data-hook="${index}"]`).classList.add("active");
+  document.getElementById("now").innerHTML = `Playing <strong>${hook.name}</strong>`;
+  updateFavorite();
+}
+
+function updateFavorite() {
+  const favorite = Number(localStorage.getItem("asukaHookFavorite"));
+  document.getElementById("favorite").classList.toggle("selected", activeHook === favorite);
+}
+
+document.querySelectorAll(".hook").forEach((button) => {
+  button.onclick = () => play(Number(button.dataset.hook));
+});
+document.getElementById("stop").onclick = stop;
+document.getElementById("favorite").onclick = () => {
+  if (activeHook < 0) return;
+  localStorage.setItem("asukaHookFavorite", String(activeHook));
+  updateFavorite();
+};
+for (const control of document.querySelectorAll("#punch,#tempo,#colour"))
+  control.oninput = () => { if (activeHook >= 0) play(activeHook); };
+addEventListener("keydown", (event) => {
+  if (event.key >= "1" && event.key <= "4") play(Number(event.key) - 1);
+  if (event.code === "Space") { event.preventDefault(); stop(); }
+});
+
+function animate() {
+  if (activeHook >= 0 && audio) {
+    document.getElementById("progress").style.width = `${audio.currentTime / loopSeconds * 100}%`;
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+window.__asukaHookLab = {
+  hooks,
+  play,
+  stop,
+  get activeHook() { return activeHook; },
+  get playbackKind() { return "generated-wav"; },
+  get audioTime() { return audio?.currentTime || 0; },
+  get audioPaused() { return audio?.paused ?? true; },
+};
+</script>
+</body>
+</html>

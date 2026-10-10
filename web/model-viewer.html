@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>DW2003 — Model Viewer</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            body {
+                background: #0d0d0d;
+                color: #ccc;
+                font-family: monospace;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+            }
+            #toolbar {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                padding: 8px 12px;
+                background: #111;
+                border-bottom: 1px solid #333;
+                flex-shrink: 0;
+                flex-wrap: wrap;
+            }
+            #toolbar h1 {
+                color: #f0c040;
+                font-size: 15px;
+                margin-right: 8px;
+            }
+            label {
+                font-size: 12px;
+                color: #aaa;
+            }
+            select,
+            input {
+                background: #1a1a2e;
+                color: #f0f0f0;
+                border: 1px solid #444;
+                padding: 3px 6px;
+                font-family: monospace;
+                font-size: 12px;
+            }
+            input[type="range"] {
+                width: 140px;
+            }
+            #info {
+                font-size: 11px;
+                color: #888;
+                padding: 2px 8px;
+                background: #1a1a1a;
+                border: 1px solid #333;
+            }
+            #canvas-wrap {
+                flex: 1;
+                position: relative;
+                overflow: hidden;
+            }
+            #c {
+                display: block;
+                width: 100%;
+                height: 100%;
+                cursor: grab;
+            }
+            #c.dragging {
+                cursor: grabbing;
+            }
+            #overlay {
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                font-size: 11px;
+                color: #aaa;
+                background: rgba(0, 0, 0, 0.6);
+                padding: 4px 8px;
+                pointer-events: none;
+                line-height: 1.6;
+                z-index: 10;
+            }
+            .hint {
+                color: #666;
+                font-size: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="toolbar">
+            <h1>Model Viewer</h1>
+            <div>
+                <label>Model</label><br />
+                <select id="modelSel"></select>
+            </div>
+            <div>
+                <label>Anim speed</label><br />
+                <input
+                    type="range"
+                    id="speedSel"
+                    min="0"
+                    max="3"
+                    step="0.05"
+                    value="1"
+                />
+                <span id="speedVal">1.0x</span>
+            </div>
+            <div>
+                <label>Frame</label><br />
+                <input
+                    type="range"
+                    id="frameScrub"
+                    min="0"
+                    max="2000"
+                    step="1"
+                    value="0"
+                    style="width: 160px"
+                />
+                <span id="frameVal">0</span>
+            </div>
+            <div>
+                <label
+                    ><input type="checkbox" id="autoPlay" checked />
+                    Auto-play</label
+                >
+            </div>
+            <div>
+                <label
+                    ><input type="checkbox" id="wireframe" /> Wireframe</label
+                >
+            </div>
+            <div>
+                <label
+                    ><input type="checkbox" id="debugColors" /> Debug bone
+                    colors</label
+                >
+            </div>
+            <div>
+                <label><input type="checkbox" id="boneAxes" /> Bone axes</label>
+            </div>
+            <div>
+                <label
+                    ><input type="checkbox" id="identityBones" /> Identity bones
+                    (T-pose test)</label
+                >
+            </div>
+            <div>
+                <label>Clip</label><br />
+                <select id="clipSel">
+                    <option value="-1">— all frames —</option>
+                </select>
+            </div>
+            <div id="info">–</div>
+        </div>
+        <div id="canvas-wrap">
+            <canvas id="c"></canvas>
+            <div id="overlay">
+                <div id="ov-model">–</div>
+                <div id="ov-bones">–</div>
+                <div id="ov-verts">–</div>
+                <div id="ov-frame">–</div>
+                <div class="hint">
+                    Drag to orbit · Scroll to zoom · Right-drag to pan
+                </div>
+            </div>
+        </div>
+
+        <script type="module">
+            import {
+                buildBoneWorldMatrices,
+                mat4Identity,
+                mat4Mul,
+                mat4Perspective,
+                mat4LookAt,
+                mat4Translate,
+                normalize,
+                sub3,
+                cross3,
+                dot3,
+                compileShader,
+                createProgram,
+                loadTexture,
+                loadSkeletalModel,
+                buildSkeletalGLBuffers,
+                updateSkeletalVBO,
+                drawSkeletalMesh,
+                VERT_SRC,
+                FRAG_SRC,
+                interpChannel,
+                centroid3,
+            } from "./battle3d.js?v=dflip1";
+            window._b3d = { buildBoneWorldMatrices, interpChannel };
+
+                        // Populated at boot from assets/battle/models/index.json
+            // (all 248 fight models). Falls back to the two reference models.
+            let MODELS = ["m373rena", "m003agum"];
+
+            // ── Canvas / WebGL setup ──────────────────────────────────────────────────────
+            const canvas = document.getElementById("c");
+            const wrap = document.getElementById("canvas-wrap");
+
+            function resizeCanvas() {
+                canvas.width = wrap.clientWidth;
+                canvas.height = wrap.clientHeight;
+            }
+            resizeCanvas();
+            new ResizeObserver(resizeCanvas).observe(wrap);
+
+            const gl = canvas.getContext("webgl", { antialias: true });
+            if (!gl) {
+                document.getElementById("info").textContent =
+                    "WebGL not available";
+            }
+
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            // ── Shader programs ──────────────────────────────────────────────────────────
+            const texProg = (() => {
+                const p = createProgram(gl, VERT_SRC, FRAG_SRC);
+                return {
+                    program: p,
+                    aPos: gl.getAttribLocation(p, "aPos"),
+                    aUV: gl.getAttribLocation(p, "aUV"),
+                    uMVP: gl.getUniformLocation(p, "uMVP"),
+                    uTex: gl.getUniformLocation(p, "uTex"),
+                    uAlpha: gl.getUniformLocation(p, "uAlpha"),
+                    uTint: gl.getUniformLocation(p, "uTint"),
+                };
+            })();
+
+            const VERT_WIRE = `
+attribute vec3 aPos;
+uniform mat4 uMVP;
+void main() { gl_Position = uMVP * vec4(aPos, 1.0); }`;
+            const FRAG_WIRE = `
+precision mediump float;
+void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
+
+            const wireProg = (() => {
+                const p = createProgram(gl, VERT_WIRE, FRAG_WIRE);
+                return {
+                    program: p,
+                    aPos: gl.getAttribLocation(p, "aPos"),
+                    uMVP: gl.getUniformLocation(p, "uMVP"),
+                };
+            })();
+
+            // White fallback texture
+            const whiteTex = (() => {
+                const t = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, t);
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    0,
+                    gl.RGBA,
+                    1,
+                    1,
+                    0,
+                    gl.RGBA,
+                    gl.UNSIGNED_BYTE,
+                    new Uint8Array([255, 255, 255, 255]),
+                );
+                return t;
+            })();
+
+            // ── Orbit camera ─────────────────────────────────────────────────────────────
+            let camTheta = 0.4;
+            let camPhi = 0.3;
+            let camDist = 1500;
+            let camTarget = [0, 600, 0];  // center on model: Y-flip puts model at +54..+1157, center≈605
+
+            const MIN_DIST = 50,
+                MAX_DIST = 8000;
+
+            function getEye() {
+                const cd = Math.cos(camPhi);
+                return [
+                    camTarget[0] + camDist * cd * Math.sin(camTheta),
+                    camTarget[1] + camDist * Math.sin(camPhi),
+                    camTarget[2] + camDist * cd * Math.cos(camTheta),
+                ];
+            }
+
+            let drag = null;
+            canvas.addEventListener("mousedown", (e) => {
+                drag = {
+                    button: e.button,
+                    x: e.clientX,
+                    y: e.clientY,
+                    theta: camTheta,
+                    phi: camPhi,
+                    target: [...camTarget],
+                };
+                canvas.classList.add("dragging");
+                e.preventDefault();
+            });
+            window.addEventListener("mousemove", (e) => {
+                if (!drag) return;
+                const dx = e.clientX - drag.x;
+                const dy = e.clientY - drag.y;
+                if (drag.button === 0) {
+                    camTheta = drag.theta - dx * 0.01;
+                    camPhi = Math.max(
+                        -1.4,
+                        Math.min(1.4, drag.phi + dy * 0.01),
+                    );
+                } else if (drag.button === 2) {
+                    const right = normalize(
+                        cross3(sub3(getEye(), camTarget), [0, 1, 0]),
+                    );
+                    const up = [0, 1, 0];
+                    const panSpeed = camDist * 0.002;
+                    camTarget = [
+                        drag.target[0] -
+                            right[0] * dx * panSpeed +
+                            up[0] * dy * panSpeed,
+                        drag.target[1] -
+                            right[1] * dx * panSpeed +
+                            up[1] * dy * panSpeed,
+                        drag.target[2] -
+                            right[2] * dx * panSpeed +
+                            up[2] * dy * panSpeed,
+                    ];
+                }
+            });
+            window.addEventListener("mouseup", () => {
+                drag = null;
+                canvas.classList.remove("dragging");
+            });
+            canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+            canvas.addEventListener(
+                "wheel",
+                (e) => {
+                    camDist = Math.max(
+                        MIN_DIST,
+                        Math.min(MAX_DIST, camDist * (1 + e.deltaY * 0.001)),
+                    );
+                    e.preventDefault();
+                },
+                { passive: false },
+            );
+
+            // ── Flat-color line shader (bone axes) ───────────────────────────────────────
+            const flatVS = `
+                attribute vec3 aPos;
+                uniform mat4 uMVP;
+                void main() { gl_Position = uMVP * vec4(aPos, 1.0); }
+            `;
+            const flatFS = `
+                precision mediump float;
+                uniform vec4 uColor;
+                void main() { gl_FragColor = uColor; }
+            `;
+            const flatProg = (() => {
+                const p = createProgram(gl, flatVS, flatFS);
+                return {
+                    program: p,
+                    aPos: gl.getAttribLocation(p, "aPos"),
+                    uMVP: gl.getUniformLocation(p, "uMVP"),
+                    uColor: gl.getUniformLocation(p, "uColor"),
+                };
+            })();
+            let axisVBO = null;
+
+            function drawBoneAxes(pv, model, worldMats, worldPos, scale) {
+                const sx = scale,
+                    sy = -scale,
+                    sz = scale;
+                const axLen = 40;
+                const lines = [];
+
+                for (let b = 0; b < model.bones.length; b++) {
+                    const bone = model.bones[b];
+                    const mat = worldMats[b];
+                    let cx = 0,
+                        cy = 0,
+                        cz = 0;
+                    const verts = bone.verts || [];
+                    if (verts.length === 0) continue;
+                    for (const [lx, ly, lz] of verts) {
+                        cx += mat[0] * lx + mat[4] * ly + mat[8] * lz + mat[12];
+                        cy += mat[1] * lx + mat[5] * ly + mat[9] * lz + mat[13];
+                        cz +=
+                            mat[2] * lx + mat[6] * ly + mat[10] * lz + mat[14];
+                    }
+                    cx = worldPos[0] + (cx / verts.length) * sx;
+                    cy = worldPos[1] + (cy / verts.length) * sy;
+                    cz = worldPos[2] + (cz / verts.length) * sz;
+
+                    lines.push(
+                        cx,
+                        cy,
+                        cz,
+                        cx + mat[0] * sx * axLen,
+                        cy + mat[1] * sy * axLen,
+                        cz + mat[2] * sz * axLen,
+                    );
+                    lines.push(
+                        cx,
+                        cy,
+                        cz,
+                        cx + mat[4] * sx * axLen,
+                        cy + mat[5] * sy * axLen,
+                        cz + mat[6] * sz * axLen,
+                    );
+                    lines.push(
+                        cx,
+                        cy,
+                        cz,
+                        cx + mat[8] * sx * axLen,
+                        cy + mat[9] * sy * axLen,
+                        cz + mat[10] * sz * axLen,
+                    );
+                }
+
+                const vdata = new Float32Array(lines);
+                if (!axisVBO) axisVBO = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, axisVBO);
+                gl.bufferData(gl.ARRAY_BUFFER, vdata, gl.DYNAMIC_DRAW);
+
+                gl.useProgram(flatProg.program);
+                gl.uniformMatrix4fv(flatProg.uMVP, false, pv);
+                gl.bindBuffer(gl.ARRAY_BUFFER, axisVBO);
+                gl.enableVertexAttribArray(flatProg.aPos);
+                gl.vertexAttribPointer(flatProg.aPos, 3, gl.FLOAT, false, 0, 0);
+
+                const nBones = lines.length / 18;
+                const colors = [
+                    [1, 0, 0, 1],
+                    [0, 1, 0, 1],
+                    [0, 0, 1, 1],
+                ];
+                for (let b = 0; b < nBones; b++) {
+                    for (let ax = 0; ax < 3; ax++) {
+                        gl.uniform4fv(flatProg.uColor, colors[ax]);
+                        gl.drawArrays(gl.LINES, b * 6 + ax * 2, 2);
+                    }
+                }
+                gl.disableVertexAttribArray(flatProg.aPos);
+            }
+
+            // ── Wireframe lines builder ───────────────────────────────────────────────────
+            function buildWireframeLines(model) {
+                const lines = [];
+                for (const bone of model.bones) {
+                    for (const face of bone.faces || []) {
+                        const vs = [
+                            bone.verts[face[0]],
+                            bone.verts[face[1]],
+                            bone.verts[face[2]],
+                        ];
+                        for (let i = 0; i < 3; i++) {
+                            const a = vs[i],
+                                b = vs[(i + 1) % 3];
+                            lines.push(...a, ...b);
+                        }
+                    }
+                }
+                return new Float32Array(lines);
+            }
+
+            let wireVBO = null;
+            let wireCount = 0;
+
+            // ── Model / texture state ─────────────────────────────────────────────────────
+            let model = null;
+            let skelBufs = null;
+            let tex = null;
+            let maxFrame = 2000;
+            let autoFrame = 0;
+
+            async function loadModel(folder) {
+                if (skelBufs) {
+                    if (skelBufs.ibo) gl.deleteBuffer(skelBufs.ibo);
+                    if (skelBufs.ubo) gl.deleteBuffer(skelBufs.ubo);
+                    if (skelBufs.vbo) gl.deleteBuffer(skelBufs.vbo);
+                    skelBufs = null;
+                }
+                if (wireVBO) {
+                    gl.deleteBuffer(wireVBO);
+                    wireVBO = null;
+                }
+                if (tex && tex !== whiteTex) {
+                    gl.deleteTexture(tex);
+                    tex = null;
+                }
+                model = null;
+                autoFrame = 0;
+
+                document.getElementById("ov-model").textContent =
+                    `Loading ${folder}…`;
+
+                const m = await loadSkeletalModel(folder);
+                if (!m) {
+                    document.getElementById("ov-model").textContent =
+                        `${folder}: no anim.json`;
+                    return;
+                }
+                model = m;
+                window._model = m;
+                skelBufs = buildSkeletalGLBuffers(gl, m);
+
+                // --- auto-fit camera to model bounds (frame 0) so models of all sizes
+                //     frame nicely. bbox = each bone's render-space joint pos ± its max
+                //     local vert radius (a safe over-estimate; render space = x*S, -y*S, z*S).
+                const { mats: fitMats } = buildBoneWorldMatrices(m, 0);
+                const lo = [Infinity, Infinity, Infinity];
+                const hi = [-Infinity, -Infinity, -Infinity];
+                for (let b = 0; b < m.bones.length; b++) {
+                    let r = 0;
+                    for (const v of (m.bones[b].verts || [])) {
+                        const d = Math.hypot(v[0], v[1], v[2]);
+                        if (d > r) r = d;
+                    }
+                    const px = fitMats[b][12] * MODEL_SCALE;
+                    const py = -fitMats[b][13] * MODEL_SCALE;
+                    const pz = fitMats[b][14] * MODEL_SCALE;
+                    const rs = r * MODEL_SCALE;
+                    lo[0] = Math.min(lo[0], px - rs); hi[0] = Math.max(hi[0], px + rs);
+                    lo[1] = Math.min(lo[1], py - rs); hi[1] = Math.max(hi[1], py + rs);
+                    lo[2] = Math.min(lo[2], pz - rs); hi[2] = Math.max(hi[2], pz + rs);
+                }
+                if (lo[0] < hi[0]) {
+                    camTarget = [(lo[0]+hi[0])/2, (lo[1]+hi[1])/2, (lo[2]+hi[2])/2];
+                    const radius = 0.5 * Math.hypot(hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]);
+                    camDist = Math.max(MIN_DIST,
+                              Math.min(MAX_DIST, radius / Math.tan(Math.PI / 8) * 1.15));
+                }
+
+                let mf = 0;
+                for (const bone of m.bones) {
+                    if (!bone.anim) continue;
+                    for (const ch of [bone.anim.ch1, bone.anim.ch2]) {
+                        if (!ch) continue;
+                        for (const kf of ch) {
+                            if (kf[3] !== 30000 && kf[3] > mf) mf = kf[3];
+                        }
+                    }
+                }
+                maxFrame = mf || 200;
+                document.getElementById("frameScrub").max = maxFrame;
+
+                const clipSel = document.getElementById("clipSel");
+                clipSel.innerHTML =
+                    '<option value="-1">— all frames —</option>';
+                if (m.clips) {
+                    const CLIP_LABELS = {
+                        0: "idle",
+                        1: "walk",
+                        2: "run",
+                        3: "run2",
+                        4: "??",
+                        5: "??",
+                        6: "attack1",
+                        7: "attack2",
+                        8: "attack3",
+                        9: "??",
+                        10: "hit",
+                        11: "??",
+                        12: "??",
+                        13: "??",
+                        14: "??",
+                        15: "??",
+                        16: "win",
+                        17: "lose",
+                    };
+                    m.clips.forEach((c, i) => {
+                        if (!c.present) return;
+                        const label = c.name ?? CLIP_LABELS[i] ?? `clip${i}`;
+                        const opt = document.createElement("option");
+                        opt.value = i;
+                        opt.textContent = `${i}: ${label} (${c.start_frame}–${c.end_frame})`;
+                        clipSel.appendChild(opt);
+                    });
+                }
+                const previewClip = Number.isInteger(m.preview_clip) && m.clips?.[m.preview_clip]
+                    ? m.preview_clip : 0;
+                autoFrame = m.clips?.[previewClip]?.start_frame ?? 0;
+                if (clipSel)
+                    ((clipSel.value = String(previewClip)),
+                        clipSel.dispatchEvent(new Event("change")));
+
+                let totalVerts = 0,
+                    totalFaces = 0;
+                for (const bone of m.bones) {
+                    totalVerts += (bone.verts || []).length;
+                    totalFaces += (bone.faces || []).length;
+                }
+                document.getElementById("ov-model").textContent = folder;
+                document.getElementById("ov-bones").textContent =
+                    `${m.num_bones} bones`;
+                document.getElementById("ov-verts").textContent =
+                    `${totalVerts} verts · ${totalFaces} tris`;
+                document.getElementById("info").textContent =
+                    `${folder} · ${m.num_bones} bones · ${totalVerts}v · ${totalFaces}f`;
+
+                const wdata = buildWireframeLines(m);
+                wireCount = wdata.length / 3 + (m.bridgeVertCapacity || 0);
+                wireVBO = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, wireVBO);
+                gl.bufferData(gl.ARRAY_BUFFER, wdata, gl.STATIC_DRAW);
+
+                tex = loadTexture(gl, `assets/battle/textures/${folder}.png`);
+            }
+
+            // Emit wireframe edges for one bridge cap (ring→apex triangle fan) into lineData.
+            // Returns the updated write index li.
+            // ring: array of [wx,wy,wz] world verts. apex: single [wx,wy,wz] vert.
+            // worldPos, sx, sy, sz: scene-space transform (matches drawWireframe convention).
+            function emitCapLines(lineData, ring, apex, worldPos, sx, sy, sz, li) {
+                const N = ring.length;
+                for (let j = 0; j < N; j++) {
+                    const a = ring[j], b = ring[(j + 1) % N], c = apex;
+                    for (const [pa, pb] of [[a, b], [b, c], [c, a]]) {
+                        for (const pt of [pa, pb]) {
+                            if (li + 3 <= lineData.length) {
+                                lineData[li++] = worldPos[0] + pt[0] * sx;
+                                lineData[li++] = worldPos[1] + pt[1] * sy;
+                                lineData[li++] = worldPos[2] + pt[2] * sz;
+                            }
+                        }
+                    }
+                }
+                return li;
+            }
+
+            // (buildBonePool removed — mesh renders bone.faces → bone.verts × worldMat directly.
+            //  Task 9 / session 14: the bin-0 pool/slotMap/LERP apparatus is the anim-channel
+            //  keyframe sampler, not mesh geometry; pool rendering produced spikes.)
+
+            // ── Wireframe draw (skinned lines) ────────────────────────────────────────────
+            function drawWireframe(mvp, model, worldPos, scale) {
+                if (!wireVBO || wireCount === 0) return;
+                const useIdentity = document.getElementById('identityBones').checked;
+                const bwm = useIdentity
+                    ? { mats: model.bones.map(() => mat4Identity()), worldTrans: model.bones.map(() => [0, 0, 0]) }
+                    : buildBoneWorldMatrices(model, currentFrame());
+                const { mats } = bwm;
+                const lineData = new Float32Array(wireCount * 3);
+                const sx = scale, sy = -scale, sz = scale;
+                let li = 0;
+                // Mesh = bone.faces edges drawn directly from bone.verts × worldMat (Task 9: the
+                // bin-0 pool/slotMap/LERP apparatus is the anim-channel sampler, NOT mesh geometry).
+                for (let b = 0; b < model.bones.length; b++) {
+                    const bone = model.bones[b];
+                    const mat = mats[b];
+                    // World vert = D·(worldRot·vert) + worldTrans, D=diag(-1,1,-1) (negate X,Z
+                    // of the rotated vert). Matches game +0x3c/+0x50 to 0.5u (verify_renderer_fix.py).
+                    // No per-vert mirrorX — mirroring is already in the FK (ch1.x sign).
+                    const applyMat = ([lx, ly, lz]) => [
+                        -(mat[0]*lx + mat[4]*ly + mat[8]*lz)  + mat[12],
+                         (mat[1]*lx + mat[5]*ly + mat[9]*lz)  + mat[13],
+                        -(mat[2]*lx + mat[6]*ly + mat[10]*lz) + mat[14],
+                    ];
+                    for (const face of bone.faces || []) {
+                        for (let ei = 0; ei < 3; ei++) {
+                            const v0 = bone.verts[face[ei]], v1 = bone.verts[face[(ei + 1) % 3]];
+                            if (!v0 || !v1) continue;
+                            const p0 = applyMat(v0), p1 = applyMat(v1);
+                            if (li + 6 <= lineData.length) {
+                                lineData[li++] = worldPos[0] + p0[0] * sx;
+                                lineData[li++] = worldPos[1] + p0[1] * sy;
+                                lineData[li++] = worldPos[2] + p0[2] * sz;
+                                lineData[li++] = worldPos[0] + p1[0] * sx;
+                                lineData[li++] = worldPos[1] + p1[1] * sy;
+                                lineData[li++] = worldPos[2] + p1[2] * sz;
+                            }
+                        }
+                    }
+                }
+                // ── Skeleton sticks: draw a line from each bone's world origin to its parent's ──
+                {
+                    for (let b = 1; b < model.bones.length; b++) {
+                        const bone = model.bones[b];
+                        if (bone.parent_slot === 0) continue;
+                        const parentIdx = bone.parent_slot - 1;
+                        const childMat  = mats[b];
+                        const parentMat = mats[parentIdx];
+                        const pts = [
+                            [parentMat[12], parentMat[13], parentMat[14]],
+                            [childMat[12],  childMat[13],  childMat[14]],
+                        ];
+                        for (const pt of pts) {
+                            if (li + 3 <= lineData.length) {
+                                lineData[li++] = worldPos[0] + pt[0] * sx;
+                                lineData[li++] = worldPos[1] + pt[1] * sy;
+                                lineData[li++] = worldPos[2] + pt[2] * sz;
+                            }
+                        }
+                    }
+                }
+                const buf = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+                gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.STREAM_DRAW);
+                gl.useProgram(wireProg.program);
+                gl.uniformMatrix4fv(wireProg.uMVP, false, mvp);
+                gl.enableVertexAttribArray(wireProg.aPos);
+                gl.vertexAttribPointer(wireProg.aPos, 3, gl.FLOAT, false, 0, 0);
+                gl.drawArrays(gl.LINES, 0, li / 3);
+                gl.deleteBuffer(buf);
+            }
+
+            // ── Controls ──────────────────────────────────────────────────────────────────
+            const modelSel = document.getElementById("modelSel");
+            const speedSel = document.getElementById("speedSel");
+            const speedVal = document.getElementById("speedVal");
+            const frameScrub = document.getElementById("frameScrub");
+            const frameVal = document.getElementById("frameVal");
+            const autoPlay = document.getElementById("autoPlay");
+            const wireCheck = document.getElementById("wireframe");
+            const debugColorsCheck = document.getElementById("debugColors");
+
+
+            function populateModels() {
+                modelSel.innerHTML = "";
+                for (const f of MODELS) {
+                    const opt = document.createElement("option");
+                    opt.value = opt.textContent = f;
+                    modelSel.appendChild(opt);
+                }
+            }
+            populateModels();
+
+            modelSel.addEventListener("change", () =>
+                loadModel(modelSel.value),
+            );
+            speedSel.addEventListener("input", () => {
+                speedVal.textContent = (+speedSel.value).toFixed(2) + "x";
+            });
+            frameScrub.addEventListener("input", () => {
+                autoPlay.checked = false;
+                autoFrame = +frameScrub.value;
+            });
+
+            document
+                .getElementById("clipSel")
+                .addEventListener("change", () => {
+                    const v = +document.getElementById("clipSel").value;
+                    if (v === -1) {
+                        frameScrub.min = 0;
+                        frameScrub.max = maxFrame;
+                    } else if (model?.clips?.[v]) {
+                        const c = model.clips[v];
+                        autoFrame = c.start_frame;
+                        frameScrub.min = c.start_frame;
+                        frameScrub.max = c.end_frame;
+                        frameScrub.value = c.start_frame;
+                        autoPlay.checked = true;
+                    }
+                });
+
+            function currentFrame() {
+                return autoPlay.checked ? autoFrame : +frameScrub.value;
+            }
+
+            // ── Render loop ───────────────────────────────────────────────────────────────
+            const MODEL_SCALE = 0.85;
+            const WORLD_POS = [0, 0, 0];
+            let lastTs = null;
+
+            function frame(ts) {
+                requestAnimationFrame(frame);
+                const dt =
+                    lastTs == null ? 0 : Math.min((ts - lastTs) / 1000, 0.1);
+                lastTs = ts;
+
+                if (autoPlay.checked) {
+                    const clipSel = document.getElementById("clipSel");
+                    const clipIdx = +clipSel.value;
+                    const activeClip =
+                        clipIdx >= 0 && model?.clips?.[clipIdx]
+                            ? model.clips[clipIdx]
+                            : null;
+                    const clipStart = activeClip ? activeClip.start_frame : 0;
+                    const clipEnd = activeClip
+                        ? activeClip.end_frame
+                        : maxFrame;
+                    autoFrame += dt * 60 * +speedSel.value;
+                    if (autoFrame > clipEnd) autoFrame = clipStart;
+                    if (autoFrame < clipStart) autoFrame = clipStart;
+                    frameScrub.value = Math.floor(autoFrame);
+                    frameVal.textContent = Math.floor(autoFrame);
+                } else {
+                    frameVal.textContent = frameScrub.value;
+                }
+                document.getElementById("ov-frame").textContent =
+                    `frame ${Math.floor(currentFrame())} / ${maxFrame}`;
+
+                const W = canvas.width,
+                    H = canvas.height;
+                gl.viewport(0, 0, W, H);
+                gl.clearColor(0.06, 0.06, 0.12, 1);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                if (!model || !skelBufs) return;
+
+                const proj = mat4Perspective(Math.PI / 4, W / H, 1, 10000);
+                const eye = getEye();
+                const view = mat4LookAt(eye, camTarget, [0, 1, 0]);
+                const pv = mat4Mul(proj, view);
+
+                const useIdentity =
+                    document.getElementById("identityBones").checked;
+                const bwm = useIdentity
+                    ? { mats: model.bones.map(() => mat4Identity()), worldTrans: model.bones.map(() => [0, 0, 0]) }
+                    : buildBoneWorldMatrices(model, currentFrame());
+                const mats = bwm.mats;
+
+                // --- CORRECT SKINNING UPDATE ---
+                if (!skelBufs.vbo) {
+                    skelBufs.vbo = gl.createBuffer();
+                }
+                const positions = new Float32Array(skelBufs.totalVerts * 3);
+                updateSkeletalVBO(model, currentFrame(), bwm, positions);
+                if (!window._solidDebugDone && model && skelBufs) {
+                    window._solidDebugDone = true;
+                    console.log('=== SOLID DEBUG ===');
+                    console.log('slotMap present:', !!model.slotMap, 'mirrorBones:', model.mirrorBones?.size);
+                    console.log('worldTrans present:', !!bwm.worldTrans);
+                    for (let b = 0; b < Math.min(model.bones.length, 5); b++) {
+                        const off = skelBufs.boneOffsets[b] * 3;
+                        const wt = bwm.worldTrans?.[b];
+                        const sm = model.slotMap?.[b];
+                        console.log(`bone[${b}] slotEntry:`, sm ? JSON.stringify({composite:sm.composite,l1:sm.lerp1_vc,d1:sm.direct1_vc,l2:sm.lerp2_vc,d2:sm.direct2_vc}) : 'null',
+                            '| worldTrans:', wt?.map(v=>v.toFixed(0)),
+                            '| pos[0]:', positions[off]?.toFixed(0), positions[off+1]?.toFixed(0), positions[off+2]?.toFixed(0));
+                    }
+                }
+                // Apply same coordinate transform as wireframe: scale + Y-flip
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i]   *= MODEL_SCALE;
+                    positions[i+1] *= -MODEL_SCALE;
+                    positions[i+2] *= MODEL_SCALE;
+                }
+                gl.bindBuffer(gl.ARRAY_BUFFER, skelBufs.vbo);
+                gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+                // ---------------------------------
+
+                if (wireCheck.checked) {
+                    drawWireframe(pv, model, WORLD_POS, MODEL_SCALE);
+                } else {
+                    // EXPERIMENT (uncommitted): PS1 culls backfaces per-primitive
+                    // (fightstg.s:2695 GTE NCLIP -> :2715 blez = skip if winding<=0).
+                    // window._cull: 'off' (default), 'ccw', or 'cw'. Y-flip (sy=-scale)
+                    // inverts handedness vs PS1, so the correct winding is found visually.
+                    const cm = window._cull || 'off';
+                    if (cm !== 'off') {
+                        gl.enable(gl.CULL_FACE);
+                        gl.cullFace(gl.BACK);
+                        gl.frontFace(cm === 'cw' ? gl.CW : gl.CCW);
+                    }
+                    drawSkeletalMesh(
+                        gl,
+                        texProg,
+                        pv,
+                        skelBufs,
+                        tex || whiteTex,
+                        debugColorsCheck.checked,
+                    );
+                    gl.disable(gl.CULL_FACE);
+                }
+
+                if (document.getElementById("boneAxes").checked) {
+                    drawBoneAxes(pv, model, mats, WORLD_POS, MODEL_SCALE);
+                }
+            }
+            requestAnimationFrame(frame);
+
+            // Load the full model list (all 248) from index.json, then load a default.
+            (async () => {
+                try {
+                    const r = await fetch("assets/battle/models/index.json");
+                    if (r.ok) {
+                        const list = await r.json();
+                        if (Array.isArray(list) && list.length) {
+                            MODELS = list;
+                            populateModels();
+                        }
+                    }
+                } catch (e) { /* keep fallback list */ }
+                const requested = new URLSearchParams(location.search).get("model");
+                if (requested && /^m[0-9]{3}[a-z0-9_]+$/.test(requested) && !MODELS.includes(requested)) {
+                    MODELS.push(requested);
+                    populateModels();
+                }
+                const def = requested && MODELS.includes(requested)
+                    ? requested : (MODELS.includes("m373rena") ? "m373rena" : MODELS[0]);
+                modelSel.value = def;
+                loadModel(def);
+            })();
+
+            window.identifyHeadBone = () => {
+                if (!model) {
+                    console.log("No model loaded yet.");
+                    return;
+                }
+                autoFrame = 0;
+                frameScrub.value = 0;
+                const { mats } = buildBoneWorldMatrices(model, 0);
+                const n = model.num_bones;
+                const children = Array(n)
+                    .fill()
+                    .map(() => []);
+                for (let i = 0; i < n; i++) {
+                    const parentAnimBin = model.bones[i].parent_slot;
+                    if (parentAnimBin > 0) {
+                        const parentIdx = model.bones.findIndex(
+                            (b) => b.anim_bin === parentAnimBin,
+                        );
+                        if (parentIdx !== -1) children[parentIdx].push(i);
+                    }
+                }
+                function depth(i) {
+                    let d = 0,
+                        p = model.bones[i].parent_slot;
+                    while (p > 0) {
+                        d++;
+                        const parentIdx = model.bones.findIndex(
+                            (b) => b.anim_bin === p,
+                        );
+                        if (parentIdx === -1) break;
+                        p = model.bones[parentIdx].parent_slot;
+                    }
+                    return d;
+                }
+                const boneInfo = [];
+                for (let i = 0; i < n; i++) {
+                    const y = mats[i][13];
+                    boneInfo.push({
+                        index: i,
+                        y,
+                        depth: depth(i),
+                        isLeaf: children[i].length === 0,
+                    });
+                }
+                boneInfo.sort((a, b) => b.y - a.y);
+                console.log("=== Bones sorted by world Y (highest = top) ===");
+                boneInfo.forEach((b) =>
+                    console.log(
+                        `Bone ${b.index}: Y=${b.y.toFixed(1)}, depth=${b.depth}, leaf=${b.isLeaf}`,
+                    ),
+                );
+                let head =
+                    boneInfo.find((b) => b.isLeaf && b.y > 0) || boneInfo[0];
+                console.log(
+                    `\n🎯 Most likely HEAD bone: index ${head.index} (Y=${head.y.toFixed(1)}, leaf=${head.isLeaf})`,
+                );
+                return head.index;
+            };
+        </script>
+    </body>
+</html>

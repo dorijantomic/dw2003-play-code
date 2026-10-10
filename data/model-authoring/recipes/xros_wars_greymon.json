@@ -1,0 +1,277 @@
+{
+  "name": "xros_wars_greymon",
+  "base_model": "m005grey",
+  "output_model": "m705xros",
+  "reference": "data/model-authoring/references/xros_wars_greymon.png",
+  "changes": [
+    {
+      "operation": "adapt_chain",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          -1,
+          -0.3
+        ],
+        "bone_count": 3
+      },
+      "axis": [
+        0,
+        -1,
+        -0.3
+      ],
+      "length_scale": 1.12,
+      "thickness_scale": 1.1
+    },
+    {
+      "operation": "adapt_chain",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "bone_count": 3
+      },
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "length_scale": 1.5,
+      "thickness_scale": 1.08
+    },
+    {
+      "operation": "curve_chain",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "bone_count": 3
+      },
+      "reference_start": [
+        0.82,
+        0.61
+      ],
+      "reference_tip": [
+        0.95,
+        0.25
+      ]
+    },
+    {
+      "operation": "armor_shell",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          -1,
+          -0.3
+        ],
+        "bone_count": 3
+      },
+      "surface_bone": "most_faces",
+      "reference_sample": [
+        0.35,
+        0.28
+      ],
+      "sites": [
+        {
+          "position": [
+            0.5,
+            0.08,
+            0.45
+          ],
+          "direction": [
+            0,
+            -1,
+            -0.25
+          ],
+          "face_count": 12,
+          "lift_ratio": 0.13
+        },
+        {
+          "position": [
+            0.25,
+            0.2,
+            0.36
+          ],
+          "direction": [
+            -0.35,
+            -0.8,
+            -0.3
+          ],
+          "face_count": 8,
+          "lift_ratio": 0.12,
+          "mirror_axis": 0
+        }
+      ]
+    },
+    {
+      "operation": "repaint",
+      "clusters": 12,
+      "swatches": [
+        {
+          "source_rank": 0,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 2,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 3,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 5,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 6,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 1,
+          "reference_sample": [
+            0.742,
+            0.577
+          ]
+        },
+        {
+          "source_rank": 4,
+          "reference_sample": [
+            0.742,
+            0.577
+          ]
+        },
+        {
+          "source_rank": 7,
+          "reference_sample": [
+            0.205,
+            0.524
+          ]
+        },
+        {
+          "source_rank": 10,
+          "reference_sample": [
+            0.711,
+            0.322
+          ]
+        }
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          -1,
+          -0.3
+        ],
+        "bone_count": 3
+      },
+      "target": "most_faces",
+      "axis": 1,
+      "intervals": [
+        [
+          0,
+          0.48
+        ]
+      ],
+      "reference_sample": [
+        0.35,
+        0.28
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          -1,
+          -0.3
+        ],
+        "bone_count": 3
+      },
+      "target": "parent",
+      "axis": 1,
+      "intervals": [
+        [
+          0.3,
+          0.37
+        ],
+        [
+          0.52,
+          0.59
+        ],
+        [
+          0.73,
+          0.79
+        ]
+      ],
+      "reference_sample": [
+        0.494,
+        0.594
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "select": {
+        "centerline": true,
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "bone_count": 3
+      },
+      "target": "chain",
+      "axis": 2,
+      "intervals": [
+        [
+          0.2,
+          0.32
+        ],
+        [
+          0.51,
+          0.63
+        ],
+        [
+          0.8,
+          0.89
+        ]
+      ],
+      "reference_sample": [
+        0.494,
+        0.594
+      ]
+    }
+  ],
+  "validation": {
+    "idle": 0,
+    "attack": 14,
+    "hit": 20,
+    "victory": 44
+  }
+}

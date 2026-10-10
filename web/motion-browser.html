@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Motion Browser — identify which timeline table is which animation</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#f0c040; font-family:monospace; }
+  #top { padding:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  select, button { background:#2a3a6a; color:#f0c040; border:1px solid #f0c040; padding:6px 14px; cursor:pointer; font-family:monospace; font-size:14px; }
+  button:hover { background:#3a4a8a; }
+  #label { font-size:18px; color:#fff; min-width:380px; }
+  canvas { display:block; margin:0 auto; background:#05050f; }
+  #hint { padding:6px 12px; color:#9ab; font-size:13px; }
+</style>
+</head>
+<body>
+<div id="top">
+  <label>Model <select id="modelSel"></select></label>
+  <button id="prev">◀ Prev</button>
+  <button id="next">Next ▶</button>
+  <span id="label">loading…</span>
+</div>
+<div id="hint">The camera auto-orbits so you can read each pose. Cycle the motions with Prev/Next and tell me which table # is the basic ATTACK (and the signature / hit if you spot them).</div>
+<canvas id="c" width="720" height="560"></canvas>
+<script type="module">
+import { createBattle3D, resolveModelFolder } from "./battle3d.js";
+
+const $ = id => document.getElementById(id);
+const canvas = $("c");
+const r = createBattle3D(canvas);
+r.setCameraMode("orbit");           // slow auto-orbit so you can read the pose
+window.__r = r;
+
+// model list
+const MODELS = [["m373rena","Renamon"],["m003agum","Agumon"]];
+for (const [id,name] of MODELS) {
+  const o = document.createElement("option"); o.value=id; o.textContent=name; $("modelSel").appendChild(o);
+}
+
+let tables = [];     // [{idx,len}]
+let cur = 0;
+
+async function spawn() {
+  const folder = $("modelSel").value;
+  r.setPlayerDigimon(folder);
+  r.setEnemyDigimon(null);
+  // wait for the model + timeline to load
+  for (let i=0;i<60;i++){ await new Promise(res=>setTimeout(res,100)); tables = r.debugTimelineTables(); if (tables.length) break; }
+  cur = 0; show();
+}
+function show() {
+  if (!tables.length) { $("label").textContent = "no timeline tables"; return; }
+  const t = tables[cur];
+  r.debugPlayPlayerTable(t.idx);
+  $("label").textContent = `motion ${cur+1}/${tables.length}  —  timeline table #${t.idx}  (${t.len} entries)`;
+}
+$("prev").onclick = ()=>{ cur=(cur-1+tables.length)%tables.length; show(); };
+$("next").onclick = ()=>{ cur=(cur+1)%tables.length; show(); };
+$("modelSel").onchange = spawn;
+
+// render loop
+let last=performance.now();
+function loop(t){ const dt=Math.min(0.05,(t-last)/1000); last=t; r.render(dt); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+// simple orbit controls
+let drag=false, lx=0, ly=0;
+canvas.addEventListener("mousedown", e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+window.addEventListener("mouseup", ()=>drag=false);
+window.addEventListener("mousemove", e=>{ if(!drag)return; const dx=e.clientX-lx, dy=e.clientY-ly; lx=e.clientX; ly=e.clientY; if (r.orbitDrag) r.orbitDrag(dx,dy); });
+
+spawn();
+</script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fight Action Lab — compose & name motion sequences (visual ground truth)</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#f0c040; font-family:monospace; font-size:13px; }
+  #top { padding:8px 10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #243; }
+  #wrap { display:flex; gap:10px; padding:10px; align-items:flex-start; }
+  #palette { width:150px; max-height:560px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; }
+  #palette button { text-align:left; }
+  #side { width:330px; display:flex; flex-direction:column; gap:10px; }
+  canvas { background:#05050f; flex:0 0 auto; }
+  select, button, input { background:#2a3a6a; color:#f0c040; border:1px solid #f0c040; padding:5px 10px; cursor:pointer; font-family:monospace; font-size:13px; }
+  button:hover { background:#3a4a8a; }
+  .panel { border:1px solid #243; padding:8px; }
+  .panel h3 { margin:0 0 6px; font-size:12px; color:#9ab; font-weight:normal; text-transform:uppercase; letter-spacing:1px; }
+  #seq { display:flex; flex-wrap:wrap; gap:4px; min-height:26px; }
+  .chip { background:#1c2a52; border:1px solid #4a5a8a; padding:3px 7px; border-radius:3px; cursor:pointer; }
+  .chip:hover { background:#7a2a2a; border-color:#c55; } /* click chip = remove */
+  #reveal { white-space:pre-wrap; color:#cde; min-height:18px; }
+  .ok { color:#6f6; } .bad { color:#f77; }
+  .row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  #authored { display:flex; flex-direction:column; gap:3px; max-height:160px; overflow-y:auto; }
+  #authored .a { display:flex; justify-content:space-between; gap:8px; border-bottom:1px dotted #243; padding:2px 0; }
+  #hint { color:#9ab; font-size:12px; }
+  label.lbl { color:#9ab; }
+</style>
+</head>
+<body>
+<div id="top">
+  <label class="lbl">Model <select id="modelSel"></select></label>
+  <label class="lbl">Speed <input id="speed" type="range" min="1" max="4" step="1" value="1"> <span id="speedVal">1</span></label>
+  <span id="status">loading…</span>
+</div>
+
+<div id="wrap">
+  <!-- palette: click a table to APPEND it to the sequence (and solo-preview what you added) -->
+  <div id="palette" class="panel" style="max-height:560px;"></div>
+
+  <canvas id="c" width="640" height="560"></canvas>
+
+  <div id="side">
+    <div class="panel">
+      <h3>Sequence (click a table to add · click a chip to remove)</h3>
+      <div id="seq"></div>
+      <div class="row" style="margin-top:8px;">
+        <button id="play">▶ Play assembled</button>
+        <button id="clear">Clear</button>
+      </div>
+      <div id="hint" style="margin-top:6px;">Build the action by clicking tables in order, then watch it play assembled at the chosen speed.</div>
+    </div>
+
+    <div class="panel">
+      <h3>Label this action</h3>
+      <div class="row">
+        <select id="labelSel"></select>
+        <input id="labelFree" placeholder="…or type a name" style="width:130px;">
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="reveal">▸ Reveal what the script says</button>
+        <button id="save">✓ Save action</button>
+      </div>
+      <div id="reveal" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Authored map (this model)</h3>
+      <div id="authored"></div>
+      <div class="row" style="margin-top:8px;">
+        <button id="export">⬇ Export JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createBattle3D } from "./battle3d.js";
+import { clipTableSeq } from "./fight/actor-animator.js";
+
+const $ = id => document.getElementById(id);
+const canvas = $("c");
+const r = createBattle3D(canvas);
+r.setCameraMode("orbit");
+window.__r = r;
+
+const MODELS = [["m373rena","Renamon"],["m003agum","Agumon"]];
+for (const [id,name] of MODELS) {
+  const o = document.createElement("option"); o.value = id; o.textContent = name; $("modelSel").appendChild(o);
+}
+
+// Action labels → the action-script clip whose op2 stream is the engine's derived sequence.
+// Labels not in this map are motion/SFSTDATA-table-driven (no single attack clip) → no script compare.
+const LABEL_CLIP = { "ATTACK": 5, "COMBO": 6, "SPECIAL": 11, "BEING HIT": 10, "DEFEND": 4 };
+const LABELS = ["ATTACK","SPECIAL","BEING HIT","KILLED","IDLE","DEFEND","VICTORY","GET-UP","ITEM","LOW-HP","COMBO"];
+for (const l of LABELS) { const o = document.createElement("option"); o.value = l; o.textContent = l; $("labelSel").appendChild(o); }
+
+let seq = [];                 // ordered timeline-table indices being composed
+let authored = {};            // model -> [{ name, tables }]
+let curModel = MODELS[0][0];
+
+function curLabel() { return ($("labelFree").value.trim() || $("labelSel").value); }
+const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+async function spawn() {
+  curModel = $("modelSel").value;
+  r.setPlayerDigimon(curModel);
+  r.setEnemyDigimon(null);
+  let tables = [];
+  for (let i = 0; i < 80 && !tables.length; i++) { await new Promise(res => setTimeout(res, 100)); tables = r.debugTimelineTables(); }
+  // palette
+  $("palette").innerHTML = "";
+  for (const t of tables) {
+    const b = document.createElement("button");
+    b.textContent = `table ${t.idx}  (${t.len})`;
+    b.onclick = () => { seq.push(t.idx); r.debugPlayPlayerTable(t.idx); drawSeq(); };  // add + solo-preview
+    $("palette").appendChild(b);
+  }
+  $("status").textContent = `${MODELS.find(m => m[0]===curModel)[1]} — ${tables.length} tables`;
+  drawAuthored();
+}
+
+function drawSeq() {
+  $("seq").innerHTML = "";
+  seq.forEach((idx, i) => {
+    const c = document.createElement("span");
+    c.className = "chip"; c.textContent = idx;
+    c.title = "click to remove";
+    c.onclick = () => { seq.splice(i, 1); drawSeq(); };
+    $("seq").appendChild(c);
+  });
+}
+
+$("play").onclick = () => { if (seq.length) r.debugPlayPlaylist(seq, { loop: true }); };
+$("clear").onclick = () => { seq = []; drawSeq(); $("reveal").textContent = ""; };
+
+$("speed").oninput = e => { const n = r.debugSetSpeed(+e.target.value); $("speedVal").textContent = n; };
+
+$("reveal").onclick = () => {
+  const name = curLabel();
+  const clip = LABEL_CLIP[name];
+  const el = $("reveal");
+  if (clip == null) { el.innerHTML = `<span class="bad">${name}</span>: motion/SFSTDATA-table driven — no action-script clip to compare.`; return; }
+  const model = r.playerAnimator?.model;
+  const scriptSeq = clipTableSeq(model, clip);
+  const match = eq(scriptSeq, seq);
+  el.innerHTML =
+    `script clip ${clip} op2 = [${scriptSeq.join(",")}]\n` +
+    `your sequence  = [${seq.join(",")}]\n` +
+    (match ? `<span class="ok">✓ match</span>` : `<span class="bad">✗ differs</span> — record WHY (timing/camera bug vs. interpretation bug).`);
+};
+
+$("save").onclick = () => {
+  if (!seq.length) return;
+  const name = curLabel();
+  (authored[curModel] ||= []);
+  const existing = authored[curModel].find(a => a.name === name);
+  if (existing) existing.tables = seq.slice();
+  else authored[curModel].push({ name, tables: seq.slice() });
+  drawAuthored();
+};
+
+function drawAuthored() {
+  const list = authored[curModel] || [];
+  $("authored").innerHTML = list.length ? "" : '<span id="hint">nothing saved yet</span>';
+  list.forEach((a, i) => {
+    const d = document.createElement("div"); d.className = "a";
+    d.innerHTML = `<span>${a.name}: [${a.tables.join(",")}]</span>`;
+    const del = document.createElement("button"); del.textContent = "✕"; del.style.padding = "0 6px";
+    del.onclick = () => { list.splice(i, 1); drawAuthored(); };
+    d.appendChild(del);
+    $("authored").appendChild(d);
+  });
+}
+
+$("export").onclick = () => {
+  const out = { model: curModel, step: +$("speed").value, actions: authored[curModel] || [] };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `${curModel}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+$("modelSel").onchange = () => { seq = []; drawSeq(); $("reveal").textContent = ""; spawn(); };
+
+// render loop + orbit drag (same as motion-browser)
+let last = performance.now();
+function loop(t) { const dt = Math.min(0.05, (t - last) / 1000); last = t; r.render(dt); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+let drag = false, lx = 0, ly = 0;
+canvas.addEventListener("mousedown", e => { drag = true; lx = e.clientX; ly = e.clientY; });
+window.addEventListener("mouseup", () => drag = false);
+window.addEventListener("mousemove", e => { if (!drag) return; const dx = e.clientX-lx, dy = e.clientY-ly; lx = e.clientX; ly = e.clientY; if (r.orbitDrag) r.orbitDrag(dx, dy); });
+
+spawn();
+</script>
+</body>
+</html>

@@ -1,0 +1,904 @@
+{
+  "folder": "m999guide",
+  "num_bones": 2,
+  "total_frames": 20,
+  "clips": [
+    {
+      "index": 0,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 1,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 2,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 3,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 4,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 5,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 6,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 7,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 8,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 9,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 10,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 11,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 12,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 13,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 14,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 15,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 16,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    },
+    {
+      "index": 17,
+      "present": true,
+      "start_frame": 0,
+      "end_frame": 20,
+      "loop_count": 1
+    }
+  ],
+  "bones": [
+    {
+      "parent_slot": 0,
+      "anim": {
+        "ch1": [
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "ch2": [
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "ch3": [
+          [
+            4096,
+            4096,
+            4096,
+            0
+          ]
+        ]
+      },
+      "verts": [
+        [
+          -120,
+          -80,
+          0
+        ],
+        [
+          120,
+          -80,
+          0
+        ],
+        [
+          120,
+          80,
+          0
+        ],
+        [
+          -120,
+          80,
+          0
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          1,
+          2,
+          0,
+          0,
+          128,
+          0,
+          128,
+          128
+        ],
+        [
+          0,
+          2,
+          3,
+          0,
+          0,
+          128,
+          128,
+          0,
+          128
+        ]
+      ]
+    },
+    {
+      "parent_slot": 1,
+      "anim": {
+        "ch1": [
+          [
+            120,
+            0,
+            0,
+            0
+          ]
+        ],
+        "ch2": [
+          [
+            0,
+            0,
+            -120,
+            0
+          ],
+          [
+            0,
+            0,
+            120,
+            10
+          ],
+          [
+            0,
+            0,
+            -120,
+            20
+          ]
+        ],
+        "ch3": [
+          [
+            4096,
+            4096,
+            4096,
+            0
+          ]
+        ]
+      },
+      "verts": [
+        [
+          0,
+          -35,
+          0
+        ],
+        [
+          180,
+          -20,
+          0
+        ],
+        [
+          180,
+          20,
+          0
+        ],
+        [
+          0,
+          35,
+          0
+        ]
+      ],
+      "faces": [
+        [
+          0,
+          1,
+          2,
+          128,
+          0,
+          256,
+          0,
+          256,
+          128
+        ],
+        [
+          0,
+          2,
+          3,
+          128,
+          0,
+          256,
+          128,
+          128,
+          128
+        ]
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "table": [
+        {
+          "value": 0,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 1,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 2,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 3,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 4,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 5,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 6,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 7,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 8,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 9,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 10,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 11,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 12,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 13,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 14,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 15,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 16,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 17,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 18,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 19,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 20,
+          "loop_target": 0,
+          "aux": null
+        },
+        {
+          "value": 32768,
+          "loop_target": 0,
+          "aux": null
+        }
+      ]
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    },
+    {
+      "table": []
+    }
+  ],
+  "actions": [
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    },
+    {
+      "ops": [
+        {
+          "op": 2,
+          "words": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": 255,
+          "words": []
+        }
+      ],
+      "overrun": false
+    }
+  ]
+}

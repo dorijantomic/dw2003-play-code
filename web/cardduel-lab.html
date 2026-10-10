@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Card Duel</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #wrap { position: fixed; inset: 0; }
+  canvas { display: block; width: 100vw; height: 100vh; object-fit: contain;
+           image-rendering: pixelated; background: #000; }
+  #cardinfo, #hint { position: fixed; left: 10px; color: #9fb0d0;
+    font: 13px system-ui, sans-serif; text-shadow: 0 0 3px #000, 0 0 3px #000; z-index: 2; }
+  #cardinfo { bottom: 26px; }
+  #hint { bottom: 8px; color: #6b7488; }
+  .k { color: #cdd3e0; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="320" height="240"></canvas></div>
+<div id="cardinfo"></div>
+<div id="hint"><span class="k">← →</span> move &middot; <span class="k">Space</span> select/mark &middot; <span class="k">Enter</span> summon/play &middot; <span class="k">Esc</span> pass &middot; <span class="k">A</span> auto &middot; <span class="k">R</span> redeal</div>
+<script type="module" src="cardduel-lab.js"></script>
+</body>
+</html>

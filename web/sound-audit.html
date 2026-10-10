@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battle Sound Audit</title>
+<style>
+  body { margin:0; background:#0d1117; color:#c9d1d9; font:13px/1.45 system-ui, sans-serif; display:flex; height:100vh; }
+  #side { width:260px; min-width:260px; border-right:1px solid #21262d; display:flex; flex-direction:column; }
+  #side input { margin:8px; padding:6px 8px; background:#161b22; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; }
+  #roster { overflow-y:auto; flex:1; }
+  .mon { padding:5px 10px; cursor:pointer; border-bottom:1px solid #161b22; }
+  .mon:hover { background:#161b22; }
+  .mon.sel { background:#1f6feb33; }
+  .mon .pk { color:#8b949e; font-size:11px; }
+  #main { flex:1; overflow-y:auto; padding:14px 18px; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  h2 { font-size:14px; margin:18px 0 6px; color:#e6edf3; border-bottom:1px solid #21262d; padding-bottom:3px; }
+  .meta { color:#8b949e; font-size:12px; }
+  table { border-collapse:collapse; width:100%; }
+  td, th { padding:3px 8px; text-align:left; font-size:12px; border-bottom:1px solid #161b22; vertical-align:top; }
+  th { color:#8b949e; font-weight:normal; }
+  .snd { color:#79c0ff; font-family:ui-monospace, monospace; }
+  .id  { color:#8b949e; font-family:ui-monospace, monospace; font-size:11px; }
+  .tag { display:inline-block; padding:0 5px; border-radius:8px; font-size:11px; margin-left:6px; }
+  .loop { background:#1f6feb33; color:#79c0ff; }
+  .contact { background:#bb800933; color:#e3b341; }
+  .none { color:#8b949e; font-style:italic; }
+  button { background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:5px; padding:2px 8px; cursor:pointer; margin-right:4px; }
+  button:hover { background:#30363d; }
+  .sub { padding-left:22px; }
+</style>
+</head>
+<body>
+<div id="side">
+  <input id="q" placeholder="search digimon / pack…">
+  <div id="roster"></div>
+</div>
+<div id="main"><p class="meta">Loading data…</p></div>
+<script type="module">
+import { buildRoster, resolveModel } from "./sound-audit.js";
+
+const J = (u) => fetch(u).then((r) => (r.ok ? r.json() : null));
+const [index, modelMap, op10Map, manifest, techTable, digimon, enemies] = await Promise.all([
+  J("assets/battle/models/index.json"), J("assets/battle/model_map.json"),
+  J("assets/sfx/op10_map.json"), J("assets/sfx/manifest.json"),
+  J("assets/data/fight_tech_table.json"), J("assets/data/digimon.json"),
+  J("assets/data/enemies.json"),
+]);
+const data = { index, modelMap, op10Map, manifest, techTable, digimon, enemies };
+
+// ── playback: mirrors audio.js playBattle semantics (manifest rate, loop points
+//    sustained for the authored duration frames, then keyed off). raw = as-recorded.
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+const bufCache = {};
+async function buffer(key) {
+  if (!bufCache[key]) {
+    bufCache[key] = fetch(`assets/sfx/${key}.wav`).then((r) => r.arrayBuffer())
+      .then((ab) => ctx.decodeAudioData(ab));
+  }
+  return bufCache[key];
+}
+let liveSrc = null;
+window.__lastPlay = null;                     // headless-verify hook
+async function play(key, { battle, duration }) {
+  if (ctx.state === "suspended") await ctx.resume();
+  if (liveSrc) { try { liveSrc.stop(); } catch {} liveSrc = null; }
+  const meta = manifest[key] || {};
+  const src = ctx.createBufferSource();
+  src.buffer = await buffer(key);
+  if (battle && meta.rate && meta.rate !== 1) src.playbackRate.value = meta.rate;
+  const sustained = battle && meta.loop && duration > 0;
+  if (sustained) { src.loop = true; src.loopStart = meta.loop.start; src.loopEnd = meta.loop.end; }
+  const analyser = ctx.createAnalyser();
+  src.connect(analyser); analyser.connect(ctx.destination);
+  src.start(0);
+  liveSrc = src;
+  if (sustained) setTimeout(() => { try { src.stop(); } catch {} }, (duration / 60) * 1000);
+  window.__lastPlay = { key, battle, duration, rate: battle ? (meta.rate ?? 1) : 1, sustained, analyser, src };
+}
+
+// ── rendering ────────────────────────────────────────────────────────────────
+const roster = buildRoster(data);
+const rosterEl = document.getElementById("roster");
+const mainEl = document.getElementById("main");
+const qEl = document.getElementById("q");
+let selected = null;
+
+function drawRoster() {
+  const q = qEl.value.trim().toLowerCase();
+  rosterEl.innerHTML = "";
+  for (const r of roster) {
+    if (q && !r.label.toLowerCase().includes(q) && !r.pack.includes(q)) continue;
+    const d = document.createElement("div");
+    d.className = "mon" + (selected === r.pack ? " sel" : "");
+    d.innerHTML = `${r.names.length ? r.label : "<span class='pk'>(unnamed)</span>"} <div class="pk">${r.pack}</div>`;
+    d.onclick = () => select(r);
+    rosterEl.appendChild(d);
+  }
+}
+qEl.oninput = drawRoster;
+
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function soundCell(row) {
+  if (!row.key) return `<span class="none">unmapped op10 type ${row.type}</span>`;
+  const tags = (row.loop ? `<span class="tag loop">loop${row.sustained ? ` · sustained ${row.duration}f` : ""}</span>` : "");
+  return `<span class="snd">${esc(row.soundName)}</span> <span class="id">${esc(row.packedId ?? "")}</span>${tags}`;
+}
+function playBtns(row) {
+  if (!row.key) return "";
+  return `<button data-k="${row.key}" data-b="1" data-d="${row.duration}">▶ battle</button>` +
+         `<button data-k="${row.key}" data-b="0" data-d="0">▶ raw</button>`;
+}
+function rowHtml(row) {
+  if (row.contact) {
+    let h = `<tr><td>op10 ${row.type}</td><td><span class="tag contact">contact — ${row.contact}</span></td><td></td></tr>`;
+    if (!row.resolutions.length) {
+      h += `<tr class="sub"><td></td><td class="none sub">no tech data — no species with a tech record uses this model</td><td></td></tr>`;
+    }
+    for (const r of row.resolutions) {
+      const label = `${esc(r.species)} (${r.kind})${r.techName ? ` — ${esc(r.techName)}` : ` — tech #${r.techId}`}`;
+      if (r.noTechData || !r.row) {
+        h += `<tr><td></td><td class="sub none">${label}: no tech record</td><td></td></tr>`;
+      } else {
+        h += `<tr><td></td><td class="sub">${label} → type ${r.contactType}: ${soundCell(r.row)}` +
+             `<span class="id"> · hit visual effect ${r.effectId}</span></td><td>${playBtns(r.row)}</td></tr>`;
+      }
+    }
+    return h;
+  }
+  return `<tr><td>op10 ${row.type}</td><td>${soundCell(row)}</td><td>${playBtns(row)}</td></tr>`;
+}
+
+async function select(r) {
+  selected = r.pack;
+  drawRoster();
+  mainEl.innerHTML = `<p class="meta">Loading ${esc(r.pack)}…</p>`;
+  const anim = await J(`assets/battle/models/${r.pack}/anim.json`);
+  if (!anim) { mainEl.innerHTML = `<p class="none">no anim.json for ${esc(r.pack)}</p>`; return; }
+  const m = resolveModel(r.pack, anim, data);
+  let h = `<h1>${esc(r.label)}</h1><p class="meta">${esc(r.pack)} — ` +
+    (m.species.length
+      ? m.species.map((s) => `${esc(s.name)} (${s.kind}${s.basic ? `, basic tech #${s.basic}` : ", no basic tech"})`).join(" · ")
+      : "no species data (unnamed model)") + `</p>`;
+  for (const sec of m.sections) {
+    h += `<h2>${esc(sec.title)}</h2><table><tr><th>record</th><th>sound</th><th>play</th></tr>`;
+    for (const row of sec.rows) h += rowHtml(row);
+    if (sec.evadeRow) {
+      h += `<tr><td>evade</td><td>defender evades → type ${sec.evadeRow.type}: ${soundCell(sec.evadeRow)}</td>` +
+           `<td>${playBtns(sec.evadeRow)}</td></tr>`;
+    }
+    h += `</table>`;
+  }
+  if (!m.sections.length) h += `<p class="none">this model's scripts carry no op10 sound records</p>`;
+  mainEl.innerHTML = h;
+  mainEl.querySelectorAll("button").forEach((b) => {
+    b.onclick = () => play(b.dataset.k, { battle: b.dataset.b === "1", duration: +b.dataset.d });
+  });
+}
+
+drawRoster();
+window.__audit = { roster, select, data, resolveModel };   // headless hooks
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+ "_note": "Pinned gap baseline for tools/audit_stage_coverage.py. --check exits non-zero when any stage's badness in any bucket EXCEEDS this file (a new silent extraction/render gap). Rerun --write-baseline only when a gap is legitimately closed or a newly decoded system adds an expected bucket.",
+ "buckets": {
+  "esdmg_unreferenced": {
+   "esdmg260": 66
+  },
+  "exits_floating": {
+   "s260": 1,
+   "s410": 1,
+   "s530": 1,
+   "s615": 1
+  }
+ }
+}

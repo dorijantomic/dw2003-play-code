@@ -1,0 +1,138 @@
+{
+  "source": "/mnt/c/Users/dorij/Downloads/hunyuan3d_20260930_225842_original.glb",
+  "source_faces": 182970,
+  "converted_faces": 6488,
+  "seams": {
+    "edges": 404,
+    "vertices": 396,
+    "max_animated_gap": 0.0
+  },
+  "native_validation": {
+    "bones": 12,
+    "triangles": 6488,
+    "texture": "1024x1024",
+    "timelines": 62
+  },
+  "parts": [
+    {
+      "id": "body",
+      "faces": 1904,
+      "vertices": 1059,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "head",
+      "faces": 1195,
+      "vertices": 662,
+      "color": [
+        122,
+        123,
+        125
+      ]
+    },
+    {
+      "id": "tail_base",
+      "faces": 638,
+      "vertices": 348,
+      "color": [
+        72,
+        88,
+        121
+      ]
+    },
+    {
+      "id": "tail_tip",
+      "faces": 246,
+      "vertices": 134,
+      "color": [
+        72,
+        88,
+        121
+      ]
+    },
+    {
+      "id": "upper_arm_a",
+      "faces": 181,
+      "vertices": 115,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "hand_a",
+      "faces": 52,
+      "vertices": 41,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "upper_arm_b",
+      "faces": 214,
+      "vertices": 139,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "hand_b",
+      "faces": 496,
+      "vertices": 275,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "thigh_a",
+      "faces": 510,
+      "vertices": 288,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "foot_a",
+      "faces": 309,
+      "vertices": 168,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "thigh_b",
+      "faces": 278,
+      "vertices": 171,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    },
+    {
+      "id": "foot_b",
+      "faces": 465,
+      "vertices": 250,
+      "color": [
+        90,
+        105,
+        138
+      ]
+    }
+  ]
+}

@@ -1,0 +1,307 @@
+{
+  "frontier": 45,
+  "holes": [],
+  "beats": [
+    {
+      "target": 1,
+      "stage": "s785",
+      "name": "Kusanagi City — Online Center",
+      "status": "advanced",
+      "detail": "→0x1"
+    },
+    {
+      "target": 2,
+      "stage": "s225",
+      "name": "Asuka City — Login Room",
+      "status": "advanced",
+      "detail": "→0x2"
+    },
+    {
+      "target": 3,
+      "stage": "s212",
+      "name": "Asuka City — Main Lobby",
+      "status": "advanced",
+      "detail": "→0x3"
+    },
+    {
+      "target": 4,
+      "stage": "s200",
+      "name": "Central Sector — Asuka City",
+      "status": "advanced",
+      "detail": "→0x4"
+    },
+    {
+      "target": 5,
+      "stage": "s420",
+      "name": "East Sector — Seiryu City",
+      "status": "advanced",
+      "detail": "→0x5"
+    },
+    {
+      "target": 6,
+      "stage": "s410",
+      "name": "East Sector — East Station",
+      "status": "advanced",
+      "detail": "→0x6"
+    },
+    {
+      "target": 7,
+      "stage": "s440",
+      "name": "South Sector — South Station",
+      "status": "advanced",
+      "detail": "→0x7"
+    },
+    {
+      "target": 8,
+      "stage": "s480",
+      "name": "South Sector — Jungle Grave",
+      "status": "advanced",
+      "detail": "→0x8"
+    },
+    {
+      "target": 9,
+      "stage": "s380",
+      "name": "East Sector — Divermon's Lake",
+      "status": "advanced",
+      "detail": "→0x9"
+    },
+    {
+      "target": 10,
+      "stage": "s475",
+      "name": "South Sector — Shaman House",
+      "status": "advanced",
+      "detail": "→0xa"
+    },
+    {
+      "target": 11,
+      "stage": "s520",
+      "name": "Suzaku City — Suzaku Hall",
+      "status": "advanced",
+      "detail": "→0xb"
+    },
+    {
+      "target": 12,
+      "stage": "s212",
+      "name": "Asuka City — Main Lobby",
+      "status": "advanced",
+      "detail": "→0xc"
+    },
+    {
+      "target": 13,
+      "stage": "s237",
+      "name": "Asuka City — Underground Path",
+      "status": "advanced",
+      "detail": "→0xd"
+    },
+    {
+      "target": 14,
+      "stage": "s212",
+      "name": "Asuka City — Main Lobby",
+      "status": "advanced",
+      "detail": "→0xe"
+    },
+    {
+      "target": 15,
+      "stage": "s460",
+      "name": "South Sector — Reliability Spot",
+      "status": "advanced",
+      "detail": "→0xf"
+    },
+    {
+      "target": 16,
+      "stage": "s685",
+      "name": "Byakko City — Underground Cave",
+      "status": "advanced",
+      "detail": "→0x10"
+    },
+    {
+      "target": 17,
+      "stage": "s655",
+      "name": "West Sector — Mirage Room",
+      "status": "advanced",
+      "detail": "→0x11"
+    },
+    {
+      "target": 18,
+      "stage": "s605",
+      "name": "West Sector — Operation Room",
+      "status": "advanced",
+      "detail": "→0x12"
+    },
+    {
+      "target": 19,
+      "stage": "s615",
+      "name": "West Sector — Sewers",
+      "status": "advanced",
+      "detail": "→0x13"
+    },
+    {
+      "target": 20,
+      "stage": "s620",
+      "name": "West Sector — Secret Room",
+      "status": "advanced",
+      "detail": "→0x14"
+    },
+    {
+      "target": 21,
+      "stage": "s620",
+      "name": "West Sector — Secret Room",
+      "status": "advanced",
+      "detail": "→0x15"
+    },
+    {
+      "target": 22,
+      "stage": "s325",
+      "name": "Asuka City — Control Room",
+      "status": "advanced",
+      "detail": "→0x16"
+    },
+    {
+      "target": 23,
+      "stage": "s305",
+      "name": "Asuka City — Master Room",
+      "status": "advanced",
+      "detail": "→0x17"
+    },
+    {
+      "target": 24,
+      "stage": "s210",
+      "name": "Asuka City — Main Lobby",
+      "status": "advanced",
+      "detail": "→0x18"
+    },
+    {
+      "target": 25,
+      "stage": "s685",
+      "name": "Byakko City — Underground Cave",
+      "status": "advanced",
+      "detail": "→0x19"
+    },
+    {
+      "target": 26,
+      "stage": "s520",
+      "name": "Suzaku City — Suzaku Hall",
+      "status": "advanced",
+      "detail": "→0x1a"
+    },
+    {
+      "target": 27,
+      "stage": "s545",
+      "name": "Network Break — Bug Maze Pit",
+      "status": "advanced",
+      "detail": "→0x1b"
+    },
+    {
+      "target": 28,
+      "stage": "s421",
+      "name": "East Sector — Qing Long City",
+      "status": "advanced",
+      "detail": "→0x1c"
+    },
+    {
+      "target": 29,
+      "stage": "s521",
+      "name": "Zhu Que City — Zhu Que Hall",
+      "status": "advanced",
+      "detail": "→0x1d"
+    },
+    {
+      "target": 30,
+      "stage": "s526",
+      "name": "South Sector — Zhu Que UG Lake",
+      "status": "advanced",
+      "detail": "→0x1e"
+    },
+    {
+      "target": 31,
+      "stage": "s755",
+      "name": "North Sector — Battle Gate",
+      "status": "advanced",
+      "detail": "→0x1f"
+    },
+    {
+      "target": 32,
+      "stage": "s750",
+      "name": "North Sector — Chamber Room",
+      "status": "advanced",
+      "detail": "→0x20"
+    },
+    {
+      "target": 33,
+      "stage": "s750",
+      "name": "North Sector — Chamber Room",
+      "status": "advanced",
+      "detail": "→0x21"
+    },
+    {
+      "target": 34,
+      "stage": "s305",
+      "name": "Asuka City — Master Room",
+      "status": "advanced",
+      "detail": "→0x22"
+    },
+    {
+      "target": 35,
+      "stage": "s676",
+      "name": "Bai Hu City — Bai Hu Dome",
+      "status": "advanced",
+      "detail": "→0x23"
+    },
+    {
+      "target": 36,
+      "stage": "s756",
+      "name": "North Sector — Battle Gate",
+      "status": "advanced",
+      "detail": "→0x24"
+    },
+    {
+      "target": 37,
+      "stage": "s206",
+      "name": "Central Sector — Amaterasu Bridge",
+      "status": "advanced",
+      "detail": "→0x25"
+    },
+    {
+      "target": 38,
+      "stage": "s226",
+      "name": "Amaterasu City — Login Room",
+      "status": "advanced",
+      "detail": "→0x26"
+    },
+    {
+      "target": 39,
+      "stage": "s310",
+      "name": "Asuka City — A.o.A Headquarters",
+      "status": "advanced",
+      "detail": "→0x27"
+    },
+    {
+      "target": 40,
+      "stage": "s311",
+      "name": "Amaterasu City — A.o.A Headquarters",
+      "status": "advanced",
+      "detail": "→0x28"
+    },
+    {
+      "target": 41,
+      "stage": "s810",
+      "name": "Spy Satellite — Gunslinger 1F",
+      "status": "advanced",
+      "detail": "→0x29"
+    },
+    {
+      "target": 43,
+      "stage": "s820",
+      "name": "Spy Satellite — Control Room",
+      "status": "advanced",
+      "detail": "→0x2b"
+    },
+    {
+      "target": 45,
+      "stage": "s780",
+      "name": "Kusanagi City — Street Corner",
+      "status": "advanced",
+      "detail": "→0x2d"
+    }
+  ]
+}

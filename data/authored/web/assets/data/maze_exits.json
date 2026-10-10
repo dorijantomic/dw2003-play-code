@@ -1,0 +1,277 @@
+{
+ "_comment": "Runtime-captured real exit tables for the Mobius Desert self-warp stages. The wstag*.s overlay warp records for these stages are STALE PLACEHOLDERS (self-warps to their own screen); the actual disc overlay loads real inter-map neighbour warps, which the field engine writes into the exit buffer at [0x80099d80+0x14]. Captured live on the PCSX-Redux rig (warp-anywhere from the Suzaku Inn save-state, read the exit buffer). Verified entry-INDEPENDENT and game-state-independent (single write during overlay load, pc 0x80025168; two different entry edges gave identical tables). See docs/todo/2026-07-09-self-warp-maze-wiring.md and docs/research/field/door-warp-decode.md. Trigger geometry comes from the type-7 grid (story_trigger_grids.json), whose wedge codes = (dir<<5)|step and index these exits by direction. Only the 4 desert stages (which have grids) are wired here; the seabed/circuit harvest is recorded in the todo, pending trigger-geometry decode. 2026-07-10: added the 8 Seabed stages (s825-s860) from the same 2026-07-09 runtime harvest (tables recorded in the todo doc); their type-7 grids were recovered by fixing the lw-base-register blind spot in the grid extractors. Seabed entries carry an explicit step index (harvest order = step order; wedge low5 = step). Wedge dir 4 corresponds to live dir 0 (non-cardinal), verified consistent across all 8 stages. Circuit s865-s895 stay unwired: still self-warps even at runtime (need the s9xx alias entry context).",
+ "stages": {
+  "635": [
+   {
+    "dir": "up",
+    "to": "s630",
+    "screen": 599,
+    "spawnX": 256,
+    "spawnY": 632
+   },
+   {
+    "dir": "right",
+    "to": "s640",
+    "screen": 601,
+    "spawnX": 288,
+    "spawnY": 256
+   },
+   {
+    "dir": "down",
+    "to": "s640",
+    "screen": 601,
+    "spawnX": 856,
+    "spawnY": 252
+   },
+   {
+    "dir": "left",
+    "to": "s640",
+    "screen": 601,
+    "spawnX": 848,
+    "spawnY": 760
+   }
+  ],
+  "640": [
+   {
+    "dir": "up",
+    "to": "s630",
+    "screen": 599,
+    "spawnX": 256,
+    "spawnY": 632
+   },
+   {
+    "dir": "right",
+    "to": "s635",
+    "screen": 600,
+    "spawnX": 272,
+    "spawnY": 264
+   },
+   {
+    "dir": "down",
+    "to": "s635",
+    "screen": 600,
+    "spawnX": 832,
+    "spawnY": 240
+   },
+   {
+    "dir": "left",
+    "to": "s635",
+    "screen": 600,
+    "spawnX": 872,
+    "spawnY": 748
+   }
+  ],
+  "636": [
+   {
+    "dir": "up",
+    "to": "s631",
+    "screen": 704,
+    "spawnX": 256,
+    "spawnY": 632
+   },
+   {
+    "dir": "right",
+    "to": "s641",
+    "screen": 706,
+    "spawnX": 288,
+    "spawnY": 256
+   },
+   {
+    "dir": "down",
+    "to": "s641",
+    "screen": 706,
+    "spawnX": 856,
+    "spawnY": 252
+   },
+   {
+    "dir": "left",
+    "to": "s641",
+    "screen": 706,
+    "spawnX": 848,
+    "spawnY": 760
+   }
+  ],
+  "641": [
+   {
+    "dir": "up",
+    "to": "s631",
+    "screen": 704,
+    "spawnX": 256,
+    "spawnY": 632
+   },
+   {
+    "dir": "right",
+    "to": "s636",
+    "screen": 705,
+    "spawnX": 272,
+    "spawnY": 264
+   },
+   {
+    "dir": "down",
+    "to": "s636",
+    "screen": 705,
+    "spawnX": 832,
+    "spawnY": 240
+   },
+   {
+    "dir": "left",
+    "to": "s636",
+    "screen": 705,
+    "spawnX": 872,
+    "spawnY": 748
+   }
+  ],
+  "825": [
+   {
+    "step": 0,
+    "dir": 0,
+    "to": "s400",
+    "screen": 554,
+    "spawnX": 812,
+    "spawnY": 562
+   },
+   {
+    "step": 1,
+    "dir": "down",
+    "to": "s855",
+    "screen": 742,
+    "spawnX": 1104,
+    "spawnY": 584
+   }
+  ],
+  "830": [
+   {
+    "step": 0,
+    "dir": 0,
+    "to": "s205",
+    "screen": 514,
+    "spawnX": 336,
+    "spawnY": 328
+   },
+   {
+    "step": 1,
+    "dir": 0,
+    "to": "s205",
+    "screen": 514,
+    "spawnX": 1056,
+    "spawnY": 496
+   },
+   {
+    "step": 2,
+    "dir": "up",
+    "to": "s825",
+    "screen": 736,
+    "spawnX": 176,
+    "spawnY": 376
+   }
+  ],
+  "835": [
+   {
+    "step": 0,
+    "dir": 0,
+    "to": "s570",
+    "screen": 587,
+    "spawnX": 720,
+    "spawnY": 800
+   },
+   {
+    "step": 1,
+    "dir": "up",
+    "to": "s855",
+    "screen": 742,
+    "spawnX": 160,
+    "spawnY": 336
+   }
+  ],
+  "840": [
+   {
+    "step": 0,
+    "dir": 0,
+    "to": "s345",
+    "screen": 544,
+    "spawnX": 112,
+    "spawnY": 184
+   },
+   {
+    "step": 1,
+    "dir": "down",
+    "to": "s855",
+    "screen": 742,
+    "spawnX": 1104,
+    "spawnY": 584
+   }
+  ],
+  "845": [
+   {
+    "step": 0,
+    "dir": "up",
+    "to": "s850",
+    "screen": 741,
+    "spawnX": 224,
+    "spawnY": 288
+   },
+   {
+    "step": 1,
+    "dir": "down",
+    "to": "s850",
+    "screen": 741,
+    "spawnX": 944,
+    "spawnY": 216
+   }
+  ],
+  "850": [
+   {
+    "step": 0,
+    "dir": 0,
+    "to": "s330",
+    "screen": 541,
+    "spawnX": 808,
+    "spawnY": 1060
+   },
+   {
+    "step": 1,
+    "dir": "up",
+    "to": "s855",
+    "screen": 742,
+    "spawnX": 160,
+    "spawnY": 336
+   },
+   {
+    "step": 2,
+    "dir": "down",
+    "to": "s845",
+    "screen": 740,
+    "spawnX": 832,
+    "spawnY": 160
+   }
+  ],
+  "855": [
+   {
+    "step": 0,
+    "dir": "up",
+    "to": "s840",
+    "screen": 739,
+    "spawnX": 160,
+    "spawnY": 384
+   },
+   {
+    "step": 1,
+    "dir": "down",
+    "to": "s835",
+    "screen": 738,
+    "spawnX": 816,
+    "spawnY": 248
+   }
+  ],
+  "860": [
+   {
+    "step": 0,
+    "dir": "up",
+    "to": "s850",
+    "screen": 741,
+    "spawnX": 224,
+    "spawnY": 288
+   }
+  ]
+ }
+}

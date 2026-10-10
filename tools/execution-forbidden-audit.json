@@ -1,0 +1,1419 @@
+{
+  "generated": "2026-10-06T22:56:47.559Z",
+  "summary": {
+    "ours": 41,
+    "switch-gated-only": 0,
+    "interpreter-reachable": 2
+  },
+  "pageBundle": {
+    "file": "web/vendor/engine.js",
+    "markers": [],
+    "containsInterpreter": false
+  },
+  "nativeBundle": {
+    "file": "web/vendor/engine-native.js",
+    "present": true,
+    "containsInterpreter": true
+  },
+  "pageGraph": {
+    "entries": [
+      "web/game.js",
+      "web/battle.js"
+    ],
+    "reachesInterpreter": false,
+    "interpreter": []
+  },
+  "interpreterShipped": false,
+  "negativeControl": {
+    "entry": "engine/native-entry.ts",
+    "reachable": [
+      "engine/native/bridge.ts",
+      "engine/native/device-ports.ts",
+      "engine/native/gte.ts",
+      "engine/native/memory.ts",
+      "engine/native/mips.ts",
+      "engine/native/raw-prims.ts",
+      "engine/native/runtime.ts",
+      "engine/native/screen-heap.ts",
+      "engine/native/stubs.ts",
+      "engine/native/vram.ts"
+    ],
+    "catchesInterpreter": true,
+    "catchesInterpreterSource": true,
+    "consumedPorts": {
+      "portsChecked": 25,
+      "importedPortReadsConsumed": true,
+      "emptyImportsCreditsNothing": true,
+      "strippedImportFlipsPort": true,
+      "fullImportSetCreditsAll": true,
+      "fullImportSetLeavesNoneUnconsumed": true,
+      "example": {
+        "consumed": "engine/dw3/battle-presentation.ts",
+        "flipped": "engine/systems/blast-presentation.ts"
+      }
+    }
+  },
+  "productionBarrel": {
+    "entry": "engine/index.ts",
+    "reachable": [
+      "engine/native/memory.ts",
+      "engine/native/vram.ts"
+    ],
+    "reachesInterpreter": false
+  },
+  "surfaces": [
+    {
+      "id": "stitshop",
+      "kind": "screen",
+      "title": "Item / armory / pawn shop",
+      "class": "ours",
+      "entry": "engine/dw3/ui/shop-root-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 478,
+        "text": "const shop = USE_NATIVE_SHOP ? createShopNative(sfx, { digimonDB: () => menu.digimonDB ?? {} }) : shopTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/shop-native.js",
+        "flag": "nativeShop"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_shop.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stcrdshp",
+      "kind": "screen",
+      "title": "Card shop",
+      "class": "ours",
+      "entry": "engine/dw3/ui/card-shop-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 579,
+        "text": ": GYM_PARAMS.has(\"nativeCardShop\") ? cardShopNative : cardShopTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/cardshop-native.js",
+        "flag": "nativeCardShop"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_cardshop.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stgtrain",
+      "kind": "screen",
+      "title": "Training gym",
+      "class": "ours",
+      "entry": "engine/dw3/ui/gym-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 543,
+        "text": "const gym = USE_NATIVE_GYM ? (USE_REFERENCE_GYM ? createGymNative(sfx) : createGymTranslated(sfx)) : gymLegacy;"
+      },
+      "reachable": [
+        "engine/native/memory.ts",
+        "engine/native/vram.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/gym-native.js",
+        "flag": "nativeGym"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_gym.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stgdglab",
+      "kind": "screen",
+      "title": "Digimon Lab",
+      "class": "ours",
+      "entry": "engine/dw3/ui/lab-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 570,
+        "text": "const driMenu = USE_NATIVE_DRI ? (USE_REFERENCE_LAB ? createDriNative(sfx) : createLabTranslated(sfx)) : driLegacy;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/dri-native.js",
+        "flag": "nativeLab"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_lab.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "ststatus",
+      "kind": "screen",
+      "title": "Pause / STATUS pages",
+      "class": "ours",
+      "entry": "engine/dw3/ui/pause-root-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 568,
+        "text": ": USE_REFERENCE_STATUS ? createStatusNative(sfx, statusOptions)"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/status-native.js",
+        "flag": "nativeStatus"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_pause.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stdgname",
+      "kind": "screen",
+      "title": "Partner naming",
+      "class": "ours",
+      "entry": "engine/dw3/ui/name-root-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 539,
+        "text": "const nameEntryNative = USE_REFERENCE_NAME"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/nameentry-native.js",
+        "flag": "nativeName"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_naming.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stplnmet",
+      "kind": "screen",
+      "title": "Registration wizard",
+      "class": "ours",
+      "entry": "engine/dw3/ui/wizard-root-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 532,
+        "text": "const packSelectNative = USE_REFERENCE_PACK ? createPackSelectNative(sfx) : createPackSelectTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/packselect-native.js",
+        "flag": "nativePack"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_packselect.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stdwtitl",
+      "kind": "screen",
+      "title": "Title screen",
+      "class": "ours",
+      "entry": "engine/dw3/ui/title-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 2463,
+        "text": "const newTitle = () => USE_NATIVE_TITLE"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/title-native.js",
+        "flag": "nativeTitle"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_title.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stgmcard",
+      "kind": "screen",
+      "title": "Save / Load memory card",
+      "class": "ours",
+      "entry": "engine/dw3/ui/memcard-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 716,
+        "text": "const saveScreenNative = USE_REFERENCE_SAVE ? createSaveNative(sfx) : createSaveTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/save-native.js",
+        "flag": "nativeSave"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_save.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "stfgtrep",
+      "kind": "screen",
+      "title": "Victory report",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-report-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 703,
+        "text": "const fightReportNative = USE_REFERENCE_REPORT"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/fightreport-native.js",
+        "flag": "nativeReport"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_report.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "cnty_sel",
+      "kind": "screen",
+      "title": "Language selection",
+      "class": "ours",
+      "entry": "engine/dw3/ui/country-screen.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 897,
+        "text": "const USE_NATIVE_CNTYSEL = !GYM_PARAMS.has(\"legacyCntysel\");"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": {
+        "verifier": "tools/verify_translated_language.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "fightstg",
+      "kind": "screen",
+      "title": "Battle command list",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-command-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2610,
+        "text": "const commandNative = USE_REFERENCE_COMMAND"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/battlecmd-native.js",
+        "flag": "nativeBattleCmd"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_battlecmd.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "wfightmn",
+      "kind": "screen",
+      "title": "Battle scene loader",
+      "class": "ours",
+      "entry": "engine/dw3/ui/wfight-loader-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2698,
+        "text": "const wfightNative = USE_REFERENCE_WFIGHT"
+      },
+      "reachable": [
+        "engine/native/memory.ts",
+        "engine/native/vram.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/wfightmn-native.js",
+        "flag": "nativeWfight"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_wfight.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "battle-tech",
+      "kind": "screen",
+      "title": "Battle TECH list",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-tech-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2621,
+        "text": "const techNative = createBattleTechTranslated(sfx, { getState });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-item",
+      "kind": "screen",
+      "title": "Battle ITEM list",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-item-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2630,
+        "text": "const itemNative = createBattleItemTranslated(sfx, { getState });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-tag",
+      "kind": "screen",
+      "title": "Battle TAG partner list",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-tag-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2640,
+        "text": "const tagNative = createBattleTagTranslated(sfx, { getState });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-form",
+      "kind": "screen",
+      "title": "Battle Digivolve form list",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-form-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2654,
+        "text": "const formNative = createBattleFormTranslated(sfx, { getState });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-dna",
+      "kind": "screen",
+      "title": "Battle DNA / Tag follow-up",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-dna-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2683,
+        "text": "const dnaNative = createBattleDnaTranslated(sfx, { getState });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-msg",
+      "kind": "screen",
+      "title": "Battle message line",
+      "class": "ours",
+      "entry": "engine/dw3/ui/battle-message-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2599,
+        "text": "const msgSession = USE_TRANSLATED_MSG"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "battle-hud",
+      "kind": "screen",
+      "title": "Battle HP plate",
+      "class": "ours",
+      "entry": "engine/dw3/ui/native/battle-hud.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2586,
+        "text": "translatedBattleHudEnabled(location.search);"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "dialogue",
+      "kind": "screen",
+      "title": "Field conversation box",
+      "class": "ours",
+      "entry": "engine/dw3/ui/dialogue-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 425,
+        "text": "const dialogueBox = createDialogueTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": {
+        "verifier": "tools/verify_dialogue_talk.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "yesno",
+      "kind": "screen",
+      "title": "Field Yes / No box",
+      "class": "ours",
+      "entry": "engine/dw3/ui/yesno-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 436,
+        "text": "const yesNoBox = createYesNoTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "help-menu",
+      "kind": "screen",
+      "title": "Help menu (eight topics)",
+      "class": "ours",
+      "entry": "engine/dw3/ui/help-menu-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 446,
+        "text": "const helpMenuBox = createHelpMenuTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "endcard",
+      "kind": "screen",
+      "title": "END card",
+      "class": "ours",
+      "entry": "engine/dw3/ui/end-card-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 339,
+        "text": "const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": {
+        "verifier": "tools/verify_endscreen.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "placecard",
+      "kind": "screen",
+      "title": "Place title card",
+      "class": "ours",
+      "entry": "engine/dw3/ui/place-card-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 887,
+        "text": "const placeCard = USE_LEGACY_PLACE_CARD ? createPlaceCard() : createPlaceCardTranslated();"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "inn",
+      "kind": "screen",
+      "title": "Inn rest screen",
+      "class": "ours",
+      "entry": "engine/dw3/ui/inn-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 879,
+        "text": "const inn = new URLSearchParams(location.search).has(\"legacyInn\") ? createInn(sfx) : createInnTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "stcrdabm",
+      "kind": "screen",
+      "title": "Card Album",
+      "class": "ours",
+      "entry": "engine/dw3/ui/album-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 592,
+        "text": ": GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/cardalbum-native.js",
+        "flag": "nativeAlbum"
+      },
+      "browser": null
+    },
+    {
+      "id": "stcrddek",
+      "kind": "screen",
+      "title": "Card folder editor",
+      "class": "ours",
+      "entry": "engine/dw3/ui/folder-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 604,
+        "text": ": GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/carddeck-native.js",
+        "flag": "nativeFolder"
+      },
+      "browser": null
+    },
+    {
+      "id": "cardgame",
+      "kind": "screen",
+      "title": "Card duel",
+      "class": "interpreter-reachable",
+      "entry": "engine/native/runtime.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 632,
+        "text": "const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy;"
+      },
+      "reachable": [
+        "engine/native/device-ports.ts",
+        "engine/native/gte.ts",
+        "engine/native/memory.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts",
+        "engine/native/vram.ts"
+      ],
+      "forbidden": [
+        "engine/native/device-ports.ts",
+        "engine/native/gte.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts"
+      ],
+      "interpreterVia": [
+        "engine/native/device-ports.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts"
+      ],
+      "reference": null,
+      "browser": null
+    },
+    {
+      "id": "field",
+      "kind": "screen",
+      "title": "Field / stage ambience",
+      "class": "ours",
+      "entry": [
+        "engine/systems/point-record-actor.ts",
+        "engine/systems/falling-object.ts",
+        "engine/systems/street-vehicles.ts",
+        "engine/systems/street-screens.ts",
+        "engine/systems/street-lights.ts",
+        "engine/systems/stinger-popup.ts",
+        "engine/systems/stage-fixed-sprite.ts",
+        "engine/systems/stage-slot-player.ts",
+        "engine/systems/stage-slot-ensemble.ts",
+        "engine/systems/shape-annotator.ts",
+        "engine/systems/draw-context.ts",
+        "engine/systems/field-character.ts",
+        "engine/systems/field-camera.ts",
+        "engine/systems/ordinal-scene-variant.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 5414,
+        "text": "enterNativeStage(mapId, {"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/native-stage.js",
+        "flag": "nativeStages"
+      },
+      "browser": {
+        "verifier": "tools/verify_translated_field_ambience.mjs",
+        "deniesNativeAssets": true
+      }
+    },
+    {
+      "id": "system:shops",
+      "kind": "system",
+      "title": "shops",
+      "class": "ours",
+      "entry": "engine/dw3/ui/shop-root-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 478,
+        "text": "const shop = USE_NATIVE_SHOP ? createShopNative(sfx, { digimonDB: () => menu.digimonDB ?? {} }) : shopTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/shop-native.js",
+        "flag": "nativeShop"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:card-battle",
+      "kind": "system",
+      "title": "card-battle",
+      "class": "ours",
+      "entry": [
+        "engine/dw3/ui/album-session.ts",
+        "engine/dw3/ui/folder-session.ts",
+        "engine/systems/card-battle.ts",
+        "engine/systems/card-effect-vm.ts",
+        "engine/systems/card-ceremony.ts",
+        "engine/systems/card-view.ts",
+        "engine/systems/card-inspect.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 592,
+        "text": ": GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "browser": null,
+      "components": [
+        {
+          "id": "card-battle:album",
+          "title": "Card Album screen",
+          "class": "ours",
+          "entry": "engine/dw3/ui/album-session.ts",
+          "decision": {
+            "file": "web/game.js",
+            "line": 592,
+            "text": ": GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated;"
+          },
+          "reachable": [
+            "engine/native/memory.ts"
+          ],
+          "forbidden": [],
+          "interpreterVia": []
+        },
+        {
+          "id": "card-battle:folder",
+          "title": "Card folder editor screen",
+          "class": "ours",
+          "entry": "engine/dw3/ui/folder-session.ts",
+          "decision": {
+            "file": "web/game.js",
+            "line": 604,
+            "text": ": GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated;"
+          },
+          "reachable": [
+            "engine/native/memory.ts"
+          ],
+          "forbidden": [],
+          "interpreterVia": []
+        },
+        {
+          "id": "card-battle:duel",
+          "title": "Card duel screen",
+          "class": "interpreter-reachable",
+          "entry": "web/cardduel-native.js",
+          "decision": {
+            "file": "web/game.js",
+            "line": 632,
+            "text": "const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy;"
+          },
+          "reachable": [],
+          "forbidden": [],
+          "interpreterVia": [
+            "web/vendor/engine-native.js"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system:digivolution",
+      "kind": "system",
+      "title": "digivolution",
+      "class": "ours",
+      "entry": "engine/dw3/ui/lab-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 570,
+        "text": "const driMenu = USE_NATIVE_DRI ? (USE_REFERENCE_LAB ? createDriNative(sfx) : createLabTranslated(sfx)) : driLegacy;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/dri-native.js",
+        "flag": "nativeLab"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:gym-training",
+      "kind": "system",
+      "title": "gym-training",
+      "class": "ours",
+      "entry": "engine/dw3/ui/gym-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 543,
+        "text": "const gym = USE_NATIVE_GYM ? (USE_REFERENCE_GYM ? createGymNative(sfx) : createGymTranslated(sfx)) : gymLegacy;"
+      },
+      "reachable": [
+        "engine/native/memory.ts",
+        "engine/native/vram.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/gym-native.js",
+        "flag": "nativeGym"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:inn",
+      "kind": "system",
+      "title": "inn",
+      "class": "ours",
+      "entry": "engine/dw3/ui/inn-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 879,
+        "text": "const inn = new URLSearchParams(location.search).has(\"legacyInn\") ? createInn(sfx) : createInnTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "browser": null
+    },
+    {
+      "id": "system:battle",
+      "kind": "system",
+      "title": "battle",
+      "class": "ours",
+      "entry": "engine/dw3/ui/fight-command-session.ts",
+      "decision": {
+        "file": "web/battle.js",
+        "line": 2610,
+        "text": "const commandNative = USE_REFERENCE_COMMAND"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/battlecmd-native.js",
+        "flag": "nativeBattleCmd"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:save-load",
+      "kind": "system",
+      "title": "save-load",
+      "class": "ours",
+      "entry": "engine/dw3/ui/memcard-session.ts",
+      "decision": {
+        "file": "web/game.js",
+        "line": 716,
+        "text": "const saveScreenNative = USE_REFERENCE_SAVE ? createSaveNative(sfx) : createSaveTranslated(sfx);"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/save-native.js",
+        "flag": "nativeSave"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:ui-chrome",
+      "kind": "system",
+      "title": "ui-chrome",
+      "class": "ours",
+      "entry": [
+        "engine/dw3/ui/album-session.ts",
+        "engine/dw3/ui/folder-session.ts",
+        "engine/dw3/ui/pause-root-session.ts",
+        "engine/dw3/ui/name-root-session.ts",
+        "engine/dw3/ui/title-session.ts",
+        "engine/dw3/ui/country-screen.ts",
+        "engine/dw3/ui/help-menu-session.ts",
+        "engine/dw3/ui/dialogue-session.ts",
+        "engine/dw3/ui/yesno-session.ts",
+        "engine/dw3/ui/end-card-session.ts",
+        "engine/dw3/ui/place-card-session.ts",
+        "engine/dw3/ui/inn-session.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 604,
+        "text": ": GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated;"
+      },
+      "reachable": [
+        "engine/native/memory.ts"
+      ],
+      "forbidden": [],
+      "interpreterVia": [],
+      "browser": null,
+      "components": [
+        {
+          "id": "ui-chrome:album",
+          "title": "Card Album screen",
+          "class": "ours",
+          "entry": "engine/dw3/ui/album-session.ts",
+          "decision": {
+            "file": "web/game.js",
+            "line": 592,
+            "text": ": GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated;"
+          },
+          "reachable": [
+            "engine/native/memory.ts"
+          ],
+          "forbidden": [],
+          "interpreterVia": []
+        },
+        {
+          "id": "ui-chrome:folder",
+          "title": "Card folder editor screen",
+          "class": "ours",
+          "entry": "engine/dw3/ui/folder-session.ts",
+          "decision": {
+            "file": "web/game.js",
+            "line": 604,
+            "text": ": GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated;"
+          },
+          "reachable": [
+            "engine/native/memory.ts"
+          ],
+          "forbidden": [],
+          "interpreterVia": []
+        },
+        {
+          "id": "ui-chrome:duel",
+          "title": "Card duel screen",
+          "class": "interpreter-reachable",
+          "entry": "web/cardduel-native.js",
+          "decision": {
+            "file": "web/game.js",
+            "line": 632,
+            "text": "const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy;"
+          },
+          "reachable": [],
+          "forbidden": [],
+          "interpreterVia": [
+            "web/vendor/engine-native.js"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "system:quest-events",
+      "kind": "system",
+      "title": "quest-events",
+      "class": "ours",
+      "entry": [
+        "engine/systems/native-event-families.ts",
+        "engine/systems/dungeon-switch.ts",
+        "engine/systems/trigger-system.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 476,
+        "text": "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\");"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/native-stage.js",
+        "flag": "nativeStages"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:world-exploration",
+      "kind": "system",
+      "title": "world-exploration",
+      "class": "ours",
+      "entry": [
+        "engine/systems/point-record-actor.ts",
+        "engine/systems/falling-object.ts",
+        "engine/systems/street-vehicles.ts",
+        "engine/systems/street-screens.ts",
+        "engine/systems/street-lights.ts",
+        "engine/systems/stinger-popup.ts",
+        "engine/systems/stage-fixed-sprite.ts",
+        "engine/systems/stage-slot-player.ts",
+        "engine/systems/stage-slot-ensemble.ts",
+        "engine/systems/shape-annotator.ts",
+        "engine/systems/draw-context.ts",
+        "engine/systems/field-character.ts",
+        "engine/systems/cast-list.ts",
+        "engine/systems/block-actor.ts",
+        "engine/systems/field-camera.ts",
+        "engine/systems/ordinal-scene-variant.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 476,
+        "text": "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\");"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/native-stage.js",
+        "flag": "nativeStages"
+      },
+      "browser": null
+    },
+    {
+      "id": "system:story-gating",
+      "kind": "system",
+      "title": "story-gating",
+      "class": "ours",
+      "entry": [
+        "engine/systems/story-command-banks.ts",
+        "engine/systems/trigger-system.ts"
+      ],
+      "decision": {
+        "file": "web/game.js",
+        "line": 476,
+        "text": "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\");"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "reference": {
+        "adapter": "web/native-stage.js",
+        "flag": "nativeStages"
+      },
+      "browser": null
+    },
+    {
+      "id": "battle-3d",
+      "kind": "system",
+      "title": "battle-3d",
+      "class": "ours",
+      "entry": [
+        "engine/dw3/battle-presentation.ts",
+        "engine/dw3/battle-mesh.ts",
+        "engine/dw3/battle-camera.ts",
+        "engine/dw3/battle-idle-director.ts",
+        "engine/dw3/battle-slot-motion.ts",
+        "engine/dw3/battle-timeline-sampler.ts",
+        "engine/dw3/battle-actor-animation.ts",
+        "engine/dw3/battle-actor-lifecycle.ts",
+        "engine/dw3/battle-actor-pool.ts",
+        "engine/dw3/battle-task-spawn.ts",
+        "engine/dw3/battle-action-dispatcher.ts",
+        "engine/dw3/battle-action-handlers.ts",
+        "engine/dw3/battle-action-opcodes.ts",
+        "engine/dw3/battle-reaction-dispatch.ts",
+        "engine/dw3/battle-effects.ts",
+        "engine/dw3/battle-effect-driver.ts",
+        "engine/dw3/battle-effect-driver-host.ts",
+        "engine/dw3/battle-effect-spawn.ts",
+        "engine/dw3/battle-effect-tint.ts",
+        "engine/dw3/battle-projectile.ts",
+        "engine/dw3/battle-slow-motion.ts",
+        "engine/dw3/battle-cel-draw.ts",
+        "engine/dw3/battle-enemy-id.ts",
+        "engine/dw3/battle-steal-roll.ts",
+        "engine/dw3/gte-math.ts"
+      ],
+      "decision": {
+        "file": "web/battle3d.js",
+        "line": 31,
+        "text": "import { ui, arenaPlacement, patchCopyRect, ARENA_BASE_Z,"
+      },
+      "reachable": [],
+      "forbidden": [],
+      "interpreterVia": [],
+      "browser": null,
+      "consumption": {
+        "routeEntry": [
+          "web/battle3d.js",
+          "web/battle.js",
+          "web/battlehud-translated.js"
+        ],
+        "routeFiles": [
+          "web/assets.js",
+          "web/battle.js",
+          "web/battle3d.js",
+          "web/battlecmd-native.js",
+          "web/battlecmd-translated.js",
+          "web/battledna-translated.js",
+          "web/battleform-translated.js",
+          "web/battlehud-translated.js",
+          "web/battleitem-translated.js",
+          "web/battlemsg-translated.js",
+          "web/battletag-translated.js",
+          "web/battletech-translated.js",
+          "web/blast-presentation.js",
+          "web/fight/action-vm.js",
+          "web/fight/actor-animator.js",
+          "web/fight/battle-camera.js",
+          "web/fight/battle-idle-director.js",
+          "web/fight/display-list.js",
+          "web/fight/effect-player.js",
+          "web/fight/fight-coordinator.js",
+          "web/fight/fight-tables.js",
+          "web/fight/proj-layers.js",
+          "web/fight/texture-patch-animator.js",
+          "web/fight/timeline-player.js",
+          "web/input.js",
+          "web/itemicons-data.js",
+          "web/itemicons.js",
+          "web/nameentry-translated.js",
+          "web/native-runtime.js",
+          "web/native-screen-host.js",
+          "web/native-screen-render.js",
+          "web/native-screen-text.js",
+          "web/native-screen.js",
+          "web/native-session.js",
+          "web/party.js",
+          "web/resident-data.js",
+          "web/screendim.js",
+          "web/screenpack.js",
+          "web/uifont.js",
+          "web/vendor/engine.js",
+          "web/wfight-translated.js",
+          "web/wfightmn-native.js"
+        ],
+        "routeSymbolCount": 238,
+        "ports": [
+          {
+            "module": "engine/dw3/battle-presentation.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-mesh.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-camera.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-idle-director.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-slot-motion.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-timeline-sampler.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-actor-animation.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-actor-lifecycle.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-actor-pool.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-task-spawn.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-action-dispatcher.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-action-handlers.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-action-opcodes.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-reaction-dispatch.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-effects.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-effect-driver.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-effect-driver-host.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-effect-spawn.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-effect-tint.ts",
+            "consumed": true,
+            "via": "transitive"
+          },
+          {
+            "module": "engine/dw3/battle-projectile.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-slow-motion.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-cel-draw.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-enemy-id.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/battle-steal-roll.ts",
+            "consumed": true,
+            "via": "direct"
+          },
+          {
+            "module": "engine/dw3/gte-math.ts",
+            "consumed": true,
+            "via": "transitive"
+          }
+        ],
+        "consumedCount": 25,
+        "unconsumed": []
+      }
+    },
+    {
+      "id": "system:resident-core",
+      "kind": "system",
+      "title": "resident-core",
+      "class": "interpreter-reachable",
+      "entry": "engine/native/runtime.ts",
+      "decision": {
+        "file": "web/native-runtime.js",
+        "line": 29,
+        "text": "promise = import(\"./vendor/engine-native.js\").then((m) => {"
+      },
+      "reachable": [
+        "engine/native/device-ports.ts",
+        "engine/native/gte.ts",
+        "engine/native/memory.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts",
+        "engine/native/vram.ts"
+      ],
+      "forbidden": [
+        "engine/native/device-ports.ts",
+        "engine/native/gte.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts"
+      ],
+      "interpreterVia": [
+        "engine/native/device-ports.ts",
+        "engine/native/mips.ts",
+        "engine/native/raw-prims.ts",
+        "engine/native/runtime.ts",
+        "engine/native/screen-heap.ts",
+        "engine/native/stubs.ts"
+      ],
+      "browser": null
+    }
+  ],
+  "logicSystems": [
+    "arena-tournaments",
+    "audio",
+    "battle-model-data",
+    "battle-scene-test",
+    "blast-digivolution",
+    "charisma",
+    "dna-digivolution",
+    "elemental",
+    "engine-resource",
+    "equipment",
+    "exp-leveling",
+    "field-character-shadow",
+    "fishing",
+    "input",
+    "items",
+    "party-management",
+    "post-game",
+    "random-encounters",
+    "rendering-2d",
+    "stat-growth",
+    "status-effects",
+    "technique-loading"
+  ]
+}

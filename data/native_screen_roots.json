@@ -1,0 +1,290 @@
+[
+  {
+    "module": "pro/stgdglab",
+    "ctor": "0x8008efd0",
+    "tick": "0x8008ed0c",
+    "actor": "lab_root_tick",
+    "disc_index": 492,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/lab-translated.js",
+      "controller": "engine/dw3/ui/lab-session.ts",
+      "data": "web/assets/data/lab/manifest.json",
+      "oracle": "tests/lab-session.test.js",
+      "proof": "tools/verify_translated_lab.mjs"
+    }
+  },
+  {
+    "module": "pro/ststatus",
+    "ctor": "0x80099a80",
+    "tick": "0x80099894",
+    "actor": "pause_host_tick",
+    "disc_index": 519,
+    "production": {
+      "execution": "translated",
+      "complete": false,
+      "adapter": "web/status-translated.js",
+      "controller": "engine/dw3/ui/pause-root-session.ts",
+      "data": "web/assets/data/pause/manifest.json",
+      "oracle": "tests/pause-root-session.test.js",
+      "proof": "tools/verify_translated_pause.mjs"
+    }
+  },
+  {
+    "module": "pro/stitshop",
+    "ctor": "0x8008596c",
+    "tick": "0x80085890",
+    "actor": "shopActorConstruct_stitshop_1",
+    "disc_index": 517,
+    "pack": "stshop",
+    "packs": {
+      "646": "cmfont",
+      "1026": "stshop"
+    },
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/shop-translated.js",
+      "controller": "engine/dw3/ui/shop-root-session.ts",
+      "data": "web/assets/data/shop_catalog.json",
+      "oracle": "tests/shop-task-composition.test.js",
+      "proof": "tools/verify_browser_shop.mjs"
+    }
+  },
+  {
+    "module": "pro/stgtrain",
+    "ctor": "0x80085dd8",
+    "tick": "0x80085bb0",
+    "actor": "gym_screen_tick",
+    "disc_index": 498,
+    "packs": {
+      "652:0": "sttrng0"
+    },
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/gym-translated.js",
+      "controller": "engine/dw3/ui/gym-session.ts",
+      "data": "web/assets/data/gym/manifest.json",
+      "oracle": "tests/gym-session.test.js",
+      "proof": "tools/verify_translated_gym.mjs"
+    }
+  },
+  {
+    "module": "pro/stdwtitl",
+    "ctor": "0x80086db0",
+    "tick": "0x80086c70",
+    "actor": "title_sequence_owner_tick",
+    "disc_index": 464,
+    "production": {
+      "execution": "translated",
+      "complete": false,
+      "adapter": "web/titlescreen.js",
+      "controller": "engine/dw3/ui/title-session.ts",
+      "data": "web/assets/data/stdwtitl_ui.json",
+      "oracle": "tests/titlescreen.test.js",
+      "proof": "tools/verify_translated_title.mjs"
+    },
+    "packs": {
+      "2183:3": "ttcommpk3",
+      "2183:8": "ttcommpk8"
+    }
+  },
+  {
+    "module": "pro/stdgname",
+    "ctor": "0x800865b0",
+    "tick": "0x8008645c",
+    "actor": "name_screen_tick",
+    "disc_index": 354,
+    "packs": {
+      "1904:0": "namedt"
+    },
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/nameentry-translated.js",
+      "controller": "engine/dw3/ui/name-root-session.ts",
+      "data": "web/assets/data/name/tables.bin",
+      "oracle": "tests/name-root-session.test.js",
+      "proof": "tools/verify_translated_naming.mjs"
+    }
+  },
+  {
+    "module": "pro/stplnmet",
+    "ctor": "0x800882a4",
+    "tick": "0x80088138",
+    "actor": "wizard_screen_tick",
+    "disc_index": 518,
+    "packs": {
+      "1904:0": "namedt"
+    },
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/packselect-translated.js",
+      "controller": "engine/dw3/ui/wizard-root-session.ts",
+      "data": "web/assets/data/wizard/tables.bin",
+      "oracle": "tests/wizard-root-session.test.js",
+      "proof": "tools/verify_translated_packselect.mjs"
+    }
+  },
+  {
+    "module": "pro/stcrdabm",
+    "ctor": "0x8008566c",
+    "tick": "0x80085540",
+    "actor": "album_screen_lifecycle",
+    "disc_index": 389,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/cardalbum-translated.js",
+      "controller": "engine/dw3/ui/album-session.ts",
+      "data": "web/assets/data/album/manifest.json",
+      "oracle": "tests/album-session-composition.test.js",
+      "proof": "tools/verify_translated_album.mjs"
+    }
+  },
+  {
+    "module": "pro/stcrddek",
+    "ctor": "0x8008a0b8",
+    "tick": "0x80089e98",
+    "actor": "folder_screen_lifecycle",
+    "disc_index": 458,
+    "production": {
+      "execution": "translated",
+      "complete": false,
+      "adapter": "web/carddeck-translated.js",
+      "controller": "engine/dw3/ui/folder-session.ts",
+      "data": "web/cardshop-data (card-shop text bank 0x32+language)",
+      "oracle": "tests/folder-selection-oracle.test.js",
+      "proof": "tools/verify_translated_folder.mjs"
+    }
+  },
+  {
+    "module": "pro/stcrdshp",
+    "ctor": "0x80088ca0",
+    "tick": "0x80088b50",
+    "actor": "shop_screen_lifecycle",
+    "disc_index": 462
+  },
+  {
+    "module": "pro/stfgtrep",
+    "ctor": "0x80085b24",
+    "tick": "0x800857f0",
+    "actor": "report_screen_tick",
+    "disc_index": 465,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/fightreport-translated.js",
+      "controller": "engine/dw3/ui/fight-report-session.ts",
+      "data": "web/assets/data/report/manifest.json",
+      "oracle": "tests/fight-report-session.test.js",
+      "proof": "tools/verify_translated_report.mjs"
+    }
+  },
+  {
+    "module": "pro/stgmcard",
+    "ctor": "0x80087b08",
+    "tick": "0x800877f0",
+    "actor": "accessing_screen_tick",
+    "disc_index": 494,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/save-translated.js",
+      "controller": "engine/dw3/ui/memcard-session.ts",
+      "data": "web/assets/data/memcard/manifest.json",
+      "oracle": "tests/memcard-session.test.js",
+      "proof": "tools/verify_translated_save.mjs"
+    }
+  },
+  {
+    "module": "pro/stagslct",
+    "ctor": "0x80085ea4",
+    "tick": "0x80084d9c",
+    "actor": "stage_select_menu_tick",
+    "disc_index": 388
+  },
+  {
+    "module": "pro/cnty_sel",
+    "ctor": "0x80084394",
+    "tick": "0x80083d18",
+    "actor": "language_select_tick",
+    "disc_index": 357,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/cntysel-native.js",
+      "controller": "engine/dw3/ui/country-screen.ts",
+      "lifecycle": "engine/dw3/ui/country-startup.ts",
+      "data": "web/assets/data/country_screen.json",
+      "oracle": "tests/country-screen-oracle.test.js",
+      "proof": "tools/verify_translated_language.mjs"
+    }
+  },
+  {
+    "module": "pro/shocktst",
+    "ctor": "0x8008499c",
+    "tick": "0x80084714",
+    "actor": "shock_screen_tick",
+    "disc_index": 360
+  },
+  {
+    "module": "pro/soundtst",
+    "ctor": "0x80084d48",
+    "tick": "0x80084b2c",
+    "actor": "pro/soundtst:F0x80084b2c",
+    "disc_index": 361
+  },
+  {
+    "module": "pro/cardgame",
+    "ctor": "0x80095e2c",
+    "tick": "0x80095bfc",
+    "actor": "cardBattleSceneTick",
+    "disc_index": 353
+  },
+  {
+    "module": "pro/fightstg",
+    "ctor": "0x80093f9c",
+    "tick": "0x80093e44",
+    "actor": "battleCommandMenuActor",
+    "disc_index": 359,
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "adapter": "web/battlecmd-translated.js",
+      "controller": "engine/dw3/ui/fight-command-session.ts",
+      "data": "web/assets/data/battlecmd/manifest.json",
+      "oracle": "tests/fight-command-session.test.js",
+      "proof": "tools/verify_translated_battlecmd.mjs"
+    }
+  },
+  {
+    "module": "pro/wfightmn",
+    "ctor": "0x800a6414",
+    "tick": "0x800a5ecc",
+    "actor": "pro/wfightmn:F0x800a5ecc",
+    "disc_index": 520,
+    "load_base": "0x800a5de0",
+    "production": {
+      "execution": "translated",
+      "complete": true,
+      "scope": "the boot loader task only (F0x800A6414 / F0x800A5ECC); the overlay's turn loop is not run in production",
+      "adapter": "web/wfight-translated.js",
+      "controller": "engine/dw3/ui/wfight-loader-session.ts",
+      "data": "web/assets/data/wfight/manifest.json",
+      "oracle": "tests/wfight-loader-session.test.js",
+      "proof": "tools/verify_translated_wfight.mjs"
+    }
+  },
+  {
+    "module": "pro/wfightts",
+    "ctor": "0x800a931c",
+    "tick": "0x800a8d34",
+    "actor": "pro/wfightts:F0x800a8d34",
+    "disc_index": 521,
+    "load_base": "0x800a5de0"
+  }
+]

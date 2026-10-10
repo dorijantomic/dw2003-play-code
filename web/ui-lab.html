@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DDW3 UI Lab</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0c14; color: #cdd3e0; font: 13px/1.4 system-ui, sans-serif; display: flex; height: 100vh; }
+  #side { width: 210px; flex: none; background: #12121e; border-right: 1px solid #232838; padding: 12px; overflow-y: auto; box-sizing: border-box; }
+  #side h1 { font-size: 14px; margin: 0 0 4px; }
+  #side .sub { color: #7d879c; font-size: 11px; margin-bottom: 12px; }
+  #side h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; margin: 14px 0 6px; color: #6b7488; }
+  button.scr { display: block; width: 100%; text-align: left; background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346; border-radius: 6px; padding: 7px 10px; margin: 4px 0; cursor: pointer; }
+  button.scr:hover { border-color: #3d6bff; }
+  button.scr.active { background: #2d54c8; border-color: #3d6bff; color: #fff; }
+  a.maplink { display: block; width: 100%; background: #173b59; color: #a9deff; border: 1px solid #4a91ba; border-radius: 6px; padding: 8px 10px; margin: 10px 0 14px; box-sizing: border-box; text-decoration: none; font-weight: 700; }
+  a.maplink:hover { background: #225579; }
+  #main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; overflow: auto; }
+  #frameWrap { position: relative; }
+  iframe { border: 1px solid #2c3346; border-radius: 4px; background: #000; width: 640px; height: 480px; }
+  #boot { color: #7d879c; }
+  .refbox { display: none; }
+  .refbox.show { display: block; }
+  .refbox h2 { font-size: 11px; text-transform: uppercase; color: #7d879c; margin: 4px 0; }
+  img.ref { image-rendering: pixelated; border: 1px solid #2c3346; border-radius: 4px; max-width: 640px; }
+  #refstrip { display: none; max-width: 660px; }
+  #refstrip.show { display: block; }
+  #refgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  #refgrid figure { margin: 0; width: 320px; }
+  #refgrid img { image-rendering: pixelated; width: 320px; border: 1px solid #2c3346; border-radius: 3px; display: block; }
+  #refgrid figcaption { font-size: 10px; color: #7d879c; margin-top: 2px; }
+  #refgrid figcaption b { color: #9fb0d0; font-weight: 600; }
+  #hint { color: #7d879c; font-size: 12px; max-width: 640px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>DDW3 UI Lab</h1>
+  <div class="sub">Every screen, rendered by the real game.js</div>
+  <a class="maplink" href="ui-flow.html">Screen route map →</a>
+  <h2>Registration</h2>
+  <button class="scr" data-scr="assetmode">Visual Mode</button>
+  <button class="scr" data-scr="nameentry">Name Entry</button>
+  <button class="scr" data-scr="packselect">Pack Select</button>
+  <button class="scr" data-scr="endscreen">END Card</button>
+  <button class="scr" data-scr="titlescreen">Title Screen</button>
+  <button class="scr" data-scr="savequad">Save: transition quad</button>
+  <h2>Field / Menus</h2>
+  <button class="scr" data-scr="placecard">Location Title Card</button>
+  <button class="scr" data-scr="textbox">Dialogue Box (balloon)</button>
+  <button class="scr" data-scr="textbox_plain">Dialogue Box (plain window)</button>
+  <button class="scr" data-scr="textbox_legacy">Dialogue Box (legacy textbox.js)</button>
+  <button class="scr" data-scr="menu">Status Menu</button>
+  <button class="scr" data-scr="demosetup">Digivolve Demo*</button>
+  <button class="scr" data-scr="shop">Shop</button>
+  <button class="scr" data-scr="shop" data-arg="1">Pawn Shop</button>
+  <button class="scr" data-scr="dri">DRI Desk</button>
+  <button class="scr" data-scr="gym">Gym</button>
+  <button class="scr" data-scr="cardshop">Card Shop</button>
+  <button class="scr" data-scr="cardalbum">Card Album</button>
+  <button class="scr" data-scr="carddeck">Card Folder</button>
+  <button class="scr" data-scr="cardduel">Card Duel</button>
+  <button class="scr" data-scr="cardduel-real">Card Duel (full screen)</button>
+  <button class="scr" data-scr="cardduel-lab">Card Duel (from scratch)</button>
+  <button class="scr" data-scr="inn">Inn (Rest)</button>
+  <button class="scr" data-scr="fightreport">Battle Report</button>
+  <button class="scr" data-scr="cntysel">Language Select</button>
+  <button class="scr" data-scr="nativescreen">Native Screen (boot)</button>
+  <button class="scr" data-scr="save">Memory Card (Save)</button>
+  <button class="scr" data-scr="load">Memory Card (Load)</button>
+</div>
+<div id="main">
+  <div id="frameWrap">
+    <iframe id="game" title="game"></iframe>
+  </div>
+  <div id="hint">Boot the game, then pick a screen. Controls go to the game canvas — click it first, then use arrows / WASD / Space / Enter.</div>
+  <div class="refbox" id="refbox">
+    <h2>Real game (reference)</h2>
+    <img class="ref" id="ref" alt="reference" />
+  </div>
+  <div id="refstrip">
+    <h2 style="font-size:11px;text-transform:uppercase;color:#7d879c;margin:4px 0">Real game — captured duel, in order</h2>
+    <div id="refgrid"></div>
+  </div>
+</div>
+
+<script>
+// Seed a Balanced-pack party so menus/shop have real party data, then boot the
+// real game straight into the field (skipTitle) with encounters off.
+localStorage.setItem("engineSchema", "2");
+localStorage.setItem("party", JSON.stringify(["p003pken", "p009rena", "p010pata"]));
+localStorage.setItem("packId", "A");
+localStorage.setItem("charId", "p003pken");
+localStorage.setItem("partyStats", JSON.stringify([null, null, null]));
+localStorage.setItem("playerName", JSON.stringify("Junior"));
+localStorage.setItem("assetMode", "authentic");
+
+const frame = document.getElementById("game");
+const refbox = document.getElementById("refbox");
+const ref = document.getElementById("ref");
+const REFS = { nameentry: "keyboard", packselect: "packselect", textbox: "s415_bulbmon_dialogue_ref" };
+// Screens whose reference is a whole captured sequence rather than one frame.
+// assets/ref/cardduel/index.json is generated by tools/build_cardduel_refs.py
+// from the 2026-08-05 rig screenshots.
+const STRIPS = { cardduel: "cardduel" };
+// Standalone lab pages that replace the embedded game rather than going through
+// __labOpen. `cardduel-lab` is a second, from-scratch renderer of the duel.
+const PAGES = { "cardduel-lab": "cardduel-lab.html", "cardduel-real": "cardduel-real.html", nativescreen: "native-screen-lab.html" };
+// Forward the lab's own query params to the game iframe so a verifier can ask
+// for a development rollback route (e.g. ui-lab.html?legacyReport=1). GAME_URL
+// is the single source for both the initial src and the reload comparison.
+const labQs = new URLSearchParams(location.search);
+const requestedScreen = labQs.get("screen");
+labQs.delete("screen"); // the map's choice belongs to this lab, not the game iframe
+labQs.set("skipTitle", "1");
+labQs.set("noEncounters", "1");
+const GAME_URL = "index.html?" + labQs.toString();
+const strip = document.getElementById("refstrip");
+const grid = document.getElementById("refgrid");
+let stripLoaded = null;
+
+async function showStrip(dir) {
+  strip.classList.add("show");
+  if (stripLoaded === dir) return;
+  stripLoaded = dir;
+  grid.textContent = "";
+  const idx = await (await fetch(`assets/ref/${dir}/index.json`)).json();
+  for (const f of idx.frames) {
+    const fig = document.createElement("figure");
+    const img = document.createElement("img");
+    img.src = `assets/ref/${dir}/${f.name}.png`;
+    img.alt = f.name;
+    const cap = document.createElement("figcaption");
+    cap.innerHTML = `<b>${f.name}</b> — ${f.caption} <span style="opacity:.6">(frame ${f.frame})</span>`;
+    fig.append(img, cap);
+    grid.append(fig);
+  }
+}
+
+let ready = false, pending = requestedScreen ? [requestedScreen, null] : null;
+frame.src = GAME_URL;
+function win() { return frame.contentWindow; }
+frame.addEventListener("load", () => {
+  // Hide the game's dev toolbar / HUD so the lab shows just the screen.
+  try {
+    const d = frame.contentDocument;
+    const s = d.createElement("style");
+    s.textContent = "header,#hint,#hud{display:none!important} #stage{margin:0}";
+    d.head.appendChild(s);
+  } catch { /* cross-origin unexpected */ }
+});
+function tryReady() {
+  if (win() && win().__labOpen && win().__state?.started) { ready = true; if (pending) open(...pending); }
+  else setTimeout(tryReady, 200);
+}
+tryReady();
+
+function open(name, arg) {
+  pending = [name, arg];
+  document.querySelectorAll(".scr").forEach((b) => b.classList.toggle("active",
+    b.dataset.scr === name && (b.dataset.arg ?? null) === (arg ?? null)));
+  const r = REFS[name];
+  if (r) { ref.src = `assets/ref/${r}.png`; refbox.classList.add("show"); }
+  else refbox.classList.remove("show");
+  if (STRIPS[name]) showStrip(STRIPS[name]);
+  else strip.classList.remove("show");
+  // A standalone page takes over the whole window, so the duel is the only
+  // thing on screen. Browser Back returns to the lab.
+  if (PAGES[name]) { window.location.href = PAGES[name]; return; }
+  if (frame.getAttribute("src") !== GAME_URL) {
+    ready = false;
+    frame.src = GAME_URL;
+    tryReady();
+    return;
+  }
+  if (ready) { win().__labOpen(name, arg); frame.focus(); }
+}
+document.querySelectorAll(".scr").forEach((b) =>
+  b.addEventListener("click", () => open(b.dataset.scr, b.dataset.arg)));
+</script>
+</body>
+</html>

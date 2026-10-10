@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Same RPC protocol/wrapper as dw3-rpc, pointed at the BizHawk rig
+# (C:\bizhawk-rig) instead of the PCSX-Redux rig (C:\dw3-rig).
+#
+# Usage:
+#   tools/windows-rig/bizhawk-rpc "print(getSceneID())"
+#   tools/windows-rig/bizhawk-rpc rig-status
+#   tools/windows-rig/bizhawk-rpc rig-kill
+#
+# Launching EmuHawk itself stays a human action (run
+# launch-bizhawk-windows.ps1 in Windows PowerShell first), same as the PCSX
+# rig never auto-starts pcsx-redux.exe.
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export DW3_RIG_WIN_MOUNT="${DW3_RIG_WIN_MOUNT:-/mnt/c/bizhawk-rig}"
+export DW3_RIG_IMAGE="${DW3_RIG_IMAGE:-EmuHawk.exe}"
+exec "$repo_root/tools/windows-rig/rpc-windows.sh" "$@"

@@ -1,0 +1,142 @@
+{
+  "summary": {
+    "generated_by": "tools/extract_scroll_walls.py",
+    "asm_root": "~/ddw3/asm/dw2003",
+    "shape": "toggle + counter, +1 every second blank, wrap below 0x60, drawn at (counter, counter)",
+    "period_px": 96,
+    "rate_px_per_s": 25,
+    "members": 10
+  },
+  "members": [
+    {
+      "overlay": "stcrdabm",
+      "source": "pro/stcrdabm.s",
+      "wrap_file_line": 1590,
+      "wrap_text": ".L0x000018bc: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x08",
+      "clip_field": null,
+      "draw_file_line": 1611,
+      "draw_text": ".L0x00001910: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stcrddek",
+      "source": "pro/stcrddek.s",
+      "wrap_file_line": 6293,
+      "wrap_text": ".L0x00006238: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x08",
+      "clip_field": null,
+      "draw_file_line": 6314,
+      "draw_text": ".L0x0000628c: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stcrdshp",
+      "source": "pro/stcrdshp.s",
+      "wrap_file_line": 5413,
+      "wrap_text": ".L0x00005478: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x08",
+      "clip_field": null,
+      "draw_file_line": 5434,
+      "draw_text": ".L0x000054cc: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stdgname",
+      "source": "pro/stdgname.s",
+      "wrap_file_line": 3545,
+      "wrap_text": ".L0x00003748: slti $v0, 0x5f                      # .word 0x2842005f",
+      "wrap_bound": "0x5f",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x24",
+      "clip_field": null,
+      "draw_file_line": 3565,
+      "draw_text": ".L0x00003798: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stfgtrep",
+      "source": "pro/stfgtrep.s",
+      "wrap_file_line": 2042,
+      "wrap_text": ".L0x000020b8: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x1e",
+      "clip_field": null,
+      "draw_file_line": 2063,
+      "draw_text": ".L0x0000210c: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stgdglab",
+      "source": "pro/stgdglab.s",
+      "wrap_file_line": 12386,
+      "wrap_text": ".L0x0000c16c: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x54",
+      "toggle": "0x58",
+      "clip": "0x37",
+      "clip_field": null,
+      "draw_file_line": 12405,
+      "draw_text": ".L0x0000c1b8: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stgmcard",
+      "source": "pro/stgmcard.s",
+      "wrap_file_line": 4957,
+      "wrap_text": ".L0x00004d58: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x1e",
+      "clip_field": null,
+      "draw_file_line": 4977,
+      "draw_text": ".L0x00004da8: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stgtrain",
+      "source": "pro/stgtrain.s",
+      "wrap_file_line": 1873,
+      "wrap_text": ".L0x00002448: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x5c",
+      "toggle": "0x60",
+      "clip": null,
+      "clip_field": "0x58",
+      "draw_file_line": 1893,
+      "draw_text": ".L0x00002498: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "stitshop",
+      "source": "pro/stitshop.s",
+      "wrap_file_line": 8959,
+      "wrap_text": ".L0x00008be0: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x58",
+      "toggle": "0x5c",
+      "clip": "0x14",
+      "clip_field": null,
+      "draw_file_line": 8984,
+      "draw_text": ".L0x00008c44: move_ $a3, $a2                      # .word 0x00c03821"
+    },
+    {
+      "overlay": "ststatus",
+      "source": "pro/ststatus.s",
+      "wrap_file_line": 23271,
+      "wrap_text": ".L0x00016b80: slti $v0, $v1, 0x60                 # .word 0x28620060",
+      "wrap_bound": "0x60",
+      "counter": "0x54",
+      "toggle": "0x58",
+      "clip": "0x1d",
+      "clip_field": null,
+      "draw_file_line": 23291,
+      "draw_text": ".L0x00016bd0: move_ $a3, $a2                      # .word 0x00c03821"
+    }
+  ]
+}

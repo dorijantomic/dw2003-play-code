@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DDW3 Seam Lab</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0c14; color: #cdd3e0; font: 13px/1.4 system-ui, sans-serif; display: flex; height: 100vh; }
+  #side { width: 300px; flex: none; background: #12121e; border-right: 1px solid #232838; padding: 12px; overflow-y: auto; box-sizing: border-box; }
+  h1 { font-size: 14px; margin: 0 0 2px; }
+  .sub { color: #7d879c; font-size: 11px; margin-bottom: 10px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; margin: 14px 0 6px; color: #6b7488; }
+  select, button { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346; border-radius: 6px; padding: 6px 9px; font: inherit; }
+  select { width: 100%; }
+  button { cursor: pointer; }
+  button:hover { border-color: #3d6bff; }
+  button.go { background: #2d54c8; border-color: #3d6bff; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+  .row > * { flex: 1; }
+  label.chk { display: flex; gap: 6px; align-items: center; font-size: 12px; color: #9fb0d0; }
+  label.chk input { flex: none; }
+  #hits { list-style: none; margin: 6px 0 0; padding: 0; max-height: 42vh; overflow-y: auto; }
+  #hits li { padding: 5px 7px; border: 1px solid #2c3346; border-radius: 5px; margin-bottom: 4px; cursor: pointer; font-size: 12px; }
+  #hits li:hover { border-color: #3d6bff; }
+  #hits li.active { background: #2d54c8; border-color: #3d6bff; color: #fff; }
+  #hits li .k { color: #7d879c; }
+  #hits li.active .k { color: #cddcff; }
+  #main { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px; overflow: auto; }
+  iframe { border: 1px solid #2c3346; border-radius: 4px; background: #000; width: 1280px; height: 896px; max-width: 100%; }
+  canvas#mag { image-rendering: pixelated; border: 1px solid #2c3346; border-radius: 4px; background: #000; }
+  #status { color: #7d879c; font-size: 12px; min-height: 18px; }
+  .note { color: #6b7488; font-size: 11px; margin-top: 8px; }
+  code { color: #9fb0d0; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>DDW3 Seam Lab</h1>
+  <div class="sub">Where does the background show through the map?</div>
+
+  <h2>Stage</h2>
+  <select id="map"></select>
+  <div class="row">
+    <button id="prevMap">◀ prev</button>
+    <button id="nextMap">next ▶</button>
+  </div>
+
+  <h2>Scan</h2>
+  <div class="row"><button id="scan" class="go">Scan this stage</button></div>
+  <div class="row"><button id="scanAll">Scan every stage →&nbsp;JSON</button></div>
+  <label class="chk"><input type="checkbox" id="hideProps" /> hide the cut-out fillers</label>
+  <div class="row">
+    <span style="flex:none;color:#7d879c">camera phase</span>
+    <input type="range" id="phase" min="0" max="7" value="0" step="1" />
+    <span id="phaseTxt" style="flex:none">0/8</span>
+  </div>
+  <label class="chk"><input type="checkbox" id="crawl" /> crawl the camera (see it wiggle)</label>
+  <label class="chk"><input type="checkbox" id="mark" checked /> mark the holes red in the magnifier</label>
+  <div class="row"><button id="release">release the lab camera</button></div>
+
+  <h2>Holes found</h2>
+  <div id="status">not scanned yet</div>
+  <ul id="hits"></ul>
+  <div class="note">
+    A hole is measured, not guessed: the lab paints the frame's clear colour twice
+    in two different colours and keeps only the pixels that changed. Those are
+    pixels where nothing covered the background. Runs 1–2 px thin are seams;
+    thicker blocks are the map's own edge.
+  </div>
+</div>
+
+<div id="main">
+  <div id="status2"></div>
+  <iframe id="game" title="game"></iframe>
+  <div>
+    <h2 style="margin:0 0 4px">Selected hole ×8</h2>
+    <canvas id="mag" width="512" height="512"></canvas>
+  </div>
+</div>
+
+<script>
+localStorage.setItem("engineSchema", "2");
+localStorage.setItem("party", JSON.stringify(["p003pken", "p009rena", "p010pata"]));
+localStorage.setItem("packId", "A");
+localStorage.setItem("charId", "p003pken");
+localStorage.setItem("playerName", JSON.stringify("Junior"));
+localStorage.setItem("assetMode", "authentic");
+
+const frame = document.getElementById("game");
+const mapSel = document.getElementById("map");
+const hitsEl = document.getElementById("hits");
+const statusEl = document.getElementById("status");
+const status2El = document.getElementById("status2");
+const mag = document.getElementById("mag").getContext("2d");
+const phaseEl = document.getElementById("phase");
+const phaseTxt = document.getElementById("phaseTxt");
+const hidePropsEl = document.getElementById("hideProps");
+const crawlEl = document.getElementById("crawl");
+const markEl = document.getElementById("mark");
+document.getElementById("release").addEventListener("click", () => win().__labCam(null));
+
+frame.src = "index.html?skipTitle=1&noEncounters=1";
+const win = () => frame.contentWindow;
+const doc = () => frame.contentDocument;
+
+frame.addEventListener("load", () => {
+  try {
+    const s = doc().createElement("style");
+    s.textContent = "header,#hint{display:none!important} #stage{margin:0}";
+    doc().head.appendChild(s);
+  } catch { /* same origin expected */ }
+});
+
+let ready = false;
+(function poll() {
+  if (win()?.__mapInfo && win().__state?.started && doc()?.getElementById("mapSelect")?.options.length) {
+    ready = true;
+    fillMaps();
+    status2El.textContent = "";
+  } else { status2El.textContent = "booting the game…"; setTimeout(poll, 200); }
+})();
+
+function fillMaps() {
+  const src = doc().getElementById("mapSelect");
+  mapSel.textContent = "";
+  for (const o of src.options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.textContent;
+    mapSel.append(opt);
+  }
+  mapSel.value = src.value;
+}
+
+// The game's own map list is keyed by INDEX (game.js loadAndSetMap reads
+// mapSelect.selectedIndex), while the option value is the stage id.
+function setMap() {
+  win().__setMap(mapSel.selectedIndex);
+  clearHits();
+}
+mapSel.addEventListener("change", setMap);
+document.getElementById("prevMap").addEventListener("click", () => {
+  mapSel.selectedIndex = Math.max(0, mapSel.selectedIndex - 1);
+  setMap();
+});
+document.getElementById("nextMap").addEventListener("click", () => {
+  mapSel.selectedIndex = Math.min(mapSel.options.length - 1, mapSel.selectedIndex + 1);
+  setMap();
+});
+hidePropsEl.addEventListener("change", () => { win().__hideProps = hidePropsEl.checked; });
+
+// ── the measurement ────────────────────────────────────────────────────────
+// Two frames, two clear colours. Any pixel that differs was never painted over,
+// so the player is looking at the background through the picture.
+function gameCanvas() { return doc().getElementById("game"); }
+
+async function frameTick() {
+  await new Promise((r) => win().requestAnimationFrame(() => win().requestAnimationFrame(r)));
+}
+
+async function grab(colour) {
+  win().__clearColour = colour;
+  await frameTick();
+  const cv = gameCanvas();
+  return cv.getContext("2d").getImageData(0, 0, cv.width, cv.height);
+}
+
+async function holesHere() {
+  // Four frames, alternating the clear colour: black, magenta, black, magenta.
+  // A hole must differ between the two colours AND repeat on both takes of each
+  // colour. The repeat test is what makes the measurement usable — water,
+  // windmills and NPCs repaint every frame, and on Amaterasu Bridge that motion
+  // alone changed 30,848 pixels while the real holes were 756.
+  const a = await grab("#000000");
+  const b = await grab("#ff00ff");
+  const c = await grab("#000000");
+  const d = await grab("#ff00ff");
+  win().__clearColour = null;
+  const cv = gameCanvas();
+  const w = cv.width, h = cv.height;
+  const mask = new Uint8Array(w * h);
+  const same = (u, v, p) => u.data[p] === v.data[p] && u.data[p + 1] === v.data[p + 1] && u.data[p + 2] === v.data[p + 2];
+  for (let i = 0, p = 0; i < mask.length; i++, p += 4) {
+    if (!same(a, b, p) && same(a, c, p) && same(b, d, p)) mask[i] = 1;
+  }
+  return { mask, w, h };
+}
+
+// A hole is a shape, not a row. Label the connected blobs of background-visible
+// pixels and keep only the ones a player reads as a LINE: thin one way, long the
+// other. That excludes the wide void around an isometric map, whose diagonal
+// edge produces short runs on every row and drowned the first version in noise.
+function seamBlobs(mask, w, h, maxThick, minLong) {
+  const seen = new Uint8Array(w * h);
+  const stack = new Int32Array(1 << 18);
+  const blobs = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i] || seen[i]) continue;
+    let sp = 0, area = 0;
+    let x0 = i % w, x1 = x0, y0 = (i / w) | 0, y1 = y0;
+    stack[sp++] = i; seen[i] = 1;
+    while (sp > 0) {
+      const p = stack[--sp];
+      const px = p % w, py = (p / w) | 0;
+      area++;
+      if (px < x0) x0 = px; if (px > x1) x1 = px;
+      if (py < y0) y0 = py; if (py > y1) y1 = py;
+      const nb = [px > 0 ? p - 1 : -1, px < w - 1 ? p + 1 : -1, py > 0 ? p - w : -1, py < h - 1 ? p + w : -1];
+      for (const n of nb) {
+        if (n >= 0 && mask[n] && !seen[n] && sp < stack.length - 1) { seen[n] = 1; stack[sp++] = n; }
+      }
+    }
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    const thin = Math.min(bw, bh), long = Math.max(bw, bh);
+    if (thin <= maxThick && long >= minLong) {
+      blobs.push({ x: x0, y: y0, w: bw, h: bh, area, axis: bw < bh ? "vertical" : "horizontal", len: long });
+    }
+  }
+  return blobs;
+}
+
+let hits = [];
+function clearHits() { hits = []; hitsEl.textContent = ""; statusEl.textContent = "not scanned yet"; mag.clearRect(0, 0, 512, 512); }
+
+async function scanStage() {
+  // An auto event may have opened a dialogue box over the picture on arrival;
+  // it would hide whatever it covers. Lab-only poke: drop it before measuring.
+  if (win().__textbox) win().__textbox.dialogue = null;
+  const info = win().__mapInfo();
+  const zoom = info.zoom, viewW = info.viewW / zoom, viewH = info.viewH / zoom;
+  const stepX = Math.floor(viewW * 0.75), stepY = Math.floor(viewH * 0.75);
+  const found = new Map(); // key: rounded map cell -> hit
+  let views = 0;
+  for (let cy = viewH / 2; cy < info.height + viewH; cy += stepY) {
+    for (let cx = viewW / 2; cx < info.width + viewW; cx += stepX) {
+      for (const frac of [0, 0.25, 0.5, 0.75]) {
+        win().__labCam(Math.min(info.width, cx) + frac, Math.min(info.height, cy));
+        const { mask, w, h } = await holesHere();
+        const runs = seamBlobs(mask, w, h, 2 * zoom, 8 * zoom);
+        views++;
+        const cam = win().__cam;
+        for (const r of runs) {
+          const mx = Math.round(cam.x + r.x / zoom), my = Math.round(cam.y + r.y / zoom);
+          const key = `${mx >> 3},${my >> 3}`;
+          const prev = found.get(key);
+          if (!prev || r.len > prev.len) found.set(key, { mx, my, len: Math.round(r.len / zoom), axis: r.axis, frac });
+        }
+      }
+      statusEl.textContent = `scanning… ${views} views, ${found.size} holes`;
+    }
+  }
+  hits = [...found.values()].sort((a, b) => b.len - a.len);
+  renderHits(info);
+}
+
+function renderHits(info) {
+  hitsEl.textContent = "";
+  statusEl.textContent = hits.length
+    ? `${hits.length} thin holes on ${info.id}`
+    : `no thin holes on ${info.id}`;
+  hits.slice(0, 200).forEach((hit, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<b>${hit.mx}, ${hit.my}</b> <span class="k">${hit.axis} line, ${hit.len}px · phase ${hit.frac}</span>`;
+    li.addEventListener("click", () => selectHit(i));
+    hitsEl.append(li);
+  });
+}
+
+let selected = null;
+async function selectHit(i) {
+  [...hitsEl.children].forEach((li, n) => li.classList.toggle("active", n === i));
+  selected = hits[i];
+  win().__labCam(selected.mx + selected.frac, selected.my);
+  await frameTick();
+  await drawMagnifier();
+}
+
+// The magnifier shows the picture AND the measurement: every pixel where the
+// background shows through is painted red, so a hairline is unmistakable.
+async function drawMagnifier() {
+  const cv = gameCanvas();
+  const src = 64, scale = 8;
+  mag.imageSmoothingEnabled = false;
+  mag.clearRect(0, 0, 512, 512);
+  const ox = Math.floor((cv.width - src) / 2), oy = Math.floor((cv.height - src) / 2);
+  mag.drawImage(cv, ox, oy, src, src, 0, 0, src * scale, src * scale);
+  if (!markEl.checked) return;
+  const { mask, w } = await holesHere();
+  mag.fillStyle = "rgba(255,40,40,.75)";
+  for (let y = 0; y < src; y++) {
+    for (let x = 0; x < src; x++) {
+      if (mask[(oy + y) * w + ox + x]) mag.fillRect(x * scale, y * scale, scale, scale);
+    }
+  }
+}
+
+document.getElementById("scan").addEventListener("click", async () => {
+  if (!ready) return;
+  clearHits();
+  document.getElementById("scan").disabled = true;
+  await scanStage();
+  document.getElementById("scan").disabled = false;
+});
+
+document.getElementById("scanAll").addEventListener("click", async () => {
+  if (!ready) return;
+  const report = {};
+  for (let i = 0; i < mapSel.options.length; i++) {
+    mapSel.selectedIndex = i;
+    setMap();
+    await new Promise((r) => setTimeout(r, 700));
+    await scanStage();
+    const info = win().__mapInfo();
+    report[info.id] = hits.slice(0, 40);
+    status2El.textContent = `stage ${i + 1}/${mapSel.options.length}: ${info.id} — ${hits.length} holes`;
+  }
+  const blob = new Blob([JSON.stringify(report, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "seam-report.json";
+  a.click();
+});
+
+// Headless verification drives the SAME code the buttons drive (tools/verify_seam_lab.mjs).
+window.__seamLab = {
+  ready: () => ready,
+  setMapById: (id) => { mapSel.value = id; setMap(); },
+  mapIds: () => [...mapSel.options].map((o) => o.value),
+  scan: async () => { clearHits(); await scanStage(); return hits; },
+  hits: () => hits,
+  setHideProps: (on) => { hidePropsEl.checked = on; win().__hideProps = on; },
+  // Park on one spot and report what is measured there, for attributing a hole.
+  probe: async (x, y) => {
+    win().__labCam(x, y);
+    await frameTick();
+    const { mask, w, h } = await holesHere();
+    let n = 0; for (let i = 0; i < mask.length; i++) n += mask[i];
+    const cam = win().__cam;
+    const zoom = win().__mapInfo().zoom;
+    return {
+      holePixels: n, cam: { x: cam.x, y: cam.y },
+      blobs: seamBlobs(mask, w, h, 4, 16).map((b) => ({
+        ...b, mapX: cam.x + b.x / zoom, mapY: cam.y + b.y / zoom,
+      })),
+    };
+  },
+};
+
+// Live phase control: nudge the camera by eighths of a pixel, or crawl it.
+let camX = 0;
+phaseEl.addEventListener("input", async () => {
+  phaseTxt.textContent = `${phaseEl.value}/8`;
+  if (!ready || !selected) return;
+  camX = selected.mx + Number(phaseEl.value) / 8;
+  win().__labCam(camX, selected.my);
+  await frameTick();
+  await drawMagnifier();
+});
+setInterval(async () => {
+  if (!ready || !crawlEl.checked || !selected) return;
+  camX = (camX || selected.mx) + 0.05;
+  win().__labCam(camX, selected.my);
+  await drawMagnifier();
+}, 120);
+</script>
+</body>
+</html>

@@ -1,0 +1,2334 @@
+{
+  "digivolve": [
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 0,
+      "sy": 376,
+      "dx": 120,
+      "dy": 19
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 20,
+      "sy": 376,
+      "dx": 0,
+      "dy": 19
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 20,
+      "sy": 376,
+      "dx": 80,
+      "dy": 19
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 20,
+      "sy": 376,
+      "dx": 40,
+      "dy": 19
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 0,
+      "sy": 191,
+      "dx": 16,
+      "dy": 45
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 96,
+      "sy": 545,
+      "dx": 17,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 212,
+      "sy": 0,
+      "dx": 52,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 59,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 65,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 71,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 77,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 84,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 90,
+      "dy": 23
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 164,
+      "sy": 0,
+      "dx": 52,
+      "dy": 35
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 244,
+      "sy": 0,
+      "dx": 59,
+      "dy": 35
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 66,
+      "dy": 35
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 73,
+      "dy": 35
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 136,
+      "sy": 0,
+      "dx": 52,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 196,
+      "sy": 0,
+      "dx": 59,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 66,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 73,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 80,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 87,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 28,
+      "sy": 60,
+      "dx": 95,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 102,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 109,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 116,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 123,
+      "dy": 46
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 172,
+      "sy": 0,
+      "dx": 52,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 196,
+      "sy": 0,
+      "dx": 59,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 66,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 73,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 80,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 87,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 28,
+      "sy": 60,
+      "dx": 95,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 102,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 109,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 116,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "canvas",
+      "sx": 72,
+      "sy": 0,
+      "dx": 123,
+      "dy": 57
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 192,
+      "sy": 639,
+      "dx": 146,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 224,
+      "sy": 639,
+      "dx": 210,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 224,
+      "sy": 639,
+      "dx": 242,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 224,
+      "sy": 639,
+      "dx": 306,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 224,
+      "sy": 639,
+      "dx": 178,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 224,
+      "sy": 639,
+      "dx": 274,
+      "dy": 15
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 96,
+      "sy": 0,
+      "dx": 175,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 182,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 188,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 194,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 412,
+      "sy": 0,
+      "dx": 200,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 206,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 211,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 218,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 223,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 308,
+      "sy": 0,
+      "dx": 230,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 236,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 332,
+      "sy": 0,
+      "dx": 239,
+      "dy": 22
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 246,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 432,
+      "sy": 0,
+      "dx": 249,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 255,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 261,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 432,
+      "sy": 0,
+      "dx": 265,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 271,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 468,
+      "sy": 48,
+      "dx": 276,
+      "dy": 21
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 306,
+      "dx": 166,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 306,
+      "dx": 198,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 306,
+      "dx": 230,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 208,
+      "sy": 306,
+      "dx": 288,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 180,
+      "sy": 306,
+      "dx": 262,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 128,
+      "sy": 306,
+      "dx": 146,
+      "dy": 42
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 416,
+      "sy": 60,
+      "dx": 155,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 156,
+      "sy": 0,
+      "dx": 168,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 456,
+      "sy": 0,
+      "dx": 175,
+      "dy": 50
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 424,
+      "sy": 0,
+      "dx": 181,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 292,
+      "sy": 0,
+      "dx": 188,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 194,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 197,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 204,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 210,
+      "dy": 49
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 228,
+      "sy": 0,
+      "dx": 168,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 175,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 181,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 187,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 194,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 200,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 220,
+      "sy": 0,
+      "dx": 168,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 175,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 356,
+      "sy": 0,
+      "dx": 181,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 424,
+      "sy": 0,
+      "dx": 187,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 456,
+      "sy": 0,
+      "dx": 194,
+      "dy": 78
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 200,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 206,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 213,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 219,
+      "dy": 77
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 160,
+      "sy": 689,
+      "dx": 291,
+      "dy": 85
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 56,
+      "sy": 0,
+      "dx": 84,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 76,
+      "sy": 0,
+      "dx": 104,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 76,
+      "sy": 0,
+      "dx": 136,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 108,
+      "sy": 0,
+      "dx": 168,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 0,
+      "dx": 208,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 176,
+      "sy": 0,
+      "dx": 230,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 0,
+      "dx": 244,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 0,
+      "dx": 272,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 0,
+      "dx": 300,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 148,
+      "sy": 0,
+      "dx": 238,
+      "dy": 100
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 112,
+      "sy": 689,
+      "dx": 192,
+      "dy": 221
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 112,
+      "sy": 689,
+      "dx": 228,
+      "dy": 221
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 36,
+      "sy": 689,
+      "dx": 192,
+      "dy": 207
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 112,
+      "sy": 689,
+      "dx": 264,
+      "dy": 221
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 112,
+      "sy": 689,
+      "dx": 300,
+      "dy": 221
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 36,
+      "sy": 689,
+      "dx": 228,
+      "dy": 207
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 36,
+      "sy": 689,
+      "dx": 264,
+      "dy": 207
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 36,
+      "sy": 689,
+      "dx": 300,
+      "dy": 207
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 156,
+      "sy": 211,
+      "dx": 91,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 168,
+      "sy": 211,
+      "dx": 91,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 180,
+      "sy": 211,
+      "dx": 91,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 192,
+      "sy": 211,
+      "dx": 91,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 204,
+      "sy": 211,
+      "dx": 91,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 216,
+      "sy": 211,
+      "dx": 91,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 228,
+      "sy": 211,
+      "dx": 133,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 240,
+      "sy": 211,
+      "dx": 133,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 0,
+      "sy": 227,
+      "dx": 133,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 12,
+      "sy": 227,
+      "dx": 133,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 24,
+      "sy": 227,
+      "dx": 133,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 36,
+      "sy": 227,
+      "dx": 133,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 48,
+      "sy": 227,
+      "dx": 133,
+      "dy": 211
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 156,
+      "sy": 0,
+      "dx": 92,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 456,
+      "sy": 0,
+      "dx": 99,
+      "dy": 107
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 424,
+      "sy": 0,
+      "dx": 105,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 292,
+      "sy": 0,
+      "dx": 112,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 118,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 121,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 128,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 134,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 220,
+      "sy": 0,
+      "dx": 236,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 356,
+      "sy": 0,
+      "dx": 243,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 249,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 252,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 256,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 259,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 164,
+      "sy": 0,
+      "dx": 266,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 244,
+      "sy": 0,
+      "dx": 273,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 8,
+      "sy": 0,
+      "dx": 288,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 8,
+      "sy": 0,
+      "dx": 295,
+      "dy": 106
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 105,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 112,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 72,
+      "sy": 0,
+      "dx": 119,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 24,
+      "sy": 0,
+      "dx": 154,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 0,
+      "sy": 0,
+      "dx": 161,
+      "dy": 127
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 24,
+      "sy": 0,
+      "dx": 154,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 0,
+      "sy": 0,
+      "dx": 161,
+      "dy": 141
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 32,
+      "sy": 0,
+      "dx": 154,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 40,
+      "sy": 0,
+      "dx": 161,
+      "dy": 155
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 8,
+      "sy": 0,
+      "dx": 154,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 40,
+      "sy": 0,
+      "dx": 161,
+      "dy": 169
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 48,
+      "sy": 0,
+      "dx": 154,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 0,
+      "sy": 0,
+      "dx": 161,
+      "dy": 183
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 0,
+      "sy": 0,
+      "dx": 161,
+      "dy": 197
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 24,
+      "sy": 0,
+      "dx": 154,
+      "dy": 211
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 0,
+      "sy": 0,
+      "dx": 161,
+      "dy": 211
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 60,
+      "sy": 227,
+      "dx": 180,
+      "dy": 139
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 120,
+      "sy": 0,
+      "dx": 195,
+      "dy": 139
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 202,
+      "dy": 139
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 332,
+      "sy": 0,
+      "dx": 205,
+      "dy": 140
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 212,
+      "dy": 139
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 420,
+      "sy": 0,
+      "dx": 218,
+      "dy": 139
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 72,
+      "sy": 227,
+      "dx": 180,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 104,
+      "sy": 0,
+      "dx": 195,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 408,
+      "sy": 0,
+      "dx": 202,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 284,
+      "sy": 0,
+      "dx": 207,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 332,
+      "sy": 0,
+      "dx": 213,
+      "dy": 154
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 220,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 226,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 231,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 252,
+      "sy": 0,
+      "dx": 238,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 245,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 251,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 257,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 263,
+      "dy": 153
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 72,
+      "sy": 227,
+      "dx": 180,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 228,
+      "sy": 0,
+      "dx": 195,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 202,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 424,
+      "sy": 0,
+      "dx": 208,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 215,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 308,
+      "sy": 0,
+      "dx": 221,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 227,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 408,
+      "sy": 0,
+      "dx": 233,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 237,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 88,
+      "sy": 0,
+      "dx": 244,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 251,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 257,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 420,
+      "sy": 0,
+      "dx": 261,
+      "dy": 167
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 72,
+      "sy": 227,
+      "dx": 180,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 228,
+      "sy": 0,
+      "dx": 195,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 202,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 424,
+      "sy": 0,
+      "dx": 208,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 215,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 308,
+      "sy": 0,
+      "dx": 221,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 227,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 408,
+      "sy": 0,
+      "dx": 233,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 237,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 128,
+      "sy": 0,
+      "dx": 244,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 251,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 257,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 264,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 267,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 273,
+      "dy": 181
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 72,
+      "sy": 227,
+      "dx": 180,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 144,
+      "sy": 0,
+      "dx": 195,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 300,
+      "sy": 0,
+      "dx": 199,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 205,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 210,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 88,
+      "sy": 0,
+      "dx": 217,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 224,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 228,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 440,
+      "sy": 0,
+      "dx": 234,
+      "dy": 195
+    },
+    {
+      "op": "clip",
+      "src": "cmfont_sheet.png",
+      "sx": 72,
+      "sy": 227,
+      "dx": 180,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 144,
+      "sy": 0,
+      "dx": 195,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 300,
+      "sy": 0,
+      "dx": 199,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 205,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 210,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 220,
+      "sy": 0,
+      "dx": 217,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 340,
+      "sy": 0,
+      "dx": 224,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 230,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 440,
+      "sy": 0,
+      "dx": 236,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 243,
+      "dy": 209
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 408,
+      "sy": 0,
+      "dx": 249,
+      "dy": 209
+    }
+  ],
+  "chart": [
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 609,
+      "dx": 144,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 48,
+      "sy": 609,
+      "dx": 40,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 48,
+      "sy": 609,
+      "dx": 0,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 48,
+      "sy": 609,
+      "dx": 80,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 108,
+      "sy": 609,
+      "dx": 120,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 156,
+      "sy": 0,
+      "dx": 21,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 28,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 420,
+      "sy": 0,
+      "dx": 34,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 39,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 368,
+      "sy": 0,
+      "dx": 45,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 52,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 376,
+      "sy": 0,
+      "dx": 58,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 436,
+      "sy": 48,
+      "dx": 63,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 308,
+      "sy": 0,
+      "dx": 70,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 76,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 332,
+      "sy": 0,
+      "dx": 79,
+      "dy": 26
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 348,
+      "sy": 0,
+      "dx": 86,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 432,
+      "sy": 0,
+      "dx": 89,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 384,
+      "sy": 0,
+      "dx": 95,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 364,
+      "sy": 0,
+      "dx": 101,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 432,
+      "sy": 0,
+      "dx": 105,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 316,
+      "sy": 0,
+      "dx": 111,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 0,
+      "sy": 609,
+      "dx": 240,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 16,
+      "sy": 609,
+      "dx": 256,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 16,
+      "sy": 609,
+      "dx": 288,
+      "dy": 17
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 8,
+      "sy": 0,
+      "dx": 249,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 28,
+      "sy": 60,
+      "dx": 259,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 32,
+      "sy": 0,
+      "dx": 266,
+      "dy": 25
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 216,
+      "sy": 429,
+      "dx": 20,
+      "dy": 50
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 180,
+      "sy": 689,
+      "dx": 28,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_portraits_sheet.png",
+      "sx": 64,
+      "sy": 0,
+      "dx": 20,
+      "dy": 50
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 68,
+      "sy": 376,
+      "dx": 0,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 20,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 60,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 100,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 140,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 180,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 220,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 260,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 88,
+      "sy": 376,
+      "dx": 300,
+      "dy": 168
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 100,
+      "sy": 429,
+      "dx": 18,
+      "dy": 173
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_portraits_sheet.png",
+      "sx": 64,
+      "sy": 128,
+      "dx": 20,
+      "dy": 175
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 0,
+      "sy": 477,
+      "dx": 74,
+      "dy": 50
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 172,
+      "sy": 689,
+      "dx": 66,
+      "dy": 63
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_portraits_sheet.png",
+      "sx": 64,
+      "sy": 128,
+      "dx": 74,
+      "dy": 50
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 136,
+      "sy": 429,
+      "dx": 72,
+      "dy": 48
+    },
+    {
+      "op": "clip",
+      "src": "stdglabo_sheet.png",
+      "sx": 0,
+      "sy": 689,
+      "dx": 272,
+      "dy": 201
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 212,
+      "sy": 0,
+      "dx": 278,
+      "dy": 196
+    },
+    {
+      "op": "clip",
+      "src": "uifont.png",
+      "sx": 8,
+      "sy": 0,
+      "dx": 285,
+      "dy": 196
+    }
+  ]
+}

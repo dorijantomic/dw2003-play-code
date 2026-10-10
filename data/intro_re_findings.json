@@ -1,0 +1,48 @@
+{
+  "fn6a": { "effect": "camera_focus_actor", "args": "[mode, actorId]",
+            "notes": "VERIFIED (2026-06-13 corpus analysis, 203 instances): FN6A 1 <actor> at disasm idx 0 = initial camera target at scene start (followed by SETPOS/WALKTO for that actor); FN6A 0 <actor> mid-scene = pan camera to actor immediately before they speak (consistently precedes SAY with matching actor id). Both modes mean 'look at this actor'; mode distinguishes initial-lock vs mid-scene-focus." },
+  "fn6b": { "effect": "camera_snap_coords", "args": "[mode, x, y]",
+            "notes": "VERIFIED (2026-06-13 corpus analysis, 90 instances): FN6B 1 x y at disasm idx 0 = snap camera to coords at scene start; FN6B 0 x y mid-scene = move camera to coords. Mode 1 = scene-start snap, mode 0 = mid-scene pan." },
+  "waitflag": { "semantics": "anim_complete", "default_frames": 48,
+                "notes": "VERIFIED (2026-06-13 corpus analysis): WAITFLAG releases when gesture animation completes. Preceding SETANIM opcodes are always gesture/action anims (anim 54: 26x, anim 9: 15x, anim 57: 5x, etc.), never idle/walk loops. Pattern: SETANIM <gesture> -> WAITFLAG -> SETANIM <idle>. 48-frame default is reasonable approximation." },
+  "emotes": {
+    "notes": "FALSIFIED (2026-06-13): No emote TIM art found in tim/dw2003/field/ tree. Effect actor ids 800-835 are PS1 heap objects; their TIM art is runtime-loaded from the wstag overlay or cmnbgdtm pack by native call 0x80092484 - not a separate sprite directory. Glyph fallback is correct approach.",
+    "800": { "kind": "clear", "glyph": null, "img": null },
+    "801": { "kind": "ambient", "glyph": "♪", "img": null },
+    "802": { "kind": "react", "glyph": "?", "img": null },
+    "803": { "kind": "react", "glyph": "!", "img": null },
+    "804": { "kind": "ellipsis", "glyph": "…", "img": null },
+    "805": { "kind": "ellipsis", "glyph": "…", "img": null },
+    "806": { "kind": "react", "glyph": "!", "img": null },
+    "807": { "kind": "react", "glyph": "!?", "img": null },
+    "808": { "kind": "fx", "glyph": "*", "img": null },
+    "809": { "kind": "react", "glyph": "!", "img": null },
+    "810": { "kind": "clear", "glyph": null, "img": null },
+    "811": { "kind": "react", "glyph": "!", "img": null },
+    "812": { "kind": "fx", "glyph": "♪", "img": null },
+    "813": { "kind": "fx", "glyph": "*", "img": null },
+    "814": { "kind": "fx", "glyph": "*", "img": null },
+    "821": { "kind": "fx", "glyph": "!", "img": null },
+    "823": { "kind": "react", "glyph": "?", "img": null }
+  },
+  "transitions": {
+    "notes": "All intro transitions are HANDOFF opcodes already followed by the engine (handoff_to). Only the two special ids below need code.",
+    "handoff_specials": {
+      "1280": { "meaning": "registration/name-entry screen (HYPOTHESIS: native screen 0x500)", "stage": "s785", "action": "nameentry_then_recheck" },
+      "3587": { "meaning": "dive FMV -> s200 (HYPOTHESIS: 0xE03 special)", "stage": "s790", "action": "warp_s200" }
+    }
+  },
+  "menu_interleave": {
+    "pack_choice_after_say": 14,
+    "lead_choice_after_say": 14,
+    "name_entry": "handoff_1280",
+    "notes": "VERIFIED (2026-06-13 static analysis): SAY p1=14 = strings[13] = 'Have you all decided?' (Account Clerk). Pack+lead menus fire after this SAY via afterSay hook. SAY p1=16 = strings[15] = 'Okay, then I'll register you...' is the last line before HANDOFF 1280. esdmg700[1] has NO choice markup; all 16 strings are linear SAYs. Name entry is at HANDOFF 1280 (disasm idx 294) after ev1 ends, before ev3."
+  },
+  "title_art": {
+    "notes": "FOUND but not decoded (2026-06-13): pack/dw2003/screen/tlogousa/ has 13 bin files in sub-pack 0 + 3 in sub-pack 1. Also tlogopal (PAL) and tlogojpn (JPN) variants. These are raw PS1 TIM format; the extraction tool has not processed screen-type packs. No PNG available. Canvas-drawn title screen is correct current approach.",
+    "location": "pack/dw2003/screen/tlogousa/"
+  },
+  "screen_id_correction": {
+    "notes": "IMPORTANT: screen id != stage number. s780 = screen 727, s785 = screen 728, s790 = screen 729. See data/screen_table.json for authoritative mapping. The task brief's claim that 'screen id = hex of stage number' (e.g. 0x30C = s780) is wrong; 0x30C = 780 decimal is a different stage."
+  }
+}

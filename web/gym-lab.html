@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gym Lab — DW2003 training scenes</title>
+<style>
+  body { background:#0d0d16; color:#cfd8ea; font:13px monospace; margin:0; display:flex; }
+  #side { width:340px; padding:10px; height:100vh; overflow-y:auto; box-sizing:border-box; background:#12121e; }
+  #main { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px; }
+  canvas { background:#000; border:1px solid #333; image-rendering:pixelated; }
+  select, input, button { background:#22223a; color:#dfe; border:1px solid #445; font:12px monospace; padding:3px 6px; margin:2px 0; }
+  input[type=number] { width:56px; }
+  input[type=range] { width:150px; vertical-align:middle; }
+  button.on { background:#2a4a2a; }
+  .row { margin:7px 0; }
+  h3 { margin:8px 0 4px; color:#8cf; }
+  #anchOut { font-size:11px; color:#9fb; background:#0a0a12; padding:4px; white-space:pre; user-select:all; }
+  #status { font-size:11px; color:#9ab; }
+  .hint { font-size:11px; color:#778; }
+  label { user-select:none; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h3>Gym Lab — TRANIN scenes</h3>
+  <div class="row">drill family: <select id="famSel"></select></div>
+  <div class="row">starter: <select id="catSel"></select></div>
+  <h3>Playback</h3>
+  <div class="row" id="phaseBtns"></div>
+  <div class="row">
+    <button id="fullBtn" class="on">Full process</button>
+    <button id="pauseBtn">Pause</button>
+  </div>
+  <div class="row">speed <input id="speed" type="range" min="0.1" max="2" step="0.1" value="1"><span id="speedV">1.0x</span></div>
+  <div class="row" id="status"></div>
+  <h3>Anchor (native px)</h3>
+  <div class="row">
+    scene x<input id="ax" type="number"> y<input id="ay" type="number">
+    <span class="hint">(arrow keys)</span>
+  </div>
+  <div class="row">
+    digi Δ x<input id="ddx" type="number" value="0"> y<input id="ddy" type="number" value="0">
+    <span class="hint">(shift+arrows; leave 0 — both calibrated families share one anchor)</span>
+  </div>
+  <div id="anchOut"></div>
+  <h3>Reference overlay</h3>
+  <div class="row"><input id="refFile" type="file" accept="image/*"> <span class="hint">or drop a PS1 capture on the canvas</span></div>
+  <div class="row">opacity <input id="refOp" type="range" min="0" max="1" step="0.05" value="0.5"></div>
+  <div class="row">
+    <button id="refAuto">Auto-register (frame lines)</button>
+    <button id="refClear">Clear</button>
+  </div>
+  <div class="row">
+    manual: scale <input id="refScale" type="number" step="0.01" value="1">
+    ox <input id="refOx" type="number" value="0"> oy <input id="refOy" type="number" value="0">
+  </div>
+  <div class="hint">
+    Auto-register finds the viewport frame's blue border lines in the capture
+    and maps it onto native (114,75)-(299,178), the same registration used for
+    the Punch/Study anchor verifications. Nudge until the walker sprites sit
+    pixel-crisp on the capture, then copy the anchor line into TRANIN_ANCHORS
+    (web/gym.js).
+  </div>
+</div>
+<div id="main">
+  <canvas id="cv" width="320" height="240" style="width:960px;height:720px"></canvas>
+</div>
+<script type="module">
+import {
+  traninEntry, drawTraninScene, traninScriptMs, traninAnchors,
+  TR_INTRO, TR_WINDUP, TR_HIT, TR_MISS, TR_WIN, TR_LOSE,
+} from "./gym.js";
+import { loadPack, drawClip, packReady } from "./screenpack.js";
+
+const FAMILIES = [
+  ["00", "Punch"], ["01", "Defense"], ["02", "Yoga"], ["03", "Study"],
+  ["04", "Jump Rope"], ["10", "Heat Tolerance"], ["11", "Water Tolerance"],
+  ["12", "Ice Tolerance"], ["13", "Wind Tolerance"], ["14", "Thunder Defense"],
+  ["15", "Missile Defense"], ["16", "Haunting"],
+];
+const STARTERS = ["Kotemon", "Kumamon", "Monmon", "Agumon", "Veemon", "Guilmon", "Renamon", "Patamon"];
+const PHASES = [
+  ["intro", TR_INTRO], ["wind-up", TR_WINDUP], ["HIT", TR_HIT],
+  ["MISS", TR_MISS], ["win", TR_WIN], ["lose", TR_LOSE],
+];
+const FULL_SEQ = [TR_INTRO, TR_WINDUP, TR_HIT, TR_WINDUP, TR_MISS, TR_WIN, TR_LOSE];
+const SEQ_NAMES = ["intro", "wind-up", "HIT", "wind-up", "MISS", "win", "lose"];
+
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+const chrome = loadPack("sttrng3");
+
+const st = {
+  fam: "03", cat: 6, mode: "full", phase: TR_INTRO, paused: false, speed: 1,
+  t0: performance.now(), pausedAt: 0,
+  anch: null, // {props:[x,y], digi:[x,y]} editable copy
+  ref: null, refReg: null, // reference Image + {sx,sy,L,T} registration
+};
+
+for (const [suf, name] of FAMILIES) $("famSel").add(new Option(`${suf} — ${name}`, suf));
+STARTERS.forEach((n, i) => $("catSel").add(new Option(`${i} — ${n}`, i)));
+$("famSel").value = st.fam; $("catSel").value = st.cat;
+
+function loadAnchors() {
+  st.anch = [...traninAnchors(st.fam)];
+  st.digiD = [0, 0];
+  ["ax", "ay"].forEach((id, i) => $(id).value = st.anch[i]);
+  ["ddx", "ddy"].forEach((id, i) => $(id).value = 0);
+  updateAnchOut();
+}
+function updateAnchOut() {
+  const d = st.digiD[0] || st.digiD[1] ? `   /* digi offset (${st.digiD}) — shared-anchor model violated! */` : "";
+  $("anchOut").textContent = `"${st.fam}": [${st.anch}],${d}`;
+}
+loadAnchors();
+
+const restart = () => { st.t0 = performance.now(); st.pausedAt = 0; };
+$("famSel").onchange = () => { st.fam = $("famSel").value; loadAnchors(); restart(); };
+$("catSel").onchange = () => { st.cat = +$("catSel").value; restart(); };
+const phaseBox = $("phaseBtns");
+for (const [name, idx] of PHASES) {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.onclick = () => {
+    st.mode = "single"; st.phase = idx; restart();
+    [...phaseBox.children].forEach((c) => c.classList.remove("on"));
+    b.classList.add("on"); $("fullBtn").classList.remove("on");
+  };
+  phaseBox.appendChild(b);
+}
+$("fullBtn").onclick = () => {
+  st.mode = "full"; restart();
+  [...phaseBox.children].forEach((c) => c.classList.remove("on"));
+  $("fullBtn").classList.add("on");
+};
+$("pauseBtn").onclick = () => {
+  st.paused = !st.paused;
+  if (st.paused) st.pausedAt = performance.now();
+  else st.t0 += performance.now() - st.pausedAt;
+  $("pauseBtn").classList.toggle("on", st.paused);
+};
+$("speed").oninput = () => { st.speed = +$("speed").value; $("speedV").textContent = st.speed.toFixed(1) + "x"; };
+["ax", "ay"].forEach((id, i) => $(id).oninput = () => { st.anch[i] = +$(id).value | 0; updateAnchOut(); });
+["ddx", "ddy"].forEach((id, i) => $(id).oninput = () => { st.digiD[i] = +$(id).value | 0; updateAnchOut(); });
+document.addEventListener("keydown", (e) => {
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!d || e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  e.preventDefault();
+  const t = e.shiftKey ? st.digiD : st.anch;
+  t[0] += d[0]; t[1] += d[1];
+  ["ax", "ay"].forEach((id, i) => $(id).value = st.anch[i]);
+  ["ddx", "ddy"].forEach((id, i) => $(id).value = st.digiD[i]);
+  updateAnchOut();
+});
+
+// ── Reference capture overlay ──
+function setRef(img) { st.ref = img; st.refReg = null; $("refScale").value = (185 / img.width).toFixed(3); }
+$("refFile").onchange = () => {
+  const f = $("refFile").files[0];
+  if (f) { const img = new Image(); img.onload = () => setRef(img); img.src = URL.createObjectURL(f); }
+};
+cv.addEventListener("dragover", (e) => e.preventDefault());
+cv.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) { const img = new Image(); img.onload = () => setRef(img); img.src = URL.createObjectURL(f); }
+});
+$("refClear").onclick = () => { st.ref = st.refReg = null; };
+// Find the viewport frame's border lines (color ~rgb(104,104,208)) in the
+// capture: strongest matching column in each horizontal third and strongest
+// row top/bottom — the same registration recipe used to verify Punch/Study.
+$("refAuto").onclick = () => {
+  if (!st.ref) return;
+  const c = document.createElement("canvas");
+  c.width = st.ref.width; c.height = st.ref.height;
+  const cx = c.getContext("2d");
+  cx.drawImage(st.ref, 0, 0);
+  const d = cx.getImageData(0, 0, c.width, c.height).data;
+  const cols = new Float32Array(c.width), rows = new Float32Array(c.height);
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    const i = (y * c.width + x) * 4;
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (Math.abs(r - 104) < 40 && Math.abs(g - 104) < 40 && b > 170 && b < 240) { cols[x]++; rows[y]++; }
+  }
+  const peak = (arr, lo, hi) => { let m = lo; for (let i = lo; i < hi; i++) if (arr[i] > arr[m]) m = i; return m; };
+  const L = peak(cols, 0, c.width / 3 | 0), R = peak(cols, c.width * 2 / 3 | 0, c.width);
+  const T = peak(rows, 0, c.height / 3 | 0), B = peak(rows, c.height * 2 / 3 | 0, c.height);
+  if (cols[L] < c.height * 0.2 || cols[R] < c.height * 0.2) { $("status").textContent = "auto-register: frame lines not found"; return; }
+  st.refReg = { sx: (R - L) / 185, sy: (B - T) / 103, L, T };
+  $("status").textContent = `registered: L${L} R${R} T${T} B${B} (scale ${st.refReg.sx.toFixed(3)})`;
+};
+
+function drawRef() {
+  if (!st.ref) return;
+  ctx.save();
+  ctx.globalAlpha = +$("refOp").value;
+  if (st.refReg) {
+    const { sx, sy, L, T } = st.refReg;
+    ctx.drawImage(st.ref, 114 - L / sx, 75 - T / sy, st.ref.width / sx, st.ref.height / sy);
+  } else {
+    const s = +$("refScale").value || 1;
+    ctx.drawImage(st.ref, +$("refOx").value, +$("refOy").value, st.ref.width * s, st.ref.height * s);
+  }
+  ctx.restore();
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  ctx.clearRect(0, 0, 320, 240);
+  if (packReady(chrome)) {
+    drawClip(ctx, chrome, 45, 0, 0);      // cave backdrop
+    drawClip(ctx, chrome, 0x28, 114, 75); // viewport window
+  }
+  const props = traninEntry(`${st.fam}_s8`);
+  const digi = traninEntry(`${st.fam}_s${st.cat}`);
+  const now = st.paused ? st.pausedAt : performance.now();
+  let el = (now - st.t0) * st.speed;
+  let script = st.phase, label, loop;
+  if (st.mode === "full") {
+    // play the whole session: each beat once, then loop the sequence
+    const durs = FULL_SEQ.map((s) => Math.max(traninScriptMs(props, s), traninScriptMs(digi, s), 200));
+    const total = durs.reduce((a, b) => a + b, 0);
+    el %= total;
+    let i = 0;
+    while (el >= durs[i]) { el -= durs[i]; i++; }
+    script = FULL_SEQ[i]; label = `full: ${SEQ_NAMES[i]}`; loop = false;
+  } else {
+    label = PHASES.find(([, s]) => s === script)?.[0]; loop = true;
+  }
+  // native layering: effects backdrop -> trainee -> props on top
+  drawTraninScene(ctx, digi, props, script, el, ...st.anch, loop, st.digiD);
+  drawRef();
+  if (!st.paused) $("status").textContent = `${label} — script ${script}, t=${(el / 1000).toFixed(2)}s`;
+}
+frame();
+</script>
+</body>
+</html>

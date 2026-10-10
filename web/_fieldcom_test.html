@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><body style="background:#446">
+<canvas id="c" width="560" height="120" style="image-rendering:pixelated;width:1120px"></canvas>
+<script type="module">
+import { loadFieldcom, drawIndicatorBubble, KIND } from "./fieldcom.js";
+const loadImage = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+await loadFieldcom(loadImage);
+const ctx = document.getElementById("c").getContext("2d");
+ctx.imageSmoothingEnabled = false;
+let t = 0;
+const kinds = [KIND.exclaim, KIND.ladder, KIND.dots, KIND.doorGlyph, KIND.arrowDown, KIND.arrowLeft, KIND.arrowUp, KIND.arrowRight, KIND.arrowLift, KIND.tool, KIND.smoke];
+function draw() {
+    ctx.clearRect(0,0,560,120);
+    kinds.forEach((k,i) => drawIndicatorBubble(ctx, 30 + i*50, 70, k, t));
+    t++;
+    window.__drawn = true;
+    requestAnimationFrame(draw);
+}
+draw();
+</script>

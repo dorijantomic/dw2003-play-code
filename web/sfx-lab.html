@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SFX Lab — 105 decoded sounds</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#f0c040; font-family:monospace; }
+  #top { padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; background:#0a0e1a; border-bottom:1px solid #333; z-index:2; }
+  select, button, input { background:#2a3a6a; color:#f0c040; border:1px solid #f0c040; padding:5px 10px; cursor:pointer; font-family:monospace; font-size:13px; }
+  button:hover { background:#3a4a8a; }
+  #hint { padding:8px 14px; color:#9ab; font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { padding:5px 8px; border-bottom:1px solid #222; text-align:left; vertical-align:top; }
+  th { position:sticky; top:47px; background:#0a0e1a; z-index:1; }
+  tr:hover { background:#111a2e; }
+  tr.playing td { background:#1a2540; }
+  .play { background:#204070; color:#fff; border-color:#4a7abf; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:bold; }
+  .badge.wired { background:#1a5c2a; color:#8fe08f; }
+  .badge.traced { background:#1a3a5c; color:#8fc4e0; }
+  .badge.has_audio_no_trigger { background:#5c4a1a; color:#e0c48f; }
+  .badge.no_audio { background:#3a3a3a; color:#999; }
+  .sites { font-size:11px; color:#9ab; }
+  .sites div { white-space:nowrap; }
+  .id { color:#666; font-size:11px; }
+  #legend { padding:6px 14px; font-size:12px; display:flex; gap:16px; flex-wrap:wrap; }
+  #legend span { display:flex; align-items:center; gap:4px; }
+  .section-row td { background:#050810; font-weight:bold; color:#f0c040; padding-top:14px; }
+  .note { width:220px; background:#05070d; color:#fff; border:1px solid #333; font-family:monospace; font-size:12px; padding:4px 6px; }
+  .note.filled { border-color:#f0c040; }
+  #dumpWrap { padding:10px 14px; }
+  #dump { width:100%; height:160px; background:#05070d; color:#8f8; font-size:12px; border:1px solid #333; padding:8px; box-sizing:border-box; }
+</style>
+</head>
+<body>
+<div id="top">
+  <button id="stop">■ Stop</button>
+  <button id="copy">📋 Copy your notes</button>
+  <input id="filter" placeholder="filter by name..." style="width:200px">
+  <span id="count"></span>
+</div>
+<div id="legend">
+  <span><span class="badge wired">wired</span> playing live in the walker right now</span>
+  <span><span class="badge traced">traced</span> real call site found — name + WHEN it fires + audio, not wired yet</span>
+  <span><span class="badge has_audio_no_trigger">has audio</span> name + audio known, no call site found yet (know WHAT, not WHEN)</span>
+  <span><span class="badge no_audio">no audio</span> name known, WAV falls in the unparsed-tone extraction gap</span>
+</div>
+<div id="hint">Decoded from the game's own developer Sound Test overlay (soundtst.s) + an automated
+call-site sweep across 50 overlay files — not by ear, not by guessing. Click ▶ to hear a sound
+(if it has audio). "call sites" shows real file:address locations where the game triggers it.
+Sounds tagged <b>loops</b> have real loop points decoded straight from the PS1 ADPCM data (not
+guessed) and play back seamlessly looping via Web Audio, matching how the game actually holds
+them — everything else is a genuine one-shot in the original too (the game re-triggers those
+manually, like the ladder creak every 16 ticks, rather than looping the sample itself).
+Play a sound and type what you actually hear/recognize in "your note" — even for names we
+already have, tell me if the guess is wrong. Notes collect at the bottom; "Copy your notes"
+grabs them as text to paste back.</div>
+
+<div id="rawWrap" style="padding:8px 14px">
+  <div style="color:#f0c040;font-weight:bold;margin-bottom:4px">RAW VAG SAMPLES — every sample in the common bank (0–110)</div>
+  <div style="color:#9ab;font-size:12px;margin-bottom:6px">The named sounds above each point at ONE of these. If a battle sound (e.g. MID_DOWN thud) is the wrong sample, find the correct raw sample here and tell me its number.
+    <label style="margin-left:10px">rate <input id="rawRate" type="range" min="0.05" max="2" step="0.005" value="1" style="vertical-align:middle"><span id="rawRateV">1.00×</span></label></div>
+  <div id="rawGrid" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+</div>
+
+<table>
+  <thead><tr><th>status</th><th>name</th><th>id / slot</th><th></th><th>call sites (file × count)</th><th>your note</th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div id="dumpWrap">
+  <textarea id="dump" readonly placeholder="your notes collect here as you type them above..."></textarea>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const rows = await (await fetch(`assets/sfx-lab/common-105.json`)).json();
+$("count").textContent = `${rows.length} sounds — ${rows.filter(r=>r.status==='wired').length} wired, ${rows.filter(r=>r.status==='traced').length} traced, ${rows.filter(r=>r.status==='has_audio_no_trigger').length} audio-only, ${rows.filter(r=>r.status==='no_audio').length} no audio`;
+
+const tbody = $("tbody");
+
+// Real ADPCM loop points (decoded from the raw VAG data's loop flags, not
+// guessed) let us loop authentically via Web Audio's native loopStart/loopEnd
+// instead of just repeating the whole clip — the game re-plays some sounds
+// (like the ladder creak) manually instead of relying on sample looping, so
+// only sounds with an actual loop flag in their ADPCM stream get this.
+const actx = new (window.AudioContext || window.webkitAudioContext)();
+const bufferCache = new Map();
+async function loadBuffer(vag) {
+  if (bufferCache.has(vag)) return bufferCache.get(vag);
+  const resp = await fetch(`assets/sfx-lab/inst/${vag}.wav`);
+  const arr = await resp.arrayBuffer();
+  const buf = await actx.decodeAudioData(arr);
+  bufferCache.set(vag, buf);
+  return buf;
+}
+
+let curSource = null, curRow = null;
+function stop() {
+  if (curSource) { try { curSource.stop(); } catch {} curSource = null; }
+  if (curRow) { curRow.classList.remove("playing"); curRow = null; }
+}
+async function play(vag, tr, loop, rate) {
+  stop();
+  await actx.resume();
+  const buf = await loadBuffer(vag);
+  const src = actx.createBufferSource();
+  src.buffer = buf;
+  // decoded note-vs-center pitch (2026-07-02i positional-path decode)
+  if (rate && rate !== 1) src.playbackRate.value = rate;
+  if (loop) {
+    src.loop = true;
+    src.loopStart = loop.start;
+    src.loopEnd = loop.end;
+  } else {
+    src.onended = () => { if (curRow === tr) tr.classList.remove("playing"); };
+  }
+  src.connect(actx.destination);
+  src.start();
+  curSource = src;
+  curRow = tr;
+  tr.classList.add("playing");
+}
+
+const STATUS_LABEL = { wired: "wired", traced: "traced", has_audio_no_trigger: "has audio", no_audio: "no audio" };
+
+function render(filterText) {
+  tbody.innerHTML = "";
+  let lastStatus = null;
+  const SECTION_TITLE = {
+    wired: "WIRED — playing in the walker",
+    traced: "TRACED — name + trigger + audio known",
+    has_audio_no_trigger: "AUDIO ONLY — name + audio known, no trigger found yet",
+    no_audio: "NO AUDIO — name known, WAV not extracted (tone-parse gap)",
+  };
+  for (const r of rows) {
+    if (filterText && !r.name.toLowerCase().includes(filterText)) continue;
+    if (r.status !== lastStatus) {
+      const sec = document.createElement("tr");
+      sec.className = "section-row";
+      sec.innerHTML = `<td colspan="5">${SECTION_TITLE[r.status]}</td>`;
+      tbody.appendChild(sec);
+      lastStatus = r.status;
+    }
+    const tr = document.createElement("tr");
+    const sitesHtml = r.call_sites.length
+      ? r.call_sites.slice(0, 6).map(s => `<div>${s.file}:${s.addr}</div>`).join("") + (r.call_sites.length > 6 ? `<div>… +${r.call_sites.length - 6} more</div>` : "")
+      : "";
+    const wiredHtml = r.wired ? `<div>walker: <b>${r.wired.name_in_walker}</b><br>${r.wired.where}</div>` : "";
+    const loopBadge = r.loop ? `<span class="badge traced" style="margin-left:4px" title="real ADPCM loop points, ${r.loop.start}s-${r.loop.end}s">loops</span>` : "";
+    tr.innerHTML = `
+      <td><span class="badge ${r.status}">${STATUS_LABEL[r.status]}</span></td>
+      <td><b>${r.name}</b>${loopBadge}</td>
+      <td class="id">${r.id}<br>slot ${r.slot}</td>
+      <td>${r.vag != null ? `<button class="play">${r.loop ? "▶ loop" : "▶"}</button>` : ""}</td>
+      <td class="sites">${wiredHtml}${sitesHtml}</td>
+      <td><input class="note" placeholder="what did you hear?"></td>
+    `;
+    if (r.vag != null) {
+      tr.querySelector(".play").onclick = () => play(r.vag, tr, r.loop, r.rate);
+    }
+    tr.dataset.name = r.name;
+    tr.dataset.id = r.id;
+    tr.querySelector(".note").oninput = (e) => {
+      e.target.classList.toggle("filled", !!e.target.value.trim());
+      updateDump();
+    };
+    tbody.appendChild(tr);
+  }
+}
+render("");
+
+function updateDump() {
+  const lines = [];
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const inp = tr.querySelector(".note");
+    if (inp && inp.value.trim()) {
+      lines.push(`${tr.dataset.name} (${tr.dataset.id}): ${inp.value.trim()}`);
+    }
+  });
+  $("dump").value = lines.join("\n");
+}
+
+$("stop").onclick = stop;
+$("filter").oninput = (e) => render(e.target.value.trim().toLowerCase());
+$("copy").onclick = () => { updateDump(); $("dump").select(); document.execCommand("copy"); };
+</script>
+</body>
+</html>

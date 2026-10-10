@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""What actually runs when the player walks into a story-gated stage.
+
+Joins the per-stage runtime traces collected by `tools/stage_entry_sweep.sh`
+(BizHawk dumps at `/mnt/c/bizhawk-rig/dumps/stageNNN_entries.txt`) with the
+recovered names and descriptions in `recovered/ddw3/semantics.json` and each
+stage's own ordinal-only gate from `web/assets/data/auto_event_gates.json`.
+
+The output is a reading document, not evidence: the counts are runtime
+observations made by the sweep, and a name next to one says which recovered
+function the address belongs to, not that the run proved its semantics. The
+dumps themselves are the artifact; this tool only arranges them.
+
+Usage:
+    python3 tools/report_stage_entry_runs.py
+    python3 tools/report_stage_entry_runs.py --write docs/generated/stage-entry-runs.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import re
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from gate_ordinal import gate_ordinal  # noqa: E402
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+DUMPS = pathlib.Path("/mnt/c/bizhawk-rig/dumps")
+
+HEADER = re.compile(
+    r"^# stage=(\S+) armed_scene=0x([0-9a-f]+) resident_at=(\S+) resident_scene=0x([0-9a-f]+) "
+    r"scene_now=0x([0-9a-f]+) frames=(\d+) armed=(\d+) attributable=(\d+) "
+    r"previous_stage_only=(\d+) total=(\d+) tainted=(\S+)"
+)
+ROW = re.compile(r"^([0-9a-f]{8}) after=(\d+) before=(\d+) (\S+)")
+
+
+def brief(text: str, limit: int = 170) -> str:
+    text = " ".join((text or "").split())
+    cut = len(text)
+    for i, ch in enumerate(text):
+        if ch in ".;" and i >= 40:
+            cut = i + 1
+            break
+    text = text[:cut]
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0] + "..."
+
+
+def lift_note(stage: int, addr: int) -> str:
+    """Why an address with no name table entry has no readable body of its own.
+
+    A jump-table case target gets a `_asm` closure (so the builder threads it)
+    but its `_c` lift fails: the body it starts belongs to the enclosing
+    dispatcher. Saying so beats an empty cell that reads as unread.
+    """
+    src = ROOT / "exe-decomp" / f"wstag{stage}_c" / f"F0x{addr:08x}.c"
+    try:
+        head = src.read_text(encoding="utf8", errors="replace")[:200]
+    except OSError:
+        return ""
+    if "Decompilation failure" in head:
+        return " — jump-table case target inside a dispatcher, not a standalone routine"
+    return ""
+
+
+def load_names() -> tuple[dict, dict, dict]:
+    semantics = json.loads((ROOT / "recovered/ddw3/semantics.json").read_text())
+    functions = semantics["functions"]
+    family_names: dict[str, str] = {}
+    family_summaries: dict[str, str] = {}
+    for family in semantics["families"].values():
+        template = family.get("template", {})
+        for key, name in (family.get("members") or {}).items():
+            family_names[key] = name
+            family_summaries[key] = template.get("summary") or ""
+    return functions, family_names, family_summaries
+
+
+def resolve(key: str, functions: dict, family_names: dict, family_summaries: dict) -> tuple[str, str]:
+    entry = functions.get(key)
+    if entry:
+        return entry.get("name") or key, entry.get("summary") or ""
+    if key in family_names:
+        return family_names[key], family_summaries.get(key, "")
+    return f"{key.rsplit(':', 1)[-1]} (unnamed)", ""
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--dumps", type=pathlib.Path, default=DUMPS)
+    ap.add_argument("--write", type=pathlib.Path)
+    args = ap.parse_args()
+
+    from build_stage_entry_list import entry_words, stage_entries
+
+    extents = json.loads((ROOT / "docs/generated/function-extents.json").read_text())
+    functions, family_names, family_summaries = load_names()
+    ladder = json.loads((ROOT / "web/assets/data/progress_ordinal.json").read_text())["ladder"]
+    ladder_by_stage = {row["stage"]: sorted(row["ordinals"]) for row in ladder}
+    destinations = json.loads((ROOT / "web/assets/data/stagslct_ui.json").read_text())
+    codes = {}
+    for row in destinations["destinations"]:
+        if row.get("kind") == "screen" and "type" in row:
+            try:
+                codes[row["stage"]] = int(row["type"], 16)
+            except (TypeError, ValueError):
+                pass
+
+    dumps = []
+    for path in args.dumps.glob("stage*_entries.txt"):
+        m = re.match(r"stage(\d+)_entries$", path.stem)
+        if m:
+            dumps.append((int(m.group(1)), path))
+    dumps.sort()
+
+    lines = [
+        "---",
+        "reach: Reading what runs when a player enters a story-gated stage, or checking the sweep's"
+        " per-stage execution counts against the recovered function names and the engine story beats.",
+        "status: generated",
+        "---",
+        "",
+        "# Stage entry runs — what runs when a gated stage is entered",
+        "",
+        "> Generated by `python3 tools/report_stage_entry_runs.py --write docs/generated/stage-entry-runs.md`.",
+        "> Do not edit by hand; fix the traces or the generator.",
+        "",
+        "One trace per story-gated stage, read with the developers' own stage-launch request and the",
+        "story beat that stage's own gate table names. The counts are instruction executions recorded by",
+        "`tools/windows-rig/trace-stage-entries.lua`; a name beside an address is the recovered function",
+        "that owns it, and a count is how many times its first instruction was fetched during the trace.",
+        "",
+        "Reading the table: `runs` is hits after the stage's own code was confirmed resident. Entries that",
+        "only ran before that confirmation are listed separately — they may be the previous stage's copy of",
+        "the same address. The last three traces compare four instruction words per entry; earlier ones",
+        "compared one, which is weaker against the shared wstag load base. `engine beat(s)` is the ordinal",
+        "list the shipped engine's story spine assigns to that stage; where the written gate is not in it,",
+        "the run captured an earlier or variant gated scene, not the stage's story-step entry.",
+        "",
+        "Stages with `gate none` need a story flag already set, which the sweep refuses to fake; those runs",
+        "traced at the story value left by the previous stage and prove execution only, not the gated event.",
+        "",
+    ]
+
+    summary_rows = []
+    body = []
+    for stage, path in dumps:
+        raw = path.read_text().splitlines()
+        head = HEADER.match(raw[0])
+        if not head:
+            print(f"skipping {path}: unrecognised header", file=sys.stderr)
+            continue
+        frames = int(head.group(6))
+        armed = int(head.group(7))
+        attributable = int(head.group(8))
+        resident_scene = int(head.group(4), 16)
+        tainted = head.group(11)
+
+        rows = []
+        before_only = []
+        for line in raw[1:]:
+            m = ROW.match(line)
+            if not m:
+                continue
+            addr, after, before = int(m.group(1), 16), int(m.group(2)), int(m.group(3))
+            if after > 0:
+                rows.append((after, addr))
+            else:
+                before_only.append((before, addr))
+
+        prefix = f"pro/wstag{stage}:"
+        executed = []
+        for after, addr in rows:
+            name, desc = resolve(f"{prefix}F0x{addr:08x}", functions, family_names, family_summaries)
+            if name.endswith("(unnamed)"):
+                name += lift_note(stage, addr)
+            executed.append((after, addr, name, desc))
+        executed.sort(reverse=True)
+
+        prior = []
+        for before, addr in sorted(before_only, reverse=True):
+            name, _ = resolve(f"{prefix}F0x{addr:08x}", functions, family_names, family_summaries)
+            if name.endswith("(unnamed)"):
+                name += lift_note(stage, addr)
+            prior.append((before, addr, name))
+
+        entries = [a for a in stage_entries(extents, f"wstag{stage}") if entry_words(f"wstag{stage}", a)]
+        hit = {addr for _, addr in rows} | {addr for _, addr in before_only}
+        silent = [a for a in entries if a not in hit]
+
+        gate = gate_ordinal(stage)
+        code = codes.get(stage)
+        engine_beats = ladder_by_stage.get(stage, [])
+        gate_text = f"story gate {gate}" if gate is not None else "gate none"
+        code_text = f"launch code 0x{code:x}" if code else "no launch code"
+        header = f"## wstag{stage} — {gate_text}, {code_text}"
+        top = executed[0][2] if executed else "—"
+        summary_rows.append((stage, gate, engine_beats, code, len(executed), armed, top))
+
+        part = [header, ""]
+        part.append(
+            f"{attributable} of {armed} traced functions ran after the stage was resident, over "
+            f"{frames} frames; landed in scene 0x{resident_scene:x}."
+            + (" **Trace flagged tainted — treat the counts as mixed.**" if tainted == "true" else "")
+        )
+        if gate is None:
+            part.append(
+                "No ordinal-only gate: this stage's events need a story flag already set, so the run "
+                "traced at the story value the previous stage left."
+            )
+        elif not engine_beats:
+            part.append(
+                "This stage carries no beat on the engine's story ladder; the written value is the "
+                "stage's own earliest gate, and its content ran."
+            )
+        elif gate in engine_beats:
+            part.append(
+                "The written beat is the engine story-ladder beat for this stage ("
+                + ", ".join(f"{o} (0x{o:x})" for o in engine_beats)
+                + ")."
+            )
+        else:
+            part.append(
+                "This run used an earlier or variant gate, **not** the engine story-ladder beat "
+                f"({', '.join(f'{o} (0x{o:x})' for o in engine_beats)}), so the story-step entry "
+                "remains untraced here. Where the gate is exactly one below the ladder beat, the "
+                "gated event's own on-complete hook is what writes the next value."
+            )
+        part.append("")
+        if executed:
+            part.append("| runs | function | what it is |")
+            part.append("|---:|---|---|")
+            for after, addr, name, desc in executed:
+                part.append(f"| {after} | `{name}` | {brief(desc)} |")
+        else:
+            part.append("Nothing ran after residency.")
+        if prior:
+            part.append("")
+            part.append(
+                "Only ran before residency was confirmed (attribution uncertain): "
+                + ", ".join(f"`{name}` x{before}" for before, _, name in prior)
+                + "."
+            )
+        if silent:
+            names = []
+            for addr in silent:
+                name, _ = resolve(f"{prefix}F0x{addr:08x}", functions, family_names, family_summaries)
+                if name.endswith("(unnamed)"):
+                    name += lift_note(stage, addr)
+                names.append(f"`{name}`")
+            part.append("")
+            part.append("Never ran: " + ", ".join(names) + ".")
+        part.append("")
+        body.append("\n".join(part))
+
+    lines.append("## All stages at a glance")
+    lines.append("")
+    lines.append("| stage | story gate | engine beat(s) | launch | ran / traced | busiest function |")
+    lines.append("|---|---:|---|---|---:|---|")
+    for stage, gate, engine_beats, code, ran, armed, top in summary_rows:
+        gate_text = str(gate) if gate is not None else "—"
+        beats_text = ", ".join(str(o) for o in engine_beats) if engine_beats else "—"
+        code_text = f"0x{code:x}" if code else "—"
+        lines.append(
+            f"| wstag{stage} | {gate_text} | {beats_text} | {code_text} | {ran} / {armed} | `{top}` |"
+        )
+    lines.append("")
+    lines.extend(body)
+
+    text = "\n".join(lines).rstrip() + "\n"
+    if args.write:
+        args.write.parent.mkdir(parents=True, exist_ok=True)
+        args.write.write_text(text)
+        print(f"wrote {args.write} ({len(summary_rows)} stages)")
+    else:
+        print(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

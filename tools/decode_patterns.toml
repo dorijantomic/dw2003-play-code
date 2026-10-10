@@ -1,0 +1,74 @@
+# Named shapes for the zero-token decoder.
+#
+# A rule names the SHAPE of a body. It never states purpose -- that stays a
+# human judgement, and tools/test_decode_shapes.py enforces it.
+#
+# Conditions are exact counts over the `proven` block. Every listed condition
+# must hold. Keys: fields_read, fields_written, globals_read, globals_written,
+# hardware_read, hardware_written, calls, indirect_calls, conditions, tables,
+# plus the booleans returns_load and returns_none.
+
+[[rule]]
+name = "field-getter"
+summary = "reads one field of an argument and returns it"
+fields_read = 1
+fields_written = 0
+calls = 0
+tables = 0
+returns_load = true
+
+[[rule]]
+name = "field-setter"
+summary = "writes one field of an argument and returns nothing"
+fields_read = 0
+fields_written = 1
+calls = 0
+tables = 0
+returns_none = true
+
+[[rule]]
+name = "table-dispatch"
+summary = "indexes a table and calls through the entry it read"
+tables = 1
+indirect_calls = 1
+
+[[rule]]
+name = "hardware-read"
+summary = "reads a hardware register and stores the value to a global"
+hardware_read = 1
+globals_written = 1
+calls = 0
+
+[[rule]]
+name = "call-forwarder"
+summary = "makes one direct call and no memory access of its own"
+fields_read = 0
+fields_written = 0
+globals_read = 0
+globals_written = 0
+calls = 1
+tables = 0
+conditions = 0
+
+[[rule]]
+name = "global-snapshot"
+summary = "writes one or more globals, touches no argument field, makes no call"
+fields_read = 0
+fields_written = 0
+calls = 0
+indirect_calls = 0
+tables = 0
+
+[[rule]]
+name = "leaf-branchless"
+summary = "no memory access, no call and no test"
+fields_read = 0
+fields_written = 0
+globals_read = 0
+globals_written = 0
+hardware_read = 0
+hardware_written = 0
+calls = 0
+indirect_calls = 0
+tables = 0
+conditions = 0

@@ -1,0 +1,313 @@
+{
+  "base": "m005grey",
+  "reference": "data/model-authoring/references/xros_wars_greymon.png",
+  "operations": [
+    {
+      "operation": "adapt_chain",
+      "selected_bone": 1,
+      "chain": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "operation": "adapt_chain",
+      "selected_bone": 15,
+      "chain": [
+        15,
+        16,
+        17
+      ]
+    },
+    {
+      "operation": "curve_chain",
+      "root": 15,
+      "bones": [
+        15,
+        16,
+        17
+      ],
+      "before_degrees": 10.49,
+      "target_degrees": 57.12,
+      "after_degrees": 57.0
+    },
+    {
+      "operation": "armor_shell",
+      "selected_bone": 2,
+      "shells": [
+        {
+          "bone": 2,
+          "faces": 12,
+          "new_vertices": 12,
+          "lift": 35.946,
+          "seam_distance": 0,
+          "attachment_score": 0.19203502473659986
+        },
+        {
+          "bone": 2,
+          "faces": 8,
+          "new_vertices": 10,
+          "lift": 35.246,
+          "seam_distance": 0,
+          "attachment_score": 0.2257845740456865
+        },
+        {
+          "bone": 2,
+          "faces": 8,
+          "new_vertices": 9,
+          "lift": 30.623,
+          "seam_distance": 0,
+          "attachment_score": 0.24271286214657553
+        }
+      ],
+      "reference_color": [
+        75,
+        76,
+        78
+      ]
+    },
+    {
+      "operation": "repaint",
+      "swatches": [
+        {
+          "source_rank": 0,
+          "source_color": [
+            148,
+            116,
+            36
+          ],
+          "reference_color": [
+            85,
+            105,
+            138
+          ]
+        },
+        {
+          "source_rank": 1,
+          "source_color": [
+            88,
+            73,
+            49
+          ],
+          "reference_color": [
+            67,
+            77,
+            102
+          ]
+        },
+        {
+          "source_rank": 2,
+          "source_color": [
+            192,
+            152,
+            48
+          ],
+          "reference_color": [
+            97,
+            117,
+            150
+          ]
+        },
+        {
+          "source_rank": 3,
+          "source_color": [
+            112,
+            88,
+            32
+          ],
+          "reference_color": [
+            76,
+            96,
+            129
+          ]
+        },
+        {
+          "source_rank": 4,
+          "source_color": [
+            69,
+            48,
+            36
+          ],
+          "reference_color": [
+            59,
+            69,
+            94
+          ]
+        },
+        {
+          "source_rank": 5,
+          "source_color": [
+            216,
+            176,
+            56
+          ],
+          "reference_color": [
+            105,
+            125,
+            158
+          ]
+        },
+        {
+          "source_rank": 6,
+          "source_color": [
+            248,
+            200,
+            64
+          ],
+          "reference_color": [
+            113,
+            133,
+            166
+          ]
+        },
+        {
+          "source_rank": 7,
+          "source_color": [
+            69,
+            97,
+            145
+          ],
+          "reference_color": [
+            87,
+            107,
+            140
+          ]
+        },
+        {
+          "source_rank": 10,
+          "source_color": [
+            193,
+            191,
+            191
+          ],
+          "reference_color": [
+            152,
+            153,
+            157
+          ]
+        }
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "bones": [
+        2
+      ],
+      "axis": 1,
+      "intervals": [
+        [
+          0,
+          0.48
+        ]
+      ],
+      "pixels": 2010,
+      "reference_color": [
+        75,
+        76,
+        78
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "bones": [
+        0
+      ],
+      "axis": 1,
+      "intervals": [
+        [
+          0.3,
+          0.37
+        ],
+        [
+          0.52,
+          0.59
+        ],
+        [
+          0.73,
+          0.79
+        ]
+      ],
+      "pixels": 298,
+      "reference_color": [
+        174,
+        96,
+        62
+      ]
+    },
+    {
+      "operation": "paint_mesh_region",
+      "bones": [
+        15,
+        16,
+        17
+      ],
+      "axis": 2,
+      "intervals": [
+        [
+          0.2,
+          0.32
+        ],
+        [
+          0.51,
+          0.63
+        ],
+        [
+          0.8,
+          0.89
+        ]
+      ],
+      "pixels": 212,
+      "reference_color": [
+        174,
+        96,
+        62
+      ]
+    }
+  ],
+  "validation": {
+    "frames": [
+      49,
+      919,
+      1214,
+      1215
+    ],
+    "attachments": 0,
+    "triangles": 1040,
+    "samples": {
+      "idle": 49,
+      "attack": 1215,
+      "hit": 1214,
+      "victory": 919
+    }
+  },
+  "recipe": "data/model-authoring/recipes/xros_wars_greymon.json",
+  "browser": {
+    "model": "m705xros",
+    "frames": [
+      49,
+      919,
+      1214,
+      1215
+    ],
+    "screenshots": [
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-front-f49.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-front-f919.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-front-f1214.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-front-f1215.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-side-f49.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-side-f919.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-side-f1214.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-side-f1215.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-rear-f49.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-rear-f919.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-rear-f1214.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m705xros/m705xros-rear-f1215.png"
+    ],
+    "webgl": "ok"
+  },
+  "capture_check": {
+    "captures": 12,
+    "distinct": 12
+  }
+}

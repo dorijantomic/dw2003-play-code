@@ -1,0 +1,165 @@
+{
+ "_method": "Pad-button convention calibrated from the standard PSX SIO pad bitfield (bit0=Select,3=Start,4=Up,5=Right,6=Down,7=Left,8=L2,9=R2,10=L1,11=R1,12=Triangle,13=Circle,14=Cross,15=Square) and confirmed in-context: bit4/bit6 (Up/Down) drive a stored cursor-index field that a sound plays on CHANGE (cursor_move); bit13 (Circle) drives menu-confirm/purchase/proceed call chains; bit14 (Cross) drives menu-cancel/close call chains. All bit values below are the literal `li $a1,N` immediate passed to the per-button pad-test function at [$s1+0x408] (helper also seen at +0x3f4/+0x3fc for press/hold variants).",
+ "SWITCH03": {
+  "action": "other:periodic_title_cue",
+  "evidence": [
+   {
+    "file": "pro/stdwtitl.s",
+    "offset": "0x00002b04",
+    "note": "Title-screen 'Press Start' blink state machine: counter at [$s1+0x54] increments every frame; at 0x00002a6c `slti $v0,0x258` gates a ~600-frame cycle, sub-counters at +0x56/+0x59 track blink sub-phases; when the sub-phase counter wraps (0x00002ab0 `sltiu $v0,0x3`), code resets fields and at 0x00002afc/0x00002b04 `lw $v0,0x5c48($v0)` / `jalr $v0` with `ori $a0,0x113e` plays SYSTEM00 unconditionally -- a periodic logo/title animation beat, not a pad-gated UI action."
+   }
+  ],
+  "confidence": "single-source",
+  "note": "Only 1 call site in the whole 470-site sweep (pro/stdwtitl.s), and it fires off a frame counter, not a pad-button branch -- cannot be classified as cursor/confirm/cancel; recorded honestly as an unrelated periodic cue rather than force-fit into the UI-action set.",
+  "id": "0x8004113e"
+ },
+ "SYSTEM00": {
+  "action": "confirm",
+  "evidence": [
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x00001a34",
+    "note": "`li $a1,0xd` (bit 13 = Circle) -> jalr [$s1+0x408] (newly-pressed test) -> `srav $s0,$s0,$v0` / `andi $s0,0x1` -> `beqz $s0,.L0x00001a74` (skip if not pressed) -> `lw $v0,0x5c48($v0)` / `jalr $v0` with `ori $a0,0x503c` plays SYSTEM01, then stores an exit/result code to [$s2+0x14] and jumps to the shared menu-return routine at 0x80084a78 -- fires exactly on Circle-press that closes/commits the current status-menu screen."
+   },
+   {
+    "file": "pro/stitshop.s",
+    "offset": "0x00001344",
+    "note": "Same shape: `li $a1,0xd` (bit 13) at 0x00001314 -> pressed test -> `ori $a0,0x503c` plays SYSTEM01 at 0x00001344, then immediately calls the item's callback at `[a0+0x6f0]` (the 'buy/select this item' function pointer) -- Circle-confirm on the shop item list."
+   },
+   {
+    "file": "pro/stdwtitl.s",
+    "offset": "0x00002a48",
+    "note": "Title screen: `li $a1,0x3` (bit 3 = Start) at 0x00002a00 -> pressed test -> plays SYSTEM01 (`ori $a0,0x503c`) at 0x00002a48 then proceeds into the game-start transition -- same id used for the Start-button 'confirm/proceed' action on a screen with no cursor to move."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x8004503c"
+ },
+ "SYSTEM01": {
+  "action": "cancel",
+  "evidence": [
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x00001ab8",
+    "note": "`li $a1,0xe` (bit 14 = Cross) at 0x00001a88 -> pressed test -> `beqz $s0,.L0x00001dc8` (skip if not pressed) -> plays SYSTEM02 (`ori $a0,0x50bd`) at 0x00001ab8, then calls `[a0+0x2c]` with `li $a1,0x32` and jumps to the same shared return routine (0x80084a78) used by the SYSTEM01 confirm path -- Cross-cancel sibling of the Circle-confirm branch above."
+   },
+   {
+    "file": "pro/stitshop.s",
+    "offset": "0x0000149c",
+    "note": "`li $a1,0xe` (bit 14) at 0x0000146c -> pressed test -> plays SYSTEM02 (`ori $a0,0x50bd`) at 0x0000149c, then calls the item's `[a0+0x6ec]` callback -- a DIFFERENT function pointer than SYSTEM01's `[a0+0x6f0]` 'select' callback in the same struct, i.e. the dedicated cancel/back handler."
+   },
+   {
+    "file": "pro/stplnmet.s",
+    "offset": "0x00003fdc",
+    "note": "`li $a1,0xe` (bit 14) at 0x00003fac -> pressed test -> plays SYSTEM02 (`ori $a0,0x50bd`) at 0x00003fdc, sets a result code (`li $v0,0xc8`) and jumps to the shared exit routine at 0x80086e20 -- third independent overlay agreeing on Cross==SYSTEM02==cancel."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x800450bd"
+ },
+ "SYSTEM02": {
+  "action": "cursor_move",
+  "evidence": [
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x000019b8",
+    "note": "Up (bit 4) and Down (bit 6) newly-pressed tests (0x000018c4/0x0000193c, each paired with a +0x3fc 'held' re-test) update a stored selection index at [$s2+0x70]; at 0x000019a4 `beq $s4,$v0,.L0x000019e8` skips the sound if the index is UNCHANGED from the value cached in $s4 before the frame's input; only when it changed does the code fall through to 0x000019b8 and play SYSTEM03 (`ori $a0,0x513e`) -- classic 'index changed this frame' cursor-move gate."
+   },
+   {
+    "file": "pro/stitshop.s",
+    "offset": "0x00001c4c",
+    "note": "Identical shape in the shop's item list: Up/Down (bit4/bit6, 0x00001bc8/0x00001c08) update [$s2+0x74]; `beq $s4,$v0,.L0x00001c7c` at 0x00001c38 skips the play call unless the index changed; SYSTEM03 (`ori $a0,0x513e`) plays at 0x00001c4c only on the changed path."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x8004513e"
+ },
+ "SYSTEM03": {
+  "action": "open",
+  "evidence": [
+   {
+    "file": "EXE fns.norm.s",
+    "offset": "F0x8001bb88 (0x8001bbc8/cc)",
+    "note": "The dialogue-window constructor: allocates the window struct via `jal F0x80014504`, stores the caller-supplied style, and unconditionally plays SYSTEM04 (`lw $v0,%lo(D0x80055c48)($v0)` / `jalr $v0` with `ori $a0,0x19`) as its very last action before returning -- fires exactly once per window creation."
+   },
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x000170d8",
+    "note": "Generic open/close sub-panel helper: `beqz $a1,.L0x000170f8` branches on a boolean opening-direction argument; the TRUE side (falls through) plays SYSTEM04 (`ori $a0,0x19`) at 0x000170d8 before computing a slide-in tween denominator (`li $v0,0x1000; div ...`)."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x00040019"
+ },
+ "SYSTEM04": {
+  "action": "close",
+  "evidence": [
+   {
+    "file": "EXE fns.norm.s",
+    "offset": "F0x8001bbe8 (0x8001bd18/24)",
+    "note": "The window's per-frame update function: when the closing-condition callback at `[a0+0x168]` returns true, code sets the window's state field to 2 (`li $v0,0x2` / `sw $v0,0x10($v1)` at 0x8001bce0/ce) and, on the very next lines, plays SYSTEM05 (`lw $v0,%lo(D0x80055c48)($v0)` / `jalr $v0` with `ori $a0,0x1a`) at 0x8001bd24 -- fires exactly on the open-to-closing state transition, the complementary event to F0x8001bb88's unconditional open blip."
+   },
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x00017108",
+    "note": "Same open/close helper as SYSTEM04's ststatus.s evidence: the FALSE side of `beqz $a1,.L0x000170f8` (i.e. the boolean argument was 0, closing direction) falls into 0x000170f8-0x00017108 and plays SYSTEM05 (`ori $a0,0x1a`) instead of SYSTEM04 -- direct boolean-complement sibling in the same function, same struct field pattern the EXE trace above independently confirms."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x0004001a"
+ },
+ "SYSTEM05": {
+  "action": "other:periodic_tick",
+  "evidence": [
+   {
+    "file": "pro/fieldstg.s",
+    "offset": "0x0000a820",
+    "note": "`andi $v0,$v1,0xff` masks a low byte of a running value; `bne $v0,$a2,.L0x0000a82c` SKIPS the play call unless the masked value EQUALS a parameter $a2 (a target/threshold), in which case it falls through and plays SYSTEM06 (`ori $a0,0x5341`) at 0x0000a820 -- a counter-reaches-target tick, not a pad-input branch."
+   },
+   {
+    "file": "pro/stplnmet.s",
+    "offset": "0x00004058",
+    "note": "A frame counter at [$s2+0x80] increments every tick (0x00003ff8/fc); `slti $v0,0x65` at 0x00004000 gates a ~101-frame period; when the counter wraps (reset to 0x64 at 0x0000400c), the code falls through and plays SYSTEM06 (`ori $a0,0x5341`) at 0x00004058 -- same 'periodic counter tick' shape as fieldstg.s, in a completely different menu (partner-select), agreeing this id is a background/ambient cadence blip rather than a cursor/confirm/cancel action."
+   }
+  ],
+  "confidence": "confirmed",
+  "note": "Two independent overlays agree on the SHAPE (counter-driven, not pad-gated) but this doesn't match any of the closed-set UI-action verbs, so it's recorded as other: rather than force-fit to cursor_move/confirm/cancel.",
+  "id": "0x80045341"
+ },
+ "SYSTEM06": {
+  "action": "cursor_move",
+  "evidence": [
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x0000b620",
+    "note": "An item-quantity stepper: Up/Down (bit4 at 0x0000b530, bit6 at 0x0000b584) inc/dec a value at [$s2+0x7c], clamped to a max derived from [$s2+0x5c]; `beq $s3,$v0,.L0x0000b630` at 0x0000b60c skips the sound unless the stepped value differs from the cached $s3; SYSTEM07 (`ori $a0,0x1b`) plays at 0x0000b620 only on the changed path -- same 'value changed' gate as SYSTEM03, in a numeric-stepper context instead of a list cursor."
+   },
+   {
+    "file": "pro/stitshop.s",
+    "offset": "0x00002708",
+    "note": "The shop's buy-quantity stepper: value at [$s2+0x78] is incremented/decremented (clamped against the item's stock count via a callback at 0xb44c), `beq $s4,$a0,.L0x00002720` at 0x000026c4 skips the play call unless changed, and SYSTEM07 (`ori $a0,0x1b`) plays at 0x00002708 on the changed path -- confirms the same id/action in a second, independent overlay."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x0004001b"
+ },
+ "SYSTEM07": {
+  "action": "confirm",
+  "evidence": [
+   {
+    "file": "pro/ststatus.s",
+    "offset": "0x0000b67c",
+    "note": "Continuing the quantity-stepper function above: Circle (bit 13) tested at 0x0000b64c -> pressed -> plays SYSTEM08 (`ori $a0,0x1c`) at 0x0000b67c, then clears the stepper's active-flag fields ([$s2+0x78]/[$s2+0x74]), sets a result code (`li $v0,0x1`) and jumps to the shared exit routine (0x8008e728) -- Circle-confirm that commits the stepped value, mirroring SYSTEM01's role but scoped to this stepper widget."
+   },
+   {
+    "file": "pro/stitshop.s",
+    "offset": "0x0000276c",
+    "note": "The shop's buy-quantity stepper: Circle (bit 13) tested at 0x0000273c -> pressed -> plays SYSTEM08 (`ori $a0,0x1c`) at 0x0000276c, then immediately runs the purchase-commit call chain (price lookup, stock-count callback, then the buy-confirm dialog at `[a0+0x244]`) -- Circle-confirm gate on the quantity, confirmed in a second overlay."
+   }
+  ],
+  "confidence": "confirmed",
+  "id": "0x0004001c"
+ },
+ "_SYSTEM10_note": "SYSTEM10 (id 0x800454c4) has zero entries in soundtst-common-call-sites.json's 470 sites -- no disassembled call site to trace, so it is intentionally omitted from this table rather than guessed.",
+ "_naming_note": "Keys are TRUE Sound Test names (2026-07-03 correction: the 2026-07-02f {id,name} record-order parse paired every id with the NEXT record's name; play code at soundtst file 0x1a44 proves records are {name_ptr,id}). Evidence/sites were traced per ID and are unchanged; each row now carries its id."
+}

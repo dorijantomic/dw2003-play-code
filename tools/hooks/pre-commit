@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refuse a commit that adds a document with no `reach:` header, or that leaves
+# docs/DOC_INDEX.md stale.
+#
+# Rationale: 336 documents went unheadered because the rule lived only in
+# instructions. `tools/doc_index.py --check` is a ratchet -- the count of
+# unheadered documents may fall and never rise -- so this hook is the thing that
+# makes the ratchet bite without a session remembering to run it.
+#
+# It checks the WORKING TREE, not the staged tree: a partial `git add` can still
+# pass here and fail later. That is the cheap version on purpose.
+#
+# Skips entirely unless the commit touches a Markdown file under docs/.
+# Bypass with `git commit --no-verify` when you know why.
+
+# Screen work must update data/screen_progress.json (tools/check_screen_progress.py);
+# it also regenerates and stages the ownership report. Bunny branches are exempt.
+root0=$(git rev-parse --show-toplevel)
+[ -x "$root0/tools/check_screen_progress.py" ] && { "$root0/tools/check_screen_progress.py" || exit 1; }
+
+git diff --cached --name-only --diff-filter=ACMR | grep -q '^docs/.*\.md$' || exit 0
+
+root=$(git rev-parse --show-toplevel)
+"$root/tools/doc_index.py" --check || {
+    printf '\n%s\n%s\n\n' \
+        "pre-commit: documentation headers or the generated index are out of date." \
+        "Fix: give the new document a reach:/status: header, then run tools/doc_index.py --write"
+    exit 1
+}

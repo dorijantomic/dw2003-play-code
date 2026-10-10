@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DW2003 door wiring tool</title>
+<style>
+  body { background:#16161f; color:#ddd; font:14px/1.4 system-ui, sans-serif;
+         margin:0; display:flex; height:100vh; }
+  #left { flex:1; overflow:auto; padding:12px; }
+  #side { width:380px; background:#1d1d2b; padding:14px; overflow:auto;
+          border-left:1px solid #333; }
+  h1 { font-size:16px; color:#ffd34d; margin:0 0 10px; }
+  h2 { font-size:13px; color:#9ad; margin:14px 0 6px; }
+  select, button { background:#2a2a3c; color:#eee; border:1px solid #555;
+                   padding:5px 8px; margin:2px 0; font:inherit; max-width:100%; }
+  button { cursor:pointer; }
+  button:hover { background:#3a3a52; }
+  #srcwrap { position:relative; display:inline-block; }
+  #srcimg { display:block; image-rendering:pixelated; }
+  #overlay { position:absolute; inset:0; }
+  .doorbox { position:absolute; border:2px solid #58a0ff; cursor:pointer;
+             min-width:10px; }
+  .doorbox.wired { border-color:#5dff7a; }
+  .doorbox.sel { border-color:#ffd34d; box-shadow:0 0 8px #ffd34d; }
+  .doorbox span { position:absolute; top:-18px; left:0; font-size:11px;
+                  background:#000a; padding:0 4px; white-space:nowrap; }
+  .npcdot { position:absolute; width:8px; height:8px; border-radius:50%;
+            background:#ff5050; transform:translate(-50%,-50%); }
+  #destprev { position:relative; display:inline-block; margin-top:6px;
+              cursor:crosshair; }
+  #destprev img { display:block; max-width:340px; image-rendering:pixelated; }
+  #spawnmark { position:absolute; width:12px; height:12px; border-radius:50%;
+               border:2px solid #5dff7a; transform:translate(-50%,-50%);
+               pointer-events:none; display:none; }
+  .muted { color:#888; font-size:12px; }
+  #wiredlist div { font-size:12px; padding:2px 0; border-bottom:1px solid #2a2a3c; }
+  .ok { color:#5dff7a; }
+</style>
+</head>
+<body>
+<div id="left">
+  <h1>Door wiring tool</h1>
+  <label>Stage: <select id="srcsel"></select></label>
+  <span class="muted" id="srcinfo"></span>
+  <div id="srcwrap">
+    <img id="srcimg" alt="">
+    <div id="overlay"></div>
+  </div>
+</div>
+<div id="side">
+  <h2>Selected door</h2>
+  <div id="doorinfo" class="muted">Click a blue door box on the map.</div>
+  <div id="editor" style="display:none">
+    <h2>Destination stage</h2>
+    <select id="destsel"></select>
+    <div id="destprev">
+      <img id="destimg" alt="">
+      <div id="spawnmark"></div>
+    </div>
+    <div class="muted">Click the preview to place the spawn point.</div>
+    <h2>Facing after entering</h2>
+    <select id="dirsel">
+      <option>down</option><option>up</option><option>left</option><option>right</option>
+    </select>
+    <br>
+    <button id="save">Save this door</button>
+    <button id="unwire">Remove wiring</button>
+    <div id="savemsg" class="ok"></div>
+  </div>
+  <h2>Wired doors (<span id="wiredcount">0</span>)</h2>
+  <div id="wiredlist"></div>
+  <h2>Data</h2>
+  <button id="export">Export door_wiring.json</button>
+  <input type="file" id="importfile" accept=".json" style="display:none">
+  <button id="importbtn">Import existing wiring</button>
+  <div class="muted">Save the exported file as <code>data/door_wiring.json</code>
+    and rerun <code>tools/gen_scenes.py</code> to turn wiring into in-game exits.</div>
+</div>
+<script type="module" src="wire.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+--- a/tools/ddw3-tim-tools/src/bin/untim/main.rs
++++ b/tools/ddw3-tim-tools/src/bin/untim/main.rs
+@@ -159,11 +159,16 @@
+ 					"Too many duplicate colors to generate clut. Must be at most 2048"
+ 				);
+ 
+-				// Note: The colors are stored at the most-significant 5 bits, so we won't interfere
+-				//       with the color itself.
+-				color.r |= prev_occurrences;
+-				color.g |= prev_occurrences;
+-				color.b |= prev_occurrences;
++				// Note: The committed ddw3 PNGs were generated with the pre-2023-12-02
++				//       encoding (commit cbbaf7569 changed it): the duplicate counter
++				//       sits at bits 3-10 (`cccccddd ddddd...`, `+= counter << 3`), so
++				//       this patch makes `untim` output pixel-identical to the committed
++				//       tree. `byod` builds its tools with it.
++				if prev_occurrences != 0 {
++					color.r += prev_occurrences << 3;
++					color.g += prev_occurrences << 3;
++					color.b += prev_occurrences << 3;
++				}
+ 			}
+ 
+ 			Some((header, img))

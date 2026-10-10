@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8"><title>walk sound A/B</title>
+<body style="background:#111;color:#eee;font-family:monospace;padding:2em">
+<h3>Which is the real walk footstep?</h3>
+<p style="max-width:60em">In-game, PLAYER01 refires every 8 frames (133&nbsp;ms) while you walk,
+and each refire <b>cuts the previous voice</b> — so a long sample is only ever heard as its first
+133&nbsp;ms. The old version of this page played A and B as full one-shots, which is not what the
+game sounds like. Compare the <b>walking</b> buttons (16 steps at the real cadence, previous voice
+cut) — the single-shot buttons are only for reference.</p>
+<table style="border-spacing:0 1em">
+<tr><td><b>SAMPLE CONFIRMED: inst/52.wav</b> (vag field 53, 1-based → file 52). Last question — the PITCH:</td><td></td></tr>
+<tr><td>P1: inst/52 @ 0.126 (data-resolved: note 60, center 96 — what the walker now ships)&nbsp;</td>
+    <td><button data-src="assets/sfx/player01.wav" data-rate="0.12596">single</button>
+        <button data-src="assets/sfx/player01.wav" data-rate="0.12596" data-step="16">walking</button></td></tr>
+<tr><td>P2: inst/52 @ 0.168 (the rate from your earlier confirmed "B" button)&nbsp;</td>
+    <td><button data-src="assets/sfx/player01.wav" data-rate="0.16814">single</button>
+        <button data-src="assets/sfx/player01.wav" data-rate="0.16814" data-step="16">walking</button></td></tr>
+</table>
+<script>
+const actx = new AudioContext();
+const bufs = {};
+async function buf(u){ return bufs[u] ??= await actx.decodeAudioData(await (await fetch(u)).arrayBuffer()); }
+document.querySelectorAll("button").forEach(b => b.onclick = async () => {
+  await actx.resume(); const bf = await buf(b.dataset.src);
+  const n = +(b.dataset.step || 1), step = 8/60;
+  for (let i=0;i<n;i++){ const s=actx.createBufferSource(); s.buffer=bf;
+    s.playbackRate.value=+b.dataset.rate; s.connect(actx.destination);
+    const t0 = actx.currentTime + i*step; s.start(t0);
+    if (n>1 && i<n-1) s.stop(t0 + step);  // next refire cuts this voice, as in-game
+  }
+});
+</script>

@@ -1,0 +1,33 @@
+{
+  "name": "Greymon (2010 anime) custom model",
+  "model_name": "Greymon2010",
+  "folder": "m005xros",
+  "register": false,
+  "animation_source": "web/assets/battle/models/m005grey/anim.json",
+  "mesh": "data/custom/greymon2010/mesh.obj",
+  "texture": "data/custom/greymon2010/texture.png",
+  "bone_bindings": {
+    "chest": 0,
+    "neck": 1,
+    "head": 2,
+    "jaw": 3,
+    "right_upper_arm": 4,
+    "right_forearm": 5,
+    "right_hand": 6,
+    "left_upper_arm": 7,
+    "left_forearm": 8,
+    "left_hand": 9,
+    "hips": 10,
+    "right_thigh": 11,
+    "right_shin": 12,
+    "right_ankle": 13,
+    "right_foot": 14,
+    "tail_base": 15,
+    "tail_mid": 16,
+    "tail_tip": 17,
+    "left_thigh": 18,
+    "left_shin": 19,
+    "left_ankle": 20,
+    "left_foot": 21
+  }
+}

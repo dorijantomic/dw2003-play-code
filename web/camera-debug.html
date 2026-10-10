@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DW2003 — Camera Debug</title>
+<style>
+  body { margin:0; background:#0d0d12; color:#cdd; font-family:monospace; display:flex; gap:16px; padding:14px; }
+  h1 { color:#f0c040; margin:0 0 8px; font-size:16px; }
+  #left { display:flex; flex-direction:column; gap:10px; }
+  #right { display:flex; flex-direction:column; gap:8px; width:300px; font-size:12px; }
+  canvas#c { border:2px solid #2a3a6a; display:block; background:#000; }
+  .row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+  .ctrl { display:flex; flex-direction:column; gap:3px; font-size:11px; color:#9ab; }
+  select, input[type=number] { background:#1a1a2e; color:#f0f0f0; border:1px solid #445; padding:3px 5px; font-family:monospace; font-size:13px; }
+  button { background:#223; color:#f0c040; border:1px solid #556; padding:5px 12px; cursor:pointer; font-family:monospace; font-size:12px; }
+  button:hover { background:#2a3a6a; }
+  button.on { background:#f0c040; color:#111; border-color:#f0c040; }
+  .grp { border:1px solid #334; border-radius:4px; padding:8px; }
+  .grp h2 { margin:0 0 6px; font-size:12px; color:#f0c040; }
+  .slider { display:grid; grid-template-columns:70px 1fr 44px; gap:6px; align-items:center; margin:3px 0; }
+  .slider label { color:#9ab; }
+  .slider output { color:#dde; text-align:right; }
+  input[type=range] { width:100%; }
+  #info { white-space:pre; background:#0a0a10; border:1px solid #334; padding:6px; font-size:11px; color:#8ab; min-height:64px; }
+  #log { font-size:10px; color:#789; max-height:90px; overflow-y:auto; background:#0a0a10; border:1px solid #233; padding:4px; }
+</style>
+</head>
+<body>
+<div id="left">
+  <h1>DW2003 Camera Debug — watch any two Digimon battle under the PS1 camera</h1>
+  <div class="row">
+    <div class="ctrl"><label>Player Digimon</label><select id="playerSel"></select></div>
+    <div class="ctrl"><label>Enemy Digimon</label><select id="enemySel"></select></div>
+    <button id="spawnBtn">Spawn / Swap</button>
+    <button id="swapSides">⇄ Swap sides</button>
+  </div>
+  <canvas id="c" width="720" height="480"></canvas>
+  <div id="log"></div>
+</div>
+
+<div id="right">
+  <div class="grp">
+    <h2>Camera mode</h2>
+    <div class="row">
+      <button class="camMode on" data-mode="game">game (PS1)</button>
+      <button class="camMode" data-mode="behind">behind</button>
+      <button class="camMode" data-mode="orbit">orbit</button>
+    </div>
+  </div>
+
+  <div class="grp" id="tuneGrp">
+    <h2>game-camera tuning (real PS1 camera)</h2>
+    <div class="slider"><label>side ±</label><input type="range" id="t-side" min="-1" max="1" step="2" value="1"><output id="o-side">1</output></div>
+    <div class="slider"><label>zoom</label><input type="range" id="t-zoom" min="0.3" max="2.5" step="0.05" value="1"><output id="o-zoom">1</output></div>
+    <div class="slider"><label>height</label><input type="range" id="t-height" min="0.3" max="2" step="0.05" value="1"><output id="o-height">1</output></div>
+    <div class="slider"><label>FOV°</label><input type="range" id="t-fovDeg" min="20" max="80" step="1" value="46"><output id="o-fovDeg">46</output></div>
+  </div>
+
+  <div class="grp">
+    <h2>Animation</h2>
+    <div class="row" id="animBtns">
+      <button data-anim="idle" class="on">idle</button>
+      <button data-anim="walk">walk</button>
+      <button data-anim="attack">attack</button>
+      <button data-anim="signature">signature</button>
+      <button data-anim="hit">hit</button>
+      <button data-anim="win">win</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <h2>Camera readout</h2>
+    <div id="info">spawning…</div>
+  </div>
+</div>
+
+<script type="module">
+import { createBattle3D, resolveModelFolder } from "./battle3d.js";
+
+const DIGIMON = [
+  {id:1,name:"Kotemon"},{id:2,name:"Kumamon"},{id:3,name:"Monmon"},{id:4,name:"Agumon"},
+  {id:5,name:"Veemon"},{id:6,name:"Guilmon"},{id:7,name:"Renamon"},{id:8,name:"Patamon"},
+  {id:9,name:"Dinohumon"},{id:10,name:"Hookmon"},{id:11,name:"Grizzmon"},{id:12,name:"Greymon"},
+  {id:13,name:"ExVeemon"},{id:14,name:"Growlmon"},{id:15,name:"Kyubimon"},{id:16,name:"Angemon"},
+  {id:17,name:"Devimon"},{id:18,name:"Stingmon"},{id:19,name:"Angewomon"},{id:20,name:"Kyukimon"},
+  {id:21,name:"Armormon"},{id:22,name:"GrapLeomon"},{id:23,name:"MetalGreymon"},{id:24,name:"SkullGreymon"},
+  {id:25,name:"Paildramon"},{id:26,name:"WarGrowlmon"},{id:27,name:"Taomon"},{id:28,name:"MagnaAngemon"},
+  {id:29,name:"Myotismon"},{id:30,name:"MetalMamemon"},{id:31,name:"Kabuterimon"},{id:32,name:"Digitamamon"},
+  {id:33,name:"GuardiAngemon"},{id:34,name:"Cannondramon"},{id:35,name:"Marsmon"},{id:36,name:"WarGreymon"},
+  {id:37,name:"Imperialdramon"},{id:38,name:"Gallantmon"},{id:39,name:"Sakuyamon"},{id:40,name:"Seraphimon"},
+  {id:41,name:"MetalGarurumon"},{id:42,name:"Rosemon"},{id:43,name:"BK WarGreymon"},{id:44,name:"Imperialdramon-F"},
+  {id:45,name:"MaloMyotismon"},{id:46,name:"MegaGargomon"},{id:47,name:"GranKuwagamon"},{id:48,name:"Phoenixmon"},
+  {id:49,name:"Omnimon"},{id:50,name:"Imperialdramon-P"},{id:51,name:"Beelzemon"},{id:52,name:"Diaboromon"},
+  {id:53,name:"Agunimon"},{id:54,name:"BladeGarurumon"},{id:55,name:"AncientGreymon"},
+];
+
+const $ = id => document.getElementById(id);
+function log(m){ const d=$("log"); d.innerHTML += m+"<br>"; d.scrollTop=d.scrollHeight; console.log(m); }
+
+// populate pickers
+const playerSel=$("playerSel"), enemySel=$("enemySel");
+for (const d of DIGIMON) {
+  for (const sel of [playerSel, enemySel]) {
+    const o=document.createElement("option"); o.value=d.name; o.textContent=`${d.name} (${d.id})`; sel.appendChild(o);
+  }
+}
+playerSel.value="Renamon"; enemySel.value="Greymon";
+
+const canvas=$("c");
+const r=createBattle3D(canvas);
+if (!r) { log("ERROR: createBattle3D returned null (no WebGL?)"); }
+window.__r = r;  // debug handle (headless camera/anim smoke tests sample getCameraInfo)
+
+async function spawn() {
+  const [pF, eF] = await Promise.all([resolveModelFolder(playerSel.value), resolveModelFolder(enemySel.value)]);
+  log(`spawn player=${playerSel.value}→${pF}  enemy=${enemySel.value}→${eF}`);
+  if (pF) r.setPlayerDigimon(pF); if (eF) r.setEnemyDigimon(eF);
+}
+$("spawnBtn").onclick = spawn;
+$("swapSides").onclick = () => { const a=playerSel.value; playerSel.value=enemySel.value; enemySel.value=a; spawn(); };
+
+// camera mode buttons
+for (const b of document.querySelectorAll(".camMode")) {
+  b.onclick = () => {
+    r.setCameraMode(b.dataset.mode);
+    document.querySelectorAll(".camMode").forEach(x=>x.classList.toggle("on", x===b));
+    $("tuneGrp").style.opacity = b.dataset.mode==="game" ? "1" : "0.4";
+  };
+}
+
+// tuning sliders → setGameCamParam
+for (const k of ["side","zoom","height","fovDeg"]) {
+  const el=$("t-"+k), out=$("o-"+k);
+  el.oninput = () => { out.textContent=el.value; r.setGameCamParam(k, +el.value); };
+}
+
+// animation triggers (applies to both fighters so you can watch attack poses)
+for (const b of $("animBtns").querySelectorAll("button")) {
+  b.onclick = () => {
+    r.setPlayerAnim(b.dataset.anim); r.setEnemyAnim(b.dataset.anim);
+    $("animBtns").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+  };
+}
+
+// render loop + camera readout
+let last=null;
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt = last==null ? 0 : Math.min((ts-last)/1000, 0.05); last=ts;
+  if (!r) return;
+  r.render(dt);
+  const ci = r.getCameraInfo();
+  if (ci) {
+    const f=v=>v.map(n=>n.toFixed(0).padStart(6)).join(",");
+    $("info").textContent =
+      `mode : ${r.getCameraMode()}\n`+
+      `eye  : ${f(ci.eye)}\n`+
+      `look : ${f(ci.look)}\n`+
+      `FOV  : ${ci.fovDeg.toFixed(0)}°`;
+  }
+}
+r.setCameraMode("game");
+spawn().then(()=>requestAnimationFrame(loop));
+log("ready — pick two Digimon, Spawn, watch the game camera. Tune on the right.");
+</script>
+</body>
+</html>

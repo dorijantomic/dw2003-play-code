@@ -1,0 +1,114 @@
+{
+ "models": 249,
+ "clipsRun": 2153,
+ "failingClips": 47,
+ "failures": {
+  "m005grey": {
+   "12": "emptyTables[56]"
+  },
+  "m056digi": {
+   "12": "emptyTables[56]"
+  },
+  "m066vand": {
+   "5": "snaps(1)",
+   "6": "snaps(1)"
+  },
+  "m144rose": {
+   "7": "snaps(1)"
+  },
+  "m148ipdr": {
+   "12": "emptyTables[56]"
+  },
+  "m151dblm": {
+   "12": "stuck(4000)"
+  },
+  "m196mgar": {
+   "12": "emptyTables[56]"
+  },
+  "m211hang": {
+   "12": "emptyTables[56]"
+  },
+  "m213wgre": {
+   "12": "emptyTables[56]"
+  },
+  "m214srph": {
+   "12": "emptyTables[56]"
+  },
+  "m230gkwa": {
+   "12": "emptyTables[56]"
+  },
+  "m259exvm": {
+   "12": "emptyTables[56]"
+  },
+  "m260stng": {
+   "12": "emptyTables[56]"
+  },
+  "m267bkwg": {
+   "12": "emptyTables[56]"
+  },
+  "m327runx": {
+   "5": "snaps(1)"
+  },
+  "m337zamb": {
+   "5": "snaps(1)"
+  },
+  "m367graw": {
+   "12": "emptyTables[56]"
+  },
+  "m368mgrw": {
+   "12": "emptyTables[56]"
+  },
+  "m369duke": {
+   "12": "emptyTables[56]"
+  },
+  "m374kybi": {
+   "12": "emptyTables[56]"
+  },
+  "m375taom": {
+   "7": "snaps(1)",
+   "12": "emptyTables[56]"
+  },
+  "m378bvnd": {
+   "5": "snaps(1)",
+   "6": "snaps(1)",
+   "7": "snaps(1)",
+   "12": "emptyTables[56]"
+  },
+  "m381ipdp": {
+   "12": "stuck(4000)"
+  },
+  "m386dino": {
+   "5": "snaps(1)",
+   "6": "snaps(1)",
+   "7": "snaps(1)",
+   "12": "emptyTables[56]"
+  },
+  "m387pirt": {
+   "6": "snaps(1)",
+   "7": "snaps(1)",
+   "12": "emptyTables[56]"
+  },
+  "m388griz": {
+   "12": "emptyTables[56]"
+  },
+  "m389kyki": {
+   "5": "snaps(2)",
+   "6": "snaps(2)",
+   "7": "snaps(2)",
+   "8": "snaps(1)"
+  },
+  "m392slag": {
+   "5": "snaps(1)",
+   "6": "snaps(1)",
+   "7": "snaps(1)"
+  },
+  "m394mars": {
+   "5": "snaps(1)",
+   "6": "snaps(1)",
+   "7": "snaps(1)"
+  },
+  "m454kyk9": {
+   "5": "snaps(2)"
+  }
+ }
+}

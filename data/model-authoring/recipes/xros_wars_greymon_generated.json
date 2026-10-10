@@ -1,0 +1,1093 @@
+{
+  "name": "xros_wars_greymon_generated",
+  "output_model": "m805xros",
+  "reference": "data/model-authoring/references/xros_wars_greymon.png",
+  "assembly": [
+    {
+      "id": "torso",
+      "attach": [
+        0,
+        0,
+        0
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "offset": [
+          0,
+          -340,
+          0
+        ],
+        "length": 650,
+        "width": 290,
+        "depth": 235,
+        "profile": [
+          0.6,
+          0.95,
+          1.1,
+          0.95,
+          0.6
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.13,
+            0.18
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        },
+        {
+          "range": [
+            0.34,
+            0.39
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        },
+        {
+          "range": [
+            0.55,
+            0.6
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ],
+      "features": [
+        {
+          "attach": [
+            0,
+            -240,
+            190
+          ],
+          "repeat": 3,
+          "step": [
+            0,
+            170,
+            0
+          ],
+          "shape": {
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "length": 120,
+            "width": 45,
+            "depth": 40,
+            "profile": [
+              1,
+              0.65,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pelvis",
+      "parent": "torso",
+      "attach": [
+        0,
+        215,
+        0
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "offset": [
+          0,
+          -80,
+          0
+        ],
+        "length": 250,
+        "width": 240,
+        "depth": 210,
+        "profile": [
+          0.85,
+          1,
+          0.9,
+          0.6
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ]
+    },
+    {
+      "id": "neck",
+      "parent": "torso",
+      "attach": [
+        0,
+        -310,
+        -100
+      ],
+      "shape": {
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "length": 200,
+        "width": 140,
+        "depth": 125,
+        "profile": [
+          1,
+          0.9,
+          0.75
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.27,
+            0.34
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        },
+        {
+          "range": [
+            0.62,
+            0.69
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ]
+    },
+    {
+      "id": "head",
+      "parent": "neck",
+      "attach": [
+        0,
+        -185,
+        -70
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "offset": [
+          0,
+          0,
+          170
+        ],
+        "length": 440,
+        "width": 225,
+        "depth": 170,
+        "profile": [
+          0.8,
+          1,
+          1,
+          0.8
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "features": [
+        {
+          "attach": [
+            215,
+            -20,
+            -105
+          ],
+          "mirror_x": true,
+          "shape": {
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "length": 38,
+            "width": 38,
+            "depth": 34,
+            "profile": [
+              0.9,
+              1,
+              0.7
+            ]
+          },
+          "color_sample": [
+            0.6855,
+            0.334
+          ]
+        }
+      ]
+    },
+    {
+      "id": "muzzle",
+      "parent": "head",
+      "attach": [
+        0,
+        65,
+        -220
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "length": 385,
+        "width": 165,
+        "depth": 105,
+        "profile": [
+          1,
+          0.9,
+          0.75,
+          0.6
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "features": [
+        {
+          "attach": [
+            80,
+            -15,
+            -245
+          ],
+          "mirror_x": true,
+          "shape": {
+            "axis": [
+              0,
+              0,
+              -1
+            ],
+            "length": 25,
+            "width": 20,
+            "depth": 18,
+            "profile": [
+              1,
+              0.6
+            ]
+          },
+          "color_sample": [
+            0.35,
+            0.28
+          ]
+        },
+        {
+          "attach": [
+            100,
+            70,
+            -70
+          ],
+          "mirror_x": true,
+          "repeat": 3,
+          "step": [
+            0,
+            0,
+            -65
+          ],
+          "shape": {
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "length": 82,
+            "width": 23,
+            "depth": 22,
+            "profile": [
+              1,
+              0.7,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jaw",
+      "parent": "head",
+      "attach": [
+        0,
+        160,
+        -200
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "length": 365,
+        "width": 155,
+        "depth": 55,
+        "profile": [
+          0.85,
+          1,
+          0.8,
+          0.5
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.7
+      },
+      "features": [
+        {
+          "attach": [
+            92,
+            -38,
+            -80
+          ],
+          "mirror_x": true,
+          "repeat": 2,
+          "step": [
+            0,
+            0,
+            -95
+          ],
+          "shape": {
+            "axis": [
+              0,
+              -1,
+              0
+            ],
+            "length": 60,
+            "width": 18,
+            "depth": 18,
+            "profile": [
+              1,
+              0.6,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "helmet",
+      "parent": "head",
+      "attach": [
+        0,
+        -110,
+        -30
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "offset": [
+          0,
+          -20,
+          160
+        ],
+        "length": 390,
+        "width": 245,
+        "depth": 80,
+        "profile": [
+          0.65,
+          1,
+          1,
+          0.65
+        ]
+      },
+      "color_sample": [
+        0.35,
+        0.28
+      ],
+      "features": [
+        {
+          "attach": [
+            0,
+            12,
+            -170
+          ],
+          "shape": {
+            "axis": [
+              0,
+              0,
+              -1
+            ],
+            "length": 170,
+            "width": 50,
+            "depth": 36,
+            "profile": [
+              1,
+              0.85,
+              0.4,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        },
+        {
+          "attach": [
+            190,
+            85,
+            -130
+          ],
+          "mirror_x": true,
+          "shape": {
+            "axis": [
+              0,
+              0,
+              -1
+            ],
+            "length": 170,
+            "width": 35,
+            "depth": 35,
+            "profile": [
+              1,
+              0.8,
+              0.25
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crest",
+      "parent": "helmet",
+      "attach": [
+        0,
+        -70,
+        -50
+      ],
+      "shape": {
+        "axis": [
+          0,
+          -1,
+          0
+        ],
+        "length": 180,
+        "width": 55,
+        "depth": 65,
+        "profile": [
+          1,
+          0.8,
+          0.45,
+          0.05
+        ]
+      },
+      "color_sample": [
+        0.7,
+        0.27
+      ]
+    },
+    {
+      "id": "horn",
+      "parent": "head",
+      "pair": true,
+      "attach": [
+        225,
+        -105,
+        20
+      ],
+      "shape": {
+        "axis": [
+          1,
+          -0.1,
+          0
+        ],
+        "bend": [
+          0,
+          -75,
+          55
+        ],
+        "length": 280,
+        "width": 55,
+        "depth": 48,
+        "profile": [
+          1,
+          0.8,
+          0.5,
+          0.05
+        ]
+      },
+      "color_sample": [
+        0.7,
+        0.27
+      ]
+    },
+    {
+      "id": "arm",
+      "parent": "torso",
+      "pair": true,
+      "attach": [
+        255,
+        -220,
+        -50
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "bend": [
+          70,
+          0,
+          -55
+        ],
+        "length": 315,
+        "width": 100,
+        "depth": 90,
+        "profile": [
+          1,
+          0.9,
+          0.7,
+          0.65
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.9
+      }
+    },
+    {
+      "id": "forearm",
+      "parent": "arm",
+      "pair": true,
+      "attach": [
+        65,
+        285,
+        -55
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "bend": [
+          -20,
+          0,
+          -60
+        ],
+        "length": 265,
+        "width": 90,
+        "depth": 78,
+        "profile": [
+          0.85,
+          1,
+          0.8,
+          0.6
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.65
+      }
+    },
+    {
+      "id": "hand",
+      "parent": "forearm",
+      "pair": true,
+      "attach": [
+        -20,
+        235,
+        -60
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "length": 145,
+        "width": 85,
+        "depth": 70,
+        "profile": [
+          0.8,
+          1,
+          0.9,
+          0.55
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "features": [
+        {
+          "attach": [
+            58,
+            115,
+            -40
+          ],
+          "mirror_x": true,
+          "shape": {
+            "axis": [
+              0,
+              0,
+              -1
+            ],
+            "length": 115,
+            "width": 30,
+            "depth": 28,
+            "profile": [
+              0.85,
+              0.6,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thigh",
+      "parent": "pelvis",
+      "pair": true,
+      "attach": [
+        175,
+        165,
+        0
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "bend": [
+          15,
+          0,
+          -40
+        ],
+        "length": 335,
+        "width": 170,
+        "depth": 135,
+        "profile": [
+          0.85,
+          1.1,
+          0.9,
+          0.7
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.3,
+            0.39
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.7
+      }
+    },
+    {
+      "id": "shin",
+      "parent": "thigh",
+      "pair": true,
+      "attach": [
+        15,
+        310,
+        -40
+      ],
+      "shape": {
+        "axis": [
+          0,
+          1,
+          0
+        ],
+        "bend": [
+          -15,
+          0,
+          -70
+        ],
+        "length": 260,
+        "width": 105,
+        "depth": 95,
+        "profile": [
+          0.9,
+          0.75,
+          0.7,
+          0.6
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.5
+      }
+    },
+    {
+      "id": "foot",
+      "parent": "shin",
+      "pair": true,
+      "attach": [
+        -15,
+        240,
+        -65
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "length": 290,
+        "width": 155,
+        "depth": 65,
+        "profile": [
+          0.7,
+          1,
+          0.85,
+          0.5
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "features": [
+        {
+          "attach": [
+            0,
+            0,
+            -210
+          ],
+          "shape": {
+            "axis": [
+              0,
+              0,
+              -1
+            ],
+            "length": 145,
+            "width": 42,
+            "depth": 35,
+            "profile": [
+              0.9,
+              0.6,
+              0.05
+            ]
+          },
+          "color_sample": [
+            0.7,
+            0.27
+          ]
+        }
+      ]
+    },
+    {
+      "id": "toe_inner",
+      "parent": "foot",
+      "pair": true,
+      "attach": [
+        -75,
+        0,
+        -210
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "length": 135,
+        "width": 42,
+        "depth": 36,
+        "profile": [
+          0.9,
+          0.55,
+          0.05
+        ]
+      },
+      "color_sample": [
+        0.7,
+        0.27
+      ]
+    },
+    {
+      "id": "toe_outer",
+      "parent": "foot",
+      "pair": true,
+      "attach": [
+        75,
+        0,
+        -210
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          -1
+        ],
+        "length": 135,
+        "width": 42,
+        "depth": 36,
+        "profile": [
+          0.9,
+          0.55,
+          0.05
+        ]
+      },
+      "color_sample": [
+        0.7,
+        0.27
+      ]
+    },
+    {
+      "id": "tail_base",
+      "parent": "pelvis",
+      "attach": [
+        0,
+        45,
+        200
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "bend": [
+          0,
+          -45,
+          0
+        ],
+        "length": 350,
+        "width": 170,
+        "depth": 145,
+        "profile": [
+          1,
+          0.9,
+          0.8,
+          0.72
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.5,
+            0.62
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.2
+      }
+    },
+    {
+      "id": "tail_middle",
+      "parent": "tail_base",
+      "attach": [
+        0,
+        -45,
+        340
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "bend": [
+          0,
+          -205,
+          0
+        ],
+        "length": 340,
+        "width": 120,
+        "depth": 105,
+        "profile": [
+          1,
+          0.8,
+          0.65,
+          0.5
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.35,
+            0.48
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.35
+      }
+    },
+    {
+      "id": "tail_tip",
+      "parent": "tail_middle",
+      "attach": [
+        0,
+        -205,
+        330
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "bend": [
+          0,
+          -365,
+          0
+        ],
+        "length": 300,
+        "width": 75,
+        "depth": 60,
+        "profile": [
+          1,
+          0.75,
+          0.45,
+          0.12
+        ]
+      },
+      "color_sample": [
+        0.205,
+        0.524
+      ],
+      "bands": [
+        {
+          "range": [
+            0.55,
+            0.66
+          ],
+          "color_sample": [
+            0.494,
+            0.594
+          ]
+        }
+      ],
+      "motion": {
+        "axis": 0,
+        "strength": 0.45
+      }
+    },
+    {
+      "id": "tail_blade",
+      "parent": "tail_tip",
+      "attach": [
+        0,
+        -365,
+        285
+      ],
+      "shape": {
+        "axis": [
+          0,
+          0,
+          1
+        ],
+        "length": 170,
+        "width": 70,
+        "depth": 45,
+        "profile": [
+          1,
+          0.7,
+          0.05
+        ]
+      },
+      "color_sample": [
+        0.7,
+        0.27
+      ]
+    }
+  ],
+  "validation": {
+    "idle": 0,
+    "attack": 14,
+    "hit": 20,
+    "victory": 44
+  }
+}

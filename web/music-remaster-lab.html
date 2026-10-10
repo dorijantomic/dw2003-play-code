@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DW3 Music Remaster A/B Lab</title>
+<style>
+  :root { color-scheme:dark; font-family:system-ui,sans-serif; }
+  body { margin:0; background:#0d1117; color:#c9d1d9; }
+  main { max-width:960px; margin:auto; padding:28px 20px 50px; }
+  h1 { margin:0 0 6px; color:#f0c040; font-size:24px; }
+  .note { color:#8b949e; margin:0 0 24px; }
+  .track { border:1px solid #30363d; border-radius:10px; padding:14px; margin:10px 0; background:#161b22; }
+  .title { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .stem { color:#8b949e; font:12px ui-monospace,monospace; }
+  .controls { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  button { color:#c9d1d9; background:#21262d; border:1px solid #484f58; border-radius:6px; padding:7px 12px; cursor:pointer; }
+  button:hover, button.active { background:#1f6feb; border-color:#58a6ff; }
+  input[type=range] { width:220px; }
+  .stats { color:#8b949e; font:12px ui-monospace,monospace; margin-top:8px; }
+  #status { color:#79c0ff; min-height:1.4em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>DW3 music remaster A/B lab</h1>
+  <p class="note">A is authentic and B is the punchier hybrid remaster. Switching versions preserves the current playback position.</p>
+  <p id="status">Loading manifest…</p>
+  <section id="tracks"></section>
+</main>
+<script type="module">
+const manifest = await fetch("assets/music-remastered/manifest.json").then((r) => {
+  if (!r.ok) throw new Error("Run tools/remaster_music.py first");
+  return r.json();
+});
+const status = document.getElementById("status");
+const tracks = document.getElementById("tracks");
+status.textContent = `Profile: ${manifest.profile} · ${manifest.tracks.length} tracks · ${manifest.warning}`;
+
+let audio = null;
+let activeButton = null;
+
+async function play(track, variant, button) {
+  const source = variant === "a"
+    ? `assets/music/${track.stem}.ogg`
+    : `assets/music-remastered/${track.output}?v=${track.output_sha256.slice(0, 12)}`;
+  const next = new Audio(source);
+  next.loop = true;
+  next.volume = Number(button.closest(".track").querySelector("input").value);
+  const position = audio?.currentTime || 0;
+  if (audio) {
+    audio.pause();
+  }
+  await new Promise((resolve, reject) => {
+    next.addEventListener("loadedmetadata", resolve, { once:true });
+    next.addEventListener("error", () => reject(new Error("could not load audio")), { once:true });
+    next.load();
+  });
+  next.currentTime = position % Math.max(next.duration, 1);
+  await next.play();
+  if (activeButton) activeButton.classList.remove("active");
+  button.classList.add("active");
+  activeButton = button;
+  audio = next;
+}
+
+for (const track of manifest.tracks) {
+  const card = document.createElement("article");
+  card.className = "track";
+  card.innerHTML = `
+    <div class="title"><strong>${track.label}</strong><span class="stem">${track.stem}</span></div>
+    <div class="controls">
+      <button data-variant="a">A · authentic</button>
+      <button data-variant="b">B · punchy remaster</button>
+      <button data-stop>Stop</button>
+      <label>volume <input type="range" min="0" max="1" step="0.01" value="0.65"></label>
+    </div>
+    <div class="stats">B difference ${track.comparison.difference_rms_dbfs} dBFS · ${track.after.seconds.toFixed(1)}s</div>`;
+  card.querySelectorAll("[data-variant]").forEach((button) => {
+    button.onclick = () => play(track, button.dataset.variant, button).catch((error) => {
+      status.textContent = `Playback failed: ${error.message}`;
+    });
+  });
+  card.querySelector("[data-stop]").onclick = () => {
+    if (audio) audio.pause();
+    if (activeButton) activeButton.classList.remove("active");
+    audio = activeButton = null;
+  };
+  card.querySelector("input").oninput = (event) => {
+    if (audio && activeButton?.closest(".track") === card) audio.volume = Number(event.target.value);
+  };
+  tracks.append(card);
+}
+window.__remasterLab = { manifest, play, get audio() { return audio; } };
+</script>
+</body>
+</html>

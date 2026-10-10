@@ -1,0 +1,296 @@
+{
+  "base": "generated",
+  "reference": "data/model-authoring/references/xros_wars_greymon.png",
+  "operations": [
+    {
+      "operation": "assemble",
+      "parts": [
+        {
+          "id": "torso",
+          "parent": null,
+          "pattern": 0,
+          "rings": 5,
+          "sides": 6,
+          "features": 3
+        },
+        {
+          "id": "pelvis",
+          "parent": "torso",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 0
+        },
+        {
+          "id": "neck",
+          "parent": "torso",
+          "pattern": 6,
+          "rings": 3,
+          "sides": 5,
+          "features": 0
+        },
+        {
+          "id": "head",
+          "parent": "neck",
+          "pattern": 0,
+          "rings": 4,
+          "sides": 6,
+          "features": 2
+        },
+        {
+          "id": "muzzle",
+          "parent": "head",
+          "pattern": 4,
+          "rings": 4,
+          "sides": 5,
+          "features": 8
+        },
+        {
+          "id": "jaw",
+          "parent": "head",
+          "pattern": 4,
+          "rings": 4,
+          "sides": 5,
+          "features": 4
+        },
+        {
+          "id": "helmet",
+          "parent": "head",
+          "pattern": 0,
+          "rings": 4,
+          "sides": 6,
+          "features": 3
+        },
+        {
+          "id": "crest",
+          "parent": "helmet",
+          "pattern": 17,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "horn_l",
+          "parent": "head",
+          "pattern": 17,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "horn_r",
+          "parent": "head",
+          "pattern": 17,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "arm_l",
+          "parent": "torso",
+          "pattern": 5,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "arm_r",
+          "parent": "torso",
+          "pattern": 5,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "forearm_l",
+          "parent": "arm_l",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 0
+        },
+        {
+          "id": "forearm_r",
+          "parent": "arm_r",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 0
+        },
+        {
+          "id": "hand_l",
+          "parent": "forearm_l",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 2
+        },
+        {
+          "id": "hand_r",
+          "parent": "forearm_r",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 2
+        },
+        {
+          "id": "thigh_l",
+          "parent": "pelvis",
+          "pattern": 0,
+          "rings": 4,
+          "sides": 6,
+          "features": 0
+        },
+        {
+          "id": "thigh_r",
+          "parent": "pelvis",
+          "pattern": 0,
+          "rings": 4,
+          "sides": 6,
+          "features": 0
+        },
+        {
+          "id": "shin_l",
+          "parent": "thigh_l",
+          "pattern": 5,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "shin_r",
+          "parent": "thigh_r",
+          "pattern": 5,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "foot_l",
+          "parent": "shin_l",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 1
+        },
+        {
+          "id": "foot_r",
+          "parent": "shin_r",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 1
+        },
+        {
+          "id": "toe_inner_l",
+          "parent": "foot_l",
+          "pattern": 17,
+          "rings": 3,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "toe_inner_r",
+          "parent": "foot_r",
+          "pattern": 17,
+          "rings": 3,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "toe_outer_l",
+          "parent": "foot_l",
+          "pattern": 17,
+          "rings": 3,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "toe_outer_r",
+          "parent": "foot_r",
+          "pattern": 17,
+          "rings": 3,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "tail_base",
+          "parent": "pelvis",
+          "pattern": 6,
+          "rings": 4,
+          "sides": 5,
+          "features": 0
+        },
+        {
+          "id": "tail_middle",
+          "parent": "tail_base",
+          "pattern": 17,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "tail_tip",
+          "parent": "tail_middle",
+          "pattern": 17,
+          "rings": 4,
+          "sides": 4,
+          "features": 0
+        },
+        {
+          "id": "tail_blade",
+          "parent": "tail_tip",
+          "pattern": 17,
+          "rings": 3,
+          "sides": 4,
+          "features": 0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "frames": [
+      20,
+      190,
+      320,
+      450
+    ],
+    "attachments": 0,
+    "triangles": 1738,
+    "samples": {
+      "idle": 20,
+      "attack": 190,
+      "hit": 320,
+      "victory": 450
+    }
+  },
+  "recipe": "data/model-authoring/recipes/xros_wars_greymon_generated.json",
+  "browser": {
+    "model": "m805xros",
+    "frames": [
+      20,
+      190,
+      320,
+      450
+    ],
+    "screenshots": [
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-front-f20.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-front-f190.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-front-f320.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-front-f450.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-side-f20.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-side-f190.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-side-f320.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-side-f450.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-rear-f20.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-rear-f190.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-rear-f320.png",
+      "/home/dorij/ddw3-walker/captures/model-authoring/m805xros/m805xros-rear-f450.png"
+    ],
+    "webgl": "ok"
+  },
+  "capture_check": {
+    "captures": 12,
+    "distinct": 12
+  }
+}

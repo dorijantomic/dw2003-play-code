@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battle Lab — DW2003</title>
+<style>
+  body { background:#0d0d16; color:#cfd8ea; font:13px monospace; margin:0; display:flex; }
+  #side { width:360px; padding:10px; height:100vh; overflow-y:auto; box-sizing:border-box; background:#12121e; }
+  #main { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px; }
+  canvas { background:#000; border:1px solid #333; max-width:100%; }
+  select, input, button { background:#22223a; color:#dfe; border:1px solid #445; font:12px monospace; padding:3px 6px; margin:2px 0; }
+  select { max-width: 200px; }
+  button.big { padding:6px 14px; font-weight:bold; }
+  .row { margin:7px 0; }
+  h3 { margin:8px 0 4px; color:#8cf; }
+  #techSel { width: 330px; }
+  #log { font-size:11px; color:#9ab; white-space:pre-wrap; max-height:200px; overflow-y:auto; background:#0a0a12; padding:4px; }
+  #rec { font-size:11px; color:#adc; white-space:pre-wrap; }
+  label { user-select:none; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h3>Battle Lab</h3>
+  <div class="row">our side: <select id="pModel"></select></div>
+  <div class="row">enemy&nbsp;&nbsp;: <select id="eModel"></select></div>
+  <div class="row">tech: <select id="techSel"></select></div>
+  <div class="row">raw tech id: <input id="rawTech" type="number" min="1" max="443" style="width:64px">
+    <span style="color:#678">(overrides the list if set)</span></div>
+  <div class="row">
+    <button class="big" id="atkP">▶ our side attacks</button>
+    <button class="big" id="atkE">◀ enemy attacks</button>
+  </div>
+  <div class="row">
+    <label><input id="lethal" type="checkbox"> lethal (death reaction)</label>
+    <label><input id="miss" type="checkbox"> miss (no recoil)</label>
+  </div>
+  <div class="row">camera: <select id="cam">
+      <option value="director" selected>director (real idle)</option>
+      <option value="game">game (real PS1 fixed)</option>
+      <option value="behind">behind (debug)</option>
+      <option value="orbit">orbit (debug)</option>
+    </select>
+    <label><input id="autoloop" type="checkbox"> auto-repeat attack</label>
+  </div>
+  <h3>Tech record</h3>
+  <div id="rec">—</div>
+  <h3>op10 SFX test</h3>
+  <div style="color:#678;font-size:11px">click to play each op10 sound (as battle plays it)</div>
+  <div id="sfxTest" style="display:flex;flex-wrap:wrap;gap:2px;margin:4px 0"></div>
+  <h3>Event log</h3>
+  <div id="log"></div>
+</div>
+<div id="main">
+  <canvas id="cv" width="960" height="672"></canvas>
+  <div id="status"></div>
+</div>
+<script type="module">
+import { createBattle3D } from "./battle3d.js";
+import { drawEffects } from "./fight/effect-player.js";
+import { techRecord } from "./fight/fight-tables.js";
+import { createSfxPlayer } from "./audio.js";
+import { autoFilterable, injectFilterStyles } from "./lab-filter.js";
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const off = new OffscreenCanvas(cv.width, cv.height);
+// Battle Lab is the sound test surface: wire the real SFX player so the op10
+// battle sounds fire on attack. Web Audio needs a user gesture, so unlock on
+// the first click. (The game wires this via game.js -> battle.js; the lab
+// constructs battle3d directly, so it must supply its own player.)
+const sfx = createSfxPlayer();
+window.addEventListener("pointerdown", () => sfx.unlock(), { once: true });
+const r = createBattle3D(off, sfx);
+window.__r = r;   // debug handle for headless probes (Battle Lab is a dev tool)
+window.__sfx = sfx;
+if (!r) document.getElementById("status").textContent = "WebGL unavailable";
+
+const [models, dj, effectManifest, op10Map, sfxManifest] = await Promise.all([
+  fetch("assets/battle/models/index.json").then(x => x.json()),
+  fetch("assets/data/digimon.json").then(x => x.json()),
+  fetch("assets/battle/effects/manifest.json").then(x => x.json()),
+  fetch("assets/sfx/op10_map.json").then(x => x.json()),
+  fetch("assets/sfx/manifest.json").then(x => x.json()),
+]);
+const requestedModel = new URLSearchParams(location.search).get("model");
+if (requestedModel && /^m[0-9]{3}[a-z0-9_]+$/.test(requestedModel) && !models.includes(requestedModel)) {
+  models.push(requestedModel);
+}
+
+const $ = (id) => document.getElementById(id);
+const log = (m) => {
+  const el = $("log");
+  el.textContent = `${m}\n` + el.textContent.split("\n").slice(0, 60).join("\n");
+};
+const playBattle = sfx.playBattle.bind(sfx);
+sfx.playBattle = (name, side, durationFrames = 0) => {
+  log(`sfx ${side}: ${name}${durationFrames ? ` (${durationFrames}f)` : ""}`);
+  return playBattle(name, side, durationFrames);
+};
+
+// model pickers
+for (const id of ["pModel", "eModel"]) {
+  const sel = $(id);
+  for (const f of models) {
+    const o = document.createElement("option");
+    o.value = f; o.textContent = f;
+    sel.appendChild(o);
+  }
+}
+$("pModel").value = requestedModel && models.includes(requestedModel)
+  ? requestedModel : (models.includes("m373rena") ? "m373rena" : models[0]);
+// The default camera is the real idle director, and its FIRST cut is the arena shot: the ENEMY's
+// own staging record names a 1-based canned shot out of OUR twelve, which is the shot the battle
+// opens on ([0x100], F0x8009257c). That word is record+0x44, a field only the 0x48 records carry —
+// the wild Digimon the disc puts on the far side — so a partner-versus-partner pair has no
+// opening shot: the lab holds that arm's 90 frames with nothing to draw (the console would read
+// six halfwords from before the record's own camera array) and the director's NEXT arm, a canned
+// shot of our own Digimon, starts the picture. The default opponent is therefore one of the wild
+// Digimon, so the lab opens on the shot the disc would open on: Kuwagamon (the first story
+// battle's opponent), then the next ones in the manifest, then whatever there is.
+const LAB_FOE_CANDIDATES = ["m051kuwa", "m004beta", "m007aird"];
+$("eModel").value = LAB_FOE_CANDIDATES.find((f) => models.includes(f)) ?? models[0];
+$("pModel").onchange = () => r.setPlayerDigimon($("pModel").value);
+$("eModel").onchange = () => r.setEnemyDigimon($("eModel").value);
+r.setPlayerDigimon($("pModel").value);
+r.setEnemyDigimon($("eModel").value);
+
+// tech picker: named skills first (the game's 210), the rest selectable by raw id
+const techSel = $("techSel");
+for (const s of dj.skills) {
+  const rec = techRecord(s.id);   // may be null until the table fetch below resolves
+  const o = document.createElement("option");
+  o.value = s.id;
+  o.textContent = `${s.id} ${s.name} (${s.element}, pow ${s.power})`;
+  techSel.appendChild(o);
+}
+techSel.value = "59";   // Diamond Storm
+
+// Type-to-filter the long pickers (245 models, 210 techs) so reaching one is not a scroll.
+injectFilterStyles();
+autoFilterable(document);
+
+function currentTech() {
+  const raw = $("rawTech").value;
+  return raw ? +raw : +techSel.value;
+}
+
+function showRecord(id) {
+  const rec = techRecord(id);
+  const s = dj.skills.find(k => k.id === id);
+  if (!rec) { $("rec").textContent = "no record (tech table still loading?)"; return; }
+  const fx = effectManifest.types[String(rec.effect)];
+  $("rec").textContent =
+    `tech ${id} ${s ? s.name : ""}\n` +
+    `clip ${rec.clip}  motion ${rec.motion}  category ${rec.category}\n` +
+    `effect type ${rec.effect}` + (fx ? ` -> ${fx.file} bin ${fx.bin} (arch ${fx.arch})` : " (not in registry)") +
+    `\nsig-slot ${rec.sigEffect}  mp ${rec.mp}  power ${rec.power}  elem ${rec.elem1}/${rec.elem2}`;
+}
+
+$("cam").onchange = () => r.setCameraMode($("cam").value);
+r.setCameraMode($("cam").value);
+
+let lastAttack = null;   // {side, id} for auto-repeat
+function attack(side) {
+  const id = currentTech();
+  showRecord(id);
+  lastAttack = { side, id };
+  const opts = {
+    lethal: $("lethal").checked,
+    miss: $("miss").checked,
+    onEffect: (e) => log(`op3 spawn type ${e.type} @ (${e.x},${e.y},${e.z})`),
+    onEffectPreload: (t) => log(`op3 preload type ${t}`),
+    onHit: (rec) => log(`op10 type ${rec.type}${rec.type === 99 ? "  ← STRIKE" : ""}`),
+  };
+  const ok = side === "player" ? r.playerAttack(id, opts) : r.enemyAttack(id, opts);
+  log(`${side} attacks with tech ${id} → ${ok ? "playing" : "FAILED (model loaded?)"}`);
+}
+$("atkP").onclick = () => attack("player");
+$("atkE").onclick = () => attack("enemy");
+techSel.onchange = () => { $("rawTech").value = ""; showRecord(+techSel.value); };
+$("rawTech").oninput = () => showRecord(currentTech());
+showRecord(59);
+
+let last = performance.now();
+let wasActive = false;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  // The original does not run the battle's idle camera while an action's own script is playing:
+  // the camera director re-publishes its record through the cut [0xf8] on EVERY tick it runs
+  // (fightstg.s:5096-5105), so an op5 shot would be overwritten on the next frame and a tech's
+  // screen-space effect would be measured through the idle shot instead of its own. The battle
+  // says so once a frame through setCameraMode's scriptOwnsCamera flag, from its own state list
+  // (web/battle.js SCRIPT_OWNED_CAMERA_STATES); the lab drives the same renderer without that
+  // battle flow, so it answers the same question from the one thing it can see — an action
+  // playing — and the rule lands in the same place it does in the game.
+  r.setCameraMode($("cam").value, { scriptOwnsCamera: r.coordinator.active });
+  r.render(dt);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0);
+  const fx = r.getEffectDraw?.();
+  window.__fxCount = fx ? fx.list.length : 0;
+  if (fx) drawEffects(ctx, fx.list, fx.manifest, fx.images, fx.view);
+  const active = r.coordinator.active;
+  if (wasActive && !active) {
+    log("— sequence ended —");
+    if ($("autoloop").checked && lastAttack) setTimeout(() => attack(lastAttack.side), 400);
+  }
+  wasActive = active;
+  $("status").textContent = active ? "action playing…" : "idle";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

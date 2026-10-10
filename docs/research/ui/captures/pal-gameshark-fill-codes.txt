@@ -1,0 +1,29 @@
+# Digimon World 2003 (PAL) GameShark codes, converted from NTSC by "splakappa"
+# (GameFAQs board topic "Digimon World 2003 PAL VERSION GAMESHARK CODES (CONVERTED)").
+# Used only by tools/windows-rig/game_driver.py explore --codes, on the robot's own copy of
+# a moment. Community codes: a lead, not evidence.
+# Infinite Bits
+80048DA0 967F
+80048DA2 0098
+# Have All Items
+50003101 0000
+30048DDB 0063
+# Have All Weapons
+50007B01 0000
+30048E0C 0063
+# Have All Armor
+50004D01 0000
+30048E87 0063
+# Have All Accessories
+50004401 0000
+30048ED4 0063
+# Have All Cards
+300490D7 0009
+50009C02 0000
+800490D8 0909
+30049210 0009
+50009D02 0000
+80049214 0101
+# Not from the board: the CARD FOLDERS row shows when the held count at 0x80048F42
+# (item 402) is nonzero (pause-menu-screen-tree-2026-08-14.md §1; F0x8001270c.c:83).
+30048F42 0001

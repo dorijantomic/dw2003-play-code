@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asuka City Authentic / HD / New</title>
+<style>
+  :root { color-scheme:dark; font-family:system-ui,sans-serif; }
+  body { margin:0; background:#0d1117; color:#c9d1d9; }
+  main { max-width:760px; margin:auto; padding:40px 20px; }
+  h1 { color:#f0c040; margin-bottom:8px; }
+  .note,.stats { color:#8b949e; }
+  .controls { display:flex; gap:10px; flex-wrap:wrap; margin:24px 0; }
+  button { padding:10px 16px; color:#c9d1d9; background:#21262d; border:1px solid #484f58; border-radius:7px; cursor:pointer; }
+  button.active { background:#1f6feb; border-color:#58a6ff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Asuka City — authentic / HD / brand new</h1>
+  <p class="note">A is authentic. B restores only its 16 instrument waveforms. C–E are separate, punchier 128 BPM compositions built around G-major/Mixolydian fusion harmony and measured Asuka-style rhythmic traits.</p>
+  <div class="controls">
+    <button data-version="a">A · authentic</button>
+    <button data-version="b">B · HD samples</button>
+    <button data-version="c" data-track="neon-promenade">C · Neon Promenade</button>
+    <button data-version="d" data-track="chrome-circuit">D · Chrome Circuit</button>
+    <button data-version="e" data-track="pixel-skyline">E · Pixel Skyline</button>
+    <button id="stop">Stop</button>
+  </div>
+  <p class="stats" id="stats">Loading…</p>
+  <p><a href="asuka-hook-lab.html">Open the instant no-build hook lab →</a></p>
+</main>
+<script type="module">
+const manifest = await fetch("assets/music-hd/manifest.json").then((response) => {
+  if (!response.ok) throw new Error("Run tools/build_hd_music.py first");
+  return response.json();
+});
+const newManifest = await fetch("assets/music-new/manifest.json").then((response) => {
+  if (!response.ok) throw new Error("Run tools/build_new_asuka.py first");
+  return response.json();
+});
+const buttons = [...document.querySelectorAll("[data-version]")];
+let audio = null;
+let active = null;
+
+async function play(version, button) {
+  const position = audio?.currentTime || 0;
+  if (audio) audio.pause();
+  const composed = newManifest.tracks.find(
+    (track) => track.slug === button.dataset.track,
+  );
+  const source = version === "a"
+    ? `assets/music/${manifest.bank}.ogg`
+    : version === "b"
+      ? `assets/music-hd/${manifest.output}?v=${manifest.output_sha256.slice(0, 12)}`
+      : `assets/music-new/${composed.audio.file}?v=${composed.audio.sha256.slice(0, 12)}`;
+  const next = new Audio(source);
+  next.loop = true;
+  next.volume = 0.65;
+  await new Promise((resolve, reject) => {
+    next.addEventListener("loadedmetadata", resolve, { once:true });
+    next.addEventListener("error", () => reject(new Error("audio load failed")), { once:true });
+    next.load();
+  });
+  const targetTime = position % Math.max(next.duration, 1);
+  if (targetTime > 0.01) {
+    await new Promise((resolve) => {
+      next.addEventListener("seeked", resolve, { once:true });
+      next.currentTime = targetTime;
+    });
+  } else {
+    next.currentTime = targetTime;
+  }
+  await next.play();
+  if (active) active.classList.remove("active");
+  button.classList.add("active");
+  active = button;
+  audio = next;
+}
+
+for (const button of buttons) {
+  button.onclick = () => play(button.dataset.version, button);
+}
+document.getElementById("stop").onclick = () => {
+  if (audio) audio.pause();
+  if (active) active.classList.remove("active");
+  audio = active = null;
+};
+document.getElementById("stats").textContent =
+  `A/B: ${manifest.after.seconds.toFixed(1)}s · C–E: ${newManifest.tracks.length} variations, ${newManifest.key}, ${newManifest.tempo_bpm} BPM`;
+window.__musicHdLab = { manifest, newManifest, play, get audio() { return audio; } };
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Digimon World 2003 — Walkabout</title>
+<style>
+  html, body {
+    margin: 0; height: 100%;
+    background: #14141e; color: #e8e8f0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    overflow: hidden;
+  }
+  header {
+    display: flex; gap: 16px; align-items: center;
+    padding: 8px 16px; width: 100%; box-sizing: border-box;
+    background: #1d1d2b; border-bottom: 2px solid #34344e;
+  }
+  header h1 { font-size: 15px; margin: 0; color: #ffd34d; letter-spacing: 1px; }
+  header label { font-size: 12px; color: #9a9ab8; }
+  select {
+    background: #2a2a40; color: #e8e8f0; border: 1px solid #45456a;
+    border-radius: 4px; padding: 3px 6px; font-size: 13px;
+  }
+  #hint { margin-left: auto; font-size: 11px; color: #707090; }
+  #stage { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
+  #stage:fullscreen { width: 100vw; height: 100vh; background: #000; }
+  #stage:fullscreen canvas:not(.battle-fs) {
+    width: 100%; height: auto; max-width: 100%; max-height: 100%;
+    border: none; border-radius: 0;
+  }
+  @media (min-aspect-ratio: 10/7) {
+    #stage:fullscreen canvas:not(.battle-fs) { width: auto; height: 100%; }
+  }
+  canvas {
+    image-rendering: pixelated;
+    background: #000;
+    border: 2px solid #34344e; border-radius: 4px;
+    width: 640px; height: 480px;
+    max-width: 100%; max-height: 100%;
+  }
+  html[data-asset-mode="hd"] canvas,
+  html[data-asset-mode="hd"] #title-bg,
+  html[data-asset-mode="hd"] #title-logo { image-rendering: auto; }
+  /* Fullscreen battle: fill the stage, render smooth (canvas internal res == display res). */
+  canvas.battle-fs {
+    image-rendering: auto;
+    width: 100%; height: 100%;
+    max-width: none; max-height: none;
+    border: none; border-radius: 0;
+  }
+  #loading { position: absolute; top: 50%; font-size: 14px; color: #9a9ab8; }
+
+  #asset-mode-screen {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 8, 16, 0.96);
+  }
+  #asset-mode-screen[hidden] { display: none; }
+  .asset-mode-panel {
+    width: min(560px, calc(100% - 36px)); box-sizing: border-box;
+    padding: 28px; border: 2px solid #45456a; border-radius: 10px;
+    background: #1d1d2b; box-shadow: 0 12px 50px #000;
+    text-align: center;
+  }
+  .asset-mode-panel h2 { margin: 0 0 6px; color: #ffd34d; letter-spacing: 2px; }
+  .asset-mode-panel > p { margin: 0 0 20px; color: #aaaac4; }
+  .asset-mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .asset-mode-option {
+    min-height: 116px; padding: 14px; cursor: pointer;
+    color: #e8e8f0; background: #29293d; border: 1px solid #565680;
+    border-radius: 8px; font: inherit;
+  }
+  .asset-mode-option:hover:not(:disabled) { border-color: #ffd34d; background: #32324b; }
+  .asset-mode-option:disabled { opacity: 0.45; cursor: not-allowed; }
+  .asset-mode-option strong { display: block; color: #ffd34d; font-size: 17px; margin-bottom: 8px; }
+  .asset-mode-option span { display: block; color: #aaaac4; font-size: 12px; line-height: 1.4; }
+  .asset-mode-close {
+    margin-top: 18px; padding: 6px 18px; color: #e8e8f0;
+    background: transparent; border: 1px solid #565680; border-radius: 5px; cursor: pointer;
+  }
+
+  #title-screen {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: #14141e;
+    opacity: 1; transition: opacity 0.6s ease;
+  }
+  #stage:fullscreen #title-screen { background: #000; }
+  #title-screen[hidden] { display: none; }
+  #title-screen.fade-out { opacity: 0; pointer-events: none; }
+  /* Native STDWTITL background: the "circuit board" ttcommpk composite the
+     overlay itself draws full-screen (F0x80086108, disasm-proven — see
+     docs/research/ui/stdwtitl-decoded-2026-07-11.md). 320x240 source,
+     nearest-neighbor scaled to fill like every other native PS1 asset. */
+  #title-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; image-rendering: pixelated; z-index: -1;
+  }
+  /* The native screen. It draws the background itself, so it sits over
+     #title-bg and covers it whenever the title pack is available. */
+  #title-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    image-rendering: pixelated; z-index: 1; display: none;
+  }
+  /* When the native screen is up, the walker-authored heading and buttons are
+     not shown -- the option divs stay in the DOM as the action carriers. */
+  #title-screen.native #title-canvas { display: block; }
+  #title-screen.native #title-text,
+  #title-screen.native .subtitle,
+  #title-screen.native #title-logo,
+  #title-screen.native #title-bg,
+  #title-screen.native .title-opt { display: none; }
+  #title-screen h2 {
+    font-family: monospace; font-size: 42px; margin: 0;
+    color: #ffd34d; letter-spacing: 6px; text-shadow: 3px 3px 0 #000;
+  }
+  #title-screen .subtitle {
+    font-family: monospace; font-size: 18px; color: #e8e8f0;
+    letter-spacing: 14px; margin-top: -6px;
+  }
+  #title-logo {
+    image-rendering: pixelated;
+    max-width: 512px; max-height: 256px;
+    width: auto; height: auto;
+    display: block;
+  }
+  #title-logo[hidden] { display: none; }
+  .title-opt {
+    font-family: monospace; font-size: 18px; color: #ffd34d;
+    letter-spacing: 2px; cursor: pointer; margin-top: 8px;
+    padding: 6px 20px; border: 1px solid #45456a; border-radius: 4px;
+    min-width: 180px; text-align: center;
+  }
+  .title-opt:hover { background: #2a2a40; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #hud {
+    position: absolute; top: 8px; left: 8px; z-index: 5;
+    background: rgba(20, 20, 30, 0.78); border: 1px solid #34344e;
+    border-radius: 6px; padding: 6px 10px;
+    font-family: monospace; font-size: 12px; color: #e8e8f0;
+    pointer-events: none; display: none;
+  }
+  #hud.visible { display: block; }
+  #hud-map { color: #ffd34d; letter-spacing: 1px; }
+  #hud-partner { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  #hud-icon { image-rendering: pixelated; width: 32px; height: 32px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DW2003 WALKABOUT</h1>
+  <label>Partner
+    <select id="charSelect"></select>
+  </label>
+  <label>Map
+    <select id="mapSelect"></select>
+  </label>
+  <label>Music
+    <select id="musicSelect"></select>
+  </label>
+  <label>Visuals
+    <select id="assetModeSelect">
+      <option value="authentic">Authentic PS1</option>
+      <option value="hd">HD Remaster</option>
+    </select>
+  </label>
+  <label>Chapter
+    <select id="chapterSelect">
+      <option value="0">0</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7" selected>7 (all)</option>
+    </select>
+  </label>
+  <!-- Pad buttons first, because a joystick works too and the on-screen prompts
+       name the buttons. The button after each key is the one on a PlayStation
+       pad that the key stands for, which in English is what the disc does: the
+       bottom face button (Cross) confirms and the top one (Triangle) goes back.
+       Dev keys moved off the letters that are now buttons. -->
+  <span id="hint">Joystick supported · WASD/Arrows d-pad · Enter/Space/Z Cross (confirm) · Esc/X Circle (back) · C Triangle · V Square · Q/E L1/R1 · I start · R select &nbsp;—&nbsp; dev: H partner · M map · B music · J anim debug · O editor (paint LMB/RMB · N npc · G exit · K zone · Del remove · U/Shift+U export)</span>
+</header>
+<div id="stage">
+  <div id="loading">Loading assets…</div>
+  <div id="asset-mode-screen" hidden>
+    <div class="asset-mode-panel">
+      <h2>Choose Visual Style</h2>
+      <p>This only changes artwork resolution. Gameplay and geometry stay identical.</p>
+      <div class="asset-mode-options">
+        <button id="asset-mode-authentic" class="asset-mode-option">
+          <strong>Authentic PS1</strong>
+          <span>Original extracted pixels with crisp nearest-neighbour scaling.</span>
+        </button>
+        <button id="asset-mode-hd" class="asset-mode-option">
+          <strong>HD Remaster</strong>
+          <span id="asset-mode-hd-note">Checking whether the HD pack is installed…</span>
+        </button>
+      </div>
+      <button class="asset-mode-close" hidden>Cancel</button>
+    </div>
+  </div>
+  <canvas id="game" width="640" height="480" hidden></canvas>
+  <div id="hud">
+    <div id="hud-map"></div>
+    <div id="hud-partner">
+      <canvas id="hud-icon" width="32" height="32"></canvas>
+      <span id="hud-partner-name"></span>
+    </div>
+  </div>
+  <!-- The native title screen. `#title-canvas` renders the decoded STDWTITL
+       composition (background, logo, wordmark, the 3 and its glow, and the
+       Press Start Button / Start / Continue menu) through web/titlescreen.js.
+       The two option divs stay as the ACTION carriers so the new-game and
+       continue paths below are untouched; they are not shown to the player.
+       `#title-bg` and `#title-logo` remain as the fallback shown when the
+       title pack has not loaded. -->
+  <div id="title-screen" hidden>
+    <img id="title-bg" src="assets/ui/stdwtitl_bg.png" alt="">
+    <canvas id="title-canvas" width="320" height="240"></canvas>
+    <img id="title-logo" src="assets/title_logo.png" alt="DIGIMON WORLD 2003" hidden>
+    <h2 id="title-text">DIGIMON WORLD 2003</h2>
+    <div class="subtitle">WALKABOUT</div>
+    <div id="title-newgame" class="title-opt">New Game</div>
+    <div id="title-continue" class="title-opt">Continue</div>
+  </div>
+</div>
+<script type="module" src="game.js"></script>
+</body>
+</html>

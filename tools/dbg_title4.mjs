@@ -1,0 +1,15 @@
+import { chromium } from "playwright";
+import { baseUrl } from "./verify-base-url.mjs";
+const browser = await chromium.launch();
+const page = await browser.newPage();
+const errs = [];
+page.on("pageerror", (e) => errs.push("PAGEERROR: " + String(e && e.message || e).slice(0, 300)));
+page.on("console", (m) => { if (m.type() === "error") errs.push("CONSOLE: " + m.text().slice(0, 300)); });
+await page.goto(`${baseUrl(8741)}/`);
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForFunction(() => window.__state?.manifest, null, { timeout: 20000 });
+await page.waitForTimeout(5000);
+console.log("errors:", JSON.stringify(errs.slice(0, 10), null, 1));
+await page.screenshot({ path: "/tmp/dbg_title4.png" });
+await browser.close();

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Card Duel</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  iframe { border: 0; width: 100vw; height: 100vh; display: block; background: #000; }
+</style>
+</head>
+<body>
+<!--
+  Full-window host for the REAL card duel: web/cardduel.js driving
+  engine/systems/card-*.ts. Nothing is re-implemented here — the game's own
+  screen is loaded and opened, and every part of it (beats, banners, prompts,
+  browser, summon picker, targeting, combo, drain, win/lose) is the decoded
+  implementation. The chrome is hidden and the canvas stretched to the window.
+-->
+<iframe id="f" src="index.html?skipTitle=1&noEncounters=1"></iframe>
+<script>
+  const f = document.getElementById("f");
+  f.addEventListener("load", () => {
+    try {
+      const w = f.contentWindow, d = f.contentDocument;
+      const s = d.createElement("style");
+      s.textContent =
+        "header,#hint,#hud{display:none!important} #stage{margin:0} body{background:#000}" +
+        "canvas{width:100vw!important;height:100vh!important;max-width:none!important;" +
+        "max-height:none!important;border:none!important;border-radius:0!important;" +
+        "object-fit:contain;background:#000}";
+      d.head.appendChild(s);
+      const t = setInterval(() => {
+        if (w.__labOpen && w.__state && w.__state.started) {
+          clearInterval(t);
+          w.__labOpen("cardduel");
+          w.focus();
+        }
+      }, 200);
+    } catch (e) { /* ignore */ }
+  });
+</script>
+</body>
+</html>

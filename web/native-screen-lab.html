@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DDW3 Native Screen Lab</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0c14; color: #cdd3e0;
+               font: 12px/1.5 ui-monospace, monospace; }
+  #bar { display: flex; gap: 8px; align-items: center; padding: 8px 10px;
+         border-bottom: 1px solid #232838; }
+  select, button { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346;
+                   border-radius: 6px; padding: 5px 8px; font: inherit; }
+  button { cursor: pointer; }
+  button:hover { border-color: #3d6bff; }
+  #wrap { position: fixed; inset: 46px 0 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  canvas { image-rendering: pixelated; background: #000; border: 1px solid #2c3346;
+           width: 640px; height: 480px; }
+  #status { color: #7d879c; font-size: 11px; max-width: 640px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <b>Native screen</b>
+  <select id="screen"></select>
+  <button id="reboot">Reboot</button>
+  <span style="color:#6b7488">debug readout — intents, not pixels</span>
+</div>
+<div id="wrap">
+  <canvas id="c" width="320" height="240"></canvas>
+  <div id="status">loading…</div>
+  <figure id="refbox" style="display:none; margin:8px 0 0">
+    <img id="refimg" width="320" alt="original console capture"
+         style="image-rendering:pixelated; border:1px solid #2c3346">
+    <figcaption style="color:#6b7488">Original console capture (BizHawk, dev-screen launch)</figcaption>
+  </figure>
+</div>
+<script type="module" src="native-screen-lab.js"></script>
+</body>
+</html>

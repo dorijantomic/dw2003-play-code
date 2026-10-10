@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DDW3 Dev Toolset (internal)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+         background: #0b0c14; color: #cdd3e0; font: 13px/1.4 system-ui, sans-serif; }
+  header { flex: none; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+           padding: 10px 14px; background: #10131f; border-bottom: 1px solid #232838; }
+  header h1 { font-size: 15px; margin: 0; }
+  header .sub { color: #7d879c; font-size: 11px; max-width: 640px; }
+  header .warn { color: #e0b64a; font-size: 11px; }
+  #tabs { display: flex; gap: 6px; margin-left: auto; }
+  #tabs button { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346;
+                 border-radius: 6px; padding: 7px 11px; cursor: pointer; font: inherit; }
+  #tabs button[aria-selected="true"] { background: #2d54c8; border-color: #3d6bff; color: #fff; font-weight: 700; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #side { width: 380px; flex: none; background: #12121e; border-right: 1px solid #232838;
+          padding: 10px 12px; overflow-y: auto; }
+  #side h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+             margin: 12px 0 6px; color: #6b7488; }
+  #side .hint, .hint { color: #7d879c; font-size: 11px; }
+  #stage { flex: 1; display: flex; flex-direction: column; align-items: center;
+           justify-content: center; gap: 8px; padding: 12px; overflow: auto; min-width: 0; }
+  iframe { border: 1px solid #2c3346; border-radius: 4px; background: #000;
+           width: 640px; height: 480px; max-width: 100%; }
+  #inspect { width: 360px; flex: none; background: #10131f; border-left: 1px solid #232838;
+             padding: 10px 12px; overflow-y: auto; }
+  #inspect h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+                margin: 10px 0 6px; color: #6b7488; }
+  button.act { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346;
+               border-radius: 5px; padding: 5px 9px; cursor: pointer; font: inherit; }
+  button.act:hover { border-color: #3d6bff; }
+  button.act.primary { background: #173b59; border-color: #4a91ba; color: #a9deff; font-weight: 700; }
+  button.act:disabled { opacity: .4; cursor: default; }
+  select, input[type=text], input[type=number] { background: #0c1627; color: #dfe;
+               border: 1px solid #33405c; border-radius: 5px; padding: 5px 7px; font: inherit; max-width: 100%; }
+  .row { margin: 6px 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row label { color: #9fb0d0; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { display: flex; gap: 6px; align-items: center; padding: 3px 0;
+               border-bottom: 1px solid #1a1e2c; }
+  ul.list li .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ul.list li .meta { color: #6b7488; font-size: 11px; }
+  #log { font: 11px/1.4 ui-monospace, monospace; color: #9ab; white-space: pre-wrap;
+         background: #0a0a12; padding: 6px; border-radius: 5px; max-height: 180px; overflow-y: auto; }
+  pre#snap { font: 11px/1.35 ui-monospace, monospace; color: #cdd3e0; background: #0a0a12;
+             padding: 8px; border-radius: 5px; white-space: pre-wrap; word-break: break-word; margin: 0; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px;
+          background: #1b2b45; border: 1px solid #38516f; color: #c6d8f4; }
+  .pill.good { background: #173b2f; border-color: #2f7d5f; color: #a9e6c9; }
+  .pill.warn { background: #3b3417; border-color: #7d6a2f; color: #e6dca9; }
+  #preview { image-rendering: pixelated; max-width: 100%; max-height: 300px;
+             border: 1px solid #2c3346; border-radius: 4px; background: #000; }
+  .tabpane { display: none; }
+  .tabpane.on { display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>DDW3 Dev Toolset</h1>
+  <span class="sub">Internal tooling — drives the real game in the iframe. Not a player-facing
+    screen. The disc's leftover debug screens (stage select, sound test, shock test, battle scene
+    test) are research tools and are deliberately not reproduced here.</span>
+  <span class="warn" id="readyPill">booting…</span>
+  <div id="tabs">
+    <button data-tab="stages" aria-selected="true">Stages &amp; Scenes</button>
+    <button data-tab="battles">Battles</button>
+    <button data-tab="assets">Backgrounds &amp; Assets</button>
+    <button data-tab="state">State Inspector</button>
+  </div>
+</header>
+<main>
+  <div id="side">
+    <div class="tabpane on" id="pane-stages"></div>
+    <div class="tabpane" id="pane-battles"></div>
+    <div class="tabpane" id="pane-assets"></div>
+    <div class="tabpane" id="pane-state">
+      <h2>Poke live state</h2>
+      <div class="hint">Set a story flag through the real set_flag path, teleport, or set the
+        chapter. These run in the game document through <code>window.__*</code> hooks.</div>
+      <div class="row"><label>flag id</label>
+        <input type="text" id="setFlagId" placeholder="0x1e02 / 7750" style="width:130px">
+        <button class="act" id="setFlagOn">set 1</button>
+        <button class="act" id="setFlagOff">set 0</button></div>
+      <div class="row"><label>x</label><input type="number" id="tpX" style="width:80px">
+        <label>y</label><input type="number" id="tpY" style="width:80px">
+        <button class="act" id="tpGo">teleport</button></div>
+      <div class="row"><label>chapter</label><input type="number" id="chapterN" style="width:70px">
+        <button class="act" id="chapterGo">set</button>
+        <button class="act" id="chapterClear">derive</button></div>
+      <h2>Export</h2>
+      <div class="row"><button class="act primary" id="snapCopy">copy state JSON</button>
+        <button class="act" id="snapRefresh">refresh</button></div>
+      <pre id="snapJson">—</pre>
+    </div>
+  </div>
+  <div id="stage">
+    <iframe id="game" title="game"></iframe>
+    <div class="hint">Click the canvas first, then arrows / WASD / Space / Enter.
+      Reloads keep the seeded party and asset mode.</div>
+  </div>
+  <div id="inspect">
+    <h2>Live state</h2>
+    <pre id="snap">—</pre>
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
+</main>
+<script type="module" src="devtools.js"></script>
+</body>
+</html>
