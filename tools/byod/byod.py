@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -181,7 +182,19 @@ def sound_step(dec: Decoder, tree: Path) -> None:
             dec.warn(f"sound {group}: unvab-sep failed: {r.stderr.strip()[-300:]}")
         else:
             made += 1
+            if os.name == "nt":
+                _posix_toml_paths(tree / f"sound/dw2003/{group}.toml")
     log(f"sound: {made} groups -> sound/dw2003/")
+
+
+def _posix_toml_paths(toml: Path) -> None:
+    """ddw3-unvab-sep writes OS-native paths; on Windows that is 'a\\b' literals.
+    Rewrite them to the "a/b" strings it writes everywhere else."""
+    text = toml.read_text(encoding="utf-8")
+    fixed = re.sub(r"= '([^'\n]*\\[^'\n]*)'",
+                   lambda m: '= "' + m.group(1).replace("\\", "/") + '"', text)
+    if fixed != text:
+        toml.write_text(fixed, encoding="utf-8", newline="\n")
 
 
 def main(argv=None):
