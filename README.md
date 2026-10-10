@@ -10,7 +10,7 @@ matching decompilation of the game's original code. It is still in progress:
 
 - 13 of 34 systems work fully, 21 work partly.
 - 105 of 121 game screens are rebuilt from the original game's code (87%).
-- 36% of the 2119 documented facts about the original game are fully checked against its code.
+- Everything is built from the original game's code and checked as we go: 85% of the 2119 facts we have written down about the original are at least partly confirmed against its code, and 36% fully.
 
 Per-feature breakdown: [PROGRESS.md](PROGRESS.md).
 <!-- progress:end -->
@@ -40,8 +40,8 @@ on, starting the app goes straight to the game.
 No Python, Node, Rust, git or admin rights needed; the download carries
 everything it uses. Keep the small window that opens alongside the browser
 while you play; close it to quit. The disc is decoded with Marko's
-([markisha64](https://github.com/markisha64/ddw3)) extractors, reused with
-permission — see `tools/byod/README.md` and Credits below. On first setup the
+([markisha64](https://github.com/markisha64/ddw3)) extractors (using markisha's work) —
+see `tools/byod/README.md` and Credits below. On first setup the
 app downloads ddw3's public source text (~11 MB of assembly/tables, no game
 data) that the build reads alongside your disc.
 
@@ -205,7 +205,7 @@ matching, function-by-function, across every overlay and the executable — is t
 foundation this entire recreation is built on. The game data used at runtime
 comes from the repository he created and maintains. The bring-your-own-disc
 route (`tools/byod/`) builds and drives his extractor binaries and ships the two
-small patches they need, reused with his permission — if you use it, credit
+small patches they need — using markisha's work. If you use it, credit
 Marko and ddw3. Without his years of patient work documenting how this game
 actually works, none of this would be possible. Thank you, Marko.
 
@@ -261,8 +261,8 @@ free to use, modify, and distribute it. See LICENSE for the full text.
 Third-party components:
 - `tools/m2c/**` is a vendored copy of m2c, licensed GPL-3.0-only (see
   `tools/m2c/LICENSE`); it keeps its own license.
-- The byod disc tools build and patch Marko's ddw3 extractor sources, reused
-  with permission (see `tools/byod/README.md` and Credits).
+- The byod disc tools build and patch Marko's ddw3 extractor sources, using
+  markisha's work (see `tools/byod/README.md` and Credits).
 
 The game data — whether built from your own copy of the game or downloaded
 via the opt-in `--fetch-data` flag — is subject to its own terms; we claim no

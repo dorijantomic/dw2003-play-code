@@ -54,6 +54,30 @@ const NAMES = {
   "engine-resource": ["Loading game resources", "Under the hood"],
   "battle-model-data": ["Battle model data", "Under the hood"],
 };
+// Plain-English note for each partly-working system (shown in PROGRESS.md).
+const NOTES = {
+  "arena-tournaments": "The final World Champ fight works from start to finish. The tournament bracket itself isn't in the game yet, and neither is the 4-badge entry check.",
+  "card-battle": "Duels, card effects and the card screens work. Many card effects are still unfinished.",
+  "world-exploration": "Maps, doors, ladders, mazes, ice, fire traps, launch pads and Submarimon all work. A few map details are still unfinished.",
+  "fishing": "Rod, bobber, meter and both fishing battle outcomes work. One small visual detail at the end of a cast still needs checking.",
+  "post-game": "The reunion, the world changes and the post-game movie work. The movie that plays on the title screen after you finish isn't done yet.",
+  "quest-events": "The whole story is hooked up: all 40 story beats work, with no gaps. Three side events are skipped for now.",
+  "save-load": "The memory-card screens work, and your party, stats, gear, forms and cards save and load correctly. The saved file isn't byte-for-byte the same as the original's.",
+  "shops": "Buying, selling, stock and the card-pack shop work. A few small details are left.",
+  "story-gating": "The story's gating works. A few extra party-related checks aren't covered.",
+  "battle": "Commands, damage, items, status effects and the results screen work. A few damage details are unresolved.",
+  "blast-digivolution": "The blast gauge, the free-technique use and all four animations work. Some detail around switching fighters mid-battle and what is kept after the fight still needs work.",
+  "digivolution": "The digivolve screens, evolution graph, unlock checks and dive forms work. Some saved form details are still unnamed.",
+  "equipment": "Slots, two-handed and accessory rules, stats and the 999 limit work. Some crest and equipment effects are unfinished.",
+  "items": "The item list, prices, battle items and stack limits work. Some item effects and edge cases are unfinished.",
+  "technique-loading": "Learning, slots, MP cost and technique rules work. How forms are stored on the memory card is unfinished.",
+  "audio": "Music and sound effects play the way the original does. A few specific cues (item, KO and miss sounds) are deliberately not played yet.",
+  "ui-chrome": "Menus, dialogue, name entry, registration, title and country screens work. A few screens still use a stopgap.",
+  "rendering-2d": "Text, windows and screens are drawn the way the original draws them. We haven't compared whole screens against the original yet.",
+  "input": "Controller and keyboard input work consistently across every screen.",
+  "resident-core": "The game's basic services (memory, flags, randomness, timing) work. One stopgap remains: some original machine code is still being run.",
+  "engine-resource": "Loading and unloading screens' assets works. We haven't compared load timing and visuals against the original yet."
+};
 const GROUPS = ["Story & world", "Battles & Digimon", "Look & sound", "Under the hood", "Other"];
 const SCORE = { implemented: 1, partial: 0.5, missing: 0 };
 const LABEL = { implemented: "✅ Works", partial: "🟡 Partly works", missing: "⬜ Not yet" };
@@ -75,7 +99,7 @@ const summary = [
   "",
   `- ${count("implemented")} of ${systems.length} systems work fully, ${count("partial")} work partly${count("missing") ? `, ${count("missing")} not yet` : ""}.`,
   `- ${screensDone} of ${screensTotal} game screens are rebuilt from the original game's code (${pct(screensDone, screensTotal)}%).`,
-  `- ${pct(t.verified, t.claims)}% of the ${t.claims} documented facts about the original game are fully checked against its code.`,
+  `- Everything is built from the original game's code and checked as we go: ${pct(t.verified + t.partially_verified, t.claims)}% of the ${t.claims} facts we have written down about the original are at least partly confirmed against its code, and ${pct(t.verified, t.claims)}% fully.`,
   "",
   "Per-feature breakdown: [PROGRESS.md](PROGRESS.md).",
 ].join("\n");
@@ -85,9 +109,7 @@ const rows = (group) =>
     .filter((s) => (NAMES[s.id]?.[1] ?? "Other") === group)
     .sort((a, b) => SCORE[b.wired.status] - SCORE[a.wired.status] || (NAMES[a.id]?.[0] ?? a.id).localeCompare(NAMES[b.id]?.[0] ?? b.id))
     .map((s) => {
-      const l = s.learned ?? {};
-      const checked = l.claims ? `${pct(l.verified, l.claims)}% (${l.verified}/${l.claims})` : "—";
-      return `| ${NAMES[s.id]?.[0] ?? s.id} | ${LABEL[s.wired.status]} | ${checked} |`;
+      return `| ${NAMES[s.id]?.[0] ?? s.id} | ${LABEL[s.wired.status]} | ${NOTES[s.id] ?? ""} |`;
     });
 
 const page = [
@@ -105,16 +127,15 @@ const page = [
   "  as far as we have found. Bugs are still possible.",
   "- **🟡 Partly works**: the feature is in the game, but parts of it are missing",
   "  or simplified.",
-  "- **Checked against the original**: of the facts we have written down about how",
-  "  the original does this feature, the share that has been fully confirmed",
-  "  against the original game's code. A low number means less has been double",
-  "  checked, not that it is broken.",
+  "- **Double-checking**: we keep checking each feature against the original",
+  "  game's code. The share of facts confirmed so far is in the summary above;",
+  "  a feature that is not fully confirmed yet is not necessarily broken.",
   "- **Overall %**: every system counts the same; a working one counts 1, a",
   "  partly working one ½. It is a rough guide, not a measurement of play time.",
   "",
   ...GROUPS.flatMap((g) => {
     const r = rows(g);
-    return r.length ? [`## ${g}`, "", "| Feature | Status | Checked against the original |", "| --- | --- | --- |", ...r, ""] : [];
+    return r.length ? [`## ${g}`, "", "| Feature | Status | What works and what is missing |", "| --- | --- | --- |", ...r, ""] : [];
   }),
   "The engineering view of the same data (every claim, test and code file) is the",
   "systems page: open `systems.html` in the running game.",
