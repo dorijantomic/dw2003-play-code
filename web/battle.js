@@ -45,11 +45,11 @@ import { drawEffects } from "./fight/effect-player.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
 import {
-  physicalBase, magicalBase, resolveDamage, rollHit, fleeChance, drainHeal, RAND_U16,
+  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, drainHeal, RAND_U16,
   hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc,
   blastPresentationState, BLAST_FIRST_FRAME,
   FormChangeProgram, formChangeState, formChangeSoundFrame, evolEffectsDue,
-  statusRoll, critBonusFor, counterDamage,
+  statusRoll, counterDamage,
   enemyMoveCondition,
   elementId,
   enemyActionSkillId,
@@ -127,6 +127,10 @@ import {
   advanceFrameClock, frameDelta,
   newOpeningState, stepOpeningPhase, openingLineRoll, introVariantFor,
   OPENING_PHASES, OPENING_PHASE_COUNT, openingPhaseFor,
+  FINALE_MSG_BODY, FINALE_MSG_LEARNED, FINALE_HEAD_ATTACK_ID,
+  BATTLE_WIN_RESULT_SCREEN, FINALE_WIN_ENDING_MOVIE,
+  battleWinLaunchCode, battleWinJinglePlays,
+  FINALE_TAIL_DEFEAT_BEATS, finaleBattleKind, finaleRecordsTechnique, finaleCopiedAttackSkill,
 } from "./vendor/engine.js";
 // Three fight mechanisms wired onto the ordinary route above, each an engine port of the
 // original fightstg routine: the face-box cel draw (FIGHTSTG_F0x80093fec), the enemy-id
@@ -815,15 +819,29 @@ export function gauntletNext(party, index) {
 }
 
 /**
- * The final boss's mid-battle track switch, gated exactly as the original arms it: the
- * transition counters `+0xda`/`+0xdb` are zeroed only by WFIGHTMN's battle-0x144 arm
- * (.L0x00001090-.L0x0000109c) — the Galacticmon sequence, `specialBattleMode` 4 — and
- * the damage-apply wrapper fires on the third counted application (.L0x00004d90:
- * `slti $v0, 0x3` / `bnez`). Pure so the cue test can walk the boundary; the battle
- * closure counts and calls it (see noteFinalBossPhaseDamage).
+ * The battle's LIVE kind word (0x800a4536): the finale's phase once it has advanced,
+ * else setup's own value (`specialMode`). Stamped onto both combatant records so the
+ * accuracy leaves read it; the phase writer is runFinaleBeat.
  */
-export function finalBossPhaseSwitchesTrack(specialMode, landedCount) {
-  return specialMode === 4 && landedCount >= 3;
+function battleKindOf(b) {
+  return finaleBattleKind(b?.specialMode ?? 0, b?._finaleKind);
+}
+
+/**
+ * The final boss's mid-battle track switch, gated exactly as the original arms it.
+ *
+ * WFIGHTMN zeroes the transition counters only for battle 0x144, the Galacticmon
+ * sequence (.L0x00001090-.L0x0000109c: mode 4, then `sb 0, +0xdb` / `sb 0, +0xda`),
+ * and the damage-apply wrapper fires on the third counted application
+ * (.L0x00004d90: `slti $v0, 0x3` / `bnez`) — BUT the wrapper's own gates come
+ * first (.L0x00004d48-.L0x00004d70): the kind word must be 6 (the head phase; the
+ * counter `+0xda` runs only while it is), the acting side must be the player's,
+ * `+0xdb` must still be clear, and the applied delta must be nonzero. Pure so the
+ * cue test can walk the boundary; the battle closure counts and calls it (see
+ * noteFinalBossPhaseDamage).
+ */
+export function finalBossPhaseSwitchesTrack(specialMode, battleKind, landedCount) {
+  return specialMode === 4 && battleKind === 6 && landedCount >= 3;
 }
 
 // Pick an enemy's vitals: prefer the REAL per-encounter hp/mp (extracted from ROM into
@@ -2763,6 +2781,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // the dropped item, and its close calls finishNativeReport(). Left null, the
   // hand-authored inline report runs exactly as before.
   let reportHandoff = null;
+  // The finale's win exit (wfightmn.s:2165-2174): when the win's launch cue is
+  // the ending movie (0xE0B, kind 6), the host registers how to play it — movie
+  // row 10 (MOVIEE01_STR), its return selector 0xE0C (row 11, MOVIEE02_STR),
+  // then 0x2d7 (screen 727 = stage 780) — and calls finishEnding() when the
+  // chain is done. The ordinary win's cue (0x1400, STFRPT) still goes through
+  // reportHandoff; the two exits never both run.
+  let endingHandoff = null;
   // The field's battle handoff (F0x8008B798): the host registers what has to run
   // BEFORE a field battle starts. At story ordinal 43 that is the title overlay's
   // movie MOVIED08_STR (selector 0xE0A, whose own return selector is 0x600, the
@@ -2981,7 +3006,15 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     dnaResultScript = dcj;
     jogressDB = jgj;
     digimonDB   = Object.fromEntries(dj.digimon.map(d => [d.id, d]));
-    skillDB     = Object.fromEntries(dj.skills.map(s => [s.id, s]));
+    // The record's own raw bytes the formula leaves test: +0x0A the TECH_EFFECT_*
+    // opcode (`dispatch` in the extracted table) and +0x0C its effect power (`crit`).
+    // `effect`/`effect_p2` name only the subset with a decoded effect name; the raw
+    // bytes cover all 443 rows, so a technique the name table misses still gets its
+    // true crit/accuracy branch.
+    skillDB     = Object.fromEntries(dj.skills.map(s => {
+      const rec = ftj?.[String(s.id)];
+      return [s.id, rec ? { ...s, effect_id: rec.dispatch, effect_power: rec.crit } : s];
+    }));
     stageEncDB  = sej;
     fieldEncDB  = fej;
     cardmonBoostersDB = cbj;
@@ -3681,6 +3714,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       encounterGateBytes: battleConfig?.raw_2b58_2b65 ?? null,
       statusImmunities,
       specialMode: specialBattleMode(mapId, Number(screenId)),
+      // The finale's live phase state (claim wfightmn-finale-kinds-2026-10-10): the
+      // kind word's 4 -> 5 -> 6 advance. `_finaleKind` is null until the tail falls
+      // (the live kind is then `specialMode`, 4); `_finaleRecordedTechId` is the
+      // technique latched while the tail stands (F0x800aa06c); `_finaleCopiedAttack`
+      // is the head's rebuilt attack record (arm 22 state 2); `_finaleAfter` runs the
+      // next scripted beat once the current result pages are read.
+      _finaleKind: null,
+      _finaleRecordedTechId: 0,
+      _finaleCopiedAttack: null,
+      _finaleAfter: null,
       _loot: { drops: [] },                 // drop list; endBattle banks every name here
 
       menuSel: 0,
@@ -3738,6 +3781,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       rec.statusEvents = battle.statusEvents;
       rec.sideByte = side;
       rec.slot = 0;
+      // The accuracy leaf F0x800a06ac's kind word (0x800a4536). The walker's
+      // `specialMode` IS that word for the scripted battles (WFIGHTMN's init writes
+      // 1..4 by field-screen/battle-id pair); the finale's own 4 -> 5 -> 6 advance
+      // (runFinaleBeat) restamps both records as the phases change, so the kind-6
+      // fixed roll fires from the head phase on.
+      rec.battleKind = battleKindOf(battle);
     }
 
     // The field's own handoff cues ENCOUNTS once, on the transition's first frame:
@@ -4091,23 +4140,27 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    *
    * WFIGHTMN zeroes the two transition counters only for battle 0x144, the Galacticmon
    * sequence (.L0x00001090-.L0x0000109c: mode 4, then `sb 0, +0xdb` / `sb 0, +0xda`).
-   * Its damage-apply wrapper counts player-side applications whose delta is nonzero and,
-   * on the third, (.L0x00004d30-.L0x00004da8) calls fightstg F0x8009d06c, which spawns
-   * battle effect 0x1d3 (.L0x8009d0a0) and latches +0xdb. That effect's actor
-   * F0x80086a00 then plays 0x60980000 = archive 38 boss04 (LASTB_02) through
-   * [0x80055c48] and saves it to [0x80042b30] (.L0x80086e84-.L0x80086ea0) — the only
-   * battle-side boss-track play in the whole game (sound-system.md 2026-07-03h).
+   * Its damage-apply wrapper F0x800aab10 counts player-side applications whose delta is
+   * nonzero (.L0x00004d30-.L0x00004da8) — but only while the kind word is 6, the head
+   * phase (`.L0x00004d48-.L0x00004d50`: `lh $v1, 0xd6` / `li $v0, 6` / `bne` returns),
+   * and only until `+0xdb` is set. On the third it calls fightstg F0x8009d06c, which
+   * spawns battle effect 0x1d3 (.L0x8009d0a0), latches `+0xdb := 1` (:27300-:27303) and
+   * enqueues kind 0x18. That effect's actor F0x80086a00 then plays 0x60980000 = archive
+   * 38 boss04 (LASTB_02) through [0x80055c48] and saves it to [0x80042b30]
+   * (.L0x80086e84-.L0x80086ea0) — the only battle-side boss-track play in the whole
+   * game (sound-system.md 2026-07-03h).
    */
   function noteFinalBossPhaseDamage(b) {
     if (b._bossPhaseDone) return;
+    // The wrapper's own kind gate: +0xda counts only while the head stands. The walker's
+    // three call sites are the player's own landed damaging commits (basic, technique,
+    // DNA) — the closest faithful condition for the wrapper's per-application count,
+    // which is only reachable through a pointer in the original.
+    if (battleKindOf(b) !== 6) return;
     b._bossPhaseCount = (b._bossPhaseCount ?? 0) + 1;
-    // The walker charges one count per landed player damaging commit (basic, technique,
-    // DNA). The original counts its own HP applications through a wrapper that is only
-    // reachable through a pointer, so per-application granularity (our commit, not each
-    // hit of a multi-hit technique) is the closest faithful condition.
-    if (!finalBossPhaseSwitchesTrack(b.specialMode, b._bossPhaseCount)) return;
+    if (!finalBossPhaseSwitchesTrack(b.specialMode, battleKindOf(b), b._bossPhaseCount)) return;
     b._bossPhaseDone = true;
-    b._battleTrack = "boss04";   // the register update at .L0x80086ea0
+    b._battleTrack = "boss04";   // the register update at .L0x00086ea0
     bgm?.play(b._battleTrack);
   }
 
@@ -4422,7 +4475,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       setCaption: (v) => { damages[i] = v | 0; },
     }));
     const manager = {
-      predicate: () => (rollHit(atk, def, skill, RAND_U16) ? 1 : 0),
+      // The manager's predicate is the MAGICAL accuracy leaf (+0xa0), read
+      // unconditionally by F0x8009ddd8 (:28224 `lw $v0, 0xa0($s3)`) — not the
+      // physical +0x9c entry.
+      predicate: () => (rollMagicHit(atk, def, skill, RAND_U16) ? 1 : 0),
       produce: (_side, slotTechId) => slotDamage(slotTechId, atk, def, RAND_U16, field),
     };
     const state = { count: 0, total: 0, done: 0 };
@@ -4433,6 +4489,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // Continue after the current action's result text has either timed out (ordinary results) or
   // been confirmed (the explicit impact/defeat sequence).
   function advanceAfterResult(b) {
+    // The finale's scripted beats chain through here: once a beat's pages have been
+    // read, the next beat runs (the kind advance, the body's cannon, the head swap).
+    // Set only while the sequence is in flight, and cleared before it runs so a beat
+    // that puts up no page cannot re-enter itself.
+    if (b._finaleAfter) { const run = b._finaleAfter; b._finaleAfter = null; run(); b.timer = 0; return; }
     if (b._forcedFlee) { b._forcedFlee = false; b.state = ST.RESULT_MSG; b._nextState = ST.NONE; b.message = "Running away!"; b.timer = 0; const cb = b.onFlee; setTimeout(() => { if (battle === b) { persistPlayerGauge(b); if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack); battle = null; cb?.(); } }, 1400); return; } if (b._enemyFled) { endBattle("enemy-fled"); return; } if (!b._mode1EscapeShown && specialModeLowHpEscape(b.specialMode ?? 0, b.enemy.hp, b.enemy.maxHp)) { b._mode1EscapeShown = true; b.state = ST.RESULT_MSG; b._nextState = ST.NONE; const escName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy"; sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.FLEEING], name: escName }, "Fleeing!"); b.timer = 0; setTimeout(() => { if (battle === b) endBattle("enemy-fled"); }, 1400); return; } // ^ forced flee: Zanbamon's Cross Slash (result-queue slot 35, fightstg F0x80091a8c) puts up esmfight[0x48] "Running away!" and commits the result to 0 (flee) — the disc's only route that avoids the loss. The mode-1 low-HP escape (fightstg F0x80088564 `.L0x800885bc`, esmfight[0x5f] "Fleeing!") is the mode-1 boss ending: mode 1 + the enemy's HP below maxHP/10 (which the maxHP/11 floor guarantees) closes the fight back to the field with no rewards
     if (b._timelinePages?.length) {
       // The turn's status pages. One page the player reads, then the next, the way the
@@ -5350,12 +5411,25 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // "Battle Won!" message; the timer is a safety path for a missing/late 3D model.
         if (renderer3d?.playerVictoryComplete || b.timer > 3) {
           b._victoryReady = true;
-          b._victoryPhase = "report";
-          b._winPageIndex = 0;
           b.timer = 0;
-          // The native results screen takes over the whole framebuffer when a
-          // host is registered; the inline report stays the fallback.
-          if (reportHandoff?.open) b._reportNative = reportHandoff.open(b) === true;
+          if (b._winLaunchCode === FINALE_WIN_ENDING_MOVIE) {
+            // The finale's win goes straight into the ending movie
+            // (wfightmn.s:2165-2174): STFRPT never opens, the launch cue 0xE0B
+            // plays movie row 10 (MOVIEE01_STR) and its own return selector
+            // chains to row 11 (MOVIEE02_STR) and then 0x2d7 (screen 727 =
+            // stage 780). The host plays the chain and calls finishEnding when
+            // it is done; with no host the battle finishes directly rather than
+            // stranding the player in the ending phase.
+            b._victoryPhase = "ending";
+            b._endingHosted = endingHandoff?.play ? endingHandoff.play(b) === true : false;
+            if (!b._endingHosted) endBattle("win");
+          } else {
+            b._victoryPhase = "report";
+            b._winPageIndex = 0;
+            // The native results screen takes over the whole framebuffer when a
+            // host is registered; the inline report stays the fallback.
+            if (reportHandoff?.open) b._reportNative = reportHandoff.open(b) === true;
+          }
         }
       } else if (b._victoryPhase === "report") {
         b.timer += dt;
@@ -5430,6 +5504,19 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const drop = rollDrop(b.enemy.eStats);
     if (drop) b._loot.drops.push(drop);
 
+    // The Galacticmon finale's scripted sequence replaces the gauntlet swap for the
+    // tail's fall (claim wfightmn-finale-kinds-2026-10-10): the disc's kind word walks
+    // 4 -> 5 -> 6 through the body's cannon, and the body is never fought. What the
+    // player meets: "After beating the tail, the body will fire off the Ragnarock
+    // Cannon, reducing your current digimon to 1 HP. Fortunately, though, you should
+    // get first attack on the head" (docs/research/story-progression/WALKTHROUGH_FULL.txt:5469-5471).
+    // The extracted party's three members stand in for the disc's three spawned
+    // phases: member 0 the tail, 1 the body, 2 the head.
+    if (b.specialMode === 4 && b.partyIndex === 0 && b.party.length === 3) {
+      runFinaleBeat(b, 0);
+      return;
+    }
+
     const step = gauntletNext(b.party, b.partyIndex);
     const nextEnemy = step.done ? null : buildEnemyRecord(step.entry);
     if (!nextEnemy) {
@@ -5439,11 +5526,19 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       b._victoryPhase = "pose";
       b._victoryReady = false;
       renderer3d?.playPlayerVictory?.();
-      // wfightmn's win arm: it writes result 1 (.L0x00003498) and then plays W_JINGLE
-      // 0x6004001e through [0x80055c48] (.L0x000034c0-.L0x000034c4); its only gate is
-      // the battle's mode word being 6, a mode this controller never sets, so the
-      // walker celebrates every win. Same id the card duel's win already plays.
-      sfx?.play("w_jingle");
+      // wfightmn's win arm: it writes result 1 (the stager F0x8009c534(1) stores
+      // `1` into the result byte 0x800a435c, fightstg.s:26513-26524) and then
+      // plays W_JINGLE 0x6004001e through [0x80055c48] (.L0x000034c0-.L0x000034c4)
+      // ONLY when the battle-kind word is not 6 (.L0x000034a4-.L0x000034ac) — the
+      // finale's win skips the jingle. The exit cue that result 1 then takes is
+      // read at arm 4's phase 2 (wfightmn.s:2165-2174): 0xE0B at kind 6 — STTITL
+      // mode 11 = movie row 10 = MOVIEE01_STR, the ending movie — vs 0x1400
+      // (STFRPT, the battle-result screen) otherwise. The report phase below is
+      // replaced by the ending chain when the cue is the movie. Same jingle id the
+      // card duel's win already plays.
+      const winKind = battleKindOf(b);
+      b._winLaunchCode = battleWinLaunchCode(winKind);
+      if (battleWinJinglePlays(winKind)) sfx?.play("w_jingle");
       return;
     }
     nextEnemy.statusImmunities = b.statusImmunities;
@@ -5462,6 +5557,110 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b._nextState = ST.PLAYER_MENU;
     b.state = ST.RESULT_MSG;
     b.timer = 0;
+  }
+
+  /**
+   * Run one beat of the finale's scripted sequence (FINALE_TAIL_DEFEAT_BEATS).
+   *
+   * Beat 0 is arm 18's default sub-state (wfightmn.s:3219-3234): presentation 0x8B
+   * "What! The body?!", kind 5, the body on the field (sub-state 5's spawn,
+   * :3490-3494). Beat 1 is the kind-5 body object's cannon: the current Digimon is
+   * set to 1 HP and the box shows the delta it took (fightstg.s:14416-14425). Beat 2
+   * is arm 22 (:3781-3793, :3843-3966): kind 6, the head on the field, and its attack
+   * record rebuilt from the technique latched while the tail stood. Each beat's pages
+   * advance to the next through `_finaleAfter` (see advanceAfterResult); the last
+   * beat hands the command menu to the player, who gets the first turn of the head
+   * phase — the kind-6 fixed roll governs the player's attacks from there on.
+   */
+  function runFinaleBeat(b, index) {
+    const beat = FINALE_TAIL_DEFEAT_BEATS[index];
+    if (!beat) return;
+    b._finaleKind = beat.kind;
+    if (b.player) b.player.battleKind = beat.kind;
+    if (b.partyIndex !== beat.member) {
+      const entry = b.party[beat.member];
+      const next = entry ? buildEnemyRecord(entry) : null;
+      if (next) {
+        next.statusImmunities = b.statusImmunities;
+        next.battleKind = beat.kind;
+        b.enemy = next;
+        b.partyIndex = beat.member;
+        b.timeline = initialActorTimeline(b.player.spd, next.spd);
+        // A fresh timeline is a fresh turn for the command phase's Frozen gate.
+        b._turnSeq = (b._turnSeq ?? 0) + 1;
+        const nextName = next.eStats?.digimon_id ?? next.profile?.name ?? "Enemy";
+        swapEnemyModel(nextName);
+      }
+    } else if (b.enemy) {
+      b.enemy.battleKind = beat.kind;
+    }
+    if (beat.head) {
+      // Arm 22 state 2: the head's own attack record (technique 440, the "?????"
+      // skill) is rebuilt from the technique row latched at 0x800a4538. The record
+      // fields the walker's skill model carries are copied; a zero latch (nothing
+      // recorded) leaves the head's own attack untouched.
+      const base = skillDB?.[String(FINALE_HEAD_ATTACK_ID)] ?? null;
+      const recorded = b._finaleRecordedTechId
+        ? (skillDB?.[String(b._finaleRecordedTechId)] ?? null) : null;
+      b._finaleCopiedAttack = base && recorded ? finaleCopiedAttackSkill(base, recorded) : null;
+    }
+    const pages = [];
+    if (beat.message === FINALE_MSG_BODY) {
+      // The line arm 18's default sub-state plays: message kind 1, esmfight 0x8B.
+      pages.push({
+        text: "What! The body?!",
+        spec: { kind: MSG_KIND.ONE_LINE, payload: [FINALE_MSG_BODY] },
+      });
+    }
+    if (beat.cannon) {
+      // The kind-5 object's state 1 (fightstg.s:14416-14425): the current Digimon's
+      // HP is set to 1, after a damage page carrying the delta it took.
+      const pname = b.player.profile.name;
+      const dealt = Math.max(0, b.player.hp - 1);
+      b.player.hp = 1;
+      pages.push({ text: `${pname} took ${dealt} damage!`, spec: damageSpec(pname, dealt, "", 0, 1) });
+    }
+    if (beat.message === FINALE_MSG_LEARNED && b._finaleRecordedTechId) {
+      // Arm 22's state-2 message: kind 22, line one the bank's 0x8C, line two the
+      // copied technique's name. Arm 22 skips it (and the record build) when nothing
+      // was latched (:3869 -> .L0x00003dd4 at :3964-3966).
+      const techName = skillDB?.[String(b._finaleRecordedTechId)]?.name ?? "";
+      pages.push({
+        text: `Galacticmon learned a technique! ${techName}!`,
+        spec: { kind: 22, payload: [0], slots: [techName] },
+      });
+    }
+    if (pages.length) {
+      setResultPages(b, pages);
+      b.state = ST.RESULT_MSG;
+      b.timer = 0;
+      // The beat hook owns every non-final stage; only the head beat hands the turn
+      // to the player.
+      b._nextState = index === FINALE_TAIL_DEFEAT_BEATS.length - 1 ? ST.PLAYER_MENU : ST.NONE;
+      b._finaleAfter = index + 1 < FINALE_TAIL_DEFEAT_BEATS.length
+        ? () => runFinaleBeat(b, index + 1) : null;
+    } else {
+      b._finaleAfter = null;
+      if (index + 1 < FINALE_TAIL_DEFEAT_BEATS.length) runFinaleBeat(b, index + 1);
+      else {
+        b.menuSel = 0;
+        b.state = ST.PLAYER_MENU;
+        b.timer = 0;
+      }
+    }
+  }
+
+  /**
+   * The finale's technique latch (F0x800aa06c), where the disc runs it: the damage
+   * applier for a category-2/3 action calls it right before the damage wrapper
+   * (wfightmn.s:4830-4842). The walker's landed damaging commit is that call's
+   * closest equivalent; the predicate (player side, kind 4, the row's own filter)
+   * is the engine's port.
+   */
+  function recordFinaleTechnique(b, techniqueId) {
+    const row = fightTechDB?.[String(techniqueId | 0)] ?? null;
+    if (!finaleRecordsTechnique(battleKindOf(b), 0, row)) return;
+    b._finaleRecordedTechId = techniqueId | 0;
   }
 
   function applyTagAction(action) {
@@ -5789,6 +5988,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           if (committed) return;
           committed = true;
           b.enemy.hp = Math.max(0, b.enemy.hp - total);
+          if (total > 0) recordFinaleTechnique(b, basicTechId);   // the finale's latch (F0x800aa06c), before the wrapper
           if (total > 0) noteFinalBossPhaseDamage(b);   // the final boss's 3rd landed blow switches boss04 on
           let message = `${enemyName} took ${total} damage!`;
           let extra = "";
@@ -5966,6 +6166,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           if (committed) return;
           committed = true;
           b.enemy.hp = Math.max(0, b.enemy.hp - total);
+          if (total > 0) recordFinaleTechnique(b, actionTechId);   // the finale's latch (F0x800aa06c), before the wrapper
           if (total > 0) noteFinalBossPhaseDamage(b);
           let message = `${enemyName} took ${total} damage!`;
           let extra = "";
@@ -6211,6 +6412,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const usesTech = (move.action === 2 || move.action === 3) && !!requestedSkill;
     let skill = requestedSkill;
     if (!skill) skill = en.fightSkill ?? null;
+    // The finale's head attacks with the technique it copied from the player: arm 22
+    // state 2 rebuilt its own attack record (technique 440, the "?????" skill) from
+    // the row latched while the tail stood, so that id serves the rebuilt record from
+    // the head phase on (claim wfightmn-finale-kinds-2026-10-10).
+    if (b._finaleCopiedAttack && (requestedSkillId | 0) === FINALE_HEAD_ATTACK_ID) skill = b._finaleCopiedAttack;
     if (!usesTech && skill) skill = { ...skill, attack_category: "physical" };
     if (!usesTech && skill) skill = { ...skill, basic_attack: true };
     if (usesTech) en.mp -= techniqueMpCost(skill.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
@@ -7313,6 +7519,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // "Defeated!" page, then the victory pose/message runs into STFGTREP.
         return true;
       }
+      if (b._victoryPhase === "ending") {
+        // The finale's ending chain owns the pad while it plays: the movie
+        // object reads the raw pad's START itself (the host's movie adapter —
+        // dispatchInput routes to the open movie before any battle key), and
+        // the battle swallows anything else.
+        return true;
+      }
       if (b._victoryPhase !== "report") return true;
       // The native results screen owns the pad while it is up; it reads the
       // held-button word each frame, so key events must not advance pages here.
@@ -8295,6 +8508,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The native results screen owns the whole framebuffer while it is up; the
     // battle must not paint over it (web/game.js draws the report afterwards).
     if (b._reportNative) return;
+    // The finale's ending chain owns the whole framebuffer the same way: the
+    // host's movie adapter draws it over the battle's last pose frame.
+    if (b._endingHosted) return;
     const cw = canvas.width, ch = canvas.height;  // real device px (fullscreen)
     const W  = BATTLE_REF_W;   // 640 — logical UI layout space (scaled to fill below)
     const H  = BATTLE_REF_H;   // 480
@@ -8530,10 +8746,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // player leaves it, which returns to the field exactly like the inline
     // report's final confirm.
     setReportHandoff: (h) => { reportHandoff = h ?? null; },
+    // The finale's win exit hand-off: the host registers how to play the ending
+    // chain (movie row 10 MOVIEE01_STR, then its return selector 0xE0C = row 11
+    // MOVIEE02_STR, then 0x2d7 = screen 727 = stage 780) and calls
+    // finishEnding() when it is done — the kind-6 equivalent of the report
+    // hand-off above (wfightmn.s:2165-2174).
+    setEndingHandoff: (h) => { endingHandoff = h ?? null; },
     // The pre-battle presentation the field's handoff owes (F0x8008B798). The
     // host's handler returns a promise that resolves when it is over.
     setFieldMovieHandoff: (h) => { fieldMovieHandoff = h ?? null; },
     finishNativeReport: () => { if (battle) endBattle("win"); },
+    finishEnding: () => { if (battle) endBattle("win"); },
     evoTargets, applyEvolution, initializePartyStats, partnerInfo, availableEvolutions,
     getPlayerProfile, update, draw, handleKey, pickEnemy, encounterRateLevel, loadData, peek,
     // The status-event pool itself, so a test can read the 99 x 28-byte queue the

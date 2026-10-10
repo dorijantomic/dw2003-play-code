@@ -4,9 +4,9 @@
 // decoded pipeline — see docs/research/battle/battle-formula-leaves.md.
 
 import {
-  physicalBase, magicalBase, resolveDamage, rollHit, drainHeal, drainProcRoll, RAND_U16,
+  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, drainHeal, drainProcRoll, RAND_U16,
   statusInflictionRoll, ailmentOfEffect, poisonTimelineDamage, regenTick, frozenBlockRoll,
-  critBonusFor, counterDamage,
+  counterDamage,
   type ElementalField, type StatPenalty,
 } from "./battle-formulas.ts";
 import { ENEMY_GAG_LINES } from "./battle-confusion.ts";
@@ -50,6 +50,11 @@ export interface Combatant {
   sideByte?: number;
   /** `[0x800a4468 + 4 * (side != 0)]` — this record's side's active fighter slot. */
   slot?: number;
+  /** FIGHTSTG_battle.kind (0x800a4536), copied from the battle host at setup: the
+   *  accuracy leaf F0x800a06ac runs a different formula per side and the final battle
+   *  (BATTLE_KIND_FINAL_LAST, 6) a fixed roll, so the record carries the word the roll
+   *  reads. Absent = 0 (an ordinary battle). */
+  battleKind?: number;
   /** Recover Crest's battle-long recurring source; it is not a curable status bit. */
   regeneration?: boolean;
   counterStance?: { uses: number };
@@ -102,8 +107,6 @@ export interface Combatant {
   multiAttack?: boolean;
   /** Exact eff[+0x1c]+eff[+0x14] input for F0x800a19d8, when a host can supply it. */
   frozenBlockResistance?: number;
-  /** Optional decoded intensity contribution consumed by the magical crit roll. */
-  magicalCritStatusBonus?: number;
   /**
    * Effective block +0x26, the affinity multiplier byte, copied by F0x8009EC94 from
    * the live combatant record's +0x0E. F0x8009F6DC stage 3 adds `running * byte / 64`.
@@ -131,8 +134,13 @@ export interface Skill {
   base_acc?: number;
   attack_category?: string;
   effect?: string;
+  /** Raw record byte +0x0A (TECH_EFFECT_*); the formula leaves prefer it over the
+   *  name when a caller has it (the skill bank carries it as `effect_id`). */
+  effect_id?: number;
   effect_p1?: number;
   effect_p2?: number;
+  /** Raw +0x0C (TechData.effectPower) — the same byte effect_p2 names. */
+  effect_power?: number;
   target_family?: number;
   damage_scalar?: number;
   confusion_recovery_mode?: 0 | 1;
@@ -339,6 +347,17 @@ export function effStats(c: Combatant) {
   // F0x80017174 subtracts each from its own folded core stat and floors at 0, BEFORE
   // the live form's base and the live `statMods` are added: `exe/fns.s:7919-7945`.
   const penalty = statPenaltyOf(c);
+  // The three record-intensity terms BOTH crit rolls read from the TARGET's record:
+  // the `+0x1c` bit 0x2 / 0x8 / 0x4 gates the `+0x1d>>3` (frozen) / `+0x1e>>3`
+  // (asleep) / `+0x1f>>1` (confused) magnitudes. F0x800a0514's status block is
+  // word-identical to F0x800a02ac's (0x800a0620..0x800a067c vs 0x800a0484..0x800a04e0
+  // in pro_fightstg.bin, base 0x80082cb0) and both select `fighters[side == 0]` —
+  // the OTHER team, i.e. the target. One supplier feeds both rolls' defender views:
+  // `critProc` reads `def.critStatusBonus`, `magicalCritProc` reads
+  // `def.magicalCritStatusBonus`.
+  const critStatus = (c.ailments?.frozen ? (c.ailments.frozen.power ?? 0) >> 3 : 0)
+    + (c.ailments?.sleep ? (c.ailments.sleep.power ?? 0) >> 3 : 0)
+    + (c.ailments?.confuse ? (c.ailments.confuse.power ?? 0) >> 1 : 0);
   const stats = {
     level: c.level ?? 0,
     // THE THREE STAT MODIFIERS — the live combatant record's `+0x10` / `+0x12` / `+0x14`,
@@ -355,9 +374,16 @@ export function effStats(c: Combatant) {
     spt: withStatMod(c.spt + form.spt, 0),
     wis: withStatMod(c.wis + form.wis, 0),
     spd: withStatMod(subtractPenaltyFloor(c.spd, penalty.spd) + form.spd, statMod(c, "spd")),
-    // F0x800a02ac doubles the attacker's effective +0x38 crit contribution
-    // when AuraPlug's effective +0x1b flag is active.
-    crit: (c.crit ?? 0) * (c.aura ? 2 : 1),
+    // The +0x38 crit byte stays RAW here. The doubling the original applies when the
+    // attacker's own +0x1b flag is set (AuraPlug) lives in the crit roll's plain-attack
+    // arm itself (F0x800a02ac: fightstg.s:30694 `lbu $v0, 0x1b($a0)` / :30700
+    // `sll $v0, 0x1`), and the accuracy leaf reads the same byte UNDOUBLED
+    // (:30960 `lbu $v0, 0x38($a2)`; ReGame rolls.c:148 `level - atk->criticalBonus`).
+    crit: c.crit ?? 0,
+    // The attacker's effective +0x1b flag (AuraPlug), read by the crit roll's
+    // plain-attack arm only — it gates the +0x38 doubling there (`critProc`). Carried
+    // on the effStats view so the roll sees the ATTACKER's flag, not the defender's.
+    aura: !!c.aura,
     armor: c.armor ?? 0,
     resistances: combatantElements(c),
     family: c.profile?.family ?? 1,
@@ -367,7 +393,18 @@ export function effStats(c: Combatant) {
     weaponFamilies: c.weaponFamilies ?? [],
     accuracyBonus: c.accBonus ?? 0,
     multiAttack: !!c.multiAttack,
-    magicalCritStatusBonus: c.magicalCritStatusBonus ?? 0,
+    // Effective +0x3b, the combatant's evasion pool (equipment evade_up): only the
+    // enemy branch of the accuracy leaf reads it, folded into the SPD difference.
+    evadeBonus: c.evadeBonus ?? 0,
+    // The accuracy leaf's per-side switch and battle-kind word (F0x800a06ac), and the
+    // crit rolls' TARGET-side intensity sum — the `+0x1d>>3` (frozen) / `+0x1e>>3`
+    // (asleep) / `+0x1f>>1` (confused) terms BOTH F0x800a02ac and F0x800a0514 read
+    // from `fighters[side == 0]`, the OTHER team's record. Computed on each
+    // combatant's own view, so both rolls consume it from the DEFENDER.
+    sideByte: c.sideByte ?? 0,
+    battleKind: c.battleKind ?? 0,
+    critStatusBonus: critStatus,
+    magicalCritStatusBonus: critStatus,
   };
   return c.elemAttack ? { ...stats, elementalAttack: c.elemAttack } : stats;
 }
@@ -386,8 +423,17 @@ function buildAttack(attacker: Combatant, defender: Combatant, skill: Skill | nu
   const attackFields = {
     power,
     element: skill?.element ?? "normal",
-    base_acc: (skill?.base_acc ?? 128) - (defender.evadeBonus ?? 0),
-    crit_bonus: critBonusFor(skill),
+    // F0x800a06ac reads the record's own +0x6 accuracy. The defender's evasion is NOT
+    // taken off it — the enemy branch subtracts evasion inside its SPD difference and
+    // the player branch never sees it; the old `- defender.evadeBonus` here applied to
+    // both sides and was one half of the divergence.
+    base_acc: skill?.base_acc ?? 128,
+    // The raw +0x0A / +0x0C bytes and the name-only fallbacks the formula leaves test
+    // (the crit arm, the plain/technique branch, TECH_EFFECT_CRITICAL's +0xC power).
+    ...(skill?.effect === undefined ? {} : { effect: skill.effect }),
+    ...(skill?.effect_id === undefined ? {} : { effect_id: skill.effect_id }),
+    ...(skill?.effect_p2 === undefined ? {} : { effect_p2: skill.effect_p2 }),
+    ...(skill?.effect_power === undefined ? {} : { effect_power: skill.effect_power }),
     magical: isMagical,
     target_family: skill?.target_family ?? 1,
     ...(skill?.clip === undefined ? {} : { clip: skill.clip }),
@@ -442,15 +488,24 @@ export function resolveAttackSequence(
 ): MultiHitResult {
   const attempts = Math.max(1, hits | 0);
   const { atk, def, sk, base } = buildAttack(attacker, defender, skill);
-  // 1. accuracy #1 — the original stores its result whatever happens next.
-  const firstLanded = rollHit(atk, def, sk, rng);
+  // 1. accuracy #1 — the original stores its result whatever happens next. The
+  // resolver dispatches on the attack category: category 3 (magical) calls the
+  // magical accuracy leaf `+0xa0` (F0x800a08c8), everything else the physical
+  // `+0x9c` (F0x800a06ac) — fightstg.s:28463-:28467 (`lbu $v1, 0x4($s4)` /
+  // `beq $v1, 3, .L0x8009e330`) and :28553-:28559 (`lw $v0, 0xa0($s0)`).
+  const firstLanded = sk.magical
+    ? rollMagicHit(atk, def, sk, rng)
+    : rollHit(atk, def, sk, rng);
   let landed = firstLanded ? 1 : 0;
   // 2. the damage value, once, whether or not the first roll landed.
   const dmgPerHit = Math.max(1, resolveDamage(base, atk, def, sk, rng, field));
   const heal = firstLanded && skill?.effect === "drain" && drainProcRoll(skill.effect_p1 ?? 0, rng)
     ? drainHeal(dmgPerHit, skill.effect_p2 ?? 0, !!attacker.aura)
     : 0;
-  // 3. accuracy #2..hits — the applier's loop, accuracy only.
+  // 3. accuracy #2..hits — the applier's loop, accuracy only. It calls the PHYSICAL
+  // accuracy method `+0x9c` unconditionally, magical technique or not
+  // (fightstg.s:27628 `lw $v0, 0x9c($s3)`; ReGame tech_effects.c:100-136
+  // FIGHTSTG_rollMultiHit), so the follow-up rolls stay on `rollHit`.
   for (let i = 1; i < attempts; i++) if (rollHit(atk, def, sk, rng)) landed++;
   // The charge is spent by the NEXT action of the acting fighter — and it is this action
   // when this action is the one that reads it. Read out of `FIGHTSTG_F0x8008f714`: its

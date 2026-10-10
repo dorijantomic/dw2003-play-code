@@ -1,18 +1,19 @@
 // Lane B oracle for the battle-formula leaves that had no dedicated oracle file.
 //
-// Every function below is a pure port in engine/dw3/battle-formulas.ts (and one in
-// battle-status-events.ts) of a decoded pro/fightstg routine. The comments in the
-// module name the original address; each test here pins ONE boundary, clamp or
-// ordering of that routine rather than restating the body:
+// Every function below is a pure port in engine/dw3/battle-formulas.ts (one in
+// battle-status-events.ts, and the effStats supplier in battle-combat.ts) of a decoded
+// pro/fightstg routine. The comments in the module name the original address; each
+// test here pins ONE boundary, clamp or ordering of that routine rather than
+// restating the body:
 //
 //   0x8009f644  elementalFieldAdjustment   the active-field adjustment (3 arms)
 //   0x8009f97c  physicalBase               STR*power/DEF, DEF floored at 1
 //   0x8009fab4  magicalBase                SPT-ratio base, clamped to [power/2, 2*power]
-//   0x800a02ac  critProc                   4 + crit stat + skill crit bonus
-//   0x800a0514  magicalCritProc            scalar term capped at 0x40; family 0x40/4
+//   0x800a02ac  critProc                   the crit byte only on plain attacks; family + ailment arms
+//   0x800a06ac  rollHit (physical)        per-side formula, enemy-only 0x20 floor, kind-6 fixed roll
+//   0x800a08c8  rollMagicHit (magical)   WIS/level shape for both sides, no floor, player-only kind 6
+//   0x800a0514  magicalCritProc            the 100x scalar capped at 0x40; family 0x40/4; target-side terms
 //   0x8009f6dc  resolveDamage              x1.5 family boost, 0x40 element curve, caps
-//   0x800a06ac  rollHit (physical)
-//   0x800a08c8  rollHit (magical)          the 0x20 hit floor, crit only on plain attacks
 //   0x800a1c18  gaugeGain                  ratio^2/20, cap 1000
 //   0x800a1608  enemyFleeProc              Binder halving, SPD term truncates toward zero;
 //                                             Sleep refuses, Frozen halves the base
@@ -30,10 +31,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
     elementalFieldAdjustment, physicalBase, magicalBase, critProc, magicalCritProc,
-    resolveDamage, rollHit, gaugeGain, enemyFleeProc, statusInflictionRoll,
+    resolveDamage, rollHit, rollMagicHit, gaugeGain, enemyFleeProc, statusInflictionRoll,
     drainProcRoll, poisonTimelineDamage, regenTick, frozenBlockRoll, techniqueMpCost,
     basicAttackHitCount, enemyActionSkillId, actionTimelineDelay,
 } from "../../engine/dw3/battle-formulas.ts";
+import { effStats } from "../../engine/dw3/battle-combat.ts";
 import { statusEventDelay, STATUS_EVENT_OPCODE_PARAMS } from "../../engine/dw3/battle-status-events.ts";
 
 const at = (v) => () => v;
@@ -66,35 +68,116 @@ test("0x8009fab4 magicalBase: the SPT ratio, clamped to [power/2, 2*power]", () 
     assert.equal(magicalBase({ spt: 1 }, { spt: 10000 }, power), 50);
 });
 
-test("0x800a02ac critProc: 4 + crit stat + the skill's crit bonus", () => {
-    // Default skill bonus 0x10 -> chance 20.
-    assert.equal(critProc({ crit: 0 }, {}, at(19)), true);
-    assert.equal(critProc({ crit: 0 }, {}, at(20)), false);
-    // A skill with no bonus and no crit stat -> chance 4.
-    assert.equal(critProc({ crit: 0 }, { crit_bonus: 0 }, at(3)), true);
-    assert.equal(critProc({ crit: 0 }, { crit_bonus: 0 }, at(4)), false);
-    // The crit stat raises it one for one.
-    assert.equal(critProc({ crit: 30 }, { crit_bonus: 0 }, at(33)), true);
-    assert.equal(critProc({ crit: 30 }, { crit_bonus: 0 }, at(34)), false);
+test("0x800a02ac critProc: the crit byte only on a plain attack, the effect power on a CRITICAL technique", () => {
+    // Plain attack (f7 < 2): the +0x38 crit byte replaces the base 4.
+    assert.equal(critProc({ crit: 30 }, {}, {}, at(33)), true);
+    assert.equal(critProc({ crit: 30 }, {}, {}, at(34)), false);
+    // AuraPlug's +0x1B doubles that byte AT THE ROLL (F0x800a02ac .L0x800a03b4
+    // `lbu $v0, 0x1b($a0)` / .L0x800a03cc `sll $v0, 0x1`): 30 -> chance 64, not 34.
+    assert.equal(critProc({ crit: 30, aura: true }, {}, {}, at(63)), true);
+    assert.equal(critProc({ crit: 30, aura: true }, {}, {}, at(64)), false);
+    // The doubling is the plain-attack arm's alone: a technique's chance is unchanged.
+    assert.equal(critProc({ crit: 30, aura: true }, {}, { effect: "drain" }, at(3)), true);
+    assert.equal(critProc({ crit: 30, aura: true }, {}, { effect: "drain" }, at(4)), false);
+    // The arm is gated on the byte itself: zero stays zero under Aura.
+    assert.equal(critProc({ crit: 0, aura: true }, {}, {}, at(3)), true);
+    assert.equal(critProc({ crit: 0, aura: true }, {}, {}, at(4)), false);
+    // No crit byte and no effect -> chance 4.
+    assert.equal(critProc({ crit: 0 }, {}, {}, at(3)), true);
+    assert.equal(critProc({ crit: 0 }, {}, {}, at(4)), false);
+    // A technique (f7 >= 2) NEVER adds the crit byte: chance stays 4.
+    assert.equal(critProc({ crit: 30 }, {}, { effect: "drain" }, at(3)), true);
+    assert.equal(critProc({ crit: 30 }, {}, { effect: "drain" }, at(4)), false);
+    // TECH_EFFECT_CRITICAL (f7 = 0xb, "precision") adds its +0xC effect power: 4 + 60.
+    assert.equal(critProc({ crit: 0 }, {}, { effect: "precision", effect_p2: 60 }, at(63)), true);
+    assert.equal(critProc({ crit: 0 }, {}, { effect: "precision", effect_p2: 60 }, at(64)), false);
+    // The raw +0x0A / +0x0C bytes win over the name fallback.
+    assert.equal(critProc({ crit: 0 }, {}, { effect_id: 0x0b, effect_power: 10 }, at(13)), true);
+    assert.equal(critProc({ crit: 0 }, {}, { effect_id: 0x0b, effect_power: 10 }, at(14)), false);
+    assert.equal(critProc({ crit: 30 }, {}, { effect_id: 2 }, at(3)), true);
+    assert.equal(critProc({ crit: 30 }, {}, { effect_id: 2 }, at(4)), false);
+});
+
+test("0x800a02ac critProc: the 0x3C/0x10 family arms and the TARGET's ailment terms", () => {
+    // skill+0x9 (target_family) >= 2 matching the defender's +0x25 adds 0x3C.
+    assert.equal(critProc({ crit: 0 }, { family: 4 }, { effect: "drain", target_family: 4 }, at(63)), true);
+    assert.equal(critProc({ crit: 0 }, { family: 4 }, { effect: "drain", target_family: 4 }, at(64)), false);
+    // A nonmatch adds nothing.
+    assert.equal(critProc({ crit: 0 }, { family: 3 }, { effect: "drain", target_family: 4 }, at(3)), true);
+    assert.equal(critProc({ crit: 0 }, { family: 3 }, { effect: "drain", target_family: 4 }, at(4)), false);
+    // f7 < 2 scans the attacker's worn families (+0x28..+0x2A): a match adds 0x10.
+    assert.equal(critProc({ crit: 0, weaponFamilies: [4] }, { family: 4 }, {}, at(19)), true);
+    assert.equal(critProc({ crit: 0, weaponFamilies: [4] }, { family: 4 }, {}, at(20)), false);
+    // ... and a tag below 2 is never a match, even when it equals the defender byte.
+    assert.equal(critProc({ crit: 0, weaponFamilies: [1] }, { family: 1 }, {}, at(3)), true);
+    assert.equal(critProc({ crit: 0, weaponFamilies: [1] }, { family: 1 }, {}, at(4)), false);
+    // The target's own +0x1d>>3 / +0x1e>>3 / +0x1f>>1 sum (effStats on the defender).
+    assert.equal(critProc({ crit: 0 }, { critStatusBonus: 9 }, {}, at(12)), true);
+    assert.equal(critProc({ crit: 0 }, { critStatusBonus: 9 }, {}, at(13)), false);
 });
 
 test("0x800a0514 magicalCritProc: the scalar term caps at 0x40; a family match uses 0x40", () => {
-    // No matching family, negligible scalar: base chance 4.
+    // The scalar chain is ((a<<1 + a)<<3 + a)<<2 = 100*a (fightstg.s:30812-30820),
+    // so scalar 2 against resist 100 gives trunc(200/100) = 2: chance 2 + 4 = 6.
     assert.equal(magicalCritProc({}, { resistances: { fire: 100 } },
-        { element: "fire", damage_scalar: 2, target_family: 0 }, at(3)), true);
+        { element: "fire", damage_scalar: 2, target_family: 0 }, at(5)), true);
     assert.equal(magicalCritProc({}, { resistances: { fire: 100 } },
-        { element: "fire", damage_scalar: 2, target_family: 0 }, at(4)), false);
-    // A matching target family replaces the base 4 with 0x40 -> chance 64.
+        { element: "fire", damage_scalar: 2, target_family: 0 }, at(6)), false);
+    // A matching target family replaces the base 4 with 0x40 -> chance 66.
     assert.equal(magicalCritProc({}, { family: 2, resistances: { fire: 100 } },
-        { element: "fire", damage_scalar: 2, target_family: 2 }, at(63)), true);
+        { element: "fire", damage_scalar: 2, target_family: 2 }, at(65)), true);
     assert.equal(magicalCritProc({}, { family: 2, resistances: { fire: 100 } },
-        { element: "fire", damage_scalar: 2, target_family: 2 }, at(64)), false);
+        { element: "fire", damage_scalar: 2, target_family: 2 }, at(66)), false);
     // The scalar term itself caps at 0x40, so the chance tops out at 128 (always fires).
     assert.equal(magicalCritProc({}, { family: 2, resistances: { fire: 1 } },
         { element: "fire", damage_scalar: 100, target_family: 2 }, at(127)), true);
     // A NON-matching family keeps the small base even when target_family >= 2.
     assert.equal(magicalCritProc({}, { family: 5, resistances: { fire: 100 } },
-        { element: "fire", damage_scalar: 2, target_family: 2 }, at(4)), false);
+        { element: "fire", damage_scalar: 2, target_family: 2 }, at(5)), true);
+    assert.equal(magicalCritProc({}, { family: 5, resistances: { fire: 100 } },
+        { element: "fire", damage_scalar: 2, target_family: 2 }, at(6)), false);
+});
+
+test("0x800a0514 magicalCritProc: the scalar is the assembly's 100x chain, not 9*4", () => {
+    // ((64<<1 + 64)<<3 + 64)<<2 = 6400; /100 = 64; chance = 64 + 4 = 68.
+    // The old *9*4 reading gave trunc(64*36/100) = 23 -> chance 27.
+    assert.equal(magicalCritProc({}, { resistances: { fire: 100 } },
+        { element: "fire", damage_scalar: 64, target_family: 0 }, at(67)), true);
+    assert.equal(magicalCritProc({}, { resistances: { fire: 100 } },
+        { element: "fire", damage_scalar: 64, target_family: 0 }, at(68)), false);
+});
+
+test("0x800a0514 magicalCritProc: the intensity terms are the TARGET's", () => {
+    // The status block selects fighters[side == 0] (fightstg.s:30838-30874), so
+    // only the DEFENDER's field feeds the roll; the attacker's own value is ignored.
+    const skill = { element: "fire", damage_scalar: 2, target_family: 0 };
+    assert.equal(magicalCritProc({ magicalCritStatusBonus: 50 }, { resistances: { fire: 100 } }, skill, at(5)), true);
+    assert.equal(magicalCritProc({ magicalCritStatusBonus: 50 }, { resistances: { fire: 100 } }, skill, at(6)), false);
+    // The defender's value adds: scalar 2 + 4 + 50 = 56.
+    assert.equal(magicalCritProc({}, { resistances: { fire: 100 }, magicalCritStatusBonus: 50 }, skill, at(55)), true);
+    assert.equal(magicalCritProc({}, { resistances: { fire: 100 }, magicalCritStatusBonus: 50 }, skill, at(56)), false);
+});
+
+test("0x800a0514 magicalCritProc: effStats supplies the target's intensity sum", () => {
+    // The supplier half of the fact above: the target's own frozen / asleep /
+    // confused magnitudes (+0x1d/+0x1e/+0x1f, gated by +0x1c bits 0x2/0x8/0x4) become
+    // the defender's `magicalCritStatusBonus` — the same sum the physical roll
+    // consumes as `critStatusBonus`, because the two status blocks are word-identical
+    // (0x800a0620..0x800a067c vs 0x800a0484..0x800a04e0).
+    const mk = (ailments) => ({
+        str: 120, def: 60, spt: 80, wis: 50, spd: 40, hp: 500, maxHp: 500,
+        ailments, profile: { resistances: {} }, elemBonuses: {},
+    });
+    const target = effStats(mk({ frozen: { power: 64 }, sleep: { power: 16 }, confuse: { power: 3 } }));
+    assert.equal(target.magicalCritStatusBonus, 11); // 64>>3 + 16>>3 + 3>>1
+    assert.equal(target.magicalCritStatusBonus, target.critStatusBonus);
+    assert.equal(effStats(mk({})).magicalCritStatusBonus, 0);
+    // And the roll reads it: base chance 4 -> 15 against the frozen target, while the
+    // same draw never crits against a clean one (element "normal" adds no scalar term).
+    const skill = { element: "normal", damage_scalar: 2, target_family: 0 };
+    assert.equal(magicalCritProc({}, target, skill, at(14)), true);
+    assert.equal(magicalCritProc({}, target, skill, at(15)), false);
+    assert.equal(magicalCritProc({}, effStats(mk({})), skill, at(14)), false);
 });
 
 test("0x8009f6dc resolveDamage: the attacker family match adds half again", () => {
@@ -125,13 +208,97 @@ test("0x8009f6dc resolveDamage: armor floors at 0 and 10000 clamps to 9999", () 
     assert.equal(resolveDamage(10000, atk, { ...def, armor: 0 }, { element: "normal", power: 1 }, noCrit), 9999);
 });
 
-test("0x800a06ac/0x800a08c8 rollHit: the 0x20 floor, crit penalty only on a plain attack", () => {
-    const skill = { base_acc: 100, element: "normal" };
-    // A hopeless attacker is floored at 32, and never lower.
-    const slow = { str: 1, def: 1, spt: 1, wis: 1, spd: 0, crit: 0, level: 0 };
-    const fast = { str: 1, def: 1, spt: 1, wis: 1, spd: 10000, crit: 0, level: 0 };
-    assert.equal(rollHit(slow, fast, skill, at(31)), true);
-    assert.equal(rollHit(slow, fast, skill, at(32)), false);
+test("0x800a06ac rollHit: the player path has no 0x20 floor; the enemy path does", () => {
+    const skill = { base_acc: 100 };
+    const slow = { spd: 0, crit: 0, level: 0 };
+    const fast = { spd: 10000, level: 0 };
+    // Player: chance = 100 + trunc(100 * -1250 / 128) = -876 — every roll misses.
+    assert.equal(rollHit({ ...slow, sideByte: 0 }, fast, skill, at(0)), false);
+    assert.equal(rollHit({ ...slow, sideByte: 0 }, fast, skill, at(31)), false);
+    // Enemy: the same inputs floor at 0x20 — 31 lands, 32 misses.
+    assert.equal(rollHit({ ...slow, sideByte: 0x10 }, fast, skill, at(31)), true);
+    assert.equal(rollHit({ ...slow, sideByte: 0x10 }, fast, skill, at(32)), false);
+});
+
+test("0x800a06ac rollHit: the player's plain-attack +0x38 subtraction reads the byte UNDOUBLED, aura or not", () => {
+    // acc 64, spd 0 vs 8, level 0, crit 4: term = -1 + 0 - 4 = -5 -> chance 62.
+    const atk = { spd: 0, crit: 4, level: 0, sideByte: 0 };
+    const def = { spd: 8, level: 0 };
+    const skill = { base_acc: 64 };
+    assert.equal(rollHit(atk, def, skill, at(61)), true);
+    assert.equal(rollHit(atk, def, skill, at(62)), false);
+    // AuraPlug's +0x1B doubling belongs to the CRIT roll; the accuracy leaf reads the
+    // raw byte (fightstg.s:30960 `lbu $v0, 0x38($a2)`), so the hit chance is unchanged.
+    assert.equal(rollHit({ ...atk, aura: true }, def, skill, at(61)), true);
+    assert.equal(rollHit({ ...atk, aura: true }, def, skill, at(62)), false);
+    // A technique skips the subtraction entirely: term = -1, chance 64.
+    assert.equal(rollHit({ ...atk, aura: true }, def, { base_acc: 64, effect: "precision" }, at(63)), true);
+    assert.equal(rollHit({ ...atk, aura: true }, def, { base_acc: 64, effect: "precision" }, at(64)), false);
+});
+
+test("0x800a06ac rollHit: the enemy path folds evasion into the SPD difference and never subtracts crit", () => {
+    const base = { spd: 0, crit: 0, level: 0, sideByte: 0x10 };
+    // diff = 0 - 0 - 1024, /8 = -128; acc 64: chance 0 -> floored to 32.
+    const evasive = { spd: 0, level: 0, evadeBonus: 1024 };
+    assert.equal(rollHit(base, evasive, { base_acc: 64 }, at(31)), true);
+    assert.equal(rollHit(base, evasive, { base_acc: 64 }, at(32)), false);
+    // Without the evasion pool the same attack is certain.
+    assert.equal(rollHit(base, { spd: 0, level: 0, evadeBonus: 0 }, { base_acc: 64 }, at(63)), true);
+    assert.equal(rollHit(base, { spd: 0, level: 0, evadeBonus: 0 }, { base_acc: 64 }, at(64)), false);
+    // A plain attack's +0x38 crit byte is NOT read on the enemy path: chance stays 64.
+    assert.equal(rollHit({ ...base, crit: 30 }, { spd: 0, level: 0, evadeBonus: 0 }, { base_acc: 64 }, at(63)), true);
+    assert.equal(rollHit({ ...base, crit: 30 }, { spd: 0, level: 0, evadeBonus: 0 }, { base_acc: 64 }, at(64)), false);
+});
+
+test("0x800a06ac rollHit: the final battle's fixed roll (kind 6, player side)", () => {
+    const atk = { spd: 40, crit: 0, level: 0, sideByte: 0, battleKind: 6 };
+    const def = { spd: 25, level: 0 };
+    const skill = { base_acc: 100 };
+    // (RAND & 0x7f) >= 0x2b: 0x2a misses, 0x2b lands.
+    assert.equal(rollHit(atk, def, skill, at(0x2a)), false);
+    assert.equal(rollHit(atk, def, skill, at(0x2b)), true);
+    // The enemy side is never short-circuited.
+    assert.equal(rollHit({ ...atk, sideByte: 0x10 }, def, skill, at(0x2a)), true);
+    // ... and neither is an ordinary battle on the player's side.
+    assert.equal(rollHit({ ...atk, battleKind: 0 }, def, skill, at(0x2a)), true);
+});
+
+test("0x800a08c8 rollMagicHit: the WIS shape, no floor, and no SPD read", () => {
+    // WIS 80 vs 40 -> trunc(40/8) = 5; levels equal; acc 100: chance 100 + trunc(500/128) = 103.
+    const atk = { wis: 80, spd: 0, level: 0, sideByte: 0 };
+    const def = { wis: 40, spd: 0, level: 0 };
+    const skill = { base_acc: 100 };
+    assert.equal(rollMagicHit(atk, def, skill, at(102)), true);
+    assert.equal(rollMagicHit(atk, def, skill, at(103)), false);
+    // SPD is never read: a huge defender SPD cannot push the magical chance down.
+    assert.equal(rollMagicHit(atk, { ...def, spd: 10000 }, skill, at(102)), true);
+    assert.equal(rollMagicHit(atk, { ...def, spd: 10000 }, skill, at(103)), false);
+    // NO floor: a hopeless WIS deficit drives the chance negative on BOTH sides, where
+    // the physical leaf's enemy path would still land on its 0x20 floor.
+    const hopeless = { wis: 0, spd: 0, level: 0, sideByte: 0x10 };
+    const wise = { wis: 10000, spd: 0, level: 0 };
+    assert.equal(rollMagicHit(hopeless, wise, skill, at(0)), false);
+    assert.equal(rollMagicHit(hopeless, wise, skill, at(31)), false);
+    // The level difference adds AFTER the WIS difference's /8: 0/8 + 8 -> chance 106.
+    assert.equal(rollMagicHit({ ...atk, wis: 40, level: 8 }, def, skill, at(105)), true);
+    assert.equal(rollMagicHit({ ...atk, wis: 40, level: 8 }, def, skill, at(106)), false);
+    // The WIS division truncates toward zero (the +7 fixup): -9/8 = -1, so a 64-accuracy
+    // cast keeps chance 64 — a JS `>>` (floor: -9>>3 = -2, chance 63) would miss at 63.
+    assert.equal(rollMagicHit({ wis: 31, spd: 0, level: 0, sideByte: 0 }, { wis: 40, level: 0 }, { base_acc: 64 }, at(63)), true);
+    assert.equal(rollMagicHit({ wis: 31, spd: 0, level: 0, sideByte: 0 }, { wis: 40, level: 0 }, { base_acc: 64 }, at(64)), false);
+});
+
+test("0x800a08c8 rollMagicHit: the kind-6 short-circuit is the player side's alone", () => {
+    const atk = { wis: 80, spd: 0, level: 0, sideByte: 0, battleKind: 6 };
+    const def = { wis: 40, spd: 0, level: 0 };
+    const skill = { base_acc: 100 };
+    // (RAND & 0x7f) >= 0x2b, whatever the stats say: 0x2a misses, 0x2b lands.
+    assert.equal(rollMagicHit(atk, def, skill, at(0x2a)), false);
+    assert.equal(rollMagicHit(atk, def, skill, at(0x2b)), true);
+    // The enemy side is never short-circuited (the formula gives chance 103 here).
+    assert.equal(rollMagicHit({ ...atk, sideByte: 0x10 }, def, skill, at(0x2a)), true);
+    // ... and neither is an ordinary battle on the player's side.
+    assert.equal(rollMagicHit({ ...atk, battleKind: 0 }, def, skill, at(0x2a)), true);
 });
 
 test("0x800a1c18 gaugeGain: ratio^2/20 capped at 1000; a nonpositive stat gives 0", () => {

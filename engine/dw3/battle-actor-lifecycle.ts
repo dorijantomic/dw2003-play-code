@@ -27,7 +27,7 @@
 //     Finally it sets the workspace flag [0x800a4435] = 1. base = 0x800a43f4.
 //
 //     The two manager entries are NOT a message producer: +0xa0 is the magical
-//     ACCURACY leaf F0x800a08c8 (ported as `rollHit`) and +0x88 is the magical
+//     ACCURACY leaf F0x800a08c8 (ported as `rollMagicHit`) and +0x88 is the magical
 //     DAMAGE leaf F0x8009fab4 (ported as `magicalBase` + `resolveDamage`) — see
 //     docs/research/battle/battle-formula-leaves.md, "the real damage leaves are
 //     +0x84 (0x8009f97c, physical) and +0x88 (0x8009fab4, magical), and the real

@@ -59,6 +59,16 @@ test("web/battle.js imports and uses the multi-hit reset port", () => {
     "the enemy path drives the port with side 1");
 });
 
+test("the repeat-dispatch predicate asks the magical accuracy leaf (F0x800a08c8)", () => {
+  // F0x8009ddd8 reads [0x800a4580+0xa0] — the magical accuracy leaf — for its
+  // two-slot predicate (:28224 `lw $v0, 0xa0($s3)`), never the physical +0x9c.
+  assert.ok(importsFromEngine("web/battle.js", "rollMagicHit"),
+    "web/battle.js must import the magical accuracy leaf from the engine bundle");
+  const src = read("web/battle.js");
+  assert.match(src, /predicate:\s*\(\)\s*=>\s*\(rollMagicHit\(/,
+    "the repeat-dispatch predicate must use the magical leaf");
+});
+
 test("the disc census: exactly one technique has dispatch 0x1f, and it is reachable", () => {
   // The census over the shipped 443-row table. `every`+filter is the whole denominator.
   const tech = parse("web/assets/data/fight_tech_table.json");

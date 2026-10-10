@@ -1,15 +1,15 @@
 {
   "generatedBy": "tools/report_ui_code_ownership.mjs",
-  "generatedAt": "2026-10-09T07:43:51.100Z",
+  "generatedAt": "2026-10-10T14:33:34.362Z",
   "scope": "Normal default browser routes, named subpanels, top-level web JS/HTML files, every translation registry row and every shipped bridge entry. Original binary instruction coverage is bounded by the optional runtime probe; not all gameplay paths have been executed.",
   "sourceHashes": {
-    "web/game.js": "fb0e5b70dcd8ec83ba23b6328b692a3fa8cc7333f49474772c2ea2878e613b6d",
-    "web/battle.js": "3c64e8d16d2274feb153501bbe902f4ec068ec0a79ebf63eb3459de632e587c7",
+    "web/game.js": "8c3bc9793d2d7f5b6d474993bf3e08b7667783cc5a26de947f54e46e80e4e997",
+    "web/battle.js": "088a0f125d3cca49504d719b1570d1c3b1389a25dc5f738af8415ac3fd3d13a2",
     "web/native-screen-host.js": "71af02373050f4d98e821555b11a0255221a182670a475832b21cf57dd881299",
     "web/native-screen.js": "1072400c655b16c5b9319ad2faf32ab622f628cd70c8f0292c9b5833ae2e1ef2",
-    "web/vendor/engine.js": "c6c4939437e0423514251fd1016be81a4ad0b993af37e9b12564b6d70740d5fa",
+    "web/vendor/engine.js": "f1f33d78d36ef6acd420942252e99e185ec5bc269d0e46be3c4cd509431952fb",
     "engine/native/bridge.ts": "e6ea3af4d17699245e53cd9fa000e70e93c449a25cc4663ba4a75988899c44b9",
-    "data/translated_functions.json": "d756b2e2286073e33b1e0cf31a4638af4e0dfbb561607fa5b6a9b3bc38ef9a36",
+    "data/translated_functions.json": "c7390f103b1d98cbdfd354071cce9bf075ec94a4eef8d13ed9a9967db5f6bf1e",
     "web/assets/native/screens/manifest.json": "35384e62a16c63c409a9a2cde42dd7de8043b799091f85f0de8ece167f1cda08"
   },
   "surfaces": [
@@ -15005,7 +15005,7 @@
       "address": "0x800a08c8",
       "module": "pro/fightstg",
       "name": "magical_accuracy",
-      "port": "engine/dw3/battle-formulas.ts#rollHit",
+      "port": "engine/dw3/battle-formulas.ts#rollMagicHit",
       "oracle": "tests/lane-b/battle-formula-leaves.test.js",
       "ownership": "ORIGINAL BODY STILL SELECTED",
       "replacementInstalled": false,

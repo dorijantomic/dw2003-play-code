@@ -29,8 +29,8 @@
 //     phase  6 0x800a7b08 L1873 |   7 0x800a7c00 L1935 |   8 0x800a7fe4 L2184
 //     phase  9 0x800a8118 L2261 |  10 0x800a8260 L2343 |  11 0x800a8458 L2469
 //     phase 12 0x800a84d0 L2499 |  13 0x800a8770 L2667 |  16 0x800a88cc L2754
-//     phase 17 0x800a89f0 L3083 |  18 0x800a8ac8 L3137 |  19 0x800a8bf4 L3148
-//     phase 20 0x800a8e90 L3315 |  21 0x800a8f88 L3377 |  22 0x800a9584 L3568
+//     phase 17 0x800a89f0 L2827 |  18 0x800a8ac8 L2881 |  19 0x800a8bf4 L2956
+//     phase 20 0x800a8e90 L3123 |  21 0x800a8f88 L3185 |  22 0x800a9584 L3568
 //     phase 23 0x800a9640 L3615 |  24 0x800a97bc L3710 |  25 0x800a988c L3762
 //     phase 26 0x800a9c10 L3987
 //   Request stagers, `~/ddw3/asm/dw2003/pro/fightstg.s` (base `0x80082cb0`):
@@ -192,31 +192,31 @@ export const WA_ACTION_ARM_TABLE: readonly WaActionArm[] = [
         index: 14, phase: 17, address: 0x800a89f0, name: "battleActionArm",
         presentationKind: null, queueKinds: [], resultOpcodes: [2, 0],
         changesBattleState: true,
-        evidence: "pro/wfightmn.s:3083 (F0x800a89f0) — the named battleActionArm: launches the Fight task 0x8008d37c when the actor's +0x5C is 0 (else m2c 0), then re-enqueues via the stager 0x8009c4bc",
+        evidence: "pro/wfightmn.s:2827 (F0x800a89f0) — the named battleActionArm: launches the Fight task 0x8008d37c when the actor's +0x5C is 0 (else m2c 0), then re-enqueues via the stager 0x8009c4bc",
     },
     {
         index: 15, phase: 18, address: 0x800a8ac8, name: "statusClearEx",
         presentationKind: 0x57, queueKinds: [], resultOpcodes: [0],
         changesBattleState: true,
-        evidence: "pro/wfightmn.s:3137 (F0x800a8ac8) — kind = entry +0x0C + 0x57, then clears a status bit `~(phase << (entry+0x0C + 4))` in the enemy-block record",
+        evidence: "pro/wfightmn.s:2881 (F0x800a8ac8) — kind = entry +0x0C + 0x57, then clears a status bit `~(phase << (entry+0x0C + 4))` in the enemy-block record",
     },
     {
         index: 16, phase: 19, address: 0x800a8bf4, name: "blastCommit",
         presentationKind: 0x61, queueKinds: [0x0b], resultOpcodes: [2],
         changesBattleState: true,
-        evidence: "pro/wfightmn.s:3148 (F0x800a8bf4) — the Blast on/revert handler: restores the combatant's saved HP (+0x08 = +0x06), clears status bit 4, clears queued kind 0x0B, calls 0x8009cf00, and spawns via 0x8008a7f4 (3d-battle-complete-model-2026-08-19.md:1344)",
+        evidence: "pro/wfightmn.s:2956 (F0x800a8bf4) — the Blast on/revert handler: restores the combatant's saved HP (+0x08 = +0x06), clears status bit 4, clears queued kind 0x0B, calls 0x8009cf00, and spawns via 0x8008a7f4 (3d-battle-complete-model-2026-08-19.md:1344)",
     },
     {
         index: 17, phase: 20, address: 0x800a8e90, name: "blastRevert",
         presentationKind: 0x62, queueKinds: [], resultOpcodes: [2],
         changesBattleState: true,
-        evidence: "pro/wfightmn.s:3315 (F0x800a8e90) — the Blast revert handler: restates the combatant's species/hp from its saved halfword (+0x00 = +0x02), calls the shared Tag/Blast cleanup 0x800a7328, spawns via 0x80087000",
+        evidence: "pro/wfightmn.s:3123 (F0x800a8e90) — the Blast revert handler: restates the combatant's species/hp from its saved halfword (+0x00 = +0x02), calls the shared Tag/Blast cleanup 0x800a7328, spawns via 0x80087000",
     },
     {
         index: 18, phase: 21, address: 0x800a8f88, name: "tagBlastSpawn",
         presentationKind: 0x50, queueKinds: [], resultOpcodes: [5, 2, 7],
         changesBattleState: true,
-        evidence: "pro/wfightmn.s:3377 (F0x800a8f88) — scans the enemy block for a living slot, stages request 0x8009c534 and spawns it via 0x80087000, sets mode 0x0D; the loss branch walks 0x8009c534/0x8008cb44 later in the same body",
+        evidence: "pro/wfightmn.s:3185 (F0x800a8f88) — scans the enemy block for a living slot, stages request 0x8009c534 and spawns it via 0x80087000, sets mode 0x0D; the loss branch walks 0x8009c534/0x8008cb44 later in the same body",
     },
     {
         index: 19, phase: 22, address: 0x800a9584, name: "guardClear",
@@ -396,7 +396,7 @@ export const WA_COMMAND_ROUTES: readonly WaCommandRoute[] = [
         command: "Recover Crest (held crest accessory)",
         queueKind: 0x06, producer: 0x8009c6a4,
         armPhase: 9, armAddress: 0x800a8118, link: "armReadsKind",
-        evidence: "F0x800a6920 scans roster +0x3C8/+0x3CA for accessory 0x140 and calls 0x8009C6A4(0,actor,0) (pro/wfightmn.s:1921, exe-decomp/wfightmn_c/F0x800a6920.c:12-13); 0x8009C6A4 enqueues kind 6 (pro/fightstg.s:26613); arm phase 9 (F0x800a8118) looks kind 6 up via the +0xB0C slot (exe-decomp/wfightmn_c/F0x800a8118.c:9)",
+        evidence: "F0x800a6920 scans roster +0x3C8/+0x3CA for accessory 0x140 and calls 0x8009C6A4(0,actor,0) (pro/wfightmn.s:727, exe-decomp/wfightmn_c/F0x800a6920.c:12-13); 0x8009C6A4 enqueues kind 6 (pro/fightstg.s:26613); arm phase 9 (F0x800a8118) looks kind 6 up via the +0xB0C slot (exe-decomp/wfightmn_c/F0x800a8118.c:9)",
     },
     {
         command: "Blast (submit the Blast event)",
@@ -486,7 +486,7 @@ export interface WaOffTableRoute {
  *      (digivolution-tech-system-decoded-2026-07-11.md §10f);
  *   2. the `wfightmn` controller reads it and enters its DNA step 6 — the step word is
  *      `li $a1, 0x6` at `wfightmn.s:1626` (`.L0x0000194c`, word `0x24050006`);
- *   3. the DNA step calls `F0x80090C44(0, phase+0x68)` — `wfightmn.s:1884` loads the result
+ *   3. the DNA step calls `F0x80090C44(0, phase+0x68)` — `wfightmn.s:1887` loads the result
  *      into `$a1` (`lw $a1, 0x68($v0)`), `:1888` is `jal 0x80090c44` with `move_ $a0, $zr`
  *      in its delay slot (word `0x0c024311`). `0x80090c44` lives in `pro/fightstg`, NOT in
  *      the `wfightmn` arm table, and its callback/tick is `F0x8008F714`
@@ -521,7 +521,7 @@ export const WA_OFF_TABLE_ROUTES: readonly WaOffTableRoute[] = [
         actionAddress: 0x80090c44,
         actionCallSite: 0x800a7b44,
         actionTick: 0x8008f714,
-        evidence: "FIGHTSTG command phase writes action 6 (pro/fightstg.s:16357, .L0x80092b54 li $v0,0x6); wfightmn controller enters DNA step 6 (pro/wfightmn.s:1626, .L0x0000194c li $a1,0x6); DNA step calls FIGHTSTG_F0x80090C44(0, phase+0x68) (pro/wfightmn.s:1884 lw $a1,0x68($v0); :1888 jal 0x80090c44), a pro/fightstg routine whose tick is F0x8008F714 (digivolution-tech-system-decoded-2026-07-11.md §10f). NOT the 24-arm table (all arms are in pro/wfightmn at 0x800a7418+) and NOT the queue.",
+        evidence: "FIGHTSTG command phase writes action 6 (pro/fightstg.s:16357, .L0x80092b54 li $v0,0x6); wfightmn controller enters DNA step 6 (pro/wfightmn.s:1626, .L0x0000194c li $a1,0x6); DNA step calls FIGHTSTG_F0x80090C44(0, phase+0x68) (pro/wfightmn.s:1887 lw $a1,0x68($v0); :1888 jal 0x80090c44), a pro/fightstg routine whose tick is F0x8008F714 (digivolution-tech-system-decoded-2026-07-11.md §10f). NOT the 24-arm table (all arms are in pro/wfightmn at 0x800a7418+) and NOT the queue.",
     },
 ];
 
@@ -613,32 +613,32 @@ export const WA_SEQUENCER_HELPERS: readonly WaSequencerHelper[] = [
     {
         address: 0x800a66b0, name: "loadCombatantTable",
         role: "copies each existing party member's four fighting stats and its live species into the flat combatant table (0x800A4470) and seeds the three enemy-block records (0x800A44D0)",
-        evidence: "pro/wfightmn.s:1895 (F0x800a66b0); wfightmn.md:32",
+        evidence: "pro/wfightmn.s:571 (F0x800a66b0); wfightmn.md:32",
     },
     {
         address: 0x800a69b8, name: "sweepQueueForCrest",
         role: "loops the three party slots and calls 0x800a6920 on each",
-        evidence: "pro/wfightmn.s:1933 (F0x800a69b8); wfightmn.md:35",
+        evidence: "pro/wfightmn.s:765 (F0x800a69b8); wfightmn.md:35",
     },
     {
         address: 0x800a69f0, name: "markQueuedTarget",
         role: "sets the report word 0x80042B84[slot] bit 6, and bit 7 when the acting fighter's move matches the queued one",
-        evidence: "pro/wfightmn.s:1957 (F0x800a69f0)",
+        evidence: "pro/wfightmn.s:779 (F0x800a69f0)",
     },
     {
         address: 0x800a6b18, name: "markTargetForActor",
         role: "finds the actor's slot and marks the target's report word the same way as 0x800a69f0",
-        evidence: "pro/wfightmn.s:1991 (F0x800a6b18)",
+        evidence: "pro/wfightmn.s:853 (F0x800a6b18)",
     },
     {
         address: 0x800a6920, name: "recoverCrestEnqueue",
         role: "when the combatant carries accessory id 0x140 in +0x3C8/+0x3CA, stages request 0x8009c6a4",
-        evidence: "pro/wfightmn.s:1921 (F0x800a6920); 3d-battle-complete-model-2026-08-19.md:1525",
+        evidence: "pro/wfightmn.s:727 (F0x800a6920); 3d-battle-complete-model-2026-08-19.md:1525",
     },
     {
         address: 0x800a7328, name: "cancelPendingReaction",
         role: "the shared Tag/Blast cleanup: clears the actor's pending reaction (queued kinds 0x13 and 8) and its flag",
-        evidence: "pro/wfightmn.s:2160 (F0x800a7328); wfightmn.md:37",
+        evidence: "pro/wfightmn.s:1369 (F0x800a7328); wfightmn.md:37",
     },
     {
         address: 0x800a9cb4, name: "battleActionSequencer",

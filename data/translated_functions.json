@@ -7925,7 +7925,7 @@
     "address": "0x800a08c8",
     "module": "pro/fightstg",
     "name": "magical_accuracy",
-    "port": "engine/dw3/battle-formulas.ts#rollHit",
+    "port": "engine/dw3/battle-formulas.ts#rollMagicHit",
     "oracle": "tests/lane-b/battle-formula-leaves.test.js"
   },
   {

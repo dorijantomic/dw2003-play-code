@@ -14,14 +14,21 @@ export interface EffStats {
   spt: number;
   wis: number;
   spd: number;
-  crit?: number;            // crit stat +0x38 (default 0)
+  /** Effective +0x38, the crit contribution — RAW (default 0). The doubling the
+   *  crit roll's plain-attack arm applies when `aura` is set is the ROLL's own
+   *  step (fightstg.s:30700 `sll $v0, 0x1`), so it does not live in this value;
+   *  the accuracy leaf reads the same byte undoubled (`:30960 lbu $v0, 0x38($a2)`). */
+  crit?: number;
+  /** The attacker's effective +0x1B flag (AuraPlug), read by the crit roll's
+   *  plain-attack arm only: it doubles the +0x38 contribution. */
+  aura?: boolean;
   armor?: number;           // flat reduction +0x27 = equipment armor (default 0)
   resistances?: Record<string, number>; // element ×100 table (100 = neutral)
   elementalAttack?: { element?: string; amount: number };
   family?: number;          // effective +0x25 raw profile byte
   accuracyBonus?: number;   // equipment pool +0x3a, added to attacker SPD
   multiAttack?: boolean;    // effective +0x37 != 0 (Multi Crest): 3-hit divert + 0.4x per hit
-  magicalCritStatusBonus?: number; // decoded +0x1c intensity terms, when supplied
+  magicalCritStatusBonus?: number; // the target's +0x1c intensity terms; supplied by effStats, read by magicalCritProc from the DEFENDER's view
   /**
    * Effective +0x26, the affinity multiplier byte, copied from the live combatant
    * record's +0x0E. F0x8009f6dc stage 3 (0x8009f7b0) adds `running * byte / 64`
@@ -34,18 +41,46 @@ export interface EffStats {
    * Effective +0x28..: the stat-record byte +0x12 of every worn family 2..14 piece
    * that carries one (`wornFamilyBytes`). F0x8009f6dc stage 2's plain-attack arm
    * (0x8009f77c) scans +0x28..+0x2A for a value equal to the defender's +0x25 and adds
-   * half the running damage (x1.5).
+   * half the running damage (x1.5). F0x800a02ac's crit roll scans the same three bytes
+   * for a family equal to the defender's and adds 0x10.
    */
   weaponFamilies?: readonly number[];
+  /**
+   * Effective +0x3B: the combatant's evasion pool (equipment evade_up). Read ONLY by
+   * the enemy branch of the accuracy leaf F0x800a06ac, which folds it into the SPD
+   * difference (`diff = SPD − SPD − evasion`, then /8); the player branch never sees
+   * it.
+   */
+  evadeBonus?: number;
+  /**
+   * The combatant's own +0x1d>>3 (paralyzed), +0x1e>>3 (asleep) and +0x1f>>1
+   * (confused) terms, summed. The crit roll F0x800a02ac reads them from the OTHER
+   * team's fighter record (`fighters[side == 0]` — the target), so a caller computes
+   * this on the DEFENDER's view and `critProc` adds it as `def.critStatusBonus`.
+   */
+  critStatusBonus?: number;
+  /** The acting side's byte — 0 the player (SIDE_PLAYER), 0x10 the enemy (SIDE_ENEMY).
+   *  F0x800a06ac runs a different formula per side, so the roll needs it. */
+  sideByte?: number;
+  /** FIGHTSTG_battle.kind (0x800a4536). 6 = BATTLE_KIND_FINAL_LAST, whose player-side
+   *  accuracy is the fixed `(RAND & 0x7f) >= 0x2b` roll. */
+  battleKind?: number;
 }
 
 export interface Skill {
   power: number;            // +0x2 raw game power units
   element?: string;         // +0x7 element name ("normal" = none)
   base_acc?: number;        // +0x6 base accuracy
-  crit_bonus?: number;      // skill/element crit term (default 0x10)
+  /** Raw record byte +0x0A, the TECH_EFFECT_* opcode (the "f7" byte): < 2 = a plain
+   *  attack, >= 2 = a technique, 0x0B = TECH_EFFECT_CRITICAL. The skill bank supplies
+   *  it where the raw table is available; `effect` is the name-only fallback. */
+  effect_id?: number;
   effect?: string;          // f7 effect name (e.g. "precision")
-  effect_p2?: number;       // f9 effect parameter
+  effect_p1?: number;       // f8 effect param 1 (proc chance / magnitude)
+  effect_p2?: number;       // f9 effect param 2 — the SAME byte as effectPower (+0xC)
+  /** Raw +0x0C, TechData.effectPower: the crit-chance addition of a TECH_EFFECT_CRITICAL
+   *  technique (and the drain ratio, a boost's amount, ... by effect). */
+  effect_power?: number;
   basic_attack?: boolean;   // enables the equipment +0x2b/+0x2c basic-attack term
   /** Raw record byte +0x10, the action-script clip. The Multi-Crest plain-attack
    *  gate (F0x8009e0cc .L0x8009e24c and F0x8009f6dc .L0x8009f88c) skips the 3-hit
@@ -259,19 +294,72 @@ export function magicalBase(atk: EffStats, def: EffStats, power: number): number
   return Math.min(power * 2, Math.max(Math.floor(power / 2), base));
 }
 
-/** Crit proc — F0x800a02ac: (RAND_U16 & 0x7f) < 4 + atk.crit + skill bonus(default 0x10). */
-export function critProc(atk: EffStats, skill: Skill, rng: () => number): boolean {
-  const chance = 4 + (atk.crit ?? 0) + (skill.crit_bonus ?? 0x10);
+/** The technique's raw effect byte (skill+0x0A, the "f7" opcode). Falls back to the
+ *  skill bank's effect name when a caller carries no raw byte; only two tests matter to
+ *  the formulas — `>= 2` (a technique, not a plain attack) and `== 0x0B`
+ *  (TECH_EFFECT_CRITICAL, named "precision") — so every other name maps to a plain 2. */
+function effectByteOf(skill: Skill | null | undefined): number {
+  if (typeof skill?.effect_id === "number") return skill.effect_id;
+  const name = skill?.effect;
+  if (!name || name === "none") return 0;
+  return name === "precision" ? 0x0b : 2;
+}
+
+/**
+ * Physical critical roll — F0x800a02ac(side, move): `(RAND_U16 & 0x7f) < chance` with
+ *
+ *   chance = 4
+ *     technique arm (effect >= 2):  += effectPower(+0xC) ONLY when effect == 0x0B;
+ *     plain-attack arm (effect < 2): chance = atk.crit + 4 when the +0x38 byte is
+ *       nonzero, DOUBLED when the attacker's record +0x1B is set (fightstg.s:30694
+ *       `lbu $v0, 0x1b($a0)` / :30700 `sll $v0, 0x1`) — the roll owns this doubling;
+ *   + skill.family(+0x9) >= 2 and == def.family(+0x25) ? 0x3C
+ *     : first worn weapon family (+0x28..+0x2A) >= 2 and == def.family ? 0x10;
+ *   + def.critStatusBonus — the TARGET's own +0x1d>>3 / +0x1e>>3 / +0x1f>>1.
+ *
+ * The status terms read the OTHER team's fighter record (`j = side == 0` →
+ * `fighters[side == 0][active]`, fightstg.s:30732-30768) — the target's ailments, not
+ * the attacker's. The +0x1B doubling applies only where the byte itself does, i.e.
+ * the plain-attack arm; a technique never reads it.
+ */
+export function critProc(atk: EffStats, def: EffStats, skill: Skill, rng: () => number): boolean {
+  let chance = 4;
+  const effect = effectByteOf(skill);
+  if (effect >= 2) {
+    if (effect === 0x0b) chance += skill.effect_power ?? skill.effect_p2 ?? 0;
+  } else if ((atk.crit ?? 0) !== 0) {
+    chance = (atk.crit ?? 0) * (atk.aura ? 2 : 1) + 4;
+  }
+  if ((skill.target_family ?? 0) >= 2) {
+    if (skill.target_family === def.family) chance += 0x3c;
+  } else {
+    for (const tag of (atk.weaponFamilies ?? []).slice(0, 3)) {
+      if (tag >= 2 && tag === def.family) { chance += 0x10; break; }
+    }
+  }
+  chance += def.critStatusBonus ?? 0;
   return (rng() & 0x7f) < chance;
 }
 
 /**
  * Magical critical roll — F0x800a0514, called by F0x8009fab4.
- * The scalar is multiplied by nine, multiplied by four, and divided by the
- * defender's elemental value; that term is capped at 0x40. A matching target
- * family replaces the base 4 with 0x40. The three record intensity terms are
- * supplied by the caller because this pure combat model does not own those
- * battle-record bytes.
+ *
+ *   chance = min(0x40, trunc(skill[+0x8] * 100 / defender element)) + 4,
+ *            or that scalar term + 0x40 when skill[+0x9] >= 2 matches the
+ *            defender's +0x25; + the TARGET's three record intensity terms.
+ *
+ * The scalar chain is `((a<<1 + a)<<3 + a)<<2` = 100*a (fightstg.s:30812-30820
+ * `sll/addu/sll/addu/sll`, words 00041840 00641821 000318c0 00641821 00031880),
+ * divided by the defender's element halfword (`div` at :30821, truncated toward
+ * zero) and capped at 0x40 (:30824-:30827); ReGame rolls.c:97 agrees
+ * (`elementPower * 100 / resist`). The status block (:30838-30874) selects the
+ * OTHER team's fighter record — `fighters[side == 0]`, the TARGET (`sltiu $v0,
+ * 0x1` @0x800a05ec, the same selector the physical roll uses) — so the terms
+ * are read from the defender's effStats view (`def.magicalCritStatusBonus`).
+ * That block is word-identical to the physical roll's (0x800a0620..0x800a067c
+ * vs 0x800a0484..0x800a04e0 in pro_fightstg.bin, base 0x80082cb0), and `effStats`
+ * supplies both views from the combatant's own frozen/sleep/confuse magnitudes —
+ * the same sum as `critStatusBonus`. The attacker contributes nothing to this roll.
  */
 export function magicalCritProc(
   atk: EffStats,
@@ -285,13 +373,13 @@ export function magicalCritProc(
     : 0;
   let scalarTerm = 0;
   if (resistance !== 0 && skill.damage_scalar != null) {
-    scalarTerm = Math.min(0x40, Math.trunc((skill.damage_scalar * 9 * 4) / resistance));
+    scalarTerm = Math.min(0x40, Math.trunc((skill.damage_scalar * 100) / resistance));
   }
   let chance = scalarTerm + 4;
   if ((skill.target_family ?? 0) >= 2 && skill.target_family === def.family) {
     chance = scalarTerm + 0x40;
   }
-  chance += atk.magicalCritStatusBonus ?? 0;
+  chance += def.magicalCritStatusBonus ?? 0;
   return (rng() & 0x7f) < chance;
 }
 
@@ -374,7 +462,7 @@ export function resolveDamage(
   }
   const critical = skill.magical
     ? magicalCritProc(atk, def, skill, rng)
-    : critProc(atk, skill, rng);
+    : critProc(atk, def, skill, rng);
   if (critical) {
     const r = (rng() & 0x3f) + 0x20; // 32..95
     s0 += Math.floor((s0 * r) / 64);
@@ -390,19 +478,85 @@ export function resolveDamage(
   return s0;
 }
 
-/** Hit / evade roll — F0x800a06ac (phys) / F0x800a08c8 (mag). false = "X evaded". */
+/** MIPS `sra` after the `+7`/`+0x7f` sign fixup: divide by 2^bits, truncated toward
+ *  zero (NOT a JS `>>`, which floors — the two differ for every negative non-multiple). */
+function truncDivPow2(value: number, bits: number): number {
+  const v = Math.trunc(value);
+  return (v + (v < 0 ? (1 << bits) - 1 : 0)) >> bits;
+}
+
+/**
+ * Physical accuracy roll — F0x800a06ac(side, move). `(RAND_U16 & 0x7f) < chance`.
+ * The two sides run DIFFERENT formulas (fightstg.s:30929-31011):
+ *
+ *   player (side == 0):
+ *     - battle kind 6 (BATTLE_KIND_FINAL_LAST) short-circuits to `(RAND & 0x7f) >= 0x2B`;
+ *     - diff = atk.SPD(+0xA) + atk.accuracy(+0x3A) − def.SPD(+0xA);
+ *     - a plain attack (effect < 2) subtracts the attacker's +0x38 crit byte; a
+ *       technique never does;
+ *     - chance = skill accuracy(+0x6) + trunc(accuracy · (trunc(diff/8) + level) / 128);
+ *     - NO floor: a low-accuracy attack falls below 0x20, or below zero — then it
+ *       can never land.
+ *   enemy (side != 0):
+ *     - diff = atk.SPD − def.SPD − def.evasion(+0x3B)  (the evasion lives INSIDE diff/8);
+ *     - no crit term at all;
+ *     - chance is floored at 0x20.
+ *
+ * `atk.sideByte` carries the acting side (0 player / 0x10 enemy; absent = player) and
+ * `atk.battleKind` the battle's kind word (0x800a4536); both come from `effStats`.
+ */
 export function rollHit(atk: EffStats, def: EffStats, skill: Skill, rng: () => number): boolean {
-  const baseAcc = skill.base_acc ?? 100;
-  // F0x800a06ac/F0x800a08c8: the leading effective field is level on both
-  // player and enemy paths. +0x38 (the attacker crit contribution) is subtracted
-  // by the accuracy leaf ONLY on the plain-attack branch (skill+0xa = f7 < 2);
-  // a technique (f7 >= 2) never pays it. `effect` is the walker's f7 proxy.
-  const critPenalty = skill.effect ? 0 : (atk.crit ?? 0);
-  const accTerm = ((atk.spd + (atk.accuracyBonus ?? 0) - def.spd) >> 3)
-    + (atk.level ?? 0) - (def.level ?? 0) - critPenalty;
-  let hitChance = baseAcc + Math.floor((baseAcc * accTerm) / 128);
-  if (hitChance < 0x20) hitChance = 0x20;
-  return (rng() & 0x7f) < hitChance;
+  const acc = skill.base_acc ?? 100;
+  const level = (atk.level ?? 0) - (def.level ?? 0);
+  if ((atk.sideByte ?? 0) === 0) {
+    if ((atk.battleKind ?? 0) === 6) return (rng() & 0x7f) >= 0x2b;
+    const diff = atk.spd + (atk.accuracyBonus ?? 0) - def.spd;
+    const crit = effectByteOf(skill) >= 2 ? 0 : (atk.crit ?? 0);
+    const term = truncDivPow2(diff, 3) + level - crit;
+    return (rng() & 0x7f) < acc + truncDivPow2(acc * term, 7);
+  }
+  const diff = atk.spd - def.spd - (def.evadeBonus ?? 0);
+  const term = truncDivPow2(diff, 3) + level;
+  let chance = acc + truncDivPow2(acc * term, 7);
+  if (chance < 0x20) chance = 0x20;
+  return (rng() & 0x7f) < chance;
+}
+
+/**
+ * Magical accuracy roll — F0x800a08c8(side, move). `(RAND_U16 & 0x7f) < chance`.
+ *
+ * Unlike the physical leaf's per-side split, ONE formula serves both sides
+ * (fightstg.s:31082-31105, arm `.L0x800a09a0`):
+ *
+ *   - the battle kind word (0x800a4536) == 6 short-circuits to
+ *     `(RAND & 0x7f) >= 0x2B` on the PLAYER side only (:31069-31081,
+ *     `.L0x800a096c`-`.L0x800a099c`), the same fixed roll as the physical leaf;
+ *   - acc_term = trunc((atk.WIS(+0x8) − def.WIS(+0x8)) / 8) + (atk.level(+0x0) − def.level)
+ *     (:31082-31092; the `+7` sign fixup precedes the `>>3`, so the WIS division
+ *     truncates toward zero and the level difference is added AFTER it);
+ *   - chance = skill accuracy(+0x6) + trunc(accuracy · acc_term / 128)
+ *     (:31093-31098; the `+0x7f` fixup precedes the `>>7`);
+ *   - NO floor and NO cap: a low-accuracy cast falls below 0x20 — at or below
+ *     zero it can never land — and nothing clamps the top at 0x80. This leaf has
+ *     no crit, family or ailment terms at all.
+ *
+ * The resolver calls this leaf for category-3 (magical) attacks only
+ * (`FIGHTSTG_F0x8009e0cc`: :28467 `beq $v1, 3, .L0x8009e330`, which loads
+ * `0xa0($s0)` at :28557); the dispatch-byte-0x1f reset F0x8009ddd8 reads the same
+ * `+0xa0` entry unconditionally (:28224 `lw $v0, 0xa0($s3)`). The multi-hit
+ * applier's follow-up rolls call the PHYSICAL leaf whatever the category
+ * (`F0x8009d4b8` :27628 `lw $v0, 0x9c($s3)`; ReGame tech_effects.c:100-136
+ * FIGHTSTG_rollMultiHit), so only the FIRST accuracy roll of an action dispatches
+ * on the attack category.
+ *
+ * `atk.sideByte` carries the acting side (0 player / 0x10 enemy; absent = player)
+ * and `atk.battleKind` the battle's kind word — both come from `effStats`.
+ */
+export function rollMagicHit(atk: EffStats, def: EffStats, skill: Skill, rng: () => number): boolean {
+  if ((atk.sideByte ?? 0) === 0 && (atk.battleKind ?? 0) === 6) return (rng() & 0x7f) >= 0x2b;
+  const acc = skill.base_acc ?? 100;
+  const term = truncDivPow2(atk.wis - def.wis, 3) + ((atk.level ?? 0) - (def.level ?? 0));
+  return (rng() & 0x7f) < acc + truncDivPow2(acc * term, 7);
 }
 
 /**
@@ -883,14 +1037,6 @@ export function scheduleNextActor(
   timeline.player = Math.max(0, timeline.player - elapsed);
   timeline.enemy = Math.max(0, timeline.enemy - elapsed);
   return { elapsed, next };
-}
-
-/** Crit-chance bonus for a skill — base 0x10; precision adds effect_p2+4. Reads only the
- *  effect fields, so it accepts any skill-shaped object (or null, for a basic attack). */
-export function critBonusFor(skill: { effect?: string; effect_p2?: number } | null | undefined): number {
-  let bonus = 0x10;
-  if (skill?.effect === "precision") bonus += (skill.effect_p2 ?? 0) + 4;
-  return bonus;
 }
 
 /** Counter retaliation — reflects the incoming hit at half strength (damage >> 1). */

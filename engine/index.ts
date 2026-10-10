@@ -946,6 +946,14 @@ export {
   encounterStepTick, zoneRateLevel, encounterGroupIndex, stageZoneBlocks,
 } from "./dw3/encounters.ts";
 export {
+  FINALE_KIND_TAIL, FINALE_KIND_BODY, FINALE_KIND_HEAD,
+  FINALE_MSG_BODY, FINALE_MSG_LEARNED, FINALE_HEAD_ATTACK_ID,
+  BATTLE_WIN_RESULT_SCREEN, FINALE_WIN_ENDING_MOVIE,
+  battleWinLaunchCode, battleWinJinglePlays,
+  FINALE_TAIL_DEFEAT_BEATS, finaleBattleKind, finaleRecordsTechnique, finaleCopiedAttackSkill,
+  type FinaleBeat, type FinaleTechniqueRow, type FinaleCopiedRow,
+} from "./dw3/battle-finale.ts";
+export {
   isCardmonEnemyId, cardmonBooster, CARDMON_ENEMY_IDS,
   type CardmonBoosterTable, type BoosterChoice,
 } from "./dw3/cardmon-booster.ts";
@@ -1292,12 +1300,12 @@ export {
 } from "./dw3/ui/opponent-deck.ts";
 export type { OpponentDeckMemory, OpponentDeckHost } from "./dw3/ui/opponent-deck.ts";
 export {
-  physicalBase, magicalBase, resolveDamage, rollHit, fleeChance, escapeThreshold,
+  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, escapeThreshold,
   ESCAPE_BASE_DEFAULT, drainHeal, drainProcRoll, RAND_U16,
   gaugeGain, boostedGaugeGain, hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc,
   statusRoll, statusInflictionRoll, ailmentOfEffect, poisonTimelineDamage, regenTick, frozenBlockRoll,
   actionTimelineDelay, initialActorTimeline, scheduleNextActor,
-  critBonusFor, counterDamage,
+  counterDamage,
   enemyMoveCondition,
   hpFractionThreshold,
   signedDiv100,

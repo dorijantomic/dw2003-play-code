@@ -114,15 +114,19 @@ test("the win transition plays W_JINGLE, and the loss side still plays GAMEOVER"
 
 // ── 4. 0x60980000 boss04 — the final boss's phase transition ────────────────
 
-test("the phase switch fires on the third landed commit, only in battle 0x144", async () => {
+test("the phase switch fires on the third landed commit of the head phase, only in battle 0x144", async () => {
   const { finalBossPhaseSwitchesTrack } = await import("../web/battle.js");
-  assert.equal(finalBossPhaseSwitchesTrack(4, 1), false, "first commit: no switch");
-  assert.equal(finalBossPhaseSwitchesTrack(4, 2), false, "second commit: no switch");
-  assert.equal(finalBossPhaseSwitchesTrack(4, 3), true, "third commit: LASTB_02");
-  assert.equal(finalBossPhaseSwitchesTrack(4, 9), true, "stays on after the third");
+  assert.equal(finalBossPhaseSwitchesTrack(4, 6, 1), false, "first commit: no switch");
+  assert.equal(finalBossPhaseSwitchesTrack(4, 6, 2), false, "second commit: no switch");
+  assert.equal(finalBossPhaseSwitchesTrack(4, 6, 3), true, "third commit: LASTB_02");
+  assert.equal(finalBossPhaseSwitchesTrack(4, 6, 9), true, "stays on after the third");
+  // The counter (+0xda) runs only while the kind word is 6: the tail and body beats
+  // must not count toward the switch.
+  assert.equal(finalBossPhaseSwitchesTrack(4, 4, 3), false, "the tail phase (kind 4) must not switch");
+  assert.equal(finalBossPhaseSwitchesTrack(4, 5, 3), false, "the body phase (kind 5) must not switch");
   // The counters are armed by the battle-0x144 init alone, so no other mode switches.
   for (const mode of [0, 1, 2, 3, 5, 6]) {
-    assert.equal(finalBossPhaseSwitchesTrack(mode, 3), false, `mode ${mode} must not switch`);
+    assert.equal(finalBossPhaseSwitchesTrack(mode, 6, 3), false, `mode ${mode} must not switch`);
   }
 });
 

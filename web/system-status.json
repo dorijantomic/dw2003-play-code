@@ -3,15 +3,15 @@
  "note": "Generated. Do not edit by hand; run node tools/build_system_status.mjs. Every number comes from the inputs listed; this file adds no facts.",
  "inputs": {
   "catalogUpdated": "2026-10-06",
-  "ledgerClaims": 2046,
-  "ownershipGeneratedAt": "2026-10-09T07:43:51.100Z",
+  "ledgerClaims": 2119,
+  "ownershipGeneratedAt": "2026-10-10T14:33:34.362Z",
   "functionTableRows": 3875,
   "inventoryModules": 319
  },
  "totals": {
-  "claims": 2046,
-  "verified": 684,
-  "partially_verified": 1046,
+  "claims": 2119,
+  "verified": 754,
+  "partially_verified": 1049,
   "candidate": 232,
   "contradicted": 82,
   "unresearched": 2,
@@ -22,7 +22,7 @@
   "routinesUnlabeled": 364,
   "codeFiles": 319,
   "codeFilesOwned": 572,
-  "codeFilesUnowned": 77,
+  "codeFilesUnowned": 78,
   "notExportedFiles": 135
  },
  "systems": [
@@ -588,9 +588,9 @@
     "docs/research/fight-3d/action-vm-dispatch.md"
    ],
    "learned": {
-    "claims": 296,
-    "verified": 169,
-    "partially_verified": 92,
+    "claims": 319,
+    "verified": 189,
+    "partially_verified": 95,
     "candidate": 29,
     "contradicted": 6,
     "unresearched": 0,
@@ -644,7 +644,8 @@
      "engine/dw3/battle-status-events.ts",
      "engine/dw3/ui/native/battle-message-pages.ts",
      "engine/dw3/ui/native/battle-message-line.ts",
-     "engine/dw3/random-stream.ts"
+     "engine/dw3/random-stream.ts",
+     "engine/dw3/battle-finale.ts"
     ],
     "note": "2026-10-04 (ailment display): a 3D battle draws NO 2D status icon over a fighter. fightstg loads exactly two sprite packs (PGFGTC00 0x455 in 13 routines, CMFONT 0x286 in 7) and PGFGTC00's whole 48-cel inventory has no ailment icon; of the 79 reads of a record's ailment byte (+0x1c) in the overlay exactly ONE is inside a sprite-drawing routine, the plate marker test at fightstg.s:17305. The ailment's picture is therefore the plate's party marker - one cel (0x0F active / 0x3F other) for all four ailments, at the member's own x out of 0x800A34C0 at y 0x30 - and two ailments are still one marker. The ailment is NAMED by the shared battle message box with the game's own one word: FIGHTSTG_F0x80091534's applier arms write esmfight 0x1e/0x1f/0x20/0x21 = Poisoned!/Frozen!/Confused!/Sleep! and call the panel with kind 2 (fightstg.s:15176-15202). Shipped as engine/dw3/battle-ailment-display.ts; t…",
     "remaining": {
@@ -667,6 +668,8 @@
      "tests/timeline-player.test.js",
      "tests/effect-player.test.js",
      "tests/engine/systems/battle-combat.test.ts",
+     "tests/engine/systems/battle-formulas.test.ts",
+     "tests/lane-b/battle-formula-leaves.test.js",
      "tests/engine/systems/battle-manager.test.ts",
      "tests/proj-layer-transform.test.js",
      "tests/fight-arena-placement.test.js",
@@ -688,7 +691,10 @@
      "tests/battle-affinity-stage.test.js",
      "tests/battle-result-queue-slots.test.js",
      "tests/battle-item-count-tag-plate.test.js",
-     "tests/battle-missing-cues.test.js"
+     "tests/battle-missing-cues.test.js",
+     "tests/battle-finale-phases.test.js",
+     "tests/battle-finale-win-path.test.js",
+     "tests/movie-assets.test.js"
     ],
     "markVerified": "2026-10-06",
     "proof": "A named test is a claim that it passes, not a record that it passed. python3 tools/check_implementation_status.py --run-tests is what runs them."
@@ -727,6 +733,7 @@
      "tests/timeline-player.test.js",
      "tests/effect-player.test.js",
      "tests/engine/systems/battle-combat.test.ts",
+     "tests/engine/systems/battle-formulas.test.ts",
      "tests/engine/systems/battle-manager.test.ts",
      "tests/proj-layer-transform.test.js",
      "tests/fight-arena-placement.test.js",
@@ -1436,6 +1443,31 @@
      "text": "F0x8009e77c Calls 0x8004DE10->unk17C(), 0x8004DE10->unk138(temp_v0,arg1) and 0x8004DE10->unk158(); several fields (unk7/unkF/unk17/unk1F) are M2C_ERROR unreadable lwr loads. Sets fields on the unk158() object (unk3=8, u…"
     },
     {
+     "id": "fightstg-camera-and-script-task-constructors-2026-10-10",
+     "status": "verified",
+     "text": "FIGHTSTG_createBattleCamera (0x80092618, fightstg.s L16018-L16047) = F0x800143dc(F0x80091df4, 0x108, 0, 0x12): the battle camera task, id 0x12, with +0xF8 = set (F0x80092244), +0xFC = fade (F0x800922b4), +0x100 = getEne…"
+    },
+    {
+     "id": "fightstg-hit-effect-and-digimon-change-tasks-2026-10-10",
+     "status": "verified",
+     "text": "FIGHTSTG_startHitEffect (0x8008834c, fightstg.s L5690-L5710) = F0x80014504(F0x800880f0, 0x70, 8) + task+0x58 = result + task+0x5C = arg1: the hit-effect task. Its tick FIGHTSTG_updateHitEffect (0x800880f0, L5536-L5689) …"
+    },
+    {
+     "id": "fightstg-lights-and-fader-tasks-2026-10-10",
+     "status": "verified",
+     "text": "FIGHTSTG_createLights (0x8008b0b8, fightstg.s L8356-L8382) = F0x800143dc(F0x8008aaf0, 0x11C, 0, 0x13): the stage-lights task, id 0x13, with +0x110 = set (FIGHTSTG_setLights 0x8008ae9c), +0x114 = fade (0x8008af10), +0x11…"
+    },
+    {
+     "id": "fightstg-player-turn-tasks-2026-10-10",
+     "status": "verified",
+     "text": "FIGHTSTG_startPlayerTurn (0x80092d50, fightstg.s L16486-L16500) = F0x800143dc(F0x80092684, 0x6C, 0x1C, 0xE): the player-turn task, id 0xE (0x6C bytes, a 0x1C-byte = 7-Task child block), whose tick (0x80092684) drives th…"
+    },
+    {
+     "id": "fightstg-scene-task-constructors-2026-10-10",
+     "status": "verified",
+     "text": "FIGHTSTG_createStage (0x800869a8, fightstg.s L3989-L4013) = F0x800143dc(F0x80086304, 0xEC, 4, 0x15): the fight-stage task, id 0x15, with the setStage method at +0xE8 (F0x800868c0), the stage id at +0x50 and the fade-in …"
+    },
+    {
      "id": "fx-mesh-abr-nibble-is-one-based",
      "status": "verified",
      "text": "The op6 mesh display list's 0xEn state register is a ONE-BASED semi-transparency selector, not the hardware blend mode. FIGHTSTG_F0x80085110 splits each opcode byte into nibbles at 0x80085358 and dispatches a high nibbl…"
@@ -1676,6 +1708,81 @@
      "text": "The steal factor is genuinely zero for a hundred of the game's enemies - nothing there is stealable - and our shipped data matches the disc, so the corrected steal rule makes stealing impossible against exactly those en…"
     },
     {
+     "id": "wfightmn-arm-table-and-event-dispatch-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_states (0x800aade4, file 0x5004) is three zero words (states 0-2) followed by the battle menu's 24 action-arm pointers, indexed by the menu substate 3..26 (0x800aadf0..0x800aae4c = file 0x5010-0x506c): 3 runCom…"
+    },
+    {
+     "id": "wfightmn-bringlastenemy-and-restoreenemy-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_bringLastEnemy (0x800a988c, file 0x3AAC-0x3E30) runs a five-step machine through its own table at 0x800a5e54 (file 0x74). Step 0: kind = 6 (BATTLE_KIND_FINAL_LAST); active[1] = 2; FIGHTSTG_startEntrance(fighter…"
+    },
+    {
+     "id": "wfightmn-createlayers-seven-layers-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_createLayers (0x800a6440, file 0x660-0x8D0) builds the battle's seven display layers over the WFIGHTMN_screen rect at 0x800aad08 ({0,0,320,240}) through the display service 0x8005de10: reset (+0x150), allocPrim…"
+    },
+    {
+     "id": "wfightmn-endboost-and-knockout-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_endBoost (0x800a88cc): step 0 shows message args[2]+0x5B (0x5B + the boost's stat index) with {args[0], args[1]} 7-wide; step 1 clears the s16 at unit+0x10+args[2]*2 = BattleFighter.boosts[args[2]] (unit = 0x80…"
+    },
+    {
+     "id": "wfightmn-endspecial-digidevolve-showwon-2026-10-10",
+     "status": "verified",
+     "text": "Three of the battle menu's arms, read from the original assembly. WFIGHTMN_endSpecial (0x800a9584): unit = fighters[0][args[1]] (0x800a4470 + args[1]*0x20); unit->special (+0x1B byte) = 0; message 0x59 shown 7-wide with…"
+    },
+    {
+     "id": "wfightmn-finale-kinds-2026-10-10",
+     "status": "verified",
+     "text": "The Galacticmon finale's battle-kind progression 4 -> 5 -> 6 is written by two arms of wfightmn's 24-entry action-arm table (base literal 0x800aade4 fetched as [0x800aade4 + 4*phase]; the 24 arm pointers at file 0x5010-…"
+    },
+    {
+     "id": "wfightmn-loadfiles-and-create-loader-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_loadFiles (0x800a5ecc, file 0xEC-0x634) is the battle menu's file loader task: state at +0xC (0/1 dispatch, 2/3 exit), substate +0x10, step +0x14. Its state-0 path runs the overlay's seven-state setup machine t…"
+    },
+    {
+     "id": "wfightmn-rollambush-and-checkparty-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_rollAmbush (0x800a684c) returns 0 when the ambush chance (BATTLE_SETUP 0x80042b1c +0x3C byte) is zero; otherwise chance = ambushChance * ((32 - the first party member's level) - enemies[0].level (BATTLE_SETUP+0…"
+    },
+    {
+     "id": "wfightmn-runaway-recover-clearfield-2026-10-10",
+     "status": "verified",
+     "text": "Three of the battle menu's arms, read from the original assembly. WFIGHTMN_runAway (0x800a7fe4): counter +0x18; counter 0 takes action = events[events+0xAF1] (0x1C-byte entries) and calls FIGHTSTG_battleFuncs.testRunAwa…"
+    },
+    {
+     "id": "wfightmn-runturn-lifecycle-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_runTurn (0x800a9cb4, file 0x3ED4-0x4210) is the battle menu's main state machine: substate (+0x10) 0 -> setSubstate(1) and step (+0x14) = FIGHTSTG_events.funcs.pop (cell 0x800a4368 = events base 0x800a3868 +0xB…"
+    },
+    {
+     "id": "wfightmn-start-task-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_start (0x800a9ff0, file 0x4210-0x428C) is the battle menu's entry point: createTaskWithId(F0x800a6c44 (updateMenu), 0x74, 0x20, 0xC) through F0x800143dc - the BattleMenu task is 0x74 bytes with a 0x20-byte chil…"
+    },
+    {
+     "id": "wfightmn-starttech-and-counthit-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTMN_startTech (0x800aa1f0, file 0x4410-0x4C10) starts a move's battle script: own = computeStats(actor, 1, active[side]) and other = computeStats(0x10 - actor, 0, active[1-side]) through the battleFuncs table 0x800…"
+    },
+    {
+     "id": "wfightts-battle-test-harness-and-pages-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTTS_battleTest (0x800a6b90, wfightts.s file 0xDB0) is the battle scene test's single tick. State 0 is the setup pipeline: substate 0 calls FILE_CACHE.freeAll ([0x80044f54]) + initLayers + nextSubstate; substate 1 c…"
+    },
+    {
+     "id": "wfightts-lists-edit-the-battle-parameters-2026-10-10",
+     "status": "verified",
+     "text": "The battle scene test's five list widgets each edit one battle parameter (the overlay document's open question 'which parameter each list edits' is answered here; each creator stores the target and value pointers into t…"
+    },
+    {
+     "id": "wfightts-start-layers-and-images-2026-10-10",
+     "status": "verified",
+     "text": "WFIGHTTS_start (0x800a7a60, wfightts.s file 0x1C80) is createTaskWithId(F0x800a6b90, 0, 0, 0) through F0x800143dc - the battle scene test's task, created with 0 bytes of fields, no children block and no id (wfightts.s L…"
+    },
+    {
      "id": "0x800aade4-is-the-action-type-dispatch-table-of-f0x800a9cb4-2026-10-08",
      "status": "partially_verified",
      "text": "0x800AADE4 is the battle action-type dispatch table of the controller's action sequencer F0x800a9cb4, indexed by the action-type word ctx+0x10 in [3,0x1a]. The instruction that forms it is present in the corpus as a lui…"
@@ -1696,6 +1803,11 @@
      "text": "An ordinary landed attack plays the op-1 reaction clip 2/3/4, and clips 2, 3 and 4 author no camera in any of the 249 shipped packs. The attacker's authored op-1 records drive FIGHTSTG_F0x8008b69c, whose mode-0 arm writ…"
     },
     {
+     "id": "battle-accuracy-side-split-2026-10-09",
+     "status": "partially_verified",
+     "text": "The physical accuracy leaf F0x800a06ac runs two formulas. Player (side == 0): chance = acc(+0x6) + trunc(acc * (trunc((atk.SPD + atk.+0x3a - def.SPD)/8) + atk.level - def.level - (plain attack ? atk.+0x38 : 0)) / 128), …"
+    },
+    {
      "id": "battle-ailment-lines-are-own-box-pages-2026-10-04",
      "status": "partially_verified",
      "text": "A landed ailment is a separate battle message box page after the damage page, not part of the damage line. At turn start the game prints kind 2 with the name on line 1 and esmfight 0x90 (sleep), 0x56 (frozen) or 0x83+ra…"
@@ -1714,6 +1826,11 @@
      "id": "battle-command-flow-phase-back-returns-the-command-list-on-the-row-it-was-taken-from-2026-10-04",
      "status": "partially_verified",
      "text": "The six-row battle command menu and every screen one of its rows opens are run by ONE object, FIGHTSTG_F0x80092684, and its state is four words: the main state, the outer step, WHICH ROW'S BRANCH is running, and that sc…"
+    },
+    {
+     "id": "battle-crit-roll-arms-2026-10-09",
+     "status": "partially_verified",
+     "text": "The physical crit roll F0x800a02ac's chance is 4 plus, in this order: (a) on the technique arm (skill+0xa >= 2) skill+0xc (effectPower) only when skill+0xa == 0xb, with the accessory +0x38 byte never read on that arm; (…"
     },
     {
      "id": "battle-cross-slash-display-is-damage-not-seventy-percent-of-hp-2026-10-05",
@@ -1776,9 +1893,14 @@
      "text": "The battle ITEM list is the held ids of directory 1 (D0x80042bc8[1], 83 ids, table order) whose effect record class byte +0 has bit 1 set, seven to a page. Chips 47-65 and boosters 91, 361-394 are not offered by the dis…"
     },
     {
+     "id": "battle-magical-accuracy-roll-2026-10-09",
+     "status": "partially_verified",
+     "text": "The magical accuracy leaf F0x800a08c8 runs ONE formula for both sides: chance = acc(+0x6) + trunc(acc * (trunc((atk.WIS(+0x8) - def.WIS(+0x8)) / 8) + atk.level(+0x0) - def.level) / 128), with every division truncating t…"
+    },
+    {
      "id": "battle-magical-crit-roll-2026-09-05",
      "status": "partially_verified",
-     "text": "F0x8009fab4 uses the separate F0x800a0514 magical-critical roll. Its chance term is min(0x40, trunc(4 * skill[+0x08] * 9 / defender effective element)), followed by +0x40 instead of +4 when skill[+0x09] matches defender…"
+     "text": "F0x8009fab4 uses the separate F0x800a0514 magical-critical roll. Its chance term is min(0x40, trunc(100 * skill[+0x08] / defender effective element)) — the assembly's ((a<<1 + a)<<3 + a)<<2 chain — followed by +0x40 ins…"
     },
     {
      "id": "battle-message-page-kinds-2026-10-04",
@@ -2917,8 +3039,8 @@
     "docs/research/ui/stcrdabm-decoded-2026-07-12.md"
    ],
    "learned": {
-    "claims": 496,
-    "verified": 97,
+    "claims": 527,
+    "verified": 128,
     "partially_verified": 283,
     "candidate": 96,
     "contradicted": 20,
@@ -3520,6 +3642,31 @@
      "text": "F0x8009cfbc bind_slot_to_card: a board slot is bound to a card; it stores the card index at slot+0x142, copies three card bytes into slot+0x14B and +0x14C and +0x149, and stores record byte[0]-1 as a halfword at +0x140,…"
     },
     {
+     "id": "cardgame-ai-field-target-narrowing-2026-10-10",
+     "status": "verified",
+     "text": "The AI's field-target scoring and narrowing family, read end to end (cardgame.s L33855-L34211). aiPickBestFieldTarget (F0x800A3D90(duel, side)) walks the side's marks (duel+0x446 side 0, duel+0x44C side 1, count row+0x7…"
+    },
+    {
+     "id": "cardgame-ai-pile-picks-and-hand-scan-2026-10-10",
+     "status": "verified",
+     "text": "The opponent AI's three selection helpers, read end to end (cardgame.s L1341-L1384, L10045-L10092, L34596-L34615). aiPickBestOppFieldSlot (F0x80084188(duel)) clears the twelve 0x46F marks, scores each far-side slot 6-11…"
+    },
+    {
+     "id": "cardgame-card-info-panel-and-cursors-2026-10-10",
+     "status": "verified",
+     "text": "The picker's detail panel and its cursor movers, read end to end (cardgame.s L3943-L4354, L9214-L9306). pickerDetailPanelFill (F0x80086A30(ctx, view, page)) takes slot = view + (ctx+0x43C + page)*0x4C; when the card is …"
+    },
+    {
+     "id": "cardgame-discard-marked-sweep-2026-10-10",
+     "status": "verified",
+     "text": "Opcodes 0x4D/0x4E's removal sweep, read from the original assembly. Enter F0x800915C4 sets the tick state duel+0x422=1 and clears 0x428. Update F0x800915D4(duel, view, mode): state 1 scans slots from the cursor 0x428 up…"
+    },
+    {
+     "id": "cardgame-draws-and-marked-moves-2026-10-10",
+     "status": "verified",
+     "text": "The draw and marked-card moves, read from the original assembly - all of them put cards into the HAND array row+0x600 (count row+0x5A6). F0x8008FF08(duel, view, side, mode; opcodes 0x42/0x43) stores the pre-move hand co…"
+    },
+    {
      "id": "cardgame-duel-0x421-is-the-pending-enter-opcode-latch",
      "status": "verified",
      "text": "duel+0x421 is the pending-enter-opcode latch of the card-effect interpreter, and it selects which of the two phases F0x80084320 runs. The prologue loads it, and when it is zero the function branches to the update-phase …"
@@ -3530,9 +3677,54 @@
      "text": "duel+0x438 names which pile a card effect's prompt runs over. F0x8008C6E0 subtracts 5 from it, bounds the result unsigned against 11, and jumps through the table at 0x8008349C. Selector 5 takes the acting side's hand co…"
     },
     {
+     "id": "cardgame-effect-legality-gate-2026-10-10",
+     "status": "verified",
+     "text": "F0x800954F8 checkEffectLegality, the resolution gate the effect VM calls from fetchNextEffectOpcode, read in full from the original assembly. a2 = the effect's condition id, bounds-checked to 1..0xB and dispatched throu…"
+    },
+    {
      "id": "cardgame-effect-vm-side-registers-s2-s3-s4-are-history-sides",
      "status": "verified",
      "text": "Pin the quantifier: '... are fixed by the interpreter prologue of F0x80084320, each written once there, and no instruction writes any of them between the prologue and either dispatch.' Add one clause: 'A single update a…"
+    },
+    {
+     "id": "cardgame-marked-card-copy-op57-2026-10-10",
+     "status": "verified",
+     "text": "Opcode 0x57 copies the marked board card onto the acting side's next free slot, read from the original assembly. Enter F0x80091EB0(duel, view, side): scans the twelve slots for the first marked (0x46F) live one (own bou…"
+    },
+    {
+     "id": "cardgame-marked-counts-symbol-2026-10-10",
+     "status": "verified",
+     "text": "0x800A5DC2 is CARDGAME_markedCounts[2], two per-side bytes in the duel's data segment, read from the original assembly. The removal sweep F0x8008E5BC zeroes both bytes in its first state (sb $zr into 0x800A5DC2 and +1),…"
+    },
+    {
+     "id": "cardgame-op29-antipower-drain-2026-10-10",
+     "status": "verified",
+     "text": "Opcode 0x29 (Anti-Power) drains every S-Energy counter to zero, read from the original assembly. The shared enter F0x8008F2D8(duel, a2, a3) writes a3 into duel+0x430 and a2 into duel+0x434 and arms the action latch 0x42…"
+    },
+    {
+     "id": "cardgame-op41-resolving-card-return-2026-10-10",
+     "status": "verified",
+     "text": "Opcode 0x41's enter/tick pair, re-read from the original assembly. Enter F0x8008F750(duel, view): duel+0x424=0, 0x422=1, then calls the view's centre-plate close wipe view+0xEA8 with the play-history index TWO below the…"
+    },
+    {
+     "id": "cardgame-op49-hand-to-trash-sweep-2026-10-10",
+     "status": "verified",
+     "text": "Opcode 0x49 sweeps the acting side's HAND into its TRASH, read from the original assembly. Enter F0x8008F0B4(duel, view, side) sets duel+0x422=1, duel+0x424=0, duel+0x428 = the side's hand count (row+0x5A6), duel+0x42C …"
+    },
+    {
+     "id": "cardgame-picker-flags-and-energy-2026-10-10",
+     "status": "verified",
+     "text": "The picker's re-greying, its nothing-selectable gate, the energy spend/refund and the tick toggle, read end to end (cardgame.s L4454-L4676), plus the movePickHighlight forwarder (L8249-L8255). pickerRegreyRows (F0x80087…"
+    },
+    {
+     "id": "cardgame-pile-badge-primitive-and-picker-layout-2026-10-10",
+     "status": "verified",
+     "text": "The pile-count badge draw, the second message-plate primitive and the picker's per-language layout reader, read end to end (cardgame.s L20451-L20501, L22014-L22063, L3327-L3342). pileCountBadgeDraw (F0x80096C20, index =…"
+    },
+    {
+     "id": "cardgame-pile-browse-and-window-waits-2026-10-10",
+     "status": "verified",
+     "text": "The opponent's pile-browse setup and the two window waits, read end to end (cardgame.s L27605-L27827, L31817-L31857, L22260-L22271). startAiPileBrowse (F0x8009DBE8(duel, screen, side, mode)) reads the pile count for mod…"
     },
     {
      "id": "cardgame-rand-u16-is-reached-by-exactly-one-cardgame-function",
@@ -3540,14 +3732,54 @@
      "text": "In the LIMITATION, label the units: 'the closure does not follow the stack-spilled indirect calls (the committed tool reports them as distinct slots: 4 reachable in the policy closure - $sp+0x3c/+0x44/+0x5c/+0x60) ... i…"
     },
     {
+     "id": "cardgame-record-hit-marks-2026-10-10",
+     "status": "verified",
+     "text": "The duel keeps a per-slot, per-play-record hit matrix at view+0x146+slot*0x4C+record, and two routines write it, both dispatching on a play-history class byte (the effect's targeting class, 1..8) through an eight-arm ta…"
+    },
+    {
+     "id": "cardgame-resolve-ceremony-2026-10-10",
+     "status": "verified",
+     "text": "Opcodes 0x12/0x13's resolve ceremony tick, read from the original assembly. F0x80092638(duel, view) dispatches nine states through the table D0x800835B4 indexed by duel+0x422-1; an out-of-range state returns 0 and only …"
+    },
+    {
+     "id": "cardgame-resolve-window-and-stack-2026-10-10",
+     "status": "verified",
+     "text": "The resolution-stack windows, read from the original assembly. F0x80095030 (opcodes 0x2F/0x30/0x31's update) waits for the prompt plate's dismiss state view+0xDFA to read 2, then for either button (pad +0x408 bit 0xD or…"
+    },
+    {
+     "id": "cardgame-slot-animations-2026-10-10",
+     "status": "verified",
+     "text": "Three slot-animation helpers, read from the original assembly. F0x8008DB7C(duel, view, index) is a two-phase gate around one slot's lift: while duel+0x424 is not 1 it (re)starts the move - sets 0x424=1, sets the view sl…"
+    },
+    {
+     "id": "cardgame-sprite-draw-routines-2026-10-10",
+     "status": "verified",
+     "text": "The four card-picture draw routines, read end to end from the original assembly (cardgame.s L24294-L25207). drawCardPicture (F0x8009A82C) turns the sprite's picture number (+0x3A) into a 32x32 tile - U = (pic/8)*32, V =…"
+    },
+    {
+     "id": "cardgame-sprite-move-machines-2026-10-10",
+     "status": "verified",
+     "text": "The five card-move state machines and the effect countdown, read end to end (cardgame.s L23770-L24292, L1279-L1293). cardMoveTween (F0x80099FFC): timer +0x28 -= delta; while positive it lerps position (dstX +0x8 / dstY …"
+    },
+    {
      "id": "cardgame-starter-deck-grant-and-the-collection-api",
      "status": "verified",
      "text": "Two precision edits: (a) 'tests whether the count is non-zero' -> 'tests the count with the polarity selected by its second argument (non-zero for a1 != 0, zero for a1 == 0)'; (b) 'a 40-entry table of card ids' -> 'a 40…"
     },
     {
+     "id": "cardgame-stat-ramp-and-death-mark-2026-10-10",
+     "status": "verified",
+     "text": "The card-duel stat ramps, read from the original assembly. F0x8008E08C(duel, view; the update for opcodes 0x5E-0x69 whose enter is F0x8008DEF8) walks each marked live slot's DISPLAYED stat pair toward the true pair: pha…"
+    },
+    {
      "id": "cardgame-summoning-costs-s-energy-by-colour",
      "status": "verified",
      "text": "Summoning a Digimon requires and consumes S-Energy of the card's own colour. F0x80085FD0(duel, energyArray, instance) is the gate: when duel+0x2F8 == 6, i.e. only during the Summon Phase, it fetches the card's CARDPAK r…"
+    },
+    {
+     "id": "cardgame-summons-and-stat-totals-2026-10-10",
+     "status": "verified",
+     "text": "The board-row fill, the summon commit, the five-pass mega application and the per-side totals, read end to end (cardgame.s L30365-L30649). placeCardInFieldSlot (F0x800A0708(duel, side, cardId)) bumps the side's slot cou…"
     },
     {
      "id": "cardnpc-deck-entry-byte-03-is-the-ai-play-class-with-5-never-summoned",
@@ -3568,6 +3800,51 @@
      "id": "folder-editor-runs-our-code-2026-10-06",
      "status": "verified",
      "text": "The card folder editor is the first of the three card surfaces converted: its ordinary route runs our composed session and reaches no interpreter, with the original and the hand-made editor kept behind flags."
+    },
+    {
+     "id": "stcrddek-editor-draw-2026-10-09",
+     "status": "verified",
+     "text": "STCRDDEK_drawEditor (0x80084890) is the editor's draw pass: it draws the grid cursor as pack-0x063E0000 clip 0x43 at (col*32+16, row*32+58) with a 6-row CLUT cycle (table 0x8008A484 = {0,1,2,3,2,1}) advanced every >= 5 …"
+    },
+    {
+     "id": "stcrddek-editor-object-2026-10-09",
+     "status": "verified",
+     "text": "The deck editor object and its per-frame machinery, read from the original assembly: STCRDDEK_createEditor (0x8008660c) creates the editor task F0x80014504(0x80086574, 0x494, 0xD4) with +0x54 = 0x1000, +0x58 = 6, +0x50 …"
+    },
+    {
+     "id": "stcrddek-editor-rows-and-reveal-2026-10-09",
+     "status": "verified",
+     "text": "The swap-list fill and the deck reveal, read from the original assembly: STCRDDEK_showCardList (0x80084278) fills the eight visible rows from the s16 card-id table at editor+0x88 (indexed by row + scroll offset +0x78) a…"
+    },
+    {
+     "id": "stcrddek-editor-windows-2026-10-09",
+     "status": "verified",
+     "text": "STCRDDEK_createEditorWindows (0x8008397c) builds the editor's whole widget set: the title labels at (0xC1,0x17) and (0x15,0x18); six colour counters at x = 0x34+0x23*i, y = 0x29; nine objects at (0x96,0xCC), (0x96,0xBD)…"
+    },
+    {
+     "id": "stcrddek-keyboard-draw-2026-10-09",
+     "status": "verified",
+     "text": "STCRDDEK_drawKeyboard (0x80086e04) draws the name keyboard from pack handle 0x07700000: the character grid is 7 rows x 15 columns of cells, cell x = col*0xE + (col/5)*8 + 0x2F and cell y = row*0x12 + 0x5A (14px columns …"
+    },
+    {
+     "id": "stcrddek-lerp-2026-10-09",
+     "status": "verified",
+     "text": "The clamped linear interpolator the screen installs as its fold methods: STCRDDEK_startLerp (0x8008a3d8) with (obj, from, to, frames), when from != to, sets +0x0 = frames, +0xC = from << 8, +0x8 = from, +0x10 = to, +0x1…"
+    },
+    {
+     "id": "stcrddek-name-entry-2026-10-09",
+     "status": "verified",
+     "text": "The deck editor's built-in name keyboard, read from the original assembly: STCRDDEK_createNameEntry (0x800887d4) creates the name task F0x80014504(0x800884E8, 0xF4, 0x34) with getName installed at +0xEC, closeNameEntry …"
+    },
+    {
+     "id": "stcrddek-scene-frame-2026-10-09",
+     "status": "verified",
+     "text": "The deck editor's frame and fade, read from the original assembly: STCRDDEK_start (0x800832e8, a function start the walker's index does not carry) creates the 0x50-byte frame task F0x80014504(0x800831f0, 0x50, 4). updat…"
+    },
+    {
+     "id": "stcrddek-scroll-bar-2026-10-09",
+     "status": "verified",
+     "text": "The overlay's list scroll-bar widget, read from the original assembly: STCRDDEK_createScrollBar (0x80088ac8) creates the 0x9C-byte task F0x80014504(0x800888B0, 0x9C, 0) and installs four setters as methods - +0x8C = set…"
     },
     {
      "id": "stcrdshp-80088afc-role-2026-09-12",
@@ -8127,8 +8404,8 @@
     "docs/research/scripting/bank70-opcode-handlers-decoded-2026-07-27.md"
    ],
    "learned": {
-    "claims": 24,
-    "verified": 12,
+    "claims": 32,
+    "verified": 20,
     "partially_verified": 2,
     "candidate": 6,
     "contradicted": 4,
@@ -8268,6 +8545,46 @@
      "id": "field-native-events-fully-translated-2026-10-06",
      "status": "verified",
      "text": "Every field stage event that carries no bytecode of its own now runs our code: the last two were the Undersea Base room's inverse phase switches, decoded as a pair of layouts over one shared step-program table and porte…"
+    },
+    {
+     "id": "fieldstg-askchoice-constructors-2026-10-09",
+     "status": "verified",
+     "text": "The sixteen FIELDSTG_askChoice0-15 routines at 0x80084804, 0x80084834, 0x80084868, 0x8008489c, 0x800848d0, 0x80084904, 0x80084938, 0x8008496c, 0x800849a0, 0x800849d4, 0x80084a08, 0x80084a3c, 0x80084a70, 0x80084aa4, 0x80…"
+    },
+    {
+     "id": "fieldstg-auction-bid-questions-2026-10-09",
+     "status": "verified",
+     "text": "The 16 questions are the story's auction bids: question N's text entry (esdmg260, story text file base 0x119, loaded as ESDMG260 for English via +LANGUAGE<<16 at 0x8005cca8) is \"Bid at X BIT?\" with \"Yes, bid.\"/\"No, I'll…"
+    },
+    {
+     "id": "fieldstg-auction-lot-items-2026-10-09",
+     "status": "verified",
+     "text": "The 16 lots' granted items, by the item code in each Answer0 handler and the item-name bank: 0:281 Divine Barrier, 1:287 Hazard Shield, 2:282 Sniper Shield, 3:288 Dramon Shield, 4:137 Yin Yang Wand, 5:149 Hazard Fang, 6…"
+    },
+    {
+     "id": "fieldstg-choices-table-2026-10-09",
+     "status": "verified",
+     "text": "FIELDSTG_choices at 0x80096b38 is 16 eight-byte records {u32 text = 0x1190000 | entry, s16 events[2]}; record N names question N's text entry and the two answer event ids: 0:(entry 2, 1333/1334) 1:(5, 1338/1339) 2:(9, 1…"
+    },
+    {
+     "id": "fieldstg-endchoice-code-consequences-2026-10-09",
+     "status": "verified",
+     "text": "The three codes an Answer0 handler applies resolve through the resident set_flag dispatcher F0x800165ac to three different writes: 0x400+N sets bit N of the bank-4 flag array D0x8004b38a; 0x707E+n routes bank 0x70 to F0…"
+    },
+    {
+     "id": "fieldstg-endchoice-flag-handlers-2026-10-09",
+     "status": "verified",
+     "text": "The thirty-two FIELDSTG_endChoiceNAnswerM handlers at 0x800915a0 through 0x80091e34 are the answer-end handlers of the field's 16 yes/no questions. Every Answer1 handler calls the resident flag-apply pointer (FLAGS_00+0…"
+    },
+    {
+     "id": "fieldstg-events-choice-wiring-2026-10-09",
+     "status": "verified",
+     "text": "FIELDSTG_events at 0x80099844 is 66 twenty-byte records {s32 id, void *script, s32 text, void *start, void *end} + {-1}; the 16 questions are wired per lot as open (script) / question (start = askChoiceN, no script, no …"
+    },
+    {
+     "id": "fieldstg-progressevents-table-2026-10-09",
+     "status": "verified",
+     "text": "FIELDSTG_progressEvents at 0x80096bb8 is 16 records {s32 progress, s32 flag, s32 condition, s16 script, s16 nextScript} + {-1}: (5,0x400,0x7074,1331,1332) (8,0x401,0x7074,1336,1337) (12,0x402,0x7075,1341,1342) (14,0x403…"
     },
     {
      "id": "gunslinger-native-dual-type7-program-switch-2026-08-03",
@@ -13227,8 +13544,8 @@
     "docs/research/field/ladder-climb-decoded-2026-07-02.md"
    ],
    "learned": {
-    "claims": 205,
-    "verified": 55,
+    "claims": 216,
+    "verified": 66,
     "partially_verified": 128,
     "candidate": 11,
     "contradicted": 11,
@@ -13602,6 +13919,11 @@
      "text": "F0x800872cc Returns the texture slot a floor cell already owns (reads +0x70), which is how the overworld window knows a cell is already bound as you walk."
     },
     {
+     "id": "fieldstg-script-command-table-2026-10-10",
+     "status": "verified",
+     "text": "The field-script pose op's id>=0x320 arm is a script-command dispatch over the static FIELDSTG_scriptCommands table, not an effect-object spawn. FIELDSTG_setEventPose (0x80084dd0) reads the op's three operands and keeps…"
+    },
+    {
      "id": "fire-dungeon-floor-trap",
      "status": "verified",
      "text": "In both Fire Dungeon rooms, 16 marked regions of the type-7 trigger grid start a native stage-event controller that takes field control, plays SWITCH02, and 30 ticks apart blows up each Digimon walking with the tamer --…"
@@ -13652,6 +13974,26 @@
      "text": "F0x8009239c Calls the function pointer stored at 0x8004DF8C with 0x1002, invokes that returned object's unk11C method with &sp10 to fill sp10/sp14, then subtracts sp10 from arg0->unk0 and sp14 from arg0->unk4. No named …"
     },
     {
+     "id": "places-copy-place-points-family-2026-10-10",
+     "status": "verified",
+     "text": "The places copy routine is one body in 34 stage overlays. copyPlacePoints(slots, placePoints, place, placeArg) walks the NULL-terminated placePoints array of the overlay for the entry whose place and placeArg equal GAME…"
+    },
+    {
+     "id": "places-game-place-producers-2026-10-10",
+     "status": "verified",
+     "text": "GAME.place and GAME.placeArg (D0x80048d34 +0x44 and +0x46) are written at exactly two sites in the FIELDSTG overlay: the trigger set-off switch F0x800885d4, whose SLOT_EXIT arm copies the taken StageSlot place and place…"
+    },
+    {
+     "id": "places-start-stage-family-2026-10-10",
+     "status": "verified",
+     "text": "The startStage bootstrap is one 22-word shape in 292 of the 294 stage overlays (one occurrence per overlay): createTask(updateStage, 0x54, childrenSize) via F0x80014504, store the owner at task+0x50, then call stageFunc…"
+    },
+    {
+     "id": "places-update-stage-variants-2026-10-10",
+     "status": "verified",
+     "text": "The places updateStage wrappers are three shapes, and the assembly classification matches the ReGame include census on every member: 25 overlays copy the entry points first and call task->nextState(task) after; 7 overla…"
+    },
+    {
      "id": "point-record-actors-mined-for-26-stages-2026-10-06",
      "status": "verified",
      "text": "The in-place halo actor is now mined for twenty-six stages rather than eighteen: the eight new ones build it with their own allocator and run it without registering, so the effect appears where it was missing even thoug…"
@@ -13685,6 +14027,36 @@
      "id": "stage-actor-phase-gate-family",
      "status": "verified",
      "text": "167 unnamed stage-overlay routines are one routine, word-for-word the same 18 instructions: it reads an object's phase word at +0xC and, when the phase is 0, negative or 4 or greater, calls that object's own +0x38 metho…"
+    },
+    {
+     "id": "stage-command-set-aoa-2026-10-10",
+     "status": "verified",
+     "text": "The A.o.A. Headquarters pair. wstag310 commands 831/832 (table 0x33f/0x340) are the two six-slot display ensembles whose behaviour is already decoded in stage-display-slot-ensemble-2026-10-05; this pass fixes their comm…"
+    },
+    {
+     "id": "stage-command-set-city-2026-10-10",
+     "status": "verified",
+     "text": "Three city stages' script commands decoded from assembly. wstag225 command 815 (table 0x32f): createCommand815 (0x800a61e0) allocates 0x70 bytes with callback 0x800a5ef0 (updateTileEffect); handleCommand815 (0x800a6174)…"
+    },
+    {
+     "id": "stage-command-set-gondola-2026-10-10",
+     "status": "verified",
+     "text": "The East Sector crevice (wstag415) drives its gondola ride through the script-command table. Command 811 (table id 0x32b) is the mover: createCommand811 (0x800a6a98) allocates 0x78 bytes through F0x800143dc with callbac…"
+    },
+    {
+     "id": "stage-command-set-kusanagi-2026-10-10",
+     "status": "verified",
+     "text": "Kusanagi City's script commands. wstag780 command 801 (table 0x321): createCommand801 (0x800a749c) allocates 0x78 bytes with callback 0x800a72b0 (updateByteAnims, the animated screen quads); its handle 0x800a7450 and th…"
+    },
+    {
+     "id": "stage-command-set-one-offs-2026-10-10",
+     "status": "verified",
+     "text": "Six more stages' script commands. wstag455 command 828 (0x33c, create-only): createCommand828 (0x800a6010) allocates 0x58 bytes with callback 0x800a5ebc (updateTileTask). wstag460 command 830 (0x33e): createCommand830 (…"
+    },
+    {
+     "id": "stage-command-set-undersea-2026-10-10",
+     "status": "verified",
+     "text": "Magasta and Gunslinger script commands. wstag795 command 836 (table 0x344, handle-only): handleCommand836 (0x800a6180) on operand 0x35b sets +0x50=1 (playing), resets the first animation index with the frame duration at…"
     },
     {
      "id": "stage-fire-trap-explosion-and-hooks-wstag740-2026-09-11",
@@ -22056,6 +22428,10 @@
     "reason": "no owner recorded"
    },
    {
+    "path": "engine/dw3/battle-finale.ts",
+    "reason": "no owner recorded"
+   },
+   {
     "path": "engine/dw3/battle-idle-director.ts",
     "reason": "no owner recorded"
    },
@@ -22813,6 +23189,30 @@
     "what": "The Deeper Crevice's opening ride now moves: arriving the first time you see the crevice wall and pipes slide up and to the right past the platform you are standing on, then ease to a stop. Coming back later the picture is there but still, the way the original leaves it.",
     "state": "The last unported stage script. Stage s415's scenery layer draws the stage's own background pack S415BG01 (packed id 0x769) as a repeating picture: TMPK sub-entries 2 and 4 (0x075E0002/0x075E0004), 24 tiles of 64x128, tile period 0x200 x 0x100, drawn at (x, y) = (obj+0x50>>8, (obj+0x54>>8)+0x100) plus a copy one period away so it wraps, through the shared shape emitter F0x8001ed6c; it scrolls 8 px right and 4 px up per tick, decelerating 0x10 per tick to 0 with cue sound 0x340003, wrapping past 0x1FFFF. Live capture (authority 1) fixed the visibility question that had blocked the port: on a genuine first arrival the layer is still about 136 frames, then slides at a steady 8.00 px right / 4.00 px up per frame, then decays to 0 over about 135 frames (2.7 s), fully stopped at frame 650 -- and the arrival scene is first-visit only, gated by story flag 0x4018 (RAM 0x8004b3e1 bit 0); on a revisit the same object is built with speed 0 and position 0, which is why an earlier recording measured it static. Worker-db's guess that the pixels came from s415mask was wrong (that sheet is only 384 px wide); the pixels are the stage's background pack, cut by tools/extract_scroll_layers.py into web/assets/effects/scroll/s415.png (512x768) + web/assets/data/scroll_layers.json. Ported through the shared point-record system: one new scroll-layer machine in engine/systems/point-record-actor.ts, same registry/tick/advanceClip, only the data differs; web/game.js routes the arrival event's own SETANIM 812 822 (the ease is the event's own, after WAIT 180) and reads the flag once at construction through the existing story-flag store. Per-frame measured in tools/verify_scroll_layer.mjs: constant slide 2048/1024, ease 2048->2032->2016->...->0 in 0x10 steps (y = x>>1) holding at 0; revisit x 0, y 256, speed 0; canvas before/after 67,829 px changed on a first visit vs 1,252 on a revisit. tests/scroll-layer.test.js 9/9; suites 4555/0; engine 970/0; tsc clean. LEFT: the registry census still lists the layer id 0x32c as interpreter-only (flipping it needs the member in point_record_actors.json -- a bookkeeping pass); the capture's ~136-frame still-band onset before the slide is measured but not code-explained; and one gate-polarity tension -- the live capture saw the visit word 0 on a first visit while the raw branch in wstag415.s reads the other way, so the shipped behaviour follows the observation and the polarity lives in one named place.",
     "commit": "2026-10-09, Stage: the Deeper Crevice ride slides, first visit only"
+   },
+   {
+    "screen": "battle",
+    "what": "Criticals land the way the disc rolls them, and enemy attacks aim with their own formula. A technique's crit chance is 4 plus its own effect power (only the \"precision\" techniques) instead of every skill riding the crit crest; a matching family and a frozen, asleep or confused target raise the odds. Enemy hits fold your evasion into the speed difference, never pay the crit penalty, and keep a quarter floor - while your own low-accuracy attacks can now fall under that floor.",
+    "state": "Settled from the original assembly (fightstg.s:30627-30781 F0x800a02ac, :30889-31024 F0x800a06ac; the ReGame decompilation agrees) for the two divergences the ReGame cross-check flagged. engine/dw3/battle-formulas.ts: critProc takes the defender and reads the plain-attack-only +0x38 byte, the 0x0B effect power, the 0x3C/0x10 family arms and the TARGET's +0x1d/+0x1e/+0x1f magnitudes; rollHit runs the player/enemy split, the enemy-only 0x20 floor and the kind-6 fixed roll, all divisions truncating toward zero; critBonusFor (the wrong-model helper) is removed. effStats carries sideByte/battleKind/evadeBonus/critStatusBonus; the skill bank gains the raw +0xa/+0xc bytes. Tests: tests/lane-b/battle-formula-leaves.test.js, tests/engine/systems/battle-formulas.test.ts, tests/engine/systems/battle-combat.test.ts (fail-before probe: 11 new assertions fail on the old bodies). Claims battle-crit-roll-arms-2026-10-09 and battle-accuracy-side-split-2026-10-09 (partially_verified, BATTLE-Q004). NAMED GAPS: the finale model collapses the Galacticmon sequence's kinds 4/5/6 into 4, so the kind-6 roll cannot fire in play yet; the magical leaf F0x800a08c8 (one WIS formula, no floor) is not ported.",
+    "commit": "\"Battle: crits and hit rolls follow the disc's own formulas per side\" (2026-10-09)"
+   },
+   {
+    "screen": "battle",
+    "what": "Enemy spells now aim with the caster's WISDOM, not its speed - and your own magic does too. A magical attack's hit chance rides an eighth of the wisdom gap plus the level gap; a low-accuracy cast can fall under the physical quarter floor, and in the final battle your magic keeps the disc's fixed ~2-in-3 roll.",
+    "state": "Settled from the original assembly (fightstg.s:31026-31111 F0x800a08c8; ReGame rolls.c:165-190 agrees): ONE formula for both sides, chance = acc + trunc(acc * (trunc((WIS diff)/8) + level diff) / 128), no floor and no cap, no crit/family/ailment terms; the kind-6 fixed roll is player-side only. engine/dw3/battle-formulas.ts gains rollMagicHit; resolveAttackSequence dispatches the FIRST accuracy roll on the attack category (magical -> rollMagicHit, physical -> rollHit) and multi-hit follow-ups stay on rollHit (the applier F0x8009d4b8 calls the +0x9c entry unconditionally, :27628); web/battle.js resolveRepeatDispatch's predicate (the F0x8009ddd8 +0xa0 reader) now uses rollMagicHit. Tests: tests/lane-b/battle-formula-leaves.test.js, tests/engine/systems/battle-formulas.test.ts, tests/engine/systems/battle-combat.test.ts, tests/fight-multihit-repeat-dispatch-wired.test.js (fail-before: 4 new tests fail on HEAD). Claim battle-magical-accuracy-roll-2026-10-09 (partially_verified, BATTLE-Q004). NAMED GAP: the finale model still collapses kinds 4/5/6 into 4, so the kind-6 fixed rolls cannot fire in play yet.",
+    "commit": "\"Battle: magical attacks roll their own WIS-shaped accuracy leaf\" (2026-10-09)"
+   },
+   {
+    "screen": "battle",
+    "what": "The final battle's three phases now run: you fight the tail; when it falls the game says \"What! The body?!\", the body's cannon drops your Digimon to 1 HP, then the head takes over with \"Galacticmon learned a technique!\" and your own attacks keep the disc's fixed ~2-in-3 roll from the head phase on.",
+    "state": "The sixth session's decode (claim wfightmn-finale-kinds-2026-10-10) implemented: engine/dw3/battle-finale.ts carries the beats (kind 5 -> cannon -> kind 6), the live kind word, the F0x800aa06c latch predicate and arm 22's copied-attack build (the head's technique 440 = 0x80042bca + 18 * 440, shipped name \"?????\"); web/battle.js stamps the live kind onto both records, runs the beats off the tail's defeat through the result pages, serves the head's attack from the rebuilt record, records the tail-phase technique at the landed commits, and re-gates finalBossPhaseSwitchesTrack to kind 6 (the assembly's counter runs only while the head stands). Tests: tests/battle-finale-phases.test.js (9; fail-before), tests/battle-missing-cues.test.js updated to the new signature. NAMED STAND-INS: the +0x90/+0xb0 presentation halfwords stay unread; the body's cannon is the player's HP set to 1 (the disc's own state-1 write).",
+    "commit": "\"Battle: the Galacticmon finale's kinds 4 -> 5 -> 6 run; the kind-6 fixed roll fires\" (2026-10-10)"
+   },
+   {
+    "screen": "battle",
+    "what": "Winning the final battle goes straight into the ending instead of the ordinary result screen: the kind-6 win takes the disc's 0xE0B launch cue (the ending movie, MOVIEE01_STR) while every other win keeps the STFRPT results screen — and the finale's win no longer plays the victory jingle.",
+    "state": "The 2026-10-10 win-path session (claim wfightmn-finale-kinds-2026-10-10's outcome-cue consumer): engine/dw3/battle-finale.ts adds battleWinLaunchCode (0xE0B at kind 6 vs 0x1400 otherwise, wfightmn.s:2165-2174 — arm 4's phase-2 exit reads the result byte) and battleWinJinglePlays (wfightmn.s:3376-3384); web/battle.js's win commit stores the cue, gates the jingle and branches the pose's exit — the ordinary win opens the STFRPT report hand-off exactly as before, the kind-6 win runs the ending chain; web/game.js playEndingChain (setEndingHandoff/finishEnding) plays movie row 10 MOVIEE01_STR -> its return selector 0xE0C -> row 11 MOVIEE02_STR -> 0x2d7 = screen 727 = stage 780 through the one field movie adapter. Tests: tests/battle-finale-win-path.test.js (8; fail-before). NAMED GAP: the two ending streams are not shipped (web/assets/movie/ has the two openings and MOVIED08), so each row ends through the adapter's browser-safety abort (logged) and only the return chain is exercised; adding the mp4s to the manifest makes the same code play them.",
+    "commit": "\"Battle: the finale's win exits into the ending movie (kind 6), not the result screen\" (2026-10-10)"
    }
   ],
   "inProgress": [

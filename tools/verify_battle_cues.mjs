@@ -124,10 +124,12 @@ try {
   if (!has(battleSounds, "playBattle:comex102"))
     fail.push(`COMEX102 did not play for an evaded contact: ${JSON.stringify(evadeCues)}`);
 
-  // boss04: arm the Galacticmon counters two-commits-in and land the third.
+  // boss04: arm the Galacticmon counters two-commits-in and land the third — the
+  // counter only runs while the kind word is 6 (the head phase), so the head phase
+  // is what this battle is put into.
   await page.evaluate(() => {
     const b = window.__battleB();
-    b.specialMode = 4; b._bossPhaseCount = 2; b._bossPhaseDone = false;
+    b.specialMode = 4; b._finaleKind = 6; b._bossPhaseCount = 2; b._bossPhaseDone = false;
     b.enemy.hp = 999999; b.enemy.maxHp = 999999;
     b.player.hp = 9999; b.player.maxHp = 9999;
   });

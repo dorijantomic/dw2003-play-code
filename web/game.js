@@ -195,7 +195,13 @@ import {
     // Where the disc sends the player after a movie: the movie's own row
     // (F0x80083cc0 loads the destination word, engine/dw3/screen-routing.ts).
     movieReturnScreen,
+    // The disc's movie row a launch code names (F0x80083f48/F0x80083cc0):
+    // low byte minus one into the twelve-row table.
+    movieRow,
     MOVIE_TITLE_SCREEN,
+    // The kind-6 win's launch cue 0xE0B = STTITL mode 11 = movie row 10 =
+    // MOVIEE01_STR, the ending movie (wfightmn.s:2165-2174).
+    FINALE_WIN_ENDING_MOVIE,
     // The field's battle handoff selector: F0x8008B798 writes 0xE0A (movie row 9,
     // MOVIED08_STR) instead of 0x600 while the master ordinal reads 43.
     battleHandoff,
@@ -823,6 +829,50 @@ battle.setFieldMovieHandoff(async () => {
     });
 });
 window.__fieldMovie = () => fieldMovie.diagnostics();
+
+// The finale's win exit (wfightmn.s:2165-2174, arm 4's phase 2): with the result
+// byte 1 — the win — the resident launcher takes 0xE0B when the battle-kind word
+// is 6, instead of 0x1400 (STFRPT). 0xE0B is STTITL mode 11 = movie row 10 =
+// MOVIEE01_STR (pro/stdwtitl.s:161-167 the mode dispatch, :212-218 the low-byte-
+// minus-one row; engine/dw3/movie-destinations.ts), whose own return selector is
+// 0xE0C = row 11 = MOVIEE02_STR, whose own return selector is 0x2d7 = screen 727
+// = WSTAG780_PRO (stage 780, Kusanagi City Street Corner — the same place the
+// title's Start option lands).
+//
+// The chain plays through the one field movie adapter. A row whose stream is not
+// shipped yet (MOVIEE01/MOVIEE02 are not in assets/movie/) ends through the
+// adapter's browser-safety abort — logged, not fatal — and the chain still
+// resolves the row's return selector, so the win is never stranded; adding the
+// mp4s to the manifest makes the same code play them. The ordinary win's cue
+// (0x1400) never enters here: the battle only calls this for the 0xE0B cue.
+const ENDING_CHAIN_MAX_STEPS = 4;
+async function playEndingChain(launchCode) {
+    let selector = launchCode | 0;
+    for (let step = 0; step < ENDING_CHAIN_MAX_STEPS; step++) {
+        if (movieRow(selector) == null) break;
+        await new Promise((resolve) => {
+            fieldMovieDone = resolve;
+            fieldMovie.open(selector).then((row) => {
+                if (!row) { fieldMovieDone = null; resolve(); } // unknown code: never strand
+            });
+        });
+        selector = movieReturnScreen(selector, state.progressOrdinal === 0x2d) ?? 0;
+    }
+    const routed = screenRouter.route(selector, currentMap().id);
+    if (routed?.kind === "warp") {
+        startTransition({ to: routed.to, spawnX: null, spawnY: null, dir: "down", scripted: true });
+    } else {
+        console.warn("[battle] the finale's ending chain did not resolve to a field screen:", selector);
+    }
+}
+battle.setEndingHandoff({
+    play: (b) => {
+        playEndingChain(b._winLaunchCode ?? FINALE_WIN_ENDING_MOVIE)
+            .catch((error) => console.error("[battle] ending chain", error))
+            .then(() => battle.finishEnding());
+        return true;
+    },
+});
 
 // Ordinary-play hand-off: when a fight is won, the victory report phase opens
 // the native pro/stfgtrep screen instead of the inline report. The screen pays
