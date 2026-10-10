@@ -63,8 +63,14 @@ def process_path(path: str, base: Path) -> Path:
 
 
 def config_of(built: Path) -> Path:
-    """A path under build/ names a .toml beside the source it is built from."""
-    return Path(built.as_posix().replace("/build/", "/")).with_suffix(".toml")
+    """A path under build/ names a .toml beside the source it is built from.
+    Only the ddw3 tree's own build/ is dropped: the tree itself may live under
+    a directory called build."""
+    try:
+        rel = built.relative_to(DDW3 / "build")
+    except ValueError:
+        return built.with_suffix(".toml")
+    return (DDW3 / rel).with_suffix(".toml")
 
 
 def parse_entry(entry: str):
