@@ -27,6 +27,8 @@ const BAND_H = 128;          // map rows per instanced mesh (for culling)
 const CELL = 5;              // jittered placement grid, map pixels
 const BLADES_PER_CELL = 3;
 const MAX_BLADE_H = 20;      // world units, for band culling margin
+const SOLID_R = 5;           // a cell needs a solid-grass window of (2R+1)^2 pixels...
+const SOLID_MIN = 0.9;       // ...of which at least this fraction is grass-coloured
 
 let renderer = null;
 let scene = null;
@@ -130,6 +132,27 @@ function buildStage(stageId, mapImg) {
     const data = cx.getImageData(0, 0, W, H).data;
     const rand = rng(stageId.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
 
+    // Solid-patch test. Tree canopies, leaves and mossy stone have grass-green
+    // speckles mixed with dark gaps; real grass is green all the way across. So a
+    // cell only counts if nearly every pixel in a (2R+1)^2 window is grass-coloured.
+    // A summed-area table makes the window test O(1) per cell.
+    const SW = W + 1;
+    const sat = new Int32Array(SW * (H + 1));
+    for (let y = 0; y < H; y++) {
+        let run = 0;
+        for (let x = 0; x < W; x++) {
+            const o = (y * W + x) * 4;
+            if (isGrass(data[o], data[o + 1], data[o + 2])) run++;
+            sat[(y + 1) * SW + (x + 1)] = sat[y * SW + (x + 1)] + run;
+        }
+    }
+    const solid = (x, y) => {
+        const x0 = Math.max(0, x - SOLID_R), x1 = Math.min(W, x + SOLID_R + 1);
+        const y0 = Math.max(0, y - SOLID_R), y1 = Math.min(H, y + SOLID_R + 1);
+        const n = sat[y1 * SW + x1] - sat[y0 * SW + x1] - sat[y1 * SW + x0] + sat[y0 * SW + x0];
+        return n >= SOLID_MIN * (x1 - x0) * (y1 - y0);
+    };
+
     const bandCount = Math.ceil(H / BAND_H);
     const perBand = Array.from({ length: bandCount }, () => []);
     let total = 0;
@@ -144,6 +167,7 @@ function buildStage(stageId, mapImg) {
             // a cell is grass only if its centre and two nearby probes all are
             const m = [sample(cxp + 2, cy + 2), sample(cxp, cy), sample(cxp + 4, cy + 4)];
             if (!m.every((p) => isGrass(p[0], p[1], p[2]))) continue;
+            if (!solid(cxp + 2, cy + 2)) continue;
             for (let k = 0; k < BLADES_PER_CELL; k++) {
                 const px = cxp + rand() * CELL;
                 const py = cy + rand() * CELL;
