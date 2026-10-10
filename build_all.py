@@ -15,7 +15,9 @@ import shutil
 import os
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
@@ -131,12 +133,16 @@ def _build_argv(stage, uv):
     return [uv, "run", *python_flags, *with_flags, "python", *stage.cmd]
 
 
+_SETUP_LOCK = threading.Lock()
+
+
 def run_stage(stage, uv, log_dir):
     log_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     if stage.setup:
         try:
-            stage.setup()
+            with _SETUP_LOCK:  # setups share toolchain/LFS state; never run two at once
+                stage.setup()
         except (Exception, SystemExit) as e:  # setup is environment-specific; surface, don't crash the run
             return StageResult(stage.name, "FAILED", f"setup: {e}", time.time() - t0)
     for out in stage.outputs:  # tools assume their output directories exist
@@ -153,8 +159,37 @@ def run_stage(stage, uv, log_dir):
     return StageResult(stage.name, "FAILED", f"rc={rc}; log {log}", secs)
 
 
+def default_jobs():
+    """Parallel stage count: DW2003_JOBS, else the core count capped at 6 (the heavy
+    stages hold hundreds of MB each, so more than that mostly costs memory)."""
+    env = os.environ.get("DW2003_JOBS")
+    if env and env.isdigit() and int(env) > 0:
+        return int(env)
+    return max(1, min(os.cpu_count() or 1, 6))
+
+
+def _overlap(a: Path, b: Path) -> bool:
+    return a == b or a in b.parents or b in a.parents
+
+
+def _serial_order_edges(ordered):
+    """name -> names that must finish first so parallel runs keep the serial order
+    for stages that touch overlapping paths (one writes what another reads or
+    writes). Stage definitions don't declare every such pair; the serial order
+    always honoured them, so keep that order for exactly those pairs."""
+    outs = [[_resolve(s.cwd, p) for p in s.outputs] for s in ordered]
+    ins = [[_resolve(s.cwd, p) for p in s.inputs] for s in ordered]
+    edges = {s.name: set() for s in ordered}
+    for j in range(len(ordered)):
+        for i in range(j):
+            if (any(_overlap(o, p) for o in outs[i] for p in outs[j] + ins[j])
+                    or any(_overlap(p, o) for p in ins[i] for o in outs[j])):
+                edges[ordered[j].name].add(ordered[i].name)
+    return edges
+
+
 def run_all(stages, *, only=None, skip=None, include_opt_in=False,
-            uv="uv", log_dir=Path(__file__).resolve().parent / "build/logs"):
+            uv="uv", log_dir=Path(__file__).resolve().parent / "build/logs", jobs=None):
     ordered = topo_order(stages)
     if only:
         keep = set(only)
@@ -163,23 +198,52 @@ def run_all(stages, *, only=None, skip=None, include_opt_in=False,
         ordered = [s for s in ordered if not s.opt_in]
     if skip:
         ordered = [s for s in ordered if s.name not in set(skip)]
+    jobs = max(1, jobs or default_jobs())
+    names = {s.name for s in ordered}
+    waits = _serial_order_edges(ordered)
+    for s in ordered:
+        waits[s.name] |= {d for d in s.deps if d in names}
+    index = {s.name: i for i, s in enumerate(ordered)}
     results = {}
     bad = set()  # names that FAILED or were SKIPPED -> propagate to dependents
     total = len(ordered)
-    for i, s in enumerate(ordered, 1):
-        dep_bad = [d for d in s.deps if d in bad]
-        if dep_bad:
-            results[s.name] = StageResult(s.name, "SKIPPED", f"dep {dep_bad[0]}")
-            bad.add(s.name)
-            print(f"[{i}/{total}] {s.name}: SKIPPED (dep {dep_bad[0]})", flush=True)
-            continue
-        print(f"[{i}/{total}] {s.name} ...", flush=True)
-        res = run_stage(s, uv, log_dir)
-        results[s.name] = res
-        print(f"[{i}/{total}] {s.name}: {res.status}"
-              + (f" ({res.detail})" if res.detail else "") + f" [{res.seconds:.1f}s]", flush=True)
-        if res.status != "OK":
-            bad.add(s.name)
+    pending = list(ordered)
+    running = {}  # future -> stage
+    done_n = 0
+    t_start = time.time()
+    print(f"build: {total} stages, up to {jobs} at a time", flush=True)
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        while pending or running:
+            # start every ready stage (lowest serial index first) while a slot is free
+            for s in list(pending):
+                if len(running) >= jobs:
+                    break
+                if any(w not in results for w in waits[s.name]):
+                    continue
+                pending.remove(s)
+                dep_bad = [d for d in s.deps if d in bad]
+                if dep_bad:
+                    results[s.name] = StageResult(s.name, "SKIPPED", f"dep {dep_bad[0]}")
+                    bad.add(s.name)
+                    done_n += 1
+                    print(f"[{done_n}/{total}] {s.name}: SKIPPED (dep {dep_bad[0]})", flush=True)
+                    continue
+                print(f"   start {s.name}", flush=True)
+                running[pool.submit(run_stage, s, uv, log_dir)] = s
+            if not running:
+                continue
+            finished, _ = wait(running, return_when=FIRST_COMPLETED)
+            for fut in sorted(finished, key=lambda f: index[running[f].name]):
+                s = running.pop(fut)
+                res = fut.result()
+                results[s.name] = res
+                done_n += 1
+                print(f"[{done_n}/{total}] {s.name}: {res.status}"
+                      + (f" ({res.detail})" if res.detail else "") + f" [{res.seconds:.1f}s]", flush=True)
+                if res.status != "OK":
+                    bad.add(s.name)
+    print(f"build wall time: {time.time() - t_start:.0f}s "
+          f"(stage time {sum(r.seconds for r in results.values()):.0f}s)", flush=True)
     _print_summary([results[s.name] for s in ordered])
     return 0 if all(r.status == "OK" for r in results.values()) else 1
 
@@ -1403,6 +1467,10 @@ def main(argv=None):
         "--profile", choices=("authentic", "hd"), default="authentic",
         help="authentic builds native assets only; hd also builds the 4x asset pack",
     )
+    ap.add_argument(
+        "--jobs", "-j", type=int, default=None,
+        help="stages to run at once (default: cores, max 6, or $DW2003_JOBS; 1 = serial)",
+    )
     ap.add_argument("--list", action="store_true", help="print stages in order and exit")
     ap.add_argument("--dry-run", action="store_true", help="validate only, run nothing")
     a = ap.parse_args(argv)
@@ -1436,7 +1504,7 @@ def main(argv=None):
         import shutil as _shutil_uv
         uv = _shutil_uv.which("uv") or uv
     return run_all(
-        STAGES, only=only, skip=skip, include_opt_in=a.profile == "hd", uv=uv
+        STAGES, only=only, skip=skip, include_opt_in=a.profile == "hd", uv=uv, jobs=a.jobs
     )
 
 

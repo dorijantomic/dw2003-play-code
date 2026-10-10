@@ -32,6 +32,7 @@
 #   ./install-play.sh --port 9000           # serve on another port
 #   ./install-play.sh --no-serve            # build only, do not serve
 #   ./install-play.sh --rebuild             # force a tree + asset rebuild
+#   ./install-play.sh --jobs 4              # build stages in parallel (default: cores, max 6)
 #   ./install-play.sh --skip-prereqs        # do not install python/node/uv
 #
 # Disc-route options (all cached under ~/.cache/dw2003-play/ by default):
@@ -63,6 +64,7 @@ DISC_TREE_ARG=""
 SERVE=1
 REBUILD=0
 SKIP_PREREQS=0
+JOBS_ARG=""
 FETCH_DATA=0
 # The ddw3 commit this tree is tested against (override: DDW3_REF=<ref>).
 DDW3_REF="${DDW3_REF:-b125b3d7471c23d305b27f0b1d7a2353643a3ee3}"
@@ -88,6 +90,8 @@ while [ $# -gt 0 ]; do
     --no-serve)      SERVE=0; shift ;;
     --rebuild)       REBUILD=1; shift ;;
     --skip-prereqs)  SKIP_PREREQS=1; shift ;;
+    --jobs)          JOBS_ARG="${2:-}"; shift 2 ;;
+    --jobs=*)        JOBS_ARG="${1#*=}"; shift ;;
     -h|--help)       sed -n '2,51p' "$0"; exit 0 ;;
     *) echo "install-play: unknown option '$1' (try --help)" >&2; exit 2 ;;
   esac
@@ -357,7 +361,7 @@ else
   mkdir -p "$REPO/build"
   rm -f "$REPO/build/.install-ok"
   set +e
-  ( cd "$REPO" && python3 build_all.py ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} ) 2>&1 | tee "$REPO/build/install-build.log"
+  ( cd "$REPO" && python3 build_all.py ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} ${JOBS_ARG:+--jobs "$JOBS_ARG"} ) 2>&1 | tee "$REPO/build/install-build.log"
   rc="${PIPESTATUS[0]}"
   set -e
   if [ "$rc" != 0 ]; then
