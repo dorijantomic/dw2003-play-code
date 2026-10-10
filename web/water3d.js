@@ -10,6 +10,7 @@
 //   3. game.js draws the result right after the map, before the y-sorted
 //      entities, so the party and props stand on top of the water.
 import * as THREE from "./lib3d/three.module.min.js";
+import { classSource } from "./mapclass.js";
 
 const VIEW_W = 320;
 const VIEW_H = 240;
@@ -115,6 +116,22 @@ function ensureRenderer() {
     return true;
 }
 
+// Only these maps get water. "Blue pixels" is a poor test on its own: city
+// interiors have blue floors and screens (30-43% "water" in Amaterasu City) and
+// night variants are tinted blue all over. Each id is listed with its day/night
+// variant. Lake of Ice (ice) and the swamps (murky, ~0% blue) are left out for now.
+const WATER_STAGES = new Set([
+    "s206",           // Amaterasu Bridge
+    "s330", "s331",   // Central Park
+    "s340", "s341",   // Shell Beach
+    "s345", "s346",   // Plug Cape
+    "s380", "s381",   // Divermon's Lake
+    "s385", "s386",   // Duel Island
+    "s495", "s496",   // South Cape
+    "s525", "s526",   // Suzaku / Zhu Que UG Lake
+    "s560", "s561",   // Pelche Oasis
+]);
+
 // Maps whose water is murky GREEN rather than blue. A green rule would put water
 // on forest shadows elsewhere (e.g. Wind Prairie), so it is opt-in per stage.
 const GREEN_WATER_STAGES = new Set(["s380", "s381"]); // Divermon's Lake
@@ -128,6 +145,7 @@ function isWater(r, g, b, greenMode) {
 // The water test for one stage, so grass3d.js can keep blades out of water
 // with exactly the rule that decides where water is drawn.
 export function waterPixelTest(stageId) {
+    if (!WATER_STAGES.has(stageId)) return () => false;
     const greenMode = GREEN_WATER_STAGES.has(stageId);
     return (r, g, b) => isWater(r, g, b, greenMode);
 }
@@ -156,12 +174,14 @@ function boxBlur(src, W, H, rad) {
     return out;
 }
 
-function buildStage(stageId, mapImg) {
+// clsImg decides WHERE the water is (the base map for a day/night variant);
+// the shader draws it over mapImg, the map on screen, so it keeps that palette.
+function buildStage(stageId, mapImg, clsImg) {
     const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(mapImg, 0, 0);
+    cx.drawImage(clsImg, 0, 0);
     const data = cx.getImageData(0, 0, W, H).data;
     const raw = new Uint8Array(W * H);
     let count = 0;
@@ -188,11 +208,14 @@ function buildStage(stageId, mapImg) {
 
 // Returns the hidden canvas (VIEW_W*PX by VIEW_H*PX, camera-relative) or null.
 export function renderWater(stageId, mapImg, camX, camY, timeSec) {
+    if (!WATER_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
     let st = stages.get(stageId);
     if (st === undefined) {
-        st = buildStage(stageId, mapImg);
+        const cls = classSource(stageId, mapImg);
+        if (!cls) return null;                 // variant list / base map still loading
+        st = buildStage(stageId, mapImg, cls);
         stages.set(stageId, st);
     }
     if (!st) return null;

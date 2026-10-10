@@ -17,6 +17,7 @@
 // exactly on that map pixel and a blade h tall rises h*cos(PITCH) pixels.
 import * as THREE from "./lib3d/three.module.min.js";
 import { waterPixelTest } from "./water3d.js";
+import { classSource } from "./mapclass.js";
 
 const VIEW_W = 320;          // map pixels visible (game draws at ZOOM 2)
 const VIEW_H = 240;
@@ -125,13 +126,20 @@ function isGrass(r, g, b) {
     return g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
 }
 
-function buildStage(stageId, mapImg) {
-    const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
+function pixelsOf(img) {
     const cv = document.createElement("canvas");
-    cv.width = W; cv.height = H;
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(mapImg, 0, 0);
-    const data = cx.getImageData(0, 0, W, H).data;
+    cx.drawImage(img, 0, 0);
+    return cx.getImageData(0, 0, cv.width, cv.height).data;
+}
+
+// clsImg decides WHERE grass goes (the base map for a day/night variant);
+// mapImg, the map on screen, decides what COLOUR each blade is.
+function buildStage(stageId, mapImg, clsImg) {
+    const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
+    const data = pixelsOf(clsImg);
+    const colorData = clsImg === mapImg ? data : pixelsOf(mapImg);
     const rand = rng(stageId.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
 
     // Solid-patch test. Tree canopies, leaves and mossy stone have grass-green
@@ -175,6 +183,12 @@ function buildStage(stageId, mapImg) {
         const o = (y * W + x) * 4;
         return [data[o], data[o + 1], data[o + 2]];
     };
+    const sampleColor = (x, y) => {
+        x = Math.min(W - 1, Math.max(0, x | 0));
+        y = Math.min(H - 1, Math.max(0, y | 0));
+        const o = (y * W + x) * 4;
+        return [colorData[o], colorData[o + 1], colorData[o + 2]];
+    };
     for (let cy = 0; cy < H; cy += CELL) {
         for (let cxp = 0; cxp < W; cxp += CELL) {
             // a cell is grass only if its centre and two nearby probes all are
@@ -184,8 +198,9 @@ function buildStage(stageId, mapImg) {
             for (let k = 0; k < BLADES_PER_CELL; k++) {
                 const px = cxp + rand() * CELL;
                 const py = cy + rand() * CELL;
-                const [r, g, b] = sample(px, py);
-                if (!isGrass(r, g, b)) continue;
+                const [cr, cg, cb] = sample(px, py);
+                if (!isGrass(cr, cg, cb)) continue;
+                const [r, g, b] = sampleColor(px, py);
                 const vary = 0.85 + rand() * 0.35;
                 perBand[Math.min(bandCount - 1, (py / BAND_H) | 0)].push(
                     px, 0, py / SIN,                                  // iPos
@@ -224,7 +239,9 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
     if (!ensureRenderer()) return null;
     let st = stages.get(stageId);
     if (st === undefined) {
-        st = buildStage(stageId, mapImg);
+        const cls = classSource(stageId, mapImg);
+        if (!cls) return null;                 // variant list / base map still loading
+        st = buildStage(stageId, mapImg, cls);
         if (!st.count) st = null;
         stages.set(stageId, st);
         console.log(`grass3d: ${stageId} -> ${st ? st.count : 0} blades`);
