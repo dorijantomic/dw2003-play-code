@@ -43,6 +43,9 @@ PLIST
 # Ad-hoc signature so Apple Silicon runs the bundled binaries.
 codesign --force --deep --sign - "$APP" || true
 
+# The app as players get it must pass the launcher's self-test.
+"$APP/Contents/Resources/runtime/python/bin/python3" "$APP/Contents/Resources/app/launcher/dw2003.py" --self-test
+
 ln -s /Applications "$WORK/Applications"
 cat > "$WORK/READ ME FIRST.txt" <<TXT
 1. Drag "Digimon World 2003" into Applications.
