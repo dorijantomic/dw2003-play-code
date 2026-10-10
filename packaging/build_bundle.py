@@ -110,8 +110,14 @@ def trim(out: Path):
     stdlib = py / "Lib" if os.name == "nt" else next((py / "lib").glob("python3.*"))
     for rel in TRIM_PY:
         shutil.rmtree(stdlib / rel, ignore_errors=True)
-    for pat in ("lib/libtcl*", "lib/libtk*", "lib/tcl*", "lib/tk*", "lib/itcl*", "lib/thread*",
-                "tcl", "DLLs/tcl*.dll", "DLLs/tk*.dll", "DLLs/_tkinter.pyd"):
+    # Tcl/Tk (no GUI is used). Windows paths are case-insensitive: "lib/thread*"
+    # there would match the stdlib's Lib/threading.py, so each OS gets its own list.
+    if os.name == "nt":
+        tk = ("tcl", "DLLs/tcl*.dll", "DLLs/tk*.dll", "DLLs/_tkinter.pyd")
+    else:
+        tk = ("lib/libtcl*", "lib/libtk*", "lib/tcl[0-9]*", "lib/tk[0-9]*", "lib/itcl*",
+              "lib/thread[0-9]*")
+    for pat in tk:
         for f in py.glob(pat):
             shutil.rmtree(f, ignore_errors=True) if f.is_dir() else f.unlink()
     for f in py.rglob("__pycache__"):
