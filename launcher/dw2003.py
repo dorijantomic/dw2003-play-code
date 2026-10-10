@@ -696,5 +696,22 @@ def main(argv=None):
     return serve(build, a.port, not a.no_browser)
 
 
+def _run_from_shortcut():
+    """Started from a shortcut there is no terminal to read a crash in: keep it open."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetConsoleTitleW("Digimon World 2003")
+        except Exception:
+            pass
+    try:
+        return main()
+    except Exception:
+        traceback.print_exc()
+        if os.name == "nt" or sys.platform == "darwin":
+            input("\nSomething went wrong (details above). Press Enter to close.")
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_run_from_shortcut())
