@@ -293,8 +293,8 @@ def build() -> dict:
 
     return {
         "_source": {
-            "resident": str(RESIDENT.relative_to(REPO)),
-            "models": str(MODEL_DIR),
+            "resident": RESIDENT.relative_to(REPO).as_posix(),
+            "models": MODEL_DIR.as_posix(),
             "profileTable": "0x%08X stride 0x%02X rows 0x%02X" % (
                 PROFILE_BASE, PROFILE_STRIDE, PROFILE_ROWS),
             "techniqueTable": "0x%08X stride 0x%02X, byte +0x10 = clip" % (
