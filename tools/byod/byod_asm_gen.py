@@ -115,7 +115,7 @@ def disassemble(objdump_bin: str, input_path: str, adjust_vma: str) -> str:
         objdump_bin, "--disassemble-all", "--target=binary",
         "--architecture=mips:3000", f"--adjust-vma={adjust_vma}",
         "--endian=little", "--disassemble-zeroes", input_path,
-    ]).decode("utf-8")
+    ]).decode("utf-8").replace("\r\n", "\n")  # a Windows objdump writes CRLF
     # `.word\t0x2458` (new binutils) -> `0x2458` (2023 toolchain form)
     out = re.sub(r"\t\.word\t(0x[0-9a-f]+)$", lambda m: "\t" + m.group(1), out, flags=re.M)
     return out
