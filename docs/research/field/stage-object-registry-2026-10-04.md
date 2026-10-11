@@ -3712,3 +3712,199 @@ Ledger: `s415-scroll-layer-visit-word-polarity-tension-2026-10-09`.
 > == 260` / `members_interpreter_only == 1` and hard-coded twenty-three-member list
 > the automated census check compares against — updated in the same change. The
 > port and its machine are unaffected by that bookkeeping.
+
+## 22. The A.o.A. Headquarters pair's stage-side machinery, re-read for the ReGame-leads pass (2026-10-10)
+
+**Why this section.** The ReGame-Labs cross-reference
+(`~/.hermes/cache/scratch/regame-xref/leads.json`) lists 35 free leads across the
+two A.o.A. Headquarters stages — s310 (Asuka City) and s311 (Amaterasu City).
+This pass read all 35 from the original assembly. Five were already closed as
+DECODED (the 831/832 command entries of `stage-command-set-aoa-2026-10-10`); of
+the remaining 30, eighteen were named by earlier claims (§13.2's fixed still
+sprites, §16's display-slot ensembles, the 2026-09-11 sweep claim
+`stage-aoa-hq-scene-controllers-wstag310-311-2026-09-11`, the places claims of
+§WS7) but `./dw3-research known` still reported them **MENTIONED**, because the
+sweep's evidence locators name bodies by overlay-relative `.L0x…` labels and the
+anchor reader credits only RAM addresses; §22.3 anchors those with `@0x800a…`
+locators. The other twelve are genuinely new, and they are all one system: the
+stages' own copy of the six-slot display machinery and the clip-run steppers it
+and the pad ticks drive. **Nothing here was implemented**; the wiring note is
+§22.5. Ledger: claims `aoa-hq-tile-six-machinery-2026-10-10` and
+`aoa-hq-stage-leads-anchored-2026-10-10`; evidence
+`EV-WSTAG310/311-TILESIX/STEPPER/LEADS-ANCHORS-ASM-2026-10-10`.
+
+### 22.1 The six-slot display machinery beyond the two command entries
+
+§16 covers the two registry members (831/832: ticks `0x800a61d0`/`0x800a6758`,
+builders `0x800a65d4`/`0x800a6b58`, configure `0x800a6598`/`0x800a6b1c`). The
+overlays also carry the rest of that family, and the assembly says which parts
+are live:
+
+| stage | address | what it is | referenced? |
+|---|---|---|---|
+| s310 | `0x800a660c` createTileSix | `createTask(callback 0x800a61d0, 0x84)` — the 831 object with no registry id and no mode store | **no** |
+| s310 | `0x800a6b90` createTileSixW | `createTask(callback 0x800a6758, 0x9c)` — the 832 object, same omissions | **no** |
+| s310 | `0x800a6638` stepTileAnimation2 | the per-slot clip-run stepper updateTileSixW drives (five call sites; tables `0x800a83f8`/`0x800a842c`/`0x800a8460`/`0x800a846c`/`0x800a84d0`) | updateTileSixW only |
+| s311 | `0x800a6594` restartTileSix | two-arm configure: operand 0 resets slots 0/1 (cursors `+0x58`/`+0x60` to 0, holds `0x800a81d2`/`0x800a8206`) and sets mode 1; operand 1 the same with `0x800a8282`/`0x800a82b6` and mode 3 | **no** |
+| s311 | `0x800a6b44` restartTileSixW | the same pair for the W member (holds `0x800a82ea`/`0x800a831e` and `0x800a838e`/`0x800a83c2`) | **no** |
+| s311 | `0x800a6604`/`0x800a6634` | createTileSixWithId / createTileSix — `0x84` bytes, callback `0x800a61d0`, no mode store | **no** |
+| s311 | `0x800a6bb4`/`0x800a6be4` | createTileSixWWithId / createTileSixW — `0x84` bytes, callback `0x800a6780` (s311's own W tick; `0x84` bytes, not s310's `0x9c`) | **no** |
+
+"Referenced" was tested per file: the address as a `jal` target, as a data word,
+and as a `lui`/`addiu` immediate pair — zero hits for every "no" row (the
+registry's `0x33f`/`0x340` entries point at `0x800a65d4`/`0x800a6b58`, not at
+the plain builders). The family also carries s311's W tick `0x800a6780` (the
+callback the two dead W builders install) and its per-slot stepper `0x800a6660`
+(cursor `+4`/`+6`, self-recursing): the tick drives the stepper five times, so
+neither is unreferenced — both are referenced only from within the dead block.
+So s310 keeps half the family alive and s311's copy is
+entirely dead code from the shared stage template — and unreachable through the
+command table too: the global table's `0x33f`/`0x340` pointers land inside
+s311's *restart* bodies, not on its builders, and s311's scripts fire none of
+the display-slot ids (its registry members are 803-806, 813, 838 — §16.2 said
+the same from the other side: "s311 carries a display-chain walk with no
+registry constructor behind it").
+
+`stepTileAnimation2` is the same four-argument recursive stepper as §22.2's two
+scripts, with one difference: the cursor block sits at `+8`/`+0xa` from the
+passed base instead of `+0`/`+2`, which is exactly the W member's per-slot block
+layout (base `+0x54`, stride `0xc`, live pair `+0x5c`/`+0x5e` for slot 0 — the
+same pair handleCommand832 writes on operand `0x359`).
+
+### 22.2 The two script steppers
+
+`stepAnimation` (`0x800a6dd8`) and `stepAnimation2` (`0x800a7338`) are the
+same body apart from their two self-referential jump targets (the one-shot jump
+and the self-recursion call) — the clip-run stepper the shared-routines document
+lists in four forms, here with the cursor at `+0`/`+2`:
+
+```
+lh $v1, ($s1)           # cursor -> table entry {s16 clip; s16 hold}
+lw $v0, [0x8005df9c]    # frame delta for this tick, capped at 4 (slti 5 / li 4)
+lhu $v0, 2($s1)         # hold counter; charged by the delta when depth == 0
+                        # hold <= 0 -> cursor++, hold += the next entry's hold
+lh $v1, ($s0) ; 0xff    # terminator: one-shot (a2 != 0) returns 0xff,
+                        # loop (a2 == 0) wraps to entry 0 and adds its hold
+return lh($s0)          # the clip id to draw
+```
+
+Both recurse (`a3 + 1`) so several expired entries advance within one tick.
+Their callers: `stepAnimation` is driven by the fixed still sprite's tick
+`0x800a70ac` for its idle run (`0x800a851c` on `+0x60`) and strobe run
+(`0x800a8534` on `+0x5c`); `stepAnimation2` by the class-0x17 pad tick
+`0x800a7604` for its loop run (`0x800a858c` on `+0x60`) and burst run
+(`0x800a85a4` on `+0x5c`). s311's copy (`0x800a6e2c`) is the same body, called
+only by the tick `0x800a70f8` — which serves both its id-838 fixed sprite
+(`0x800a73e4` allocates a `0x6c`-byte object with that callback) and its pads
+(`0x800a7388` registers a `0x6c`-byte, task-id-`0x17` object with the same
+callback) — against s310 where the pads (`createEffect` `0x800a7894` → tick
+`0x800a7604`) and the fixed sprite (`0x800a72cc` → tick `0x800a70ac`) use two
+different ticks.
+
+### 22.3 The leads already decoded, now anchored per overlay
+
+Read again and anchored this pass (`known` reported MENTIONED for each before):
+
+* **s310** — `updateStage` `0x800a6bbc` (children[0] = the tagged-decor task via
+  `createTileAnims`; children[3]/[4] = the two pads of the 2-record table
+  `0x800a8504` — `{clip 0x14, guard 0, (492,188)}` and `{clip 0x14, guard 0,
+  (620,252)}`; one event per visit: 680 when `get_flag(0x404e,0)` (clear), 681
+  when set and `0x404f` clear — the branch that also builds commands 831/832
+  into children[1] (the 831 task, stored in the 832 builder call's delay slot)
+  and children[2] (the 832 task) — 682 when `0x404f` is
+  set, 961 at ordinal `0x26`; the started event's handle lands in children[5]
+  in every branch (in the 681 branch its store is the delay slot of the 831
+  builder call)). `startStage` `0x800a6d7c` (`createTask(0x800a6bbc,
+  0x54, 0x18)`, `stageFuncs[0]` = `[0x800a8ce4]`). `setupStage` `0x800a79d4`
+  (descriptor `0x80099d80`: `+0x8=0x342`, `+0xc=0x3430000`, `+0x1c=0x341`,
+  `+0x3c=0x2a`, `+0x40=0x60a80000`, `+0x44=language+0xe8`, `+0x2c/+0x30/+0x34 =
+  0x13e00/0x19800/0`, pointers at `+0x10/+0x14/+0x20/+0x24/+0x28/+0x4c`, then
+  zonemgr loads `0x3430001`/`0x3430002` and load-start — values also in
+  `docs/generated/stage-descriptors.json`). `createTileAnims` `0x800a6084`
+  (`createTask(0x800a5f34, 0x60)`). `createEffect` `0x800a7894`
+  (`createTask(0x800a7604, 0x6c)`, then x/y/clip to `+0x54`/`+0x58`/`+0x50`).
+  `updateStageEffect` `0x800a7604` (the class-0x17 pad tick: loop run on
+  `+0x60` → `+0x64`, burst run on `+0x5c` → `+0x66`/`+0x68`, `vt+0x28(obj,1)`
+  when the burst hits `0xff`, draws the `0x20`-wide pair at `(x,y)` and
+  `(x,y-0x20)` through the `0x1002` draw context with callback `0x800a7458`,
+  gated by the on-screen test `0x800a7540`). Hooks: `endEvent680` `0x800a78ec`
+  (flags `0xc13`, `0x404e`; battle `0x7401`), `endEvent681` `0x800a794c`
+  (`0x404f`; battle `0x7400`), `endEvent682` `0x800a7998` (`0x4050`),
+  `endEvent961` `0x800a79c4` (master ordinal `0x27`).
+* **s311** — `updateStage` `0x800a6c10` (children[0] as above; three pads from
+  the 3-record table `0x800a83f4` through `0x800a7388` into children[3]/[4]/[5]
+  — `{0x14,0,(492,188)}`, `{0x14,0,(620,252)}`, `{0x2a,2,(271,411)}`, the third
+  only when the master ordinal `>= 0x28`; children[1]/[2] are never written; at
+  ordinal `0x25` the first clear flag in order `0x405e`/`0x4067`/`0x405f`/`0x4060`
+  starts `0x3a3`/`0x3a4`/`0x3a5`/`0x3a6`; at ordinal `0x27` flag `0x406c`
+  clear/set starts `0x3d5`/`0x3d6`; the handle lands in children[6]).
+  `startStage` `0x800a6dd0` (`createTask(0x800a6c10, 0x54, 0x1c)`,
+  `[0x800a8b18]`). `setupStage` `0x800a75a0` (descriptor `+0x8=0x53c`,
+  `+0xc=0x53d0000`, `+0x1c=0x53b`, `+0x3c=0x2a`, `+0x40=0x60a80000`,
+  `+0x44=language+0xda`, `+0x2c/+0x30/+0x34 = 0x13500/0x19d00/0`, loads
+  `0x53d0001`/`0x53d0002`). `createTileAnims` `0x800a6084` (same body as
+  s310's). Hooks: `endEvent931` `0x800a7460` (`0x405e`, `0xc33`; battle
+  `7401`), `endEvent932` `0x800a74c0` (`0x4067`; battle `0x7400`),
+  `endEvent933` `0x800a750c` (`0x405f`), the two further end hooks `0x800a7538`
+  (`0x4060`, event `0x3a6`) and `0x800a7564` (`0x406c`, event `0x3d5`),
+  `endEvent982` `0x800a7590` (ordinal
+  `0x28`).
+
+The flag reads use the polarity reader of §WS4.7: `get_flag(id, 0)` is true iff
+the flag is clear, `get_flag(id, 1)` iff set. The anchoring gap itself is worth
+recording: the 2026-09-11 sweep cites bodies as `.L0x00000ddc`-style labels and
+the anchor reader parses only 6-8 hex digits after `0x`, so those anchors never
+registered per overlay — a `known` verdict of MENTIONED on an address that a
+claim already describes is this failure mode, not evidence the work is undone.
+
+### 22.4 What the player meets
+
+Both A.o.A. Headquarters interiors are built from the same parts: the two
+stacks of six wall pictures (§16.3), the fixed still sprite on the wall (§13.2),
+two animated wall pads (a third in the Amaterasu room, which only appears once
+the story has advanced past ordinal `0x28`), and a scene controller that picks
+one scene per visit from the story state — Asuka: 680, then 681 (which also
+lights the two six-picture ensembles), then 682, then event 961 which advances
+the chapter to ordinal `0x27`; Amaterasu: 931-934 in sequence, then 981/982,
+which advances the chapter to ordinal `0x28`. The event-end hooks are what flip
+the flags and the chapter between visits, so the two rooms' story loops are:
+enter → one scene from the current flags → hook advances the flag → next visit
+picks the next scene. The `0x800a7604`/`0x800a70f8` pads draw a 32-pixel-wide
+two-tile animation (palette cycling, a burst row 32 pixels higher) through the
+game's 2D draw service, and the picture runs are driven by the clip tables this
+pass read (`0x800a851c`, `0x800a8534`, `0x800a858c`, `0x800a85a4`, and s311's
+twins).
+
+### 22.5 Walker wiring note (not implemented here)
+
+* Ported and unaffected: the two ensembles (§16, `stage-slot-ensemble.ts` +
+  `stage_slot_ensembles.json`, members s310 only) and the two fixed sprites
+  (§13.2, `stage-fixed-sprite.ts` + `stage_fixed_sprites.json`); the generated
+  census reads 7/7 and 6/6 for s310/s311.
+* **Not ported**: the pads — s310's two (`createEffect`/`updateStageEffect`,
+  tick `0x800a7604`) and s311's three (`0x800a7388`, tick `0x800a70f8`, task id
+  `0x17`) — have no engine module today (nothing under `engine/` or `web/`
+  names their routines). A faithful port needs the draw-context submission
+  (`0x1002` +0x14c with callback `0x800a7458`) and the on-screen test
+  (`0x800a7540`, which is the same shape as the ported `0x800a6fe8`).
+* **Not ported, and this pass does not ask for it**: the scene controllers'
+  event-selection branches. The walker drives these stages' scenes from the
+  converted event data; a port of `0x800a6bbc`/`0x800a6c10` would need
+  `get_flag` polarity semantics (arg 0 = clear) and the child slots above (the
+  started event's handle to children[5] in every branch; in the 681 branch, the
+  831/832 tasks to children[1]/children[2]).
+* The six-slot machinery's dead copies (s310's plain builders, all of s311's)
+  need **no** port — nothing calls them.
+
+### 22.6 What this pass did not establish
+
+* What any of the pads or the ensembles depict pixel-for-pixel in the two
+  rooms' art (the runs and positions are read; the pictures are not).
+* The sounds: `0x4001d` (the fixed sprite's build cue) and the pads' sounds are
+  packed ids; their names are not established (`docs/research/audio/`).
+* No runtime: everything above is static reads of the original assembly
+  (authority 2). Neither stage was run for this pass.
+* The s310 681-branch children bookkeeping (children[1] and children[2] take
+  the 831/832 tasks; children[5] the started event's handle in every branch) is
+  recorded as the machine does it; whether the original source intended those
+  two command tasks to be consumed elsewhere is not established.

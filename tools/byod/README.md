@@ -6,7 +6,7 @@ Digimon World 2003 (PAL/EU, SLES-03936) disc image.
 **Credits.** Format decoding is done by Marko's
 ([markisha64](https://github.com/markisha64), the
 [ddw3](https://github.com/markisha64/ddw3) decompilation) extractor binaries,
-using markisha's work. If you use this, credit Marko and ddw3. The routing,
+reused with permission. If you use this, credit Marko and ddw3. The routing,
 kind detection, config rewriting and the wiring into the play-code build are
 byod's.
 

@@ -125,7 +125,7 @@ import {
     RADAR_Y,
     treeActionPoint,
     treeIndexAt,
-    FIELD_FOOTPRINT_OFFSETS,
+    fieldProbePushback,
     actorFootprintBlocked,
     npcHalfWidth,
     relocateActiveTree,
@@ -141,6 +141,9 @@ import {
     fieldDirectionIndex,
     isLadderPlayback,
     ladderMountFacing,
+    ladderClimbPlan,
+    ladderClimbPosition,
+    ladderDismountEnd,
     isStageChangePlayback,
     isDivePlayback,
     routePairCommit,
@@ -3047,7 +3050,13 @@ function currentMap() {
 // The player is drawn from the dedicated ladder sprite (p002plyl) while
 // mounted — the same swap the PS1 does.
 const CLIMB_SPEED = 60; // px/s = +0x100 (1px<<8) per 60fps frame, decoded
-const DISMOUNT_SECS = 19 / 60; // clip 28 durations 4+4+4+4+3 ticks
+// Clip lengths, in ticks at the 60 fps animation clock (build_assets durations):
+// clip 28 (0x1c, bottom step-on) 4+4+4+4+3; clip 30 (0x1e, head step-on) 4x5;
+// clip 29 (0x1d, top step-off) 3+1x10+6+6; clip 31 (0x1f, bottom step-off) 3+3+3+4.
+const MOUNT_SECS_BOTTOM = 19 / 60;
+const MOUNT_SECS_TOP = 20 / 60;
+const DISMOUNT_SECS_TOP = 25 / 60;
+const DISMOUNT_SECS_BOTTOM = 13 / 60;
 
 // The rail the PLAYBACK executor's record names. The op-2/op-3 handler passes
 // params[0] (the ladder id) and the endpoint cell params[1]/params[2] straight to
@@ -3180,16 +3189,6 @@ function startLadderClimb(scene) {
     if (!hit) return null;
     const { L, pt, isTop } = hit;
     const fromBottom = !isTop;
-    // Vertical climb only, and the climb runs on the RAIL, not on the cell you
-    // mounted from. The rail's x is the FOOT endpoint's x: the disc's bottom mount
-    // does not move x (mode 0x43, file 0xd8ec, never touches entity+0x50), while the
-    // head mount's step-on mode 0x44 (file 0xd950) reads the side word entity+0x8c and
-    // does `addiu $v0,$v1,0x1000` / `sw $v0,0x50($s0)` — x = mount_x ± 16 px
-    // (fieldstg.s:13927-13932) — so the head cell (the landing) is one grid cell to the
-    // side of the rail the climb uses. The two climb blocks themselves (0xd818 up,
-    // 0xd878 down) only touch the offset entity+0x90. Height = vertical span.
-    const height = Math.abs(L.bottom.y - L.top.y);
-    const railX = L.bottom.x;
     // The facing the mount hands the player actor, read out of the port's own
     // actor call — `a1`, which both mount bodies store into `entity+0x60`
     // (pro/fieldstg.s:12601 `sw $s3,0x60($s4)` bottom, :12644 top). Op 2 passes its
@@ -3204,22 +3203,39 @@ function startLadderClimb(scene) {
     const facing = ladderMountFacing(pb.effect);
     if (facing == null) return null;
     const dirStr = fieldDirectionFromIndex(facing);
+    // The climb's own geometry: the rail x (the foot's x from the bottom, the head
+    // cell ± 16 by the side word from the top), the rail's foot ground row, the
+    // drawn start row, and the climb length = the record's `(params[0]-1)<<4`
+    // (actorCall.args[3]) — NOT the endpoint span. The census over all 216 shipped
+    // rails has span = height + 24 for 132 of them (+13..+28 for the rest); the
+    // last 24 px are the dismount step-off, not climb. engine/systems/
+    // scene-step-ops.ts carries the full citations.
+    const recordHeight = pb.effect.actorCall?.args?.[3] ?? 0;
+    const plan = ladderClimbPlan(L.bottom, L.top, facing, fromBottom, recordHeight);
     state.climb = {
         bottom: L.bottom,
         top: L.top,
-        x: railX,
-        height,
-        progress: fromBottom ? 0 : height,
-        phase: "climb",
-        clip: 32, // hang
+        plan,
+        x: plan.railX,
+        baseY: plan.baseY,
+        height: plan.height,
+        side: plan.side,
+        fromBottom,
+        progress: fromBottom ? 0 : plan.height,
+        // The mount plays its own step-ONTO-the-rail clip first: the bottom mount
+        // hands over mode 0x43 = clip 0x1c (28), the head mount mode 0x44 = clip
+        // 0x1e (30). Both then hand over to mode 0x40, the hang (clip 0x20 = 32).
+        phase: "mount",
+        clip: fromBottom ? 28 : 30,
         animT: 0,
         dirStr,
     };
-    // The mount puts the sprite on the rail (x = the foot's x); y is the mount cell's,
-    // which for a head mount equals the rail's foot y minus the height tickClimb
-    // would set on the next frame.
-    state.x = railX;
-    state.y = pt.y;
+    // The mount's own drawn row: the bottom mount pins the foot cell; the head
+    // mount's step-on moves x onto the rail and its first drawn row is
+    // head.y + 24 (mode 0x44's `+0x1800 + +0x94` base, offset seeded to height).
+    const at = ladderClimbPosition(plan, state.climb.progress);
+    state.x = at.x;
+    state.y = at.y;
     // entity+0x60 is that same word, not a generic "up": the disc's mount writes
     // the facing it was handed (pro/fieldstg.s:12601), and the step-load under
     // the player reads it back on the next frame (:5546) to decide whether the
@@ -3462,25 +3478,37 @@ function treeStage(mapId = currentMap().id) {
 }
 
 /**
- * Whether the player's foot perimeter at (x,y) is occupied by a standing field
- * actor or a tree — the walk predicate's obstacle (`F0x8008dfec` probes the
- * perimeter through `F0x8008de0c` -> zonemgr+0x58 = `F0x80092a90`). The offsets
- * and the actor diamond live in engine/systems/field-movement.ts; the tree test
- * is treeIndexAt (`F0x8008ce40`). Reads the same live NPC list and tree table the
- * draw uses, so what blocks is what you see. The player is never in the list.
+ * The occupancy query at ONE probe point (F0x80092a90): occupied when the point
+ * lies inside a standing field actor's footprint diamond `|dx| + 2|dy| <=
+ * halfWidth` or within 10 px of a tree (F0x8008ce40, treeIndexAt). Reads the
+ * same live NPC list and tree table the draw uses, so what blocks is what you
+ * see. The player is never in the list.
  */
-function fieldStepBlockedByActors(m, x, y) {
+function fieldPointOccupied(m, px, py) {
     const scene = state.scenes[m.id];
     const npcs = scene?.npcs
         ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get)
         : [];
+    if (actorFootprintBlocked(npcs, (n) => npcHalfWidth(n.npc_id), px, py)) return true;
     const trees = treeStage(m.id)?.trees ?? null;
-    for (const [ox, oy] of FIELD_FOOTPRINT_OFFSETS) {
-        const px = x + ox, py = y + oy;
-        if (actorFootprintBlocked(npcs, (n) => npcHalfWidth(n.npc_id), px, py)) return true;
-        if (trees && treeIndexAt(trees, { x: px, y: py }) != null) return true;
-    }
-    return false;
+    return !!(trees && treeIndexAt(trees, { x: px, y: py }) != null);
+}
+
+/**
+ * The disc's obstacle response at a post-step position: F0x8008dfec's five
+ * probes for the actor's CURRENT facing (`fieldProbePushback`), each occupied
+ * point pushing the actor back by its own (∓mag/2, ∓mag/4) — never a step
+ * revert, and never a point behind the actor, so walking away from an obstacle
+ * is always allowed. Returns the vector to SUBTRACT (F0x8008de0c's arg3/arg4).
+ */
+function fieldStepObstaclePush(m, x, y, magnitudeFixed) {
+    return fieldProbePushback(
+        fieldDirectionIndex(state.dir),
+        magnitudeFixed,
+        x,
+        y,
+        (px, py) => fieldPointOccupied(m, px, py),
+    );
 }
 
 /**
@@ -3602,18 +3630,46 @@ function storyGridCellAt(x, y) {
     return g.grid[cy * g.w + cx] ?? null;
 }
 
-// Per-frame climb driver. Player-controlled: up/down move along the rungs,
-// idle hangs; auto-dismount at either end. Returns true while mounted.
+// Per-frame climb driver. The disc's own sequence, in order: the mount's
+// step-onto-the-rail clip (mode 0x43 bottom = clip 0x1c, mode 0x44 head = clip
+// 0x1e), then mode 0x40's hang (clip 0x20) while up/down move the offset along
+// the rungs, then the step-off clip (mode 0x45 top = clip 0x1d, mode 0x46
+// bottom = clip 0x1f). The step-off's landing shift is applied on ITS
+// completion, not at its start — the clip's own art carries the visual move.
+// Returns true while mounted.
 function tickClimb(dt) {
     const c = state.climb;
     if (!c) return false;
     state.moving = false;
-    if (c.phase === "dismount") {
+    const k = state.keys;
+    if (c.phase === "mount") {
+        // The step-on plays out first; up/down are not read yet (the mount modes
+        // hand over to mode 0x40 only when their own clip has run out).
         c.animT += dt;
-        if (c.animT >= DISMOUNT_SECS) state.climb = null;
+        if (c.animT >= (c.fromBottom ? MOUNT_SECS_BOTTOM : MOUNT_SECS_TOP)) {
+            c.phase = "climb";
+            c.clip = 32; // mode 0x40, the hang
+            c.animT = 0;
+        }
         return true;
     }
-    const k = state.keys;
+    if (c.phase === "dismount") {
+        c.animT += dt;
+        if (c.animT >= (c.atTop ? DISMOUNT_SECS_TOP : DISMOUNT_SECS_BOTTOM)) {
+            // The completion applies the step-off: mode 0x45 moves x 16 px
+            // against the side word and drops y by 24 + height, landing on the
+            // head cell (fieldstg.s:14017-14030); mode 0x46 moves nothing and
+            // only stores 0 into entity+0x60 (:13983), so the player comes off
+            // the foot facing down.
+            const done = c.atTop ? "top" : "bottom";
+            const land = ladderDismountEnd(c.plan, c.atTop);
+            state.x = land.x;
+            state.y = land.y;
+            if (done === "bottom") state.dir = fieldDirectionFromIndex(0);
+            state.climb = null;
+        }
+        return true;
+    }
     const up = k.has("up");
     const down = k.has("down");
     let clip = 32;
@@ -3650,26 +3706,21 @@ function tickClimb(dt) {
     } else {
         c.animT += dt;
     }
-    // Straight up the rails: x pinned at the mount point, y from the offset.
+    // Straight up the rails: x pinned at the rail (c.x = plan.railX, the mount's
+    // own decoded word entity+0x50), y from the offset (entity+0x54 - entity+0x90
+    // at draw, file 0xe3d8-0xe3fc).
+    const at = ladderClimbPosition(c.plan, c.progress);
     state.x = c.x;
-    state.y = c.bottom.y - c.progress;
+    state.y = at.y;
     if (done) {
+        // The step-off clip plays IN PLACE at the end of the climb; the landing
+        // shift happens on its completion (above). Climbing down faces you down
+        // when the clip finishes; climbing up keeps the mount's facing, so the
+        // head tile is not armed until you turn.
         c.phase = "dismount";
-        c.clip = 28;
+        c.atTop = done === "top";
+        c.clip = c.atTop ? 29 : 31;
         c.animT = 0;
-        // Step off onto the actual endpoint (the top/bottom landing spot).
-        const land = done === "top" ? c.top : c.bottom;
-        state.x = land.x;
-        state.y = land.y;
-        // Which way you face when you let go is the two ends' one difference, and
-        // it is entity+0x60 again — the same word the mount wrote and the step-load
-        // reads back. Climbing DOWN ends in mode 0x46 (fieldstg.s:13957), whose
-        // completion stores ZERO there — pro/fieldstg.s:13983 `sw $zr,0x60($s0)` —
-        // so you face down on the floor and the foot tile's cone decides whether
-        // you can go straight back up. Climbing UP ends in mode 0x45
-        // (:13986), which never stores +0x60, so you keep the facing that mount
-        // handed you and the head tile is NOT armed until you turn.
-        if (done === "bottom") state.dir = fieldDirectionFromIndex(0);
     }
     return true;
 }
@@ -7585,18 +7636,19 @@ function update(dt) {
                 });
                 state.dir = fieldDirectionFromIndex(state.submarimon.facing);
             }
+            // Digmon's constructor halves the move magnitude it stores at
+            // +0x68 (fieldstg 0x8009116c, file 0xe67c-0xe6a0). Submarimon
+            // does not use a constant at all: its +0x68 is the throttle the
+            // thrust/coast states ramp, so the sub's own speed is passed. The
+            // same word feeds the obstacle probe's push sizes below.
+            const moveMag = state.submarimon
+                ? state.submarimon.speedFixed
+                : diveMoveMagnitude(state.diveForm, FIELD_RUN_MAGNITUDE);
             const delta = fieldDirectionDelta(
                 state.dir,
-                // Digmon's constructor halves the move magnitude it stores at
-                // +0x68 (fieldstg 0x8009116c, file 0xe67c-0xe6a0). Submarimon
-                // does not use a constant at all: its +0x68 is the throttle the
-                // thrust/coast states ramp, so the sub's own speed is passed.
-                state.submarimon
-                    ? state.submarimon.speedFixed
-                    : diveMoveMagnitude(state.diveForm, FIELD_RUN_MAGNITUDE),
+                moveMag,
                 terrainCodeAt(grid, state.x, state.y),
             );
-            const prevX = state.x, prevY = state.y;
             const moved = moveWithCollision(
                 grid,
                 state.x,
@@ -7618,16 +7670,18 @@ function update(dt) {
                 state.y = Math.max(margin, Math.min(m.height - margin, moved.y));
             }
             // The disc's standing-actor / tree obstacle (F0x8008dfec ->
-            // F0x8008de0c -> zonemgr+0x58 F0x80092a90): the whole step is
-            // REFUSED and reverted when a point of the actor's foot perimeter
-            // lands inside another field actor's diamond or within 10 px of a
-            // tree. Already being inside one (an editor-placed spawn) is exempt
-            // so the player can never be trapped; the disc relies on its own
-            // placement and reverts outright.
-            if (!gated && fieldStepBlockedByActors(m, state.x, state.y)
-                && !fieldStepBlockedByActors(m, prevX, prevY)) {
-                state.x = prevX;
-                state.y = prevY;
+            // F0x8008de0c -> zonemgr+0x58 F0x80092a90): five probes in the
+            // facing cone; each occupied point pushes the actor back by its own
+            // (∓mag/2, ∓mag/4) vector. There is no step revert and no "already
+            // inside" exemption — the push only ever moves the actor away, and
+            // the points behind it are never probed, so backing away from an
+            // obstacle is always allowed.
+            if (!gated) {
+                const push = fieldStepObstaclePush(m, state.x, state.y, moveMag);
+                if (push.x !== 0 || push.y !== 0) {
+                    state.x = Math.max(margin, Math.min(m.width - margin, state.x - push.x));
+                    state.y = Math.max(margin, Math.min(m.height - margin, state.y - push.y));
+                }
             }
 
             // Walking onto an op-11 cell hands the leader to mode 0x4f for the
@@ -8570,11 +8624,13 @@ function render() {
             const drawY = state.y - subLift;
             // The climb offset `entity+0x90`, fed to the shadow so it stays on
             // the ladder's FOOT while the billboard (drawn at `drawY`, already
-            // offset-subtracted) climbs away from it. During a climb
-            // `state.y = c.bottom.y - progress`, so +progress restores the
-            // ground row; the modules hold no offset (the native clears +0x90
-            // on dismount, file 0xd8c0 `sw $zr,0x90`), so the phase gate.
-            const climbGroundOffsetFixed = cl && cl.phase === "climb"
+            // offset-subtracted) climbs away from it. The modules hold +0x90 in
+            // every phase: the bottom mount seeds 0, the head mount seeds
+            // `height` (mode 0x44, file 0xd950), the climb steps it, and the
+            // step-off keeps it until F0x8008fd60 clears it on completion —
+            // which is exactly `progress` in all four phases.
+            const climbGroundOffsetFixed = cl
+                && (cl.phase === "mount" || cl.phase === "dismount" || cl.phase === "climb")
                 && !window.__noClimbShadowOffset
                 ? Math.round(cl.progress * 256) : 0;
             drawActorShadow(

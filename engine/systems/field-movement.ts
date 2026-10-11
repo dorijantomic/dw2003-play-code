@@ -134,28 +134,112 @@ export function consumeFieldTicks(accumulator: number, dt: number): {
   return { ticks, accumulator: total - ticks * FIELD_TICK_SECONDS };
 }
 
-// ── the standing-actor / tree obstacle of the walk predicate ────────────────
+// ── the standing-actor / tree obstacle: the disc's own five-point probe ─────
 //
-// The original refuses a field step when the ground under the actor's foot
-// perimeter is void OR when any perimeter point lies inside another field
-// actor's footprint, OR within 10 px of a tree. The step advances the position
-// and then runs `F0x8008dfec` (file 0xb33c), which probes the foot perimeter
-// and REVERTS the whole step on any occupied point. `F0x8008dfec` passes each
-// probe to `F0x8008de0c` (file 0xb15c), which asks the zone manager's
-// `+0x58` method `F0x80092a90` (file 0xfde0) — the occupancy query — before the
-// typed-terrain read. See docs/research/field/collision.md and
-// `.dw3-research/field-npc-collision-2026-10-08/worker-ca.md`.
+// The original's obstacle response is NOT a step revert. Each movement mode that
+// walks advances the position and then calls `F0x8008dfec` (file 0xb33c,
+// fieldstg.s:11478), whose return value BOTH call sites discard — the response is
+// the side effect inside it:
+//
+//   * FIVE probes per step, not eight: the loop body at fieldstg.s:11495 reads
+//     `table[0x80097B60 + facing*5 + i]` and the tail at :11549-11551 runs it for
+//     i = 0..4. Each entry indexes a 16-record table of {s32 x, s32 y} foot-ring
+//     offsets at `0x80097B88` (:11539-11543); the five records of a facing span a
+//     135° cone centred on it (e.g. facing 0 probes (0,8), (-6,8), (6,8), (-8,6),
+//     (8,6) — the front five). Nothing behind the actor is ever probed, which is
+//     why walking away from an obstacle is never refused.
+//   * Each occupied point pushes the actor back by that point's OWN vector, from
+//     the two flag bytes at `0x80097C08 + record*2` (:11504-11538): x by
+//     `(flag0 & 1) * ±magnitude/2`, y by `(flag1 & 1) * ±magnitude/4` (bit 7 of
+//     each byte negates). `F0x8008de0c` applies them as `actor.x -= arg3;
+//     actor.y -= arg4` (file 0xb15c, :11461-11471) — a push of at most ±2.4 px in
+//     x and ±1.2 px in y per point, never the step.
+//   * The probe point itself is the actor's pixel position plus the record:
+//     `(actor+0x50 >> 8) + rec.x`, `(actor+0x54 >> 8) + rec.y`
+//     (:11366-11378), tested by the occupancy query `F0x80092a90` (zonemgr+0x58)
+//     and the tree query `F0x8008ce40`.
+//   * Both `jal 0x8008dfec` sites (:13627 and :13682) jump straight to the
+//     shared epilogue, so nothing upstream can turn the push into a refusal.
+//
+// See docs/research/field/collision.md and the 2026-10-11 re-read of
+// `F0x8008dfec`/`F0x8008de0c` in this task's report.
 
 /**
- * The foot-perimeter probe offsets `F0x8008dfec` reads out of table RAM
- * `0x80097B88` (file `0x14ED8`): the perimeter of the actor's foot box.
- * FIELDSTG.PRO selects five of these per 0-7 facing through the index table at
- * `0x80097B60`; every offset here is one of a facing's five, and none is
- * `(0,0)`, which is why an actor is never stopped by its own footprint.
+ * The disc's foot-ring offset table, RAM `0x80097B88` (file `0x14ED8`): sixteen
+ * {s32 x, s32 y} records. Records 0-7 are the octagon `FIELD_FOOTPRINT_OFFSETS`
+ * below; 8-11 are the edge midpoints and 12-15 the corners.
  */
-export const FIELD_FOOTPRINT_OFFSETS: readonly (readonly [number, number])[] = [
+export const FIELD_PROBE_OFFSETS: readonly (readonly [number, number])[] = [
   [-6, -8], [6, -8], [8, -6], [8, 6], [6, 8], [-6, 8], [-8, 6], [-8, -6],
+  [0, -8], [8, 0], [0, 8], [-8, 0], [8, -8], [8, 8], [-8, 8], [-8, -8],
 ];
+
+/**
+ * The per-facing selector, RAM `0x80097B60` (file `0x14EB0`): five record
+ * indices per 0-7 facing, read by `F0x8008dfec` as `table[facing*5 + i]`.
+ */
+export const FIELD_PROBE_INDEX: readonly (readonly number[])[] = [
+  [10, 5, 4, 6, 3],
+  [14, 6, 5, 7, 4],
+  [11, 7, 6, 0, 5],
+  [15, 7, 0, 6, 1],
+  [8, 0, 1, 7, 2],
+  [12, 2, 1, 3, 0],
+  [9, 2, 3, 1, 4],
+  [13, 3, 4, 2, 5],
+];
+
+/**
+ * The push flags, RAM `0x80097C08` (file `0x14F58`): two bytes per record.
+ * byte0 drives the X push (bit0 = pushes, bit7 = negate), byte1 the Y push.
+ */
+export const FIELD_PROBE_FLAGS: readonly (readonly [number, number])[] = [
+  [0x00, 0x81], [0x00, 0x81], [0x01, 0x00], [0x01, 0x00],
+  [0x00, 0x01], [0x00, 0x01], [0x81, 0x00], [0x81, 0x00],
+  [0x00, 0x81], [0x01, 0x00], [0x00, 0x01], [0x81, 0x00],
+  [0x01, 0x81], [0x01, 0x01], [0x81, 0x01], [0x81, 0x81],
+];
+
+/** The five probe points `F0x8008dfec` tests for a 0-7 facing. */
+export function fieldProbeOffsets(facing: number): readonly (readonly [number, number])[] {
+  const row = FIELD_PROBE_INDEX[((facing % 8) + 8) % 8]!;
+  return row.map((rec) => FIELD_PROBE_OFFSETS[rec]!);
+}
+
+/**
+ * The disc's response to an occupied probe point: `F0x8008de0c` subtracts the
+ * record's own (±magnitude/2, ±magnitude/4) from the actor. This returns the
+ * TOTAL (x, y) to subtract for the five probes of `facing` — the caller applies
+ * `actor.x -= push.x; actor.y -= push.y`. `isOccupied(px, py)` is the occupancy
+ * query at an absolute probe point: inside a standing actor's footprint diamond
+ * or within 10 px of a tree.
+ */
+export function fieldProbePushback(
+  facing: number,
+  magnitudeFixed: number,
+  x: number,
+  y: number,
+  isOccupied: (px: number, py: number) => boolean,
+): { x: number; y: number } {
+  const row = FIELD_PROBE_INDEX[((facing % 8) + 8) % 8]!;
+  let pushX = 0;
+  let pushY = 0;
+  for (const rec of row) {
+    const [ox, oy] = FIELD_PROBE_OFFSETS[rec]!;
+    if (!isOccupied(x + ox, y + oy)) continue;
+    const [f0, f1] = FIELD_PROBE_FLAGS[rec]!;
+    if (f0 & 1) pushX += (f0 & 0x80 ? -1 : 1) * Math.trunc(magnitudeFixed / 2);
+    if (f1 & 1) pushY += (f1 & 0x80 ? -1 : 1) * Math.trunc(magnitudeFixed / 4);
+  }
+  return { x: pushX / 0x100, y: pushY / 0x100 };
+}
+
+/**
+ * The octagon half of the foot ring — records 0-7 of `FIELD_PROBE_OFFSETS`.
+ * Kept as its own export for callers that reason about the ring's eight points.
+ */
+export const FIELD_FOOTPRINT_OFFSETS: readonly (readonly [number, number])[] =
+  FIELD_PROBE_OFFSETS.slice(0, 8);
 
 /**
  * The occupancy half of the walk predicate (`F0x80092a90`): a probe point is

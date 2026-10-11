@@ -37,6 +37,7 @@
 import { chromium } from "playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { baseUrl } from "./verify-base-url.mjs";
+import { ladderClimbPlan, ladderDismountEnd } from "../engine/systems/scene-step-ops.ts";
 
 const ROOT = process.env.LAD_ROOT || `${baseUrl(8741)}/`;
 const MAP = "s381"; // one 54 px ladder at (432,374)->(417,320), no NPC at either end
@@ -162,10 +163,13 @@ try {
   if (!(await field()).icon) await fail("no ladder icon while looking at the tile");
   await page.keyboard.press("Enter");
   await waitFor(() => !!window.__state.climb, "mount at bottom");
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(120);
   const mounted = await field();
   await shot("ladder-mounted");
-  if (mounted.climb?.phase !== "climb") await fail(`mount phase ${mounted.climb?.phase}`);
+  // The mount plays its step-on clip first (mode 0x43 = clip 0x1c = 28), then
+  // hands over to the hang (mode 0x40 = clip 0x20 = 32) where up/down move.
+  if (mounted.climb?.phase !== "mount") await fail(`mount phase ${mounted.climb?.phase}`);
+  if (mounted.climb?.clip !== 28) await fail(`the foot mount latched clip ${mounted.climb?.clip}, not 0x1c`);
   if (mounted.x !== ladder.bottom.x || mounted.y !== ladder.bottom.y)
     await fail(`mount did not pin the bottom endpoint: ${JSON.stringify(mounted)}`);
   // The mount turned you to the facing it handed you — entity+0x60, read back.
@@ -173,6 +177,13 @@ try {
     await fail(`the foot mounted you facing ${mounted.dir}, not ${FACINGS[bottom.mountFacing]}`);
   if (mounted.climb?.side !== FACINGS[bottom.mountFacing])
     await fail(`the foot drew the ${mounted.climb?.side} side, not ${FACINGS[bottom.mountFacing]}`);
+  // The decoded climb geometry, straight from the engine: the rail x, the
+  // record's own height ((params[0]-1)<<4), and the step-off landing.
+  const height = mounted.climb.height;
+  const plan = ladderClimbPlan(ladder.bottom, ladder.top, bottom.mountFacing, true, height);
+  if (plan.height !== (ladder.id - 1) * 16)
+    await fail(`the climb height is ${plan.height}, not the record's (id-1)*16`);
+  await waitFor(() => window.__state.climb?.phase === "climb", "mount clip hands over to the hang");
 
   // Hold Up: progress climbs, x stays pinned on the rail.
   await page.keyboard.down("ArrowUp");
@@ -181,17 +192,26 @@ try {
   await shot("ladder-climbing");
   if (!(mid.climb && mid.climb.progress > 0 && mid.climb.progress < mid.climb.height))
     await fail(`not mid-climb after 400 ms: ${JSON.stringify(mid)}`);
-  if (mid.x !== ladder.bottom.x) await fail(`x left the rail mid-climb: ${JSON.stringify(mid)}`);
+  if (mid.x !== plan.railX) await fail(`x left the rail mid-climb: ${JSON.stringify(mid)}`);
   // Release the moment the landing spot is taken (phase dismount), or the still
   // held key walks the player off the endpoint before the check reads it.
   await waitFor(() => { const c = window.__state.climb; return !c || c.phase === "dismount"; }, "top dismount begins");
   await page.keyboard.up("ArrowUp");
+  const climbEnd = await field();
+  // The step-off clip plays IN PLACE on the rail (mode 0x45, clip 0x1d): the
+  // landing shift only happens when the clip completes.
+  if (climbEnd.climb && climbEnd.x !== plan.railX)
+    await fail(`the top step-off left the rail early: ${JSON.stringify(climbEnd)}`);
   await waitFor(() => !window.__state.climb, "climb cleared at top");
   await page.waitForTimeout(150);
   const atTop = await field();
   await shot("ladder-at-top");
-  if (atTop.x !== ladder.top.x || atTop.y !== ladder.top.y)
-    await fail(`top dismount landed at ${JSON.stringify(atTop)}, expected ${JSON.stringify(ladder.top)}`);
+  const landTop = ladderDismountEnd(plan, true);
+  if (atTop.x !== landTop.x || atTop.y !== landTop.y)
+    await fail(`top dismount landed at ${JSON.stringify(atTop)}, expected ${JSON.stringify(landTop)} ` +
+      `(the head cell ${JSON.stringify(ladder.top)} within the records' jitter)`);
+  if (Math.abs(atTop.x - ladder.top.x) > 3 || Math.abs(atTop.y - ladder.top.y) > 11)
+    await fail(`the top landing is not the head cell: ${JSON.stringify(atTop)} vs ${JSON.stringify(ladder.top)}`);
   // You came off the top looking the way the mount handed you, and the top tile's
   // cone does NOT admit that — so it is not armed until you turn.
   if (atTop.dir !== FACINGS[top.mountFacing])
@@ -203,22 +223,26 @@ try {
   await page.keyboard.press("Enter");
   await waitFor(() => !!window.__state.climb, "mount at top");
   const atTopMount = await field();
-  if (atTopMount.climb?.progress !== ladder.bottom.y - ladder.top.y)
-    await fail(`top mount did not start at the top offset: ${JSON.stringify(atTopMount)}`);
+  // The head mount steps 16 px sideways ONTO the rail and starts with the climb
+  // offset seeded to the height (mode 0x44, file 0xd950: `addiu $v0,$v1,0x1000` /
+  // `sw $v0,0x50($s0)` / `+0x1800 + +0x94`, fieldstg.s:13927-13938), so the first
+  // drawn row is head.y + 24 with progress = height.
+  const planTop = ladderClimbPlan(ladder.bottom, ladder.top, top.mountFacing, false, height);
+  if (atTopMount.climb?.progress !== planTop.height)
+    await fail(`top mount did not start at the height offset: ${JSON.stringify(atTopMount)}`);
+  if (atTopMount.x !== planTop.railX)
+    await fail(`the head mount left x at ${atTopMount.x}, off the rail ${planTop.railX}`);
+  if (atTopMount.y !== planTop.startY)
+    await fail(`the head mount drew row ${atTopMount.y}, not head.y + 24 = ${planTop.startY}`);
   if (atTopMount.dir !== FACINGS[top.mountFacing])
     await fail(`the top mounted you facing ${atTopMount.dir}, not ${FACINGS[top.mountFacing]}`);
-  // The head mount steps 16 px sideways ONTO the rail before the climb (fieldstg
-  // mode 0x44, file 0xd950: `addiu $v0,$v1,0x1000` / `sw $v0,0x50($s0)`,
-  // fieldstg.s:13927-13932), and the climb blocks never touch +0x50 — so the sprite
-  // rides the FOOT endpoint's x the whole way down, not the head cell until the exit.
-  if (atTopMount.x !== ladder.bottom.x)
-    await fail(`the head mount left x at ${atTopMount.x}, off the rail ${ladder.bottom.x}`);
+  await waitFor(() => window.__state.climb?.phase === "climb", "top mount clip hands over");
   await page.keyboard.down("ArrowDown");
   await page.waitForTimeout(400);
   const downMid = await field();
   await shot("ladder-climbing-down");
   if (downMid.climb && downMid.climb.progress > 0 && downMid.climb.progress < downMid.climb.height
-      && downMid.x !== ladder.bottom.x)
+      && downMid.x !== planTop.railX)
     await fail(`x left the rail on the way down: ${JSON.stringify(downMid)}`);
   await waitFor(() => { const c = window.__state.climb; return !c || c.phase === "dismount"; }, "bottom dismount begins");
   await page.keyboard.up("ArrowDown");
@@ -226,8 +250,12 @@ try {
   await page.waitForTimeout(150);
   const backDown = await field();
   await shot("ladder-back-down");
-  if (backDown.x !== ladder.bottom.x || backDown.y !== ladder.bottom.y)
-    await fail(`down dismount landed at ${JSON.stringify(backDown)}, expected the bottom ${JSON.stringify(ladder.bottom)}`);
+  const landBottom = ladderDismountEnd(planTop, false);
+  if (backDown.x !== landBottom.x || backDown.y !== landBottom.y)
+    await fail(`down dismount landed at ${JSON.stringify(backDown)}, expected ${JSON.stringify(landBottom)} ` +
+      `(the foot ${JSON.stringify(ladder.bottom)} within the records' jitter)`);
+  if (Math.abs(backDown.y - ladder.bottom.y) > 11)
+    await fail(`the bottom landing is not the foot row: ${JSON.stringify(backDown)}`);
   // Climbing down ends in the disc's mode 0x46, which stores ZERO into that same
   // entity+0x60 (fieldstg.s:13983) — so you come off the bottom looking DOWN, not
   // still looking up the rail. Climbing UP ends in mode 0x45 (:13986), which never
