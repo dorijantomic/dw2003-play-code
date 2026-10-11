@@ -6,8 +6,8 @@ Digimon World 2003 (EU) disc image.
 
 The tree it writes is the data tree the dw2003-play-code build reads
 (pack/, map/, map-tile/, rlen/, tim/, lang_file/, sound/, dw2003/, ...).
-Format decoding uses Marko's (markisha64/ddw3) extractor binaries (using markisha's
-work); see README.md for credits and how to build them.
+Format decoding uses Marko's (markisha64/ddw3) extractor binaries, used with
+permission; see README.md for credits and how to build them.
 
 Preflight is strict and non-interactive: a missing/not-a-disc-image/wrong-region
 disc image or a missing tool binary exits with an actionable message before any
@@ -60,8 +60,8 @@ def check_tools(tools: Path) -> None:
             "Build them from a ddw3 checkout with the patches in tools/byod/patches/ applied:\n"
             "    tools/byod/build-ddw3-tools.sh --ddw3-src <ddw3 checkout> --out <dir>\n"
             "then pass that dir as --tools (or set BYOD_DDW3_TOOLS).\n"
-            "The format decoding is Marko's (markisha64/ddw3) work, using\n"
-            "markisha's work — see tools/byod/README.md."
+            "The format decoding is Marko's (markisha64/ddw3) work, reused with\n"
+            "permission — see tools/byod/README.md."
         )
 
 

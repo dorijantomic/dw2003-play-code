@@ -116,7 +116,7 @@ classification rather than a removal.
   plus `catalog.json` (a measurement database built from the *built* battle
   models by `tools/model_authoring.py`; tracked as the authoring tool's input).
 - `tools/byod/**` — the bring-your-own-disc tool: our routing/decoding code and
-  two patches against Marko's ddw3 extractor sources (using markisha's work,
+  two patches against Marko's ddw3 extractor sources (reused with permission,
   credited), plus path lists (`data/discmap.json`, `data/readset.tsv`). No game
   content: the extractor binaries are built by the user from the ddw3 source,
   and the tree is decoded from the user's own disc.

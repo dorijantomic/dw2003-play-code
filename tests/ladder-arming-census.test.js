@@ -232,23 +232,29 @@ test("letting go of the rails at the foot faces you down, and at the head keeps 
     "climbing up does not touch the facing, because mode 0x45 does not either");
 });
 
-test("the climb runs on the rail x, the FOOT endpoint's x, whichever end you mounted from", () => {
+test("the climb runs on the rail x, the FOOT endpoint's x, whichever end you mounted from", async () => {
+  const { ladderClimbPlan } = await import("../engine/systems/scene-step-ops.ts");
   const mount = walkerLadderMount();
-  // The disc's rail axis is the foot cell's x: the bottom mount never moves x
-  // (mode 0x43, file 0xd8ec, never touches entity+0x50), while the head mount's
-  // step-on mode 0x44 (file 0xd950) does `addiu $v0,$v1,0x1000` /
-  // `sw $v0,0x50($s0)` — x = mount_x ± 16 px (fieldstg.s:13927-13932) — landing on
-  // the foot row. The two climb blocks (0xd818 up / 0xd878 down) only touch the
-  // offset entity+0x90. So the mount must pin x to L.bottom.x, NOT to pt.x (the
-  // endpoint you pressed on): pinning to pt.x left the head-mounted climb 15-17 px
-  // off the rail until the foot exit snapped it back (the operator's "it is to the
-  // left or right of the ladder until you are about to leave it").
-  assert.match(mount, /const railX = L\.bottom\.x/,
-    "the rail x is the foot endpoint's own x");
-  assert.match(mount, /x: railX,/,
-    "the climb's x is the rail, not the mount cell");
-  assert.match(mount, /state\.x = railX;/,
-    "and the mount places the sprite on that rail");
+  // The disc's rail axis: the bottom mount never moves x (mode 0x43, file 0xd8ec,
+  // never touches entity+0x50), while the head mount's step-on mode 0x44 (file
+  // 0xd950) computes x = head cell ± 16 by the side word (fieldstg.s:13927-13932).
+  // Every shipped head cell sits one cell (13..18 px, 123× exactly 16) to one side
+  // of the foot column, with the mount facing's sign agreeing with that side on all
+  // 215 op-3 tops, so head.x ± 16 lands back on the rail within 3 px. Pinning to
+  // pt.x instead left the head-mounted climb 15-17 px off the rail until the foot
+  // exit snapped it back (the operator's "it is to the left or right of the ladder
+  // until you are about to leave it").
+  const bottom = { x: 432, y: 374 };
+  const topLeft = { x: 417, y: 320 }; // s381: head cell LEFT of the rail (facing 3, side 1)
+  const topRight = { x: 200, y: 236 }; // s235: head cell RIGHT of the rail (facing 5, side 0)
+  assert.equal(ladderClimbPlan(bottom, topLeft, 3, true, 32).railX, 432,
+    "the foot mount runs on the foot cell's own x");
+  assert.equal(ladderClimbPlan(bottom, topLeft, 3, false, 32).railX, 417 + 16,
+    "the head mount lands on the rail from the head cell (side 1)");
+  assert.equal(ladderClimbPlan({ x: 184, y: 306 }, topRight, 5, false, 48).railX, 200 - 16,
+    "and from the other side (side 0)");
+  assert.match(mount, /ladderClimbPlan\(L\.bottom, L\.top, facing, fromBottom, recordHeight\)/,
+    "the mount takes the rail from the decoded plan, not from the pressed endpoint");
   assert.doesNotMatch(mount, /x: pt\.x/,
     "the climb no longer pins x to whichever endpoint was mounted");
 

@@ -508,6 +508,103 @@ export function ladderMountFacing(effect: PlaybackEffect | null | undefined): nu
     const a1 = effect?.actorCall?.args?.[0];
     return typeof a1 === "number" ? a1 & 7 : null;
 }
+
+/** One ladder endpoint, as the record's params[1]/params[2] carry it (px). */
+export interface LadderEnd { x: number; y: number }
+
+/**
+ * The decoded geometry of one climb, read out of the two mount bodies
+ * (`F0x8008f128` file 0xc478 bottom, `F0x8008f1d4` file 0xc524 top) and the four
+ * step-on/dismount mode blocks they hand over to. All line citations are
+ * `pro/fieldstg.s`.
+ *
+ * - `side` is `entity+0x8c`: both mounts compare the facing they were handed
+ *   against 5 (`beq $s3,$v0` at :12605/:12648) and store 0 when it matches,
+ *   else 1 — the same word the sprite side and the step-off direction read.
+ * - The bottom mount pins the foot cell verbatim: x = params[1], y = params[2],
+ *   offset 0 (:12602-:12604). The head mount pins the head cell (:12645/:12646)
+ *   and its step-on block (mode 0x44, file 0xd950) then moves ONTO the rail:
+ *   `x = head.x + 16` when side is 1, `- 16` when 0 (:13925-:13932), and
+ *   `y = head.y + 24 + height` with the climb offset seeded to `height`
+ *   (:13933-:13938) — so the first drawn row is `head.y + 24`.
+ * - `height` is the record's own `(params[0] - 1) << 4` — the stack argument the
+ *   op handlers build (`addiu $v0,-1 / sll $v0,0x4` at :5a94/:5aec) and the
+ *   mounts store at `entity+0x94` (:12606/:12647). The climb blocks compare
+ *   `entity+0x90` against it (up :13851-:13855, down :13874) — it is NOT the
+ *   endpoint span: the census over all 216 shipped rails has `span = height + 24`
+ *   for 132 of them, `+13..+28` for the rest, and the missing 24 px are the
+ *   dismount step-off.
+ * - `baseY` is the ground row the shadow is pinned to: the bottom mount's
+ *   `y`, and for the head mount `head.y + 24 + height` — both the rail's foot
+ *   row, because the climb offset `entity+0x90` is subtracted from the drawn row
+ *   (file 0xe3d8-0xe3fc) and added back for the shadow (file 0xcbf8).
+ */
+export interface LadderClimbPlan {
+    /** The rail x the whole climb runs on. */
+    railX: number;
+    /** The rail's foot ground row — where the drop shadow stays. */
+    baseY: number;
+    /** The drawn row the climb starts from. */
+    startY: number;
+    /** The climb length in px: the record's `(params[0]-1)<<4`. */
+    height: number;
+    /** `entity+0x8c`: 0 when the mount handed facing 5, else 1. */
+    side: number;
+    fromBottom: boolean;
+}
+
+export function ladderClimbPlan(
+    bottom: LadderEnd,
+    top: LadderEnd,
+    mountFacing: number,
+    fromBottom: boolean,
+    recordHeight: number,
+): LadderClimbPlan {
+    const side = (mountFacing & 7) === 5 ? 0 : 1;
+    // A rail whose record height is not positive cannot climb; the disc ships
+    // ids 3..18 ((params[0]-1)<<4 = 32..272 px), so the fallback never fires on
+    // the shipped data and exists only so a malformed call cannot divide the
+    // climb by nothing.
+    const height = recordHeight > 0 ? recordHeight : Math.abs(bottom.y - top.y);
+    if (fromBottom) {
+        return { railX: bottom.x, baseY: bottom.y, startY: bottom.y, height, side, fromBottom };
+    }
+    return {
+        railX: top.x + (side ? 16 : -16),
+        baseY: top.y + 24 + height,
+        startY: top.y + 24,
+        height,
+        side,
+        fromBottom,
+    };
+}
+
+/** The drawn position of a climb `progress` px up from the mount (entity+0x90). */
+export function ladderClimbPosition(
+    plan: LadderClimbPlan,
+    progress: number,
+): { x: number; y: number } {
+    return { x: plan.railX, y: plan.baseY - progress };
+}
+
+/**
+ * Where a finished climb leaves the actor.
+ *
+ * The top end (mode 0x45, file 0xda6c) steps off when its clip completes: x
+ * moves 16 px sideways AGAINST the side word (:14017-:14021 — the head mount's
+ * ±16 in reverse, so the landing is the head cell) and y drops by `24 + height`
+ * (:14025-:14028), landing on the head cell's row. The bottom end (mode 0x46,
+ * file 0xd9f8) shifts nothing — the climb's own `offset <= 0` clamp already left
+ * the actor on the foot row — and only stores 0 into `entity+0x60` (:13983), so
+ * the player comes off facing down.
+ */
+export function ladderDismountEnd(
+    plan: LadderClimbPlan,
+    atTop: boolean,
+): { x: number; y: number } {
+    if (!atTop) return { x: plan.railX, y: plan.baseY };
+    return { x: plan.railX + (plan.side ? -16 : 16), y: plan.baseY - 24 - plan.height };
+}
 /** Ops 1 and 14 change stage; op 1 is the ordinary door, op 14 the pad-style handoff. */
 export function isStageChangePlayback(op: number): boolean {
     return op === 1 || op === 14;

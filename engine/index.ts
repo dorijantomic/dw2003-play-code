@@ -44,6 +44,8 @@ export {
   execPlaybackOp, execPlaybackRecord,
   isLadderPlayback, ladderMountFacing, isStageChangePlayback, isDivePlayback, handoffHold,
   launcherRouteWords,
+  ladderClimbPlan, ladderClimbPosition, ladderDismountEnd,
+  type LadderEnd, type LadderClimbPlan,
   OP6_PARTY_SLOT, OP6_CLEARED_OFFSET,
   type StepOpRecord, type StepOpEffect, type DecodedSetupOp, type DecodedPlaybackOp,
   type PlaybackEffect, type PlaybackActorCall, type PlaybackHandoff,
@@ -69,6 +71,8 @@ export {
   FOLLOWER_HISTORY_LENGTH, FOLLOWER_LAG_TICKS,
   seedFollowerHistory, pushFollowerHistory, followerHistorySample, followerGatherSample, consumeFieldTicks,
   FIELD_FOOTPRINT_OFFSETS, actorFootprintBlocked,
+  FIELD_PROBE_OFFSETS, FIELD_PROBE_INDEX, FIELD_PROBE_FLAGS,
+  fieldProbeOffsets, fieldProbePushback,
   type FieldDirection, type FieldTrailPoint,
 } from "./systems/field-movement.ts";
 // THE live field character: the resident object the field overlay registers as
