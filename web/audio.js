@@ -61,7 +61,7 @@ export function createBgmPlayer(register = createExclusiveRegister()) {
   const el = new Audio();
   el.loop = true;
   el.volume = 0.6;
-  const player = { muted: false, current: null };
+  const player = { muted: false, current: null, el };
 
   // This track's own stop entry, handed to the register: the exclusive
   // replacement stops a registered track through it (and clears `current`,

@@ -21,6 +21,9 @@ import {
 import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
+import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
+import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
+import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
 import { createBgmPlayer, createSfxPlayer, createExclusiveRegister } from "./audio.js";
 import { sceneBgmTrack } from "./ordinal-scene-variant.js";
@@ -359,6 +362,7 @@ const PACKED_MUSIC = {
 // stops every sound (D0x80055C64), which is sfx.stopAll() here.
 const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
+installFxPanel(document.getElementById("stage"));
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
@@ -8053,7 +8057,30 @@ function _idleClipId(meta) {
 // Returns {mode, clipId, frame, dir} describing what actually got drawn, for the "V" anim
 // debug overlay below — computed from the exact same branch that rendered, so the overlay
 // can never show a mode that doesn't match the screen.
-function drawEntitySprite(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null) {
+// EXPERIMENT (ambience): the wet / dusty look and the reflection on water are applied here, so every
+// body that goes through this function (leader, partners, NPCs, ambient villagers) gets them.
+function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest) {
+    const bf = window.__bodyFx;
+    if (!bf) return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
+    if (bf.reflect) {
+        const a = bf.reflect(x, y);
+        if (a > 0.02) {
+            ctx.save();
+            ctx.globalAlpha = a; ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";
+            ctx.translate(0, 2 * (y - lastCam.y + 4)); ctx.scale(1, -1);
+            _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
+            ctx.restore();
+        }
+    }
+    if (bf.filter) {
+        ctx.save(); ctx.filter = bf.filter;
+        const r = _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
+        ctx.restore();
+        return r;
+    }
+    return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
+}
+function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null) {
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));
         const clipTime = isMoving || activeClip != null ? animTime : (idleTime ?? 0);
@@ -8455,6 +8482,14 @@ function render() {
             m.fixedViewportBackground ? 0 : -camY,
         );
     }
+    // EXPERIMENT (seam fixes): filler pixels for pin-holes and hairline cracks in the
+    // map picture, drawn over the ground. Off with the Effects panel / __noSeamFix.
+    if (!window.__noSeamFix && !window.__hideProps && !m.fixedViewportBackground && mapImg instanceof Image) {
+        const sp = seamPatchFor(m.id, mapImg);
+        if (sp) ctx.drawImage(sp.canvas, -camX, -camY);
+    }
+    // EXPERIMENT (swaying trees): hide the painted canopies; the swaying copy is drawn with the foreground layer
+    if (!m.fixedViewportBackground && mapImg instanceof Image && swayFor(m, mapImg)) drawTreePatch(ctx, m.id, state.mapFgImgs[m.id], mapImg, camX, camY);
     // Build y-sorted drawable list
     //
     // `playerAnimTime` feeds gesture-clip timing (drawEntitySprite's `animTime` for
@@ -8494,11 +8529,21 @@ function render() {
             }
         }
     }
+    // EXPERIMENT (ambience ground layer): puddles, footprints, dust and wading ripples,
+    // above the ground and under every sprite.
+    if (!window.__hideProps && !m.fixedViewportBackground) {
+        const gfx = groundFxFor(m, mapImg, camX, camY);
+        if (gfx) drawables.push({ y: -1e12, draw: () => gfx(ctx) });
+    }
     const fgImg = state.mapFgImgs[m.id];
     if (fgImg instanceof Image) {
         drawables.push({
             y: Infinity,
-            draw: () => ctx.drawImage(fgImg, -camX, -camY),
+            draw: () => {
+                // EXPERIMENT (swaying trees): the canopies move; everything else in the layer stays put
+                const sw = swayFor(m, mapImg);
+                if (!(sw && drawSwayingForeground(ctx, m.id, fgImg, mapImg, camX, camY, performance.now(), sw.gust))) ctx.drawImage(fgImg, -camX, -camY);
+            },
         });
     }
 
@@ -8748,7 +8793,11 @@ function render() {
     function drawPartyFollowers() {
         for (const it of partyFollowerDraws()) drawPartyFollower(it);
     }
+    // every body in view, for the ambience layer (breath, footprints, grass parting, footsteps)
+    const feetNow = [{ id: "leader", x: state.x, y: state.y, moving: !!(state.moving || state._cutTarget), dir: state.dir, leader: true }];
+    window.__feet = feetNow;
     for (const it of partyFollowerDraws()) {
+        feetNow.push({ id: "f" + feetNow.length, x: it.f.x, y: it.f.y, moving: feetNow[0].moving, dir: state.dir });
         drawables.push({
             y: it.f.y,
             follower: true,
@@ -8785,6 +8834,7 @@ function render() {
                 const npcFrameIdx = npcMoving
                     ? walkFrameIndex(timingForDir(npcMeta.frameDurations ?? {}, npcDir), npcAnimTime)
                     : 0;
+                feetNow.push({ id: "n" + npc.id, x: npc.x, y: npc.y, moving: npcMoving, dir: npcDir });
                 drawables.push({
                     y: npc.y,
                     draw: () => {
@@ -8830,6 +8880,11 @@ function render() {
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
+    // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
+    if (!window.__hideProps && !m.fixedViewportBackground) {
+        const amb = ambienceFor(m, mapImg, camX, camY);
+        if (amb) amb(ctx);
+    } else ambienceSilence();
     if (state.debugAnim) drawAnimDebug(debugInfos);
     window.__lastAnimDebug = debugInfos;
     // Debug hook, alongside __lastAnimDebug: the camera this frame was drawn
