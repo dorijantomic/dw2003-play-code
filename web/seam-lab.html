@@ -57,6 +57,7 @@
   </div>
   <label class="chk"><input type="checkbox" id="crawl" /> crawl the camera (see it wiggle)</label>
   <label class="chk"><input type="checkbox" id="mark" checked /> mark the holes red in the magnifier</label>
+  <div class="row"><button id="grassToggle" class="go">Grass &amp; water: ON (press G)</button></div>
   <div class="row"><button id="release">release the lab camera</button></div>
 
   <h2>Holes found</h2>
@@ -100,11 +101,26 @@ const crawlEl = document.getElementById("crawl");
 const markEl = document.getElementById("mark");
 document.getElementById("release").addEventListener("click", () => win().__labCam(null));
 
+// One switch for the 3D grass and water experiments (the game reads these flags every frame).
+const grassBtn = document.getElementById("grassToggle");
+let grassOn = true;
+function toggleGrass() {
+  grassOn = !grassOn;
+  try { win().__noGrass3d = !grassOn; win().__noWater3d = !grassOn; } catch { /* iframe not ready */ }
+  grassBtn.textContent = "Grass & water: " + (grassOn ? "ON" : "OFF") + " (press G)";
+  grassBtn.classList.toggle("go", grassOn);
+}
+grassBtn.addEventListener("click", toggleGrass);
+window.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey && !e.altKey && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) toggleGrass();
+});
+
 frame.src = "index.html?skipTitle=1&noEncounters=1";
 const win = () => frame.contentWindow;
 const doc = () => frame.contentDocument;
 
 frame.addEventListener("load", () => {
+  try { win().addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey && !e.altKey) toggleGrass(); }); } catch { /* same origin expected */ }
   try {
     const s = doc().createElement("style");
     s.textContent = "header,#hint{display:none!important} #stage{margin:0}";

@@ -28,6 +28,8 @@ const uniforms = {
     uCam: { value: new THREE.Vector2() },
     uMapSize: { value: new THREE.Vector2(1, 1) },
     uTime: { value: 0 },
+    uRefl: { value: null },
+    uReflOn: { value: 1 },
 };
 const stages = new Map(); // stageId -> { mapTex, maskTex } | null
 
@@ -61,6 +63,8 @@ function ensureRenderer() {
             uniform vec2 uCam;
             uniform vec2 uMapSize;
             uniform float uTime;
+            uniform sampler2D uRefl;   // distance (px) from each water pixel up to the shore above it
+            uniform float uReflOn;
             const float SIN = ${SIN.toFixed(6)};
             const vec2 VIEWPX = vec2(${VIEW_W * PX}.0, ${VIEW_H * PX}.0);
             const float PXS = ${PX}.0;
@@ -99,6 +103,16 @@ function ensureRenderer() {
                 vec3 col = base * shade + vec3(0.55, 0.72, 0.95) * fres
                          + vec3(1.0, 0.97, 0.86) * glint;
 
+                // shoreline reflection: mirror the picture about the shore row above this
+                // pixel, wobbled by the waves and fading out away from the bank
+                float rd = texture2D(uRefl, uv).r * 255.0;
+                if (uReflOn > 0.5 && rd > 1.0) {
+                    vec2 rp = vec2(mp.x + s.x * 2.2, mp.y - 2.0 * rd + s.y * 1.4);
+                    vec3 rc = texture2D(uMap, rp / uMapSize).rgb;
+                    float k = clamp(1.0 - rd / 64.0, 0.0, 1.0) * 0.40;
+                    col = mix(col, rc * 0.88 + vec3(0.02, 0.05, 0.10), k);
+                }
+
                 // foam hugging the shoreline (the soft edge of the mask)
                 float edge = 1.0 - abs(m * 2.0 - 1.0);
                 float lap = 0.5 + 0.5 * sin(g.x * 0.55 + g.y * 0.35 + uTime * 2.4
@@ -121,7 +135,6 @@ function ensureRenderer() {
 // night variants are tinted blue all over. Each id is listed with its day/night
 // variant. Lake of Ice (ice) and the swamps (murky, ~0% blue) are left out for now.
 const WATER_STAGES = new Set([
-    "s206",           // Amaterasu Bridge
     "s330", "s331",   // Central Park
     "s340", "s341",   // Shell Beach
     "s345", "s346",   // Plug Cape
@@ -192,6 +205,20 @@ function buildStage(stageId, mapImg, clsImg) {
     // ignore specks: need at least ~0.4% of the map to be water
     if (count < W * H * 0.004) return null;
     const mask = boxBlur(boxBlur(raw, W, H, 2), W, H, 2);   // soft shoreline
+    // for the reflection: how far each water pixel is below the nearest shore pixel above it
+    const refl = new Uint8Array(W * H);
+    for (let x = 0; x < W; x++) {
+        let land = -1;
+        for (let y = 0; y < H; y++) {
+            const q = y * W + x;
+            if (raw[q]) { if (land >= 0) refl[q] = Math.min(255, y - land); } else land = y;
+        }
+    }
+    const reflTex = new THREE.DataTexture(refl, W, H, THREE.RedFormat, THREE.UnsignedByteType);
+    reflTex.minFilter = reflTex.magFilter = THREE.LinearFilter;
+    reflTex.unpackAlignment = 1;
+    reflTex.flipY = false;
+    reflTex.needsUpdate = true;
     const maskTex = new THREE.DataTexture(mask, W, H, THREE.RedFormat, THREE.UnsignedByteType);
     maskTex.minFilter = maskTex.magFilter = THREE.LinearFilter;
     maskTex.unpackAlignment = 1;
@@ -203,7 +230,7 @@ function buildStage(stageId, mapImg, clsImg) {
     mapTex.flipY = false;
     mapTex.needsUpdate = true;
     console.log(`water3d: ${stageId} -> ${(100 * count / (W * H)).toFixed(1)}% water`);
-    return { mapTex, maskTex, W, H };
+    return { mapTex, maskTex, reflTex, maskData: mask, W, H };
 }
 
 // Returns the hidden canvas (VIEW_W*PX by VIEW_H*PX, camera-relative) or null.
@@ -221,6 +248,8 @@ export function renderWater(stageId, mapImg, camX, camY, timeSec) {
     if (!st) return null;
     uniforms.uMap.value = st.mapTex;
     uniforms.uMask.value = st.maskTex;
+    uniforms.uRefl.value = st.reflTex;
+    uniforms.uReflOn.value = window.__noWaterRefl ? 0 : 1;
     uniforms.uMapSize.value.set(st.W, st.H);
     uniforms.uCam.value.set(camX, camY);
     uniforms.uTime.value = timeSec;
@@ -229,3 +258,15 @@ export function renderWater(stageId, mapImg, camX, camY, timeSec) {
 }
 
 export const WATER_VIEW = { w: VIEW_W, h: VIEW_H, px: PX };
+
+// Is this map pixel water (so wading can ripple)? False until the stage has been drawn once.
+export function isWaterAt(stageId, x, y) {
+    const st = stages.get(stageId);
+    if (!st) return false;
+    const xi = x | 0, yi = y | 0;
+    if (xi < 0 || yi < 0 || xi >= st.W || yi >= st.H) return false;
+    return st.maskData[yi * st.W + xi] > 140;
+}
+
+// Is this one of the maps that gets the water shader (so real water, not blue paving)?
+export function isWaterStage(stageId) { return WATER_STAGES.has(stageId); }

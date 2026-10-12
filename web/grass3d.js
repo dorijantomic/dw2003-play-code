@@ -37,6 +37,9 @@ let renderer = null;
 let scene = null;
 let camera = null;
 let uTime = { value: 0 };
+// feet (x, z, radius, strength) that blades part around, and the wind-gust front (world x, strength)
+const uFeet = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) };
+const uGust = { value: new THREE.Vector2(0, 0) };
 let material = null;
 const stages = new Map();    // stageId -> { bands: [{mesh, y0, y1}], count } | null
 
@@ -62,13 +65,15 @@ function ensureRenderer() {
     camera = new THREE.OrthographicCamera(0, VIEW_W, 0, -VIEW_H, -1e5, 1e5);
     camera.rotation.x = -PITCH;
     material = new THREE.ShaderMaterial({
-        uniforms: { uTime },
+        uniforms: { uTime, uFeet, uGust },
         side: THREE.DoubleSide,
         vertexShader: `
             attribute vec3 iPos;    // blade base in world space
             attribute vec4 iData;   // yaw, height, width, wind phase
             attribute vec3 iColor;  // painted grass colour under the blade
             uniform float uTime;
+            uniform vec4 uFeet[8];
+            uniform vec2 uGust;
             varying vec3 vColor;
             void main() {
                 float t = position.y;                         // 0 base .. 1 tip
@@ -83,6 +88,25 @@ function ensureRenderer() {
                 p.y -= bend * 0.10;                           // arc over
                 float c = cos(iData.x), s = sin(iData.x);
                 p = vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+                // blades part around anything walking through them, and lean hard as a gust passes
+                float tt = t * t;
+                vec2 push = vec2(0.0);
+                float squash = 0.0;
+                for (int i = 0; i < 8; i++) {
+                    if (uFeet[i].z > 0.5) {
+                        vec2 d = iPos.xz - uFeet[i].xy;
+                        float dist = length(d);
+                        float k = smoothstep(uFeet[i].z, 0.0, dist) * uFeet[i].w;
+                        if (dist > 0.001) push += d / dist * k;
+                        squash = max(squash, k);
+                    }
+                }
+                p.xz += push * (tt * h * 0.7);
+                p.y *= 1.0 - 0.55 * squash * tt;
+                float gd = (iPos.x - uGust.x) / 55.0;
+                float gl = exp(-gd * gd) * uGust.y;
+                p.x += gl * tt * h * 0.95;
+                p.y *= 1.0 - 0.18 * gl * tt;
                 gl_Position = projectionMatrix * viewMatrix * vec4(iPos + p, 1.0);
                 // dark at the root, lit at the tip; faces turned away read darker
                 vColor = iColor * mix(0.55, 1.18, t) * (0.9 + 0.1 * c);
@@ -122,9 +146,27 @@ function rng(seed) {
     };
 }
 
-function isGrass(r, g, b) {
+function isGrassBase(r, g, b) {
     return g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
 }
+
+// Cities whose "green" is roofs, moss on stone and market stalls, not lawn: no grass.
+const isGrass = isGrassBase;
+const NO_GRASS_STAGES = new Set([
+    "s500", "s501",   // Suzaku / Zhu Que City
+    "s660", "s661",   // Byakko / Bai Hu City
+    "s421", "s956",   // Qing Long City
+]);
+// Maps with real lawns next to mossy stone and stairs: only lush, saturated green counts.
+const STRICT_GRASS_STAGES = new Set([
+    "s200", "s201", "s202", "s203", "s218", "s219", "s920", "s921",   // Asuka / Amaterasu City
+    "s420",                                                           // Seiryu City
+]);
+function isGrassStrict(r, g, b) {
+    return g >= 110 && g > r * 1.5 && g > b * 2.0 && g - b >= 70;
+}
+const WET_R = 15;            // grass in a patch mostly surrounded by water is a reed bed
+const WET_MAX = 0.3;
 
 function pixelsOf(img) {
     const cv = document.createElement("canvas");
@@ -141,6 +183,7 @@ function buildStage(stageId, mapImg, clsImg) {
     const data = pixelsOf(clsImg);
     const colorData = clsImg === mapImg ? data : pixelsOf(mapImg);
     const rand = rng(stageId.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
+    const isGrass = STRICT_GRASS_STAGES.has(stageId) ? isGrassStrict : isGrassBase;
 
     // Solid-patch test. Tree canopies, leaves and mossy stone have grass-green
     // speckles mixed with dark gaps; real grass is green all the way across. So a
@@ -169,7 +212,7 @@ function buildStage(stageId, mapImg, clsImg) {
                 (x1 - x0) * (y1 - y0)];
     };
     const solid = (x, y) => {
-        const [n, area] = boxSum(sat, x, y, SOLID_R);
+        const [n, area] = boxSum(sat, x, y, STRICT_GRASS_STAGES.has(stageId) ? 9 : SOLID_R);
         return n >= SOLID_MIN * area;
     };
     const nearWater = (x, y) => boxSum(wsat, x, y, WATER_GAP)[0] > 0;
@@ -195,6 +238,7 @@ function buildStage(stageId, mapImg, clsImg) {
             const m = [sample(cxp + 2, cy + 2), sample(cxp, cy), sample(cxp + 4, cy + 4)];
             if (!m.every((p) => isGrass(p[0], p[1], p[2]))) continue;
             if (!solid(cxp + 2, cy + 2) || nearWater(cxp + 2, cy + 2)) continue;
+            { const [wn, wa] = boxSum(wsat, cxp + 2, cy + 2, WET_R); if (wn >= WET_MAX * wa) continue; }
             for (let k = 0; k < BLADES_PER_CELL; k++) {
                 const px = cxp + rand() * CELL;
                 const py = cy + rand() * CELL;
@@ -235,6 +279,7 @@ function buildStage(stageId, mapImg, clsImg) {
 // Render the grass for the current camera. Returns the hidden canvas (always
 // VIEW_W*PX by VIEW_H*PX, camera-relative) or null when there is no grass.
 export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
+    if (NO_GRASS_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
     let st = stages.get(stageId);
@@ -247,6 +292,12 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
         console.log(`grass3d: ${stageId} -> ${st ? st.count : 0} blades`);
     }
     if (!st) return null;
+    // Every stage's blades live in the one shared scene, so hide everything that
+    // belongs to another stage; otherwise the last map's grass is drawn over this one.
+    for (const [sid, other] of stages) {
+        if (sid === stageId || !other) continue;
+        for (const b of other.bands) b.mesh.visible = false;
+    }
     // A blade rises up to MAX_BLADE_H*COS pixels above its base, so keep bands
     // whose base rows are within that of the view.
     const top = camY, bottom = camY + VIEW_H;
@@ -262,6 +313,19 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
     camera.bottom = -camY - VIEW_H;
     camera.updateProjectionMatrix();
     uTime.value = timeSec;
+    // who is standing in the grass this frame (map px -> blade world: x, z = y / sin(pitch))
+    const feet = window.__feet;
+    for (let i = 0; i < 8; i++) uFeet.value[i].set(0, 0, 0, 0);
+    if (feet && window.__grassPush !== false) {
+        let n = 0;
+        for (const f of feet) {
+            if (n >= 8) break;
+            if (f.x < camX - 40 || f.x > camX + VIEW_W + 40 || f.y < camY - 40 || f.y > camY + VIEW_H + 60) continue;
+            uFeet.value[n++].set(f.x, f.y / SIN, f.leader ? 22 : 17, f.moving ? 1 : 0.55);
+        }
+    }
+    const gu = window.__grassGust;
+    uGust.value.set(gu ? gu.x : 0, gu ? gu.s : 0);
     renderer.render(scene, camera);
     return renderer.domElement;
 }

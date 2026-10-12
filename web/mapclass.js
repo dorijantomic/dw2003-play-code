@@ -40,3 +40,8 @@ export function classSource(stageId, mapImg) {
         || e.naturalHeight !== mapImg.naturalHeight) return mapImg;
     return e;
 }
+
+// The base map id a day/night/event variant was cut from, or null.
+export function variantBase(stageId) {
+    return (variants && variants[stageId]) || null;
+}
