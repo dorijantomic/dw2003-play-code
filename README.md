@@ -3,6 +3,9 @@
 A playable browser recreation of Digimon World 2003 (PS1), built from a
 matching decompilation of the game's original code. It is still in progress:
 
+> **Join the Discord:** [https://discord.gg/6FVuHqjYu4](https://discord.gg/6FVuHqjYu4) — test the game, report bugs, ask for help and follow progress.
+> New here? Jump to [How to play](#how-to-play) for the keyboard and joystick controls.
+
 ## Progress
 
 <!-- progress:start -->
@@ -10,7 +13,7 @@ matching decompilation of the game's original code. It is still in progress:
 
 - 13 of 34 systems work fully, 21 work partly.
 - 105 of 121 game screens are rebuilt from the original game's code (87%).
-- Everything is built from the original game's code and checked as we go: 85% of the 2119 facts we have written down about the original are at least partly confirmed against its code, and 36% fully.
+- 36% of the 2119 documented facts about the original game are fully checked against its code.
 
 Per-feature breakdown: [PROGRESS.md](PROGRESS.md).
 <!-- progress:end -->
@@ -40,8 +43,8 @@ on, starting the app goes straight to the game.
 No Python, Node, Rust, git or admin rights needed; the download carries
 everything it uses. Keep the small window that opens alongside the browser
 while you play; close it to quit. The disc is decoded with Marko's
-([markisha64](https://github.com/markisha64/ddw3)) extractors (using markisha's work) —
-see `tools/byod/README.md` and Credits below. On first setup the
+([markisha64](https://github.com/markisha64/ddw3)) extractors, reused with
+permission — see `tools/byod/README.md` and Credits below. On first setup the
 app downloads ddw3's public source text (~11 MB of assembly/tables, no game
 data) that the build reads alongside your disc.
 
@@ -93,6 +96,54 @@ serves the game at http://localhost:8080. Alternatives:
 
 The one-click downloads are built by `.github/workflows/release.yml`
 (`packaging/`); the launcher they run is `launcher/dw2003.py`.
+
+## How to play
+
+The game runs in your browser. Use a keyboard, a gamepad/joystick, or both at
+once.
+
+### Keyboard
+
+| Action | Keys |
+| --- | --- |
+| Move | Arrow keys or **W A S D** |
+| Confirm / talk / examine / kick a tree | **Enter**, **Space**, **Z** or **C** |
+| Back / cancel | **Esc** or **X** |
+| Third action (shop, card lab and folder editor) | **K** |
+| Sort items (main menu) | **V** |
+| Left / right shoulder (page through lists) | **Q** / **E** |
+| Left / right trigger | **1** / **3** |
+| Start (pause menu) | **I** |
+| Select | **R** |
+
+### Gamepad / joystick
+
+Any standard controller works (Xbox, PlayStation, Switch Pro and most USB pads).
+
+1. Plug in or pair the controller **before** you open the game page.
+2. Press any button once so the browser notices it. Browsers hide controllers
+   until the first press.
+3. Play. The page picks it up by itself; you can keep using the keyboard too.
+
+| Action | Controller |
+| --- | --- |
+| Move | **D-pad** or **left stick** |
+| Confirm / talk / examine / kick a tree | Bottom button (**A** on Xbox, **Cross** on PlayStation) |
+| Back / cancel | Top button (**Y** on Xbox, **Triangle** on PlayStation) |
+| Third action (shop, card lab and folder editor) | Right button (**B** / **Circle**) |
+| Sort items (main menu) | Left button (**X** / **Square**) |
+| Shoulders and triggers | **L1 / R1** and **L2 / R2** |
+| Start / Select | **Start** / **Select** |
+
+Buttons are matched by position, not by the letter printed on them, so a
+PlayStation pad and an Xbox pad behave the same way. If a controller does not
+respond, unplug it, plug it back in and press a button again; if it still does
+not, ask on the Discord below.
+
+## Community
+
+Join the Discord to test, report bugs, ask for help and follow progress:
+https://discord.gg/6FVuHqjYu4
 
 ## Prerequisites (source install only)
 
@@ -205,7 +256,7 @@ matching, function-by-function, across every overlay and the executable — is t
 foundation this entire recreation is built on. The game data used at runtime
 comes from the repository he created and maintains. The bring-your-own-disc
 route (`tools/byod/`) builds and drives his extractor binaries and ships the two
-small patches they need — using markisha's work. If you use it, credit
+small patches they need, reused with his permission — if you use it, credit
 Marko and ddw3. Without his years of patient work documenting how this game
 actually works, none of this would be possible. Thank you, Marko.
 
@@ -261,17 +312,12 @@ free to use, modify, and distribute it. See LICENSE for the full text.
 Third-party components:
 - `tools/m2c/**` is a vendored copy of m2c, licensed GPL-3.0-only (see
   `tools/m2c/LICENSE`); it keeps its own license.
-- The byod disc tools build and patch Marko's ddw3 extractor sources, using
-  markisha's work (see `tools/byod/README.md` and Credits).
+- The byod disc tools build and patch Marko's ddw3 extractor sources, reused
+  with permission (see `tools/byod/README.md` and Credits).
 
 The game data — whether built from your own copy of the game or downloaded
 via the opt-in `--fetch-data` flag — is subject to its own terms; we claim no
 ownership over it.
-
-## Community
-
-Join the Discord to test, report bugs, ask for help and follow progress:
-https://discord.gg/6FVuHqjYu4
 
 ## Issues
 

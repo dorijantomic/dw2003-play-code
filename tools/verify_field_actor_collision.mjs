@@ -118,6 +118,33 @@ try {
   assert.ok(treeThrough.x > treeRun.x + 6,
     `control walk passes the tree centre (${treeThrough.x.toFixed(1)} > ${treeRun.x + 6})`);
 
+  // ── Tree BESIDE the path: walking past 18 px UNDER a tree must not be
+  // refused. The pre-fix model probed all eight foot-perimeter points —
+  // including the two behind and the two beside the walker — and reverted the
+  // whole step on any hit, so a tree anywhere near the octagon froze the walk
+  // (the operator's "it blocks me when I am not even touching it"). The disc
+  // probes only the five points of the facing cone and never reverts: passing
+  // below a tree is at most a small downward push.
+  const treeBeside = await page.evaluate(() => {
+    const s = window.__state;
+    const map = s.manifest.maps[s.mapIdx].id;
+    const trees = s.treeStages?.[map]?.trees ?? null;
+    if (!trees) return null;
+    for (const t of trees) {
+      if (window.__freeRun(map, t.y + 18, t.x - 60, t.x + 60)) return t;
+    }
+    return null;
+  });
+  assert.ok(treeBeside, "a tree with a clear walkable line 18 px below it exists");
+  const besideWalk = await page.evaluate(
+    (t) => window.__walk(t.x - 60, t.y + 18, "ArrowRight", 1200), treeBeside);
+  assert.ok(besideWalk.x > treeBeside.x + 20,
+    `the walk passes under the tree, not frozen beside it ` +
+    `(${besideWalk.x.toFixed(1)} > ${treeBeside.x + 20}); y ${besideWalk.y.toFixed(1)}`);
+  // The pass is a push, not a teleport: the walker stays on the path row.
+  assert.ok(Math.abs(besideWalk.y - (treeBeside.y + 18)) < 12,
+    `passing under the tree kept the walker near the path row (y ${besideWalk.y.toFixed(1)})`);
+
   // ── NPC: a field actor on the same stage (synthetic, same code path) ──────
   // The stage ships dozens of NPCs; clear the list so ONLY the test actor is
   // live, then the control (list emptied) is a clean A/B.
@@ -159,11 +186,14 @@ try {
     map: MAP,
     tree: { at: treeRun.x, blockedTo: +treeBlocked.x.toFixed(1), gap: +treeGap.toFixed(1),
       controlTo: +treeThrough.x.toFixed(1) },
+    treeBeside: { at: treeBeside.x, passTo: +besideWalk.x.toFixed(1),
+      rowY: treeBeside.y + 18, endY: +besideWalk.y.toFixed(1) },
     npc: { at: npcRun.npc.x, blockedTo: +npcBlocked.x.toFixed(1), gap: +npcGap.toFixed(1),
       controlTo: +npcThrough.x.toFixed(1) },
   };
   console.log(JSON.stringify(report, null, 2));
-  console.log("VERDICT OK — walking is blocked by NPCs and trees; bypassed, the same walk passes through.");
+  console.log("VERDICT OK — walking is blocked by NPCs and trees; bypassed, the same walk passes through;");
+  console.log("            and walking 18 px under a tree is a push, not a refusal.");
 } finally {
   await browser.close();
 }
