@@ -108,6 +108,35 @@ function buildPuddles(S, grid) {
 
 // ----------------------------------------------------------------- overlay
 // Called with the game's 2D context (view units, clipped to the view).
+// Lights register here: they get the untinted frame so they can put the real colours back around
+// themselves (a lamp lights the wall, instead of adding white on top of the night tint).
+let revealer = null;
+export const setReveal = (r) => { revealer = r; };
+let snapC = null;
+function takeSnap(ctx) {
+    const cv = ctx.canvas;
+    if (!snapC || snapC.width !== cv.width || snapC.height !== cv.height) { snapC = document.createElement("canvas"); snapC.width = cv.width; snapC.height = cv.height; }
+    const g = snapC.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "copy"; g.drawImage(cv, 0, 0);
+    return snapC;
+}
+
+// Indoors and underground there is no sky to dim, but the stage has its own lights: a gentle cool
+// dim stands in for the night so they can show, with the same reveal that restores true colours.
+function drawIndoorMood(ctx, S) {
+    const { fade } = S;
+    const snap = revealer && revealer.wants(S) ? takeSnap(ctx) : null;
+    ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = fade;
+    // full mood in a dark room, fading to nothing as the room gets brighter (see indoorK in ambience.js)
+    const d = 1 - 0.33 * S.p.indoorK, c = (v) => Math.round(255 * Math.max(0, Math.min(1, v)));
+    ctx.fillStyle = `rgb(${c(d + 0.005)},${c(d - 0.011)},${c(d + 0.09)})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const vg = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.7);
+    vg.addColorStop(0, "rgba(14,10,36,0)"); vg.addColorStop(1, `rgba(14,10,36,${(0.35 * S.p.indoorK).toFixed(3)})`);
+    ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = vg; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.globalAlpha = 1;
+    if (snap) revealer.draw(ctx, snap, S);
+}
+
 export function drawScenery(ctx, S) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, fade, camX, camY, Q, now } = S;
@@ -115,11 +144,13 @@ export function drawScenery(ctx, S) {
 
     todLight = 1;
     // time of day: a multiply tint (warm at golden hour, cool and darker at dusk)
+    if (fx.indoor && p.indoorLit) drawIndoorMood(ctx, S);
     if (fx.tod && p.tod) {
         const phase = typeof window.__todForce === "number" ? window.__todForce : ((now / 1000) / TOD_SECONDS) % 1;
         const [r, g, b] = todColor(phase);
         todLight = (r + g + b) / 765;
         if (r + g + b < 760) {
+            const snap = revealer && revealer.wants(S) ? takeSnap(ctx) : null;
             ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = fade;
             ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
             const dusk = 1 - (r + g + b) / 765;
@@ -130,6 +161,7 @@ export function drawScenery(ctx, S) {
                 ctx.fillRect(0, 0, VIEW_W, VIEW_H);
             }
             ctx.globalCompositeOperation = "source-over";
+            if (snap) revealer.draw(ctx, snap, S);
         }
     }
 
@@ -449,6 +481,7 @@ export function groundScenery(ctx, S) {
 // How dark it is, 0 (full daylight) .. 1 (night): drives lamp and window glow.
 export function darkness(p, fx, now) {
     if (p.night) return 1;
+    if (fx.indoor && p.indoorLit) return 0.7 * p.indoorK;   // indoor mood: the lights count as lit in the dim
     if (fx.tod && p.tod) {
         const phase = typeof window.__todForce === "number" ? window.__todForce : ((now / 1000) / TOD_SECONDS) % 1;
         const [r, g, b] = todColor(phase);

@@ -17,7 +17,7 @@ import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel } from "./s
 import { syncVillagers, removeVillagers } from "./crowd.js";
 import { setSound, thunder, footstep, setAmbience, setMusic } from "./fxaudio.js";
 import { resetScenery3, drawScenery3 } from "./scenery3.js";
-import { resetScenery2, drawScenery2, gustLevel } from "./scenery2.js";
+import { resetScenery2, drawScenery2, gustLevel, hasLights } from "./scenery2.js";
 import { isWaterAt, isWaterStage, waterPixelTest } from "./water3d.js";
 
 const VIEW_W = 320;
@@ -27,7 +27,7 @@ const VIEW_H = 240;
 export const FX_GROUPS = [
     ["Terrain", [["sway", "Swaying trees"], ["grass", "Grass"], ["grasspush", "Grass parts around feet"], ["water", "Water"], ["reflect", "Water reflections"], ["mirror", "Characters reflect in water"], ["wetlook", "Wet / dusty look on characters"], ["seam", "Seam fixes"]]],
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
-    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["windows", "Window glow"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
+    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["windows", "Window glow"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["butterflies", "Butterflies"], ["birds", "Birds"], ["dragonflies", "Dragonflies"], ["fish", "Jumping fish"], ["critters", "Critters"], ["wildlife", "Frogs, gulls, bats, lizards"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, birds, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
@@ -40,6 +40,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto" };
 for (const [k] of FX_DEFS) fx[k] = true;
+fx.hd2d = false;           // experimental: off until you switch it on
 fx.villagers = false;        // experimental: off until you switch it on
 try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
 const stored = { ...fx };   // what the panel last saved; URL flags below never reach it
@@ -86,7 +87,7 @@ syncLegacyFlags();
 const APPLIES = {
     rain: (p) => p.rainy, lightning: (p) => p.rainy, snow: (p) => p.snowy, sand: (p) => p.sandy,
     gusts: (p) => p.open, breath: (p) => p.snowy, frost: (p) => p.snowy, sparkle: (p) => p.snowy,
-    tod: (p) => p.tod, clouds: (p) => p.clouds, lamps: (p) => p.lamps, fog: (p) => p.fog, shafts: (p) => p.shafts,
+    indoor: (p) => p.indoorLit, tod: (p) => p.tod, clouds: (p) => p.clouds, lamps: (p) => p.lamps, fog: (p) => p.fog, shafts: (p) => p.shafts,
     heat: (p) => p.heat, pollen: (p) => p.pollen, leaves: (p) => p.leaves, fireflies: (p) => p.fireflies,
     butterflies: (p) => p.butterflies, critters: (p) => p.butterflies, birds: (p) => p.birds, devils: (p) => p.devils,
     dragonflies: (p, map) => p.open && !p.snowy && isWaterStage(map.id), fish: (p, map) => p.open && !p.snowy && isWaterStage(map.id),
@@ -146,14 +147,16 @@ function scan(img) {
     const cx = cv.getContext("2d", { willReadFrequently: true });
     cx.drawImage(img, 0, 0, w, h);
     const d = cx.getImageData(0, 0, w, h).data;
-    let lum = 0, grass = 0, n = 0;
+    let lum = 0, grass = 0, n = 0, room = 0, rn = 0;
     for (let i = 0; i < d.length; i += 4) {
         if (d[i + 3] < 128) continue;
         n++;
-        lum += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+        const l = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+        lum += l;
+        if (l > 14) { room += l; rn++; }                 // the room itself, not the black void around it
         if (d[i + 1] >= 105 && d[i + 1] > d[i] * 1.22 && d[i + 1] > d[i + 2] * 1.7 && d[i + 1] - d[i + 2] >= 55) grass++;
     }
-    return { lum: n ? lum / n : 0, grass: n ? grass / n : 0 };
+    return { lum: n ? lum / n : 0, grass: n ? grass / n : 0, room: rn ? room / rn : 0 };
 }
 
 function profileOf(map, mapImg) {
@@ -170,7 +173,7 @@ function profileOf(map, mapImg) {
     p = {
         open, snowy, sandy, night,
         rainy: !snowy && !sandy && RAINY.some((r) => r.test(map.name)),
-        grassShare: base.grass,
+        grassShare: base.grass, lum: here.lum, room: here.room,
         leaves: open && !snowy && !sandy && !night && base.grass >= 0.05,
         fireflies: night && !sandy,
         tod: open && !night,
@@ -187,7 +190,7 @@ function profileOf(map, mapImg) {
         coast: open && /Beach|Cape|Bay|Lake|Island/.test(map.name),
         bats: open && !snowy && !sandy && (base.grass >= 0.05 || /Forest|Jungle/.test(map.name)),
         clouds: open && !night,
-        lamps: open && !sandy && !snowy && /City|Bridge|Street Corner/.test(map.name),
+        lamps: open && (hasLights(map.id) || (!sandy && !snowy && /City|Bridge|Street Corner/.test(map.name))),
         devils: sandy && !night,
         w: mapImg.naturalWidth, h: mapImg.naturalHeight,
         seed: [...map.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0,
@@ -427,6 +430,14 @@ export function ambienceFor(map, mapImg, camX, camY) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p) return null;
+    // Stages that are not outdoors but carry the game's own light records get a mood dim, so their lights show.
+    // Decided every call (the light list loads after the first profile), switchable in F2.
+    if (p.baseLamps === undefined) p.baseLamps = p.lamps;
+    // Indoor mood only helps a DARK room (shrine, sewers, the Amaterasu versions of the inns): a bright, warmly lit
+    // room (the Asuka inns, lobbies, labs) already looks right, so it is left exactly as the game draws it.
+    p.indoorK = Math.max(0, Math.min(1, (95 - (p.room || 0)) / 20));
+    p.indoorLit = !p.open && hasLights(map.id) && p.indoorK > 0.02;
+    p.lamps = p.baseLamps || (fx.indoor && p.indoorLit);
     if (panel && lastMarked !== map.id) markApplicable(map, p);
     const now = performance.now();
     const L = levels(p, now);
@@ -440,7 +451,7 @@ export function ambienceFor(map, mapImg, camX, camY) {
     const sceneryOn = (fx.tod && p.tod) || (fx.fog && p.fog) || (fx.shafts && p.shafts) || (fx.heat && p.heat)
         || (fx.pollen && p.pollen) || (fx.butterflies && p.butterflies) || (fx.birds && p.birds)
         || (fx.sparkle && p.snowy) || (fx.lightning && fx.rain && p.rainy)
-        || (fx.clouds && p.clouds) || (fx.lamps && p.lamps) || (fx.gusts && p.open) || (fx.breath && p.snowy)
+        || (fx.clouds && p.clouds) || (fx.indoor && p.indoorLit) || (fx.lamps && p.lamps) || (fx.gusts && p.open) || (fx.breath && p.snowy)
         || (p.open && (fx.nightlight || fx.windows || fx.screenfx || fx.wildlife || fx.rainwater))
         || (fx.frost && p.snowy) || (fx.devils && p.devils) || ((fx.dragonflies || fx.fish || fx.critters) && p.open);
     if (!(wantRain || wantSnow || wantSand || wantLeaves || wantFlies || sceneryOn)) return null;

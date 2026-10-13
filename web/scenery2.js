@@ -3,7 +3,7 @@
 // grass critters. Same rules as scenery.js: everything lives in WORLD space (map
 // pixels), wrapped onto a torus a little bigger than the view, so the camera never
 // drags it along. ambience.js decides which maps get which effect.
-import { darkness } from "./scenery.js";
+import { darkness, setReveal } from "./scenery.js";
 
 const VIEW_W = 320;
 const VIEW_H = 240;
@@ -23,6 +23,127 @@ let breath = [], rings = [], fishes = [], critters = [], glints = [];
 let gust = null, nextGust = 0;
 let devil = null, nextDevil = 0, weed = null, nextWeed = 0;
 let nextFish = 0, nextCritter = 0, wasMoving = false, nextBreath = [0, 0, 0, 0, 0];
+
+// light sources read from the game own ambient-prop records (tools/gen_lights.py)
+let stageLights = null;
+fetch("assets/data/lights.json").then((r) => r.json()).then((j) => { stageLights = j; }).catch(() => { stageLights = {}; });
+const imgs = {};
+function loadImg(src) {
+    if (!imgs[src]) { const i = new Image(); i.src = src; imgs[src] = i; }
+    return imgs[src];
+}
+// the game's own glow sprite for one light, drawn at night over the darkness: the plain layer at
+// full brightness, the additive layer on top (its real palette variants cycle like the game's), and
+// a blurred copy of that same picture as the bloom. Nothing here is invented colour.
+const bloomCache = new Map();
+function bloomFor(sc, key, layers) {
+    let c = bloomCache.get(key);
+    if (c) return c;
+    const K = 3, pad = 10;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const [, , w, h, dx, dy] of layers) { x0 = Math.min(x0, dx); y0 = Math.min(y0, dy); x1 = Math.max(x1, dx + w); y1 = Math.max(y1, dy + h); }
+    c = document.createElement("canvas"); c.width = (x1 - x0 + pad * 2) * K; c.height = (y1 - y0 + pad * 2) * K;
+    const g = c.getContext("2d");
+    g.filter = "blur(" + 5 * K / 3 + "px)";
+    for (const [sx, sy, w, h, dx, dy] of layers) {
+        g.drawImage(sc.sheetP, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
+        g.globalCompositeOperation = "lighter";
+        g.drawImage(sc.sheetS, sx, sy, w, h, (dx - x0 + pad) * K, (dy - y0 + pad) * K, w * K, h * K);
+        g.globalCompositeOperation = "source-over";
+    }
+    g.filter = "none"; g.globalCompositeOperation = "lighter"; g.drawImage(c, 0, 0);   // doubled once here, so it is drawn once per frame
+    c.ox = x0 - pad; c.oy = y0 - pad; c.K = K;
+    c.col = [255, 255, 255];
+    try {
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let r = 0, gg = 0, b = 0, wsum = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            const l = Math.max(d[i], d[i + 1], d[i + 2]);
+            if (l < 90 || d[i + 3] < 128) continue;
+            r += d[i] * l; gg += d[i + 1] * l; b += d[i + 2] * l; wsum += l;
+        }
+        if (wsum) { const m = Math.max(r, gg, b) / wsum || 1; c.col = [Math.round(r / wsum * 255 / m), Math.round(gg / wsum * 255 / m), Math.round(b / wsum * 255 / m)]; }
+    } catch (e) { /* tainted canvas: keep white */ }
+    bloomCache.set(key, c);
+    return c;
+}
+const poolSprites = new Map();
+function poolSprite(r, g, b) {
+    const k = (r << 16) | (g << 8) | b;
+    let c = poolSprites.get(k);
+    if (c) return c;
+    c = document.createElement("canvas"); c.width = c.height = 64;
+    const x = c.getContext("2d"), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(0.35, `rgba(${r},${g},${b},0.47)`); gr.addColorStop(0.7, `rgba(${r},${g},${b},0.17)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+    poolSprites.set(k, c);
+    return c;
+}
+function drawGameLight(ctx, sc, m, camX, camY, a, now) {
+    if (!(sc.sheetP.complete && sc.sheetP.naturalWidth && sc.sheetS.complete && sc.sheetS.naturalWidth)) return;
+    const vi = ((now / 1000 * 60 / m.per) | 0) % m.v.length, layers = m.v[vi];
+    const bx = Math.round(m.ox - camX), by = Math.round(m.oy - camY);
+    const bl = bloomFor(sc, (m.key || (m.key = sc.id + ":" + m.v[0][0].join(","))) + ":" + vi, layers);
+    const f0 = layers[0], cx = bx + f0[4] + f0[2] / 2, cy = by + f0[5] + f0[3] / 2, size = Math.max(f0[2], f0[3]);
+    const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, rad = 14 + size * 2.4, small = 0.45 + 0.55 * clamp01(size / 24), [cr, cg, cb] = bl.col, flick = 0.88 + 0.12 * Math.sin(now / 1000 * 9 + m.ph);
+    ctx.globalCompositeOperation = "lighter";
+    const sprite = poolSprite(cr, cg, cb);
+    ctx.globalAlpha = Math.min(1, 0.30 * small * gain * a * flick);
+    ctx.drawImage(sprite, cx - rad, cy + (m.wall ? rad * 0.25 : 0) - rad * 0.62, rad * 2, rad * 1.24);   // lies on the ground, not a flat disc
+    // a big glow sprite is already a soft wide light: it gets far less bloom than a small bright lamp, or it saturates to a white disc
+    const bloomGain = Math.max(0.15, Math.min(1, 1.5 - size / 26));
+    ctx.globalAlpha = Math.min(1, a * bloomGain);
+    ctx.drawImage(bl, bx + bl.ox, by + bl.oy, bl.width / bl.K, bl.height / bl.K);   // stacked: additive, so it brightens in the sprite own colours
+    const redraw = size >= 32 ? 0.4 : size >= 24 ? 0.7 : 1;            // restoring a big glow to full brightness over the dark makes it a white disc
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = Math.min(1, a * redraw);
+    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetP, sx, sy, w, h, bx + dx, by + dy, w, h);
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, a * redraw);
+    for (const [sx, sy, w, h, dx, dy] of layers) ctx.drawImage(sc.sheetS, sx, sy, w, h, bx + dx, by + dy, w, h);
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+}
+
+// Put the real, untinted colours back around each light. The mask is the same flattened ellipse as the
+// pool; the snapshot is the frame as drawn just before the night tint.
+let rvMask = null, rvTmp = null, rvSprite = null;
+function revealSprite() {
+    if (rvSprite) return rvSprite;
+    rvSprite = document.createElement("canvas"); rvSprite.width = rvSprite.height = 64;
+    const x = rvSprite.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.4, "rgba(255,255,255,0.55)"); g.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return rvSprite;
+}
+setReveal({
+    wants(S) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.p.lamps); },
+    draw(ctx, snap, S) {
+        const dark = darkness(S.p, S.fx, S.now);
+        if (dark < 0.04) return;
+        const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, a = clamp01(0.85 * gain * dark * S.fade);
+        if (!rvMask) { rvMask = document.createElement("canvas"); rvMask.width = VIEW_W; rvMask.height = VIEW_H; }
+        if (!rvTmp || rvTmp.width !== snap.width || rvTmp.height !== snap.height) { rvTmp = document.createElement("canvas"); rvTmp.width = snap.width; rvTmp.height = snap.height; }
+        const mx = rvMask.getContext("2d");
+        mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = "source-over"; mx.clearRect(0, 0, VIEW_W, VIEW_H);
+        mx.globalCompositeOperation = "lighter";
+        let any = false;
+        for (const m of sc2.lamps) {
+            if (!m.rec) continue;
+            const rad = 12 + m.sz * 2.0, small = 0.5 + 0.5 * clamp01(m.sz / 24), x = m.x - S.camX, y = m.y - S.camY + (m.wall ? rad * 0.2 : 0);
+            if (x < -rad || x > VIEW_W + rad || y < -rad || y > VIEW_H + rad) continue;
+            any = true;
+            mx.globalAlpha = a * small;
+            mx.drawImage(revealSprite(), x - rad, y - rad * 0.8, rad * 2, rad * 1.6);
+        }
+        if (!any) return;
+        mx.globalAlpha = 1;
+        const tx = rvTmp.getContext("2d");
+        tx.setTransform(1, 0, 0, 1, 0, 0); tx.globalCompositeOperation = "copy"; tx.drawImage(snap, 0, 0);
+        tx.globalCompositeOperation = "destination-in"; tx.drawImage(rvMask, 0, 0, rvTmp.width, rvTmp.height);
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+        ctx.drawImage(rvTmp, 0, 0, VIEW_W, VIEW_H);
+    },
+});
+
+export const hasLights = (id) => !!(stageLights && stageLights[id]);
 
 export function resetScenery2(map, p, S) {
     const r = rng(p.seed ^ 0x7f4a7c15);
@@ -101,12 +222,22 @@ function findLamps(S) {
 }
 function build(S) {
     const { p } = S;
-    if (!S.pix()) return;
+    if (!S.pix() || !stageLights) return;
     sc2.built = true;
     sc2.waterPts = p.open && !p.snowy && S.waterStage() ? scatterOn(S, 60, S.waterTest()) : [];
     sc2.meadow = p.butterflies ? scatterOn(S, 40, isGrassPx) : [];
-    sc2.lamps = p.lamps ? findLamps(S) || [] : [];
+    sc2.lamps = []; sc2.lamps.windows = [];             // no picture scan any more: only the game own records place lights
     sc2.windows = (sc2.lamps && sc2.lamps.windows) || [];
+    const rec = stageLights[sc2.id];
+    if (rec) {                                      // the game says where its lights are: use that, not the picture scan
+        sc2.sheetP = loadImg(`assets/effects/${sc2.id}.png`); sc2.sheetS = loadImg(`assets/effects/${sc2.id}_semi.png`);
+        const win = [];
+        sc2.lamps = rec.lights.map((l) => {
+            const v = rec.sprites[l.s], f = v[0][0];
+            return { x: l.x + f[4] + f[2] / 2, y: l.y + f[5] + f[3] / 2, size: clamp01(f[2] / 40), ph: sc2.rand() * 6.28, rec: true, sz: Math.max(f[2], f[3]), wall: l.z >= 6, v, ox: l.x, oy: l.y, per: l.p + 1 };
+        });
+        sc2.lamps.windows = win; sc2.windows = win;
+    }
     const r = sc2.rand;
     sc2.dragonflies = sc2.waterPts.length >= 12 && p.open && !p.night
         ? sc2.waterPts.slice(0, 6).map(([x, y]) => ({ hx: x, hy: y, x, y, tx: x, ty: y, until: 0, ph: r() * 6.28, col: ["#3fd0e0", "#4a8cff", "#7be08a"][(r() * 3) | 0] })) : [];
@@ -205,6 +336,7 @@ export function drawScenery2(ctx, S) {
             for (const m of sc2.lamps) {
                 const sx = m.x - camX, sy = m.y - camY;
                 if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) continue;
+                if (m.rec) { drawGameLight(ctx, sc2, m, camX, camY, dark * fade, now); ctx.globalCompositeOperation = "lighter"; continue; }
                 const fl = 0.86 + 0.09 * Math.sin(t * 7.3 + m.ph) + 0.05 * Math.sin(t * 17 + m.ph * 3);
                 const rad = 20 + 32 * m.size, a = dark * fl * fade;
                 // wide soft halo, then a hot bloom, then the bright core

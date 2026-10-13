@@ -22,6 +22,7 @@ import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
+import { installPost2d } from "./post2d.js";
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
@@ -366,6 +367,7 @@ const PACKED_MUSIC = {
 const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
+installPost2d(document.getElementById("stage"), document.getElementById("game"));
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
