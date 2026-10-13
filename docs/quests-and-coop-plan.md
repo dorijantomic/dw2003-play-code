@@ -76,8 +76,26 @@ story or battle rules, and every part of it is off by default.
       quests that truly need a character.
 
 ### Phase 3 - more quests, once the framework is proven
-- [ ] Arena qualifiers (the four stub rounds on each floor), fishing contest, Circuit Board cartographer,
-      across-the-worlds errands, leader rematch gauntlet, album collector.
+- [x] **Challenge fights** (new capability): the quest layer can launch a real fight from the log through the
+      game's own hand-off (`startQuestBattle` in `game.js`, same guards as a random encounter), using real
+      encounter screens, optionally stronger (`scale`, `hpMult`). Only a win completes it. A **loss returns to
+      the field with the party restored** (it does not go to the title screen). Tested with real fights.
+- [x] **Leader rematch gauntlet:** Seiryu's team (the game's real three-fighter gauntlet), a hard version
+      (the game's own stat scales x22/16, HP x1.5, verified in the battle), and "Three leaders, one afternoon"
+      (eight fights). Gated by the game's own decoded story-beat flags, **read only** (`requires.flag`).
+- [x] **Double trouble in Central Park:** two real roaming fights back to back (this is the Phase 4.4
+      "double ambush", done as a gauntlet).
+- [x] **Arena qualifiers:** a new three-match gauntlet on the arena floor (the game's own tournament rounds
+      are unfilled stubs; these are new, and say so).
+- [x] **Circuit Board cartographer:** chart six different boards (new `visitSet` objective; it remembers which
+      ones, counts a variant of a place once, and survives a reload).
+- [x] **Before and after:** see the Main Lobby as Asuka City and again as Amaterasu City. Changed from the plan's
+      "across the worlds": the story shows that Asuka becomes Amaterasu partway through, they are not two
+      worlds you can travel between.
+- [ ] **Fishing contest: not feasible yet.** There is no fishing implementation in the web port to hook; the
+      system is decoded in the docs but not ported.
+- [ ] **Album collector: not feasible yet.** The only album in the port is the card album; there is no record of
+      which Digimon species you have seen.
 
 ### Phase 4 - co-op, in order of effort
 - [ ] 4.1 **Remote play**: the host's browser runs the game and streams its canvas; the second player sends

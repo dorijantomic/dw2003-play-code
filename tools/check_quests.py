@@ -60,6 +60,28 @@ for q in quests:
         elif o["type"] == "visit":
             if o["map"] not in maps:
                 errors.append(f"{qid}: unknown map '{o['map']}'")
+        elif o["type"] == "challenge":
+            for scr in o.get("screens", [o.get("screen")]):
+                party = fe.get(str(scr))
+                if not party:
+                    errors.append(f"{qid}: challenge screen {scr} is not a real encounter screen")
+                else:
+                    for p in party:
+                        if p["name"] not in enemies:
+                            errors.append(f"{qid}: screen {scr} holds unknown enemy '{p['name']}'")
+            if o.get("scale", 16) < 8 or o.get("scale", 16) > 40:
+                errors.append(f"{qid}: scale {o.get('scale')} is outside a sane range (16 = normal)")
+            if not (0.25 <= o.get("hpMult", 1) <= 4):
+                errors.append(f"{qid}: hpMult {o.get('hpMult')} is outside a sane range")
+            for m in o.get("startAt", []):
+                if m not in maps:
+                    errors.append(f"{qid}: startAt names unknown map '{m}'")
+        elif o["type"] == "visitSet":
+            for m in o["maps"]:
+                if m not in maps:
+                    errors.append(f"{qid}: visitSet names unknown map '{m}'")
+            if not (1 <= o["count"] <= len(set(o["maps"]))):
+                errors.append(f"{qid}: visitSet count {o['count']} must be between 1 and the number of distinct maps")
         elif o["type"] == "duelWin":
             if not isinstance(o.get("count"), int) or o["count"] < 1:
                 errors.append(f"{qid}: duelWin needs a positive integer count")
@@ -80,10 +102,14 @@ for q in quests:
     for it in q.get("reward", {}).get("items", []):
         if it["name"] not in item_names:
             errors.append(f"{qid}: reward item '{it['name']}' is not in the in-game item table")
+known_flags = {r["flag"] for r in load(os.path.join(A, "data/chapter_progression.json"))["ladder"]}
 for q in quests:
     r = q.get("requires", {}).get("done")
     if r and r not in ids:
         errors.append(f"{q['id']}: requires unknown quest '{r}'")
+    fl = q.get("requires", {}).get("flag")
+    if fl is not None and fl not in known_flags:
+        errors.append(f"{q['id']}: requires flag {fl}, which is not one of the decoded story-beat flags {sorted(known_flags)}")
 
 print(f"{len(quests)} quest(s) checked against {len(enemies)} enemies, {len(maps)} maps, {len(item_names)} item names")
 for e in errors:

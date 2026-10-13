@@ -371,6 +371,8 @@ installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
 installQuests({
     stageEl: document.getElementById("stage"),
+    startBattle: (party, opts) => startQuestBattle(party, opts),
+    readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     // rewards go through the game's own item store and money, exactly as a battle drop does
     giveItem: (name, count = 1) => {
         const item = ITEM_BY_NAME?.[name];
@@ -3816,6 +3818,35 @@ function presentVictory(_res, after) {
 function startFieldBattle(run) {
     if (USE_LEGACY_BATTLE_HANDOFF) { run(); return; }
     state.wipe28 = { ...createCheckerboard(), pending: { run } };
+}
+
+// EXPERIMENT: lets the optional quest layer launch a custom fight (real boss screens, or a stronger copy of one)
+// through the same hand-off a random encounter uses, with the same guards. A LOSS returns to the field with the
+// party restored (see below) instead of going to the title screen, because the title route belongs to the
+// story's own fights.
+function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose } = {}) {
+    if (
+        fieldPartySize(state.party) === 0 ||
+        battle.isActive() ||
+        cutscene.isActive() ||
+        textbox.isOpen() ||
+        choice.isOpen() ||
+        fade.dir !== 0 ||
+        !!state.diveDemo ||
+        !!state.wipe28
+    )
+        return false;
+    const mapId = currentMap().id;
+    // A lost challenge costs nothing: put the party's vitals back as they were before the fight (an optional
+    // fight must not leave your lead at 1 HP for the rest of the session). Wins and runs keep the real outcome.
+    const before = { lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null) };
+    const restoreParty = () => {
+        state.partnerStats = JSON.parse(before.lead);
+        state.partyStats = JSON.parse(before.party);
+    };
+    startFieldBattle(() =>
+        battle.startParty(party, (res) => presentVictory(res, () => onWin?.(res)), () => onFlee?.(), () => { restoreParty(); onLose?.(); }, { screenId, mapId }));
+    return true;
 }
 
 function triggerRandomEncounter(mapId, x, y) {

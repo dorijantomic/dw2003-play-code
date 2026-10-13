@@ -1,5 +1,5 @@
-// Browser test, phase 2: station boards (accept only there, variants count), bounties, the quiet route (fight / leaving the map resets it, a REAL battle start resets it), the card ladder (simulated duel results).
-// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate, clean profile).
+// Browser test, phase 2: station boards, bounties, the quiet route, the card ladder (simulated duel results).
+// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate profile).
 // Run:   PORT=8770 node tools/verify_quests_phase2.mjs
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -21,16 +21,25 @@ const boot = async (map) => {
   for (let i = 0; i < 90; i++) { await sleep(300); if (await ev("!window.__oldPage && !!(window.__state && window.__state.started && window.__quests)")) break; }
   await ev('[...document.querySelectorAll("button")].find(b=>/Authentic PS1/.test(b.textContent))?.click()'); await sleep(2500);
 };
-const goMap = async (id) => { await ev(`(()=>{const s=document.getElementById("mapSelect");s.value="${id}";s.dispatchEvent(new Event("change",{bubbles:true}))})()`); await sleep(2500); };
+const goMap = async (mid) => {            // the game can ignore a map change made while it is still settling: retry until it takes
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await ev(`(()=>{const s=document.getElementById("mapSelect");s.value="${mid}";s.dispatchEvent(new Event("change",{bubbles:true}))})()`);
+    for (let i = 0; i < 20; i++) { await sleep(400); if ((await ev(`window.__quests.where().lastMap`)) === mid) return; }
+  }
+};
 const win = (enemies, mapId) => ev(`import("/gameEvents.js").then(m=>m.emit("battleWon",{enemies:${JSON.stringify(enemies)},mapId:"${mapId}",screenId:1}))`);
 const at = async (x, y) => { await ev(`window.__state.x=${x};window.__state.y=${y}`); await sleep(350); };
 const prog = (qid) => ev(`JSON.stringify(window.__quests.state.active["${qid}"]?.p ?? null)`);
 const st = (qid) => ev(`window.__quests.status("${qid}")`);
 const ok = (name, cond, extra = "") => console.log(cond ? "PASS" : "FAIL", name, extra);
 
-await boot("s330");
-await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
-await boot("s330");
+for (let attempt = 0; attempt < 4; attempt++) {     // a previous run's tab can still be rewriting its saved state as it closes: retry until genuinely clean
+  await boot("s330");
+  await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
+  await boot("s330");
+  if ((await ev(`JSON.stringify(window.__quests.state)`)) === '{"v":1,"active":{},"done":{}}') break;
+  await sleep(1500);
+}
 if ((await ev(`JSON.stringify(window.__quests.state)`)) !== '{"v":1,"active":{},"done":{}}') { console.log("ABORT: the test browser did not start clean (leftover quest state); rerun"); process.exit(2); }
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
 await ev(`window.__quests.togglePanel(true)`); await sleep(300);

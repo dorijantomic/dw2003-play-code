@@ -18,6 +18,11 @@ const KEY = "dw.quests.v1";
 const OBJECTIVES = {
     defeat: { target: (o) => Math.max(1, o.count | 0), valid: (o) => Array.isArray(o.species) && o.species.length > 0 },
     visit: { target: () => 1, valid: (o) => typeof o.map === "string" },
+    // a fight the quest layer launches itself: real encounter screens (a boss, or two roaming fights back to back),
+    // optionally stronger (scale 16 = normal, hpMult). Only a WIN completes it.
+    challenge: { target: () => 1, valid: (o) => (Number.isInteger(o.screen) || (Array.isArray(o.screens) && o.screens.every(Number.isInteger) && o.screens.length > 0)) },
+    // visit any N distinct places out of a set; remembers WHICH ones (night/story variants of a place count as one)
+    visitSet: { target: (o) => Math.max(1, o.count | 0), valid: (o) => Array.isArray(o.maps) && o.maps.length > 0 && (o.count | 0) >= 1 && (o.count | 0) <= o.maps.length },
     duelWin: { target: (o) => Math.max(1, o.count | 0), valid: (o) => (o.count | 0) > 0 },
     // walk from one gate to another in one go; any fight (or leaving the map) sends you back to the start
     reach: { target: () => 2, valid: (o) => typeof o.map === "string" && o.from && o.to && [o.from.x, o.from.y, o.from.r, o.to.x, o.to.y, o.to.r].every(Number.isFinite) },
@@ -25,7 +30,7 @@ const OBJECTIVES = {
 
 let defs = [];
 let st = loadState();
-let api = null;
+let api = null, fieldEnc = null, challengeBusy = false;
 let variants = {};
 let mapNames = {};
 let lastMap = null, lastX = 0, lastY = 0;
@@ -65,13 +70,14 @@ function statusOf(d) {
     if (st.done[d.id]) return "done";
     if (st.active[d.id]) return isReady(d.id) ? "ready" : "active";
     if (d.requires?.done && !st.done[d.requires.done]) return "locked";
+    if (d.requires?.flag != null && api?.readFlag?.(d.requires.flag) !== 1) return "locked";   // read-only: needs a story beat
     return "available";
 }
 
 function accept(id) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "available" || !atGiver(d)) return false;
-    st.active[id] = { p: d.objectives.map(() => 0), at: Date.now() };
+    st.active[id] = { p: d.objectives.map(() => 0), seen: d.objectives.map(() => []), at: Date.now() };
     saveState(); toast(`Quest accepted: ${d.title}`); render();
     return true;
 }
@@ -89,6 +95,57 @@ function claim(id) {
     }
     toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`); render();
     return true;
+}
+
+async function enemyParty(o) {
+    if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r) => r.json())).screens;
+    const party = [];
+    for (const scr of o.screens ?? [o.screen]) {
+        for (const p of fieldEnc[String(scr)] ?? []) {
+            party.push({ name: p.name, level: p.level, hp: Math.round(p.hp * (o.hpMult ?? 1)), mp: p.mp, stat_scale: Math.round((p.stat_scale ?? 16) * ((o.scale ?? 16) / 16)) });
+        }
+    }
+    return party;
+}
+const challengeIndex = (d) => d.objectives.findIndex((o, i) => o.type === "challenge" && (st.active[d.id]?.p[i] || 0) < 1);
+const canBegin = (d) => !!api?.startBattle && !challengeBusy && (!d.objectives[challengeIndex(d)]?.startAt || (lastMap != null && d.objectives[challengeIndex(d)].startAt.some((m) => sameMapId(m, lastMap))));
+async function beginChallenge(id) {
+    const d = defOf(id), i = d ? challengeIndex(d) : -1;
+    if (!enabled() || i < 0 || statusOf(d) !== "active" || !canBegin(d)) return false;
+    const o = d.objectives[i];
+    const party = await enemyParty(o);
+    if (!party.length) { console.warn(`[quests] challenge for "${id}" has no enemies`); return false; }
+    challengeBusy = true;
+    if (panel) panel.hidden = true;
+    const started = api.startBattle(party, {
+        screenId: (o.screens ?? [o.screen])[0],
+        onWin: (res) => { challengeBusy = false; if (res?.enemyFled) toast("They got away. Try again."); else { bump("challenge", (x) => x === o); } },
+        onFlee: () => { challengeBusy = false; toast("You ran away. The challenge is still open."); },
+        onLose: () => { challengeBusy = false; toast("You were beaten. The challenge is still open."); },
+    });
+    if (!started) { challengeBusy = false; toast("Not now - finish what you are doing first."); }
+    return started;
+}
+
+function markVisited(mapId) {
+    if (!enabled()) return;
+    let changed = false;
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        const wasReady = isReady(id);
+        d.objectives.forEach((o, i) => {
+            if (o.type !== "visitSet" || !o.maps.some((m) => sameMap(m, mapId))) return;
+            a.seen = a.seen ?? d.objectives.map(() => []);
+            const key = canon(mapId);
+            if (a.seen[i].includes(key)) return;
+            a.seen[i].push(key);
+            a.p[i] = Math.min(targetOf(d, i), a.seen[i].length);
+            changed = true;
+        });
+        if (!wasReady && isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
+    }
+    if (changed) { saveState(); render(); }
 }
 
 function bump(type, match) {
@@ -131,7 +188,7 @@ export function questsTick(mapId, x, y) {
     if (mapId !== lastMap) {
         lastMap = mapId;
         if (enabled()) resetRoutes("You left the route. Start it again.", mapId);   // leaving the route's map abandons it
-        if (mapId) bump("visit", (o) => sameMap(o.map, mapId));
+        if (mapId) { bump("visit", (o) => sameMap(o.map, mapId)); markVisited(mapId); }
         if (panel && !panel.hidden) render();                                    // the board may now be in reach
     }
     if (!enabled() || !mapId) return;
@@ -159,6 +216,8 @@ function toast(msg) {
 function objectiveText(d, i) {
     const o = d.objectives[i], a = st.active[d.id], p = a ? (a.p[i] || 0) : 0, t = targetOf(d, i);
     if (o.type === "defeat") return `Defeat ${o.species.join(" / ")}${o.maps ? " in " + [...new Set(o.maps.map(mapLabel))].join(" / ") : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
+    if (o.type === "challenge") return `${o.label ?? "Win the challenge fight"}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
+    if (o.type === "visitSet") return `${o.label ?? `Visit ${t} different places`}  ${a ? `${p}/${t}` : `(${t} of ${o.maps.length})`}`;
     if (o.type === "duelWin") return `Win ${t} card duel${t > 1 ? "s" : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
     if (o.type === "visit") return `Visit ${mapLabel(o.map)}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
     if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  ✓" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
@@ -168,7 +227,10 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 function card(d, status) {
     const objs = d.objectives.map((_, i) => `<li>${esc(objectiveText(d, i))}</li>`).join("");
     const here = atGiver(d);
-    const btn = status === "available" ? (here ? `<button data-q="accept:${d.id}">Accept</button>` : `<div class="qr" style="color:#c9a45a">Accept it at: ${esc([...new Set(d.acceptAt.map(mapLabel))].join(" / "))}</div>`) : status === "ready" ? `<button data-q="claim:${d.id}" class="go">Claim reward</button>` : "";
+    const cIdx = status === "active" ? challengeIndex(d) : -1;
+    const cBtn = cIdx >= 0 ? (canBegin(d) ? `<button data-q="begin:${d.id}" class="go">Begin challenge (a real fight)</button>` : `<div class="qr" style="color:#c9a45a">${challengeBusy ? "Fight in progress" : d.objectives[cIdx].startAt ? "Begin it at: " + esc([...new Set(d.objectives[cIdx].startAt.map(mapLabel))].join(" / ")) : ""}</div>`) : "";
+    const btn0 = status === "available" ? (here ? `<button data-q="accept:${d.id}">Accept</button>` : `<div class="qr" style="color:#c9a45a">Accept it at: ${esc([...new Set(d.acceptAt.map(mapLabel))].join(" / "))}</div>`) : status === "ready" ? `<button data-q="claim:${d.id}" class="go">Claim reward</button>` : "";
+    const btn = cBtn || btn0;
     const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} x ${it.name}`)].filter(Boolean).join(", ");
     return `<div class="qc ${status}"><b>${esc(d.title)}</b><div class="qt">${esc(d.giver ?? "")}${d.giver ? " — " : ""}${esc(d.text ?? "")}</div><ul>${objs}</ul>${rw ? `<div class="qr">Reward: ${esc(rw)}</div>` : ""}${btn}</div>`;
 }
@@ -216,6 +278,7 @@ function installUi(stageEl) {
         const [act, id] = b.dataset.q.split(":");
         if (act === "accept") accept(id);
         else if (act === "claim") claim(id);
+        else if (act === "begin") beginChallenge(id);
         else if (act === "reset") {
             if (resetArmed > Date.now()) { st = freshState(); saveState(); resetArmed = 0; toast("Quest progress reset"); }
             else { resetArmed = Date.now() + 3500; setTimeout(render, 3600); }
@@ -230,9 +293,9 @@ function installUi(stageEl) {
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag }) {
     if (!stageEl || api) return;
-    api = { giveItem, giveBits };
+    api = { giveItem, giveBits, startBattle, readFlag };
     installUi(stageEl);
     try {
         const [q, v, m] = await Promise.all([
@@ -251,6 +314,7 @@ export async function installQuests({ stageEl, giveItem, giveBits }) {
     } catch (e) { console.warn("[quests] could not load quests.json:", e); }
     window.__quests = {   // debug / test hooks; nothing in the game reads these
         get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id) => (defOf(id) ? statusOf(defOf(id)) : null),
-        togglePanel, bump,
+        togglePanel, bump, beginChallenge,
+        where: () => ({ lastMap, lastX, lastY, enabled: enabled() }),
     };
 }

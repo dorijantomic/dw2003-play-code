@@ -1,5 +1,5 @@
-// Browser test, phase 1: switch off by default, F3 log, accept, objective counting (right/wrong map and species, both worlds, map variants), claim pays once, survives a reload, story/progress keys untouched.
-// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate, clean profile).
+// Browser test, phase 1: switch off by default, F3 log, accept, objective counting, claim pays once, survives a reload, story/progress keys untouched.
+// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate profile).
 // Run:   PORT=8770 node tools/verify_quests.mjs
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -27,9 +27,13 @@ const win = (enemies, mapId) => ev(`import("/gameEvents.js").then(m=>m.emit("bat
 const snap = () => ev(`(()=>{const s=window.__state;const keys=Object.keys(localStorage).filter(k=>!/^dw\\.(quests|fx)/.test(k)&&!/^(inventory|bits)$/.test(k)).sort();return JSON.stringify({flags:s.flags,ls:keys.map(k=>[k,localStorage.getItem(k)])})})()`);
 const ok = (name, cond, extra = "") => console.log(cond ? "PASS" : "FAIL", name, extra);
 
-await boot("s330");
-await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);   // start from a clean slate: quests off, no progress
-await boot("s330");
+for (let attempt = 0; attempt < 4; attempt++) {     // a previous run's tab can still be rewriting its saved state as it closes: retry until genuinely clean
+  await boot("s330");
+  await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
+  await boot("s330");
+  if ((await ev(`JSON.stringify(window.__quests.state)`)) === '{"v":1,"active":{},"done":{}}') break;
+  await sleep(1500);
+}
 const before = await snap();
 const bits0 = await ev("window.__state.bits"), inv0 = await ev("JSON.stringify(window.__state.inventory)");
 ok("layer present, switch off by default", (await ev("window.__fx.quests")) === false);

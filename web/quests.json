@@ -83,6 +83,94 @@
         { "type": "duelWin", "count": 6 }
       ],
       "reward": { "bits": 900, "items": [{ "name": "Life Disk", "count": 1 }] }
+    },
+    {
+      "id": "double_trouble_park",
+      "title": "Double trouble in Central Park",
+      "giver": "Park ranger board",
+      "text": "Two pests came out of the long grass at once. Face a Kunemon and a Tapirmon back to back, with no time to heal in between.",
+      "acceptAt": ["s330", "s940"],
+      "objectives": [
+        {
+          "type": "challenge", "screens": [34, 35], "startAt": ["s330", "s940"],
+          "label": "Beat a Kunemon and then a Tapirmon, back to back"
+        }
+      ],
+      "reward": { "bits": 350, "items": [{ "name": "Antidote Disk", "count": 1 }] }
+    },
+    {
+      "id": "seiryu_rematch",
+      "title": "Seiryu's rematch",
+      "giver": "Seiryu City notice board",
+      "text": "Word is the Seiryu leader's team will take on all comers again. The same three fighters, in the same order.",
+      "acceptAt": ["s420", "s421"],
+      "requires": { "flag": 16402 },
+      "objectives": [
+        { "type": "challenge", "screen": 3, "startAt": ["s420", "s421"], "label": "Beat the three fighters in a row" }
+      ],
+      "reward": { "bits": 800, "items": [{ "name": "Revive Disk", "count": 1 }] }
+    },
+    {
+      "id": "seiryu_rematch_hard",
+      "title": "Seiryu's rematch: the hard way",
+      "giver": "Seiryu City notice board",
+      "text": "The same three fighters, but they have been training. Stronger and tougher.",
+      "acceptAt": ["s420", "s421"],
+      "requires": { "done": "seiryu_rematch" },
+      "objectives": [
+        { "type": "challenge", "screen": 3, "scale": 22, "hpMult": 1.5, "startAt": ["s420", "s421"], "label": "Beat the three trained fighters in a row" }
+      ],
+      "reward": { "bits": 1500, "items": [{ "name": "Power Charge", "count": 1 }] }
+    },
+    {
+      "id": "leaders_gauntlet",
+      "title": "Three leaders, one afternoon",
+      "giver": "Seiryu City notice board",
+      "text": "Take on the Seiryu, Suzaku and Byakko teams one after another. No healing between rounds.",
+      "acceptAt": ["s420", "s421"],
+      "requires": { "flag": 16414 },
+      "objectives": [
+        { "type": "challenge", "screens": [3, 4, 5], "startAt": ["s420", "s421"], "label": "Beat all three leaders' teams in a row (eight fights)" }
+      ],
+      "reward": { "bits": 2500, "items": [{ "name": "Super Charge", "count": 1 }] }
+    },
+    {
+      "id": "circuit_board_cartographer",
+      "title": "Circuit Board cartographer",
+      "giver": "Surveyor's board",
+      "text": "The underground Circuit Board boards are not on any map. Chart six different ones.",
+      "objectives": [
+        {
+          "type": "visitSet", "count": 6,
+          "maps": ["s865", "s870", "s875", "s880", "s885", "s890", "s895", "s968", "s969", "s970", "s971", "s972", "s973", "s974"],
+          "label": "Chart different Circuit Board boards"
+        }
+      ],
+      "reward": { "bits": 700, "items": [{ "name": "Energy Disk", "count": 2 }] }
+    },
+    {
+      "id": "witness_the_change",
+      "title": "Before and after",
+      "giver": "Lobby clerk's board",
+      "text": "The Main Lobby is not always the same place. See it as it is now, and again once the city has changed.",
+      "objectives": [
+        {
+          "type": "visitSet", "count": 2, "maps": ["s210", "s211"],
+          "label": "Visit the Main Lobby once as Asuka City and once as Amaterasu City"
+        }
+      ],
+      "reward": { "bits": 600, "items": [{ "name": "Life Disk", "count": 1 }] }
+    },
+    {
+      "id": "arena_qualifiers",
+      "title": "Arena qualifiers",
+      "giver": "Arena front desk board",
+      "text": "Three qualifier matches, back to back, on the arena floor. The game's own tournament rounds were never filled in; these are new.",
+      "acceptAt": ["s230", "s231"],
+      "objectives": [
+        { "type": "challenge", "screens": [49, 53, 48], "startAt": ["s232", "s233"], "label": "Win three qualifier matches in a row on the arena floor" }
+      ],
+      "reward": { "bits": 900, "items": [{ "name": "Energy Disk", "count": 1 }] }
     }
   ]
 }
