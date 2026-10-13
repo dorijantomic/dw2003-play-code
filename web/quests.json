@@ -1,0 +1,27 @@
+{
+  "_comment": "EXPERIMENT: optional extra quests. Not original game content. Each stage list names BOTH worlds where a place exists twice (Asuka and Amaterasu), so a quest works whichever world the story is in. Species names, stage ids and item names are checked against the game's own data by tools/check_quests.py.",
+  "quests": [
+    {
+      "id": "park_pest_control",
+      "title": "Central Park pest control",
+      "giver": "Notice board",
+      "text": "Kunemon keep wandering into Central Park. Thin them out.",
+      "objectives": [
+        { "type": "defeat", "species": ["Kunemon"], "count": 3, "maps": ["s330", "s940"] }
+      ],
+      "reward": { "bits": 300, "items": [{ "name": "Antidote Disk", "count": 1 }] }
+    },
+    {
+      "id": "forest_gate_survey",
+      "title": "Wire Forest survey",
+      "giver": "Notice board",
+      "text": "Walk the Wire Forest entrance and the forest beyond it, and report back.",
+      "objectives": [
+        { "type": "visit", "map": "s335" },
+        { "type": "visit", "map": "s350" }
+      ],
+      "reward": { "bits": 200 },
+      "requires": { "done": "park_pest_control" }
+    }
+  ]
+}

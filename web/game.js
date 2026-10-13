@@ -23,6 +23,7 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
+import { installQuests, questsTick } from "./quests.js"; // EXPERIMENT: optional extra quests
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
@@ -368,6 +369,21 @@ const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
+installQuests({
+    stageEl: document.getElementById("stage"),
+    // rewards go through the game's own item store and money, exactly as a battle drop does
+    giveItem: (name, count = 1) => {
+        const item = ITEM_BY_NAME?.[name];
+        if (!item) return false;
+        for (let i = 0; i < count; i++) storeAddItem(state, item.id, 1);
+        localStorage.setItem("inventory", JSON.stringify(state.inventory));
+        return true;
+    },
+    giveBits: (n) => {
+        state.bits = Math.min((state.bits ?? 0) + n, 9999999);
+        localStorage.setItem("bits", String(state.bits));
+    },
+});
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
@@ -8938,6 +8954,7 @@ function render() {
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
+    questsTick(m.id);   // EXPERIMENT: lets the optional quest layer notice a new stage
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {
         const amb = ambienceFor(m, mapImg, camX, camY);

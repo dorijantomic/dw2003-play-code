@@ -42,13 +42,22 @@ story or battle rules, and every part of it is off by default.
 - [x] Plan written and committed on `experiment/quests-coop`.
 
 ### Phase 1 - quest framework (works offline, one player)
-- [ ] 1.1 Read the existing flag store, save path, reward dispatch, textbox/balloon and NPC placement code.
-- [ ] 1.2 `quests.js`: data-driven quest definitions (`quests.json`), own state store (separate from the
-      story flags), persisted in the same place saves live, with a version field.
-- [ ] 1.3 Quest log screen (a key, plus a line in the F2 panel); toast on accept / progress / complete.
-- [ ] 1.4 Hooks: battle won (enemy species, stage), item obtained, stage entered, card duel won.
-- [ ] 1.5 Rewards through the game's own item/money routines; never duplicates on reload.
-- [ ] 1.6 F2 switch "Extra quests" (off by default) and a test that proves the story state is untouched.
+- [x] 1.1 Read the flag store, save path, reward dispatch and battle/stage hooks. (NPC placement and the
+      textbox/balloon are still unread: they belong to Phase 2.)
+- [x] 1.2 `web/quests.js` + `web/quests.json`: data-driven definitions, its own state store
+      (`localStorage` key `dw.quests.v1`, version field), never touching story flags.
+      **Limitation:** the store is per browser, not per memory-card slot. The card image has a fixed binary
+      layout, so quest data is not written into it. Per-slot quests need a look at how loading rewrites state.
+- [x] 1.3 Quest log (F3), toasts on accept / ready / complete, a two-step "Reset quests" button.
+- [~] 1.4 Hooks: **battle won** (real, tested through a real fight) and **stage entered** (tested) are done,
+      via `web/gameEvents.js`. **Item obtained** and **card duel won** are not done yet; add them when a
+      quest needs them (Phase 2.3 needs the card duel one).
+- [x] 1.5 Rewards go through the game's own item store and money; the quest is marked done and saved
+      before the reward is paid, so a reload cannot pay twice (tested).
+- [x] 1.6 F2 switch "Extra quests (experimental)": off by default, and excluded from "All on" and the presets.
+      Tested: no story or progress key changes (`tools/verify_quests.mjs`).
+- Tests: `python3 tools/check_quests.py` (data against the game's tables), `tools/verify_quests.mjs`
+  and `tools/verify_quests_realbattle.mjs` (browser).
 
 ### Phase 2 - first three quests (each one small and testable)
 - [ ] 2.1 **Bounty board** at the stations: defeat N named wild Digimon (counts from the stage encounter tables).

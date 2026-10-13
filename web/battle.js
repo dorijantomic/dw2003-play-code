@@ -26,6 +26,7 @@
 //   We use: hp = 80 + str * level  (approximation; real formula in Unknown4 init code)
 
 import { asButton } from "./input.js";
+import { emit as emitGameEvent } from "./gameEvents.js";
 import { createBattle3D, resolveModelFolder } from "./battle3d.js";
 import { createBattleCommandNative } from "./battlecmd-native.js";
 import { createBattleCommandTranslated, battleAilmentByte } from "./battlecmd-translated.js";
@@ -6927,6 +6928,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));
       localStorage.setItem("bits", String(state.bits));
       battle = null;
+      // optional layers (extra quests) hear every win; no listener means nothing happens
+      emitGameEvent("battleWon", { enemies: (b.party ?? []).map((e) => e.enemyId).filter((n) => typeof n === "string"), mapId: b.mapId ?? null, screenId: b.screenId ?? null });
       b.onWin?.({ xp: activeProgress.xp, bits, levelUp: activeProgress.levelUp,
         newLevel: activeProgress.newLevel, droppedItem,
         availableEvos: activeProgress.availableEvos, participantProgress: progress });
