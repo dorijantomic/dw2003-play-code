@@ -60,10 +60,20 @@ story or battle rules, and every part of it is off by default.
   and `tools/verify_quests_realbattle.mjs` (browser).
 
 ### Phase 2 - first three quests (each one small and testable)
-- [ ] 2.1 **Bounty board** at the stations: defeat N named wild Digimon (counts from the stage encounter tables).
-- [ ] 2.2 **Quiet route**: cross a map without stepping on the known ambush tiles; a miss triggers the ambush.
-- [ ] 2.3 **Card ladder**: one duelist per town, rare cards as rewards (card shop data).
-- [ ] 2.4 A quest giver NPC mechanism (placed from data, speaks with the game's own balloon).
+- [x] 2.1 **Bounty boards** at East Station and South Station: defeat N named wild Digimon on the nearby map.
+      Species and maps are checked against the real encounter tables (`tools/check_quests.py`). A quest can
+      only be accepted while standing at its board (`acceptAt`), and night/story variants count.
+- [x] 2.2 **Quiet route** (changed from the plan): walk from the Wire Forest entrance's north-west gate to its
+      south gate without a fight. A fight, or leaving the map, sends you back to the start. The ambush-tile
+      version was dropped: ambush tiles are one-shot and share a single latch, so dodging them is not a
+      repeatable skill. Tested with simulated fights AND a real battle start.
+- [~] 2.3 **Card ladder** (changed from the plan): win 3, then 6, duels against any tamer. Per-opponent
+      ladders need the field's NPC-to-opponent mapping, which I have not read. The quest logic is tested with
+      simulated results; the one-line hook in `cardduel-native.js` (`cardDuelEnded`) parses but has **not** been
+      exercised by a real duel, because the duel runs on the original's code inside an emulated screen.
+- [~] 2.4 Quest giver NPC mechanism: **replaced by location-gated notice boards** (above). Placing new NPCs
+      into maps is the riskiest part and was not needed to prove the framework. Do it in Phase 3 only for
+      quests that truly need a character.
 
 ### Phase 3 - more quests, once the framework is proven
 - [ ] Arena qualifiers (the four stub rounds on each floor), fishing contest, Circuit Board cartographer,

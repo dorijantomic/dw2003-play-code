@@ -1,5 +1,5 @@
 {
-  "_comment": "EXPERIMENT: optional extra quests. Not original game content. Each stage list names BOTH worlds where a place exists twice (Asuka and Amaterasu), so a quest works whichever world the story is in. Species names, stage ids and item names are checked against the game's own data by tools/check_quests.py.",
+  "_comment": "EXPERIMENT: optional extra quests. Not original game content. Stage lists name BOTH worlds where a place exists twice (Asuka and Amaterasu), and night/story variants count as the same place, so a quest works whichever world the story is in. Species, stage ids, coordinates and item names are checked against the game's own data by tools/check_quests.py. 'acceptAt' makes a quest acceptable only while standing in that place (a notice board, in effect).",
   "quests": [
     {
       "id": "park_pest_control",
@@ -22,6 +22,67 @@
       ],
       "reward": { "bits": 200 },
       "requires": { "done": "park_pest_control" }
+    },
+    {
+      "id": "east_station_greens",
+      "title": "East Station bounty: forest greens",
+      "giver": "Station bounty board",
+      "text": "Plants are overrunning the Kicking Forest path. Cut four of them back.",
+      "acceptAt": ["s410", "s411", "s955"],
+      "objectives": [
+        { "type": "defeat", "species": ["Vegiemon", "RedVegiemon", "Woodmon"], "count": 4, "maps": ["s400"] }
+      ],
+      "reward": { "bits": 450, "items": [{ "name": "Energy Disk", "count": 1 }] }
+    },
+    {
+      "id": "south_station_swamp",
+      "title": "South Station bounty: swamp pests",
+      "giver": "Station bounty board",
+      "text": "The Bulk Swamp crossing is infested. Clear four of the worst offenders.",
+      "acceptAt": ["s440", "s441"],
+      "objectives": [
+        { "type": "defeat", "species": ["Gekomon", "Tortomon"], "count": 4, "maps": ["s445"] }
+      ],
+      "reward": { "bits": 550, "items": [{ "name": "Revive Disk", "count": 1 }] }
+    },
+    {
+      "id": "quiet_route_wire_forest",
+      "title": "The quiet route",
+      "giver": "Park ranger board",
+      "text": "Couriers lose time to fights in the Wire Forest. Show a fight-free way through.",
+      "acceptAt": ["s330", "s940"],
+      "requires": { "done": "forest_gate_survey" },
+      "objectives": [
+        {
+          "type": "reach", "map": "s335",
+          "label": "Cross the Wire Forest entrance from the north-west gate to the south gate without a fight",
+          "startLabel": "now reach the south gate",
+          "from": { "x": 64, "y": 96, "r": 120 },
+          "to": { "x": 688, "y": 832, "r": 90 }
+        }
+      ],
+      "reward": { "bits": 400, "items": [{ "name": "Sober Disk", "count": 1 }] }
+    },
+    {
+      "id": "card_ladder_1",
+      "title": "Card ladder: first steps",
+      "giver": "Card players' board",
+      "text": "Prove yourself at the card table. Beat any three tamers.",
+      "objectives": [
+        { "type": "duelWin", "count": 3 }
+      ],
+      "reward": { "bits": 500, "items": [{ "name": "Energy Disk", "count": 1 }] }
+    },
+    {
+      "id": "card_ladder_2",
+      "title": "Card ladder: rising duelist",
+      "giver": "Card players' board",
+      "text": "Word is spreading. Beat six tamers in all.",
+      "requires": { "done": "card_ladder_1" },
+      "objectives": [
+        { "type": "duelWin", "count": 6 }
+      ],
+      "reward": { "bits": 900, "items": [{ "name": "Life Disk", "count": 1 }] }
     }
   ]
 }

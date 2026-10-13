@@ -8954,7 +8954,7 @@ function render() {
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
-    questsTick(m.id);   // EXPERIMENT: lets the optional quest layer notice a new stage
+    questsTick(m.id, state.x, state.y);   // EXPERIMENT: lets the optional quest layer notice a new stage and where you are
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {
         const amb = ambienceFor(m, mapImg, camX, camY);

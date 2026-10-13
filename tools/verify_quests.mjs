@@ -1,5 +1,5 @@
-// Browser test for the optional quest layer: switch off by default, F3 log, accept, objective counting (right/wrong map and species, both worlds, map variants), claim pays once, survives a reload, story/progress keys untouched.
-// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate profile).
+// Browser test, phase 1: switch off by default, F3 log, accept, objective counting (right/wrong map and species, both worlds, map variants), claim pays once, survives a reload, story/progress keys untouched.
+// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate, clean profile).
 // Run:   PORT=8770 node tools/verify_quests.mjs
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -17,8 +17,9 @@ const ev = async (e) => (await send("Runtime.evaluate", { expression: e, awaitPr
 await send("Runtime.enable"); await send("Page.enable"); await send("Network.enable"); await send("Network.setCacheDisabled", { cacheDisabled: true });
 await send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 900, deviceScaleFactor: 1, mobile: false });
 const boot = async (map) => {
+  await ev("window.__oldPage = 1");   // marks the page being replaced, so we never mistake it for the new one
   await send("Page.navigate", { url: base(map) });
-  for (let i = 0; i < 90; i++) { if (await ev("!!(window.__state && window.__state.started && window.__quests)")) break; await sleep(500); }
+  for (let i = 0; i < 90; i++) { await sleep(300); if (await ev("!window.__oldPage && !!(window.__state && window.__state.started && window.__quests)")) break; }
   await ev('[...document.querySelectorAll("button")].find(b=>/Authentic PS1/.test(b.textContent))?.click()'); await sleep(2500);
 };
 const key = (k) => ev(`window.dispatchEvent(new KeyboardEvent("keydown",{key:"${k}",bubbles:true}))`);
@@ -43,7 +44,7 @@ ok("switch on via F2 panel", (await ev("window.__fx.quests")) === true);
 await key("F3"); await sleep(300);
 ok("F3 opens the log", (await ev(`document.getElementById("quest-panel").hidden`)) === false);
 const titles = await ev(`JSON.stringify([...document.querySelectorAll("#quest-panel .qc b")].map(b=>b.textContent))`);
-ok("only the first quest is offered (second is locked)", titles === '["Central Park pest control"]', titles);
+ok("the first quest is offered and the chained one is locked", titles.includes("Central Park pest control") && !titles.includes("Wire Forest survey"), titles);
 await ev(`document.querySelector('[data-q="accept:park_pest_control"]').click()`); await sleep(200);
 ok("accept via button", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
 
@@ -76,6 +77,7 @@ await ev(`window.__quests.accept("forest_gate_survey")`);
 await boot("s336");                           // s336 is the night variant of s335
 ok("variant of s335 counts as s335", (await ev(`JSON.stringify(window.__quests.state.active.forest_gate_survey.p)`)) === "[1,0]", await ev(`JSON.stringify(window.__quests.state.active.forest_gate_survey.p)`));
 await boot("s350");
+for (let i = 0; i < 24 && (await ev(`window.__quests.status("forest_gate_survey")`)) !== "ready"; i++) await sleep(500);   // a big map can take a few seconds to draw its first frame
 ok("second visit counts, quest ready", (await ev(`window.__quests.status("forest_gate_survey")`)) === "ready");
 await ev(`window.__quests.claim("forest_gate_survey")`); await sleep(200);
 

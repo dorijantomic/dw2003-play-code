@@ -1,5 +1,5 @@
 // Plays a REAL Kunemon fight (real key presses) and checks the quest layer counted it through the game's own win path.
-// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate profile).
+// Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate, clean profile).
 // Run:   PORT=8770 node tools/verify_quests_realbattle.mjs
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

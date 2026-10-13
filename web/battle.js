@@ -3798,6 +3798,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // [0x80055c48] (fieldstg.s .L0x00007448-.L0x00007458; s0 = 0x800519ec, +0x425c).
     // Every stop of the field into a battle is that handoff, so the cue belongs here.
     sfx?.play("encounts");
+    emitGameEvent("battleStarted", { mapId: battle?.mapId ?? null, screenId: battle?.screenId ?? null });   // optional layers (extra quests) hear it
 
     // Battle music: per-battle packed id at battle-struct+0x2b30 = the
     // trigger record's tag (mined into battle_music.json — batl00/batl10 for

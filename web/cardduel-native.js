@@ -33,6 +33,7 @@ import {
 } from "./native-screen-host.js";
 import { encodeNativeScreenText, nativeScreenObjects, nativeScreenRead } from "./native-screen.js";
 import { cards } from "./cardstate.js";
+import { emit as emitGameEvent } from "./gameEvents.js";
 
 const MODULE_ID = "pro/cardgame";
 /** The duel's root tick F0x80095BFC (cardgame.s 0x00012f4c). */
@@ -133,6 +134,7 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         commitBoosterStock(state, BOOSTER_ITEM_IDS, (address, size) => host.read(address, size));
         if (typeof localStorage !== "undefined") localStorage.setItem("inventory", JSON.stringify(state.inventory));
         state.duelWon = won;
+        emitGameEvent("cardDuelEnded", { won, opponentId: d._opponentId ?? null });   // optional layers (extra quests) hear it
         // The screen's own win count for this opponent: the scene's end arm adds
         // one to the byte at 0x80048D34 + duel+0x2EC + 0x7C (capped at 99) on a
         // win and leaves it alone on a loss (cardgame.s 0x000204e0-0x00020504).

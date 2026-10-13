@@ -18,6 +18,9 @@ const KEY = "dw.quests.v1";
 const OBJECTIVES = {
     defeat: { target: (o) => Math.max(1, o.count | 0), valid: (o) => Array.isArray(o.species) && o.species.length > 0 },
     visit: { target: () => 1, valid: (o) => typeof o.map === "string" },
+    duelWin: { target: (o) => Math.max(1, o.count | 0), valid: (o) => (o.count | 0) > 0 },
+    // walk from one gate to another in one go; any fight (or leaving the map) sends you back to the start
+    reach: { target: () => 2, valid: (o) => typeof o.map === "string" && o.from && o.to && [o.from.x, o.from.y, o.from.r, o.to.x, o.to.y, o.to.r].every(Number.isFinite) },
 };
 
 let defs = [];
@@ -25,7 +28,7 @@ let st = loadState();
 let api = null;
 let variants = {};
 let mapNames = {};
-let lastMap = null;
+let lastMap = null, lastX = 0, lastY = 0;
 let panel = null, toastEl = null, toastTimer = 0, resetArmed = 0;
 
 function freshState() { return { v: 1, active: {}, done: {} }; }
@@ -39,6 +42,8 @@ function loadState() {
 function saveState() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* private window: progress lasts for the session */ } }
 
 const enabled = () => !!(fx && fx.quests);
+const atGiver = (d) => !d.acceptAt || (lastMap != null && d.acceptAt.some((m) => sameMapId(m, lastMap)));
+function sameMapId(a, b) { return canon(a) === canon(b); }
 const canon = (id) => variants[id] ?? id;
 const sameMap = (a, b) => canon(a) === canon(b);
 const mapLabel = (id) => (mapNames[id] ?? mapNames[canon(id)] ?? id).replace(/^.*— /, "");
@@ -65,7 +70,7 @@ function statusOf(d) {
 
 function accept(id) {
     const d = defOf(id);
-    if (!enabled() || !d || statusOf(d) !== "available") return false;
+    if (!enabled() || !d || statusOf(d) !== "available" || !atGiver(d)) return false;
     st.active[id] = { p: d.objectives.map(() => 0), at: Date.now() };
     saveState(); toast(`Quest accepted: ${d.title}`); render();
     return true;
@@ -104,13 +109,45 @@ function bump(type, match) {
 }
 
 // ------------------------------------------------------------ what the game tells us
+on("cardDuelEnded", (e) => { if (e.won) bump("duelWin", () => true); });
 on("battleWon", (e) => {
     for (const sp of e.enemies ?? []) bump("defeat", (o) => o.species.includes(sp) && (!o.maps || o.maps.some((m) => sameMap(m, e.mapId))));
 });
-export function questsTick(mapId) {
-    if (mapId === lastMap) return;
-    lastMap = mapId;
-    if (mapId) bump("visit", (o) => sameMap(o.map, mapId));
+const near = (p, r) => Math.hypot(lastX - p.x, lastY - p.y) <= p.r;
+function resetRoutes(why, onlyMap) {
+    let changed = false;
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        d.objectives.forEach((o, i) => {
+            if (o.type === "reach" && (a.p[i] || 0) === 1 && (!onlyMap || !sameMap(o.map, onlyMap))) { a.p[i] = 0; changed = true; toast(why); }
+        });
+    }
+    if (changed) { saveState(); render(); }
+}
+on("battleStarted", (e) => { if (enabled()) resetRoutes("A fight broke out. Start the route again.", null); });
+export function questsTick(mapId, x, y) {
+    lastX = x ?? lastX; lastY = y ?? lastY;
+    if (mapId !== lastMap) {
+        lastMap = mapId;
+        if (enabled()) resetRoutes("You left the route. Start it again.", mapId);   // leaving the route's map abandons it
+        if (mapId) bump("visit", (o) => sameMap(o.map, mapId));
+        if (panel && !panel.hidden) render();                                    // the board may now be in reach
+    }
+    if (!enabled() || !mapId) return;
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        d.objectives.forEach((o, i) => {
+            if (o.type !== "reach" || !sameMap(o.map, mapId)) return;
+            const p = a.p[i] || 0;
+            if (p === 0 && near(o.from, o.from.r)) { a.p[i] = 1; saveState(); toast(`Route started: ${o.startLabel ?? "go to the far gate"} - no fights!`); render(); }
+            else if (p === 1 && near(o.to, o.to.r)) {
+                a.p[i] = 2; saveState(); render();
+                if (isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
+            }
+        });
+    }
 }
 
 // ------------------------------------------------------------ UI
@@ -122,13 +159,16 @@ function toast(msg) {
 function objectiveText(d, i) {
     const o = d.objectives[i], a = st.active[d.id], p = a ? (a.p[i] || 0) : 0, t = targetOf(d, i);
     if (o.type === "defeat") return `Defeat ${o.species.join(" / ")}${o.maps ? " in " + [...new Set(o.maps.map(mapLabel))].join(" / ") : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
+    if (o.type === "duelWin") return `Win ${t} card duel${t > 1 ? "s" : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
     if (o.type === "visit") return `Visit ${mapLabel(o.map)}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
+    if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  ✓" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
     return "?";
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function card(d, status) {
     const objs = d.objectives.map((_, i) => `<li>${esc(objectiveText(d, i))}</li>`).join("");
-    const btn = status === "available" ? `<button data-q="accept:${d.id}">Accept</button>` : status === "ready" ? `<button data-q="claim:${d.id}" class="go">Claim reward</button>` : "";
+    const here = atGiver(d);
+    const btn = status === "available" ? (here ? `<button data-q="accept:${d.id}">Accept</button>` : `<div class="qr" style="color:#c9a45a">Accept it at: ${esc([...new Set(d.acceptAt.map(mapLabel))].join(" / "))}</div>`) : status === "ready" ? `<button data-q="claim:${d.id}" class="go">Claim reward</button>` : "";
     const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} x ${it.name}`)].filter(Boolean).join(", ");
     return `<div class="qc ${status}"><b>${esc(d.title)}</b><div class="qt">${esc(d.giver ?? "")}${d.giver ? " — " : ""}${esc(d.text ?? "")}</div><ul>${objs}</ul>${rw ? `<div class="qr">Reward: ${esc(rw)}</div>` : ""}${btn}</div>`;
 }

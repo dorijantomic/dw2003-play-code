@@ -22,7 +22,8 @@ load = lambda p: json.load(open(p, encoding="utf-8"))
 
 quests = load(os.path.join(WEB, "quests.json"))["quests"]
 enemies = {e["enemy_id"] for e in load(os.path.join(A, "data/enemies.json"))["enemies"]}
-maps = {m["id"] for m in load(os.path.join(A, "manifest.json"))["maps"]}
+map_info = {m["id"]: m for m in load(os.path.join(A, "manifest.json"))["maps"]}
+maps = set(map_info)
 fe = load(os.path.join(A, "data/field_encounters.json"))["screens"]
 se = load(os.path.join(A, "data/stage_encounters.json"))["stages"]
 item_names = load(os.path.join(A, "data/battlecmd/esitmnam.json"))
@@ -59,6 +60,23 @@ for q in quests:
         elif o["type"] == "visit":
             if o["map"] not in maps:
                 errors.append(f"{qid}: unknown map '{o['map']}'")
+        elif o["type"] == "duelWin":
+            if not isinstance(o.get("count"), int) or o["count"] < 1:
+                errors.append(f"{qid}: duelWin needs a positive integer count")
+        elif o["type"] == "reach":
+            m = map_info.get(o["map"])
+            if not m:
+                errors.append(f"{qid}: unknown map '{o['map']}'")
+            else:
+                for end in ("from", "to"):
+                    pt = o[end]
+                    if not (0 <= pt["x"] <= m["width"] and 0 <= pt["y"] <= m["height"]):
+                        errors.append(f"{qid}: reach '{end}' ({pt['x']},{pt['y']}) is outside {o['map']} ({m['width']}x{m['height']})")
+                    if pt["r"] <= 0:
+                        errors.append(f"{qid}: reach '{end}' radius must be positive")
+    for m in q.get("acceptAt", []):
+        if m not in maps:
+            errors.append(f"{qid}: acceptAt names unknown map '{m}'")
     for it in q.get("reward", {}).get("items", []):
         if it["name"] not in item_names:
             errors.append(f"{qid}: reward item '{it['name']}' is not in the in-game item table")
