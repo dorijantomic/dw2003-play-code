@@ -4,6 +4,7 @@
 // block sound before a gesture) and driven every frame by the ambience layer.
 let ac = null, master = null, rain = null, wind = null, sand = null, crickets = null, gust = null;
 let armed = false;
+window.__fxaudioVer = "no-wind-2";
 
 function noiseBuffer(ctx, seconds = 2) {
     const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
@@ -57,8 +58,8 @@ export function setSound(on, lv) {
     if (!ac) return;
     ease(master.gain, on ? 0.55 : 0, ac, 0.2);
     ease(rain.g.gain, on ? lv.rain * 0.16 : 0, ac);
-    ease(wind.g.gain, on ? lv.wind * 0.20 : 0, ac, 0.8);
-    ease(sand.g.gain, on ? lv.sand * 0.14 : 0, ac);
+    ease(wind.g.gain, 0, ac, 0.8);   // wind loop removed (harsh); node kept silent
+    ease(sand.g.gain, 0, ac);   // sandstorm hiss removed (sounded like wind gusts)
     ease(crickets.out.gain, on ? lv.night * 0.07 : 0, ac, 1.2);
 }
 export function thunder(on, delayMs, pan = 0) {
@@ -122,7 +123,8 @@ function buildPlace() {
     const buf = noiseBuffer(ac, 3);
     const lap = loopNoise(ac, buf, "lowpass", 760, 0.6);
     const lfo = ac.createOscillator(); lfo.frequency.value = 0.27;
-    const ld = ac.createGain(); ld.gain.value = 0.5; lfo.connect(ld); ld.connect(lap.g.gain); lfo.start();
+    const ld = ac.createGain(); ld.gain.value = 0;   // was 0.5: it ADDED +-0.5 to the lap gain, so water noise swelled constantly on every map
+    lfo.connect(ld); ld.connect(lap.g.gain); lfo.start();
     const rustle = loopNoise(ac, buf, "bandpass", 1100, 0.9);
     const rl = ac.createOscillator(); rl.frequency.value = 0.13;
     const rd = ac.createGain(); rd.gain.value = 420; rl.connect(rd); rd.connect(rustle.f.frequency); rl.start();
@@ -156,7 +158,7 @@ function birdLoop() {
 export function setAmbience(on, lv) {
     if (!ac || !buildPlace()) return;
     ease(pa.lap.g.gain, on ? (lv.water || 0) * 0.17 : 0, ac, 1.2);
-    ease(pa.rustle.g.gain, on ? (lv.forest || 0) * 0.07 : 0, ac, 1.5);
+    ease(pa.rustle.g.gain, 0, ac, 1.5);   // rustle removed with the wind
     ease(pa.hum.g.gain, on ? (lv.city || 0) * 0.09 : 0, ac, 1.5);
     ease(pa.hg.gain, on ? (lv.city || 0) * 0.035 : 0, ac, 1.5);
     birdLevel = on ? lv.birds || 0 : 0;

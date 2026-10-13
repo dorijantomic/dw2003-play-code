@@ -21,12 +21,14 @@ import {
 import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
-import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
+import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, drawGhostLabel } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
+import { installChat, buildChatPack } from "./chat.js";
+import { installShowcase } from "./showcase.js";
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
@@ -399,6 +401,33 @@ installQuests({
         localStorage.setItem("bits", String(state.bits));
     },
 });
+// Type-to-chat: T opens a line box, Enter shows it as a speech bubble over the player.
+installChat({
+    stage: document.getElementById("stage"),
+    canOpen: () => state.started && !state.nameEntry && !textbox.isOpen() && !cutscene.isActive()
+        && !battle.isActive() && fade.dir === 0,
+    releaseKeys: () => state.keys.clear(),
+    onSend: (text) => chatSay(text),
+});
+// The bubble itself is a second instance of the game's own conversation box, so it has the real
+// balloon chrome, tail and font, but the game never sees it open: nothing is blocked while it shows.
+const chatBox = createDialogueTranslated(sfx);
+const chatActor = { x: 0, y: 0, actorId: 0 };
+let chatShownAt = 0;
+function chatSay(text) {
+    chatBox.close();
+    chatShownAt = performance.now() / 1000;
+    chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
+    chatBox.open({ pack: buildChatPack(text, String(state.playerName || "")), index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
+        (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
+}
+function chatTick(dt) {
+    if (!chatBox.isOpen()) return;
+    chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
+    chatBox.update(dt, null);
+    // close it by itself a few seconds after the text has shown (the box wants a confirm press)
+    if (performance.now() / 1000 - chatShownAt > 4.5 && Math.floor(performance.now() / 300) % 2) chatBox.pressConfirm();
+}
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
@@ -2441,6 +2470,16 @@ async function init() {
         loadAndSetMap(mapSelect.selectedIndex);
         mapSelect.blur();
     };
+    installShowcase({
+        select: document.getElementById("showcaseSelect"),
+        apply: applyScene,
+        goTo: (id) => {
+            const i = state.manifest.maps.findIndex((m) => m.id === id);
+            if (i < 0) return;
+            mapSelect.selectedIndex = i;
+            loadAndSetMap(i);
+        },
+    });
 
     try {
         const tracks = await (await fetch("assets/music/index.json")).json();
@@ -6990,6 +7029,7 @@ function update(dt) {
     fightReport.update(dt);
     saveScreen.update?.(dt); // native save-screen host step (the legacy screen has none)
     dialogueBox.update(dt, state.keys); // translated conversation box (UI Lab)
+    chatTick(dt);
     yesNoBox.update(dt, state.keys);
     helpMenuBox.update(dt, state.keys); // translated eight-topic help menu (5 NPC counters)
     cardAlbum.update?.(dt); // native album host step (the legacy album has no update)
@@ -9166,11 +9206,6 @@ function render() {
                 fieldcomTick(),
             );
         }
-    } else {
-        // Draw suppressed (dialogue/cutscene/fade). Keep _indicatorKey: the
-        // armed step hasn't changed, so the icon reappearing after the window
-        // closes is the SAME arming — no re-blip until the player moves to a
-        // different armed step (or none).
     }
 
     // The end-of-cast bubble. Mode 0x48 sub-state 3 opens it with
@@ -9316,6 +9351,7 @@ function render() {
     if (shop.isOpen()) shop.draw(ctx, VIEW_W, VIEW_H, state);
     if (driMenu.isOpen()) driMenu.draw(ctx, VIEW_W, VIEW_H);
     if (dialogueBox.isOpen()) dialogueBox.draw(ctx, VIEW_W, VIEW_H);
+    if (chatBox.isOpen()) chatBox.draw(ctx, VIEW_W, VIEW_H);
     if (yesNoWindowUp()) yesNoBox.draw(ctx, VIEW_W, VIEW_H);
     if (helpMenuWindowUp()) helpMenuBox.draw(ctx, VIEW_W, VIEW_H);
     if (gym.isOpen()) gym.draw(ctx, VIEW_W, VIEW_H, state);
