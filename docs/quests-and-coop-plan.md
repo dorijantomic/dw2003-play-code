@@ -98,16 +98,27 @@ story or battle rules, and every part of it is off by default.
       which Digimon species you have seen.
 
 ### Phase 4 - co-op, in order of effort
-- [ ] 4.1 **Remote play**: the host's browser runs the game and streams its canvas; the second player sends
-      button presses back. No determinism needed; works for turn-based play. Needs a way to connect the two
-      browsers (copy-paste codes, no server). Unverified.
-- [ ] 4.2 **Tag-team co-op**: each player owns some of the Digimon; control passes to the owner of the
-      active one. Small change to turn handling.
-- [ ] 4.3 **Harder fights**: enemy stats scaled by player count (a data change); boss phases that reuse
-      existing moves and the AI table's comparators.
-- [ ] 4.4 **Double ambush** as a two-member gauntlet (works today); a simultaneous one only after 4.5.
-- [ ] 4.5 **True 2-versus-2** (multi-actor timeline, targeting, enemy target choice, camera framing).
-      Large; only if 4.1 to 4.4 prove the idea is worth it.
+- [x] 4.1 **Remote play** (`web/coop.js`, `web/coop-guest.html`; F2 switch "Co-op", F4 panel): the host's browser
+      runs the game and streams its canvas as live video; the guest opens `coop-guest.html` (no game files
+      needed) and sends key presses back, which the host injects as ordinary keyboard events. Connected by
+      copy and paste (invite code, reply code) over WebRTC; no server of ours. **Verified:** between two tabs of one
+      browser, including live video (640px, playing) and input. **Not verified:** two separate computers or the
+      internet (that needs a STUN server typed into the panel; a STUN server only learns your IP address).
+      **Not done:** audio for the guest, a gamepad for the guest. Anyone holding your invite code can connect, so
+      share it only with a friend. Remote keys are held at least 60 ms, because the game's screens read "held
+      this frame" and a fast remote tap was being missed (found by the test).
+- [x] 4.2 **Tag-team control:** in a battle the front Digimon's slot decides who plays: even slots are the host's,
+      odd slots the guest's. Only the owner's keys reach the game (the host's own keys are blocked while the
+      guest holds control; F-keys, Esc and typing still work). Verified with real key presses, including a real
+      in-game tag-in handing the controls back. Out of battle the host drives, or both with "shared field control".
+- [x] 4.3 **Harder fights:** while a friend is connected, every enemy party is scaled (HP x1.6, stats x1.25)
+      through a `partyBuilt` hook in `battle.js`, so it also covers story fights. Switch: "Tougher enemies".
+- [x] 4.4 **Double ambush:** a wild fight can bring a second enemy of the same kind (35%), fought after the
+      first, as the game's gauntlet already works. Switch: "Wild fights can bring a second enemy". Tagged
+      `kind: random` vs `scripted` in `battle.js` so story fights are never doubled.
+- [ ] 4.5 **True 2-versus-2: not done, on purpose.** It needs a multi-actor turn timeline, targeting, enemy
+      target choice and camera framing in a very large file that assumes one enemy. 4.1 to 4.4 give two people
+      playing together without it; decide whether the real thing is worth that cost after playing them.
 
 ## Risks
 
