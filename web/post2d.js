@@ -97,6 +97,8 @@ export function installPost2d(stageEl, gameCanvas) {
         if (ov.width !== gameCanvas.width || ov.height !== gameCanvas.height) { ov.width = gameCanvas.width; ov.height = gameCanvas.height; }
         ov.style.display = "block";
         const t = Object.assign({}, DEFAULTS, window.__hd2d || {});
+        const k = typeof fx.hd2dStrength === "number" ? fx.hd2dStrength : 1;      // the F2 slider scales every part of the look
+        t.blur *= k; t.bloom *= k; t.vig *= k; t.sat = 1 + (t.sat - 1) * k; t.con = 1 + (t.con - 1) * k;
         gl.viewport(0, 0, ov.width, ov.height);
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCanvas);

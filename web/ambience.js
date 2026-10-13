@@ -27,7 +27,7 @@ const VIEW_H = 240;
 export const FX_GROUPS = [
     ["Terrain", [["sway", "Swaying trees"], ["grass", "Grass"], ["grasspush", "Grass parts around feet"], ["water", "Water"], ["reflect", "Water reflections"], ["mirror", "Characters reflect in water"], ["wetlook", "Wet / dusty look on characters"], ["seam", "Seam fixes"]]],
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
-    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["windows", "Window glow"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
+    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["butterflies", "Butterflies"], ["birds", "Birds"], ["dragonflies", "Dragonflies"], ["fish", "Jumping fish"], ["critters", "Critters"], ["wildlife", "Frogs, gulls, bats, lizards"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, birds, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
@@ -40,8 +40,10 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto" };
 for (const [k] of FX_DEFS) fx[k] = true;
-fx.hd2d = false;           // experimental: off until you switch it on
-fx.villagers = false;        // experimental: off until you switch it on
+const EXPERIMENTAL = ["villagers", "hd2d"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+for (const k of EXPERIMENTAL) fx[k] = false;
+fx.lightGain = 1;            // Light strength slider (0 to 2)
+fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
 const stored = { ...fx };   // what the panel last saved; URL flags below never reach it
 
@@ -53,10 +55,16 @@ function syncLegacyFlags() {
     window.__noWaterRefl = !fx.reflect;
     window.__grassPush = !!fx.grasspush;
     window.__todForce = TODMODES[fx.todMode];
+    window.__lightGain = fx.lightGain;        // read by scenery2.js (lamp strength)
 }
 function save(keys = null) {
     for (const k of keys || Object.keys(fx)) stored[k] = fx[k];
     try { localStorage.setItem(STORE_KEY, JSON.stringify(stored)); } catch { }
+}
+export function setNum(key, value) {
+    fx[key] = value;
+    syncLegacyFlags();
+    save([key]);
 }
 export function setFx(key, value) {
     fx[key] = value;
@@ -649,15 +657,15 @@ export function groundFxFor(map, mapImg, camX, camY) {
 const BASE = ["grass", "grasspush", "water", "reflect", "seam", "sway", "wetlook", "mirror"];
 const PRESETS = {
     cinematic: { tod: "golden", mode: "auto", all: true },
-    clear: { tod: "day", mode: "clear", on: [...BASE, "gusts", "clouds", "shafts", "pollen", "butterflies", "birds", "dragonflies", "fish", "critters", "leaves", "sparkle", "steps", "puddles", "ambience", "footsteps", "wildlife", "tod"] },
-    cozyrain: { tod: "dusk", mode: "always", on: [...BASE, "rain", "rainwater", "fog", "puddles", "screenfx", "sound", "ambience", "musicfx", "steps", "footsteps", "lamps", "windows", "nightlight", "tod", "leaves", "wildlife", "clouds"] },
-    storm: { tod: "day", mode: "storm", on: [...BASE, "rain", "rainwater", "lightning", "snow", "sand", "gusts", "frost", "breath", "screenfx", "puddles", "sound", "musicfx", "steps", "footsteps", "clouds", "tod"] },
-    night: { tod: "night", mode: "auto", on: [...BASE, "tod", "lamps", "windows", "nightlight", "fireflies", "fog", "wildlife", "ambience", "sound", "footsteps", "steps", "sparkle", "gusts"] },
+    clear: { tod: "day", mode: "clear", on: [...BASE, "indoor", "gusts", "clouds", "shafts", "pollen", "butterflies", "birds", "dragonflies", "fish", "critters", "leaves", "sparkle", "steps", "puddles", "ambience", "footsteps", "wildlife", "tod"] },
+    cozyrain: { tod: "dusk", mode: "always", on: [...BASE, "indoor", "rain", "rainwater", "fog", "puddles", "screenfx", "sound", "ambience", "musicfx", "steps", "footsteps", "lamps", "lightpool", "lightreveal", "nightlight", "tod", "leaves", "wildlife", "clouds"] },
+    storm: { tod: "day", mode: "storm", on: [...BASE, "indoor", "rain", "rainwater", "lightning", "snow", "sand", "gusts", "frost", "breath", "screenfx", "puddles", "sound", "musicfx", "steps", "footsteps", "clouds", "tod"] },
+    night: { tod: "night", mode: "auto", on: [...BASE, "indoor", "tod", "lamps", "lightpool", "lightreveal", "nightlight", "fireflies", "fog", "wildlife", "ambience", "sound", "footsteps", "steps", "sparkle", "gusts"] },
 };
 function applyPreset(name) {
     const d = PRESETS[name];
     if (!d) return;
-    for (const [k] of FX_DEFS) fx[k] = k !== "villagers" && (d.all ? true : d.on.includes(k));
+    for (const [k] of FX_DEFS) fx[k] = !EXPERIMENTAL.includes(k) && (d.all ? true : d.on.includes(k));
     fx.todMode = d.tod; fx.weatherMode = d.mode;
     syncLegacyFlags(); save(); refreshPanel();
 }
@@ -749,6 +757,10 @@ function refreshPanel() {
     const w = panel.querySelector("[data-mode]"); if (w) w.value = fx.weatherMode;
     const q = panel.querySelector("[data-quality]"); if (q) q.value = fx.quality;
     const td = panel.querySelector("[data-tod]"); if (td) td.value = fx.todMode;
+    for (const k of ["lightGain", "hd2dStrength"]) {
+        const r = panel.querySelector(`[data-slider="${k}"]`), v = panel.querySelector(`[data-val="${k}"]`);
+        if (r) r.value = fx[k]; if (v) v.textContent = (+fx[k]).toFixed(2);
+    }
 }
 export function installFxPanel(stageEl) {
     if (panel || !stageEl) return;
@@ -768,6 +780,8 @@ export function installFxPanel(stageEl) {
       #fx-panel .row { display:flex; gap:6px; margin-top:8px; }
       #fx-toast { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:50; padding:6px 14px; border-radius:8px; background:#000b; color:#fff; font:600 14px 'Segoe UI',system-ui,sans-serif; pointer-events:none; opacity:0; transition:opacity .3s; }
       #fx-rec { position:absolute; top:14px; left:14px; z-index:50; width:14px; height:14px; border-radius:7px; background:#e33; box-shadow:0 0 8px #e33; pointer-events:none; display:none; }
+      #fx-panel input[type=range] { width:84px; }
+      #fx-panel span[data-val] { min-width:28px; color:#8a8ab0; font-size:11px; }
       #fx-panel label.na { opacity:.42; }
       #fx-panel label.na::after { content:"(not here)"; font-size:10px; color:#8a8aa8; margin-left:auto; }
       #fx-panel .hint { color:#707090; font-size:11px; line-height:1.4; margin-top:6px; }`;
@@ -786,6 +800,8 @@ export function installFxPanel(stageEl) {
          <h4>Settings</h4>
          <label>Weather <select data-mode><option value="auto">random</option><option value="always">always on</option><option value="storm">stormy</option><option value="clear">clear skies</option></select></label>
          <label>Time <select data-tod><option value="auto">auto cycle</option><option value="day">day</option><option value="golden">golden hour</option><option value="dusk">dusk</option><option value="night">night</option></select></label>
+         <label>Light strength <input type="range" min="0" max="2" step="0.05" data-slider="lightGain"> <span data-val="lightGain"></span></label>
+         <label>HD-2D strength <input type="range" min="0" max="2" step="0.05" data-slider="hd2dStrength"> <span data-val="hd2dStrength"></span></label>
          <label>Quality <select data-quality><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></label>
          <div class="row"><button data-all="1">All on</button><button data-all="0">All off</button></div>
          <div class="hint">F2 opens this. Choices are remembered.</div>`;
@@ -794,6 +810,13 @@ export function installFxPanel(stageEl) {
     stageEl.append(gear, panel, toastEl, recDot);
     const toggle = () => { panel.hidden = !panel.hidden; if (!panel.hidden) lastMarked = null; gear.classList.toggle("open", !panel.hidden); gear.blur(); };
     gear.addEventListener("click", toggle);
+    panel.addEventListener("input", (e) => {
+        const t = e.target;
+        if (t.dataset && t.dataset.slider) {
+            setNum(t.dataset.slider, +t.value);
+            const v = panel.querySelector(`[data-val="${t.dataset.slider}"]`); if (v) v.textContent = (+t.value).toFixed(2);
+        }
+    });
     panel.addEventListener("change", (e) => {
         const t = e.target;
         if (t.dataset.fx) setFx(t.dataset.fx, t.checked);
@@ -815,7 +838,7 @@ export function installFxPanel(stageEl) {
         }
         const b = e.target.closest("[data-all]");
         if (!b) return;
-        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1" && k !== "villagers";
+        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1" && !EXPERIMENTAL.includes(k);
         syncLegacyFlags(); save(); refreshPanel();
         b.blur();
     });

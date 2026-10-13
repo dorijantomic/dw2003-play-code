@@ -79,7 +79,7 @@ function poolSprite(r, g, b) {
     poolSprites.set(k, c);
     return c;
 }
-function drawGameLight(ctx, sc, m, camX, camY, a, now) {
+function drawGameLight(ctx, sc, m, camX, camY, a, now, fxo) {
     if (!(sc.sheetP.complete && sc.sheetP.naturalWidth && sc.sheetS.complete && sc.sheetS.naturalWidth)) return;
     const vi = ((now / 1000 * 60 / m.per) | 0) % m.v.length, layers = m.v[vi];
     const bx = Math.round(m.ox - camX), by = Math.round(m.oy - camY);
@@ -87,12 +87,14 @@ function drawGameLight(ctx, sc, m, camX, camY, a, now) {
     const f0 = layers[0], cx = bx + f0[4] + f0[2] / 2, cy = by + f0[5] + f0[3] / 2, size = Math.max(f0[2], f0[3]);
     const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, rad = 14 + size * 2.4, small = 0.45 + 0.55 * clamp01(size / 24), [cr, cg, cb] = bl.col, flick = 0.88 + 0.12 * Math.sin(now / 1000 * 9 + m.ph);
     ctx.globalCompositeOperation = "lighter";
-    const sprite = poolSprite(cr, cg, cb);
-    ctx.globalAlpha = Math.min(1, 0.30 * small * gain * a * flick);
-    ctx.drawImage(sprite, cx - rad, cy + (m.wall ? rad * 0.25 : 0) - rad * 0.62, rad * 2, rad * 1.24);   // lies on the ground, not a flat disc
+    if (fxo.lightpool) {
+        const sprite = poolSprite(cr, cg, cb);
+        ctx.globalAlpha = Math.min(1, 0.30 * small * gain * a * flick);
+        ctx.drawImage(sprite, cx - rad, cy + (m.wall ? rad * 0.25 : 0) - rad * 0.62, rad * 2, rad * 1.24);   // lies on the ground, not a flat disc
+    }
     // a big glow sprite is already a soft wide light: it gets far less bloom than a small bright lamp, or it saturates to a white disc
     const bloomGain = Math.max(0.15, Math.min(1, 1.5 - size / 26));
-    ctx.globalAlpha = Math.min(1, a * bloomGain);
+    ctx.globalAlpha = Math.min(1, a * bloomGain * gain);
     ctx.drawImage(bl, bx + bl.ox, by + bl.oy, bl.width / bl.K, bl.height / bl.K);   // stacked: additive, so it brightens in the sprite own colours
     const redraw = size >= 32 ? 0.4 : size >= 24 ? 0.7 : 1;            // restoring a big glow to full brightness over the dark makes it a white disc
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = Math.min(1, a * redraw);
@@ -114,7 +116,7 @@ function revealSprite() {
     return rvSprite;
 }
 setReveal({
-    wants(S) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.p.lamps); },
+    wants(S) { return !!(sc2 && sc2.id === S.map.id && sc2.built && sc2.lamps && sc2.lamps.some((m) => m.rec) && S.fx.lamps && S.fx.lightreveal && S.p.lamps); },
     draw(ctx, snap, S) {
         const dark = darkness(S.p, S.fx, S.now);
         if (dark < 0.04) return;
@@ -336,7 +338,7 @@ export function drawScenery2(ctx, S) {
             for (const m of sc2.lamps) {
                 const sx = m.x - camX, sy = m.y - camY;
                 if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) continue;
-                if (m.rec) { drawGameLight(ctx, sc2, m, camX, camY, dark * fade, now); ctx.globalCompositeOperation = "lighter"; continue; }
+                if (m.rec) { drawGameLight(ctx, sc2, m, camX, camY, dark * fade, now, fx); ctx.globalCompositeOperation = "lighter"; continue; }
                 const fl = 0.86 + 0.09 * Math.sin(t * 7.3 + m.ph) + 0.05 * Math.sin(t * 17 + m.ph * 3);
                 const rad = 20 + 32 * m.size, a = dark * fl * fade;
                 // wide soft halo, then a hot bloom, then the bright core
