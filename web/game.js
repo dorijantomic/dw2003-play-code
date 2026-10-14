@@ -23,7 +23,8 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick, questTalk, questsPauseRow, openLog as openQuestLog } from "./quests.js"; // extra quests
+import { installQuests, questsTick, questTalk, questsPauseRow, questNpcMark, openLog as openQuestLog } from "./quests.js";
+import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
@@ -9095,6 +9096,18 @@ function render() {
         }
     } else {
         state._seenEmotes?.clear();
+    }
+
+    // Extra quests: a red "?" over a character with a job for you, a red "!" over one you can hand a finished job to.
+    if (!textbox.isOpen() && !choice.isOpen() && fade.dir === 0 && !cutscene.isActive() && !battle.isActive() && !state.menuOpen && fieldcomReady()) {
+        const here = state.scenes[currentMap()?.id];
+        if (here) {
+            for (const npc of sceneCast(here)) {
+                if (npc.cutsceneOnly || npc.invisible) continue;
+                const mark = questNpcMark(npc.npc_id, currentMap().id);
+                if (mark) drawQuestMark(ctx, mark, Math.round(npc.x - camX), Math.round(balloonAnchorY(npc.y - camY)), fieldcomTick());
+            }
+        }
     }
 
 // Field trigger indicator — the authentic step-VM rule (disasm: step-load

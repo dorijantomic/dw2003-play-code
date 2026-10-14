@@ -58,6 +58,7 @@ ok("winning a card duel unlocks the card ladder", t.includes("Card ladder: first
 ok("and it was announced once", (await ev(`window.__quests.state.announced.card_ladder_1`)) === 1);
 
 // ---- Leomon hands out a quest, through the game's own box
+ok("Leomon wears the red ? while he has a job for you", (await ev(`window.__quests.npcMark(27, "s330")`)) === "offer");
 ok("the first job is not taken from the log: Leomon hands it out", (await ev(`window.__quests.accept("park_pest_control")`)) === false);
 ok("Leomon is standing in the park", await stand(27));
 await key("Enter"); await waitBox();
@@ -66,6 +67,8 @@ await advance();
 await key("Enter"); await sleep(400);
 ok("the park job is accepted through him", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
 for (let i = 0; i < 3; i++) await ev(`import("/gameEvents.js").then(m=>m.emit("battleWon",{enemies:["Kunemon"],mapId:"s330",screenId:1}))`);
+ok("with the job finished he wears the red ! instead", (await ev(`window.__quests.npcMark(27, "s330")`)) === "turnin");
+ok("and a stranger wears nothing", (await ev(`window.__quests.npcMark(99999, "s330")`)) === null);
 await ev(`window.__quests.claim("park_pest_control", true)`);
 ok("done; the survey is now offered", (await ev(`window.__quests.status("forest_gate_survey")`)) === "available");
 ok("...but it cannot be taken from the log", (await ev(`window.__quests.accept("forest_gate_survey")`)) === false);
@@ -128,8 +131,9 @@ await advance();
 for (let i = 0; i < 20 && (await ev(`window.__quests.state.active.guilmon_lost_tamer.p[0]`)) !== 1; i++) await sleep(300);
 ok("that step is ticked", (await ev(`window.__quests.state.active.guilmon_lost_tamer.p[0]`)) === 1);
 await boot("s956");
-await ev(`window.__quests.questTalk(179, "s956"); 0`); await waitBox();
-ok("Takato must be spoken to second: his box opens", (await boxOpen()) === true);
+await waitNpc(179); await sleep(1000);
+for (let tries = 0; tries < 3 && !(await boxOpen()); tries++) { await ev(`window.__quests.questTalk(179, "s956"); 0`); await waitBox(); }      // a freshly loaded page can still be settling
+ok("Takato must be spoken to second: his box opens", (await boxOpen()) === true, await ev(`JSON.stringify({p: window.__quests.state.active.guilmon_lost_tamer && window.__quests.state.active.guilmon_lost_tamer.p, st: window.__quests.status("guilmon_lost_tamer"), npcs: window.__npcsHere().filter(n=>n.npc_id===179).length, tb: window.__textbox.isOpen(), map: window.__state.map && window.__state.map.id})`));
 await advance();
 for (let i = 0; i < 20 && (await ev(`window.__quests.status("guilmon_lost_tamer")`)) !== "ready"; i++) await sleep(300);
 ok("the quest is ready to claim", (await ev(`window.__quests.status("guilmon_lost_tamer")`)) === "ready");

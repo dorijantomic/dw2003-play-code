@@ -446,6 +446,18 @@ export async function openLog() {
     } finally { logOpen = false; }
 }
 
+/** What mark a character wears for the extra quests: "turnin" (a finished job to hand in: red "!"), "offer" (a job to give: red "?") or null. */
+export function questNpcMark(npcId, mapId) {
+    if (!enabled() || dialogBusy || logOpen || !mapId) return null;
+    let mark = null;
+    for (const d of allDefs()) {
+        const s = statusOf(d);
+        if (s === "ready" && atNpc(turnInRef(d), npcId, mapId)) return "turnin";
+        if (s === "available" && d.offer && !declined.has(d.id) && atNpc(d.offer, npcId, mapId)) mark = "offer";
+    }
+    return mark;
+}
+
 /**
  * The extra row on the pause home list (see PauseSeed.extraRow in engine/dw3/ui/pause-root-session.ts). The label carries the
  * number of quests that want attention (ready to claim, or new and not yet taken), e.g. "QUESTS 2". Null when quests are off.
@@ -497,7 +509,7 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
     ensureGenerated(); announceUnlocks();
     window.__quests = {   // debug / test hooks; nothing in the game reads these
         get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id) => (defOf(id) ? statusOf(defOf(id)) : null),
-        openLog, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id) => (defOf(id) ? detailText(defOf(id), statusOf(defOf(id))) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
+        openLog, npcMark: questNpcMark, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id) => (defOf(id) ? detailText(defOf(id), statusOf(defOf(id))) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
         where: () => ({ lastMap, lastX, lastY, enabled: enabled() }),
     };
 }
