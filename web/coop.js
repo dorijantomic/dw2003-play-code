@@ -102,7 +102,8 @@ export async function createInvite() {
     wireChannel(pc.createDataChannel("input"));
     const stream = gameCanvas.captureStream(30);
     for (const t of stream.getVideoTracks()) pc.addTrack(t, stream);
-    pc.onconnectionstatechange = () => { if (["failed", "closed", "disconnected"].includes(pc.connectionState)) { connected = false; releaseHeld(); renderPanel(); } };
+    pc.onconnectionstatechange = () => { if (["failed", "closed", "disconnected"].includes(pc.connectionState)) { connected = false; releaseHeld(); } renderPanel(); };
+    pc.oniceconnectionstatechange = () => renderPanel();
     await pc.setLocalDescription(await pc.createOffer());
     await waitIce(pc);
     return enc(pc.localDescription.toJSON());
@@ -134,12 +135,22 @@ on("partyBuilt", ({ entries, kind }) => {
 
 // ------------------------------------------------------------ the panel (F4)
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function linkText() {
+    if (!pc) return "";
+    const ice = pc.iceConnectionState, st = pc.connectionState;
+    if (ice === "failed" || st === "failed") return "The link FAILED. The two browsers could not reach each other. Same computer: close the guest tab, make a NEW invite and start again. Different computers: put a STUN server (for example stun:stun.l.google.com:19302) in the box below on BOTH pages, then start again.";
+    if (!pc.remoteDescription) return "Step 2 not done yet: paste your friend's reply and press Connect.";
+    return `Connecting... (link: ${ice}). This can take up to about 10 seconds.`;
+}
 function renderPanel() {
     if (!panel || panel.hidden) return;
+    const keep = {};
+    for (const k of ["invitebox", "replybox"]) { const el = panel.querySelector(`[data-coop="${k}"]`); if (el) keep[k] = el.value; }
     const url = new URL("coop-guest.html", location.href).href;
     const c = connected ? controller() : null;
     panel.innerHTML = `<h3>CO-OP <span>F4 / Esc to close</span></h3>
-      <div class="cs">${connected ? `Friend connected. Controls: <b>${c === "both" ? "both of you (shared)" : c === "guest" ? "your friend" : "you"}</b>` : pc ? "Waiting for your friend's reply..." : "Not connected."}</div>
+      <div class="cs">${connected ? `Friend connected. Controls: <b>${c === "both" ? "both of you (shared)" : c === "guest" ? "your friend" : "you"}</b>` : pc ? "Not connected yet." : "Not connected."}</div>
+      ${!connected && pc ? `<div class="cs" style="color:#ffd34d">${esc(linkText())}</div>` : ""}
       <div class="ct">Your friend opens <code>${esc(url)}</code> and pastes your invite there.</div>
       <label>Optional STUN server (internet play) <input data-coop="stun" placeholder="stun:host:port" value="${esc(localStorage.getItem(CFG.stunKey) || "")}"></label>
       <button data-coop="invite">1. Create invite</button>
@@ -151,6 +162,7 @@ function renderPanel() {
       <label class="chk"><input type="checkbox" data-fx="coopdouble" ${fx.coopdouble ? "checked" : ""}> Wild fights can bring a second enemy</label>
       <button data-coop="leave">Disconnect</button>
       <div class="ct">Battles: your Digimon in the front slot are yours; every other slot is your friend's. Control passes when you tag in. No audio for your friend yet.</div>`;
+    for (const k in keep) { const el = panel.querySelector(`[data-coop="${k}"]`); if (el) el.value = keep[k]; }
 }
 function installUi(stageEl) {
     const css = document.createElement("style");
@@ -179,12 +191,13 @@ function installUi(stageEl) {
         if (!b || b.tagName !== "BUTTON") return;
         try {
             if (b.dataset.coop === "invite") { const code = await createInvite(); renderPanel(); panel.querySelector('[data-coop="invitebox"]').value = code; panel.querySelector('[data-coop="invitebox"]').select(); }
-            else if (b.dataset.coop === "connect") { await acceptReply(panel.querySelector('[data-coop="replybox"]').value); toast("Co-op: connecting..."); }
+            else if (b.dataset.coop === "connect") { await acceptReply(panel.querySelector('[data-coop="replybox"]').value); toast("Co-op: connecting..."); renderPanel(); }
             else if (b.dataset.coop === "leave") { closeConnection(); renderPanel(); }
         } catch (err) { toast("Co-op: " + (err.message || err)); }
     });
     window.addEventListener("keydown", (e) => {
-        if (e.key === "F4" && enabled()) { e.preventDefault(); panel.hidden = !panel.hidden; renderPanel(); }
+        if (e.key === "F4" && !enabled()) { if (e.isTrusted) { e.preventDefault(); toast("Co-op is off. Press F2, tick \"Co-op by remote play\" (under Extras), then F4."); } }
+        else if (e.key === "F4") { e.preventDefault(); panel.hidden = !panel.hidden; renderPanel(); }
         else if (e.key === "Escape" && !panel.hidden && e.isTrusted) { panel.hidden = true; }
     });
 }

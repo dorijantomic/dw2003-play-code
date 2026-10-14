@@ -55,6 +55,8 @@
           try { const s = JSON.parse(m.data); if (s.t === "state") { $("banner").textContent = s.c === "guest" ? "Your turn: you control the Digimon in front." : s.c === "both" ? "Shared control." : (s.battle ? "Your friend's Digimon is in front. Tag yours in to take over." : "Your friend is exploring."); window.__guest.control = s.c; } } catch (e2) { /* ignore */ }
         };
       };
+      const show = () => { if (open) return; const i = pc.iceConnectionState; if (i === "failed") $("status").textContent = "The link FAILED. Same computer: reload this page and your friend must make a NEW invite. Different computers: type the same STUN server (e.g. stun:stun.l.google.com:19302) on both pages and start again."; else if (pc.remoteDescription && pc.localDescription && $("reply").value) $("status").textContent = `Reply made. Your friend must now press Connect. Link: ${i}`; };
+      pc.oniceconnectionstatechange = show; pc.onconnectionstatechange = show;
       pc.ontrack = (e) => { $("video").srcObject = e.streams[0] || new MediaStream([e.track]); $("video").play().catch(() => {}); };
       await pc.setRemoteDescription(dec($("invite").value));
       await pc.setLocalDescription(await pc.createAnswer());

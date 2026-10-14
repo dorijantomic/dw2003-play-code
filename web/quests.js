@@ -287,7 +287,8 @@ function installUi(stageEl) {
         b.blur();
     });
     window.addEventListener("keydown", (e) => {
-        if (e.key === "F3" && enabled()) { e.preventDefault(); togglePanel(); }
+        if (e.key === "F3" && !enabled()) { if (e.isTrusted) { e.preventDefault(); toast("Extra quests are off. Press F2, tick \"Extra quests\" (under Extras), then F3."); } }
+        else if (e.key === "F3") { e.preventDefault(); togglePanel(); }
         else if (e.key === "Escape" && panel && !panel.hidden) { panel.hidden = true; }
     });
 }
