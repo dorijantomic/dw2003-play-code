@@ -24,6 +24,7 @@ import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk } from "./quests.js"; // extra quests
+import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
@@ -375,6 +376,12 @@ installQuests({
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
     npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
+    // Speech goes through the game's own conversation box (translated, same balloon and font as a real NPC); the list and
+    // the yes/no questions are the game's choice widget. Both resolve when the player is done.
+    speak: (npcId, name, text) => questSpeak(npcId, name, text),
+    ask: (prompt, options) => new Promise((resolve) => choice.open(prompt, options, resolve)),
+    idle: () =>
+        !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28,
     partnerIds: () => [state.charId, ...(Array.isArray(state.party) ? state.party : [])].filter(Boolean),
     // rewards go through the game's own item store and money, exactly as a battle drop does
     giveItem: (name, count = 1) => {
@@ -518,6 +525,7 @@ const textbox = new Proxy(legacyTextbox, {
     set(target, prop, value) { target[prop] = value; return true; },
 });
 const choice = createChoice();
+window.__choice = choice;   // checks: whether a list / yes-no question is up
 const menu = createMenu(sfx);
 // Ordinary merchants use the shipped shop screen; the authored shop remains
 // The original-execution merchant remains available to research checks only.
@@ -1957,6 +1965,36 @@ function openTalkLine(ref, onClose, npc, legacyAnchor) {
             onFail: () => legacyTextbox.open(getDialogue(ref), onClose, legacyAnchor),
         },
     );
+}
+
+/**
+ * Extra-quest speech: the same translated box an NPC's line uses, with the line built in the disc's own text format
+ * (web/dialogue-pack.js). With the NPC on this map it is their balloon, otherwise the plain bottom window. Resolves on close.
+ */
+function questSpeak(npcId, name, text) {
+    return new Promise((resolve) => {
+        const pages = paginate(text);
+        const scene = state.scenes[currentMap()?.id];
+        const npc = npcId != null && scene ? sceneCast(scene).find((n) => n.npc_id === npcId && !n.cutsceneOnly) : null;
+        const anchor = npc
+            ? (() => {
+                const mode = autoBalloonMode(npc.dir, (npc.x - lastCam.x) * ZOOM, (npc.y - lastCam.y) * ZOOM, VIEW_W, VIEW_H);
+                return () => ({ x: (npc.x - lastCam.x) * ZOOM, y: (npc.y - lastCam.y) * ZOOM, mode });
+            })()
+            : null;
+        const fallback = () => legacyTextbox.open({ name, pages }, resolve, anchor);
+        if (!USE_TRANSLATED_TALK) return fallback();
+        const project = (x, y) => ({
+            sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
+            sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
+        });
+        translatedDialogueText = { name, pages };
+        const opts = { playerNameBytes: encodeNativeScreenText(state.playerName), onFail: fallback };
+        const mode = npc
+            ? { kind: "talk", npc: { x: Math.round(npc.x), y: Math.round(npc.y), facing: fieldDirectionIndex(npc.dir), actorId: npc.npc_id ?? 0 } }
+            : { kind: "say", plain: true, balloonMode: 0, actor: null };
+        dialogueBox.open({ pack: buildPack(name, pages), index: 0 }, mode, resolve, project, opts);
+    });
 }
 
 function getDialogue(ref) {

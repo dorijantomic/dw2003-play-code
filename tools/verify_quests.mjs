@@ -43,18 +43,20 @@ ok("layer present, on by default", (await ev("window.__fx.quests")) !== false);
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=false;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
 ok("switched off via the F2 panel", (await ev("window.__fx.quests")) === false);
 await key("F3"); await sleep(300);
-ok("F3 does nothing while the switch is off", (await ev(`document.getElementById("quest-panel").hidden`)) === true);
-await ev(`window.__quests.togglePanel(true)`); ok("the log stays shut while off", (await ev(`document.getElementById("quest-panel").hidden`)) === true);
+ok("F3 does nothing while the switch is off", (await ev(`!window.__quests.isLogOpen() && !window.__choice.isOpen()`)) === true);
+ok("the log stays shut while off", (await ev(`window.__quests.openLog()`)) === false);
 await win(["Kunemon"], "s330");
 ok("battle wins ignored while off", (await ev(`JSON.stringify(window.__quests.state.active)`)) === "{}");
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
 ok("switched back on", (await ev("window.__fx.quests")) === true);
 await key("F3"); await sleep(300);
-ok("F3 opens the log", (await ev(`document.getElementById("quest-panel").hidden`)) === false);
-const titles = await ev(`JSON.stringify([...document.querySelectorAll("#quest-panel .qc b")].map(b=>b.textContent))`);
+ok("F3 opens the log (the game's own list widget)", (await ev(`window.__quests.isLogOpen() && window.__choice.isOpen()`)) === true);
+const titles = await ev(`JSON.stringify(window.__quests.entries().map(e=>e.title))`);
 ok("the first quest is offered and the chained one is locked", titles.includes("Central Park pest control") && !titles.includes("Wire Forest survey"), titles);
-await ev(`document.querySelector('[data-q="accept:park_pest_control"]').click()`); await sleep(200);
-ok("accept via button", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
+await key("ArrowUp"); await key("Enter"); await sleep(300);          // wraps to "Close"
+ok("the list closes", (await ev(`!window.__quests.isLogOpen() && !window.__choice.isOpen()`)) === true);
+await ev(`window.__quests.accept("park_pest_control")`); await sleep(200);
+ok("accept", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
 
 await win(["Kunemon"], "s200");              // wrong map: must not count
 await win(["Tapirmon"], "s330");             // wrong species: must not count
@@ -66,7 +68,7 @@ ok("ready after the third", (await ev(`window.__quests.status("park_pest_control
 await win(["Kunemon"], "s330");
 ok("progress never exceeds the target", (await ev(`JSON.stringify(window.__quests.state.active.park_pest_control.p)`)) === "[3]");
 
-await ev(`document.querySelector('[data-q="claim:park_pest_control"]').click()`); await sleep(300);
+await ev(`window.__quests.claim("park_pest_control")`); await sleep(300);
 const bits1 = await ev("window.__state.bits"), inv1 = await ev("JSON.stringify(window.__state.inventory)");
 ok("claim pays 300 BIT", bits1 - bits0 === 300, `(${bits0} -> ${bits1})`);
 ok("claim adds the AntidoteDisk", inv1 !== inv0, "");
@@ -99,10 +101,6 @@ const after = await snap();
   const storyKeys = changed.filter((k) => /flag|ordinal|chapter|b370|story|progress|party|roster|album|card/i.test(k));
   ok("no story/progress key touched", storyKeys.length === 0, JSON.stringify(storyKeys));
 }
-const shot = await send("Page.captureScreenshot", { format: "png" });
-await ev(`window.__quests.togglePanel(true)`); await sleep(300);
-const shot2 = await send("Page.captureScreenshot", { format: "png" });
-fs.writeFileSync((process.env.TEMP || ".") + "/quests_log.png", Buffer.from(shot2.result.data, "base64"));
 console.log("errors/warnings:", errs.join(" | ") || "none");
 await ev(`localStorage.removeItem("dw.quests.v1")`);
 await fetch("http://127.0.0.1:9333/json/close/" + tab.id); process.exit(0);

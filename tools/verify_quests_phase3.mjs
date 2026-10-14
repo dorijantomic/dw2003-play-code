@@ -66,12 +66,11 @@ const flagsBefore = await ev(`JSON.stringify(window.__state.flags)`);
 
 // ---- double trouble: a real two-enemy fight launched from the quest log
 ok("accept the double ambush at Central Park", (await ev(`window.__quests.accept("double_trouble_park")`)) === true);
-await ev(`window.__quests.togglePanel(true)`); await sleep(300);
-ok("log offers a Begin button for the open challenge", (await ev(`!!document.querySelector('[data-q="begin:double_trouble_park"]')`)) === true);
-await ev(`document.querySelector('[data-q="begin:double_trouble_park"]').click()`); await sleep(5000);
+ok("the open challenge can be begun here", (await ev(`window.__quests.entries().some(e=>e.id==="double_trouble_park" && e.status==="active")`)) === true);
+await ev(`window.__quests.beginChallenge("double_trouble_park"); 0`); await sleep(5000);
 const party = await ev(`(()=>{const b=window.__battleB&&window.__battleB();return b?JSON.stringify(b.party.map(e=>[e.enemyId,e.enemyLevel,e.enemyHp,e.enemyStatScale])):null})()`);
 ok("a REAL two-enemy fight started with the real party", party === '[["Kunemon",1,120,16],["Tapirmon",1,120,16]]', party);
-ok("the log closed for the fight", (await ev(`document.getElementById("quest-panel").hidden`)) === true);
+ok("no list is left open over the fight", (await ev(`!window.__quests.isLogOpen() && !window.__choice.isOpen()`)) === true);
 ok("cannot start a second one meanwhile", (await ev(`window.__quests.beginChallenge("double_trouble_park")`)) === false);
 const finished = await playOut(false);
 ok("the fight ended", finished);

@@ -45,12 +45,11 @@ if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(wi
 // the game's own progress unlocks quests; this test gives the save the progress it needs (visited places, a duel win)
 await ev(`(()=>{const q=window.__quests, s=q.state; for (const m of ${JSON.stringify(['s330', 's410', 's440', 's230'])}) if(!s.visited.includes(m)) s.visited.push(m); s.duelWins = Math.max(s.duelWins, 1); q.announceUnlocks(); q.save();})()`);
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
-await ev(`window.__quests.togglePanel(true)`); await sleep(300);
 
 // ---- location-gated acceptance
 const bits0 = await ev("window.__state.bits");
 ok("away from the board: accept is refused", (await ev(`window.__quests.accept("east_station_greens")`)) === false && (await st("east_station_greens")) === "available");
-const note = await ev(`document.querySelector("#quest-panel").innerText`);
+const note = await ev(`window.__quests.detail("east_station_greens")`);
 ok("log tells you where to accept it", /Accept it at: East Station/.test(note), "");
 ok("quiet route is locked until the survey is done", (await st("quiet_route_wire_forest")) === "locked");
 await goMap("s411");                                       // the other-world East Station

@@ -1,5 +1,5 @@
 // Extra quests (new content, not part of the shipped game). On by default; F2 -> "Quests" switches them off.
-// Open the log with F3 or the Quests button. Quests unlock as you play (see "unlock" below).
+// Open the log with F3. Quests unlock as you play (see "unlock" below).
 //
 // Design rules (docs/quests-plan.md):
 //   * Never writes the story: no story flags, no master story counter. Quest progress lives under its
@@ -41,7 +41,7 @@ let api = null, fieldEnc = null, challengeBusy = false;
 let variants = {};
 let mapNames = {};
 let lastMap = null, lastX = 0, lastY = 0;
-let panel = null, toastEl = null, toastTimer = 0, resetArmed = 0, btn = null;
+let toastEl = null, toastTimer = 0;
 
 function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, gen: { n: 0, def: null } }; }
 function loadState() {
@@ -105,7 +105,7 @@ function announceUnlocks() {
         st.announced[d.id] = 1; changed = true;
         toast(`New quest: ${d.title}`);
     }
-    if (changed) { saveState(); render(); updateButton(); }
+    if (changed) saveState();
 }
 
 const placesOf = (maps) => [...new Set(maps.map(mapLabel))].join(" / ");
@@ -115,7 +115,7 @@ function accept(id, viaNpc = false) {
     if (!enabled() || !d || statusOf(d) !== "available" || !atGiver(d)) return false;
     if (d.offer && !viaNpc) return false;                    // this one is handed out by a character, not by the log
     st.active[id] = { p: d.objectives.map(() => 0), seen: d.objectives.map(() => []), at: Date.now() };
-    saveState(); toast(`Quest accepted: ${d.title}`); render();
+    saveState(); toast(`Quest accepted: ${d.title}`);
     return true;
 }
 
@@ -131,7 +131,7 @@ function claim(id, viaNpc = false) {
         if (api.giveItem(it.name, it.count ?? 1)) got.push(`${it.count ?? 1} x ${it.name}`);
         else console.warn(`[quests] reward item "${it.name}" is not in the game's item table; skipped`);
     }
-    toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`); render();
+    toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`);
     return true;
 }
 
@@ -154,7 +154,6 @@ async function beginChallenge(id) {
     const party = await enemyParty(o);
     if (!party.length) { console.warn(`[quests] challenge for "${id}" has no enemies`); return false; }
     challengeBusy = true;
-    if (panel) panel.hidden = true;
     const started = api.startBattle(party, {
         screenId: (o.screens ?? [o.screen])[0],
         onWin: (res) => { challengeBusy = false; if (res?.enemyFled) toast("They got away. Try again."); else { bump("challenge", (x) => x === o); } },
@@ -183,7 +182,7 @@ function markVisited(mapId) {
         });
         if (!wasReady && isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
     }
-    if (changed) { saveState(); render(); }
+    if (changed) saveState();
 }
 
 function bump(type, match) {
@@ -200,7 +199,7 @@ function bump(type, match) {
         });
         if (!wasReady && isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
     }
-    if (changed) { saveState(); render(); }
+    if (changed) saveState();
 }
 
 // ------------------------------------------------------------ what the game tells us
@@ -218,7 +217,7 @@ function resetRoutes(why, onlyMap) {
             if (o.type === "reach" && (a.p[i] || 0) === 1 && (!onlyMap || !sameMap(o.map, onlyMap))) { a.p[i] = 0; changed = true; toast(why); }
         });
     }
-    if (changed) { saveState(); render(); }
+    if (changed) saveState();
 }
 on("battleStarted", (e) => { if (enabled()) resetRoutes("A fight broke out. Start the route again.", null); });
 // A quest about a character unlocks once you have actually seen that character where the quest says (story-gated
@@ -249,7 +248,6 @@ export function questsTick(mapId, x, y) {
             bump("visit", (o) => sameMap(o.map, mapId)); markVisited(mapId);
             ensureGenerated(); announceUnlocks();
         }
-        if (panel && !panel.hidden) render();                                    // the board may now be in reach
     }
     if (!enabled() || !mapId) return;
     for (const id of Object.keys(st.active)) {
@@ -258,9 +256,9 @@ export function questsTick(mapId, x, y) {
         d.objectives.forEach((o, i) => {
             if (o.type !== "reach" || !sameMap(o.map, mapId)) return;
             const p = a.p[i] || 0;
-            if (p === 0 && near(o.from, o.from.r)) { a.p[i] = 1; saveState(); toast(`Route started: ${o.startLabel ?? "go to the far gate"} - no fights!`); render(); }
+            if (p === 0 && near(o.from, o.from.r)) { a.p[i] = 1; saveState(); toast(`Route started: ${o.startLabel ?? "go to the far gate"} - no fights!`); }
             else if (p === 1 && near(o.to, o.to.r)) {
-                a.p[i] = 2; saveState(); render();
+                a.p[i] = 2; saveState();
                 if (isReady(id)) toast(`Quest ready to claim: ${d.title}  (F3)`);
             }
         });
@@ -270,44 +268,19 @@ export function questsTick(mapId, x, y) {
 // ------------------------------------------------------------ talking to the game's own characters
 // game.js calls questTalk() when you press confirm on an NPC, AFTER the game's own story check, so a quest can never
 // replace a story scene: if the story or a scripted battle takes the conversation, this is never reached.
-let dlg = null, dialogBusy = false;
+let dialogBusy = false, logOpen = false;
 const declined = new Set();                                  // offers you said "not now" to, until you reload
-function say(name, lines, choices) {
-    return new Promise((resolve) => {
-        dialogBusy = true;
-        const cv = document.getElementById("game"), sr = dlg.parentElement.getBoundingClientRect();
-        if (cv) { const r = cv.getBoundingClientRect(); Object.assign(dlg.style, { left: `${r.left - sr.left + 8}px`, right: "auto", width: `${r.width - 16}px`, bottom: `${sr.bottom - r.bottom + 8}px` }); }   // over the game picture, not the whole page
-        let i = 0, sel = 0;
-        const draw = () => {
-            const last = i >= lines.length - 1;
-            dlg.hidden = false;
-            dlg.innerHTML = `<div class="dn">${esc(name)}</div><div class="dtx">${esc(lines[i])}</div>`
-                + (last && choices ? `<div class="dc">${choices.map((c, k) => `<button data-c="${k}" class="${k === sel ? "sel" : ""}">${esc(c)}</button>`).join("")}</div>` : `<div class="dh">Enter &#9660;</div>`);
-        };
-        const close = (v) => { window.removeEventListener("keydown", onKey, true); dlg.removeEventListener("click", onClick); dlg.hidden = true; dialogBusy = false; resolve(v); };
-        const advance = () => { if (i < lines.length - 1) { i++; draw(); } else close(choices ? sel : 0); };
-        const onKey = (e) => {
-            if (/^F\d+$/.test(e.key)) return;
-            e.stopImmediatePropagation(); e.preventDefault();         // the game must not also act on this key
-            if (e.repeat) return;
-            const last = i >= lines.length - 1;
-            if (e.key === "Enter" || e.key === " " || e.key === "z" || e.key === "Z") advance();
-            else if (e.key === "Escape") close(choices ? choices.length - 1 : 0);
-            else if (last && choices && /^Arrow(Left|Up)$/.test(e.key)) { sel = Math.max(0, sel - 1); draw(); }
-            else if (last && choices && /^Arrow(Right|Down)$/.test(e.key)) { sel = Math.min(choices.length - 1, sel + 1); draw(); }
-        };
-        const onClick = (e) => { const b = e.target.closest("[data-c]"); if (b) close(+b.dataset.c); else advance(); };
-        window.addEventListener("keydown", onKey, true);           // capture: ahead of the game's own key handler
-        dlg.addEventListener("click", onClick);
-        draw();
-    });
-}
+// Speech goes through the game's own conversation box (web/dialogue-pack.js builds the line, game.js shows it), so it
+// looks and sounds like any other NPC; a blank line in the text starts a new page.
+const say = (name, lines, npcId = null) => (api?.speak ? api.speak(npcId, name, Array.isArray(lines) ? lines.join("\n\n") : lines) : Promise.resolve());
+const ask = (prompt, options) => (api?.ask ? api.ask(prompt, options) : Promise.resolve(options.length - 1));
+async function busy(fn) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
 const atNpc = (ref, npcId, mapId) => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
 const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
 
 /** Returns true when a quest took this conversation (the game then skips the character's normal line). */
 export function questTalk(npcId, mapId) {
-    if (!enabled() || dialogBusy || !dlg || !mapId) return false;
+    if (!enabled() || dialogBusy || logOpen || !mapId) return false;
     // 1. a "talk" step of a running quest
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), a = st.active[id];
@@ -316,12 +289,12 @@ export function questTalk(npcId, mapId) {
             const o = d.objectives[i];
             if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !atNpc(o, npcId, mapId)) continue;
             if (d.ordered && !talksDone(d, a, i)) continue;
-            (async () => {
-                await say(o.name ?? "", o.lines);
+            busy(async () => {
+                await say(o.name ?? "", o.lines, npcId);
                 const was = isReady(id);
-                a.p[i] = 1; saveState(); render(); updateButton();
+                a.p[i] = 1; saveState();
                 if (!was && isReady(id)) toast(`Quest ready: ${d.title}${turnInRef(d) ? "" : "  (F3)"}`);
-            })();
+            });
             return true;
         }
     }
@@ -329,17 +302,17 @@ export function questTalk(npcId, mapId) {
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), ref = d && turnInRef(d);
         if (!d || !isReady(id) || !atNpc(ref, npcId, mapId)) continue;
-        (async () => { await say(ref.name, ref.doneLines ?? ["Well done. Here is your reward."]); claim(id, true); updateButton(); })();
+        busy(async () => { await say(ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId); claim(id, true); });
         return true;
     }
     // 3. an offer
     for (const d of allDefs()) {
         if (statusOf(d) !== "available" || !d.offer || declined.has(d.id) || !atNpc(d.offer, npcId, mapId)) continue;
-        (async () => {
-            const pick = await say(d.offer.name, d.offer.lines, ["I will do it", "Not now"]);
-            if (pick === 0) { accept(d.id, true); } else declined.add(d.id);
-            updateButton();
-        })();
+        busy(async () => {
+            await say(d.offer.name, d.offer.lines, npcId);
+            const pick = await ask("Take the job?", ["I will do it", "Not now"]);
+            if (pick === 0) accept(d.id, true); else declined.add(d.id);
+        });
         return true;
     }
     return false;
@@ -406,6 +379,8 @@ function ensureGenerated() {
 }
 
 // ------------------------------------------------------------ UI
+// Nothing here draws its own windows. Speech is the game's conversation box, the list and the yes/no questions are the
+// game's choice widget, and the log is a list of those plus system-window pages. Only the small notice (toast) is ours.
 function toast(msg) {
     if (!toastEl) return;
     toastEl.textContent = msg; toastEl.style.opacity = "1";
@@ -414,114 +389,81 @@ function toast(msg) {
 function objectiveText(d, i) {
     const o = d.objectives[i], a = st.active[d.id], p = a ? (a.p[i] || 0) : 0, t = targetOf(d, i);
     if (o.type === "defeat") return `Defeat ${o.species.join(" / ")}${o.maps ? " in " + [...new Set(o.maps.map(mapLabel))].join(" / ") : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
-    if (o.type === "challenge") return `${o.label ?? "Win the challenge fight"}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
-    if (o.type === "talk") return `${o.label ?? `Talk to ${o.name ?? "someone"} in ${placesOf(o.maps)}`}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
+    if (o.type === "challenge") return `${o.label ?? "Win the challenge fight"}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
+    if (o.type === "talk") return `${o.label ?? `Talk to ${o.name ?? "someone"} in ${placesOf(o.maps)}`}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
     if (o.type === "visitSet") return `${o.label ?? `Visit ${t} different places`}  ${a ? `${p}/${t}` : `(${t} of ${o.maps.length})`}`;
     if (o.type === "duelWin") return `Win ${t} card duel${t > 1 ? "s" : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
-    if (o.type === "visit") return `Visit ${mapLabel(o.map)}${a ? (p >= 1 ? "  ✓" : "") : ""}`;
-    if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  ✓" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
+    if (o.type === "visit") return `Visit ${mapLabel(o.map)}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
+    if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  (done)" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
     return "?";
 }
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-function card(d, status) {
-    const objs = d.objectives.map((_, i) => `<li>${esc(objectiveText(d, i))}</li>`).join("");
-    const here = atGiver(d);
-    const cIdx = status === "active" ? challengeIndex(d) : -1;
-    const cBtn = cIdx >= 0 ? (canBegin(d) ? `<button data-q="begin:${d.id}" class="go">Begin challenge (a real fight)</button>` : `<div class="qr" style="color:#c9a45a">${challengeBusy ? "Fight in progress" : d.objectives[cIdx].startAt ? "Begin it at: " + esc([...new Set(d.objectives[cIdx].startAt.map(mapLabel))].join(" / ")) : ""}</div>`) : "";
-    const hint = (t) => `<div class="qr" style="color:#c9a45a">${t}</div>`;
+const MARK = { ready: "!", active: ">", available: "*", done: "x" };
+const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "." : s);
+const logEntries = () => ["ready", "active", "available", "done"].flatMap((s) => allDefs().filter((d) => statusOf(d) === s).map((d) => ({ d, s })));
+
+function detailText(d, s) {
     const ref = turnInRef(d);
-    const btn0 = status === "available"
-        ? (d.offer ? hint(`Talk to ${esc(d.offer.name)} in ${esc(placesOf(d.offer.maps))}`) : here ? `<button data-q="accept:${d.id}">Accept</button>` : hint(`Accept it at: ${esc(placesOf(d.acceptAt))}`))
-        : status === "ready" ? (ref ? hint(`Report to ${esc(ref.name)} in ${esc(placesOf(ref.maps))}`) : `<button data-q="claim:${d.id}" class="go">Claim reward</button>`) : "";
-    const btn = cBtn || btn0;
     const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} x ${it.name}`)].filter(Boolean).join(", ");
-    return `<div class="qc ${status}"><b>${esc(d.title)}</b><div class="qt">${esc(d.giver ?? "")}${d.giver ? " — " : ""}${esc(d.text ?? "")}</div><ul>${objs}</ul>${rw ? `<div class="qr">Reward: ${esc(rw)}</div>` : ""}${btn}</div>`;
+    const goals = d.objectives.map((_, i) => "- " + objectiveText(d, i)).join("\n");
+    const where = s === "available" ? (d.offer ? `Talk to ${d.offer.name} in ${placesOf(d.offer.maps)}.` : d.acceptAt && !atGiver(d) ? `Accept it at: ${placesOf(d.acceptAt)}.` : "")
+        : s === "ready" && ref ? `Report to ${ref.name} in ${placesOf(ref.maps)}.`
+        : s === "active" && challengeIndex(d) >= 0 && !canBegin(d) && d.objectives[challengeIndex(d)].startAt ? `Begin it at: ${placesOf(d.objectives[challengeIndex(d)].startAt)}.` : "";
+    return [`${d.title}${s === "done" ? " (done)" : ""}\n${d.giver ? d.giver + ": " : ""}${d.text ?? ""}`, goals, rw ? `Reward: ${rw}` : "", where].filter(Boolean).join("\n\n");
 }
-function updateButton() {
-    if (!btn) return;
-    const ready = allDefs().filter((d) => statusOf(d) === "ready").length;
-    const fresh = allDefs().filter((d) => statusOf(d) === "available" && !st.seen[d.id]).length;
-    const n = ready + fresh;
-    btn.innerHTML = `Quests${n ? ` <i>${n}</i>` : ""}`;
-    btn.hidden = !enabled();
+async function showQuest(d) {
+    const s = statusOf(d);
+    await say("Quest", detailText(d, s));
+    const acts = [];
+    if (s === "available" && !d.offer && atGiver(d)) acts.push(["Accept", () => accept(d.id)]);
+    if (s === "ready" && !turnInRef(d)) acts.push(["Claim reward", () => claim(d.id)]);
+    if (s === "active" && challengeIndex(d) >= 0 && canBegin(d)) acts.push(["Begin the fight", () => { beginChallenge(d.id); return "leave"; }]);
+    if (!acts.length) return null;
+    const pick = await ask(clip(d.title, 28), [...acts.map((a) => a[0]), "Back"]);
+    return pick < acts.length ? acts[pick][1]() : null;
 }
-function render() {
-    if (!panel || panel.hidden) return;
-    for (const d of allDefs()) if (statusOf(d) === "available" && !st.seen[d.id]) { st.seen[d.id] = 1; }
-    saveState();
-    const by = (s) => allDefs().filter((d) => statusOf(d) === s);
-    const sect = (title, list, st2) => (list.length ? `<h4>${title}</h4>${list.map((d) => card(d, st2)).join("")}` : "");
-    const ready = by("ready"), active = by("active"), avail = by("available"), done = by("done");
-    panel.innerHTML = `<h3>QUESTS <span>F3 / Esc to close</span></h3>`
-        + sect("Ready to claim", ready, "ready") + sect("In progress", active, "active") + sect("Available", avail, "available") + sect("Done", done, "done")
-        + (!ready.length && !active.length && !avail.length && !done.length ? `<div class="qt">No quests yet. Explore, fight and talk to people: quests unlock as you play.</div>` : "")
-        + (st.gen.completed ? `<div class="qt" style="margin-top:8px">Wanted-board jobs completed: ${st.gen.completed}</div>` : "")
-        + `<div class="qfoot"><button data-q="reset">${resetArmed > Date.now() ? "Click again to reset ALL quest progress" : "Reset quests"}</button></div>`;
-}
-function togglePanel(force) {
-    if (!panel || !enabled()) { if (panel) panel.hidden = true; return; }
-    panel.hidden = force === undefined ? !panel.hidden : !force;
-    if (!panel.hidden) render();
-    updateButton();
+/** The quest log: a choice list of quests (4 to a page), each opening its details in the conversation box. */
+export async function openLog() {
+    if (!enabled() || logOpen || dialogBusy || (api?.idle && !api.idle())) return false;
+    logOpen = true;
+    try {
+        let page = 0;
+        for (;;) {
+            const list = logEntries();
+            if (!list.length) { await say("Quests", "No quests yet.\n\nExplore, fight and talk to people: quests unlock as you play."); return true; }
+            const PER = 4, pages = Math.ceil(list.length / PER);
+            page = Math.min(page, pages - 1);
+            const slice = list.slice(page * PER, page * PER + PER);
+            const options = [...slice.map(({ d, s }) => `${MARK[s]} ${clip(d.title, 34)}`), ...(pages > 1 ? [`More (${page + 1}/${pages})`] : []), "Reset quests", "Close"];
+            const pick = await ask("Quests: ! ready > open * new", options);
+            if (pick < slice.length) { if ((await showQuest(slice[pick].d)) === "leave") return true; }
+            else if (pages > 1 && pick === slice.length) page = (page + 1) % pages;
+            else if (options[pick] === "Reset quests") {
+                if ((await ask("Reset ALL quest progress?", ["Reset", "Cancel"])) === 0) { st = { ...freshState(), visited: st.visited, duelWins: st.duelWins }; saveState(); toast("Quest progress reset"); ensureGenerated(); announceUnlocks(); }
+            } else return true;
+        }
+    } finally { logOpen = false; }
 }
 
 function installUi(stageEl) {
     const css = document.createElement("style");
     css.textContent = `
-      #quest-panel { position:absolute; top:44px; left:8px; z-index:41; width:300px; max-height:calc(100% - 60px); overflow-y:auto;
-        padding:10px 14px 12px; border:2px solid #45456a; border-radius:10px; background:#1d1d2bf2; color:#e8e8f0;
-        font:13px/1.5 "Segoe UI",system-ui,sans-serif; box-shadow:0 8px 30px #000; }
-      #quest-panel[hidden] { display:none; }
-      #quest-panel h3 { margin:0 0 4px; font-size:13px; color:#ffd34d; letter-spacing:1px; }
-      #quest-panel h3 span { color:#707090; font-size:10px; letter-spacing:0; margin-left:6px; }
-      #quest-panel h4 { margin:10px 0 3px; font-size:11px; color:#8a8ab0; letter-spacing:1.5px; text-transform:uppercase; }
-      #quest-panel .qc { border:1px solid #35355a; border-radius:8px; padding:6px 9px; margin:5px 0; background:#252540; }
-      #quest-panel .qc.ready { border-color:#ffd34d; } #quest-panel .qc.done { opacity:.55; }
-      #quest-panel .qt { color:#a8a8c8; font-size:12px; } #quest-panel ul { margin:4px 0 4px 16px; padding:0; } #quest-panel .qr { color:#9ad7a0; font-size:12px; }
-      #quest-panel button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:4px; padding:2px 8px; font:inherit; cursor:pointer; margin-top:4px; }
-      #quest-panel button.go { border-color:#ffd34d; color:#ffd34d; }
-      #quest-panel .qfoot { margin-top:10px; border-top:1px solid #35355a; padding-top:4px; }
-      #quest-btn { position:absolute; top:8px; right:8px; z-index:40; padding:3px 10px; border:1px solid #45456a; border-radius:6px; background:#1d1d2bd9; color:#e8e8f0; font:600 12px "Segoe UI",system-ui,sans-serif; cursor:pointer; }
-      #quest-btn i { font-style:normal; background:#ffd34d; color:#1d1d2b; border-radius:8px; padding:0 6px; margin-left:3px; }
-      #quest-btn[hidden] { display:none; }
-      #quest-dlg { box-sizing:border-box; position:absolute; left:12px; right:12px; bottom:12px; z-index:60; padding:10px 16px 12px; border:2px solid #ffd34d; border-radius:10px; background:#101020f5; color:#f0f0f8; font:15px/1.5 "Segoe UI",system-ui,sans-serif; cursor:pointer; }
-      #quest-dlg[hidden] { display:none; } #quest-dlg .dn { color:#ffd34d; font-weight:700; font-size:13px; letter-spacing:1px; } #quest-dlg .dh { text-align:right; color:#8a8aa8; font-size:11px; }
-      #quest-dlg .dc { display:flex; gap:10px; margin-top:6px; } #quest-dlg .dc button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:4px; padding:3px 14px; font:inherit; cursor:pointer; } #quest-dlg .dc button.sel { border-color:#ffd34d; color:#ffd34d; }
-      #quest-toast { position:absolute; left:14px; bottom:22px; z-index:51; max-width:70%; padding:6px 14px; border-radius:8px; background:#000c; color:#fff; font:600 13px 'Segoe UI',system-ui,sans-serif; pointer-events:none; opacity:0; transition:opacity .3s; }`;
+      #quest-toast { position:absolute; left:50%; transform:translateX(-50%); top:14px; z-index:51; max-width:80%; padding:5px 12px; background:rgb(0,0,32); border:1px solid rgb(104,104,208);
+        color:#fff; font:14px monospace; pointer-events:none; opacity:0; transition:opacity .3s; }`;
     document.head.appendChild(css);
-    panel = document.createElement("div"); panel.id = "quest-panel"; panel.hidden = true;
     toastEl = document.createElement("div"); toastEl.id = "quest-toast";
-    btn = document.createElement("button"); btn.id = "quest-btn"; btn.type = "button"; btn.textContent = "Quests";
-    btn.addEventListener("click", () => { togglePanel(); btn.blur(); });
-    btn.addEventListener("keydown", (e) => e.stopPropagation());
-    dlg = document.createElement("div"); dlg.id = "quest-dlg"; dlg.hidden = true;
-    stageEl.append(panel, toastEl, btn, dlg);
-    panel.addEventListener("keydown", (e) => e.stopPropagation());
-    panel.addEventListener("click", (e) => {
-        const b = e.target.closest("[data-q]");
-        if (!b) return;
-        const [act, id] = b.dataset.q.split(":");
-        if (act === "accept") accept(id);
-        else if (act === "claim") claim(id);
-        else if (act === "begin") beginChallenge(id);
-        else if (act === "reset") {
-            if (resetArmed > Date.now()) { st = { ...freshState(), visited: st.visited, duelWins: st.duelWins }; saveState(); resetArmed = 0; toast("Quest progress reset"); ensureGenerated(); announceUnlocks(); }
-            else { resetArmed = Date.now() + 3500; setTimeout(render, 3600); }
-            render();
-        }
-        b.blur();
-    });
+    stageEl.append(toastEl);
     window.addEventListener("keydown", (e) => {
-        if (e.key === "F3" && !enabled()) { if (e.isTrusted) { e.preventDefault(); toast("Quests are switched off. Press F2 and tick \"Quests\" (under Extras)."); } }
-        else if (e.key === "F3") { e.preventDefault(); togglePanel(); }
-        else if (e.key === "Escape" && panel && !panel.hidden) { panel.hidden = true; }
+        if (e.key !== "F3") return;
+        e.preventDefault();
+        if (!enabled()) { if (e.isTrusted) toast("Quests are switched off. Press F2 and tick \"Quests\" (under Extras)."); return; }
+        openLog();
     });
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle }) {
     if (!stageEl || api) return;
-    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere };
+    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle };
     installUi(stageEl);
     try {
         const [q, v, m] = await Promise.all([
@@ -539,10 +481,10 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         }
     } catch (e) { console.warn("[quests] could not load quests.json:", e); }
     await loadRoam();
-    ensureGenerated(); announceUnlocks(); updateButton();
+    ensureGenerated(); announceUnlocks();
     window.__quests = {   // debug / test hooks; nothing in the game reads these
         get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id) => (defOf(id) ? statusOf(defOf(id)) : null),
-        togglePanel, bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
+        openLog, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id) => (defOf(id) ? detailText(defOf(id), statusOf(defOf(id))) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
         where: () => ({ lastMap, lastX, lastY, enabled: enabled() }),
     };
 }

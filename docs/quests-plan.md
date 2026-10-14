@@ -21,8 +21,8 @@ the story or the battle rules.
 
 ## What the player sees
 
-- A **Quests** button on the screen (and **F3**) opens the log. A badge counts quests ready to claim and new ones
-  not yet looked at.
+- **F3** opens the log (the page's key hint lists it). The log is the game's own list widget; each quest's details open
+  in the game's own conversation window.
 - Quests are **not all available**. They unlock as you play (below) and a toast says "New quest: ...".
 - Some are taken from a **notice board** (only while you stand in that place), some are **handed out by a real
   character** of the game, some are **generated** and scale with the party.
@@ -51,11 +51,16 @@ current story state cannot deliver.
 - `offer` hands a quest out through an NPC (`npc` id from the scene files, `maps`, `lines`); the player answers
   "I will do it" / "Not now". `turnIn` (or the offer NPC) takes the finished quest back and pays.
 - `talk` objectives are conversations with NPCs, optionally `ordered`.
-- The dialogue box is the quest layer's own (not the game's balloon). While it is open it takes the keys ahead of
-  the game (Enter / Space / Z advance, arrows choose, Esc = "not now"). Key-ups still reach the game.
+- Speech is shown by the game's own translated conversation box (the same balloon, bitmap font, wipe and sounds as a
+  real NPC). `web/dialogue-pack.js` writes a line in the disc's own text format (name tab, words, line and page
+  breaks) and hands it to the box as a one-line pack. `tools/verify_dialogue_pack.mjs` re-encodes every plain-text line
+  of the disc's `estalk00..09` files and checks the bytes are identical (2825 of 2825 readable lines). The quest's own
+  words are new writing; only the format and the box are the game's.
+- The yes/no question and the quest list use the game's `choice` widget, details use the game's system window.
 - `tools/check_quests.py` checks that each named NPC has a real field position on the named maps.
-- **Not done:** placing brand-new characters into maps, and using the game's own balloon / text font for quest
-  speech. The quest speech is written for this layer; it is not shipped-game dialogue.
+- **Not done:** placing brand-new characters into maps. Characters the disc text has no code for (some punctuation,
+  the player-name code) are dropped from quest text. The small "New quest" notice is still a page-level box styled like
+  the game's windows, not drawn on the game canvas.
 
 ## Generated jobs ("Wanted board")
 
@@ -83,7 +88,7 @@ then Agumon at East Station and Takato in Qing Long City.
 - `python3 tools/check_quests.py` - data against the game's tables (species, maps, items, NPC positions, unlock rules).
 - Browser (needs Chrome with `--remote-debugging-port=9333` and the game on port 8770): `verify_quests.mjs`,
   `verify_quests_phase2.mjs`, `verify_quests_phase3.mjs`, `verify_quests_phase3b.mjs`,
-  `verify_quests_realbattle.mjs`, `verify_quests_unlock.mjs`.
+  `verify_quests_realbattle.mjs`, `verify_quests_unlock.mjs`; `node tools/verify_dialogue_pack.mjs` (set `DIALOGUE_DIR` if `web/assets` is a symlink Windows cannot follow).
 
 ## Not verified / not built
 
@@ -93,7 +98,7 @@ then Agumon at East Station and Takato in Qing Long City.
 - The real-key talk path was checked with Leomon (a fresh game). For Agumon and Takato in the late-game cities, a
   jump-in load has no story state, so the test calls the same hook the game calls instead of pressing keys there.
 - Fishing contest and album collector are not possible yet (no fishing in the port; the only album is the card album).
-- No gamepad button for the Quests button; the dialogue takes keyboard and mouse.
+- F3 is a keyboard key; there is no gamepad button for the log (the conversation box and lists do work with the pad).
 
 ## Co-op (removed)
 
