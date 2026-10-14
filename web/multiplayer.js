@@ -127,6 +127,10 @@ export function connect(want) {
             p.card = m.card; emit("roster");
         } else if (m.t === "trade") {
             emit("trade", m);
+        } else if (m.t === "duel") {
+            emit("duel", m);
+        } else if (m.t === "coop") {
+            emit("coop", m);
         }
     };
     ws.onclose = () => {
@@ -190,6 +194,8 @@ export function sendChat(text) {
 export function sendFeed(kind, text) { return sendRaw({ t: "feed", kind, text }); }
 export function sendCard(card) { return sendRaw({ t: "card", card }); }
 export const sendTrade = (o) => sendRaw({ t: "trade", ...o });
+export const sendDuel = (o) => sendRaw({ t: "duel", ...o });
+export const sendCoop = (o) => sendRaw({ t: "coop", ...o });
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */

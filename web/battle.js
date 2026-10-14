@@ -3876,7 +3876,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (fieldMovieHandoff) await fieldMovieHandoff({ screenId, mapId });
     // Fight every member sequentially (boss gauntlet); random encounters are 1-member parties.
     const entries = party.map(e => ({
-      enemyId: e.name, enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp,
+      // (multiplayer duels: a player's own Digimon form may not be in the enemy table, so those entries carry its numeric id)
+      enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name, enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp,
       enemyStatScale: e.stat_scale ?? 16,
     }));
     await start({ party: entries, screenId, mapId, onWin, onFlee, onLose });
@@ -8744,7 +8745,20 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return scriptedScreenId(stage, index, storyOrdinal(), entryKey());
   }
 
+  // EXPERIMENT (multiplayer co-op, web/mpsocial.js): two players fight the same enemy on their own screens and share its HP.
+  // These three are only used while a co-op fight is on; they change nothing for a normal fight.
+  async function rollEncounter(mapId, x, y) {
+    await loadData();
+    const roll = pickEnemy(mapId, x, y);
+    return roll ? { party: roll.party, screen: roll.screen } : null;
+  }
+  const coopState = () => (battle?.enemy ? { index: battle.partyIndex | 0, hp: battle.enemy.hp, maxHp: battle.enemy.maxHp, count: battle.party?.length ?? 1 } : null);
+  function coopSetEnemyHp(index, hp) {
+    if (battle?.enemy && (battle.partyIndex | 0) === index && hp < battle.enemy.hp) battle.enemy.hp = Math.max(0, hp | 0);
+  }
+
   return { isActive, start, startRandom, startParty, startScreen, scriptedScreen, partyForScreen, triggersForStage,
+    rollEncounter, coopState, coopSetEnemyHp,
     // Post-fight results hand-off (Phase 6.3): the host registers how to open
     // the native pro/stfgtrep screen, and calls finishNativeReport() when the
     // player leaves it, which returns to the field exactly like the inline

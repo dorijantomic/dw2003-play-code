@@ -89,3 +89,38 @@ test("rooms hold 50 by default and maxPeers can be changed", () => {
     assert.ok(client(hub, { room }).session);
     assert.equal(client(hub, { room }).error, "full");
 });
+
+test("duel messages go only to the player they name, with the sender filled in and results cleaned", () => {
+    const { a, b, hub } = pair();
+    const c = client(hub, { room: a.last("welcome").room, name: "Cy" });
+    send(a, { t: "duel", op: "ask", to: b.session.id });
+    assert.deepEqual(b.last("duel"), { t: "duel", op: "ask", from: a.session.id });
+    assert.equal(c.last("duel"), undefined);
+    send(b, { t: "duel", op: "yes", to: a.session.id, from: 999 });          // "from" cannot be forged
+    assert.deepEqual(a.last("duel"), { t: "duel", op: "yes", from: b.session.id });
+    send(a, { t: "duel", op: "result", to: b.session.id, hp: 7, won: 1 });
+    assert.deepEqual(b.last("duel"), { t: "duel", op: "result", from: a.session.id, hp: 1, won: true });
+    send(a, { t: "duel", op: "explode", to: b.session.id });                  // unknown op ignored
+    send(a, { t: "duel", op: "ask", to: a.session.id });                      // not to myself
+    send(a, { t: "duel", op: "ask", to: 12345 });                             // nobody there
+    assert.equal(b.got.filter((m) => m.t === "duel").length, 2);
+});
+
+test("co-op messages: foes are cleaned, hits are bounds-checked, the sender is filled in", () => {
+    const { a, b } = pair();
+    send(a, { t: "coop", op: "pask", to: b.session.id });
+    assert.deepEqual(b.last("coop"), { t: "coop", op: "pask", from: a.session.id });
+    send(a, { t: "coop", op: "ask", to: b.session.id, label: "Boss <x>", foes: [
+        { name: "Kunemon", level: 5, hp: 120, mp: 10, stat_scale: 16 }, { name: "", level: 5, hp: 1 }, { name: "Bad", level: 500, hp: 1 }, null] });
+    const ask = b.last("coop");
+    assert.deepEqual(ask.foes, [{ name: "Kunemon", level: 5, hp: 120, mp: 10, stat_scale: 16 }]);
+    assert.equal(ask.label, "Boss x");
+    const before = b.got.length;
+    send(a, { t: "coop", op: "ask", to: b.session.id, foes: [] });                  // nothing to fight: ignored
+    send(a, { t: "coop", op: "hit", to: b.session.id, i: 0, hp: -5 });             // out of range: ignored
+    send(a, { t: "coop", op: "hit", to: b.session.id, i: 99, hp: 5 });
+    send(a, { t: "coop", op: "bogus", to: b.session.id });
+    assert.equal(b.got.length, before);
+    send(a, { t: "coop", op: "hit", to: b.session.id, i: 1, hp: 77 });
+    assert.deepEqual(b.last("coop"), { t: "coop", op: "hit", from: a.session.id, i: 1, hp: 77 });
+});

@@ -25,7 +25,7 @@ import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, 
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
-import { installSocial, socialQuestDone } from "./mpsocial.js"; // EXPERIMENT: multiplayer chat, feed, inspect, trade
+import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js"; // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { installChat, buildChatPack } from "./chat.js";
@@ -388,7 +388,7 @@ function mpCard() {
             if (typeof v === "number" && k.length <= 6 && !/^(hp|mp|maxhp|maxmp)$/i.test(k) && Object.keys(st).length < 8) st[k] = v + (r.bonuses?.[k] ?? 0);
         }
         return {
-            n: String(r.name ?? "").slice(0, 14), f: String(r.formName ?? "").slice(0, 14), lv: r.level | 0, xp: r.xp | 0,
+            n: String(r.name ?? "").slice(0, 14), f: String(r.formName ?? "").slice(0, 14), id: r.digimonId | 0, lv: r.level | 0, xp: r.xp | 0,
             hp: r.hp | 0, mhp: r.maxHp | 0, mp: r.mp | 0, mmp: r.maxMp | 0, st,
         };
     });
@@ -410,6 +410,35 @@ installSocial({
             return true;
         },
         bits: () => state.bits | 0,
+        canFight: () => mpIdle() && fieldPartySize(state.party) > 0,
+        // co-op: the same enemy on two screens with one shared HP pool (see web/mpsocial.js)
+        coopState: () => battle.coopState(),
+        coopSetHp: (i, hp) => battle.coopSetEnemyHp(i, hp),
+        coopFight: (foes, done) => startQuestBattle(foes, { onWin: done, onFlee: done, onLose: done }),
+        // A friendly duel: fight a copy of the other player's team (from their card), then put everything back as it was
+        // (EXP, level ups, drops, BIT). cb({ won, hp }) where hp is the share of my team's HP left after a win.
+        startDuel: (card, cb) => {
+            const foes = (card?.party ?? []).filter((d) => menu.digimonDB?.[d.id]).slice(0, 3)
+                .map((d) => ({ name: d.f, digimonId: d.id, level: Math.max(1, d.lv | 0), hp: Math.max(1, d.mhp | 0), mp: d.mmp | 0, stat_scale: 16 }));
+            if (!foes.length) return false;
+            const snap = { inv: JSON.stringify(state.inventory), bits: state.bits, lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null) };
+            const share = () => {
+                const rows = [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats.slice(1) : [])].filter(Boolean);
+                const max = rows.reduce((n, r) => n + (r.maxHp | 0), 0);
+                return max > 0 ? Math.max(0, Math.min(1, rows.reduce((n, r) => n + Math.max(0, r.hp | 0), 0) / max)) : 0;
+            };
+            let over = false;
+            const finish = (won) => {
+                if (over) return; over = true;
+                const hp = won ? share() : 0;
+                state.inventory = JSON.parse(snap.inv); state.bits = snap.bits;
+                state.partnerStats = JSON.parse(snap.lead); state.partyStats = JSON.parse(snap.party);
+                localStorage.setItem("inventory", snap.inv); localStorage.setItem("bits", String(snap.bits));
+                localStorage.setItem("partnerStats", snap.lead); localStorage.setItem("partyStats", snap.party);
+                cb({ won, hp });
+            };
+            return startQuestBattle(foes, { onWin: () => finish(true), onFlee: () => finish(false), onLose: () => finish(false) });
+        },
         // what I can hand over: carried (not worn) items of the four ordinary bags, never the Important Items bag
         tradable: () => [1, 2, 3, 4].flatMap((k) => listItemIds(state, k)).map((id) => ({ id, name: ITEM_BY_ID[id]?.name ?? `Item ${id}`, qty: heldCount(state, id) }))
             .filter((b) => b.qty > 0),
@@ -435,7 +464,8 @@ installSocial({
 
 installQuests({
     stageEl: document.getElementById("stage"),
-    startBattle: (party, opts) => startQuestBattle(party, opts),
+    // with a team-up partner a quest fight is offered to them too (same enemies, shared HP); otherwise exactly as before
+    startBattle: (party, opts) => (coopTry(party, "Quest fight", (foes) => startQuestBattle(foes, opts) || (opts?.onFlee?.(), false)) ? true : startQuestBattle(party, opts)),
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
     npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
@@ -4017,6 +4047,20 @@ function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose } = {}
     return true;
 }
 
+// EXPERIMENT (multiplayer co-op): a wild fight while teamed up spawns two Digimon from the same area's pool; the partner is
+// invited to the same fight and the enemy's HP is shared. If the roll finds nothing there is no fight, as usual.
+async function mpCoopRandom(mapId, x, y) {
+    coopRolling(true);
+    try {
+        const a = await battle.rollEncounter(mapId, x, y);
+        if (!a) return;
+        const b = await battle.rollEncounter(mapId, x, y);
+        const foes = [a.party[0], ...(b ? [b.party[0]] : [])];
+        const go = (f) => startQuestBattle(f, {});
+        if (!coopTry(foes, "Wild Digimon", go)) go(foes);
+    } finally { coopRolling(false); }
+}
+
 function triggerRandomEncounter(mapId, x, y) {
     if (
         fieldPartySize(state.party) === 0 ||
@@ -4029,6 +4073,7 @@ function triggerRandomEncounter(mapId, x, y) {
         !!state.wipe28
     )
         return;
+    if (coopReady()) { mpCoopRandom(mapId, x, y); return; }   // teamed up: two wild Digimon, and your partner can join
     startFieldBattle(() =>
         battle.startRandom(mapId, x, y, (res) => presentVictory(res), null, gameOverToTitle));
 }

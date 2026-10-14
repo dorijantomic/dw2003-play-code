@@ -12,6 +12,8 @@
 //   {t:"feed", kind, text}          something I did (a level up, a finished quest): in everyone's log
 //   {t:"card", card}                my player card (name, Digimon, levels...): what others see when they inspect me
 //   {t:"trade", op, ...}            trading, see #trade below
+//   {t:"coop", op, to, ...}         team-up and shared fights between two players (see #coop)
+//   {t:"duel", op, to, hp, won}     a friendly duel: ask / yes / no / cancel / result, passed to player `to` (see #direct)
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
 // and receives:
 //   {t:"welcome", id, room, roster:[{id,name,map,card}]}
@@ -33,6 +35,8 @@ const LIMIT = 80;                    // messages a second a player may send befo
 const CHAT_GAP = 600;                // ms between two chat lines from one player
 const CHAT_MAX = 100, FEED_MAX = 90, CARD_MAX = 2000;
 const FEED_KINDS = new Set(["level", "quest", "evolve", "info"]);
+const DUEL_OPS = new Set(["ask", "yes", "no", "cancel", "result"]);
+const COOP_OPS = new Set(["pask", "pyes", "pno", "pleave", "ask", "yes", "no", "cancel", "hit"]);
 
 export function makeCode(rand = Math.random) {
     let s = "";
@@ -148,6 +152,8 @@ export class Hub {
         if (m.t === "feed") return this.#feed(r, peer, m);
         if (m.t === "card") return this.#card(r, peer, m);
         if (m.t === "trade") return this.#trade(r, peer, m);
+        if (m.t === "duel") return this.#direct(r, peer, m, "duel", DUEL_OPS);
+        if (m.t === "coop") return this.#coop(r, peer, m);
         if (m.t === "emote" && Number.isInteger(m.e) && m.e >= 0 && m.e <= 7) {
             for (const o of r.peers.values()) if (o !== peer && o.map && o.map === peer.map) this.#to(o, { t: "emote", id: peer.id, e: m.e });
         }
@@ -195,6 +201,44 @@ export class Hub {
         if (json.length > CARD_MAX) return;
         peer.card = JSON.parse(json);
         this.#others(r, peer, { t: "card", id: peer.id, card: peer.card });
+    }
+
+    // ---- #direct
+    // Short messages from one player to one other player in the room (duel requests and results). The relay keeps no state
+    // for them: it checks the op, fills in who it is from, and passes on only the few plain fields that op may carry.
+    #direct(r, peer, m, type, ops) {
+        const to = r.peers.get(m.to);
+        if (!to || to === peer || !ops.has(m.op)) return;
+        const out = { t: type, op: m.op, from: peer.id };
+        if (m.op === "result") {
+            out.hp = typeof m.hp === "number" && Number.isFinite(m.hp) ? Math.max(0, Math.min(1, m.hp)) : 0;
+            out.won = !!m.won;
+        }
+        this.#to(to, out);
+    }
+
+    // ---- #coop
+    // pask/pyes/pno/pleave: two players team up (or stop). ask{foes,label}/yes/no/cancel: one starts a fight and invites the
+    // other, who fights the same enemies. hit{i,hp}: "enemy number i is down to hp", so the two of them share its HP.
+    // Like duels, the relay only checks, labels the sender and passes on a few plain fields.
+    #coop(r, peer, m) {
+        const to = r.peers.get(m.to);
+        if (!to || to === peer || !COOP_OPS.has(m.op)) return;
+        const out = { t: "coop", op: m.op, from: peer.id };
+        if (m.op === "ask") {
+            const foes = [];
+            for (const f of Array.isArray(m.foes) ? m.foes.slice(0, 6) : []) {
+                const name = cleanText(f?.name, 24), int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
+                const level = int(f?.level, 1, 99), hp = int(f?.hp, 1, 999999), mp = int(f?.mp ?? 0, 0, 99999), scale = int(f?.stat_scale ?? 16, 1, 64);
+                if (name && level != null && hp != null && mp != null && scale != null) foes.push({ name, level, hp, mp, stat_scale: scale });
+            }
+            if (!foes.length) return;
+            out.foes = foes; out.label = cleanText(m.label, 40);
+        } else if (m.op === "hit") {
+            if (!Number.isInteger(m.i) || m.i < 0 || m.i > 20 || !Number.isInteger(m.hp) || m.hp < 0 || m.hp > 999999) return;
+            out.i = m.i; out.hp = m.hp;
+        }
+        this.#to(to, out);
     }
 
     // ---- #trade

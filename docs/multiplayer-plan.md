@@ -60,7 +60,21 @@ The relay sees only: the display name, the stage id, x/y, the facing and emote n
 
 - Not tried over a real Hamachi/Tailscale link between two computers (only on one machine), nor on macOS/Windows.
 - Other players as their own Digimon or character instead of the player sprite; ladders, fishing and other poses.
-- Saves and quest progress on the server (they stay in each player's browser), shared quests, trading.
-- Text chat (deliberately: emotes only until there is a way to moderate), a public room list, accounts.
-- Two players in one battle. Battles are always local.
+- Saves and quest progress on the server (they stay in each player's browser).
+- Co-op credit for the partner's quest *challenge* objectives (their kill objectives do count; challenges only credit the one who started it).
+- A public room list, accounts.
+- A true two-against-two battle: the battle engine is one Digimon against one enemy, so co-op shares the enemy's HP instead.
 - If the host's game closes, the room ends; friends see "Connection lost".
+
+## Social layer, duels and co-op (added 2026-10-14)
+
+- **Dock** (bottom left, once in a room): ALL / CHAT / EVENTS / PLAYERS. Chat lines show in the game's own speech balloon over the
+  speaker (one balloon per player). Events: level ups, digivolutions, finished extra quests, joins. Names are the character names as typed.
+- **Players**: level, lead Digimon, where they are; Inspect (the player card: party, HP/MP, stats, BIT, quests), Trade, Duel, Team up, Go there.
+- **Trade**: both press Confirm on the same offers; the relay then says "done" and each game moves its own items (item store only).
+- **Duel**: each side fights a computer-played copy of the other's team (from their card); EXP/drops/BIT are taken back; the better result wins.
+- **Co-op** (side quests and wild fights only; the main story stays solo): after **Team up**, a quest challenge fight or a wild
+  encounter offers the same fight to the partner (wild = two Digimon). Each fights on their own screen; the enemy's HP is one shared
+  pool (`battle.coopState` / `coopSetEnemyHp`), and the enemies are made stronger by the boss-strength setting (x1/x2/x3 HP, a little more attack).
+- Relay messages: `chat`, `feed`, `card`, `at`, `trade`, `duel`, `coop` (see `server/room-core.mjs`). Tests: `tests/multiplayer-social.test.js`,
+  `tools/verify_multiplayer.mjs`, `tools/verify_multiplayer_battle.mjs`.
