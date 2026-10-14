@@ -23,7 +23,7 @@ console.log("partners:", await ev(`JSON.stringify([...document.querySelector("#c
 await ev(`(()=>{const s=document.querySelector("#charSelect");const o=[...s.options].find(o=>/^p00[2-9]|^p01/.test(o.value));s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));})()`); await sleep(2500);
 console.log("lead now:", await ev(`window.__state.manifest.characters[window.__state.charIdx].id`));
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
-await ev(`window.__quests.accept("park_pest_control")`);
+await ev(`window.__quests.accept("park_pest_control", true)`);
 console.log("battle api:", await ev(`JSON.stringify(Object.keys(window.__battle).filter(k=>/start|active/i.test(k)))`));
 console.log("progress before:", await ev(`JSON.stringify(window.__quests.state.active.park_pest_control.p)`));
 // a real fight: one Kunemon, on Central Park, through the game's own party starter

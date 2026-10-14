@@ -55,7 +55,7 @@ const titles = await ev(`JSON.stringify(window.__quests.entries().map(e=>e.title
 ok("the first quest is offered and the chained one is locked", titles.includes("Central Park pest control") && !titles.includes("Wire Forest survey"), titles);
 await key("ArrowUp"); await key("Enter"); await sleep(300);          // wraps to "Close"
 ok("the list closes", (await ev(`!window.__quests.isLogOpen() && !window.__choice.isOpen()`)) === true);
-await ev(`window.__quests.accept("park_pest_control")`); await sleep(200);
+await ev(`window.__quests.accept("park_pest_control", true)`); await sleep(200);
 ok("accept", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
 
 await win(["Kunemon"], "s200");              // wrong map: must not count
@@ -68,12 +68,12 @@ ok("ready after the third", (await ev(`window.__quests.status("park_pest_control
 await win(["Kunemon"], "s330");
 ok("progress never exceeds the target", (await ev(`JSON.stringify(window.__quests.state.active.park_pest_control.p)`)) === "[3]");
 
-await ev(`window.__quests.claim("park_pest_control")`); await sleep(300);
+await ev(`window.__quests.claim("park_pest_control", true)`); await sleep(300);
 const bits1 = await ev("window.__state.bits"), inv1 = await ev("JSON.stringify(window.__state.inventory)");
 ok("claim pays 300 BIT", bits1 - bits0 === 300, `(${bits0} -> ${bits1})`);
 ok("claim adds the AntidoteDisk", inv1 !== inv0, "");
 ok("quest is done", (await ev(`window.__quests.status("park_pest_control")`)) === "done");
-await ev(`window.__quests.claim("park_pest_control")`);
+await ev(`window.__quests.claim("park_pest_control", true)`);
 ok("claiming twice pays nothing more", (await ev("window.__state.bits")) === bits1);
 
 // reload: persisted, no double reward

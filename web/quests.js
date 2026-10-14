@@ -247,6 +247,8 @@ export function questsTick(mapId, x, y) {
             if (!st.visited.includes(key)) { st.visited.push(key); saveState(); }
             bump("visit", (o) => sameMap(o.map, mapId)); markVisited(mapId);
             ensureGenerated(); announceUnlocks();
+            const posted = allDefs().find((d) => !d.offer && d.acceptAt && statusOf(d) === "available" && d.acceptAt.some((m) => sameMap(m, mapId)));
+            if (posted) toast(`A job is posted here: ${posted.title}  (press F3)`);
         }
     }
     if (!enabled() || !mapId) return;

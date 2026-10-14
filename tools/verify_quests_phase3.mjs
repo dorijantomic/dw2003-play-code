@@ -65,7 +65,7 @@ ok("three-leaders quest is locked too", (await st("leaders_gauntlet")) === "lock
 const flagsBefore = await ev(`JSON.stringify(window.__state.flags)`);
 
 // ---- double trouble: a real two-enemy fight launched from the quest log
-ok("accept the double ambush at Central Park", (await ev(`window.__quests.accept("double_trouble_park")`)) === true);
+ok("accept the double ambush at Central Park", (await ev(`window.__quests.accept("double_trouble_park", true)`)) === true);
 ok("the open challenge can be begun here", (await ev(`window.__quests.entries().some(e=>e.id==="double_trouble_park" && e.status==="active")`)) === true);
 await ev(`window.__quests.beginChallenge("double_trouble_park"); 0`); await sleep(5000);
 const party = await ev(`(()=>{const b=window.__battleB&&window.__battleB();return b?JSON.stringify(b.party.map(e=>[e.enemyId,e.enemyLevel,e.enemyHp,e.enemyStatScale])):null})()`);
@@ -76,7 +76,7 @@ const finished = await playOut(false);
 ok("the fight ended", finished);
 for (let i = 0; i < 20 && (await st("double_trouble_park")) !== "ready"; i++) await sleep(500);
 ok("winning completes the challenge", (await st("double_trouble_park")) === "ready", await st("double_trouble_park"));
-await ev(`window.__quests.claim("double_trouble_park")`);
+await ev(`window.__quests.claim("double_trouble_park", true)`);
 
 // ---- the gated rematch + the hard version carries the scaled stats
 await goMap("s420");

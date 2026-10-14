@@ -58,9 +58,15 @@ ok("winning a card duel unlocks the card ladder", t.includes("Card ladder: first
 ok("and it was announced once", (await ev(`window.__quests.state.announced.card_ladder_1`)) === 1);
 
 // ---- Leomon hands out a quest, through the game's own box
-ok("the park job is accepted", (await ev(`window.__quests.accept("park_pest_control")`)) === true);
+ok("the first job is not taken from the log: Leomon hands it out", (await ev(`window.__quests.accept("park_pest_control")`)) === false);
+ok("Leomon is standing in the park", await stand(27));
+await key("Enter"); await waitBox();
+ok("a fresh game: talking to Leomon offers the park job in the game's box", /Kunemon/.test(await ev(`window.__textbox.dialogue.pages.flat().join(" ")`)) && (await nativeOpen()) === true);
+await advance();
+await key("Enter"); await sleep(400);
+ok("the park job is accepted through him", (await ev(`window.__quests.status("park_pest_control")`)) === "active");
 for (let i = 0; i < 3; i++) await ev(`import("/gameEvents.js").then(m=>m.emit("battleWon",{enemies:["Kunemon"],mapId:"s330",screenId:1}))`);
-await ev(`window.__quests.claim("park_pest_control")`);
+await ev(`window.__quests.claim("park_pest_control", true)`);
 ok("done; the survey is now offered", (await ev(`window.__quests.status("forest_gate_survey")`)) === "available");
 ok("...but it cannot be taken from the log", (await ev(`window.__quests.accept("forest_gate_survey")`)) === false);
 ok("Leomon is standing in the park", await stand(27));

@@ -4,8 +4,8 @@
     {
       "id": "park_pest_control",
       "title": "Central Park pest control",
-      "giver": "Notice board",
-      "text": "Kunemon keep wandering into Central Park. Thin them out.",
+      "giver": "Leomon",
+      "text": "Leomon cannot leave the gym, and Kunemon keep wandering into Central Park. Thin them out.",
       "objectives": [
         {
           "type": "defeat",
@@ -33,6 +33,23 @@
           "s330",
           "s940",
           "s331"
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "Hey there. The Kunemon have been wandering into Central Park again, and I cannot leave the gym to deal with them.",
+          "If you could thin out three of them, I would be grateful. I will make it worth your while.",
+          "Can you do that?"
+        ],
+        "doneLines": [
+          "Three less to worry about. Thank you.",
+          "Take this, you earned it."
         ]
       }
     },
@@ -245,12 +262,8 @@
     {
       "id": "double_trouble_park",
       "title": "Double trouble in Central Park",
-      "giver": "Park ranger board",
+      "giver": "Leomon",
       "text": "Two pests came out of the long grass at once. Face a Kunemon and a Tapirmon back to back, with no time to heal in between.",
-      "acceptAt": [
-        "s330",
-        "s940"
-      ],
       "objectives": [
         {
           "type": "challenge",
@@ -272,6 +285,23 @@
             "name": "Antidote Disk",
             "count": 1
           }
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "Something odd happened. Two pests came out of the long grass at the same time, a Kunemon and a Tapirmon.",
+          "Could you face them back to back? No time to heal in between. It is harder than it sounds.",
+          "Will you try?"
+        ],
+        "doneLines": [
+          "Both of them at once, and you are still standing. Impressive.",
+          "Here you go."
         ]
       }
     },
