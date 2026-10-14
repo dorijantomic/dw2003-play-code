@@ -17,7 +17,7 @@ import { createIdleDirector, createIdleClock, idleDirectorTick } from "./fight/b
 import { FightCoordinator } from "./fight/fight-coordinator.js";
 import { setMoveSpeed } from "./fight/action-vm.js";
 import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
-import { setTechTable, techRecord } from "./fight/fight-tables.js";
+import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP } from "./fight/fight-tables.js";
 import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
          projLayerWorlds, clipFrameAt, meshAbrMode } from "./fight/proj-layers.js";
@@ -1664,6 +1664,7 @@ export function createBattle3D(canvas, sfx = null) {
       // A model can finish loading before this table does; re-seat whatever is already up.
       if (playerAnim8r) playerAnim8r.homeSlot = arenaSlotFor(playerFolder, "player", placementTable);
       if (enemyAnim8r)  enemyAnim8r.homeSlot  = arenaSlotFor(enemyFolder,  "enemy",  placementTable);
+      for (const f of extras.values()) if (f.anim8r) f.anim8r.homeSlot = arenaSlotFor(f.folder, f.side, placementTable);   // (multiplayer fighters that loaded first)
       if (playerFolder && !playerPatches) setupTexturePatches("player", playerFolder);
       if (enemyFolder && !enemyPatches) setupTexturePatches("enemy", enemyFolder);
       if (introCamPending) applyArenaShot();
@@ -2672,6 +2673,150 @@ export function createBattle3D(canvas, sfx = null) {
       _enemyHooks(_fxHooks("enemy", _impactContact({ ...hooks, onMotion: dataFieldMotion }))),
       { lethal, miss, defenderHooks: _playerHooks(_fxHooks("player")) });
   }
+  // ── EXTRA FIGHTERS (multiplayer many-vs-many, web/mpbattle.js) ───────────────────────────────────────
+  // A normal fight has two models, "player" and "enemy". Multiplayer needs more of them in the SAME arena, so this adds any
+  // number of extra fighters, each with its own model, texture, skeleton buffers and ActorAnimator, standing in a lane beside
+  // the others (`dx`, PS1 units sideways). They are drawn, animated, framed and sequenced by the same code as the two main
+  // fighters: attacks run through the SAME FightCoordinator (it already takes any two animators), the effects and projectiles
+  // are the same op3 / op6 records, shifted into the right lane. Nothing here runs unless addFighter() is called.
+  const extras = new Map();          // id -> fighter
+  let multiCam = false;
+  const fighterScreen = new Map();   // id -> { x, topY, footY } in 0..1 of the canvas, written every render
+  coordinator.extraActors = () => { const out = []; for (const f of extras.values()) if (f.anim8r) out.push(f.anim8r); return out; };
+  const laneOf = (f) => f.dx + f.lat;
+
+  function addFighter(id, side, folder, dx = 0) {
+    removeFighter(id);
+    const f = { id, side, folder, dx, lat: 0, latT: 0, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
+      visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null };
+    extras.set(id, f);
+    f.tex = loadTexture(gl, `assets/battle/textures/${folder}.png`);
+    return loadSkeletalModel(folder).then((m) => {
+      if (!m || extras.get(id) !== f) return false;
+      f.model = m;
+      f.bufs = buildSkeletalGLBuffers(gl, m);
+      f.frame = m.clips?.[0]?.start_frame ?? 0;
+      f.anim8r = new ActorAnimator(m);
+      f.anim8r.resetSlotPlacement(arenaSlotFor(folder, side, placementTable));
+      preloadModelProjectiles(m.actions);
+      return true;
+    });
+  }
+  function removeFighter(id) {
+    const f = extras.get(id);
+    if (!f) return;
+    extras.delete(id); fighterScreen.delete(id);
+    releaseActorResources([f.tex, f.bufs, f.model]);
+  }
+  function clearFighters(side = null) { for (const f of [...extras.values()]) if (!side || f.side === side) removeFighter(f.id); }
+  function setFighterLane(id, dx) { const f = extras.get(id); if (f) f.dx = dx; }
+  function setFighterVisible(id, v) { const f = extras.get(id); if (f) f.visible = !!v; }
+  function setMultiCamera(on) { multiCam = !!on; }
+  function fightersReady() { for (const f of extras.values()) if (!f.anim8r) return false; return true; }
+  function fightersBusy() { return coordinator.active; }
+  function getFighterScreen(id) { return fighterScreen.get(id) ?? null; }
+
+  // A hurt Digimon stands in its low-HP stance (the same base idle table the main fighters use).
+  function setFighterHurt(id, low) { const f = extras.get(id); if (f?.anim8r) f.anim8r.baseTable = low ? 1 : 0; }
+  function fighterVictory(id) {
+    const f = extras.get(id);
+    const table = f?.model?.timeline?.[44]?.table;
+    if (!f?.anim8r || !table || !table.length) return false;
+    f.anim8r.playTimelineTable(table);
+    return true;
+  }
+  /** A bystander's reaction (a spread attack hits several): the same op1 reaction clips the coordinator picks. */
+  function fighterReact(id, { lethal = false, miss = false } = {}) {
+    const f = extras.get(id);
+    if (!f?.anim8r) return false;
+    const clip = lethal ? REACTION_DEATH_CLIP : miss ? REACTION_EVADE_CLIP : REACTION_HIT_CLIP;
+    return f.anim8r.setAction(clip, _fxHooks(f.side), { holdFinalPose: clip === REACTION_DEATH_CLIP });
+  }
+
+  // The attacker plays techId's clip; at its strike the defender plays its reaction (survive / die / dodge), exactly as in the
+  // two-fighter attack. Positions in the action records are absolute arena coordinates authored for ONE fighter per side, so
+  // the ones that land in a lane other than the middle one are shifted sideways into the right lane here.
+  function fighterAttack(attId, defId, techId, opts = {}) {
+    const A = extras.get(attId), D = extras.get(defId);
+    if (!A?.anim8r || !D?.anim8r) return false;
+    const { lethal = false, miss = false, ...hooks } = opts;
+    if (sfx) { sfx.stopBattle("player"); sfx.stopBattle("enemy"); }
+    contactSoundType[A.side] = contactSoundTypeFor(techId);
+    contactEvade[A.side] = miss;
+    armDataField(techId);                      // a special's element backdrop, same as in a one-on-one fight
+    A.latT = D.dx - A.dx;                      // run along the lane that leads to the target, and come back afterwards
+    const aLane = A.dx + A.latT, dLane = D.dx;
+    // an effect whose z is on the defender's side of the arena is at the defender; otherwise it is at the attacker
+    const atDefender = (z, defSide) => (defSide === "enemy" ? z > 0 : z < 0);
+    const shiftFx = (h, laneNear, laneFar, defSide) => ({
+      ...h,
+      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + (atDefender(rec.z | 0, defSide) ? laneFar : laneNear) }),
+      setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + laneNear, ...l.from.slice(1)] } : l),
+    });
+    const attHooks = shiftFx(_fxHooks(A.side, _impactContact({ ...hooks, onMotion: dataFieldMotion })), aLane, dLane, D.side);
+    const defHooks = shiftFx(_fxHooks(D.side), dLane, dLane, D.side);
+    return coordinator.attack(A.anim8r, D.anim8r, techId, attHooks, { lethal, miss, defenderHooks: defHooks });
+  }
+
+  // Per frame: pose every extra fighter into its own skeleton buffer (before the camera, so it can frame them).
+  function _updateExtras(alpha, ARENA) {
+    for (const f of extras.values()) {
+      if (!f.model || !f.bufs || !f.anim8r) { f.aabb = null; continue; }
+      const a = f.anim8r;
+      const home = a.homeSlot || arenaSlot(null, f.side);
+      const mv = a.moveDelta();
+      const pos = ps1ToRender([home.x + mv[0] + f.dx + f.lat, home.y + mv[1], home.z + mv[2]], ARENA);
+      pos[1] += Math.sin(animTime * 3 + f.phase) * 2;
+      const yaw = f.side === "player" ? -(((a.rotation?.()[1] || 0) - (a.rotationBase || 0)) * Math.PI * 2 / 4096) : Math.PI;
+      const sample = a.isActive ? a.renderSample(alpha) : null;
+      if (sample) f.frame = sample.frame;
+      const bwm = buildBoneWorldMatrices(f.model, f.frame, sample ? sample.blend : null);
+      f.pos = pos;
+      f.aabb = _updateSkeletalVBOGL(gl, f.model, f.bufs, bwm, pos, MODEL_SCALE, false, yaw);
+    }
+  }
+  function _drawExtras(pv) {
+    for (const f of extras.values()) {
+      if (!f.visible || !f.model || !f.bufs) continue;
+      drawSkeletalMesh(gl, texP, pv, f.bufs, f.tex || whiteTex, FIGHTER_TINT);
+      drawShadow(gl, texP, pv, f.pos, 20, 8);
+    }
+  }
+  function _projectExtras(pv, W, H) {
+    const proj = (x, y, z) => {
+      const cx = pv[0] * x + pv[4] * y + pv[8] * z + pv[12], cy = pv[1] * x + pv[5] * y + pv[9] * z + pv[13], cw = pv[3] * x + pv[7] * y + pv[11] * z + pv[15];
+      return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null;
+    };
+    for (const f of extras.values()) {
+      if (!f.aabb) continue;
+      const cx = (f.aabb.min[0] + f.aabb.max[0]) / 2, cz = (f.aabb.min[2] + f.aabb.max[2]) / 2;
+      const top = proj(cx, f.aabb.max[1], cz), foot = proj(cx, f.aabb.min[1], cz);
+      if (top && foot) fighterScreen.set(f.id, { x: top.x, topY: top.y, footY: foot.y });
+    }
+  }
+  // The wide camera: behind the near line, a little to the side, looking at the middle of everybody.
+  function _multiCameraShot() {
+    const fs = [...extras.values()].filter((f) => f.model && f.visible && f.aabb);
+    if (!fs.length) return null;
+    const near = fs.filter((f) => f.side === "player"), far = fs.filter((f) => f.side === "enemy");
+    const avg = (list) => list.length ? [list.reduce((s, f) => s + f.pos[0], 0) / list.length, list.reduce((s, f) => s + f.pos[2], 0) / list.length] : null;
+    const nc = avg(near) ?? avg(far), fc = avg(far) ?? avg(near);
+    let minX = Infinity, maxX = -Infinity, tall = 60;
+    for (const f of fs) { minX = Math.min(minX, f.aabb.min[0]); maxX = Math.max(maxX, f.aabb.max[0]); tall = Math.max(tall, f.aabb.max[1] - f.aabb.min[1]); }
+    let dir = [fc[0] - nc[0], fc[1] - nc[1]];
+    const dl = Math.hypot(dir[0], dir[1]);
+    dir = dl > 1 ? [dir[0] / dl, dir[1] / dl] : [0, 1];
+    const side = [-dir[1], dir[0]];
+    const W = Math.max(260, maxX - minX), depth = dl;
+    // a three-quarter view from beside the near line: both lines read side by side, and an attacker running at the far line stays in shot
+    const sway = Math.sin(orbitClock * 0.4) * W * 0.06;
+    const back = Math.max(520, W * 0.55 + depth * 0.30) + tall * 0.9;
+    const lateral = W * 0.55 + tall * 0.5 + sway;
+    const eye = [nc[0] - dir[0] * back + side[0] * lateral, tall * 1.5 + W * 0.14, nc[1] - dir[1] * back + side[1] * lateral];
+    const look = [(nc[0] + fc[0]) / 2, tall * 0.3, (nc[1] + fc[1]) / 2];
+    return { eye, look, fov: Math.PI / 3.6 };
+  }
+
   function render(dt) {
     animTime += dt;
 
@@ -2766,6 +2911,10 @@ export function createBattle3D(canvas, sfx = null) {
       // glide to ~0.5 s and read as a fast zoom rather than the original's slow one.
       camRec.tick(CAMERA_FRAME_DELTA);
       coordinator.tick(speed);
+      for (const f of extras.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
+        f.lat += (f.latT - f.lat) * Math.min(1, 0.12 * speed);
+        if (f.latT !== 0 && !(f.anim8r?.vm && !f.anim8r.vm.ended)) f.latT = 0;
+      }
       // Eyes and looping body textures. `speed` is the same per-tick frame delta the
       // original's blink timer counts down by (D0x800a4464), so the blink keeps the
       // cadence the record was authored for.
@@ -2860,6 +3009,7 @@ export function createBattle3D(canvas, sfx = null) {
       eAABB = _updateSkeletalVBOGL(gl, enemyModel, enemySkelBufs, bwm, enemyPos, MODEL_SCALE, false, enemyYaw);
       eAABBLast = eAABB;
     }
+    if (extras.size) _updateExtras(alpha, ARENA);
 
     // ── Cinematic camera: rotate-around-target look-at on our digimon ──
     const pCenter = pAABB
@@ -3039,7 +3189,7 @@ export function createBattle3D(canvas, sfx = null) {
       if (shot.up) up = ps1ToRender(shot.up, 1);
       rollDeg = shot.roll || 0;
       if (shot.H) fovRad = fovYFromH(shot.H) * Math.PI / 180;
-    } else {
+    } else if (!(multiCam && extras.size)) {
       // The frame is drawn THROUGH the record, or not at all. `sample()` is null in exactly one
       // situation — no writer has installed a record yet — and then there is no view matrix to
       // build: `eye`/`look` were never computed for this mode, because a camera mode that computes
@@ -3058,6 +3208,11 @@ export function createBattle3D(canvas, sfx = null) {
       // bottom stop above, so holding the frame here is that dark screen — and nothing invents a
       // camera to fill it.
       return;
+    }
+
+    if (multiCam && extras.size) {   // (multiplayer) the wide shot of everybody owns the camera
+      const c = _multiCameraShot();
+      if (c) { eye = c.eye; look = c.look; up = UP; rollDeg = 0; fovRad = c.fov; } else if (!shot) return;
     }
 
     // DNA clip 12's verified explicit cameras sit ~9.1–9.6k render units from
@@ -3110,6 +3265,7 @@ export function createBattle3D(canvas, sfx = null) {
     if (rollDeg) camUp = applyScreenRoll(camUp, camEye, camLook, rollDeg);
     const view = mat4LookAt(camEye, camLook, camUp);
     const pv   = mat4Mul(proj, view);
+    if (extras.size) _projectExtras(pv, W, H);
     lastCamInfo = {
       eye, look, fovDeg: fovRad * 180 / Math.PI,
       // PS1 convention, matching the record's own frame.
@@ -3280,6 +3436,8 @@ export function createBattle3D(canvas, sfx = null) {
       drawDigimonBillboard(gl, texP, pv, enemyPos, DIGI_W, DIGI_H,
         enemyTex || whiteTex, 1, FIGHTER_TINT, false);
     }
+
+    if (extras.size) _drawExtras(pv);
 
     // Floor shadow ellipses. The Blast vortex has no floor to cast onto — the
     // capture is a black void from f180 — so both shadows drop with it.
@@ -3536,6 +3694,7 @@ export function createBattle3D(canvas, sfx = null) {
   }
 
   function destroy() {
+    clearFighters();
     for (const pk of Object.values(backdropPacks)) {
       if (pk.floorTex) gl.deleteTexture(pk.floorTex);
       if (pk.wallTex) gl.deleteTexture(pk.wallTex);
@@ -3592,6 +3751,9 @@ export function createBattle3D(canvas, sfx = null) {
                cull: { keptTri: arenaCullLog.kept, totalTri: arenaCullLog.total, sign: arenaCullSign, groups: arenaCullLog.groups } };
     },
     setEnemyDigimon,
+    // (multiplayer many-vs-many, web/mpbattle.js)
+    addFighter, removeFighter, clearFighters, setFighterLane, setFighterVisible, setFighterHurt, setMultiCamera,
+    fighterAttack, fighterReact, fighterVictory, fightersReady, fightersBusy, getFighterScreen,
     setPlayerAnim,
     setEnemyAnim,
     playPlayerVictory,

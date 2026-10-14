@@ -43,7 +43,7 @@ async function autoPlay(page, useTech = false) {
         if (!root || root.style.display !== "flex") return "off";
         if (root.querySelector(".end")) return "end";
         const btn = (t) => [...root.querySelectorAll(".bar2 button")].find((b) => b.textContent.trim() === t && !b.disabled);
-        const pick = root.querySelector(".card.foe.pick:not(.ko)");
+        const pick = root.querySelector(".foe.pick:not(.ko)");
         if (pick) { pick.click(); return "target"; }
         if (useTech) {
             const tech = [...root.querySelectorAll(".bar2 button")].find((b) => /\(\d+ MP\)/.test(b.textContent) && !b.disabled);
@@ -105,7 +105,14 @@ try {
     }
     const view = await b.evaluate(() => ({ foes: window.__mpb.fight.S.E.length, players: window.__mpb.fight.S.P.map((p) => p.pn) }));
     ok("2 enemies and 2 players on both sides of the screen", view.foes === 2 && view.players.length === 2, JSON.stringify(view));
+    // the scene is the game's own 3D battle: every Digimon is a real model in one arena, with a plate floating over it
+    await a.waitForFunction(() => { const f = window.__mpb.fight; return f?.r3d && f.S && ["p" + f.S.P[0].id, "p" + f.S.P[1].id, "e" + f.S.E[0].i, "e" + f.S.E[1].i].every((k) => f.r3d.getFighterScreen(k)); }, null, { timeout: 30000 });
+    ok("all four Digimon stand in the 3D arena (A's screen)", true);
+    await b.waitForFunction(() => { const f = window.__mpb.fight; return f?.r3d && f.S && ["p" + f.S.P[0].id, "p" + f.S.P[1].id, "e" + f.S.E[0].i, "e" + f.S.E[1].i].every((k) => f.r3d.getFighterScreen(k)); }, null, { timeout: 30000 });
+    ok("all four Digimon stand in the 3D arena (B's screen)", true);
+    ok("the screen is in 3D mode with a plate over each Digimon", await b.evaluate(() => document.getElementById("mpb").classList.contains("d3") && document.querySelectorAll("#mpb .plate").length === 4));
     ok("the other player's name is shown as typed", view.players.includes("SENIOR") && view.players.includes("Ana"));
+    await sleep(3500);                                           // let the arena finish loading
     if (SHOTS) await b.screenshot({ path: `${SHOTS}/multiplayer-fight-b.png` });
 
     if (HURT) {

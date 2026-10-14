@@ -3,25 +3,31 @@
 // The game's own battle is one Digimon against one enemy and stays exactly that for single player. This is an EXTENSION that
 // multiplayer uses instead: two or more players fight two or more enemies at once, each player controlling their own lead
 // Digimon on their own screen. It does not re-implement the battle: every number comes from the game's own engine through
-// `battle.mpKit()` (web/battle.js): the same fighter records, the same damage / accuracy / critical rolls, the same technique
-// lists and MP prices, the same EXP and BIT payout.
+// `battle.mpKit()` (web/battle.js), and every picture from the game's own 3D battle renderer (web/battle3d.js), which has
+// been extended to hold any number of fighters in one arena (addFighter / fighterAttack / the wide camera). So it looks like
+// the real battle: the same models, the same arena, the same attack animations, effects and projectiles.
 //
 // How a fight runs (one player's game is the "host" and keeps the turn order; nobody needs anyone else's stats):
 //   - every round, everybody who is still standing acts once, fastest first
 //   - on YOUR turn you pick Fight / Tech / Run on your screen; YOUR game rolls the damage against the enemy and tells the host
 //   - on an ENEMY's turn the host picks a target (or everybody, for a spread technique); the TARGET's game rolls the damage against
 //     its own real defence and tells the host how much HP it has left
-//   - the host sends everyone the same small snapshot after every action, and everyone draws it
+//   - the host sends everyone the same small snapshot after every action (including "who attacked whom"), and every screen
+//     plays that attack with the game's own animation
 // Spread techniques (strong magic) hit every enemy (or every player) at 65% of the single-target damage.
 // A fight with many enemies is fought in waves of at most max(2, players) at a time.
-// Nothing here writes a story flag.
+// If WebGL is not available the fight falls back to plain cards. Nothing here writes a story flag.
+import { createBattle3D, resolveModelFolder } from "./battle3d.js";
+import { drawEffects } from "./fight/effect-player.js";
 
 const SPREAD_FACTOR = 0.65;
 const SPREAD_MP = 40;               // a magical technique that costs at least this much hits everyone
 const TURN_MS = 45000;              // how long a player may think
 const FOE_WAIT_MS = 4000;           // how long the host waits for a player's game to answer an enemy attack
-const ANIM_MS = 1000;               // the pause after each action
+const MIN_ANIM_MS = 900;            // the shortest pause after an action
+const MAX_ANIM_MS = 7000;           // the longest the host waits for the attack animation to finish
 const READY_MS = 25000;             // how long the host waits for the others to get into the fight (the battle-start transition plays first)
+const LANE = 1900;                  // sideways distance between two fighters of one side, in the game's own arena units
 
 const isSpread = (skill) => !!skill && skill.attack_category === "magical" && (skill.mp_cost ?? 0) >= SPREAD_MP;
 
@@ -35,22 +41,24 @@ export const mpbVisible = () => !!F || (!!A?.ui && A.ui.root.style.display === "
 // ------------------------------------------------------------ the screen
 const css = `
 #mpb { position:absolute; inset:0; z-index:70; display:none; flex-direction:column; color:#fff; font:13px/1.35 system-ui,sans-serif;
-  background:radial-gradient(ellipse at 50% 30%, #1d2b63 0%, #0b0f2c 70%); user-select:none; }
+  background:radial-gradient(ellipse at 50% 30%, #1d2b63 0%, #0b0f2c 70%); user-select:none; overflow:hidden; }
+#mpb canvas.view { display:none; position:absolute; inset:0; width:100%; height:100%; }
 #mpb .top { padding:8px 14px; display:flex; justify-content:space-between; font:bold 14px monospace; background:rgba(0,0,0,.35); }
 #mpb .row { flex:1; display:flex; gap:14px; justify-content:center; align-items:center; padding:6px 14px; flex-wrap:wrap; }
 #mpb .vs { text-align:center; font:bold 12px monospace; color:#8a94d6; letter-spacing:6px; padding:0; }
 #mpb .card { position:relative; width:190px; padding:8px 10px; border:2px solid #45509a; border-radius:10px; background:rgba(20,26,70,.85); transition:transform .15s, border-color .15s, opacity .3s; }
 #mpb .card.foe { border-color:#a84a5a; background:rgba(60,20,36,.85); }
-#mpb .card.act { border-color:#ffd34d; transform:translateY(-4px); box-shadow:0 0 14px #ffd34d88; }
-#mpb .card.me .nm { color:#7dffa0; }
-#mpb .card.ko { opacity:.35; filter:grayscale(1); }
-#mpb .card.pick { cursor:pointer; border-color:#fff; } #mpb .card.pick:hover { background:rgba(120,40,60,.95); }
+#mpb .card.act, #mpb .plate.act { border-color:#ffd34d; box-shadow:0 0 14px #ffd34d88; }
+#mpb .card.act { transform:translateY(-4px); }
+#mpb .card.me .nm, #mpb .plate.me .nm { color:#7dffa0; }
+#mpb .card.ko, #mpb .plate.ko { opacity:.35; filter:grayscale(1); }
+#mpb .card.pick, #mpb .plate.pick { cursor:pointer; border-color:#fff; } #mpb .card.pick:hover, #mpb .plate.pick:hover { background:rgba(120,40,60,.95); }
 #mpb .pic { float:left; width:38px; height:38px; margin-right:8px; border-radius:50%; font:bold 20px/38px monospace; text-align:center; text-shadow:0 1px 2px #000; border:2px solid #fff6; }
 #mpb .nm { font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #mpb .sub { color:#aab3e8; font-size:11px; }
 #mpb .bar { clear:both; height:7px; margin-top:5px; background:#0009; border-radius:4px; overflow:hidden; } #mpb .bar i { display:block; height:100%; transition:width .5s; }
 #mpb .bar.hp i { background:#5fe07f; } #mpb .bar.mp i { background:#58a8ff; } #mpb .bar.foe i { background:#ff7a5f; }
 #mpb .num { font:10px monospace; color:#cfd6ff; }
-#mpb .float { position:absolute; left:50%; top:0; font:bold 24px monospace; pointer-events:none; text-shadow:0 2px 3px #000; animation:mpbfloat 1.1s ease-out forwards; }
+#mpb .float { position:absolute; left:50%; top:0; font:bold 24px monospace; pointer-events:none; text-shadow:0 2px 3px #000; animation:mpbfloat 1.1s ease-out forwards; z-index:3; }
 @keyframes mpbfloat { from { transform:translate(-50%,0); opacity:1; } to { transform:translate(-50%,-46px); opacity:0; } }
 #mpb .log { padding:6px 14px; min-height:68px; background:rgba(0,0,0,.4); font:12px/1.5 monospace; }
 #mpb .log div:last-child { color:#ffe9a0; }
@@ -58,37 +66,50 @@ const css = `
 #mpb .bar2 button { background:#2f3d9a; color:#fff; border:2px solid #8a98ff; border-radius:6px; padding:6px 16px; font:bold 13px monospace; cursor:pointer; }
 #mpb .bar2 button:hover { background:#4a5cd0; } #mpb .bar2 button:disabled { opacity:.4; cursor:default; }
 #mpb .bar2 .hint { color:#cfd6ff; font:12px monospace; }
-#mpb .end { position:absolute; inset:0; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; background:rgba(5,8,30,.9); }
-#mpb .end h2 { margin:0; font:bold 38px monospace; letter-spacing:4px; } #mpb .end .sm { color:#cfd6ff; font:14px monospace; }
+#mpb .end { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; background:rgba(5,8,30,.72); }
+#mpb .end h2 { margin:0; font:bold 38px monospace; letter-spacing:4px; text-shadow:0 3px 6px #000; } #mpb .end .sm { color:#e4e8ff; font:14px monospace; text-shadow:0 2px 3px #000; }
+/* 3D mode: the scene fills the screen; plates float over the fighters; the log and the buttons sit on top of it */
+#mpb.d3 .row, #mpb.d3 .vs { display:none; }
+#mpb.d3 canvas.view { display:block; }
+#mpb.d3 .top { position:absolute; top:0; left:0; right:0; z-index:2; background:linear-gradient(rgba(0,0,0,.6), transparent); }
+#mpb.d3 .log { position:absolute; left:0; bottom:52px; width:48%; min-height:0; z-index:2; background:linear-gradient(to right, rgba(0,0,0,.6), transparent); }
+#mpb.d3 .bar2 { position:absolute; left:0; right:0; bottom:0; z-index:2; background:linear-gradient(transparent, rgba(0,0,0,.75) 55%); }
+#mpb .plates { display:none; position:absolute; inset:0; z-index:1; pointer-events:none; }
+#mpb.d3 .plates { display:block; }
+#mpb .plate { position:absolute; width:132px; padding:3px 6px 4px; border:2px solid #45509a; border-radius:8px; transform:translate(-50%,-100%); pointer-events:auto; background:rgba(8,12,40,.72); }
+#mpb .plate .pic { display:none; } #mpb .plate .nm { font-size:12px; } #mpb .plate .sub { font-size:10px; } #mpb .plate .bar { margin-top:3px; height:6px; }
+#mpb .plate.foe { background:rgba(50,14,28,.74); border-color:#a84a5a; }
 `;
 
 function buildUi() {
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
     const root = document.createElement("div"); root.id = "mpb";
+    const view = document.createElement("canvas"); view.className = "view";
     const top = document.createElement("div"); top.className = "top";
     const title = document.createElement("span"), status = document.createElement("span");
     top.append(title, status);
     const foes = document.createElement("div"); foes.className = "row";
     const vs = document.createElement("div"); vs.className = "vs"; vs.textContent = "VS";
     const mine = document.createElement("div"); mine.className = "row";
+    const plates = document.createElement("div"); plates.className = "plates";
     const log = document.createElement("div"); log.className = "log";
     const bar = document.createElement("div"); bar.className = "bar2";
-    root.append(top, foes, vs, mine, log, bar);
+    root.append(view, plates, top, foes, vs, mine, log, bar);
     A.stageEl.append(root);
-    return { root, title, status, foes, mine, log, bar, cards: new Map(), endEl: null };
+    return { root, view, plates, title, status, foes, mine, log, bar, cards: new Map(), plateMap: new Map(), endEl: null };
 }
 
 const hue = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x % 360; };
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
-function makeCard(key, foe) {
-    const root = mk("div", "card" + (foe ? " foe" : ""));
+function makeCard(key, foe, small = false) {
+    const root = mk("div", (small ? "plate " : "card ") + (foe ? "foe" : ""));
     const pic = mk("div", "pic"), nm = mk("div", "nm"), sub = mk("div", "sub");
     const hp = mk("div", "bar " + (foe ? "foe" : "hp")), hpi = mk("i"); hp.append(hpi);
     const hpn = mk("div", "num");
     root.append(pic, nm, sub, hp, hpn);
-    let mp = null, mpi = null;
-    if (!foe) { mp = mk("div", "bar mp"); mpi = mk("i"); mp.append(mpi); root.append(mp); }
+    let mpi = null;
+    if (!foe) { const mp = mk("div", "bar mp"); mpi = mk("i"); mp.append(mpi); root.append(mp); }
     return { key, root, pic, nm, sub, hpi, hpn, mpi, last: null };
 }
 
@@ -110,13 +131,142 @@ function updateCard(c, o, foe) {
     c.last = o.hp;
 }
 
+// ------------------------------------------------------------ the 3D scene
+async function makeScene() {
+    const U = F.ui;
+    if (typeof OffscreenCanvas === "undefined") return false;
+    const w = Math.max(320, U.view.clientWidth || 640), h = Math.max(240, U.view.clientHeight || 480);
+    U.off = new OffscreenCanvas(w, h);
+    let r3d = null;
+    try { r3d = createBattle3D(U.off, A.sfx ?? null); } catch (e) { console.warn("[mpbattle] no 3D renderer", e); }
+    if (!r3d) { U.off = null; return false; }
+    r3d.setPlayerVisible?.(false); r3d.setEnemyVisible?.(false);        // the two built-in fighters stay out; everybody is an extra
+    try { r3d.setArenaStage?.(A.mapId?.() ?? null, F.screenId ?? null); } catch { /* the plain arena is fine */ }
+    U.r3d = r3d; F.r3d = r3d;
+    U.root.classList.add("d3");
+    U.ctx = U.view.getContext("2d");
+    U.last = performance.now();
+    const loop = (t) => {
+        if (!U.r3d) return;
+        const dt = Math.min(0.05, (t - U.last) / 1000); U.last = t;
+        const cw = U.view.clientWidth, ch = U.view.clientHeight;
+        if (cw && ch && (U.view.width !== cw || U.view.height !== ch)) { U.view.width = cw; U.view.height = ch; U.off.width = cw; U.off.height = ch; }
+        try {
+            U.r3d.render(dt);
+            const ctx = U.ctx;
+            ctx.drawImage(U.off, 0, 0, cw, ch);
+            const fx = U.r3d.getEffectDraw?.();                       // op3 sprite effects, composited over the 3D frame
+            if (fx) { ctx.save(); ctx.scale(cw / U.off.width, ch / U.off.height); drawEffects(ctx, fx.list, fx.manifest, fx.images, fx.view); ctx.restore(); }
+            const overlay = U.r3d.getScreenOverlay?.();
+            if (overlay) { ctx.save(); ctx.globalAlpha = overlay.alpha; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); ctx.restore(); }
+            placePlates(cw, ch);
+        } catch (e) { console.warn("[mpbattle] frame failed", e); }
+        U.raf = requestAnimationFrame(loop);
+    };
+    U.raf = requestAnimationFrame(loop);
+    return true;
+}
+
+function endScene(U) {
+    cancelAnimationFrame(U.raf); U.raf = 0;
+    try { U.r3d?.destroy?.(); } catch { /* already gone */ }
+    U.r3d = null; U.off = null;
+    U.root.classList.remove("d3");
+    for (const c of U.plateMap.values()) c.root.remove();
+    U.plateMap.clear();
+}
+
+function placePlates(cw, ch) {
+    const U = A.ui; if (!U?.r3d) return;
+    const placed = [];
+    const rows = [];
+    for (const [key, c] of U.plateMap) {
+        const p = U.r3d.getFighterScreen(key);
+        if (!p) { c.root.style.display = "none"; continue; }
+        c.root.style.display = "";
+        rows.push({ c, x: Math.round(p.x * cw), y: Math.round(Math.max(60, p.topY * ch - 6)) });
+    }
+    // plates of fighters standing close would sit on top of each other: lift the lower one clear of the plates already placed
+    rows.sort((a, b) => a.y - b.y);
+    for (const r of rows) {
+        for (let guard = 0; guard < 6; guard++) {
+            const hit = placed.find((q) => Math.abs(q.x - r.x) < 138 && Math.abs(q.y - r.y) < 52);
+            if (!hit) break;
+            r.y = hit.y - 54;
+        }
+        r.y = Math.max(40, r.y);
+        placed.push(r);
+        r.c.root.style.left = r.x + "px"; r.c.root.style.top = r.y + "px";
+    }
+}
+
+/** Keep the 3D arena in step with the shared state: who is standing where, who is hurt, and what just happened. */
+function syncScene() {
+    const U = F.ui, S = F.S, r = F.r3d;
+    if (!r || !S) return;
+    const laneOf = (i, n) => (i - (n - 1) / 2) * LANE;
+    // players (once), in the order the host lists them
+    S.P.forEach((p, i) => {
+        const key = "p" + p.id;
+        if (!F.placed.has(key)) {
+            F.placed.add(key);
+            resolveModelFolder(p.n).then((folder) => { if (folder && F && F.r3d === r) r.addFighter(key, "player", folder, laneOf(i, S.P.length)); });
+            const c = makeCard(key, false, true); U.plateMap.set(key, c); U.plates.append(c.root);
+        }
+    });
+    // the current wave of enemies (rebuilt when the wave changes)
+    const waveKey = S.E.map((e) => e.i).join(",");
+    if (F.waveKey !== waveKey) {
+        F.waveKey = waveKey;
+        r.clearFighters("enemy");
+        for (const [k, c] of [...U.plateMap]) if (k[0] === "e") { c.root.remove(); U.plateMap.delete(k); F.placed.delete(k); }
+        S.E.forEach((e, i) => {
+            const key = "e" + e.i;
+            F.placed.add(key);
+            resolveModelFolder(e.n).then((folder) => { if (folder && F && F.r3d === r) r.addFighter(key, "enemy", folder, laneOf(i, S.E.length)); });
+            const c = makeCard(key, true, true); c.root.addEventListener("click", () => onPick(e.i)); U.plateMap.set(key, c); U.plates.append(c.root);
+        });
+    }
+    r.setMultiCamera(true);
+    for (const e of S.E) { const c = U.plateMap.get("e" + e.i); if (c) updateCard(c, e, true); r.setFighterHurt("e" + e.i, e.hp / Math.max(1, e.mhp) < 0.25); }
+    for (const p of S.P) {
+        const c = U.plateMap.get("p" + p.id);
+        if (c) { updateCard(c, p, false); c.root.classList.toggle("me", p.id === A.myId()); }
+        r.setFighterHurt("p" + p.id, p.hp / Math.max(1, p.mhp) < 0.25 && !p.ko);
+    }
+    // an action just happened: play it with the game's own animation, on every screen
+    if (S.ev && S.ev.q !== F.lastEv) {
+        F.lastEv = S.ev.q;
+        const [first, ...rest] = S.ev.d;
+        if (first) {
+            r.fighterAttack(S.ev.a, first[0], S.ev.sk, { lethal: !!first[3], miss: !first[2] });
+            for (const t of rest) setTimeout(() => { if (F && F.r3d === r) r.fighterReact(t[0], { lethal: !!t[3], miss: !t[2] }); }, 650);
+        }
+    }
+    if (S.ph === "won" && !F.cheered) { F.cheered = true; for (const p of S.P) if (!p.ko) r.fighterVictory("p" + p.id); }
+}
+
 // ------------------------------------------------------------ the view of the shared state S (same on every screen)
 function render() {
     const U = F?.ui; if (!U) return;
     const S = F.S;
     if (!S) { U.title.textContent = F.label || "Fight"; U.status.textContent = "Waiting for everyone to get ready..."; return; }
     U.title.textContent = `${F.label || "Fight"}   ·   round ${S.r}${F.waves > 1 ? `   ·   wave ${S.w + 1}/${F.waves}` : ""}`;
-    // enemy row (rebuilt when the wave changes)
+    if (F.r3d) syncScene();
+    else renderCards(U, S);
+    for (const [k, c] of F.r3d ? U.plateMap : U.cards) {
+        const t = S.t;
+        c.root.classList.toggle("act", !!t && ((t.t === "e" && k === "e" + t.i) || (t.t === "p" && k === "p" + t.id)));
+    }
+    U.log.replaceChildren(...S.g.map((l) => mk("div", "", l)));
+    const t = S.t;
+    const who = !t ? "" : t.t === "e" ? (S.E.find((e) => e.i === t.i)?.n ?? "Enemy") : (S.P.find((p) => p.id === t.id)?.pn ?? "Player");
+    U.status.textContent = S.ph !== "play" ? "" : t?.t === "p" && t.id === A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
+    renderCmd();
+}
+
+// the fallback when there is no WebGL: plain cards
+function renderCards(U, S) {
     const foeKeys = S.E.map((e) => "e" + e.i).join(",");
     if (U.foeKeys !== foeKeys) {
         for (const [k, c] of [...U.cards]) if (k[0] === "e") { c.root.remove(); U.cards.delete(k); }
@@ -130,22 +280,13 @@ function render() {
         updateCard(c, p, false);
         c.root.classList.toggle("me", p.id === A.myId());
     }
-    for (const [k, c] of U.cards) {
-        const t = S.t;
-        c.root.classList.toggle("act", !!t && ((t.t === "e" && k === "e" + t.i) || (t.t === "p" && k === "p" + t.id)));
-    }
-    U.log.replaceChildren(...S.g.map((l) => mk("div", "", l)));
-    const t = S.t;
-    const who = !t ? "" : t.t === "e" ? (S.E.find((e) => e.i === t.i)?.n ?? "Enemy") : (S.P.find((p) => p.id === t.id)?.pn ?? "Player");
-    U.status.textContent = S.ph !== "play" ? "" : t?.t === "p" && t.id === A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
-    renderCmd();
 }
 
 function renderCmd() {
     const U = F?.ui; if (!U) return;
     const S = F.S, bar = U.bar;
     bar.replaceChildren();
-    for (const c of U.cards.values()) c.root.classList.remove("pick");
+    for (const c of [...U.cards.values(), ...U.plateMap.values()]) c.root.classList.remove("pick");
     const mineTurn = S && S.ph === "play" && S.t?.t === "p" && S.t.id === A.myId() && F.me.hp > 0;
     if (!mineTurn) { F.cmd = null; bar.append(mk("span", "hint", S?.ph === "play" ? "Waiting..." : "")); return; }
     const alive = S.E.filter((e) => !e.ko);
@@ -169,7 +310,7 @@ function renderCmd() {
         btn("Back", () => { F.cmd = { stage: "menu" }; renderCmd(); });
     } else if (cmd.stage === "target") {
         bar.append(mk("span", "hint", `Pick a target for ${cmd.skill.name}`));
-        for (const e of alive) U.cards.get("e" + e.i)?.root.classList.add("pick");
+        for (const e of alive) (U.plateMap.get("e" + e.i) ?? U.cards.get("e" + e.i))?.root.classList.add("pick");
         btn("Back", () => { F.cmd = { stage: "menu" }; renderCmd(); });
     }
 }
@@ -214,8 +355,7 @@ function onFoe(d) {
     const skill = d.b ? (F.kit.foeMoves(rec).find((m) => !m.tech)?.skill ?? null) : F.kit.skillOf(d.sk);
     let dmg = 0, hit = false;
     if (skill) {
-        const sk = d.b ? skill : { ...skill };
-        const r = F.kit.attack(rec, F.me, sk);
+        const r = F.kit.attack(rec, F.me, d.b ? skill : { ...skill });
         hit = r.hit; dmg = r.hit ? Math.max(0, d.sp ? Math.floor(r.dmg * SPREAD_FACTOR) : r.dmg) : 0;
     }
     F.me.hp = Math.max(0, F.me.hp - dmg);
@@ -229,10 +369,22 @@ const alivePlayers = () => [...F.H.P.values()].filter((p) => !p.ko && !p.fled);
 const waveEnemies = () => F.H.E.filter((e) => e.i >= F.H.wave * F.H.waveSize && e.i < (F.H.wave + 1) * F.H.waveSize);
 const say = (line) => { F.H.log.push(String(line).slice(0, 70)); if (F.H.log.length > 4) F.H.log.shift(); };
 
+/** Run `fn` once the attack animation on the host's own screen is over (and at least a moment has passed). */
+function afterAnim(fn) {
+    const t0 = performance.now();
+    const poll = () => {
+        if (!F) return;
+        const waited = performance.now() - t0;
+        if (waited >= MAX_ANIM_MS || (waited >= MIN_ANIM_MS && !(F.r3d && F.r3d.fightersBusy?.()))) { fn(); return; }
+        later(120, poll);
+    };
+    later(MIN_ANIM_MS / 3, poll);
+}
+
 function snapshot(ph = "play") {
     const H = F.H;
     return {
-        r: H.round, w: H.wave, t: H.turn, ph, g: H.log.slice(),
+        r: H.round, w: H.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null,
         E: waveEnemies().map((e) => ({ i: e.i, n: e.n, lv: e.lv, hp: e.hp, mhp: e.mhp, ko: e.ko ? 1 : 0 })),
         P: [...H.P.values()].map((p) => ({ id: p.id, pn: p.pn, n: p.n, lv: p.lv, hp: p.hp, mhp: p.mhp, mp: p.mp, mmp: p.mmp, ko: p.ko || p.fled ? 1 : 0 })),
     };
@@ -243,6 +395,7 @@ function broadcast(ph = "play") {
     if (others.length) A.send(others, { k: "st", fid: F.fid, S });
     F.S = S; render();
 }
+function setEvent(a, sk, rows) { const H = F.H; H.ev = { q: (H.evq = (H.evq | 0) + 1), a, sk: sk | 0, d: rows }; }
 
 function hostBegin() {
     const H = F.H;
@@ -255,17 +408,17 @@ function hostBegin() {
     H.waveSize = Math.max(2, F.ids.length);
     F.waves = Math.ceil(F.foes.length / H.waveSize);
     A.send(F.ids.filter((id) => id !== A.myId()), { k: "go", fid: F.fid, waves: F.waves });
-    later(500, nextTurn);
+    broadcast();                       // everyone sees the arena and the lineup straight away
+    later(1800, nextTurn);
 }
 
 function buildOrder() {
     const H = F.H;
     H.round++;
-    const actors = [
+    H.order = [
         ...alivePlayers().map((p) => ({ t: "p", id: p.id, spd: p.spd + Math.random() })),
         ...waveEnemies().filter((e) => !e.ko).map((e) => ({ t: "e", i: e.i, spd: e.spd + Math.random() })),
     ].sort((a, b) => b.spd - a.spd);
-    H.order = actors;
 }
 
 function checkEnd() {
@@ -273,8 +426,8 @@ function checkEnd() {
     if (!alivePlayers().length) { hostEnd(false); return true; }
     if (waveEnemies().every((e) => e.ko)) {
         if ((H.wave + 1) * H.waveSize >= F.foes.length) { hostEnd(true); return true; }
-        H.wave++; H.order = []; say(`Next wave! (${H.wave + 1}/${F.waves})`); broadcast();
-        later(ANIM_MS, nextTurn); return true;
+        H.wave++; H.order = []; H.turn = null; say(`Next wave! (${H.wave + 1}/${F.waves})`); broadcast();
+        later(1800, nextTurn); return true;
     }
     return false;
 }
@@ -310,17 +463,19 @@ function hostAct(from, d) {
     const p = H.P.get(from); if (!p) return;
     H.turn = null;
     p.mp = Math.max(0, p.mp - (Number(d.cost) || 0));
-    const nm = String(d.nm || "attack").slice(0, 24);
+    const nm = String(d.nm || "attack").slice(0, 24), rows = [];
     for (const row of Array.isArray(d.res) ? d.res.slice(0, 6) : []) {
         const [i, dmg, hit] = row, e = H.E[i];
         if (!e || e.ko || i < H.wave * H.waveSize || i >= (H.wave + 1) * H.waveSize) continue;
         const dm = Math.max(0, Math.min(99999, Number(dmg) | 0));
         e.hp = Math.max(0, e.hp - dm);
         if (e.hp <= 0) e.ko = true;
+        rows.push(["e" + i, dm, hit ? 1 : 0, e.ko ? 1 : 0]);
         say(hit ? `${p.pn}: ${nm} -> ${e.n} -${dm}${e.ko ? "  DOWN!" : ""}` : `${p.pn}: ${nm} missed ${e.n}`);
     }
+    if (rows.length) setEvent("p" + from, d.sk, rows);
     broadcast();
-    later(ANIM_MS, nextTurn);
+    afterAnim(nextTurn);
 }
 
 function hostRun(from) {
@@ -329,7 +484,7 @@ function hostRun(from) {
     const wasTurn = H.turn?.t === "p" && H.turn.id === from;
     if (wasTurn) { clearTimeout(H.turnTimer); H.turn = null; }
     broadcast();
-    if (wasTurn) later(ANIM_MS, nextTurn); else if (!alivePlayers().length) later(500, nextTurn);
+    if (wasTurn) later(MIN_ANIM_MS, nextTurn); else if (!alivePlayers().length) later(500, nextTurn);
 }
 
 function foeTurn(e) {
@@ -339,7 +494,7 @@ function foeTurn(e) {
     const moves = F.kit.foeMoves(rec).filter((m) => m.cost <= e.mp);
     const techs = moves.filter((m) => m.tech);
     const move = techs.length && Math.random() < 0.35 ? techs[Math.floor(Math.random() * techs.length)] : (moves.find((m) => !m.tech) ?? moves[0]);
-    if (!move) { say(`${e.n} waits.`); broadcast(); later(ANIM_MS, nextTurn); return; }
+    if (!move) { say(`${e.n} waits.`); broadcast(); later(MIN_ANIM_MS, nextTurn); return; }
     e.mp -= move.cost;
     const spread = move.tech && isSpread(move.skill);
     const targets = spread ? alive : [alive[Math.floor(Math.random() * alive.length)]];
@@ -361,16 +516,19 @@ function hostRes(from, d) {
     if (p) {
         const hp = Math.max(0, Math.min(p.mhp, Number(d.hp) | 0));
         p.hp = hp; if (hp <= 0) p.ko = true;
-        say(d.hit ? `  ${p.pn} takes ${Math.max(0, Number(d.dmg) | 0)}${p.ko ? "  DOWN!" : ""}` : `  ${p.pn} dodged!`);
+        const dm = Math.max(0, Number(d.dmg) | 0);
+        pend.res.push(["p" + from, dm, d.hit ? 1 : 0, p.ko ? 1 : 0]);
+        say(d.hit ? `  ${p.pn} takes ${dm}${p.ko ? "  DOWN!" : ""}` : `  ${p.pn} dodged!`);
     }
     if (!pend.need.size) finishFoe();
 }
 function finishFoe() {
-    const H = F.H;
-    if (!H.pending) return;
-    clearTimeout(H.pending.timer); H.pending = null; H.turn = null;
+    const H = F.H, pend = H.pending;
+    if (!pend) return;
+    clearTimeout(pend.timer); H.pending = null; H.turn = null;
+    if (pend.res.length) setEvent("e" + pend.e, pend.move.skill.id, pend.res);
     broadcast();
-    later(ANIM_MS, nextTurn);
+    afterAnim(nextTurn);
 }
 
 function hostEnd(won) {
@@ -392,13 +550,15 @@ async function begin(setup, isHost, hostId, done) {
     F = {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
         screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, erec, techs: kit.myTechs(me), done, S: null, cmd: null, waves: 1,
-        snap: A.snapshot(), timers: new Set(), ui: null, H: null,
+        snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), waveKey: null, lastEv: null, cheered: false,
     };
-    F.ui = A.ui ?? (A.ui = buildUi());
-    F.ui.cards.clear(); F.ui.foes.replaceChildren(); F.ui.mine.replaceChildren(); F.ui.foeKeys = ""; F.ui.bar.replaceChildren(); F.ui.log.replaceChildren();
-    if (F.ui.endEl) { F.ui.endEl.remove(); F.ui.endEl = null; }
-    F.ui.root.style.display = "flex";
+    const U = F.ui = A.ui ?? (A.ui = buildUi());
+    U.cards.clear(); U.foes.replaceChildren(); U.mine.replaceChildren(); U.foeKeys = ""; U.bar.replaceChildren(); U.log.replaceChildren(); U.plateMap.clear(); U.plates.replaceChildren();
+    if (U.endEl) { U.endEl.remove(); U.endEl = null; }
+    U.root.style.display = "flex";
     A.releaseKeys();
+    await makeScene();                                       // (falls back to plain cards without WebGL)
+    if (!F) return true;
     const mePublic = { id: A.myId(), pn: A.myName(), n: me.profile?.name ?? "?", lv: me.level | 0, hp: me.hp | 0, mhp: me.maxHp | 0, mp: me.mp | 0, mmp: me.maxMp | 0, spd: me.spd | 0 };
     if (isHost) {
         F.H = {
@@ -472,26 +632,35 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
     if (!won && !fled) A.restore(f.snap);       // a lost optional fight costs nothing
     else f.kit.commit(f.me);
     const U = f.ui;
-    const close = () => { U.root.style.display = "none"; if (U.endEl) { U.endEl.remove(); U.endEl = null; } A.releaseKeys(); try { f.done?.({ won, fled, reward }); } catch (e) { console.warn("[mpbattle] done failed", e); } };
+    const close = () => {
+        endScene(U);
+        U.root.style.display = "none"; if (U.endEl) { U.endEl.remove(); U.endEl = null; }
+        A.releaseKeys();
+        try { f.done?.({ won, fled, reward }); } catch (e) { console.warn("[mpbattle] done failed", e); }
+    };
     if (fled) { close(); return; }
-    const end = mk("div", "end");
-    const h2 = mk("h2", "", won ? "VICTORY!" : "DEFEATED");
-    h2.style.color = won ? "#ffd34d" : "#ff7a7a";
-    end.append(h2);
-    if (won && reward) {
-        end.append(mk("div", "sm", `+${reward.xp} EXP   +${reward.bits} BIT`));
-        if (reward.to > reward.from) end.append(mk("div", "sm", `Your ${f.me.profile?.name ?? "Digimon"} reached Lv ${reward.to}!`));
-    } else if (!won) end.append(mk("div", "sm", "Nothing was lost."));
-    const b = mk("button", "", "Continue"); b.type = "button";
-    b.style.cssText = "background:#2f3d9a;color:#fff;border:2px solid #8a98ff;border-radius:6px;padding:8px 24px;font:bold 15px monospace;cursor:pointer";
-    b.onclick = close; end.append(b);
-    U.root.append(end); U.endEl = end;
+    // let the last hit and the victory (or defeat) pose play before the result page covers the scene
+    setTimeout(() => {
+        if (!U.root || U.root.style.display !== "flex") return;
+        const end = mk("div", "end");
+        const h2 = mk("h2", "", won ? "VICTORY!" : "DEFEATED");
+        h2.style.color = won ? "#ffd34d" : "#ff7a7a";
+        end.append(h2);
+        if (won && reward) {
+            end.append(mk("div", "sm", `+${reward.xp} EXP   +${reward.bits} BIT`));
+            if (reward.to > reward.from) end.append(mk("div", "sm", `Your ${f.me.profile?.name ?? "Digimon"} reached Lv ${reward.to}!`));
+        } else if (!won) end.append(mk("div", "sm", "Nothing was lost."));
+        const b = mk("button", "", "Continue"); b.type = "button";
+        b.style.cssText = "background:#2f3d9a;color:#fff;border:2px solid #8a98ff;border-radius:6px;padding:8px 24px;font:bold 15px monospace;cursor:pointer";
+        b.onclick = close; end.append(b);
+        U.root.append(end); U.endEl = end;
+    }, won ? 2800 : 1600);
 }
 
 // ------------------------------------------------------------ install
 /**
  * api: { stageEl, getKit(), myId(), myName(), nameOf(id), send(ids, d), releaseKeys(), snapshot(), restore(snap),
- *        canJoin(), joinDone(setup) -> done fn }
+ *        canJoin(), joinDone(setup) -> done fn, sfx, mapId() }
  */
 export function installMpBattle(api) {
     A = api;

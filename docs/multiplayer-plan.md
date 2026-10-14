@@ -73,16 +73,24 @@ The relay sees only: the display name, the stage id, x/y, the facing and emote n
 - **Trade**: both press Confirm on the same offers; the relay then says "done" and each game moves its own items (item store only).
 - **Duel**: each side fights a computer-played copy of the other's team (from their card); EXP/drops/BIT are taken back; the better result wins.
 - **Co-op** (side quests and wild fights only; the main story stays solo): after **Team up**, a quest challenge fight or a wild
-  encounter is offered to the partner (wild = two Digimon). If they Join, it runs as a **many-vs-many fight** (`web/mpbattle.js`):
-  every player's lead Digimon on one side, all the enemies on the other, in waves of at most max(2, players). The game's own
-  one-on-one battle is untouched; this is an extension that uses the engine through `battle.mpKit()` (fighter records, the damage /
-  accuracy / critical rolls, tech lists and prices, the EXP and BIT payout), so the numbers are the game's own.
+  encounter is offered to the partner (wild = two Digimon). If they Join, it runs as a **many-vs-many fight** in the game's own
+  **3D battle scene** (`web/mpbattle.js`): every player's lead Digimon on one side, all the enemies on the other, in waves of at
+  most max(2, players). The game's own one-on-one battle is untouched; this is an extension of it.
+  - **Picture:** `web/battle3d.js` now takes any number of extra fighters (`addFighter`, `fighterAttack`, `fighterReact`,
+    `fighterVictory`, `setMultiCamera`, `getFighterScreen`): each has its own model, texture, skeleton and `ActorAnimator`, stands in
+    a lane beside the others, and is posed, shadowed, framed and sequenced by the same renderer code. Attacks go through the
+    same `FightCoordinator` (it already takes any two animators), so the real attack clips, hit/death/dodge reactions, op3 sprite
+    effects, op6 projectiles and the special-attack element backdrops all play; effects authored for one fighter per side are
+    shifted into the attacker's / target's lane. A wide three-quarter camera frames everybody. With no WebGL it falls back to cards.
+  - **Numbers:** `battle.mpKit()` hands out the engine's own fighter records, damage / accuracy / critical rolls, tech lists and
+    prices, and the EXP and BIT payout, so they match the normal game.
   - Turn order by speed. On your turn: Fight / Tech / Run. Your game rolls your damage; an enemy's attack is rolled by the
-    *target's* game against its real defence; the host (the player who started it) keeps the order and sends one small snapshot after each action.
+    *target's* game against its real defence; the host (the player who started it) keeps the order and sends one small snapshot
+    after each action, including who attacked whom, so every screen plays the same attack.
   - Spread techniques (magical, 40+ MP) hit every enemy (or every player) at 65% damage.
   - Boss strength (x1/x2/x3 HP, a little more attack) is the setting at the top of the PLAYERS tab.
   - Each player gets the disc's EXP/BIT payout for the fight and keeps the HP it left; a lost fight costs nothing.
   - The partner who joins a quest challenge is credited for the same open challenge.
-  - Not done: items and healing in the fight, more than two players per party, enemy/Digimon artwork on the screen (it is cards).
+  - Not done: items and healing in the fight, more than two players per party, per-fighter eye-blink texture animation, battle music.
 - Relay messages: `chat`, `feed`, `card`, `at`, `trade`, `duel`, `coop`, `mpb` (see `server/room-core.mjs`). Tests: `tests/multiplayer-social.test.js`,
   `tools/verify_multiplayer.mjs`, `tools/verify_multiplayer_battle.mjs`, `tools/verify_multiplayer_fight.mjs` (a real 2-vs-2 fight, played through the buttons; `HURT=1` for the enemies-hit-back case).

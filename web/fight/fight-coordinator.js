@@ -47,6 +47,9 @@ export class FightCoordinator {
     this.enemy = enemy;          // ActorAnimator (opponent)
     this._defender = null;       // the actor that should react to the current attack
     this._reacted = false;       // one-shot: defender reaction started for this attack
+    // EXPERIMENT (multiplayer many-vs-many): a function returning the extra ActorAnimators standing in the arena beside the
+    // two main ones. Null in a normal fight, where this class behaves exactly as before.
+    this.extraActors = null;
   }
 
   // Start an attack. attacker/defender are the two ActorAnimators (subset of player/enemy).
@@ -110,6 +113,7 @@ export class FightCoordinator {
   tick(speed = 1) {
     if (this.player && this.player.isActive) this.player.tick(speed);
     if (this.enemy && this.enemy.isActive) this.enemy.tick(speed);
+    if (this.extraActors) for (const a of this.extraActors()) if (a.isActive) a.tick(speed);
   }
 
   // A sequence is in progress while either participant's action VM is still running.
@@ -117,7 +121,8 @@ export class FightCoordinator {
     const a = this.player && this.player.vm && !this.player.vm.ended;
     const d = this._defender && this._defender.vm && !this._defender.vm.ended;
     const e = this.enemy && this.enemy.vm && !this.enemy.vm.ended;
-    return !!(a || d || e);
+    const x = !!this.extraActors && this.extraActors().some((t) => t.vm && !t.vm.ended);
+    return !!(a || d || e || x);
   }
 
   // Whether an action SCRIPT owns the frame — one half of the original's camera arbitration. The
@@ -135,6 +140,7 @@ export class FightCoordinator {
   // director's own resume/retire edges.
   cameraScriptOwned() {
     const running = (a) => !!(a && a.vm && !a.vm.ended);
-    return running(this.player) || running(this.enemy) || running(this._defender);
+    return running(this.player) || running(this.enemy) || running(this._defender)
+      || (!!this.extraActors && this.extraActors().some(running));
   }
 }
