@@ -24,6 +24,7 @@ import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark } from "./quests.js";
+import { installMultiplayer, multiplayerTick, multiplayerGhosts, drawGhostLabel } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
@@ -371,6 +372,7 @@ const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
+installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () => state.playerName || "Tamer" });
 installQuests({
     stageEl: document.getElementById("stage"),
     startBattle: (party, opts) => startQuestBattle(party, opts),
@@ -8866,6 +8868,20 @@ function render() {
             debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: c.id, info });
     }
     drawables.push({ y: state.y, player: true, draw: drawPlayerActor });
+    // EXPERIMENT (multiplayer): the other players in this stage, drawn as the player character at their own position, in the same depth order.
+    if (sheet) {
+        for (const g of multiplayerGhosts(m.id)) {
+            drawables.push({
+                y: g.y,
+                draw: () => {
+                    const gi = g.moving ? walkFrameIndex(timingForDir(c.frameDurations, g.dir), g.animTime) : 0;
+                    drawActorShadow(g.x, g.y, PLAYER_ENTITY_KIND, undefined, 0, 0);
+                    drawEntitySprite(c, sheet, state.clipImgs[c.id], g.x, g.y, g.dir, undefined, g.animTime, gi,
+                        g.moving, 0, g.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP);
+                },
+            });
+        }
+    }
 
     // Junior's kick cells, drawn at his own ground anchor. The per-facing y-sort
     // bias (table 0x80097a88) is ±1 pixel: kicking upward puts the cell BEHIND
@@ -9031,6 +9047,8 @@ function render() {
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
+    for (const g of multiplayerGhosts(m.id)) drawGhostLabel(ctx, g, Math.round(g.x - camX), Math.round(balloonAnchorY(g.y - camY)));
+    multiplayerTick(m.id, state);   // EXPERIMENT: sends where I am and glides the other players
     questsTick(m.id, state.x, state.y);   // EXPERIMENT: lets the optional quest layer notice a new stage and where you are
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {

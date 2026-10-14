@@ -27,6 +27,7 @@ Stdlib only: it must run on the bundled interpreter before anything is set up.
 from __future__ import annotations
 
 import argparse
+import atexit
 import io
 import json
 import os
@@ -496,6 +497,44 @@ MIME = {".js": "text/javascript", ".mjs": "text/javascript", ".json": "applicati
         ".mp3": "audio/mpeg", ".bin": "application/octet-stream", ".txt": "text/plain"}
 
 
+MP_PORT = 20031
+_relay_proc = None
+
+
+def _port_open(port: int) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+            return True
+    except OSError:
+        return False
+
+
+def start_relay(build: Build, tools: dict) -> tuple[bool, str]:
+    """Start the optional multiplayer relay (server/relay.mjs) so friends can join this game. Idempotent."""
+    global _relay_proc
+    if _port_open(MP_PORT):
+        return True, ""
+    script = build.app / "server" / "relay.mjs"
+    if not script.is_file():
+        return False, "This install has no multiplayer server."
+    search = os.pathsep.join([*map(str, tools.get("path", [])), os.environ.get("PATH", "")])
+    node = shutil.which("node", path=search)
+    if not node:
+        return False, "Node was not found, so the multiplayer server cannot start."
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+    try:
+        _relay_proc = subprocess.Popen([node, str(script)], cwd=str(build.app), env={**os.environ, "PORT": str(MP_PORT)},
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
+    except OSError as e:
+        return False, f"Could not start the multiplayer server ({e})."
+    atexit.register(lambda: _relay_proc and _relay_proc.poll() is None and _relay_proc.terminate())
+    for _ in range(30):
+        if _port_open(MP_PORT):
+            return True, ""
+        time.sleep(0.1)
+    return False, "The multiplayer server did not start."
+
+
 def make_handler(build: Build):
     setup_dir = HERE / "setup"
 
@@ -532,6 +571,11 @@ def make_handler(build: Build):
             path = urllib.parse.urlparse(self.path).path
             if path == "/__dw2003/status":
                 return self._json(build.status())
+            if path == "/__mp/host":      # the game's Host button; only this computer may ask (the server listens on 127.0.0.1 anyway)
+                if self.client_address[0] not in ("127.0.0.1", "::1"):
+                    return self.send_error(403)
+                ok, error = start_relay(build, getattr(build, "tools", {}) or {})
+                return self._json({"ok": ok, "port": MP_PORT, "error": error})
             if path.startswith("/__dw2003/"):
                 name = path.rsplit("/", 1)[-1] or "index.html"
                 f = setup_dir / name
