@@ -143,6 +143,8 @@ export function createStatusTranslated(sfx = null, opts = {}) {
             stage: context?.stage ?? 0, mapSeen: mapSeenReader(context),
             homeOverlay: st._homeOverlay, homeRow: st._homeRow,
             cardFoldersUnlocked: !!opts.cardFoldersUnlocked?.(),
+            // EXTRA (not on the disc): one more row on the pause home list, e.g. the extra quests
+            ...(entry === "home" && opts.extraRow?.(state) ? { extraRow: opts.extraRow(state) } : {}),
         };
     }
 
@@ -187,9 +189,9 @@ export function createStatusTranslated(sfx = null, opts = {}) {
     st.isOpen = () => st._open;
     /** "home" while the pause list itself is up, otherwise the page that is open (items, map, status, ...). */
     st.entry = () => (st._open ? st._entry : null);
-    st.openHome = (state, onClose = null) => {
+    st.openHome = (state, onClose = null, row = 0) => {
         st._homeOverlay = false;
-        st._homeRow = 0;
+        st._homeRow = row;
         st.open(state, "home", onClose, true);
     };
     /** Re-open one translated page in the same pause, as the disc's screen
@@ -230,6 +232,12 @@ export function createStatusTranslated(sfx = null, opts = {}) {
                         st._homeOverlay = true;
                         st._homeRow = result.row;
                         st.open(st._state, result.page, st._onClose, true);
+                    } else if (result?.kind === "extra" && typeof opts.onExtraRow === "function") {
+                        // The extra row ends the list like Back does (the pause closes), then the host runs it and
+                        // reopens the list on that row when it is done.
+                        const row = result.row;
+                        st._finish(false);
+                        opts.onExtraRow(row);
                     } else st._finish(false);
                 } else if (st._homeFlow && !session.transition()) {
                     readBack(session);

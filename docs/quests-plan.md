@@ -23,6 +23,12 @@ the story or the battle rules.
 
 - **F3** opens the log (the page's key hint lists it). The log is the game's own list widget; each quest's details open
   in the game's own conversation window.
+- **The pause menu has a QUESTS row** after CARD FOLDERS (labelled `QUESTS` or `QUESTS 2`: the number is how many are
+  ready to claim or new). It is the disc's own list: its seven-row panel (clip 0x19, the disc has the art for it), its font,
+  cursor and fold animation. Choosing it closes the pause, runs the quest log, and reopens the pause on that row.
+  Built in `engine/dw3/ui/native/pause-list.ts` and `pause-root-session.ts` behind an optional `extraRow` hook that the
+  disc-faithful default never sets (the original-code oracle tests for the list still pass). The log itself is still the
+  game's choice list and system window, not a page inside the pause with the party cards behind it.
 - Quests are **not all available**. They unlock as you play (below) and a toast says "New quest: ...".
 - Some are taken from a **notice board** (only while you stand in that place), some are **handed out by a real
   character** of the game, some are **generated** and scale with the party.
@@ -83,12 +89,21 @@ cartographer, Before and after, Arena qualifiers, and "Guilmon cannot find his t
 recalled game content). It needs Guilmon as lead or in the party and having met Takato (alt) in Qing Long City,
 then Agumon at East Station and Takato in Qing Long City.
 
+## Building the engine
+
+The pause row needs a rebuilt `web/vendor/engine.js`. This checkout lacks five generated data files the engine imports, so
+`tools/build_engine_local.sh` borrows them (and esbuild) from a research checkout (`GENERATED_ENGINE_DIR`, `ESBUILD`;
+default `~/ddw3-walker`) and writes `web/vendor/` of THIS checkout only. Building the unmodified sources there reproduces the
+shipped bundle byte for byte apart from path comments, so the tooling matches. `web/vendor` is git-ignored: a copy or ZIP of the
+game needs the rebuilt `engine.js`, or the QUESTS row is simply absent (the list is then the disc's six rows).
+
 ## Tests
+
 
 - `python3 tools/check_quests.py` - data against the game's tables (species, maps, items, NPC positions, unlock rules).
 - Browser (needs Chrome with `--remote-debugging-port=9333` and the game on port 8770): `verify_quests.mjs`,
   `verify_quests_phase2.mjs`, `verify_quests_phase3.mjs`, `verify_quests_phase3b.mjs`,
-  `verify_quests_realbattle.mjs`, `verify_quests_unlock.mjs`; `node tools/verify_dialogue_pack.mjs` (set `DIALOGUE_DIR` if `web/assets` is a symlink Windows cannot follow).
+  `verify_quests_realbattle.mjs`, `verify_quests_unlock.mjs`, `verify_quests_pause.mjs` (the pause row); `node tools/verify_dialogue_pack.mjs` (set `DIALOGUE_DIR` if `web/assets` is a symlink Windows cannot follow).
 
 ## Not verified / not built
 

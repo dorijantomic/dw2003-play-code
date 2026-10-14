@@ -18,10 +18,10 @@
 // rollback as a whole: with no translated adapter there is no translated list to
 // open, so that route keeps web/menu.js. No production route and no lab route
 // reaches it.
-export function openPauseHome({ state, status, menu }) {
+export function openPauseHome({ state, status, menu, row = 0 }) {
   if (typeof status?.openHome === "function") {
     state.menuOpen = true;
-    status.openHome(state, () => { state.menuOpen = false; menu.reset(); });
+    status.openHome(state, () => { state.menuOpen = false; menu.reset(); }, row);
     return "translated";
   }
   state.menuOpen = true;

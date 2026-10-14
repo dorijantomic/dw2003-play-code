@@ -156,6 +156,11 @@ export interface PauseSeed {
   stage?: number;
   /** Whether a map cell has been seen (the page's flag reader). */
   mapSeen?: (flagId: number) => boolean;
+  /**
+   * EXTRA (not on the disc): one more row at the end of the pause home list, with this label (letters, digits and spaces).
+   * Choosing it ends the list with `{ kind: "extra" }` instead of opening a page.
+   */
+  extraRow?: { label: string };
 }
 
 export interface PauseQuad {
@@ -198,7 +203,7 @@ export class PauseRootSession {
   private frame = 0;
   private sawPage = false;
   private closed = false;
-  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "exit" } | null = null;
+  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "extra"; row: number } | { kind: "exit" } | null = null;
   private homeBackdrop = 0;
 
   constructor(language: number, seed: PauseSeed, resources: PauseResources, host: PauseSessionHost) {
@@ -288,7 +293,9 @@ export class PauseRootSession {
       statusFactory: (obj) => statusFactory(mem, obj, statusHost),
       cardFoldersFactory: (obj) => cardFoldersFactory(mem, obj, foldersHost),
     });
+    const extraBank = seed.page === "home" && seed.extraRow ? this.buildTextBank(seed.extraRow.label) : 0;
     const homeHost = {
+      extraRow: () => (extraBank ? { bank: extraBank } : null),
       sfx: host.playSound,
       callMethod: (target: number, slot: number, args: number[]) => { this.call(target, slot, args); return 0; },
       textBank: (id: number) => this.banks.source(id),
@@ -378,7 +385,7 @@ export class PauseRootSession {
     });
     this.tree = new TranslatedTaskTree(mem, classes, (task) => this.widgets.retireTask(task));
     if (seed.page === "home") {
-      this.root = this.tree.allocate(HOME_HANDLER, 0xac, 0x84);
+      this.root = this.tree.allocate(HOME_HANDLER, 0xac, seed.extraRow ? 0xb4 : 0x84); // 0xb4: room for the cursor's slot, which moves past the seventh row
       pauseListBuild(mem, this.root, 0x1002, seed.homeRow ?? 0);
       if (seed.homeOverlay) {
         this.homeBackdrop = this.widgets.arena.alloc(0x60);
@@ -434,8 +441,30 @@ export class PauseRootSession {
 
   homeResult(): typeof this.homeResultValue { return this.homeResultValue; }
 
+  /** A one-string text bank (count, offset table, the string) in the game's own text codes, for the extra row's label. */
+  private buildTextBank(label: string): number {
+    const bytes: number[] = [];
+    for (const ch of label) {
+      if (ch >= "0" && ch <= "9") bytes.push(0x04 + (ch.charCodeAt(0) - 0x30));
+      else if (ch >= "A" && ch <= "Z") bytes.push(0x0e + (ch.charCodeAt(0) - 0x41));
+      else if (ch >= "a" && ch <= "z") bytes.push(0x28 + (ch.charCodeAt(0) - 0x61));
+      else if (ch === " ") bytes.push(0x01, 0x01);
+    }
+    bytes.push(0);
+    const at = this.widgets.arena.alloc(8 + bytes.length + 4, 4);
+    this.mem.write32(at, 1);
+    this.mem.write32(at + 4, 8);
+    bytes.forEach((b, i) => this.mem.write8(at + 8 + i, b));
+    this.banks.sources.set(0x7f00, at); // the text widgets only accept a registered source
+    return at;
+  }
+
   private selectHomePage(): void {
     const row = this.mem.read32(PAUSE_ROW_CELL) | 0;
+    if (this.seed.extraRow && row === (this.mem.read32(this.root + 0x5c) | 0) - 1) {
+      this.homeResultValue = { kind: "extra", row };
+      return;
+    }
     const page = (["items", "sort", "map", "techniques", "status", "cardfolders"] as PausePage[])[row];
     if (!page) throw new Error(`Invalid pause home row ${row}`);
     this.homeResultValue = { kind: "page", page, row };
