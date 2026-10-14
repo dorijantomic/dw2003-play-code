@@ -13,7 +13,6 @@
 //
 //   multiplayerTick(mapId, state)   called every frame: sends where I am (about 10 times a second) and moves the others smoothly
 //   multiplayerGhosts(mapId)        the other players standing in this stage, for game.js to draw
-import { fx } from "./ambience.js";
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr", KEY_NAME = "dw.mp.name";
@@ -32,7 +31,6 @@ const mp = {
     ui: null, lastTick: 0,
 };
 
-const enabled = () => fx.multiplayer !== false;
 
 /** What a friend typed ("25.1.2.3", "25.1.2.3:20031", "ws://...") -> a WebSocket address, or null. */
 function wsAddress(text) {
@@ -151,7 +149,7 @@ export function multiplayerTick(mapId, st) {
     const now = performance.now();
     const dt = Math.min(0.1, (now - (mp.lastTick || now)) / 1000);
     mp.lastTick = now;
-    if (!enabled() || mp.status !== "online") return;
+    if (mp.status !== "online") return;
     const mv = st.moving || st._cutTarget ? 1 : 0;
     const x = Math.round(st.x), y = Math.round(st.y), s = mp.sent;
     const changed = s.map !== mapId || s.x !== x || s.y !== y || s.dir !== st.dir || s.mv !== mv;
@@ -171,7 +169,7 @@ export function multiplayerTick(mapId, st) {
 
 /** The other players standing in this stage: [{ id, name, x, y, dir, moving, animTime, emote }] */
 export function multiplayerGhosts(mapId) {
-    if (!enabled() || mp.status !== "online") return [];
+    if (mp.status !== "online") return [];
     const now = performance.now(), out = [];
     for (const [id, p] of mp.peers) {
         if (p.map !== mapId || p.x == null || now - p.seen > STALE_MS) continue;
@@ -306,7 +304,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
         panel.addEventListener(type, (e) => { if (e.key !== "F4" && e.key !== "Escape") e.stopPropagation(); });
     }
     window.addEventListener("keydown", (e) => {
-        if (e.key === "F4") { e.preventDefault(); if (enabled()) openPanel(); }
+        if (e.key === "F4") { e.preventDefault(); openPanel(); }
         else if (e.key === "Escape" && !panel.hidden && panel.contains(document.activeElement)) openPanel(false);
     });
     // for tests and the console
