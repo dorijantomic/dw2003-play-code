@@ -16,7 +16,7 @@ const browser = await chromium.launch();
 const errors = [];
 
 async function player(label, url) {
-    const ctx = await browser.newContext({ viewport: { width: 1000, height: 900 } });
+    const ctx = await browser.newContext({ viewport: { width: 1500, height: 900 } });
     const page = await ctx.newPage();
     page.on("pageerror", (e) => errors.push(`${label}: ${e.message}`.slice(0, 200)));
     await page.goto(url);
