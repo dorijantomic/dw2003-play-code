@@ -68,5 +68,29 @@ if (typeof window !== "undefined" && !/[?&]noextras=1\b/.test(window.location?.s
     const merged = hit[1] === "digimon" ? mergeDigimon(json, extra) : mergeEvolutions(json, extra);
     return new Response(JSON.stringify(merged), { status: 200, headers: { "Content-Type": "application/json" } });
   };
-  window.__extraRoster = { load: () => loadExtraRoster(realFetch) };
+  window.__extraRoster = {
+    load: () => loadExtraRoster(realFetch),
+    /**
+     * Testing aid (browser console): teach the lead Digimon every enemy-only species as a form at once, so they can be
+     * picked in the Digimon Lab and the battle Digivolve list without playing for them. `ids` limits it to some.
+     */
+    async learnAll(ids = null) {
+      const extra = await loadExtraRoster(realFetch);
+      const st = window.__state?.partnerStats;
+      if (!extra || !st) return 0;
+      st.formLedger ??= [];
+      const have = new Set(st.formLedger.map((e) => Number(e.id)));
+      let added = 0;
+      for (const d of extra.digimon) {
+        if (have.has(d.id) || (ids && !ids.includes(d.id))) continue;
+        st.formLedger.push({ id: d.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
+        added++;
+      }
+      try { localStorage.setItem("partnerStats", JSON.stringify(st)); } catch (_) { /* storage blocked */ }
+      const party = window.__state?.partyStats;
+      if (Array.isArray(party) && party[0] !== st) party[0] = st;
+      try { localStorage.setItem("partyStats", JSON.stringify(window.__state?.partyStats ?? [st])); } catch (_) { /* storage blocked */ }
+      return added;
+    },
+  };
 }
