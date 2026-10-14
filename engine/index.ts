@@ -62,17 +62,23 @@ export {
   routePairPredicate, routePairTest, routePairFlagId, routePairCommit,
   type RoutePair, type RoutePairExit,
 } from "./systems/route-pair.ts";
+// The places system: a stage's exits re-aim per the place you entered from
+// (copyPlacePoints, 34 stage overlays). Ledger: places-copy-place-points-family-2026-10-10.
+export {
+  copyPlacePoints, placePointPair, aimPlacePoints,
+  type PlacePoint, type PlacePointEntry, type StagePlacePoints, type PlaceAimRow,
+} from "./systems/place-points.ts";
 export {
   FIELD_TICK_RATE, FIELD_TICK_SECONDS,
   FIELD_WALK_MAGNITUDE, FIELD_RUN_MAGNITUDE,
   FIELD_WALK_STEP, FIELD_WALK_SPEED, FIELD_RUN_STEP, FIELD_RUN_SPEED,
   FIELD_IDLE_CLIP, FIELD_WALK_CLIP, FIELD_RUN_CLIP, FIELD_STOP_CLIP,
-  FIELD_DIRECTION_SCALE, fieldDirectionDelta, fieldDirectionFromIndex, fieldDirectionIndex,
+  FIELD_DIRECTION_SCALE, fieldDirectionDelta, fieldPureDirectionDelta, fieldDirectionFromIndex, fieldDirectionIndex, oppositeDirection,
   FOLLOWER_HISTORY_LENGTH, FOLLOWER_LAG_TICKS,
   seedFollowerHistory, pushFollowerHistory, followerHistorySample, followerGatherSample, consumeFieldTicks,
   FIELD_FOOTPRINT_OFFSETS, actorFootprintBlocked,
   FIELD_PROBE_OFFSETS, FIELD_PROBE_INDEX, FIELD_PROBE_FLAGS,
-  fieldProbeOffsets, fieldProbePushback,
+  fieldProbeOffsets, fieldProbePushback, applyObstaclePush,
   type FieldDirection, type FieldTrailPoint,
 } from "./systems/field-movement.ts";
 // THE live field character: the resident object the field overlay registers as
@@ -132,6 +138,11 @@ export {
   engageBlock, tickBlockEngagement,
   type BlockDurations, type BlockEngagement, type BlockTickEvents,
 } from "./systems/block-actor.ts";
+// The item boxes (p126itmb, npc ids 33/77-87/340-344/347): the talk body's
+// family test and its close arm, which removes the box as the textbox closes.
+export {
+  BOX_ACTOR_IDS, BOX_TALK_CLIP, BOX_TALK_CUE, BOX_GONE_STATE, isBoxActorId,
+} from "./systems/box-actor.ts";
 export {
   PAD_BUTTONS, PAD_BIT, KEYBOARD_BINDINGS, GAMEPAD_BUTTON_MAP, GAMEPAD_AXIS,
   STICK_PRESS, STICK_RELEASE, TRIGGER_PRESS, PAD_REPEAT, padRepeatFires, REPEATING,
@@ -429,6 +440,12 @@ export {
   sceneVariantActive, sceneBgmPlayId, sceneBgmTrack,
   sceneVariantSlotIndex, sceneVariantSlotActive,
 } from "./systems/ordinal-scene-variant.ts";
+// The s260 Cargo Tower auction — the lot cycle (gate, question, answer, writes)
+// ported once; the lot table is data (web/assets/data/auction_lots.json).
+export {
+  selectAuctionLot, auctionAnswerWrites, runAuctionLot,
+  type AuctionLot, type AuctionAnswer, type AuctionWrite, type AuctionHost, type AuctionHandoff,
+} from "./systems/auction.ts";
 export {
   timingForDir, walkFrameIndex, clipFrame, clipDurationSeconds,
   type Dir8, type SpriteTimings, type SpriteClips, type ClipFrameEntry, type ClipFrameResult,
@@ -563,10 +580,10 @@ export {
   OPENING_DEFAULT_PHASE, OPENING_PHASE_COUNT,
   OPENING_ADVANCE_PHASE_METHOD, OPENING_ADVANCE_SUBSTATE_METHOD, OPENING_EXIT_METHOD,
   OPENING_PHASES, OPENING_INTRO_VARIANT_PAIRS, OPENING_SPECIAL_MODE4_MAP,
-  openingPhaseIndex, openingPhaseFor, introVariantFor, openingLineRoll,
+  openingPhaseIndex, openingPhaseFor, introVariantFor, openingLineRoll, ambushRoll,
   newOpeningState, openingAdvancePhase, openingExit, stepOpeningPhase,
   type OpeningPhase, type OpeningIntroVariant, type OpeningIntroAnswer,
-  type OpeningLineRollInput, type OpeningState, type OpeningPorts, type OpeningStep,
+  type OpeningLineRollInput, type AmbushRollInput, type OpeningState, type OpeningPorts, type OpeningStep,
 } from "./dw3/battle-opening-machine.ts";
 // The slow-motion stepper (engine/dw3/battle-slow-motion.ts): F0x8009e428 / F0x8009e510.
 // Oracle tests/engine/unit/battle-slow-motion-oracle.test.ts.
@@ -923,6 +940,10 @@ export type {
 } from "./dw3/evo-trees.ts";
 export {
   PARTY_CHARISMA_VAR, CHARISMA_THRESHOLDS, partyCharismaMeets,
+  // The bank-0x70 op-0x30 story-range test and its literal open upper bound —
+  // shared so the browser adapter (web/flag-store.js) resolves the range exactly
+  // as the engine's FlagManager does, F0x80015b9c.
+  ORDINAL_RANGE_OPEN_HI, ordinalInRange,
 } from "./dw3/dw3-config.ts";
 export * as items from "./dw3/items.ts";
 // The shared item store: the one owner of the bag. Every screen's add / remove /
@@ -1027,7 +1048,7 @@ export {
 export { computeEquipPreview, type EquipPreview, type EquipPreviewRow } from "./systems/equip-preview.ts";
 export {
   quoteInnStay, restAtInn, innBankIndex, innForStage, innStages,
-  isInnLauncherIndex, INN_NAMES, INN_BANK, INN_RECORDS,
+  isInnLauncherIndex, INN_NAMES, INN_BANK, INN_RECORDS, INN_ALIAS_STAGES,
   type InnMember, type InnQuote, type InnRecord, type InnRestResult,
 } from "./dw3/inn.ts";
 // The 25 decoded save points and the memory-card slot each one selects.
@@ -1164,7 +1185,8 @@ export type {
   TechniqueResultPath,
 } from "./dw3/battle-damage-terms.ts";
 export {
-  emptyStatusEventPool, advanceStatusEvents, cureStatusEvent, enqueueStatusEvent,
+  emptyStatusEventPool, advanceStatusEvents, cureStatusEvent, cureAllStatusEvents,
+  enqueueStatusEvent,
   findStatusEvent, pickNextStatusEvent, preemptStatusEvent, removeStatusEvent,
   stageStatusEventAilment, stageStatusEventLock, stageStatusEventSideTick,
   stageStatusEventStat, statusEventActionDelay, statusEventActionHandler,
@@ -1175,7 +1197,8 @@ export {
   statusEventLockBit, statusEventLockDelay, statusEventLockHeld, statusEventLockIndex,
   statusEventRecoveryDelay, statusEventStatDelay, statusEventStatDelayUnrefreshing,
   statusEventStatIndex, statusEventTickDelay,
-  STATUS_EVENT_ACTION_HANDLERS, STATUS_EVENT_AILMENTS, STATUS_EVENT_CODES,
+  STATUS_EVENT_ACTION_HANDLERS, STATUS_EVENT_AILMENTS, STATUS_EVENT_ALL_CURE_CODES,
+  STATUS_EVENT_CODES,
   STATUS_EVENT_CONSUMER_ACTION_TYPES, STATUS_EVENT_DELAY_ARMS,
   STATUS_EVENT_KEEP_QUEUED_CODES,
   STATUS_EVENT_LOCK_CODES, STATUS_EVENT_OPCODE_PARAMS, STATUS_EVENT_POOL_SIZE,
@@ -1304,13 +1327,14 @@ export {
 } from "./dw3/ui/opponent-deck.ts";
 export type { OpponentDeckMemory, OpponentDeckHost } from "./dw3/ui/opponent-deck.ts";
 export {
-  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, escapeThreshold,
+  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, escapeThreshold, runAwayLine,
   ESCAPE_BASE_DEFAULT, drainHeal, drainProcRoll, RAND_U16,
   gaugeGain, boostedGaugeGain, hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc,
   statusRoll, statusInflictionRoll, ailmentOfEffect, poisonTimelineDamage, regenTick, frozenBlockRoll,
   actionTimelineDelay, initialActorTimeline, scheduleNextActor,
   counterDamage,
   enemyMoveCondition,
+  pickEnemyAiMove,
   hpFractionThreshold,
   signedDiv100,
   enemyActionSkillId,
@@ -1402,8 +1426,9 @@ export type {
   BattleFormLedgerRecord, BattlePartyStats, BattlePartyMember, ActiveKoResolution,
   DnaEvolution, DnaMatch, DnaParticipants, DnaRejection,
 } from "./dw3/battle-party.ts";
-export { chapterNpcs, stageCast, removeSceneActor, deriveChapter, pickDialogue, pickDialogueState, selectNpcDialogue, applyNpcPrograms, confirmProbeTarget, confirmProbeContains, talkCandidates } from "./dw3/npc-manager.ts";
+export { chapterNpcs, stageCast, removeSceneActor, deriveChapter, pickDialogue, pickDialogueState, selectNpcDialogue, applyNpcPrograms, confirmProbeTarget, confirmProbeContains, talkCandidates, resolveConfirmTarget, confirmRefusesTarget, CONFIRM_REFUSED_IDS } from "./dw3/npc-manager.ts";
 export { npcHalfWidth } from "./dw3/npc-sizes.ts";
+export { confirmRedirectId, confirmRedirectPairs, NPC_CONFIRM_REDIRECT_TABLE_RAM } from "./dw3/npc-confirm-redirects.ts";
 // Wrap-maze exit graph (Mobius Desert / Seabed / Circuit Board). Ledger: maze-exit-record-table.
 export { resolveMazeExit, currentSection, isHole } from "./dw3/maze.ts";
 export type { MazeExit, MazeSection } from "./dw3/maze.ts";
@@ -1438,6 +1463,8 @@ export {
   POINT_RECORD_SCRIPT_END, POINT_RECORD_BLINK_OFF, POINT_RECORD_DELTA_CLAMP,
   claimRecord, claimedSameTagTwice, padSlotEnded,
   stepPointRecordCursor,
+  pointRecordLive, pointRecordInView, tickPointSpriteRecords,
+  applyPointModeGates, pointModeGatesFor,
   loadPointRecordActors, pointRecordActorStages, pointRecordActorIds,
   loadChildPoolParents, fireChildPoolParent,
   hasPointRecordActor, createPointActor,
@@ -1449,6 +1476,8 @@ export {
   loadScrollLayers, setScrollLayerFlag, fireScrollLayer, scrollLayerDraws,
   type PointRecord, type PointScriptEntry, type PointCursor,
   type PointStepperVariant, type PointEndArm, type PointStepOptions,
+  type PointSpriteRecord, type PointSpriteRuntime, type PointSpriteFrame,
+  type PointModeGate,
   type RecipeByte, type PointRecipe, type PointPanel, type PointMember,
   type PointActorTable, type PointPatch, type PointLive, type PointHost,
   type PointActor, type PointParentChild, type PointParentChildSpec,
@@ -1632,6 +1661,32 @@ export class GameEngine {
         opts.storyCommand?.(command);
       },
       rosterAction: (id) => {
+        // The op-0x20 CURRENCY records (F0x80015aac over the BIT total, the same
+        // $party.bit the AddMoney command writes): arm 1 ADD gains MONEY_GAINS[param2]
+        // capped at 0x98967F; arm 2 SUBTRACT takes MONEY_LOSSES[param2] floored at 0
+        // — the auction's bid write (claims fieldstg-endchoice-code-consequences-
+        // 2026-10-09, fieldstg-auction-bid-questions-2026-10-09). Arm 0 is a read and
+        // is answered by the flag bank (dw3-config.ts), never here. The amounts come
+        // from the static EXE tables via bank70_rewards.json (converter-attached).
+        const rec = (content.roster?.records ?? []).find((r) => r.flag_id === id);
+        if (rec && (rec.op & 0xf0) === 0x20) {
+          const arm = rec.op & 0xf;
+          const amounts = content.roster?.amounts;
+          const cur = Number(this.state.vars.get("$party.bit") ?? 0);
+          if (arm === 1) {
+            const gain = amounts?.add?.[rec.param2];
+            if (gain !== undefined) {
+              this.state.vars.set("$party.bit", Math.min(cur + gain, 0x98967f));
+              return true;
+            }
+          } else if (arm === 2) {
+            const loss = amounts?.subtract?.[rec.param2];
+            if (loss !== undefined) {
+              this.state.vars.set("$party.bit", Math.max(0, cur - loss));
+              return true;
+            }
+          }
+        }
         const kind = rosterWrites.find(([fid]) => fid === id)?.[1];
         if (kind === "heal_active_party") { opts.healParty?.(); return true; }
         return false;

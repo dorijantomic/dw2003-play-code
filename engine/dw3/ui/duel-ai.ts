@@ -394,10 +394,14 @@ export function evaluateBoard(mem: AiMemory, host: AiHost, duel: number, side: n
 
 /**
  * F0x800A3D90(duel, side): score every marked slot on `side` with the mask set
- * to just that slot, keep the highest score, and leave only that slot marked.
+ * to just that slot, keep the LOWEST score, and leave only that slot marked.
  * The original's comparison is `!(bestScore < score)` — it ACCEPTS when
- * score <= bestScore, so a tie keeps the LATER slot (assembly F0x800A3D90:
- * `slt $v0,$s4,$v1; bnez $v0, reject`).
+ * score <= bestScore (`slt $v0,$s4,$v1; bnez $v0, reject` at
+ * cardgame.norm.s F0x800a3d90: accept when the new score is <= the incumbent,
+ * starting from 0xFFF), so a tie keeps the LATER slot. This is
+ * `aiPickBestFieldTarget`; its sibling `aiPickBestOppFieldSlot` (F0x80084188)
+ * is the one that keeps the HIGHEST, over the far row — do not copy this
+ * direction there. (claim cardgame-ai-field-target-narrowing-2026-10-10)
  */
 export function chooseBestTarget(mem: AiMemory, host: AiHost, duel: number, side: number): void {
     const marks = duel + (side === 1 ? 0x44c : 0x446);

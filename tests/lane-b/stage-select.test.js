@@ -35,7 +35,6 @@ const DISPLAY = 0x8004de10;
 const PAD = 0x8004b7d0;
 
 const WIDGET_FN = 0x8001ae38;
-const MOVE_FN = 0x80084a5c;
 const SCROLL_FN = 0x80084b2c;
 const DRAW_FN = 0x80084b70;
 const RELEASE_CELL = 0x8004b440;
@@ -134,12 +133,9 @@ function runtime() {
     rt.cpu.setStub(PAD_SHIFT_STUB, (c) => shiftFor(c.reg(4) | 0, c.reg(5) | 0));
     rt.cpu.setStub(FRAME_BUTTON_STUB, () => CONTROL.frameButtons);
     rt.cpu.setStub(SOUND_STUB, (c) => { LOG.push(["sound", c.reg(4) | 0]); return 0; });
-    rt.cpu.setStub(MOVE_FN, (c) => {
-        LOG.push(["moveColumn", c.reg(4) | 0, c.reg(5) | 0]);
-        const obj = c.reg(4) | 0;
-        rt.mem.write32(obj + 0x54, ((rt.mem.read32(obj + 0x54) | 0) + (c.reg(5) | 0)) | 0);
-        return 0;
-    });
+    // The mover F0x80084A5C is NOT stubbed: the original runs its own body and
+    // the port runs stageSelectMoveCursor, so the cursor memory is compared too
+    // (the mover's own oracle is tests/lane-b/stage-select-move-cursor.test.js).
     rt.cpu.setStub(SCROLL_FN, (c) => { LOG.push(["scrollColumn", c.reg(4) | 0, c.reg(5) | 0]); return 0; });
     rt.cpu.setStub(DRAW_FN, (c) => { LOG.push(["drawRows", c.reg(4) | 0, c.reg(5) | 0]); return 0; });
 
@@ -170,10 +166,6 @@ function portHost() {
         releaseEntry(a, b) { LOG.push(["releaseEntry", a | 0, b | 0]); },
         cardIndexOf(index) { LOG.push(["cardIndex", index | 0]); return CONTROL.cardIndex[index | 0] ?? -1; },
         cardRecord(index) { LOG.push(["cardRecord", index | 0]); return RECORD; },
-        moveColumn(obj, delta) {
-            LOG.push(["moveColumn", obj | 0, delta | 0]);
-            mem.write32(obj + 0x54, ((mem.read32(obj + 0x54) | 0) + (delta | 0)) | 0);
-        },
         scrollColumn(obj, delta) { LOG.push(["scrollColumn", obj | 0, delta | 0]); },
         drawRows(obj, a1) { LOG.push(["drawRows", obj | 0, a1 | 0]); },
         padButtons(cell, port) { return pad(cell, port); },

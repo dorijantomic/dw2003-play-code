@@ -31,10 +31,15 @@ import {
   FIELD_PROBE_OFFSETS,
   FIELD_PROBE_INDEX,
   FIELD_PROBE_FLAGS,
+  FIELD_RUN_MAGNITUDE,
   fieldProbeOffsets,
   fieldProbePushback,
+  fieldDirectionDelta,
+  fieldDirectionIndex,
+  applyObstaclePush,
   actorFootprintBlocked,
 } from "../engine/systems/field-movement.ts";
+import { fromJSON, moveWithCollision, rectBlocked } from "../engine/core/util/collision.ts";
 import { npcHalfWidth } from "../engine/dw3/npc-sizes.ts";
 import { treeIndexAt, TREE_HIT_RADIUS } from "../engine/systems/tree-kick.ts";
 
@@ -159,10 +164,93 @@ test("web/game.js routes field movement through the actor/tree obstacle", () => 
   assert.match(gameSrc, /treeIndexAt\(/);
   // It must be reached inside the walking tick, right after the walkmesh move,
   // and it must SUBTRACT the push instead of restoring the previous position.
-  const iMove = gameSrc.indexOf("const moved = moveWithCollision(");
-  const iPush = gameSrc.indexOf("fieldStepObstaclePush(m, state.x, state.y, moveMag)");
+  const iMove = gameSrc.indexOf("const moved = boxStuck(grid, state.x, state.y)");
+  const iPush = gameSrc.indexOf("fieldStepObstaclePush(m, grid, state.x, state.y, moveMag, heightFixed)");
   assert.ok(iMove > 0 && iPush > iMove,
     "the obstacle response sits after the walkmesh move in the field tick");
   assert.doesNotMatch(gameSrc, /fieldStepBlockedByActors/,
     "the old whole-step revert is gone");
+});
+
+test("the push is clamped by the walk's own foot box (applyObstaclePush), never applied unchecked", () => {
+  // The disc applies the push unchecked; the walker's wall model is the 8 px
+  // walkmesh, which has no probes — an unchecked push can shove the foot box
+  // into a blocked cell and the destination check then refuses every direction
+  // (the s210 counter trap). The call site must route the push through the
+  // clamped helper, and a stuck box must be able to walk back out.
+  assert.match(gameSrc, /applyObstaclePush\(grid, state\.x, state\.y, push, \{ w: 12, h: 8 \}\)/,
+    "the push is clamped through the walk's foot box");
+  assert.doesNotMatch(gameSrc, /state\.x - push\.x/,
+    "the unchecked `state.x -= push.x` application is gone");
+  assert.match(gameSrc, /const moved = boxStuck\(grid, state\.x, state\.y\)/,
+    "the walk carries the already-inside exemption (a stuck box can always move)");
+});
+
+test("s210's counter walk: the clamped push keeps the box out of the blocked row, the unchecked push sinks in", () => {
+  // The live trap (2026-10-14 journey run): walking east past s210's counter
+  // NPC 46 at (391,359), the one blocked up-right probe pushes the box down by
+  // mag/4 (1.2 px) a tick while the step slides along — the box sinks into the
+  // counter's blocked row (46) in a couple of ticks, and once the box bottom is
+  // inside, the destination check refuses every direction (the journey's walker
+  // ended frozen at (382,375), unable to move at all). This simulates the walk
+  // tick with the stage's own collision data.
+  const grid = fromJSON(JSON.parse(readFileSync(join(ROOT, "web/assets/collision/s210.json"), "utf8")));
+  const npc = { npc_id: 46, x: 391, y: 359 };
+  const occupied = (px, py) =>
+    actorFootprintBlocked([npc], (n) => npcHalfWidth(n.npc_id), px, py);
+  const box = { w: 12, h: 8 };
+  const tick = (x, y, dir, clamp) => {
+    const delta = fieldDirectionDelta(dir, FIELD_RUN_MAGNITUDE, 0);
+    const moved = moveWithCollision(grid, x, y, delta.x, delta.y, box);
+    x = moved.x;
+    y = moved.y;
+    const push = fieldProbePushback(fieldDirectionIndex(dir), FIELD_RUN_MAGNITUDE, x, y, occupied);
+    if (push.x !== 0 || push.y !== 0) {
+      if (clamp) {
+        const pushed = applyObstaclePush(grid, x, y, push, box);
+        x = pushed.x;
+        y = pushed.y;
+      } else {
+        x -= push.x;
+        y -= push.y;
+      }
+    }
+    return { x, y };
+  };
+  const overlaps = (p) => rectBlocked(grid, p.x - 6, p.y - 8, p.x + 6, p.y);
+
+  // Unchecked (the pre-fix call site): the box enters the blocked row at once.
+  let u = { x: 370, y: 366 };
+  let sank = null;
+  for (let t = 0; t < 10 && !sank; t++) {
+    u = tick(u.x, u.y, "right", false);
+    if (overlaps(u)) sank = { t, ...u };
+  }
+  assert.ok(sank, "the unchecked push must reproduce the sink (the bug this pins)");
+  assert.ok(sank.y >= 368, `the box sank into the blocked row (y=${sank.y})`);
+
+  // Clamped (the fixed call site): the box never overlaps a blocked cell and
+  // the player still makes progress (the push degrades to a wall slide).
+  let c = { x: 370, y: 366 };
+  for (let t = 0; t < 60; t++) {
+    c = tick(c.x, c.y, "right", true);
+    assert.ok(!overlaps(c),
+      `tick ${t}: the clamped push entered a blocked cell at (${c.x},${c.y})`);
+  }
+  assert.ok(c.x > 420, `the player still walks east along the corridor (x=${c.x})`);
+
+  // And a legacy stuck box (a save written while the trap existed) can always
+  // walk back out: the walk skips its destination check while the box is stuck,
+  // so repeated ticks carry it clear of the blocked row.
+  let stuck = { x: 382, y: 375 };
+  assert.ok(overlaps(stuck), "the old trap position overlaps the counter row");
+  const delta = fieldDirectionDelta("up", FIELD_RUN_MAGNITUDE, 0);
+  let escaped = null;
+  for (let t = 0; t < 6 && !escaped; t++) {
+    stuck = overlaps(stuck)
+      ? { x: stuck.x + delta.x, y: stuck.y + delta.y }
+      : moveWithCollision(grid, stuck.x, stuck.y, delta.x, delta.y, box);
+    if (!overlaps(stuck)) escaped = { t, ...stuck };
+  }
+  assert.ok(escaped, "walking up out of the legacy stuck box reaches a free cell");
 });

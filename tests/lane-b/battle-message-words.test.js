@@ -237,10 +237,22 @@ const SITES = [
     },
     {
         what: "the enemy gets away",
-        site: "wfightmn.s .L0x000022b8", kind: MSG_KIND.OUTCOME, payload: [MSG.RUN_AWAY],
+        // The runAway arm's page is actor-keyed (wfightmn.s file 0x228c-0x22a0):
+        // 0x5F "Fleeing!" for any nonzero actor, which is what the fightstg
+        // action-4 path queues (a0 = 0x10, fightstg.s file 0x6123-0x6124).
+        site: "wfightmn.s .L0x000022b8", kind: MSG_KIND.OUTCOME, payload: [MSG.FLEEING],
         slots: [], name: "Numemon",
         walker: "Numemon ran away!",
-        expect: ["Numemon", "Run away!"],
+        expect: ["Numemon", "Fleeing!"],
+    },
+    {
+        what: "the player's own Run succeeds",
+        // The same arm with actor 0 (the player's Run, queued by the command arm's
+        // FIGHTSTG_queueRunAway call, wfightmn.s file 0x1674) prints 0x43.
+        site: "wfightmn.s .L0x0000229c", kind: MSG_KIND.OUTCOME, payload: [MSG.RUN_AWAY],
+        slots: [], name: "Kotemon",
+        walker: "Got away safely!",
+        expect: ["Kotemon", "Run away!"],
     },
     {
         what: "the enemy fails to get away",

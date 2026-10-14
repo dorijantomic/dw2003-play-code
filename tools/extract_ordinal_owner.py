@@ -224,17 +224,27 @@ def decode_li(w, want_rt):
 
 
 def ordinal_stores(words, reach):
-    """[(ordinal, word_offset_in_routine)] written by the routine, in file order."""
+    """[(ordinal, word_offset_in_routine, is_reset)] written by the routine, in file order.
+
+    A `sw $zr,0xb370` stores 0 with no `li` at all — wstag780.s .L0x1834, the completion
+    routine of event 0. It is a real store of the ordinal (a RESET, the opening street
+    scene's own write), so it is reported here; it is not a beat step (value 0 is the
+    story's start, not a ladder rung), so the caller keeps it out of the owner map while
+    the note records the truth.
+    """
     out = []
     for i in sorted(reach):
         r = decode_sw_ordinal(words[i])
         if r is None:
             continue
+        if r == 0:                       # $zr: the reset store, value 0
+            out.append((0, i, True))
+            continue
         for j in range(i - 1, max(-1, i - 1 - LOOKBACK), -1):
             n = decode_li(words[j], r)
             if n is not None:
                 if 0 <= n <= MAX_ORDINAL:
-                    out.append((n, i))
+                    out.append((n, i, False))
                 break
     return out
 
@@ -286,13 +296,23 @@ def main():
             # this routine must not run past the entry of a DIFFERENT event's routine
             barrier = entries - {start}
             reach = routine_words(words, start, barrier)
-            stores = ordinal_stores(words, reach)
+            all_stores = ordinal_stores(words, reach)
+            resets = [s for s in all_stores if s[2]]
+            stores = [s for s in all_stores if not s[2]]
             if not stores:
-                notes.append({"event": e["id"], "reason": "no master-ordinal store in routine"})
+                if resets:
+                    # A `sw $zr,0xb370` store: the routine DOES write the master ordinal,
+                    # as a reset to 0 (wstag780.s .L0x1834, event 0's completion — the
+                    # opening street scene). 0 is the story's start, not a ladder rung,
+                    # so it is not a beat owner; the note says what the routine really is.
+                    notes.append({"event": e["id"],
+                                  "reason": "reset store only (sw $zr -> 0), not a beat step"})
+                else:
+                    notes.append({"event": e["id"], "reason": "no master-ordinal store in routine"})
                 continue
             if len(stores) > 1:
                 notes.append({"event": e["id"],
-                              "reason": f"{len(stores)} ordinal stores {[n for n, _ in stores]}"})
+                              "reason": f"{len(stores)} ordinal stores {[n for n, _, _ in stores]}"})
             owners[str(e["id"])] = stores[0][0]
         if not owners:
             unresolved.append({"stage": stage, "reason": "no event routine writes 0x8004b370",

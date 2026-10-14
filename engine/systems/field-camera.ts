@@ -63,18 +63,22 @@ export function fieldCameraCentreOf(targetX: number, targetY: number): FieldCame
   return { x: targetX - CAMERA_CENTRE_X, y: targetY - CAMERA_CENTRE_Y };
 }
 
-function clampInt(v: number, lo: number, hi: number): number {
-  if (v < lo) return lo;
-  if (v > hi) return hi;
-  return v;
+function clampToView(v: number, ceiling: number): number {
+  // The native's exact composition (F0x8008D788): clamp the LOW end to zero
+  // first (`bgez` skips, else the value becomes 0), then apply the ceiling
+  // unconditionally (`slt` ceiling < value -> value = ceiling). With a map
+  // narrower or shorter than the view the ceiling is NEGATIVE and the camera
+  // pins to it — the view shows the map right-aligned / bottom-aligned, not
+  // pinned to zero. The walker's old clampInt returned zero there instead.
+  return Math.min(Math.max(v, 0), ceiling);
 }
 
 /**
  * The ordinary free-roam camera: centre the target at (160,140) and clamp the
- * view inside the map, `x ∈ [0, mapW-320]`, `y ∈ [0, mapH-240]` — the same
- * clamp `F0x8008D788` applies before it adds the shake offset. A map narrower
- * or shorter than the view pins the camera to zero, as the native does when its
- * clamp ceiling goes negative.
+ * view inside the map — the same two-step clamp `F0x8008D788` applies before it
+ * adds the shake offset. A map narrower than 320 or shorter than 240 pins the
+ * camera to the negative ceiling (`mapW-320` / `mapH-240`), which the native
+ * does because its ceiling test runs after the low clamp and is unconditional.
  */
 export function fieldCameraFollow(
   targetX: number,
@@ -84,7 +88,7 @@ export function fieldCameraFollow(
 ): FieldCamera {
   const { x, y } = fieldCameraCentreOf(targetX, targetY);
   return {
-    x: clampInt(x, 0, mapW - CAMERA_VIEW_W),
-    y: clampInt(y, 0, mapH - CAMERA_VIEW_H),
+    x: clampToView(x, mapW - CAMERA_VIEW_W),
+    y: clampToView(y, mapH - CAMERA_VIEW_H),
   };
 }

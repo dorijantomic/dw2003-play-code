@@ -585,7 +585,7 @@ export function createGym(sfx = null) {
         sfx?.play("system07"); g.trainSlot = g.selSlot; g.drillSel = 0;
         g.screen = "drill"; g._animStart("drill"); return true;
       }
-      if (k === "cross") { sfx?.play("system02"); requestLeave(); return true; }
+      if (k === "cross") { sfx?.play("system01"); requestLeave(); return true; }
       return true;
     }
     if (g.screen === "drill") {
@@ -622,8 +622,8 @@ export function createGym(sfx = null) {
         if (next !== g.drillSel) { sfx?.play("system06"); g.drillSel = next; }
         return true;
       }
-      if (k === "circle") { sfx?.play("system07"); g.tpWarn = false; g.screen = "tp"; g._animStart("tp"); return true; }
-      if (k === "cross") { sfx?.play("system02"); requestLeave(); return true; }
+      if (k === "circle") { sfx?.play("system06"); g.tpWarn = false; g.screen = "tp"; g._animStart("tp"); return true; }
+      if (k === "cross") { sfx?.play("system01"); requestLeave(); return true; }
       return true;
     }
     if (g.screen === "tp") {
@@ -633,17 +633,17 @@ export function createGym(sfx = null) {
       if (k === "right") { sfx?.play("system06"); g.tpSel = Math.min(2, g.tpSel + 1); g.tpWarn = false; return true; }
       if (k === "circle") {
         const cost = g.progression.gym.tp_costs[g.tpSel];
-        if (tpAvailable(state) < cost) { sfx?.play("system02"); g.tpWarn = true; return true; }
+        if (tpAvailable(state) < cost) { sfx?.play("system07"); g.tpWarn = true; return true; }
         sfx?.play("system07"); g.tpWarn = false; g.confirmSel = 0; g.screen = "confirm"; g._animStart("confirm"); return true;
       }
-      if (k === "cross") { sfx?.play("system02"); g.tpWarn = false; g.screen = "drill"; g._animStart("drill"); return true; }
+      if (k === "cross") { sfx?.play("system01"); g.tpWarn = false; g.screen = "drill"; g._animStart("drill"); return true; }
       return true;
     }
     if (g.screen === "confirm") { // "Is this ok?" Yes/No
-      if (k === "up" || k === "down") { sfx?.play("system06"); g.confirmSel ^= 1; return true; }
+      if (k === "up" || k === "down") { sfx?.play("system02"); g.confirmSel ^= 1; return true; }
       if (k === "circle") {
-        if (g.confirmSel === 1) { sfx?.play("system02"); g.screen = "tp"; g._animStart("tp"); return true; }
-        sfx?.play("system07");
+        if (g.confirmSel === 1) { sfx?.play("system00"); g.screen = "tp"; g._animStart("tp"); return true; }
+        sfx?.play("system00");
         // Mid-training rep phase: widget polls at 75/78/81% (TrainingBook/PowerBrace
         // accessory bonus, helper 0x80086abc). Three ordinary polls for basic drills;
         // a super/starred drill (id >= 13) that doesn't sweep extends to five
@@ -667,14 +667,14 @@ export function createGym(sfx = null) {
         g.screen = "reps";
         return true;
       }
-      if (k === "cross") { sfx?.play("system02"); g.screen = "tp"; return true; }
+      if (k === "cross") { sfx?.play("system01"); g.screen = "tp"; return true; }
       return true;
     }
     if (g.screen === "reps") return true; // training runs itself (advanced in draw)
     if (g.screen === "ultra") { // "Ultra Training Chance!" Challenge / As is
-      if (k === "up" || k === "down") { sfx?.play("system06"); g.ultraSel ^= 1; return true; }
+      if (k === "up" || k === "down") { sfx?.play("system02"); g.ultraSel ^= 1; return true; }
       if (k === "circle") {
-        sfx?.play("system07");
+        sfx?.play("system00");
         if (g.ultraSel === 0) {
           // Challenge (F0x80087cf4 unk18==0 -> state 20 F0x80087e18): ONE high-value
           // bonus rep. 50% win, forced 0 on the last-won drill; decided before the

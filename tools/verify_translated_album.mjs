@@ -45,15 +45,20 @@ try {
     null, { timeout: 10000 });
   await page.locator("#game").screenshot({ path: `${output}/01-open.png` });
 
-  // R1 (key "e") turns the page forward; L1 (key "q") back.
+  // R1 (key "e") turns the page forward; L1 (key "q") back. The screen locks
+  // input while the grid plays its page reveal (state 0xF waits for the grid's
+  // +0x0C to settle at 1), so each turn waits for the cursor state first.
+  const settle = () => page.waitForFunction(
+    () => (window.__cardAlbum?._session?.mem.read32(window.__cardAlbum._session.root + 0x10) | 0) === 4,
+    null, { timeout: 10000 });
   const pageBefore = await readWord(0x60);
   await press("e");
-  await page.waitForTimeout(400);
+  await settle();
   const pageAfter = await readWord(0x60);
   if (pageAfter !== pageBefore + 1) failures.push(`R1 did not turn the page: ${pageBefore} -> ${pageAfter}`);
   await page.locator("#game").screenshot({ path: `${output}/02-page-turn.png` });
   await press("q");
-  await page.waitForTimeout(400);
+  await settle();
   const pageBack = await readWord(0x60);
   if (pageBack !== pageBefore) failures.push(`L1 did not turn back: ${pageAfter} -> ${pageBack}`);
 

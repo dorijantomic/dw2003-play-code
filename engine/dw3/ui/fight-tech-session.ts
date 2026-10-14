@@ -212,6 +212,12 @@ export class FightTechSession {
                 pageCursor += 1;
                 void header;
             },
+            // The Blast step (the current form's signature marked/appended with
+            // 0x8000 while party +0x1A is set) is already performed by the seed:
+            // battleTechWords appends it for battle.js when Blast is active, so
+            // this boundary answers null and the port's own branch stays dormant
+            // (its mark/append logic is exercised by
+            // tests/battle-tech-menu-flags.test.js).
             preselectRecord: () => null,
             techCost: (entry) => {
                 const index = this.entryIndex(entry);

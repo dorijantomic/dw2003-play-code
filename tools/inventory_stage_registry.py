@@ -368,6 +368,18 @@ PORTS = [
         "data_check": "falling",
         "why": "the crevice-ride rockfall, one builder per id in the registry order",
     },
+    {
+        # The scenery layer. Its member list is web/assets/data/scroll_layers.json
+        # (tools/extract_scroll_layers.py), and the machine is the same
+        # point-record-actor module: `data_check: "scroll"` makes the census read
+        # the id out of that table.
+        "stage": "415", "ids": [0x32c],
+        "files": ["engine/systems/point-record-actor.ts",
+                  "web/assets/data/scroll_layers.json"],
+        "must_contain": ["scroll-layer", "fireScrollLayer", "tickScrollLayer"],
+        "data_check": "scroll",
+        "why": "the Deeper Crevice scenery layer: one object, visit-gated slide",
+    },
     # ── THE point-record actor system: fifteen members, ONE module ──────────
     # Every one of these claims its stage's own dormant point-sprite records by
     # their atlas byte and animates them through the stepper its overlay repeats
@@ -747,6 +759,26 @@ def port_lookup(falling):
                 ok = False
                 broken.append(
                     "web/assets/data/child_pool_parents.json s%s does not carry "
+                    "id(s) %s" % (entry["stage"], ", ".join("0x%03x" % i for i in missing)))
+        if entry.get("data_check") == "scroll":
+            # The scenery layer's table IS its member list: a citation that
+            # loses the id, or an id the extractor does not find, shows up as a
+            # broken citation here.
+            try:
+                doc = json.loads(
+                    (REPO / "web/assets/data/scroll_layers.json").read_text())
+            except (OSError, ValueError) as exc:
+                broken.append("web/assets/data/scroll_layers.json: %s" % exc)
+                continue
+            members = (doc.get("stages") or {}).get("s" + entry["stage"]) or {}
+            # The table keys members by their DECIMAL id string ("812"), the
+            # same convention point_record_actors.json uses.
+            listed = {int(k) for k in members}
+            missing = [i for i in entry["ids"] if i not in listed]
+            if missing:
+                ok = False
+                broken.append(
+                    "web/assets/data/scroll_layers.json s%s does not carry "
                     "id(s) %s" % (entry["stage"], ", ".join("0x%03x" % i for i in missing)))
         if entry.get("data_check") == "actors":
             # The ONE table (tools/extract_point_record_actors.py --check) is the

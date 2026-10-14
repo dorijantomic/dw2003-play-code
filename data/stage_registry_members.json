@@ -73,8 +73,8 @@
   "stages_with_a_script_table": 139,
   "stages_with_members": 128,
   "members_total": 261,
-  "members_ported": 260,
-  "members_interpreter_only": 1,
+  "members_ported": 261,
+  "members_interpreter_only": 0,
   "members_none": 0,
   "shared_ids": [
    "0x323",
@@ -1151,8 +1151,8 @@
    "raw_words_overlay": false,
    "has_script_table": true,
    "members": 14,
-   "ported": 13,
-   "interpreter_only": 1,
+   "ported": 14,
+   "interpreter_only": 0,
    "none": 0
   },
   {
@@ -6878,12 +6878,12 @@
     "tick_source": "stage allocator call",
     "family": "9e9f99e27a13",
     "draw_here": "code in this stage's image (file 0x10a8)",
-    "port": "interpreter only",
+    "port": "ported",
     "port_cite": [
-     "web/native-stage.js",
-     "engine/native/runtime.ts"
+     "engine/systems/point-record-actor.ts",
+     "web/assets/data/scroll_layers.json"
     ],
-    "port_basis": "the stage ships an overlay image, so ?nativeStages runs the original code; no translated module claims this id"
+    "port_basis": "the Deeper Crevice scenery layer: one object, visit-gated slide"
    },
    {
     "id": 813,
@@ -17604,14 +17604,14 @@
    "members": 1,
    "script_calls": 2,
    "ports": {
-    "interpreter only": 1
+    "ported": 1
    },
    "example": [
     {
      "stage": "415",
      "id": "0x32c",
      "tick": "0x800a6c8c",
-     "port": "interpreter only"
+     "port": "ported"
     }
    ],
    "stage_count": 1

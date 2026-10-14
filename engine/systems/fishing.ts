@@ -4,11 +4,13 @@
 //
 // WHAT THE PLAYER DOES. Stand on a fishing spot at the water's edge and press
 // the action button. The float goes out, sits for about a second and a half,
-// and then a marker starts sweeping back and forth along a bar. Press CIRCLE to
-// strike. The marker does not stop dead — it decelerates and glides to a halt,
-// and where it comes to rest is what decides the cast. Land it on a live band of
-// this cast's pattern and something takes the line; land it anywhere else and
-// you get nothing.
+// and then a marker starts sweeping back and forth along a bar. Press the SAME
+// button again — the confirm press, pad bit 0x2000 — to strike: the bobber's
+// tick reads that bit and no other, so the button people call circle (which
+// sends a different bit) never strikes at all. The marker does not stop dead —
+// it decelerates and glides to a halt, and where it comes to rest is what
+// decides the cast. Land it on a live band of this cast's pattern and something
+// takes the line; land it anywhere else and you get nothing.
 //
 // THE PATTERN IS ON SCREEN. The bar is not blank: the original draws the strip
 // for THIS cast's pattern inside the bar frame (FIELDCOM sub-entry 1, id
@@ -79,29 +81,40 @@ export const EMPTY_PATTERN = 8;
 /** Scripted-encounter-block slot each live band starts a battle from (file 0xfaf0). */
 export const BAND_SLOT: Readonly<Record<number, number>> = { 1: 4, 2: 7 };
 
-/** Pad bit the strike is read from — CIRCLE (file 0xa700). */
+/** Pad bit the strike is read from — the CONFIRM bit, 0x2000, the press the
+ * step VM casts with too (file 0xa700; claim
+ * `a-fishing-strike-is-the-confirm-button-s-own-bit-2026-10-05`). */
 export const STRIKE_BUTTON = 0x2000;
 
 /** Packed sound played on the strike (file 0xa74c-0xa760). */
 export const STRIKE_SOUND = 0x0004001b;
 
-/** SYSTEM06 — the blip when the marker settles on a Cardmon band (file 0xa824). */
+/** SYSTEM05 — the blip when the marker settles on a Cardmon band (file 0xa824). */
 export const BITE_SOUND = 0x80045341;
 
 /**
  * The float's four 16x16 cells in FIELDCOM sub-entry 0, ids 0x60..0x63.
  *
- * The original re-picks one EVERY tick (files 0xa958-0xa9c4): `rand() % 48`,
- * divided by 12, added to 0x60 — four equally likely frames. It is not an
- * animation with an order, it is a flicker, which is what makes the float look
- * like it is riding disturbed water.
+ * The original re-picks one EVERY tick (files 0xa958-0xa9c4) — but not from
+ * this cast's random. The value it divides by 48 is read through the pointer
+ * cell 0x8004df98, whose target F0x8001d6f4 returns D0x8004de20: the display
+ * service's free-running tick, the same counter `engine/systems/frame-clock.ts`
+ * publishes for the rest of the game (claims `resident-global-word-getters`,
+ * `UI-DISPLAY-TICK-2026-08-21`). The cast's own RANDOM is a DIFFERENT cell,
+ * 0x8004dc0c, a few bytes away — reading the two neighbours as one is what made
+ * this look like a flicker. Because the tick just counts up, the four cells run
+ * IN ORDER, twelve units each: the float ripples on the water.
  */
 export const FLOAT_CELL_BASE = 0x60;
 export const FLOAT_CELL_COUNT = 4;
+/** Display-tick units each cell holds before the next shows (48 / 4). */
+export const FLOAT_CELL_TICKS = 12;
 
-/** The float cell for one tick. */
-export function floatCell(rand: () => number): number {
-  return FLOAT_CELL_BASE + Math.floor((Math.abs(rand()) % 48) / 12);
+/** The float cell for one display tick — a 48-unit cycle, walked in order. */
+export function floatCell(tick: number): number {
+  const cycle = FLOAT_CELL_COUNT * FLOAT_CELL_TICKS;
+  const t = ((Math.floor(tick) % cycle) + cycle) % cycle;
+  return FLOAT_CELL_BASE + Math.floor(t / FLOAT_CELL_TICKS);
 }
 
 // The eight live patterns plus the spent-budget one, 12 bytes each: 48 two-bit
@@ -191,10 +204,11 @@ export interface FishingState {
   /** Band the marker stopped on; null until it has stopped. */
   band: number | null;
   /**
-   * FIELDCOM sub-entry 0 cell for the float this tick, re-picked every tick.
-   * Only meaningful once the float has settled — the original draws nothing at
-   * all during the settle, because its draw block sits after the meter update
-   * and the settle phase returns before reaching it.
+   * FIELDCOM sub-entry 0 cell for the float this tick — one of the four the
+   * display tick walks in order (see `floatCell`). Only meaningful once the
+   * float has settled: the original draws nothing at all during the settle,
+   * because its draw block sits after the meter update and the settle phase
+   * returns before reaching it.
    */
   cell: number;
 }
@@ -237,12 +251,15 @@ export function startFishing(
 /**
  * Advance one field tick.
  *
- * `strike` is the CIRCLE press — it only counts while the marker is still
- * sweeping at full speed, exactly as the original only reads the pad in that
- * sub-state. Mutates `s` and returns what the host should do.
+ * `strike` is the confirm press (pad bit 0x2000) — it only counts while the
+ * marker is still sweeping at full speed, exactly as the original only reads
+ * the pad in that sub-state. `tick` is the display clock the float's cell is
+ * walked off (the free-running counter at 0x8004df98, fed by the host); the
+ * cast's own random only ever rolls the pattern and the brake, never the float.
+ * Mutates `s` and returns what the host should do.
  */
 export function tickFishing(
-  s: FishingState, strike: boolean, rand: () => number,
+  s: FishingState, strike: boolean, rand: () => number, tick: number,
 ): FishingCue {
   if (s.phase === "over") return { kind: "nothing" };
 
@@ -292,9 +309,10 @@ export function tickFishing(
   }
 
   // Everything below is what the original reaches only after the settle: the
-  // sweep, then the draw block. The float's cell is re-rolled here for the same
-  // reason it is there — once per drawn tick.
-  s.cell = floatCell(rand);
+  // sweep, then the draw block. The float's cell is re-picked here for the same
+  // reason it is there — once per drawn tick — but off the display tick, the
+  // counter the original's draw block reads (file 0xa95c), not off `rand`.
+  s.cell = floatCell(tick);
 
   // The sweep itself runs on every tick from `sweep` onward, braking included —
   // that is what makes the marker glide to a stop rather than snap.
@@ -344,7 +362,7 @@ export function fishingSpotAt(
 // RAM 0x800836d8 (file 0xa28) -> 0x8009095c, 0x80090978, 0x800909b8,
 // 0x800909f8, 0x80090a34, 0x80090a98. Mode 0x48 is entered by the op-7 cast
 // controller F0x8008f304 (file 0xc668: `li $a1, 0x48` into the entity's
-// set-mode slot +0x2c), which also raises the scene lock at 0x800a9dd8.
+// set-mode slot +0x2c), which also raises the scene lock at 0x80099dd8.
 //
 // The blocks fall THROUGH into each other, so advancing runs the next block in
 // the same tick — harmless, because SETANIM (F0x8008f4b4, file 0xc804) clears

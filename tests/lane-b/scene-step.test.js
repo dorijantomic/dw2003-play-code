@@ -352,7 +352,16 @@ test("the cone gate is the shipped ±1 facing cone, per opcode class", () => {
             const inside = d <= 1 || d === 7;   // {g-1, g, g+1} mod 8
             assert.equal(port._stepLive(1, g, f), inside,
                 `group ${g} allows facings {${(g + 7) % 8}, ${g}, ${(g + 1) % 8}}; facing ${f}`);
+            // The class split, straight out of step-load (fieldstg.s:5650-:5680):
+            // ops 0-4 fall to the cone read at :5684, ops 5 and 6 return 1 at
+            // :565c-:5664 (`slti $v0,$v1,0x7` / `bnez` with `li $v0,0x1` in the
+            // delay slot) WITHOUT reading it, op 7 branches back to the cone at
+            // :5674, and ops 8-14 return 1 at :567c-:5680.
+            assert.equal(port._stepLive(5, g, f), true, "op 5 is live without the cone");
+            assert.equal(port._stepLive(6, g, f), true, "op 6 too");
+            assert.equal(port._stepLive(7, g, f), inside, "op 7 reads the cone");
             assert.equal(port._stepLive(8, g, f), true, "op 8 never reads the cone");
+            assert.equal(port._stepLive(14, g, f), true, "op 14 too");
             assert.equal(CONE.rows[g][f], inside ? 1 : 0, "and the shipped bytes agree");
         }
     }

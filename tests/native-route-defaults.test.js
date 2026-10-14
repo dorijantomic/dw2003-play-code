@@ -148,7 +148,7 @@ test("every in-scope route defaults to its current production adapter", () => {
         }
         if (r.module === "pro/stdwtitl") {
             assert.equal(flagExpression(source, r.flag), 'GYM_PARAMS.has("nativeTitle")');
-            assert.match(source, /: createTitleScreen\(\{ language: state\.languageByte \?\? 2, previousScreenCode: previousTitleCode \}\)/);
+            assert.match(source, /: createTitleScreen\(\{ language: state\.languageByte \?\? 2, previousScreenCode \}\)/);
             const adapter = read(r.adapter);
             assert.match(adapter, /new ui\.TitleSession\(/);
             assert.doesNotMatch(adapter, /openNativeScreen|preloadNativeScreens|bootNativeScreen/);

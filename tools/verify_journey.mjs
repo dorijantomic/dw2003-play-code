@@ -74,8 +74,16 @@ const KNOWN_OPTIONAL_404 = [
   /slot_map\.json$/,
 ];
 const unexpectedHttpErrors = () => httpErrors.filter((r) => !KNOWN_OPTIONAL_404.some((re) => re.test(r)));
-// The skipped opening movie aborts mid-load by design.
-const unexpectedFailed = () => failedRequests.filter((r) => !/movieopn\.mp4/.test(r));
+// The skipped opening movie aborts mid-load by design, and the first-launch
+// visual-style chooser RELOADS the page (driveBootToTitle) while the boot's own
+// eager asset fetch (~430 scene/data files) is still in flight — the browser
+// cancels every in-flight request, all reported as net::ERR_ABORTED. Neither is
+// a game failure: the game code never aborts a fetch (no AbortController in
+// web/), so an ERR_ABORTED is always a navigation the harness itself caused.
+// Real failures (ERR_FAILED, connection refused, DNS) still count.
+const unexpectedFailed = () =>
+  failedRequests.filter((r) =>
+    !/movieopn\.mp4/.test(r) && !/:: net::ERR_ABORTED$/.test(r));
 
 const counts = () => ({
   consoleErrors: consoleErrors.length, pageErrors: pageErrors.length,

@@ -30,7 +30,7 @@
 //   VERIFY_PORT=8752 tools/run-playwright.sh tools/verify_deep_playthrough.mjs [outdir]
 
 import { chromium } from "playwright";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { baseUrl } from "./verify-base-url.mjs";
 import { waitForCommandMenu, tapCircle } from "./verify-battle-wait.mjs";
 
@@ -383,16 +383,20 @@ try {
         }
     } catch (e) { check("arena: completed without throwing", false, String(e)); }
 
-    // ═══ PART F — the fixture-boot render crash (shim ON only) ═══
+    // ═══ PART F — the fixture-boot render crash (spriteless trees only) ═══
     // With the harness shim DISABLED, a `?skipTitle=1&map=` boot can throw inside
     // render() on a missing sprite image; because the throw precedes the next
     // requestAnimationFrame, the whole game loop dies and the field never moves.
     // This is a robustness gap in the renderer, but it only fires on a tree whose
     // untracked sprite assets (web/assets/sprites, not in git) are absent — which
-    // is what a fresh `git worktree` checkout is. On a normal working tree the
-    // sprites are present and there is no crash, so this part only runs when the
-    // shim is enabled (i.e. on such a worktree).
-    if (ALLOW_MISSING_SPRITE) try {
+    // is what a fresh `git worktree` checkout is. On a normal working tree (or a
+    // worktree with the assets symlinked in) the sprites are present, there is no
+    // crash, and asserting the crash would be a false failure — so the part runs
+    // only when the sprites are genuinely absent.
+    const spritesPresent = (() => {
+        try { return readdirSync("web/assets/sprites").length > 0; } catch { return false; }
+    })();
+    if (ALLOW_MISSING_SPRITE && !spritesPresent) try {
         const { page, errors } = await newPage({ seedOrdinal: 30, allowMissingSprite: false });
         await page.goto(`${ROOT}/index.html?skipTitle=1&map=s330&noEncounters=1`, { waitUntil: "load", timeout: 60000 });
         await page.waitForFunction(() => window.__state?.started === true, null, { timeout: 40000 }).catch(() => {});
@@ -407,6 +411,9 @@ try {
         await shot(page, "F-shim-off-frozen");
         await page.close().catch(() => {});
     } catch (e) { check("fixture boot (shim off): ran without throwing", false, String(e)); }
+    else if (ALLOW_MISSING_SPRITE && spritesPresent) {
+        note("fixture boot (shim off): skipped — web/assets/sprites is present on this tree, so the missing-sprite crash this part documents cannot fire");
+    }
 } catch (e) {
     check("deep session: ran to completion", false, String(e));
 } finally {

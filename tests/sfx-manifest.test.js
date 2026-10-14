@@ -75,6 +75,16 @@ test("every wired trigger is played by a web/ call site or the shared packed sin
   // web/ plays the shared sink -- the by-name forms stay as they were.
   const emoteTable = fs.readFileSync("engine/systems/emote-sounds.ts", "utf8");
   const sinkInWeb = files.some(([, src]) => /sfx\s*\??\.\s*playPacked/.test(src));
+  // DELIBERATE WIDENING (2026-10-14, audit/sfx-triggers-vs-decode): the
+  // fishing cast's two cues (PLAYER09/PLAYER10, 0x80045cc5 / 0x80045d46) are
+  // carried as engine/systems/fishing.ts's POSE_CAST_SOUND / POSE_THROW_SOUND
+  // and played through the same shared sink (web/game.js `sfx.playPacked(
+  // pc.sound)`), not by a `play("player09")` literal nor the emote table. Any
+  // engine/systems module carrying the id counts as wired while the shared
+  // sink is present.
+  const engineSystemSources = fs.readdirSync("engine/systems")
+    .filter((n) => n.endsWith(".ts"))
+    .map((n) => fs.readFileSync(`engine/systems/${n}`, "utf8"));
   for (const t of trig) {
     if (t.status !== "decoded" || !t.walker_hook) continue;
     if (!PLAIN_NAME.test(t.name)) continue;
@@ -83,7 +93,8 @@ test("every wired trigger is played by a web/ call site or the shared packed sin
     // the sustained-voice entry point, whose voice the caller then keys off.
     const byName = files.some(([, src]) =>
       [`play("${key}")`, `playSustained("${key}")`].some((n) => src.includes(n)));
-    const byPackedSink = sinkInWeb && emoteTable.includes(t.id.toLowerCase());
+    const byPackedSink = sinkInWeb && (emoteTable.includes(t.id.toLowerCase())
+      || engineSystemSources.some((src) => src.includes(t.id.toLowerCase())));
     assert.ok(byName || byPackedSink,
       `${t.name} decoded+hooked but neither played by name in web/ nor resolved by the shared packed sink`);
   }

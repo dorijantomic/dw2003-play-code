@@ -24,7 +24,8 @@ import {
   STATUS_EVENT_ACTION_HANDLERS, statusEventActionType, statusEventActionHandler,
   statusEventAilmentBit, statusEventAilmentCode, statusEventAilmentDelay,
   statusEventConfusionDelay, statusEventDelayArm, statusEventDivide2710,
-  statusEventRecoveryDelay, statusEventTickDelay, cureStatusEvent,
+  statusEventRecoveryDelay, statusEventTickDelay, cureStatusEvent, cureAllStatusEvents,
+  STATUS_EVENT_ALL_CURE_CODES,
   stageStatusEventAilment, stageStatusEventSideTick,
 } from "../engine/dw3/battle-status-events.ts";
 
@@ -543,11 +544,18 @@ test("CENSUS: each ailment's code and record bit are the shipped stager's own tw
 // One behaviour test per code this job added.
 // ---------------------------------------------------------------------------
 
-/** A stage input with every field named, so each assertion below can say which one. */
+/**
+ * A stage input with every field named, so each assertion below can say which one.
+ *
+ * `magnitude` is the stager's THIRD ARGUMENT — the apply machine's effect byte,
+ * `effects[slot]` (`lbu $a2, 0x38($s4)`, `pro/fightstg.s:15196`) — and the same value the
+ * delay arm reads back out of `0x800a435d`. 0x1e here is just a magnitude-shaped input;
+ * the disc's own appliers fill it with the technique's f9/effect_p2.
+ */
 function stage(ailment, over = {}) {
   return {
-    side: 0x10, slot: 0, ailment, ailmentId: 0x1e,
-    delay: { draw: 0, ownSpt: 100, ailmentId: 0x1e, otherA: 0, otherB: 0 },
+    side: 0x10, slot: 0, ailment, magnitude: 0x1e,
+    delay: { draw: 0, ownSpt: 100, magnitude: 0x1e, otherA: 0, otherB: 0 },
     techniqueId: 0,
     ...over,
   };
@@ -588,11 +596,12 @@ test("CODE 0x09: the poison tick is a 1000-unit entry that keeps its slot and re
   assert.equal(pool[at].side, 0x10);
   assert.equal(pool[at].slot, 2);
   // The refresh rewrites the PAYLOAD, not the time: `sw $s3, 0xc($v0)` in the `j`'s delay
-  // slot :26720 stores the register it names, which is the caller's third argument.
-  const again = stageStatusEventAilment(pool, stage("poison", { side: 0x10, slot: 2, ailmentId: 0x1e }));
+  // slot :26720 stores the register it names, which is the caller's third argument — the
+  // magnitude the apply machine handed over.
+  const again = stageStatusEventAilment(pool, stage("poison", { side: 0x10, slot: 2, magnitude: 0x1e }));
   assert.equal(again, at);
   assert.equal(pool.filter((x) => x.code === 0x09).length, 1);
-  assert.equal(pool[at].payload, 0x1e, "the refresh still writes payload 1");
+  assert.equal(pool[at].payload, 0x1e, "the refresh writes the magnitude into payload 1");
   // `0x800a3800`'s word for code 9 is -1, so the entry SURVIVES its own fire.
   assert.equal(statusEventFreesSlot(0x09), false);
   const fired = advanceStatusEvents(pool, 1000);
@@ -607,20 +616,20 @@ test("CODE 0x09: the poison tick is a 1000-unit entry that keeps its slot and re
 test("CODE 0x0a: the frozen recovery is opcode 9, and its expiry IS the cure", () => {
   const pool = emptyStatusEventPool();
   const at = stageStatusEventAilment(pool, stage("frozen", {
-    side: 0x10, slot: 1, ailmentId: 0x1f,
-    delay: { draw: 0, ownSpt: 100, ailmentId: 0x1f, otherA: 0, otherB: 0 },
+    side: 0x10, slot: 1, magnitude: 0x1f,
+    delay: { draw: 0, ownSpt: 100, magnitude: 0x1f, otherA: 0, otherB: 0 },
   }));
   const e = pool[at];
   assert.equal(e.code, 0x0a);
   assert.equal(e.side, 0x10);
   assert.equal(e.slot, 1, "the SIDE'S ACTIVE SLOT, which the caller supplies");
-  assert.equal(e.payload, 0x1f, "the record's `+0x38` ailment id the stager keeps");
+  assert.equal(e.payload, 0x1f, "the magnitude the stager's third argument carried");
   // `li $a1, 0x9` :26700 -- opcode 9, whose arm adds 3000 and floors at 1000.
   assert.equal(statusEventDelayArm(9), 0x8009bec8);
   assert.equal(e.time, 0 + 8 * (100 + 0x1f) + 3000);
   // The floor bites when the OTHER side's pair outweighs the 3000 term.
   assert.equal(statusEventRecoveryDelay(9,
-    { draw: 0, ownSpt: 0, ailmentId: 0, otherA: 500, otherB: 0 }), 1000, "opcode 9's floor");
+    { draw: 0, ownSpt: 0, magnitude: 0, otherA: 500, otherB: 0 }), 1000, "opcode 9's floor");
   // Consumer + effect.
   assert.equal(statusEventActionType(0x0a), 0x0d);
   assert.equal(STATUS_EVENT_CODES.find((r) => r.code === 0x0a).recordBit, 0x02);
@@ -632,8 +641,8 @@ test("CODE 0x0a: the frozen recovery is opcode 9, and its expiry IS the cure", (
   assert.equal(pool.filter((x) => x.code !== 0).length, 0, "the slot was freed on the fire");
   // Re-staging refreshes in place (`sh $a1, 0x2($v0)` :26690), it never stacks.
   const again = stageStatusEventAilment(pool, stage("frozen", {
-    side: 0x10, slot: 1, ailmentId: 0x1f,
-    delay: { draw: 0x8000, ownSpt: 100, ailmentId: 0x1f, otherA: 0, otherB: 0 },
+    side: 0x10, slot: 1, magnitude: 0x1f,
+    delay: { draw: 0x8000, ownSpt: 100, magnitude: 0x1f, otherA: 0, otherB: 0 },
   }));
   assert.equal(again, at);
   assert.equal(pool.filter((x) => x.code === 0x0a).length, 1);
@@ -642,8 +651,8 @@ test("CODE 0x0a: the frozen recovery is opcode 9, and its expiry IS the cure", (
 test("CODE 0x0b: the confused recovery runs opcode 8, whose own arithmetic floors at 2000", () => {
   const pool = emptyStatusEventPool();
   const at = stageStatusEventAilment(pool, stage("confuse", {
-    side: 0, slot: 0, ailmentId: 0x20, techniqueId: 0,
-    delay: { draw: 0x8000, ownSpt: 100, ailmentId: 0x20, otherA: 0, otherB: 0 },
+    side: 0, slot: 0, magnitude: 0x20, techniqueId: 0,
+    delay: { draw: 0x8000, ownSpt: 100, magnitude: 0x20, otherA: 0, otherB: 0 },
   }));
   assert.equal(pool[at].code, 0x0b);
   assert.equal(pool[at].side, 0);
@@ -652,7 +661,7 @@ test("CODE 0x0b: the confused recovery runs opcode 8, whose own arithmetic floor
   // every caller passes the action's technique id. Zero -> opcode 8.
   assert.equal(statusEventDelayArm(8), 0x8009be7c);
   assert.equal(statusEventAilmentDelay("confuse",
-    { draw: 0x8000, ownSpt: 100, ailmentId: 0x20, otherA: 0, otherB: 0 }, 0),
+    { draw: 0x8000, ownSpt: 100, magnitude: 0x20, otherA: 0, otherB: 0 }, 0),
     statusEventConfusionDelay(() => 0x8000 / 0x10000));
   // The disc's magic divides by 2710 while the rebuild multiplies by 8001, so the arm's
   // own answer is 2000 for every draw from 2710 up.
@@ -666,8 +675,8 @@ test("CODE 0x0b: the confused recovery runs opcode 8, whose own arithmetic floor
   // A non-zero technique id takes opcode 10 instead, whose arm has the 3000 term.
   assert.equal(statusEventDelayArm(10), 0x8009bf90);
   const other = stageStatusEventAilment(pool, stage("confuse", {
-    side: 0x10, slot: 0, ailmentId: 0x20, techniqueId: 7,
-    delay: { draw: 0, ownSpt: 100, ailmentId: 0x20, otherA: 0, otherB: 0 },
+    side: 0x10, slot: 0, magnitude: 0x20, techniqueId: 7,
+    delay: { draw: 0, ownSpt: 100, magnitude: 0x20, otherA: 0, otherB: 0 },
   }));
   assert.equal(pool[other].time, 8 * (100 + 0x20) + 3000, "opcode 10's shape");
   assert.equal(STATUS_EVENT_CODES.find((r) => r.code === 0x0b).recordBit, 0x04);
@@ -680,16 +689,16 @@ test("CODE 0x0b: the confused recovery runs opcode 8, whose own arithmetic floor
 test("CODE 0x0c: the asleep recovery is opcode 11, the one arm that floors at 500", () => {
   const pool = emptyStatusEventPool();
   const at = stageStatusEventAilment(pool, stage("sleep", {
-    side: 0, slot: 0, ailmentId: 0x21,
-    delay: { draw: 0, ownSpt: 100, ailmentId: 0x21, otherA: 0, otherB: 0 },
+    side: 0, slot: 0, magnitude: 0x21,
+    delay: { draw: 0, ownSpt: 100, magnitude: 0x21, otherA: 0, otherB: 0 },
   }));
   assert.equal(pool[at].code, 0x0c);
   assert.equal(pool[at].time, 8 * (100 + 0x21) + 1000, "opcode 11 adds 1000");
   assert.equal(statusEventDelayArm(11), 0x8009c058);
   assert.equal(statusEventRecoveryDelay(11,
-    { draw: 0, ownSpt: 0, ailmentId: 0, otherA: 100, otherB: 0 }), 500, "opcode 11's floor");
+    { draw: 0, ownSpt: 0, magnitude: 0, otherA: 100, otherB: 0 }), 500, "opcode 11's floor");
   assert.equal(statusEventRecoveryDelay(11,
-    { draw: 7, ownSpt: 100, ailmentId: 0x21, otherA: 40, otherB: 20 }),
+    { draw: 7, ownSpt: 100, magnitude: 0x21, otherA: 40, otherB: 20 }),
     7 % 500 + 1000 + 8 * (100 + 0x21 - 40 - 20));
   assert.equal(STATUS_EVENT_CODES.find((r) => r.code === 0x0c).recordBit, 0x08);
   assert.equal(statusEventActionType(0x0c), 0x0f);
@@ -714,4 +723,31 @@ test("a cure frees the entry as well as the flag, through the one shared routine
   }
   assert.equal(cureStatusEvent(pool, "nonsense", 0, 0), false);
   assert.equal(cureStatusEvent(undefined, "poison", 0, 0), false);
+});
+
+test("the ALL-status cure cancels six codes, read off the disc's own table", () => {
+  // `FIGHTSTG_F0x8009c330`'s `which` 3 arm walks SIX bytes from `.L0x800a43d4`
+  // (`slti $v0, $s0, 0x6` :26464) — `0x0c0b0a09` (:34881) plus the low half of
+  // `.L0x800a43d8` (`0x00001110`, :34882). Read them out of the shipped overlay, not out
+  // of the port's own list, so the two cannot agree by accident.
+  const six = [...fight.raw(0x800a43d4, 6)];
+  assert.deepEqual(six, [9, 10, 11, 12, 16, 17], "the disc's six codes");
+  assert.deepEqual([...STATUS_EVENT_ALL_CURE_CODES], six,
+    "and the port's list, in the disc's own order");
+  // Technique 375's helper reads the same six out of `.L0x800a3438`, a word at a time.
+  assert.deepEqual([...fight.raw(0x800a3438, 24)].filter((_, i) => i % 4 === 0), six);
+
+  const pool = emptyStatusEventPool();
+  stageStatusEventAilment(pool, stage("poison", { side: 0, slot: 0 }));
+  stageStatusEventAilment(pool, stage("frozen", { side: 0, slot: 0, magnitude: 0x1f }));
+  stageStatusEventAilment(pool, stage("sleep", { side: 0, slot: 0, magnitude: 0x21 }));
+  stageStatusEventLock(pool, 0, 0, 24, () => 0);
+  stageStatusEventLock(pool, 1, 0, 24, () => 0);
+  // A different record's entries are NOT this record's to cure.
+  stageStatusEventLock(pool, 0, 1, 24, () => 0);
+  assert.equal(cureAllStatusEvents(pool, 0, 0), 5, "all five of this slot's entries go");
+  assert.equal(pool.filter((x) => x.code !== 0).length, 1, "the other slot keeps its lock");
+  assert.equal(statusEventLockHeld(pool, 0, 0, 1), true);
+  assert.equal(cureAllStatusEvents(pool, 0, 0), 0, "nothing left to free");
+  assert.equal(cureAllStatusEvents(undefined, 0, 0), 0);
 });

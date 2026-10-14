@@ -127,12 +127,15 @@ function sceneFieldCensus() {
 test("no scene file carries a hand field: the whole field vocabulary is pinned", () => {
   const counts = sceneFieldCensus();
   const EXPECTED = ["arg_a", "arg_b", "bottom", "cell", "cols", "companion", "cutsceneOnly",
-    "dialogue", "dialogue_states", "dir", "dirName", "doors", "entryCompanion", "entryKey", "eq",
+    "dialogue", "dialogue_states", "dir", "dirName", "doors", "entries", "entryCompanion",
+    "entryKey", "eq",
     "eq_b", "exits", "expected", "file", "flag", "flag_b", "gate", "gate_a", "gate_b", "grid",
     "h", "iceSlide", "id", "idx", "index", "invisible", "key", "ladders", "launchPad", "mask",
-    "mazeSections", "n", "nativeDir", "npc_id", "npcs", "on_close", "param", "ptrB", "reset",
+    "mazeSections", "n", "nativeDir", "npc_id", "npcs", "on_close", "param", "place", "placeArg",
+    "placePoints", "points", "ptrB", "reset",
     "rows", "screen", "selfWarp", "slot", "spawnX", "spawnY", "spawn_flags", "sprite", "stage",
-    "start", "stepOp", "stop", "to", "top", "transition", "trapPads", "w", "warp", "warps", "x",
+    "start", "stepOp", "stop", "to", "top", "transition", "trapPads", "variant", "w", "warp",
+    "warps", "x",
     "y", "y1", "y2", "zones"];
   assert.deepEqual([...counts.keys()].sort(), EXPECTED,
     "a scene field appeared that no generator writes — a hand row unless it is named here");

@@ -2477,6 +2477,23 @@ export function handInstanceAt(s: DuelSide, slot: number): number | null {
   return v === undefined || v < 0 ? null : v;
 }
 
+/** The play's settled target in `checkEffectLegality`'s terms, or undefined
+ *  when the model has none.
+ *
+ *  The disc stores the settled target's placement serial at `history+0x586`
+ *  (`F0x800A3E9C` writes it from the field slot's `+0xC`), and arms 9 and 11
+ *  re-check THAT value. The model's equivalent is a live field slot's
+ *  `instance`. A `FieldTarget` names a slot, not an instance, so a target
+ *  whose slot has since emptied cannot be named; arms 9 and 11 then cannot
+ *  refuse, which is the same "no settled target" state the browse-time caller
+ *  has and is recorded as a residual gap (the disc settles the target
+ *  immediately before it asks, so the window is one beat wide). */
+export function namedTargetFor(target: FieldTarget | undefined | null): NamedTarget | undefined {
+  if (!target) return undefined;
+  const instance = fieldInstanceAt(target.side, target.slot);
+  return instance === null ? undefined : { zone: "field", instance };
+}
+
 /** The eleven board/hand/deck conditions the disc asks before a committed
  *  Program card either fires or shows its own authored no-effect line.
  *  `F0x800954f8 checkEffectLegality`, read whole at
@@ -2658,6 +2675,21 @@ function fieldFilterLegal(duel: DuelState, actor: DuelSide, playKind: number): b
  *
  *  `target` pre-picks a board slot, as the older callers pass it. With
  *  `interactive` the machine stops instead, and the duel asks the player.
+ *
+ *  THE RESOLUTION GATE. F0x800954f8 (`checkEffectLegality`) is asked once the
+ *  card is committed and its target settled — F0x800a2180 case 6 — and a
+ *  non-zero answer shows the record's own +0x02 line and STOPS: the effect
+ *  program never runs. `canPlayProgram` (F0x800a36e4) is a different question
+ *  asked earlier, and for every shipped card that authors a no-effect line
+ *  its refusal is a SUBSET of this one's, so this gate refuses in MORE states.
+ *  Without this check the walker ran programs the disc refuses — Digimon
+ *  Charge with a deck of only Programs moved the top deck card into the hand
+ *  where the disc shows "No Digimon Cards in Deck." (claim
+ *  cardgame-effect-legality-gate-2026-10-10, verified; §46.4's delay-slot
+ *  note is the pile-count arms' return). The line itself is the record's
+ *  +0x02 id (`eff.effectAsset`); the web owns the bank and shows it in the
+ *  browser pre-commit, so the model logs the refusal rather than inventing
+ *  text.
  */
 export function applyProgramEffect(
   duel: DuelState,
@@ -2669,6 +2701,10 @@ export function applyProgramEffect(
   opts: { interactive?: boolean } = {},
 ): boolean {
   if (!eff) return false;
+  if (!checkEffectLegality(duel, actor, eff, namedTargetFor(target))) {
+    duel.log.push(`${actor.name}: ${eff.name} — no effect (condition ${eff.effectVisual} refuses; escardgm line ${eff.effectAsset})`);
+    return false;
+  }
   const vm = startProgram(duel, actor, eff, {
     interactive: opts.interactive ?? false,
     ...(target ? { target } : {}),

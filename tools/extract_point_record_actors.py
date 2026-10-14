@@ -2562,7 +2562,24 @@ TWO_SLOT_SITES = [
         "waitBlanks": 30, "blinkSteps": 0xFE, "blinkStep": 0x100,
         "deltaEnd": 0x3E8,
         "deltaTable": 0x800A66A0,
+        # The constructor's create-time flag read (file 0x4d0-0x4fc): `li $a0,
+        # F` / `li $a1, P` / get_flag / `sh 1` or `sh zr` into obj+0x58.  The
+        # claim's 127-pixel drop is gated on that word, so the object is born
+        # lifted exactly when the flag is set.
+        "seedFlagAt": {"flag": 0x800A62B0, "arg": 0x800A62B4,
+                       "getFlag": 0x800A62BC,
+                       "storeOne": 0x800A62D8, "storeZero": 0x800A62DC},
         "anchors": [
+            (0x800A62B0, 'li $a0, 0x1c3d',
+             "ctor: the create-time flag id"),
+            (0x800A62B4, 'li $a1, 0x1',
+             "ctor: with polarity 1"),
+            (0x800A62BC, 'lw $v1, -0x7534($v1)',
+             "ctor: [0x80048acc] = get_flag"),
+            (0x800A62D8, 'sh $v0, 0x58($s0)',
+             "ctor: +0x58 = 1 when the flag reads set"),
+            (0x800A62DC, 'sh $zr, 0x58($s0)',
+             "ctor: +0x58 = 0 otherwise"),
             (0x800A5DFC, 'addiu $sp, -0x20',
              "the tick"),
             (0x800A5E64, 'li $t0, 0x2',
@@ -2906,6 +2923,28 @@ def mine_two_slot(ov, spec, arms, reg, points, checked):
                          % (table_ram, spec["deltaTable"]))
     end = spec["deltaEnd"]
     deltas = read_deltas(ov, table_ram, end)
+    # The constructor's create-time seed (file 0x4d0-0x4fc), read out of the
+    # image like every other number here: `li $a0, F` / `li $a1, P` /
+    # [0x80048acc] / `sh 1` or `sh zr` into obj+0x58.  The claim's drop is
+    # gated on that word, so a stage whose flag reads set at construction is
+    # born with both rows 127 pixels up.
+    seed = {}
+    for key, want in (("flag", 0x2404), ("arg", 0x2405)):
+        at = spec["seedFlagAt"][key]
+        word = ov.word(at)
+        if (word >> 16) != want:
+            raise ValueError("the create-time seed's %s is not `li` at %#010x"
+                             % (key, at))
+        seed[key] = word & 0xFFFF
+    gf = ov.word(spec["seedFlagAt"]["getFlag"])
+    if (gf >> 26) != 0x23 or (gf & 0xFFFF) != 0x8ACC:
+        raise ValueError("the create-time seed does not read [0x80048acc]")
+    for key in ("storeOne", "storeZero"):
+        word = ov.word(spec["seedFlagAt"][key])
+        if (word >> 26) != 0x29 or ((word >> 21) & 0x1F) != 16 \
+                or (word & 0xFFFF) != 0x58:
+            raise ValueError("the create-time seed's store at %#010x is not a "
+                             "halfword to obj+0x58" % spec["seedFlagAt"][key])
     # The configure arm's two halfword stores, keyed by the sub id each beq tests.
     directions = {}
     for sub, at in ((0x348, 0x800A6260), (0x349, 0x800A6278)):
@@ -2957,6 +2996,7 @@ def mine_two_slot(ov, spec, arms, reg, points, checked):
             "blinkSteps": spec["blinkSteps"],
             "blinkStep": spec["blinkStep"],
             "directions": directions,
+            "seedFlag": {"id": seed["flag"], "arg": seed["arg"]},
             "startSound": "0x8004103C",
             "waitSound": "0x01080001",
         },
@@ -4162,6 +4202,61 @@ def build_ride_walker_members(overlays, points, reg, checked):
     return out
 
 
+# ── the flag-gated mode writer (s421 Qing Long City) ────────────────────────
+#
+# The family's one actor that claims NO record and runs NO stepper.  Its state
+# 0 walks the stage's own point table and writes the ANIMATION MODE byte
+# (record+5) of every record whose atlas byte (+1) equals `tag`, from
+# `get_flag(flag) != 0` -- `sltu $a1, $zr, $v0` normalizes the flag to 0/1
+# before the store.  On the console Qing Long City's windmills and fans are
+# frozen while flag 0x1a0a is clear and spin once it is set (the flag's
+# producer is the s435 flag-set script); the walker's ordinary route never ran
+# this actor, so its windmills spun regardless of the flag.
+#
+# `anchors` are the load-bearing instructions of that walk, each read at its
+# RAM address from wstag421.s and re-checked against the shipped image.
+MODE_GATE_SITES = [
+    {
+        # ── s421 Qing Long City, the overlay-base actor (file 0x0-0x138) ────
+        "stage": "421", "tag": 1, "flag": 0x1A0A,
+        "anchors": [
+            (0x800A5E18, "li $a0, 0x1a0a", "the flag the mode follows"),
+            (0x800A5E20, "lw $v0, -0x7534($v0)",
+             "get_flag at [0x80048acc] (flagapi+0x10)"),
+            (0x800A5E28, "jalr $v0", "the get_flag call"),
+            (0x800A5E2C, "li $a1, 0x1", "get_flag's second argument"),
+            (0x800A5E34, "lw $a0, -0x6270($v1)",
+             "the stage's point table at 0x80099d90"),
+            (0x800A5E3C, "lbu $v1, 0x2($a0)", "record+2 == 0 ends the walk"),
+            (0x800A5E48, "sltu $a1, $zr, $v0", "mode = (flag != 0)"),
+            (0x800A5E4C, "li $a2, 0x1", "the atlas tag the write matches"),
+            (0x800A5E50, "addiu $v1, $a0, 0x2", "the record cursor"),
+            (0x800A5E54, "lbu $v0, -0x1($v1)", "record+1 = the atlas tag"),
+            (0x800A5E5C, "bne $v0, $a2, .L0x00000088", "only the tag is written"),
+            (0x800A5E64, "sb $a1, 0x3($v1)", "record+5 = the mode"),
+            (0x800A5E68, "addiu $v1, 0x12", "0x12-byte record stride"),
+            (0x800A5E74, "bnez $v0, .L0x00000074", "walk to the terminator"),
+        ],
+    },
+]
+
+
+def build_mode_gate_rows(overlays):
+    """The mode-gate rows, every anchor re-read from the overlay image."""
+    out = []
+    for spec in MODE_GATE_SITES:
+        ov = overlays.setdefault(spec["stage"], Overlay(spec["stage"]))
+        for ram_addr, text, note in spec["anchors"]:
+            ov.check(ram_addr, text, note)
+        out.append({
+            "stage": "s" + spec["stage"],
+            "tag": spec["tag"],
+            "flag": spec["flag"],
+            "cite": "pro/wstag%s.s" % spec["stage"],
+        })
+    return out
+
+
 def build():
     try:
         points = json.loads(POINTS.read_text())
@@ -4213,7 +4308,7 @@ def build():
                   for spec in (PAD_SITES + DECOR_SITES + POINT_SITES
                                + SLOT_SITES + SINGLE_SITES + RISE_SITES
                                + TWO_SLOT_SITES + PICTURE_STEPS_SITES
-                               + RIDE_WALKER_SITES))
+                               + RIDE_WALKER_SITES + MODE_GATE_SITES))
     machines = {}
     for members in stages.values():
         for member in members.values():
@@ -4221,6 +4316,7 @@ def build():
     return {
         "twoSlotCensus": two_slot_census,
         "inPlaceRefused": inplace_refused,
+        "modeGates": build_mode_gate_rows(overlays),
         "source": {
             "overlayBase": ram(OVERLAY_BASE),
             "images": "web/assets/native/sNNN.bin",

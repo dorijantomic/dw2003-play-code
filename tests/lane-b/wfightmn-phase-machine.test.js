@@ -261,8 +261,8 @@ test("the phase advance and the two exits are the disc's own words", () => {
 const DISAGREEMENTS = [
   { phase: 0, walker: "INTRO (ST.INTRO=1, b.timer>1.2 -> PLAYER_MENU)",
     disagreement: "the walker's INTRO is a 1.2s timer; the original's phase 0 builds five sub-objects and hands to phase 1 through ctx->+0x40. Case: a battle whose sub-object build takes longer than 1.2s (or fails) times the walker into the menu while the original is still in phase 0." },
-  { phase: 1, walker: "INTRO line + HUD",
-    disagreement: "the walker's 'Ambush!' line is a scripted message in ST.INTRO; the original's phase 1 reads the encounter row, picks one of four intro variants (0x800A4536) and loads the combatant table. Case: a battle id/map-id pair naming variant 2/3/4 shows the walker a generic intro, the original a variant intro." },
+  { phase: 1, walker: "the opening machine's phase 1 (loadEncounterAndFighters + the ambush roll)",
+    disagreement: "the walker ports the intro-variant rule (introVariantFor) and the ambush roll F0x800a684c (ambushRoll, fed the encounter's own chance byte, the first enemy's level and the first party member's level), so the 'Ambush!' line now appears at the encounter's own rate; what it does NOT port is the ambush branch's forced opening form (table 0x8003ef5c[idx*0x58] / GAME+0x2738 / record +0x764). Case: a battle whose roll returns 1 opens the partner in the record's own opening form in the original, while the walker keeps the roster's configured form." },
   { phase: 2, walker: "no state (the walker never re-queues its own overlay)",
     disagreement: "the original's phase 2 re-queues the battle overlay (F0x800a6414) and phase 3 blocks on it; the walker has no equivalent load beat. Case: watching the frame the fight is armed — the original holds two frames in 2/3, the walker goes straight to the menu." },
   { phase: 3, walker: "no state",

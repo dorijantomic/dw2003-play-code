@@ -635,16 +635,19 @@ export function applyAilment(
     side,
     slot,
     ailment: ail,
-    // The record's own `+0x38` byte is the ailment id the apply machine hands the stager
-    // (`lbu $a2, 0x38($r4)` `pro/fightstg.s:15196`, `:15206`, `:15216`, `:15226`); the
-    // three cure stagers keep it at `record+0x1d` / `+0x1e` / `+0x1f`.
-    ailmentId: ail === "poison" ? 0x1e : ail === "frozen" ? 0x1f
-      : ail === "confuse" ? 0x20 : 0x21,
+    // The stager's third argument is the apply machine's OWN effect byte — `lbu $a2,
+    // 0x38($s4)` with `$s4 = 0x800a43f4 + slot` (`pro/fightstg.s:15196`, `:15206`,
+    // `:15216`, `:15226`), i.e. `effects[slot]`, which the appliers filled with the rolled
+    // f9/effect_p2 magnitude (`sb $v1, 0x3a($s1)` F0x8009d140, `sb $v1, 0x442f($v0)`
+    // F0x8009d1dc, and the same for the confused/asleep appliers). It is the code-9
+    // payload and the `G` of every recovery delay, NOT the `li $v0, 0x1e`-`0x21` next to
+    // each stager call — those are the message-box ids stored to the screen's `+0x54`.
+    magnitude: power,
     delay: {
       draw,
       ownSpt: Math.max(0, effSptOf(c) | 0),
-      ailmentId: ail === "poison" ? 0x1e : ail === "frozen" ? 0x1f
-        : ail === "confuse" ? 0x20 : 0x21,
+      // `0x800a435d` — the magnitude the stager wrote in its delay call's delay slot.
+      magnitude: power,
       otherA: fields.element,
       otherB: fields.statusResistance,
     },
@@ -860,16 +863,18 @@ export function processTurnStart(
   // used to sit in front of an action's line was the typed regeneration sentence, and
   // that is the kind-10 status page now. Kept as the field every caller reads.
   const prefix = "";
-  // The three arms of FIGHTSTG_F0x80088564 (fightstg.s:5997-6027). Each one puts up ONE
+  // The three arms of FIGHTSTG_F0x80088564 (fightstg.s:5997-6027) run in the original's
+  // order: SLEEP first (bit 0x08, fightstg.s:5980-5986), then the frozen roll (bit 0x02,
+  // :5987-6000), then the confused gag (bit 0x04, :6001-6021). Each one puts up ONE
   // battle message box page through the shared tail at `.L0x80088860`: the Digimon's name
   // on line one and the bank's own line on line two (kind 2). The words are the disc's,
   // read off `web/assets/data/battlecmd/esmfight.json`; none of them is a sentence typed
   // here. See engine/dw3/battle-ailment-display.ts for the citations.
-  if (frozenGate && frozenGateBlocksTurn(c, RAND_U16)) {
-    return turnStartSkip(prefix, name, "frozen", 0);
-  }
   if (a.sleep) {
     return turnStartSkip(prefix, name, "sleep", 0);
+  }
+  if (frozenGate && frozenGateBlocksTurn(c, RAND_U16)) {
+    return turnStartSkip(prefix, name, "frozen", 0);
   }
   if (a.confuse && handleConfusion) {
     // Enemy/auto path: FIGHTSTG_F0x80088564 emits one random gag (`0x83 + acc % 8`) and

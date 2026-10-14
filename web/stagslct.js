@@ -35,7 +35,7 @@
 import { drawText } from "./uifont.js";
 
 let DATA = null;
-if (typeof fetch !== "undefined") {
+if (typeof fetch !== "undefined" && typeof location !== "undefined") {
   fetch("assets/data/stagslct_ui.json")
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => { DATA = j; })
@@ -47,6 +47,19 @@ if (typeof fetch !== "undefined") {
 // See the 2026-08-05 section of the decode doc.
 const CH = () => (DATA && DATA.chrome) || null;
 const VISIBLE_ROWS = 14; // chrome.list.rows_visible — row count clamp at file 0x21f4
+
+// The cursor step rule of the original mover F0x80084a5c (claim
+// `stagslct-movecursor-address-2026-10-11`): the step is refused at either end
+// of the list — it restores the entry position rather than wrapping, so a press
+// that cannot move leaves the cursor where it is. This screen's list is already
+// filtered to the selectable rows, so the original's skip loop reduces to a
+// clamp here. The full mover is ported in engine/dw3/ui/native/stage-select.ts
+// (`stageSelectMoveCursor`) and proved against the original by
+// tests/lane-b/stage-select-move-cursor.test.js.
+export function cursorStep(cursor, count, delta) {
+  if (!(count > 0)) return 0;
+  return Math.max(0, Math.min(count - 1, (cursor | 0) + (delta | 0)));
+}
 
 export function createStagslctMenu() {
   const d = { open: false, cursor: 0, scroll: 0, onPick: null };
@@ -84,9 +97,9 @@ export function createStagslctMenu() {
     const list = selectable();
     if (!list.length) return true;
     if (k === "arrowup") {
-      d.cursor = (d.cursor - 1 + list.length) % list.length;
+      d.cursor = cursorStep(d.cursor, list.length, -1);
     } else if (k === "arrowdown") {
-      d.cursor = (d.cursor + 1) % list.length;
+      d.cursor = cursorStep(d.cursor, list.length, 1);
     } else if (k === "pageup") {
       d.cursor = Math.max(0, d.cursor - VISIBLE_ROWS);
     } else if (k === "pagedown") {

@@ -213,17 +213,18 @@ export function createCardShop(sfx = null) {
 
     if (c.screen === "root") {
       const n = LAYOUT?.root_menu?.optionCount ?? 3;
-      if (k === "up") { sfx?.play("system06"); c.rootSel = Math.max(0, c.rootSel - 1); return true; }
-      if (k === "down") { sfx?.play("system06"); c.rootSel = Math.min(n - 1, c.rootSel + 1); return true; }
+      if (k === "up") { sfx?.play("system02"); c.rootSel = Math.max(0, c.rootSel - 1); return true; }
+      if (k === "down") { sfx?.play("system02"); c.rootSel = Math.min(n - 1, c.rootSel + 1); return true; }
       if (confirm) {
-        sfx?.play("system07");
+        sfx?.play("system00");
         c.message = "";
         if (c.rootSel === 2) {
           if (c.onEditFolder) { c.onEditFolder(); return true; }
           return true;
         }
         if (c.rootSel === 1 && !heldPackSets().length) {
-          sfx?.play("system02");
+          // The disc's root confirm has already played its cue and the popup
+          // that follows is silent (F0x8008838C state 3 -> state 0x64/0x65).
           c.message = LAYOUT?.strings?.noBoosters ?? "No boosters";
           return true;
         }
@@ -232,7 +233,7 @@ export function createCardShop(sfx = null) {
         c.packSel = 0;
         return true;
       }
-      if (back) { sfx?.play("system02"); requestLeave(); return true; }
+      if (back) { sfx?.play("system01"); requestLeave(); return true; }
       return true;
     }
 
@@ -250,13 +251,13 @@ export function createCardShop(sfx = null) {
         c.confirmSel = 0;
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "root"; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "root"; return true; }
       return true;
     }
 
     if (c.screen === "confirm") {
-      if (k === "up") { sfx?.play("system06"); c.confirmSel = 0; return true; }
-      if (k === "down") { sfx?.play("system06"); c.confirmSel = 1; return true; }
+      if (k === "up") { sfx?.play("system02"); c.confirmSel = 0; return true; }
+      if (k === "down") { sfx?.play("system02"); c.confirmSel = 1; return true; }
       if (confirm) {
         if (c.confirmSel === 0) {
           // F0x80086DC4 makes two refusals in this order before the sale:
@@ -265,26 +266,29 @@ export function createCardShop(sfx = null) {
           const card = buyList()[c.buyCursor];
           const price = cardPrice(card);
           if (card && (c.state?.bits ?? 0) < price) {
-            sfx?.play("system02");
+            // The refusal window's own cue (F0x80086DC4 file 0x4c5c / the
+            // port's state 12 dismiss): 0x0004001C.
+            sfx?.play("system07");
             c.message = LAYOUT?.strings?.notEnoughBit ?? "Not enough BIT.";
           } else if (card && ownedCount(cards(), card.id) >= COLLECTION_CAP) {
-            sfx?.play("system02");
+            sfx?.play("system07");
             c.message = LAYOUT?.strings?.tooManyCards ?? "Too many cards";
           } else if (card) {
             c.state.bits -= price;
             grantCard(cards(), card.id, 1);
             refreshBits();
-            sfx?.play("system07");
+            // The prompt's own confirm (file 0x4a34): 0x8004503C.
+            sfx?.play("system00");
             c.message = "";
           } else {
-            sfx?.play("system02");
+            sfx?.play("system07");
             c.message = LAYOUT?.strings?.notEnoughBit ?? "Not enough BIT.";
           }
-        } else sfx?.play("system02");
+        } else sfx?.play("system00");
         c.screen = "buy";
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "buy"; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "buy"; return true; }
       return true;
     }
 
@@ -293,32 +297,32 @@ export function createCardShop(sfx = null) {
       // hold, and there is no price — packs are won, not bought.
       const held = heldPackSets();
       if (held.length) {
-        if (k === "up") { sfx?.play("system06"); c.packSel = Math.max(0, c.packSel - 1); return true; }
-        if (k === "down") { sfx?.play("system06"); c.packSel = Math.min(held.length - 1, c.packSel + 1); return true; }
-        if (k === "l1") { sfx?.play("system06"); c.packSel = Math.max(0, c.packSel - 8); return true; }
-        if (k === "r1") { sfx?.play("system06"); c.packSel = Math.min(held.length - 1, c.packSel + 8); return true; }
+        if (k === "up") { sfx?.play("system02"); c.packSel = Math.max(0, c.packSel - 1); return true; }
+        if (k === "down") { sfx?.play("system02"); c.packSel = Math.min(held.length - 1, c.packSel + 1); return true; }
+        if (k === "l1") { sfx?.play("system02"); c.packSel = Math.max(0, c.packSel - 8); return true; }
+        if (k === "r1") { sfx?.play("system02"); c.packSel = Math.min(held.length - 1, c.packSel + 8); return true; }
       }
       if (confirm) {
         const setId = held[Math.min(c.packSel, held.length - 1)];
         const pull = setId === undefined ? null : openBooster(setId);
         if (pull) {
           beginReveal(pull);
-          sfx?.play("system07");
+          sfx?.play("system00"); // the booster list's confirm (F0x800844B8 file 0x1eac)
           c.message = LAYOUT?.strings?.openedBooster ?? "Opened booster.";
           if (c.packSel >= heldPackSets().length) c.packSel = 0;
         } else {
-          sfx?.play("system02");
+          sfx?.play("system00");
           c.message = LAYOUT?.strings?.noBoosters ?? "No boosters";
         }
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "root"; c.lastPull = null; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "root"; c.lastPull = null; return true; }
       return true;
     }
 
     if (c.screen === "reveal") {
       if (back || confirm) {
-        sfx?.play("system02");
+        sfx?.play("system01"); // the reveal list's cancel (F0x800844B8 file 0x2350)
         c.screen = "booster";
         c.revealActive = false;
         return true;

@@ -17,6 +17,7 @@ const host = () => ({ setFlag() {}, getFlag: () => 0, rand16: () => 0x777 });
 const FAMILY = [
     { module: "pro/stgmcard", file: "pro_stgmcard.bin", start: 0x80087fdc, tick: 0x8008801c },
     { module: "pro/stgdglab", file: "pro_stgdglab.bin", start: 0x8008f32c, tick: 0x8008f36c },
+    { module: "pro/stcrdabm", file: "pro_stcrdabm.bin", start: 0x800859a0, tick: 0x800859e0 },
 ];
 
 const OBJ_A = 0x80180000;
@@ -79,6 +80,11 @@ for (const f of FAMILY) {
         runStart("fractional delta", 0, 0x1000, 7);
         runStart("negative delta", 0x1000, 0, 10);
         runStart("large values", 0x1234, 0x5678, 0x0d);
+        // A zero step count divides by zero: the hardware quotient is -1 for a
+        // positive dividend and +1 for a negative one (the same model
+        // reportFadeStart uses).
+        runStart("zero steps rising", 0, 0x1000, 0);
+        runStart("zero steps falling", 0x1000, 0, 0);
     });
 
     test(`${f.module} tween tick ${f.tick.toString(16)} matches tweenLinearTick`, () => {

@@ -45,11 +45,12 @@ import {
 } from "./native/album-lifecycle.ts";
 import { albumScreenTick, ALBUM_TICK_FIELDS } from "./native/album-tick.ts";
 import { albumGridCreate, albumGridTick, GRID_HANDLER, GRID_SIZE } from "./native/album-grid-object.ts";
-import { albumGridDrawSilhouettes, ALBUM_CARD_MAX, type AlbumGridHost } from "./native/album-grid.ts";
+import { albumGridDrawSilhouettes, albumGridBeginPage, ALBUM_CARD_MAX, type AlbumGridHost } from "./native/album-grid.ts";
 import { albumGridDrawCells } from "./native/album-cells-draw.ts";
 import { albumPanelCreateLabels, albumPanelFillHeadings } from "./native/album-panel.ts";
 import {
-  albumCellPaint, albumMakePopup, albumPageMask, ALBUM_POPUP_HANDLER, ALBUM_POPUP_SIZE,
+  albumCellPaint, albumMakePopup, albumPageMask, albumPopupFadeStart, albumPopupFadeTick,
+  ALBUM_POPUP_HANDLER, ALBUM_POPUP_SIZE,
 } from "./native/album-leaves.ts";
 import { albumPageHasCollected, albumGridDrawFaces } from "./album-residue.ts";
 import { albumRequestTextBanks, albumTextBanksPending } from "./native/album-banks.ts";
@@ -284,7 +285,14 @@ export class AlbumSession {
       widget118: (widget: number, line: number, value: number) => this.widgets.textNumber(widget, line, value),
       widget144: (widget: number, value: number) => this.widgets.textShow(widget, value),
       widget148: (widget: number, value: number) => this.widgets.textMeasure(widget, value),
-      widget84: (widget: number, x: number, y: number) => this.widgets.cursorPlace(widget, x, y),
+      // The screen tick's page change calls the GRID's +0x84 with page*12|1
+      // (stcrdabm F0x80084C38 0x80084FA8-0x80084FC8 / 0x80084FD4-0x80084FF4;
+      // a0 = [ctx+0x44], the grid object). +0x84 is the grid's begin-page
+      // (F0x80083114), not a cursor position setter: it stores the page's first
+      // card id in the grid's +0x5C, keeps the old window in +0x60, clears
+      // +0x68/+0x70 and restarts the reveal. Mapping it to cursorPlace left the
+      // grid window at 0 after every page turn (audit 2026-10-14).
+      widget84: (widget: number, x: number, _y: number) => albumGridBeginPage(this.mem, widget, x, this.gridHost()),
       widget64: (widget: number, a: number, b: number) => this.tree.callMethod(widget, 0x64, [a, b]),
     };
   }
@@ -407,33 +415,23 @@ export class AlbumSession {
     this.popup = object;
     return object;
   }
-  /** F0x80082D88(popup, direction, frames): start the popup's fade tween. */
+  /** F0x80082D88(popup, direction, frames): start the popup's fade tween.
+   *  Translated in native/album-leaves.ts and proved against the original by
+   *  tests/lane-b/album-popup-fade.test.js. */
   private popupFadeStart(popup: number, direction: number, frames: number): void {
-    this.tree.callMethod(popup, 0x28, [1]);
-    this.mem.write32(popup + 0x10, 1);
-    this.mem.write32(popup + 0x58, direction | 0);
-    if ((direction | 0) === 0) {
-      this.mem.write32(popup + 0x5c, 0);
-      this.mem.write32(popup + 0x60, (0xff00 / (frames | 0)) | 0);
-    } else {
-      this.mem.write32(popup + 0x5c, 0xff00);
-      this.mem.write32(popup + 0x60, (-(0xff00 / (frames | 0))) | 0);
-    }
+    albumPopupFadeStart(this.mem, popup, direction, frames,
+      { callMethod: (t, slot, args) => this.tree.callMethod(t, slot, args) });
   }
-  /** F0x80082F54(popup): advance the fade; state 2 means it has finished. */
+  /** F0x80082F54(popup): advance the fade; state 2 means it has finished.
+   *  The fade quad the tick submits is painted by the browser from
+   *  `fadeLevel()` (paintNativeSession), so the draw boundary is a no-op here —
+   *  the same substitution the naming screen's fade uses. */
   private popupTick(popup: number): void {
-    const state = this.mem.read32(popup + 0x0c) | 0;
-    if ((state === 1 || state === 0) && (this.mem.read32(popup + 0x10) | 0) !== 0) {
-      const value = ((this.mem.read32(popup + 0x5c) | 0) + (this.mem.read32(popup + 0x60) | 0)) | 0;
-      this.mem.write32(popup + 0x5c, value);
-      if ((this.mem.read32(popup + 0x58) | 0) === 0) {
-        if (value > 0xff00) { this.mem.write32(popup + 0x5c, 0xff00); this.mem.write32(popup + 0x0c, 2); }
-      } else if (value < 0) {
-        this.mem.write32(popup + 0x5c, 0); this.mem.write32(popup + 0x0c, 2);
-      }
-    } else if (state === 0) {
-      this.tree.callMethod(popup, 0x38, [popup]);
-    }
+    albumPopupFadeTick(this.mem, popup, {
+      baseMethod38: (obj) => { this.tree.callMethod(obj, 0x38, [obj]); },
+      drawFade: () => {},
+      callMethod: (t, slot, args) => this.tree.callMethod(t, slot, args),
+    });
   }
   private popupDone(): boolean { return this.popup !== 0 && (this.mem.read32(this.popup + 0x0c) | 0) === 2; }
 

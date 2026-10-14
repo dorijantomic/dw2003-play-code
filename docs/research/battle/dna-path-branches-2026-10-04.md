@@ -200,6 +200,34 @@ requires an authored special-mode battle and bounded capture at `0x8008F92C`.
 Static refusal/cancel decisions are settled; these presentation/corrupt-pointer
 observations do not justify inventing extra refusal conditions.
 
+## Two pane button/freeze behaviours the branch table does not enumerate
+
+Settled 2026-10-14 from the same bodies (audit branch `audit/dna-jogress-vs-decode`):
+
+* **The two sub-states test their buttons in OPPOSITE order.** The species strip
+  tests Cross first — `fightstg.s:22085` `.L0x80098270: andi $v0, $v1, 0x4000`,
+  branch to the cancel arm at `:22086` — and Circle second at `:22087`. The option
+  rows test Circle first — `:22246` `.L0x800984f4: andi $v0, $v1, 0x2000`, with
+  `beqz $v0, .L0x800986f8` at `:22247` sending a frame without Circle on to the
+  Cross test at `:22375`. A frame carrying both buttons therefore cancels on the
+  names and commits the confirm on the rows.
+* **The strip's Circle freezes the species list with the pane's BUILD flag.** The
+  store is `:22224` `.L0x8009849c: sw $s0, 0x54($v0)`, and `$s0` was loaded from
+  the pane's `+0x14` by the sub-state-0 dispatch (`:22053` `.L0x800981f0: lw $s0,
+  0x14($s1)`), so the value is always 1 on that path. The rows' confirm writes
+  the same field from `$s4`, also the build flag (`:22374` `.L0x800986f4: sw $s4,
+  0x54($v0)`). The shared list widget only tests that word for non-zero
+  (`:25089-25091` `.L0x8009b010: lw $v0, 0x54($s1)` / `bnez $v0, .L0x8009b0b4`).
+
+Both were walker port defects, fixed on that branch: `markSpecies` wrote the
+partner's combatant index (0 for a roster-slot-0 partner, so the list stayed
+live), and the options tick tested cancel before confirm. `tests/lane-b/fight-dna-menu.test.js`
+gained four oracle cases (fail-before on the old code). One port-only guard
+remains: `dnaPaneCommit` returns when the option list model pointer is zero,
+where the original reads the row through it (`:22265` `.L0x80098540: lw $v0,
+0x50($v0)`); unreachable in ordinary play, because the option list is always
+built before the build flag advances.
+
 ## Validation and reproduction
 
 See `.bunny-scratch/dnabranches-report.md` for current command results, old-code

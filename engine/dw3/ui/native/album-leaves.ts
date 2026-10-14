@@ -192,6 +192,7 @@ export function albumCellPaint(
 }
 
 export interface AlbumPopupMemory {
+    read32(addr: number): number;
     write32(addr: number, value: number): void;
 }
 
@@ -207,4 +208,70 @@ export function albumMakePopup(mem: AlbumPopupMemory, host: AlbumPopupHost): num
     mem.write32(obj + ALBUM_POPUP_FIELDS.depth50, 0x1000);
     mem.write32(obj + ALBUM_POPUP_FIELDS.scale54, 0);
     return obj;
+}
+
+// ── the popup's fade start and tick (F0x80082D88 / F0x80082F54) ─────────────
+// The same 0..0xFF00 accumulator family as the fight report's fade and the
+// pause menu's dim quad: a direction-0 start rises from 0, any other direction
+// falls from 0xFF00, by 0xFF00 / frames per frame, and the level saturates at
+// its end (state 2). The claim is `stcrdabm-fader-lerp-addresses-2026-10-11`;
+// the oracle is tests/lane-b/album-popup-fade.test.js.
+
+export interface AlbumPopupFadeHost {
+    /** obj+0x28(1): the base start method. */
+    callMethod(target: number, slot: number, args: number[]): void;
+    /** obj+0x38(obj): the parked base method. */
+    baseMethod38(obj: number): void;
+    /** F0x80082E10(obj): submit the fade quad and its draw-mode word. */
+    drawFade(obj: number): void;
+}
+
+/** F0x80082D88(obj, direction, frames): start the popup's fade ramp. */
+export function albumPopupFadeStart(
+    mem: AlbumPopupMemory,
+    obj: number,
+    direction: number,
+    frames: number,
+    host: Pick<AlbumPopupFadeHost, "callMethod">,
+): void {
+    host.callMethod(obj, 0x28, [1]);
+    mem.write32(obj + 0x10, 1);
+    mem.write32(obj + 0x58, direction | 0);
+    // MIPS signed div: a zero divisor yields -1 for a positive dividend.
+    const step = frames === 0 ? -1 : Math.trunc(0xff00 / (frames | 0));
+    if ((direction | 0) === 0) {
+        mem.write32(obj + 0x5c, 0);
+        mem.write32(obj + 0x60, step | 0);
+        return;
+    }
+    mem.write32(obj + 0x5c, 0xff00);
+    mem.write32(obj + 0x60, (-step) | 0);
+}
+
+/** F0x80082F54(obj): one frame of the popup fade. */
+export function albumPopupFadeTick(mem: AlbumPopupMemory, obj: number, host: AlbumPopupFadeHost): void {
+    const state = mem.read32(obj + 0x0c) | 0;
+    if (state === 1) {
+        if ((mem.read32(obj + 0x10) | 0) === 0) return;
+        const value = ((mem.read32(obj + 0x5c) | 0) + (mem.read32(obj + 0x60) | 0)) | 0;
+        mem.write32(obj + 0x5c, value);
+        if ((mem.read32(obj + 0x58) | 0) === 0) {
+            if (value > 0xff00) {
+                mem.write32(obj + 0x5c, 0xff00);
+                mem.write32(obj + 0x0c, 2);
+            }
+        } else if (value < 0) {
+            mem.write32(obj + 0x5c, 0);
+            mem.write32(obj + 0x0c, 2);
+        }
+        host.drawFade(obj);
+        return;
+    }
+    if (state === 2) {
+        host.drawFade(obj);
+        return;
+    }
+    if (state === 3) return;
+    // State 0, a negative state and every state from 4 up park the object.
+    host.baseMethod38(obj);
 }

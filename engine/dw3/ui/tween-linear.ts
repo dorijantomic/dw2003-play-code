@@ -49,7 +49,11 @@ export function tweenLinearStart(
     const start = s32(from);
     const target = s32(to);
     const count = s32(steps);
-    const delta = count === 0 ? 0 : Math.trunc(((target - start) << 8) / count);
+    const dividend = ((target - start) << 8) | 0;
+    // MIPS `div` with a zero divisor: -1 for a non-negative dividend, +1 for a
+    // negative one. (A zero step count is not reachable from the shipped call
+    // sites; the oracle pins it because the instruction's quotient is defined.)
+    const delta = count === 0 ? (dividend >= 0 ? -1 : 1) : Math.trunc(dividend / count);
     mem.write32(obj + TWEEN_STEPS, count >>> 0);
     mem.write32(obj + TWEEN_ACCUM, (start << 8) >>> 0);
     mem.write32(obj + TWEEN_VALUE, start >>> 0);

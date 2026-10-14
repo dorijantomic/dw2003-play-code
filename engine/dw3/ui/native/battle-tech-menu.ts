@@ -49,11 +49,17 @@ export const TECH_LIST_LAST_CURSOR = 0x54;
 export const TECH_LIST_OUT = 0x50;
 export const TECH_LIST_WIDGET_SLOT = 0x1c;
 export const TECH_LIST_ROWS = 6;
-/** The entry word: 13 bits of technique id, bit 14 "moved to the back", bit 15 "pre-selected". */
+/**
+ * The entry word: 13 bits of technique id, bit 14 the LOAN flag (0x4000 — set
+ * on a technique borrowed from another equipped form; the row palette and the
+ * MP price rule both read it), bit 15 "pre-selected" (0x8000 — the signature,
+ * and the Blast signature while active).
+ */
 export const TECH_ID_MASK = 0x1fff;
-export const TECH_FLAG_BACK = 0x4000;
+export const TECH_FLAG_LOADED = 0x4000;
 export const TECH_FLAG_PRESELECTED = 0x8000;
-export const TECH_CLEAR_FLAGS = -0x4001;
+/** The alias the palette/draw code was written with; same bit as TECH_FLAG_LOADED. */
+export const TECH_FLAG_BACK = TECH_FLAG_LOADED;
 /** The battle workspace: the acting slot at +0x08, the party records at +0x10, 0x20 bytes each. */
 export const TECH_PARTY_BASE = 0x800a4470;
 export const TECH_PARTY_INDEX = 0x800a4468;
@@ -243,10 +249,10 @@ export function techListTick(
 /**
  * F0x800967A0 state 0 (fightstg.s:20345-20620): read the acting member's
  * technique words a page at a time, append every non-zero one to the list at
- * +0x9C with bits 14 and 15 cleared, append the pre-selected row when the party
- * carries the +0x1A flag, move every bit-14 entry to the back of the list,
- * compute the page count, write the row count into the config block, build the
- * model, build and fill the widgets and call the screen's per-frame method.
+ * +0x9C with its flags intact, mark or append the current form's signature
+ * with bit 15 while the party carries the +0x1A flag, compute the page count,
+ * write the row count into the config block, build the model, build and fill
+ * the widgets and call the screen's per-frame method.
  */
 export function techListBuild(
     mem: TechListMemory,
@@ -282,76 +288,51 @@ export function techListBuild(
             for (let i = 0; i < TECH_LIST_ROWS; i++) {
                 const word = mem.read16(dest + TECH_LIST_PAGE_IDS - TECH_LIST_PAGE_FILL + i * 2) | 0;
                 if ((s16(word) | 0) === 0) continue;
+                // The words keep their flags: the caller's list already cleared
+                // bit 14 on the current form's own slots and kept it on the
+                // sibling loans (F0x800967A0 :20368-:20466), and the row palette
+                // and the price rule both read it back.
                 let count = mem.read32(self + TECH_LIST_COUNT) | 0;
-                mem.write32(self + TECH_LIST_ENTRIES + count * TECH_LIST_ENTRY_STRIDE,
-                    (s16(word) & TECH_CLEAR_FLAGS) | 0);
+                mem.write32(self + TECH_LIST_ENTRIES + count * TECH_LIST_ENTRY_STRIDE, s16(word) | 0);
                 mem.write32(self + TECH_LIST_COUNT, count + 1);
             }
         }
     }
 
-    // The pre-selected technique is appended with bit 15 when the party carries
-    // the +0x1A flag: the record's +0x28 id is matched against the list, and the
-    // row is appended once either way.
-    let appended = 0;
+    // The current form's signature is marked or appended with bit 15 while the
+    // party carries the +0x1A flag (Blast active): an entry whose 13-bit id
+    // matches is REWRITTEN as id | 0x8000, else the signature is appended with
+    // the flag (F0x800967A0 :20381-:20400, `.L0x80096878`).
     if ((mem.read8(party + TECH_PARTY_NO_CHARGE) | 0) !== 0) {
         const record = host.preselectRecord(mem.read16s(party) | 0);
         if (record !== null) {
-            const id = mem.read16(record + 0x28) | 0;
+            const signature = mem.read16(record + 0x28) | 0;
+            let found = false;
             const count = mem.read32(self + TECH_LIST_COUNT) | 0;
             for (let i = 0; i < count; i++) {
-                const entry = mem.read32(self + TECH_LIST_ENTRIES + i * TECH_LIST_ENTRY_STRIDE) | 0;
-                if ((entry & TECH_ID_MASK) === id) {
-                    appendEntry(mem, self, (mem.read16(record + 0x28) | 0) | TECH_FLAG_PRESELECTED);
-                    appended = 1;
+                const at = (self + TECH_LIST_ENTRIES + i * TECH_LIST_ENTRY_STRIDE) >>> 0;
+                const entry = mem.read32(at) | 0;
+                if ((entry & TECH_ID_MASK) === signature) {
+                    mem.write32(at, ((entry & TECH_ID_MASK) | TECH_FLAG_PRESELECTED) | 0);
+                    found = true;
                     break;
                 }
             }
-            if (appended === 0) appendEntry(mem, self, (mem.read16(record + 0x28) | 0) | TECH_FLAG_PRESELECTED);
+            if (!found) appendEntry(mem, self, (signature & TECH_ID_MASK) | TECH_FLAG_PRESELECTED);
         }
     }
 
-    moveFlaggedToBack(mem, self, pages, techCount);
     techListFinishBuild(mem, self, slot, host);
 }
 
 /**
- * fightstg.s:20486-20562: collect every list entry whose page word carried bit
- * 14 into a scratch array, then append each one that is not already listed
- * (compared by the 13-bit id), keeping bit 14 set.
+ * fightstg.s:20496-20499 and 20526-20532: append one entry and count it.
+ * (The sibling merge that used to live here as `moveFlaggedToBack` — collect
+ * bit-14 page words, append the missing ones — is the SAME list step the caller's
+ * seed already performs: the original's merge appends the sibling loans once,
+ * inside the build, and the port was re-appending a list that already contained
+ * them, so the pass was always a no-op. The words now arrive flagged.)
  */
-function moveFlaggedToBack(
-    mem: TechListMemory,
-    self: number,
-    pages: number,
-    techCount: number,
-): void {
-    const flagged: number[] = [];
-    for (let page = 0; page < pages; page++) {
-        const dest = (self + TECH_LIST_PAGE_FILL + page * TECH_LIST_PAGE_STRIDE) >>> 0;
-        if ((mem.read16s(dest) | 0) !== techCount) continue;
-        for (let i = 0; i < TECH_LIST_ROWS; i++) {
-            const word = mem.read16(dest + TECH_LIST_PAGE_IDS - TECH_LIST_PAGE_FILL + i * 2) | 0;
-            if (((word & TECH_FLAG_BACK) >>> 0) === 0) continue;
-            flagged.push(s16(word));
-        }
-    }
-    for (const entry of flagged) {
-        const id = entry & TECH_ID_MASK;
-        let count = mem.read32(self + TECH_LIST_COUNT) | 0;
-        let present = false;
-        for (let i = 0; i < count; i++) {
-            if (((mem.read32(self + TECH_LIST_ENTRIES + i * TECH_LIST_ENTRY_STRIDE) | 0) & TECH_ID_MASK) === id) {
-                present = true;
-                break;
-            }
-        }
-        if (present) continue;
-        appendEntry(mem, self, s16(entry) | 0);
-    }
-}
-
-/** fightstg.s:20496-20499 and 20526-20532: append one entry and count it. */
 function appendEntry(mem: TechListMemory, self: number, entry: number): void {
     const count = mem.read32(self + TECH_LIST_COUNT) | 0;
     mem.write32(self + TECH_LIST_ENTRIES + count * TECH_LIST_ENTRY_STRIDE, entry | 0);

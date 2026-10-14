@@ -106,3 +106,42 @@ export function pushComposite(drawables, key, parts, tag = null) {
         draw: () => { for (const d of draws) d(); },
     });
 }
+
+/**
+ * Order the frame's drawables the way the disc's queue and its ordering-table
+ * prepend order them, and hand the list back for the draw loop.
+ *
+ * Ascending key, because the flush walks its DESCENDING list head->tail and
+ * every callback PREPENDS its primitive into its bucket — `prim->next = old
+ * head; entry = prim`. The field actor's own billboard does it at
+ * `exe-decomp/fieldstg_c/F0x8008f52c.c:69-70` and the map-tile draw at
+ * `pro/fieldstg.s .L0x000043a4-0x43d0` — so the LAST callback's primitive is
+ * the bucket head, drawn first, and a LARGER key renders in FRONT. `|| 0`
+ * guards the Infinity band (Infinity - Infinity is NaN; 0 keeps the stable
+ * insertion order, map fg overlay first, then point-sprite fg records).
+ *
+ * EQUAL KEYS: the queue keeps arrival order among them, and its head-most
+ * record is called first — and the first call is the deepest in the bucket
+ * list, drawn last, ON TOP. So among equal keys the EARLIER arrival renders on
+ * top. The sort above is stable, so each equal-key run is reversed to put the
+ * earlier arrival last (drawn on top). The two sentinel bands are the walker's
+ * own collapse of the buckets above and below the entity bucket; their
+ * producers already submit in bucket order (the map fg at 3 before the
+ * bucket-2 records and glows), so they are left in insertion order.
+ */
+export function sortDrawables(drawables) {
+    drawables.sort((a, b) => (a.y - b.y) || 0);
+    for (let i = 0, n = drawables.length; i < n; ) {
+        let j = i + 1;
+        while (j < n && drawables[j].y === drawables[i].y) j += 1;
+        if (j - i > 1 && Number.isFinite(drawables[i].y)) {
+            for (let k = i, m = j - 1; k < m; k += 1, m -= 1) {
+                const swap = drawables[k];
+                drawables[k] = drawables[m];
+                drawables[m] = swap;
+            }
+        }
+        i = j;
+    }
+    return drawables;
+}

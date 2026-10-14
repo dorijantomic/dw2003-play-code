@@ -64,6 +64,7 @@ const STR_FX = "[circle] Button: Effects";             // 10
 const STR_DETAILS = "[circle] Button: Details";        // 11
 const CURSOR = "[arrow-right]";                        // 12
 const STR_HOWMANY = "How many?";                       // 17
+const STR_QTY_MARK = "X";                              // 8 (showQuantity's second label)
 const STR_NO_BIT = "Not enough BIT.";                  // 27
 const STR_TOO_MANY = "Too many items";                 // reject, full bag
 const STR_EQUIPPED = "Equipped.";                      // post-equip message
@@ -378,7 +379,7 @@ export function createShop(sfx = null) {
         sh._animStart("cfmPlate", "cfm");
         return;
       }
-      else if (key === "cross") { sfx?.play("system01"); backToList(); return; }
+      else if (key === "cross") { sfx?.play("system01"); sh.qty = 1; backToList(); return; }
       if (sh.qty !== q) sfx?.play("system06");
       return;
     }
@@ -390,9 +391,9 @@ export function createShop(sfx = null) {
       else if (key === "circle") {
         sfx?.play("system00");
         if (sh.confirmIdx === 0) sh._commit(state);
-        else backToList();
+        else { sh.qty = 1; backToList(); }
         return;
-      } else if (key === "cross") { sfx?.play("system01"); backToList(); return; }
+      } else if (key === "cross") { sfx?.play("system01"); sh.qty = 1; backToList(); return; }
       if (sh.confirmIdx !== c) sfx?.play("system02");
       return;
     }
@@ -825,8 +826,11 @@ export function createShop(sfx = null) {
       text(STR_ITEMS, 0xEA, 0x75 + m42);
       text(String(bag), 0x12A - textWidth(String(bag), 1), 0x75 + m42);
       // gold "{1} BIT" inside the band's price-plate section (rig: plain
-      // digits, no thousands separator — only the balance uses one)
-      const pd = String(sh._unitPrice(selItem));
+      // digits, no thousands separator — only the balance uses one).
+      // F0x80089E2C fills widget +0x18 with price x quantity (band+0x1E8): the
+      // running total, recomputed on every dial, never the bare unit price once
+      // a quantity is up. At qty 1 the two coincide, which is the list view.
+      const pd = String(sh._unitPrice(selItem) * sh.qty);
       text(pd, 0x117 - textWidth(pd, 3), 0x8B + m42, true);
       text("BIT", 0x11A, 0x8B + m42, true);
     }
@@ -934,13 +938,17 @@ export function createShop(sfx = null) {
         fold("qty", 0x140, 0x32, "x", () => drawClip(ctx, stshop, 13, 160, 36));
         fold("qty", 0x140, 0x3B, "x", () => drawClip(ctx, stshop, 4, 169, 38));
       }
-      // "How many?" plate clip 10 @ (154,52) + spinner clip 11 @ (246,79) + ▲/▼
+      // "How many?" plate clip 10 @ (154,52) + spinner clip 11 @ (246,79) + ▲/▼.
+      // The three widgets are F0x8008360C's decoded pens, refilled by
+      // showQuantity (F0x800836F8): "How many?" (0xB9,0x3A), the "X" marker
+      // (0x103,0x54), the value (0x11E,0x54) right-aligned by its +0x148 measure.
       if (fold("qty", 0x140, 0x42, "x", () => drawClip(ctx, stshop, 10, 0x9A, 0x34)) >= 1) {
-        text(STR_HOWMANY, 0xB4, 0x38);
+        text(STR_HOWMANY, 0xB9, 0x3A);
       }
       if (fold("qtySpin", 0x140, 0x59, "x", () => drawClip(ctx, stshop, 11, 0xF6, 0x4F)) >= 1) {
+        text(STR_QTY_MARK, 0x103, 0x54);
         const qs = String(sh.qty);
-        text(qs, 0x11E - textWidth(qs, 1), 0x55);
+        text(qs, 0x11E - textWidth(qs, 1), 0x54);
         const item = ITEM_BY_ID[sh._selected(state)?.id];
         if (sh.qty < sh._maxQty(state, item)) drawClip(ctx, stshop, 18, 0x122, 0x51);
         if (sh.qty > 1) drawClip(ctx, stshop, 19, 0x122, 0x5B);

@@ -50,7 +50,7 @@
 //         routePair:()=>[key, companion] } (all optional).
 // ownedSlots returns the obtained-partner bitmask (bit n = roster slot n obtained), the
 // walker's model of the original's `roster_owned[slot] != 0` (see dw3-config ROSTER_OWNED_VAR).
-import { partyCharismaMeets, routePairPredicate, isStoryCommandBank, flagConditionPasses, storyCommand } from "./vendor/engine.js";
+import { partyCharismaMeets, routePairPredicate, isStoryCommandBank, flagConditionPasses, storyCommand, ordinalInRange } from "./vendor/engine.js";
 
 const ITEM_BANKS = new Set([0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e]);
 const CARD_BANK = 0x92;
@@ -74,9 +74,15 @@ export function createFlagStore(backend, opts = {}) {
     if (bank === 0x70) {                                            // table-dispatched predicate
       const rec = rosterTable && rosterTable[id & 0x1ff];
       if (rec && (rec.op & 0xf0) === 0x30 && getOrdinal) {         // op0x30 = ordinal range
-        const ord = getOrdinal();
-        return (ord >= rec.ordinal_lo &&
-                (rec.ordinal_hi == null || ord <= rec.ordinal_hi)) ? 1 : 0;
+        // `F0x80015b9c` — `lo <= ordinal <= hi`, both bounds inclusive, hi the literal
+        // byte the disc stores. The seven records whose range has no end carry the byte
+        // 0x63 = 99 (extract_roster_predicate_table.py writes null for hi >= 0x63), and
+        // the disc compares it with no special case, so an open range ENDS AT 99 — it is
+        // not unbounded. Shared with the engine's FlagManager (engine/dw3/dw3-config.ts)
+        // so both consumers of the same bank resolve identically; reading null as
+        // "missing bound" is the bug claim bank70-open-range-upper-bound-99-2026-10-02
+        // closed on the engine side.
+        return ordinalInRange(rec.ordinal_lo, rec.ordinal_hi, getOrdinal()) ? 1 : 0;
       }
       // Everything else dispatches on the extractor's decoded `semantics` (see
       // tools/extract_roster_predicate_table.py). A record with no semantics, or one whose

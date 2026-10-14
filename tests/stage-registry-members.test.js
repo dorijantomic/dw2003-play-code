@@ -362,16 +362,17 @@ test("all twenty-three point-record actor members are listed as ported", () => {
   // moved here: s455 (0x33c) and s926 (0x356) came out of the separate
   // materialize-effect module into this one, so interpreter-only drops by two
   // and ported rises by two against the lead branch's 232 / 29.
-  assert.equal(json.summary.members_ported, 260,
+  assert.equal(json.summary.members_ported, 261,
     "226 shared/bubble/rock/broadcast members, the s780 news screens, stinger "
     + "and street lights, the two fixed still sprites on s310/s311, the two "
     + "arena markers on s305/s306, the twenty-three point-record actor members "
-    + "(the s785 picture stepper and the s415 ride walker included), "
+    + "(the s785 picture stepper and the s415 ride walker included), the s415 "
+    + "scenery layer (its own scroll_layers.json table, same module), "
     + "the two draw-context annotators on s805/s820, the two six-slot "
     + "display ensembles on s310, s545's child-pool parent and the two "
     + "\"triple\" parents on s460/s526, each of which exists only below its "
     + "own story-ordinal gate");
-  assert.equal(json.summary.members_interpreter_only, 1);
+  assert.equal(json.summary.members_interpreter_only, 0);
   assert.deepEqual(json.summary.broken_port_citations, []);
   assert.ok(
     readFileSync(resolve(ROOT, "engine/systems/point-record-actor.ts"), "utf8").length > 0,
@@ -452,9 +453,13 @@ test("the census is whole: every member resolves and is accounted for", () => {
   // from 255 to 256; and s785's 807, the picture stepper that claims no record
   // at all, from 258 to 259 (the s785 read of 2026-10-05); and s415's 811, the
   // ride walker that falls onto the rail and runs the three roll-in scripts,
-  // from 259 to 260 (the s415 read of 2026-10-05).
-  assert.equal(json.summary.members_ported, 260);
-  assert.equal(json.summary.members_interpreter_only, 1);
+  // from 259 to 260 (the s415 read of 2026-10-05); and s415's 812, the scenery
+  // layer, from 260 to 261 (corrected 2026-10-14: the port has shipped in
+  // engine/systems/point-record-actor.ts, driven by its own scroll_layers.json
+  // table and covered by tests/scroll-layer.test.js, and the earlier census row
+  // was stale).
+  assert.equal(json.summary.members_ported, 261);
+  assert.equal(json.summary.members_interpreter_only, 0);
   assert.equal(json.summary.members_none, 0);
   assert.equal(json.summary.records, 56);
   assert.equal(

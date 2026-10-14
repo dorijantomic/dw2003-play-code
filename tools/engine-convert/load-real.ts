@@ -16,13 +16,14 @@ export interface RealContent {
   sceneCompletion: any;
   stages: ConvertedStage[];
   ordinal: { allOrdinals: number[]; byStage: Record<string, number[]> };
-  roster: { records: { key: number; op: number; param2: number }[]; ranges: Record<number, [number, number]> };
+  roster: { records: { key: number; op: number; param2: number }[]; ranges: Record<number, [number, number]>; amounts?: { compare?: number[]; add?: number[]; subtract?: number[] } };
 }
 
 export function loadRealContent(): RealContent {
   const storySteps = JSON.parse(readFileSync(D + "story_steps.json", "utf8"));
   const ordinalJson = JSON.parse(readFileSync(D + "progress_ordinal.json", "utf8"));
   const rosterJson = JSON.parse(readFileSync(D + "roster_predicate_table.json", "utf8"));
+  const bank70 = JSON.parse(readFileSync(D + "bank70_rewards.json", "utf8"));
   const sceneCompletion = JSON.parse(readFileSync(D + "scene/scene_completion.json", "utf8"));
   return {
     storySteps,
@@ -31,7 +32,7 @@ export function loadRealContent(): RealContent {
     sceneCompletion,
     stages: convertStoryStages(storySteps, sceneCompletion),
     ordinal: convertOrdinalLadder(ordinalJson),
-    roster: convertRosterTable(rosterJson),
+    roster: convertRosterTable(rosterJson, bank70.amount_tables),
   };
 }
 

@@ -304,7 +304,11 @@ test("every shipped door row faces the way its own record's facing word says", (
   }
 
   assert.deepEqual(wrong, [], `door arrivals facing the wrong way:\n  ${wrong.join("\n  ")}`);
-  assert.ok(rows > 780, `expected the whole game's door table, saw ${rows} positioned rows`);
+  // 754 positioned rows, not 787: the 34 place-carrying stages now ship their
+  // own StageSlots as self-warp placeholders (skipped above) and their doors'
+  // real destinations and facings live in the scene's placePoints table, aimed
+  // at runtime per the incoming place pair (engine/systems/place-points.ts).
+  assert.ok(rows > 750, `expected the whole game's door table, saw ${rows} positioned rows`);
   assert.ok(checked / rows > 0.95,
     `${checked} of ${rows} rows could be traced to a step record — the rest: ` +
     `${unattributed.join(", ")}`);

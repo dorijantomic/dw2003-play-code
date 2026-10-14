@@ -688,9 +688,12 @@ export function memcardStateMachine(
             }
             const sum = host.checksum(buf + 4, MEMCARD_CHECKSUM_LEN) | 0;
             // The same bitwise test as state 0x16 (0x3270-0x3284); both this and
-            // the format test jump to 0x3918 with $v0 = 8.
+            // the format test jump to 0x3918 with $v0 = 8. The format test reads
+            // ONE BYTE (0x3288 `lbu $v1, 0x2($a0)`); byte +3 is retained data the
+            // save path copies from the live block and never rewrites, so it is
+            // not part of the gate.
             if (((sum & ~(mem.read8(buf) & 0xff)) & 0xff) !== 0
-                || (mem.read16(buf + 2) !== MEMCARD_FORMAT && mode() !== 0)) {
+                || (mem.read8(buf + 2) !== MEMCARD_FORMAT && mode() !== 0)) {
                 mem.write32(screen + MEMCARD.result, 8);
                 host.memcardHideStep(screen, widgets);
                 return;

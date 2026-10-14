@@ -6,6 +6,8 @@
 // tick. Party actors use a 64-record {x,y,dir} ring and start their read cursors
 // at 55, 46 and 37 while the write cursor starts at 0, i.e. 9/18/27 ticks back.
 
+import { moveWithCollision, type Grid } from "../core/util/collision.ts";
+
 export const FIELD_TICK_RATE = 50;
 export const FIELD_TICK_SECONDS = 1 / FIELD_TICK_RATE;
 export const FIELD_RUN_MAGNITUDE = 0x4cc;
@@ -43,6 +45,19 @@ export function fieldDirectionIndex(dir: FieldDirection | string): number {
   return i < 0 ? 0 : i;
 }
 
+/**
+ * The direction exactly opposite (180°): `(index + 4) & 7` in the native 0-7
+ * facing order. This is the talk handler's turn-to-face — when a conversation
+ * starts, `npc+0x60 = (player+0x60 + 4) & 7` (F0x80090afc, pro/fieldstg.s file
+ * 0xdf00-0xdf18), so the NPC ends up facing the player it was spoken to from.
+ * (The disc gates the write on `npc+0x100 == 0` — a per-npc_id constructor flag
+ * the walker does not carry — and skips it for the special ids whose speaker is
+ * the player; the walker applies the rule to every talk target.)
+ */
+export function oppositeDirection(dir: FieldDirection | string): FieldDirection {
+  return fieldDirectionFromIndex(fieldDirectionIndex(dir) + 4);
+}
+
 // Runtime table at 0x8009b724 in SLES-03936, captured from a field savestate.
 // Seven terrain classes × eight directions × {x,y}, in signed 20.12 scale.
 export const FIELD_DIRECTION_SCALE = [
@@ -77,6 +92,24 @@ export function fieldDirectionDelta(
     x: Math.trunc((scaleX * magnitudeFixed * signX) / 0x1000) / 0x100,
     y: Math.trunc((scaleY * magnitudeFixed) / 0x1000) / 0x100,
   };
+}
+
+/**
+ * The pure unit facing vector — zonemgr+0x4c, `F0x80092da0` (file 0x100f0):
+ * row 0 of the same table with no terrain query, no scale row, no remap and no
+ * sign flip (`0x8009b724 + facing*8` read once per axis). Submarimon's swim
+ * states (0x4b thrust / 0x4c coast) call this cell — the `lw $v0,-0x48f0($v0)`
+ * loads at fieldstg.s:13614 (coast, file 0xd49c) and :13666 (thrust, file
+ * 0xd56c) — so the sub's speed is NOT scaled by terrain. The split against
+ * the walk states' terrain-scaled cell (zonemgr+0x48 = `F0x80092ca0`) is
+ * structural: two statically-initialized cells, never repointed. Claims
+ * WQ004-ZONE-4C-PURE, WQ004-ZONE-48-TERRAIN, ZONE-Q001-CELL-710-FACING-MOVE-STEP.
+ */
+export function fieldPureDirectionDelta(
+  dir: FieldDirection,
+  magnitudeFixed: number = FIELD_RUN_MAGNITUDE,
+): { x: number; y: number } {
+  return fieldDirectionDelta(dir, magnitudeFixed, 0);
 }
 
 export type FieldTrailPoint<D = string> = { x: number; y: number; dir: D };
@@ -207,31 +240,66 @@ export function fieldProbeOffsets(facing: number): readonly (readonly [number, n
 }
 
 /**
- * The disc's response to an occupied probe point: `F0x8008de0c` subtracts the
+ * The disc's response to a blocked probe point: `F0x8008de0c` subtracts the
  * record's own (±magnitude/2, ±magnitude/4) from the actor. This returns the
  * TOTAL (x, y) to subtract for the five probes of `facing` — the caller applies
- * `actor.x -= push.x; actor.y -= push.y`. `isOccupied(px, py)` is the occupancy
- * query at an absolute probe point: inside a standing actor's footprint diamond
- * or within 10 px of a tree.
+ * `actor.x -= push.x; actor.y -= push.y`. `isBlocked(px, py)` is the whole
+ * F0x8008de0c predicate at one absolute probe point: the occupancy query
+ * (F0x80092a90: inside a standing actor's footprint diamond, or F0x8008ce40's
+ * ±10 box around a class-0xB object) OR the terrain half (the typed-terrain byte
+ * under the form's height band — engine/core/util/collision.ts
+ * terrainGateBlocks).
+ *
+ * The probe base is the actor's PIXEL position: F0x8008dfec reads
+ * `(actor+0x50 >> 8) + rec.x` (fieldstg.s:11366-11370), an arithmetic shift of
+ * the 24.8 fixed coordinate — the floor — and only then adds the record offset.
  */
 export function fieldProbePushback(
   facing: number,
   magnitudeFixed: number,
   x: number,
   y: number,
-  isOccupied: (px: number, py: number) => boolean,
+  isBlocked: (px: number, py: number) => boolean,
 ): { x: number; y: number } {
   const row = FIELD_PROBE_INDEX[((facing % 8) + 8) % 8]!;
+  const baseX = Math.floor(x);
+  const baseY = Math.floor(y);
   let pushX = 0;
   let pushY = 0;
   for (const rec of row) {
     const [ox, oy] = FIELD_PROBE_OFFSETS[rec]!;
-    if (!isOccupied(x + ox, y + oy)) continue;
+    if (!isBlocked(baseX + ox, baseY + oy)) continue;
     const [f0, f1] = FIELD_PROBE_FLAGS[rec]!;
     if (f0 & 1) pushX += (f0 & 0x80 ? -1 : 1) * Math.trunc(magnitudeFixed / 2);
     if (f1 & 1) pushY += (f1 & 0x80 ? -1 : 1) * Math.trunc(magnitudeFixed / 4);
   }
   return { x: pushX / 0x100, y: pushY / 0x100 };
+}
+
+/**
+ * Apply a probe push to the walker's grid, clamped by the same foot box the walk
+ * uses.
+ *
+ * The disc applies the push unchecked (`actor.x -= arg3; actor.y -= arg4`) — it
+ * has no walkmesh, because its walls ARE the probe refusal: a push toward void
+ * is answered by the void's own probes on the following tick. The walker's wall
+ * model is the 8 px collision grid, which has no probes, so an unchecked push
+ * can shove the foot box INTO a blocked cell; the destination check then refuses
+ * every direction and the player is trapped (seen live on s210's counter, walking
+ * north beside the counter NPC: the three blocked up-probes push the box down by
+ * 3*mag/4 while the step only rises 1/2*mag, and the box sinks into the counter's
+ * blocked row). Clamping the push through the walk's own box keeps the mesh
+ * unenterable; in open space the push applies whole, and against a wall it
+ * degrades to the axis-separated slide the walk itself uses.
+ */
+export function applyObstaclePush(
+  grid: Grid,
+  x: number,
+  y: number,
+  push: { x: number; y: number },
+  box: { w: number; h: number },
+): { x: number; y: number } {
+  return moveWithCollision(grid, x, y, -push.x, -push.y, box);
 }
 
 /**

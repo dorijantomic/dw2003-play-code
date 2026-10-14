@@ -87,17 +87,28 @@ try {
     await fail(`sub started below the talk limit: ${start.sub.height}`);
 
   const box = await page.evaluate(() => {
+    // The box's gate is the ROUTE PAIR (bank 0x7E: 0x7E05/0x7E1E = 1), read
+    // from entryKey/entryCompanion when the cast is built. The pair must be set
+    // BEFORE the build, so set it and re-enter the stage: the cast is built
+    // once at stage entry now (the s395 Veemon rule), so writing entryKey after
+    // the load no longer brings the box in.
     window.__state.entryKey = 6;
     window.__state.entryCompanion = 1;
-    return (window.__npcsHere() || []).find((n) => n.sprite === "p126itmb") ?? null;
+    window.__setMap(window.__state.mapIdx);
+    return true;
   });
-  if (!box) throw new Error("no p126itmb item box with arrival key 6 / companion 1");
+  if (!box) throw new Error("could not set the arrival pair");
+  await page.waitForTimeout(1000);
+  const boxRow = await page.evaluate(
+    () => (window.__npcsHere() || []).find((n) => n.sprite === "p126itmb") ?? null,
+  );
+  if (!boxRow) throw new Error("no p126itmb item box with arrival key 6 / companion 1");
 
   // Fixture: stand one tile below the box, facing it (facing 4 = up).
   await page.evaluate((b) => {
     window.__tp(b.x, b.y + 16);
     window.__state.submarimon.facing = 4;
-  }, box);
+  }, boxRow);
   await page.waitForTimeout(250);
   const seated = await field();
   await shot("depth-gate-seated-high");
@@ -136,7 +147,7 @@ try {
   await page.evaluate((b) => {
     window.__tp(b.x, b.y + 32);
     window.__state.submarimon.facing = 4;
-  }, box);
+  }, boxRow);
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => window.__textbox?.isOpen?.() ?? false, null, { timeout: 2000 })
     .catch(() => {});
@@ -185,7 +196,7 @@ try {
 
   if (errors.length) await fail(`${errors.length} page error(s)`);
   console.log("RESULT", JSON.stringify({
-    ok: !failed, start, box, seated, highTry, deep, lowTry, consumed, surface,
+    ok: !failed, start, boxRow, seated, highTry, deep, lowTry, consumed, surface,
   }));
 } catch (e) {
   await fail(e.message);

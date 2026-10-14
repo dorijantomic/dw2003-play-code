@@ -1316,7 +1316,12 @@ export function resolveVmChoice(duel: DuelState, vm: EffectVm, index: number): b
 export const awaitingChoice = (vm: EffectVm | null | undefined): boolean =>
   !!vm && vm.choice !== null && !vm.done;
 
-/** Run a whole program with every pick made automatically. */
+/** Run a whole program with every pick made automatically.
+ *
+ *  This is the model-only driver: it starts the machine and steps it, WITHOUT
+ *  the resolution gate `checkEffectLegality` that `applyProgramEffect` asks
+ *  (F0x800a2180 case 6). Tests that want the disc's resolution behaviour go
+ *  through `applyProgramEffect` / `playProgramTurn` + `pumpProgramTurns`. */
 export function runProgram(
   duel: DuelState,
   owner: DuelSide,

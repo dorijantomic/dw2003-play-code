@@ -115,7 +115,11 @@ export class MemcardServices {
             this.transfers.push({ direction: "read", length, file: at, slot: at - CARD_FILE_BASE });
             if (data && data.length >= CARD_IMAGE_BYTES) {
                 const sum = cardChecksumBytes(data, 4, CARD_IMAGE_BYTES);
-                const verified = sum === (data[0]! & 0xff) && (data[2]! | (data[3]! << 8)) === 4;
+                // The original's gate (stgmcard.s .L0x00003270-.L0x00003290): the
+                // recomputed byte must have no bit the stored byte at +0 lacks,
+                // and the SINGLE format byte at +2 must be 4. Byte +3 is retained
+                // data the writer copies and never rewrites.
+                const verified = (sum & ~(data[0]! & 0xff) & 0xff) === 0 && data[2] === 4;
                 if (verified) this.restored.push(at - CARD_FILE_BASE);
             }
         } else {

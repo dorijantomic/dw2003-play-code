@@ -57,8 +57,12 @@ export interface DuelEffectStepHost {
     presentResolvingCard(duel: number, scene: number): number;
     /** F0x80083E34(id, kind, arg): the card-record predicate (see duel-ai.ts). */
     cardPredicate(id: number, kind: number, arg: number): number;
-    /** F0x800954F8(duel, view, pred): apply the resolving card's stat change; 1 if it did. */
-    applyResolvingStatChange(duel: number, view: number, pred: number): number;
+    /** F0x800954F8(duel, view, conditionId): the resolution legality gate,
+     *  `checkEffectLegality` — NOT a stat change. 0 runs the effect program
+     *  (state 7); non-zero shows the record's own +0x02 line and enters state
+     *  8. The magnitude is never consumed. Condition id 1..0xB; out of range
+     *  allows. (claim cardgame-effect-legality-gate-2026-10-10, verified) */
+    checkResolvingLegality(duel: number, view: number, conditionId: number): number;
     /** `view+0xEE4(view, a1, a2, a3, a4)`: the board view's prompt opener. */
     viewOpenPrompt(view: number, a1: number, a2: number, a3: number, a4: number): void;
     /** `view+0xEE8(view)`: the board view's field-redraw method. */
@@ -172,12 +176,12 @@ export function fetchNextEffectOpcode(
             if (host.presentResolvingCard(duel, scene) === 0) return 0;
             return advanceState6(m, duel);
         }
-        case 0x06: { // F0x800A22A4: the resolving card's stat change and prompt
+        case 0x06: { // F0x800A22A4: the resolving card's condition gate and prompt
             const pc = s8(m, duel + 0x575);
             const word580 = s16(m, duel + (pc - 1) * 8 + 0x580);
             const id = s16(m, duel + (word580 << 1) + 0x50);
             const pred1 = host.cardPredicate(id, 1, 0);
-            if (host.applyResolvingStatChange(duel, view, pred1) !== 0) {
+            if (host.checkResolvingLegality(duel, view, pred1) !== 0) {
                 const pred2 = host.cardPredicate(id, 2, 0);
                 host.viewOpenPrompt(view, pred2, 0, 1, 1);
                 m.write8(duel + EFFECT_STEP_STATE, 8);

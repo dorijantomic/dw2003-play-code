@@ -160,6 +160,15 @@ export function createCntyselMenu(sfx = null) {
     d._stepHeld(heldKeys);
   };
 
+  // Sound ids from the overlay's own call sites (cnty_sel.s, RAM = file +
+  // 0x80082c70): every accepted cursor step plays 0x0004001b — sites at file
+  // 0x1310 (Up), 0x13bc (Down), 0x1490 (Left), 0x152c/0x1550 (Right), each
+  // `ori $a0,0x1b` in the play call's delay slot — and the one confirm site
+  // (Start, `li $a1,0x3`; `ori $a0,0x1c` at file 0x1224) plays 0x0004001c.
+  // True Sound Test names (soundtst-common-ids.json): SYSTEM06 and SYSTEM07.
+  // Corrected 2026-10-14 (audit/sfx-triggers-vs-decode): the first wiring used
+  // the pre-2026-07-03i shifted names, which made every move play 0x4001c and
+  // the confirm play 0x800454c4 — an id with no call site anywhere.
   d.handleKey = (k) => {
     if (!d.open) return false;
     if (d.fadeLeaving) return true;
@@ -168,7 +177,7 @@ export function createCntyselMenu(sfx = null) {
       if (d.cursor <= 4 && d.cursor > 0) {
         d.cursor -= 1;
         d.lastMain = d.cursor;
-        sfx?.play("system07");
+        sfx?.play("system06");
       }
       return true;
     }
@@ -176,7 +185,7 @@ export function createCntyselMenu(sfx = null) {
       if (d.cursor < 4) {
         d.cursor += 1;
         d.lastMain = d.cursor;
-        sfx?.play("system07");
+        sfx?.play("system06");
       }
       return true;
     }
@@ -184,7 +193,7 @@ export function createCntyselMenu(sfx = null) {
       if (d.cursor !== 6) {
         if (d.cursor <= 4) d.lastMain = d.cursor;
         d.cursor = 6;
-        sfx?.play("system07");
+        sfx?.play("system06");
       }
       return true;
     }
@@ -196,12 +205,12 @@ export function createCntyselMenu(sfx = null) {
         d.lastMain = d.cursor;
         d.cursor = 5;
       }
-      if (d.cursor !== prev) sfx?.play("system07");
+      if (d.cursor !== prev) sfx?.play("system06");
       return true;
     }
     if (k === "enter" || k === " " || k === "circle") {
       d.chosen = d.row();
-      sfx?.play("system08");
+      sfx?.play("system07");
       requestLeave();
       return true;
     }

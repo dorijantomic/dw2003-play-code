@@ -20,7 +20,11 @@
 //   Accuracy = rand%128 < base_acc·(1 + SPD_diff/128); a miss renders as "evaded".
 //
 // Turn order: SPD comparison — higher SPD acts first within a round.
-// Flee chance (decoded wfightmn 0x1320): rand%128 < 8·SPD_self/SPD_enemy.
+// Flee (Run) chance: F0x800a1608 side 0 — a 0..127 roll under
+//   (base+1)*8 + level advantage + speed advantage (only when faster) + Runner bonus,
+//   refused outright by the encounter byte 0x80042b65, Sleep/tech-abort; Frozen halves
+//   the base. (The 8·SPD_self/SPD_enemy at wfightmn 0x1320 is a routine the Run never
+//   executes — claim wfightmn-0x1320-ratio-block-is-not-the-player-run-path-2026-10-09.)
 //
 // HP for non-starter Digimon (id 9-55): game stores hp=1, growth=1 (level-derived).
 //   We use: hp = 80 + str * level  (approximation; real formula in Unknown4 init code)
@@ -46,11 +50,12 @@ import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-prese
 import { assignAssetImage } from "./assets.js";
 import {
   physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, drainHeal, RAND_U16,
-  hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc,
+  hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc, runAwayLine,
   blastPresentationState, BLAST_FIRST_FRAME,
   FormChangeProgram, formChangeState, formChangeSoundFrame, evolEffectsDue,
   statusRoll, counterDamage,
   enemyMoveCondition,
+  pickEnemyAiMove,
   elementId,
   enemyActionSkillId,
   basicAttackHitCount, techniqueMpCost,
@@ -71,6 +76,7 @@ import {
   JOKE_GAG_KIND, JOKE_GAG_NAME_ID, confusionGagRoll,
   foldElemBonuses as engineFoldElemBonuses, effStats as engineEffStats,
   commitManualDigivolve as engineCommitManualDigivolve,
+  markEquippedFormFlags as engineMarkEquippedFormFlags,
   resolveAttack as engineResolveAttack,
   resolveMultiHit as engineResolveMultiHit,
   weaponSecondaryProc as engineWeaponSecondaryProc,
@@ -97,7 +103,7 @@ import {
   consumeAffinity,
   emptyStatusEventPool, advanceStatusEvents, stageStatusEventStat,
   stageStatusEventLock, statusEventLockHeld, statusEventActionDelay,
-  STATUS_EVENT_POOL_SIZE,
+  cureStatusEvent, cureAllStatusEvents, STATUS_EVENT_POOL_SIZE,
   weaponDrainHeal as engineWeaponDrainHeal, equipmentBonuses,
   weaponCritByte, crestSuppressedByWeapon, wornFamilyBytes,
   elementValue, battleCoreStat,
@@ -125,7 +131,7 @@ import {
   FIGHT_TASK_ARG_BYTE_OFF, FIGHT_TASK_ARG_WORD_OFF,
   BATTLE_MESSAGE_CLOSE_BIT, BattleMessageSession,
   advanceFrameClock, frameDelta,
-  newOpeningState, stepOpeningPhase, openingLineRoll, introVariantFor,
+  newOpeningState, stepOpeningPhase, openingLineRoll, ambushRoll, introVariantFor,
   OPENING_PHASES, OPENING_PHASE_COUNT, openingPhaseFor,
   FINALE_MSG_BODY, FINALE_MSG_LEARNED, FINALE_HEAD_ATTACK_ID,
   BATTLE_WIN_RESULT_SCREEN, FINALE_WIN_ENDING_MOVIE,
@@ -139,7 +145,7 @@ import {
 // task F0x80090c44 (the acting fighter's action object, its tick the technique record
 // machine) and its data variant the plate-HUD spawner F0x80093cc8.
 import { ui } from "./vendor/engine.js";
-import { applyFormTechGates } from "./form-tech-slots.js";
+import { learnOneTechnique, markOneLoadable } from "./form-tech-slots.js";
 import { CHARID_TO_DIGID, baseStatsFor } from "./party.js";
 import { loadPack, drawClip, drawClipWidth, clipSize, packReady, drawClipAtPaletteRow } from "./screenpack.js";
 import { drawText as uiDrawText, drawIconGlyph, fontReady as uiFontReady } from "./uifont.js";
@@ -186,20 +192,36 @@ const MENU_ITEMS = BATTLE_COMMANDS;
 const COMMAND_COUNT = 6;
 const COLS = 1;
 
-// The battle tech list (FIGHTSTG 0x80094f0c, TL-008/TL-009). A digivolution
-// contributes the current form's six learned halfwords with all flags intact;
-// every OTHER equipped form then lends the halfwords carrying 0x4000, deduped by
-// the 13-bit id. The flag bit survives into the command list because the price
-// rule (TL-010) charges the loaded premium from it. Rookie mode is the
-// signature halfword alone, marked 0x8000.
+// The battle TECH list (FIGHTSTG_F0x800967A0 — the TECH command's own six-row
+// list; its build at fightstg.s:20332-:20470). A digivolved combatant contributes
+// its current form's six learned halfwords with bit 14 (0x4000, "loaded")
+// CLEARED (`li $t3, -0x4001` :20368-:20398): a form's own loaded word is not a
+// loan. Every OTHER equipped form then lends the halfwords carrying 0x4000 WITH
+// their flags (:20412-:20466), deduped by the 13-bit id, so the price rule
+// (TL-010) charges the loan premium only for a borrowed technique — and the row
+// palette (F0x80096314 :20090-:20100) draws those rows in colour row 4. While
+// Blast is active (combatant +0x1a != 0) the current form's signature is marked
+// or appended with 0x8000 (:20381-:20400). Rookie mode is the signature halfword
+// alone, marked 0x8000.
+//
+// (FIGHTSTG_F0x80094f08's ctx+0xd4 list is a DIFFERENT list — the Digivolve
+// panel's — and it keeps the current form's flags; the TECH menu never reads it.)
 export function battleTechWords({
-  ledger, currentId = 0, equippedForms, signatureTech = 0,
+  ledger, currentId = 0, equippedForms, signatureTech = 0, blastSignature = 0,
 } = {}) {
   const records = ledger ?? [];
   const current = records.find((record) => Number(record?.id) === Number(currentId));
   const words = current
-    ? [...(current.techSlots ?? [])].map((w) => Number(w) & 0xffff)
+    ? [...(current.techSlots ?? [])].map((w) => (Number(w) & 0xffff) & ~0x4000)
     : [(Number(signatureTech) & 0x1fff) | 0x8000];
+  if (current && blastSignature) {
+    const sig = Number(blastSignature) & 0x1fff;
+    const at = words.findIndex((word) => (word & 0x1fff) === sig);
+    // The mark rewrites the entry as masked|0x8000 (dropping its other flags);
+    // an absent signature is appended with the flag.
+    if (at >= 0) words[at] = ((words[at] & 0x1fff) | 0x8000) & 0xffff;
+    else words.push((sig | 0x8000) & 0xffff);
+  }
   const equipped = equippedForms ?? (current ? [currentId] : []);
   for (const formId of equipped) {
     if (Number(formId) === Number(currentId)) continue;
@@ -211,6 +233,34 @@ export function battleTechWords({
     }
   }
   return words.filter((word) => word !== 0); // an empty ledger slot is not a menu row
+}
+
+/**
+ * The disc's per-form learn/load pass, one battle's worth: F0x8008670C until it
+ * answers 0, then F0x80086844 until it answers 0. Each service fills ONE slot,
+ * and the report's state machine re-enters their states after every message page
+ * (state 0x19 selector 1 -> state 0x16, selector 2 -> state 0x17; the selector
+ * table at 0x80082d80), so a single battle teaches EVERY technique whose gate the
+ * new form level has passed and then marks every learned ordinary technique whose
+ * load gate it has passed — one message page each, in slot order.
+ *
+ * Returns the ids learned and the ids that became loadable, in call order. The
+ * guards bound the loops at the slot counts the services can fill (6 and 5).
+ */
+export function applyFormLearnPass(record, formProfile) {
+  const learned = [];
+  const loadable = [];
+  for (let guard = 0; guard < 6; guard++) {
+    const tech = learnOneTechnique(record, formProfile);
+    if (!tech) break;
+    learned.push(tech);
+  }
+  for (let guard = 0; guard < 5; guard++) {
+    const tech = markOneLoadable(record, formProfile);
+    if (!tech) break;
+    loadable.push(tech);
+  }
+  return { learned, loadable };
 }
 
 // STATUS-C004: when the active Digimon is confused, the command menu is replaced
@@ -615,7 +665,8 @@ export const MSG = Object.freeze({
   TRYING_TO_FLEE: 0x5e,  // kind 2, fightstg.s .L0x80088a20
   DID_NOT_FLEE: 0x60,    // kind 2, fightstg.s .L0x80088734
   FLEEING: 0x5f,         // kind 2, fightstg.s .L0x80088644
-  RUN_AWAY: 0x43,        // kind 2, wfightmn.s:2222 (the Run command's own page)
+  RUN: 0x41,             // kind 2, wfightmn.s .L0x000018a8 (the Run command's own page)
+  RUN_AWAY: 0x43,        // kind 2, wfightmn.s:2222 (the runAway arm, actor 0)
   DEFEATED: 0x51,        // kind 2, wfightmn.s:3265 -- "Defeated!", the fallen enemy's page
   BLASTED: 0x61,         // kind 2, wfightmn.s:2977 (and kind 1 at fightstg.s:14077)
   BACK_TO_NORMAL: 0x62,  // kind 2, wfightmn.s .L0x0000316c
@@ -862,42 +913,43 @@ export function setLiveBattleForm(record, profile) {
 }
 
 /**
- * The one form change, shared by every path that changes a battle form
- * (engine/dw3/battle-form-change.ts, the port of pro/wfightmn's 0x800A69F0,
- * 0x800A7328 and the commit at wfightmn.s:1680-1692).
- *
- * What the original writes, and nothing else: the live form id in the combatant
- * record, the equipped-form flag bytes at 0x80042B84, and — only while a
- * reserved second form is standing — the release of that reservation. No HP, MP,
- * stat, technique or ailment value is written, so the walker's record keeps the
- * numbers it had; `savedSpeciesId` is what makes effStats add the new form's own
- * base stats on the next read, exactly as F0x8009EC94 does.
- *
- * @param b the live battle
- * @param profile the profile the Digimon takes (its id is what the record carries)
- * @param position the party position that changes (the acting one for a Digivolve)
+ * The member's equipped triple as F0x800176AC (get_equipped) presents it: the
+ * valid entries in slot order, then `-1` for each empty position. The disc's
+ * reader "emits only ids of 3 or above and fills the unused positions of the
+ * three with -1" (claim auto-equip-full-triple-is-never-reduced-2026-10-03), so
+ * a padded position reads back as 0xffff and is not below 3.
  */
-export function commitBattleFormChange(b, profile, position = b?.activePlayerIndex ?? 0) {
-  const record = b?.playerRecords?.[position];
-  if (!record) return null;
-  const view = {
-    activeSlot: () => b.activePlayerIndex,
+function equippedTriple(forms) {
+  const valid = (Array.isArray(forms) ? forms : []).map(Number).filter((id) => id >= 3);
+  return Array.from({ length: 3 }, (_, i) => (valid[i] ?? -1));
+}
+
+/**
+ * The engine's FormChangeView over one live battle record
+ * (engine/dw3/battle-form-change.ts). `position` is the party position the call
+ * acts on: F0x800A69F0's flag stores are indexed by it, and its lookups resolve
+ * that position to the member's own equipped triple.
+ */
+function formChangeView(b, position, profile = null) {
+  return {
+    activeSlot: () => position,
     liveFormId: (slot) => Number(b.playerRecords[slot]?.profile?.id ?? -1),
     // record +0x00: the form id, which the caller has already resolved to the
     // profile object the Digimon is taking.
     writeLiveFormId: (slot, id) => {
       const target = b.playerRecords[slot];
-      if (!target || Number(id) !== Number(profile?.id)) return;
+      if (!target || !profile || Number(id) !== Number(profile?.id)) return;
       setLiveBattleForm(target, profile);
     },
     // record +0x1A: the reserved second form is Blast's own writer (ledger
     // BLAST-9767), and the walker keeps Blast's state where the flag lives.
-    reservedSecondForm: (slot) => (Number(slot) === b.activePlayerIndex && b.blast?.active ? 1 : 0),
+    reservedSecondForm: (slot) => (Number(slot) === position && b.blast?.active ? 1 : 0),
     reservedFormId: (slot) => Number(b.playerRecords[slot]?.rosterSpeciesId ?? 0),
     clearReservedSecondForm: () => releaseReservedSecondForm(b),
-    // 0x80042B84 + slot*4 + k. The original sets byte 6 on every form change and
-    // byte 7 + the equipped row for the form just taken; no reader of those bytes
-    // has been located in this port, so they are stored and left there.
+    // 0x80042B84 + position*4 + k. The original sets byte 6 on every form change
+    // and byte 7 + the equipped row for the form just taken; the reader is the
+    // report's DVEXP scan (stfgtrep.s state 0x14 arm, file 0x12C0), which pays
+    // the gain and the form-level ladder for every marked row.
     setFormFlag: (slot, k, value) => {
       b.formFlags ??= [];
       const flags = b.formFlags[slot] ?? (b.formFlags[slot] = new Array(10).fill(0));
@@ -916,13 +968,73 @@ export function commitBattleFormChange(b, profile, position = b?.activePlayerInd
     findTimelineIndex: () => -1,
     clearTimelineCounter: () => {},
     rosterKey: (slot) => Number(b.playerRecords[slot]?.rosterIndex ?? slot),
-    equippedForms: (slot) => {
-      const forms = b.playerRecords[slot]?.statsRecord?.equippedForms ?? [];
-      return Array.from({ length: 3 }, (_, i) => (Number(forms[i]) > 0 ? Number(forms[i]) : -1));
+    // get_equipped's contract: fill `dest` with the three rows and return the
+    // count of valid entries (F0x800A69F0 scans dest and leaves on the first
+    // match).
+    equippedForms: (slot, dest) => {
+      const triple = equippedTriple(b.playerRecords[slot]?.statsRecord?.equippedForms);
+      for (let i = 0; i < 3; i++) dest[i] = triple[i];
+      return triple.filter((id) => id !== -1).length;
     },
-    rosterSpecies: (slot) => Number(b.playerRecords[slot]?.savedSpeciesId ?? -1),
+    // 0x8003EF5C + 0x58*rosterKey, halfword 0: the species row of the member's
+    // own ROSTER SLOT — the starter it was born as. F0x800A69F0's short-circuit
+    // is `rosterSpecies == live form` (wfightmn.s .L0x00000CA8), so the
+    // comparison is against that rookie, never against the form the member is
+    // configured to stand in.
+    rosterSpecies: (slot) => Number(b.playerRecords[slot]?.rookieId ?? -1),
   };
-  engineCommitManualDigivolve(view, Number(profile?.id));
+}
+
+/**
+ * F0x800A69F0's mark alone, without the commit: byte 6 of the position's word
+ * and byte 7 + the equipped row carrying the form just taken. The disc calls it
+ * for the lead at battle setup (F0x800a66b0) and again on every Manual DV and
+ * Tag commit; the report then pays DVEXP and the form-level ladder, and tries
+ * one learn and one loadable, per marked row.
+ */
+export function markFormTaken(b, position, speciesId) {
+  if (!b?.playerRecords?.[position]) return;
+  engineMarkEquippedFormFlags(formChangeView(b, position), Number(speciesId));
+}
+
+/**
+ * The report's own DVEXP target scan for one participant (stfgtrep.s state-0x14
+ * arm, file 0x12C0): for every equipped row whose mark byte at
+ * `0x80042B84 + position*4 + 7 + formIndex` is set, the form that row holds —
+ * and the disc's `form >= 4` guard drops anything that is not an acquired form.
+ * In the walker's id space the rookies are 1..8, so `> 8` is the same guard.
+ */
+export function markedEquippedForms(flags, equipped) {
+  const out = [];
+  const triple = equippedTriple(equipped);
+  for (let i = 0; i < 3; i++) {
+    if (!Number(flags?.[7 + i] ?? 0)) continue;
+    const id = triple[i];
+    if (id > 8 && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * The one form change, shared by every path that changes a battle form
+ * (engine/dw3/battle-form-change.ts, the port of pro/wfightmn's 0x800A69F0,
+ * 0x800A7328 and the commit at wfightmn.s:1680-1692).
+ *
+ * What the original writes, and nothing else: the live form id in the combatant
+ * record, the equipped-form flag bytes at 0x80042B84, and — only while a
+ * reserved second form is standing — the release of that reservation. No HP, MP,
+ * stat, technique or ailment value is written, so the walker's record keeps the
+ * numbers it had; `savedSpeciesId` is what makes effStats add the new form's own
+ * base stats on the next read, exactly as F0x8009EC94 does.
+ *
+ * @param b the live battle
+ * @param profile the profile the Digimon takes (its id is what the record carries)
+ * @param position the party position that changes (the acting one for a Digivolve)
+ */
+export function commitBattleFormChange(b, profile, position = b?.activePlayerIndex ?? 0) {
+  const record = b?.playerRecords?.[position];
+  if (!record) return null;
+  engineCommitManualDigivolve(formChangeView(b, position, profile), Number(profile?.id));
   return record;
 }
 
@@ -1282,16 +1394,27 @@ export function rollLevelUpGains(profile, newLevel, lu, rng = RAND_U16) {
   const bounds = lu.core_tier_bounds; // [5, 20, 40, 60, 80]
   let tier6 = bounds.length;
   for (let i = 0; i < bounds.length; i++) if (newLevel < bounds[i]) { tier6 = i; break; }
+  // The disc reads the six 9-word core rows and the 8-word element table as ONE
+  // contiguous block (core at 0x800891B0, the element table right after it at
+  // 0x80089288, overlay end at 0x800892A8). A roll can run off a row's end, and
+  // the read follows the memory: growth 5 with rand%5==4 reads the NEXT row's
+  // first word (tiers 0-4; tier 5 reads the element table's first word, a 0), and
+  // growth 5 with rand%4==3 reads the word past the whole block — the RAM after
+  // the 0x65F8-byte overlay, which is 0 in every captured dump (the overlay file
+  // ends exactly at the table). The old code clamped to the tail (a 2) in both
+  // cases and returned 0 for the core overflow; the disc adds the block's own
+  // word instead.
+  const coreRows = (lu.core_table ?? []).flat();
+  const stride = lu.core_table?.[0]?.length ?? 9;
+  const block = coreRows.concat(lu.elem_table ?? []);
   const core = {};
   for (const k of ["str", "def", "spt", "wis", "spd", "chr"])
-    core[k] = lu.core_table[tier6][(g[k] ?? 0) + rng() % 5] ?? 0;
+    core[k] = block[tier6 * stride + (g[k] ?? 0) + rng() % 5] ?? 0;
   const elems = {};
   if (newLevel < (lu.elem_level_limit ?? 41)) {
     for (const k of ["fire", "water", "ice", "wind", "thunder", "machine", "dark"]) {
-      // growth 5 + rand 3 indexes one word past the 8-entry table in the original;
-      // clamping repeats the tail value instead of reading undefined memory.
-      const idx = (profile.resistance_growth?.[k] ?? 0) + rng() % 4;
-      elems[k] = lu.elem_table[Math.min(idx, lu.elem_table.length - 1)] ?? 0;
+      const idx = coreRows.length + (profile.resistance_growth?.[k] ?? 0) + rng() % 4;
+      elems[k] = block[idx] ?? 0;
     }
   }
   return { hp: hpmp(g.hp ?? 0), mp: hpmp(g.mp ?? 0), core, elems };
@@ -1340,6 +1463,28 @@ export function applyLevelUpGains(ps, gains, lu) {
   return ps;
 }
 
+// One partner's level-up, applied once (stfgtrep fn 0x80086184 + rolls 0x80085e3c):
+// rolls every level gained onto the stored stats, adds TP +5 a level (clamped at 99 —
+// the disc's check is `if (TP+5 >= 100) TP = 99`, file 0x3658-0x3664) and sets the
+// level. NOTHING refills HP or MP: the disc's routine writes only the 19-halfword
+// block's level/TP/maxHP/maxMP/stat halfwords (the current-HP halfword at record
+// +0x20 and current MP at +0x24 are never a store target there), so a level-up keeps
+// the damage the battle left. The old walker code healed the partner to full here.
+export function applyLevelUp(ps, prof, oldLevel, newLevel, lu) {
+  ps.level = newLevel;
+  if (lu) {
+    ensureStoredStats(ps, prof);
+    for (let lv = oldLevel + 1; lv <= newLevel; lv++)
+      applyLevelUpGains(ps, rollLevelUpGains(prof, lv, lu), lu);
+  } else {
+    ps.maxHp = scaledStat(prof, "hp", newLevel) + (ps.bonuses?.hp ?? 0);
+    ps.maxMp = scaledStat(prof, "mp", newLevel) + (ps.bonuses?.mp ?? 0);
+  }
+  const tpCap = lu?.tp_cap ?? 99;
+  ps.tp = Math.min((ps.tp ?? 0) + (lu?.tp_per_level ?? 5) * (newLevel - oldLevel), tpCap);
+  return ps;
+}
+
 // DV form level from banked DVEXP (fn 0x800865c0): while L<99 and dvexp >= thr(L), L+=1;
 // thr(L) = 10·L below the profile's DV cap, then 10·(cap−1) + 50·(L−cap+1) past it.
 export function dvLevelForExp(dvexp, dvCap, levelCap = 99) {
@@ -1347,6 +1492,40 @@ export function dvLevelForExp(dvexp, dvCap, levelCap = 99) {
   const thr = (L) => L < dvCap ? 10 * L : 10 * (dvCap - 1) + 50 * (L - dvCap + 1);
   while (lv < levelCap && dvexp >= thr(lv)) lv++;
   return lv;
+}
+
+// One form's DVEXP bank for a battle: add the gain (capped 9,999,999) and run the
+// ladder (fn 0x800865c0). The disc's ladder routine reads the form's state, adds the
+// gain, and RETURNS BEFORE its write-back when the form already stands at level 99
+// (stfgtrep.s file 0x3994 `slti $v0, 0x63` / file 0x399C `j 0x800866f0` jumps to the
+// epilogue, skipping the [0x8004B480] store at file 0x3A28), so a maxed form banks
+// NOTHING and its DVEXP total freezes. Returns true when the form gained a level.
+export function bankFormDvexp(record, gain, formCap, dvexpCap = 9999999) {
+  const oldLevel = record.formLevel ?? 1;
+  if (oldLevel >= 99) return false;
+  record.dvexp = Math.min(Number(record.dvexp ?? 0) + gain, dvexpCap);
+  while (record.formLevel < 99 && record.dvexp >= (record.formLevel < formCap
+    ? 10 * record.formLevel
+    : 10 * (formCap - 1) + 50 * (record.formLevel + 1 - formCap))) {
+    record.formLevel++;
+  }
+  return record.formLevel > oldLevel;
+}
+
+// The DVEXP share divisor: ONE PER SET FORM FLAG BYTE across the rows still flagged
+// as reward participants — not the number of standing positions. The report root's
+// tick counts them (stfgtrep.s file 0x2C58-0x2CB4: per flagged row, per set byte
+// 7+v, `lw $v0, 0x70($s4)` / `sw` at file 0x2C8C-0x2C98), and each row's dvGain call
+// passes that count (file 0x1368 `lw $a3, 0x70($v1)`, v1 = the row's +0x50 parent).
+// A form taken mid-battle is a second mark on the same row, so it enlarges the
+// divisor: a solo lead that DV'd once splits its DVEXP two ways (60% each), not 100%.
+export function dvexpShareCount(formFlags, indices) {
+  let marks = 0;
+  for (const index of indices ?? []) {
+    const flags = formFlags?.[index];
+    for (let i = 0; i < 3; i++) if (Number(flags?.[7 + i] ?? 0)) marks++;
+  }
+  return Math.max(1, marks);
 }
 
 // Gym drill catalog for a gym rank (1..14): [{ drill, primary, secondary }].
@@ -1726,6 +1905,12 @@ function clearRestoreAilments(rec, mask) {
 export function applyBattleRestorePlan(b, side, plan) {
   const targets = battleRestoreTargets(b, side);
   const healed = [];
+  const pool = b?.statusEvents;
+  // The disc's cure is the RECORD's own bit clear plus the pool entry's free, both inside
+  // `FIGHTSTG_F0x8009c330` (`sb $v1, 0x1c($a2)` :26425 and `sh $zr, ($v0)` :26443), so a
+  // cured ailment's recovery must not be left queued. An ALL-status mask (`0x3f`, or
+  // technique 375's whole-byte `0xff`) additionally cancels the six codes of
+  // `STATUS_EVENT_ALL_CURE_CODES` — the two tech-abort locks among them.
   for (let i = 0; i < targets.length; i++) {
     const rec = targets[i];
     if (!rec) continue;
@@ -1735,7 +1920,25 @@ export function applyBattleRestorePlan(b, side, plan) {
     } else if ((plan?.heal?.[i] | 0) > 0) {
       rec.hp = Math.min(rec.maxHp | 0, before + (plan.heal[i] | 0));
     }
-    clearRestoreAilments(rec, plan?.cure?.[i] | 0);
+    const mask = plan?.cure?.[i] | 0;
+    clearRestoreAilments(rec, mask);
+    if (mask) {
+      const sideByte = (side | 0) < 1 ? 0 : 0x10;
+      // The record's own slot when it carries one (the walker's active fighter does), the
+      // party position otherwise — the disc's cure helper walks slots 0..2 by index.
+      const slot = (rec.slot ?? i) | 0;
+      if (mask & 0x30) {
+        // `which` 3 / F0x8008f5d4: the four recoveries AND the two locks. The walker's
+        // records are one fighter per side and a lock is staged on the side's ACTIVE slot,
+        // so every slot of that side is swept.
+        for (let s = 0; s < 3; s++) cureAllStatusEvents(pool, sideByte, s);
+      } else {
+        if (mask & 0x01) cureStatusEvent(pool, "poison", sideByte, slot);
+        if (mask & 0x02) cureStatusEvent(pool, "frozen", sideByte, slot);
+        if (mask & 0x04) cureStatusEvent(pool, "confuse", sideByte, slot);
+        if (mask & 0x08) cureStatusEvent(pool, "sleep", sideByte, slot);
+      }
+    }
     if (plan?.regen && i === ((b?.activePlayerIndex ?? 0) | 0) && (side | 0) < 1) {
       rec.regeneration = true;
     }
@@ -2221,6 +2424,14 @@ function applyCategory5Plan(b, plan, ctx) {
       ctx.recordMagnitude | 0,
       RAND_U16,
     );
+    // The stager ALSO sets the record's own `+0x1c` bit (`ori $v0, 0x10` :27134 /
+    // `ori $v0, 0x20` :27141). The record byte is the interface every consumer
+    // reads: the command menu's row greys (`FIGHTSTG_F0x80093cf4` :17595 reads
+    // actor +0x1c & 0x20 for the DV row), the DNA pane's rejection tests and the
+    // escape roll. The walker keeps the two bits as per-record booleans, cleared
+    // by the pool's expiry below.
+    if (plan.effect === "lockFlee") playerRec.cantFlee = true;
+    else playerRec.cantDigivolve = true;
   }
   // The stat arms stage their own expiry: `jal FIGHTSTG_F0x8009cc20` :13776 with the code
   // from `.L0x800a43e0[stat]` (`:26986`) and the delay of OPCODE 12 -- `2000 + rand % 2001
@@ -2555,6 +2766,19 @@ export function commandPhaseWaitsForLine(line, state) {
 export function lowHpStance(c) {
   const max = Number(c?.maxHp ?? 0), hp = Number(c?.hp ?? 0);
   return max > 0 && hp > 0 && hp <= Math.trunc(max / 4);
+}
+
+// The flag WFIGHTMN_F0x800aa9f0 latches into the anim object's base-table field (+0x18) — which
+// resting pose a fighter plays. The routine's own kind-6 branch (wfightmn.s:4875-4946, file
+// 0x4c10) replaces the HP test for ONE fighter: arena slot 0x10 — the enemy — while the battle
+// kind word (+0xD6) is 6 takes the battle's weakened byte (+0xDB) as the flag, so the finale's
+// head stands in the hurt stance from the moment the third landed hit weakens it, whatever its
+// HP; every other fighter and phase keeps the quarter-HP rule. Claims
+// wfightmn-endweakness-and-weaken-chain-2026-10-10 (verified), BATTLE-C009,
+// low-hp-resting-stance-threshold-2026-08-19.
+export function fighterBaseStance(b, side) {
+  if (side === "enemy" && battleKindOf(b) === 6) return !!b?._bossPhaseDone;
+  return lowHpStance(side === "enemy" ? b?.enemy : b?.player);
 }
 
 // The in-fight HP bar, decoded from the 3D battle's HUD draw (FIGHTSTG_F0x800934f0).
@@ -3692,11 +3916,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // is armed at phase 5, exactly where the original opens its window.
       _opening: newOpeningState(),
       _introLineArmed: false,
-      // Phase 1's opening-line gate F0x800a684c is ported (openingLineRoll). Its three
-      // encounter inputs ([0x80042B1C]+0x3C/+0x1C and the party record's +0x784) are not
-      // extracted into the walker's data, so the default weight arms the opening line
-      // exactly as the walker always did. `?introNoLine=1` forces the no-line branch.
-      _introLineWeight: FORCE_INTRO_NO_LINE ? 0 : 1,
+      // Phase 1's ambush roll F0x800a684c is the disc's own gate and is fed the
+      // encounter's three real numbers by introLinePendingFor() below.
 
       player: initialPlayer,
       playerRoster,
@@ -3762,6 +3983,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // original's build arm: both bars start on the live HP with no tween.
       _hudClock: 0,
     };
+    // F0x800A69F0's setup call for the lead (wfightmn's setup F0x800a66b0 runs
+    // it): byte 6 of position 0's word, plus byte 7 + the equipped row carrying
+    // the form the lead fights in. This is the mark the report's DVEXP scan
+    // reads — without it a battle that never changed form would bank no DVEXP
+    // (stfgtrep.s state 0x14 arm, file 0x12C0, reads byte 7 + formIndex).
+    markFormTaken(battle, 0, initialPlayer.profile.id);
     // ?legacyIntroTimer=1 keeps the walker's old behaviour verbatim: the "Ambush!" line
     // is armed at creation and a flat 1.2 s timer hands the menu the turn. The default
     // route runs the ported seven-phase machine instead.
@@ -3898,6 +4125,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       currentId,
       equippedForms: partner?.equippedForms,
       signatureTech: battle.player.profile.tech_signature ?? battle.player.profile.techs?.[1] ?? 0,
+      // While Blast is active the fighter IS the blast form (setLiveBattleForm on
+      // the transformation's model frame), and the TECH list marks or appends
+      // that form's own signature with 0x8000 (F0x800967A0 :20381-:20400).
+      blastSignature: battle.blast?.active
+        ? (battle.player.profile.tech_signature ?? battle.player.profile.techs?.[1] ?? 0)
+        : 0,
     });
     return flagged
       .map((word) => {
@@ -4494,7 +4727,42 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // Set only while the sequence is in flight, and cleared before it runs so a beat
     // that puts up no page cannot re-enter itself.
     if (b._finaleAfter) { const run = b._finaleAfter; b._finaleAfter = null; run(); b.timer = 0; return; }
-    if (b._forcedFlee) { b._forcedFlee = false; b.state = ST.RESULT_MSG; b._nextState = ST.NONE; b.message = "Running away!"; b.timer = 0; const cb = b.onFlee; setTimeout(() => { if (battle === b) { persistPlayerGauge(b); if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack); battle = null; cb?.(); } }, 1400); return; } if (b._enemyFled) { endBattle("enemy-fled"); return; } if (!b._mode1EscapeShown && specialModeLowHpEscape(b.specialMode ?? 0, b.enemy.hp, b.enemy.maxHp)) { b._mode1EscapeShown = true; b.state = ST.RESULT_MSG; b._nextState = ST.NONE; const escName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy"; sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.FLEEING], name: escName }, "Fleeing!"); b.timer = 0; setTimeout(() => { if (battle === b) endBattle("enemy-fled"); }, 1400); return; } // ^ forced flee: Zanbamon's Cross Slash (result-queue slot 35, fightstg F0x80091a8c) puts up esmfight[0x48] "Running away!" and commits the result to 0 (flee) — the disc's only route that avoids the loss. The mode-1 low-HP escape (fightstg F0x80088564 `.L0x800885bc`, esmfight[0x5f] "Fleeing!") is the mode-1 boss ending: mode 1 + the enemy's HP below maxHP/10 (which the maxHP/11 floor guarantees) closes the fight back to the field with no rewards
+    if (b._forcedFlee) {
+      b._forcedFlee = false;
+      b.state = ST.RESULT_MSG;
+      b._nextState = ST.NONE;
+      b.message = "Running away!";
+      b.timer = 0;
+      const cb = b.onFlee;
+      setTimeout(() => {
+        if (battle === b) {
+          persistPlayerGauge(b);
+          if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack);
+          battle = null; cb?.();
+        }
+      }, 1400);
+      return;
+    }
+    // ^ forced flee: Zanbamon's Cross Slash (result-queue slot 35, fightstg F0x80091a8c) puts
+    // up esmfight[0x48] "Running away!" and commits the result to 0 (flee) — the disc's only
+    // route that avoids the loss.
+    if (b._enemyFled) { endBattle("enemy-fled"); return; }
+    // A successful player Run ends the battle outside endBattle (the field callback owns the
+    // exit), and only once its two pages have been read (setResultPages below).
+    if (b._runAwayEnd) { const run = b._runAwayEnd; b._runAwayEnd = null; run(); return; }
+    // The mode-1 low-HP escape (fightstg F0x80088564 `.L0x800885bc`, esmfight[0x5f]
+    // "Fleeing!") is the mode-1 boss ending: mode 1 + the enemy's HP below maxHP/10 (which
+    // the maxHP/11 floor guarantees) closes the fight back to the field with no rewards.
+    if (!b._mode1EscapeShown && specialModeLowHpEscape(b.specialMode ?? 0, b.enemy.hp, b.enemy.maxHp)) {
+      b._mode1EscapeShown = true;
+      b.state = ST.RESULT_MSG;
+      b._nextState = ST.NONE;
+      const escName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+      sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.FLEEING], name: escName }, "Fleeing!");
+      b.timer = 0;
+      setTimeout(() => { if (battle === b) endBattle("enemy-fled"); }, 1400);
+      return;
+    }
     if (b._timelinePages?.length) {
       // The turn's status pages. One page the player reads, then the next, the way the
       // original's status-event machines each build one line object and wait for it
@@ -4836,8 +5104,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   //                                synchronously in start(), before this frame.
   //   1 loadEncounterAndFighters   the intro variant by the disc's own rule
   //                                (introVariantFor: battle id x map id pairs, map 0x144
-  //                                the special-mode-4 arm) + the opening-line gate
-  //                                F0x800a684c (openingLineRoll).
+  //                                the special-mode-4 arm) + the ambush roll F0x800a684c
+  //                                (ambushRoll), fed the encounter's own numbers.
   //   2 queueBattleOverlay         the boot loader (web/wfight-translated.js, the
   //                                WfightLoaderSession) is the overlay F0x800a6414 queues.
   //   3 awaitOverlay               holds while the loader is still running, so a slow load
@@ -4854,6 +5122,37 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return 1;
   }
 
+  /**
+   * Phase 1's ambush roll F0x800a684c, fed the encounter's own three numbers.
+   *
+   * The disc's call site (`wfightmn.s` file `0x10ac`-`0x10fc`) reads the chance
+   * byte `[0x80042B1C]+0x3C` (the battle host's copy of the selected screen
+   * record's `+0xC` — `fieldstg.s` file `0x8b84`-`0x8b8c`), the first enemy's
+   * level `[0x80042B1C]+0x1C` (the host stores it at `fieldstg.s` file `0x8bf8`)
+   * and the first party member's level (`GAME + idx*0x3DC + 0x784`), then rolls
+   * against the shared RANDOM.next. The result decides BOTH the "Ambush!" page
+   * (phase 5's line window) and, in the original, the partner's opening form —
+   * the form half is a named gap (engine/dw3/battle-opening-machine.ts).
+   *
+   * A screen outside the mined encounter table has no row at all: keep the
+   * walker's previous default (a line), exactly what the old constant call did.
+   * `?introNoLine=1` still forces the no-line branch for captures.
+   */
+  function introLinePendingFor(b) {
+    if (FORCE_INTRO_NO_LINE) return false;
+    const chanceByte = b.encounterGateBytes?.[0];
+    if (chanceByte == null) return true;
+    // The disc returns BEFORE the RNG draw when the byte is zero (`wfightmn.s`
+    // file 0x0a8c-0x0a98), so do not spend a stream value here either.
+    if (chanceByte === 0) return false;
+    return ambushRoll({
+      chanceByte,
+      partnerLevel: b.player?.level ?? 0,
+      enemyLevel: b.enemy?.level ?? 0,
+      roll: RAND_U16(),
+    });
+  }
+
   function openingPorts(b) {
     return {
       assembleBattleObjects() {},
@@ -4864,7 +5163,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b._introVariant = ans.variant;
         b._specialMode4 = ans.specialMode4;
       },
-      introLinePending: () => openingLineRoll({ lineWeight: b._introLineWeight, bias: 0, enemyField: 0, roll: 0 }),
+      introLinePending: () => introLinePendingFor(b),
       queueBattleOverlay: () => (wfightNative.isOpen() ? 1 : 0),
       overlayPending: (handle) => handle !== 0 && wfightNative.isOpen() && !wfightNative.diagnostics?.().failed,
       sweepActionQueue() {},
@@ -4973,9 +5272,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const b = battle;
     tickHudEase(dt);
     // A hurt Digimon rests in the low-HP stance; a healthy one rests in the normal idle. Every
-    // action script's trailing "return to base" record plays whichever is current.
-    renderer3d?.setFighterBaseIdle?.("player", lowHpStance(b.player));
-    renderer3d?.setFighterBaseIdle?.("enemy", lowHpStance(b.enemy));
+    // action script's trailing "return to base" record plays whichever is current. The finale's
+    // head (kind 6, slot 0x10) is the one exception: its flag is the weakened byte.
+    renderer3d?.setFighterBaseIdle?.("player", fighterBaseStance(b, "player"));
+    renderer3d?.setFighterBaseIdle?.("enemy", fighterBaseStance(b, "enemy"));
     // Cinematic camera shot follows the battle phase, then render the 3D scene.
     // The walker no longer carries a state list for camera ownership: the renderer retires the
     // idle director on the confirm edge (its own absence makes it stop republishing), and the
@@ -5688,9 +5988,22 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b._forcedTag = false;
     b.activePlayerIndex = action.rosterIndex;
     b.player = incoming;
+    // The pool link follows the active fighter. The original has ONE queue at 0x800a3868
+    // and every stager writes into it, but the walker hands `statusEvents` / `sideByte` /
+    // `slot` to the records at battle setup — and setup only reaches the record that was
+    // active then. Without this a tagged-in partner's ailment would be staged into a
+    // DETACHED pool (`applyAilment` creates one when a record has none), so its poison
+    // would never tick and its recovery would never come due.
+    incoming.statusEvents = b.statusEvents;
+    incoming.sideByte = 0;
+    incoming.slot = 0;
     // Native Tag writes the selected form id into the already-resident incoming
     // record, then marks that roster position as a battle participant.
     setLiveBattleForm(b.player, profile);
+    // F0x800a78d8's commit also runs F0x800A69F0 on the incoming record
+    // (wfightmn file 0x0C10): byte 7 + the equipped row of the form Tagged in,
+    // so the report pays that form's DVEXP and ladder too.
+    markFormTaken(b, action.rosterIndex, profile.id);
     b.participantIndices.add(action.rosterIndex);
     // Native event 4 / shared presentation selector 2 runs sequence 0x38:
     // remove outgoing actor, show the input-gated "Go for it!" message, then
@@ -6327,33 +6640,35 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return false;
   }
 
-  // Pick enemy action from ai_moves (sdigiedt Moves struct).
-  // Conditions 0-7 are the self/target HP-MP predicates. 8, 10, 11, 12 and 13
-  // are wired to the operands the walker owns; 9 and 14-18 still depend on
+  // Pick enemy action from ai_moves (sdigiedt Moves struct) through the engine's
+  // F0x80088564 selection loop (engine/dw3/battle-formulas.ts::pickEnemyAiMove): rows
+  // 0..2 are condition-tested in order and the first passing row wins; the FOURTH row
+  // is taken unconditionally when none passes — the loop exits on `slti $s1, 0x3` and
+  // `sll $v0, $s1, 0x2` reads row 3 without ever evaluating its condition
+  // (fightstg.s:6050-6056). Conditions 0-8, 9, 10-13 are wired; 14-18 still depend on
   // unread fight-workspace record fields and are skipped rather than guessed.
   function pickEnemyMove(en) {
     const moves = en.eStats?.ai_moves;
     if (!moves || !moves.length) return { action: 1 };
     // check_move_cond operands: the active party form (0x800a4468 record +0x00
-    // -> DIGIMON_PROFILES row), the field element (0x800a4530), the battle id
-    // (0x80042b2c) and encounter config byte 1 (0x80042b59). The walker fights
-    // one enemy at a time, so the enemy-slot scan sees only this actor and
-    // condition 10 is false -- a simultaneous multi-enemy model is a separate
-    // divergence, not something to fake here.
+    // -> DIGIMON_PROFILES row), the party member's own ailment byte (record +0x1c,
+    // cond 9), the field element (0x800a4530), the battle id (0x80042b2c) and
+    // encounter config byte 1 (0x80042b59). The walker fights one enemy at a time, so
+    // the enemy-slot scan sees only this actor and condition 10 is false -- a
+    // simultaneous multi-enemy model is a separate divergence, not something to fake here.
     const context = {
       partyProfileId: battle.player?.profile?.id ?? null,
+      partyAilmentByte: battleAilmentByte(battle.player),
       fieldElementId: battle.field ? elementId(battle.field.element) : 0,
       battleId: battle.screenId ?? null,
       encounterGateByte: battle.encounterGateBytes?.[1] ?? null,
       enemySlots: [{ speciesId: Number(en.profile?.id) || 0, hp: en.hp }],
       activeEnemyIndex: 0,
     };
-    for (const m of moves) {
-      const pass = enemyMoveCondition(m.comparator, m.value, en, RAND_U16, battle.player, context);
-      if (pass === true) return m;
-    }
-    // The original selection loop is not decoded far enough to justify forcing a failed or
-    // unsupported final row. Basic attack is the walker's explicit safe fallback.
+    const picked = pickEnemyAiMove(moves, en, RAND_U16, battle.player, context);
+    if (picked) return picked;
+    // Only when the extracted row set has no fourth row at all (the disc's record always
+    // carries four) does the walker keep its explicit safe fallback: a basic attack.
     return { action: 1 };
   }
 
@@ -6381,25 +6696,25 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     const move = pickEnemyMove(en);
 
-    // AI action 4 maps to the type-4 special task; its consumer is the enemy escape
-    // roll F0x800a1608. Binder halves the base; Sleep refuses the flee, Frozen halves it.
+    // AI action 4 maps through F0x80089148 to code -1, the flee special; its consumer is
+    // the enemy escape roll F0x800a1608. Binder (the player's +0x3d) halves the base;
+    // Sleep refuses the flee, Frozen halves it.
     if (move.action === 4) {
-      if (enemyFleeProc(b.player.spd, en.spd, b.player.binderCrest, RAND_U16, battleAilmentByte(en))) {
-        // The original's flee beat is three pages of its own, one per outcome:
-        // `esmfight[0x5e]` "Trying to flee." (:6129), `esmfight[0x5f]` "Fleeing!"
-        // (:5882) and `esmfight[0x43]` "Run away!" -- the last one written by the Run
-        // command itself in the battle controller, `pro/wfightmn.s:2222`-`:2231`.
-        sayOriginal(b, {
-          kind: MSG_KIND.OUTCOME, payload: [MSG.RUN_AWAY], name,
-        }, `${name} ran away!`);
-        b._enemyFled = true;
-      } else {
-        // `esmfight[0x60]` "Did not flee." -- the command-gate arm that rolls the escape
-        // and prints the refusal, `pro/fightstg.s:5942`/`:5947`.
-        sayOriginal(b, {
-          kind: MSG_KIND.OUTCOME, payload: [MSG.DID_NOT_FLEE], name,
-        }, `${name} couldn't escape!`);
-      }
+      const fled = enemyFleeProc(b.player.spd, en.spd, b.player.binderCrest, RAND_U16, battleAilmentByte(en));
+      // The action-code -1 path puts up 0x5E "Trying to flee." BEFORE the roll
+      // (fightstg.s file `0x6123`-`0x6137` = .L0x800889f4-.L0x80088a30: queue the
+      // RUN_AWAY event for side 0x10, then the 0x5E page), and the runAway arm prints
+      // the outcome after it — 0x5F "Fleeing!" for an enemy actor (the arm picks 0x43
+      // only when the queued entry's actor is 0, `wfightmn.s` file `0x228c`-`0x22a0`)
+      // or 0x60 "Did not flee.". The original's message panel is blocking, so both are
+      // Circle-gated pages in this order.
+      setResultPages(b, [
+        { text: `${name} is trying to flee!`,
+          spec: { kind: MSG_KIND.OUTCOME, payload: [MSG.TRYING_TO_FLEE], name } },
+        { text: fled ? `${name} ran away!` : `${name} couldn't escape!`,
+          spec: { kind: MSG_KIND.OUTCOME, payload: [fled ? runAwayLine(0x10) : MSG.DID_NOT_FLEE], name } },
+      ]);
+      if (fled) b._enemyFled = true;
       return;
     }
 
@@ -6419,7 +6734,19 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (b._finaleCopiedAttack && (requestedSkillId | 0) === FINALE_HEAD_ATTACK_ID) skill = b._finaleCopiedAttack;
     if (!usesTech && skill) skill = { ...skill, attack_category: "physical" };
     if (!usesTech && skill) skill = { ...skill, basic_attack: true };
-    if (usesTech) en.mp -= techniqueMpCost(skill.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
+    if (usesTech) {
+      const mpCost = techniqueMpCost(skill.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
+      // F0x80088564's dispatch for action codes >= 2 (.L0x80088934-.L0x800889d0,
+      // fightstg.s:6080-6100): the actor's current MP is tested against the technique
+      // record's own u16 cost FIRST, and when it is below the cost the action is
+      // replaced by esmfight[0x8d] "No MP!" (kind 2, the same page shape the ailment
+      // gate uses) — no MP is taken and the technique never runs.
+      if (en.mp < mpCost) {
+        sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.NO_MP], name }, `${name} has no MP!`);
+        return;
+      }
+      en.mp -= mpCost;
+    }
 
     const usedCounter = setCounterStance(skill, en);  // f7=10: enemy gains a counter stance
     const hits = skill?.hits ?? 1;
@@ -6766,25 +7093,25 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     if (newLevel > oldLevel) {
       levelUp = true;
-      ps.level = newLevel;
-      if (lu) {
-        ensureStoredStats(ps, prof);
-        for (let lv = oldLevel + 1; lv <= newLevel; lv++)
-          applyLevelUpGains(ps, rollLevelUpGains(prof, lv, lu), lu);
-      } else {
-        ps.maxHp = scaledStat(prof, "hp", newLevel) + (ps.bonuses?.hp ?? 0);
-        ps.maxMp = scaledStat(prof, "mp", newLevel) + (ps.bonuses?.mp ?? 0);
-      }
-      ps.hp = ps.maxHp;
-      ps.mp = ps.maxMp;
-      const tpCap = lu?.tp_cap ?? 99;
-      ps.tp = Math.min((ps.tp ?? 0) +
-        (lu?.tp_per_level ?? 5) * (newLevel - oldLevel), tpCap);
+      // The disc's level-up writes the level, the rolls, and TP — never HP or MP,
+      // so the partner keeps the damage the battle left (applyLevelUp).
+      applyLevelUp(ps, prof, oldLevel, newLevel, lu);
       if (rosterIndex === 0)
         availableEvos = treeCandidatesFor(evolutionTrees, digimonDB, partyFormState(getState(), rosterIndex));
     }
     ps.xp = newXp;
 
+    // DVEXP is paid to every form the battle TOOK, not only the one in the seat
+    // at the end. F0x800A69F0 marks the equipped row of the form just taken
+    // (the lead at setup, then each Manual DV and Tag commit), and the report's
+    // state-0x14 arm runs dvGain + dvLadder for every marked row (stfgtrep.s
+    // file 0x12C0, reading byte 7 + formIndex of the position's word). A form
+    // with no row to mark — the rookie — banks nothing and gets no ledger entry.
+    // The share divisor is the number of MARKED FORMS across the standing rows
+    // (dvexpShareCount), not the number of positions: a mid-battle DV adds a
+    // second mark to its row and enlarges the divisor. The state-0x16/0x17 arms
+    // then try ONE learn and ONE loadable per marked form, at the level the
+    // ladder just landed on.
     if (reward.dvexp > 0) {
       ps.dvexpByForm ??= {};
       if (ps.dvexp) {
@@ -6792,42 +7119,50 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         delete ps.dvexp;
       }
       ps.formLedger ??= [];
-      let record = ps.formLedger.find((r) => Number(r.id) === Number(prof.id));
-      if (!record) {
-        record = { id: prof.id, formLevel: 1, dvexp: ps.dvexpByForm[prof.id] ?? 0,
-          techSlots: [0, 0, 0, 0, 0, 0] };
-        ps.formLedger.push(record);
-      }
-      const oldFormLevel = record.formLevel ?? 1;
-      const oldSlots = [...(record.techSlots ?? [0, 0, 0, 0, 0, 0])];
-      const banked = Number(record.dvexp ?? ps.dvexpByForm[prof.id] ?? 0);
-      const formCap = prof.dv_cap ?? 100;
-      const participants = Math.max(1, paidParticipants(b).length);
-      const gain = dvexpGain(reward.dvexp, ps.level ?? 1, participants,
-                             record.formLevel ?? 1, formCap);
-      record.dvexp = Math.min(banked + gain, lu?.dvexp_cap ?? 9999999);
-      while (record.formLevel < 99 && record.dvexp >= (record.formLevel < formCap
-        ? 10 * record.formLevel
-        : 10 * (formCap - 1) + 50 * (record.formLevel + 1 - formCap))) {
-        record.formLevel++;
-        // The disc's learn/load pass, once per form-level step. The signature is
-        // ledger slot 5 with its own learn gate (+0x36), never the slot after the
-        // last ordinary technique — see web/form-tech-slots.js.
-        applyFormTechGates(record, prof, record.formLevel);
-      }
-      ps.dvexpByForm[prof.id] = record.dvexp;
-      if (record.formLevel > oldFormLevel)
-        formLevelsGained.push({ name: prof.name, level: record.formLevel });
-      for (let i = 0; i < 6; i++) {
-        const now = record.techSlots[i] ?? 0;
-        const was = oldSlots[i] ?? 0;
-        if (!was && now) {
-          const name = namedSkill(now);
-          if (name) learnedTechs.push(name);
+      const participants = dvexpShareCount(b.formFlags, paidParticipants(b));
+      for (const formId of markedEquippedForms(b.formFlags?.[rosterIndex], ps.equippedForms)) {
+        const formProfile = digimonDB?.[formId] ?? profileById(formId) ?? prof;
+        let record = ps.formLedger.find((r) => Number(r.id) === Number(formId));
+        if (!record) {
+          record = { id: formId, formLevel: 1, dvexp: ps.dvexpByForm[formId] ?? 0,
+            techSlots: [0, 0, 0, 0, 0, 0] };
+          ps.formLedger.push(record);
         }
-        if (i < 5 && !(was & 0x2000) && (now & 0x2000)) {
-          const name = namedSkill(now);
-          if (name) loadableTechs.push(name);
+        const oldFormLevel = record.formLevel ?? 1;
+        const oldSlots = [...(record.techSlots ?? [0, 0, 0, 0, 0, 0])];
+        if (record.dvexp == null) record.dvexp = ps.dvexpByForm[formId] ?? 0;
+        const formCap = formProfile.dv_cap ?? 100;
+        // A form already at level 99 banks nothing (bankFormDvexp / the disc's
+        // ladder early return); a lower one takes the gain and the ladder.
+        const leveled = bankFormDvexp(record, dvexpGain(reward.dvexp, ps.level ?? 1,
+          participants, oldFormLevel, formCap), formCap, lu?.dvexp_cap ?? 9999999);
+        if (leveled) {
+          // EVERY technique the new form level has passed, then every loadable
+          // it unlocked — the report LOOPS both services. F0x8008670C is called
+          // from state 0x16, which the state-0x19 message-done dispatch re-enters
+          // through selector 1 (its table at 0x80082d80 points selectors 0 AND 1
+          // at 0x800843f4 = state 0x16) until the service answers 0; F0x80086844
+          // loops the same way through selector 2 -> state 0x17. Proven by
+          // running the original F0x80083E74 in engine/native: msg-done with
+          // selector 1 writes state 0x16 (tests/report-row-oracle.test.js
+          // carries the case). The signature is ledger slot 5 with its own learn
+          // gate (+0x36) — see web/form-tech-slots.js.
+          applyFormLearnPass(record, formProfile);
+        }
+        ps.dvexpByForm[formId] = record.dvexp;
+        if (record.formLevel > oldFormLevel)
+          formLevelsGained.push({ name: formProfile.name, level: record.formLevel });
+        for (let i = 0; i < 6; i++) {
+          const now = record.techSlots[i] ?? 0;
+          const was = oldSlots[i] ?? 0;
+          if (!was && now) {
+            const name = namedSkill(now);
+            if (name) learnedTechs.push(name);
+          }
+          if (i < 5 && !(was & 0x2000) && (now & 0x2000)) {
+            const name = namedSkill(now);
+            if (name) loadableTechs.push(name);
+          }
         }
       }
     }
@@ -7446,6 +7781,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // The player's Run is F0x800a1608 side 0 (fightstg): a 0..127 roll under
       //   (base+1)*8 + level advantage + speed advantage (only when faster)
       //   + the Runner Sandal/Shoes bonus, from the fighters' real level and SPD.
+      // The routine's FIRST test is the encounter's own byte 0x80042b65 (the screen
+      // record's +0x19, `raw_2b58_2b65[13]`): nonzero returns 0, so the Run can never
+      // succeed — the flag that refuses a Run in the story/special battles (zero of
+      // the 167 screens that carry it appear in any active random-encounter zone).
       // The Runner item folds into that sum (`+0x3c`); Sleep/tech-abort refuse it
       // and Frozen halves the base. Capture Beam (211) stages status event 0x10 on
       // the player's active fighter, the game's own "can't run away" lock; that lock
@@ -7454,24 +7793,40 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (!statusEventLockHeld(b.statusEvents, 0, 0, activeSlotOf(b, 0)) &&
           fleeChance({ selfLevel: b.player.level | 0, otherLevel: b.enemy.level | 0,
             selfSpd: b.player.spd | 0, otherSpd: b.enemy.spd | 0,
-            escapeBonus: b.player.escapeBonus | 0, selfAilment: battleAilmentByte(b.player) }, RAND_U16)) {
+            escapeBonus: b.player.escapeBonus | 0, selfAilment: battleAilmentByte(b.player),
+            escapeBlocked: (b.encounterGateBytes?.[13] ?? 0) !== 0 }, RAND_U16)) {
         b.state = ST.RESULT_MSG;
         b._nextState = ST.NONE;
-        b.message = "Got away safely!";
+        // The Run command's own arm (`wfightmn.s` file `0x1880`-`0x18d8`) increments the
+        // escape base counter, queues the RUN_AWAY event for actor 0 and puts up
+        // esmfight[0x41] "Run!" (kind 2, arg 0) BEFORE the event rolls; the runAway arm
+        // then prints 0x43 "Run away!" on the success (`wfightmn.s` file `0x2294`-`0x22a0`).
+        // Both are Circle-gated pages in this order, and the battle ends when the second
+        // has been read (the walker's own exit — flee bypasses endBattle, so the music is
+        // restored here).
+        setResultPages(b, [
+          { text: `${b.player.profile.name} runs!`,
+            spec: { kind: MSG_KIND.OUTCOME, payload: [MSG.RUN], name: b.player.profile.name } },
+          { text: "Got away safely!",
+            spec: { kind: MSG_KIND.OUTCOME, payload: [runAwayLine(0)], name: b.player.profile.name } },
+        ]);
         b.timer = 0;
-        // End battle after message (flee bypasses endBattle -- restore music here)
         const cb = b.onFlee;
-        setTimeout(() => {
-          if (battle === b) {
-            persistPlayerGauge(b);
-            if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack);
-            battle = null; cb?.();
-          }
-        }, 1400);
+        b._runAwayEnd = () => {
+          persistPlayerGauge(b);
+          if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack);
+          battle = null; cb?.();
+        };
       } else {
-        b.message = "Can't escape!";
+        // The disc prints NO second page for a failed Run: the 0x41 "Run!" line the
+        // command arm put up is the only one (the runAway arm's failure arm re-queues the
+        // event with a delay and shows nothing — claim
+        // wfightmn-runaway-recover-clearfield-2026-10-10), and the turn passes on.
+        sayOriginal(b, {
+          kind: MSG_KIND.OUTCOME, payload: [MSG.RUN], name: b.player.profile.name,
+        }, `${b.player.profile.name} runs!`);
         queueAfterAction(b, "player");
-        b.state = ST.FLEE_FAIL;
+        b.state = ST.RESULT_MSG;
         b.timer = 0;
       }
     }

@@ -99,7 +99,13 @@ export function createSaveNative(sfx = null) {
                     playSeconds: seconds,
                 });
                 r._savedSlot = slot;
-                sfx?.play("system01");
+                // The write itself is silent in the overlay: the save states
+                // 0x32-0x35 of F0x80084dcc carry no play site (pro/stgmcard.s),
+                // and the cues around the write come from the machine itself —
+                // the prompt's Circle (0x8004503c) and the result window's
+                // dismiss (0x0004001c). The old wiring played "system01" (the
+                // pre-2026-07-03i shifted name for 0x8004503c) here; nothing
+                // plays it now (audit/sfx-save-pause-vs-decode).
             },
         });
         // A 0x26C4 read is the screen loading that file; remember the slot so the

@@ -175,6 +175,56 @@ export function openingLineRoll(input: OpeningLineRollInput): boolean {
     return frac < (bound >> 5);
 }
 
+// ── The ambush roll in the encounter's own terms ────────────────────────────
+//
+// `F0x800a684c` (WFIGHTMN_rollAmbush) is the same routine; the phase-1 call
+// site (`wfightmn.s` file `0x10ac`-`0x10fc`, inside `loadEncounterAndFighters`)
+// feeds it the ENCOUNTER's three numbers, and its result is the battle's
+// ambush answer:
+//
+//   chanceByte    `[0x80042B1C]+0x3C` — the encounter row's first config byte.
+//                 The battle host `F0x8008B798` copies the selected screen
+//                 record's `+0xC` here (`fieldstg.s` file `0x8b84`-`0x8b8c`),
+//                 i.e. `field_encounters.battle_config[screen].raw_2b58_2b65[0]`.
+//                 Zero for most screens — those battles never ambush.
+//   partnerLevel  the first party member's level: `GAME + idx*0x3DC + 0x784`
+//                 after `getPartyMember(0)` (`wfightmn.s` file `0x10b4`-`0x10c8`).
+//   enemyLevel    the first enemy's level: `[0x80042B1C]+0x1C`, the low half of
+//                 the screen record's enemy[0] word 1 (the host stores it at
+//                 `fieldstg.s` file `0x8bf8`).
+//   roll          the shared `RANDOM.next` value ([0x8004DC0C]).
+//
+// true = the party was ambushed: `ctx+0x18 = 1`, so phase 5 opens the
+// one-line window with payload 7 — esmfight 0x07 "Ambush!" (`wfightmn.s`
+// file `0x12e8`-`0x1300`) — instead of the camera beat, AND the partner opens
+// in the record's own opening form (`table 0x8003ef5c[idx*0x58]`, file
+// `0x10d0`-`0x10fc`). false = the ordinary opening (the camera beat; the
+// partner's form may come from the record's `+0x764`).
+//
+// NAMED GAP: the opening-form half is not implemented — the walker has no port
+// of the `0x8003ef5c` table / `GAME+0x2738` lookup / record `+0x764` read, so a
+// battle that IS ambushed still opens in the roster's configured form.
+export interface AmbushRollInput {
+    /** `[0x80042B1C]+0x3C` — the encounter row's config byte 0 (0 = no ambush). */
+    chanceByte: number;
+    /** The first party member's level (`+0x784` of the `getPartyMember(0)` record). */
+    partnerLevel: number;
+    /** The first enemy's level (`[0x80042B1C]+0x1C`, s16). */
+    enemyLevel: number;
+    /** The raw value the shared random stream returned. */
+    roll: number;
+}
+
+/** Phase 1's ambush roll `F0x800a684c`, fed the encounter's own three numbers. */
+export function ambushRoll(input: AmbushRollInput): boolean {
+    return openingLineRoll({
+        lineWeight: input.chanceByte,
+        bias: input.enemyLevel,
+        enemyField: input.partnerLevel,
+        roll: input.roll,
+    });
+}
+
 // ── The machine's own state (the controller's three-level word + its block) ──
 
 /**

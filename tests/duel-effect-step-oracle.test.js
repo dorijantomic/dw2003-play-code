@@ -47,7 +47,7 @@ const CALLS = [
     ["waitViewWindowOpen", 0x800a1db8, 2],
     ["presentResolvingCard", 0x800a1e60, 2],
     ["cardPredicate", 0x80083e34, 3],
-    ["applyResolvingStatChange", 0x800954f8, 3],
+    ["checkResolvingLegality", 0x800954f8, 3],
     ["repaintHudStrips", 0x8009edcc, 2],
 ];
 // [port method name, pointer slot, arity, has-5th-stack-arg]

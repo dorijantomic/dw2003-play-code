@@ -639,10 +639,23 @@ export interface StatusEventOwnDelayInput {
   /** `lh $v0, 0x6($s1)` — the HANDED side's effective SPT (block `0x800a4580` + 0x06). */
   readonly ownSpt: number;
   /**
-   * The global `0x800a435d` — the ailment id byte the three cure stagers write
-   * (`sb $s0, 0xaf5($s5)` / `sb $s4, 0x435d($v0)`).
+   * The global `0x800a435d` — the MAGNITUDE of the ailment being applied, which the
+   * three cure stagers write in their delay call's own delay slot (`sb $s0, 0xaf5($s5)`
+   * F0x8009c8b0 :26709-:26714, `sb $s0, 0xaf5($s5)` F0x8009cb10 :26972-:26975,
+   * `sb $s4, 0x435d($v0)` F0x8009c9c0 :26854-:26856 on the opcode-10 path only).
+   *
+   * It is the stager's THIRD ARGUMENT, which the apply machine loads from the action
+   * context's own effect byte — `lbu $a2, 0x38($s4)` with `$s4 = 0x800a43f4 + slot`
+   * (`pro/fightstg.s:15196`, `:15206`, `:15216`, `:15226`), i.e. `effects[slot]` — and
+   * that byte is the applier's rolled `f9`/`effect_p2` magnitude, doubled when the acting
+   * fighter's record `+0x1b` is set (`sb $v1, 0x3a($s1)` F0x8009d140, `sb $v1,
+   * 0x442f($v0)` F0x8009d1dc). It is NOT an id: the id-looking `li $v0, 0x1e`-`0x21` next
+   * to each stager call is the message-box id stored to the screen's `+0x54`
+   * (`sw $v0, 0x54($s3)` :15197-:15229), a different value entirely. The arms read it
+   * back as the `G` of `rand % 500 + 8 * (SPT + G) + K - 8 * (otherA + otherB)`
+   * (`lbu $v1, 0x435d($v1)` :26136, :26149, :26157).
    */
-  readonly ailmentId: number;
+  readonly magnitude: number;
   /** The other side's first stat-pair field (`lh $a0, 0x14|$12|$10($s0)`). */
   readonly otherA: number;
   /** The other side's second stat-pair field (`lh $v1, 0x1c|$1e|$20($s0)`). */
@@ -711,11 +724,11 @@ export function statusEventDivide2710(draw: number): number {
  * and `0x8009c058`, which share one shape (`pro/fightstg.s:26091`-`:26135`, `:26141`-`:
  * 26190`, `:26191`-`:26244`). Each asks the getter TWICE: flag 1 first for the side it was
  * handed and flag 0 second for `0x10 - side`, and the shared tail reads
- * `lh $v0, 0x6($s1)` for the HANDED side's SPT and `0x435d($v1)` for the ailment id. The
+ * `lh $v0, 0x6($s1)` for the HANDED side's SPT and `0x435d($v1)` for the magnitude. The
  * second `jalr` again carries `move_ $s1, $v0` in its DELAY SLOT, so `$s1` keeps the
  * handed-side block and `$s0` ends up holding the OTHER side's block.
  *
- * `delay = rand % 500 + 8 * (ownSpt + ailmentId) + K - 8 * (otherA + otherB)`, clamped:
+ * `delay = rand % 500 + 8 * (ownSpt + magnitude) + K - 8 * (otherA + otherB)`, clamped:
  *
  * | opcode | ailment | `K` | `otherA` | `otherB` | floor |
  * |---|---|---|---|---|---|
@@ -728,7 +741,7 @@ export function statusEventRecoveryDelay(
 ): number {
   const base = STATUS_EVENT_OPCODE_PARAMS[opcode]![0];
   const stat = 8 * (
-    Math.max(0, input.ownSpt | 0) + (input.ailmentId | 0)
+    Math.max(0, input.ownSpt | 0) + (input.magnitude | 0)
     - (input.otherA | 0) - (input.otherB | 0)
   );
   const roll = (input.draw >>> 0) % base;
@@ -860,8 +873,18 @@ export interface StatusEventAilmentStage {
   readonly slot: number;
   /** The ailment, which picks the code, the record bit and the delay opcode. */
   readonly ailment: string;
-  /** The record `+0x38` byte the apply machine hands over — the ailment's own id. */
-  readonly ailmentId: number;
+  /**
+   * The stager's THIRD ARGUMENT — the apply machine's effect byte, `effects[slot]`
+   * (`lbu $a2, 0x38($s4)` with `$s4 = 0x800a43f4 + slot`, `pro/fightstg.s:15196`,
+   * `:15206`, `:15216`, `:15226`), which the appliers fill with the rolled
+   * `f9`/`effect_p2` magnitude. The poison stager stores it as the code-9 payload
+   * (`sw $s3, 0xc($v0)` :26720, `sw $s3, 0x10($a0)` :26721-:26730); the three cure
+   * stagers store it in the record's own magnitude byte (`sb $s0, 0x1d($v1)` :26790
+   * frozen, `sb $s6, 0x1f($v1)` :26897 confused, `sb $s0, 0x1e($v1)` :26969 asleep) and
+   * hand it to the delay arm as `0x800a435d` (`sb $s0, 0xaf5($s5)` :26709-:26714,
+   * `sb $s4, 0x435d($v0)` :26854-:26856, `sb $s0, 0xaf5($s5)` :26972-:26975).
+   */
+  readonly magnitude: number;
   /** Everything the delay arm needs. */
   readonly delay: StatusEventOwnDelayInput;
   /** The action's technique id, which selects opcode 8 or 10 for confusion. */
@@ -877,9 +900,9 @@ export interface StatusEventAilmentStage {
  * | code | stager | delay | refresh rewrites | enqueue writes | record |
  * |---|---|---|---|---|---|
  * | `0x09` | `F0x8009c7d4` | none — `li $v0, 0x3e8` `:26742` | `+0x0c` (the payload) `sw $s3, 0xc($v0)` `:26720` | code/time/side/slot/payload `:26721`-`:26730` | `record[+0x1c] |= 0x01` `:26743`-`:26744` |
- * | `0x0a` | `F0x8009c8b0` | opcode 9 `:26700` | `+0x02` only, in the `j`'s delay slot `sh $a1, 0x2($v0)` `:26690` | code/time/side/activeSlot `:26789`-`:26797` | `record[+0x1d] = id` `:26790`, `record[+0x1c] |= 0x02` `:26797`-`:26798` |
- * | `0x0b` | `F0x8009c9c0` | opcode 8 or 10 `:26853`/`:26857` | `+0x02` only `sh $a1, 0x2($v0)` `:26869` | code/time/side/activeSlot `:26870`-`:26883` | `record[+0x1f] = id` `:26897`, `record[+0x1c] |= 0x04` `:26898`-`:26899` |
- * | `0x0c` | `F0x8009cb10` | opcode 11 `:26933` | `+0x02` only `sh $v1, 0x2($v0)` `:26946` | code/time/side/activeSlot `:26947`-`:26955` | `record[+0x1e] = id` `:26969`, `record[+0x1c] |= 0x08` `:26970`-`:26971` |
+ * | `0x0a` | `F0x8009c8b0` | opcode 9 `:26700` | `+0x02` only, in the `j`'s delay slot `sh $a1, 0x2($v0)` `:26690` | code/time/side/activeSlot `:26789`-`:26797` | `record[+0x1d] = magnitude` `:26790`, `record[+0x1c] |= 0x02` `:26797`-`:26798` |
+ * | `0x0b` | `F0x8009c9c0` | opcode 8 or 10 `:26853`/`:26857` | `+0x02` only `sh $a1, 0x2($v0)` `:26869` | code/time/side/activeSlot `:26870`-`:26883` | `record[+0x1f] = magnitude` `:26897`, `record[+0x1c] |= 0x04` `:26898`-`:26899` |
+ * | `0x0c` | `F0x8009cb10` | opcode 11 `:26933` | `+0x02` only `sh $v1, 0x2($v0)` `:26946` | code/time/side/activeSlot `:26947`-`:26955` | `record[+0x1e] = magnitude` `:26969`, `record[+0x1c] |= 0x08` `:26970`-`:26971` |
  *
  * All four **re-stage in place**: an entry already queued for the same code and side is
  * never duplicated, its remaining time is replaced (or, for poison, its payload), and the
@@ -896,7 +919,7 @@ export function stageStatusEventAilment(
     if (code === 0x09) {
       // `F0x8009c7d4` refreshes the payload and NOT `+0x02` — its delay slot stores the
       // register it names (`$s3`), which is the caller's third argument, not the time.
-      found.payload = stage.ailmentId | 0;
+      found.payload = stage.magnitude | 0;
     } else {
       found.time = statusEventAilmentDelay(stage.ailment, stage.delay, stage.techniqueId);
     }
@@ -909,7 +932,7 @@ export function stageStatusEventAilment(
       : statusEventAilmentDelay(stage.ailment, stage.delay, stage.techniqueId),
     side: stage.side,
     slot: stage.slot,
-    payload: stage.ailmentId | 0,
+    payload: stage.magnitude | 0,
     payload2: stage.slot | 0,
   });
 }
@@ -955,10 +978,11 @@ export function stageStatusEventSideTick(
  * This is the free half of `FIGHTSTG_F0x8009c330` (`pro/fightstg.s:26376`-`:26443`), the
  * disc's one "an ailment ends now" routine: `which` 0..3 picks the bit out of the four-byte
  * table at `0x800a43dc` (`0x3f040201` — poison `0x01`, frozen `0x02`, confused `0x04`,
- * all three `0x3f`), clears it with `nor $v0, $zr, $v0` / `and $v1, $v0` /
+ * all six bits `0x3f`), clears it with `nor $v0, $zr, $v0` / `and $v1, $v0` /
  * `sb $v1, 0x1c($a2)` (`:26421`-`:26425`), and then frees the matching pool entry from the
  * companion table at `0x800a43d4` (`0x0c0b0a09` — which 0 → code `0x09`, 1 → `0x0a`,
- * 2 → `0x0b`, 3 → `0x0c`) with `sh $zr, ($v0)` (`:26443`).
+ * 2 → `0x0b`) with `sh $zr, ($v0)` (`:26443`). `which` 3 is the ALL arm and takes the
+ * six-code walk instead — see {@link cureAllStatusEvents}.
  *
  * The walker's own flag byte is the ailment's presence in `c.ailments`, so freeing the
  * entry IS the cure. Returns true when an entry was freed.
@@ -970,6 +994,47 @@ export function cureStatusEvent(
   const code = statusEventAilmentCode(ailment);
   if (code === null) return false;
   return removeStatusEvent(pool, code, side, slot);
+}
+
+/**
+ * The six pool codes an ALL-status cure cancels, in the order the disc walks them.
+ *
+ * Two routines cancel exactly this set, and neither is the single-ailment half of
+ * `FIGHTSTG_F0x8009c330`:
+ *
+ * - its `which` 3 arm (`li $v0, 0x3` `pro/fightstg.s:26423` / `beq $a0, $v0,
+ *   .L0x8009c440` `:26424`) walks SIX bytes from `.L0x800a43d4` (`slti $v0, $s0, 0x6`
+ *   `:26464`), which is `0x0c0b0a09` (`:34881`) plus the low half of `.L0x800a43d8`
+ *   (`0x00001110`, `:34882`) — codes 9, 10, 11, 12, 16 and 17 DECIMAL, i.e. the four
+ *   ailment recoveries AND the two tech-abort locks `0x10` / `0x11`;
+ * - `FIGHTSTG_F0x8008f5d4` (technique 375's own helper, `:12884`-`:12940`) reads the same
+ *   six codes a WORD at a time out of `.L0x800a3438` (`:33882`-:33887`, `lw $a0, ($s0)`
+ *   `:12906` / `slti $v0, $s1, 0x6` `:12919`) and zeroes each matching entry
+ *   (`sh $zr, ($v0)` `:12938`).
+ *
+ * So an all-status cure is not "the four ailments": it also releases the cannot-flee and
+ * cannot-digivolve locks, and the record's own mask for it (`0x3f`) carries their bits.
+ */
+export const STATUS_EVENT_ALL_CURE_CODES: readonly number[] = Object.freeze([
+  0x09, 0x0a, 0x0b, 0x0c, 0x10, 0x11,
+]);
+
+/**
+ * Free one record's ALL-status entries: the four ailment recoveries and the two locks.
+ *
+ * This is `FIGHTSTG_F0x8009c330`'s `which` 3 arm, whose expiry set
+ * {@link STATUS_EVENT_ALL_CURE_CODES} lists, and the same six-code cancel technique 375's
+ * helper runs. Returns how many entries were freed.
+ */
+export function cureAllStatusEvents(
+  pool: StatusEventPool | undefined, side: number, slot: number,
+): number {
+  if (!pool || pool.length !== STATUS_EVENT_POOL_SIZE) return 0;
+  let freed = 0;
+  for (const code of STATUS_EVENT_ALL_CURE_CODES) {
+    if (removeStatusEvent(pool, code, side, slot)) freed += 1;
+  }
+  return freed;
 }
 
 /** What one expiry did. */
