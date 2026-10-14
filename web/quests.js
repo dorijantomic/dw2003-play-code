@@ -18,6 +18,7 @@
 // the party's level.
 import { fx } from "./ambience.js";
 import { on } from "./gameEvents.js";
+import { drawWindow } from "./uiRects.js";
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -444,6 +445,48 @@ export async function openLog() {
             } else return true;
         }
     } finally { logOpen = false; }
+}
+
+/**
+ * The pause menu's home list is the original's own fixed six-row panel (a baked picture), so a seventh row cannot be added
+ * without new art. Instead the open quests are shown in a window of the same style under it, in the free corner of the
+ * screen. Drawn in the game's 320x240 units; `viewW` is the canvas width.
+ */
+export function drawPausePanel(ctx, viewW = 320) {
+    if (!enabled() || !defs.length) return;
+    const all = logEntries();
+    const open = all.filter(({ s }) => s === "ready" || s === "active");
+    const fresh = all.filter(({ s }) => s === "available").length;
+    const shown = open.slice(0, 3);
+    const rows = Math.max(1, shown.length);
+    const x = 114, y = 148, w = 202, h = 18 + rows * 21 + (open.length > 3 || fresh ? 11 : 0);
+    ctx.save();
+    ctx.scale(viewW / 320, viewW / 320);
+    drawWindow(ctx, null, null, x, y, w, h);
+    ctx.textBaseline = "alphabetic";
+    ctx.font = "bold 9px monospace";
+    ctx.fillStyle = "rgb(152, 152, 248)";
+    ctx.fillText("ACTIVE QUESTS", x + 7, y + 11);
+    if (!shown.length) {
+        ctx.font = "9px monospace"; ctx.fillStyle = "rgb(190, 190, 215)";
+        ctx.fillText("No open quests.", x + 7, y + 29);
+    }
+    shown.forEach(({ d, s }, i) => {
+        const top = y + 13 + i * 21;
+        ctx.font = "bold 9px monospace"; ctx.fillStyle = s === "ready" ? "rgb(255, 211, 77)" : "rgb(232, 232, 248)";
+        ctx.fillText(`${s === "ready" ? "!" : ">"} ${clip(d.title, 30)}`, x + 7, top + 10);
+        const a = st.active[d.id];
+        const k = d.objectives.findIndex((_, j) => ((a?.p[j]) || 0) < targetOf(d, j));
+        const ref = turnInRef(d);
+        const line = s === "ready" ? (ref ? `Report to ${ref.name}` : "Ready: claim it with F3") : (k >= 0 ? objectiveText(d, k) : "");
+        ctx.font = "8px monospace"; ctx.fillStyle = "rgb(160, 160, 190)";
+        ctx.fillText(clip(line, 40), x + 13, top + 19);
+    });
+    if (open.length > 3 || fresh) {
+        ctx.font = "8px monospace"; ctx.fillStyle = "rgb(130, 130, 170)";
+        ctx.fillText([open.length > 3 ? `+${open.length - 3} more` : "", fresh ? `${fresh} new` : "", "F3 in the field"].filter(Boolean).join("  -  "), x + 7, y + h - 4);
+    }
+    ctx.restore();
 }
 
 function installUi(stageEl) {

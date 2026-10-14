@@ -23,7 +23,7 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick, questTalk } from "./quests.js"; // extra quests
+import { installQuests, questsTick, questTalk, drawPausePanel } from "./quests.js"; // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
@@ -9302,7 +9302,10 @@ function render() {
         }
         fightReport.draw(ctx, VIEW_W, VIEW_H);
     }
-    if (status?.isOpen()) status.draw(ctx, VIEW_W, VIEW_H);
+    if (status?.isOpen()) {
+        status.draw(ctx, VIEW_W, VIEW_H);
+        if (status.entry?.() === "home") drawPausePanel(ctx, VIEW_W);   // extra quests: the open ones, under the pause list
+    }
     else if (state.menuOpen) menu.draw(ctx, VIEW_W, VIEW_H, state);
     if (battle.isActive()) battle.draw();
     // The field movie takes the whole screen (its draw fills black first), the

@@ -185,6 +185,8 @@ export function createStatusTranslated(sfx = null, opts = {}) {
     };
 
     st.isOpen = () => st._open;
+    /** "home" while the pause list itself is up, otherwise the page that is open (items, map, status, ...). */
+    st.entry = () => (st._open ? st._entry : null);
     st.openHome = (state, onClose = null) => {
         st._homeOverlay = false;
         st._homeRow = 0;
