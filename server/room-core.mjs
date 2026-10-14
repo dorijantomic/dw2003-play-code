@@ -12,6 +12,7 @@
 //   {t:"feed", kind, text}          something I did (a level up, a finished quest): in everyone's log
 //   {t:"card", card}                my player card (name, Digimon, levels...): what others see when they inspect me
 //   {t:"trade", op, ...}            trading, see #trade below
+//   {t:"mpb", to:[ids], d:{...}}    a many-vs-many fight message (turns, actions, results) passed to those players (see #mpb)
 //   {t:"coop", op, to, ...}         team-up and shared fights between two players (see #coop)
 //   {t:"duel", op, to, hp, won}     a friendly duel: ask / yes / no / cancel / result, passed to player `to` (see #direct)
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
@@ -137,7 +138,7 @@ export class Hub {
     #message(code, peer, raw) {
         const r = this.rooms.get(code);
         if (!r || typeof raw !== "string" || raw.length > MAX_MESSAGE) return;
-        if (raw.length > SMALL && !raw.startsWith('{"t":"card"')) return;
+        if (raw.length > SMALL && !raw.startsWith('{"t":"card"') && !raw.startsWith('{"t":"mpb"')) return;
         const t = this.now();
         peer.tokens = Math.min(LIMIT * 2, peer.tokens + ((t - peer.last) / 1000) * LIMIT);
         peer.last = t;
@@ -154,6 +155,7 @@ export class Hub {
         if (m.t === "trade") return this.#trade(r, peer, m);
         if (m.t === "duel") return this.#direct(r, peer, m, "duel", DUEL_OPS);
         if (m.t === "coop") return this.#coop(r, peer, m);
+        if (m.t === "mpb") return this.#mpb(r, peer, m);
         if (m.t === "emote" && Number.isInteger(m.e) && m.e >= 0 && m.e <= 7) {
             for (const o of r.peers.values()) if (o !== peer && o.map && o.map === peer.map) this.#to(o, { t: "emote", id: peer.id, e: m.e });
         }
@@ -215,6 +217,18 @@ export class Hub {
             out.won = !!m.won;
         }
         this.#to(to, out);
+    }
+
+    // ---- #mpb
+    // Messages of a many-vs-many fight: a small JSON object passed to up to 8 named players in the room. The relay never reads
+    // it beyond its size: it only fills in who it is from. (The fight is run by the players' games, see web/mpbattle.js.)
+    #mpb(r, peer, m) {
+        if (!m.d || typeof m.d !== "object" || Array.isArray(m.d) || JSON.stringify(m.d).length > 1500) return;
+        const ids = (Array.isArray(m.to) ? m.to : [m.to]).slice(0, 8);
+        for (const id of ids) {
+            const to = r.peers.get(id);
+            if (to && to !== peer) this.#to(to, { t: "mpb", from: peer.id, d: m.d });
+        }
     }
 
     // ---- #coop

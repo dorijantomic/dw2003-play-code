@@ -9100,6 +9100,89 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return scriptedScreenId(stage, index, storyOrdinal(), entryKey());
   }
 
+  // EXPERIMENT (multiplayer many-vs-many, web/mpbattle.js): the pieces of this engine that a separate N-vs-M screen needs, so
+  // its numbers are the game's own: the same enemy and player records, the same damage / accuracy / critical rolls, the same
+  // technique lists and prices, the same EXP and BIT payout. A normal one-on-one fight never calls any of this.
+  async function mpKit() {
+    await loadData();
+    const state = getState();
+    const persist = () => {
+      localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
+      if (state.partyStats) localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
+      localStorage.setItem("bits", String(state.bits | 0));
+    };
+    const basic = (rec) => {
+      const s = skillDB[rec?.profile?.tech_basic];
+      return s ? { ...s, attack_category: "physical", basic_attack: true } : null;
+    };
+    return {
+      enemyRecord: (e) => buildEnemyRecord({
+        enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name,
+        enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp, enemyStatScale: e.stat_scale ?? 16,
+      }),
+      /** My lead Digimon as a fighter (null when I have none). */
+      myRecord: () => {
+        const roster = buildPlayerRoster(state), prof = getPlayerProfile(state);
+        return roster.length && prof ? buildPlayerRecord(roster[0], prof.id) : null;
+      },
+      basic,
+      /** My attack techniques I could use: [{ id, name, cost, magical, power, skill }] (healing and support ones are left out). */
+      myTechs: (rec) => {
+        const partner = rec.statsRecord;
+        partner.formLedger ??= Object.entries(partner.dvexpByForm ?? {}).map(([id, dvexp]) => ({
+          id: Number(id), formLevel: dvLevelForExp(Number(dvexp) || 0, digimonDB?.[id]?.dv_cap ?? 100), dvexp: Number(dvexp) || 0, techSlots: [],
+        }));
+        const words = battleTechWords({
+          ledger: partner.formLedger, currentId: rec.profile.id, equippedForms: partner.equippedForms,
+          signatureTech: rec.profile.tech_signature ?? rec.profile.techs?.[1] ?? 0,
+        });
+        return words.map((w) => {
+          const s = skillDB[Number(w) & 0x1fff];
+          if (!s || s.type !== "attack") return null;
+          const skill = { ...s, techWord: Number(w) & 0xffff };
+          return { id: s.id, name: s.name, magical: s.attack_category === "magical", power: s.power | 0, skill,
+            cost: techniqueMpCost(s.mp_cost ?? 20, skill.techWord, { mpCostDown: rec.mpCostDown ?? 0 }) };
+        }).filter(Boolean);
+      },
+      /** One attack, rolled by the game's own resolver. Returns { hit, dmg, landed, attempts }. */
+      attack: (att, def, skill) => {
+        const n = skill?.basic_attack ? basicAttackHitCount(att.multiAttack, skill?.clip) : Math.max(1, skill?.hits ?? 1);
+        const r = n > 1 ? resolveMultiHit(att, def, skill, n, RAND_U16, null) : resolveAttack(att, def, skill, RAND_U16, null);
+        return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n };
+      },
+      skillOf: (id) => skillDB[id] ?? null,
+      /** What an enemy can do: its basic attack, and its two moves when they are attack techniques. */
+      foeMoves: (en) => {
+        const out = [];
+        const b0 = en.fightSkill ? { ...en.fightSkill, attack_category: "physical", basic_attack: true } : null;
+        if (b0) out.push({ skill: b0, cost: 0, tech: false });
+        for (const action of [2, 3]) {
+          const s = skillDB[enemyActionSkillId(action, en.eStats ?? {})];
+          if (s && s.type === "attack") out.push({ skill: s, cost: techniqueMpCost(s.mp_cost ?? 0, 0, { enemySide: true }), tech: true });
+        }
+        return out;
+      },
+      /** The disc's payout for winning this fight, applied to my lead: EXP (with level ups) and BIT. */
+      applyWin: ({ screenId, participants }) => {
+        const ps = state.partnerStats, prof = getPlayerProfile(state);
+        if (!ps || !prof) return null;
+        const reward = winBattleRewards({
+          screenId, participants: Math.max(1, participants | 0), equipment: state.equipment?.[0] ?? {}, rewards: progressionDB?.battle_rewards,
+        });
+        const lu = progressionDB?.level_up;
+        const oldLevel = ps.level ?? 1, newXp = Math.min((ps.xp ?? 0) + reward.xp, lu?.exp_cap ?? 999999);
+        const newLevel = lu ? levelForExp(oldLevel, newXp, prof.growth_xp ?? 8, lu) : oldLevel;
+        if (newLevel > oldLevel) applyLevelUp(ps, prof, oldLevel, newLevel, lu);
+        ps.xp = newXp;
+        state.bits = Math.min((state.bits | 0) + reward.bits, 9999999);
+        persist();
+        return { xp: reward.xp, bits: reward.bits, from: oldLevel, to: Math.max(oldLevel, newLevel) };
+      },
+      /** Leave my Digimon as the fight left it (the field's own write-back: KO -> 1 HP). */
+      commit: (rec) => { writeBackBattleVitals(rec); persist(); },
+    };
+  }
+
   // EXPERIMENT (multiplayer co-op, web/mpsocial.js): two players fight the same enemy on their own screens and share its HP.
   // These three are only used while a co-op fight is on; they change nothing for a normal fight.
   async function rollEncounter(mapId, x, y) {
@@ -9114,7 +9197,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   return { isActive, start, startRandom, startParty, startScreen, scriptedScreen, partyForScreen, triggersForStage,
-    rollEncounter, coopState, coopSetEnemyHp,
+    rollEncounter, coopState, coopSetEnemyHp, mpKit,
     // Post-fight results hand-off (Phase 6.3): the host registers how to open
     // the native pro/stfgtrep screen, and calls finishNativeReport() when the
     // player leaves it, which returns to the field exactly like the inline

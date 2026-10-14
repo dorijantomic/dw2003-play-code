@@ -24,9 +24,10 @@ import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
-import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
+import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
-import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js"; // EXPERIMENT: multiplayer chat, feed, inspect, trade
+import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
+import { installMpBattle, mpbHost, mpbMessage, mpbPeerGone, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { installChat, buildChatPack } from "./chat.js";
@@ -399,6 +400,24 @@ const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
 installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () => state.playerName || "Tamer" });
+// EXPERIMENT (multiplayer): the many-vs-many fight screen and what it needs from the game.
+installMpBattle({
+    stageEl: document.getElementById("stage"),
+    getKit: () => battle.mpKit(),
+    myId: () => myId(), myName: () => myName(),
+    nameOf: (id) => peerOf(id)?.name ?? myName(),
+    send: (ids, d) => sendMpb(ids, d),
+    releaseKeys: () => state.keys.clear(),
+    snapshot: () => ({ lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null), bits: state.bits | 0 }),
+    restore: (sn) => {
+        state.partnerStats = JSON.parse(sn.lead); state.partyStats = JSON.parse(sn.party); state.bits = sn.bits;
+        localStorage.setItem("partnerStats", sn.lead); localStorage.setItem("partyStats", sn.party); localStorage.setItem("bits", String(sn.bits));
+    },
+    canJoin: () => mpIdle() && fieldPartySize(state.party) > 0,
+    // a friend's quest challenge that I join counts for my own quest too
+    joinDone: (setup) => (r) => { if (r.won && !r.fled && setup.ch?.length) questsCreditChallenge(setup.ch); },
+});
+
 // EXPERIMENT (multiplayer): the chat / feed / players / inspect / trade box. It reads the game's state and moves items only
 // through the game's own item store; it never writes a story flag.
 function mpCard() {
@@ -423,7 +442,7 @@ installSocial({
         card: mpCard,
         currentMapId: () => state.manifest?.maps?.[state.mapIdx]?.id ?? null,
         mapName: (id) => state.manifest?.maps?.find((m) => m.id === id)?.name ?? null,
-        busy: () => !!state.started && (battle.isActive() || cutscene.isActive() || fade.dir !== 0),
+        busy: () => !!state.started && (battle.isActive() || cutscene.isActive() || fade.dir !== 0 || mpbVisible()),
         releaseKeys: () => state.keys.clear(),
         warp: (id) => {
             const idx = state.manifest?.maps?.findIndex((m) => m.id === id) ?? -1;
@@ -432,7 +451,7 @@ installSocial({
             return true;
         },
         bits: () => state.bits | 0,
-        canFight: () => mpIdle() && fieldPartySize(state.party) > 0,
+        canFight: () => mpIdle() && fieldPartySize(state.party) > 0 && !mpbVisible(),
         // co-op: the same enemy on two screens with one shared HP pool (see web/mpsocial.js)
         coopState: () => battle.coopState(),
         coopSetHp: (i, hp) => battle.coopSetEnemyHp(i, hp),
@@ -490,7 +509,9 @@ installSocial({
 installQuests({
     stageEl: document.getElementById("stage"),
     // with a team-up partner a quest fight is offered to them too (same enemies, shared HP); otherwise exactly as before
-    startBattle: (party, opts) => (coopTry(party, "Quest fight", (foes) => startQuestBattle(foes, opts) || (opts?.onFlee?.(), false), opts?.challenge) ? true : startQuestBattle(party, opts)),
+    startBattle: (party, opts) => (coopTry(party, "Quest fight", (foes, withId) => (withId
+        ? mpbLaunch({ foes, withId, label: "Quest fight", screenId: opts?.screenId ?? null, challenge: opts?.challenge, opts })
+        : (startQuestBattle(foes, opts) || (opts?.onFlee?.(), false))), opts?.challenge) ? true : startQuestBattle(party, opts)),
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
     npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
@@ -4141,6 +4162,22 @@ function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose } = {}
     return true;
 }
 
+// EXPERIMENT (multiplayer): a many-vs-many fight. I am its host: it runs on the same field hand-off as any other fight.
+function mpbLaunch({ foes, withId, label, screenId, challenge, opts }) {
+    if (!mpIdle() || fieldPartySize(state.party) === 0) return false;
+    const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
+    startFieldBattle(() => {
+        mpbHost({ foes, ids: [myId(), withId], label, screenId, challenge, done }).then((ok) => { if (!ok) done({ fled: true }); });
+    });
+    return true;
+}
+mpOn((type, d) => {
+    if (type === "mpb") {
+        if (d.d?.k === "setup" && mpIdle() && fieldPartySize(state.party) > 0) startFieldBattle(() => mpbMessage(d.from, d.d));   // the same hand-off for a friend's fight
+        else mpbMessage(d.from, d.d);
+    } else if (type === "leave") mpbPeerGone(d.id);
+});
+
 // EXPERIMENT (multiplayer co-op): a wild fight while teamed up spawns two Digimon from the same area's pool; the partner is
 // invited to the same fight and the enemy's HP is shared. If the roll finds nothing there is no fight, as usual.
 async function mpCoopRandom(mapId, x, y) {
@@ -4150,8 +4187,8 @@ async function mpCoopRandom(mapId, x, y) {
         if (!a) return;
         const b = await battle.rollEncounter(mapId, x, y);
         const foes = [a.party[0], ...(b ? [b.party[0]] : [])];
-        const go = (f) => startQuestBattle(f, {});
-        if (!coopTry(foes, "Wild Digimon", go)) go(foes);
+        const go = (f, withId) => (withId ? mpbLaunch({ foes: f, withId, label: "Wild Digimon", screenId: a.screen ?? null }) : startQuestBattle(f, {}));
+        if (!coopTry(foes, "Wild Digimon", go)) go(foes, null);
     } finally { coopRolling(false); }
 }
 

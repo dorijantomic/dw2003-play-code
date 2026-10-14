@@ -349,12 +349,11 @@ function onDuel(m) {
 // ------------------------------------------------------------ co-op: team up, fight the same enemy, share its HP
 // Only the side quests and the extra fights are shared. The main story is never touched.
 // Two players team up. Then, whenever either of them starts a quest challenge fight or runs into a wild Digimon, the other is
-// invited into the SAME fight (same enemies, made stronger by the "boss strength" setting). Each plays their own Digimon on
-// their own screen; the enemy's HP is one shared pool, so damage from either of you counts for both, and when it is down
-// you both win. Each player's own game gives them their own EXP, drops and quest progress for it.
+// invited into the SAME fight (same enemies, made stronger by the "boss strength" setting). It runs as a many-vs-many fight
+// (web/mpbattle.js): both Digimon on one side, all the enemies on the other. Each player's own game gives them their own EXP,
+// BIT and quest progress for it.
 const KEY_STR = "dw.mp.strength";
 let partner = null, partyAsk = null, coop = null, rolling = false;
-const pool = {};                       // enemy number -> lowest HP either of us has brought it to
 const strength = () => { try { return Math.max(1, Math.min(3, Number(localStorage.getItem(KEY_STR)) || 2)); } catch { return 2; } };
 const scaleFoes = (foes, m) => foes.map((f) => ({
     ...f, hp: Math.min(999999, Math.round(f.hp * m)), stat_scale: Math.max(1, Math.min(64, Math.round((f.stat_scale ?? 16) * (1 + (m - 1) * 0.25)))),
@@ -365,7 +364,7 @@ export const coopPartner = () => partner;
 export const coopReady = () => !!(isOnline() && partner != null && peerOf(partner) && !coop && !rolling && !duel && !trade);
 export function coopRolling(on) { rolling = !!on; }
 
-/** Offer a fight to my partner. `start(foes)` runs it here. Returns false when I have no partner (the caller just fights). */
+/** Offer a fight to my partner. `start(foes, partnerId)` runs it here (partnerId null = fight alone). Returns false when I have no partner (the caller just fights). */
 export function coopTry(foes, label, start, screens) {
     if (!(isOnline() && partner != null && peerOf(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
     rolling = false;
@@ -392,34 +391,6 @@ function leaveParty() {
     note(`You left ${peerOf(partner)?.name ?? "your partner"}'s party.`); partner = null; drawPlayers();
 }
 
-// A small panel on the battle screen: my partner's Digimon and HP, and what their hits did to the shared enemy.
-let hud = null, hudTimer = 0, lastStat = "";
-function hudEl() {
-    if (hud) return hud;
-    hud = h("div"); hud.style.cssText = "position:absolute;right:10px;top:10px;z-index:80;min-width:170px;padding:6px 10px;background:rgba(8,10,40,.78);color:#fff;border:1px solid #6a78ff;border-radius:6px;font:12px/1.4 system-ui,sans-serif;pointer-events:none;display:none";
-    hud.append(h("div"), h("div"), h("div")); document.getElementById("stage")?.append(hud); return hud;
-}
-function hudSet(name, m) { const e = hudEl(); e.style.display = ""; e.children[0].textContent = `★ ${name}`; e.children[1].textContent = `${m.name}  HP ${m.hp}/${m.maxHp}`; }
-function hudSay(text) { const e = hudEl(); e.style.display = ""; e.children[2].textContent = text; clearTimeout(hudTimer); hudTimer = setTimeout(() => { e.children[2].textContent = ""; }, 2200); }
-function hudHide() { if (hud) hud.style.display = "none"; lastStat = ""; }
-
-let sync = null;
-function beginSync(id) {
-    for (const k of Object.keys(pool)) delete pool[k];
-    let started = false, quiet = 0;
-    clearInterval(sync);
-    sync = setInterval(() => {
-        const s = api.coopState();
-        if (!s) { if ((started && ++quiet > 2) || ++quiet > 25) { clearInterval(sync); sync = null; hudHide(); if (started) note("The co-op fight is over."); } return; }
-        if (s.me) { const j = JSON.stringify(s.me); if (j !== lastStat) { lastStat = j; sendCoop({ op: "stat", to: id, name: s.me.name, hp: s.me.hp, maxHp: s.me.maxHp }); } }
-        started = true; quiet = 0;
-        const k = pool[s.index];
-        if (k === undefined) pool[s.index] = s.hp;
-        else if (s.hp < k) { pool[s.index] = s.hp; sendCoop({ op: "hit", to: id, i: s.index, hp: Math.max(0, s.hp | 0) }); }
-        else if (s.hp > k) api.coopSetHp(s.index, k);        // my partner already brought it lower
-    }, 120);
-}
-
 function drawCoop() {
     const box = el.coop; if (!box) return;
     box.replaceChildren();
@@ -432,8 +403,8 @@ function drawCoop() {
         else box.append(h("div", "sub", `${who} is starting a fight: ${coop.label || "enemies"} (${coop.foes.map((f) => `${f.name} Lv${f.level}`).join(", ")}). Join them?`),
             h("div", "acts", btn("Join", () => {
                 clearTimeout(coop.timer); sendCoop({ op: "yes", to: coop.id });
-                const c = coop; coop = null; drawCoop(); beginSync(c.id);
-                if (!api.coopFight(c.foes, () => {}, c.screens)) note("You could not join right now.");
+                const c = coop; coop = null; drawCoop();
+                note(`Joining ${peerOf(c.id)?.name ?? "your partner"}'s fight...`);   // their game sends the fight setup next
             }), btn("No", () => { clearTimeout(coop.timer); sendCoop({ op: "no", to: coop.id }); coop = null; drawCoop(); })));
         return;
     }
@@ -468,17 +439,10 @@ function onCoop(m) {
         clearTimeout(coop.timer); coop = null; drawCoop();
     } else if (m.op === "yes" && coop?.st === "out" && coop.id === m.from) {
         clearTimeout(coop.timer); const c = coop; coop = null; drawCoop();
-        note(`${n} joined your fight. The enemy's HP is shared.`);
-        beginSync(c.id);
-        if (!c.start(c.scaled)) { clearInterval(sync); sync = null; }
+        note(`${n} joined your fight.`);
+        if (!c.start(c.scaled, c.id)) note("The fight could not start right now.");
     } else if (m.op === "no" && coop?.st === "out" && coop.id === m.from) {
         clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); note(`${n} could not join - you fight alone.`); c.start(c.foes);
-    } else if (m.op === "hit") {
-        const dealt = Math.max(0, (pool[m.i] ?? m.hp) - m.hp);
-        pool[m.i] = Math.min(pool[m.i] ?? Infinity, m.hp);
-        if (dealt > 0) hudSay(`${n} hit for ${dealt}!`);
-    } else if (m.op === "stat" && m.from === partner) {
-        hudSet(n, m);
     }
 }
 
@@ -627,5 +591,5 @@ export function installSocial({ stageEl, api: a }) {
     });
     setInterval(pollSelf, 1500);
     setInterval(() => { if (dock && isOnline()) dock.style.display = api.busy() ? "none" : ""; }, 400);
-    window.__mpsocial = { S, api, post, openInspect, askTrade, get trade() { return trade; } };
+    window.__mpsocial = { S, api, coopTry, post, openInspect, askTrade, get trade() { return trade; } };
 }

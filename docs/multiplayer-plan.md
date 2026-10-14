@@ -63,7 +63,6 @@ The relay sees only: the display name, the stage id, x/y, the facing and emote n
 - Saves and quest progress on the server (they stay in each player's browser).
 - Co-op credit for the partner's quest *challenge* objectives (their kill objectives do count; challenges only credit the one who started it).
 - A public room list, accounts.
-- A true two-against-two battle: the battle engine is one Digimon against one enemy, so co-op shares the enemy's HP instead.
 - If the host's game closes, the room ends; friends see "Connection lost".
 
 ## Social layer, duels and co-op (added 2026-10-14)
@@ -74,7 +73,16 @@ The relay sees only: the display name, the stage id, x/y, the facing and emote n
 - **Trade**: both press Confirm on the same offers; the relay then says "done" and each game moves its own items (item store only).
 - **Duel**: each side fights a computer-played copy of the other's team (from their card); EXP/drops/BIT are taken back; the better result wins.
 - **Co-op** (side quests and wild fights only; the main story stays solo): after **Team up**, a quest challenge fight or a wild
-  encounter offers the same fight to the partner (wild = two Digimon). Each fights on their own screen; the enemy's HP is one shared
-  pool (`battle.coopState` / `coopSetEnemyHp`), and the enemies are made stronger by the boss-strength setting (x1/x2/x3 HP, a little more attack).
-- Relay messages: `chat`, `feed`, `card`, `at`, `trade`, `duel`, `coop` (see `server/room-core.mjs`). Tests: `tests/multiplayer-social.test.js`,
-  `tools/verify_multiplayer.mjs`, `tools/verify_multiplayer_battle.mjs`.
+  encounter is offered to the partner (wild = two Digimon). If they Join, it runs as a **many-vs-many fight** (`web/mpbattle.js`):
+  every player's lead Digimon on one side, all the enemies on the other, in waves of at most max(2, players). The game's own
+  one-on-one battle is untouched; this is an extension that uses the engine through `battle.mpKit()` (fighter records, the damage /
+  accuracy / critical rolls, tech lists and prices, the EXP and BIT payout), so the numbers are the game's own.
+  - Turn order by speed. On your turn: Fight / Tech / Run. Your game rolls your damage; an enemy's attack is rolled by the
+    *target's* game against its real defence; the host (the player who started it) keeps the order and sends one small snapshot after each action.
+  - Spread techniques (magical, 40+ MP) hit every enemy (or every player) at 65% damage.
+  - Boss strength (x1/x2/x3 HP, a little more attack) is the setting at the top of the PLAYERS tab.
+  - Each player gets the disc's EXP/BIT payout for the fight and keeps the HP it left; a lost fight costs nothing.
+  - The partner who joins a quest challenge is credited for the same open challenge.
+  - Not done: items and healing in the fight, more than two players per party, enemy/Digimon artwork on the screen (it is cards).
+- Relay messages: `chat`, `feed`, `card`, `at`, `trade`, `duel`, `coop`, `mpb` (see `server/room-core.mjs`). Tests: `tests/multiplayer-social.test.js`,
+  `tools/verify_multiplayer.mjs`, `tools/verify_multiplayer_battle.mjs`, `tools/verify_multiplayer_fight.mjs` (a real 2-vs-2 fight, played through the buttons; `HURT=1` for the enemies-hit-back case).

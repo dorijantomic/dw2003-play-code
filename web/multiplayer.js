@@ -101,6 +101,7 @@ export function connect(want) {
             emit("sys", { text: `${m.name} joined.` }); emit("roster");
         } else if (m.t === "leave") {
             const p = mp.peers.get(m.id); mp.peers.delete(m.id); render(); if (p) toast(`${p.name} left`);
+            emit("leave", { id: m.id });
             if (p) emit("sys", { text: `${p.name} left.` }); emit("roster");
         } else if (m.t === "gone") {
             const p = mp.peers.get(m.id); if (p) p.hidden = true;
@@ -131,6 +132,8 @@ export function connect(want) {
             emit("duel", m);
         } else if (m.t === "coop") {
             emit("coop", m);
+        } else if (m.t === "mpb") {
+            emit("mpb", m);
         }
     };
     ws.onclose = () => {
@@ -196,6 +199,8 @@ export function sendCard(card) { return sendRaw({ t: "card", card }); }
 export const sendTrade = (o) => sendRaw({ t: "trade", ...o });
 export const sendDuel = (o) => sendRaw({ t: "duel", ...o });
 export const sendCoop = (o) => sendRaw({ t: "coop", ...o });
+/** A many-vs-many fight message to these players (web/mpbattle.js). */
+export const sendMpb = (ids, d) => sendRaw({ t: "mpb", to: ids, d });
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */

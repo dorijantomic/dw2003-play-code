@@ -124,3 +124,17 @@ test("co-op messages: foes are cleaned, hits are bounds-checked, the sender is f
     send(a, { t: "coop", op: "hit", to: b.session.id, i: 1, hp: 77 });
     assert.deepEqual(b.last("coop"), { t: "coop", op: "hit", from: a.session.id, i: 1, hp: 77 });
 });
+
+test("fight messages go to the named players only, with the sender filled in, and are size limited", () => {
+    const { a, b, hub } = pair();
+    const c = client(hub, { room: a.last("welcome").room, name: "Cy" });
+    send(a, { t: "mpb", to: [b.session.id], d: { k: "setup", fid: 1 } });
+    assert.deepEqual(b.last("mpb"), { t: "mpb", from: a.session.id, d: { k: "setup", fid: 1 } });
+    assert.equal(c.last("mpb"), undefined);
+    send(a, { t: "mpb", to: [b.session.id, c.session.id, a.session.id, 999], d: { k: "st" } });
+    assert.equal(c.got.filter((m) => m.t === "mpb").length, 1);
+    assert.equal(a.got.filter((m) => m.t === "mpb").length, 0);                // not back to the sender
+    send(a, { t: "mpb", to: [b.session.id], d: { k: "big", pad: "x".repeat(1600) } });   // too big
+    send(a, { t: "mpb", to: [b.session.id], d: [1, 2] });                       // not an object
+    assert.equal(b.got.filter((m) => m.t === "mpb").length, 2);
+});
