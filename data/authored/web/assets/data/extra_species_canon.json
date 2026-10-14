@@ -1,5 +1,5 @@
 {
- "note": "Species the game only ever used as enemies, made obtainable as digivolution forms. 'from' = the canonical pre-evolution(s) (Digimon World 2 / anime lineage); ids are fixed - never renumber, append only. Stage, stats, techs and gating are derived from the disc's own enemy rows by tools/build_extra_species.py.",
+ "note": "Species the game only ever used as enemies, made obtainable as digivolution forms. 'from' = the canonical pre-evolution(s) (Digimon World 2 / anime lineage); ids are fixed - never renumber, append only. Stage, stats, techs and gating are derived from the disc's own enemy rows by tools/build_extra_species.py. 'lines' (optional) overrides the family default for which starter lines the form suits (0 Kotemon 1 Kumamon 2 Monmon 3 Agumon 4 Veemon 5 Guilmon 6 Renamon 7 Patamon).",
  "species": [
   {
    "id": 56,
@@ -59,7 +59,11 @@
   {
    "id": 67,
    "name": "Numemon",
-   "from": []
+   "from": [],
+   "lines": [
+    2,
+    5
+   ]
   },
   {
    "id": 68,
@@ -69,12 +73,19 @@
   {
    "id": 69,
    "name": "Frigimon",
-   "from": []
+   "from": [],
+   "lines": [
+    1
+   ]
   },
   {
    "id": 70,
    "name": "Meramon",
-   "from": []
+   "from": [],
+   "lines": [
+    3,
+    5
+   ]
   },
   {
    "id": 71,
@@ -130,6 +141,10 @@
    "name": "Vemmon",
    "from": [
     "Kuwagamon"
+   ],
+   "lines": [
+    4,
+    2
    ]
   },
   {
@@ -397,6 +412,9 @@
    "name": "Vademon",
    "from": [
     "Mamemon"
+   ],
+   "lines": [
+    2
    ]
   },
   {
@@ -404,6 +422,10 @@
    "name": "Rockmon",
    "from": [
     "Drimogemon"
+   ],
+   "lines": [
+    2,
+    0
    ]
   },
   {
@@ -418,6 +440,10 @@
    "name": "Knightmon",
    "from": [
     "Andromon"
+   ],
+   "lines": [
+    0,
+    2
    ]
   },
   {
@@ -446,6 +472,10 @@
    "name": "Quetzalmon",
    "from": [
     "Kokatorimon"
+   ],
+   "lines": [
+    7,
+    6
    ]
   },
   {
@@ -460,6 +490,9 @@
    "name": "Valkyrimon",
    "from": [
     "Angewomon"
+   ],
+   "lines": [
+    7
    ]
   },
   {
@@ -467,6 +500,10 @@
    "name": "Fujinmon",
    "from": [
     "Gryphonmon"
+   ],
+   "lines": [
+    7,
+    6
    ]
   },
   {
@@ -481,6 +518,10 @@
    "name": "Kimeramon",
    "from": [
     "Airdramon"
+   ],
+   "lines": [
+    4,
+    5
    ]
   },
   {
@@ -544,6 +585,9 @@
    "name": "Icemon",
    "from": [
     "Frigimon"
+   ],
+   "lines": [
+    1
    ]
   },
   {
@@ -593,6 +637,10 @@
    "name": "Raijinmon",
    "from": [
     "Raidenmon"
+   ],
+   "lines": [
+    0,
+    3
    ]
   },
   {
@@ -600,6 +648,10 @@
    "name": "Suijinmon",
    "from": [
     "MetalSeadramon"
+   ],
+   "lines": [
+    1,
+    4
    ]
   },
   {
@@ -607,6 +659,10 @@
    "name": "Flarerizamon",
    "from": [
     "Greymon"
+   ],
+   "lines": [
+    3,
+    5
    ]
   },
   {
@@ -614,6 +670,10 @@
    "name": "SkullMeramon",
    "from": [
     "Meramon"
+   ],
+   "lines": [
+    3,
+    5
    ]
   },
   {
@@ -621,6 +681,10 @@
    "name": "BlueMeramon",
    "from": [
     "SkullMeramon"
+   ],
+   "lines": [
+    3,
+    5
    ]
   },
   {
@@ -670,6 +734,10 @@
    "name": "Ogremon",
    "from": [
     "Goburimon"
+   ],
+   "lines": [
+    0,
+    3
    ]
   },
   {
@@ -677,6 +745,10 @@
    "name": "Fugamon",
    "from": [
     "Ogremon"
+   ],
+   "lines": [
+    0,
+    3
    ]
   },
   {
@@ -684,6 +756,10 @@
    "name": "Cyclonemon",
    "from": [
     "Ogremon"
+   ],
+   "lines": [
+    0,
+    3
    ]
   },
   {
@@ -691,6 +767,9 @@
    "name": "Musyamon",
    "from": [
     "Dinohumon"
+   ],
+   "lines": [
+    0
    ]
   },
   {
@@ -698,6 +777,9 @@
    "name": "Zanbamon",
    "from": [
     "Musyamon"
+   ],
+   "lines": [
+    0
    ]
   },
   {
@@ -740,6 +822,10 @@
    "name": "Pharaohmon",
    "from": [
     "Mummymon"
+   ],
+   "lines": [
+    5,
+    6
    ]
   },
   {
@@ -782,6 +868,10 @@
    "name": "Baronmon",
    "from": [
     "Gargoylemon"
+   ],
+   "lines": [
+    5,
+    6
    ]
   },
   {
@@ -803,6 +893,10 @@
    "name": "Piedmon",
    "from": [
     "Myotismon"
+   ],
+   "lines": [
+    6,
+    5
    ]
   },
   {
@@ -824,6 +918,10 @@
    "name": "Nanimon",
    "from": [
     "Numemon"
+   ],
+   "lines": [
+    2,
+    5
    ]
   },
   {
@@ -831,6 +929,10 @@
    "name": "Sukamon",
    "from": [
     "Numemon"
+   ],
+   "lines": [
+    2,
+    5
    ]
   },
   {
@@ -838,6 +940,9 @@
    "name": "Monzaemon",
    "from": [
     "Numemon"
+   ],
+   "lines": [
+    2
    ]
   },
   {
@@ -845,6 +950,9 @@
    "name": "WaruMonzaemon",
    "from": [
     "Monzaemon"
+   ],
+   "lines": [
+    2
    ]
   },
   {
@@ -852,6 +960,10 @@
    "name": "Garbagemon",
    "from": [
     "Sukamon"
+   ],
+   "lines": [
+    2,
+    5
    ]
   },
   {
@@ -866,6 +978,10 @@
    "name": "BKWayGreymon",
    "from": [
     "BK WarGreymon"
+   ],
+   "lines": [
+    3,
+    4
    ]
   },
   {
@@ -887,6 +1003,9 @@
    "name": "BKSeraphimon",
    "from": [
     "Seraphimon"
+   ],
+   "lines": [
+    7
    ]
   },
   {
@@ -894,6 +1013,9 @@
    "name": "BKKingNumemon",
    "from": [
     "WaruMonzaemon"
+   ],
+   "lines": [
+    2
    ]
   },
   {
@@ -902,6 +1024,16 @@
    "from": [
     "Piedmon",
     "Diaboromon"
+   ],
+   "lines": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
    ]
   },
   {

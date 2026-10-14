@@ -257,7 +257,7 @@ def main() -> int:
         top = max(STAT_KEYS, key=lambda k: e[k])
         meta[name] = {
             "id": sp["id"], "value0": value0, "tier": tier, "family": e["digimon_type"], "bank": idx,
-            "affinity": list(AFFINITY.get(e["digimon_type"], ())), "parents": sp["from"],
+            "affinity": list(sp.get("lines") or AFFINITY.get(e["digimon_type"], ())), "parents": sp["from"],
             "gateStat": top, "gateValue": min(460, max(30, int(e[top] * 0.55 / 10) * 10)),
         }
 
