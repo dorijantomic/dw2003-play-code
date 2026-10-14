@@ -9116,17 +9116,31 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       return s ? { ...s, attack_category: "physical", basic_attack: true } : null;
     };
     return {
-      enemyRecord: (e) => buildEnemyRecord({
-        enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name,
-        enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp, enemyStatScale: e.stat_scale ?? 16,
-      }),
+      enemyRecord: (e, screenId = null) => {
+        const rec = buildEnemyRecord({
+          enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name,
+          enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp, enemyStatScale: e.stat_scale ?? 16,
+        });
+        if (rec) {   // the screen's own record says which ailments this fight's enemies cannot catch
+          const gates = fieldEncDB?.battle_config?.[String(screenId)]?.effect_gates ?? {};
+          rec.statusImmunities = Object.fromEntries(["poison", "frozen", "confuse", "sleep", "ko"].map((k) => [k, !!gates[k]]));
+        }
+        return rec;
+      },
       /** My lead Digimon as a fighter (null when I have none). */
       myRecord: () => {
         const roster = buildPlayerRoster(state), prof = getPlayerProfile(state);
         return roster.length && prof ? buildPlayerRecord(roster[0], prof.id) : null;
       },
       basic,
-      /** My attack techniques I could use: [{ id, name, cost, magical, power, skill }] (healing and support ones are left out). */
+      /** The forms this Digimon could digivolve to right now (the one-on-one battle's Digivolve list): [{ id, name }]. */
+      forms: (rec) => battleFormIds(Number(rec?.profile?.id), rec?.statsRecord ?? {})
+        .map((id) => digimonDB[id]).filter((p) => p && p.id !== rec?.profile?.id).map((p) => ({ id: p.id, name: p.name })),
+      /** A manual digivolve: the record takes the form; the numbers it fights with are re-derived from it, as in the game. */
+      digivolve: (rec, id) => { const p = digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
+      /** A plain-data copy of a fighter record, to hand to the referee. */
+      pack: (rec) => JSON.parse(JSON.stringify(rec)),
+      /** My techniques: [{ id, name, cost, tw, type, magical, power, skill }]. type is "attack", "heal" or "support". */
       myTechs: (rec) => {
         const partner = rec.statsRecord;
         partner.formLedger ??= Object.entries(partner.dvexpByForm ?? {}).map(([id, dvexp]) => ({
@@ -9138,9 +9152,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         });
         return words.map((w) => {
           const s = skillDB[Number(w) & 0x1fff];
-          if (!s || s.type !== "attack") return null;
+          if (!s) return null;
           const skill = { ...s, techWord: Number(w) & 0xffff };
-          return { id: s.id, name: s.name, magical: s.attack_category === "magical", power: s.power | 0, skill,
+          return { id: s.id, name: s.name, type: s.type, tw: skill.techWord, magical: s.attack_category === "magical", power: s.power | 0, skill,
             cost: techniqueMpCost(s.mp_cost ?? 20, skill.techWord, { mpCostDown: rec.mpCostDown ?? 0 }) };
         }).filter(Boolean);
       },
@@ -9178,6 +9192,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         persist();
         return { xp: reward.xp, bits: reward.bits, from: oldLevel, to: Math.max(oldLevel, newLevel) };
       },
+      /** The data tables the rules read: technique rows, the decoded technique records, and the item menu. */
+      skillDB: () => skillDB,
+      techRecord: (id) => fightTechDB?.[String(id | 0)] ?? null,
+      items: () => usableItems(),
+      /** The disc's battle track for this fight (the name `bgm.play` takes). */
+      musicFor: (screenId, mapId) => musicForScreen(screenId, mapId),
+      /** Use an item from my bag: take it out through the shared store, as the one-on-one battle does. */
+      spendItem: (id) => { storeRemoveItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
       /** Leave my Digimon as the fight left it (the field's own write-back: KO -> 1 HP). */
       commit: (rec) => { writeBackBattleVitals(rec); persist(); },
     };

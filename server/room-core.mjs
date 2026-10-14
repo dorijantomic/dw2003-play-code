@@ -26,7 +26,7 @@
 //   {t:"err", reason}   reasons: no_room, full, exists, busy, bad
 export const MAX_PEERS = 50;         // a room of friends; positions only go to the same stage, so this stays cheap
 export const MAX_ROOMS = 200;        // per relay, so a flood of "create" cannot fill its memory
-export const MAX_MESSAGE = 2400;     // bytes; a position update is about 80, a player card up to ~2000
+export const MAX_MESSAGE = 8000;     // bytes; a position update is about 80, a player card up to ~2000, a fighter record ~2500
 const SMALL = 600;                   // every message except a card is held to this
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // no I, O, 0, 1: easy to read out loud
 const CODE_LEN = 5;
@@ -220,10 +220,10 @@ export class Hub {
     }
 
     // ---- #mpb
-    // Messages of a many-vs-many fight: a small JSON object passed to up to 8 named players in the room. The relay never reads
+    // Messages of a many-vs-many fight: a JSON object (up to ~6 KB: the setup carries each player's fighter record) passed to up to 8 named players in the room. The relay never reads
     // it beyond its size: it only fills in who it is from. (The fight is run by the players' games, see web/mpbattle.js.)
     #mpb(r, peer, m) {
-        if (!m.d || typeof m.d !== "object" || Array.isArray(m.d) || JSON.stringify(m.d).length > 1500) return;
+        if (!m.d || typeof m.d !== "object" || Array.isArray(m.d) || JSON.stringify(m.d).length > 6500) return;
         const ids = (Array.isArray(m.to) ? m.to : [m.to]).slice(0, 8);
         for (const id of ids) {
             const to = r.peers.get(id);

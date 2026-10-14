@@ -1,35 +1,28 @@
 // EXPERIMENT: many-vs-many fights for multiplayer (not original game content).
 //
 // The game's own battle is one Digimon against one enemy and stays exactly that for single player. This is an EXTENSION that
-// multiplayer uses instead: two or more players fight two or more enemies at once, each player controlling their own lead
-// Digimon on their own screen. It does not re-implement the battle: every number comes from the game's own engine through
-// `battle.mpKit()` (web/battle.js), and every picture from the game's own 3D battle renderer (web/battle3d.js), which has
-// been extended to hold any number of fighters in one arena (addFighter / fighterAttack / the wide camera). So it looks like
-// the real battle: the same models, the same arena, the same attack animations, effects and projectiles.
-//
-// How a fight runs (one player's game is the "host" and keeps the turn order; nobody needs anyone else's stats):
-//   - every round, everybody who is still standing acts once, fastest first
-//   - on YOUR turn you pick Fight / Tech / Run on your screen; YOUR game rolls the damage against the enemy and tells the host
-//   - on an ENEMY's turn the host picks a target (or everybody, for a spread technique); the TARGET's game rolls the damage against
-//     its own real defence and tells the host how much HP it has left
-//   - the host sends everyone the same small snapshot after every action (including "who attacked whom"), and every screen
-//     plays that attack with the game's own animation
-// Spread techniques (strong magic) hit every enemy (or every player) at 65% of the single-target damage.
-// A fight with many enemies is fought in waves of at most max(2, players) at a time.
+// multiplayer uses instead: two or more players fight two or more enemies at once, each controlling their own lead Digimon.
+//   - the PICTURE is the game's own 3D battle renderer (web/battle3d.js), extended to hold any number of fighters in one arena:
+//     the same arena, models, attack animations, effects, projectiles and special-attack backdrops;
+//   - the RULES are the game's own decoded battle routines, run for any number of fighters by web/mpbattle-rules.js: its action
+//     timeline, enemy AI, damage / accuracy / critical rolls, status effects, heals and buffs, items, running away, its
+//     battle strings and the EXP / BIT payout. Nothing is re-invented where the game has a rule.
+// One player's game (the one that started the fight) is the REFEREE: it holds every fighter's record, runs the rules, and sends
+// everyone the same small snapshot after each action. The other players send only their choices (Fight / Tech / Item / Run and a
+// target) and see the result. Spread techniques (strong magic) hit everyone on the other side at 65% damage; a fight with many
+// enemies is fought in waves of at most max(2, players).
 // If WebGL is not available the fight falls back to plain cards. Nothing here writes a story flag.
 import { createBattle3D, resolveModelFolder } from "./battle3d.js";
 import { drawEffects } from "./fight/effect-player.js";
+import { Arena, isSpread, T } from "./mpbattle-rules.js";
+import { ITEM_BY_ID } from "./vendor/engine.js";
 
-const SPREAD_FACTOR = 0.65;
-const SPREAD_MP = 40;               // a magical technique that costs at least this much hits everyone
 const TURN_MS = 45000;              // how long a player may think
-const FOE_WAIT_MS = 4000;           // how long the host waits for a player's game to answer an enemy attack
 const MIN_ANIM_MS = 900;            // the shortest pause after an action
-const MAX_ANIM_MS = 7000;           // the longest the host waits for the attack animation to finish
-const READY_MS = 25000;             // how long the host waits for the others to get into the fight (the battle-start transition plays first)
+const MAX_ANIM_MS = 7000;           // the longest the referee waits for the attack animation to finish
+const READY_MS = 25000;             // how long the referee waits for the others to get into the fight (the battle-start transition plays first)
 const LANE = 1900;                  // sideways distance between two fighters of one side, in the game's own arena units
-
-const isSpread = (skill) => !!skill && skill.attack_category === "magical" && (skill.mp_cost ?? 0) >= SPREAD_MP;
+const LOG_LINES = 5;
 
 let A = null;       // what the game gives us (see installMpBattle)
 let F = null;       // the fight I am in, or null
@@ -57,7 +50,7 @@ const css = `
 #mpb .nm { font-weight:bold; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } #mpb .sub { color:#aab3e8; font-size:11px; }
 #mpb .bar { clear:both; height:7px; margin-top:5px; background:#0009; border-radius:4px; overflow:hidden; } #mpb .bar i { display:block; height:100%; transition:width .5s; }
 #mpb .bar.hp i { background:#5fe07f; } #mpb .bar.mp i { background:#58a8ff; } #mpb .bar.foe i { background:#ff7a5f; }
-#mpb .num { font:10px monospace; color:#cfd6ff; }
+#mpb .num { font:10px monospace; color:#cfd6ff; } #mpb .ail { color:#ffb347; font:bold 10px monospace; margin-left:4px; }
 #mpb .float { position:absolute; left:50%; top:0; font:bold 24px monospace; pointer-events:none; text-shadow:0 2px 3px #000; animation:mpbfloat 1.1s ease-out forwards; z-index:3; }
 @keyframes mpbfloat { from { transform:translate(-50%,0); opacity:1; } to { transform:translate(-50%,-46px); opacity:0; } }
 #mpb .log { padding:6px 14px; min-height:68px; background:rgba(0,0,0,.4); font:12px/1.5 monospace; }
@@ -72,7 +65,7 @@ const css = `
 #mpb.d3 .row, #mpb.d3 .vs { display:none; }
 #mpb.d3 canvas.view { display:block; }
 #mpb.d3 .top { position:absolute; top:0; left:0; right:0; z-index:2; background:linear-gradient(rgba(0,0,0,.6), transparent); }
-#mpb.d3 .log { position:absolute; left:0; bottom:52px; width:48%; min-height:0; z-index:2; background:linear-gradient(to right, rgba(0,0,0,.6), transparent); }
+#mpb.d3 .log { position:absolute; left:0; bottom:52px; width:52%; min-height:0; z-index:2; background:linear-gradient(to right, rgba(0,0,0,.6), transparent); }
 #mpb.d3 .bar2 { position:absolute; left:0; right:0; bottom:0; z-index:2; background:linear-gradient(transparent, rgba(0,0,0,.75) 55%); }
 #mpb .plates { display:none; position:absolute; inset:0; z-index:1; pointer-events:none; }
 #mpb.d3 .plates { display:block; }
@@ -106,11 +99,13 @@ function makeCard(key, foe, small = false) {
     const root = mk("div", (small ? "plate " : "card ") + (foe ? "foe" : ""));
     const pic = mk("div", "pic"), nm = mk("div", "nm"), sub = mk("div", "sub");
     const hp = mk("div", "bar " + (foe ? "foe" : "hp")), hpi = mk("i"); hp.append(hpi);
-    const hpn = mk("div", "num");
+    const hpn = mk("div", "num"), ail = mk("span", "ail");
+    hpn.append(ail);
     root.append(pic, nm, sub, hp, hpn);
     let mpi = null;
     if (!foe) { const mp = mk("div", "bar mp"); mpi = mk("i"); mp.append(mpi); root.append(mp); }
-    return { key, root, pic, nm, sub, hpi, hpn, mpi, last: null };
+    root.addEventListener("click", () => onPick(key));
+    return { key, root, pic, nm, sub, hpi, hpn, ail, mpi, last: null };
 }
 
 function updateCard(c, o, foe) {
@@ -119,7 +114,8 @@ function updateCard(c, o, foe) {
     c.nm.textContent = foe ? o.n : `${o.pn}`;
     c.sub.textContent = foe ? `Lv ${o.lv}` : `${o.n}  Lv ${o.lv}`;
     c.hpi.style.width = Math.max(0, Math.min(100, (o.hp / Math.max(1, o.mhp)) * 100)) + "%";
-    c.hpn.textContent = foe ? `HP ${o.hp}/${o.mhp}` : `HP ${o.hp}/${o.mhp}   MP ${o.mp}/${o.mmp}`;
+    c.hpn.firstChild.textContent = foe ? `HP ${o.hp}/${o.mhp}` : `HP ${o.hp}/${o.mhp}   MP ${o.mp}/${o.mmp}`;
+    c.ail.textContent = o.ail?.length ? o.ail.join(" ") : "";
     if (c.mpi) c.mpi.style.width = Math.max(0, Math.min(100, (o.mp / Math.max(1, o.mmp)) * 100)) + "%";
     c.root.classList.toggle("ko", !!o.ko);
     if (c.last != null && o.hp !== c.last) {
@@ -178,8 +174,7 @@ function endScene(U) {
 
 function placePlates(cw, ch) {
     const U = A.ui; if (!U?.r3d) return;
-    const placed = [];
-    const rows = [];
+    const placed = [], rows = [];
     for (const [key, c] of U.plateMap) {
         const p = U.r3d.getFighterScreen(key);
         if (!p) { c.root.style.display = "none"; continue; }
@@ -205,17 +200,20 @@ function syncScene() {
     const U = F.ui, S = F.S, r = F.r3d;
     if (!r || !S) return;
     const laneOf = (i, n) => (i - (n - 1) / 2) * LANE;
-    // players (once), in the order the host lists them
-    S.P.forEach((p, i) => {
+    S.P.forEach((p, i) => {                                          // players: placed once, in the order the referee lists them
         const key = "p" + p.id;
+        if (F.placed.has(key) && F.modelName.get(key) !== p.n) {         // it digivolved: the new form's model takes its place
+            F.modelName.set(key, p.n);
+            resolveModelFolder(p.n).then((folder) => { if (folder && F && F.r3d === r) r.addFighter(key, "player", folder, laneOf(i, S.P.length)); });
+        }
         if (!F.placed.has(key)) {
+            F.modelName.set(key, p.n);
             F.placed.add(key);
             resolveModelFolder(p.n).then((folder) => { if (folder && F && F.r3d === r) r.addFighter(key, "player", folder, laneOf(i, S.P.length)); });
             const c = makeCard(key, false, true); U.plateMap.set(key, c); U.plates.append(c.root);
         }
     });
-    // the current wave of enemies (rebuilt when the wave changes)
-    const waveKey = S.E.map((e) => e.i).join(",");
+    const waveKey = S.E.map((e) => e.i).join(",");                   // the current wave of enemies (rebuilt when the wave changes)
     if (F.waveKey !== waveKey) {
         F.waveKey = waveKey;
         r.clearFighters("enemy");
@@ -224,7 +222,7 @@ function syncScene() {
             const key = "e" + e.i;
             F.placed.add(key);
             resolveModelFolder(e.n).then((folder) => { if (folder && F && F.r3d === r) r.addFighter(key, "enemy", folder, laneOf(i, S.E.length)); });
-            const c = makeCard(key, true, true); c.root.addEventListener("click", () => onPick(e.i)); U.plateMap.set(key, c); U.plates.append(c.root);
+            const c = makeCard(key, true, true); U.plateMap.set(key, c); U.plates.append(c.root);
         });
     }
     r.setMultiCamera(true);
@@ -235,13 +233,19 @@ function syncScene() {
         r.setFighterHurt("p" + p.id, p.hp / Math.max(1, p.mhp) < 0.25 && !p.ko);
     }
     // an action just happened: play it with the game's own animation, on every screen
-    if (S.ev && S.ev.q !== F.lastEv) {
-        F.lastEv = S.ev.q;
-        const [first, ...rest] = S.ev.d;
-        if (first) {
-            r.fighterAttack(S.ev.a, first[0], S.ev.sk, { lethal: !!first[3], miss: !first[2] });
-            for (const t of rest) setTimeout(() => { if (F && F.r3d === r) r.fighterReact(t[0], { lethal: !!t[3], miss: !t[2] }); }, 650);
-        }
+    const ev = S.ev;
+    if (ev && ev.q !== F.lastEv) {
+        F.lastEv = ev.q;
+        if (ev.kind === "atk") {
+            const [first, ...rest] = ev.d;
+            if (first) {
+                r.fighterAttack(ev.a, first[0], ev.sk, { lethal: !!first[3], miss: !first[2] });
+                for (const t of rest) setTimeout(() => { if (F && F.r3d === r) r.fighterReact(t[0], { lethal: !!t[3], miss: !t[2] }); }, 650);
+            }
+        } else if (ev.kind === "self") r.fighterTech(ev.a, ev.sk);       // a heal or a buff: its own motion, no one is hit
+        else if (ev.kind === "item") r.fighterAction(ev.a, 10);           // the item-use motion (clip 10), as in the one-on-one battle
+        // (a digivolve needs no motion of its own here: the new form's model is put in place above)
+        if (ev.kind !== "atk") for (const t of ev.d) if (t[3]) r.fighterReact(t[0], { lethal: true });
     }
     if (S.ph === "won" && !F.cheered) { F.cheered = true; for (const p of S.P) if (!p.ko) r.fighterVictory("p" + p.id); }
 }
@@ -251,17 +255,24 @@ function render() {
     const U = F?.ui; if (!U) return;
     const S = F.S;
     if (!S) { U.title.textContent = F.label || "Fight"; U.status.textContent = "Waiting for everyone to get ready..."; return; }
+    const mine = S.P.find((p) => p.id === A.myId());
+    if (mine && !F.isHost) { F.me.hp = mine.hp; F.me.mp = mine.mp; }       // the referee's numbers are the true ones
+    if (mine && mine.n !== F.me.profile?.name) {                             // I digivolved: my record and my technique list follow
+        const form = F.kit.forms(F.me).find((f) => f.name === mine.n);
+        if (form && !F.isHost) F.kit.digivolve(F.me, form.id);
+        F.techs = F.kit.myTechs(F.me);
+    }
     U.title.textContent = `${F.label || "Fight"}   ·   round ${S.r}${F.waves > 1 ? `   ·   wave ${S.w + 1}/${F.waves}` : ""}`;
     if (F.r3d) syncScene();
     else renderCards(U, S);
     for (const [k, c] of F.r3d ? U.plateMap : U.cards) {
         const t = S.t;
-        c.root.classList.toggle("act", !!t && ((t.t === "e" && k === "e" + t.i) || (t.t === "p" && k === "p" + t.id)));
+        c.root.classList.toggle("act", !!t && t === k);
     }
     U.log.replaceChildren(...S.g.map((l) => mk("div", "", l)));
     const t = S.t;
-    const who = !t ? "" : t.t === "e" ? (S.E.find((e) => e.i === t.i)?.n ?? "Enemy") : (S.P.find((p) => p.id === t.id)?.pn ?? "Player");
-    U.status.textContent = S.ph !== "play" ? "" : t?.t === "p" && t.id === A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
+    const who = !t ? "" : t[0] === "e" ? (S.E.find((e) => "e" + e.i === t)?.n ?? "Enemy") : (S.P.find((p) => "p" + p.id === t)?.pn ?? "Player");
+    U.status.textContent = S.ph !== "play" ? "" : t === "p" + A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
     renderCmd();
 }
 
@@ -270,7 +281,7 @@ function renderCards(U, S) {
     const foeKeys = S.E.map((e) => "e" + e.i).join(",");
     if (U.foeKeys !== foeKeys) {
         for (const [k, c] of [...U.cards]) if (k[0] === "e") { c.root.remove(); U.cards.delete(k); }
-        for (const e of S.E) { const c = makeCard("e" + e.i, true); U.cards.set(c.key, c); U.foes.append(c.root); c.root.addEventListener("click", () => onPick(e.i)); }
+        for (const e of S.E) { const c = makeCard("e" + e.i, true); U.cards.set(c.key, c); U.foes.append(c.root); }
         U.foeKeys = foeKeys;
     }
     for (const e of S.E) updateCard(U.cards.get("e" + e.i), e, true);
@@ -282,94 +293,99 @@ function renderCards(U, S) {
     }
 }
 
+// ------------------------------------------------------------ my turn: the command menu
+const itemTargets = (item) => {
+    if (!item) return { allies: true, foes: false };
+    if (["hp", "mp", "full_hp"].includes(item.effect) && !(item.id >= 66 && item.id <= 90)) return { allies: true, foes: false };
+    return item.id >= 85 && item.id !== 84 ? { allies: false, foes: true } : { allies: true, foes: false };
+};
+
 function renderCmd() {
     const U = F?.ui; if (!U) return;
     const S = F.S, bar = U.bar;
     bar.replaceChildren();
     for (const c of [...U.cards.values(), ...U.plateMap.values()]) c.root.classList.remove("pick");
-    const mineTurn = S && S.ph === "play" && S.t?.t === "p" && S.t.id === A.myId() && F.me.hp > 0;
-    if (!mineTurn) { F.cmd = null; bar.append(mk("span", "hint", S?.ph === "play" ? "Waiting..." : "")); return; }
-    const alive = S.E.filter((e) => !e.ko);
+    const myKey = "p" + A.myId();
+    const mineTurn = S && S.ph === "play" && S.t === myKey && F.me.hp > 0 && !F.iFled;
+    if (!mineTurn) {
+        F.cmd = null;
+        bar.append(mk("span", "hint", F.iFled ? "You ran away. Watching the rest of the fight." : S?.ph === "play" ? "Waiting..." : ""));
+        return;
+    }
     const btn = (label, fn, disabled) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
     if (!F.cmd) F.cmd = { stage: "menu" };
     const cmd = F.cmd;
+    const back = () => btn("Back", () => { F.cmd = { stage: "menu" }; renderCmd(); });
     if (cmd.stage === "menu") {
-        btn("Fight", () => chooseTarget(F.kit.basic(F.me), 0));
+        btn("Fight", () => askTarget({ foes: true }, (t) => send({ k: "fight", t: Number(t.slice(1)) }), "Pick a target"));
         btn("Tech", () => { F.cmd = { stage: "tech" }; renderCmd(); }, !F.techs.length);
+        btn("Item", () => { F.items = F.kit.items(); F.cmd = { stage: "item" }; renderCmd(); }, !F.kit.items().length);
+        const forms = F.kit.forms(F.me);
+        if (forms.length) btn("Digivolve", () => { F.cmd = { stage: "dv" }; renderCmd(); }, !!F.me.cantDigivolve);
         btn("Run", () => { F.cmd = { stage: "run" }; renderCmd(); });
         bar.append(mk("span", "hint", `HP ${F.me.hp}/${F.me.maxHp}   MP ${F.me.mp}/${F.me.maxMp}`));
     } else if (cmd.stage === "run") {
-        bar.append(mk("span", "hint", "Run away and leave the fight?"));
-        btn("Yes, run", () => run());
+        bar.append(mk("span", "hint", "Try to run away?"));
+        btn("Yes, run", () => send({ k: "run" }));
         btn("No", () => { F.cmd = { stage: "menu" }; renderCmd(); });
     } else if (cmd.stage === "tech") {
         for (const t of F.techs) {
-            const spread = isSpread(t.skill), ok = F.me.mp >= t.cost;
-            btn(`${t.name}  (${t.cost} MP)${spread ? "  [all]" : ""}`, () => chooseTarget(t.skill, t.cost), !ok);
+            const spread = t.type === "attack" && isSpread(t.skill), ok = F.me.mp >= t.cost;
+            btn(`${t.name}  (${t.cost} MP)${spread ? "  [all]" : t.type !== "attack" ? "  [support]" : ""}`, () => {
+                if (spread) send({ k: "tech", sk: t.id, tw: t.tw, t: -1 });
+                else if (t.type === "attack") askTarget({ foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Pick a target for ${t.name}`);
+                else askTarget({ allies: true, foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Pick a target for ${t.name}`);
+            }, !ok);
         }
-        btn("Back", () => { F.cmd = { stage: "menu" }; renderCmd(); });
+        back();
+    } else if (cmd.stage === "dv") {
+        for (const f of F.kit.forms(F.me)) btn(f.name, () => send({ k: "dv", form: f.id }));
+        back();
+    } else if (cmd.stage === "item") {
+        for (const it of F.items) {
+            btn(`${it.name}  x${it.qty}`, () => {
+                const tg = itemTargets(ITEM_BY_ID[it.id] ?? it);
+                askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k) => { send({ k: "item", item: it.id, to: k[0] === "p" ? k : myKey, t: k[0] === "e" ? Number(k.slice(1)) : -1 }); F.kit.spendItem(it.id); }, `Use ${it.name} on...`);
+            });
+        }
+        back();
     } else if (cmd.stage === "target") {
-        bar.append(mk("span", "hint", `Pick a target for ${cmd.skill.name}`));
-        for (const e of alive) (U.plateMap.get("e" + e.i) ?? U.cards.get("e" + e.i))?.root.classList.add("pick");
-        btn("Back", () => { F.cmd = { stage: "menu" }; renderCmd(); });
+        bar.append(mk("span", "hint", cmd.label));
+        for (const key of cmd.options) (U.plateMap.get(key) ?? U.cards.get(key))?.root.classList.add("pick");
+        back();
     }
 }
 
-function chooseTarget(skill, cost) {
-    const alive = F.S.E.filter((e) => !e.ko);
-    if (!alive.length) return;
-    if (isSpread(skill)) return attack(skill, cost, alive.map((e) => e.i));
-    if (alive.length === 1) return attack(skill, cost, [alive[0].i]);
-    F.cmd = { stage: "target", skill, cost }; renderCmd();
-}
-function onPick(i) {
-    if (!F || F.cmd?.stage !== "target") return;
-    if (F.S.E.find((e) => e.i === i)?.ko) return;
-    attack(F.cmd.skill, F.cmd.cost, [i]);
-}
-
-// ------------------------------------------------------------ my actions (computed here, with my real stats)
-function attack(skill, cost, targets) {
-    const spread = targets.length > 1;
-    const res = targets.map((i) => {
-        const r = F.kit.attack(F.me, F.erec[i], skill);
-        const dmg = r.hit ? Math.max(0, spread ? Math.floor(r.dmg * SPREAD_FACTOR) : r.dmg) : 0;
-        return [i, dmg, r.hit ? 1 : 0];
-    });
-    F.me.mp = Math.max(0, F.me.mp - cost);
-    F.cmd = null;
-    const d = { k: "act", fid: F.fid, r: F.S.r, sk: skill.id, nm: skill.name, res, cost };
-    if (F.isHost) hostAct(A.myId(), d); else A.send([F.hostId], d);
+/** Ask for a target on the screen: { foes, allies } say which plates may be picked. Only one choice? it is taken for me. */
+function askTarget(spec, done, label) {
+    const options = [];
+    if (spec.allies) for (const p of F.S.P) if (!p.ko || spec.revive) options.push("p" + p.id);
+    if (spec.foes) for (const e of F.S.E) if (!e.ko) options.push("e" + e.i);
+    if (!options.length) return;
+    if (options.length === 1) return done(options[0]);
+    F.cmd = { stage: "target", options, done, label };
     renderCmd();
 }
-function run() {
+function onPick(key) {
+    if (!F || F.cmd?.stage !== "target" || !F.cmd.options.includes(key)) return;
+    const done = F.cmd.done;
     F.cmd = null;
-    if (F.isHost) hostRun(A.myId()); else A.send([F.hostId], { k: "run", fid: F.fid });
-    finish(false, { fled: true });
+    done(key);
 }
 
-/** An enemy attacks ME: roll it against my real defence, answer with the HP I have left. */
-function onFoe(d) {
-    if (!F || d.fid !== F.fid || F.me.hp <= 0) return;
-    const rec = F.erec[d.e]; if (!rec) return;
-    const skill = d.b ? (F.kit.foeMoves(rec).find((m) => !m.tech)?.skill ?? null) : F.kit.skillOf(d.sk);
-    let dmg = 0, hit = false;
-    if (skill) {
-        const r = F.kit.attack(rec, F.me, d.b ? skill : { ...skill });
-        hit = r.hit; dmg = r.hit ? Math.max(0, d.sp ? Math.floor(r.dmg * SPREAD_FACTOR) : r.dmg) : 0;
-    }
-    F.me.hp = Math.max(0, F.me.hp - dmg);
-    const res = { k: "res", fid: F.fid, e: d.e, dmg, hit: hit ? 1 : 0, hp: F.me.hp };
-    if (F.isHost) hostRes(A.myId(), res); else A.send([F.hostId], res);
+/** My choice for this turn goes to the referee (or is taken straight in when it is me). */
+function send(c) {
+    F.cmd = null;
+    const d = { k: "cmd", fid: F.fid, c };
+    if (F.isHost) hostCommand(A.myId(), d); else A.send([F.hostId], d);
+    renderCmd();
 }
 
-// ------------------------------------------------------------ the host: turn order, enemies, who is down
+// ------------------------------------------------------------ the referee: runs the rules, tells everyone
 const later = (ms, fn) => { const id = setTimeout(() => { if (F) fn(); }, ms); (F.timers ??= new Set()).add(id); return id; };
-const alivePlayers = () => [...F.H.P.values()].filter((p) => !p.ko && !p.fled);
-const waveEnemies = () => F.H.E.filter((e) => e.i >= F.H.wave * F.H.waveSize && e.i < (F.H.wave + 1) * F.H.waveSize);
-const say = (line) => { F.H.log.push(String(line).slice(0, 70)); if (F.H.log.length > 4) F.H.log.shift(); };
+const say = (lines) => { for (const l of [].concat(lines)) if (l) F.H.log.push(String(l).slice(0, 72)); while (F.H.log.length > LOG_LINES) F.H.log.shift(); };
 
-/** Run `fn` once the attack animation on the host's own screen is over (and at least a moment has passed). */
+/** Run `fn` once the attack animation on the referee's own screen is over (and at least a moment has passed). */
 function afterAnim(fn) {
     const t0 = performance.now();
     const poll = () => {
@@ -382,160 +398,109 @@ function afterAnim(fn) {
 }
 
 function snapshot(ph = "play") {
-    const H = F.H;
+    const H = F.H, ar = H.arena;
     return {
-        r: H.round, w: H.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null,
-        E: waveEnemies().map((e) => ({ i: e.i, n: e.n, lv: e.lv, hp: e.hp, mhp: e.mhp, ko: e.ko ? 1 : 0 })),
-        P: [...H.P.values()].map((p) => ({ id: p.id, pn: p.pn, n: p.n, lv: p.lv, hp: p.hp, mhp: p.mhp, mp: p.mp, mmp: p.mmp, ko: p.ko || p.fled ? 1 : 0 })),
+        r: H.round, w: ar.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null,
+        E: ar.waveFoes().map((e) => ({ i: e.i, n: e.name, lv: e.rec.level | 0, ...ar.plate(e) })),
+        P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0 })),
     };
 }
 function broadcast(ph = "play") {
     const S = snapshot(ph);
-    const others = F.ids.filter((id) => id !== A.myId() && !F.H.P.get(id)?.fled);
+    const others = F.ids.filter((id) => id !== A.myId() && !F.H.arena.byKey("p" + id)?.fled);
     if (others.length) A.send(others, { k: "st", fid: F.fid, S });
     F.S = S; render();
 }
-function setEvent(a, sk, rows) { const H = F.H; H.ev = { q: (H.evq = (H.evq | 0) + 1), a, sk: sk | 0, d: rows }; }
+function setEvent(res) {
+    const H = F.H;
+    if (!res.rows?.length && res.kind !== "self" && res.kind !== "item" && res.kind !== "dv") return;
+    H.ev = { q: (H.evq = (H.evq | 0) + 1), a: res.a, sk: res.sk | 0, kind: res.kind, d: res.rows ?? [] };
+}
 
 function hostBegin() {
     const H = F.H;
     clearTimeout(H.readyTimer);
     if (H.started) return; H.started = true;
-    for (const id of F.ids) if (!H.P.has(id)) F.ids = F.ids.filter((x) => x !== id);   // never got ready: not in the fight
+    F.ids = F.ids.filter((id) => H.P.has(id));                // never got ready: not in the fight
     if (!H.P.size) { finish(false, { fled: true }); return; }
+    const players = [...H.P.values()].map((p) => ({ id: p.id, name: p.pn, rec: p.rec }));
+    const waveSize = Math.max(2, players.length);
+    H.arena = new Arena({ kit: F.kit, players, foes: F.erec.map((rec, i) => ({ name: H.names[i], rec })), screenId: F.screenId, waveSize });
+    F.waves = H.arena.waves();
     say("The fight begins!");
-    F.ids = [...H.P.keys()];
-    H.waveSize = Math.max(2, F.ids.length);
-    F.waves = Math.ceil(F.foes.length / H.waveSize);
     A.send(F.ids.filter((id) => id !== A.myId()), { k: "go", fid: F.fid, waves: F.waves });
-    broadcast();                       // everyone sees the arena and the lineup straight away
+    broadcast();                                               // everyone sees the arena and the lineup straight away
     later(1800, nextTurn);
 }
 
-function buildOrder() {
-    const H = F.H;
-    H.round++;
-    H.order = [
-        ...alivePlayers().map((p) => ({ t: "p", id: p.id, spd: p.spd + Math.random() })),
-        ...waveEnemies().filter((e) => !e.ko).map((e) => ({ t: "e", i: e.i, spd: e.spd + Math.random() })),
-    ].sort((a, b) => b.spd - a.spd);
-}
-
-function checkEnd() {
-    const H = F.H;
-    if (!alivePlayers().length) { hostEnd(false); return true; }
-    if (waveEnemies().every((e) => e.ko)) {
-        if ((H.wave + 1) * H.waveSize >= F.foes.length) { hostEnd(true); return true; }
-        H.wave++; H.order = []; H.turn = null; say(`Next wave! (${H.wave + 1}/${F.waves})`); broadcast();
-        later(1800, nextTurn); return true;
-    }
-    return false;
-}
-
 function nextTurn() {
-    const H = F.H;
+    const H = F.H, ar = H.arena;
     clearTimeout(H.turnTimer);
-    if (checkEnd()) return;
-    for (let guard = 0; guard < 50; guard++) {
-        if (!H.order.length) { buildOrder(); say(`-- Round ${H.round} --`); }
-        const a = H.order.shift();
-        if (a.t === "p") {
-            const p = H.P.get(a.id);
-            if (!p || p.ko || p.fled) continue;
-            H.turn = { t: "p", id: a.id };
-            broadcast();
-            H.turnTimer = later(TURN_MS, () => { say(`${p.pn} took too long.`); H.turn = null; broadcast(); later(400, nextTurn); });
-            return;
-        }
-        const e = H.E[a.i];
-        if (e.ko) continue;
-        H.turn = { t: "e", i: a.i };
-        broadcast();
-        later(600, () => foeTurn(e));
-        return;
+    H.turn = null;
+    const st = ar.state();
+    if (st !== "play") { hostEnd(st); return; }
+    const nx = ar.next();
+    if (!nx) { hostEnd(ar.state()); return; }
+    if (nx.wave != null) { say(`Next wave! (${nx.wave + 1}/${F.waves})`); broadcast(); later(1800, nextTurn); return; }
+    const key = nx.key, actor = ar.byKey(key);
+    H.turns = (H.turns | 0) + 1;                               // "round" = everyone standing has had about one action
+    H.round = Math.floor((H.turns - 1) / Math.max(1, ar.alivePlayers().length + ar.aliveFoes().length)) + 1;
+    const ts = ar.turnStart(key);
+    H.turn = key;
+    if (ts.skipped) {                                          // asleep, frozen or confused: the turn is lost
+        const res = { lines: ts.lines, rows: [], a: key, sk: 0, kind: "run" };
+        ar.finish(key, res);
+        say(res.lines); broadcast(); afterAnim(nextTurn); return;
     }
+    broadcast();
+    if (key[0] === "p") {
+        H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
+    } else later(700, () => foeTurn(key));
 }
 
-function hostAct(from, d) {
-    const H = F.H;
-    if (d.fid !== F.fid || H.turn?.t !== "p" || H.turn.id !== from || d.r !== H.round) return;
-    clearTimeout(H.turnTimer);
-    const p = H.P.get(from); if (!p) return;
-    H.turn = null;
-    p.mp = Math.max(0, p.mp - (Number(d.cost) || 0));
-    const nm = String(d.nm || "attack").slice(0, 24), rows = [];
-    for (const row of Array.isArray(d.res) ? d.res.slice(0, 6) : []) {
-        const [i, dmg, hit] = row, e = H.E[i];
-        if (!e || e.ko || i < H.wave * H.waveSize || i >= (H.wave + 1) * H.waveSize) continue;
-        const dm = Math.max(0, Math.min(99999, Number(dmg) | 0));
-        e.hp = Math.max(0, e.hp - dm);
-        if (e.hp <= 0) e.ko = true;
-        rows.push(["e" + i, dm, hit ? 1 : 0, e.ko ? 1 : 0]);
-        say(hit ? `${p.pn}: ${nm} -> ${e.n} -${dm}${e.ko ? "  DOWN!" : ""}` : `${p.pn}: ${nm} missed ${e.n}`);
-    }
-    if (rows.length) setEvent("p" + from, d.sk, rows);
+function foeTurn(key) {
+    const H = F.H, ar = H.arena;
+    const res = ar.foeAction(key);
+    ar.finish(key, res);
+    say(res.lines); setEvent(res);
     broadcast();
     afterAnim(nextTurn);
 }
 
-function hostRun(from) {
-    const H = F.H, p = H.P.get(from); if (!p || p.fled) return;
-    p.fled = true; say(`${p.pn} ran away!`);
-    const wasTurn = H.turn?.t === "p" && H.turn.id === from;
+/** A player's choice reached the referee. */
+function hostCommand(from, d) {
+    const H = F.H; if (!H?.arena) return;
+    const ar = H.arena, key = "p" + from;
+    if (d.fid !== F.fid || H.turn !== key) return;
+    clearTimeout(H.turnTimer);
+    const c = d.c && typeof d.c === "object" ? d.c : {};
+    const res = ar.playerAction(key, { k: String(c.k), sk: c.sk | 0, tw: c.tw | 0, item: c.item | 0, form: c.form | 0, to: String(c.to ?? ""), t: typeof c.t === "string" ? c.t : (Number.isInteger(c.t) ? c.t : -1) });
+    ar.finish(key, res);
+    H.turn = null;
+    say(res.lines); setEvent(res);
+    broadcast();
+    if (res.fled) {                                            // the player got away: they leave the fight (the host keeps refereeing)
+        if (from === A.myId()) F.iFled = true; else A.send([from], { k: "left", fid: F.fid });
+    }
+    afterAnim(nextTurn);
+}
+
+function hostGone(from) {                                     // a player's connection dropped mid-fight
+    const H = F.H; if (!H?.arena) return;
+    const p = H.arena.byKey("p" + from); if (!p || p.fled) return;
+    p.fled = true; say(`${p.name} left the fight.`);
+    const wasTurn = H.turn === p.key;
     if (wasTurn) { clearTimeout(H.turnTimer); H.turn = null; }
     broadcast();
-    if (wasTurn) later(MIN_ANIM_MS, nextTurn); else if (!alivePlayers().length) later(500, nextTurn);
+    if (wasTurn || H.arena.state() !== "play") later(MIN_ANIM_MS, nextTurn);
 }
 
-function foeTurn(e) {
-    const H = F.H, rec = F.erec[e.i];
-    const alive = alivePlayers();
-    if (!alive.length) { nextTurn(); return; }
-    const moves = F.kit.foeMoves(rec).filter((m) => m.cost <= e.mp);
-    const techs = moves.filter((m) => m.tech);
-    const move = techs.length && Math.random() < 0.35 ? techs[Math.floor(Math.random() * techs.length)] : (moves.find((m) => !m.tech) ?? moves[0]);
-    if (!move) { say(`${e.n} waits.`); broadcast(); later(MIN_ANIM_MS, nextTurn); return; }
-    e.mp -= move.cost;
-    const spread = move.tech && isSpread(move.skill);
-    const targets = spread ? alive : [alive[Math.floor(Math.random() * alive.length)]];
-    H.pending = { e: e.i, move, spread, need: new Set(targets.map((p) => p.id)), res: [] };
-    H.pending.timer = later(FOE_WAIT_MS, finishFoe);        // (before the attacks go out: my own Digimon answers at once)
-    say(`${e.n} uses ${move.tech ? move.skill.name : "an attack"}!`);
-    broadcast();
-    for (const p of targets) {
-        const d = { k: "foe", fid: F.fid, e: e.i, sk: move.skill.id, b: move.tech ? 0 : 1, sp: spread ? 1 : 0 };
-        if (p.id === A.myId()) onFoe(d); else A.send([p.id], d);
-    }
-}
-
-function hostRes(from, d) {
-    const H = F.H, pend = H.pending;
-    if (!pend || d.fid !== F.fid || d.e !== pend.e || !pend.need.has(from)) return;
-    pend.need.delete(from);
-    const p = H.P.get(from);
-    if (p) {
-        const hp = Math.max(0, Math.min(p.mhp, Number(d.hp) | 0));
-        p.hp = hp; if (hp <= 0) p.ko = true;
-        const dm = Math.max(0, Number(d.dmg) | 0);
-        pend.res.push(["p" + from, dm, d.hit ? 1 : 0, p.ko ? 1 : 0]);
-        say(d.hit ? `  ${p.pn} takes ${dm}${p.ko ? "  DOWN!" : ""}` : `  ${p.pn} dodged!`);
-    }
-    if (!pend.need.size) finishFoe();
-}
-function finishFoe() {
-    const H = F.H, pend = H.pending;
-    if (!pend) return;
-    clearTimeout(pend.timer); H.pending = null; H.turn = null;
-    if (pend.res.length) setEvent("e" + pend.e, pend.move.skill.id, pend.res);
-    broadcast();
-    afterAnim(nextTurn);
-}
-
-function hostEnd(won) {
+function hostEnd(state) {
+    const won = state === "won";
     const others = F.ids.filter((id) => id !== A.myId());
     broadcast(won ? "won" : "lost");
-    if (others.length) A.send(others, { k: "end", fid: F.fid, won: won ? 1 : 0 });
-    finish(won, {});
+    if (others.length) A.send(others, { k: "end", fid: F.fid, won: won ? 1 : 0, st: state });
+    finish(won, { fled: state === "fled" || F.iFled });
 }
 
 // ------------------------------------------------------------ starting, joining, finishing
@@ -544,39 +509,43 @@ async function begin(setup, isHost, hostId, done) {
     const kit = await A.getKit();
     const me = kit.myRecord();
     if (!me) return false;
-    const erec = setup.foes.map((e) => kit.enemyRecord(e));
+    const erec = isHost ? setup.foes.map((e) => kit.enemyRecord(e, setup.screenId ?? null)) : [];
     if (erec.some((r) => !r)) return false;
     if (F) return false;
     F = {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
-        screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, erec, techs: kit.myTechs(me), done, S: null, cmd: null, waves: 1,
-        snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), waveKey: null, lastEv: null, cheered: false,
+        screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1,
+        snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
     };
     const U = F.ui = A.ui ?? (A.ui = buildUi());
     U.cards.clear(); U.foes.replaceChildren(); U.mine.replaceChildren(); U.foeKeys = ""; U.bar.replaceChildren(); U.log.replaceChildren(); U.plateMap.clear(); U.plates.replaceChildren();
     if (U.endEl) { U.endEl.remove(); U.endEl = null; }
     U.root.style.display = "flex";
     A.releaseKeys();
+    try {                                                      // the battle track (and the field's back afterwards)
+        F.prevTrack = A.bgm?.current;
+        const track = kit.musicFor(F.screenId, A.mapId?.() ?? null);
+        if (track && A.bgm) A.bgm.play(track);
+    } catch { /* silence is fine */ }
     await makeScene();                                       // (falls back to plain cards without WebGL)
     if (!F) return true;
-    const mePublic = { id: A.myId(), pn: A.myName(), n: me.profile?.name ?? "?", lv: me.level | 0, hp: me.hp | 0, mhp: me.maxHp | 0, mp: me.mp | 0, mmp: me.maxMp | 0, spd: me.spd | 0 };
+    const mePublic = { id: A.myId(), pn: A.myName(), n: me.profile?.name ?? "?", lv: me.level | 0 };
     if (isHost) {
         F.H = {
-            P: new Map([[mePublic.id, { ...mePublic, ko: false, fled: false }]]),
-            E: erec.map((r, i) => ({ i, n: r.eStats?.digimon_id ?? r.profile?.name ?? "?", lv: r.level | 0, hp: r.hp | 0, mhp: r.maxHp | 0, mp: r.mp | 0, spd: r.spd | 0, ko: false })),
-            wave: 0, waveSize: 2, round: 0, order: [], turn: null, log: ["Waiting for everyone..."], started: false, pending: null,
+            P: new Map([[mePublic.id, { ...mePublic, rec: me }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
+            arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false,
         };
         A.send(F.ids.filter((id) => id !== mePublic.id), { k: "setup", fid: F.fid, foes: F.foes, ids: F.ids, names: F.names, label: F.label, screenId: F.screenId, ch: F.challenge });
         F.H.readyTimer = setTimeout(() => { if (F) hostBegin(); }, READY_MS);
         if (F.H.P.size >= F.ids.length) hostBegin();
     } else {
-        A.send([hostId], { k: "ready", fid: F.fid, p: mePublic });
+        A.send([hostId], { k: "ready", fid: F.fid, p: { ...mePublic, rec: kit.pack(me) } });      // the referee needs my real fighter record
     }
     render();
     return true;
 }
 
-/** Start a fight as the host. ids = everyone in it (me first). done({won, fled, reward}) runs when it is over. */
+/** Start a fight as the referee. ids = everyone in it (me first). done({won, fled, reward}) runs when it is over. */
 export function mpbHost({ foes, ids, label, screenId, challenge, done }) {
     const names = Object.fromEntries(ids.map((id) => [id, A.nameOf(id)]));
     return begin({ fid: (Date.now() % 1000000000) + Math.floor(Math.random() * 1000), foes, ids, names, label, screenId, ch: challenge }, true, A.myId(), done);
@@ -594,20 +563,17 @@ export function mpbMessage(from, d) {
     if (!F || d.fid !== F.fid) return;
     if (F.isHost) {
         if (!F.ids.includes(from)) return;
-        if (d.k === "ready" && d.p && !F.H.started) {
-            const p = d.p, int = (v, hi) => Math.max(0, Math.min(hi, Number(v) | 0));
-            F.H.P.set(from, { id: from, pn: String(p.pn ?? "?").slice(0, 12), n: String(p.n ?? "?").slice(0, 14), lv: int(p.lv, 99), hp: int(p.hp, 99999), mhp: Math.max(1, int(p.mhp, 99999)),
-                mp: int(p.mp, 99999), mmp: int(p.mmp, 99999), spd: int(p.spd, 9999), ko: false, fled: false });
+        if (d.k === "ready" && d.p && !F.H.started && d.p.rec && typeof d.p.rec === "object") {
+            const p = d.p;
+            F.H.P.set(from, { id: from, pn: String(p.pn ?? "?").slice(0, 12), n: String(p.n ?? "?").slice(0, 14), lv: Math.max(1, Math.min(99, p.lv | 0)), rec: p.rec });
             if (F.H.P.size >= F.ids.length) hostBegin();
         } else if (d.k === "decline") { F.ids = F.ids.filter((x) => x !== from); if (F.H.P.size >= F.ids.length) hostBegin(); }
-        else if (d.k === "act") hostAct(from, d);
-        else if (d.k === "res") hostRes(from, d);
-        else if (d.k === "run") hostRun(from);
+        else if (d.k === "cmd") hostCommand(from, d);
     } else if (from === F.hostId) {
         if (d.k === "go") F.waves = Math.max(1, Math.min(20, d.waves | 0));
         else if (d.k === "st") { F.S = d.S; render(); }
-        else if (d.k === "foe") onFoe(d);
-        else if (d.k === "end") finish(!!d.won, {});
+        else if (d.k === "left") finish(false, { fled: true });
+        else if (d.k === "end") finish(!!d.won, { fled: d.st === "fled" });
     }
 }
 
@@ -615,7 +581,7 @@ export function mpbMessage(from, d) {
 export function mpbPeerGone(id) {
     if (!F) return;
     if (!F.isHost && id === F.hostId) { finish(false, { fled: true, hostLeft: true }); return; }
-    if (F.isHost && F.H?.P.has(id)) hostRun(id);
+    if (F.isHost && F.H?.arena) hostGone(id);
     if (F.isHost && F.H && !F.H.started) { F.ids = F.ids.filter((x) => x !== id); if (F.H.P.size >= F.ids.length) hostBegin(); }
 }
 
@@ -624,13 +590,15 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
     for (const t of f.timers ?? []) clearTimeout(t);
     clearTimeout(f.H?.readyTimer); clearTimeout(f.H?.turnTimer);
     F = null;                                   // from here on the fight is over; the screen stays up for the result
+    fled = fled || f.iFled;
     let reward = null;
     if (won && !fled) {
-        const standing = f.isHost ? [...f.H.P.values()].filter((p) => !p.fled).length : f.ids.length;
+        const standing = f.isHost ? f.H.arena.P.filter((p) => !p.fled).length : f.ids.length;
         reward = f.kit.applyWin({ screenId: f.screenId, participants: standing });
     }
     if (!won && !fled) A.restore(f.snap);       // a lost optional fight costs nothing
     else f.kit.commit(f.me);
+    try { if (f.prevTrack && A.bgm) A.bgm.play(f.prevTrack); } catch { /* ignore */ }
     const U = f.ui;
     const close = () => {
         endScene(U);
@@ -638,12 +606,13 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
         A.releaseKeys();
         try { f.done?.({ won, fled, reward }); } catch (e) { console.warn("[mpbattle] done failed", e); }
     };
-    if (fled) { close(); return; }
+    if (hostLeft || (fled && !f.isHost)) { close(); return; }
+    if (fled && f.iFled && f.isHost) { close(); return; }
     // let the last hit and the victory (or defeat) pose play before the result page covers the scene
     setTimeout(() => {
         if (!U.root || U.root.style.display !== "flex") return;
         const end = mk("div", "end");
-        const h2 = mk("h2", "", won ? "VICTORY!" : "DEFEATED");
+        const h2 = mk("h2", "", won ? "VICTORY!" : fled ? "FIGHT OVER" : "DEFEATED");
         h2.style.color = won ? "#ffd34d" : "#ff7a7a";
         end.append(h2);
         if (won && reward) {
@@ -660,7 +629,7 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
 // ------------------------------------------------------------ install
 /**
  * api: { stageEl, getKit(), myId(), myName(), nameOf(id), send(ids, d), releaseKeys(), snapshot(), restore(snap),
- *        canJoin(), joinDone(setup) -> done fn, sfx, mapId() }
+ *        canJoin(), joinDone(setup) -> done fn, sfx, bgm, mapId() }
  */
 export function installMpBattle(api) {
     A = api;
@@ -671,5 +640,5 @@ export function installMpBattle(api) {
         A.releaseKeys(); e.stopImmediatePropagation();
     }, true);
     window.addEventListener("keyup", (e) => { if (F || (A.ui && A.ui.root.style.display === "flex")) e.stopImmediatePropagation(); }, true);
-    window.__mpb = { get fight() { return F; }, isSpread, host: mpbHost };   // (for tests and the console)
+    window.__mpb = { get fight() { return F; }, isSpread, host: mpbHost, T, Arena };   // (for tests and the console)
 }

@@ -404,7 +404,7 @@ installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () 
 installMpBattle({
     stageEl: document.getElementById("stage"),
     getKit: () => battle.mpKit(),
-    sfx, mapId: () => currentMap()?.id ?? null,
+    sfx, bgm, mapId: () => currentMap()?.id ?? null,
     myId: () => myId(), myName: () => myName(),
     nameOf: (id) => peerOf(id)?.name ?? myName(),
     send: (ids, d) => sendMpb(ids, d),

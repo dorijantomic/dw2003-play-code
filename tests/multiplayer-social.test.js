@@ -134,7 +134,7 @@ test("fight messages go to the named players only, with the sender filled in, an
     send(a, { t: "mpb", to: [b.session.id, c.session.id, a.session.id, 999], d: { k: "st" } });
     assert.equal(c.got.filter((m) => m.t === "mpb").length, 1);
     assert.equal(a.got.filter((m) => m.t === "mpb").length, 0);                // not back to the sender
-    send(a, { t: "mpb", to: [b.session.id], d: { k: "big", pad: "x".repeat(1600) } });   // too big
+    send(a, { t: "mpb", to: [b.session.id], d: { k: "big", pad: "x".repeat(7000) } });   // too big
     send(a, { t: "mpb", to: [b.session.id], d: [1, 2] });                       // not an object
     assert.equal(b.got.filter((m) => m.t === "mpb").length, 2);
 });

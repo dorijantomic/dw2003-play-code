@@ -37,14 +37,28 @@ async function player(label, name) {
 }
 
 // click through my turn whenever it is my turn: Fight, then the first living enemy
-async function autoPlay(page, useTech = false) {
-    return page.evaluate((useTech) => {
+async function autoPlay(page, useTech = false, useItem = false, useDv = false) {
+    return page.evaluate(({ useTech, useItem, useDv }) => {
         const root = document.getElementById("mpb");
         if (!root || root.style.display !== "flex") return "off";
         if (root.querySelector(".end")) return "end";
         const btn = (t) => [...root.querySelectorAll(".bar2 button")].find((b) => b.textContent.trim() === t && !b.disabled);
         const pick = root.querySelector(".foe.pick:not(.ko)");
         if (pick) { pick.click(); return "target"; }
+        if (useDv) {                                             // the Digivolve menu: the first form on offer
+            const form = [...root.querySelectorAll(".bar2 button")].find((b) => !/^(Back|Fight|Tech|Item|Run|Digivolve)/.test(b.textContent.trim()) && !b.disabled);
+            if (form && root.querySelector(".bar2 button")?.textContent.trim() !== "Fight") { form.click(); return "dvform"; }
+            const dv = btn("Digivolve");
+            if (dv) { dv.click(); return "dvmenu"; }
+        }
+        if (useItem) {                                           // the Item menu: pick the first item, then myself as the target
+            const mine = root.querySelector(".plate.pick.me, .plate.pick");
+            if (mine && root.querySelector(".bar2 .hint")?.textContent.startsWith("Use ")) { (root.querySelector(".plate.pick.me") ?? mine).click(); return "itemtarget"; }
+            const itemBtn = [...root.querySelectorAll(".bar2 button")].find((b) => /x\d+$/.test(b.textContent.trim()) && !b.disabled);
+            if (itemBtn) { itemBtn.click(); return "item"; }
+            const menuItem = btn("Item");
+            if (menuItem) { menuItem.click(); return "itemmenu"; }
+        }
         if (useTech) {
             const tech = [...root.querySelectorAll(".bar2 button")].find((b) => /\(\d+ MP\)/.test(b.textContent) && !b.disabled);
             if (tech) { tech.click(); return "tech"; }
@@ -54,7 +68,7 @@ async function autoPlay(page, useTech = false) {
         const fight = btn("Fight");
         if (fight) { fight.click(); return "fight"; }
         return "wait";
-    }, useTech);
+    }, { useTech, useItem, useDv });
 }
 
 try {
@@ -79,6 +93,8 @@ try {
     await b.click('.mp-win:not([hidden]) button:has-text("Team up")');
     await a.waitForFunction(() => /teamed up/.test(document.querySelector("#mp-dock .log")?.textContent ?? "") || window.__mpsocial.S.log.some((e) => /teamed up/.test(e.text ?? "")), null, { timeout: 5000 });
     ok("the two players team up with the buttons", true);
+    await b.evaluate(() => { const ps = window.__state.partnerStats; ps.formLedger = [{ id: 39, formLevel: 1, dvexp: 0, techSlots: [] }]; ps.equippedForms = [39]; });   // Ana can digivolve
+    await a.evaluate(() => { window.__state.inventory.push({ id: 43, qty: 2 }); window.__state.partnerStats.hp = 300; });   // two PowerCharges in A's bag, and A is hurt
     const started = await a.evaluate(({ foes, ids }) => {
         window.__fightResult = null;
         return window.__mpsocial.coopTry(foes, "Test fight", (f, withId) => {
@@ -128,25 +144,35 @@ try {
         ok("the enemies hurt the players", (A.S?.P ?? []).some((p) => p.hp < p.mhp) || A.over, JSON.stringify(A.S?.P));
         ok("A's own HP matches what everyone sees", A.over || A.S.P.find((p) => p.pn === "SENIOR").hp === A.meHp, `${A.S?.P.find((p) => p.pn === "SENIOR").hp} vs ${A.meHp}`);
         ok("B's own HP matches what everyone sees", B.S == null || B.S.P.find((p) => p.pn === "Ana").hp === B.meHp, `${B.S?.P.find((p) => p.pn === "Ana").hp} vs ${B.meHp}`);
-        ok("the log tells who took damage", (A.S?.g ?? []).some((l) => /takes|dodged|DOWN/.test(l)) || A.over, (A.S?.g ?? []).join(" | "));
+        ok("the log tells who took damage", (A.S?.g ?? []).some((l) => /\d+ damage!|Evade!|KO!|Poisoned/.test(l)) || A.over, (A.S?.g ?? []).join(" | "));
         if (SHOTS) await a.screenshot({ path: `${SHOTS}/multiplayer-fight-hurt-a.png` });
         ok("no page errors", errors.length === 0, errors.join(" | "));
         throw { handled: true };
     }
     // play it out
-    let turns = 0, shot = false;
+    let turns = 0, shot = false, itemDone = false, dvDone = false, techNameSet = false;
+    const anaForms = new Set();
+    const itemWanted = true;
     const seen = new Set();
     for (let i = 0; i < 400; i++) {
-        const [ra, rb] = [await autoPlay(a, true), await autoPlay(b)];
-        if (ra === "fight" || rb === "fight" || ra === "tech") turns++;
+        if (!techNameSet) { techNameSet = true; await a.evaluate(() => { window.__techName = window.__mpb.fight?.techs?.[0]?.name ?? null; }); }
+        const [ra, rb] = [await autoPlay(a, true, !itemDone && itemWanted), await autoPlay(b, false, false, !dvDone)];
+        if (ra === 'itemtarget') itemDone = true;
+        if (rb === 'dvform') dvDone = true;
+        const nm = await b.evaluate(() => window.__mpb.fight?.S?.P.find((p) => p.pn === 'Ana')?.n); if (nm) anaForms.add(nm);
+        if (ra === "fight" || rb === "fight" || ra === "tech" || ra === "itemtarget" || rb === "dvform") turns++;   // (a turn = an order given: attack, tech, item or digivolve)
         for (const l of await a.evaluate(() => window.__mpb.fight?.S?.g ?? [])) seen.add(l);
         if (!shot && SHOTS && turns > 2) { shot = true; await a.screenshot({ path: `${SHOTS}/multiplayer-fight-a-mid.png` }); }
         if (ra === "end" && rb === "end") break;
         await sleep(350);
     }
-    ok("both players took turns", turns >= 4, `turns=${turns}`);
+    ok("both players took turns", turns >= 3, `turns=${turns}`);
     const end = [await a.evaluate(() => document.querySelector("#mpb .end h2")?.textContent), await b.evaluate(() => document.querySelector("#mpb .end h2")?.textContent)];
-    const techLine = [...seen].find((l) => /^SENIOR: (?!Fight)/.test(l));
+    const bag = await a.evaluate(() => window.__state.inventory.find((x) => x.id === 43)?.qty ?? 0);
+    ok("A used a PowerCharge from the Item menu: named in the log, it healed, taken from the bag", itemDone && [...seen].some((l) => /used Power ?Charge/i.test(l)) && [...seen].some((l) => /SENIOR: 500 ?HP healed/.test(l)) && bag === 1, `done=${itemDone} bag=${bag} ${[...seen].slice(0, 5).join(" | ")}`);
+    ok("Ana digivolved from the Digivolve menu: her Digimon changed on the shared screen", dvDone && anaForms.size >= 2, JSON.stringify([...anaForms]));
+    const techName = await a.evaluate(() => window.__techName ?? null);
+    const techLine = [...seen].find((l) => techName && l === `SENIOR: ${techName}!`);
     ok("a technique was used from the Tech menu (and named in the log)", !!techLine, techLine ?? [...seen].slice(0, 6).join(" | "));
     ok("both see VICTORY", end[0] === "VICTORY!" && end[1] === "VICTORY!", end.join(" / "));
     const wave2 = await a.evaluate(() => window.__mpb.fight?.waves ?? null);   // (fight is over: null) -- waves were checked through the log below

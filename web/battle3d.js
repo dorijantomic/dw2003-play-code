@@ -1664,7 +1664,10 @@ export function createBattle3D(canvas, sfx = null) {
       // A model can finish loading before this table does; re-seat whatever is already up.
       if (playerAnim8r) playerAnim8r.homeSlot = arenaSlotFor(playerFolder, "player", placementTable);
       if (enemyAnim8r)  enemyAnim8r.homeSlot  = arenaSlotFor(enemyFolder,  "enemy",  placementTable);
-      for (const f of extras.values()) if (f.anim8r) f.anim8r.homeSlot = arenaSlotFor(f.folder, f.side, placementTable);   // (multiplayer fighters that loaded first)
+      for (const f of extras.values()) {   // (multiplayer fighters that loaded first)
+        if (f.anim8r) f.anim8r.homeSlot = arenaSlotFor(f.folder, f.side, placementTable);
+        if (f.model && !f.patches) _setupExtraPatches(f);
+      }
       if (playerFolder && !playerPatches) setupTexturePatches("player", playerFolder);
       if (enemyFolder && !enemyPatches) setupTexturePatches("enemy", enemyFolder);
       if (introCamPending) applyArenaShot();
@@ -2699,8 +2702,15 @@ export function createBattle3D(canvas, sfx = null) {
       f.anim8r = new ActorAnimator(m);
       f.anim8r.resetSlotPlacement(arenaSlotFor(folder, side, placementTable));
       preloadModelProjectiles(m.actions);
+      _setupExtraPatches(f);
       return true;
     });
+  }
+  // the eyes and looping body textures of an extra fighter, the same animator the two main ones use
+  function _setupExtraPatches(f) {
+    const entries = placementTable[modelKeyFromFolder(f.folder)]?.texture_anim;
+    f.patches = entries && entries.length ? new TexturePatchAnimator(entries) : null;
+    if (f.patches) loadTexturePixels(`assets/battle/textures/${f.folder}.png`).then((page) => { if (extras.get(f.id) === f) f.page = page; });
   }
   function removeFighter(id) {
     const f = extras.get(id);
@@ -2724,6 +2734,19 @@ export function createBattle3D(canvas, sfx = null) {
     if (!f?.anim8r || !table || !table.length) return false;
     f.anim8r.playTimelineTable(table);
     return true;
+  }
+  /** A fighter plays one technique's own motion with nobody on the receiving end (a heal, a buff). */
+  function fighterTech(id, techId) {
+    const f = extras.get(id);
+    if (!f?.anim8r) return false;
+    if (sfx) { sfx.stopBattle("player"); sfx.stopBattle("enemy"); }
+    contactSoundType[f.side] = contactSoundTypeFor(techId);
+    return f.anim8r.setAnimByTech(techId, _fxHooks(f.side, { onMotion: dataFieldMotion }));
+  }
+  /** A fighter plays a raw action clip (10 = the item-use motion). */
+  function fighterAction(id, clip) {
+    const f = extras.get(id);
+    return f?.anim8r ? f.anim8r.setAction(clip, _fxHooks(f.side)) : false;
   }
   /** A bystander's reaction (a spread attack hits several): the same op1 reaction clips the coordinator picks. */
   function fighterReact(id, { lethal = false, miss = false } = {}) {
@@ -2922,6 +2945,10 @@ export function createBattle3D(canvas, sfx = null) {
         blitTexturePatch(playerTex, playerPage, patch);
       for (const patch of enemyPatches?.update(speed, patchState("enemy")) || [])
         blitTexturePatch(enemyTex, enemyPage, patch);
+      for (const f of extras.values()) {   // (multiplayer) the extra fighters' eyes
+        if (!f.patches || !f.page) continue;
+        for (const patch of f.patches.update(speed, f.anim8r ? f.anim8r.animationId : 1)) blitTexturePatch(f.tex, f.page, patch);
+      }
       effectPlayer?.step(speed);
       if (dnaOrbs) {
         for (const o of Object.values(dnaOrbs.orbs)) o.tick += speed;
@@ -3753,7 +3780,7 @@ export function createBattle3D(canvas, sfx = null) {
     setEnemyDigimon,
     // (multiplayer many-vs-many, web/mpbattle.js)
     addFighter, removeFighter, clearFighters, setFighterLane, setFighterVisible, setFighterHurt, setMultiCamera,
-    fighterAttack, fighterReact, fighterVictory, fightersReady, fightersBusy, getFighterScreen,
+    fighterAttack, fighterReact, fighterVictory, fighterTech, fighterAction, fightersReady, fightersBusy, getFighterScreen,
     setPlayerAnim,
     setEnemyAnim,
     playPlayerVictory,
