@@ -173,7 +173,7 @@ export function createEffectStepHost(gap: EffectGap, svc: DuelEffectHostServices
         waitViewWindowOpen: (duel, scene) => svc.waitViewWindowOpen(duel, scene),
         presentResolvingCard: (duel, scene) => svc.presentResolvingCard(duel, scene),
         cardPredicate: () => gap(0x80083e34, "effect step card predicate"),
-        applyResolvingStatChange: () => gap(0x800954f8, "effect step resolving-card stat change"),
+        checkResolvingLegality: () => gap(0x800954f8, "effect step resolution legality gate (checkEffectLegality)"),
         viewOpenPrompt: (view, a1, a2, a3, a4) => svc.openPromptView(view, a1, a2, a3, a4),
         viewRedrawField: (view) => svc.closePromptView(view),
         repaintHudStrips: (duel, scene) => svc.repaintHudStrips(duel, scene),

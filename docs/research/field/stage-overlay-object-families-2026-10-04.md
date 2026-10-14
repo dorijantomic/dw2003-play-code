@@ -301,10 +301,10 @@ own `+0x04` (`sll $v0, 0x4`, `lh` at `+0x4`, `+0x6`, `+0x8`, `+0xa`, `+0xc`,
 also shifted left 8 (the packed `y<<8|x` position every one of these objects
 uses), and the row's `+0xA` word into `+0x64`. Each frame it multiplies the rock's
 speed at `+0x68` by the row's `+0xC` word and adds the frame count read through
-`0x8005DE10+0x18C` (`mult $v1, $v0` / `mflo $t0`), storing the sum into `+0x5C` —
+`0x8004DE10+0x18C` (`mult $v1, $v0` / `mflo $t0`), storing the sum into `+0x5C` —
 the speed-times-frames pixel drop. When `+0x58` reaches `0x245` (581) the rock is
 done (`:0x800a6414` `slti $v0, 0x245`), and it calls the object's own `+0x38`
-after that. It also calls `0x8005DE10+0x17C` with `$a0 = 0x1002` on entry
+after that. It also calls `0x8004DE10+0x17C` with `$a0 = 0x1002` on entry
 (`:0x800a5efc`) — one allocator for a stage-owned cell — and, while `+0x50` is
 non-zero, a method at `+0x14C` on the object it is handed
 (`:0x800a6404 jalr $v0`) with a fixed overlay handler `0x800a5ee8` in `$a1`,

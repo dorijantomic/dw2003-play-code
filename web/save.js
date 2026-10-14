@@ -294,9 +294,15 @@ export function createSaveScreen(sfx = null) {
   // engine/dw3/ui/fold-tween.ts rather than a copy local to this screen —
   // same integer arithmetic, and its clamp lands exactly on the target instead
   // of stepping one past it first.
+  // The fold start itself is F0x80087edc (windowFoldStart_stgmcard), whose two
+  // arms play the family's cues: opening 0x00040019 at file 0x5250, closing
+  // 0x0004001a at file 0x5280 (stgmcard.s; RAM = file + 0x80082cb0). A window
+  // in this game is never silent (engine/dw3/ui/fold-tween.ts FOLD_OPEN_SFX /
+  // FOLD_CLOSE_SFX; tests/window-fold-sfx.test.js pins the family).
   function startFold() {
     const f = LAYOUT?.file_card?.fold ?? { from: 0x97, to: 0, steps: 10 };
     ui.startFold(s.foldTween, f.from, f.to, f.steps);
+    sfx?.play("system03");
   }
 
   // Closing runs the same tween the other way. DECODED 2026-08-14
@@ -308,6 +314,7 @@ export function createSaveScreen(sfx = null) {
   function startFoldOut() {
     const f = LAYOUT?.file_card?.fold ?? { from: 0x97, to: 0, steps: 10 };
     ui.startFold(s.foldTween, f.to, f.from, f.steps);
+    sfx?.play("system04");
     s.showRecordText = false;   // screen+0x60
     s.closing = true;           // screen+0x5C stays set until the fold lands
   }
@@ -358,9 +365,31 @@ export function createSaveScreen(sfx = null) {
       }
     }
     s.screen = "message";
-    sfx?.play("system01");
+    // The prompt's own Circle cue: F0x80084dcc state 0x28 (`ori $a0,0x503c` at
+    // file 0x3500) and state 0x65 (file 0x4024) play 0x8004503C (SYSTEM00) on
+    // the confirm, whichever row the cursor is on. The write that follows is
+    // silent in the overlay (states 0x32-0x35 carry no play site).
+    sfx?.play("system00");
   }
 
+  // Packed-sound map for this screen, re-derived from pro/stgmcard.s on
+  // 2026-10-14 (audit/sfx-save-pause-vs-decode; RAM = file + 0x80082cb0).
+  // All 17 play sites (`lw $v0,0x5c48($v0)` … `ori $a0,<id>`), by id:
+  //   0x0004001b SYSTEM06 — the block view's changed left/right step,
+  //     file 0x1a94 (F0x800843d8, gated `beq $v0,$v1` on the slot index)
+  //   0x8004513e SYSTEM02 — a two-row prompt's up/down move, files 0x275c
+  //     (slot picker), 0x3460 (overwrite prompt), 0x3fa8 (result prompt)
+  //   0x8004503c SYSTEM00 — a prompt's Circle, files 0x28bc, 0x3500, 0x4024
+  //   0x800450bd SYSTEM01 — a Cross back/cancel, files 0x2910, 0x3004,
+  //     0x35c4, 0x41dc
+  //   0x0004001c SYSTEM07 — the card/file list's Circle, files 0x2e70
+  //     (state 0x21) and the result-window dismisses 0x3ab0 / 0x3bb4 /
+  //     0x4324 (states 0x1F5/0x1F6/0x65)
+  //   0x00040019 / 0x0004001a SYSTEM03/SYSTEM04 — the window fold open/shut,
+  //     files 0x5250 / 0x5280 (F0x80087edc)
+  // The walker's first wiring used the pre-2026-07-03i shifted names, so its
+  // confirms played "system01" (0x800450bd) and its backs "system02"
+  // (0x8004513e). Names are the disc's own (soundtst-common-ids.json).
   s.handleKey = (rawKey) => {
     // Accept either a pad button name from the dispatcher or the raw key it
     // stands for, so a caller (and a test) may use whichever it has.
@@ -369,10 +398,15 @@ export function createSaveScreen(sfx = null) {
     if (s.fadeLeaving) return true;
     const back = k === "cross";
     if (s.screen === "slots") {
-      if (k === "left") { s.slot = Math.max(0, s.slot - 1); sfx?.play("system06"); return true; }
-      if (k === "right") { s.slot = Math.min(SLOT_COUNT - 1, s.slot + 1); sfx?.play("system06"); return true; }
-      if (k === "circle") { sfx?.play("system01"); enterFile(); return true; }
-      if (back) { sfx?.play("system02"); requestLeave(); return true; }
+      // A press that cannot move the slot is silent — the block view compares
+      // the index before and after and only then plays (site file 0x1a94).
+      if (k === "left" || k === "right") {
+        const next = k === "left" ? Math.max(0, s.slot - 1) : Math.min(SLOT_COUNT - 1, s.slot + 1);
+        if (next !== s.slot) { s.slot = next; sfx?.play("system06"); }
+        return true;
+      }
+      if (k === "circle") { sfx?.play("system07"); enterFile(); return true; }
+      if (back) { sfx?.play("system01"); requestLeave(); return true; }
       return true;
     }
     if (s.screen === "file") {
@@ -382,29 +416,34 @@ export function createSaveScreen(sfx = null) {
           s.message = (LAYOUT?.strings?.all ?? [])[24] ?? "No data here.";
           s.messageIndex = 24;
           s.screen = "message";
-          sfx?.play("system01");
+          // The card list's Circle (site file 0x2e70, state 0x21): SYSTEM07.
+          sfx?.play("system07");
           return true;
         }
         s.yesNo = 0;
         s.screen = "confirm";
-        sfx?.play("system01");
+        sfx?.play("system07");
         return true;
       }
-      if (back) { sfx?.play("system02"); startFoldOut(); return true; }
+      if (back) { sfx?.play("system01"); startFoldOut(); return true; }
       return true;
     }
     if (s.screen === "confirm") {
-      if (k === "up" || k === "down") { s.yesNo ^= 1; sfx?.play("system06"); return true; }
+      if (k === "up" || k === "down") { s.yesNo ^= 1; sfx?.play("system02"); return true; }
       if (k === "circle") {
         if (s.yesNo === 0) commit();
-        else { s.screen = "file"; sfx?.play("system02"); }
+        else { s.screen = "file"; sfx?.play("system00"); }
         return true;
       }
-      if (back) { sfx?.play("system02"); s.screen = "file"; return true; }
+      if (back) { sfx?.play("system01"); s.screen = "file"; return true; }
       return true;
     }
     // message
     if (k === "circle" || back) {
+      // The result window's own dismiss cue: states 0x1F5/0x1F6 play
+      // 0x0004001C on Circle (sites file 0x3ab0 / 0x3bb4). The walker accepts
+      // back here too (extra input) and plays the same tick.
+      sfx?.play("system07");
       if (s.reloadOnClose) {
         // A load swaps the whole persisted state under the running game, so the
         // page is reloaded to rebuild every module from it.

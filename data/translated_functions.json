@@ -8816,5 +8816,26 @@
     "name": "cardUsableKind",
     "port": "engine/dw3/ui/duel-effect-pickers.ts#cardUsableKind",
     "oracle": "tests/duel-effect-pickers-oracle.test.js"
+  },
+  {
+    "address": "0x80084a5c",
+    "module": "pro/stagslct",
+    "name": "stage_select_move_cursor",
+    "port": "engine/dw3/ui/native/stage-select.ts#stageSelectMoveCursor",
+    "oracle": "tests/lane-b/stage-select-move-cursor.test.js"
+  },
+  {
+    "address": "0x80082d88",
+    "module": "pro/stcrdabm",
+    "name": "album_popup_fade_start",
+    "port": "engine/dw3/ui/native/album-leaves.ts#albumPopupFadeStart",
+    "oracle": "tests/lane-b/album-popup-fade.test.js"
+  },
+  {
+    "address": "0x80082f54",
+    "module": "pro/stcrdabm",
+    "name": "album_popup_fade_tick",
+    "port": "engine/dw3/ui/native/album-leaves.ts#albumPopupFadeTick",
+    "oracle": "tests/lane-b/album-popup-fade.test.js"
   }
 ]

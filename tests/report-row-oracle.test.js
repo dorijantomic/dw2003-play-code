@@ -354,6 +354,15 @@ test("reportRowTick matches F0x80083E74", () => {
     step("state 25 done selector 3", { state: 25, msgDone: 1, selector: 3 });
     step("state 25 done selector 5", { state: 25, msgDone: 1, selector: 5 });
     step("state 25 done selector 0", { state: 25, msgDone: 1, selector: 0 });
+    // The learn/load LOOP: the selector table at 0x80082d80 points selectors 0
+    // AND 1 at 0x800843f4 (state 0x16, the F0x8008670C learn) and selector 2 at
+    // 0x80084400 (state 0x17, the F0x80086844 loadable), so the message-done
+    // dispatch re-enters the services' states until they answer 0. These cases
+    // run the ORIGINAL overlay, so they pin the loop against the disc itself.
+    step("state 25 done selector 1 loops to learn", { state: 25, msgDone: 1, selector: 1 });
+    step("state 25 done selector 2 loops to loadable", { state: 25, msgDone: 1, selector: 2 });
+    step("state 25 done selector 4", { state: 25, msgDone: 1, selector: 4 });
+    step("state 25 done selector 6", { state: 25, msgDone: 1, selector: 6 });
     step("state 45 waiting circle", { state: 45, msgWait: 1, pressed: 1 << 0xd });
     step("state 45 waiting idle", { state: 45, msgWait: 1, pressed: 0 });
     step("state 25 typewriter", { state: 25, msgDone: 0, msgWait: 0, pressed: 1 << 0xd });

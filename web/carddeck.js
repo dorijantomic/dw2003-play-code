@@ -123,8 +123,15 @@ export function createCardDeck(sfx = null) {
   // menu's lists use, and for the same reason: the original only sounds a
   // cursor move when the cursor index actually changed (F0x8001270c.c:168,
   // F0x80092524.c:63,126). These lists clamp, so their ends were sounding.
-  function movedSound(before, after) {
-    if (before !== after) sfx?.play("system06");
+  /** The move blip a list's cursor plays. The three-folder list and the
+   *  editor/rename cursors use the stepper tick 0x0004001B (SYSTEM06), while
+   *  the two-row submenu and the swap list use the list blip 0x8004513E
+   *  (SYSTEM02) — folder-picker-tick case 4 vs case 0xD and folder-card-grid
+   *  case 0x18 (stcrddek F0x80089354 / F0x80085210). Corrected 2026-10-14
+   *  (audit/sfx-triggers-vs-decode): the swap list and submenu used to play
+   *  the shifted names' blip. */
+  function movedSound(before, after, cue = "system06") {
+    if (before !== after) sfx?.play(cue);
     return after;
   }
 
@@ -161,7 +168,10 @@ export function createCardDeck(sfx = null) {
     if (c.fadeLeaving) return;
     c.fadeLeaving = true;
     c.fadeT0 = performance.now();
-    sfx?.play("system04"); // the window-close half of the same fold family
+    // The leave is the dim fade (F0x80089354 case 0x64), which is silent; the
+    // cancel blip that starts it is played by the caller. Corrected 2026-10-14
+    // (audit/sfx-triggers-vs-decode): a window-close cue (system04) used to play
+    // here although the dim starts no fold.
   }
 
   function paintLeaveFade(ctx) {
@@ -201,7 +211,10 @@ export function createCardDeck(sfx = null) {
     const back = k === "cross";
 
     if (c.message) {
-      if (confirm || back) { sfx?.play("system02"); c.message = null; delete c._foldSounded.message; sfx?.play("system04"); }
+      // The warning plate's dismissal plays the apply tick 0x0004001C
+      // (SYSTEM07; folder-card-grid case 0x3E, `pressed(host, 0xd)` ->
+      // playSound(0x4001C)), then the plate folds shut (0x0004001A, SYSTEM04).
+      if (confirm || back) { sfx?.play("system07"); c.message = null; delete c._foldSounded.message; sfx?.play("system04"); }
       return true;
     }
 
@@ -211,20 +224,24 @@ export function createCardDeck(sfx = null) {
       if (k === "down") { c.folderCursor = movedSound(c.folderCursor, Math.min(n - 1, c.folderCursor + 1)); return true; }
       if (confirm) {
         if (!folders().length) return true;
-        sfx?.play("system01");
+        // Confirm on the folder list plays 0x0004001C (SYSTEM07) —
+        // folder-picker-tick case 4 (`pressed 0xD` -> playSound(0x4001C)).
+        sfx?.play("system07");
         c.optionCursor = 0;
         c.screen = "options";
         return true;
       }
-      if (back) { sfx?.play("system02"); requestLeave(); return true; }
+      if (back) { sfx?.play("system01"); requestLeave(); return true; }
       return true;
     }
 
     if (c.screen === "options") {
-      if (k === "up") { c.optionCursor = movedSound(c.optionCursor, 0); return true; }
-      if (k === "down") { c.optionCursor = movedSound(c.optionCursor, 1); return true; }
+      if (k === "up") { c.optionCursor = movedSound(c.optionCursor, 0, "system02"); return true; }
+      if (k === "down") { c.optionCursor = movedSound(c.optionCursor, 1, "system02"); return true; }
       if (confirm) {
-        sfx?.play("system01");
+        // The two-row submenu: confirm 0x8004503C (SYSTEM00), cancel
+        // 0x800450BD (SYSTEM01) — folder-picker-tick case 0xD.
+        sfx?.play("system00");
         if (c.optionCursor === 0) {
           c.slot = 0; c.explain = false; c.explainTick = c.tick; c.dealt = 0;
           c.dealTick = c.tick; c.screen = "editor"; beginFold("editor");
@@ -234,7 +251,7 @@ export function createCardDeck(sfx = null) {
         }
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "folders"; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "folders"; return true; }
       return true;
     }
 
@@ -246,15 +263,20 @@ export function createCardDeck(sfx = null) {
       if (k === "right") { gridMove(1, 0); return true; }
       if (k === "r1") { sfx?.play("system06"); c.explain = !c.explain; c.explainTick = c.tick; return true; }
       // Circle sorts the folder (card-folder-editor-2026-08-14.md:108): logical
-      // 0x0C, which is word bit 0x1000.
-      if (k === "triangle") { sfx?.play("system07"); sortFolder(cards(), c.folderCursor); return true; }
+      // 0x0C, which is word bit 0x1000. The sort transition plays the cancel
+      // blip 0x800450BD (SYSTEM01) — folder-card-grid, `pressed(host, 0xc)` ->
+      // playSound(0x800450BD), state 0x1E.
+      if (k === "triangle") { sfx?.play("system01"); sortFolder(cards(), c.folderCursor); return true; }
       if (confirm) {
-        if (!placeable().length) { sfx?.play("system02"); return true; }
-        sfx?.play("system01");
+        // Confirm opens the swap list only when a card is placeable; the gate's
+        // empty arm is SILENT (folder-card-grid: `if (listCount !== 0)` with no
+        // else). A live confirm plays 0x0004001C (SYSTEM07).
+        if (!placeable().length) return true;
+        sfx?.play("system07");
         c.listCursor = 0; c.listScroll = 0; c.screen = "swap";
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "folders"; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "folders"; return true; }
       return true;
     }
 
@@ -265,20 +287,20 @@ export function createCardDeck(sfx = null) {
       const pageStep = LAYOUT?.editor?.swapList?.pageStep ?? PAGE_STEP;
       const index = () => Math.min(last, c.listScroll + c.listCursor);
       if (k === "up") {
-        sfx?.play("system06");
+        sfx?.play("system02");
         if (c.listCursor > 0) c.listCursor -= 1;
         else c.listScroll = Math.max(0, c.listScroll - 1);
         return true;
       }
       if (k === "down") {
-        sfx?.play("system06");
+        sfx?.play("system02");
         if (c.listCursor < Math.min(rows, list.length) - 1) c.listCursor += 1;
         else c.listScroll = Math.min(Math.max(0, list.length - rows), c.listScroll + 1);
         return true;
       }
-      if (k === "l1") { c.listScroll = movedSound(c.listScroll, Math.max(0, c.listScroll - pageStep)); return true; }
+      if (k === "l1") { c.listScroll = movedSound(c.listScroll, Math.max(0, c.listScroll - pageStep), "system02"); return true; }
       if (k === "r1") {
-        sfx?.play("system06");
+        sfx?.play("system02");
         c.listScroll = Math.min(Math.max(0, list.length - rows), c.listScroll + pageStep);
         return true;
       }
@@ -287,14 +309,17 @@ export function createCardDeck(sfx = null) {
         if (!pick) return true;
         const outcome = swapIntoFolder(cards(), c.slot, pick.card.id, c.folderCursor);
         if (outcome === "limit") {
-          sfx?.play("system02");
+          // The refusal arm (state 0x3C) starts the warning fold with no cue of
+          // its own — the apply tick belongs to the plate's dismissal.
           beginFold("message");
           c.message = LAYOUT?.strings?.tooManyCopies
             ?? `Only ${MAX_COPIES_PER_FOLDER} of the same card\nin one folder.`;
           return true;
         }
         if (outcome === "ok" || outcome === "unchanged") {
-          sfx?.play("system07");
+          // The swap's confirm plays 0x8004503C (SYSTEM00) — folder-card-grid
+          // case 0x18 (`pressed(host, 0xd)` -> playSound(0x8004503C)).
+          sfx?.play("system00");
           c.screen = "editor";
           // The displaced card is available again at once, so the list the
           // player comes back to is a different list.
@@ -302,7 +327,7 @@ export function createCardDeck(sfx = null) {
         } else sfx?.play("system02");
         return true;
       }
-      if (back) { sfx?.play("system02"); c.screen = "editor"; return true; }
+      if (back) { sfx?.play("system01"); c.screen = "editor"; return true; }
       return true;
     }
 
@@ -319,9 +344,11 @@ export function createCardDeck(sfx = null) {
           if (renameFolder(cards(), c.folderCursor, ne.value())) {
             c.nameEntry = null;
             c.screen = "folders";
-            sfx?.play("system01");
+            // The keyboard's commit plays 0x0004001C (SYSTEM07) — the shared
+            // NAMEDT keyboard's SFX_OK (name-keyboard.ts:363,575).
+            sfx?.play("system07");
           } else {
-            sfx?.play("system02");
+            sfx?.play("system01");
             beginFold("message");
             c.message = LAYOUT?.strings?.nameNotAllowed ?? "That name is not allowed.";
             c.nameEntry = createNameEntry({ initial: ne.value(), maxLen: FOLDER_NAME_LEN });
@@ -329,7 +356,7 @@ export function createCardDeck(sfx = null) {
         }
         return true;
       }
-      if (back) { sfx?.play("system02"); c.nameEntry = null; c.screen = "options"; return true; }
+      if (back) { sfx?.play("system01"); c.nameEntry = null; c.screen = "options"; return true; }
       return true;
     }
     return true;

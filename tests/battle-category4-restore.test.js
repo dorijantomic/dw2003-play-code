@@ -37,6 +37,8 @@ import {
   DAMAGE_TERM_NO_EFFECT_WORD, DAMAGE_TERM_ROLLED_CATEGORIES, category4RestorePlan,
   damageTermCategory4Arm, damageTermCategoryRolls, damageTermHealAmount,
   damageTermPage, damageTermTechniqueIds,
+  STATUS_EVENT_ALL_CURE_CODES, emptyStatusEventPool, enqueueStatusEvent, findStatusEvent,
+  stageStatusEventLock,
 } from "../web/vendor/engine.js";
 import {
   applyBattleRestorePlan, battleRestoreParty, battleRestorePlanFor, restoreWalkerSentence,
@@ -603,6 +605,46 @@ test("applying the plan writes HP and cures ailments on the walker's own records
   assert.equal(enemy.side, 1);
   assert.ok(b.enemy.hp > 20, "the enemy's HP rose");
   assert.ok(b.enemy.hp <= 90);
+});
+
+test("an ALL-status cure releases the pool's lock entries; a single cure does not", () => {
+  // The disc's cure is a record-bit clear AND a pool-entry free, both inside
+  // FIGHTSTG_F0x8009c330 (`sb $v1, 0x1c($a2)` :26425 / `sh $zr, ($v0)` :26443), and its
+  // `which` 3 arm cancels SIX codes — the two tech-abort locks among them. Technique 196
+  // is the cure window's slot 3 (mask 0x3f), 375 zeroes the whole byte, and 191 is the
+  // single poison cure (mask 0x01), which must leave a lock alone.
+  const mkBattle = () => {
+    const pool = emptyStatusEventPool();
+    const b = {
+      activePlayerIndex: 1,
+      statusEvents: pool,
+      playerRecords: [
+        { hp: 40, maxHp: 100, ailments: { poison: { power: 30 } }, statusEvents: pool, sideByte: 0, slot: 0 },
+        { hp: 30, maxHp: 50, ailments: {}, statusEvents: pool, sideByte: 0, slot: 0 },
+        { hp: 0, maxHp: 80, ailments: {}, statusEvents: pool, sideByte: 0, slot: 0 },
+      ],
+      enemy: { hp: 20, maxHp: 90, ailments: {} },
+    };
+    // The player's own lock lives on the ACTIVE slot — `stageStatusEventLock` is handed
+    // `activeSlotOf(b, 0)`, which is 1 here — beside a poison recovery at slot 0.
+    stageStatusEventLock(pool, 0, 1, 24, () => 0);
+    enqueueStatusEvent(pool, { code: 0x09, time: 1000, side: 0, slot: 0, payload: 30, payload2: 0 });
+    return { b, pool };
+  };
+  const all = mkBattle();
+  const plan = battleRestorePlanFor(all.b, 0, TECH_TABLE["196"], 196, { name: "Kotemon" });
+  assert.equal(plan.arm.name, "cureWindow");
+  assert.equal(findStatusEvent(all.pool, 0x10, 0, 1), -1, "Anti-Magic lifts the flee lock");
+  assert.equal(findStatusEvent(all.pool, 0x09, 0, 0), -1, "and frees the poison recovery");
+  const best = mkBattle();
+  battleRestorePlanFor(best.b, 0, TECH_TABLE["375"], 375, { name: "Kotemon" });
+  assert.equal(findStatusEvent(best.pool, 0x10, 0, 1), -1, "Best Condition lifts it too");
+  const single = mkBattle();
+  battleRestorePlanFor(single.b, 0, TECH_TABLE["191"], 191, { name: "Kotemon" });
+  assert.equal(findStatusEvent(single.pool, 0x09, 0, 0), -1, "the single cure frees its entry");
+  assert.ok(findStatusEvent(single.pool, 0x10, 0, 1) >= 0, "and leaves the lock alone");
+  // The two constants that name the same six codes cannot drift apart.
+  assert.deepEqual([...STATUS_EVENT_ALL_CURE_CODES], [...DAMAGE_TERM_CLEARED_EVENT_CODES]);
 });
 
 test("battleRestorePlanFor declines anything that is not a category-4 record", () => {

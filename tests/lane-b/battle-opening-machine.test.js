@@ -22,9 +22,10 @@ import { NativeStageRuntime } from "../../engine/native/runtime.ts";
 import {
     OPENING_PHASES, OPENING_MACHINE_BASE, OPENING_CONTROLLER_ADDRESS, OPENING_PHASE_TABLE_FILE,
     OPENING_EXIT_METHOD, OPENING_ADVANCE_PHASE_METHOD, OPENING_PHASE_COUNT,
-    openingPhaseIndex, openingPhaseFor, introVariantFor, openingLineRoll,
+    openingPhaseIndex, openingPhaseFor, introVariantFor, openingLineRoll, ambushRoll,
     newOpeningState, stepOpeningPhase, openingExit, openingAdvancePhase,
 } from "../../engine/dw3/battle-opening-machine.ts";
+import { runAwayLine } from "../../engine/dw3/battle-formulas.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const screens = join(resolve(here, "../.."), "web/assets/native/screens");
@@ -292,4 +293,72 @@ test("the exit advances the top state to 1 — the branch that drives F0x800a9cb
     assert.equal(a.phase, 1);
     assert.equal(a.linePending, 0);
     assert.equal(OPENING_PHASE_TABLE_FILE, 0x1c);
+});
+
+// ── 6. The ambush roll F0x800a684c: the disc's own routine vs the port ───────
+
+test("the ambush roll runs the disc's own F0x800a684c and the port agrees, call for call", () => {
+    const rt = runtime();
+    const m = rt.mem;
+    const SETUP = 0x80042b1c;   // BATTLE_SETUP: +0x3C the chance byte, +0x1C the enemy level
+    const GAME = 0x80048d34;    // the first party record; its level s16 at +0x784
+    // getPartyMember(0) -> index 0; the shared RANDOM.next -> a pinned value
+    m.write32(0x8004b44c, STUB + 0x60); rt.cpu.setStub(STUB + 0x60, () => 0);
+    let rngValue = 0;
+    m.write32(0x8004dc0c, STUB + 0x70); rt.cpu.setStub(STUB + 0x70, () => rngValue);
+    const disc = (chanceByte, enemyLevel, partnerLevel, roll) => {
+        m.write8(SETUP + 0x3c, chanceByte & 0xff);
+        m.write16(SETUP + 0x1c, enemyLevel & 0xffff);
+        m.write16(GAME + 0x784, partnerLevel & 0xffff);
+        rngValue = roll >>> 0;
+        return rt.cpu.call(0x800a684c, [], 200000) | 0;
+    };
+    const port = (chanceByte, enemyLevel, partnerLevel, roll) =>
+        ambushRoll({ chanceByte, partnerLevel, enemyLevel, roll }) ? 1 : 0;
+    // (chance byte, enemy level, partner level, roll). Every row is compared
+    // against the routine executed out of pro_wfightmn.bin.
+    const CASES = [
+        [0, 10, 20, 0],        // chance byte 0: never an ambush, even on frac 0
+        [0, 10, 20, 128],
+        [8, 5, 20, 0],         // bound = 8 * ((32-20) - 5) = 56; >>5 = 1
+        [8, 5, 20, 1],         // frac 1 !< 1
+        [8, 5, 20, 128],       // frac 0 always passes
+        [8, 5, 20, 129],
+        [4, 20, 20, 64],       // bound = 4 * (12 - 20) < 0: only frac 0 passes
+        [4, 20, 20, 128],
+        [127, 0, 31, 2],       // bound = 127 * 1 = 127; >>5 = 3
+        [127, 0, 31, 3],
+        [127, 0, 31, 127],
+        [32, 32, 32, 64],      // bound = 32 * (0 - 32) < 0
+        [32, 32, 32, 128],
+    ];
+    for (const [chance, enemyLevel, partner, roll] of CASES) {
+        assert.equal(disc(chance, enemyLevel, partner, roll), port(chance, enemyLevel, partner, roll),
+            `chance ${chance} enemy ${enemyLevel} partner ${partner} roll ${roll}`);
+    }
+});
+
+test("the runAway arm's page is actor-keyed: 0x43 for the player, 0x5F for an enemy", () => {
+    const rt = runtime();
+    const m = rt.mem;
+    const QUEUE = 0x800a3868, IDX = QUEUE + 0xaf1;
+    const TASK = 0x80140600;
+    // the escape test cell 0x800a4654 -> always escapes; F0x8009a298 -> a task;
+    // the task's own +0xac arm -> a stub
+    m.write32(0x800a4654, STUB + 0x80); rt.cpu.setStub(STUB + 0x80, () => 1);
+    rt.cpu.setStub(0x8009a298, () => TASK);
+    rt.cpu.setStub(STUB + 0xa0, () => 0);
+    const disc = (actor) => {
+        seed(rt, {});
+        m.write8(IDX, 0);                       // the queue's current index
+        m.write32(QUEUE + 0x00, 0);             // entry kind
+        m.write8(QUEUE + 0x04, actor);          // entry actor (the side the roll reads)
+        m.write32(TASK + 0xac, STUB + 0xa0);    // the task's own +0xac arm
+        rt.cpu.call(0x800a7fe4, [CTX, BLOCK], 200000);
+        return m.read32(CTX + 0x50) | 0;
+    };
+    assert.equal(disc(0), 0x43, "the player's own Run prints Run away!");
+    assert.equal(disc(0x10), 0x5f, "an enemy's flee prints Fleeing!");
+    assert.equal(runAwayLine(0), disc(0));
+    assert.equal(runAwayLine(0x10), disc(0x10));
 });

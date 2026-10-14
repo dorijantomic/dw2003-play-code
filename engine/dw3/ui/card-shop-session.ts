@@ -5,7 +5,7 @@
 import { NativeMemory } from '../../native/memory.ts';
 import type { PadButton } from '../../systems/input-map.ts';
 import type { CardCollection } from '../../systems/card-battle.ts';
-import { grantCard } from '../../systems/card-battle.ts';
+import { grantCard, hasSeenCard } from '../../systems/card-battle.ts';
 import { ShopPadInput } from './shop-pad-input.ts';
 import { ShopDrawIntents } from './shop-draw-intents.ts';
 import { createResidentWidgets, loadResidentResources, type ResidentTextResources } from './resident-text-host.ts';
@@ -203,12 +203,22 @@ export class CardShopChild {
         [44,3,279,199],[40,3,282,199],[48,1,18,103],[52,1,289,103],
         [56,1,154,57],[60,1,197,86],[64,1,197,102]];
       for (const [slot, type, x, y] of places) this.create(slot!, type!, x!, y!);
-      owner.mem.write32(this.context + 0x44, w.spawnUiIcon(0x1000, 3, 184, 86));
+      // F0x80086074 ends by hiding the confirm cursor it just built
+      // (0x8001b364(target, +0x58-3, 0xB8, 0x56) -> +0x44, then +0x80(0)); the
+      // constructor leaves it visible, so the hide is the original's.
+      const confirmCursor = w.spawnUiIcon(0x1000, 3, 184, 86);
+      owner.mem.write32(this.context + 0x44, confirmCursor);
+      w.cursorShow(confirmCursor, 0);
       this.reveal = new CardShopReveal(this.stock.slice(0, 6), owner.sound);
       for (const off of [0xac,0xbc,0xcc]) owner.mem.write32(this.object + off, 10);
     } else {
       for (let i = 0; i < 8; i++) this.create(i*4, 1, 55+(i%2)*131, 57+Math.floor(i/2)*14);
-      owner.mem.write32(this.context + 0x20, w.spawnUiIcon(0x1000, 5, 29, 57));
+      // F0x8008300C creates the pack-list cursor and hides it immediately
+      // (0x8001b364(layer+0x54, +0x58-1, 0x1D, 0x39) -> +0x20, then +0x80(0));
+      // state 2 shows it once the list and panel have filled.
+      const packCursor = w.spawnUiIcon(0x1000, 5, 29, 57);
+      owner.mem.write32(this.context + 0x20, packCursor);
+      w.cursorShow(packCursor, 0);
       for (const [slot,x,y] of [[64,146,117],[68,147,117],[72,166,117],[56,45,113],[60,258,113],
         [36,143,138],[40,267,138],[44,289,138],[48,20,194],[52,20,208],
         [76,136,128],[80,277,128],[84,294,128],[88,277,166],[92,300,166],
@@ -235,7 +245,13 @@ export class CardShopChild {
   private fillDetail(show: boolean): void {
     const base = this.kind === 'buy' ? 0 : 0x4c;
     this.detail = show;
-    if (!show) { this.hide(Array.from({length:10},(_,i)=>base+i*4)); if(this.kind==='buy') this.hide([0x28,0x2c]); return; }
+    // F0x80083780 (the booster panel) gates on the card's ever-obtained byte
+    // [0x80048D34 + id + 0x4DF]: a card the player has never held hides the
+    // whole panel (stcrdshp 0x80083780 0x80083780+0x18C: `lbu 0x4DF(s2)`,
+    // `beqz` to the hide-all path at 0x80083DE8). The buy panel (F0x8008627C)
+    // has no such gate, so this only applies to the booster.
+    const seen = this.kind === 'buy' || hasSeenCard(this.owner.collection, this.cardId());
+    if (!show || !seen) { this.hide(Array.from({length:10},(_,i)=>base+i*4)); if(this.kind==='buy') this.hide([0x28,0x2c]); return; }
     const id = this.cardId(); const card = this.owner.resources.cards.find((r)=>r.id===id);
     if (!card) return;
     this.text(base,0x16,id); this.text(base+12,0x32,8); this.number(base+16,this.owner.collection.owned.get(id)??0);
@@ -448,7 +464,10 @@ export class CardShopChild {
       const r=this.reveal;
       d.initDrawContext();d.setLayer(0x1000,6);d.setOrigin(0x280,0);
       const ids=r.mode===2&&r.state<3?r.previous:r.cards;
-      for(let i=0;i<r.visible;i++)this.gridCard(ids[i]??0,i);
+      // F0x80085678 stops the whole six-slot draw at the first slot whose id is
+      // out of range (0x80085678 0x8008569C: `addiu v0, a0, -1; sltiu v0,
+      // 0x13A; beqz v0 -> epilogue`), it does not skip that slot and continue.
+      for(let i=0;i<r.visible;i++){ if(!this.gridCard(ids[i]??0,i)) break; }
       d.initDrawContext();d.setLayer(0x1000,5);
       if(r.mode===2){d.paletteShift(r.palette);for(let i=0;i<r.dealt;i++)sprite(6,35+i*42,68);}
       if(this.kind==='buy'&&this.state===2){d.paletteShift(m.read32(0x8008cb10+((Math.floor(this.owner.frame/4)%6)*4)));sprite(7,36+this.cursor*42,68);}
@@ -481,9 +500,9 @@ export class CardShopChild {
       d.paletteShift(m.read32(0x8008caf8+Math.floor(this.owner.frame/5)%6*4));sprite(7,36+this.revealCursor*42,68);
     }
   }
-  private gridCard(id:number,index:number):void{
-    if(id<1||id>=0x13b)return;
-    const card=this.owner.resources.cards.find((r)=>r.id===id);if(!card)return;
+  private gridCard(id:number,index:number):boolean{
+    if(id<1||id>=0x13b)return false;
+    const card=this.owner.resources.cards.find((r)=>r.id===id);if(!card)return true;
     const d=this.owner.draw;const x=35+(index%6)*42,y=68+Math.floor(index/6)*54;
     const colours=['white','blue','green','red','black','brown'];
     d.calls.push({method:"cardSprite",args:[id,x+4,y+2,255]});
@@ -493,5 +512,6 @@ export class CardShopChild {
       for(let j=0;j<5;j++)if(digits[j]!==null)d.drawSprite(0x063e0000,digits[j]===-2?28:30+digits[j]!,x+4+(j<3?j*7:19+(j-3)*7),y+33);
     }
     d.drawSprite(0x063e0000,colours.indexOf(card.colour),x,y);
+    return true;
   }
 }

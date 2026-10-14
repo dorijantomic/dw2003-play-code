@@ -93,7 +93,7 @@ const ordinals = convertOrdinalLadder(progressOrdinal, ordinalOwner, stages);
 writeJson(resolve(contentDir, "flags", "ordinals.json"), ordinals);
 
 // Convert roster predicate table -> flags/roster.json (rosterRaw loaded above)
-const roster = convertRosterTable(rosterRaw);
+const roster = convertRosterTable(rosterRaw, bank70Raw.amount_tables);
 writeJson(resolve(contentDir, "flags", "roster.json"), roster);
 
 // The single committed artifact the browser fetches: the full EngineContent blob.

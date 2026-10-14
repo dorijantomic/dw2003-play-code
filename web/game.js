@@ -58,6 +58,7 @@ import { createInnTranslated } from "./inn-translated.js";
 import {
     nearestFacingNpc,
     talkCandidates,
+    resolveConfirmTarget,
     hitRect,
     faceToward,
     resolveMazeExit,
@@ -73,6 +74,9 @@ import {
     createCutscene,
     createScreenRouter,
     screenIdForStage,
+    // The s260 Cargo Tower auction's lot cycle (engine/systems/auction.ts).
+    selectAuctionLot,
+    runAuctionLot,
     partyOrbVisible,
     // The shared item store is the only writer of state.inventory (engine/dw3/item-store.ts,
     // the port of the original's F0x800161D8 / F0x80015F04 / F0x800135E8).
@@ -109,6 +113,8 @@ import {
     followerGatherSample,
     consumeFieldTicks,
     fieldDirectionDelta,
+    fieldPureDirectionDelta,
+    oppositeDirection,
     beginIceSlide,
     stopIceSlide,
     tickIceSlide,
@@ -141,6 +147,7 @@ import {
     treeActionPoint,
     treeIndexAt,
     fieldProbePushback,
+    applyObstaclePush,
     actorFootprintBlocked,
     npcHalfWidth,
     relocateActiveTree,
@@ -162,6 +169,11 @@ import {
     isStageChangePlayback,
     isDivePlayback,
     routePairCommit,
+    // The places system: the copyPlacePoints port and the row-aim helper
+    // (engine/systems/place-points.ts). Applied on every stage entry — see
+    // applyPlacePoints.
+    copyPlacePoints,
+    aimPlacePoints,
     startSlope,
     stepSlope,
     LAUNCH_PAD_SOUND,
@@ -186,6 +198,12 @@ import {
     BLOCK_ENGAGER_CLIP,
     BLOCK_TARGET_CLIP,
     BLOCK_CUE,
+    // The item boxes (p126itmb): the talk body's family test, its start arm
+    // (clip 0x41 + the TRESUREB cue) and its close arm, which removes the box
+    // as its textbox closes. See engine/systems/box-actor.ts.
+    isBoxActorId,
+    BOX_TALK_CLIP,
+    BOX_TALK_CUE,
     diveDemoFrame,
     DEMO_START as DIVE_DEMO_START,
     DEMO_CUE_FRAME as DIVE_DEMO_CUE_FRAME,
@@ -223,6 +241,9 @@ import {
     // The field's battle handoff selector: F0x8008B798 writes 0xE0A (movie row 9,
     // MOVIED08_STR) instead of 0x600 while the master ordinal reads 43.
     battleHandoff,
+    // The battle screen's own code (0x600): what the resident launcher records
+    // as the previous screen when the loss arm hands it 0xE00 (the title).
+    BATTLE_HANDOFF_SELECTOR,
     // The bank-0x90 talk launcher (the shared system): which conversation starts which scene.
     setTalkLaunchBindings,
     talkLaunchEventForBit,
@@ -269,7 +290,7 @@ import {
 } from "./dive-demo.js";
 import { loadPointSprites, preloadPointSpriteStage, retainPointSpriteStages, drawEffects, drawEffectsUnderMap, drawStageOverlayShapes, drawNativeIntents, drawStageObjectSprites, drawAnnotatorShapes, drawStreetVehicles, drawStreetScreens, drawFireTrapBursts, drawLaunchPads, launchPads, setLaunchPadsEnabled, setPointSprite, launchPadDebug, drawStreetGlows, drawStingerPopup, stingerPopupProbe, streetGlowProbe, setPointRecordActorSound, setPointRecordActorMusic, setPointRecordOrdinal, setPointRecordAnchor, setPointRecordFlag, drawScrollLayers, scrollLayerEntries, pointRecordActors, pointSpriteProbe } from "./effects.js";
 import { loadNativeStages, enterNativeStage, tickNativeStage, fireNativeEffect, advanceFieldBlanks, resetFieldBlanks } from "./native-stage.js";
-import { beginDrawOrderLog, takeDrawOrderLog, actorDrawsUnderMap, ENTITY_BUCKET } from "./draw-order.js";
+import { beginDrawOrderLog, takeDrawOrderLog, actorDrawsUnderMap, ENTITY_BUCKET, sortDrawables } from "./draw-order.js";
 import { loadFallingObjects, fireStageObject, fireNativeStageObject, paceStageObjects, stageObjectDraws, streetScreenQuads, clearStageObjects, annotatorActive, annotatorMarkers, setAnnotatorRandom, setStageObjectSound, setStageObjectOrdinal, stageObjectState, stageAmbienceDiagnostics, STAGE_AMBIENCE_EXECUTION } from "./stage-objects.js";
 import { fieldCharPendingPixels, resetFieldChar, fieldCharState } from "./vendor/engine.js";
 import { fieldCameraFollow } from "./vendor/engine.js";
@@ -672,7 +693,7 @@ const textbox = new Proxy(legacyTextbox, {
     },
     set(target, prop, value) { target[prop] = value; return true; },
 });
-const choice = createChoice();
+const choice = createChoice(sfx);
 window.__choice = choice;   // checks: whether a list / yes-no question is up
 const menu = createMenu(sfx);
 // Ordinary merchants use the shipped shop screen; the authored shop remains
@@ -1280,6 +1301,10 @@ const state = {
     // be revisited at several beats, so this is the FULL list per stage)
     allOrdinals: [], // sorted set of every ladder ordinal (for the linear-step advance)
     rosterPredTable: {}, // {key: record} from roster_predicate_table.json (bank-0x70)
+    // The s260 Cargo Tower auction's lot table + scripts
+    // (assets/data/auction_lots.json, tools/extract_s260_auction.py). null until
+    // loaded; a missing file leaves the tower exactly as it was (no auction).
+    auction: null,
     charIdx: 0, // LEAD partner index; 0 = no partner (until s212 download); restored after manifest loads
     charId: localStorage.getItem("charId") ?? null, // persisted lead character id
     // The full field party (all Starter-Pack members, lead first). charIdx mirrors party[0].
@@ -1544,13 +1569,17 @@ window.__activeFollowerCount = () => activeFollowerCount();
 window.__talkTarget = () => {
     const scene = state.scenes[currentMap()?.id];
     if (!scene) return null;
-    const visible = sceneCast(scene)
-        .filter((n) => !n.cutsceneOnly);
+    const cast = sceneCast(scene);
+    const visible = cast.filter((n) => !n.cutsceneOnly);
     const npc = nearestFacingNpc(talkCandidates(visible), state.x, state.y, state.dir, 48);
-    if (!npc) return { npc: null, visible: visible.length };
+    // The same target rules the live press applies (F0x8008E2CC): refuse ids and the
+    // id-redirect table (over the whole built cast, as the disc's find_entity is), so a
+    // verifier sees the NPC the press would actually address.
+    const resolved = npc ? resolveConfirmTarget(cast, npc) : null;
+    if (!resolved) return { npc: null, visible: visible.length };
     return {
-        npc: npc.npc_id, sprite: npc.sprite, x: npc.x, y: npc.y,
-        state: pickDialogueFor(npc, state.flags),
+        npc: resolved.npc_id, sprite: resolved.sprite, x: resolved.x, y: resolved.y,
+        state: pickDialogueFor(resolved, state.flags),
         visible: visible.length,
     };
 };
@@ -2260,6 +2289,10 @@ async function init() {
             scene.npcs = applyNpcPrograms(scene.npcs ?? [], npcPrograms[m.id] ?? []);
             scene.exits = scene.exits ?? [];
             scene.zones = scene.zones ?? [];
+            // A places stage re-aims its exits on every arrival from these rows
+            // (applyPlacePoints), so keep the build-time rows pristine: the aim
+            // writes a fresh array, and an unmatched pair falls back to this one.
+            if (scene.placePoints) scene._baseExits = scene.exits.map((e) => ({ ...e }));
             // gen_scenes.py already bakes the disasm-verified default ("down-left" — the
             // FIELDSTG constructor's unconditional entity+0x60 init, see npc-decode.md)
             // for NPCs with no SETANIM ground truth. This is just a safety net for any
@@ -2534,12 +2567,22 @@ async function init() {
         .then((d) => (state.mapLayer2 = d.stages ?? {}))
         .catch(() => {});
 
+    // The s260 Cargo Tower auction (assets/data/auction_lots.json, written by
+    // tools/extract_s260_auction.py from the disc): the sixteen lots of
+    // FIELDSTG_progressEvents / FIELDSTG_choices / FIELDSTG_events and the 50
+    // wstag260 scripts. Non-fatal: without it the tower loads exactly as before.
+    const auction_load = fetch("assets/data/auction_lots.json")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (state.auction = d ?? null))
+        .catch(() => { state.auction = null; });
+
     await Promise.all([
         ...sceneLoads,
         ...dlgLoads,
         ...eventLoads,
         wstag_load,
         story_load,
+        auction_load,
         findings_load,
         battle_load,
         fieldcom_load,
@@ -2716,9 +2759,13 @@ async function init() {
         return Number.isFinite(code) ? code : MEMCARD_TITLE_SCREEN;
     };
     // A FRESH title, the way the idle reset builds one — not a resumption of the
-    // menu the player left, because the launcher builds the screen again.
+    // menu the player left, because the launcher builds the screen again. The
+    // card is the screen being left, so it is the previous screen the fresh
+    // title reads back (a Japanese title times out to 0xE01 from here, not to
+    // the movie it happened to watch before).
     const leaveMemoryCardToTitle = () => {
         window.__memcardExitScreen = memoryCardExitScreen();
+        previousScreenCode = MEMCARD_SCREEN_CODE;
         startTitle();
     };
 
@@ -2825,21 +2872,37 @@ async function init() {
     const titleCanvas = document.getElementById("title-canvas");
     const titleCtx = titleCanvas?.getContext("2d") ?? null;
     // ?nativeTitle=1 runs the original-code screen for reference comparisons.
-    let previousTitleCode = 0;
+    // The resident launcher's PREVIOUS screen code — the code of the screen a
+    // launch replaces. The launcher records it on every screen change, and the
+    // title's Japanese idle timeout reads it back to alternate its two opening
+    // movies: stdwtitl's choice dispatcher F0x80086834 calls the getter
+    // 0x80016B58 through the game context's slot 0x8004B448 (the word at
+    // 0x8004B400) and launches 0xE01 unless that word already reads 0xE01
+    // (pro/stdwtitl.s .L0x00003CA0-.L0x00003CEC; ledger
+    // UI-TITLE-ATTRACT-LOOP-2026-08-14). Every route into the title must
+    // therefore record what it left, exactly as the launcher does — a stale
+    // value makes the Japanese build watch the wrong opening movie.
+    let previousScreenCode = 0;
+    // The memory-card overlay's own screen code: the title's Continue choice
+    // launches 0xC00 with argument 0 (the LOAD row), and when the card hands
+    // back 0xE00 the title is entered with the card as its previous screen.
+    const MEMCARD_SCREEN_CODE = 0xc00;
     const newTitle = () => USE_NATIVE_TITLE
         ? createTitleNative(sfx).open()
-        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode: previousTitleCode });
+        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
     // Construct the research screen only on that explicit route. Recreate the
     // translated title after language selection to use the chosen text clips.
     let ts = USE_NATIVE_TITLE ? createTitleNative(sfx)
-        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode: previousTitleCode });
+        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
     // F0x80083cc0 state 1 (stdwtitl.s:1172-1190): once the movie object is
     // gone the movie screen launches its row's destination word with argument
     // 0. Both opening rows carry 0x0e00, the title screen, so the attract loop
     // comes back here -- read from the table, not assumed.
     let movieDestination = 0;
     const movie = createTitleMoviePlayer((code) => {
-        previousTitleCode = code;
+        // The launcher's previous-screen record: the movie's own code (0xE01 /
+        // 0xE02) is what the title it hands back to reads on its next timeout.
+        previousScreenCode = code;
         movieDestination = movieReturnScreen(code, false) ?? 0;
         if (movieDestination === MOVIE_TITLE_SCREEN) ts = newTitle();
         // The attract loop's return to the title does NOT start ttlbgm here:
@@ -2994,6 +3057,10 @@ async function init() {
     // the disc: the loss arm has no field-restore branch, so Start on this title opens a
     // new game and Continue opens the card in LOAD mode (code 0xC00).
 launchTitleScreen = () => {
+        // The screen being left is the battle (its own code is 0x600), so that
+        // is the previous screen the fresh title reads back — the Japanese
+        // timeout launches 0xE01 from here, whatever movie ran earlier.
+        previousScreenCode = BATTLE_HANDOFF_SELECTOR;
         ts = newTitle();
         title.hidden = false;
         title.classList.remove("fade-out");
@@ -3561,11 +3628,13 @@ async function flushStoryBattle() {
 // does. Standing on one and pressing the action key casts; pressing again while
 // the marker is sweeping strikes.
 //
-// The original casts and strikes with two DIFFERENT buttons: the cast is the
-// CROSS press the step VM's scene controller consumes, and the strike is a pad
-// read of bit 0x2000 (CIRCLE) inside the bobber's own tick (file 0xa6f0-0xa700,
-// the only pad read in all 306 instructions of it). They are separate here too:
-// the action key casts, `x` strikes.
+// The original casts and strikes with the SAME pad bit: the cast is the confirm
+// press the step VM's driver runs on (bit 0x2000, held), and the strike is that
+// same bit read inside the bobber's own tick (file 0xa6f0-0xa700, the only pad
+// read in all 306 instructions of it). Claim
+// `a-fishing-strike-is-the-confirm-button-s-own-bit-2026-10-05`: what the pad
+// calls circle sends 0x1000 and never strikes. The walker's confirm key carries
+// that bit here too; the Back key (`x`) is a different bit and must not strike.
 //
 // While the cast runs the player is NOT Junior's ordinary sprite. Mode 0x48
 // swaps him to P002PLYF and plays five clips off it (engine/systems/fishing.ts,
@@ -3609,6 +3678,16 @@ function startBlockInteraction(npc) {
     state.blockEngage = { ix, npc };
     return true;
 }
+
+/**
+ * The strike's pad bit by the walker's button name: `circle` IS bit 0x2000
+ * (engine/systems/input-map.ts `PAD_BIT`), the confirm bit the bobber reads
+ * (`STRIKE_BUTTON`). In English that bit is what the physical Cross sends; the
+ * button the pad calls circle sends 0x1000 and never strikes (claim
+ * `a-fishing-strike-is-the-confirm-button-s-own-bit-2026-10-05`). The same
+ * name is the field's confirm press, so the cast and the strike are one button.
+ */
+const FISH_STRIKE_BIT = "circle";
 
 /** Cast at `spot`, spending one of this map's sixteen catches. */
 function startFishingCast(spot) {
@@ -3726,19 +3805,30 @@ function fieldPointOccupied(m, px, py) {
 
 /**
  * The disc's obstacle response at a post-step position: F0x8008dfec's five
- * probes for the actor's CURRENT facing (`fieldProbePushback`), each occupied
+ * probes for the actor's CURRENT facing (`fieldProbePushback`), each BLOCKED
  * point pushing the actor back by its own (∓mag/2, ∓mag/4) — never a step
  * revert, and never a point behind the actor, so walking away from an obstacle
- * is always allowed. Returns the vector to SUBTRACT (F0x8008de0c's arg3/arg4).
+ * is always allowed. A point is blocked the way F0x8008de0c blocks it:
+ * occupancy (F0x80092a90 actor diamonds + F0x8008ce40's ±10 box) OR the terrain
+ * half — the zonemgr+0x44 typed-terrain byte at the point (F0x80092914, called
+ * with the current-type word, 0 in every shipped stage) under the form's height
+ * band (`terrainGateBlocks`; only Submarimon carries a height, actor+0x64).
+ * Returns the vector to SUBTRACT (F0x8008de0c's arg3/arg4).
  */
-function fieldStepObstaclePush(m, x, y, magnitudeFixed) {
+function fieldStepObstaclePush(m, grid, x, y, magnitudeFixed, heightFixed) {
     return fieldProbePushback(
         fieldDirectionIndex(state.dir),
         magnitudeFixed,
         x,
         y,
-        (px, py) => fieldPointOccupied(m, px, py),
+        (px, py) => fieldPointOccupied(m, px, py)
+            || (grid ? terrainGateBlocks(grid, px, py, heightFixed) : false),
     );
+}
+
+/** Whether the player's 12×8 foot box at (x,y) overlaps a blocked walkmesh cell. */
+function boxStuck(grid, x, y) {
+    return !!grid && rectBlocked(grid, x - 6, y - 8, x + 6, y);
 }
 
 /**
@@ -4416,6 +4506,48 @@ function activateStageNeighborhood(id) {
     else setTimeout(warm, 0);
 }
 
+// ── THE PLACES SYSTEM, on arrival ────────────────────────────────────────────
+//
+// The disc's stages that carry a `placePoints` table (34 overlays) re-aim their
+// exits on the first tick after a stage load: updateStage calls copyPlacePoints,
+// which copies the entry matching GAME.place/GAME.placeArg — the route pair the
+// transition just published — into the stage's first StageSlots, and the slot IS
+// one of the stage's type-7 step records, i.e. one of the scene's exit rows (the
+// rows gen_scenes builds carry `slot` = the step index). The port is
+// engine/systems/place-points.ts; this is the host half.
+//
+// Every arrival re-aims from the scene's own BASE rows (`_baseExits`, snapshotted
+// when the scene loads), so:
+//   * a pair the table matches gets that chain's destination, arrival position,
+//     facing and published pair, point i on slot i;
+//   * a pair the table does not describe leaves the rows exactly as built — the
+//     static records, which is what the disc's un-copied slots hold (the disc
+//     returns without copying; it does not fall back to another entry).
+//
+// The destination is resolved through the ported screen router at the moment of
+// arrival — the same ordinal-aware walk (post-game ordinal 0x2d starts at the
+// s9xx shadow records) the op-1 handoff itself uses — with the baked base stage as
+// the fallback for a screen the table does not carry. Ledger:
+// places-copy-place-points-family-2026-10-10, places-game-place-producers-2026-10-10.
+function applyPlacePoints(mapId) {
+    const scene = state.scenes[mapId];
+    const table = scene?.placePoints;
+    if (!table || !scene._baseExits) return;
+    scene.exits = aimPlacePoints(
+        scene._baseExits,
+        table,
+        state.entryKey ?? 0,
+        state.entryCompanion ?? 0,
+        (point) => {
+            let to = point.to ?? null;
+            const routed = screenRouter?.route(point.screen, mapId);
+            if (routed?.kind === "warp") to = routed.to;
+            if (!to) return null;
+            return { to, dir: point.dirName ?? "down" };
+        },
+    );
+}
+
 async function loadAndSetMap(i, spawn = null) {
     const idx = (i + state.manifest.maps.length) % state.manifest.maps.length;
     await prepareStageAssets(state.manifest.maps[idx].id);
@@ -4466,6 +4598,12 @@ function setMap(i, spawn = null) {
     // different one (fieldstg file 0x4878).
     state.treeKick = null;
     state.treeRadar = null;
+    // The places system, on arrival: a stage with a placePoints table copies the
+    // chain matching the pair the transition just published into its slots (its
+    // exit rows) — see applyPlacePoints. This is the disc's updateStage first-tick
+    // copy, so it must run with the ARRIVING pair, which is why it sits here and
+    // not in the transition code.
+    applyPlacePoints(m.id);
     // The dive presentation ends before the stage actually changes, but clear it
     // here too so a debug/scripted map jump can never strand it on screen.
     state.diveDemo = null;
@@ -4772,8 +4910,18 @@ function activeExitAt(x = state.x, y = state.y) {
         // and the shipped row disagree about (s850's return tile: its op-1 record is an
         // arrival pad for s741, its row is the door back to s330). The flip is the part
         // that was missing, and it is the part the ordinal decides.
-        const dest = swappedStepDestination(pb);
-        return { ...hit, ...(dest ? { to: dest } : {}), routeWords: pb.routeWords };
+        // An AIMED row — a places stage's copied slot — carries the copy's own
+        // destination and pair, so the post-game screen swap is not re-decided
+        // over it here: the swap reads the STATIC step record, and the places
+        // copy has already replaced that record's destination (and resolved the
+        // screen through the same ordinal-aware router, at aim time). The row's
+        // own pair is preferred for the same reason — it IS the copied slot's
+        // params[5]/params[6], which the SLOT_EXIT arm publishes verbatim,
+        // zeros included. An un-aimed row keeps the step record's pair and the
+        // swap exactly as before.
+        const dest = hit.aimed ? null : swappedStepDestination(pb);
+        return { ...hit, ...(dest ? { to: dest } : {}),
+                 routeWords: hit.routeWords ?? pb.routeWords };
     }
     return null;                                                  // op 8 cutscene owns this tile
 }
@@ -5753,6 +5901,128 @@ function playGunslingerEvent(ev, onDone) {
     onDone?.();
     return true;
 }
+// ── The s260 Cargo Tower AUCTION ────────────────────────────────────────────
+//
+// WHAT A PLAYER MEETS.  Walk into the Cargo Tower while the story stands on one
+// of the sixteen auction beats and the auctioneer Mr. Smith is already calling
+// the lot: the crowd shouts its bids, he asks "Bid at N BIT?", and a Yes/No box
+// takes the answer.  Yes pays the bid out of your BIT and hands you the lot's
+// item; No passes.  Either answer closes the lot for good, and the scene walks
+// you out to the Water Tunnel.
+//
+// THE SYSTEM is decoded and ported once (engine/systems/auction.ts):
+//   * the gate is FIELDSTG_runStoryEvents (pro/fieldstg.s RAM 0x80084b40): on a
+//     field load it starts the first FIELDSTG_progressEvents record whose
+//     `progress` equals the master story ordinal [0x8004b370], whose flag
+//     (0x400+N) is clear and whose affordability condition (0x7074+j) holds;
+//   * the open script plays, then the lot's question event (start = askChoiceN);
+//   * the confirmed answer starts the accepted / pass script; when that ends its
+//     FIELDSTG_endChoiceNAnswerM handler applies the writes — pass sets the lot's
+//     flag, bid also subtracts the BIT and grants the item;
+//   * every accepted and pass script ends HANDOFF 530 766 165, the tower's own
+//     scripted force-exit to the Water Tunnel (s275).
+//   Claims: fieldstg-progressevents-table-2026-10-09,
+//   fieldstg-choices-table-2026-10-09, fieldstg-events-choice-wiring-2026-10-09,
+//   fieldstg-askchoice-constructors-2026-10-09,
+//   fieldstg-endchoice-flag-handlers-2026-10-09,
+//   fieldstg-endchoice-code-consequences-2026-10-09,
+//   fieldstg-auction-bid-questions-2026-10-09,
+//   fieldstg-auction-lot-items-2026-10-09; doc
+//   docs/research/field/s260-cargo-tower-auction-decoded-2026-07-10.md.
+//
+// THE NAMED GAP.  FIELDSTG_runChoice's own window state machine — its option
+// windows, cursor and confirm handoff — is listed under "Not yet decoded here"
+// in docs/research/scripting/field-script-engine-verified.md.  The question is
+// therefore shown through the walker's existing decoded question box
+// (web/choice.js, the pixel-sampled system window), with the question and the
+// two answers taken verbatim from the lot's esdmg260 entry; nothing about the
+// question's own window is invented.
+const AUCTION_STAGE = "s260";
+
+/** A wstag-shaped row for one of the auction's events, so the ordinary cutscene
+ *  path plays it: its disasm, its esdmg260 text entry, and the force-exit the
+ *  answer scripts carry (HANDOFF 530 → the Water Tunnel). */
+function auctionScriptRow(eventId) {
+    const au = state.auction;
+    const e = au?.events?.[String(eventId)];
+    if (!e) return null;
+    const handoff = (e.disasm || []).find((l) => l.startsWith("HANDOFF"));
+    const entry = e.entry;
+    return {
+        id: eventId,
+        // The region<<16|entry convention: region 0x119 is ESDMG260.
+        flag_key: "0119" + String(entry).padStart(4, "0"),
+        esdmg_stage: "260",
+        esdmg_entry: entry,
+        disasm: e.disasm,
+        ...(handoff ? { handoff_to: au.force_exit?.stage != null ? "s" + au.force_exit.stage : undefined } : {}),
+    };
+}
+
+/** One line of an esdmg260 entry as plain text (markup stripped, player name
+ *  substituted) — the question box draws text, not pack bytes. */
+function auctionPlainLine(raw) {
+    if (!raw) return null;
+    const parsed = parseEntry(raw, state.playerName || "Junior");
+    const line = parsed.pages.flat().join(" ");
+    return line.length ? line : null;
+}
+
+/** The arrival gate: does a lot fire on this field load, and if so run it.
+ *  Returns "fired" (the auction took over), "none" (nothing eligible) or "wait"
+ *  (the field is busy right now — the caller retries next frame, exactly as the
+ *  disc's own runStoryEvents tick does). */
+function runAuctionArrival(mapId) {
+    if (mapId !== AUCTION_STAGE) return "none";
+    const au = state.auction;
+    if (!au?.lots?.length || !engine) return "none";
+    // The disc asks once per field load, behind the same field-owned locks the
+    // rest of the arrival work respects: no handoff in flight, no fade, no box.
+    if (engineBridge?.isBusy() || state.handoffHold || fade.dir !== 0) return "wait";
+    if (choice.isOpen() || textbox.isOpen() || cutscene.isActive()) return "wait";
+    const ordinal = Number(engine.state.vars.get("$story.ordinal") ?? 0);
+    const lot = selectAuctionLot(au.lots, ordinal, engine.state.flags);
+    if (!lot) return "none";
+    storyDbg("AUCTION", AUCTION_STAGE, "lot", lot.n, "bid", lot.bid, "item", lot.item);
+    startAuctionLot(lot);
+    return "fired";
+}
+
+/** One lot, start to finish, through the engine's own driver. */
+function startAuctionLot(lot) {
+    let answerRow = null;
+    const host = {
+        playScript: (eventId, onDone) => {
+            const row = auctionScriptRow(eventId);
+            if (!row) { onDone(null); return; }
+            if (eventId === lot.events.accepted || eventId === lot.events.pass) answerRow = row;
+            playStoryEvent(row, (handoff) => onDone(handoff ?? null));
+        },
+        askQuestion: (l, onAnswer) => {
+            // The question and the two answers are the lot's esdmg260 choice entry
+            // (FIELDSTG_choices[N].text, entry strings 0/1/2 — claim
+            // fieldstg-auction-bid-questions-2026-10-09).  The box is the walker's
+            // decoded question window; see the named gap above.
+            const strings = state.events?.["260"]?.[String(l.entries.choice)]?.strings ?? [];
+            const prompt = auctionPlainLine(strings[0]) ?? ("Bid at " + l.bid + " BIT?");
+            const yes = auctionPlainLine(strings[1]) ?? "Yes, bid.";
+            const no = auctionPlainLine(strings[2]) ?? "No, I'll pass.";
+            storyDbg("AUCTION QUESTION", prompt, "yes:", yes, "no:", no);
+            choice.open(prompt, [yes, no], (idx) => onAnswer(idx === 0 ? "accept" : "pass"));
+        },
+        writeFlag: (id, value) => engine.writeStoryFlag(id, value),
+    };
+    runAuctionLot(lot, host, (handoff) => {
+        // The answer script's own HANDOFF is the tower's force-exit (530 → s275).
+        if (handoff) doStoryHandoff(answerRow, handoff);
+    });
+}
+window.__auctionArrival = runAuctionArrival;   // verifier hook (tools/verify_s260_auction.mjs)
+window.__auctionScriptRow = auctionScriptRow;
+// Verifier hook: the arrival fade's completion calls checkStageCutscene, and a debug
+// jump (window.__setMap) skips the fade — this is that same call, for tests.
+window.__stageEnter = (mapId) => checkStageCutscene(mapId);
+
 function playStoryEvent(ev, onDone) {
     if (!ev.disasm?.length && playHelpMenuEvent(ev, onDone)) return;
     if (!ev.disasm?.length && playYesNoEvent(ev, onDone)) return;
@@ -6039,6 +6309,10 @@ function checkStageCutscene(mapId) {
         }
     }
     if (engineBridge) engineBridge.onStageEnter(mapId);
+    // The s260 auction's arrival gate: FIELDSTG_runStoryEvents runs on the field
+    // load, so arm it here; the per-frame tick below fires the lot once the field
+    // is free (it retries, like the disc's own tick, instead of missing the beat).
+    state.auctionPending = mapId === AUCTION_STAGE;
 }
 
 // Hand the leader to the op-13 launch controller (engine/systems/launch-pad.ts):
@@ -6529,7 +6803,7 @@ function dispatchInput(k, e, raw = "") {
     // menu-close branch below because a cast locks the field and no menu can be
     // open under it, and ahead of the CIRCLE interact branch further down so the
     // in-flight cast claims the press instead of re-casting.
-    if (k === "circle" && state.fishing) {
+    if (k === FISH_STRIKE_BIT && state.fishing) {
         state.fishing.strike = true;
         return;
     }
@@ -6820,8 +7094,8 @@ function dispatchInput(k, e, raw = "") {
             // invented and are removed; the real merchants, inns and story events
             // run through NPC talk and the step VM.)
             {
-                const visibleNpcs = sceneCast(scene)
-                    .filter((n) => !n.cutsceneOnly);
+                const cast = sceneCast(scene);
+                const visibleNpcs = cast.filter((n) => !n.cutsceneOnly);
                 // Field actors occupy a full PS1 tile; allow the front half-tile around
                 // obstacles so a player can talk without walking into the NPC/collision edge.
                 //
@@ -6832,11 +7106,24 @@ function dispatchInput(k, e, raw = "") {
                 // Digmon) are never gated. Deliberately scoped to the talk probe —
                 // NOT to exits, ladders or textbox advances, which the native warp
                 // trigger owns and which stay usable at any depth.
-                const npc = submarimonCanInteract(state.submarimon)
+                const picked = submarimonCanInteract(state.submarimon)
                     ? nearestFacingNpc(talkCandidates(visibleNpcs), state.x, state.y, state.dir, 48)
                     : null;
+                // The interact handler's own target rules (F0x8008E2CC, file 0xb61c-0xb7a8):
+                // npc ids 0x180-0x182 are refused outright, and an id in the redirect table
+                // (RAM 0x80097C68) is replaced by the entity carrying the redirect id — the
+                // spriteless counter markers (112/113) resolve to the clerk behind them.
+                // The lookup is over the WHOLE built cast, as the disc's find_entity(5, id, -1)
+                // is: a redirect target a cutscene parks is still a class-5 entity there.
+                const npc = picked ? resolveConfirmTarget(cast, picked) : null;
                 if (npc) {
-                    npc.dir = faceToward(npc.x, npc.y, state.x, state.y);
+                    // Turn-to-face on talk, the disc's own rule: the talk handler writes
+                    // `npc+0x60 = (player+0x60 + 4) & 7` (F0x80090afc, file 0xdf00-0xdf18) —
+                    // the NPC faces exactly opposite the player's facing, i.e. at whoever
+                    // spoke to it. (Not a geometric point-at-the-player; the disc never
+                    // reads the positions here. It also feeds the dialogue box's balloon
+                    // quadrant, which reads npc+0x60.)
+                    npc.dir = oppositeDirection(state.dir);
                     // The three special block actors (npc 328/351/352): confirm
                     // starts the drill-armed dive, not a conversation. The
                     // dedicated branch fieldstg F0x8008E2CC runs for exactly
@@ -6873,6 +7160,19 @@ function dispatchInput(k, e, raw = "") {
                     openTalkLine(
                         dlgState.dialogue,
                         () => {
+                            // The item box's own close arm (fieldstg F0x80090afc, the mode-0x4a
+                            // talk body, file 0xdfa4-0xdfc0): the tick the talk's dialogue reads
+                            // closed, a p126itmb box calls its own remove slot — `+0x28(3)`,
+                            // entity+0xC = 3 — and leaves the field, in the same arm that applies
+                            // the on-close table below. Every other npc takes the setMode(1) arm
+                            // and keeps its actor (Veemon, s395 — see npc-manager.stageCast). The
+                            // family is the talk body's own id test; a box is removed whether or
+                            // not its table writes its own gate (engine/systems/box-actor.ts).
+                            if (isBoxActorId(npc.npc_id)) {
+                                delete npc._talking;
+                                const boxScene = state.scenes[currentMap().id];
+                                if (boxScene) removeSceneActor(boxScene, boxScene.npcs, npc);
+                            }
                             // Apply the state's on_close set_flags (F0x80016988) — advances the NPC's
                             // dialogue state so the next talk shows its later line (§WS5).
                             for (const c of dlgState.on_close || [])
@@ -6976,6 +7276,26 @@ function dispatchInput(k, e, raw = "") {
                             });
                         })(),
                     );
+                    // The box's own start arm (fieldstg F0x80090afc, file
+                    // 0xdf58-0xdf78), family only, after the line is up
+                    // (0xdf48): the box latches clip 0x41 — setClip is the
+                    // +0xa0 latch F0x8008f4b4, which also clears the frame
+                    // counters +0xcc/+0xd0 — and requests the packed cue
+                    // 0x80045DC7 = TRESUREB through the packed-sound entry
+                    // [0x80055C48]. The clip's frame list ends in the -1 hold
+                    // sentinel (fieldstg file 0xce8c-0xce9c: timer 0xffff,
+                    // +0xe8 = 1), so the chest holds its open frame once the
+                    // authored ticks are spent. See engine/systems/box-actor.ts.
+                    if (isBoxActorId(npc.npc_id)) {
+                        const boxMeta = state.manifest.npcs.find((n) => n.id === npc.sprite)
+                            ?? state.manifest.characters.find((c) => c.id === npc.sprite);
+                        const boxDur = clipDurationSeconds(boxMeta?.clips, BOX_TALK_CLIP, npc.dir ?? "down");
+                        npc.activeClip = BOX_TALK_CLIP;
+                        npc._animTime = 0;
+                        npc._talkClipEnd = boxDur != null ? Math.max(0, boxDur - FIELD_TICK_SECONDS) : null;
+                        npc._talking = true;
+                        sfx.playPacked(BOX_TALK_CUE, { overlap: true });
+                    }
                 } else if (startLadderClimb(scene)) {
                     // Ladder press-to-climb (authentic activation: the PS1 fires the
                     // actor climb method on Circle while the act-2/3 trigger is armed).
@@ -7142,6 +7462,13 @@ function update(dt) {
     sweepCollectionSave();
     textbox.update(dt);
     cutscene.step(dt);
+    // The s260 auction's arrival gate. Armed by checkStageCutscene; polled here
+    // each frame until it fires or finds nothing, so a lot that could not start
+    // while the field was busy still fires the moment the field is free (the
+    // disc's own runStoryEvents is a per-frame tick, not a one-shot).
+    if (state.auctionPending && currentMap()?.id === AUCTION_STAGE) {
+        if (runAuctionArrival(AUCTION_STAGE) !== "wait") state.auctionPending = false;
+    }
     // The footstep cue fires from the PLAYER's own move handler and nothing
     // else: PLAYER00 (0x8004583c) is called from the player action dispatcher
     // F0x8008FED0 through the helper F0x8008FD74, whose ONLY caller is that
@@ -7229,6 +7556,15 @@ function update(dt) {
     if (idleScene) {
         for (const npc of sceneCast(idleScene)) {
             npc._idleTime = (npc._idleTime ?? 0) + dt;
+            // A talking box ticks its talk clip (0x41) while the textbox is up,
+            // as the disc's per-frame loader steps every live entity's anim
+            // clock; the clip's -1 hold sentinel stops the clock on the open
+            // frame (fieldstg file 0xce8c-0xce9c, _talkClipEnd set at the talk
+            // start arm in the confirm handler above).
+            if (npc._talking) {
+                const t = (npc._animTime ?? 0) + dt;
+                npc._animTime = npc._talkClipEnd != null ? Math.min(t, npc._talkClipEnd) : t;
+            }
         }
     }
 
@@ -7532,12 +7868,23 @@ function update(dt) {
             // — that is what puts the meter on screen just as Junior finishes
             // casting. It stops when it has resolved; the angler runs on.
             if (!f.castOver) {
-                // The strike is edge-triggered: one press is one strike, and the
-                // original only reads the pad in the full-speed sweep sub-state.
+                // The strike is an EDGE, not a held level: `[0x8004bbc4](0)` is
+                // the pad decoder's NEWLY-PRESSED word — F0x80018854 returns
+                // `new AND (new XOR previous)`, the buttons that went down on
+                // this frame (claim CORE-PAD-RECORD-BUTTON-WORDS-001) — and the
+                // bobber masks bit 0x2000 of it once per tick of the sweep
+                // sub-state (files 0xa6f0-0xa704). A press is therefore consumed
+                // by the next tick, and one that began during the settle is NOT
+                // carried into the sweep.
                 const strike = f.strike;
                 f.strike = false;
+                // The fourth argument is the display clock: the float's four
+                // cells are a 48-unit cycle walked off the free-running tick at
+                // 0x8004df98 (the same clock the field's own FIELDCOM programs
+                // read), never off the cast's random.
                 const cue = tickFishing(f.run, strike, () =>
                     Math.floor(Math.random() * 0x10000),
+                    fieldcomTick(),
                 );
                 if (cue.kind === "sound") sfx.playPacked(cue.id, { overlap: true });
                 else if (cue.kind === "catch") f.pending = cue.slot;
@@ -7920,44 +8267,66 @@ function update(dt) {
             const moveMag = state.submarimon
                 ? state.submarimon.speedFixed
                 : diveMoveMagnitude(state.diveForm, FIELD_RUN_MAGNITUDE);
-            const delta = fieldDirectionDelta(
-                state.dir,
-                moveMag,
-                terrainCodeAt(grid, state.x, state.y),
-            );
-            const moved = moveWithCollision(
-                grid,
-                state.x,
-                state.y,
-                delta.x,
-                delta.y,
-                { w: 12, h: 8 },
-            );
-            // Submarimon terrain-height gate (fieldstg F0x8008DE0C): a raised or
-            // lowered tier refuses the step until the sub is at the right depth.
-            // Applied per tick on the intended destination; the walking forms
-            // carry no height, so they are never gated. See
-            // engine/core/util/collision.ts terrainHeightGate.
-            const gated = state.submarimon && grid
-                && terrainGateBlocks(grid, state.x + delta.x, state.y + delta.y,
-                                     state.submarimon.heightFixed);
-            if (!gated) {
-                state.x = Math.max(margin, Math.min(m.width - margin, moved.x));
-                state.y = Math.max(margin, Math.min(m.height - margin, moved.y));
-            }
-            // The disc's standing-actor / tree obstacle (F0x8008dfec ->
-            // F0x8008de0c -> zonemgr+0x58 F0x80092a90): five probes in the
-            // facing cone; each occupied point pushes the actor back by its own
-            // (∓mag/2, ∓mag/4) vector. There is no step revert and no "already
-            // inside" exemption — the push only ever moves the actor away, and
-            // the points behind it are never probed, so backing away from an
-            // obstacle is always allowed.
-            if (!gated) {
-                const push = fieldStepObstaclePush(m, state.x, state.y, moveMag);
-                if (push.x !== 0 || push.y !== 0) {
-                    state.x = Math.max(margin, Math.min(m.width - margin, state.x - push.x));
-                    state.y = Math.max(margin, Math.min(m.height - margin, state.y - push.y));
-                }
+            // Submarimon's swim reads zonemgr+0x4c (`F0x80092da0`), the PURE
+            // row-0 facing vector: no typed-terrain query, no scale row, no
+            // mirror. Only the WALK states read the terrain-scaled wrapper
+            // (zonemgr+0x48 = `F0x80092ca0`), so the split is structural — the
+            // sub's speed is not scaled by terrain (claims WQ004-ZONE-4C-PURE,
+            // ZONE-Q001-CELL-710-FACING-MOVE-STEP).
+            const delta = state.submarimon
+                ? fieldPureDirectionDelta(state.dir, moveMag)
+                : fieldDirectionDelta(
+                    state.dir,
+                    moveMag,
+                    terrainCodeAt(grid, state.x, state.y),
+                );
+            const moved = boxStuck(grid, state.x, state.y)
+                // A foot box already overlapping a blocked cell (a save written
+                // while the push trap existed, an editor-placed spawn) must never
+                // be permanent: while the box is stuck the destination check is
+                // skipped, so the player can always walk back out — the same
+                // exemption the pre-push step model carried. With the push
+                // clamped below, nothing new can get in.
+                ? { x: state.x + delta.x, y: state.y + delta.y }
+                : moveWithCollision(
+                    grid,
+                    state.x,
+                    state.y,
+                    delta.x,
+                    delta.y,
+                    { w: 12, h: 8 },
+                );
+            // The form's height on THIS tick. The buoyancy handler runs ahead of
+            // the dispatcher and F0x8008de0c reads actor+0x64 at probe time, so
+            // the height is read after the motion step above. Only Submarimon
+            // carries one; the walking forms are never gated.
+            const heightFixed = state.submarimon ? state.submarimon.heightFixed : 0;
+            state.x = Math.max(margin, Math.min(m.width - margin, moved.x));
+            state.y = Math.max(margin, Math.min(m.height - margin, moved.y));
+            // The disc's standing-actor / tree / terrain obstacle (F0x8008dfec ->
+            // F0x8008de0c -> zonemgr+0x58 F0x80092a90 and zonemgr+0x44
+            // F0x80092914): five probes in the facing cone; each blocked point
+            // pushes the actor back by its own (∓mag/2, ∓mag/4) vector. There is
+            // no step revert and no "already inside" exemption IN THE DISC'S
+            // RESPONSE — the push only ever moves the actor away, and the points
+            // behind it are never probed, so backing away from an obstacle is
+            // always allowed. The terrain-height gate lives HERE, at the probe
+            // points: the disc has no pre-move destination check, which is why a
+            // sub standing on a wrong-depth cell can still move off it.
+            const push = fieldStepObstaclePush(m, grid, state.x, state.y, moveMag, heightFixed);
+            if (push.x !== 0 || push.y !== 0) {
+                // The disc applies the push unchecked; the walker's wall model is
+                // the walkmesh, which has no probes — so the push is clamped by
+                // the same foot box the walk uses (applyObstaclePush). Without
+                // this, walking past s210's counter NPC pushes the box down by
+                // mag/4..3*mag/4 a tick (one to three blocked front probes) while
+                // the step slides along, and the box sinks into the counter's
+                // blocked row, where the destination check then refuses every
+                // direction — a permanent trap. Against a wall the push now
+                // degrades to a wall slide.
+                const pushed = applyObstaclePush(grid, state.x, state.y, push, { w: 12, h: 8 });
+                state.x = Math.max(margin, Math.min(m.width - margin, pushed.x));
+                state.y = Math.max(margin, Math.min(m.height - margin, pushed.y));
             }
 
             // Walking onto an op-11 cell hands the leader to mode 0x4f for the
@@ -8513,7 +8882,9 @@ function drawFishing(ctx, camX, camY) {
     if (f.run.phase === "settle" || f.castOver || !fieldcomReady()) return;
 
     // The float, out on the water where the cast put it — one of four 16x16
-    // FIELDCOM cells re-picked every tick, which is what makes it shimmer.
+    // FIELDCOM cells. It is NOT a flicker: the cell is `0x60 + ((tick % 48)/12)`
+    // off the display tick (file 0xa95c), so the four run in order, twelve
+    // units each — a ripple on the water.
     drawFieldcomIcon(
         ctx, 0, f.run.cell,
         Math.round(f.x - camX), Math.round(f.y - camY),
@@ -8788,7 +9159,9 @@ function render() {
     // console's order (map layer 2 at depth 11, these props at 8/10, the ground
     // at 7): docs/research/field/map-tile-draw-semitransparency-2026-08-20.md.
     // This pass also ticks the frame, so drawEffects below must follow it.
-    if (!window.__hideProps) drawEffectsUnderMap(ctx, m.id, camX, camY);
+    // The view size is the cull window the disc's F0x80089038 tests records
+    // against (the 0x1002 layer's screen rect, 320x240 at ZOOM 1).
+    if (!window.__hideProps) drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM);
     // The under-map band (the party, whose leader's step-op 5 bucket is 8) goes
     // down HERE — after layer 2 and the 8/10 props, before the ground — the disc's
     // own OT[11] -> OT[8] -> OT[7] order.
@@ -8873,7 +9246,7 @@ function render() {
     // the map, under all entities); y-sorted props join `drawables` at their
     // decoded baseline so the player walks behind them.
     // (tickNativeStage already ran above, before the under-map effects pass.)
-    if (!window.__hideProps) drawEffects(ctx, m.id, camX, camY, drawables);
+    if (!window.__hideProps) drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM);
     // Debug-only: record what each producer submits to the one ordering list, so
     // a verifier can read the band chosen (window.__drawComposites).
     if (window.__logDrawOrder) beginDrawOrderLog();
@@ -9205,10 +9578,11 @@ function render() {
         }
     }
 
-    // `|| 0` guards the Infinity-vs-Infinity foreground band: Infinity - Infinity
-    // is NaN, which would make sort order unspecified; 0 keeps the stable
-    // insertion order (map fg overlay first, then point-sprite fg records).
-    drawables.sort((a, b) => (a.y - b.y) || 0);
+    // The disc's own draw order, in one shared place: ascending key, larger key
+    // in front, and equal keys with the EARLIER arrival on top (the queue's
+    // flush calls the head-most first and each callback prepends into its
+    // ordering-table bucket). `sortDrawables` (web/draw-order.js) is that rule.
+    sortDrawables(drawables);
     // When the leader's bucket is behind the ground it was already painted in the
     // map band above, *before* the ground image; OT[8] is reached before OT[7]
     // and before every entity bucket, so the leader is behind the ground and
@@ -9309,7 +9683,7 @@ function render() {
 //   5/6/8/11/12/13 draw nothing because they never reach the bubble tail.
     // Drawn over the player's head, like the slot-1/slot-4 PS1 captures.
     // `state.fishing` joins the climb here: the cast raises the same scene lock
-    // (0x800a9dd8) the climb does, and the op-7 spot's own tool icon must not go
+    // (0x80099dd8) the climb does, and the op-7 spot's own tool icon must not go
     // on advertising a press you are already in the middle of.
     if (!textbox.isOpen() && fade.dir === 0 && !cutscene.isActive() && fieldcomReady()
         && !state.climb && !state.fishing) {

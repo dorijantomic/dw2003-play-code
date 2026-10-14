@@ -263,7 +263,13 @@ function moveCursor(from, to, sfx) {
 // category holds exactly what the original's held count says it holds. The old
 // hand-written `itemCategory` classifier had the same five bands (its "effect ==
 // none" test is precisely directory 0's 51 ids) but no order and no cap.
-const ITEM_CAT_DIRECTORIES = [1, 2, 3, 4, 0];
+//
+// The kinds are the original's own TAB WORDS (0x8009A890 = 1, 0x80000002,
+// 0x80000003, 0x80000004, 0): the three gear tabs carry bit 31, "list worn items
+// too" — a weapon the party wears but no longer carries is still listed there.
+// F0x800135E8 masks the category and reads the SIGN as that flag, which is why
+// the engine's listItemIds takes the tab word itself (the int32 is negative).
+const ITEM_CAT_KINDS = [1, 0x80000002, 0x80000003, 0x80000004, 0];
 
 // Real per-effect result strings (esstatus.toml 82-99).
 //
@@ -271,11 +277,19 @@ const ITEM_CAT_DIRECTORIES = [1, 2, 3, 4, 0];
 // chip's line even when the table cap clipped the real rise (`$s3` is the roll and
 // the clamp at ststatus :12960 never touches it), so `result.amount` wins over a
 // before/after difference here. `before`/`after` are still the fallback for a
-// result that carries no amount.
+// result that carries no amount. The clipped HEAL arm is the exception: its
+// constant 0x52 carries no figure at all (see below).
 function useMessage(item, before, after, result) {
   const eff = item?.effect ?? "";
   if (eff === "full_hp") return "HP healed to maximum.";
-  if (eff === "hp") return `${result?.amount ?? (after?.hp ?? 0) - (before?.hp ?? 0)} HP healed.`;
+  if (eff === "hp") {
+    // The clipped arm is the disc's own constant line and carries NO figure:
+    // ststatus :12934 sets string 0x52 and :12935 jumps to the tail with flag 2,
+    // never running the 0x118 amount call. A Power Charge that restores 5 of its
+    // 500 says "HP healed to maximum.", not "500 HP healed.".
+    if (result?.clipped) return "HP healed to maximum.";
+    return `${result?.amount ?? (after?.hp ?? 0) - (before?.hp ?? 0)} HP healed.`;
+  }
   if (eff === "mp") return `${result?.amount ?? (after?.mp ?? 0) - (before?.mp ?? 0)} MP healed.`;
   const STAT_MSG = {
     stat_hp: "Max HP increased by {1}.", stat_mp: "Max MP increased by {1}.",
@@ -469,7 +483,12 @@ function previewEquipment(state, m) {
 }
 
 function sheetStatValue(p, slots, stat, rosterSlot = null) {
-  const base = Number(p?.stats?.[stat] ?? p?.profile?.[stat] ?? 0);
+  // The total the original's roster record would hold: stored + the permanent
+  // chip rise (the walker keeps chips in `bonuses` — engine/dw3/items.ts writes
+  // the rise there — and the record itself already carries them on the disc),
+  // with the worn gear folded on top (F0x80017174). Reading `stats` alone
+  // under-reported every chipped member by the chip's amount.
+  const base = Number(p?.stats?.[stat] ?? p?.profile?.[stat] ?? 0) + Number(p?.bonuses?.[stat] ?? 0);
   const b = equipmentBonuses(slots, rosterSlot);
   return Math.min(999, base + (b[stat] ?? 0));
 }
@@ -487,6 +506,21 @@ function sheetResValue(p, slots, res) {
   const worn = Number(b.elemResists?.[res] ?? 0) || 0;
   const points = worn ? { ...(p?.elemBonuses ?? {}), [res]: (p?.elemBonuses?.[res] ?? 0) + worn } : p?.elemBonuses;
   return elementValue(p?.profile, points, res);
+}
+
+// The See Digivolve panel's numbers (F0x80088A44). Both of its branches read the
+// PARTNER's own live block — the same F0x80017174 copy the status sheet shows,
+// so the same stored-plus-chips-plus-worn-gear rule — and with a candidate
+// highlighted they ADD the candidate species record's per-stat field (+2
+// onward) and per-resistance field (+0xe onward), clamping the sum at 999. With
+// no candidate the species part is simply absent. These two helpers exist so the
+// fold cannot drift from the sheet's: they call the sheet's own readers.
+export function seeDigivolvePanelStat(p, slots, stat, rosterSlot, formProfile = null) {
+  return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot) + Number(formProfile?.[stat] ?? 0));
+}
+
+export function seeDigivolvePanelRes(p, slots, res, formProfile = null) {
+  return Math.min(999, sheetResValue(p, slots, res) + Number(formProfile?.resistances?.[res] ?? 0));
 }
 
 export function createMenu(sfx = null) {
@@ -698,8 +732,10 @@ export function createMenu(sfx = null) {
     if (screen !== "home") m.fieldHome = false;
   };
 
-  // The active tab's rows, walked in the original's directory order.
-  m.itemList = (state) => listItemIds(state, ITEM_CAT_DIRECTORIES[m.itemCat] ?? 1)
+  // The active tab's rows, walked in the original's directory order. The gear
+  // tabs pass their negative kind so worn-only items are listed too (the tab
+  // words' bit 31 — see ITEM_CAT_KINDS).
+  m.itemList = (state) => listItemIds(state, ITEM_CAT_KINDS[m.itemCat] ?? 1)
     .map((id) => ({ id, qty: heldCount(state, id) }));
 
   m.ensureData(); // fire immediately at creation — don't wait for the first reset()
@@ -740,12 +776,35 @@ export function createMenu(sfx = null) {
     localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));
   }
 
-  // TECHNIQUES rows for one party member: its field-usable healing techniques,
-  // de-duplicated, capped at five (engine fieldTechniqueRows ← F0x800937a4).
-  m.techRows = (state, idx) => fieldTechniqueRows(roster(state)[idx]?.profile?.techs);
+  // TECHNIQUES rows for one party member: the healing techniques in the six
+  // ledger slots of its three EQUIPPED forms, de-duplicated, capped at five.
+  // F0x800937a4 walks the equipped-form triple (record +0x50, validated by the
+  // +0x2738 getter), copies each form's ledger entry and reads its six slots —
+  // it does NOT read the current species' own technique list, so a partner whose
+  // evolved form learned Small Heal lists it, and a rookie with no equipped form
+  // lists nothing. formTechSlots is the one form-slot reader (see its header);
+  // engine fieldTechniqueRows keeps the (id - 0xB8) < 5 filter, first-seen order,
+  // de-dup and the five-row cap.
+  m.techRows = (state, idx) => {
+    const stats = statBlock(state, idx);
+    const slots = [];
+    for (const formId of stats?.equippedForms ?? []) {
+      slots.push(...formTechSlots(stats, formId, m.digimonDB ?? {}));
+    }
+    return fieldTechniqueRows(slots);
+  };
 
   // Apply one field technique. target === null means the whole party.
-  m.applyTechnique = (state, techId, target) => {
+  //
+  // The cues are the disc's own (F0x80093A58, pro/ststatus.s): a heal that
+  // landed plays 0x00040014 RECOVERY (`host.playSound(0x40014)` in the port,
+  // engine/dw3/ui/native/pause-techniques.ts:149/184); a refusal replays the
+  // confirm cue the caller had just played (`sound` there — 0x4001C from
+  // "Use it on who?" at :19550, 0x8004503C from the party-wide list at
+  // :19292). The copy used to play "savedemo" (0x00040015, a different
+  // sample) on success and "system01" (0x800450BD, the back cue) on refusal —
+  // divergence row `pause-home-button-table-2026-10-04.md` §13.
+  m.applyTechnique = (state, techId, target, failSound = "system07") => {
     const view = roster(state);
     const casterIdx = m.statusCursor;
     const caster = statBlock(state, casterIdx);
@@ -761,8 +820,8 @@ export function createMenu(sfx = null) {
 
     const r = useFieldTechnique(caster, blocks, skill.mp_cost ?? 0, skill.power ?? 0, scale);
     m.showFeedback(r.msg);
-    if (!r.ok) { sfx?.play("system01"); return; }
-    sfx?.play("savedemo"); // the decoded HP-heal message SFX
+    if (!r.ok) { sfx?.play(failSound); return; }
+    sfx?.play("recovery"); // 0x40014 — the applied-heal cue
     idxs.forEach((i) => persistStats(state, i));
     persistStats(state, casterIdx);
   };
@@ -807,12 +866,20 @@ export function createMenu(sfx = null) {
           };
           const r = useItem(view, slot.id, undefined, roster(state)[tgt]?.profile);
           if (r.ok) {
-            if (item?.effect === "hp" || item?.effect === "full_hp") sfx?.play("savedemo");
+            // F0x8008F584's applied arm plays 0x00040014 RECOVERY for EVERY
+            // effect that landed (file 0xcbcc, `ori $a0,0x14`), not only HP
+            // charges — the old "savedemo" here was 0x00040015, a different
+            // sample (the save screen's demo jingle).
+            sfx?.play("recovery");
             m.showFeedback(useMessage(item, before, view.partnerStats, r));
             if (tgt === 0) localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
             else localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
             localStorage.setItem("inventory", JSON.stringify(state.inventory));
-          } else m.showFeedback(r.msg);
+          } else {
+            // The refusal arm ("No effect."): file 0xcc10, `ori $a0,0x1c`.
+            sfx?.play("system07");
+            m.showFeedback(r.msg);
+          }
         }
         m.itemMode = "list";
       }
@@ -897,6 +964,11 @@ export function createMenu(sfx = null) {
       }
       if (key === "cross") { sfx?.play("system01"); m.itemMode = "cats"; return; }
       // L1/R1 page the bag (rig: Weapons "1 / 8" + R1). Categories are the picker.
+      // The original's own guards (F0x80092524): the two shoulders are mutually
+      // exclusive (`heldOther` on the other one), Left is read only when Down is
+      // NOT held and Right only when Up is not (the `padHeld` tests at :63/:126).
+      if ((key === "l1" && state.keys?.has?.("r1")) || (key === "r1" && state.keys?.has?.("l1"))) return;
+      if ((key === "left" && state.keys?.has?.("down")) || (key === "right" && state.keys?.has?.("up"))) return;
       if (key === "l1" || key === "r1" || key === "up" || key === "down" || key === "left" || key === "right") {
         m.itemCursor = moveCursor(m.itemCursor,
           bagCursorStep(m.itemCursor, key, list.length, perPage), sfx);
@@ -1046,8 +1118,10 @@ export function createMenu(sfx = null) {
         if (techId == null) return;
         sfx?.play("system00");
         // Party-wide heals (Giga/Final Heal, scope byte 4) skip the target
-        // prompt entirely and apply to everyone at once — F0x80093a58.
-        if (isPartyWide(techId)) m.applyTechnique(state, techId, null);
+        // prompt entirely and apply to everyone at once — F0x80093a58. Its
+        // refusal replays this list's own confirm cue (0x8004503C), which the
+        // copy has just played as "system00" (pause-home-button-table §7.2).
+        if (isPartyWide(techId)) m.applyTechnique(state, techId, null, "system00");
         else { m.techMode = "use_target"; m.techTarget = m.statusCursor; }
       }
       return;
@@ -1529,7 +1603,9 @@ export function createMenu(sfx = null) {
       _drawSidebar(ctx, r, m, t, picking ? m.techTarget : m.statusCursor,
         picking ? m.statusCursor : null, fold);
       _drawFooter(ctx, state, t, "[triangle] Button: Back to Menu", null, fold, { hideBit: true });
-      _drawTechniques(ctx, r[m.statusCursor], m, t);
+      // The same rows the input machine picks from — one reader, so the list on
+      // screen and the list the cursor walks cannot disagree (F0x800937a4).
+      _drawTechniques(ctx, m.techRows(state, m.statusCursor), m, t);
     } else if (m.screen === "status-detail") {
       // "See Digivolve" is a SCREEN OF ITS OWN, and it is a CHILD of the sheet:
       // the sheet object keeps running underneath, which is why the partner's
@@ -1586,6 +1662,20 @@ const white = { kind: SHEET_VALUE_KIND };
 // 0, then raises three of them to palette 6. WHAT RAISES THEM IS NOT DECODED —
 // the flags come out of the stat snapshot struct at +0x26/+0x28/+0x2A.
 export const SHEET_CLUT_MARKED = 6;
+
+// The palette a See Equipment preview number takes: F0x8008C460's own pair —
+// palette 1 when the preview raised the value, 5 when it lowered it, and the
+// face's own row when it did not move (the original then raises the unchanged
+// STR/DEF/SPD widgets to the grey 6 only when the stat snapshot's flag is set,
+// which the walker's data never sets). The grey SHEET_CLUT_MARKED is the sheet
+// filler's mark, NOT the preview's colour: the preview passes 1 and 5 to the
+// same thirteen widgets (ststatus F0x8008C460's six `li $a1, 0x1` / five
+// `li $a1, 0x5` marks), so painting 6 for every change showed grey where the
+// original shows the gym's rose/blue pair.
+export function sheetPreviewFace(before, after) {
+  const clut = sheetDeltaClut(before, after);
+  return clut ? { kind: SHEET_VALUE_KIND, clut } : white;
+}
 
 // One party card: CMFONTCS chrome (LV/HP/MP letters baked in), animated
 // pedestal portrait, name + values at the decoded label-table positions.
@@ -1978,11 +2068,13 @@ function _drawMapPane(ctx, state, m, t, sfx = null) {
 // TECHNIQUES list: ststat window 0x3a @ (168,40), header @ (178,42),
 // rows @ (197, 58+14i), cursor x=184 (ctor F0x80083680).
 // The rows are the Digimon's field-usable HEALING techniques only — ids
-// 0xB8..0xBC, de-duplicated, at most five (F0x800937a4). A Digimon that knows
-// none gets the real "Hasn't learned a technique." line, not a blank window.
-function _drawTechniques(ctx, p, m, t) {
+// 0xB8..0xBC, de-duplicated, at most five (F0x800937a4) — drawn from the same
+// reader the input machine walks (m.techRows: the three EQUIPPED forms' ledger
+// slots; the species' own list is NOT what the original reads). A Digimon that
+// knows none gets the real "Hasn't learned a technique." line, not a blank
+// window.
+function _drawTechniques(ctx, rows, m, t) {
   const T = UI.screens.techniques;
-  const rows = fieldTechniqueRows(p?.profile?.techs);
   // The window RESIZES with the row count: F0x800946bc picks its clip from the
   // 0x8009a950 table indexed by (rows - 1), so one to five heals get five
   // different window heights. An empty list keeps the smallest.
@@ -2169,18 +2261,20 @@ function _drawSeeDigivolve(ctx, p, m, state, t, fold = null) {
 
     // The panel's numbers are WHITE, as they are on the status sheet — capture
     // 03-choose-digivolve.png. Only the card's LV/HP/MP and the technique names
-    // are gold.
-    const cap999 = (v) => (v >= 999 ? 999 : v);
+    // are gold. The partner's part is its own LIVE block — the sheet's reader,
+    // stored + chips + worn gear — not the raw stored stats: F0x80088A44 reads
+    // the same F0x80017174 copy the sheet does, and folds the worn gear in.
+    ensureEquipment(state);
+    const wornSlots = state.equipment?.[m.detailIdx ?? 0] ?? {};
+    const wornSlot = rosterSlotOfCharId(String(state.party?.[m.detailIdx ?? 0] ?? ""));
     STAT_ROWS.forEach((stat, i) => {
       const y = S.stat_values.y_base + i * S.stat_values.pitch + dy;
-      const base = Number(p?.stats?.[stat] ?? p?.profile?.[stat] ?? 0);
-      valueText(ctx, String(cap999(base + Number(formProf?.[stat] ?? 0))), S.stat_values.x, y,
-        white);
+      valueText(ctx, String(seeDigivolvePanelStat(p, wornSlots, stat, wornSlot, formProf)),
+        S.stat_values.x, y, white);
     });
     RES_ROWS.forEach((res, i) => {
       const y = S.res_values.y_base + i * S.res_values.pitch + dy;
-      const base = Number(p?.profile?.resistances?.[res] ?? 0);
-      valueText(ctx, String(cap999(base + Number(formProf?.resistances?.[res] ?? 0))),
+      valueText(ctx, String(seeDigivolvePanelRes(p, wornSlots, res, formProf)),
         S.res_values.x, y, white);
     });
 
@@ -2422,18 +2516,15 @@ function _drawEquip(ctx, state, m, p, t, fold) {
       // These are the STATUS SHEET's own widgets, still on screen: the equip
       // screen's ctor F0x80086498 builds no stat widget and its draw F0x80086dd4
       // never lays down the stat window, so it draws over a sheet that is still
-      // there. Same face, same right-hand anchor, same palette pair.
-      const marked = sheetDeltaClut(before, after) !== 0;
-      valueText(ctx, String(after), D.stat_values.x, y,
-        marked ? { kind: 1, clut: SHEET_CLUT_MARKED } : white);
+      // there. Same face, same right-hand anchor, same palette pair: the preview
+      // paints palette 1 rose / 5 fell (F0x8008C460), not the sheet's grey mark.
+      valueText(ctx, String(after), D.stat_values.x, y, sheetPreviewFace(before, after));
     });
     RES_ROWS.forEach((res, i) => {
       const y = D.res_values.y_base + i * D.res_values.pitch;
       const after = sheetResValue(p, preview, res);
       const before = sheetResValue(p, snapshot, res);
-      const marked = sheetDeltaClut(before, after) !== 0;
-      valueText(ctx, String(after), D.res_values.x, y,
-        marked ? { kind: 1, clut: SHEET_CLUT_MARKED } : white);
+      valueText(ctx, String(after), D.res_values.x, y, sheetPreviewFace(before, after));
     });
   }
 

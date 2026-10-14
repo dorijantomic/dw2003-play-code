@@ -132,5 +132,34 @@ class TestRealRegistry(unittest.TestCase):
         self.assertEqual(main(["--list"]), 0)
 
 
+class TestPublicOverlayStages(unittest.TestCase):
+    """build_all.py serves both trees: the walker and the public export.
+
+    The export carries the public-overlay build tools under tools/; the walker
+    does not (docs/workflow/public-export.md). A stage whose tool this tree
+    does not carry must not be registered, so every registered stage stays
+    runnable in both trees.
+    """
+
+    def test_overlay_stage_registers_only_when_its_tool_is_on_disk(self):
+        saved = set(ba._OVERLAY_MISSING)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                self.assertIsNone(ba.overlay_stage(name="gone", cmd=["gone.py"], cwd=d))
+                (Path(d) / "here.py").write_text("")
+                kept = ba.overlay_stage(name="here", cmd=["here.py"], cwd=d)
+                self.assertIsNotNone(kept)
+                self.assertEqual(kept.name, "here")
+        finally:
+            ba._OVERLAY_MISSING.clear()
+            ba._OVERLAY_MISSING.update(saved)
+
+    def test_dropped_overlay_stages_leave_the_graph_resolvable(self):
+        names = [s.name for s in topo_order(STAGES)]
+        self.assertEqual(sorted(names), sorted(set(names)))
+        for name in ba._OVERLAY_MISSING:
+            self.assertNotIn(name, names)
+
+
 if __name__ == "__main__":
     unittest.main()

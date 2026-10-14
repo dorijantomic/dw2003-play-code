@@ -15,7 +15,7 @@
 import {
   eyePatchVariant, blinkVariant, blinkPause, cycleVariant,
   BLINK_TABLE, BLINK_TARGET_VARIANT, BLINK_PAUSE_BASE, BLINK_PAUSE_MASK,
-  CYCLE_PERIOD, CYCLE_HOLD,
+  CYCLE_PERIOD, CYCLE_HOLD, randU16,
 } from "../vendor/engine.js";
 
 export { cycleVariant, CYCLE_PERIOD, CYCLE_HOLD };
@@ -35,8 +35,15 @@ export const BLINK_RELOAD_MASK = BLINK_PAUSE_MASK;
 export const stateVariant = eyePatchVariant;
 
 export class TexturePatchAnimator {
-  /** @param entries model_placement.json `texture_anim` rows for one Digimon. */
-  constructor(entries, rng = Math.random) {
+  /**
+   * @param entries model_placement.json `texture_anim` rows for one Digimon.
+   * @param rng the disc's own random source: `rand_u16` (0..0x0fff), the game's ONE stream. The
+   *            reload at 0x8008b2cc draws through the cell [0x8004dc0c] like every other battle
+   *            roll (claim game-single-random-stream-is-a-disc-table-walk-2026-10-05), so the
+   *            default is the ported stream, never Math.random — a second source would desync the
+   *            blink from the one the rest of the battle draws.
+   */
+  constructor(entries, rng = randU16) {
     this.entries = (entries || []).map((e) => ({ ...e, variant: 0 }));
     this.rng = rng;
     this.blinkTimer = 0;     // object +0x1a0
@@ -62,8 +69,7 @@ export class TexturePatchAnimator {
       const { variant, reload } = blinkVariant(this.blinkTimer);
       blink = variant;
       if (reload) {
-        this.blinkTimer =
-          blinkPause(Math.floor(this.rng() * 0x8000));
+        this.blinkTimer = blinkPause(this.rng());
       }
       this.blinkTimer = Math.max(0, this.blinkTimer - delta);
     }

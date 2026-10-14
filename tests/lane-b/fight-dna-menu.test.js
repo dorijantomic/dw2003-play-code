@@ -457,6 +457,13 @@ test("dnaPaneTick state 1 sub-state 0 matches F0x800980E4", () => {
         { name: "strip cursor on row two", ...base, stripCursor: 2 },
         { name: "cross closes", ...base, pad: 0x4000 },
         { name: "circle opens the options", ...base, pad: 0x2000 },
+        // The freeze value the strip's Circle writes into the species list model
+        // is the pane's own build flag (+0x14), NOT the partner's combatant index:
+        // fightstg.s:22432 `sw $s0, 0x54($v0)` stores $s0, which the sub-state-0
+        // dispatch loaded from +0x14 at :22053. A partner in roster slot 0 used to
+        // write 0 there, leaving the list unfrozen.
+        { name: "circle freezes the strip list for a slot-zero partner", ...base, pad: 0x2000, combatant: 0 },
+        { name: "circle freezes the strip list for a slot-two partner", ...base, pad: 0x2000, combatant: 2 },
         { name: "r1 from zero", ...base, pad: 0x800 },
         { name: "l1 from zero wraps", ...base, pad: 0x400 },
         { name: "l1 from two", ...base, pad: 0x400, row: 2 },
@@ -499,6 +506,12 @@ test("dnaPaneTick sub-state 1 matches F0x800980E4", () => {
         { name: "idle", ...base },
         { name: "idle on the DNA row", ...base, optionCursor: 1 },
         { name: "cross back to the names", ...base, pad: 0x4000 },
+        // Circle is tested FIRST in this sub-state (fightstg.s:22246 `andi $v0,
+        // $v1, 0x2000` / `beqz` at :22247 sends a non-Circle frame on to the Cross
+        // test at :22375), so a frame carrying both commits the confirm. The strip
+        // above is the other way round: Cross is tested first there (:22085).
+        { name: "circle and cross together commit the confirm", ...base, pad: 0x6000 },
+        { name: "circle and cross and r1 together commit the confirm", ...base, pad: 0x6800 },
         { name: "r1", ...base, pad: 0x800 },
         { name: "l1", ...base, pad: 0x400, row: 1 },
         { name: "confirm Switch", ...base, pad: 0x2000 },

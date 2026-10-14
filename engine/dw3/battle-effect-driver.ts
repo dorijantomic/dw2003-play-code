@@ -36,7 +36,7 @@
 // FIFTEEN STEP BODIES and the FOUR CONSTRUCT-STAGE BODIES they select, and the
 // timer-gate constants. The bodies are the driver's own call choreography: each
 // drives the three sub-managers the object owns (the manager getter
-// [0x8005b610+0x1ac], the spawn F0x80089be4, and the sub-managers' own
+// [0x8004b610+0x1ac], the spawn F0x80089be4, and the sub-managers' own
 // +0x188/+0x104/+0xf8/... methods) through an `EffectDriverHost`. They are
 // transcribed from the raw words of web/assets/native/screens/pro_fightstg.bin
 // (base 0x80082cb0), and proven against the original words by

@@ -252,7 +252,11 @@ export interface EffectVmHost {
     popPlayedStackWithWindow(duel: number, view: number, mode: number): void;
     /** F0x800952F4(duel, view): push, waiting for the window instead of the pad. */
     pushPlayedStackWaitWindow(duel: number, view: number): number;
-    /** F0x8009535C(duel, view): displayed stats step toward the true ones; 1 moving, 2 settled, 0 a knockout was marked. */
+    /** F0x8009535C(duel, view): displayed stats step toward the true ones.
+     *  Returns 0 on any call where a displayed byte moved; when nothing moved
+     *  it returns 2 if duel+0x438 was set — the caller then latches opcode
+     *  0x4D, the flagged-card removal — and 1 if 0x438 was clear. (claim
+     *  cardgame-stat-ramp-and-death-mark-2026-10-10, verified) */
     effectOp5dTickStatSettle(duel: number, view: number): number;
 }
 

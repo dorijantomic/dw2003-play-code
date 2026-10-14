@@ -266,11 +266,29 @@ def _print_summary(results):
 # The root stage `ddw3_disc` runs ddw3's own build, which re-creates the disc image
 # ($DDW3/build/iso/dw2003.bin) and the extracted sound banks ($DDW3/sound) that the
 # stages below read; see tools/build_ddw3_disc.py and tools/ddw3_toolchain.py.
+#
+# Those two tools ship only in the public export (public-overlay/tools/ — "the
+# public build tooling the walker does not carry", docs/workflow/public-export.md),
+# so the toolchain import is optional: the export has it, the walker does not, and
+# the setup helpers below fall back to the tools the walker itself carries.
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
-import ddw3_toolchain  # noqa: E402  (stdlib-only)
 
 DDW3 = Path(os.environ.get("DDW3_DIR") or os.path.expanduser("~/ddw3"))
+
+
+def _toolchain():
+    """tools/ddw3_toolchain.py when this tree carries it (the export), else None.
+
+    It provisions a userspace build toolchain (git-lfs, fluidsynth, binutils,
+    zbuild, rust) for a fresh public clone; the walker resolves those tools from
+    its own environment instead.
+    """
+    try:
+        import ddw3_toolchain  # noqa: F401  (stdlib-only)
+    except ImportError:
+        return None
+    return ddw3_toolchain
 
 
 def _is_lfs_pointer(p: Path) -> bool:
@@ -287,13 +305,29 @@ def lfs_satisfied() -> bool:
     return bool(hits) and not _is_lfs_pointer(hits[0])
 
 
+def _git_lfs() -> Path:
+    """A git-lfs executable: the export's toolchain module, PATH, or ~/bin."""
+    tc = _toolchain()
+    if tc is not None:
+        return Path(tc.git_lfs())
+    found = shutil.which("git-lfs")
+    if found:
+        return Path(found)
+    local = Path.home() / "bin/git-lfs"  # the walker's userspace binary
+    if local.exists():
+        return local
+    raise RuntimeError(
+        "git-lfs not found (checked PATH and ~/bin/git-lfs); the public export's "
+        "tools/ddw3_toolchain.py provisions one — this tree does not carry it")
+
+
 def setup_lfs() -> None:
     """The ddw3 tree's LFS objects must be real files, not pointers."""
     if lfs_satisfied():
         return
     if not (DDW3 / ".git").exists():
         raise RuntimeError(f"{DDW3} is missing pack/dw2003/field/sprite data (an incomplete tree?)")
-    git_lfs = str(ddw3_toolchain.git_lfs())
+    git_lfs = str(_git_lfs())
     env = {**os.environ, "PATH": str(Path(git_lfs).parent) + os.pathsep + os.environ.get("PATH", "")}
     subprocess.call(["git", "lfs", "pull"], cwd=str(DDW3), env=env)
     if not lfs_satisfied():
@@ -301,12 +335,19 @@ def setup_lfs() -> None:
 
 
 def setup_fluidsynth() -> None:
-    """Build (once) the offline fluidsynth the music stage renders with."""
+    """Find (or, in the export, build once) the offline fluidsynth the music stage uses."""
     given = os.environ.get("FLUIDSYNTH") or shutil.which("fluidsynth")
     if given and Path(given).exists():
         os.environ["FLUIDSYNTH"] = given
         return
-    os.environ["FLUIDSYNTH"] = str(ddw3_toolchain.fluidsynth())
+    tc = _toolchain()
+    if tc is not None:
+        os.environ["FLUIDSYNTH"] = str(tc.fluidsynth())
+        return
+    raise RuntimeError(
+        "fluidsynth not found: set FLUIDSYNTH=<path> or put it on PATH, or run the "
+        "music stage in the public export (its tools/ddw3_toolchain.py builds one) — "
+        "this tree does not carry that module")
 
 
 # --- the pipeline -----------------------------------------------------------
@@ -327,6 +368,26 @@ BASE_ENV = {"DDW3_DIR": str(DDW3), "DW3_DISC": DISC}
 # If/when a source extractor exists for one, promote it to a generated Stage above
 # and drop it from here. Same category as the hand-written engine JS.
 AUTHORED_DATA = ()
+
+# Names of stages dropped because their tool ships only in the public export
+# (public-overlay/tools/); read by _wire_dependencies.
+_OVERLAY_MISSING = set()
+
+
+def overlay_stage(name, cmd, cwd, **kw):
+    """Stage(...) for a tool that exists only in the public export.
+
+    public-overlay/tools/ materialises these tools into the export; the walker
+    does not carry them (docs/workflow/public-export.md). The export registers
+    the stage unchanged; a tree without the tool does not offer a stage it
+    cannot run, and deps naming the dropped stage are pruned by
+    _wire_dependencies.
+    """
+    if not _resolve(cwd, cmd[0]).exists():
+        _OVERLAY_MISSING.add(name)
+        return None
+    return Stage(name, cmd, cwd, **kw)
+
 
 STAGES = [
     # name             cmd                                    deps / io / extras
@@ -370,9 +431,11 @@ STAGES = [
           deps=("build_assets", "npc_sprites", "stage_npc_banks")),
     Stage("gen_scenes", ["tools/gen_scenes.py", "--all"], str(REPO),
           inputs=("web/assets/manifest.json", "data/extracted_entities.json",
-                  "web/assets/npc_sprites.json", "web/assets/data/maze_exits.json"),
+                  "web/assets/npc_sprites.json", "web/assets/data/maze_exits.json",
+                  "web/assets/data/stage_place_points.json"),
           outputs=("web/assets/scenes",),
-          deps=("build_assets", "wstag_extract", "npc_sprites", "stage_npc_banks")),
+          deps=("build_assets", "wstag_extract", "npc_sprites", "stage_npc_banks",
+                "stage_place_points")),
     # Decodes bug-maze trap pads (TMPK tile-type layer + act-13 reset warps)
     # into the scenes gen_scenes just wrote; must run after it (modifies in place).
     Stage("gen_trap_pads", ["tools/gen_trap_pads.py"], str(REPO),
@@ -726,6 +789,22 @@ STAGES = [
     Stage("arrival_candidates", ["tools/extract_arrival_candidates.py"], str(REPO),
           inputs=(str(DDW3 / "asm/dw2003/pro"),),
           outputs=("web/assets/data/scene/arrival_candidates.json",)),
+    # The s260 Cargo Tower AUCTION: the sixteen lot records (FIELDSTG_progressEvents,
+    # FIELDSTG_choices, FIELDSTG_events), the 50 wstag260 lot scripts and the 32
+    # endChoice handler bodies -> the lot table the ported lot cycle reads
+    # (engine/systems/auction.ts; web/game.js runAuctionLot). Cross-checks every bid
+    # against its esdmg260 question line and every item against the item-name bank,
+    # and fails loudly on a mismatch. See tools/extract_s260_auction.py and
+    # docs/research/field/s260-cargo-tower-auction-decoded-2026-07-10.md.
+    Stage("s260_auction", ["tools/extract_s260_auction.py"], str(REPO),
+          inputs=(str(DDW3 / "asm/dw2003/pro/wstag260.s"),
+                  str(DDW3 / "asm/dw2003/pro/fieldstg.s"),
+                  "web/assets/native/fieldstg.bin",
+                  "web/assets/data/bank70_rewards.json",
+                  "web/assets/events/esdmg260.json",
+                  "web/assets/data/battlecmd/esitmnam.json"),
+          outputs=("web/assets/data/auction_lots.json",),
+          deps=("native_fieldstg", "bank70_rewards", "battle_text", "build_esdmg")),
     # Per-actor ptrB on_close flag PRODUCERS: the stored-bank set_ptr tables fieldstg applies on
     # stage entry (genuinely invisible handle-0 trigger-actors, e.g. s410 npc63) / talk-close
     # (visible NPCs). Mined straight from every overlay actor. The general home for flags neither
@@ -1189,7 +1268,8 @@ STAGES = [
           outputs=("web/assets/thumbs",), deps=("build_assets",)),
     # Renders ddw3's extracted SEQ tracks through soundfonts built from the
     # game's own VAB instruments (tools/vab_to_sf2.py) with a locally built
-    # fluidsynth (tools/ddw3_toolchain.py). GeneralUser GS is only an optional
+    # fluidsynth (the export's tools/ddw3_toolchain.py; the walker finds one on
+    # PATH or via $FLUIDSYNTH). GeneralUser GS is only an optional
     # fallback for a bank without a VAB, which never happens.
     Stage("music", ["build_music.py"], str(REPO), uv_with=("mido", "numpy", "soundfile"),
           inputs=(str(DDW3 / "sound/dw2003/common.toml"),
@@ -1208,21 +1288,23 @@ STAGES = [
                   "docs/research/audio/common-tones-full.json",
                   str(DDW3 / "sound/dw2003/common.toml")),
           deps=("map_sound_archives", "fight_effects")),
-    # ROOT: ddw3's own build re-creates the disc image every DISC reader uses and
-    # the extracted sound banks (music/sfx). Toolchain is fetched/compiled into
-    # ~/.cache/dw2003-play/toolchain on first run. Every other stage depends on it.
-    Stage("ddw3_disc", ["tools/build_ddw3_disc.py"], str(REPO),
+    # ROOT (public export only): ddw3's own build re-creates the disc image every
+    # DISC reader uses and the extracted sound banks (music/sfx). Toolchain is
+    # fetched/compiled into ~/.cache/dw2003-play/toolchain on first run. Every
+    # other export stage depends on it; the walker skips it (the tool is
+    # public-only) and points DW3_DISC at a disc it already has.
+    overlay_stage("ddw3_disc", ["tools/build_ddw3_disc.py"], str(REPO),
           inputs=(str(DDW3 / "zbuild.zb"),),
           outputs=(DISC, str(DDW3 / "sound/dw2003/common.toml")), setup=setup_lfs),
     # The FIELDSTG image (disc file 358, 50 sectors) the field interpreter and the
     # fieldstg-table extractors read.
-    Stage("native_fieldstg", ["tools/extract_native_fieldstg.py"], str(REPO),
+    overlay_stage("native_fieldstg", ["tools/extract_native_fieldstg.py"], str(REPO),
           inputs=(DISC,), outputs=("web/assets/native/fieldstg.bin",)),
     # Every wstag overlay's stage descriptor (0x80099D80 writes), lifted from the
     # ddw3 assembly with the vendored m2c (tools/exe_decomp/lift_overlays.py) into
     # build/exe-decomp, then tabulated. Read by the NPC-bank, NPC-program,
     # default-spawn and cast-list stages.
-    Stage("decomp_lift", ["tools/build_decomp_lift.py"], str(REPO),
+    overlay_stage("decomp_lift", ["tools/build_decomp_lift.py"], str(REPO),
           inputs=(str(DDW3 / "asm/dw2003/pro"), "recovered/ddw3/function-inventory.json"),
           uv_with=("pycparser==2.22",),
           outputs=("exe-decomp/c",)),
@@ -1240,12 +1322,12 @@ STAGES = [
     # The recovered-code semantics table: tracked (data/recovered-semantics.json)
     # because its generator chain needs the un-exported research DB; installed
     # where the native screen probe and its tests read it.
-    Stage("recovered_semantics", ["tools/install_recovered_semantics.py"], str(REPO),
+    overlay_stage("recovered_semantics", ["tools/install_recovered_semantics.py"], str(REPO),
           inputs=("data/recovered-semantics.json",),
           outputs=("recovered/ddw3/semantics.json",)),
     # The durable item route census (docs/generated/item-routes.json) and the
     # booster-id module the engine imports (engine/dw3/booster-items.ts).
-    Stage("item_routes", ["tools/report_item_routes.py"], str(REPO),
+    overlay_stage("item_routes", ["tools/report_item_routes.py"], str(REPO),
           inputs=("web/assets/data/item_effects.json",
                   "web/assets/data/item_obtain_index.json",
                   "web/assets/data/card_boosters.json",
@@ -1272,16 +1354,16 @@ STAGES = [
           outputs=("recovered/ddw3/function-inventory.json",)),
     # Byte-exact parse of the common VAB (slot -> vag + loop points); then the
     # Sound Test's common-bank name/id table built on it. Both feed sfx + SFSTDATA.
-    Stage("common_tones", ["tools/decode_vag_loops.py"], str(REPO),
+    overlay_stage("common_tones", ["tools/decode_vag_loops.py"], str(REPO),
           inputs=(str(DDW3 / "pack/dw2003/sound/common/mpcommon/0.vh"),),
           outputs=("docs/research/audio/common-tones-full.json",)),
-    Stage("soundtst_common_ids", ["tools/gen_soundtst_ids.py"], str(REPO),
+    overlay_stage("soundtst_common_ids", ["tools/gen_soundtst_ids.py"], str(REPO),
           inputs=(str(DDW3 / "asm/dw2003/pro/soundtst.s"),
                   "docs/research/audio/common-tones-full.json"),
           outputs=("docs/research/audio/soundtst-common-ids.json",)),
     # Hand-authored, non-game data (data/authored/<path> -> <path>): the chapter
     # ladder and the species -> battle-model-folder table. See the tool.
-    Stage("authored_data", ["tools/install_authored_data.py"], str(REPO),
+    overlay_stage("authored_data", ["tools/install_authored_data.py"], str(REPO),
           inputs=("data/authored",),
           outputs=("web/assets/data/chapter_progression.json",
                    "web/assets/battle/model_id_map.json",
@@ -1351,6 +1433,15 @@ STAGES = [
           inputs=("web/assets/scenes",),
           outputs=("web/assets/data/maze_exit_records.json", "web/assets/data/maze_sections.json"),
           deps=("gen_scenes",)),
+    # The places system's per-stage placePoints tables (WS7): the 34 overlays that
+    # re-aim their exits per the incoming route pair. Read from the disc's own
+    # overlays (the updateStage's copyPlacePoints call names each table), so it
+    # needs no scenes; gen_scenes consumes it to slot the exit rows and attach the
+    # table. Ledger: places-copy-place-points-family-2026-10-10.
+    Stage("stage_place_points", ["tools/extract_stage_place_points.py", "--write"], str(REPO),
+          inputs=(str(DDW3 / "asm/dw2003/pro"), "data/screen_table.json"),
+          outputs=("web/assets/data/stage_place_points.json",),
+          deps=("screen_table",)),
     # Second gen_scenes pass: the first ran before maze_sections.json existed
     # (the file is derived FROM the scenes by extract_maze_exits), so it could
     # not write the wrap-maze sections into them; this pass folds the fresh
@@ -1359,9 +1450,10 @@ STAGES = [
     # depend on THIS stage.
     Stage("gen_scenes_final", ["tools/gen_scenes.py", "--all"], str(REPO),
           inputs=("web/assets/scenes", "web/assets/data/maze_sections.json",
-                  "web/assets/data/maze_exits.json"),
+                  "web/assets/data/maze_exits.json",
+                  "web/assets/data/stage_place_points.json"),
           outputs=("web/assets/scenes",),
-          deps=("maze_exits",)),
+          deps=("maze_exits", "stage_place_points")),
     Stage("scene_completion", ["tools/extract_scene_completion.py"], str(REPO),
           inputs=("web/assets/events/wstag_events.json",),
           outputs=("web/assets/data/scene/scene_completion.json",)),
@@ -1402,7 +1494,7 @@ STAGES = [
                   str(DDW3 / "rust/types/src/item_id.rs")),
           outputs=("web/assets/data/equipment.json",)),
     # SDIGIEDT's 194 enemy stat records (ddw3 rust/dw2003_pro_sdigiedt data.rs).
-    Stage("enemies", ["tools/extract_enemies.py"], str(REPO),
+    overlay_stage("enemies", ["tools/extract_enemies.py"], str(REPO),
           inputs=(str(DDW3 / "rust/dw2003_pro_sdigiedt/src/data.rs"),),
           outputs=("web/assets/data/enemies.json",)),
     # SFSTDATA effect records + fightstg's packed-sound table (backdrops, sfx).
@@ -1431,22 +1523,30 @@ STAGES = [
           opt_in=True, uv_python="3.12"),
 ]
 
+# Public-overlay stages whose tool this tree does not carry (the walker) are
+# dropped here; the export registers every stage (see overlay_stage).
+STAGES = [s for s in STAGES if s is not None]
 
 
 def _wire_dependencies(stages):
     """Every stage runs after ddw3_disc (it makes the disc image and sound banks),
-    and after whichever single stage lists one of its inputs as an output."""
+    and after whichever single stage lists one of its inputs as an output.
+
+    A dep naming a public-overlay stage this tree does not carry (the walker) is
+    dropped with the stage itself; a dep on any other unknown name still fails
+    topo_order."""
+    names = {st.name for st in stages}
     producers = {}
     for st in stages:
         for out in st.outputs:
             producers.setdefault(str(_resolve(st.cwd, out)), []).append(st.name)
     for st in stages:
-        deps = list(st.deps)
-        if st.name != "ddw3_disc" and "ddw3_disc" not in deps:
+        deps = [d for d in st.deps if d in names or d not in _OVERLAY_MISSING]
+        if "ddw3_disc" in names and st.name != "ddw3_disc" and "ddw3_disc" not in deps:
             deps.append("ddw3_disc")
         tool = _resolve(st.cwd, st.cmd[0])
         if (st.name not in ("decomp_lift", "ddw3_disc", "recovered_inventory")
-                and tool.suffix == ".py" and tool.exists()
+                and "decomp_lift" in names and tool.suffix == ".py" and tool.exists()
                 and "exe-decomp" in tool.read_text(errors="replace")
                 and "decomp_lift" not in deps):
             deps.append("decomp_lift")  # reads lifted C under exe-decomp/

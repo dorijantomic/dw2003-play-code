@@ -275,7 +275,7 @@ that fire it.
 | `0x329` (809) | 0x800a6108 | stage | 0x800a60d0 | stage | s790 | 0x800a5df4 | `edfd4eaf74ec` | ported |
 | `0x32a` (810) | 0x800a61fc | stage | 0x800a6148 | stage | s212 | 0x800a5ef4 | `53b7966aee5a` | ported |
 | `0x32b` (811) | 0x800a6a98 | stage | 0x800a698c | stage | s415 | 0x800a6558 | `389277009daa` | ported |
-| `0x32c` (812) | 0x00000000 | null | 0x800a6e88 | stage | s415 | 0x800a6c8c | `9e9f99e27a13` | interpreter only (the s415 scrolling layer, §21.3) |
+| `0x32c` (812) | 0x00000000 | null | 0x800a6e88 | stage | s415 | 0x800a6c8c | `9e9f99e27a13` | ported (the s415 scrolling layer, §13.3) |
 | `0x32d` (813) | 0x80083cd8 | fieldstg | 0x800837ec | fieldstg | fieldstg, shared by 120 stage(s) | - | - | ported |
 | `0x32e` (814) | 0x800a63ac | stage | 0x800a627c | stage | s680 | 0x800a5fd8 | `7d363a3ed472` | ported |
 | `0x32f` (815) | 0x800a61e0 | stage | 0x800a6174 | stage | s225 | 0x800a5ef0 | `033edb715349` | ported |
@@ -422,7 +422,7 @@ that fire it.
 | s410 | `0x32d` | 823 2; 824 2; 825 2 | 90,140,142,143 | 0x80083cd8 | - | - | fieldstg resident (same routine on every stage) | ported |
 | s415 | `0x323` | 805 1; 806 1 | 150,151 | 0x80088190 | - | - | fieldstg resident (same routine on every stage) | ported |
 | s415 | `0x32b` | 816 1; 817 811; 818 811; 819 811; 820 1 | 150,151 | 0x800a6a98 | 0x800a6558 | `389277009daa` | code in this stage's image (file 0xbac) | ported |
-| s415 | `0x32c` | 822 1; 822 812 | 150,151 | 0x00000000 | 0x800a6c8c | `9e9f99e27a13` | code in this stage's image (file 0x10a8) | interpreter only |
+| s415 | `0x32c` | 822 1; 822 812 | 150,151 | 0x00000000 | 0x800a6c8c | `9e9f99e27a13` | code in this stage's image (file 0x10a8) | ported |
 | s415 | `0x32d` | 882 1; 883 1; 893 1 | 150,151 | 0x80083cd8 | - | - | fieldstg resident (same routine on every stage) | ported |
 | s415 | `0x330` | 821 816 | 150 | 0x800a6230 | 0x800a5fa8 | `493e32ee1e09` | null (the original skips it) | ported |
 | s415 | `0x331` | 821 817 | 150 | 0x800a6264 | 0x800a5fa8 | `493e32ee1e09` | null (the original skips it) | ported |
@@ -933,7 +933,7 @@ not re-wired in this pass -- see "what I did not do".
 | piece | where | note |
 |---|---|---|
 | the object layout | EXE `F0x800143dc` (`exe/fns.s:4866`) | `+0x28` setState, `+0x2c` setClip, `+0x38` advance state, `+0x40` advance counter AND clear the timer, `+0x44` tick the timer, `+0x48` the per-frame callback |
-| the record claim | fieldstg `F0x80089548` / `F0x800894d8` (`fieldstg.s:0x6898`/`0x6828`) | store the tag and the table head in the globals at `0x8005b8fc`/`0x8005b8f8`, then scan from the head for the first record whose byte+1 matches; 0 when there is none |
+| the record claim | fieldstg `F0x80089548` / `F0x800894d8` (`fieldstg.s:0x6898`/`0x6828`) | store the tag and the table head in the globals at `0x8009b8fc`/`0x8009b8f8`, then scan from the head for the first record whose byte+1 matches; 0 when there is none |
 | the script stepper | each overlay's own routine at its base -- `wstag785` `0x800a5de4`, `wstag795`/`wstag800` `0x800a6224`, `wstag790` `0x800a5de4` | `{u16 entry, s16 hold}` cursor over `{s16 value, u16 hold}` ending on value `0xff`; the delta comes through the global function pointer at `0x8004df9c` and is clamped to 4 |
 | the record bytes | `point-sprite-ambient-system.md` §"the 18-byte placement record" | `+0` active, `+1` atlas (the tag), `+4` spriteId, `+9` ctr, `+0xc` the X high half |
 
@@ -1259,10 +1259,10 @@ Three pieces are shared verbatim and have one copy each.
 (`~/ddw3/asm/dw2003/pro/fieldstg.s` file 0x6898 and 0x6828):
 
 ```
-.L0x000068a0: sw  $a0, -0x4704($v0)    # 0x8005b8fc = the atlas tag wanted
+.L0x000068a0: sw  $a0, -0x4704($v0)    # 0x8009b8fc = the atlas tag wanted
 .L0x000068a8: lw  $v1, -0x6270($v0)    # 0x80099d90 = the stage's point table
 .L0x000068b4: jal 0x800894d8
-.L0x000068b8: sw  $v1, -0x4708($v0)    # 0x8005b8f8 = the walk cursor
+.L0x000068b8: sw  $v1, -0x4708($v0)    # 0x8009b8f8 = the walk cursor
 .L0x0000682c: lw  $a0, -0x4708($v0)    # resume where the last call stopped
 .L0x00006834: lbu $v0, 0x2($a0)        # record+2 == 0 ends the table
 .L0x00006850: lbu $v0, -0x1($v1)       # record+1 = the atlas tag
@@ -1622,7 +1622,7 @@ capture, and a capture is what says what a player sees.
   on one of those seven stages will get the first row where the original would
   take the last, and `tests/point-record-actors.test.js` pins the seven names so
   that case fails the test rather than shipping quietly. Reading the resume
-  cursor (0x8005b8f8) properly is what would settle it for all of them.
+  cursor (0x8009b8f8) properly is what would settle it for all of them.
 * **The north-sector pad's cue `0x01000000`.** It is the one pad cue that is not
   a `PACKED_JINGLES` stem (`env024:entry_02`), so the jingle route plays nothing
   for it, and §12.7's fix deliberately keeps it off the sample route rather than
@@ -3780,7 +3780,7 @@ lists in four forms, here with the cursor at `+0`/`+2`:
 
 ```
 lh $v1, ($s1)           # cursor -> table entry {s16 clip; s16 hold}
-lw $v0, [0x8005df9c]    # frame delta for this tick, capped at 4 (slti 5 / li 4)
+lw $v0, [0x8004df9c]    # frame delta for this tick, capped at 4 (slti 5 / li 4)
 lhu $v0, 2($s1)         # hold counter; charged by the delta when depth == 0
                         # hold <= 0 -> cursor++, hold += the next entry's hold
 lh $v1, ($s0) ; 0xff    # terminator: one-shot (a2 != 0) returns 0xff,
@@ -3908,3 +3908,446 @@ twins).
   the 831/832 tasks; children[5] the started event's handle in every branch) is
   recorded as the machine does it; whether the original source intended those
   two command tasks to be consumed elsewhere is not established.
+
+## 23. The widget trees behind the two `triple` parents, re-read from the assembly (2026-10-10)
+
+§20 read s460 `0x33e` and s526 `0x33d` from the decompiled C. This pass re-read
+**every routine of both trees from the original assembly**, anchored per address
+(ledger `s460-widget-family-assembly-2026-10-10`,
+`s526-widget-family-assembly-2026-10-10` and the shared
+`stage-widget-actor-shared-shape-2026-10-10`, all three demoted to
+`partially_verified` on 2026-10-11 for a fresh review after the independent
+check's corrections, then re-promoted to `verified` the same day by that
+follow-up review (its four remaining locator/wording defects fixed first);
+evidence
+`EV-WSTAG460-WIDGETFAMILY-ASM-2026-10-10`,
+`EV-WSTAG526-WIDGETFAMILY-ASM-2026-10-10`,
+`EV-STAGE-WIDGETS-ALLOCATOR-EXE-2026-10-10`). It confirms §20's shape and adds
+four things: the ReGame-Labs names, the **allocator split**, the **tag rosters
+read out of the point tables**, and the two stages' **story gates**.
+
+### 23.1 ReGame-Labs' names map onto §20's machines
+
+| §20 machine | s526 | s460 |
+|---|---|---|
+| single row, two scripts | `createClutTileTask` (tick `0x800a6178`) | `createTileSoloTask` (tick `0x800a6118`) |
+| twin rows | `createTileDuoTask` (tick `0x800a64fc`) | `createTileDuoTask` (tick `0x800a64a4`) |
+| fixed-picture single row | `createStillTileTask` (tick `0x800a693c`) | — |
+| the walker | `createWanderPairTask` (tick `0x800a6fb4`), nine | `createWandererTask` (tick `0x800a6c2c`), seven |
+| the actor bodies | `updateClutTile` / `updateTileDuo` / `updateStillTile` / `updateWanderPair` | `updateTileSolo` / `updateTileDuo` / `updateWanderer` |
+| the Start arms | `fadeOutClutTile` / `fadeOutTileDuo` / `fadeOutStillTile` / `fadeOutWanderPair` | `fadeOutTileSolo` / `fadeOutTileDuo` / `fadeOutWanderer` |
+| the stepper copies | `stepTileAnimation` / `2` / `3` / `4` (A/B/C/D) | `stepTileAnimation` / `2` / `3` (A/B/C) |
+
+Each machine has an allocator pair: the **registered** `createX`
+(`F0x800143dc` with `a3` = its caller's argument) and the **unregistered**
+`createXTask` (`F0x80014504`, `a3` forced 0). The managers use only the Task
+variants; the registered twins have no caller inside their own overlay. That is
+the mechanical difference §20's "makers" table could not show: registered
+objects join the global list through `F0x80017fdc` (`[0x8004b7b4]`) and tick
+themselves, while the Task children sit in the manager's `+0x24` array (count
+`+0x20`: 12 for s526, 9 for s460) and are ticked by the shared child-array
+runner `F0x80018230` — the register/runner pair §20 and §13.6 name.
+
+### 23.2 The tag rosters are in the point tables, not in code
+
+s526's point table (`0x800a7c98`) opens with **22 widget records, tags 1..22**:
+A = tag 21, B = tags 19/20, C = tag 22, the nine walkers = tags 1..9, each with
+its second row at **tag+9**. s460's table (`0x800a7558`) carries A = tag 10,
+B = tags 8/9, and the walkers' tags 1,2,3,5,6,7 — **tag 4's record is absent**,
+so that one copy binds nothing. The walker speeds are per stage: s526
+`0x800a786c` = {96, 80, 72, 64} by kind; s460 `0x800a7438` = {96, 80}. The
+scripts are 4-byte `{value, duration}` records with a `0xff` end marker:
+s526 A = 0,1,2,1 / 0..5 at 12 blanks, B = 37..42 & 91..96 then 3..7 & 8..12,
+C pinned at sprite 33 then 33..36, D = 0..5 ping-pong then 0..10; s460 A pins
+**60 then 61**, B takes its pictures from the four bytes at `0x800a73d8`
+(62,63,64,65, offset 0 in state 1 and 2 in state 2), C walks 0..5 then 0..10.
+
+### 23.3 The fade arms and the story gates
+
+`fadeOutX` arms mode `+0x50 = 2` plus a countdown the actor's state 1 drains;
+the manager's state 2 calls it on every child and then sets its own state to 1.
+The timers are per machine and per stage: s526 150 / 90 / 40 / 60 blanks
+(A/B/C/D), s460 20 / 150 / 60 (A/B/C). Two story gates sit outside the tree:
+`endEvent760` writes master ordinal 30 and sets flag `0x8011` (`endEvent370`:
+ordinal 15, flag `0x8010`), and each stage's `updateStage` tick creates its
+command task (829 / 830) **only while the ordinal is below that number** — so
+the whole tree is early-story decoration for these two rooms.
+
+**What this section did not establish.** What the sprite ids draw on screen —
+the art, and whether the twin/pair rows read as one object or two — was not
+established; the pass is a static read and neither stage was run. The ReGame
+name mapping is a naming aid; the authority for every clause is the assembly
+anchor, not the name.
+
+
+## 24. The four Undersea Base / Spy Satellite stages' own code, read (2026-10-11)
+
+The ReGame cross-reference left 43 open leads across s795, s800, s805 and s810 --
+the per-stage routines its C names `startStage`, `setupStage`, `updateStage`,
+`createTimer`, `createStageEffect`, `drawStageEffect`, `updateStageEffect`,
+`stepAnimation`, `isOnScreen`, `createFloater*`, `createTilePairN5` and `endEvent*`.
+41 of them were still open (s805 `0x800a63c4` and s800 `0x800a6510` were already
+anchored by the command-set claims); all 41 are read here from the original
+assembly, each to its own return. Evidence
+`EV-WSTAG795/800/805/810-OWNC/EVENTHOOKS-ASM-2026-10-11` and
+`EV-STAGE-SCENE-ENTRY-TABLE-ASM-2026-10-11`; claims
+`stage-own-code-undersea-s805-2026-10-11`,
+`stage-own-code-undersea-s795-s800-2026-10-11`,
+`stage-own-code-spy-satellite-s810-2026-10-11`,
+`stage-scene-entry-table-shape-2026-10-11`.
+
+### 24.1 The skeleton all four share
+
+Each overlay carries the same three-part skeleton, already named as families in
+[`stage-overlay-shared-routines-2026-08-11.md`](stage-overlay-shared-routines-2026-08-11.md):
+
+| part | what it is | s795 | s800 | s805 | s810 |
+|---|---|---|---|---|---|
+| entry constructor (`stage-actor-entry-ctor-family`) | `F0x80014504(tick, 0x54, extra)`: a 0x54-byte stage object with the stage tick as callback; stores its caller's argument at +0x50; calls the scene setup through the overlay's own data slot | `0x800a6654` | `0x800a69cc` | `0x800a6b44` | `0x800a6418` |
+| scene setup (`stage-scene-setup-routine-family`) | fills the shared descriptor `0x80099D80` (ids, coordinates, overlay pointers) and queues the stage's resource loads through the zone manager `[0x8009B704]`, finishing with `[0x8009B714](0)`; its `+0x24` store is the stage's event table | `0x800a6728` | `0x800a70c4` | `0x800a6c44` | `0x800a6bec` |
+| stage tick (entry-object gate, §7 of the shared-routines doc) | phase word `+0xC`; on 0 / negative / >= 4 it runs the base tick `[+0x38]`, builds its children and starts its own story events | `0x800a6578` | `0x800a6884` | `0x800a69e8` | `0x800a62b8` (not re-read here) |
+
+The setup slot the constructor calls sits immediately before the event table in
+every overlay (`[0x800a7328]`/`0x800a7758`/`[0x800a7e88]`/`[0x800a7fd4]` = the setup
+routine; `+0x24` points at the table one word later).
+
+### 24.2 What each stage builds and starts
+
+**s805 -- Magasta 1F.** The tick builds the machine room's moving-platform chain
+(`0x349`: `actorFactory(0x800a5de4, 0x54, 0x6c, 0x349)`, a 0x54-byte sub-object
+manager whose extra block holds the 27 child pointers) and the four-record picture
+driver (`0x348`: `actorFactory(0x800a60cc, 0x70, 0, 0x348)`), then starts one of the
+room's three story scenes by the story so far: scene 880 when flags `0x4048` and
+`0x4046` are both clear; scene 881 after `0x4046` is set and `0x4064` is still clear;
+scene 882 when `0x4048` is set and `0x4046` is clear. Each scene's ending writes its
+own flag (`0x4046`+`0x7400` for 880, the item/collection `0x8AF0` for 881, `0x4065`
+for 882). The moving platform (builder `0x800a6990`, tick `0x800a6724`) is the
+machine-room floor panel: state 1 plays its three panel animations, state 2 slides it
+in 8.8 units per tick along the direction at `+0x5C` (zero adds the step at `+0x60`,
+nonzero subtracts it) while the panel script accumulates that step, and each 320x256
+panel is drawn only while the rectangle test `0x800a65a0` says it is on screen. The
+27 platforms come from the 3-word table at `0x800A709C` (`{x, y, direction}`: the x
+column steps 20 to 40 per slot and the y column descends in pairs from
+`0x8C`/`0x12C` down through zero and negative values), so the room reads as a
+diagonal moving staircase.
+
+**s800 -- Magasta B2F.** The tick builds the three-digit countdown
+(`0x800a6858` = `F0x80014504(0x800a6688, 0x54, 4)`) and four class-`0x17` launch pads
+from the 12-byte records at `0x800a7700` (a nonzero guard halfword at `+2` skips a
+record). It starts scene 871 when flag `0x4044` is set
+and `0x4045` is still clear (871's own ending sets `0x4045` and grants the item
+`0x84CB`), and builds the `0x345` effect object through the
+registered constructor `0x800a61c0` while flag `0x4061` is clear; once the flag is
+set (scene 850's own ending writes it) the unregistered copy `0x800a61f0` is
+built. The pads' tick `0x800a6cf4` raises
+the hologram: the entry animation in state 1, and in state 2 a second, raised copy is
+drawn while `+0x68` counts (a `0xFF` marker calls the object's `+0x28` with 1; a
+`0x12C` value clears it). The panel draw `0x800a6b48` draws the record at
+`actor+0x64+index*4`; for index 1 the y is raised `0x20` and the palette argument is
+4 instead of 6.
+
+**s795 -- Magasta B1F.** The tick builds the countdown (`0x800a654c` =
+`F0x80014504(0x800a637c, 0x54, 4)`) and the `0x344` effect object (registered
+through `0x800a61d0` while flag `0x4063` is clear; once the flag is set -- i.e.
+after the B1F's own scene 840 -- the unregistered `0x800a6200` is built), and starts scene 830 exactly when flag
+`0x4043` is clear and the master story ordinal `[0x8004B370]` is `0x20`. Scene 830's
+ending sets `0x4043`, so it plays once at that story step.
+
+**s810 -- Spy Satellite.** The scene setup instead ends with the type-7 map choice:
+with `[0x8004B40C]` nonzero, or with the map latch `[0x8004B418]` clear, map A is
+installed (scene `+0x14` = `0x800a7aac`; the handler then clears the latch to 0);
+with the latch nonzero, map B (`0x800a7dac`) is installed and the latch set to
+`0x20`. The two handlers
+(`0x800a6a2c`/`0x800a6a90`) also request the map resources `0x06ED0003`/`0x06ED0004`
+through `[0x8009B704]`. The four on-complete hooks set `0x406D`/`0x406E`/`0x406F`
+with `0x1C3A`/`0x1C3B`/`0x1C3C`, and scene 1035's hook writes the master ordinal 41.
+The tick (`0x800a62b8`, the launch-pad builder; per the curated semantics and the
+instrumented timeline, not re-read here) builds 62 class-`0x17` pads from the
+records at `0x800a71f4`; the `0x34A` point-record constructor `0x800a623c` builds
+`actorFactory(0x800a5f00, 0x68, 0, a0)` with tag `+0x52 = 5`.
+
+### 24.3 The event table at descriptor `+0x24`
+
+The field map calls `+0x24` "event table (keyed, -1 terminator)"; the shape is read
+from its only reader, `start_event` (`fieldstg.s` `0x800853f8`, file 0x2748). It
+walks **0x14-byte entries** and stops at the first key `0xffffffff`:
+
+```
+{u32 key = scene/act id; u32 w1; u32 w2; u32 w3; u32 handler}
+```
+
+On a key match it copies `key -> scene object +0x50`, `w1 -> +0x54`, `w3 -> +0x58`,
+`handler -> +0x5C`, writes `w2 -> descriptor +0x48` (plus `[0x8005CCA8] << 16`) and
+calls `[0x80044F44]` with `w2`'s high halfword (the resource group); when `w2 == 0`
+the adjusted `+0x48` write and the call are both skipped (`0x800854A4`; `+0x48`
+then takes `w2`'s zero from the branch delay slot) -- the case of s810's 9000/9001
+rows. For these four
+stages the handler word is the stage-side on-complete hook -- or, for s810's
+9000/9001, the map handler bound through start_event's scene-dispatch path (those
+ids sit above its native band `[8000,9000)`) -- and the row set matches the
+generated descriptor column exactly:
+
+| stage | table | rows (event -> handler) |
+|---|---|---|
+| s795 | `0x800a732c` | 830 -> `0x800a66b0`; 840 -> `0x800a66dc`; act 1505 -> none |
+| s800 | `0x800a7e8c` | 850 -> `0x800a6fe0`; 870 -> `0x800a702c`; 871 -> `0x800a7078`; act 1506 -> none |
+| s805 | `0x800a775c` | 880 -> `0x800a6ba0`; 881 -> `0x800a6bec`; 882 -> `0x800a6c18` |
+| s810 | `0x800a7fd8` | 990 -> `0x800a6af8`; 1000 -> `0x800a6b44`; 1010 -> `0x800a6b90`; 1035 -> `0x800a6bdc`; 9000 -> `0x800a6a2c`; 9001 -> `0x800a6a90` |
+
+### 24.4 What this means for the walker (not implemented here)
+
+- **No tool extracts these tables.** A shared extractor (one walk, 0x14-byte
+  entries, `0xffffffff` terminator) would give the original's own event -> stage
+  handler bindings for every stage; today the converted scenes bind events by their
+  own conversion and `web/assets/engine-content.json`'s `completions` table already
+  carries each hook's writes with cites. The gates the walker's conversion already
+  runs for the events these ticks start match this pass row for row: s805's
+  `880/881/882` gates carry exactly flags `0x4048`/`0x4046`/`0x4064`/`0x4065`;
+  s800's `871` gate is `0x4044` set + `0x4045` clear; s795's `830` gate is
+  `0x4043` clear + ordinal `0x20` (its converted gate adds a redundant `0x4063`
+  test). Nothing here asks for a behaviour change.
+- **The class-`0x17` pads are already extracted and ported.**
+  `web/assets/data/launch_pads.json` carries s800 and s810 with the very ctor /
+  callback pairs read here (`0x800a6f84`/`0x800a6cf4` and
+  `0x800a69d0`/`0x800a6740`) plus each pad's clip, guard, x/y and idle script;
+  `engine/systems/launch-pad.ts` runs the transition controller. This pass adds the
+  reading behind those entries, not a new port.
+- **The s805 moving platform is the one system of the four with no extracted
+  data.** `launch_pads.json` has no 805 entry, and `child_pool_parents.json` lists
+  builder `0x800a6990` under `buildersRefusedForAnotherTripleOrder` with "the three
+  offsets are parked in an order that is neither shape's". This pass names the three
+  builder fields (+0x50 x, +0x54 y, +0x5C direction) and the runtime-seeded ones
+  (+0x58 the 8.8 accumulator, +0x60 the script-accumulated step), which is exactly
+  what that refusal was missing; extracting the 27-entry table at `0x800A709C` and
+  the three panel scripts is the bounded follow-up.
+- The registry members these stages own (`0x344`, `0x345`, `0x347`-`0x349`,
+  `0x34A`-`0x34C`) are already ported per §5/§8; nothing in this pass changes that.
+
+### 24.5 What this pass did not establish
+
+Static reads only -- nothing was run on the console or in the interpreter, and no
+RAM was read. The scene programs named by each table row's `w1` are not disassembled
+here (they are the scenes' own step programs). The s810 launch-pad builder tick
+(`0x800a62b8`), the s810 panel draw (`0x800a6594`) and the s810 class-`0x17` tick
+(`0x800a6740`) were not re-read in this pass (the curated semantics and the
+instrumented timeline cover them); the s800 class-`0x17` tick *was* read
+(`0x800a6cf4`). Panel sprite/palette meanings beyond the record offsets are not
+established.
+
+## 25. The leftover stage clusters, read from the assembly (2026-10-11)
+
+The ReGame-leads sweep's last small stage clusters, anchored per address from
+the original assembly: the two North Sector Dark Dungeon rooms' own code, the
+eight city `endEvent` hook sets, two city scene setups, and the two
+Amaterasu-city eight-topic help menus. Claims
+`stage-own-code-dark-dungeon-wstag745-2026-10-11`,
+`stage-own-code-dark-dungeon-wstag746-2026-10-11`,
+`stage-hook-addresses-wstag206-2026-10-11` … `-wstag675-2026-10-11`,
+`stage-hook-setup-addresses-wstag212/225-2026-10-11`,
+`stage-help-menu-addresses-wstag924/935-2026-10-11`; evidence
+`EV-WSTAG745-OWN-ASM-2026-10-11`, `EV-WSTAG746-OWN-ASM-2026-10-11`, and one
+`EV-WSTAG<id>-HOOKS/SETUP/EVENTMENU-ASM-2026-10-11` per overlay.
+
+### 25.1 The two Dark Dungeon rooms (s745, s746)
+
+Both rooms carry the same six routines at the same addresses; they differ only
+in constants. The wash/pad semantics were already claimed
+(`stage-dark-dungeon-wash-and-pad-builders-wstag745-746-2026-09-11`), and the
+scene-setup tail by `stage-scene-setup-story-conditional-tail`; this pass adds
+the per-address assembly anchors.
+
+| routine | s745 | s746 | what it does for a player |
+|---|---|---|---|
+| `createDarkness` `0x800a5ff4` | task id `0x18` | task id `0x19` | creates the room's darkness/white-wash actor (`F0x800143dc(0x800A5DE0, 0x54, 0, id)`) |
+| `createStageEffect` `0x800a6870` | same | same | creates the class-`0x17` pad actor (`F0x800143dc(0x800A65E0, 0x6C, 0, 0x17)`; args at +0x54/+0x58/+0x50) |
+| `drawStageEffect` `0x800a6434` | same | same | draws one 320×256 pad panel from the record at actor+0x64+index·4 (index 1 raises y by 0x20 and uses palette 4, else 6) |
+| `endEvent810` / `endEvent1297` `0x800a68cc` | `0x4041`+`0x7400` | `0x4086`+`0x7400` | the room's story flags latch when the event completes |
+| `endEvent811` / `endEvent1298` `0x800a6918` | `0x88a3`+`0x4042` | `0x4087`+`0x8f41` | the collection/flag pair for the second event |
+| `setupStage` `0x800a6964` | scene `0x710`, res `0x06EE0000`, zones `(0,0x06EE0001,0x2C800)`,`(7,0x06EE0002)`,`(4,0x06EE0003)` | scene `0x6CE`, res `0x06CF0000`, zones `(0,0x06CF0001,0x2C800)`,`(7,0x06CF0002)`,`(4,0x06CF0003)` | writes the scene descriptor, queues the room's resource loads, then the story tail: when `[0x80048D34+0x26D8]` is non-zero it clears `[0x80048D34+0x26F0]` |
+
+The two `createStageEffect`/`drawStageEffect` bodies are instruction-identical
+between the rooms (0 differing instruction words); `createDarkness` and
+`setupStage` differ only in the ids/offsets listed above.
+
+### 25.2 The city `endEvent` hook sets
+
+Eight overlays' remaining event hooks, all read to their own returns. Every one
+is a leaf that calls the resident flag setter through `[0x80048abc+0xc]`
+(`lw v0, -0x7538(lui 0x8005)` then `jalr v0`) — the same mechanism the
+2026-09-11 hook sweep named; the value written is `1` everywhere except
+wstag285's `endEvent272`, which clears.
+
+| overlay | hook | flag(s) written |
+|---|---|---|
+| wstag206 | `endEvent730` `0x800a5f1c` | `0x7400` |
+| wstag206 | `endEvent921` `0x800a5f48` | `0x40ca` |
+| wstag285 | `endEvent272` `0x800a5f08` | `0x4005` = **0** (cleared) |
+| wstag285 | `endEvent340` `0x800a5f34` | `0x1c0c` |
+| wstag295 | `endEvent580` `0x800a5f3c` | `0x1c1a`, `0x404d` |
+| wstag295 | `endEvent891` `0x800a5f88` | `0x4058` |
+| wstag295 | `endEvent892` `0x800a5fb4` | `0x4059` |
+| wstag300 | `endEvent570` `0x800a5f34` | `0x404a`, `0xc11`, `0x7401` |
+| wstag300 | `endEvent571` `0x800a5f94` | `0x404b`, `0x7402` |
+| wstag300 | `endEvent572` `0x800a5fe0` | `0x404c` |
+| wstag490 | `endEvent1267` `0x800a5f24` | `0x4025`, `0x7400` |
+| wstag490 | `endEvent1268` `0x800a5f70` | `0x4026`, `0x8022` |
+| wstag490 | `endEvent1277` `0x800a5fbc` | `0x402f`, `0x7401` |
+| wstag525 | `endEvent550` `0x800a5edc` | `0x4003` |
+| wstag525 | `endEvent1273` `0x800a5f08` | `0x402b`, `0x7400` |
+| wstag525 | `endEvent1274` `0x800a5f54` | `0x402c`, `0x8013` |
+| wstag537 | `endEvent700` `0x800a5ee4` | `0x400b` |
+| wstag537 | `endEvent1455` `0x800a5f10` | `0x40cb`, `0x7400` |
+| wstag537 | `endEvent1456` `0x800a5f5c` | `0x40cc`, `0x8666` |
+| wstag675 | `endEvent390` `0x800a5ed0` | `0x4017` |
+| wstag675 | `endEvent400` `0x800a5efc` | `0x401a` |
+| wstag675 | `endEvent410` `0x800a5f28` | `0x401e`, `0x1c26`, `0x7400` |
+
+Two neighbours sit inside the same extents and are not leads: wstag206's
+`0x800a5f74` sets the master story ordinal `[0x8004B370]=0x25`, and wstag212's
+`0x800a64b4` sets it to `0xc`.
+
+### 25.3 Two city scene setups (s212, s225)
+
+Both are members of the scene-setup family (they fill the shared descriptor at
+`0x80099D80` and queue the stage's resource loads through the zone manager).
+Read here for their own constants:
+
+- **s212 `setupStage` `0x800a64d8`**: scene id `0x4CD`, resource `0x04CE0000`;
+  descriptor pointers `0x800A894C` (+0x10), `0x800A8194` (+0x28),
+  `0x800A8894` (+0x4C), `0x800A8E98` (+0x24); +0x1C=`0x4CC`,
+  +0x44=`[0x8005CCA8]+0xE8`, +0x3C=`0x43`, +0x40=`0x610C0003`, +0x2C=`0x17700`,
+  +0x30=`0x13F00`, +0x34=0, and a 4-byte copy of the overlay's own first word
+  into +0x38 (`lwl/lwr/swl/swr` from `0x800a5de0`); one zone request
+  `(0, 0x04CE0001, 0x13F00)`. Its hook `endEvent271`
+  `0x800a6448` sets flags `0x4005`+`0x4004`.
+- **s225 `setupStage` `0x800a6320`**: scene id `0x19E`, resource `0x019F0000`;
+  pointers `0x800A6A34` (+0x10), `0x800A6B0C` (+0x14), `0x800A6648` (+0x28),
+  `0x800A69F0` (+0x4C), `0x800A6B40` (+0x24); +0x1C=`0x3CD`,
+  +0x44=`[0x8005CCA8]+0xE8`, +0x2C=`0xFD00`, +0x3C=`0x33`, +0x40=`0x60CC0000`,
+  +0x30=`0x17700`, +0x34=0; zone requests `(0, 0x019F0001, 0x17700)` and
+  `(7, 0x019F0002)`; then the story-conditional tail: when the master ordinal
+  minus `0x14` is below 4, or minus `0x27` is below 2, it rewrites +0x3C=`0x1F`
+  and +0x40=`0x607C0000`. Its hook `endEvent5` `0x800a6310` (a 4-word tail
+  inside the enclosing function) sets the master story ordinal
+  `[0x8004B370]=2`.
+
+### 25.4 The two Amaterasu-city eight-topic help menus (s924, s935)
+
+Both stages host the same help menu as an event object. The 2026-09-11 sweep
+already named the machines (`updateEightTopicHelpMenu_s924_1604`,
+`_s935_1618` in `docs/research/field/stage-call-timelines-2026-09-11.md`); this
+pass read the bodies and anchors the addresses.
+
+- **scene setups**: s924 `setupStage` `0x800a5ee8` — scene id `0x19C`, resource
+  `0x08E70000`, +0x1C=`0x8E5`, +0x44=`[0x8005CCA8]+0xFD`, +0x3C=`0x33`,
+  +0x40=`0x60CC0000`, +0x2C=`0x10200`, +0x30=`0x15700`, pointers
+  `0x800A7620`/`0x800A79A4`/`0x800A742C`/`0x800A7600`/`0x800A79F8`, zones
+  `(0, 0x08E70001, 0x15700)`, `(7, 0x08E70002)`. s935 `setupStage` `0x800a5ee4` —
+  scene id `0x1AE`, resource `0x08FD0000`, +0x1C=`0x8FC`,
+  +0x44=`[0x8005CCA8]+0xFD`, +0x30=`0xC800`, +0x3C=`8`, +0x40=`0x60200000`,
+  +0x2C=`0x1A400`, pointers `0x800A7994`/`0x800A7AEC`/`0x800A73C8`/`0x800A7958`/
+  `0x800A7B28`, zones `(0, 0x08FD0001, 0x1A400)`, `(7, 0x08FD0002)`.
+- **the event objects**: `startEvent1602` `0x800a6a68` =
+  `F0x80014504(0x800A60FC, 0x84, 0x28)`; `startEvent1616` `0x800a6a04` =
+  `F0x80014504(0x800A60D8, 0x84, 0x28)`; the separate 1604/1618 objects come
+  from `0x800a7400`/`0x800a739c` = `F0x80014504(0x800A6A94/0x800A6A30, 0x84, 0x28)`.
+- **the menu tick** (`updateEvent1604` `0x800a6a94` / `updateEvent1618`
+  `0x800a6a30`, the same machine except the resource id — 924: `0x01580002`,
+  935: `0x01580009`): on init it calls the base tick `[+0x38]`, creates
+  **eight text rows** `F0x8001ae38(0x1002, 1, 0xBD, 0x21+0xE·i)`, the cursor
+  `F0x8001b364(0x1002, 1, 0xAF, 0x21)` and one more row
+  `F0x8001ae38(0x1002, 1, 0x12, 0xB0)`, and sets `+0x50=8` (eight topics). The
+  pad sub-state moves the cursor `+0x54` over rows `0..+0x50-1` (clamped; bits
+  via `[0x8004B7D0+0x3F4/+0x3FC]` shifted by `+0x408(0,4/6)`), plays
+  `0x8004513E` when the row changes and re-texts the cursor widget to
+  `0x21+0xE·row`; confirm (bit `0xD`) plays `0x8004503C` and advances — on the
+  last row it jumps to state `0xA`; cancel (bit `0xE`) plays `0x800450BD`. The
+  row texts come from each machine's own resource through the text block
+  `[0x80044B38+0x424]` — `0x01580002` for s924's 1604 machine, `0x01580009`
+  for s935's 1618 machine.
+
+### 25.5 What the player meets
+
+In the two Dark Dungeon rooms the room washes white when the story calls for it,
+pads raise and sink, and the two room events latch their flags as they finish.
+The city hooks are the small story beats that fire when an event completes —
+each writes its own flag pair, so the world remembers the beat happened. The two
+Amaterasu-city points open an eight-line help menu: eight topics with a moving
+cursor, a description row that follows the cursor, a click on move and a
+different click on confirm or cancel.
+
+### 25.6 Implementation implications (not implemented)
+
+- The hooks are flag writes and belong to the shared flag store — no per-place
+  code should be written for any of them.
+- The two `setupStage` routines are scene-descriptor writes plus zone-manager
+  requests; the descriptor field meanings and the zone manager are the shared
+  systems, the per-stage constants are data.
+- The two help menus are one machine with two members: a single port (eight-row
+  list, cursor, description row, the three sounds) would cover both, and the
+  row texts are extracted data (`0x01580002`/`0x01580009`, one resource per
+  menu).
+- Nothing in `engine/` or `web/` was changed by this pass.
+
+### 25.7 What this pass did not establish
+
+- What each flag gates: the consumers of `0x7400`/`0x7401`/`0x7402`, `0x8022`,
+  `0x8013`, `0x8666`, `0x8f41`, `0x88a3` and the `0x40xx`/`0x1cxx` pairs were
+  not traced here (the stage-script side that reads them is a separate sweep).
+- The contents of the resource payloads (the eight topic strings, the zone
+  payloads) — extraction, not read here.
+- Whether the two help menus are reachable in ordinary play; the 2026-09-11
+  slice recorded one journal beat and left the rest unestablished.
+
+
+## 26. The ReGame-gap drain: per-overlay anchors for the remaining stage leads (2026-10-13)
+
+**What this is.** The 2026-10-11 census (`.regame-leads11-census.md`) left the stage
+overlays' remaining ReGame-Labs xref leads reading open in `known` -- not because the
+routines were unread (the families were read in the 2026-09-10/11 sweeps and the places
+pass), but because the ledger's anchors did not carry each overlay's own RAM address, so
+`known` could not scope a lead to its own overlay. This pass closed that mechanical gap
+for every remaining lead of the overlays no sibling branch owns, and for the
+sibling-overlay rows no sibling progress file names.
+
+**What was anchored, and how it was checked.** 854 leads, anchored per address, one
+evidence entry per overlay (`EV-REGAME-DRAIN-<OVERLAY>-2026-10-13`) quoting that
+overlay's own listing at each lead address:
+
+- Batch 1 -- 807 leads in 254 stage overlays: 240 `startStage`, 241 `setupStage`,
+  240 `updateStage`, 1 `copyPlacePoints`, 85 auxiliary (event hooks, anim steppers,
+  tweens, thunks). Shape checks re-run over every overlay's `.s`: the `startStage`
+  22-word bootstrap required at the exact lead address (createTask F0x80014504, a0 = the
+  overlay's updateStage, owner store s1 -> +0x50(s0), stageFuncs jalr) -- 240/240; the
+  scene-setup signature (descriptor 0x80099d80 write + zone-manager 0x8009b6c4 call)
+  found inside every `setupStage` lead's body -- 241/241; each `updateStage` lead within
+  0x20 of its overlay's createTask a0 -- 240/240.
+- Batch 2 -- 38 leads in 14 sibling-owned overlays whose addresses no sibling progress
+  file names (wstag206/225/285/295/300/460/490/525/526/537/675/810/924/935).
+- Batch 3 -- 9 leads: shocktst 0x80083064/0x80083b2c (named by the verified
+  `shocktst-editor-loop-2026-10-10`), stagslct 0x80084b2c (named by
+  `UI-STAGSLCT-COMPLETE-001`/`-SELECTION-001`), cnty_sel 0x80083000 (fade-rect draw, read
+  this pass), ststatus 0x80084f54/0x800855c8 (the demo-setup ctor/draw, read this pass),
+  wstag226 0x800a6164/0x800a61cc and wstag625 0x800a614c (read this pass).
+
+All 854 leads read DECODED afterwards (`known --overlay <ov> <lead>`), 981 of the
+census's 1029 pairs now read DECODED (from 114 at the start).
+
+**Claims.** `regame-leads12-drain-stage-anchors-2026-10-13` (+ `-batch2-`,
+`-stage-residue-`) and `regame-leads12-drain-residue-anchors-2026-10-13`; all
+partially_verified. No new behaviour is asserted by the anchoring claims -- the family
+decode remains the existing claims named in each entry -- except the cnty_sel/ststatus/
+wstag226/wstag625 readings, which are fresh (heads and full quotes in the entries).
+
+**What remains open, and why** (48 rows): 36 rows whose addresses are named in the
+running sibling branches' progress files (leads6/8/9/10/11 -- left to those jobs);
+10 cardgame rows with no covering claim (0x8008be04, 0x8008c8d8, 0x8008ce0c, 0x8008f978,
+0x800919fc, 0x8009a1a0, 0x8009c960, 0x8009df68, 0x800a36e4, 0x800a4328 -- a card-duel
+follow-up); 2 wfightmn rows (0x8009c578/0x8009c6a4) whose functions live in FIGHTSTG and
+are already decoded there (`fightstg-8009c578-role-2026-09-12`, verified) -- the xref's
+overlay attribution is the residue.
+
+**Correction to the census.** The census's line "the small `wstag` clusters ... swept by
+other branches" did not hold in master: those rows were family-ambient, not decoded.
+This pass anchored them (batches 1-2). The `gcc2_compiled.` markers remain compiler
+artifacts and are skipped; no census row consists of a marker alone.

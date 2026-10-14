@@ -519,8 +519,12 @@ export function createDriMenu() {
       return;
     }
     if (key === "triangle" && (d.screen === "switch_from" || d.screen === "switch_to")) {
+      // The Details toggle (logical 0xC) plays 0x0004001C — F0x8008b798.c:112-116
+      // (`unk408(0,0xC)` -> `0x80055C48(0x4001C)` when the highlighted entry is
+      // valid). True name SYSTEM07. Corrected 2026-10-14
+      // (audit/sfx-triggers-vs-decode): it played the pre-shift "system00".
       d.details = !d.details;
-      sfx?.play("system00");
+      sfx?.play("system07");
       return;
     }
 
@@ -540,14 +544,19 @@ export function createDriMenu() {
       else if (key === "right" || key === "down")
         d.cursor = (d.cursor + 1) % Math.max(1, rows.length);
       else if (confirm && rows.length) {
-        sfx?.play("system00");
+        // The switch lists' confirm (logical 0xD) plays 0x0004001C when the
+        // highlighted entry is valid, and the resident cancel blip 0x800450BD
+        // when the gate fails — F0x8008b798.c:117-121 (the else arm of the 0xD
+        // test). True names SYSTEM07 / SYSTEM01. Corrected 2026-10-14
+        // (audit/sfx-triggers-vs-decode).
+        if (d.screen === "switch_from" && !reserve().length) {
+          sfx?.play("system01");
+          d.feedback = "No Digimon is waiting.";
+          return;
+        }
+        sfx?.play("system07");
         d.selectedPartner = d.cursor;
         if (d.screen === "switch_from") {
-          if (!reserve().length) {
-            // Nothing obtained is waiting, so there is nobody to switch with.
-            d.feedback = "No Digimon is waiting.";
-            return;
-          }
           d.switchFrom = d.cursor;
           d.screen = "switch_to";
           d.cursor = 0;
@@ -575,7 +584,9 @@ export function createDriMenu() {
       else if (key === "right" || key === "down")
         d.cursor = (d.cursor + 1) % Math.max(1, waiting.length);
       else if (confirm && waiting.length) {
-        sfx?.play("system00");
+        // Same 0xD gate as the "Switch who?" list: valid entry -> 0x0004001C
+        // (SYSTEM07). F0x8008b798.c:117-121.
+        sfx?.play("system07");
         const incoming = waiting[clampCursor(d.cursor, waiting.length)];
         d._switchLeave = { kind: "confirm", index: d.switchFrom, charId: incoming.charId, name: incoming.name };
         startSwitchFolds(false, sfx);
@@ -716,7 +727,16 @@ export function createDriMenu() {
         if (grid[nr]?.[nc]) d.cursor = nr * 5 + nc;
       }
     }
-    if (d.cursor !== prev) sfx?.play("system02");
+    // The move cue. The root desk's cursor plays the list blip 0x8004513E
+    // (F0x80088b5c.c:169-182; dri-gap-2026-09-02.md B7), while the switch
+    // lists' cursors play the stepper blip 0x0004001B (F0x8008b798.c:98-101,
+    // the `temp_s4 != arg0->unk60` changed-gate). True names SYSTEM02 /
+    // SYSTEM06. Corrected 2026-10-14 (audit/sfx-triggers-vs-decode): the
+    // switch lists used to play the root desk's blip.
+    if (d.cursor !== prev) {
+      const switching = d.screen === "switch_from" || d.screen === "switch_to";
+      sfx?.play(switching ? "system06" : "system02");
+    }
   };
 
   // Held-direction repeat on the pad service's accelerating curve. The original

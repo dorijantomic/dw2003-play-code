@@ -5,7 +5,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x000011f4",
     "trigger": "Plays once when a pushable/switch actor (generic actor struct, function at file 0x1058 / RAM 0x80083d08) finishes sliding into its new tile: fires right after the actor's computed step delta is stored to its position-accumulator field (+0x64), immediately before invoking the per-frame tick callback at [actor+0x38].",
-    "evidence": "RAM 0x80083d08 fn, actor mode dispatch on [s0+0xc] (states 1/2/3 branch away; fallthrough = the push-resolution path). At .L0x000011dc: `lw $v0,0x54($a0)` / `sw $v0,0x64($s0)` (store computed slide delta) then `.L0x000011e0: lui $a0,0x8004` / `.L0x000011ec: lw $v0,0x5c48($v0)` (load play-fn ptr) / `.L0x000011f4: jalr $v0` / `ori $a0,0x103c` (packed id 0x8004103c = SWITCH02). Preceded (0x10c4-0x1158) by a byte-table walk incrementing $a1 through push-step deltas, matching a discrete crate/switch shove animation. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x80083d08 fn, actor mode dispatch on [s0+0xc] (states 1/2/3 branch away; fallthrough = the push-resolution path). At .L0x000011dc: `lw $v0,0x54($a0)` / `sw $v0,0x64($s0)` (store computed slide delta) then `.L0x000011e0: lui $a0,0x8004` / `.L0x000011ec: lw $v0,0x5c48($v0)` (load play-fn ptr) / `.L0x000011f4: jalr $v0` / `ori $a0,0x103c` (packed id 0x8004103c = SWITCH01). Preceded (0x10c4-0x1158) by a byte-table walk incrementing $a1 through push-step deltas, matching a discrete crate/switch shove animation. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "SWITCH02"
@@ -16,7 +16,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x00005394",
     "trigger": "Plays once on the first tick of a generic scripted-actor's init state (mode field [s0+0xc] not in {1,2,3}, i.e. mode 0), gated on the actor's subtype byte [s0+0x8] being non-1; the same actor type acquires a nearest 'type 5' object handle via the shared object-lookup helper (0x8004b7bc) and sets camera-pan targets, consistent with a scripted camera/UI transition sequence (identity as literally 'party wipe' is inferred from the sound-table name/program-0 grouping with DIGM_DIG/JINGLE01, not independently proven from a caller graph).",
-    "evidence": "RAM 0x80087f84 fn. `.L0x00005349: lw $v1,0x8($s0)` / `li $v0,0x1` / `.L00005351: beq $v1,$v0,.L0x0000539c` (skip sound if subtype==1) else `.L0x00005352: lui $a0,0x4` ... `.L0x00005388: lw $v0,0x5c48($v0)` / `.L0x00005394: jalr $v0` / `ori $a0,0x7` (packed id 0x00040007 = GAMEOVER). Function also does `jalr [0x8004b7bc]` object-type-5 nearest search (fields +0x50/+0x54/+0x58) shared with the PLAYER09 and COMCD204 functions' identical call convention. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x80087f84 fn. `.L0x00005349: lw $v1,0x8($s0)` / `li $v0,0x1` / `.L00005351: beq $v1,$v0,.L0x0000539c` (skip sound if subtype==1) else `.L0x00005352: lui $a0,0x4` ... `.L0x00005388: lw $v0,0x5c48($v0)` / `.L0x00005394: jalr $v0` / `ori $a0,0x7` (packed id 0x00040007 = FUKIDASH). Function also does `jalr [0x8004b7bc]` object-type-5 nearest search (fields +0x50/+0x54/+0x58) shared with the PLAYER09 and COMCD204 functions' identical call convention. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": "web/game.js: field trigger-indicator appear edge (step-VM icon actor init, fieldstg 0x80087f84 subtype!=1) + cutscene emote 0x325",
     "status": "decoded",
     "old_name": "GAMEOVER"
@@ -38,7 +38,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x00008774",
     "trigger": "Plays once when a scripted-effect actor's sub-state ([s4+0x14]) is in its default/first case (not 0/1/2/matched value), immediately after the actor spawns a positioned sprite/particle (call to F0x80085e0c with the parent actor's stored (x,y,z) at [+0x74]/[+0x78]/[+0x70]) — i.e. the moment a dig-effect particle appears at the target position; name (DIGM_DIG = 'Digimon dig') and program-0 slot group it with the other jingle/UI-bank stingers used for scripted actions, consistent with the Digimon field-skill 'Dig' effect.",
-    "evidence": "RAM 0x8008aa10 fn (part of the same large state-machine started at 0x7d60/RAM 0x8008a9d0, actor mode field [s4+0xc]). Sub-state dispatch on [s4+0x14]: default case at `.L0x0000874c: lw $a0,0x74($s4) / lw $a1,0x78($s4) / lw $a2,0x70($s4) / jal 0x80085e0c` (spawn sprite at stored coords) / `sw $v0,($s5)`; then `.L0x00008768: lui $v0,0x8005` / `lw $v0,0x5c48($v0)` / `.L0x00008774: jalr $v0` / `ori $a0,0x4` (packed id 0x00040004 = DIGM_DIG), followed by invoking the tick callback [s4+0x40]. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x8008aa10 fn (part of the same large state-machine started at 0x7d60/RAM 0x8008a9d0, actor mode field [s4+0xc]). Sub-state dispatch on [s4+0x14]: default case at `.L0x0000874c: lw $a0,0x74($s4) / lw $a1,0x78($s4) / lw $a2,0x70($s4) / jal 0x80085e0c` (spawn sprite at stored coords) / `sw $v0,($s5)`; then `.L0x00008768: lui $v0,0x8005` / `lw $v0,0x5c48($v0)` / `.L0x00008774: jalr $v0` / `ori $a0,0x4` (packed id 0x00040004 = DIGIMENT), followed by invoking the tick callback [s4+0x40]. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "DIGM_DIG"
@@ -60,7 +60,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x0000a4a4",
     "trigger": "Plays once when a 'walk-to-and-attach' actor (mode [s2+0xc]==0, i.e. still searching) acquires its nearest 'type 5' object target via the shared object-lookup helper (0x8004b7bc), copies the target's stored position/table-index fields into its own [+0x50]/[+0x54]/[+0x60], and invokes the on-enter callback [s2+0x38] — the sound fires immediately after that callback returns, i.e. at the moment the actor latches onto its target and (per the function's mode>=1 continuation, not shown to completion here) begins a tile-by-tile approach walk toward it. This reads as a scripted 'reach for interactive prop' foley cue rather than an ordinary walk-cycle footstep.",
-    "evidence": "RAM 0x8008d068 fn. `.L0x0000a41c: lui $v0,0x8005 / lw $v0,-0x4844($v0)` (=0x8004b7bc) called with type arg 5 (either `li a0,5` tag=0x11b, or fallback tag=-1) via tail-jump to a shared continuation; result target copied `.L0x0000a450: lw $v0,0x58($v1) / sw $v0,0x50($s2)` etc.; `.L0x0000a484: lw $v1,0x38($s2) / jalr $v1` (on-enter callback) then `.L0x0000a494: lui $a0,0x8004 / ... lw $v0,0x5c48($v0) / .L0x0000a4a4: jalr $v0 / ori $a0,0x5c44` (packed id 0x80045c44 = PLAYER09). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x8008d068 fn. `.L0x0000a41c: lui $v0,0x8005 / lw $v0,-0x4844($v0)` (=0x8004b7bc) called with type arg 5 (either `li a0,5` tag=0x11b, or fallback tag=-1) via tail-jump to a shared continuation; result target copied `.L0x0000a450: lw $v0,0x58($v1) / sw $v0,0x50($s2)` etc.; `.L0x0000a484: lw $v1,0x38($s2) / jalr $v1` (on-enter callback) then `.L0x0000a494: lui $a0,0x8004 / ... lw $v0,0x5c48($v0) / .L0x0000a4a4: jalr $v0 / ori $a0,0x5c44` (packed id 0x80045c44 = PLAYER08). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "PLAYER09"
@@ -71,7 +71,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x0000a820",
     "trigger": "Plays once per ~60-frame window (actor timer field [s2+0x18] wraps at 0x3c) while the actor's map position maps to a 2-bit tile-type code (read from a packed tile-type table at RAM 0x80097b14, indexed by (y>>10) row / (x>>7) column, 2 bits per tile via a shift-by-((x>>7)&0x6) then mask 0x3) equal to a caller-supplied expected value ($a2). This is a generic 'am I standing on tile-type N' periodic-chime helper reused by whichever actor calls it with a particular $a2 — the specific in-game feature (e.g. a warning tone for a hazard/switch tile) is not resolvable from this function alone since $a2 is an argument, not a local constant.",
-    "evidence": "RAM 0x8008d788-region fn (part of the state machine starting near RAM 0x8008d27c). Tile lookup: `.L0x0000a7b4: lui $v1,0x8009 / addiu $v1,0x7b14` (table base 0x80097b14) / `sra $a1,$a0,0xa` (row = y>>10) / `sra $a0,0x7` (col = x>>7) / `lbu $v0,($v0)` / `andi $a0,0x6 / srav $v0,$v0,$a0` / `andi $v1,$v0,0x3` (2-bit tile code). Timer gate: `.L0x0000a7e8: lw $a0,0x18($s2)` (counter) `slti $v0,$a0,0x3c` / `bnez $a0,.L0x0000a82c` (only on counter==0) then `andi $v0,$v1,0xff / bne $v0,$a2,.L0x0000a82c` (only if tile code == expected) then `.L0x0000a814: lui $v0,0x8005 / lw $v0,0x5c48($v0) / .L0x0000a820: jalr $v0 / ori $a0,0x5341` (packed id 0x80045341 = SYSTEM06). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x8008d788-region fn (part of the state machine starting near RAM 0x8008d27c). Tile lookup: `.L0x0000a7b4: lui $v1,0x8009 / addiu $v1,0x7b14` (table base 0x80097b14) / `sra $a1,$a0,0xa` (row = y>>10) / `sra $a0,0x7` (col = x>>7) / `lbu $v0,($v0)` / `andi $a0,0x6 / srav $v0,$v0,$a0` / `andi $v1,$v0,0x3` (2-bit tile code). Timer gate: `.L0x0000a7e8: lw $a0,0x18($s2)` (counter) `slti $v0,$a0,0x3c` / `bnez $a0,.L0x0000a82c` (only on counter==0) then `andi $v0,$v1,0xff / bne $v0,$a2,.L0x0000a82c` (only if tile code == expected) then `.L0x0000a814: lui $v0,0x8005 / lw $v0,0x5c48($v0) / .L0x0000a820: jalr $v0 / ori $a0,0x5341` (packed id 0x80045341 = SYSTEM05). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "SYSTEM06"
@@ -82,7 +82,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x0000ac58",
     "trigger": "A looping, positional (packed-id bits: top nibble 0xa0 = positional+category bits set) ambient sound tied to a camera/scroll-boundary state on a generic actor: started (0x80055c48 play) the first tick the actor's 'scrolling active' field [+0x5c] becomes non-zero (a rotating 4-state index at [+0x60] cycles 0..3, selecting one of 4 table-driven screen-offset pairs at RAM 0x80097b38), and stopped (0x80055c50) on the tick that field clears back to zero. This reads as a per-boundary-position ambience loop for camera panning/tracking, not a discrete one-shot cue.",
-    "evidence": "Decompiled (m2c, RAM 0x8008d788): `if (temp_s0->unk5C != 0) { var_s4 = ((temp_s0->unk60+1)&3)+1; temp_s0->unk60 = ...; if (temp_s0->unk64 == -1) temp_s0->unk64 = *(s16(**)(?))0x80055C48(0xA00431BF); } else { temp_a1 = temp_s0->unk64; if (temp_a1 != -1) { *(...)0x80055C50(0xA00431BF, temp_a1); temp_s0->unk64 = -1; } }` followed by a table read at `(var_s4*8) + 0x80097b38` combined with the actor's own clamp fields (+0x54/+0x58 vs a camera-follow width/height at +0x74/+0x78) feeding a position-set call at [+0x120]. Raw disasm confirms the play call: `.L0x0000ac54: lw $v0,0x5c48($v0) / .L0x0000ac58: jalr $v0 / ori $a0,0x31bf` with `lui $a0,0xa004` two instructions earlier (packed id 0xa00431bf = COMCD204). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "Decompiled (m2c, RAM 0x8008d788): `if (temp_s0->unk5C != 0) { var_s4 = ((temp_s0->unk60+1)&3)+1; temp_s0->unk60 = ...; if (temp_s0->unk64 == -1) temp_s0->unk64 = *(s16(**)(?))0x80055C48(0xA00431BF); } else { temp_a1 = temp_s0->unk64; if (temp_a1 != -1) { *(...)0x80055C50(0xA00431BF, temp_a1); temp_s0->unk64 = -1; } }` followed by a table read at `(var_s4*8) + 0x80097b38` combined with the actor's own clamp fields (+0x54/+0x58 vs a camera-follow width/height at +0x74/+0x78) feeding a position-set call at [+0x120]. Raw disasm confirms the play call: `.L0x0000ac54: lw $v0,0x5c48($v0) / .L0x0000ac58: jalr $v0 / ori $a0,0x31bf` with `lui $a0,0xa004` two instructions earlier (packed id 0xa00431bf = COMCD203). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "COMCD204"
@@ -104,7 +104,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x0000d18c",
     "trigger": "Walk footstep: plays every 8 movement ticks (actor tick counter [s0+0x18] & 7 == 0, counter incremented per call) while the player is moving; all three callers of the helper fn 0x8008fd74 (file 0xd3f4/0xd5a4/0xd6ac) integrate the player position ([s0+0x50]/[s0+0x54] += velocity) immediately before the call with a1=1 -- i.e. the walking movement handler. Terrain values 0x146/0x147 divert to id 0x80045fcb (DIGIMENT, slot 203 -- unresolvable vag) on a 32-tick cadence instead.",
-    "evidence": "RAM 0x8008fd74 fn. `.L0x0000d0d8: lw $v0,0x8($s0) / bnez $v0,.L0x0000d1a4` (only when active==0); `.L0x0000d104: lw $v1,0x4($s0)` (terrain id) checked against `li $v0,0x146` and `li $v0,0x147` (both diverted); default path `.L0x0000d118: lui $a0,0x8004 / .L0x0000d120: lw $v0,0x5c48($v0) / j 0x8008fdf4 / ori $a0,0x583c` (packed id 0x8004583c = PLAYER01) OR the a1==0 variant at `.L0x0000d17c..0x0000d18c` (same id) gated by `.L0x0000d16c: lw $v0,0x18($s0) / andi $v0,0x1f` (32-cadence variant used elsewhere in this fn for the 0x146 case — the default-terrain path itself is entered once per call, cadence enforced by the caller's per-8-tick invocation pattern seen in the sibling ladder-creak fn 3 lines below in the same file). CONTROLLER VERIFICATION: caller contexts at file 0xd3d0-0xd3f8, 0xd580-0xd5a8, 0xd688-0xd6b0 all do position += velocity then jal 0x8008fd74 with a1=1 (8-tick cadence path). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x8008fd74 fn. `.L0x0000d0d8: lw $v0,0x8($s0) / bnez $v0,.L0x0000d1a4` (only when active==0); `.L0x0000d104: lw $v1,0x4($s0)` (terrain id) checked against `li $v0,0x146` and `li $v0,0x147` (both diverted); default path `.L0x0000d118: lui $a0,0x8004 / .L0x0000d120: lw $v0,0x5c48($v0) / j 0x8008fdf4 / ori $a0,0x583c` (packed id 0x8004583c = PLAYER00) OR the a1==0 variant at `.L0x0000d17c..0x0000d18c` (same id) gated by `.L0x0000d16c: lw $v0,0x18($s0) / andi $v0,0x1f` (32-cadence variant used elsewhere in this fn for the 0x146 case — the default-terrain path itself is entered once per call, cadence enforced by the caller's per-8-tick invocation pattern seen in the sibling ladder-creak fn 3 lines below in the same file). CONTROLLER VERIFICATION: caller contexts at file 0xd3d0-0xd3f8, 0xd580-0xd5a8, 0xd688-0xd6b0 all do position += velocity then jal 0x8008fd74 with a1=1 (8-tick cadence path). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": "web/game.js:update",
     "status": "decoded",
     "old_name": "PLAYER01"
@@ -114,11 +114,11 @@
     "id": "0x80045cc5",
     "file": "pro/fieldstg.s",
     "offset": "0x0000dcf0",
-    "trigger": "Fires as the first half of an alternating walk-footstep pair inside the player's ~81-case action-id dispatcher (mode field [s0+0x10], jump table at RAM 0x8008b590): after setting animation clip 0x11 then (gated on grounded-flag [s0+0xe8] != 0) advancing to clip 0x13 via the SETANIM helper (F0x8008f4b4), the sound plays immediately after that SETANIM(0x13) call — i.e. on the 'clip 0x13' step of the walk cycle, gated on ground contact.",
-    "evidence": "RAM 0x8008fed0-region fn (player action dispatcher, [s0+0x10] indexes RAM 0x8008b590[81]). `.L0x0000dc78..0x0000dcac`: clip-0x11 case; `.L0x0000dcc8: lw $v0,0xe8($s0) / beqz $v0,.L0x0000e19c` (grounded gate) then `.L0x0000dcd8: jal F0x8008f4b4 / li $a1,0x13` (SETANIM clip 0x13) then `.L0x0000dce0: lui $a0,0x8004 / lw $v0,0x5c48($v0) / .L0x0000dcf0: jalr $v0 / ori $a0,0x5cc5` (packed id 0x80045cc5 = PLAYER10). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
-    "walker_hook": null,
+    "trigger": "Fires once per fishing cast, on the transition from the wind-up clip to the follow-through: sub-state 1 of the player's mode 0x48 (FISHING) block, reached from the leader dispatcher's jump table at RAM 0x80083590 (0x51 entries, indexed by mode field [s0+0x10]; entry 0x48 = 0x8009092c) and re-dispatched through the six-entry sub-state table at RAM 0x800836d8. [s0+0xe8] is the SETANIM animation-complete flag (cleared by F0x8008f4b4), not a grounded flag: the sound fires when clip 0x11 has finished playing and clip 0x13 is latched. [Corrected 2026-07-29: the earlier 'alternating walk-footstep pair' reading was wrong — clips 0x11-0x15 belong to the fishing pack P002PLYF. Decode: docs/research/field/fishing-system-decoded-2026-07-11.md addendum 2026-07-29 (d).]",
+    "evidence": "RAM 0x8008fed0-region fn (player action dispatcher, [s0+0x10] indexes RAM 0x8008b590[81]). `.L0x0000dc78..0x0000dcac`: clip-0x11 case; `.L0x0000dcc8: lw $v0,0xe8($s0) / beqz $v0,.L0x0000e19c` (grounded gate) then `.L0x0000dcd8: jal F0x8008f4b4 / li $a1,0x13` (SETANIM clip 0x13) then `.L0x0000dce0: lui $a0,0x8004 / lw $v0,0x5c48($v0) / .L0x0000dcf0: jalr $v0 / ori $a0,0x5cc5` (packed id 0x80045cc5 = PLAYER09). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "walker_hook": "engine/systems/fishing.ts: POSE_CAST_SOUND (0x80045cc5) / POSE_THROW_SOUND (0x80045d46)",
     "status": "decoded",
-    "note": "Mechanism decoded (SETANIM clip 0x13/0x14 + grounded gate [s0+0xe8] inside the player action dispatcher) but WHICH action-id case this is could not be identified (jump table not recoverable from the splat dump; player clip 17-20 metadata not baked in walker assets). Wiring as a generic walk pair would be a guess -- PLAYER01 is the proven walk footstep. Not wired.",
+    "note": "Decoded 2026-07-29 as the fishing cast (mode 0x48), correcting the earlier walk-pair reading. Wired: engine/systems/fishing.ts POSE_CAST_SOUND (0x80045cc5) / POSE_THROW_SOUND (0x80045d46) play on the cast pose transitions.",
     "old_name": "PLAYER10"
   },
   {
@@ -126,11 +126,11 @@
     "id": "0x80045d46",
     "file": "pro/fieldstg.s",
     "offset": "0x0000dd30",
-    "trigger": "Second half of the alternating walk-footstep pair: immediately follows PLAYER10 in the same dispatcher case, re-checks the grounded flag [s0+0xe8], advances SETANIM to clip 0x14, and plays this sound right after — i.e. the opposite-foot footstep of the PLAYER10/PLAYER11 walk cycle.",
-    "evidence": "RAM 0x8008fed0-region fn, same case block as PLAYER10. `.L0x0000dd08: lw $v0,0xe8($s0) / beqz $v0,.L0x0000e19c` then `.L0x0000dd14: jal F0x8008f4b4 / li $a1,0x14` (SETANIM clip 0x14) then `.L0x0000dd24: lui $v0,0x8005 / lw $v0,0x5c48($v0) / .L0x0000dd30: jalr $v0 / ori $a0,0x5d46` (packed id 0x80045d46 = PLAYER11). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
-    "walker_hook": null,
+    "trigger": "The next beat of the same fishing cast — sub-state 2 of mode 0x48, which sub-state 1 falls through into. It waits on the SETANIM completion flag [s0+0xe8] again, latches clip 0x14 (the waiting pose Junior holds for the whole bobber minigame) and plays this sound right after. [Corrected 2026-07-29: the earlier 'alternating walk-footstep pair' reading was wrong — clips 0x11-0x15 belong to the fishing pack P002PLYF.]",
+    "evidence": "RAM 0x8008fed0-region fn, same case block as PLAYER10. `.L0x0000dd08: lw $v0,0xe8($s0) / beqz $v0,.L0x0000e19c` then `.L0x0000dd14: jal F0x8008f4b4 / li $a1,0x14` (SETANIM clip 0x14) then `.L0x0000dd24: lui $v0,0x8005 / lw $v0,0x5c48($v0) / .L0x0000dd30: jalr $v0 / ori $a0,0x5d46` (packed id 0x80045d46 = PLAYER10). [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "walker_hook": "engine/systems/fishing.ts: POSE_CAST_SOUND (0x80045cc5) / POSE_THROW_SOUND (0x80045d46)",
     "status": "decoded",
-    "note": "Mechanism decoded (SETANIM clip 0x13/0x14 + grounded gate [s0+0xe8] inside the player action dispatcher) but WHICH action-id case this is could not be identified (jump table not recoverable from the splat dump; player clip 17-20 metadata not baked in walker assets). Wiring as a generic walk pair would be a guess -- PLAYER01 is the proven walk footstep. Not wired.",
+    "note": "Decoded 2026-07-29 as the fishing cast (mode 0x48), correcting the earlier walk-pair reading. Wired: engine/systems/fishing.ts POSE_CAST_SOUND (0x80045cc5) / POSE_THROW_SOUND (0x80045d46) play on the cast pose transitions.",
     "old_name": "PLAYER11"
   },
   {
@@ -139,7 +139,7 @@
     "file": "pro/fieldstg.s",
     "offset": "0x0000e110",
     "trigger": "A positional impact/landing cue inside the same player action dispatcher: fires immediately after SETANIM sets clip 0x54 (a distinct, later action-id case than the walk-footstep clips 0x11/0x13/0x14), followed by a variant-select branch on the actor's entity-id field [s0+0x4] (values 0x15f/0x160/0x148 select param 8/9/10) feeding a further effect-spawn call — consistent with a landing-impact sound whose accompanying dust/splash effect variant depends on the actor/terrain identity.",
-    "evidence": "RAM 0x8008fed0-region fn. `.L0x0000e0f4: jal F0x8008f4b4 / li $a1,0x54` (SETANIM clip 0x54) then `.L0x0000e100: lui $a0,0x8004 / lw $v0,0x5c48($v0) / .L0x0000e110: jalr $v0 / ori $a0,0x46c9` (packed id 0x800446c9 = COMEX114), immediately followed by `lw $v1,0x4($s0) / li $v0,0x15f / beq ...` a 3-way entity-id branch selecting param 8/9/10 into a subsequent effect call. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
+    "evidence": "RAM 0x8008fed0-region fn. `.L0x0000e0f4: jal F0x8008f4b4 / li $a1,0x54` (SETANIM clip 0x54) then `.L0x0000e100: lui $a0,0x8004 / lw $v0,0x5c48($v0) / .L0x0000e110: jalr $v0 / ori $a0,0x46c9` (packed id 0x800446c9 = COMEX113), immediately followed by `lw $v1,0x4($s0) / li $v0,0x15f / beq ...` a 3-way entity-id branch selecting param 8/9/10 into a subsequent effect call. [2026-07-03 name-shift correction: this row's packed id and call-site evidence are unchanged and remain valid; the row was renamed to the id's TRUE Sound Test name (the 2026-07-02f table paired ids with the next record's name).]",
     "walker_hook": null,
     "status": "decoded",
     "old_name": "COMEX114"
@@ -308,12 +308,12 @@
     "evidence": "(none -- explicitly deferred, not guessed)"
   },
   {
-    "name": "SYSTEM07/SYSTEM08/SYSTEM02 (battle menu cross-check)",
+    "name": "SYSTEM06/SYSTEM07/SYSTEM01 (battle menu cross-check)",
     "id": "0x0004001b / 0x0004001c / 0x80045f3d-family",
     "file": "pro/fightstg.s",
     "offset": "(multiple)",
     "status": "decoded",
-    "trigger": "The battle command menu uses the same generic UI blips decoded in system-blip-semantics.json: SYSTEM07=cursor_move, SYSTEM08=confirm, SYSTEM02=cancel (5/10/4 fightstg sites respectively, consistent with the cross-overlay confirmed semantics). Wire the walker's battle menu with the same three sounds.",
+    "trigger": "The battle command menu uses the same generic UI blips decoded in system-blip-semantics.json: SYSTEM06=cursor_move (0x0004001b), SYSTEM07=confirm (0x0004001c), SYSTEM01=cancel (0x800450bd) (5/10/4 fightstg sites respectively, consistent with the cross-overlay confirmed semantics; the cancel id was settled 2026-08-16 — all four sites carry `ori $a0, 0x50bd`). Names corrected 2026-10-14 (audit/sfx-triggers-vs-decode) from the pre-2026-07-03i shift. Wire the walker's battle menu with the same three sounds.",
     "evidence": "Cross-check by id-set intersection against Task 2's confirmed semantics (system-blip-semantics.md); fightstg site counts from soundtst-common-call-sites.json.",
     "walker_hook": "web/battle.js: PLAYER_MENU/PLAYER_TECH/PLAYER_ITEM input handlers (cursor/confirm/cancel)"
   },
@@ -468,5 +468,75 @@
     "walker hook": null,
     "status": "id decoded, trigger partly decoded",
     "source_claim": "cardduel-picker-beats-and-sounds-2026-08-21"
+  },
+  {
+    "name": "SYSTEM06",
+    "id": "0x0004001b",
+    "file": "pro/stgmcard.s",
+    "offset": "0x00001a94",
+    "trigger": "The memory-card save/load screen's card list (F0x800843d8, the three save cards + console cursor): the left/right step plays once only when the clamped slot index actually changed. A press that cannot move the cursor is silent.",
+    "evidence": "F0x800843d8 (file 0x1728-0x1d3c) state 6: bits 7/5 (left/right) update the index at 0x80088768+0x4 with the +0x8 previous-value compare; `.L0x00001a64: beq $v0,$v1,.L0x00001acc` skips the play when unchanged, else `.L0x00001a94: lw $v0,0x5c48($v0)` / `.L0x00001aa0: ori $a0,0x1b` (packed 0x0004001b). RAM = file + 0x80082cb0 (pro/stgmcard load base). Audit 2026-10-14: web/save.js's slot moves already played this id by name; the change gate was added.",
+    "walker_hook": "web/save.js handleKey \"slots\" left/right",
+    "status": "decoded"
+  },
+  {
+    "name": "SYSTEM07",
+    "id": "0x0004001c",
+    "file": "pro/stgmcard.s",
+    "offset": "0x00002e70, 0x00003ab0, 0x00003bb4, 0x00004324",
+    "trigger": "The save/load screen's Circle on a card-list step and on the result window: the state machine's state 0x21 (the card list's confirm), and the result-window dismisses in states 0x1F5 (save result), 0x1F6 (load result) and the card-absent arm of state 0x65.",
+    "evidence": "F0x80084dcc (state machine, file 0x211c-0x46b4). State 0x21 at `.L0x00002e70: ori $a0,0x1c` after the bit-0xD pad test; state 0x1F5 `.L0x00003ab0`, state 0x1F6 `.L0x00003bb4`, state 0x65 else-arm `.L0x00004324` — each `ori $a0,0x1c` after `lui $a0,0x4` / `lw $v0,0x5c48($v0)`. Names from soundtst-common-ids.json (0x0004001c = SYSTEM07).",
+    "walker_hook": "web/save.js: slots/file Circle, message dismiss",
+    "status": "decoded"
+  },
+  {
+    "name": "SYSTEM02",
+    "id": "0x8004513e",
+    "file": "pro/stgmcard.s",
+    "offset": "0x0000275c, 0x00003460, 0x00003fa8",
+    "trigger": "A two-row prompt's up/down move on the save/load screen: the slot picker (state 2), the overwrite prompt (state 0x28) and the result prompt (state 0x65). Plays only when the row changed.",
+    "evidence": "F0x80084dcc: state 2 `.L0x0000275c`, state 0x28 `.L0x00003460`, state 0x65 `.L0x00003fa8`, each `ori $a0,0x513e` after `lui $a0,0x8004`, gated `beq $s4,$v0` on the row value (0/1) with the cursor at (0xC2, row*0xE + 0xBD).",
+    "walker_hook": "web/save.js confirm up/down",
+    "status": "decoded"
+  },
+  {
+    "name": "SYSTEM00",
+    "id": "0x8004503c",
+    "file": "pro/stgmcard.s",
+    "offset": "0x000028bc, 0x00003500, 0x00004024",
+    "trigger": "A two-row prompt's Circle on the save/load screen: the slot picker (state 2), the overwrite prompt (state 0x28) and the result prompt (state 0x65). Plays before the row is read, so both the Yes and the No row play it.",
+    "evidence": "F0x80084dcc: state 2 `.L0x000028bc`, state 0x28 `.L0x00003500`, state 0x65 `.L0x00004024`, each `ori $a0,0x503c` after `lui $a0,0x8004` / `lw $v0,0x5c48($v0)`, inside the bit-0xD arm.",
+    "walker_hook": "web/save.js commit + confirm Circle (either row)",
+    "status": "decoded"
+  },
+  {
+    "name": "SYSTEM01",
+    "id": "0x800450bd",
+    "file": "pro/stgmcard.s",
+    "offset": "0x00002910, 0x00003004, 0x000035c4, 0x000041dc",
+    "trigger": "Every Cross back/cancel on the save/load screen: the slot picker (state 2), the card list (state 0x21), the overwrite prompt (state 0x28) and the result prompt (state 0x65).",
+    "evidence": "F0x80084dcc: `.L0x00002910`, `.L0x00003004`, `.L0x000035c4`, `.L0x000041dc` — each `ori $a0,0x50bd` after `lui $a0,0x8004` / `lw $v0,0x5c48($v0)` in the bit-0xE arm.",
+    "walker_hook": "web/save.js every back handler",
+    "status": "decoded"
+  },
+  {
+    "name": "RECOVERY",
+    "id": "0x00040014",
+    "file": "pro/ststatus.s",
+    "offset": "0x0000cbc8",
+    "trigger": "The pause ITEMS page's item applier F0x8008F584, applied arm: a field item that actually landed (flag 1 or 2) plays RECOVERY after the consume, as the message is printed. Any effect that applied plays it, not only HP charges.",
+    "evidence": "F0x8008F584 (file 0xC8D4): `.L0x0000cbc8: j 0x8008f8c4` with `.L0x0000cbcc: ori $a0,0x14` in the delay slot, after the count decrement `.L0x0000cbac: sb $v0,0x7c($v1)` and `jal 0x8008ed04`. The refusal arm at `.L0x0000cc10: ori $a0,0x1c` with `li $a2,0x6a` (\"No effect.\"). Ported: engine/dw3/item-effect.ts SOUND_APPLIED / SOUND_NO_EFFECT; pause-bag.ts itemsApplyEffect.",
+    "walker_hook": "web/menu.js applyTechnique + item use (legacy copy)",
+    "status": "decoded"
+  },
+  {
+    "name": "SYSTEM07",
+    "id": "0x0004001c",
+    "file": "pro/ststatus.s",
+    "offset": "0x0000cc10",
+    "trigger": "F0x8008F584's refusal arm: an item that did nothing prints \"No effect.\" and plays SYSTEM07. The techniques applier F0x80093A58 instead replays the caller's confirm cue on a refusal (0x4001C from \"Use it on who?\", 0x8004503C from the party-wide list).",
+    "evidence": "`.L0x0000cc10: ori $a0,0x1c` / `.L0x0000cc14: jalr $v0` after `li $a2,0x6a` (the refusal line) at the end of F0x8008F584. F0x80093A58's refusal plays its `sound` argument (pause-techniques.ts techniquesApplyHeal).",
+    "walker_hook": "web/menu.js applyTechnique failure + item refusal",
+    "status": "decoded"
   }
 ]

@@ -862,7 +862,7 @@ export function convertOrdinalLadder(p: any, ownerJson?: any, stages?: Converted
   return ownerDropped.length ? { ...out, ownerDropped } : out;
 }
 
-export function convertRosterTable(roster: any): { records: { key: number; flag_id?: number; op: number; param2: number; semantics?: any }[]; ranges: Record<number, [number, number]> } {
+export function convertRosterTable(roster: any, amounts?: any): { records: { key: number; flag_id?: number; op: number; param2: number; semantics?: any }[]; ranges: Record<number, [number, number]>; amounts?: { compare?: number[]; add?: number[]; subtract?: number[] } } {
   // `semantics` is the extractor's decoded meaning per record (collection_all,
   // roster_owned, stored_bit_tally, …). Carried through verbatim so the engine's
   // bank-0x70 handler dispatches on the decode instead of re-deriving it.
@@ -879,7 +879,19 @@ export function convertRosterTable(roster: any): { records: { key: number; flag_
       ranges[r.param2] = [r.ordinal_lo, r.ordinal_hi];
     }
   }
-  return { records, ranges };
+  // The op-0x20 amount tables (MONEY_REQUIRED / MONEY_GAINS / MONEY_LOSSES,
+  // D0x80048c44 / 0x48c6c / 0x48c8c) from bank70_rewards.json — the same static
+  // EXE data, so the engine can answer F0x80015aac's compare/add/subtract arms
+  // without a second data file. See engine/dw3/dw3-config.ts and the rosterAction
+  // policy in engine/index.ts.
+  const tables = amounts
+    ? {
+        ...(amounts.compare?.values ? { compare: amounts.compare.values } : {}),
+        ...(amounts.add?.values ? { add: amounts.add.values } : {}),
+        ...(amounts.subtract?.values ? { subtract: amounts.subtract.values } : {}),
+      }
+    : undefined;
+  return { records, ranges, ...(tables && Object.keys(tables).length ? { amounts: tables } : {}) };
 }
 
 export function spawnGateArg(spawnFlags: { id: number; expected: number }[]): string[] {

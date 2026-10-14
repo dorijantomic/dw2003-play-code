@@ -75,3 +75,35 @@ test("a verified image read is recorded as a restore", () => {
     svc.read(0, BUF, 0x26c4, 3);
     assert.deepEqual(svc.restored, [0], "a corrupt image is not counted");
 });
+
+// ── The restore check is the original's gate, 2026-10-14 ────────────────────
+// The screen's load gate (stgmcard.s .L0x00003270-.L0x00003290) is the lenient
+// bit-subset test on the checksum plus `lbu` on the single format byte at +2.
+// Byte +3 is retained data the save path copies and never rewrites, so it must
+// not enter the check; and a stored checksum that merely CONTAINS the recomputed
+// bits passes the original (the diff-checker rule in
+// saveload-q001-image-content-and-load-path-2026-10-05 says compare equality in
+// a diff tool, but the load gate itself is a subset test). The `restored` list
+// gates the browser commit, so it must accept exactly what the machine accepts.
+test("the restore check is the byte + subset gate, not a halfword equality", () => {
+    const card = fakeCard();
+    const img = new Uint8Array(0x26c4);
+    for (let i = 4; i < 0x26c4; i++) img[i] = (i * 11 + 1) & 0xff;
+    img[2] = 4;    // the one format byte
+    img[3] = 0x11; // a nonzero retained +3 byte
+    let sum = 0; for (let i = 4; i < 0x26c4; i++) sum ^= img[i];
+    assert.notEqual(sum, 0, "fixture precondition: the checksum has a set bit");
+    img[0] = 0xff; // a superset of the computed sum, as the original's test allows
+    card.image = () => img;
+    const svc = new MemcardServices(mem, card);
+    assert.equal(svc.read(0, BUF, 0x26c4, 2), 1);
+    assert.deepEqual(svc.restored, [0], "byte +2 = 4 and a superset checksum restore");
+
+    // A stored byte missing one computed bit is not a restore (result 8 for the
+    // machine; the browser must not commit the slot either).
+    const bad = Uint8Array.from(img);
+    bad[0] = sum ^ (sum & -sum);
+    card.image = () => bad;
+    svc.read(0, BUF, 0x26c4, 3);
+    assert.deepEqual(svc.restored, [0], "a missing bit is not a restore");
+});

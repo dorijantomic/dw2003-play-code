@@ -43,7 +43,7 @@ const entry = { size: overlay.length, event_table: 0, init_fn: 0, root_ctor: 0, 
 
 // A harness adaptation, not a change to the port. F0x80092E60's four animation
 // arms (2..5) branch STRAIGHT to the shared frame-delta block at .L0x00010790,
-// which subtracts the 0x8005 base from $s0 and then calls `[$s0+0x18C]`. Only the
+// which subtracts 0x21F0 from the 0x8005 base in $s0 and then calls `[$s0+0x18C]`. Only the
 // arms' fall-through path runs the `lui $s0,0x8005` at .L0x0001078C that makes
 // $s0 hold that base, so the branch path assumes $s0 already equals 0x80050000 —
 // a callee-saved register the bounded harness cannot supply. Routing each of the
@@ -93,9 +93,9 @@ const S_ROWCARD = 0x80140070;        // F0x8008D854 (a direct call)
 const S_PAD_RESET = 0x80140080;      // pad block +0x3F4
 const S_PAD_WORD = 0x80140090;       // pad block +0x408
 const S_SOUND = 0x801400a0;          // [0x80055C48]
-const S_DELTA = 0x801400b0;          // [0x8005DF9C]
+const S_DELTA = 0x801400b0;          // [0x8004DF9C]
 const CELL_SOUND = 0x80055c48;
-const CELL_DELTA = 0x8005df9c;
+const CELL_DELTA = 0x8004df9c;
 const PAD_BLOCK = 0x8004b7d0;
 
 const DUEL_SPAN = [0x400, 0x480];
@@ -187,17 +187,6 @@ function installStubs(rt, c, ev) {
 function duelBytes(mem) {
     const out = [];
     for (let a = DUEL_SPAN[0]; a < DUEL_SPAN[1]; a++) out.push(mem.read8(D + a) & 0xff);
-    return out;
-}
-/** The duel span with the two frame-delta counters (0x424 timer, 0x434 span)
- *  masked out — see the note on the tick oracle below. */
-function duelBytesNoTimers(mem) {
-    const out = [];
-    for (let a = DUEL_SPAN[0]; a < DUEL_SPAN[1]; a++) {
-        if (a >= 0x424 && a < 0x428) { out.push(0); continue; }
-        if (a >= 0x434 && a < 0x438) { out.push(0); continue; }
-        out.push(mem.read8(D + a) & 0xff);
-    }
     return out;
 }
 function viewBytes(mem) {
@@ -321,17 +310,17 @@ const TICK_CASES = [
 test("tickDealTurnStart reproduces F0x80092E60 across every arm and branch", () => {
     // NOTE. F0x80092E60's four animation arms (2..5) end in a shared tail that
     // adds the frame delta to duel+0x424 (the arm timer) and duel+0x434 (the
-    // remaining span). That tail is a two-instruction leaf whose body is decoded
-    // in the port and asserted directly in the test below; the ORIGINAL's copy of
-    // it sits behind a callee-saved register the bounded harness cannot supply
-    // (see the routing note above), so the two timer words are normalised out of
-    // this comparison and the port's tail is proved separately.
+    // remaining span), read through the pointer cell [0x8004df9c] (resident
+    // F0x8001d704). The harness points that cell at a delta stub (CELL_DELTA ->
+    // S_DELTA, returning the case's delta) and the port's host returns the same
+    // delta, so both runtimes are compared across the whole duel span; the
+    // port's tail is additionally asserted directly in the test below.
     for (const c of TICK_CASES) {
         const a = runtime(); seed(a, c); const evA = []; installStubs(a, c, evA);
         const retA = a.cpu.call(TICK, [D, V]);
         const b = runtime(); seed(b, c); const evB = [];
         const retB = tickDealTurnStart(b.mem, portHost(b.mem, c, evB), D, V);
-        assert.deepEqual(duelBytesNoTimers(b.mem), duelBytesNoTimers(a.mem), `${c.name} duel`);
+        assert.deepEqual(duelBytes(b.mem), duelBytes(a.mem), `${c.name} duel`);
         assert.deepEqual(viewBytes(b.mem), viewBytes(a.mem), `${c.name} view`);
         assert.deepEqual(evB, evA, `${c.name} calls`);
         assert.equal(retB, retA, `${c.name} return`);

@@ -129,7 +129,7 @@ const CALLERS = [
     "the pause menu's equip swap and its unequip"],
   ["web/menu.js", /unequipItem\(slots, slotKey\);/,
     "the pause menu's Unequip row"],
-  ["web/menu.js", /m\.itemList = \(state\) => listItemIds\(state, ITEM_CAT_DIRECTORIES\[m\.itemCat\] \?\? 1\)/,
+  ["web/menu.js", /m\.itemList = \(state\) => listItemIds\(state, ITEM_CAT_KINDS\[m\.itemCat\] \?\? 1\)/,
     "the pause ITEMS tabs"],
   ["web/shop.js", /addItem: \(id, n\) => storeAddItem\(state, id, n\),/, "the merchant's buy commit"],
   ["web/shop.js", /removeItem: \(id, n\) => storeRemoveItem\(state, id, n\),/, "the merchant's sell commit"],

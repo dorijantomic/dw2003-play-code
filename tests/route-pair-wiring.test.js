@@ -162,10 +162,14 @@ test("web/game.js writes the pair only through the ported commit", () => {
   // `activeExitAt` is what attaches the record's pair to the exit row. The row also
   // may have its `to` swapped for the one screen id the disc resolves at story point
   // 45 (the s9xx shadow record, pro/fieldstg.s:0xf460); the pair itself is still the
-  // record's own two words, attached from whichever writer site reached it.
+  // record's own two words, attached from whichever writer site reached it. A row a
+  // PLACES chain has aimed (engine/systems/place-points.ts) is the one exception in
+  // both halves: it carries the copied slot's own pair, and its destination was
+  // already resolved through the same ordinal-aware router at aim time, so the swap
+  // is not re-decided over it.
   assert.match(src,
-    /const dest = swappedStepDestination\(pb\);\s*return \{ \.\.\.hit, \.\.\.\(dest \? \{ to: dest \} : \{\}\), routeWords: pb\.routeWords \};/,
-    "the exit row carries the step's pair, from whichever writer site reached it");
+    /const dest = hit\.aimed \? null : swappedStepDestination\(pb\);\s*return \{ \.\.\.hit, \.\.\.\(dest \? \{ to: dest \} : \{\}\),\s*routeWords: hit\.routeWords \?\? pb\.routeWords \};/,
+    "the exit row carries the step's pair (or the places copy's own), from whichever writer site reached it");
   assert.match(src, /if \(!pb\.routeWords\) return hit;/,
     "a step that publishes nothing leaves the exit row alone");
   // The destination swap is the one thing that must stay behind the post-game test.

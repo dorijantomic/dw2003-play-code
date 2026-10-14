@@ -35,6 +35,11 @@ STORY_STEPS = ROOT / "web/assets/data/story_steps.json"
 STORY_GRIDS = ROOT / "web/assets/data/story_trigger_grids.json"
 MAZE_EXITS = ROOT / "web/assets/data/maze_exits.json"
 MAZE_SECTIONS = ROOT / "web/assets/data/maze_sections.json"
+# The places system's per-stage placePoints tables (tools/extract_stage_place_points.py).
+# The 34 stages that carry one re-aim their exits per the incoming place pair on
+# entry (copyPlacePoints, WS7); the scene carries the table and one exit row per
+# op-1 step (its StageSlot), so the runtime copy can aim point i at slot i.
+PLACE_POINTS = ROOT / "web/assets/data/stage_place_points.json"
 SPRITES_DIR = Path(os.environ.get("DDW3_DIR") or Path.home() / "ddw3") / "tim/dw2003/field/sprite"
 DIALOGUE_DIR = ROOT / "web/assets/dialogue"
 WSTAG_EVENTS = ROOT / "web/assets/events/wstag_events.json"
@@ -999,6 +1004,101 @@ def merge_maze_exits(data, story_grids, screens):
     return maze_steps
 
 
+def _wedge_bounds(grid):
+    """step index -> the bounding rect of the type-7 grid cells naming it.
+
+    The same math `grid_warp_exits` places its exits with: a cell's low 5 bits
+    index the step program, so the cells naming step i are that step's trigger.
+    """
+    if not grid or "grid" not in grid:
+        return {}
+    cell, w, cells = grid["cell"], grid["w"], grid["grid"]
+    by_idx = {}
+    for i, b in enumerate(cells):
+        if b:
+            by_idx.setdefault(b & 0x1F, []).append((i % w, i // w))
+    bounds = {}
+    for idx, coords in by_idx.items():
+        xs = [c[0] for c in coords]
+        ys = [c[1] for c in coords]
+        bounds[idx] = (min(xs) * cell, min(ys) * cell,
+                       (max(xs) - min(xs) + 1) * cell,
+                       (max(ys) - min(ys) + 1) * cell)
+    return bounds
+
+
+def apply_place_points(scene, stage, place_points, screens, manifest_ids,
+                       story_grids, story_steps):
+    """Rebuild a places stage's exits as its own StageSlots, and attach the table.
+
+    The 34 stages that carry a `placePoints` table re-aim their exits per the place
+    they are entered from: updateStage copies the entry matching the incoming route
+    pair into the stage's first StageSlots (`copyPlacePoints`, WS7 of
+    docs/research/scripting/field-script-engine-verified.md), and the slot IS the
+    stage's type-7 step record — the walker's exit row. So:
+
+      * the rows are rebuilt from the STATIC step program (one per op-1 step, at
+        its own grid wedge) with `slot` = the step index. Their values are the
+        static record's own — a self-warp placeholder on the maze stages, which is
+        what the disc's un-copied slots hold;
+      * the table rides on the scene as `placePoints`, each point carrying the
+        destination stage resolved from its screen id (the base table; the runtime
+        re-resolves through the ported screen router so the post-game shadow
+        records still win) and its facing name (the maze enum: 1 = south,
+        3 = west, 5 = north, 7 = east; 0 = a hole out, arriving "down" like every
+        other facing-0 record).
+
+    The runtime copy (engine/systems/place-points.ts) then aims point i at slot i
+    on every arrival, from the scene's own base rows.
+    """
+    table = place_points.get(str(stage))
+    if not table:
+        return scene
+    out = {**scene}
+    kept = [e for e in scene.get("exits", []) if "warp" not in e]
+    prog = (story_steps.get(str(stage)) or {}).get("steps", [])
+    bounds = _wedge_bounds(story_grids.get(str(stage)))
+    rows = []
+    for i, st in enumerate(prog):
+        if st.get("op") != 1:
+            continue
+        rect = bounds.get(i)
+        if rect is None:
+            continue                       # no wedge names this step: no trigger
+        p = st.get("params") or []
+        dest = stage_for_screen(screens, p[0], alias_world=stage >= 920)
+        if dest is None or f"s{dest}" not in manifest_ids:
+            continue
+        row = {"warp": f"s{dest}:{p[4] if len(p) > 4 else 0}",
+               "x": rect[0], "y": rect[1], "w": rect[2], "h": rect[3],
+               "to": f"s{dest}", "spawnX": p[1], "spawnY": p[2],
+               "dir": DIR8.get(p[3], "down"), "grid": True, "slot": i}
+        if dest == stage:
+            row["selfWarp"] = True
+            row["transition"] = "wrap"
+            if not isinstance(p[3], str) and p[3] not in _NATIVE_DIR_FACINGS:
+                row["nativeDir"] = p[3]
+        rows.append(row)
+    out["exits"] = kept + rows
+    entries = []
+    for e in table["entries"]:
+        points = []
+        for pt in e["points"]:
+            dest = stage_for_screen(screens, pt["screen"])
+            points.append({
+                "screen": pt["screen"],
+                "to": (f"s{dest}" if dest is not None and f"s{dest}" in manifest_ids
+                       else None),
+                "x": pt["x"], "y": pt["y"], "dir": pt["dir"],
+                "dirName": MAZE_DIR_NAMES.get(pt["dir"]) or "down",
+                "place": pt["place"], "placeArg": pt["placeArg"],
+            })
+        entries.append({"place": e["place"], "placeArg": e["placeArg"],
+                        "points": points})
+    out["placePoints"] = {"entries": entries, "variant": table.get("variant")}
+    return out
+
+
 def main():
     manifest = json.loads((ROOT / "web/assets/manifest.json").read_text())
     manifest_ids = {m["id"] for m in manifest["maps"]}
@@ -1070,6 +1170,8 @@ def main():
                   if wiring_path.exists() else {})
     maze_sections = (json.loads(MAZE_SECTIONS.read_text()).get("stages", {})
                      if MAZE_SECTIONS.exists() else {})
+    place_points = (json.loads(PLACE_POINTS.read_text()).get("stages", {})
+                    if PLACE_POINTS.exists() else {})
     for sid in stages:
         stage = int(sid.lstrip("s"))
         if stage not in data:
@@ -1095,6 +1197,13 @@ def main():
                                   grid=story_grids.get(str(stage)),
                                   steps=steps,
                                   screens=screens)
+        # The places system, when this stage carries a placePoints table: the exits
+        # become the stage's own StageSlots (one row per op-1 step, with `slot`),
+        # and the table rides on the scene so the runtime copy can re-aim them per
+        # the incoming place pair. See apply_place_points and
+        # engine/systems/place-points.ts.
+        scene = apply_place_points(scene, stage, place_points, screens,
+                                   manifest_ids, story_grids, story_steps)
         # The wrap-maze GRAPH, when this stage has one. Each entry is one maze
         # section -- one (key, companion) route pair -- with its exits. The walker
         # resolves a wrap trigger through this instead of the stale placeholder

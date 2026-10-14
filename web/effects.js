@@ -68,6 +68,11 @@ import {
     tickPointRecordActors,
     pointRecordActorState,
     pointRecordPadRun,
+    pointRecordLive,
+    pointRecordInView,
+    tickPointSpriteRecords,
+    applyPointModeGates,
+    pointModeGatesFor,
     pictureStepDraws as enginePictureStepDraws,
     loadScrollLayers,
     setScrollLayerFlag,
@@ -118,6 +123,10 @@ const variantSlotApplied = new Map();
 // The master story ordinal, handed over by the game loop.  See
 // `setPointRecordOrdinal` for why it is not read out of the story engine here.
 let readOrdinal = () => 0;
+// The flag reader, handed over by the game loop beside the ordinal (the same
+// store `setPointRecordFlag` forwards to the engine's scroll layers).  The
+// stage-entry mode gates (s421's windmill actor) read it.
+let readFlag = null;
 // The character anchor the `picture-steps` machine draws at, wired once by the
 // game loop: `(stageId, type, p1, p2) -> live actor | null` and
 // `(actor) -> {x, y} | null`.  See `setPointRecordAnchor`.
@@ -413,6 +422,7 @@ function ensureScrollSheet(rel) {
  * first visit / revisit branch exactly as the disc's scene entry does.
  */
 export function setPointRecordFlag(fn) {
+    readFlag = typeof fn === "function" ? fn : null;
     setScrollLayerFlag(typeof fn === "function" ? (id) => (fn(id) ? 1 : 0) : null);
 }
 
@@ -602,7 +612,9 @@ function stageRuntime(stageId, records) {
             // `active`/`x`/`y`/`ysort` are undefined until a stage actor writes
             // them: the original's record+0, the X halfword at record+0xc, and
             // the Y and y-sort halfwords a pad flash moves its records onto.
+            // `mode` stays undefined until a stage-entry gate writes it (s421).
             active: undefined, x: undefined, y: undefined, ysort: undefined,
+            mode: undefined,
         }));
         runtime[stageId] = rt;
     }
@@ -610,34 +622,16 @@ function stageRuntime(stageId, records) {
 }
 
 // One animation step per rendered frame (call once per frame for the current
-// stage). F0x80089038: timer -= 0x100; on expiry advance + reload period<<8.
-// Mode 1 advances the sprite id; modes 2/3 advance the ctr byte (palette row):
-// 2 loops min..max, 3 ping-pongs stepping back inside at each boundary.
-function tick(records, rt) {
+// stage).  The step itself is the engine's `tickPointSpriteRecords` --
+// F0x80089038's per-record body including its two gates (the live active byte
+// and the camera cull), so the browser wrapper owns only the freeze hook.
+function tick(records, rt, f) {
     // Verification hook, same family as window.__hideProps: freeze every record
     // on the frame it is showing. A capture of an animated scene is otherwise
     // dominated by animation phase, which makes a before/after pixel diff
     // meaningless (tools/verify_under_map_props.mjs relies on this).
     if (typeof window !== "undefined" && window.__freezeProps) return;
-    for (let i = 0; i < records.length; i++) {
-        const r = records[i];
-        if (!r.max || r.mode < 1 || r.mode > 3) continue;
-        const st = rt[i];
-        if (st.timer >= 0x100) {
-            st.timer -= 0x100;
-            continue;
-        }
-        st.timer = r.period << 8;
-        if (r.mode === 1) {
-            st.sprite = st.sprite >= r.max ? r.min : st.sprite + 1;
-        } else if (r.mode === 2) {
-            st.ctr = st.ctr >= r.max ? r.min : st.ctr + 1;
-        } else {
-            st.ctr += st.dir;
-            if (st.ctr > r.max) { st.ctr = Math.max(r.min, r.max - 1); st.dir = -1; }
-            else if (st.ctr < r.min) { st.ctr = Math.min(r.max, r.min + 1); st.dir = 1; }
-        }
-    }
+    tickPointSpriteRecords(records, rt, f);
 }
 
 // Dest must share the map's camera phase. These sprites fill transparent
@@ -709,8 +703,10 @@ export function bucketPass(layer) {
 let preparedFrame = null;
 
 // Advance one frame of the stage's records and resolve where each one is and
-// which sprite it shows. Ticks animation, so call it once per frame.
-function prepareEffects(stageId) {
+// which sprite it shows. Ticks animation, so call it once per frame. `view` is
+// the camera rect ({x, y, w, h}, map pixels) the disc's cull tests against;
+// a caller with no camera passes nothing and no record is culled.
+function prepareEffects(stageId, view = null) {
     const s = data?.[stageId];
     if (!s) return null;
     const rt = stageRuntime(stageId, s.records);
@@ -719,27 +715,44 @@ function prepareEffects(stageId) {
     // `triple` parents wait for their ORDINAL instead, which is why the number
     // is read here and not cached at load.
     constructPointRecordStageObjects(stageId, readOrdinal());
-    tick(s.records, rt);
-    const sheet = Object.keys(s.sprites).length ? ensureSheet(stageId) : null;
-    const semiSheet = Object.keys(s.sprites).length ? ensureSemiSheet(stageId) : null;
 
     // Rebase onto interpreter memory: 18-byte records at the table the stage
-    // init registered (active=+0, spriteId=+4, ctr=+9 — the exact bytes the
-    // native writers poke).
+    // init registered (active=+0, mode=+5, spriteId=+4, ctr=+9 — the exact
+    // bytes the native writers poke).  Built BEFORE the tick, because
+    // F0x80089038 dispatches on these live bytes: on a native stage the
+    // overlay's own actor can switch a record off or re-mode it (the s421
+    // windmill actor writes record+5).
     const native = nativeStage(stageId);
     // The map setup's own display-slot write (fieldstg F0x80084B40): the walker
     // applies it off the native research route, which runs the original's setup
     // itself and whose rebase below reads the byte straight out of memory.
     if (!native) applySceneVariantSlot(stageId, s.records, rt);
+    // The stage-entry MODE writer (wstag421's actor, mined into
+    // point_record_actors.json `modeGates`): mode = get_flag(flag) on every
+    // tagged record.  The disc runs it in the actor's state 0, i.e. once at
+    // stage entry; the walker applies it on every prepared frame instead, which
+    // is the same thing within a visit (the flag's only producer runs in
+    // another stage) and still honours a flag set while away when the stage's
+    // runtime is retained.  Native stages skip it: the interpreter's own actor
+    // writes the live byte, which the tick reads through `liveMode`.
+    if (!native) {
+        const gates = pointModeGatesFor(stageId);
+        if (gates.length) applyPointModeGates(s.records, rt, gates, readFlag);
+    }
     const activeOverride = new Array(s.records.length).fill(null);
     const nativePos = new Array(s.records.length).fill(null);
     const actorPos = new Array(s.records.length).fill(null);
+    const liveMode = new Array(s.records.length).fill(null);
     if (native?.pointTable) {
         const m = native.rt.mem;
         for (let i = 0; i < s.records.length; i++) {
-            if (s.records[i].mode !== 0) continue; // modes 1-3: JS tick owns them
             const rec = native.pointTable + i * 18;
+            // The live bytes the tick and the draw both read: `active` and the
+            // animation `mode` for every record, then the mode-0 records'
+            // sprite/ctr/position.
             activeOverride[i] = m.read8(rec);
+            liveMode[i] = m.read8(rec + 5);
+            if (s.records[i].mode !== 0) continue; // modes 1-3: JS tick owns them
             rt[i].sprite = m.read8(rec + 4);
             rt[i].ctr = m.read8(rec + 9);
             nativePos[i] = {
@@ -799,15 +812,31 @@ function prepareEffects(stageId) {
         actorPos[idx] = patch;
     }
 
-    return { stageId, s, rt, sheet, semiSheet, activeOverride, nativePos, actorPos };
+    const f = {
+        stageId, s, rt, activeOverride, nativePos, actorPos, liveMode,
+        view: view ?? null,
+        sheet: Object.keys(s.sprites).length ? ensureSheet(stageId) : null,
+        semiSheet: Object.keys(s.sprites).length ? ensureSemiSheet(stageId) : null,
+    };
+    tick(s.records, rt, f);
+    return f;
+}
+
+/** The cull rect for a draw call's camera: the visible map-pixel window, the
+ *  walker's stand-in for the 0x1002 layer's screen rect (ctx+0x128).  No view
+ *  dimensions (a caller without a camera) -> null, and nothing is culled. */
+function viewRect(camX, camY, viewW, viewH) {
+    return viewW > 0 && viewH > 0
+        ? { x: camX, y: camY, w: viewW, h: viewH }
+        : null;
 }
 
 // Paint the records that draw BEHIND the ground map-tile layer -- ordering-table
 // buckets 8 and above. Call this immediately BEFORE the base map is drawn; the
 // map art then covers them, which is what the console does. It also ticks the
 // frame, so drawEffects must follow it on the same frame.
-export function drawEffectsUnderMap(ctx, stageId, camX, camY) {
-    const f = prepareEffects(stageId);
+export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH) {
+    const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH));
     preparedFrame = f;
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw) => {
@@ -821,10 +850,10 @@ export function drawEffectsUnderMap(ctx, stageId, camX, camY) {
 // them. Coordinates are map-space; ctx is already camera-translated by the
 // caller passing camX/camY. Records at UNDER_MAP_BUCKET and above were already
 // painted by drawEffectsUnderMap and are skipped here.
-export function drawEffects(ctx, stageId, camX, camY, drawables) {
+export function drawEffects(ctx, stageId, camX, camY, drawables, viewW, viewH) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
-        : prepareEffects(stageId);
+        : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH));
     preparedFrame = null; // one frame's preparation is good for one frame
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw, py, pysort) => {
@@ -878,13 +907,19 @@ export function drawEffects(ctx, stageId, camX, camY, drawables) {
 // this context and camera. Both passes share it so they cannot disagree about
 // which records are live or where they are.
 function eachRecord(f, ctx, camX, camY, visit) {
-    const { s, rt, sheet, semiSheet, activeOverride, nativePos, actorPos } = f;
+    const { s, rt, sheet, semiSheet } = f;
     for (let i = 0; i < s.records.length; i++) {
         const r = s.records[i];
-        if (!(activeOverride[i] ?? rt[i].active ?? r.active)) continue;
-        const px = actorPos[i]?.x ?? nativePos[i]?.x ?? rt[i].x ?? r.x;
-        const py = actorPos[i]?.y ?? nativePos[i]?.y ?? r.y;
-        const pysort = actorPos[i]?.ysort ?? nativePos[i]?.ysort ?? r.ysort;
+        // The disc's two draw gates, resolved exactly as the tick resolves
+        // them: the live active byte (`lbu $v0, ($s1)` / `beqz`, file 0x64bc)
+        // and the camera cull (file 0x64f4-0x6550) -- a culled record is not
+        // drawn, so a tall sprite does not pop in from an off-screen anchor.
+        const live = pointRecordLive(r, rt[i], f, i);
+        if (!live.active) continue;
+        if (!pointRecordInView(r, live.x, live.y, f.view)) continue;
+        const px = live.x;
+        const py = live.y;
+        const pysort = live.ysort;
         const draw = () => {
             if (r.atlas === "fieldcom") {
                 if (fieldcomReady()) {

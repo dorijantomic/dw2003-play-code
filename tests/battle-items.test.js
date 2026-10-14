@@ -11,6 +11,9 @@ import {
   ITEM_PAGE_KIND_NAME_LINE, ITEM_PAGE_KIND_SILENT, ITEM_PAGE_KIND_HEALED,
   ITEM_NO_EFFECT_ID, ITEM_CONFUSED_ID, ITEM_EVADED_ID, ITEM_NAME_ENEMY,
 } from "../engine/dw3/battle-items.ts";
+import {
+  emptyStatusEventPool, enqueueStatusEvent, findStatusEvent, stageStatusEventLock,
+} from "../engine/dw3/battle-status-events.ts";
 
 const ESMFIGHT = JSON.parse(readFileSync(
   new URL("../web/assets/data/battlecmd/esmfight.json", import.meta.url), "utf8")).strings;
@@ -33,6 +36,29 @@ test("EnergyDisk clears every ailment", () => {
   assert.equal(useBattleItem(69, u, mk()).ok, true);
   assert.deepEqual(u.ailments, {});
   assert.equal(u.regeneration, true); // Recover Crest's recurring source is not a status bit
+});
+
+test("EnergyDisk's all-status cure lifts the two tech-abort locks as well", () => {
+  // The disk's own row is 0x800a3364 — mask 0x3f, cure code 0xc4 — so it reaches
+  // FIGHTSTG_F0x8009c330's `which` 3 arm, whose cancel walks SIX codes out of
+  // .L0x800a43d4 (its low half at .L0x800a43d8 included, `slti $v0, $s0, 0x6` :26464):
+  // [9, 10, 11, 12, 16, 17] = the four ailment recoveries AND the two locks 0x10/0x11.
+  // The port freed the four recoveries only, so a cannot-flee lock survived the disk.
+  const pool = emptyStatusEventPool();
+  const u = mk({ statusEvents: pool, sideByte: 0, slot: 0 });
+  stageStatusEventLock(pool, 0, 0, 24, () => 0);
+  enqueueStatusEvent(pool, { code: 0x09, time: 1000, side: 0, slot: 0, payload: 30, payload2: 0 });
+  enqueueStatusEvent(pool, { code: 0x11, time: 900, side: 0, slot: 0, payload: 1, payload2: 0 });
+  assert.equal(useBattleItem(69, u, mk()).ok, true);
+  assert.equal(findStatusEvent(pool, 0x10, 0, 0), -1, "the cannot-flee lock is freed");
+  assert.equal(findStatusEvent(pool, 0x11, 0, 0), -1, "so is the cannot-digivolve lock");
+  assert.equal(findStatusEvent(pool, 0x09, 0, 0), -1, "and the poison recovery");
+  // A SINGLE-ailment disk must not touch a lock: `which` 0 frees code 0x09 alone.
+  const pool2 = emptyStatusEventPool();
+  const u2 = mk({ statusEvents: pool2, sideByte: 0, slot: 0, ailments: { poison: { power: 10 } } });
+  stageStatusEventLock(pool2, 0, 0, 24, () => 0);
+  assert.equal(useBattleItem(66, u2, mk()).ok, true);
+  assert.ok(findStatusEvent(pool2, 0x10, 0, 0) >= 0, "the lock survives an AntidoteDisk");
 });
 
 test("LifeDisk revives fallen party members to FULL HP", () => {

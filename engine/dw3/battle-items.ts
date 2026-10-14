@@ -138,7 +138,7 @@
 
 import { RAND_U16, specialModeDamage } from "./battle-formulas.ts";
 import { applyAilment, type Combatant } from "./battle-combat.ts";
-import { cureStatusEvent, type StatusEventPool } from "./battle-status-events.ts";
+import { cureStatusEvent, cureAllStatusEvents, type StatusEventPool } from "./battle-status-events.ts";
 
 /**
  * One battle message box page as the original asks for it: the shared panel's
@@ -333,13 +333,16 @@ export function chargeNoEffectPage(): BattleItemPage {
  * 0x29 "Defrost!", 0x2a "Conscious!" and 0x2c "All status cured!", which is the order
  * the bank itself keeps them in (web/assets/data/battlecmd/esmfight.json indices
  * 40, 41, 42 and 44).
+ *
+ * `all` marks the record whose row (0x800a3364: mask `0x3f`, cure code `0xc4`) reaches
+ * `FIGHTSTG_F0x8009c330`'s `which` 3 arm — the SIX-code cancel, not the four ailments.
  */
-const STATUS_DISKS: Readonly<Record<number, { ailments: string[]; messageId: number }>> =
+const STATUS_DISKS: Readonly<Record<number, { ailments: string[]; messageId: number; all?: boolean }>> =
   Object.freeze({
     66: { ailments: ["poison"], messageId: 0x28 },
     67: { ailments: ["frozen"], messageId: 0x29 },
     68: { ailments: ["confuse"], messageId: 0x2a },
-    69: { ailments: ALL_AILMENTS, messageId: 0x2c },
+    69: { ailments: ALL_AILMENTS, messageId: 0x2c, all: true },
   });
 
 function ensureBuffs(c: BattleItemTarget): { str: number; def: number; spd: number } {
@@ -370,7 +373,7 @@ function reduceStatBy(c: BattleItemTarget, stat: "str" | "def", amount: number):
   return next;
 }
 
-function cureAilments(c: BattleItemTarget, names: string[]): boolean {
+function cureAilments(c: BattleItemTarget, names: string[], all = false): boolean {
   let any = false;
   for (const n of names) {
     if (!c.ailments[n]) continue;
@@ -378,9 +381,8 @@ function cureAilments(c: BattleItemTarget, names: string[]): boolean {
     // The disc's one "an ailment ends now" routine frees the ailment's recovery entry as
     // well as clearing its bit: `FIGHTSTG_F0x8009c330` looks the code up in the table at
     // `0x800a43d4` (`0x0c0b0a09` — which 0 → `0x09` poison, 1 → `0x0a` frozen, 2 → `0x0b`
-    // confused, 3 → `0x0c` asleep) and zeroes the slot with `sh $zr, ($v0)`
-    // (`pro/fightstg.s:26408`-`:26443`). Without this the walker's pool would keep ticking
-    // a poison the item already cured.
+    // confused) and zeroes the slot with `sh $zr, ($v0)` (`pro/fightstg.s:26408`-`:26443`).
+    // Without this the walker's pool would keep ticking a poison the item already cured.
     cureStatusEvent(
       (c as { statusEvents?: StatusEventPool }).statusEvents,
       n,
@@ -388,6 +390,19 @@ function cureAilments(c: BattleItemTarget, names: string[]): boolean {
       ((c as { slot?: number }).slot ?? 0) | 0,
     );
     any = true;
+  }
+  if (all) {
+    // `which` 3 is the ALL arm: the mask the row tests is `0x3f` and the cancel walks SIX
+    // codes, so the two tech-abort locks (`0x10` cannot-flee, `0x11` cannot-digivolve) are
+    // lifted with the four recoveries (see `STATUS_EVENT_ALL_CURE_CODES`). The walker's
+    // records are one fighter per side, and a lock is staged on the side's ACTIVE slot, so
+    // every slot of that side is swept rather than the single slot the disc's caller
+    // passes.
+    const pool = (c as { statusEvents?: StatusEventPool }).statusEvents;
+    const side = ((c as { sideByte?: number }).sideByte ?? 0) | 0;
+    for (let slot = 0; slot < 3; slot++) {
+      if (cureAllStatusEvents(pool, side, slot) > 0) any = true;
+    }
   }
   return any;
 }
@@ -442,7 +457,7 @@ export function useBattleItem(
     // The four status disks share one handler, 0x8008dcd8, and one page shape.
     case 66: case 67: case 68: case 69: {
       const disk = STATUS_DISKS[itemId]!;
-      if (!cureAilments(user, disk.ailments)) return none;
+      if (!cureAilments(user, disk.ailments, disk.all === true)) return none;
       return { ok: true, pages: [actorPage(disk.messageId, userName)] };
     }
 

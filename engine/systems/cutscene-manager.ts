@@ -8,7 +8,6 @@
 // parseEntry (DW3 lang markup) comes from engine/dw3.
 
 import { parseEntry, type ParsedDialogue } from "../dw3/dialogue-parse.ts";
-import { faceToward } from "./map-manager.ts";
 import { emoteSound } from "./emote-sounds.ts";
 
 import {
@@ -68,7 +67,9 @@ export interface CutEntity {
   y: number;
   dir?: string;
   playerName?: string;
-  _cutTarget?: { x: number; y: number };
+  /** A scripted walk latched by WALKTO. `facing` is the opcode's 4th operand: the
+   *  walk driver stores it to char+0x60 on arrival (fieldstg file 0xc2f0-0xc30c). */
+  _cutTarget?: { x: number; y: number; facing?: number | undefined };
   _inCutscene?: boolean;
   _animTime?: number;
   /** Last SETANIM clip id targeting this actor (see field-actor-anim-engine.md); the
@@ -371,7 +372,12 @@ export function createCutscene(
         // of parallel, the reported "one NPC at a time" bug.
         if (a0 !== undefined && a0 < EFFECT_ID_THRESHOLD) {
           const e = _entity(a0);
-          if (e) { e._cutTarget = { x: a1 ?? 0, y: a2 ?? 0 }; e._inCutscene = true; }
+          // The 4th operand is the ARRIVAL FACING, not a speed: walk_to (fieldstg
+          // F0x8008efd0, file 0xc320-0xc334) latches x into +0xf0, y into +0xf4 and
+          // the operand into +0xf8; the walk driver only reads +0xf8 on the arrival
+          // arm, storing it to the facing +0x60 (file 0xc2f0-0xc30c). It is a 0-7
+          // direction index (the shipped 823 WALKTOs carry 0-7).
+          if (e) { e._cutTarget = { x: a1 ?? 0, y: a2 ?? 0, facing: args[3] }; e._inCutscene = true; }
           _walkActors.add(a0);
         }
         _pc++;
@@ -448,33 +454,47 @@ export function createCutscene(
   let _walkedTicksThisStep = 0;
   let _playerWalkedTicksThisStep = 0;
 
-  function _moveToward(e: CutEntity, target: { x: number; y: number }, ticks: number): number {
+  /** The walk driver's direction nibble: SIGN-based, both axes independently
+   *  (fieldstg F0x8008eef0, file 0xc28c-0xc2d4: `slt` curX<targetX -> 0x20 right,
+   *  `slt` targetX<curX -> 0x80 left, the same pair for Y -> 0x40 down / 0x10 up).
+   *  It is NOT an angle octant: any target with a non-zero delta on both axes walks
+   *  a diagonal, however lopsided. The comparisons are on the integer pixels
+   *  (`curX>>8`), which is what `Math.floor` reproduces for the float positions. */
+  function _walkNibble(px: number, py: number, target: { x: number; y: number }): string {
+    const dx = px < target.x ? 1 : target.x < px ? -1 : 0;
+    const dy = py < target.y ? 1 : target.y < py ? -1 : 0;
+    if (dy > 0) return dx < 0 ? "down-left" : dx > 0 ? "down-right" : "down";
+    if (dy < 0) return dx < 0 ? "up-left" : dx > 0 ? "up-right" : "up";
+    return dx < 0 ? "left" : "right";
+  }
+
+  function _moveToward(e: CutEntity, target: { x: number; y: number; facing?: number | undefined }, ticks: number): number {
     let movedTicks = 0;
     for (let tick = 0; tick < ticks; tick++) {
-      const dx = target.x - e.x;
-      const dy = target.y - e.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 2) {
+      // The driver tests ARRIVAL FIRST, every tick (fieldstg file 0xc258-0xc284):
+      // `(curX>>8)>>1 == targetX>>1 && (curY>>8)>>1 == targetY>>1`. On arrival it
+      // snaps +0x50/+0x54 to the target's exact px<<8, clears the walking flag
+      // +0xec, writes the WALKTO mode operand (+0xf8) into the facing +0x60, and
+      // requests action mode 1 (idle). The walker's old `dist < 2` test arrived up
+      // to two ticks early and never applied the operand facing.
+      const px = Math.floor(e.x), py = Math.floor(e.y);
+      if ((px >> 1) === (target.x >> 1) && (py >> 1) === (target.y >> 1)) {
         e.x = target.x;
         e.y = target.y;
+        if (target.facing != null) e.dir = DIR8[target.facing & 7]!;
         delete e._cutTarget;
         break;
       }
-      // 8-way facing (matches faceToward's real angle resolution — see map-manager.ts).
-      e.dir = faceToward(e.x, e.y, target.x, target.y);
+      // No overshoot clamp: the driver adds the vector and lets the next tick's
+      // arrival test catch the target, exactly as the assembly does.
+      e.dir = _walkNibble(px, py, target);
       const delta = fieldDirectionDelta(
         e.dir as FieldDirection,
         FIELD_WALK_MAGNITUDE,
         opts.movementTerrainCode?.(e) ?? 0,
       );
-      if (dx * delta.x + dy * delta.y >= dist * dist) {
-        e.x = target.x;
-        e.y = target.y;
-        delete e._cutTarget;
-      } else {
-        e.x += delta.x;
-        e.y += delta.y;
-      }
+      e.x += delta.x;
+      e.y += delta.y;
       movedTicks++;
     }
     _walkedTicksThisStep = Math.max(_walkedTicksThisStep, movedTicks);

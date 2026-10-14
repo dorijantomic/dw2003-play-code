@@ -238,7 +238,15 @@ export function loopCellAt(steps: readonly DemoStep[], loopTo: number, frame: nu
 
 /** One particle channel's cell at `frame`, or null while hidden or finished. */
 export function channelCellAt(chan: ParticleChannel, frame: number): number | null {
-  if (frame < chan.hidden) return null;
+  // The spawn frame runs the object's phase 0 -- the four channels are seeded
+  // (`timer = duration[0]`, F0x80085bd4 file 0x2f88) and the state advances --
+  // and draws NOTHING; the first phase-1 frame is the frame AFTER the cue.
+  // Skipping that frame is also what makes the first cell show its full
+  // duration: the stepper decrements the timer before it tests it
+  // (F0x80085afc), so on the console cell 0 shows `duration - 1` stepping
+  // frames and every later cell shows `duration` -- one frame short in all,
+  // which the skipped spawn frame accounts for exactly.
+  if (frame < 1 || frame < chan.hidden) return null;
   return stepCellAt(chan.steps, frame - chan.hidden);
 }
 

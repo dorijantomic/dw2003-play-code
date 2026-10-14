@@ -142,10 +142,15 @@ test("the shipped scenes partition cleanly into a Digmon and a Submarimon sectio
   // Digmon = Circuit band + endgame aliases. s860 and s875-s895 are absent
   // from the exit-graph network because those screens are reached only through
   // the runtime maze-exit table (mazeSections) -- the gap the per-screen
-  // cast-list markers below now cover.
+  // cast-list markers below now cover. s845/s855 left the STATIC graph with the
+  // places system: the place-carrying stages (s825-s895 here) now ship their own
+  // StageSlots as self-warp placeholders and re-aim them per the incoming place
+  // pair at runtime (engine/systems/place-points.ts), so the static rows no
+  // longer walk s840/s850 -> s845/s855. Their form comes from the native
+  // cast-list markers (327), which the runtime prefers anyway.
   const section = (op) => [...network].filter(([, v]) => v === op).map(([k]) => k).sort();
   assert.deepEqual(section(10), [
-    "s825", "s830", "s835", "s840", "s845", "s850", "s855",
+    "s825", "s830", "s835", "s840", "s850",
     "s960", "s961", "s962", "s963", "s965",
   ]);
   assert.deepEqual(section(9), ["s865", "s870", "s968", "s969"]);
@@ -191,8 +196,12 @@ test("the per-screen cast-list markers cover the maze screens the exit graph mis
   for (const s of networkScreens)
     assert.ok(s in markers, `${s} is in the network but has no native marker`);
 
-  // The 14 maze-entered screens the exit graph never reaches.
+  // The 14 maze-entered screens the exit graph never reaches, plus s845/s855:
+  // the places system rebuilt the place-carrying stages' exits as their own
+  // place-aimed StageSlots (see the section lock above), so the static graph no
+  // longer walks into those two either. Their markers are the form that ships.
   const missing = {
+    s845: "Submarimon", s855: "Submarimon",
     s860: "Submarimon", s875: "Digmon", s880: "Digmon", s885: "Digmon",
     s890: "Digmon", s895: "Digmon", s964: "Submarimon", s966: "Submarimon",
     s967: "Submarimon", s970: "Digmon", s971: "Digmon", s972: "Digmon",

@@ -302,8 +302,15 @@ let fought = (await started()).length ? await started() : null;
 // ── 3/4. Strike until a cast lands on a live band and starts its fight. ────
 // The band is the pattern's, not ours — so cast repeatedly and assert about
 // whichever cast first resolves into a battle.
-for (let attempt = 0; attempt < 40 && !fought; attempt++) {
+//
+// `attempt` bounds the POLLS and `casts` bounds the casts: one settle is ~110
+// rendered frames, so polling for the bar at raf(5) burns twenty-odd polls per
+// cast. Counting those as attempts gave the loop only about two casts before
+// the cap, which made a first cast that lands dead water fail the run.
+let casts = 0;
+for (let attempt = 0; attempt < 600 && !fought; attempt++) {
     if (!(await fishing())) {
+        if (casts++ >= 40) break;   // forty casts is the budget the message names
         await press();          // cast
         await raf(95);          // settle
     }
@@ -312,8 +319,14 @@ for (let attempt = 0; attempt < 40 && !fought; attempt++) {
     await strike();             // strike — its own pad bit, its own key
     // The fight does not start on the strike: the angler still has to play the
     // result pose (0x3c ticks) and stand back up before mode 0x48 hands control
-    // over, and only then does the battle the cast earned begin.
+    // over, and only then does the battle the cast earned begin — behind the
+    // checkerboard handoff wipe, which is why this waits on the battle rather
+    // than on the cast.
     for (let i = 0; i < 40 && (await fishing()); i++) await raf(15);
+    // Then wait for the handoff: the catch starts its battle behind the
+    // checkerboard wipe, and the battle's own load is async after that.
+    for (let i = 0; i < 30 && !(await started()).length &&
+         !(await frame.evaluate(() => window.__battle.isActive())); i++) await raf(5);
     const hits = await started();
     if (hits.length) fought = hits;
     if (await frame.evaluate(() => window.__battle.isActive())) break;

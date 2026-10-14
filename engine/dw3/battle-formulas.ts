@@ -164,6 +164,9 @@ export function hpFractionThreshold(maxHp: number, cmp: number): number {
 export interface EnemyMoveContext {
   /** Active party member's live form: DIGIMON_PROFILES row id (record +0x00 species). */
   partyProfileId?: number | null;
+  /** u8 @(active party record +0x1c) — the party member's ailment bitfield; cond 9
+   *  tests bit 0x8 (Sleep) of THIS byte, not of the acting enemy's record. */
+  partyAilmentByte?: number | null;
   /** i16 @0x800a4530 — active elemental field id (ELEMENT_ID values; 0 = none). */
   fieldElementId?: number | null;
   /** u32 @0x80042b2c — the current battle's screen id. */
@@ -184,13 +187,14 @@ export interface EnemyMoveContext {
  *   0 = always, 1 = random/128, 2/3 = self HP below / at-or-above fraction,
  *   4/5 = current MP below/at-or-above value, 6/7 = other HP below / at-or-above,
  *   8 = the active party form is one of the eight partner profiles,
+ *   9 = the active party member's record +0x1c bit 0x8 (Sleep),
  *   10 = another enemy slot is alive (cmp 0) or that species is alive (cmp != 0),
  *   11 = the active elemental field id equals value,
  *   12 = the battle screen id equals value,
  *   13 = encounter config byte 1 equals value.
- * Still unmodelled (null): 9 (self +0x2c & 0x8) and 14-18 (self +0x04/+0x0e..
- * +0x14), whose operand identities are unread; see
- * docs/research/battle/enemy-ai-move-conditions.md.
+ * Out-of-range conditions (>= 0x13) return TRUE (`.Lexit_true`).
+ * Still unmodelled (null): 14-18 (self +0x04/+0x0e..+0x14), whose operand identities
+ * are unread; see docs/research/battle/enemy-ai-move-conditions.md.
  */
 export function enemyMoveCondition(
   condition: number,
@@ -200,8 +204,12 @@ export function enemyMoveCondition(
   other?: { hp: number; maxHp: number },
   context?: EnemyMoveContext,
 ): boolean | null {
+  // `andi $v1, $a0, 0xff` / `sltiu $v0, $v1, 0x13` / `beqz $v0, .Lexit_true`: the table
+  // index is the condition's low byte, and anything past the 19 populated slots is TRUE.
+  const cond = condition & 0xff;
+  if (cond >= 0x13) return true;
   const cmp = (value << 16) >> 16;
-  switch (condition) {
+  switch (cond) {
     case 0: return true;
     case 1: return (rng() & 0x7f) < value;
     case 2:
@@ -225,6 +233,16 @@ export function enemyMoveCondition(
       const formId = context?.partyProfileId;
       if (formId == null) return null;
       return formId >= 1 && formId <= 8;
+    }
+    case 9: {
+      // .L004: `lw $v1, 0x8(0x800a4460)` is the ACTIVE PARTY member's index
+      // (0x800a4468), and `addu $a1, $v0, $v1` with $v0 = 0x800a4460 lands on
+      // 0x800a4470 + idx*0x20; `lbu $v0, 0x2c($a1)` is that record's +0x1c — the
+      // party member's ailment bitfield — tested against 0x8 (Sleep). It is NOT the
+      // acting enemy's +0x2c: the operand is the party record, one record below.
+      const ail = context?.partyAilmentByte;
+      if (ail == null) return null;
+      return (Math.trunc(ail) & 0x8) !== 0;
     }
     case 10: {
       // .L005: walk the three enemy records, skipping the actor. cmp 0 = any
@@ -255,17 +273,35 @@ export function enemyMoveCondition(
       return battleId === cmp;
     }
     case 13: {
-      // .L23: u8 @0x80042b59, encounter config byte 1 (screen record +0x0d).
+      // .L23: u8 @0x80042b59, encounter config byte 1 (screen record +0x0d). The
+      // byte is zero-extended by `lbu`; the cmp side is the SIGN-extended i16, so a
+      // negative cmp never equals the gate.
       const gate = context?.encounterGateByte;
       if (gate == null) return null;
-      return (gate & 0xff) === (cmp & 0xff);
+      return (gate & 0xff) === cmp;
     }
+    // .L24-.L28: the operand identities of 14-18 (self +0x04, +0x0e, +0x10, +0x12,
+    // +0x14) are unread — every available dump reads 0 — so they stay unsupported
+    // rather than guessed (named gap; docs/research/battle/enemy-ai-move-conditions.md).
+    case 14:
+    case 15:
+    case 16:
+    case 17:
+    case 18:
+      return null;
     default: return null;
   }
 }
 
-/** FIGHTSTG_F0x80089148: enemy AI action 1=Fight, 2=Tech A, 3=Tech B.
- *  Action 4 is the flee special; 5–8 select another enemy slot and are not techniques. */
+/** FIGHTSTG_F0x80089148 (jump table @0x80082da8): the move's action byte maps to an
+ *  action code — 1 -> 1 (the basic-attack action), 2 -> the stats record's +0x0a
+ *  (move_1 technique id), 3 -> the record's +0x0c (move_2), 4 -> -1 (the flee
+ *  special), 5..8 -> -2..-5 (the enemy-slot switch), anything else -> 0.
+ *
+ *  The walker resolves the codes it acts on itself: action 1 through the species'
+ *  `attack` skill, 2/3 through `move_1`/`move_2`, and the flee path (action 4) in the
+ *  browser. 5..8 are the slot switch, which a one-enemy walker cannot execute
+ *  (named gap: the original prints 0x8E "Switch failed!" when no slot answers). */
 export function enemyActionSkillId(
   action: number,
   skills: { attack?: number; move_1?: number; move_2?: number },
@@ -276,6 +312,45 @@ export function enemyActionSkillId(
     case 3: return skills.move_2 || null;
     default: return null;
   }
+}
+
+/** One enemy move row (sdigiedt `Moves`: action +0x32, comparator +0x33, value +0x34). */
+export interface EnemyMoveRow {
+  action?: number;
+  comparator?: number;
+  value?: number;
+}
+
+/**
+ * The enemy controller's move pick — F0x80088564's selection loop (fightstg.s:6038-6061).
+ *
+ * The loop tests rows 0..2 with check_move_cond (`lbu $a0, 0x33($s0)` condition /
+ * `lh $a1, 0x34($s0)` value, stride 4) and takes the first row whose condition passes.
+ * When none passes, the loop exits on `slti $v0, $s1, 0x3` and `sll $v0, $s1, 0x2` reads
+ * row 3 — its condition byte is NEVER evaluated: the fourth row is the unconditional
+ * fallback. A row whose condition the walker cannot supply (`enemyMoveCondition` -> null)
+ * is skipped while testing 0..2.
+ *
+ * Returns null only when there is no fourth row to fall back to (the disc's record always
+ * carries four); the browser keeps its basic-attack fallback for that case alone.
+ */
+export function pickEnemyAiMove(
+  moves: ReadonlyArray<EnemyMoveRow | null | undefined> | null | undefined,
+  self: { mp: number; hp?: number; maxHp?: number },
+  rng: () => number,
+  other?: { hp: number; maxHp: number },
+  context?: EnemyMoveContext,
+): EnemyMoveRow | null {
+  const rows = moves ?? [];
+  if (!rows.length) return null;
+  const tested = Math.min(rows.length, 3);
+  for (let i = 0; i < tested; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const pass = enemyMoveCondition(row.comparator ?? 0, row.value ?? 0, self, rng, other, context);
+    if (pass === true) return row;
+  }
+  return rows.length >= 4 ? rows[3] ?? null : null;
 }
 
 /** Physical pre-element base — F0x8009f97c → STR·power/DEF. */
@@ -865,6 +940,15 @@ export interface EscapeRoll {
   escapeBonus?: number;
   /** Live record `+0x1c` ailment bitfield (0x02 Frozen, 0x08 Sleep, 0x10 tech-abort). */
   selfAilment?: number;
+  /**
+   * u8 @0x80042b65 — the encounter record's own byte +0x19 (`raw_2b58_2b65[13]`).
+   * The routine's FIRST test on the player side is `lbu $v0, 0x2b65($v0)` /
+   * `bnez $v0, .L0x800a17b4` — nonzero returns 0, so the Run can never succeed
+   * (fightstg.s:31894-31898; C `F0x800a1608.c:25`). Zero of the 167 screens whose
+   * byte is set appear in any active random-encounter zone: this is the flag that
+   * refuses the Run in the story/special battles. The enemy side has no such test.
+   */
+  escapeBlocked?: boolean;
 }
 
 /**
@@ -874,7 +958,9 @@ export interface EscapeRoll {
  *
  * The routine builds both sides' effective blocks with `F0x8009ec94`
  * (0x800a4580 = the acting/fleeing side, 0x800a45c0 = the other) and returns
- * `((RAND_U16 & 0x7f) < threshold)`. On the player side:
+ * `((RAND_U16 & 0x7f) < threshold)`. On the player side, after its two refusals —
+ * the encounter's own `0x80042b65` flag and the acting record's Sleep/tech-abort
+ * bits — the threshold is:
  *
  *   threshold = (base + 1) * 8                       # base = *(s16)0x800a4534
  *             + max(0, level_self - level_other)      # block +0x00, both sides
@@ -890,6 +976,7 @@ export interface EscapeRoll {
  * base-plus-bonus, not a ratio.
  */
 export function escapeThreshold(opts: EscapeRoll): number {
+  if (opts.escapeBlocked) return 0;                   // the encounter's own no-run flag
   const ailment = Math.trunc(opts.selfAilment ?? 0);
   if (ailment & 0x18) return 0;                       // Sleep or tech-abort: cannot run
   let threshold = ((Math.trunc(opts.escapeBase ?? ESCAPE_BASE_DEFAULT)) + 1) << 3;
@@ -909,6 +996,28 @@ export function escapeThreshold(opts: EscapeRoll): number {
 export function fleeChance(opts: EscapeRoll, rng: () => number): boolean {
   const threshold = escapeThreshold(opts);
   return threshold > 0 && (rng() & 0x7f) < threshold;
+}
+
+/**
+ * The runAway arm's own page — which line the flee outcome prints.
+ *
+ * WFIGHTMN_runAway (`0x800a7fe4`, file `0x2204`; the arm behind battle event 4,
+ * RUN_AWAY) shows one of two lines, chosen by the ACTOR of the queued entry
+ * (`wfightmn.s` file `0x228c`-`0x22a0`):
+ *
+ *   actor == 0  -> 0x43 "Run away!"   — the player's own Run command
+ *   actor != 0  -> 0x5F "Fleeing!"    — an enemy fled
+ *
+ * The actor is the byte at entry `+0x4` (`lbu $a0, 0x4($s0)` is the same byte the
+ * escape test `F0x800a1608` reads as its side). The enemy's decision to flee
+ * queues the event with `a0 = 0x10` (`fightstg.s` file `0x6123`-`0x6124`,
+ * FIGHTSTG_queueRunAway inside the enemy action-4 path, which first prints
+ * 0x5E "Trying to flee." at file `0x6125`-`0x6137`); the player's Run command
+ * queues it with the player's own slot. esmfight 0x43/0x5F texts:
+ * "Run away!" / "Fleeing!".
+ */
+export function runAwayLine(actor: number): number {
+  return (actor | 0) === 0 ? 0x43 : 0x5f;
 }
 
 // ── Ailments (status conditions) ────────────────────────────────────────────

@@ -115,7 +115,7 @@ test("the map's layers are emitted into their own buckets around the under-map b
   const layer2 = src.indexOf("ctx.drawImage(\n            layer2Img,");
   const under = src.indexOf("drawEffectsUnderMap(ctx, m.id");
   const ground = src.indexOf("ctx.drawImage(\n            groundImg,");
-  const over = src.indexOf("drawEffects(ctx, m.id, camX, camY, drawables)");
+  const over = src.indexOf("drawEffects(ctx, m.id, camX, camY, drawables");
   for (const [name, i] of [["layer-2 layer draw", layer2], ["under-map pass", under],
                            ["ground layer draw", ground], ["over-map pass", over]]) {
     assert.ok(i > 0, `${name} draw not found`);

@@ -1,30 +1,32 @@
 // The stage-select menu's root tick, translated bit-exactly from the original
-// pro/stagslct F0x80084D9C body.
+// pro/stagslct F0x80084D9C body, plus the cursor mover F0x80084A5C it drives.
 //
 // Phase 4 translation (docs/plans/2026-09-14-native-screen-port-plan.md).
 // Oracle: tests/lane-b/stage-select.test.js runs the original through
-// engine/native and compares the ordered calls and memory.
+// engine/native and compares the ordered calls and memory; the mover itself is
+// proved separately by tests/lane-b/stage-select-move-cursor.test.js against
+// the original 0x80084A5C body.
 //
 // State 0 / >=4 builds the screen: resets the display service, counts the
 // entries in the 0x80085EEC table (shown capped at 14), creates the title and
 // the two-column entry widgets (one row per entry, up to 14) and the fixed
 // footer/level/stat widgets. State 1 sub 0 recolours the two title widgets and
 // calls the object's +0x3C; sub 1 reads the pad (page scroll with the shoulder
-// buttons, column move with up/down, level/stat edit on the second pad) and
+// buttons, row move with up/down, level/stat edit on the second pad) and
 // repaints the rows, then settles the confirm/cancel into the shared counters.
 // State 2 returns; state 3 releases the selected category entry through the card
 // service.
 //
 // The display service (0x8004DE10 + 0x150/0x154/0x174/0x16C), the shared card
 // service (0x80048D34 + 0x2718/0x2750/0x270C and its +0x28/+0x2C/+0x263C
-// cells), the three overlay helpers (F0x80084A5C / F0x80084B2C / F0x80084B70),
-// the pad service (0x8004B7D0 + 0x3F4/0x3FC/0x3F8 and its +0x408 bit shifter),
-// the frame-button cell (0x8004BBC4), the sound cell (0x80048A7C), the widget
-// factory (F0x8001AE38) and every widget method are host boundaries. The
-// selection/frame/counter cells (0x80042B1C.., 0x8004B370, 0x8005CCA8) and the
-// two overlay tables are read and written through memory exactly as the
-// original does. This is lane B (engine/dw3/ui/native/**); lane A owns the shared
-// engine/dw3/ui/index.ts barrel and data/translated_functions.json.
+// cells), the overlay helper F0x80084B2C, the pad service (0x8004B7D0 +
+// 0x3F4/0x3FC/0x3F8 and its +0x408 bit shifter), the frame-button cell
+// (0x8004BBC4), the sound cell (0x80048A7C), the widget factory (F0x8001AE38)
+// and every widget method are host boundaries. The selection/frame/counter
+// cells (0x80042B1C.., 0x8004B370, 0x8005CCA8) and the two overlay tables are
+// read and written through memory exactly as the original does. This is lane B
+// (engine/dw3/ui/native/**); lane A owns the shared engine/dw3/ui/index.ts
+// barrel and data/translated_functions.json.
 
 export const STAGE_SELECT_TICK = 0x80084d9c;
 export const STAGE_SELECT_TABLE = 0x80085eec;
@@ -80,8 +82,6 @@ export interface StageSelectHost {
     cardIndexOf(index: number): number;
     /** [0x80048D34+0x2750](index) */
     cardRecord(index: number): number;
-    /** F0x80084A5C(obj, delta) */
-    moveColumn(obj: number, delta: number): void;
     /** F0x80084B2C(obj, delta) */
     scrollColumn(obj: number, delta: number): void;
     /** F0x80084B70(obj, arg1) */
@@ -151,6 +151,64 @@ export function stageSelectTick(
     stageSelectInit(mem, obj, arg1, state < 2 ? obj : 0x80080000, host);
 }
 
+/**
+ * F0x80084A5C(obj, delta): the cursor mover that skips unselectable records.
+ *
+ * It steps the in-window row +0x50 by `delta`; when the step leaves the window
+ * it pins +0x50 and scrolls +0x54 by one (clamped to 0 and rowCount - rowsVisible,
+ * each clamp setting the "moved" flag). It then tests the record at
+ * (row + column) in the 0x10-byte table: a record whose +0x8 type is non-zero
+ * accepts the position; a type of 0 (a rule or a section heading) is stepped
+ * over again in the same direction while no clamp happened, and at either end
+ * of the list the entry position is restored instead. The claim is
+ * `stagslct-movecursor-address-2026-10-11`; the oracle is
+ * tests/lane-b/stage-select-move-cursor.test.js.
+ */
+export function stageSelectMoveCursor(mem: StageSelectMemory, obj: number, delta: number): void {
+    const step = delta | 0;
+    let moved = 0;
+    const oldRow = mem.read32(obj + STAGE_SELECT_ROW_INDEX) | 0;
+    const oldColumn = mem.read32(obj + STAGE_SELECT_COLUMN_INDEX) | 0;
+    for (;;) {
+        // The store is the branch delay slot: the stepped value is written even
+        // when it is not negative.
+        let column = ((mem.read32(obj + STAGE_SELECT_COLUMN_INDEX) | 0) + step) | 0;
+        mem.write32(obj + STAGE_SELECT_COLUMN_INDEX, column);
+        if (column < 0) {
+            mem.write32(obj + STAGE_SELECT_COLUMN_INDEX, 0);
+            const row = ((mem.read32(obj + STAGE_SELECT_ROW_INDEX) | 0) - 1) | 0;
+            mem.write32(obj + STAGE_SELECT_ROW_INDEX, row);
+            if (row < 0) {
+                mem.write32(obj + STAGE_SELECT_ROW_INDEX, 0);
+                moved = 1;
+            }
+        }
+        const shown = mem.read32(obj + STAGE_SELECT_SHOWN) | 0;
+        column = mem.read32(obj + STAGE_SELECT_COLUMN_INDEX) | 0;
+        if (shown - 1 < column) {
+            const row = ((mem.read32(obj + STAGE_SELECT_ROW_INDEX) | 0) + 1) | 0;
+            const last = ((mem.read32(obj + STAGE_SELECT_ENTRIES) | 0) - shown) | 0;
+            mem.write32(obj + STAGE_SELECT_COLUMN_INDEX, (shown - 1) | 0);
+            mem.write32(obj + STAGE_SELECT_ROW_INDEX, row);
+            if (last < row) {
+                mem.write32(obj + STAGE_SELECT_ROW_INDEX, last);
+                moved = 1;
+            }
+        }
+        const row = mem.read32(obj + STAGE_SELECT_ROW_INDEX) | 0;
+        column = mem.read32(obj + STAGE_SELECT_COLUMN_INDEX) | 0;
+        // The index arithmetic is signed, so the negative cases above read below
+        // the table exactly as the original's `sll`/`addu` pair does; the type
+        // field is the record's +0x8 word.
+        const type = mem.read32(STAGE_SELECT_TABLE + ((row + column) << 4) + 0x08) | 0;
+        if (type !== 0) return;
+        if (moved === 0) continue;
+        mem.write32(obj + STAGE_SELECT_ROW_INDEX, oldRow);
+        mem.write32(obj + STAGE_SELECT_COLUMN_INDEX, oldColumn);
+        return;
+    }
+}
+
 function stageSelectInit(
     mem: StageSelectMemory,
     obj: number,
@@ -215,9 +273,9 @@ function stageSelectInput(
     const previous = mem.read32(obj + STAGE_SELECT_ROW_INDEX) | 0;
 
     if (bit(host, 0x3f4, 0, 4) || bit(host, 0x3fc, 0, 4)) {
-        host.moveColumn(obj, -1);
+        stageSelectMoveCursor(mem, obj, -1);
     } else if (bit(host, 0x3f4, 0, 6) || bit(host, 0x3fc, 0, 6)) {
-        host.moveColumn(obj, 1);
+        stageSelectMoveCursor(mem, obj, 1);
     } else {
         stageSelectScroll(obj, host);
     }

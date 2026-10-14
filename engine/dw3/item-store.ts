@@ -195,9 +195,11 @@ export function ownsItem(state: ItemStoreState, id: number): boolean {
  * `0x80048D34` to `0x8004B3F4` sixteen bytes at a time and then one final word
  * (stgmcard.s:3514-3560, `exe-decomp/stgmcard_c/F0x80084dcc.c:446-457`), so the
  * blob is these `0x26C4` bytes verbatim — byte 0 is the XOR-8 checksum over the
- * next `0x26C0`, u16 at 2 is the format id 4. Driver state 0x47 reads the same
- * `0x26C4` and copies it back over the block in one loop after verifying
- * checksum and format (stgmcard.s:3250-3300, F0x80084dcc.c:587-614). Nothing
+ * next `0x26C0`, byte 2 is the one format byte 4 (byte 3 is retained, copied
+ * from RAM; the store is `sb`, stgmcard.s .L0x00003760-.L0x00003764). Driver
+ * state 0x47 reads the same `0x26C4` and copies it back over the block in one
+ * loop after verifying checksum and format (stgmcard.s:3250-3300,
+ * F0x80084dcc.c:587-614). Nothing
  * repacks a field, so the card layout IS the RAM layout minus this base.
  */
 export const SAVE_BLOCK_BASE = 0x80048d34;

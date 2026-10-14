@@ -147,15 +147,21 @@ export const FIELD_BOOST_CAP_STAT = 999;
  * `msg` is the original's own message id (0x52 + the effect code, or 0x6a for the
  * single refusal the original has) and `amount` the figure it prints beside it —
  * for a chip that is the ROLL, even when the cap clipped the real rise. The
- * walker's legacy ITEMS panel renders its own English words from these.
+ * clipped heal arm is the one message with NO figure: the constant 0x52
+ * ("HP healed to maximum.", ststatus :12922-:12936 prints it and jumps to the
+ * tail without the 0x118 amount call), so `amount` is absent there and `clipped`
+ * marks it. The walker's legacy ITEMS panel renders its own English words from
+ * these.
  */
 export interface UseResult {
   ok: boolean;
   msg?: string;
   /** The original's message id, when the item resolved to a record. */
   messageId?: number;
-  /** The figure the original prints with messageId. */
+  /** The figure the original prints with messageId, when it prints one. */
   amount?: number;
+  /** True for the clipped heal arm: message 0x52, which carries no figure. */
+  clipped?: boolean;
   /** How much the record actually rose, after the cap clipped it. */
   delta?: number;
 }
@@ -260,7 +266,11 @@ export function useItem(
   return {
     ok: true,
     messageId: outcome.flag === 1 ? fieldItemMessageId(item.selector) : 0x52,
-    amount: outcome.used,
+    // The clipped heal arm (flag 2) prints the constant 0x52 with NO figure
+    // (ststatus :12934 sets the string and :12935 jumps to the tail without the
+    // 0x118 amount call), so `amount` is absent there — the listed value is not
+    // something the player was told. `delta` still carries the real rise.
+    ...(outcome.flag === 1 ? { amount: outcome.used } : { clipped: true as const }),
     delta: outcome.delta,
   };
 }

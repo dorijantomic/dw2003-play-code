@@ -119,6 +119,10 @@ def s16(image: bytes, offset: int) -> int:
     return struct.unpack_from("<h", image, offset)[0]
 
 
+def u16(image: bytes, offset: int) -> int:
+    return struct.unpack_from("<H", image, offset)[0]
+
+
 def u32(image: bytes, offset: int) -> int:
     return struct.unpack_from("<I", image, offset)[0]
 
@@ -226,8 +230,11 @@ def extract(src: Path) -> dict:
             # +0x0c is stored as an absolute pointer against header word 0.
             "pool": u32(image, record + 0x0C) - pool_base,
             "texture_anim": texture_anim(image, u32(image, record + 0x0C) - pool_base),
-            "standoff": s16(image, record + 0x10),
-            "hover": s16(image, record + 0x18),
+            # F0x80087F38 reads both with `lhu` (fightstg.s:5437-5441, :5450-5454): the fields are
+            # UNSIGNED and are negated into the slot afterwards. A record that ever set the high
+            # bit would diverge under a signed read; none of the shipped 248 do.
+            "standoff": u16(image, record + 0x10),
+            "hover": u16(image, record + 0x18),
             # Carried, not interpreted: no instruction in the game reads these.
             "unread": [s16(image, record + 0x12), s16(image, record + 0x14),
                        s16(image, record + 0x16)],

@@ -64,6 +64,7 @@ import {
   battleScriptedPlanFor, scriptedWalkerSentence, clearActionAffinity,
   battleStatusEventAdvance,
 } from "../web/battle.js";
+import { battleAilmentByte } from "../web/battlecmd-translated.js";
 
 const BATTLE_JS = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
 const TECH_TABLE = JSON.parse(readFileSync(
@@ -420,6 +421,11 @@ test("THE QUEUE: the no-flee lock is RELEASED, so the escape comes back", () => 
   assert.ok(lockQueued(b, 0), "Capture Beam queued the lock");
   assert.equal(statusEventLockHeld(b.statusEvents, 0, 0, 0), true,
     "the escape gate reads the queue, and the queue says locked");
+  // The stager ALSO sets the record's own +0x1c bit (`ori $v0, 0x10` :27134) —
+  // the byte the command-menu row greys (F0x80093cf4 :17595), the DNA tests and
+  // the escape roll read. A pool-only model left it clear and the greys dead.
+  assert.equal(battleAilmentByte(b.player) & 0x10, 0x10,
+    "the record byte carries the cannot-flee bit while the lock is held");
   const before = b.statusEvents.find((e) => e.code === 0x10).time;
   let guard = 0;
   const expiries = [];
@@ -432,6 +438,20 @@ test("THE QUEUE: the no-flee lock is RELEASED, so the escape comes back", () => 
   assert.ok(before > 0);
   assert.equal(statusEventLockHeld(b.statusEvents, 0, 0, 0), false,
     "the queue released it, so the escape is offered again");
+  assert.equal(battleAilmentByte(b.player) & 0x10, 0,
+    "the expiry clears the record's bit too (pro/wfightmn.s:2743-:2773)");
+});
+
+test("the cannot-digivolve lock sets the record's 0x20 bit the DV row greys on", () => {
+  const b = battle();
+  b.statusEvents = emptyStatusEventPool();
+  const plan = battleScriptedPlanFor(b, 0, record(212), 212,
+    { name: "Marsmon", roll7: 3 });
+  assert.equal(plan.effect, "lockDigivolve");
+  assert.equal(statusEventLockHeld(b.statusEvents, 1, 0, 0), true);
+  assert.equal(battleAilmentByte(b.player) & 0x20, 0x20,
+    "the record byte carries the cannot-digivolve bit (ori $v0, 0x20 :27141)");
+  assert.equal(battleAilmentByte(b.enemy) & 0x20, 0, "the enemy record is untouched");
 });
 
 test("ARM 0x80090610: a landed roll shows NOTHING and a lost roll says \"No effect!\"", () => {

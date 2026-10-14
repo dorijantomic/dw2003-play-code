@@ -11,7 +11,7 @@
 //   F0x8008BD70 statusPromptFill  the two prompt lines.
 //   F0x8008BE34 statusFormsFill   the three form names and the current-form mark.
 //   F0x8008C02C statusEquipFill   the six equipment names.
-//   F0x8008C1C0 statusStatsFill   the thirteen stat numbers and the level.
+//   F0x8008C1C0 statusStatsFill   the thirteen stat numbers and the TP pair.
 //   F0x8008C460 statusEquipPreview try an equipment change and show the stat deltas.
 //   F0x8008C954 statusDraw        cards, portraits, panels and the cursor.
 //   F0x8008D684 statusDetailTick  the partner's detail view (forms/equipment choice).
@@ -24,8 +24,9 @@
 // bytes each, the scale at +8); +0x148 the equipment preview method.
 // Widget block: +0 header; +4 three 0x2C card rows; +0x88/+0x8C the pick prompts;
 // +0x90 two prompt lines; +0x98 the detail cursor; +0x9C/+0xA0 the detail labels;
-// +0xA4/+0xA8 forms; +0xB4/+0xB8 equipment; +0xD0.. thirteen stats; +0x104/+0x108
-// level; +0x10C the child page object.
+// +0xA4/+0xA8 forms; +0xB4/+0xB8 equipment; +0xD0.. thirteen stats; +0x104 the
+// TP value and +0x108 its "TP" label (esstatus 0x4E; the value is the record's
+// own TP halfword at +0x26, block+2); +0x10C the child page object.
 import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { partyPositionToRosterSlot } from "../../party-context.ts";
 import { itemIconClip, itemRecord } from "../../item-record.ts";
@@ -202,12 +203,12 @@ export function statusCtor(mem: PauseMemory, obj: number, ui: number, host: Stat
     for (let i = 0; i < 6; i++) put(0xb8 + i * 4, text(1, 0xc0, 0x89 + i * 0xe));
     for (let i = 0; i < 6; i++) put(0xd0 + i * 4, text(1, 0x32, 0x5b + i * 0xe));
     for (let i = 0; i < 7; i++) put(0xe8 + i * 4, text(1, 0x5b, 0x5b + i * 0xe));
-    const levelLabel = text(1, 0x10, 0xcb);
-    put(0x108, levelLabel);
-    host.callMethod(levelLabel, 0x15c, [order()]);
-    const level = text(1, 0x2d, 0xcb);
-    put(0x104, level);
-    host.callMethod(level, 0x15c, [order()]);
+    const tpLabel = text(1, 0x10, 0xcb);
+    put(0x108, tpLabel);
+    host.callMethod(tpLabel, 0x15c, [order()]);
+    const tpValue = text(1, 0x2d, 0xcb);
+    put(0x104, tpValue);
+    host.callMethod(tpValue, 0x15c, [order()]);
 }
 
 const bankOf = (mem: PauseMemory, host: StatusHost, offset: number): number =>
@@ -304,7 +305,7 @@ function statusStatPanel(mem: PauseMemory, ui: number, host: StatusHost) {
     };
 }
 
-/** F0x8008C1C0(obj, ui, show): the thirteen stat numbers and the level. */
+/** F0x8008C1C0(obj, ui, show): the thirteen stat numbers and the TP pair. */
 export function statusStatsFill(mem: PauseMemory, obj: number, ui: number, show: number, host: StatusHost): void {
     const w = (off: number) => mem.read32(ui + off) | 0;
     if (show === 0) {
@@ -319,6 +320,8 @@ export function statusStatsFill(mem: PauseMemory, obj: number, ui: number, show:
     const panel = statusStatPanel(mem, ui, host);
     fillStatPanel(mem, panel, stats, { cap: true, marks: "caller", pass: "after-clear" });
     host.callMethod(w(0x108), 0x114, [host.languageBank(lang(mem) + 0xb0), 0x4e]);
+    // Block+2 is the record's TP halfword (record +0x26); the copied block starts
+    // at record +0x24, so halfword index 1 IS the TP.
     host.callMethod(w(0x104), 0x118, [0, mem.read16s(stats + 2)]);
     host.callMethod(w(0x104), 0x148, [1]);
     greyStatPanel(mem, panel, stats);

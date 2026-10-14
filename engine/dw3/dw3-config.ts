@@ -41,6 +41,14 @@ export interface RosterPredTable {
   // param2 -> [lo,hi] for op 0x30. `hi` is `null` for the disc's open-ended ranges: the raw
   // byte is ORDINAL_RANGE_OPEN_HI, kept verbatim by the extractor.
   ranges?: Record<number, [number, number | null]>;
+  /**
+   * The three op-0x20 amount tables F0x80015aac indexes by param2, straight out of the static
+   * EXE data (web/assets/data/bank70_rewards.json, tools/extract_bank70_rewards.py):
+   * D0x80048c44 MONEY_REQUIRED (compare), D0x80048c6c MONEY_GAINS (add), D0x80048c8c
+   * MONEY_LOSSES (subtract). Attached by the converter so the engine can answer the currency
+   * arms of bank 0x70 without a second data file.
+   */
+  amounts?: { compare?: number[]; add?: number[]; subtract?: number[] };
 }
 
 /**
@@ -118,7 +126,12 @@ export function registerDw3Flags(flags: FlagManager, roster: RosterPredTable): v
   for (const bank of STORY_COMMAND_BANKS) flags.registerVirtualBank(bank, () => true);
   // bank 0x60 = progress-ordinal equality
   flags.registerVirtualBank(0x60, (bit, expected, ctx) => {
-    const ord = ctx.vars.get("$story.ordinal");
+    // `F0x80015ec8`: get_flag(0x60NN, e) = (ordinal == NN) == e. The disc reads a RAM
+    // WORD — 0 before any scene writes it (BSS) — so an unwritten ordinal answers as 0,
+    // not as "no step": the s780/s785 opening rows gate on 0x6000==1 at exactly that
+    // state. (A word can hold 0x300 from the free-roam stage-select store; see
+    // progress_ordinal.json's named gap.)
+    const ord = Number(ctx.vars.get("$story.ordinal") ?? 0);
     const eq = ord === bit;
     return expected === 0 ? !eq : eq;
   });
@@ -131,6 +144,20 @@ export function registerDw3Flags(flags: FlagManager, roster: RosterPredTable): v
       const range = roster.ranges?.[rec.param2];
       const ord = Number(ctx.vars.get("$story.ordinal") ?? -1);
       if (range) { const [lo, hi] = range; res = ordinalInRange(lo, hi, ord); }
+    } else if (rec && (rec.op & 0xf0) === 0x20) {
+      // bank 0x70 op-0x20 = F0x80015aac, the currency handler over D0x80048d34+0x6c
+      // (== 0x80048da0, the BIT total). Its low nibble is the arm: 0 = COMPARE
+      // "MONEY_REQUIRED[param2] <= BIT" (a predicate), 1 = ADD MONEY_GAINS[param2],
+      // 2 = SUBTRACT MONEY_LOSSES[param2]. Only arm 0 is a read any shipped flag
+      // uses — the auction's affordability conditions 0x7074+j (claim
+      // fieldstg-auction-bid-questions-2026-10-09); arms 1/2 are writes and stay
+      // dormant as reads, exactly as the disc leaves them (a get_flag on a subtract
+      // code is not shipped). The money is the same $party.bit AddMoney writes.
+      const money = Number(ctx.vars.get("$party.bit") ?? 0);
+      if ((rec.op & 0xf) === 0) {
+        const need = roster.amounts?.compare?.[rec.param2];
+        res = need !== undefined && money >= need;
+      }
     } else if (rec?.semantics) {
       const s = rec.semantics;
       switch (s.kind) {

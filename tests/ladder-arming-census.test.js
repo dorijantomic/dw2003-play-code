@@ -25,12 +25,15 @@
 //   1. CENSUS. The walker's member list equals the decoded list: every ladder rail end
 //      the disc's own data arms is armed here too, and the three ends it does NOT arm are
 //      named with the opcode their cell actually carries — an op-8 cutscene cell and an
-//      op-6 party-slot cell are not ladder cells, so nothing mounts from them. (The
-//      walker's `live` is narrower than the disc's step-load for op 6: the disc returns
-//      live for opcodes 5 and 6 without reading the cone at all — fieldstg.s:5534-5536
-//      `slti $v0,$v1,0x7` / `bnez` into the return with `li $v0,0x1` in the delay slot —
-//      and the walker keeps op 6 out of PLAYBACK_ACTIVE_OPS. Reported as a shared-system
-//      gap, not patched here: op 6 mounts nothing, so no ladder depends on it.)
+//      op-6 party-slot cell are not ladder cells, so nothing mounts from them. (SETTLED
+//      2026-10-14, this pass: the walker's step-load liveness is NOT narrower for ops 5
+//      and 6 — the disc returns live for both without reading the cone at all
+//      (fieldstg.s:565c-:5664 `slti $v0,$v1,0x7` / `bnez` with `li $v0,0x1` in the delay
+//      slot), and `stepLive` returns true for both; lane-b/scene-step.test.js pins that
+//      class split. `PLAYBACK_ACTIVE_OPS` correctly keeps them out, because their PLAYBACK
+//      table entries (file 0x1e8) are the executor's epilogue 0x5bc8, verified against
+//      web/assets/native/fieldstg.bin. The disc never reaches the press arm for them
+//      anyway: their setup handlers return 0, so the driver's sub-state never leaves 0.)
 //   2. THE MOUNT'S OWN FACING. `a1` of the mount call, which both mount bodies store
 //      into `entity+0x60` (fieldstg.s:12601 bottom / :12644 top): op 2 hands over its
 //      own group (:5808) and op 3 hands over 5 when the group is 1 and 3 otherwise — the

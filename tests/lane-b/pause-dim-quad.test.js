@@ -44,7 +44,7 @@ const original = (address, args, budget = 200000) => () => h.rt.cpu.call(address
 
 test("dim quad factory and start match", () => {
     h.compare("factory", seed(), RANGES, original(0x80084f10, [], 20000), () => dimQuadFactory(h.rt.mem, host()));
-    for (const [dir, frames] of [[0, 10], [1, 10], [0, 7], [1, 255], [0, 1]]) {
+    for (const [dir, frames] of [[0, 10], [1, 10], [0, 7], [1, 255], [0, 1], [0, 0], [1, 0]]) {
         h.compare(`start ${dir} ${frames}`, seed(), RANGES, original(0x80084c90, [OBJ, dir, frames], 5000),
             () => dimQuadStart(h.rt.mem, OBJ, dir, frames, host()));
     }

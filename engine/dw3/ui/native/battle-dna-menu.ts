@@ -559,16 +559,22 @@ function dnaPaneOptionsTick(mem: DnaPaneMemory, self: number, slot: number, host
         return;
     }
     const pad = host.padRead(0) | 0;
+    // This sub-state tests CIRCLE first and sends a non-Circle frame on to the
+    // Cross test (`andi $v0, $v1, 0x2000` / `beqz $v0, .L0x800986f8`,
+    // fightstg.s:22246-22247, then `andi $v0, $v1, 0x4000` at :22375). It is the
+    // other way round from the name strip above, which tests Cross first
+    // (:22085). A frame carrying both therefore commits the confirm here.
+    if ((pad & DNA_PAD_CONFIRM) !== 0) {
+        host.playSound(DNA_CONFIRM_SOUND);
+        dnaPaneCommit(mem, self, slot, host);
+        dnaPaneTail(mem, self, slot, host);
+        return;
+    }
     if ((pad & DNA_PAD_CANCEL) !== 0) {
         host.playSound(DNA_CANCEL_SOUND);
         host.callMethod(self, 0x2c, [0]);
         dnaPaneLabels(mem, self, slot, 0, host);
         dnaPaneArt(mem, self, host);
-    } else if ((pad & DNA_PAD_CONFIRM) !== 0) {
-        host.playSound(DNA_CONFIRM_SOUND);
-        dnaPaneCommit(mem, self, slot, host);
-        dnaPaneTail(mem, self, slot, host);
-        return;
     } else if ((pad & (DNA_PAD_R1 | DNA_PAD_L1)) !== 0) {
         moveRow(mem, self, pad, host);
         dnaPaneArt(mem, self, host);
@@ -798,14 +804,17 @@ function dnaPaneCommit(mem: DnaPaneMemory, self: number, slot: number, host: Dna
         dnaPaneArt(mem, self, host);
         return;
     }
-    // The charge's table address carries the selected row
-    // (fightstg.s:22296: `addiu $a2, $v0, 0x2bdc` with $v0 the row), which is
-    // what the PS1's unaligned halfword load rounds down to the even address.
+    // The price table address is built from the result id alone: `addiu $a2,
+    // $v0, 0x2bdc` at fightstg.s:22294 has the `lui $v0, 0x8004` at :22292 in its
+    // DELAY SLOT, so the selected row never reaches the address — both rows read
+    // the same even halfword at 0x80042BDC + 0x12*(id - 1).
     const dnaId = mem.read32(self + DNA_DNA_ID) | 0;
-    const price = mem.read16((DNA_PRICES + DNA_PRICE_STRIDE * ((dnaId - 1) | 0) + row) & ~1) & 0xffff;
+    const price = mem.read16(DNA_PRICES + DNA_PRICE_STRIDE * ((dnaId - 1) | 0)) & 0xffff;
+    // Both MP compares are SIGNED halfwords (`lh $v1, 0xc($s0)` at :22302 and
+    // `lh $v0, 0xc($s2)` at :22308), as in the grey test above.
     const reject =
-        (mem.read16(activeRecord + DNA_PARTY_MP) & 0xffff) < price ||
-        (mem.read16(partnerRecord + DNA_PARTY_MP) & 0xffff) < price ||
+        (mem.read16s(activeRecord + DNA_PARTY_MP) | 0) < price ||
+        (mem.read16s(partnerRecord + DNA_PARTY_MP) | 0) < price ||
         (activeAilments & 0x20) !== 0 ||
         (partnerAilments & 0x20) !== 0 ||
         (activeAilments & 0x08) !== 0 ||
@@ -840,15 +849,17 @@ function markOption(mem: DnaPaneMemory, self: number, model: number): void {
 }
 
 /**
- * fightstg.s:22432: Circle in the name strip freezes the species list the same
- * way, but with $s0 — and on this path $s0 is not a profile record. $s0 is
- * loaded once, by the seed's candidate call at fightstg.s:21982 (`lw $s0,
- * 0x60($s1)`), and nothing in sub-state 0 or its Circle branch writes it again,
- * so the store puts the pane's own combatant index (self+0x60) into the list
- * model's +0x54. Both are non-zero, and F0x8009AF4C only tests for non-zero
- * (fightstg.s:22450), so the strip stops reading input either way.
+ * fightstg.s:22224: Circle in the name strip freezes the species list by writing
+ * the pane's own +0x14 into the list model's +0x54 (`sw $s0, 0x54($v0)` at
+ * 0x8009849c). On this path the value is the BUILD flag, not the combatant: the
+ * sub-state-0 dispatch loaded it into $s0 at fightstg.s:22053 (`lw $s0,
+ * 0x14($s1)`) and the live branch below is only entered when it is 1, so the
+ * store always writes 1. Writing the partner's combatant index (self+0x60) here
+ * instead is what used to leave the list unfrozen for a partner in roster slot 0
+ * — the shared list widget skips its whole input block only when +0x54 is
+ * non-zero (`lw $v0, 0x54($s1)` / `bnez` at fightstg.s:25089-25091).
  */
 function markSpecies(mem: DnaPaneMemory, self: number, slot: number): void {
     const model = mem.read32(slot + DNA_SLOT_MODEL) >>> 0;
-    if (model !== 0) mem.write32(model + DNA_MODEL_MARKER, mem.read32(self + DNA_COMBATANT));
+    if (model !== 0) mem.write32(model + DNA_MODEL_MARKER, mem.read32(self + DNA_BUILD));
 }

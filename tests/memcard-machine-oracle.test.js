@@ -393,6 +393,54 @@ test("memcardStateMachine matches F0x80084DCC in every state", () => {
     }
 });
 
+// ── The load gate's format test, 2026-10-14 ────────────────────────────────
+// The original compares ONE BYTE: stgmcard.s .L0x00003288 `lbu $v1, 0x2($a0)`,
+// `li $v0, 0x4`, `beq`. Byte +3 is the retained byte the save path copies from
+// the live block and never rewrites, so an image written from a live block whose
+// +3 is nonzero loads fine — the writer's own output must survive its reader.
+// The port read the halfword at +2, which folded that retained byte into the
+// gate and rejected such an image with result 8.
+test("state 0x47's format gate reads the byte at +2, not the halfword", () => {
+    const variant = { ...VARIANTS[1], services: 1, checksum: 0x0f }; // load: mode 1
+    const run = (translated) => {
+        seed(0x47, variant);
+        rt.mem.write8(BUF, 0xff);       // stored checksum: a superset of the computed 0x0f
+        rt.mem.write8(BUF + 2, 4);      // the one format byte the writer stores
+        rt.mem.write8(BUF + 3, 0x11);   // the retained byte +3, nonzero
+        if (translated) memcardStateMachine(rt.mem, SCREEN, WIDGETS, 0x26c4, portHost);
+        else rt.cpu.call(FN, [SCREEN, WIDGETS, 0x26c4], 400000);
+        return {
+            state: rt.mem.read32(SCREEN + MEMCARD.state) | 0,
+            result: rt.mem.read32(SCREEN + MEMCARD.result) | 0,
+            card: Array.from({ length: 8 }, (_, i) => rt.mem.read8(CARD + i)),
+            hideStep: EVENTS.filter((e) => e[0] === "hideStep").length,
+        };
+    };
+    const original = run(false);
+    assert.equal(original.result, 1, "the original accepts the image");
+    assert.deepEqual(original.card.slice(0, 4), [0xff, 0, 4, 0x11],
+        "and copies the image back whole, retained byte included");
+    assert.equal(original.hideStep, 0, "no error strip");
+    assert.deepEqual(run(true), original, "the port must accept it the same way");
+
+    // The subset test's other direction: a stored byte missing a computed bit is
+    // an error (8) with the between-steps hide — equality is not required, but a
+    // missing bit is.
+    const runBad = (translated) => {
+        seed(0x47, { ...VARIANTS[1], services: 1, checksum: 0x0f });
+        rt.mem.write8(BUF, 0x01);       // 0x0f & ~0x01 != 0
+        rt.mem.write8(BUF + 2, 4);
+        if (translated) memcardStateMachine(rt.mem, SCREEN, WIDGETS, 0x26c4, portHost);
+        else rt.cpu.call(FN, [SCREEN, WIDGETS, 0x26c4], 400000);
+        return {
+            result: rt.mem.read32(SCREEN + MEMCARD.result) | 0,
+            hideStep: EVENTS.filter((e) => e[0] === "hideStep").length,
+        };
+    };
+    assert.deepEqual(runBad(false), { result: 8, hideStep: 1 }, "a missing bit rejects");
+    assert.deepEqual(runBad(true), runBad(false), "the port rejects it the same way");
+});
+
 test("the dispatch, the opening fall-through and the shared settle", () => {
     seed(0, VARIANTS[0]);
     memcardStateMachine(rt.mem, SCREEN, WIDGETS, 0x26c4, portHost);

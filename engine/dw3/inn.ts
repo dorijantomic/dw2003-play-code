@@ -93,6 +93,29 @@ export const INN_RECORDS: readonly InnRecord[] = [
 ];
 
 const BY_STAGE = new Map<number, InnRecord>(INN_RECORDS.map((r) => [r.stage, r]));
+const BY_SCREEN = new Map<number, InnRecord>(INN_RECORDS.map((r) => [r.screen, r]));
+
+/**
+ * The s9xx endgame variants of the inn screens that have one, as
+ * `alias stage -> the screen id it shares with its base stage`.
+ *
+ * A screen owns two overlays — its ordinary stage and its s9xx story variant —
+ * and the field's CURRENT SCREEN ID is shared by both (engine/dw3/screen-routing.ts
+ * `screenIdForStage`, whose own comment says so; the `alt` records of
+ * data/screen_table.json, selected at master ordinal 0x2d,
+ * docs/research/field/door-warp-decode.md). The inn screen's own lookup scans
+ * D0x8003edcc by that screen id (F0x800119a8), so the variant map opens the base
+ * map's record — and the innkeeper on it (NPC 20, p039tail) writes the same
+ * bank-0x7A index as the base map's: web/stage-npc-programs.json carries
+ * s928/s946/s957 on_close 0x7A28/0x7A29/0x7A2A, exactly the ids s236/s361/s426
+ * carry. Without this map `innForStage` answered null on those three maps and
+ * the innkeeper's dialogue opened nothing.
+ */
+export const INN_ALIAS_STAGES: Readonly<Record<number, number>> = Object.freeze({
+  928: 633, // Amaterasu Inn's endgame variant (base stage s236)
+  946: 658, // Forest Inn's endgame variant (base stage s361)
+  957: 669, // Qing Long Inn's endgame variant (base stage s426)
+});
 
 /** Parse `"s235"`, `235` or `"235"` to a stage number, or null. */
 function stageNumber(map: number | string | null | undefined): number | null {
@@ -106,16 +129,26 @@ function stageNumber(map: number | string | null | undefined): number | null {
  * The inn on a given map, or null when that map has none.
  *
  * This is the walker's stand-in for `F0x800119a8`'s scan of `D0x8003edcc` by
- * current screen id: the lookup key is the map you are standing on.
+ * current screen id: the lookup key is the map you are standing on. A map whose
+ * stage is one of the s9xx variants resolves through its shared screen id, so the
+ * variant opens the same record as its base (see {@link INN_ALIAS_STAGES}).
  */
 export function innForStage(map: number | string | null | undefined): InnRecord | null {
   const n = stageNumber(map);
-  return n == null ? null : BY_STAGE.get(n) ?? null;
+  if (n == null) return null;
+  const direct = BY_STAGE.get(n);
+  if (direct) return direct;
+  const screen = INN_ALIAS_STAGES[n];
+  return screen == null ? null : BY_SCREEN.get(screen) ?? null;
 }
 
-/** Every map that has an inn, ascending. */
+/**
+ * Every map that has an inn, ascending: the 21 records' own stages plus the
+ * three s9xx variants that share an inn screen's id.
+ */
 export function innStages(): number[] {
-  return INN_RECORDS.map((r) => r.stage).sort((a, b) => a - b);
+  return [...INN_RECORDS.map((r) => r.stage), ...Object.keys(INN_ALIAS_STAGES).map(Number)]
+    .sort((a, b) => a - b);
 }
 
 export interface InnQuote {

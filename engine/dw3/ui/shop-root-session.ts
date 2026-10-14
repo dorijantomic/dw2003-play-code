@@ -18,7 +18,7 @@ import { TranslatedTaskTree, type TranslatedTaskClass } from "./translated-task-
 import { windowFoldStart, windowFoldTick } from "./window-fold.ts";
 import { ShopDrawIntents } from "./shop-draw-intents.ts";
 import { ShopTradeComposition } from "./shop-trade-composition.ts";
-import { createShopFade, registerShopFade, startShopFade } from "./shop-fade-task.ts";
+import { createShopFade, registerShopFade, SHOP_FADE_START_SLOT, type ShopFadeDraw } from "./shop-fade-task.ts";
 
 export interface ShopRootResources {
   catalog: ShopCatalogData;
@@ -45,6 +45,7 @@ export class ShopRootSession {
   readonly draw = new ShopDrawIntents(this.mem);
   private resourceRequested = false;
   private frame = 0;
+  private fadeDraw: ShopFadeDraw | null = null;
 
   constructor(shopId: number, language: number, save: ShopSaveSeed,
               resources: ShopRootResources, host: ShopRootSessionHost) {
@@ -96,8 +97,10 @@ export class ShopRootSession {
           createBuy: (owner) => this.trade.createBuy(owner),
           createSell: (owner) => this.trade.createSell(owner),
           createFade: () => createShopFade(this.mem, this.tree),
+          // The original calls the fade's own +0x64 start method
+          // (createFader installs it as 0x80083344).
           fadeStart: (fade, direction, frames) =>
-            startShopFade(this.mem, this.tree, fade, direction, frames),
+            this.tree.callMethod(fade, SHOP_FADE_START_SLOT, [direction, frames]),
         }),
         draw: (owner) => shopRootDraw(this.mem, owner, this.draw),
         closeSave: host.closeSave,
@@ -109,7 +112,7 @@ export class ShopRootSession {
       widgets: this.widgets, banks: this.banks, pad: this.pad, draw: this.draw,
       playSound: host.playSound });
     this.trade.register(classes);
-    registerShopFade(this.mem, this.tree, classes);
+    registerShopFade(this.mem, this.tree, classes, (draw) => { this.fadeDraw = draw; });
     this.root = constructShopTask(this.tree, SHOP_ROOT_HANDLER, SHOP_ROOT_SIZE, SHOP_ROOT_EXTRA,
       (allocation) => shopRootCreate(this.mem, allocation));
   }
@@ -124,6 +127,8 @@ export class ShopRootSession {
 
   result(): ShopSaveResult { return readShopSaveState(this.mem, this.trade.swaps); }
   finished(): boolean { return !this.tree.tasks.has(this.root); }
+  /** F0x800833CC's last submitted dim quad (the browser paints this intent). */
+  fadeIntent(): ShopFadeDraw | null { return this.fadeDraw; }
   fadeLevel(): number {
     if (this.finished()) return 255;
     const context = this.mem.read32(this.root + 0x24) >>> 0;

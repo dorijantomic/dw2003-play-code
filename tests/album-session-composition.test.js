@@ -50,12 +50,18 @@ test("the album opens, turns pages, moves the cursor and exits", () => {
   assert.equal(rd(session, 0x64), 27, "the page count is 0x1B for the 315-card catalog");
   assert.equal(rd(session, 0x7c), 1, "page one has a collected card");
 
-  // R1 (word bit 0x800) turns the page forward; L1 (0x400) back.
-  session.tick(["r1"]); for (let f = 0; f < 30; f++) session.tick([]);
+  // R1 (word bit 0x800) turns the page forward; L1 (0x400) back. The screen
+  // locks input while the grid plays its page reveal (state 0xF waits for the
+  // grid's +0x0C to settle at 1), so wait for the cursor state between turns.
+  const settle = () => {
+    for (let frame = 0; frame < 400 && rd(session, 0x10) !== 4; frame++) session.tick([]);
+    assert.equal(rd(session, 0x10), 4, "the album returns to its cursor state");
+  };
+  session.tick(["r1"]); settle();
   assert.equal(rd(session, 0x60), 1, "R1 turns to page two");
-  session.tick(["r1"]); for (let f = 0; f < 30; f++) session.tick([]);
+  session.tick(["r1"]); settle();
   assert.equal(rd(session, 0x60), 2, "R1 turns to page three");
-  session.tick(["l1"]); for (let f = 0; f < 30; f++) session.tick([]);
+  session.tick(["l1"]); settle();
   assert.equal(rd(session, 0x60), 1, "L1 turns back to page two");
 
   // The d-pad moves the cursor within the page (right = word bit 0x20).

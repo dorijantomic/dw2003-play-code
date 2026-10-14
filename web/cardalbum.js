@@ -104,6 +104,10 @@ function moveAlbumCell(album, delta) {
     album.cursor = n;
     clampAlbumCell(album);
   }
+  // True when the cursor actually moved (the caller plays the move blip
+  // 0x0004001B, SYSTEM06 — album-tick.ts:246/310: a changed cursor on a
+  // landed cell plays 0x4001B; a refused/restored walk is silent).
+  return album.cursor !== old;
 }
 
 export function createCardAlbum(sfx = null) {
@@ -157,7 +161,11 @@ export function createCardAlbum(sfx = null) {
     if (c.fadeLeaving) return;
     c.fadeLeaving = true;
     c.fadeT0 = performance.now();
-    sfx?.play("system04"); // the window-close half of the same fold family
+    // The leave is the dim fade (F0x80083008 builds the 10-step ramper; the
+    // translated session starts it from the cancel's own call site,
+    // album-tick.ts:316). It is silent: the ramper has no play call, so the
+    // window-close cue that used to play here is gone. Corrected 2026-10-14
+    // (audit/sfx-triggers-vs-decode).
   }
 
   function stepPage(dir) {
@@ -177,8 +185,14 @@ export function createCardAlbum(sfx = null) {
     if (!c._open) return false;
     if (c.fadeLeaving || c.fadeEntering) return true;
     if (c.detailOpen) {
+      // The popup has no cue of its own in the overlay; the album's only
+      // select/apply tick is 0x0004001C (SYSTEM07), which the original plays
+      // as the cursor settles on a seen card (album-grid-object.ts:153 = the
+      // stcrdabm site at file 0x0d0c, `call83734` -> playSound(0x4001C)).
+      // Corrected 2026-10-14 (audit/sfx-triggers-vs-decode): the close used to
+      // play the list-move blip 0x8004513E.
       if (k === "cross" || k === "circle") {
-        sfx?.play("system02");
+        sfx?.play("system07");
         c.detailOpen = false;
       }
       return true;
@@ -186,19 +200,32 @@ export function createCardAlbum(sfx = null) {
     if (k === "l1") { stepPage(-1); return true; }
     if (k === "r1") { stepPage(1); return true; }
     // U-31: cell index clamps 0..11. Left/Right are cells, L1/R1 page.
-    // U-30: Circle is a no-op.
-    if (k === "left") { moveAlbumCell(c, -1); return true; }
-    if (k === "right") { moveAlbumCell(c, 1); return true; }
-    if (k === "up") { if (c.cursor >= COLS) moveAlbumCell(c, -COLS); return true; }
-    if (k === "down") { if (c.cursor < COLS) moveAlbumCell(c, COLS); return true; }
+    // U-30: Circle is a no-op. A cell move that lands plays the move blip
+    // 0x0004001B (SYSTEM06) — album-tick.ts:246/310.
+    if (k === "left") { if (moveAlbumCell(c, -1)) sfx?.play("system06"); return true; }
+    if (k === "right") { if (moveAlbumCell(c, 1)) sfx?.play("system06"); return true; }
+    if (k === "up") { if (c.cursor >= COLS && moveAlbumCell(c, -COLS)) sfx?.play("system06"); return true; }
+    if (k === "down") { if (c.cursor < COLS && moveAlbumCell(c, COLS)) sfx?.play("system06"); return true; }
     if (k === "circle") {
       if (albumCellOwned(c, c.cursor)) {
-        sfx?.play("system01");
+        // Opening the detail: the album's own select tick 0x0004001C
+        // (SYSTEM07) — see the close arm above. Corrected 2026-10-14
+        // (audit/sfx-triggers-vs-decode): this used to play the cancel blip.
+        sfx?.play("system07");
         c.detailOpen = true;
       }
       return true;
     }
-    if (k === "cross") { sfx?.play("system02"); requestLeave(); return true; }
+    if (k === "cross") {
+      // Cancel plays the resident cancel blip 0x800450BD (SYSTEM01) —
+      // album-tick.ts:316 (`padBit(host, "pressed", 0xe)` -> playSound
+      // (0x800450BD), state 0x32) = the stcrdabm site at file 0x2684.
+      // Corrected 2026-10-14 (audit/sfx-triggers-vs-decode): this used to play
+      // the list-move blip 0x8004513E.
+      sfx?.play("system01");
+      requestLeave();
+      return true;
+    }
     return true;
   };
 

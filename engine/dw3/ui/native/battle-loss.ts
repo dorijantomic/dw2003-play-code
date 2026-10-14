@@ -109,8 +109,8 @@ export const LOSS_EFFECT_EXTRA = 4;
 export const LOSS_EFFECT_CHILD_TICK = 0x8008c590;
 export const LOSS_EFFECT_CHILD_SIZE = 0xb4;
 export const LOSS_EFFECT_CHILD_EXTRA = 0x40;
-/** `[0x8005B610]`: the class allocator the entry arm builds its objects with. */
-export const LOSS_CLASS_ALLOCATOR = 0x8005b610;
+/** `[0x8004B7BC]` (`0x8004B610` + `0x1AC`): the class allocator the entry arm builds its objects with. */
+export const LOSS_CLASS_ALLOCATOR = 0x8004b7bc;
 /** `.L0x8008CAB0 slti $v1, 0xF0`: the units phase 2 waits for. */
 export const LOSS_EFFECT_PHASE2_UNITS = 0xf0;
 /** `[0x800A4548]`: F0x8009E510, the slow-motion level the entry arm sets to 2. */

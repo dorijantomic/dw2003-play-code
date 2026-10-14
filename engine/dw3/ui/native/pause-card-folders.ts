@@ -406,7 +406,8 @@ export function dimQuadStart(mem: PauseMemory, obj: number, direction: number, f
     host.callMethod(obj, 0x28, [1]);
     mem.write32(obj + 0x10, 1);
     mem.write32(obj + 0x58, direction);
-    const step = (0xff00 / frames) | 0;
+    // MIPS `div` with a zero divisor: -1 (the dividend 0xff00 is positive).
+    const step = frames === 0 ? -1 : (0xff00 / frames) | 0;
     if (direction === 0) {
         mem.write32(obj + 0x5c, 0);
         mem.write32(obj + 0x60, step);

@@ -65,11 +65,20 @@ function stripCanvas(bytes, w, h) {
     return canvas;
 }
 
-/** The acting member's ailment byte (record +0x1C): 0x01 Poison, 0x02 Frozen, 0x04 Confusion, 0x08 Sleep. */
+/**
+ * The acting member's ailment byte (record +0x1C): 0x01 Poison, 0x02 Frozen,
+ * 0x04 Confusion, 0x08 Sleep, 0x10 the cannot-flee lock, 0x20 the
+ * cannot-digivolve lock. The two locks are set by FIGHTSTG_F0x8009cd1c with the
+ * record's own bits (`ori $v0, 0x10` :27134 / `ori $v0, 0x20` :27141) and cleared
+ * by the pool's expiry (`pro/wfightmn.s:2743-:2773`); the walker keeps them as
+ * per-record booleans, so the byte the escape roll, the command-menu row greys
+ * (F0x80093cf4 :17595) and the DNA tests read carries them too.
+ */
 export function battleAilmentByte(member) {
     if (Number.isInteger(member?.statusBits)) return member.statusBits & 0xff;
     const a = member?.ailments ?? {};
-    return (a.poison ? 0x01 : 0) | (a.frozen ? 0x02 : 0) | (a.confuse ? 0x04 : 0) | (a.sleep ? 0x08 : 0);
+    return (a.poison ? 0x01 : 0) | (a.frozen ? 0x02 : 0) | (a.confuse ? 0x04 : 0) | (a.sleep ? 0x08 : 0)
+        | (member?.cantFlee ? 0x10 : 0) | (member?.cantDigivolve ? 0x20 : 0);
 }
 
 export function createBattleCommandTranslated(sfx = null, options = {}) {

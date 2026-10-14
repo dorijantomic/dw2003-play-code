@@ -56,6 +56,14 @@ export function profileLoadLevels(profile) {
  * the next learned ordinary technique loadable at its load gate) pair, run once
  * per form-level step. Returns the technique ids learned and the ids that
  * became loadable this pass.
+ *
+ * This is the BULK form, kept for back-fills (the DRI's old-save migration in
+ * web/dri-model.js derives a form's already-learned slots from its banked
+ * DVEXP). The disc's battle report never runs it: stfgtrep calls
+ * F0x8008670C/F0x80086844 at most ONCE per marked form per battle, after the
+ * DVEXP ladder has already landed, so at most one technique is learned and one
+ * marked loadable in a fight. Battle rewards use learnOneTechnique /
+ * markOneLoadable below.
  */
 export function applyFormTechGates(record, profile, formLevel) {
   const slots = profileTechSlots(profile);
@@ -79,4 +87,51 @@ export function applyFormTechGates(record, profile, formLevel) {
     loadable.push(word & 0x1fff);
   }
   return { learned, loadable };
+}
+
+/**
+ * F0x8008670C, exactly one call's worth: fill the FIRST empty ledger slot whose
+ * profile technique exists and whose learn gate the form's current level has
+ * reached, then return. The signature is slot 5 and additionally gets the
+ * 0x8000 flag. Returns the learned technique id, or 0 when nothing was due.
+ *
+ * The battle report reaches this once per marked form per battle (stfgtrep.s
+ * state 0x16 arm at file 0x14E8, after the state 0x14 arm's dvGain/dvLadder),
+ * so a form learns at most ONE technique per fight however many levels its
+ * DVEXP banked.
+ */
+export function learnOneTechnique(record, profile) {
+  const slots = profileTechSlots(profile);
+  const learn = profileLearnLevels(profile);
+  if (!Array.isArray(record.techSlots)) record.techSlots = [0, 0, 0, 0, 0, 0];
+  const level = Number(record.formLevel ?? 1);
+  for (let i = 0; i < 6; i++) {
+    if (record.techSlots[i]) continue;
+    if (!slots[i]) continue;
+    if (level < (learn[i] ?? 0)) continue;
+    record.techSlots[i] = (Number(slots[i]) | (i === 5 ? 0x8000 : 0)) & 0xffff;
+    return record.techSlots[i] & 0x1fff;
+  }
+  return 0;
+}
+
+/**
+ * F0x80086844, exactly one call's worth: mark the FIRST learned ordinary
+ * technique (slots 0..4) that has no 0x2000 bit and whose load gate the form's
+ * current level has reached, then return. Returns the technique id that became
+ * loadable, or 0. The report calls it once per marked form per battle
+ * (stfgtrep.s state 0x17 arm at file 0x15E0).
+ */
+export function markOneLoadable(record, profile) {
+  const load = profileLoadLevels(profile);
+  if (!Array.isArray(record.techSlots)) record.techSlots = [0, 0, 0, 0, 0, 0];
+  const level = Number(record.formLevel ?? 1);
+  for (let i = 0; i < 5; i++) {
+    const word = Number(record.techSlots[i] ?? 0);
+    if (word <= 0 || (word & 0x2000)) continue;
+    if (level < (load[i] ?? 0)) continue;
+    record.techSlots[i] = (word | 0x2000) & 0xffff;
+    return record.techSlots[i] & 0x1fff;
+  }
+  return 0;
 }
