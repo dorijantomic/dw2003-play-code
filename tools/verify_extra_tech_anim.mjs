@@ -17,7 +17,8 @@ const ROOT = process.env.XT_ROOT || `${baseUrl(8791)}/`;
 const OUT = process.env.XT_SHOT || "/tmp/xtshots";
 mkdirSync(OUT, { recursive: true });
 const extra = JSON.parse(readFileSync(resolve(HERE, "../web/assets/data/extra_species.json"), "utf8"));
-const KUNEMON = extra.digimon.find((d) => d.name === "Kunemon").id;
+const SPECIES = extra.digimon.find((d) => d.name === (process.env.XT_NAME || "Kunemon"));
+const KUNEMON = SPECIES.id;
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1000, height: 1100 } });
@@ -70,6 +71,7 @@ try {
     await page.evaluate(({ call, techId }) => {
       const r = window.__battle3d;
       window.__xt = { contacts: 0, maxFx: 0, ok: false };
+      if (r.effectPlayer) r.effectPlayer.lastProjectile = null;
       const origDraw = r.getEffectDraw.bind(r);
       window.__xt.ok = call === "attack"
         ? r.playerAttack(techId, { onHit: () => { window.__xt.contacts++; } })
@@ -88,7 +90,17 @@ try {
   console.log("  spell", JSON.stringify(spell));
   expect(spell.ok, "Thunder Bolt (clip 9) found a script for a model that has none");
   expect(spell.maxFx > 0, "its effects were drawn");
+  // the shot leaves the near side (our Kunemon) toward the far side: the player-authored direction is -z in flight space
+  const lp = await page.evaluate(() => { const p = window.__battle3d.effectPlayer?.lastProjectile; return p ? { from: p.from, side: p.side } : null; });
+  console.log("  projectile", JSON.stringify(lp));
+  expect(!lp || lp.from[2] < 0, "a projectile of an owned enemy model flies from the near side toward the enemy");
   await shot("spell-after");
+
+  // the species' own basic attack is its enemy-authored script: a shot in it must also fly away from the near side
+  const basic = await play("attack", SPECIES.tech_basic, "basic");
+  const bp = await page.evaluate(() => { const p = window.__battle3d.effectPlayer?.lastProjectile; return p ? { from: p.from } : null; });
+  console.log("  basic", JSON.stringify(basic), "projectile", JSON.stringify(bp));
+  expect(basic.ok && (!bp || bp.from[2] < 0), `${SPECIES.name}'s own basic attack aims at the enemy`);
 
   const combo = await play("attack", 105, "combo");
   console.log("  combo", JSON.stringify(combo));

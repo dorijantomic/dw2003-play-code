@@ -21,6 +21,9 @@
 // OWN basic attack (clip 5, which always finishes) is the body and the donor's only contribution is the
 // technique's effect: preloaded at the start and spawned with the hit spark at the target, as the donor's does.
 //
+// The donor is player-authored (its coordinates aim down +z), so for an enemy-authored model its coordinates are
+// turned around (side-mirror.js); the animator then turns the whole script around if the fighter stands on the near side.
+//
 // Models that do have the clip are never touched.
 
 // the projectile sprite most player spells of each element fire (tools: counted over the disc's clip-9 scripts)
@@ -38,6 +41,8 @@ export function fallbackDonorReady() {
 // clips that are the basic attack plus the technique's own effect
 const PHYSICAL = new Set([6, 8, 11]);
 const EFFECT_CURRENT = 9999;       // op3 type: the technique's own effect, resolved by the animator
+
+import { authoredSide, mirrorOps } from "./side-mirror.js";
 
 const hasOps = (script) => !!script && Array.isArray(script.ops) && script.ops.length > 0;
 const hasTable = (model, t) => !!model?.timeline?.[t]?.table?.length;
@@ -84,7 +89,8 @@ export function resolveClipScript(model, clip, { element = 1 } = {}) {
   const attackTables = scriptTableSeq(model.actions?.[5]).filter((t) => hasTable(model, t));
   const mapped = new Map();
   const projectile = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? null;
-  const ops = donor.ops.map((o) => {
+  const turn = authoredSide(model) === "enemy";
+  const ops = (turn ? mirrorOps(donor.ops) : donor.ops).map((o) => {
     const words = o.words ? o.words.slice() : [];
     // a model with no attack tables of its own (a larva) has nothing finite to wait on: the donor's
     // "wait for the bound table" becomes a short fixed pause

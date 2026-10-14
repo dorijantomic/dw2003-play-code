@@ -21,6 +21,7 @@ import { TimelinePlayer, PlaylistPlayer } from "./timeline-player.js";
 import { ActionVM } from "./action-vm.js";
 import { techToClip, techRecord } from "./fight-tables.js";
 import { resolveClipScript, scriptTableSeq } from "./clip-fallback.js";
+import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // The animation-slot system the original runs is ported in
 // engine/dw3/battle-actor-animation.ts: the op2 movement arms of FIGHTSTG_F0x8008b7f4
 // (`animSlotMoveDelta`) and the live=home write of mode 7 / the placement FIGHTSTG_F0x80087f38
@@ -254,6 +255,13 @@ export class ActorAnimator {
     this.idle = this._idlePlayer();
   }
 
+  // An enemy model the player owns stands on the near side (or the reverse): its scripts aim the wrong way down the
+  // arena unless turned around (side-mirror.js).
+  _standsOnOtherSide() {
+    const authored = authoredSide(this.model);
+    return !!authored && !!this.homeSlot?.side && authored !== this.homeSlot.side;
+  }
+
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
   setAction(clip, hooks = {}, { currentEffect = null, holdFinalPose = false, element = 1 } = {}) {
@@ -279,7 +287,7 @@ export class ActorAnimator {
         },
       };
       this.vm = new ActionVM(script, {
-        timelineForTable: (i) => this._playerForTable(i), hooks: h2, currentEffect,
+        timelineForTable: (i) => this._playerForTable(i), hooks: this._standsOnOtherSide() ? mirrorHooks(h2) : h2, currentEffect,
         baseTable: () => this.baseTable | 0,
         slot: this._slotAdapter(),
       });
