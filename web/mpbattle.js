@@ -11,11 +11,19 @@
 // everyone the same small snapshot after each action. The other players send only their choices (Fight / Tech / Item / Run and a
 // target) and see the result. Spread techniques (strong magic) hit everyone on the other side at 65% damage; a fight with many
 // enemies is fought in waves of at most max(2, players).
-// If WebGL is not available the fight falls back to plain cards. Nothing here writes a story flag.
+// Each player brings their party (up to three Digimon) and can Tag: swap the one in the fight; a fallen Digimon is replaced from
+// the reserves. Every Digimon has its own DV gauge that fills from the hits it takes; a full gauge is the automatic Blast. A steal
+// technique that lands takes the enemy's drop item.
+// The menus are the game's OWN translated screens (command list, TECH, ITEM, Digivolve, TAG) and its message window, opened over
+// the 3D scene (web/mpbattle-menus.js). If WebGL is not available the fight falls back to plain cards and buttons.
+// Nothing here writes a story flag.
 import { createBattle3D, resolveModelFolder } from "./battle3d.js";
 import { drawEffects } from "./fight/effect-player.js";
-import { Arena, isSpread, T } from "./mpbattle-rules.js";
+import { Arena, isSpread, T, plainLine } from "./mpbattle-rules.js";
 import { ITEM_BY_ID } from "./vendor/engine.js";
+import { createMenus } from "./mpbattle-menus.js";
+import { battleAilmentByte } from "./battlecmd-translated.js";
+import { asButton } from "./input.js";
 
 const TURN_MS = 45000;              // how long a player may think
 const MIN_ANIM_MS = 900;            // the shortest pause after an action
@@ -72,6 +80,17 @@ const css = `
 #mpb .plate { position:absolute; width:132px; padding:3px 6px 4px; border:2px solid #45509a; border-radius:8px; transform:translate(-50%,-100%); pointer-events:auto; background:rgba(8,12,40,.72); }
 #mpb .plate .pic { display:none; } #mpb .plate .nm { font-size:12px; } #mpb .plate .sub { font-size:10px; } #mpb .plate .bar { margin-top:3px; height:6px; }
 #mpb .plate.foe { background:rgba(50,14,28,.74); border-color:#a84a5a; }
+#mpb .bar.dv { height:4px; margin-top:2px; } #mpb .bar.dv i { background:#e8c14a; }
+#mpb .blast .bar.dv i { background:#ff5ad0; } #mpb .blast .sub { color:#ff9de6; }
+#mpb .plate.cur, #mpb .card.cur { border-color:#ffd34d; box-shadow:0 0 16px #ffd34d; background:rgba(150,60,40,.95); }
+#mpb canvas { border:0; border-radius:0; max-width:none; max-height:none; }
+#mpb canvas.ui2d { display:none; position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; image-rendering:auto; background:transparent; }
+#mpb.nat canvas.ui2d { display:block; }
+#mpb.nat .log, #mpb.nat .bar2 { display:none; }
+#mpb .pad { display:none; position:absolute; top:36px; right:8px; z-index:4; gap:4px; flex-wrap:wrap; width:176px; justify-content:flex-end; }
+#mpb.nat .pad.on { display:flex; }
+#mpb .pad button { width:36px; height:30px; background:rgba(15,25,90,.8); color:#fff; border:2px solid #8a98ff; border-radius:6px; font:bold 13px monospace; cursor:pointer; padding:0; }
+#mpb .pad button:hover { background:#4a5cd0; }
 `;
 
 function buildUi() {
@@ -87,9 +106,15 @@ function buildUi() {
     const plates = document.createElement("div"); plates.className = "plates";
     const log = document.createElement("div"); log.className = "log";
     const bar = document.createElement("div"); bar.className = "bar2";
-    root.append(view, plates, top, foes, vs, mine, log, bar);
+    const ui2d = document.createElement("canvas"); ui2d.className = "ui2d";
+    const pad = document.createElement("div"); pad.className = "pad";
+    for (const [label, btn] of [["▲", "up"], ["▼", "down"], ["◀", "left"], ["▶", "right"], ["L1", "l1"], ["R1", "r1"], ["○", "circle"], ["✕", "cross"]]) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.dataset.btn = btn;
+        b.addEventListener("click", () => mpbKey(btn)); pad.append(b);
+    }
+    root.append(view, plates, top, foes, vs, mine, log, bar, ui2d, pad);
     A.stageEl.append(root);
-    return { root, view, plates, title, status, foes, mine, log, bar, cards: new Map(), plateMap: new Map(), endEl: null };
+    return { root, view, plates, title, status, foes, mine, log, bar, ui2d, pad, cards: new Map(), plateMap: new Map(), endEl: null, nat: null };
 }
 
 const hue = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x % 360; };
@@ -102,17 +127,21 @@ function makeCard(key, foe, small = false) {
     const hpn = mk("div", "num"), ail = mk("span", "ail");
     hpn.append(ail);
     root.append(pic, nm, sub, hp, hpn);
-    let mpi = null;
-    if (!foe) { const mp = mk("div", "bar mp"); mpi = mk("i"); mp.append(mpi); root.append(mp); }
+    let mpi = null, dvi = null;
+    if (!foe) {
+        const mp = mk("div", "bar mp"); mpi = mk("i"); mp.append(mpi); root.append(mp);
+        const dv = mk("div", "bar dv"); dvi = mk("i"); dv.append(dvi); root.append(dv);          // this Digimon's own DV gauge
+    }
     root.addEventListener("click", () => onPick(key));
-    return { key, root, pic, nm, sub, hpi, hpn, ail, mpi, last: null };
+    return { key, root, pic, nm, sub, hpi, hpn, ail, mpi, dvi, last: null };
 }
 
 function updateCard(c, o, foe) {
     c.pic.textContent = (o.n || "?")[0].toUpperCase();
     c.pic.style.background = `hsl(${hue(o.n)} 55% 38%)`;
     c.nm.textContent = foe ? o.n : `${o.pn}`;
-    c.sub.textContent = foe ? `Lv ${o.lv}` : `${o.n}  Lv ${o.lv}`;
+    c.sub.textContent = foe ? `Lv ${o.lv}` : `${o.n}  Lv ${o.lv}${o.bl ? "  BLAST" : ""}`;
+    if (c.dvi) { c.dvi.style.width = Math.max(0, Math.min(100, (o.dv | 0) / 10)) + "%"; c.root.classList.toggle("blast", !!o.bl); }
     c.hpi.style.width = Math.max(0, Math.min(100, (o.hp / Math.max(1, o.mhp)) * 100)) + "%";
     c.hpn.firstChild.textContent = foe ? `HP ${o.hp}/${o.mhp}` : `HP ${o.hp}/${o.mhp}   MP ${o.mp}/${o.mmp}`;
     c.ail.textContent = o.ail?.length ? o.ail.join(" ") : "";
@@ -140,6 +169,10 @@ async function makeScene() {
     try { r3d.setArenaStage?.(A.mapId?.() ?? null, F.screenId ?? null); } catch { /* the plain arena is fine */ }
     U.r3d = r3d; F.r3d = r3d;
     U.root.classList.add("d3");
+    try {                                                   // the game's own menu screens and message window go over the scene
+        U.nat = F.nat = createMenus({ sfx: A.sfx ?? null, languageByte: () => (A.languageByte ? A.languageByte() : 2) });
+        U.root.classList.add("nat");
+    } catch (e) { console.warn("[mpbattle] no native menus, using buttons", e); U.nat = F.nat = null; }
     U.ctx = U.view.getContext("2d");
     U.last = performance.now();
     const loop = (t) => {
@@ -156,6 +189,13 @@ async function makeScene() {
             const overlay = U.r3d.getScreenOverlay?.();
             if (overlay) { ctx.save(); ctx.globalAlpha = overlay.alpha; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); ctx.restore(); }
             placePlates(cw, ch);
+            if (U.nat) {
+                if (U.ui2d.width !== cw || U.ui2d.height !== ch) { U.ui2d.width = cw; U.ui2d.height = ch; }
+                if (F) driveNative(dt); else U.nat.update(dt);
+                const g = U.ui2d.getContext("2d");
+                g.clearRect(0, 0, cw, ch);
+                U.nat.draw(g, cw, ch);
+            }
         } catch (e) { console.warn("[mpbattle] frame failed", e); }
         U.raf = requestAnimationFrame(loop);
     };
@@ -167,7 +207,9 @@ function endScene(U) {
     cancelAnimationFrame(U.raf); U.raf = 0;
     try { U.r3d?.destroy?.(); } catch { /* already gone */ }
     U.r3d = null; U.off = null;
-    U.root.classList.remove("d3");
+    try { U.nat?.close(); } catch { /* gone */ }
+    U.nat = null; U.pad.classList.remove("on");
+    U.root.classList.remove("d3", "nat");
     for (const c of U.plateMap.values()) c.root.remove();
     U.plateMap.clear();
 }
@@ -256,11 +298,20 @@ function render() {
     const S = F.S;
     if (!S) { U.title.textContent = F.label || "Fight"; U.status.textContent = "Waiting for everyone to get ready..."; return; }
     const mine = S.P.find((p) => p.id === A.myId());
-    if (mine && !F.isHost) { F.me.hp = mine.hp; F.me.mp = mine.mp; }       // the referee's numbers are the true ones
-    if (mine && mine.n !== F.me.profile?.name) {                             // I digivolved: my record and my technique list follow
-        const form = F.kit.forms(F.me).find((f) => f.name === mine.n);
-        if (form && !F.isHost) F.kit.digivolve(F.me, form.id);
-        F.techs = F.kit.myTechs(F.me);
+    if (mine) {
+        if (!F.isHost && mine.pt) mine.pt.forEach((q, i) => { const r = F.party[i]?.rec; if (r) { r.hp = q.hp; r.mp = q.mp; r.gauge = q.dv; } });   // the referee's numbers are the true ones
+        const key = `${mine.ac | 0}|${mine.n}|${mine.bl | 0}`;
+        if (F.mineKey !== key) {                                             // I digivolved, tagged or blasted: my record and technique list follow
+            F.mineKey = key; F.act = mine.ac | 0; (F.took ??= new Set()).add(F.act);
+            F.me = F.party[F.act]?.rec ?? F.me;
+            if (!F.isHost && F.me.profile?.name !== mine.n) F.kit.setFormByName(F.me, mine.n);
+            F.techs = F.kit.myTechs(F.me, !!mine.bl);
+        }
+    }
+    const ev = S.ev;
+    if (ev && ev.q !== F.lastStealQ) {                                       // what I stole goes into my bag
+        F.lastStealQ = ev.q;
+        if (ev.st && ev.a === "p" + A.myId()) { try { F.kit.giveItem(ev.st); } catch (e) { console.warn("[mpbattle] steal", e); } }
     }
     U.title.textContent = `${F.label || "Fight"}   ·   round ${S.r}${F.waves > 1 ? `   ·   wave ${S.w + 1}/${F.waves}` : ""}`;
     if (F.r3d) syncScene();
@@ -270,6 +321,10 @@ function render() {
         c.root.classList.toggle("act", !!t && t === k);
     }
     U.log.replaceChildren(...S.g.map((l) => mk("div", "", l)));
+    if (F.nat && S.lq !== F.lastLq) {                                       // the latest action, through the game's own message window
+        F.lastLq = S.lq;
+        if (!(F.cmd?.stage === "target")) F.nat.say(S.ln ?? []);
+    }
     const t = S.t;
     const who = !t ? "" : t[0] === "e" ? (S.E.find((e) => "e" + e.i === t)?.n ?? "Enemy") : (S.P.find((p) => "p" + p.id === t)?.pn ?? "Player");
     U.status.textContent = S.ph !== "play" ? "" : t === "p" + A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
@@ -304,7 +359,14 @@ function renderCmd() {
     const U = F?.ui; if (!U) return;
     const S = F.S, bar = U.bar;
     bar.replaceChildren();
-    for (const c of [...U.cards.values(), ...U.plateMap.values()]) c.root.classList.remove("pick");
+    for (const c of [...U.cards.values(), ...U.plateMap.values()]) c.root.classList.remove("pick", "cur");
+    if (F.nat) {                                                  // the game's own screens draw the menus; here only the target marks
+        const cmd = F.cmd;
+        if (cmd?.stage === "target") {
+            cmd.options.forEach((key, i) => { const r = (U.plateMap.get(key) ?? U.cards.get(key))?.root; if (r) { r.classList.add("pick"); if (i === cmd.cur) r.classList.add("cur"); } });
+        }
+        return;
+    }
     const myKey = "p" + A.myId();
     const mineTurn = S && S.ph === "play" && S.t === myKey && F.me.hp > 0 && !F.iFled;
     if (!mineTurn) {
@@ -322,6 +384,7 @@ function renderCmd() {
         btn("Item", () => { F.items = F.kit.items(); F.cmd = { stage: "item" }; renderCmd(); }, !F.kit.items().length);
         const forms = F.kit.forms(F.me);
         if (forms.length) btn("Digivolve", () => { F.cmd = { stage: "dv" }; renderCmd(); }, !!F.me.cantDigivolve);
+        if (F.party.length > 1) btn("Tag", () => { F.cmd = { stage: "tag" }; renderCmd(); }, !F.party.some((m, i) => i !== F.act && m.rec.hp > 0));
         btn("Run", () => { F.cmd = { stage: "run" }; renderCmd(); });
         bar.append(mk("span", "hint", `HP ${F.me.hp}/${F.me.maxHp}   MP ${F.me.mp}/${F.me.maxMp}`));
     } else if (cmd.stage === "run") {
@@ -341,6 +404,9 @@ function renderCmd() {
     } else if (cmd.stage === "dv") {
         for (const f of F.kit.forms(F.me)) btn(f.name, () => send({ k: "dv", form: f.id }));
         back();
+    } else if (cmd.stage === "tag") {
+        F.party.forEach((m, i) => { if (i !== F.act) btn(`${m.rec.profile?.name ?? "?"}  HP ${Math.max(0, m.rec.hp | 0)}/${m.rec.maxHp | 0}`, () => send({ k: "tag", slot: i }), m.rec.hp <= 0); });
+        if (!F.S?.ft) back();
     } else if (cmd.stage === "item") {
         for (const it of F.items) {
             btn(`${it.name}  x${it.qty}`, () => {
@@ -363,19 +429,110 @@ function askTarget(spec, done, label) {
     if (spec.foes) for (const e of F.S.E) if (!e.ko) options.push("e" + e.i);
     if (!options.length) return;
     if (options.length === 1) return done(options[0]);
-    F.cmd = { stage: "target", options, done, label };
+    F.cmd = { stage: "target", options, done, label, cur: Math.max(0, options.findIndex((k) => k[0] === "e")) };
+    if (F.nat) { F.nat.close(); F.nat.say([label ?? "Choose a target."], { hold: true }); }
     renderCmd();
 }
 function onPick(key) {
     if (!F || F.cmd?.stage !== "target" || !F.cmd.options.includes(key)) return;
     const done = F.cmd.done;
     F.cmd = null;
+    if (F.nat) F.nat.clearSay();
     done(key);
+}
+
+/** A pad button (keyboard, the on-screen pad, a gamepad): it drives the game's menu, or moves the target mark. */
+function mpbKey(btn) {
+    if (!F?.nat || !btn) return;
+    const cmd = F.cmd;
+    if (cmd?.stage === "target") {
+        const n = cmd.options.length;
+        if (btn === "left" || btn === "up") { cmd.cur = (cmd.cur + n - 1) % n; A.sfx?.play?.("system07"); }
+        else if (btn === "right" || btn === "down") { cmd.cur = (cmd.cur + 1) % n; A.sfx?.play?.("system07"); }
+        else if (btn === "circle") { A.sfx?.play?.("system08"); const done = cmd.done, k = cmd.options[cmd.cur]; F.cmd = null; F.nat.clearSay(); done(k); }
+        else if (btn === "cross" || btn === "triangle") { A.sfx?.play?.("system02"); F.cmd = null; F.nat.clearSay(); }
+        renderCmd();
+        return;
+    }
+    F.nat.press(btn);
+}
+
+/** My turn, through the game's own screens: the command list, then TECH / ITEM / Digivolve / TAG, then a target. */
+function driveNative(dt) {
+    const N = F.nat, S = F.S;
+    const myId = A.myId(), myKey = "p" + myId;
+    const mine = S?.P.find((p) => p.id === myId);
+    const forced = !!(S && S.ft && S.t === myKey);
+    const mineTurn = !!(S && S.ph === "play" && S.t === myKey && !F.iFled && mine && (forced || !mine.ko));
+    F.ui.pad.classList.toggle("on", mineTurn);
+    if (!mineTurn) { if (N.mode) N.close(); if (F.cmd) { F.cmd = null; renderCmd(); } N.update(dt); return; }
+    if (N.busy() && !F.cmd) { N.update(dt); return; }                // let the last action's lines finish in the window first
+    if (!F.cmd) { F.cmd = { stage: forced ? "tag" : "menu" }; renderCmd(); }
+    const stage = F.cmd.stage;
+    if (stage === "target") { N.update(dt); return; }
+    if (stage === "notice") { N.update(dt); if (!N.busy()) F.cmd = { stage: "menu" }; return; }
+    const wm = { menu: "cmd", tech: "tech", item: "item", dv: "form", tag: "tag" }[stage];
+    if (!wm) return;
+    if (N.mode !== wm) {
+        if (stage === "menu") N.open("cmd", { row: F.cmdRow | 0, activeIndex: 0, ailmentBits: battleAilmentByte(F.me) });
+        else if (stage === "tech") N.open("tech", F.kit.techSeed(F.me, !!mine.bl));
+        else if (stage === "item") N.open("item", F.kit.itemSeed());
+        else if (stage === "dv") N.open("form", F.kit.formSeed(F.me, F.party[F.act].member));
+        else if (stage === "tag") {
+            const seed = F.kit.tagSeed(F.party.map((m) => m.member), F.party.map((m) => m.rec), F.act);
+            seed.interactive = forced ? 0 : 1;
+            if (forced) seed.cursorRow = Math.max(0, F.party.findIndex((m, i) => i !== F.act && m.rec.hp > 0));
+            N.open("tag", seed);
+        }
+    }
+    const res = N.update(dt);
+    if (res) onNativeResult(res, forced, mine);
+}
+
+function notice(text) { F.nat.say([text], { ms: 1100 }); F.cmd = { stage: "notice" }; }
+
+function onNativeResult(res, forced, mine) {
+    if (res.failed) { console.warn("[mpbattle] a native screen failed; using buttons"); F.ui.nat = null; F.nat = null; F.ui.root.classList.remove("nat"); F.cmd = null; renderCmd(); return; }
+    const v = res.value;
+    if (res.mode === "cmd") {
+        F.cmdRow = v | 0;
+        if (v === 0) askTarget({ foes: true }, (k) => send({ k: "fight", t: Number(k.slice(1)) }), "Choose a target.");
+        else if (v === 1) { if (F.techs.length) F.cmd = { stage: "tech" }; else notice("No techs!"); }
+        else if (v === 2) { if (F.kit.forms(F.me).length && !F.me.cantDigivolve) F.cmd = { stage: "dv" }; else notice("Cannot digivolve."); }
+        else if (v === 3) { if (F.party.some((m, i) => i !== F.act && m.rec.hp > 0)) F.cmd = { stage: "tag" }; else notice("Cannot tag."); }
+        else if (v === 4) { if (F.kit.items().length) F.cmd = { stage: "item" }; else notice("No items!"); }
+        else if (v === 5) send({ k: "run" });
+        else F.cmd = { stage: "menu" };
+    } else if (res.mode === "tech") {
+        if (v === -2) { F.cmd = { stage: "menu" }; return; }
+        const t = F.techs.find((x) => (x.id | 0) === (v | 0));
+        if (!t) { F.cmd = { stage: "menu" }; return; }
+        const spread = t.type === "attack" && isSpread(t.skill);
+        if (spread) send({ k: "tech", sk: t.id, tw: t.tw, t: -1 });
+        else if (t.type === "attack") askTarget({ foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: Number(k.slice(1)) }), `Choose a target for ${t.name}.`);
+        else askTarget({ allies: true, foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Choose a target for ${t.name}.`);
+    } else if (res.mode === "item") {
+        if (v === -2) { F.cmd = { stage: "menu" }; return; }
+        const it = F.kit.items().find((x) => (x.id | 0) === (v | 0));
+        if (!it) { F.cmd = { stage: "menu" }; return; }
+        const tg = itemTargets(ITEM_BY_ID[it.id] ?? it);
+        askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k) => {
+            send({ k: "item", item: it.id, to: k[0] === "p" ? k : "p" + A.myId(), t: k[0] === "e" ? Number(k.slice(1)) : -1 }); F.kit.spendItem(it.id);
+        }, `Use ${it.name} on...`);
+    } else if (res.mode === "form") {
+        if (v === -2) { F.cmd = { stage: "menu" }; return; }
+        send({ k: "dv", form: v });
+    } else if (res.mode === "tag") {
+        if (v === -2) { if (!forced) F.cmd = { stage: "menu" }; else F.cmd = { stage: "tag" }; return; }
+        send({ k: "tag", slot: v | 0 });
+    }
+    void mine;
 }
 
 /** My choice for this turn goes to the referee (or is taken straight in when it is me). */
 function send(c) {
     F.cmd = null;
+    if (F.nat) { F.nat.close(); F.nat.clearSay(); F.cmdRow = 0; }
     const d = { k: "cmd", fid: F.fid, c };
     if (F.isHost) hostCommand(A.myId(), d); else A.send([F.hostId], d);
     renderCmd();
@@ -383,7 +540,12 @@ function send(c) {
 
 // ------------------------------------------------------------ the referee: runs the rules, tells everyone
 const later = (ms, fn) => { const id = setTimeout(() => { if (F) fn(); }, ms); (F.timers ??= new Set()).add(id); return id; };
-const say = (lines) => { for (const l of [].concat(lines)) if (l) F.H.log.push(String(l).slice(0, 72)); while (F.H.log.length > LOG_LINES) F.H.log.shift(); };
+const say = (lines) => {
+    const list = [].concat(lines).filter(Boolean).map((l) => String(l).slice(0, 120));
+    for (const l of list) F.H.log.push(plainLine(l).slice(0, 72));
+    while (F.H.log.length > LOG_LINES) F.H.log.shift();
+    F.H.ln = list.slice(0, 10); F.H.lq = (F.H.lq | 0) + 1;          // the latest action's lines, for the message window
+};
 
 /** Run `fn` once the attack animation on the referee's own screen is over (and at least a moment has passed). */
 function afterAnim(fn) {
@@ -400,9 +562,9 @@ function afterAnim(fn) {
 function snapshot(ph = "play") {
     const H = F.H, ar = H.arena;
     return {
-        r: H.round, w: ar.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null,
+        r: H.round, w: ar.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null, ft: H.forced ? 1 : 0, ln: H.ln ?? [], lq: H.lq | 0,
         E: ar.waveFoes().map((e) => ({ i: e.i, n: e.name, lv: e.rec.level | 0, ...ar.plate(e) })),
-        P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0 })),
+        P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0, pt: ar.partyPlate(p), ac: p.act })),
     };
 }
 function broadcast(ph = "play") {
@@ -414,7 +576,7 @@ function broadcast(ph = "play") {
 function setEvent(res) {
     const H = F.H;
     if (!res.rows?.length && res.kind !== "self" && res.kind !== "item" && res.kind !== "dv") return;
-    H.ev = { q: (H.evq = (H.evq | 0) + 1), a: res.a, sk: res.sk | 0, kind: res.kind, d: res.rows ?? [] };
+    H.ev = { q: (H.evq = (H.evq | 0) + 1), a: res.a, sk: res.sk | 0, kind: res.kind, d: res.rows ?? [], st: res.st ?? null };
 }
 
 function hostBegin() {
@@ -423,7 +585,7 @@ function hostBegin() {
     if (H.started) return; H.started = true;
     F.ids = F.ids.filter((id) => H.P.has(id));                // never got ready: not in the fight
     if (!H.P.size) { finish(false, { fled: true }); return; }
-    const players = [...H.P.values()].map((p) => ({ id: p.id, name: p.pn, rec: p.rec }));
+    const players = [...H.P.values()].map((p) => ({ id: p.id, name: p.pn, rec: p.rec, party: p.party }));
     const waveSize = Math.max(2, players.length);
     H.arena = new Arena({ kit: F.kit, players, foes: F.erec.map((rec, i) => ({ name: H.names[i], rec })), screenId: F.screenId, waveSize });
     F.waves = H.arena.waves();
@@ -443,6 +605,16 @@ function nextTurn() {
     if (!nx) { hostEnd(ar.state()); return; }
     if (nx.wave != null) { say(`Next wave! (${nx.wave + 1}/${F.waves})`); broadcast(); later(1800, nextTurn); return; }
     const key = nx.key, actor = ar.byKey(key);
+    if (nx.forced) {                                           // a Digimon fell and the player has others: they pick who comes in
+        H.turn = key; H.forced = true;
+        say(`${actor.name}: Choose the next Digimon.`);
+        broadcast();
+        H.turnTimer = later(TURN_MS, () => {
+            const slot = actor.party.findIndex((r, i) => i !== actor.act && r.hp > 0);
+            if (H.forced && H.turn === key && slot >= 0) hostCommand(Number(key.slice(1)), { fid: F.fid, c: { k: "tag", slot } });
+        });
+        return;
+    }
     H.turns = (H.turns | 0) + 1;                               // "round" = everyone standing has had about one action
     H.round = Math.floor((H.turns - 1) / Math.max(1, ar.alivePlayers().length + ar.aliveFoes().length)) + 1;
     const ts = ar.turnStart(key);
@@ -453,9 +625,14 @@ function nextTurn() {
         say(res.lines); broadcast(); afterAnim(nextTurn); return;
     }
     broadcast();
-    if (key[0] === "p") {
-        H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
-    } else later(700, () => foeTurn(key));
+    if (key[0] === "p") armTurnTimer(key, actor);
+    else later(700, () => foeTurn(key));
+}
+
+function armTurnTimer(key, actor) {
+    const H = F.H, ar = H.arena;
+    clearTimeout(H.turnTimer);
+    H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
 }
 
 function foeTurn(key) {
@@ -472,9 +649,19 @@ function hostCommand(from, d) {
     const H = F.H; if (!H?.arena) return;
     const ar = H.arena, key = "p" + from;
     if (d.fid !== F.fid || H.turn !== key) return;
-    clearTimeout(H.turnTimer);
     const c = d.c && typeof d.c === "object" ? d.c : {};
-    const res = ar.playerAction(key, { k: String(c.k), sk: c.sk | 0, tw: c.tw | 0, item: c.item | 0, form: c.form | 0, to: String(c.to ?? ""), t: typeof c.t === "string" ? c.t : (Number.isInteger(c.t) ? c.t : -1) });
+    const cmd = { k: String(c.k), sk: c.sk | 0, tw: c.tw | 0, item: c.item | 0, form: c.form | 0, slot: c.slot | 0, to: String(c.to ?? ""), t: typeof c.t === "string" ? c.t : (Number.isInteger(c.t) ? c.t : -1) };
+    if (H.forced && cmd.k !== "tag") { armTurnTimer(key, ar.byKey(key)); return; }      // only the replacement is asked for
+    clearTimeout(H.turnTimer);
+    const res = ar.playerAction(key, cmd);
+    if (res.refused) { say(res.lines); broadcast(); armTurnTimer(key, ar.byKey(key)); return; }   // a swap that cannot be done: ask again
+    if (H.forced) {                                            // the fallen Digimon's replacement costs no turn
+        ar.afterFree(res); H.forced = false; H.turn = null;
+        say(res.lines); setEvent(res);
+        broadcast();
+        afterAnim(nextTurn);
+        return;
+    }
     ar.finish(key, res);
     H.turn = null;
     say(res.lines); setEvent(res);
@@ -483,6 +670,11 @@ function hostCommand(from, d) {
         if (from === A.myId()) F.iFled = true; else A.send([from], { k: "left", fid: F.fid });
     }
     afterAnim(nextTurn);
+}
+
+function releaseBlasts() {                                    // a Blast does not outlive the fight: its gauge is spent
+    const ar = F.H.arena;
+    for (const p of ar.P) for (const r of p.party) if (r.blast?.active) { r.blast = null; r.gauge = 0; }
 }
 
 function hostGone(from) {                                     // a player's connection dropped mid-fight
@@ -497,6 +689,7 @@ function hostGone(from) {                                     // a player's conn
 
 function hostEnd(state) {
     const won = state === "won";
+    releaseBlasts();
     const others = F.ids.filter((id) => id !== A.myId());
     broadcast(won ? "won" : "lost");
     if (others.length) A.send(others, { k: "end", fid: F.fid, won: won ? 1 : 0, st: state });
@@ -507,14 +700,15 @@ function hostEnd(state) {
 async function begin(setup, isHost, hostId, done) {
     if (F) return false;
     const kit = await A.getKit();
-    const me = kit.myRecord();
+    const party = kit.party();
+    const me = party[0]?.rec;
     if (!me) return false;
     const erec = isHost ? setup.foes.map((e) => kit.enemyRecord(e, setup.screenId ?? null)) : [];
     if (erec.some((r) => !r)) return false;
     if (F) return false;
     F = {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
-        screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1,
+        screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
     };
     const U = F.ui = A.ui ?? (A.ui = buildUi());
@@ -527,19 +721,21 @@ async function begin(setup, isHost, hostId, done) {
         const track = kit.musicFor(F.screenId, A.mapId?.() ?? null);
         if (track && A.bgm) A.bgm.play(track);
     } catch { /* silence is fine */ }
+    const mePublic = { id: A.myId(), pn: A.myName(), n: me.profile?.name ?? "?", lv: me.level | 0 };
+    if (!isHost) {                                           // the referee needs my fighter records before anything else: the scene can load after
+        for (let i = 1; i < party.length; i++) A.send([hostId], { k: "res", fid: F.fid, i, rec: kit.pack(party[i].rec) });   // my reserves first (in order)
+        A.send([hostId], { k: "ready", fid: F.fid, p: { ...mePublic, rec: kit.pack(me) } });
+    }
     await makeScene();                                       // (falls back to plain cards without WebGL)
     if (!F) return true;
-    const mePublic = { id: A.myId(), pn: A.myName(), n: me.profile?.name ?? "?", lv: me.level | 0 };
     if (isHost) {
         F.H = {
-            P: new Map([[mePublic.id, { ...mePublic, rec: me }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
-            arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false,
+            P: new Map([[mePublic.id, { ...mePublic, rec: me, party: party.map((m) => m.rec) }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
+            arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false, res: new Map(),
         };
         A.send(F.ids.filter((id) => id !== mePublic.id), { k: "setup", fid: F.fid, foes: F.foes, ids: F.ids, names: F.names, label: F.label, screenId: F.screenId, ch: F.challenge });
         F.H.readyTimer = setTimeout(() => { if (F) hostBegin(); }, READY_MS);
         if (F.H.P.size >= F.ids.length) hostBegin();
-    } else {
-        A.send([hostId], { k: "ready", fid: F.fid, p: { ...mePublic, rec: kit.pack(me) } });      // the referee needs my real fighter record
     }
     render();
     return true;
@@ -565,8 +761,13 @@ export function mpbMessage(from, d) {
         if (!F.ids.includes(from)) return;
         if (d.k === "ready" && d.p && !F.H.started && d.p.rec && typeof d.p.rec === "object") {
             const p = d.p;
-            F.H.P.set(from, { id: from, pn: String(p.pn ?? "?").slice(0, 12), n: String(p.n ?? "?").slice(0, 14), lv: Math.max(1, Math.min(99, p.lv | 0)), rec: p.rec });
+            const reserves = F.H.res.get(from) ?? [];
+            F.H.P.set(from, { id: from, pn: String(p.pn ?? "?").slice(0, 12), n: String(p.n ?? "?").slice(0, 14), lv: Math.max(1, Math.min(99, p.lv | 0)), rec: p.rec, party: [p.rec, ...reserves.filter(Boolean)] });
             if (F.H.P.size >= F.ids.length) hostBegin();
+        } else if (d.k === "res" && d.rec && typeof d.rec === "object" && !F.H.started) {
+            const list = F.H.res.get(from) ?? [];
+            const i = Math.max(1, Math.min(2, d.i | 0));
+            list[i - 1] = d.rec; F.H.res.set(from, list);
         } else if (d.k === "decline") { F.ids = F.ids.filter((x) => x !== from); if (F.H.P.size >= F.ids.length) hostBegin(); }
         else if (d.k === "cmd") hostCommand(from, d);
     } else if (from === F.hostId) {
@@ -591,13 +792,16 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
     clearTimeout(f.H?.readyTimer); clearTimeout(f.H?.turnTimer);
     F = null;                                   // from here on the fight is over; the screen stays up for the result
     fled = fled || f.iFled;
-    let reward = null;
+    let reward = null, report = null, committed = false;
     if (won && !fled) {
-        const standing = f.isHost ? f.H.arena.P.filter((p) => !p.fled).length : f.ids.length;
-        reward = f.kit.applyWin({ screenId: f.screenId, participants: standing });
+        for (const m of f.party) f.kit.commit(m.rec);          // everyone in my party, as the fight left them (HP, MP, DV gauge)
+        committed = true;
+        const took = [...(f.took ?? [0])].filter((i) => f.party[i]);
+        report = f.kit.winReport?.({ screenId: f.screenId, party: f.party, took }) ?? null;   // the disc's payout for each Digimon that fought
+        reward = report?.reward ?? f.kit.applyWin({ screenId: f.screenId, participants: f.ids.length });
     }
     if (!won && !fled) A.restore(f.snap);       // a lost optional fight costs nothing
-    else f.kit.commit(f.me);
+    else if (!committed) for (const m of f.party) f.kit.commit(m.rec);
     try { if (f.prevTrack && A.bgm) A.bgm.play(f.prevTrack); } catch { /* ignore */ }
     const U = f.ui;
     const close = () => {
@@ -611,6 +815,13 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
     // let the last hit and the victory (or defeat) pose play before the result page covers the scene
     setTimeout(() => {
         if (!U.root || U.root.style.display !== "flex") return;
+        if (won && report && A.openReport) {      // the game's own post-battle screen, full frame, for each player
+            U.root.style.display = "none";
+            let opened = false;
+            try { opened = A.openReport(report.b, () => { report.save?.(); close(); }) === true; } catch (e) { console.warn("[mpbattle] report", e); }
+            if (opened) return;
+            U.root.style.display = "flex";
+        }
         const end = mk("div", "end");
         const h2 = mk("h2", "", won ? "VICTORY!" : fled ? "FIGHT OVER" : "DEFEATED");
         h2.style.color = won ? "#ffd34d" : "#ff7a7a";
@@ -638,7 +849,8 @@ export function installMpBattle(api) {
         if (!F && !(A.ui && A.ui.root.style.display === "flex")) return;
         if (/^F\d+$/.test(e.key)) return;
         A.releaseKeys(); e.stopImmediatePropagation();
+        if (F?.nat) { const b = asButton(e.key); if (b) { e.preventDefault(); mpbKey(b); } }      // the game's own menus take the pad buttons
     }, true);
     window.addEventListener("keyup", (e) => { if (F || (A.ui && A.ui.root.style.display === "flex")) e.stopImmediatePropagation(); }, true);
-    window.__mpb = { get fight() { return F; }, isSpread, host: mpbHost, T, Arena };   // (for tests and the console)
+    window.__mpb = { get fight() { return F; }, isSpread, host: mpbHost, T, Arena, key: mpbKey };   // (for tests and the console)
 }

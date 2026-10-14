@@ -1,3 +1,4 @@
+import "./extra-roster.js";   // first: it wraps fetch so digimon.json / evolutions.json carry the extra species
 import { storyCommand } from './vendor/engine.js';
 import { bindCardInventory } from "./cardstate.js";
 import { paintScreenDim, subtractLayer, dimFillStyle } from "./screendim.js";
@@ -404,7 +405,8 @@ installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () 
 installMpBattle({
     stageEl: document.getElementById("stage"),
     getKit: () => battle.mpKit(),
-    sfx, bgm, mapId: () => currentMap()?.id ?? null,
+    sfx, bgm, mapId: () => currentMap()?.id ?? null, languageByte: () => state.languageByte,
+    openReport: (b, onClose) => openNativeReport(b, onClose),
     myId: () => myId(), myName: () => myName(),
     nameOf: (id) => peerOf(id)?.name ?? myName(),
     send: (ids, d) => sendMpb(ids, d),
@@ -1114,8 +1116,8 @@ battle.setEndingHandoff({
 // the native pro/stfgtrep screen instead of the inline report. The screen pays
 // the BIT and the dropped item, and its close returns to the field.
 const REPORT_CORE = ["str", "def", "spt", "wis", "spd", "chr"];
-battle.setReportHandoff({
-    open: (b) => {
+// (shared with the multiplayer fight: `onClose` is what runs when the player leaves the screen)
+function openNativeReport(b, onClose) {
         // `?legacyReport=1`: leave the battle's own inline report in charge.
         if (!USE_NATIVE_REPORT) return false;
         const rows = b._winReportRows ?? [];
@@ -1160,11 +1162,11 @@ battle.setReportHandoff({
                         && ps.equippedForms?.[v] === pr.formId ? 1 : 0)),
                 };
             }),
-            onClose: () => { battle.finishNativeReport(); },
+            onClose,
         });
         return fightReportNative.isOpen();
-    },
-});
+}
+battle.setReportHandoff({ open: (b) => openNativeReport(b, () => { battle.finishNativeReport(); }) });
 
 // Gym greeters are no longer a hardcoded map: a greeter is any NPC whose
 // dialogue state writes flag bank 0x94, the decoded STGTRAIN launcher bank

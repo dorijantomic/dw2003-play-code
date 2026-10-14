@@ -147,9 +147,11 @@ test("the report seeding uses the outcome member too (web/game.js)", () => {
   // so its seed must be the same member the endBattle arm would have written:
   // the active position at the outcome, never a setup-time index.
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  const at = game.indexOf("battle.setReportHandoff");
-  assert.ok(at > 0, "the battle report handoff is present");
-  const handoff = game.slice(at, game.indexOf("onClose:", at));
+  // the report is opened by openNativeReport (shared with the multiplayer fight); the hand-off just calls it
+  const at = game.indexOf("function openNativeReport(");
+  assert.ok(at > 0, "the battle report opener is present");
+  assert.ok(game.includes("battle.setReportHandoff({ open: (b) => openNativeReport(b,"), "the single-player hand-off opens it");
+  const handoff = game.slice(at, game.indexOf("battle.setReportHandoff", at));
   assert.ok(handoff.includes("activePos: b.activePlayerIndex"),
     "the report's workspace +4 is seeded from the active position (the Tag-aware slot)");
   assert.ok(!/setupPlayerIndex|setupActiveIndex|setupPos/.test(handoff),

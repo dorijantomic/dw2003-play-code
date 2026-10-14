@@ -35,7 +35,7 @@ try {
         const act = (a, key, cmd) => { const r = a.playerAction(key, cmd); a.finish(key, r); return r; };
 
         // the game's own strings
-        out.strings = { dmg: T(0x0b, 42), evade: T(0x1d), heal: T(0x22, 7), poison: T(0x55, 5) };
+        const P = (s) => s.replace(/[^]*/g, ""); out.strings = { dmg: P(T(0x0b, 42)), evade: P(T(0x1d)), heal: P(T(0x22, 7)), poison: P(T(0x55, 5)) };
 
         // T1: the action timeline: a fast fighter acts more often than a slow one
         {
@@ -171,6 +171,63 @@ try {
             }
             out.fights = { fights, steps, bad: bad.slice(0, 3) };
         }
+
+        // T10: every Digimon has its own DV gauge: it fills from the hits it takes, and a full gauge is the automatic Blast
+        {
+            const p = mkP(1, "A", { mp: 400, maxMp: 400, hp: 400, maxHp: 400 });
+            const a = arena([p], [mkE("Kunemon", 30, 99999)]);
+            const rec = a.P[0].rec;
+            const blastTo = kit.blastForm(rec);
+            let filled = 0;
+            for (let i = 0; i < 12 && !filled; i++) { rec.hp = rec.maxHp; const r = a.foeAction("e0"); a.finish("e0", r); filled = rec.gauge | 0; }
+            const g1 = rec.gauge | 0;
+            rec.gauge = 995; rec.hp = rec.maxHp; rec.mp = 300;
+            let blasted = false, line = "", before = rec.profile.name;
+            for (let i = 0; i < 60 && !blasted; i++) { rec.hp = 380; const r = a.foeAction("e0"); a.finish("e0", r); if (rec.blast?.active) { blasted = true; line = r.lines.join(" | "); } }
+            const healed = rec.hp === rec.maxHp, formNow = rec.profile.name, turnsLeft = rec.blast?.turns;
+            const mpBefore = rec.mp; const tech = act(a, "p1", { k: "tech", sk: 56, tw: 0, t: 0 });
+            const free = rec.mp === mpBefore;
+            let reverted = false, gaugeAfter = null, formBack = null, revLine = "";
+            for (let i = 0; i < 8 && !reverted; i++) { const r = act(a, "p1", { k: "fight", t: 0 }); if (!rec.blast) { reverted = true; revLine = r.lines.join(" | "); } }
+            gaugeAfter = rec.gauge; formBack = rec.profile.name;
+            out.gauge = { blastTo: blastTo?.name ?? null, g1, blasted, line, healed, before, formNow, turnsLeft, free, techLine: tech.lines[0], reverted, revLine, gaugeAfter, formBack };
+        }
+
+        // T11: Tag: a player brings three Digimon and swaps the one in the fight; a fallen one is replaced from the reserves
+        {
+            const mk3 = () => { const a0 = mkP(1, "A"), a1 = mkP(1, "A", { level: 12 }), a2 = mkP(1, "A", { level: 7 }); a0.party = [a0.rec, a1.rec, a2.rec]; return a0; };
+            const a = arena([mk3()], [mkE("Kunemon", 5, 99999)]);
+            const P = a.P[0], r0 = P.rec, r1 = P.party[1], r2 = P.party[2];
+            r0.gauge = 600;
+            const same = act(a, "p1", { k: "tag", slot: 0 });
+            r2.hp = 0;
+            const dead = act(a, "p1", { k: "tag", slot: 2 });
+            const t = act(a, "p1", { k: "tag", slot: 1 });
+            const swapped = P.rec === r1 && P.act === 1;
+            const seat = [r1.sideByte, r1.slot, !!r1.statusEvents];
+            // the outgoing's gauge stays with it; the incoming has its own
+            const gauges = [r0.gauge, r1.gauge];
+            // a fight with a reserve left: the fallen Digimon must be replaced, the fight goes on
+            r1.hp = 0; a.finish("e0", { lines: [], rows: [] });
+            const needs = P.needTag, forced = a.forcedTag()?.key ?? null, nx = a.next(), stateDuring = a.state();
+            const f = a.playerAction("p1", { k: "tag", slot: 0 }); a.afterFree(f);
+            const back = P.rec === r0 && !P.needTag && a.state() === "play";
+            // no reserves left alive: the fight is lost
+            r0.hp = 0; a.finish("e0", { lines: [], rows: [] });
+            out.tag = { sameRefused: same.refused === true, deadRefused: dead.refused === true, line: t.lines.join(" | "), swapped, seat, gauges, needs, forced, nxForced: nx?.forced === true && nx.key === "p1", stateDuring, back, lostWhenNone: a.state() };
+        }
+
+        // T12: stealing: a steal technique that lands takes the enemy's drop item (the disc's own roll)
+        {
+            const steal = Object.values(window.__battle ? kit.skillDB() : {}).find((x) => x.effect === "steal");
+            const dropName = Object.keys(window.__ITEM_BY_NAME ?? {}).find((n) => /^PowerCharge$/i.test(n)) ?? Object.keys(window.__ITEM_BY_NAME ?? {})[0];
+            const p = mkP(1, "A", { mp: 9999, maxMp: 9999, spd: 400 });
+            const a = arena([p], [mkE("Kunemon", 5, 99999)]);
+            a.E[0].rec.eStats.drop_item = dropName;
+            let got = null, lines = [], tries = 0;
+            if (steal) for (; tries < 300 && got == null; tries++) { const r = act(a, "p1", { k: "tech", sk: steal.id, tw: 0, t: 0 }); if (r.st != null) { got = r.st; lines = r.lines; } }
+            out.steal = { skill: steal?.name ?? null, dropName, expect: window.__ITEM_BY_NAME?.[dropName]?.id ?? null, got, tries, lines };
+        }
         return out;
     });
 
@@ -190,6 +247,20 @@ try {
     ok("a spread technique hits every enemy; a single one hits only its target", results.spread.isSpread64 && !results.spread.isSpread56 && results.spread.rows === 2 && results.spread.singleRows.join() === "e1", JSON.stringify(results.spread));
     ok("digivolve: offered from the Digimon's own forms, takes the turn, the new form fights; a bad form is refused",
         results.dv.after !== results.dv.before && results.dv.options.includes(results.dv.after) && /Digivolved! /.test(results.dv.lines.join()) && results.dv.attackOk && /No effect/.test(results.dv.refused ?? ""), JSON.stringify(results.dv));
+
+    const gg = results.gauge;
+    ok("a hit fills the Digimon's own DV gauge", gg.g1 > 0, JSON.stringify({ g1: gg.g1 }));
+    ok("a full gauge is the automatic Blast: new form, fully healed, 'Blasted!'", gg.blasted && gg.formNow !== gg.before && gg.healed && /Blasted!/.test(gg.line), JSON.stringify({ blastTo: gg.blastTo, before: gg.before, formNow: gg.formNow, healed: gg.healed, line: gg.line }));
+    ok("techniques are free in a Blast", gg.free === true, gg.techLine);
+    ok("the Blast ends after its turns: form back, gauge spent, 'Back to normal!'", gg.reverted && gg.formBack === gg.before && gg.gaugeAfter === 0 && /Back to normal!/.test(gg.revLine), JSON.stringify({ reverted: gg.reverted, formBack: gg.formBack, gaugeAfter: gg.gaugeAfter, revLine: gg.revLine }));
+    const tg = results.tag;
+    ok("Tag: the reserve takes the fight, 'Go for it!', on the player's seat", tg.swapped && /Go for it!/.test(tg.line) && tg.seat[0] === 0 && tg.seat[2] === true, JSON.stringify(tg));
+    ok("Tag: the one already out, or a fallen one, is refused", tg.sameRefused && tg.deadRefused, JSON.stringify({ same: tg.sameRefused, dead: tg.deadRefused }));
+    ok("Tag: each Digimon keeps its own gauge", tg.gauges[0] === 600 && tg.gauges[1] !== 600, JSON.stringify(tg.gauges));
+    ok("a fallen Digimon with reserves left: the player must pick the next, and the fight goes on", tg.needs === true && tg.forced === "p1" && tg.nxForced && tg.stateDuring === "play" && tg.back, JSON.stringify(tg));
+    ok("with no reserve left standing the fight is lost", tg.lostWhenNone === "lost", tg.lostWhenNone);
+    const st = results.steal;
+    ok("stealing: a landed steal technique takes the enemy's drop", st.skill && st.got != null && st.got === st.expect && st.lines.some((l) => /Stole/.test(l)), JSON.stringify(st));
     ok("40 random fights (1-4 players, 1-6 enemies, many species) all end cleanly", results.fights.fights === 40 && results.fights.bad.length === 0, JSON.stringify(results.fights));
     ok("no page errors", errors.length === 0, errors.join(" | "));
 } finally {

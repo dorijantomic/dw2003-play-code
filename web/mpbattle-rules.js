@@ -14,6 +14,11 @@
 //   items              the game's own item effects (useBattleItem), and the plain HP / MP charges
 //   running away       the game's run roll, and the enemy's flee roll
 //   the words          the game's own battle strings (esmfight bank): "Evade!", "{1} damage!", "Poisoned: {1}"...
+//   Tag                a player brings up to three Digimon and swaps the one in the fight (the game's Tag: the outgoing one's
+//                      Blast is forfeited); a knocked-out one is replaced at once from the reserves, as the game forces it
+//   the DV gauge       every Digimon has its own: it fills from the hits it takes (hitGaugeGain), and a full gauge is the
+//                      automatic Blast: the Digimon takes its Blast form, is fully healed, fights MP-free for 6 of its turns
+//   stealing           a steal technique that lands rolls the game's steal roll (stealProc) for the enemy's drop item
 // What is NOT the game's: choosing a target among several (enemies weigh up wounded, helpless and counter-ready players;
 // players pick), and spread techniques (a strong magic attack hits everyone on the other side at 65% damage).
 //
@@ -23,11 +28,12 @@ import {
     RAND_U16, pickEnemyAiMove, techniqueMpCost, actionTimelineDelay, statusEventActionDelay, advanceStatusEvents,
     emptyStatusEventPool, poisonTimelineDamage, advanceAilmentTimeline, useBattleItem, isBattleEffectItem, fleeChance,
     enemyFleeProc, elementId, enemyActionSkillId, basicAttackHitCount, resolveAttack, resolveMultiHit, statusEventLockHeld,
-    ITEM_BY_ID, effStats,
+    ITEM_BY_ID, effStats, hitGaugeGain,
 } from "./vendor/engine.js";
 import {
     tryInflict, applyWeaponSecondary, triggerCounter, setCounterStance, battleRestorePlanFor, battleScriptedPlanFor,
     restoreWalkerSentence, scriptedWalkerSentence, processTurnStart, ailmentWord,
+    normalizeDvGauge, DV_GAUGE_MAX, blastLandingHeal, setLiveBattleForm,
 } from "./battle.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { battleMsgText } from "./battlemsg-translated.js";
@@ -41,8 +47,12 @@ export const isSpread = (skill) => !!skill && skill.attack_category === "magical
 export function T(index, ...slots) {
     let s = battleMsgText(0x7f, index) || "";
     slots.forEach((v, i) => { s = s.replace(`{${i + 1}}`, String(v)); });
+    // an invisible tag ( index , numbers ) lets the fight screen open the game's own message page for this line
+    if (s && slots.every((v) => Number.isFinite(Number(v)) && typeof v !== "boolean")) s += `${index}${slots.map((v) => "," + (Number(v) | 0)).join("")}`;
     return s;
 }
+/** A line without the tags. */
+export const plainLine = (l) => String(l ?? "").replace(/[^]*/g, "");
 const MSG = { ATTACK: 0x08, DAMAGE: 0x0b, EVADE: 0x1d, HEALED: 0x22, NO_EFFECT: 0x2f, RUN: 0x41, COULDNT_RUN: 0x42, RUN_AWAY: 0x43, POISON_TICK: 0x55, DEFEATED: 0x51, KO: 0x50, FLEEING: 0x5f, DID_NOT_FLEE: 0x60 };
 // the item-menu "actor page" ids the engine's items speak through (kind 2): the words live in the same bank
 const itemWord = (page, name) => {
@@ -64,7 +74,12 @@ export class Arena {
         this.field = null;
         this.waveSize = Math.max(1, waveSize);
         this.wave = 0;
-        this.P = players.map((p, i) => ({ key: "p" + p.id, id: p.id, name: p.name, rec: this.#seat(p.rec, SIDE_PLAYER, i), fled: false }));
+        this.P = players.map((p, i) => {
+            const party = (p.party?.length ? p.party : [p.rec]).slice(0, 3);
+            party.forEach((r) => { r.ailments ??= {}; });
+            return { key: "p" + p.id, id: p.id, name: p.name, rec: this.#seat(p.rec, SIDE_PLAYER, i), fled: false, party, act: Math.max(0, party.indexOf(p.rec)), needTag: false };
+        });
+        for (const p of this.P) if (!p.party.includes(p.rec)) { p.party[0] = p.rec; p.act = 0; }
         this.E = foes.map((f, i) => ({ key: "e" + i, i, name: f.name, rec: this.#seat(f.rec, SIDE_FOE, i), fled: false }));
         this.time = new Map();                    // actor key -> when it next acts (the shared timeline)
         this.lastTarget = new Map();              // foe key -> the player it hit last (to spread the hits around)
@@ -80,6 +95,11 @@ export class Arena {
     // ---------------------------------------------------------- who is standing
     get players() { return this.P; }
     alivePlayers() { return this.P.filter((p) => p.rec.hp > 0 && !p.fled); }
+    #reserve(p) { return p.party.some((r, i) => i !== p.act && r.hp > 0); }
+    /** Players still in the fight: the Digimon out is up, or a reserve can take its place. */
+    standing() { return this.P.filter((p) => !p.fled && (p.rec.hp > 0 || this.#reserve(p))); }
+    /** A player whose Digimon fell and who must pick the next one before anything else happens. */
+    forcedTag() { return this.P.find((p) => p.needTag && !p.fled && this.#reserve(p)) ?? null; }
     waveFoes() { return this.E.filter((e) => e.i >= this.wave * this.waveSize && e.i < (this.wave + 1) * this.waveSize); }
     aliveFoes() { return this.waveFoes().filter((e) => e.rec.hp > 0 && !e.fled); }
     byKey(key) { return this.P.find((p) => p.key === key) ?? this.E.find((e) => e.key === key) ?? null; }
@@ -87,7 +107,7 @@ export class Arena {
     waves() { return Math.ceil(this.E.length / this.waveSize); }
     /** "play" | "won" | "lost" | "fled" */
     state() {
-        if (!this.alivePlayers().length) return this.P.some((p) => p.rec.hp <= 0 && !p.fled) ? "lost" : "fled";
+        if (!this.standing().length) return this.P.some((p) => p.rec.hp <= 0 && !p.fled) ? "lost" : "fled";
         const cleared = this.aliveFoes().length === 0;
         if (cleared && (this.wave + 1) * this.waveSize >= this.E.length) return "won";
         return "play";
@@ -106,6 +126,8 @@ export class Arena {
         const st = this.state();
         if (st !== "play") return null;
         if (!this.aliveFoes().length) { this.wave++; this.#seatWave(); return { wave: this.wave }; }
+        const forced = this.forcedTag();
+        if (forced) return { key: forced.key, forced: true };
         const actors = [...this.alivePlayers(), ...this.aliveFoes()];
         let best = null;
         for (const a of actors) {
@@ -136,7 +158,41 @@ export class Arena {
             this.time.set(a.key, (this.time.get(a.key) ?? 0) + actionTimelineDelay(this.#effSpd(a.rec), Math.max(1, opp)));
         }
         res.lines.push(...this.#tick());
+        this.#afterAction(a, res);
         return res;
+    }
+
+    /** A swap that costs no turn (the forced replacement of a fallen Digimon): only the Blast / fallen checks. */
+    afterFree(res) { this.#afterAction(null, res); return res; }
+
+    // the automatic Blast (a full DV gauge), its countdown, and the fallen Digimon that must be replaced
+    #afterAction(actor, res) {
+        if (actor && actor.key[0] === "p" && actor.rec.blast?.active && actor.rec.hp > 0) {
+            if (--actor.rec.blast.turns <= 0) {                           // the Blast runs out: the form goes back, the gauge is spent
+                const r = actor.rec;
+                setLiveBattleForm(r, r.blast.saved); r.blast = null; r.gauge = 0;
+                res.lines.push(`${actor.rec.profile?.name ?? actor.name}: ${T(0x62)}`);   // "Back to normal!"
+                res.rows.push(this.#row(actor, 0, true));
+            }
+        }
+        for (const p of this.P) {
+            if (p.fled) continue;
+            const r = p.rec;
+            if (r.hp <= 0) {
+                if (r.blast?.active) { r.blast = null; r.gauge = 0; }      // a Blast does not outlive its Digimon
+                if (this.#reserve(p)) p.needTag = true;
+                continue;
+            }
+            if (!r.blast?.active && (r.gauge | 0) >= DV_GAUGE_MAX) {
+                const to = this.kit.blastForm(r);
+                if (!to) continue;
+                r.blast = { active: true, saved: r.profile, turns: 6 };
+                setLiveBattleForm(r, to); blastLandingHeal(r);
+                res.lines.push(`${to.name}: ${T(0x61)}`);                  // "Blasted!"
+                res.rows.push(this.#row(p, 0, true));
+                res.blasted = (res.blasted ?? []).concat(p.key);
+            }
+        }
     }
 
     // the pool: poison ticks, recoveries, buffs wearing off, locks releasing
@@ -192,6 +248,10 @@ export class Arena {
         if (!landed) { lines.push(`${defName}: ${T(MSG.EVADE)}`); return { hit: false, dmg: 0, lines }; }
         def.hp = Math.max(0, def.hp - dmg);
         lines.push(`${defName}: ${T(MSG.DAMAGE, dmg)}${hits > 1 && r.landed ? ` (${r.landed}/${hits})` : ""}`);
+        if ((def.sideByte | 0) === SIDE_PLAYER) {                  // a hit taken fills this Digimon's own DV gauge (not on a KO, not in a Blast)
+            const gain = hitGaugeGain(dmg, def.maxHp, def.hp, { blastActive: !!def.blast?.active, accessories: def.gaugeAccessories });
+            if (gain !== null) def.gauge = normalizeDvGauge((def.gauge | 0) + gain);
+        }
         if (r.heal > 0) {                                           // a draining technique feeds the attacker
             const before = att.hp;
             att.hp = Math.min(att.maxHp, att.hp + r.heal);
@@ -205,9 +265,15 @@ export class Arena {
             if (w.text) lines.push(w.text.trim());
             if (w.ail) lines.push(`${defName}: ${ailmentWord(w.ail)}`);
         }
+        let stolen = null;
+        if (skill.effect === "steal" && (att.sideByte | 0) === SIDE_PLAYER) {   // the disc's steal roll, for the enemy's drop
+            const st = this.kit.stealRoll?.(skill, att, def);
+            if (st?.ok) { stolen = st.item; lines.push(`${attName}: ${T(0x26)} ${T(0x09, st.name)}`); }          // "Stole {item}!"
+            else if (st?.nothing) lines.push(`${attName}: ...but there was nothing to steal!`);
+        }
         const counter = triggerCounter(att, def, dmg, attName);   // a counter stance sends half of it back
         if (counter) lines.push(counter.trim());
-        return { hit: true, dmg, lines, instantDeath: !!inflicted.text };
+        return { hit: true, dmg, lines, instantDeath: !!inflicted.text, stolen };
     }
 
     #row(entry, dmg, hit) { return [entry.key, dmg | 0, hit ? 1 : 0, entry.rec.hp <= 0 ? 1 : 0]; }
@@ -230,6 +296,7 @@ export class Arena {
         for (const t of targets) {
             const out = this.#strike(caster.rec, caster.name, t.rec, t.name, skill, spread);
             res.lines.push(...out.lines);
+            if (out.stolen != null) res.st = out.stolen;
             res.rows.push(this.#row(t, out.dmg, out.hit));
             if (t.rec.hp <= 0) res.lines.push(this.#koLine(t));
         }
@@ -252,16 +319,18 @@ export class Arena {
     playerAction(key, cmd) {
         const me = this.byKey(key);
         const A = me.rec, foes = this.aliveFoes();
+        if (me.needTag) return this.#tag(me, cmd);
         if (!foes.length) return { lines: [], rows: [], a: key, sk: 0, kind: "self" };
         if (cmd.k === "run") return this.#run(me);
         if (cmd.k === "item") return this.#item(me, cmd);
         if (cmd.k === "dv") return this.#digivolve(me, cmd);
+        if (cmd.k === "tag") return this.#tag(me, cmd);
         let skill;
         let cost = 0;
         if (cmd.k === "tech") {
             skill = this.skillDB()[cmd.sk | 0];
             if (!skill) return { lines: [`${me.name}: ${T(MSG.NO_EFFECT)}`], rows: [], a: key, sk: 0, kind: "self" };
-            cost = techniqueMpCost(skill.mp_cost ?? 20, cmd.tw | 0, { mpCostDown: A.mpCostDown ?? 0 });
+            cost = A.blast?.active ? 0 : techniqueMpCost(skill.mp_cost ?? 20, cmd.tw | 0, { mpCostDown: A.mpCostDown ?? 0 });   // (techniques are free in a Blast)
             if (A.mp < cost) return { lines: [`${me.name}: ${T(0x54)}`], rows: [], a: key, sk: 0, kind: "self" };   // "No MP."
             A.mp -= cost;
         } else {
@@ -330,6 +399,28 @@ export class Arena {
         }
         for (const p of this.P) if (p.rec.hp > 0 || p === to) res.rows.push(this.#row(p, 0, true));
         for (const e of this.waveFoes()) if (e.rec.hp <= 0) res.rows.push(this.#row(e, 0, true));
+        return res;
+    }
+
+    // Tag: another of the player's Digimon takes the fight; the one that was out goes to the reserves
+    #tag(me, cmd) {
+        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "tag" };
+        const forced = me.needTag;
+        const slot = cmd.k === "tag" ? cmd.slot | 0 : -1;
+        const inc = me.party[slot];
+        if (!inc || slot === me.act || inc.hp <= 0) { res.lines.push(`${me.name}: ${T(0x8e)}`); res.kind = "run"; res.refused = true; return res; }
+        const out = me.rec;
+        if (out.blast?.active) { setLiveBattleForm(out, out.blast.saved); out.blast = null; out.gauge = 0; }   // a Tag forfeits the Blast
+        for (let i = this.pool.length - 1; i >= 0; i--) {                     // the outgoing Digimon's timers do not follow it
+            const e = this.pool[i];
+            if ((e.side | 0) === SIDE_PLAYER && (e.slot | 0) === (out.slot | 0)) this.pool.splice(i, 1);
+        }
+        const seat = out.slot | 0;
+        this.#seat(inc, SIDE_PLAYER, seat);
+        me.rec = inc; me.act = slot; me.needTag = false;
+        res.lines.push(`${inc.profile?.name ?? me.name}: ${T(0x39)}`);       // "Go for it!"
+        res.rows.push(this.#row(me, 0, true));
+        res.forced = forced;
         return res;
     }
 
@@ -443,6 +534,11 @@ export class Arena {
     plate(entry) {
         const r = entry.rec;
         const ail = Object.keys(r.ailments ?? {}).filter((k) => r.ailments[k]).map((k) => k.slice(0, 3).toUpperCase());
-        return { hp: Math.max(0, r.hp | 0), mhp: r.maxHp | 0, mp: Math.max(0, r.mp | 0), mmp: r.maxMp | 0, ko: r.hp <= 0 || entry.fled ? 1 : 0, ail };
+        return { hp: Math.max(0, r.hp | 0), mhp: r.maxHp | 0, mp: Math.max(0, r.mp | 0), mmp: r.maxMp | 0, ko: r.hp <= 0 || entry.fled ? 1 : 0, ail,
+            dv: r.gauge | 0, bl: r.blast?.active ? 1 : 0 };
+    }
+    /** A player's whole party for the Tag list: the Digimon in the fight and the reserves. */
+    partyPlate(entry) {
+        return entry.party.map((r) => ({ n: r.profile?.name ?? "?", hp: Math.max(0, r.hp | 0), mhp: r.maxHp | 0, mp: Math.max(0, r.mp | 0), mmp: r.maxMp | 0, dv: r.gauge | 0 }));
     }
 }

@@ -4180,21 +4180,21 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }));
   }
 
-  function formOptionsFor(rosterIndex) {
-    const member = battle?.playerRoster?.[rosterIndex];
+  function formOptionsFor(rosterIndex, bb = battle) {
+    const member = bb?.playerRoster?.[rosterIndex];
     if (!member) return [];
     // The list starts at the form the member is in NOW, not at its base form:
     // F0x80094478 reads the profile block's own first halfword for the row it
     // greys, and that halfword is the live record's species. The two are the same
     // number for most of a battle and different after a DV or a Tag.
-    return battleFormIds(liveFormId(battle, rosterIndex), member.stats)
+    return battleFormIds(liveFormId(bb, rosterIndex), member.stats)
       .map((id) => digimonDB[id]).filter(Boolean);
   }
 
-  function battleFormLevel(rosterIndex, formId) {
-    const member = battle?.playerRoster?.[rosterIndex];
+  function battleFormLevel(rosterIndex, formId, bb = battle) {
+    const member = bb?.playerRoster?.[rosterIndex];
     const record = member?.stats?.formLedger?.find((r) => Number(r.id) === Number(formId));
-    return Number(record?.formLevel ?? (Number(formId) === liveFormId(battle, rosterIndex)
+    return Number(record?.formLevel ?? (Number(formId) === liveFormId(bb, rosterIndex)
       ? member?.stats?.level : 0)) || 0;
   }
 
@@ -7414,7 +7414,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * data is built once here rather than per screen.
    */
   function formPanelMemberSeed(b, index, rec) {
-    const forms = formOptionsFor(index);
+    const forms = formOptionsFor(index, b);
     const elems = FORM_ELEMENTS;
     // The panel's own seven numbers are the F0x80017174 scratch's +0x18..+0x24:
     // the roster row's base plus every trained point plus the worn gear's
@@ -7437,7 +7437,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         left: [form.str, form.def, form.spt, form.wis, form.spd, form.chr],
         right: elems.map((k) => form.resistances?.[k] ?? 0),
         techs: techsFor(form.id),
-        level: battleFormLevel(index, form.id),
+        level: battleFormLevel(index, form.id, b),
         dvexp: Number(ledger.find((row) => Number(row?.id) === Number(form.id))?.dvexp ?? 0) >>> 0,
       })),
       equipped: (rec?.statsRecord?.equippedForms ?? []).slice(0, 3).map((id) => Number(id)),
@@ -9103,6 +9103,24 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // EXPERIMENT (multiplayer many-vs-many, web/mpbattle.js): the pieces of this engine that a separate N-vs-M screen needs, so
   // its numbers are the game's own: the same enemy and player records, the same damage / accuracy / critical rolls, the same
   // technique lists and prices, the same EXP and BIT payout. A normal one-on-one fight never calls any of this.
+  function mpKitTechs(rec, blastOn = false) {
+    const partner = rec.statsRecord;
+    partner.formLedger ??= Object.entries(partner.dvexpByForm ?? {}).map(([id, dvexp]) => ({
+      id: Number(id), formLevel: dvLevelForExp(Number(dvexp) || 0, digimonDB?.[id]?.dv_cap ?? 100), dvexp: Number(dvexp) || 0, techSlots: [],
+    }));
+    const sig = rec.profile.tech_signature ?? rec.profile.techs?.[1] ?? 0;
+    const words = battleTechWords({
+      ledger: partner.formLedger, currentId: rec.profile.id, equippedForms: partner.equippedForms,
+      signatureTech: sig, blastSignature: blastOn ? sig : 0,
+    });
+    return words.map((w) => {
+      const s = skillDB[Number(w) & 0x1fff];
+      if (!s) return null;
+      const skill = { ...s, techWord: Number(w) & 0xffff };
+      return { id: s.id, name: s.name, type: s.type, tw: skill.techWord, magical: s.attack_category === "magical", power: s.power | 0, skill,
+        cost: techniqueMpCost(s.mp_cost ?? 20, skill.techWord, { mpCostDown: rec.mpCostDown ?? 0 }) };
+    }).filter(Boolean);
+  }
   async function mpKit() {
     await loadData();
     const state = getState();
@@ -9141,23 +9159,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       /** A plain-data copy of a fighter record, to hand to the referee. */
       pack: (rec) => JSON.parse(JSON.stringify(rec)),
       /** My techniques: [{ id, name, cost, tw, type, magical, power, skill }]. type is "attack", "heal" or "support". */
-      myTechs: (rec) => {
-        const partner = rec.statsRecord;
-        partner.formLedger ??= Object.entries(partner.dvexpByForm ?? {}).map(([id, dvexp]) => ({
-          id: Number(id), formLevel: dvLevelForExp(Number(dvexp) || 0, digimonDB?.[id]?.dv_cap ?? 100), dvexp: Number(dvexp) || 0, techSlots: [],
-        }));
-        const words = battleTechWords({
-          ledger: partner.formLedger, currentId: rec.profile.id, equippedForms: partner.equippedForms,
-          signatureTech: rec.profile.tech_signature ?? rec.profile.techs?.[1] ?? 0,
-        });
-        return words.map((w) => {
-          const s = skillDB[Number(w) & 0x1fff];
-          if (!s) return null;
-          const skill = { ...s, techWord: Number(w) & 0xffff };
-          return { id: s.id, name: s.name, type: s.type, tw: skill.techWord, magical: s.attack_category === "magical", power: s.power | 0, skill,
-            cost: techniqueMpCost(s.mp_cost ?? 20, skill.techWord, { mpCostDown: rec.mpCostDown ?? 0 }) };
-        }).filter(Boolean);
-      },
+      myTechs: (rec, blastOn = false) => mpKitTechs(rec, blastOn),
       /** One attack, rolled by the game's own resolver. Returns { hit, dmg, landed, attempts }. */
       attack: (att, def, skill) => {
         const n = skill?.basic_attack ? basicAttackHitCount(att.multiAttack, skill?.clip) : Math.max(1, skill?.hits ?? 1);
@@ -9192,6 +9194,31 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         persist();
         return { xp: reward.xp, bits: reward.bits, from: oldLevel, to: Math.max(oldLevel, newLevel) };
       },
+      /**
+       * The payout for a won fight, the game's way: every Digimon that fought and still stands is paid by the disc's rules
+       * (share, level-ups, DV EXP, learned techniques), exactly as a one-on-one win does. Returns the object the post-battle screen
+       * opens from (the BIT and drop are paid by that screen) and the lead's summary line.
+       */
+      winReport: ({ screenId, party, took }) => {
+        const recs = party.map((m) => m.rec);
+        const b = {
+          screenId, playerRoster: party.map((m) => m.member), playerRecords: recs, participantIndices: new Set(took),
+          activePlayerIndex: took[0] ?? 0, formFlags: [], _loot: { drops: [] }, player: recs[0], enemy: null,
+        };
+        for (const i of took) {
+          const flags = (b.formFlags[i] = new Array(10).fill(0));
+          const triple = equippedTriple(recs[i].statsRecord?.equippedForms);
+          triple.forEach((id, k) => { if (id === Number(recs[i].profile?.id)) flags[7 + k] = 1; });
+        }
+        const progress = paidParticipants(b).map((index) => ({ index, ...applyParticipantProgress(b, index) }));
+        if (!progress.length) return null;
+        const rewards = winRewards(b, progress[0].index);
+        b._winProgress = progress; b._winApplied = true;
+        b._winReward = { xp: rewards.xp, bits: rewards.bits, dvexp: rewards.dvexp, droppedItem: null, levelUp: progress[0].levelUp };
+        b._winReportRows = buildFightReportRows(b.playerRoster, b.playerRecords, digimonDB);
+        const lead = progress[0];
+        return { b, save: persist, reward: { xp: rewards.xp, bits: rewards.bits, from: lead.oldLevel, to: Math.max(lead.oldLevel, lead.newLevel) } };
+      },
       /** The data tables the rules read: technique rows, the decoded technique records, and the item menu. */
       skillDB: () => skillDB,
       techRecord: (id) => fightTechDB?.[String(id | 0)] ?? null,
@@ -9202,6 +9229,47 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       spendItem: (id) => { storeRemoveItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
       /** Leave my Digimon as the fight left it (the field's own write-back: KO -> 1 HP). */
       commit: (rec) => { writeBackBattleVitals(rec); persist(); },
+      /** My whole party, lead first: [{ member, rec }] (member = the roster entry the game's screens read). */
+      party: () => {
+        const roster = buildPlayerRoster(state), prof = getPlayerProfile(state);
+        return roster.map((member, i) => ({ member, rec: buildPlayerRecord(member, i === 0 && prof ? prof.id : null) }));
+      },
+      /** The profile Blast would turn this Digimon into at its level, or null. */
+      blastForm: (rec) => {
+        const rookie = digimonDB?.[rec?.rookieId];
+        const id = blastTargetId(rookie?.blasts, rec?.level ?? 1);
+        return id ? (digimonDB?.[id] ?? null) : null;
+      },
+      /** The form (by its name) the record takes, as the game's own Digivolve / Tag / Blast commits do. */
+      setFormByName: (rec, name) => {
+        const p = Object.values(digimonDB ?? {}).find((x) => x?.name === name);
+        if (!p) return false;
+        setLiveBattleForm(rec, p); return true;
+      },
+      profileByName: (name) => Object.values(digimonDB ?? {}).find((x) => x?.name === name) ?? null,
+      /** The disc's steal roll for a landed steal technique: { ok, item, name } | { ok:false, nothing } (no draw: it missed). */
+      stealRoll: (skill, thief, enemy) => {
+        if (skill?.effect !== "steal" || enemy.hp <= 0) return null;
+        const record = enemyStatRecordFor(enemy.eStats?.enemy_id ?? enemy.profile?.name ?? "");
+        const techWeight = fightTechDB?.[String(skill.id)]?.f8 ?? 0;
+        if (!stealProc(record?.field04 ?? 0, effStats(thief).spd | 0, effStats(enemy).spd | 0, techWeight, thief.stealBonus ?? 0, RAND_U16())) return { ok: false, missed: true };
+        const dropName = enemy.eStats?.drop_item;
+        if (!dropName || dropName === "Null") return { ok: false, nothing: true };
+        const item = window.__ITEM_BY_NAME?.[dropName];
+        if (!item) return { ok: false, nothing: true };
+        return { ok: true, item: item.id, name: battleMsgText(0x6a, item.id) || item.name };
+      },
+      /** An item into my bag (a stolen one), through the shared store. */
+      giveItem: (id) => { storeAddItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
+      itemName: (id) => battleMsgText(0x6a, id | 0) || window.__ITEM_BY_ID?.[id]?.name || "",
+      // the seeds the game's own translated screens are opened with (the same shapes the one-on-one battle hands them)
+      techSeed: (rec, free = false) => {
+        const list = mpKitTechs(rec, free);
+        return { activeIndex: 0, mp: rec.mp | 0, maxMp: rec.maxMp | 0, noCharge: free ? 1 : 0, techniques: list.map((t) => ({ word: t.tw & 0xffff, cost: t.cost })) };
+      },
+      itemSeed: () => itemListSeed(null),
+      formSeed: (rec, member) => formListSeed({ playerRoster: [member], playerRecords: [rec], activePlayerIndex: 0, player: rec, blast: null }),
+      tagSeed: (members, records, active) => tagListSeed({ playerRoster: members, playerRecords: records, activePlayerIndex: active, _forcedTag: false, tagRow: 0, blast: null }),
     };
   }
 

@@ -6,6 +6,14 @@ import { decodeSaveRoster, writeSaveBlock, readSaveCards, readSaveFlags } from "
 import { PARTY_CONTEXT } from "../dw3/party-context.ts";
 import { ROSTER_SLOT_CHARIDS } from "../dw3/roster.ts";
 import { bagFromItemArrays, readItemArrays } from "../dw3/item-store.ts";
+import { extraProfileRow } from "../dw3/ui/native/pause-status.ts";
+
+/** Forms the snapshot knew that the card's 44 cells could not hold. */
+function overflowForms(cells: { id: number }[], previous: unknown): unknown[] {
+  if (!Array.isArray(previous)) return [];
+  const held = new Set(cells.map((e) => Number(e.id)));
+  return previous.filter((e) => e && Number(e.id) > 8 && !held.has(Number(e.id)));
+}
 
 export function residentStorage(image: ArrayLike<number>, profiles: Uint8Array, snapshot: Record<string, string>) {
   const data = { ...snapshot };
@@ -23,12 +31,19 @@ export function residentStorage(image: ArrayLike<number>, profiles: Uint8Array, 
     const previous = (oldPos >= 0 ? oldParty[oldPos] : oldReserve[ROSTER_SLOT_CHARIDS[slot]!]) ?? {};
     const coreKeys = ["str", "def", "spt", "wis", "spd", "chr"];
     const stats = Object.fromEntries(coreKeys.map((k, i) => [k, r.core[i]! - (Number(previous.bonuses?.[k]) || 0)]));
-    const profile = (r.digimonId > 0 ? r.digimonId - 1 : slot) * 0x58;
-    const profileView = new DataView(profiles.buffer, profiles.byteOffset, profiles.byteLength);
+    // the form's own profile record: the disc's 55 rows, or the enemy-only species' (walker ids 56..)
+    const row = extraProfileRow(r.digimonId);
+    const profileView = row
+      ? new DataView(row.buffer, row.byteOffset, row.byteLength)
+      : new DataView(profiles.buffer, profiles.byteOffset, profiles.byteLength);
+    const profile = row ? 0 : (r.digimonId > 0 ? r.digimonId - 1 : slot) * 0x58;
     const elemBonuses = Object.fromEntries(ELEMENT_KEYS.map((k, i) => [k, r.elements[i]! - profileView.getUint16(profile + 0xe + i * 2, true)]));
     return { ...previous, stats, elemBonuses, lastUltraDrill: r.lastUltraDrill || null, xp: r.xp, level: r.level, tp: r.tp, hp: r.hp, maxHp: r.maxHp, mp: r.mp, maxMp: r.maxMp,
       core: r.core, elements: r.elements, digimonId: r.digimonId, equippedForms: r.equippedForms,
-      formLedger: r.formLedger, rawLedger: r.rawRecord.slice(0x58, 0x3c8) };
+      // The card's ledger has 44 cells; a Digimon that knows more forms (the enemy-only species are forms too)
+      // keeps the rest in the companion snapshot the card was saved with, and they come back from there.
+      formLedger: [...r.formLedger, ...overflowForms(r.formLedger, previous.formLedger)],
+      rawLedger: r.rawRecord.slice(0x58, 0x3c8) };
   };
   const storedEquipment = (slot: number) => Object.fromEntries(Object.entries(roster[slot]!.equipment).filter(([, id]) => id !== 0));
   const reserveStats: Record<string, unknown> = {};

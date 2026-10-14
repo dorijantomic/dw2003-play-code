@@ -20,6 +20,7 @@
 import { TimelinePlayer, PlaylistPlayer } from "./timeline-player.js";
 import { ActionVM } from "./action-vm.js";
 import { techToClip, techRecord } from "./fight-tables.js";
+import { resolveClipScript, scriptTableSeq } from "./clip-fallback.js";
 // The animation-slot system the original runs is ported in
 // engine/dw3/battle-actor-animation.ts: the op2 movement arms of FIGHTSTG_F0x8008b7f4
 // (`animSlotMoveDelta`) and the live=home write of mode 7 / the placement FIGHTSTG_F0x80087f38
@@ -255,8 +256,9 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip, hooks = {}, { currentEffect = null, holdFinalPose = false } = {}) {
-    const script = (clip != null) ? this.model?.actions?.[clip] : null;
+  setAction(clip, hooks = {}, { currentEffect = null, holdFinalPose = false, element = 1 } = {}) {
+    // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js)
+    const script = (clip != null) ? resolveClipScript(this.model, clip, { element }) : null;
     if (script && Array.isArray(script.ops) && script.ops.length) {
       this._clip = clip;
       this._heldPose = false;
@@ -284,7 +286,7 @@ export class ActorAnimator {
     // Seed the slot with the clip's FIRST op2 table so currentFrame() is sane before tick 1. The VM
     // then binds each op2 table in order as it runs (reaction clips 10/17 bind via op2; clip 14 has
     // neither op2 nor op4 -> _playerForTable falls back to idle so it never freezes at frame 0).
-      const seq = this._clipTableSeq(clip);
+      const seq = scriptTableSeq(script);
       this.vm.player = this._playerForTable(seq.length ? seq[0] : 0);
       return true;
     }
@@ -327,7 +329,7 @@ export class ActorAnimator {
   // effect", resolved by op3's 9999 sentinel). Both come from the extracted tech table.
   setAnimByTech(techId, hooks = {}) {
     const rec = techRecord(techId);
-    return this.setAction(techToClip(techId), hooks, { currentEffect: rec?.effect ?? null });
+    return this.setAction(techToClip(techId), hooks, { currentEffect: rec?.effect ?? null, element: rec?.elem1 ?? 1 });
   }
 
   // "Active" = something authored is driving the frame (a running VM, or the idle table while

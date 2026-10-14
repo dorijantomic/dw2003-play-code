@@ -18,6 +18,7 @@ import { FightCoordinator } from "./fight/fight-coordinator.js";
 import { setMoveSpeed } from "./fight/action-vm.js";
 import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
 import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP } from "./fight/fight-tables.js";
+import { setFallbackDonor } from "./fight/clip-fallback.js";
 import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
          projLayerWorlds, clipFrameAt, meshAbrMode } from "./fight/proj-layers.js";
@@ -1611,6 +1612,9 @@ export function createBattle3D(canvas, sfx = null) {
   let screenOverlay = null; // op7 full-screen monochrome primitive (DNA result clip 12)
   fetch("assets/data/fight_tech_table.json")
     .then(r => (r.ok ? r.json() : null)).then(setTechTable).catch(() => {});
+  // The donor for clips a model lacks (enemy-only species): a player species with the whole set. Greymon's pack.
+  fetch("assets/battle/models/m005grey/anim.json")
+    .then(r => (r.ok ? r.json() : null)).then(j => setFallbackDonor(j?.actions)).catch(() => {});
   loadEffectAssets().then(a => {
     effectAssets = a;
     effectPlayer = new EffectPlayer(a.manifest);

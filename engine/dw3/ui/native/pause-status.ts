@@ -72,6 +72,69 @@ const PROFILE_COUNT = 0x37;
  */
 export const PROFILE_SCAN_ROWS = 0x34;
 
+/**
+ * Species the disc only ever used as enemies, made available as player forms
+ * (tools/build_extra_species.py -> assets/data/extra_profiles.bin). They are NOT in the
+ * 55-row table, which the translated screens address by literal constants and which the
+ * shop's descriptor table follows. Each is a 0x58-byte record of the same layout, held
+ * in its own window of every screen's memory, and the species getter answers its address
+ * exactly as it answers a base row's. The walker numbers them 56.., each row's first
+ * halfword is the game form id (the species' model number, unique across both tables),
+ * and byte +0x55 is the species' entry in the disc's own name bank 0x4E, which already
+ * names every enemy. Nothing is registered unless the page loads the extra data, so every
+ * screen without it behaves exactly as before.
+ */
+export const EXTRA_PROFILE_BASE = 0x801f4000;
+export const EXTRA_FIRST_ID = PROFILE_COUNT + 1;
+let extraRows: Uint8Array | null = null;
+const extraInstalled = new WeakSet<object>();
+
+/** Register the extra species' profile records (a multiple of 0x58 bytes), or clear them with null. */
+export function registerExtraProfiles(bytes: Uint8Array | null): void {
+    if (bytes && (bytes.length === 0 || bytes.length % 0x58 !== 0)) throw new Error("Invalid extra profile table");
+    extraRows = bytes && bytes.length ? bytes : null;
+}
+
+/** How many extra species are registered. */
+export function extraProfileCount(): number {
+    return extraRows ? extraRows.length / 0x58 : 0;
+}
+
+/** The 0x58-byte profile record of the extra species with walker id `id` (56..), or null. */
+export function extraProfileRow(id: number): Uint8Array | null {
+    const row = (Number(id) | 0) - EXTRA_FIRST_ID;
+    if (!extraRows || row < 0 || row >= extraRows.length / 0x58) return null;
+    return extraRows.subarray(row * 0x58, (row + 1) * 0x58);
+}
+
+/** The game form id (value0) of extra species row `row` (0-based), or 0. */
+export function extraRowFormId(row: number): number {
+    if (!extraRows || !Number.isInteger(row) || row < 0 || row >= extraRows.length / 0x58) return 0;
+    return (extraRows[row * 0x58]! | (extraRows[row * 0x58 + 1]! << 8)) & 0xffff;
+}
+
+/** Put the extra rows into this screen's memory once, wherever the screen reads species records from. */
+function installExtraProfiles(mem: object): void {
+    if (!extraRows || extraInstalled.has(mem)) return;
+    const m = mem as { load?: (data: Uint8Array, at: number) => void; write8?: (a: number, v: number) => void };
+    if (typeof m.load === "function") m.load(extraRows, EXTRA_PROFILE_BASE);
+    else for (let i = 0; i < extraRows.length; i++) m.write8!(EXTRA_PROFILE_BASE + i, extraRows[i]!);
+    extraInstalled.add(mem);
+}
+
+/** The record address of the extra species whose game form id is `form`, else 0. */
+function extraProfileAddress(mem: object, form: number): number {
+    if (!extraRows) return 0;
+    const count = extraRows.length / 0x58;
+    for (let row = 0; row < count; row++) {
+        if (extraRowFormId(row) === (form >>> 0)) {
+            installExtraProfiles(mem);
+            return (EXTRA_PROFILE_BASE + row * 0x58) >>> 0;
+        }
+    }
+    return 0;
+}
+
 const s16 = (v: number): number => (v << 16) >> 16;
 const lang = (mem: PauseMemory): number => mem.read32(PAUSE_LANGUAGE_CELL) | 0;
 
@@ -99,7 +162,8 @@ export function profileIndex(mem: PauseMemory, form: number): number {
 /** F0x800134E8(form): the profile record for a form id, else 0. */
 export function profileRecord(mem: PauseMemory, form: number): number {
     const index = profileIndex(mem, form);
-    return index < 0 ? 0 : (PROFILE_TABLE_BASE + Math.imul(index, PROFILE_STRIDE)) >>> 0;
+    if (index >= 0) return (PROFILE_TABLE_BASE + Math.imul(index, PROFILE_STRIDE)) >>> 0;
+    return extraProfileAddress(mem, form);
 }
 
 /** The species getter needs nothing but halfword reads, and so does this. */
@@ -133,13 +197,18 @@ export function profileRowFormId(mem: ProfileTableMemory, row: number): number {
  * here. 0 is the original's "no such form" answer (F0x800134E8's).
  */
 export function gameFormId(mem: ProfileTableMemory, walkerId: number): number {
-    return profileRowFormId(mem, (Number(walkerId) | 0) - 1);
+    const id = Number(walkerId) | 0;
+    if (id >= EXTRA_FIRST_ID) return extraRowFormId(id - EXTRA_FIRST_ID);
+    return profileRowFormId(mem, id - 1);
 }
 
 /** The game's form id back to the walker's own id, or 0 when it has no row. */
 export function walkerIdOf(mem: ProfileTableMemory, form: number): number {
     for (let row = 0; row < PROFILE_COUNT; row++) {
         if (profileRowFormId(mem, row) === (form >>> 0)) return row + 1;
+    }
+    for (let row = 0; row < extraProfileCount(); row++) {
+        if (extraRowFormId(row) === (form >>> 0)) return EXTRA_FIRST_ID + row;
     }
     return 0;
 }

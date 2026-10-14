@@ -1091,6 +1091,7 @@ export {
 // Decode: .bunny-scratch/dnaseed-report.md (2026-10-03).
 export {
   gameFormId, PROFILE_ROWS, walkerIdOf, walkerProfileRow,
+  registerExtraProfiles, extraProfileCount, extraRowFormId, EXTRA_FIRST_ID, EXTRA_PROFILE_BASE,
   type ProfileTableMemory,
 } from "./dw3/ui/native/pause-status.ts";
 // The in-battle message line: the pro/fightstg panel's ports, promoted for the browser

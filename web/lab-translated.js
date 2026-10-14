@@ -25,6 +25,7 @@
 // Same public API as createDriNative: open/isOpen/handleKey/update/draw/close/diagnostics.
 import {
     ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, syncWornFromEquipment, ui,
+    extraProfileCount, extraRowFormId, EXTRA_FIRST_ID,
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
@@ -91,7 +92,7 @@ export function createLabTranslated(sfx = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null, _state: null,
         _onClose: null, _clock: null, _ticks: 0, _request: 0, _members: [], _seededParty: [], _summary: null,
-        _lastDiagnostic: null, _committed: 0, _banks: null, _packed: {},
+        _lastDiagnostic: null, _committed: 0, _banks: null, _packed: {}, _ledgerPages: 1,
     };
     const renderer = createNativeScreenRenderer(
         { pack: "stdglabo", packs: { "709:0": "stdglabo", "709:1": "stdglabo_portraits", "646:0": "cmfont" } }, packName);
@@ -131,6 +132,9 @@ export function createLabTranslated(sfx = null) {
         const { digimonById: db, value0 } = g._data;
         const v0ById = new Map();
         value0.forEach((v, row) => { if (v) v0ById.set(row + 1, v); });
+        // the enemy-only species (web/extra-roster.js) are forms too: walker ids 56.. with their own game form ids
+        for (let i = 0; i < extraProfileCount(); i++) v0ById.set(EXTRA_FIRST_ID + i, extraRowFormId(i));
+        g._ledgerPages = 1;
         const party = Array.from({ length: PARTY_SLOTS }, (_, i) => (state.party?.[i] ? slotOfChar(state.party[i]) : -1));
         g._seededParty = party.slice();
         g._members = [];
@@ -145,8 +149,13 @@ export function createLabTranslated(sfx = null) {
                 const id = Number(stats.equippedForms?.[i]) || 0;
                 return id > 0 ? (v0ById.get(id) ?? EMPTY) : EMPTY;
             });
+            // The screen's ledger has 44 cells: the current and equipped forms always, then one page of the rest
+            // (flip with [ and ]); the walker's own ledger is never cut.
+            const pinned = new Set([Number(stats.digimonId), ...(stats.equippedForms ?? []).map(Number)]);
+            const win = ui.windowLedger((stats.formLedger ?? []).filter((e) => v0ById.get(Number(e.id))), pinned, ui.getLedgerPage(), LEDGER_ENTRIES);
+            g._ledgerPages = Math.max(g._ledgerPages, win.pages);
             const ledger = Array.from({ length: LEDGER_ENTRIES }, (_, i) => {
-                const entry = stats.formLedger?.[i];
+                const entry = win.shown[i];
                 const value = entry ? v0ById.get(Number(entry.id)) : 0;
                 if (!entry || !value) return null;
                 return {
@@ -164,7 +173,7 @@ export function createLabTranslated(sfx = null) {
                 currentForm: form > 8 ? (v0ById.get(form) ?? 0) : 0,
                 equipped, ledger,
             };
-            g._members.push({ slot, stats, equipment, starterId, member });
+            g._members.push({ slot, stats, equipment, starterId, member, window: win.shown });
             return member;
         });
         return { language, party, members, returnSelector: Number(g._returnSelector) || 0 };
@@ -212,9 +221,10 @@ export function createLabTranslated(sfx = null) {
         const { value0 } = g._data;
         const idByV0 = new Map();
         value0.forEach((v, row) => { if (v) idByV0.set(v, row + 1); });
+        for (let i = 0; i < extraProfileCount(); i++) idByV0.set(extraRowFormId(i), EXTRA_FIRST_ID + i);
         let changed = false;
         // The current form, the equipped triple and the ledger entries, per roster record.
-        for (const { slot, stats, starterId, member } of g._members) {
+        for (const { slot, stats, starterId, member, window: shown } of g._members) {
             const record = session.record(slot);
             if (record.currentForm !== member.currentForm) {
                 if (record.currentForm === 0) stats.digimonId = starterId;
@@ -228,7 +238,7 @@ export function createLabTranslated(sfx = null) {
             record.ledger.forEach((entry, i) => {
                 const before = member.ledger[i];
                 if (!entry || !before || sameList(entry.techniques, before.techniques)) return;
-                if (stats.formLedger?.[i]) { stats.formLedger[i].techSlots = entry.techniques.slice(); changed = true; }
+                if (shown?.[i]) { shown[i].techSlots = entry.techniques.slice(); changed = true; }
             });
         }
         // The party map: reorder the party to the map; a partner that left keeps its block in the reserve.
@@ -299,7 +309,26 @@ export function createLabTranslated(sfx = null) {
     // held button), so a key event only keeps the state pointer fresh.
     g.handleKey = (_k, state) => {
         if (state && !g._state) g._state = state;
+        const key = String(_k ?? "").toLowerCase();
+        if (g._open && g._session && g._ledgerPages > 1) {
+            if (key === "]" || key === "pagedown") flipLedgerPage(1);
+            else if (key === "[" || key === "pageup") flipLedgerPage(-1);
+        }
     };
+
+    /** Show the next / previous page of a ledger longer than the screen's 44 cells: keep the edits, rebuild the screen. */
+    function flipLedgerPage(dir) {
+        const now = ui.getLedgerPage();
+        const next = Math.max(0, Math.min(g._ledgerPages - 1, now + dir));
+        if (next === now) return;
+        commit();
+        g._committed = 0;
+        ui.setLedgerPage(next);
+        try { g._session?.dispose?.(); } catch (_) { /* a screen that already closed */ }
+        g._session = null;
+        g._ticks = 0;
+        startSession();
+    }
 
     const padKeys = () => (g._state?.keys ? [...g._state.keys] : []);
 
@@ -316,6 +345,11 @@ export function createLabTranslated(sfx = null) {
         ctx.save();
         ctx.scale(s, s);
         paintNativeSession(ctx, renderer, g._session);
+        if (g._ledgerPages > 1) {
+            ctx.font = "8px monospace";
+            ctx.fillStyle = "#ffe36b";
+            ctx.fillText(`Forms ${ui.getLedgerPage() + 1}/${g._ledgerPages}  [ ] to flip`, 6, 236);
+        }
         ctx.restore();
     };
 

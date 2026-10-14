@@ -95,7 +95,22 @@ The relay sees only: the display name, the stage id, x/y, the facing and emote n
   - Boss strength (x1/x2/x3 HP, a little more attack) is the setting at the top of the PLAYERS tab.
   - Each player gets the disc's EXP/BIT payout and keeps the HP the fight left; a lost fight costs nothing. The battle track plays.
   - The partner who joins a quest challenge is credited for the same open challenge.
-  - Not done: Tag (each player brings one Digimon), the DV gauge and Blast, stealing, the boss "special modes" (the finale), the
-    game's native translated menu screens and message box (the menus here are plain buttons over the scene).
+  - **Party and Tag** (`#tag` in the rules): each player brings their whole party (up to three Digimon; the reserves are sent to the
+    referee as `res` messages before `ready`). The Tag command swaps the Digimon in the fight (the game's Tag: the outgoing one's Blast
+    is forfeited, its timers do not follow it). A Digimon that falls is replaced from the reserves at once, the player is asked which
+    (the forced Tag; it costs no turn); with none left standing the player is out.
+  - **DV gauge and Blast**: every Digimon has its own gauge (`hitGaugeGain`: it fills from the hits it takes, not on a KO, not in a
+    Blast). A full gauge is the automatic Blast: the Digimon takes its Blast form (`blastTargetId` from its rookie's `blasts` by level
+    tier), is fully healed, fights MP-free for six of its own turns, then returns ("Blasted!" / "Back to normal!" from the game's
+    strings) and the gauge is spent. The gauge is written back with the Digimon's HP after the fight. Plates show it as a thin bar.
+  - **Stealing**: a steal technique that lands runs the disc's steal roll (`stealProc`) for the enemy's drop item; the item goes into
+    the thief's own bag through the game's item store (the referee's snapshot says who stole what).
+  - **The game's own menus and message window** (`web/mpbattle-menus.js`): the command list, TECH, ITEM, Digivolve form list and TAG
+    list are the same translated pro/fightstg screens the one-on-one battle opens, opened over the 3D scene on a 320x240 overlay and
+    driven by pad buttons (keyboard, an on-screen pad, or a gamepad). What happens is told in the game's own message window, one
+    line a page ("Name" above the text). Choosing a target (which enemy, which friend) is the one thing the game has no screen for:
+    a marker moves over the plates (arrows, circle, cross, or a click). Without WebGL the plain buttons and cards come back.
+  - Not done: boss "special modes" (the finale), the DNA pane that follows Tag in the one-on-one battle, the Blast transformation
+    cinematic, enemy AI conditions the engine does not support.
 - Relay messages: `chat`, `feed`, `card`, `at`, `trade`, `duel`, `coop`, `mpb` (see `server/room-core.mjs`). Tests: `tests/multiplayer-social.test.js`, `tools/verify_multiplayer_rules.mjs` (the many-fighter rules, one by one, plus 40 random whole fights),
   `tools/verify_multiplayer.mjs`, `tools/verify_multiplayer_battle.mjs`, `tools/verify_multiplayer_fight.mjs` (a real 2-vs-2 fight, played through the buttons; `HURT=1` for the enemies-hit-back case).
