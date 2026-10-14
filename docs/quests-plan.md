@@ -21,14 +21,21 @@ the story or the battle rules.
 
 ## What the player sees
 
-- **F3** opens the log (the page's key hint lists it). The log is the game's own list widget; each quest's details open
-  in the game's own conversation window.
+- **F3** opens a log in the field (the page's key hint lists it): the game's own list widget, each quest's details in the game's
+  own conversation window. It is also where notice-board jobs are taken and finished quests without a character are claimed.
 - **The pause menu has a QUESTS row** after CARD FOLDERS (labelled `QUESTS` or `QUESTS 2`: the number is how many are
   ready to claim or new). It is the disc's own list: its seven-row panel (clip 0x19, the disc has the art for it), its font,
-  cursor and fold animation. Choosing it closes the pause, runs the quest log, and reopens the pause on that row.
-  Built in `engine/dw3/ui/native/pause-list.ts` and `pause-root-session.ts` behind an optional `extraRow` hook that the
-  disc-faithful default never sets (the original-code oracle tests for the list still pass). The log itself is still the
-  game's choice list and system window, not a page inside the pause with the party cards behind it.
+  cursor and fold animation.
+- **Choosing it opens a real QUESTS page inside the pause**, built from the same pieces the disc's pages use: the pause backdrop,
+  the top bar, the eight-row list window (clip 0x24) with the cursor, and the description band at the bottom (as SORT and ITEMS
+  have). Each row is a short title with a mark (`!` ready, `-` open, `?` new); the band shows the full title, what to do next and
+  the reward. Confirm reads the quest's full text in the band, page by page; Back returns. The page is the extra slot of the
+  disc's own page table (index 6 / 13 names builder 0x80086450, which is not translated), so it opens exactly as the other rows do.
+  Code: `engine/dw3/ui/native/pause-quests.ts` (the page), `game-text.ts` (strings in the game's character codes),
+  `pause-root-session.ts` and `pause-list.ts` (the row and the hooks), all behind optional `extraRow` / `quests` seeds the
+  disc-faithful default never sets (the original-code oracle tests for the list and the pause pages still pass).
+- Characters wear a mark: a red `?` over someone with a job for you, the game's own red `!` over someone who can take a
+  finished job (`web/questmarks.js`; FIELDCOM has no question mark, so that one is drawn in the same colours and cell).
 - Quests are **not all available**. They unlock as you play (below) and a toast says "New quest: ...".
 - Some are taken from a **notice board** (only while you stand in that place), some are **handed out by a real
   character** of the game, some are **generated** and scale with the party.

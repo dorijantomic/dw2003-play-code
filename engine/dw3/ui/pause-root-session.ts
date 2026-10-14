@@ -60,6 +60,8 @@ import {
 } from "./native/pause-card-folders.ts";
 import { pauseGridWord, pauseSeenScan, pauseStageByte } from "./native/pause-misc.ts";
 import { pauseListBuild, pauseListTick } from "./native/pause-list.ts";
+import { buildTextBankImage } from "./native/game-text.ts";
+import { QUESTS_HANDLER, questsFactory, questsRoot } from "./native/pause-quests.ts"; // EXTRA: the QUESTS page
 import { mapServerFromStage } from "./native/map-server.ts";
 import type { PauseServices } from "./native/pause-services.ts";
 
@@ -90,11 +92,12 @@ export const PAUSE_ITEM_MAX_ID = 402;
  */
 export const PAUSE_EQUIP_OFFSETS = ROSTER_EQUIP_ENTRIES;
 
-export type PausePage = "items" | "sort" | "map" | "techniques" | "status" | "cardfolders";
+export type PausePage = "items" | "sort" | "map" | "techniques" | "status" | "cardfolders" | "quests";
 export type PauseEntry = PausePage | "home";
 const PAGE_ROWS: Record<PausePage, { row: number; variant: number }> = {
   items: { row: 0, variant: 0 }, sort: { row: 1, variant: 0 }, map: { row: 2, variant: 0 },
   techniques: { row: 3, variant: 0 }, status: { row: 4, variant: 0 }, cardfolders: { row: 5, variant: 1 },
+  quests: { row: 6, variant: 1 }, // EXTRA: placeholder, seedState takes the real row and variant from the home list that opened it
 };
 
 export interface PauseResidentRange { role: string; base: number; offset: number; size: number }
@@ -158,9 +161,15 @@ export interface PauseSeed {
   mapSeen?: (flagId: number) => boolean;
   /**
    * EXTRA (not on the disc): one more row at the end of the pause home list, with this label (letters, digits and spaces).
-   * Choosing it ends the list with `{ kind: "extra" }` instead of opening a page.
+   * Choosing it opens the QUESTS page (`page: "quests"`), the builder the disc's own table names for that slot.
    */
   extraRow?: { label: string };
+  /** EXTRA (not on the disc): what the QUESTS page lists. Each entry's `lines` are the three description lines shown under the list. */
+  quests?: {
+    prompt: string; readPrompt: string;
+    /** `pages`: the quest's full text, three lines to a page. */
+    entries: ReadonlyArray<{ title: string; lines: readonly [string, string, string]; pages: ReadonlyArray<readonly [string, string, string]> }>;
+  };
 }
 
 export interface PauseQuad {
@@ -203,7 +212,7 @@ export class PauseRootSession {
   private frame = 0;
   private sawPage = false;
   private closed = false;
-  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "extra"; row: number } | { kind: "exit" } | null = null;
+  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "exit" } | null = null;
   private homeBackdrop = 0;
 
   constructor(language: number, seed: PauseSeed, resources: PauseResources, host: PauseSessionHost) {
@@ -285,6 +294,21 @@ export class PauseRootSession {
       changeScreen: (id: number, arg: number) => requestScreenTransition(mem, id, arg),
     };
     const barHost = { ...services, otBucket: this.otBucket, cursor: this.primCursor, setCursor: this.setPrimCursor };
+    // EXTRA: the QUESTS page's strings, one bank: titles, three description lines each, the prompt and the "none" strings.
+    const quests = seed.quests;
+    const questStrings = quests ? [
+      ...quests.entries.map((e) => e.title),
+      ...quests.entries.flatMap((e) => [...e.lines]),
+      quests.prompt, "None right now", "Talk to people and explore. New quests unlock as you play.", quests.readPrompt,
+      ...quests.entries.flatMap((e) => e.pages.flatMap((p) => [...p])),
+    ] : [];
+    const detailStart: number[] = [];                       // where each quest's full text starts in that bank
+    if (quests) { let at = quests.entries.length * 4 + 4; for (const e of quests.entries) { detailStart.push(at); at += e.pages.length * 3; } }
+    const questsBank = quests ? this.loadBank(questStrings, 0x7f01) : 0;
+    const questsHost = {
+      ...services, alloc: this.allocTask, bank: () => questsBank, count: () => quests?.entries.length ?? 0,
+      detail: (i: number) => ({ start: detailStart[i] ?? 0, pages: quests?.entries[i]?.pages.length ?? 0 }),
+    };
     const pauseHost = this.pauseHost(services, {
       itemsFactory: (obj) => pauseItemsRootFactory(mem, obj, itemsHost),
       sortFactory: (obj) => sortFactory(mem, obj, sortHost),
@@ -292,8 +316,9 @@ export class PauseRootSession {
       techniquesFactory: (obj) => techniquesFactory(mem, obj, techHost),
       statusFactory: (obj) => statusFactory(mem, obj, statusHost),
       cardFoldersFactory: (obj) => cardFoldersFactory(mem, obj, foldersHost),
+      questsFactory: (obj) => questsFactory(mem, obj, questsHost),
     });
-    const extraBank = seed.page === "home" && seed.extraRow ? this.buildTextBank(seed.extraRow.label) : 0;
+    const extraBank = seed.page === "home" && seed.extraRow ? this.loadBank([seed.extraRow.label], 0x7f00) : 0;
     const homeHost = {
       extraRow: () => (extraBank ? { bank: extraBank } : null),
       sfx: host.playSound,
@@ -343,6 +368,9 @@ export class PauseRootSession {
     classes.set(BAG_HANDLER, {
       name: "pause bag", childSlots: [],
       tick: (obj, ui) => pauseBagRoot(mem, obj, ui, bagHost),
+    });
+    classes.set(QUESTS_HANDLER, {
+      name: "pause quests", childSlots: [], tick: (obj, ui) => questsRoot(mem, obj, ui, questsHost),
     });
     classes.set(SORT_HANDLER, {
       name: "pause sort", childSlots: [], tick: (obj, ui) => sortRoot(mem, obj, ui, sortHost),
@@ -441,28 +469,19 @@ export class PauseRootSession {
 
   homeResult(): typeof this.homeResultValue { return this.homeResultValue; }
 
-  /** A one-string text bank (count, offset table, the string) in the game's own text codes, for the extra row's label. */
-  private buildTextBank(label: string): number {
-    const bytes: number[] = [];
-    for (const ch of label) {
-      if (ch >= "0" && ch <= "9") bytes.push(0x04 + (ch.charCodeAt(0) - 0x30));
-      else if (ch >= "A" && ch <= "Z") bytes.push(0x0e + (ch.charCodeAt(0) - 0x41));
-      else if (ch >= "a" && ch <= "z") bytes.push(0x28 + (ch.charCodeAt(0) - 0x61));
-      else if (ch === " ") bytes.push(0x01, 0x01);
-    }
-    bytes.push(0);
-    const at = this.widgets.arena.alloc(8 + bytes.length + 4, 4);
-    this.mem.write32(at, 1);
-    this.mem.write32(at + 4, 8);
-    bytes.forEach((b, i) => this.mem.write8(at + 8 + i, b));
-    this.banks.sources.set(0x7f00, at); // the text widgets only accept a registered source
+  /** Load a text bank of these strings into the session and register it as a text source (the widgets accept only registered sources). */
+  private loadBank(strings: readonly string[], sourceId: number): number {
+    const image = buildTextBankImage(strings);
+    const at = this.widgets.arena.alloc(image.length + 4, 4);
+    this.mem.load(image, at);
+    this.banks.sources.set(sourceId, at);
     return at;
   }
 
   private selectHomePage(): void {
     const row = this.mem.read32(PAUSE_ROW_CELL) | 0;
     if (this.seed.extraRow && row === (this.mem.read32(this.root + 0x5c) | 0) - 1) {
-      this.homeResultValue = { kind: "extra", row };
+      this.homeResultValue = { kind: "page", page: "quests", row }; // EXTRA: the row after the disc's own
       return;
     }
     const page = (["items", "sort", "map", "techniques", "status", "cardfolders"] as PausePage[])[row];
@@ -513,7 +532,9 @@ export class PauseRootSession {
 
   private seedState(seed: PauseSeed): void {
     const mem = this.mem;
-    const page = seed.page === "home" ? null : PAGE_ROWS[seed.page];
+    const page = seed.page === "home" ? null
+      : seed.page === "quests" ? { row: seed.homeRow ?? 6, variant: seed.cardFoldersUnlocked ? 1 : 0 } // EXTRA: the slot after the disc's rows, in the table's own variant
+      : PAGE_ROWS[seed.page];
     mem.write32(PAUSE_ROW_CELL, page?.row ?? seed.homeRow ?? 0);
     mem.write32(PAUSE_VARIANT_CELL, page?.variant ?? 0);
     mem.write32(0x80048d34 + 0x34, seed.stage ?? 0);
@@ -707,11 +728,14 @@ export class PauseRootSession {
   private pauseHost(services: PauseServices, factories: {
     itemsFactory(obj: number): number; sortFactory(obj: number): number; mapFactory(obj: number): number;
     techniquesFactory(obj: number): number; statusFactory(obj: number): number; cardFoldersFactory(obj: number): number;
+    questsFactory(obj: number): number;
   }): PauseHost {
     const table = new Map<number, (obj: number) => number>([
       [0x80091e4c, factories.itemsFactory], [0x8009824c, factories.sortFactory],
       [0x80099324, factories.mapFactory], [0x80096548, factories.techniquesFactory],
       [0x8008e8f8, factories.statusFactory], [0x80084c48, factories.cardFoldersFactory],
+      // EXTRA: the disc's table names a builder (0x80086450) for the slot after CARD FOLDERS; it is not translated, and the QUESTS page takes the slot
+      [0x80086450, factories.questsFactory],
     ]);
     return {
       resourceLoaded: () => 0, // Every text family and pack was loaded before the screen was made.

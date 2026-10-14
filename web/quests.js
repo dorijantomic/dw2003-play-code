@@ -18,6 +18,7 @@
 // the party's level.
 import { fx } from "./ambience.js";
 import { on } from "./gameEvents.js";
+import { wrap } from "./dialogue-pack.js";
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -357,13 +358,13 @@ export function generateBounty(visited, level, n, table) {
     const where = mapLabel(map);
     if (elite) {
         return {
-            id: "", title: `Elite hunt: ${e.name}`, giver: "Wanted board", generated: true, text: `A ${e.name} near ${where} has grown far stronger than the rest. Take it on.`,
+            id: "", title: `Elite hunt: ${e.name}`, short: `Elite ${e.name}`, giver: "Wanted board", generated: true, text: `A ${e.name} near ${where} has grown far stronger than the rest. Take it on.`,
             objectives: [{ type: "challenge", screen: e.screen, scale: 16 + clamp(Math.floor(L / 5), 1, 10), hpMult: Math.round((1 + clamp(L / 50, 0, 1)) * 100) / 100, startAt: [map], label: `Beat the stronger ${e.name}` }],
             reward: { bits: clamp(round10((90 + 16 * L) * 4), 300, 6000), items: [{ name: item, count: 1 }] },
         };
     }
     return {
-        id: "", title: `Wanted: ${e.name}`, giver: "Wanted board", generated: true, text: `${e.name} keep turning up around ${where}. Thin them out.`,
+        id: "", title: `Wanted: ${e.name}`, short: `Wanted ${e.name}`, giver: "Wanted board", generated: true, text: `${e.name} keep turning up around ${where}. Thin them out.`,
         objectives: [{ type: "defeat", species: [e.name], count, maps: [map] }],
         reward: { bits: clamp(round10((60 + 12 * L) * count), 120, 5000), items: L >= 6 ? [{ name: item, count: 1 }] : [] },
     };
@@ -458,6 +459,9 @@ export function questNpcMark(npcId, mapId) {
     return mark;
 }
 
+/** Text for the game's own character set (the pause page): its fonts have no slash, brackets or stars. */
+const forGameText = (s) => String(s).replace(/(\d+)\/(\d+)/g, "$1 of $2").replace(/\s+\/\s+/g, " or ").replace(/[^A-Za-z0-9 .,'\-:!?"]/g, " ").replace(/\s+/g, " ").trim();
+
 /**
  * The extra row on the pause home list (see PauseSeed.extraRow in engine/dw3/ui/pause-root-session.ts). The label carries the
  * number of quests that want attention (ready to claim, or new and not yet taken), e.g. "QUESTS 2". Null when quests are off.
@@ -467,6 +471,30 @@ export function questsPauseRow() {
     const all = logEntries();
     const n = all.filter(({ s }) => s === "ready" || s === "available").length;
     return { label: n ? `QUESTS ${n}` : "QUESTS" };
+}
+
+/** What the QUESTS page lists: ready, open and new quests, each with the three lines shown under the list. */
+export function questsPausePage() {
+    if (!enabled() || !defs.length) return null;
+    const MARK = { ready: "! ", active: "- ", available: "? " };
+    const cut = (t, n) => (t.length > n ? t.slice(0, n) : t);           // the page has no room for an ellipsis
+    const entries = logEntries().filter(({ s }) => s !== "done").map(({ d, s }) => {
+        const a = st.active[d.id];
+        const k = d.objectives.findIndex((_, j) => ((a?.p[j]) || 0) < targetOf(d, j));
+        const ref = turnInRef(d);
+        const goal = s === "ready" ? (ref ? `Report to ${ref.name} in ${placesOf(ref.maps.slice(0, 1))}` : "Done. Claim it with F3")
+            : s === "available" ? (d.offer ? `Talk to ${d.offer.name} in ${placesOf(d.offer.maps.slice(0, 1))}` : d.acceptAt ? `Accept it at ${placesOf(d.acceptAt.slice(0, 1))}` : "Open it with F3")
+            : (k >= 0 ? objectiveText(d, k) : "");
+        const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} ${it.name}`)].filter(Boolean).join(", ");
+        const line = (t) => cut(forGameText(t), 36);
+        // the full text, for reading: description, every objective with its progress, the reward and where to go
+        const full = [d.text ?? "", ...d.objectives.map((_, j) => "- " + objectiveText(d, j)), rw ? `Reward: ${rw}` : "", goal]
+            .filter(Boolean).flatMap((t) => wrap(forGameText(t), 36));
+        const pages = [];
+        for (let i = 0; i < full.length; i += 3) pages.push([full[i] ?? "", full[i + 1] ?? "", full[i + 2] ?? ""]);
+        return { title: cut(MARK[s] + forGameText(d.short ?? d.title), 16), lines: [line(d.title), line(goal), line(rw ? `Reward: ${rw}` : "")], pages: pages.length ? pages : [["", "", ""]] };
+    });
+    return { prompt: "QUESTS   Enter: Read", readPrompt: "QUESTS   Enter: Next", entries };
 }
 
 function installUi(stageEl) {

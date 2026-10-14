@@ -1,5 +1,6 @@
-// Browser test: the QUESTS row on the pause home list. It is the game's own list with one more row (the disc's seven-row panel,
-// the game's font and cursor), choosing it runs the quest log and the pause comes back on that row.
+// Browser test: the QUESTS row and page on the pause menu. The row is the game's own list with one more row (the disc's seven-row panel, the
+// game's font and cursor); choosing it opens a real pause page (top bar, list window with cursor, description band, backdrop, the folds)
+// built from the same pieces as the disc's pages; Back returns to the list on that row.
 // Needs: the game served on PORT (default 8770) from a checkout whose web/vendor/engine.js was built with tools/build_engine_local.sh,
 // and Chrome with --remote-debugging-port=9333 (a separate, clean profile).
 // Run:   PORT=8770 node tools/verify_quests_pause.mjs
@@ -28,6 +29,9 @@ const ok = (name, cond, extra = "") => console.log(cond ? "PASS" : "FAIL", name,
 const sess = `window.__status._session`;
 const rows = () => ev(`(()=>{const s=${sess}; return s ? s.mem.read32(s.root+0x5c) : null})()`);
 const cursor = () => ev(`(()=>{const s=${sess}; return s ? s.mem.read32(s.root+0x58) : null})()`);
+const entry = () => ev("window.__status.isOpen() ? window.__status.diagnostics().entry : null");
+const page = (off) => ev(`(()=>{const s=${sess}; const p=s && s.pageObject(); return p ? s.mem.read32(p+${off}) : null})()`);
+const painted = () => ev(`(()=>{const s=${sess}; return JSON.stringify(window.__status.diagnostics().painted ?? null)})()`);
 const label = () => ev(`(()=>{const s=${sess}; const at=s.banks.sources.get(0x7f00); if(!at) return null; let out=""; for(let i=0;;i++){const b=s.mem.read8(at+8+i); if(!b) break; if(b>=4&&b<=13) out+=String.fromCharCode(48+b-4); else if(b>=0x0e&&b<=0x27) out+=String.fromCharCode(65+b-0x0e); else if(b===1){i++; out+=" ";} } return out})()`);
 const waitFor = async (expr, tries = 40) => { for (let i = 0; i < tries; i++) { if (await ev(expr)) return true; await sleep(250); } return false; };
 
@@ -35,6 +39,8 @@ for (let attempt = 0; attempt < 4; attempt++) {
   await boot("s330"); await ev("localStorage.clear()"); await boot("s330");
   if ((await ev("Object.keys(window.__quests.state.done).length")) === 0) break;
 }
+await ev(`(()=>{const q=window.__quests; q.accept("park_pest_control", true); for(let i=0;i<3;i++) import("/gameEvents.js").then(m=>m.emit("battleWon",{enemies:["Kunemon"],mapId:"s330",screenId:1})); q.state.duelWins=1; q.announceUnlocks();})()`);
+await sleep(500);
 await key("i", 300);
 ok("the pause opens", await waitFor("window.__status.isOpen() && window.__status._session && window.__status._session.root"));
 await sleep(1500);
@@ -45,20 +51,36 @@ ok("the cursor walks down to the seventh row like on any other", (await cursor()
 await key("ArrowDown", 300);
 ok("and stops there", (await cursor()) === 6);
 await key("Enter", 100);
-ok("choosing it closes the pause and opens the quest log", await waitFor("window.__quests.isLogOpen() && window.__choice.isOpen() && !window.__status.isOpen()", 30));
-ok("the game is not left in menu mode while the log is up", (await ev("window.__state.menuOpen")) === false);
-await key("ArrowUp", 300); await key("Enter", 300);        // wraps to "Close"
-ok("closing the log brings the pause back", await waitFor("window.__status.isOpen() && window.__status._session && window.__state.menuOpen === true", 30));
-await sleep(2000);
-ok("...on the QUESTS row", (await cursor()) === 6 && (await rows()) === 7, `(cursor ${await cursor()}, rows ${await rows()})`);
-ok("...and the log is closed", (await ev("!window.__quests.isLogOpen() && !window.__choice.isOpen()")) === true);
-await key("x", 1500);
-ok("Back closes the pause as ever", (await ev("!window.__status.isOpen() && window.__state.menuOpen === false")) === true);
+ok("choosing it opens the QUESTS page inside the pause, as ITEMS or SORT do", await waitFor("window.__status.isOpen() && window.__status.diagnostics().entry === 'quests' && window.__status._session && window.__status._session.pageObject()", 40), await entry());
+await sleep(1500);
+ok("the pause stays open (menu mode) while the page is up", (await ev("window.__state.menuOpen")) === true);
+const count = await page(0x5c);
+ok("the page lists the open, ready and new quests", count >= 3, `(${count})`);
+ok("the first quest is selected", (await page(0x60)) === 0);
+await key("ArrowDown", 400);
+ok("Down selects the next quest", (await page(0x60)) === 1, `(${await page(0x60)})`);
+await key("ArrowUp", 400); await key("ArrowUp", 400);
+ok("Up wraps to the last", (await page(0x60)) === count - 1, `(${await page(0x60)})`);
+await key("ArrowDown", 400);
+ok("Down wraps to the first", (await page(0x60)) === 0);
+ok("no other layer is drawn over it: no log, no list, no dialogue", (await ev("!window.__quests.isLogOpen() && !window.__choice.isOpen() && !window.__dialogueBox.isOpen()")) === true);
+await key("Enter", 500);
+ok("Enter reads the selected quest's full text in the description band", (await page(0x10)) === 3 && (await page(0x68)) === 0, `(step ${await page(0x10)})`);
+let turned = 0; for (let i = 0; i < 10 && (await page(0x10)) === 3; i++) { await key("Enter", 400); turned++; }
+ok("Enter turns the pages and ends back at the list", (await page(0x10)) === 1 && turned >= 1, `(${turned} presses)`);
+await key("Enter", 500); await key("x", 500);
+ok("Back leaves reading without leaving the page", (await page(0x10)) === 1 && (await entry()) === "quests");
+await key("x", 100);
+ok("Back returns to the home list on the QUESTS row", await waitFor("window.__status.isOpen() && window.__status.diagnostics().entry === 'home' && window.__status._session && window.__status._session.mem.read32(window.__status._session.root+0x5c) === 7", 40));
+await sleep(1500);
+ok("...with the cursor still on QUESTS", (await cursor()) === 6, `(${await cursor()})`);
+await key("x", 300);
+ok("Back closes the pause as ever", await waitFor("!window.__status.isOpen() && window.__state.menuOpen === false", 40));
 
 // another row still opens its own page
-await key("i", 2500); await key("ArrowDown", 300); await key("Enter", 100);
-ok("a disc row (SORT) still opens its own page", await waitFor("window.__status.isOpen() && window.__status.diagnostics().entry === 'sort'", 30), await ev("window.__status.diagnostics().entry"));
-await ev("window.__status.close()"); await sleep(500);          // leave the page (its own Back handling is not under test)
+await sleep(1000); await key("i", 2500); await key("ArrowDown", 300); await key("Enter", 100);
+ok("a disc row (SORT) still opens its own page", await waitFor("window.__status.isOpen() && window.__status.diagnostics().entry === 'sort'", 30), await entry());
+await ev("window.__status.close()"); await sleep(500);
 
 // quests off: the list is the disc's
 await ev(`window.__setFx("quests", false)`);

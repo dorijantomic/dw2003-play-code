@@ -30,6 +30,7 @@ const goMap = async (mid) => {            // the game can ignore a map change ma
 };
 const st = (q) => ev(`window.__quests.status("${q}")`);
 const ok = (name, cond, extra = "") => console.log(cond ? "PASS" : "FAIL", name, extra);
+const untilBattle = async () => { for (let i = 0; i < 60; i++) { if (await ev(`!!(window.__battle && window.__battle.isActive())`)) break; await sleep(250); } await sleep(1500); };   // a real fight can take a while to start on a busy machine
 // play the open battle with real key presses, keeping the enemy one hit from losing (or, if lose=true, the player at 0)
 const playOut = async (lose = false, maxIter = 220) => {
   for (let i = 0; i < maxIter; i++) {
@@ -67,7 +68,7 @@ const flagsBefore = await ev(`JSON.stringify(window.__state.flags)`);
 // ---- double trouble: a real two-enemy fight launched from the quest log
 ok("accept the double ambush at Central Park", (await ev(`window.__quests.accept("double_trouble_park", true)`)) === true);
 ok("the open challenge can be begun here", (await ev(`window.__quests.entries().some(e=>e.id==="double_trouble_park" && e.status==="active")`)) === true);
-await ev(`window.__quests.beginChallenge("double_trouble_park"); 0`); await sleep(5000);
+await ev(`window.__quests.beginChallenge("double_trouble_park"); 0`); await untilBattle();
 const party = await ev(`(()=>{const b=window.__battleB&&window.__battleB();return b?JSON.stringify(b.party.map(e=>[e.enemyId,e.enemyLevel,e.enemyHp,e.enemyStatScale])):null})()`);
 ok("a REAL two-enemy fight started with the real party", party === '[["Kunemon",1,120,16],["Tapirmon",1,120,16]]', party);
 ok("no list is left open over the fight", (await ev(`!window.__quests.isLogOpen() && !window.__choice.isOpen()`)) === true);
@@ -84,7 +85,7 @@ await ev(`window.__storyFlags.set(16402, true)`);
 ok("rematch unlocks after the leader beat flag", (await st("seiryu_rematch")) === "available", await st("seiryu_rematch"));
 ok("accept the rematch in Seiryu City", (await ev(`window.__quests.accept("seiryu_rematch")`)) === true);
 ok("begin the rematch", (await ev(`window.__quests.beginChallenge("seiryu_rematch")`)) === true);
-await sleep(5000);
+await untilBattle();
 const party3 = await ev(`(()=>{const b=window.__battleB&&window.__battleB();return b?JSON.stringify(b.party.map(e=>[e.enemyId,e.enemyLevel,e.enemyHp,e.enemyStatScale])):null})()`);
 ok("the rematch is the leader's real three-fighter gauntlet, with the game's own stat scales", party3 === '[["Minotarumon",9,504,22],["Tyrannomon",11,576,23],["Apemon",14,684,20]]', party3);
 
@@ -101,7 +102,7 @@ ok("the challenge stays open after a loss", (await st("seiryu_rematch")) === "ac
 await ev(`window.__quests.state.active.seiryu_rematch.p=[1]; window.__quests.claim("seiryu_rematch")`); await sleep(300);
 ok("hard rematch unlocks once the first is done", (await st("seiryu_rematch_hard")) === "available", await st("seiryu_rematch_hard"));
 await ev(`window.__quests.accept("seiryu_rematch_hard")`);
-await ev(`window.__quests.beginChallenge("seiryu_rematch_hard")`); await sleep(5000);
+await ev(`window.__quests.beginChallenge("seiryu_rematch_hard")`); await untilBattle();
 const party4 = await ev(`(()=>{const b=window.__battleB&&window.__battleB();return b?JSON.stringify(b.party.map(e=>[e.enemyId,e.enemyHp,e.enemyStatScale])):null})()`);
 ok("hard version: the game's own stat scales x22/16 (22,23,20 -> 30,32,28) and HP x1.5 reach the battle", party4 === '[["Minotarumon",756,30],["Tyrannomon",864,32],["Apemon",1026,28]]', party4);
 

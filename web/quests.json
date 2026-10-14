@@ -51,7 +51,8 @@
           "Three less to worry about. Thank you.",
           "Take this, you earned it."
         ]
-      }
+      },
+      "short": "Park pests"
     },
     {
       "id": "forest_gate_survey",
@@ -90,7 +91,8 @@
           "So the road holds. That is a weight off my mind.",
           "Here, for your trouble."
         ]
-      }
+      },
+      "short": "Forest survey"
     },
     {
       "id": "east_station_greens",
@@ -131,7 +133,8 @@
           "s411",
           "s955"
         ]
-      }
+      },
+      "short": "East greens"
     },
     {
       "id": "south_station_swamp",
@@ -169,7 +172,8 @@
           "s440",
           "s441"
         ]
-      }
+      },
+      "short": "South swamp"
     },
     {
       "id": "quiet_route_wire_forest",
@@ -209,7 +213,8 @@
             "count": 1
           }
         ]
-      }
+      },
+      "short": "Quiet route"
     },
     {
       "id": "card_ladder_1",
@@ -233,7 +238,8 @@
       },
       "unlock": {
         "duelWins": 1
-      }
+      },
+      "short": "Card ladder 1"
     },
     {
       "id": "card_ladder_2",
@@ -257,7 +263,8 @@
             "count": 1
           }
         ]
-      }
+      },
+      "short": "Card ladder 2"
     },
     {
       "id": "double_trouble_park",
@@ -303,7 +310,8 @@
           "Both of them at once, and you are still standing. Impressive.",
           "Here you go."
         ]
-      }
+      },
+      "short": "Double trouble"
     },
     {
       "id": "seiryu_rematch",
@@ -342,7 +350,8 @@
           "s420",
           "s421"
         ]
-      }
+      },
+      "short": "Seiryu rematch"
     },
     {
       "id": "seiryu_rematch_hard",
@@ -377,7 +386,8 @@
             "count": 1
           }
         ]
-      }
+      },
+      "short": "Rematch, hard"
     },
     {
       "id": "leaders_gauntlet",
@@ -421,7 +431,8 @@
           "s421"
         ],
         "done": "seiryu_rematch"
-      }
+      },
+      "short": "Three leaders"
     },
     {
       "id": "circuit_board_cartographer",
@@ -477,7 +488,8 @@
           "s973",
           "s974"
         ]
-      }
+      },
+      "short": "Circuit maps"
     },
     {
       "id": "witness_the_change",
@@ -509,7 +521,8 @@
           "s210",
           "s211"
         ]
-      }
+      },
+      "short": "Before, after"
     },
     {
       "id": "arena_qualifiers",
@@ -549,7 +562,8 @@
           "s230",
           "s231"
         ]
-      }
+      },
+      "short": "Arena trials"
     },
     {
       "id": "guilmon_lost_tamer",
@@ -600,7 +614,8 @@
             "count": 1
           }
         ]
-      }
+      },
+      "short": "Lost tamer"
     }
   ]
 }

@@ -26,7 +26,7 @@ const PACKS = {
 };
 const packNameFor = (handle) => PACKS[handle] ?? PACKS[(handle >>> 16) & 0xffff] ?? null;
 const ITEM_MAX_ID = 402;
-const PAGES = new Set(["home", "items", "sort", "map", "techniques", "status", "cardfolders"]);
+const PAGES = new Set(["home", "items", "sort", "map", "techniques", "status", "cardfolders", "quests"]);
 
 const DATA_LABEL = "Pause data";
 
@@ -143,8 +143,9 @@ export function createStatusTranslated(sfx = null, opts = {}) {
             stage: context?.stage ?? 0, mapSeen: mapSeenReader(context),
             homeOverlay: st._homeOverlay, homeRow: st._homeRow,
             cardFoldersUnlocked: !!opts.cardFoldersUnlocked?.(),
-            // EXTRA (not on the disc): one more row on the pause home list, e.g. the extra quests
+            // EXTRA (not on the disc): one more row on the pause home list (the extra quests) and the page it opens
             ...(entry === "home" && opts.extraRow?.(state) ? { extraRow: opts.extraRow(state) } : {}),
+            ...(entry === "quests" && opts.questsPage?.(state) ? { quests: opts.questsPage(state) } : {}),
         };
     }
 
@@ -232,12 +233,6 @@ export function createStatusTranslated(sfx = null, opts = {}) {
                         st._homeOverlay = true;
                         st._homeRow = result.row;
                         st.open(st._state, result.page, st._onClose, true);
-                    } else if (result?.kind === "extra" && typeof opts.onExtraRow === "function") {
-                        // The extra row ends the list like Back does (the pause closes), then the host runs it and
-                        // reopens the list on that row when it is done.
-                        const row = result.row;
-                        st._finish(false);
-                        opts.onExtraRow(row);
                     } else st._finish(false);
                 } else if (st._homeFlow && !session.transition()) {
                     readBack(session);

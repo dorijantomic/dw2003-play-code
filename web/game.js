@@ -23,7 +23,7 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick, questTalk, questsPauseRow, questNpcMark, openLog as openQuestLog } from "./quests.js";
+import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark } from "./quests.js";
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
@@ -629,12 +629,9 @@ const statusOptions = {
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
     map: (state) => pauseMapContext(state, undefined, engineFlagSeen),
     cardFoldersUnlocked: () => (cards()?.folders?.length ?? 0) > 0,
-    // Extra quests: one more row on the pause list (after CARD FOLDERS). Choosing it closes the pause, runs the quest log,
-    // and reopens the pause on that row.
+    // Extra quests: one more row on the pause list (after CARD FOLDERS) and the page it opens.
     extraRow: () => questsPauseRow(),
-    onExtraRow: (row) => {
-        Promise.resolve(openQuestLog()).finally(() => openPauseHome({ state, status, menu, row }));
-    },
+    questsPage: () => questsPausePage(),
 };
 const status = !USE_NATIVE_STATUS ? null
     : USE_REFERENCE_STATUS ? createStatusNative(sfx, statusOptions)
