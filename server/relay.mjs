@@ -30,7 +30,7 @@ export function addresses() {
 
 const PER_IP = 12;                       // sockets one address may hold open at once
 
-export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub() } = {}) {
+export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub({ maxPeers: Number(process.env.MP_MAX) || undefined }) } = {}) {
     const byIp = new Map();
     const server = http.createServer((req, res) => {
         if (req.url === "/info") {

@@ -34,7 +34,7 @@ test("two clients over a real socket: create, join, move, leave", async () => {
         const b = open(base + `?room=${room}&name=Ana`);
         await b.ready;
         const w = await b.next((m) => m.t === "welcome");
-        assert.deepEqual(w.roster, [{ id: aid, name: "Ken" }]);
+        assert.deepEqual(w.roster, [{ id: aid, name: "Ken", map: null, card: null }]);
         await a.next((m) => m.t === "join" && m.name === "Ana");
 
         a.ws.send(JSON.stringify({ t: "pos", map: "s330", x: 100, y: 200, dir: "left", mv: 1 }));

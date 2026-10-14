@@ -23,8 +23,9 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark } from "./quests.js";
-import { installMultiplayer, multiplayerTick, multiplayerGhosts, drawGhostLabel } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
+import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
+import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
+import { installSocial, socialQuestDone } from "./mpsocial.js"; // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { installChat, buildChatPack } from "./chat.js";
@@ -77,6 +78,7 @@ import {
     storeAddItem,
     storeRemoveItem,
     heldCount,
+    listItemIds,
     ownsItem,
     wornCount,
     syncWornFromEquipment,
@@ -375,6 +377,62 @@ const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
 installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () => state.playerName || "Tamer" });
+// EXPERIMENT (multiplayer): the chat / feed / players / inspect / trade box. It reads the game's state and moves items only
+// through the game's own item store; it never writes a story flag.
+function mpCard() {
+    if (!state.started || !state.manifest) return null;
+    const roster = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
+    const party = roster.slice(0, 4).map((r) => {
+        const st = {};
+        for (const [k, v] of Object.entries(r.stats ?? {})) {
+            if (typeof v === "number" && k.length <= 6 && !/^(hp|mp|maxhp|maxmp)$/i.test(k) && Object.keys(st).length < 8) st[k] = v + (r.bonuses?.[k] ?? 0);
+        }
+        return {
+            n: String(r.name ?? "").slice(0, 14), f: String(r.formName ?? "").slice(0, 14), lv: r.level | 0, xp: r.xp | 0,
+            hp: r.hp | 0, mhp: r.maxHp | 0, mp: r.mp | 0, mmp: r.maxMp | 0, st,
+        };
+    });
+    return { v: 1, chapter: state.chapter ?? 1, bits: state.bits | 0, quests: questsDoneCount(), party };
+}
+const mpIdle = () => state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
+installSocial({
+    stageEl: document.getElementById("stage"),
+    api: {
+        card: mpCard,
+        currentMapId: () => state.manifest?.maps?.[state.mapIdx]?.id ?? null,
+        mapName: (id) => state.manifest?.maps?.find((m) => m.id === id)?.name ?? null,
+        busy: () => !!state.started && (battle.isActive() || cutscene.isActive() || fade.dir !== 0),
+        releaseKeys: () => state.keys.clear(),
+        warp: (id) => {
+            const idx = state.manifest?.maps?.findIndex((m) => m.id === id) ?? -1;
+            if (idx < 0 || !mpIdle()) return false;
+            loadAndSetMap(idx);
+            return true;
+        },
+        bits: () => state.bits | 0,
+        // what I can hand over: carried (not worn) items of the four ordinary bags, never the Important Items bag
+        tradable: () => [1, 2, 3, 4].flatMap((k) => listItemIds(state, k)).map((id) => ({ id, name: ITEM_BY_ID[id]?.name ?? `Item ${id}`, qty: heldCount(state, id) }))
+            .filter((b) => b.qty > 0),
+        // both players confirmed the same offers: take what I give, add what I get, through the game's own item store
+        exchange: (gives, gets) => {
+            const problems = [];
+            for (const it of gives?.items ?? []) {
+                const have = heldCount(state, it.id);
+                if (have < it.qty) problems.push(`(you no longer had ${it.qty} ${it.name})`);
+                if (have > 0) storeRemoveItem(state, it.id, Math.min(have, it.qty));
+            }
+            const giveBits = Math.min(gives?.bits | 0, state.bits | 0);
+            for (const it of gets?.items ?? []) {
+                if (ITEM_BY_ID[it.id] && it.qty >= 1 && it.qty <= 99) storeAddItem(state, it.id, it.qty);
+            }
+            state.bits = Math.min((state.bits | 0) - giveBits + Math.max(0, Math.min(gets?.bits | 0, 9999999)), 9999999);
+            localStorage.setItem("inventory", JSON.stringify(state.inventory));
+            localStorage.setItem("bits", String(state.bits));
+            return problems.join(" ");
+        },
+    },
+});
+
 installQuests({
     stageEl: document.getElementById("stage"),
     startBattle: (party, opts) => startQuestBattle(party, opts),
@@ -385,6 +443,7 @@ installQuests({
     // the yes/no questions are the game's choice widget. Both resolve when the player is done.
     speak: (npcId, name, text) => questSpeak(npcId, name, text),
     ask: (prompt, options) => new Promise((resolve) => choice.open(prompt, options, resolve)),
+    onDone: (title) => socialQuestDone(title),
     idle: () =>
         !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28,
     partnerIds: () => [state.charId, ...(Array.isArray(state.party) ? state.party : [])].filter(Boolean),
@@ -407,7 +466,7 @@ installChat({
     canOpen: () => state.started && !state.nameEntry && !textbox.isOpen() && !cutscene.isActive()
         && !battle.isActive() && fade.dir === 0,
     releaseKeys: () => state.keys.clear(),
-    onSend: (text) => chatSay(text),
+    onSend: (text) => (isOnline() ? sendChat(text) : chatSay(text)),   // in a room the line goes to everyone and shows over every head
 });
 // The bubble itself is a second instance of the game's own conversation box, so it has the real
 // balloon chrome, tail and font, but the game never sees it open: nothing is blocked while it shows.
@@ -421,7 +480,30 @@ function chatSay(text) {
     chatBox.open({ pack: buildChatPack(text, String(state.playerName || "")), index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
+// Multiplayer speech: every speaker gets their own instance of the same game balloon, over their own character.
+const mpBalloons = new Map();   // player id -> { box, actor, at }
+mpOn((type, d) => { if (type === "chat") mpBalloonSay(d.id, d.name, d.text); });
+function mpBalloonSay(id, name, text) {
+    let b = mpBalloons.get(id);
+    if (!b) { b = { box: createDialogueTranslated(sfx), actor: { x: 0, y: 0, actorId: 0 }, at: 0 }; mpBalloons.set(id, b); }
+    b.box.close();
+    b.at = performance.now() / 1000;
+    b.box.open({ pack: buildChatPack(text, String(name || "")), index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: b.actor }, null,
+        (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
+}
+function mpBalloonTick(dt) {
+    if (!mpBalloons.size) return;
+    const ghosts = new Map(multiplayerGhosts(currentMap().id).map((g) => [g.id, g]));
+    for (const [id, b] of mpBalloons) {
+        const at = id === myId() ? state : ghosts.get(id);
+        if (!at || !isOnline() || !b.box.isOpen()) { b.box.close(); mpBalloons.delete(id); continue; }   // left the stage, or finished
+        b.actor.x = Math.round(at.x); b.actor.y = Math.round(at.y);
+        b.box.update(dt, null);
+        if (performance.now() / 1000 - b.at > 4.5 && Math.floor(performance.now() / 300) % 2) b.box.pressConfirm();
+    }
+}
 function chatTick(dt) {
+    mpBalloonTick(dt);
     if (!chatBox.isOpen()) return;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
     chatBox.update(dt, null);
@@ -9088,6 +9170,7 @@ function render() {
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
     for (const g of multiplayerGhosts(m.id)) drawGhostLabel(ctx, g, Math.round(g.x - camX), Math.round(balloonAnchorY(g.y - camY)));
+    { const me = multiplayerSelf(); if (me) drawGhostLabel(ctx, me, Math.round(state.x - camX), Math.round(balloonAnchorY(state.y - camY))); }
     multiplayerTick(m.id, state);   // EXPERIMENT: sends where I am and glides the other players
     questsTick(m.id, state.x, state.y);   // EXPERIMENT: lets the optional quest layer notice a new stage and where you are
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
@@ -9352,6 +9435,7 @@ function render() {
     if (driMenu.isOpen()) driMenu.draw(ctx, VIEW_W, VIEW_H);
     if (dialogueBox.isOpen()) dialogueBox.draw(ctx, VIEW_W, VIEW_H);
     if (chatBox.isOpen()) chatBox.draw(ctx, VIEW_W, VIEW_H);
+    for (const b of mpBalloons.values()) if (b.box.isOpen()) b.box.draw(ctx, VIEW_W, VIEW_H);
     if (yesNoWindowUp()) yesNoBox.draw(ctx, VIEW_W, VIEW_H);
     if (helpMenuWindowUp()) helpMenuBox.draw(ctx, VIEW_W, VIEW_H);
     if (gym.isOpen()) gym.draw(ctx, VIEW_W, VIEW_H, state);

@@ -133,6 +133,7 @@ function claim(id, viaNpc = false) {
         else console.warn(`[quests] reward item "${it.name}" is not in the game's item table; skipped`);
     }
     toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`);
+    try { api.onDone?.(d.title); } catch { /* a listener must never break the reward */ }
     return true;
 }
 
@@ -473,6 +474,9 @@ export function questsPauseRow() {
     return { label: n ? `QUESTS ${n}` : "QUESTS" };
 }
 
+/** How many extra quests this player has finished (shared on the multiplayer player card). */
+export function questsDoneCount() { return Object.keys(st?.done ?? {}).length; }
+
 /** What the QUESTS page lists: ready, open and new quests, each with the three lines shown under the list. */
 export function questsPausePage() {
     if (!enabled() || !defs.length) return null;
@@ -514,9 +518,9 @@ function installUi(stageEl) {
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone }) {
     if (!stageEl || api) return;
-    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle };
+    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone };
     installUi(stageEl);
     try {
         const [q, v, m] = await Promise.all([
