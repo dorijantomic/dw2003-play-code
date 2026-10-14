@@ -158,6 +158,7 @@ async function beginChallenge(id) {
     challengeBusy = true;
     const started = api.startBattle(party, {
         screenId: (o.screens ?? [o.screen])[0],
+        challenge: o.screens ?? [o.screen],     // lets a co-op partner be credited for the same challenge
         onWin: (res) => { challengeBusy = false; if (res?.enemyFled) toast("They got away. Try again."); else { bump("challenge", (x) => x === o); } },
         onFlee: () => { challengeBusy = false; toast("You ran away. The challenge is still open."); },
         onLose: () => { challengeBusy = false; toast("You were beaten. The challenge is still open."); },
@@ -472,6 +473,12 @@ export function questsPauseRow() {
     const all = logEntries();
     const n = all.filter(({ s }) => s === "ready" || s === "available").length;
     return { label: n ? `QUESTS ${n}` : "QUESTS" };
+}
+
+/** A co-op partner won the challenge fight with these screens: credit any open challenge of mine that is the same fight. */
+export function questsCreditChallenge(screens) {
+    const key = JSON.stringify(screens);
+    bump("challenge", (o) => JSON.stringify(o.screens ?? [o.screen]) === key);
 }
 
 /** How many extra quests this player has finished (shared on the multiplayer player card). */

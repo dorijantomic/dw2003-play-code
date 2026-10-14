@@ -36,7 +36,7 @@ const CHAT_GAP = 600;                // ms between two chat lines from one playe
 const CHAT_MAX = 100, FEED_MAX = 90, CARD_MAX = 2000;
 const FEED_KINDS = new Set(["level", "quest", "evolve", "info"]);
 const DUEL_OPS = new Set(["ask", "yes", "no", "cancel", "result"]);
-const COOP_OPS = new Set(["pask", "pyes", "pno", "pleave", "ask", "yes", "no", "cancel", "hit"]);
+const COOP_OPS = new Set(["pask", "pyes", "pno", "pleave", "ask", "yes", "no", "cancel", "hit", "stat"]);
 
 export function makeCode(rand = Math.random) {
     let s = "";
@@ -234,6 +234,11 @@ export class Hub {
             }
             if (!foes.length) return;
             out.foes = foes; out.label = cleanText(m.label, 40);
+            const sc = (Array.isArray(m.screens) ? m.screens.slice(0, 8) : []).filter((v) => Number.isInteger(v) && v >= 0 && v <= 99999);
+            if (sc.length) out.screens = sc;
+        } else if (m.op === "stat") {                       // my Digimon, shown on my partner's battle screen
+            const int = (v) => (Number.isInteger(v) && v >= 0 && v <= 999999 ? v : 0);
+            out.name = cleanText(m.name, 24); out.hp = int(m.hp); out.maxHp = int(m.maxHp);
         } else if (m.op === "hit") {
             if (!Number.isInteger(m.i) || m.i < 0 || m.i > 20 || !Number.isInteger(m.hp) || m.hp < 0 || m.hp > 999999) return;
             out.i = m.i; out.hp = m.hp;

@@ -25,6 +25,7 @@ import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, 
 import { installPost2d } from "./post2d.js";
 import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
+import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js"; // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
@@ -414,7 +415,10 @@ installSocial({
         // co-op: the same enemy on two screens with one shared HP pool (see web/mpsocial.js)
         coopState: () => battle.coopState(),
         coopSetHp: (i, hp) => battle.coopSetEnemyHp(i, hp),
-        coopFight: (foes, done) => startQuestBattle(foes, { onWin: done, onFlee: done, onLose: done }),
+        coopFight: (foes, done, screens) => startQuestBattle(foes, {
+            onWin: (res) => { if (screens?.length && !res?.enemyFled) questsCreditChallenge(screens); done(); },   // the partner's quest challenge counts for me too
+            onFlee: done, onLose: done,
+        }),
         // A friendly duel: fight a copy of the other player's team (from their card), then put everything back as it was
         // (EXP, level ups, drops, BIT). cb({ won, hp }) where hp is the share of my team's HP left after a win.
         startDuel: (card, cb) => {
@@ -465,7 +469,7 @@ installSocial({
 installQuests({
     stageEl: document.getElementById("stage"),
     // with a team-up partner a quest fight is offered to them too (same enemies, shared HP); otherwise exactly as before
-    startBattle: (party, opts) => (coopTry(party, "Quest fight", (foes) => startQuestBattle(foes, opts) || (opts?.onFlee?.(), false)) ? true : startQuestBattle(party, opts)),
+    startBattle: (party, opts) => (coopTry(party, "Quest fight", (foes) => startQuestBattle(foes, opts) || (opts?.onFlee?.(), false), opts?.challenge) ? true : startQuestBattle(party, opts)),
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
     partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
     npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },

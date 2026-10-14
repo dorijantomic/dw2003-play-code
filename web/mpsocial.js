@@ -366,16 +366,16 @@ export const coopReady = () => !!(isOnline() && partner != null && peerOf(partne
 export function coopRolling(on) { rolling = !!on; }
 
 /** Offer a fight to my partner. `start(foes)` runs it here. Returns false when I have no partner (the caller just fights). */
-export function coopTry(foes, label, start) {
+export function coopTry(foes, label, start, screens) {
     if (!(isOnline() && partner != null && peerOf(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
     rolling = false;
     const m = strength(), scaled = scaleFoes(foes, m);
-    coop = { st: "out", id: partner, foes, scaled, label, start, timer: setTimeout(() => {
+    coop = { st: "out", id: partner, foes, scaled, label, start, screens, timer: setTimeout(() => {
         if (coop?.st !== "out") return;
         sendCoop({ op: "cancel", to: coop.id });
         note("No answer - you fight this one alone."); const c = coop; coop = null; drawCoop(); c.start(c.foes);
     }, 14000) };
-    sendCoop({ op: "ask", to: partner, foes: scaled, label });
+    sendCoop({ op: "ask", to: partner, foes: scaled, label, screens });
     drawCoop();
     return true;
 }
@@ -392,6 +392,17 @@ function leaveParty() {
     note(`You left ${peerOf(partner)?.name ?? "your partner"}'s party.`); partner = null; drawPlayers();
 }
 
+// A small panel on the battle screen: my partner's Digimon and HP, and what their hits did to the shared enemy.
+let hud = null, hudTimer = 0, lastStat = "";
+function hudEl() {
+    if (hud) return hud;
+    hud = h("div"); hud.style.cssText = "position:absolute;right:10px;top:10px;z-index:80;min-width:170px;padding:6px 10px;background:rgba(8,10,40,.78);color:#fff;border:1px solid #6a78ff;border-radius:6px;font:12px/1.4 system-ui,sans-serif;pointer-events:none;display:none";
+    hud.append(h("div"), h("div"), h("div")); document.getElementById("stage")?.append(hud); return hud;
+}
+function hudSet(name, m) { const e = hudEl(); e.style.display = ""; e.children[0].textContent = `★ ${name}`; e.children[1].textContent = `${m.name}  HP ${m.hp}/${m.maxHp}`; }
+function hudSay(text) { const e = hudEl(); e.style.display = ""; e.children[2].textContent = text; clearTimeout(hudTimer); hudTimer = setTimeout(() => { e.children[2].textContent = ""; }, 2200); }
+function hudHide() { if (hud) hud.style.display = "none"; lastStat = ""; }
+
 let sync = null;
 function beginSync(id) {
     for (const k of Object.keys(pool)) delete pool[k];
@@ -399,7 +410,8 @@ function beginSync(id) {
     clearInterval(sync);
     sync = setInterval(() => {
         const s = api.coopState();
-        if (!s) { if ((started && ++quiet > 2) || ++quiet > 25) { clearInterval(sync); sync = null; if (started) note("The co-op fight is over."); } return; }
+        if (!s) { if ((started && ++quiet > 2) || ++quiet > 25) { clearInterval(sync); sync = null; hudHide(); if (started) note("The co-op fight is over."); } return; }
+        if (s.me) { const j = JSON.stringify(s.me); if (j !== lastStat) { lastStat = j; sendCoop({ op: "stat", to: id, name: s.me.name, hp: s.me.hp, maxHp: s.me.maxHp }); } }
         started = true; quiet = 0;
         const k = pool[s.index];
         if (k === undefined) pool[s.index] = s.hp;
@@ -421,7 +433,7 @@ function drawCoop() {
             h("div", "acts", btn("Join", () => {
                 clearTimeout(coop.timer); sendCoop({ op: "yes", to: coop.id });
                 const c = coop; coop = null; drawCoop(); beginSync(c.id);
-                if (!api.coopFight(c.foes, () => {})) note("You could not join right now.");
+                if (!api.coopFight(c.foes, () => {}, c.screens)) note("You could not join right now.");
             }), btn("No", () => { clearTimeout(coop.timer); sendCoop({ op: "no", to: coop.id }); coop = null; drawCoop(); })));
         return;
     }
@@ -450,7 +462,7 @@ function onCoop(m) {
         partner = null; note(`${n} left the party.`); drawPlayers();
     } else if (m.op === "ask") {
         if (m.from !== partner || coop || duel || trade || !api.canFight()) { sendCoop({ op: "no", to: m.from }); return; }
-        coop = { st: "in", id: m.from, foes: m.foes, label: m.label, timer: setTimeout(() => { if (coop?.st === "in") { sendCoop({ op: "no", to: coop.id }); coop = null; drawCoop(); } }, 14000) };
+        coop = { st: "in", id: m.from, foes: m.foes, label: m.label, screens: m.screens, timer: setTimeout(() => { if (coop?.st === "in") { sendCoop({ op: "no", to: coop.id }); coop = null; drawCoop(); } }, 14000) };
         note(`${n} started a fight${m.label ? ": " + m.label : ""}. Join them!`); if (S.collapsed) toggleCollapse(); drawCoop();
     } else if (m.op === "cancel" && coop?.st === "in" && coop.id === m.from) {
         clearTimeout(coop.timer); coop = null; drawCoop();
@@ -462,7 +474,11 @@ function onCoop(m) {
     } else if (m.op === "no" && coop?.st === "out" && coop.id === m.from) {
         clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); note(`${n} could not join - you fight alone.`); c.start(c.foes);
     } else if (m.op === "hit") {
+        const dealt = Math.max(0, (pool[m.i] ?? m.hp) - m.hp);
         pool[m.i] = Math.min(pool[m.i] ?? Infinity, m.hp);
+        if (dealt > 0) hudSay(`${n} hit for ${dealt}!`);
+    } else if (m.op === "stat" && m.from === partner) {
+        hudSet(n, m);
     }
 }
 

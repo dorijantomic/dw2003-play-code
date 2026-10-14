@@ -8752,7 +8752,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const roll = pickEnemy(mapId, x, y);
     return roll ? { party: roll.party, screen: roll.screen } : null;
   }
-  const coopState = () => (battle?.enemy ? { index: battle.partyIndex | 0, hp: battle.enemy.hp, maxHp: battle.enemy.maxHp, count: battle.party?.length ?? 1 } : null);
+  const coopState = () => (battle?.enemy ? { index: battle.partyIndex | 0, hp: battle.enemy.hp, maxHp: battle.enemy.maxHp, count: battle.party?.length ?? 1,
+    me: battle.player ? { name: battle.player.profile?.name ?? "", hp: battle.player.hp | 0, maxHp: battle.player.maxHp | 0 } : null } : null);
   function coopSetEnemyHp(index, hp) {
     if (battle?.enemy && (battle.partyIndex | 0) === index && hp < battle.enemy.hp) battle.enemy.hp = Math.max(0, hp | 0);
   }
