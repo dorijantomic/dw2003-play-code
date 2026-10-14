@@ -36,10 +36,13 @@ for (let attempt = 0; attempt < 4; attempt++) {     // a previous run's tab can 
   await boot("s330");
   await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
   await boot("s330");
-  if ((await ev(`JSON.stringify(window.__quests.state)`)) === '{"v":1,"active":{},"done":{}}') break;
+  if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(window.__quests.state.done).length`)) === 0) break;
   await sleep(1500);
 }
-if ((await ev(`JSON.stringify(window.__quests.state)`)) !== '{"v":1,"active":{},"done":{}}') { console.log("ABORT: dirty start"); process.exit(2); }
+if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(window.__quests.state.done).length`)) !== 0) { console.log("ABORT: dirty start"); process.exit(2); }
+
+// the game's own progress unlocks quests; this test gives the save the progress it needs (visited places, a duel win)
+await ev(`(()=>{const q=window.__quests, s=q.state; for (const m of ${JSON.stringify(['s885', 's210', 's230', 's330'])}) if(!s.visited.includes(m)) s.visited.push(m); s.duelWins = Math.max(s.duelWins, 1); q.announceUnlocks(); q.save();})()`);
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
 
 // ---- cartographer: six DIFFERENT boards (s870 is a variant of s865, s890 of s885: each pair is one place)

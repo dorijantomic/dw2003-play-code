@@ -23,8 +23,7 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick } from "./quests.js"; // EXPERIMENT: optional extra quests
-import { installCoop } from "./coop.js"; // EXPERIMENT: optional co-op by remote play
+import { installQuests, questsTick, questTalk } from "./quests.js"; // extra quests
 import { drawSwayingForeground, drawTreePatch } from "./treesway.js"; // EXPERIMENT: rain/snow/leaves/fireflies + Effects panel
 import { seamPatchFor } from "./seamfix.js"; // EXPERIMENT: fills pin-hole seams in map pictures
 import { createSceneEditor } from "./sceneEditor.js";
@@ -370,11 +369,13 @@ const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
-installCoop({ stageEl: document.getElementById("stage"), canvas: document.getElementById("game") });
 installQuests({
     stageEl: document.getElementById("stage"),
     startBattle: (party, opts) => startQuestBattle(party, opts),
     readFlag: (id) => storyFlags.get(id),   // read-only: the quest layer never writes a story flag
+    partyLevel: () => Math.max(state.partnerStats?.level ?? 1, ...(Array.isArray(state.partyStats) ? state.partyStats.map((p) => p?.level ?? 1) : [1])),
+    npcsHere: () => { const sc = state.scenes[currentMap()?.id]; return sc ? sceneCast(sc).filter((n) => !n.cutsceneOnly).map((n) => n.npc_id) : []; },
+    partnerIds: () => [state.charId, ...(Array.isArray(state.party) ? state.party : [])].filter(Boolean),
     // rewards go through the game's own item store and money, exactly as a battle drop does
     giveItem: (name, count = 1) => {
         const item = ITEM_BY_NAME?.[name];
@@ -6653,6 +6654,7 @@ function dispatchInput(k, e, raw = "") {
                     // still apply) so we go on to show this NPC's spoken line.
                     const dlgState = pickDialogueFor(npc, state.flags);
                     if (engineBridge && engineBridge.onTalk(npc.npc_id)) return;
+                    if (questTalk(npc.npc_id, currentMap().id)) return;   // an extra quest takes this conversation (never a story one)
                     if (!dlgState) return; // no ptrB dialogue — non-speaking variant
                     openTalkLine(
                         dlgState.dialogue,

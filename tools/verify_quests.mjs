@@ -1,4 +1,4 @@
-// Browser test, phase 1: switch off by default, F3 log, accept, objective counting, claim pays once, survives a reload, story/progress keys untouched.
+// Browser test, phase 1: on by default (F2 switch can turn it off), F3 log, accept, objective counting, claim pays once, survives a reload, story/progress keys untouched.
 // Needs: the game served on PORT (default 8770) and Chrome with --remote-debugging-port=9333 (a separate profile).
 // Run:   PORT=8770 node tools/verify_quests.mjs
 
@@ -29,22 +29,26 @@ const ok = (name, cond, extra = "") => console.log(cond ? "PASS" : "FAIL", name,
 
 for (let attempt = 0; attempt < 4; attempt++) {     // a previous run's tab can still be rewriting its saved state as it closes: retry until genuinely clean
   await boot("s330");
+  await ev(`localStorage.clear()`);
+  await boot("s336"); await boot("s350"); await boot("s330");        // the game writes its own stage-entry flags: do those walks BEFORE the snapshot
   await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
   await boot("s330");
-  if ((await ev(`JSON.stringify(window.__quests.state)`)) === '{"v":1,"active":{},"done":{}}') break;
+  if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(window.__quests.state.done).length`)) === 0) break;
   await sleep(1500);
 }
 const before = await snap();
 const bits0 = await ev("window.__state.bits"), inv0 = await ev("JSON.stringify(window.__state.inventory)");
-ok("layer present, switch off by default", (await ev("window.__fx.quests")) === false);
+ok("layer present, on by default", (await ev("window.__fx.quests")) !== false);
+// the F2 panel can turn it off: then F3 only explains, and nothing counts
+await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=false;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
+ok("switched off via the F2 panel", (await ev("window.__fx.quests")) === false);
 await key("F3"); await sleep(300);
 ok("F3 does nothing while the switch is off", (await ev(`document.getElementById("quest-panel").hidden`)) === true);
+await ev(`window.__quests.togglePanel(true)`); ok("the log stays shut while off", (await ev(`document.getElementById("quest-panel").hidden`)) === true);
 await win(["Kunemon"], "s330");
 ok("battle wins ignored while off", (await ev(`JSON.stringify(window.__quests.state.active)`)) === "{}");
-
-// switch it on through the real F2 panel checkbox
 await ev(`(()=>{const c=document.querySelector('[data-fx="quests"]');c.checked=true;c.dispatchEvent(new Event("change",{bubbles:true}))})()`);
-ok("switch on via F2 panel", (await ev("window.__fx.quests")) === true);
+ok("switched back on", (await ev("window.__fx.quests")) === true);
 await key("F3"); await sleep(300);
 ok("F3 opens the log", (await ev(`document.getElementById("quest-panel").hidden`)) === false);
 const titles = await ev(`JSON.stringify([...document.querySelectorAll("#quest-panel .qc b")].map(b=>b.textContent))`);
@@ -77,13 +81,13 @@ ok("after reload: no extra BIT", (await ev("window.__state.bits")) === bits1);
 ok("second quest now unlocked", (await ev(`window.__quests.status("forest_gate_survey")`)) === "available");
 
 // the visit quest, including a night variant of the same map
-await ev(`window.__quests.accept("forest_gate_survey")`);
+await ev(`window.__quests.accept("forest_gate_survey", true)`);      // Leomon hands this one out (tested in verify_quests_unlock.mjs)
 await boot("s336");                           // s336 is the night variant of s335
 ok("variant of s335 counts as s335", (await ev(`JSON.stringify(window.__quests.state.active.forest_gate_survey.p)`)) === "[1,0]", await ev(`JSON.stringify(window.__quests.state.active.forest_gate_survey.p)`));
 await boot("s350");
 for (let i = 0; i < 24 && (await ev(`window.__quests.status("forest_gate_survey")`)) !== "ready"; i++) await sleep(500);   // a big map can take a few seconds to draw its first frame
 ok("second visit counts, quest ready", (await ev(`window.__quests.status("forest_gate_survey")`)) === "ready");
-await ev(`window.__quests.claim("forest_gate_survey")`); await sleep(200);
+await ev(`window.__quests.claim("forest_gate_survey", true)`); await sleep(200);
 
 const after = await snap();
 {
@@ -98,7 +102,7 @@ const after = await snap();
 const shot = await send("Page.captureScreenshot", { format: "png" });
 await ev(`window.__quests.togglePanel(true)`); await sleep(300);
 const shot2 = await send("Page.captureScreenshot", { format: "png" });
-fs.writeFileSync("quests_log.png", Buffer.from(shot2.result.data, "base64"));
+fs.writeFileSync((process.env.TEMP || ".") + "/quests_log.png", Buffer.from(shot2.result.data, "base64"));
 console.log("errors/warnings:", errs.join(" | ") || "none");
 await ev(`localStorage.removeItem("dw.quests.v1")`);
 await fetch("http://127.0.0.1:9333/json/close/" + tab.id); process.exit(0);

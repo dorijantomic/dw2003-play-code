@@ -1,5 +1,5 @@
 {
-  "_comment": "EXPERIMENT: optional extra quests. Not original game content. Stage lists name BOTH worlds where a place exists twice (Asuka and Amaterasu), and night/story variants count as the same place, so a quest works whichever world the story is in. Species, stage ids, coordinates and item names are checked against the game's own data by tools/check_quests.py. 'acceptAt' makes a quest acceptable only while standing in that place (a notice board, in effect).",
+  "_comment": "Extra quests (new content, not part of the shipped game). Stage lists name BOTH worlds where a place exists twice (Asuka and Amaterasu), and night/story variants count as the same place. 'unlock' keeps a quest out of the log until you have played far enough; 'acceptAt' makes a quest acceptable only while standing in that place (a notice board); 'offer' / 'turnIn' hand a quest out and take it back through one of the game's own NPCs (npc ids come from the scene files); 'talk' objectives are conversations with real NPCs. Species, stage ids, coordinates, npc ids and item names are checked against the game's own data by tools/check_quests.py. Wanted-board jobs are generated at run time (generateBounty in quests.js) and are not listed here.",
   "quests": [
     {
       "id": "park_pest_control",
@@ -7,61 +7,192 @@
       "giver": "Notice board",
       "text": "Kunemon keep wandering into Central Park. Thin them out.",
       "objectives": [
-        { "type": "defeat", "species": ["Kunemon"], "count": 3, "maps": ["s330", "s940"] }
+        {
+          "type": "defeat",
+          "species": [
+            "Kunemon"
+          ],
+          "count": 3,
+          "maps": [
+            "s330",
+            "s940"
+          ]
+        }
       ],
-      "reward": { "bits": 300, "items": [{ "name": "Antidote Disk", "count": 1 }] }
+      "reward": {
+        "bits": 300,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s330",
+          "s940",
+          "s331"
+        ]
+      }
     },
     {
       "id": "forest_gate_survey",
       "title": "Wire Forest survey",
-      "giver": "Notice board",
-      "text": "Walk the Wire Forest entrance and the forest beyond it, and report back.",
+      "giver": "Leomon",
+      "text": "Leomon wants to know whether the road into the Wire Forest is safe. Walk the entrance and the forest beyond it, then report back.",
       "objectives": [
-        { "type": "visit", "map": "s335" },
-        { "type": "visit", "map": "s350" }
+        {
+          "type": "visit",
+          "map": "s335"
+        },
+        {
+          "type": "visit",
+          "map": "s350"
+        }
       ],
-      "reward": { "bits": 200 },
-      "requires": { "done": "park_pest_control" }
+      "reward": {
+        "bits": 200
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "You have been keeping the park clear. That is good work.",
+          "Now I need eyes further out. Walk the Wire Forest entrance and the forest beyond it, and tell me whether the road is safe.",
+          "Will you do that?"
+        ],
+        "doneLines": [
+          "So the road holds. That is a weight off my mind.",
+          "Here, for your trouble."
+        ]
+      }
     },
     {
       "id": "east_station_greens",
       "title": "East Station bounty: forest greens",
       "giver": "Station bounty board",
       "text": "Plants are overrunning the Kicking Forest path. Cut four of them back.",
-      "acceptAt": ["s410", "s411", "s955"],
-      "objectives": [
-        { "type": "defeat", "species": ["Vegiemon", "RedVegiemon", "Woodmon"], "count": 4, "maps": ["s400"] }
+      "acceptAt": [
+        "s410",
+        "s411",
+        "s955"
       ],
-      "reward": { "bits": 450, "items": [{ "name": "Energy Disk", "count": 1 }] }
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Vegiemon",
+            "RedVegiemon",
+            "Woodmon"
+          ],
+          "count": 4,
+          "maps": [
+            "s400"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 450,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s410",
+          "s411",
+          "s955"
+        ]
+      }
     },
     {
       "id": "south_station_swamp",
       "title": "South Station bounty: swamp pests",
       "giver": "Station bounty board",
       "text": "The Bulk Swamp crossing is infested. Clear four of the worst offenders.",
-      "acceptAt": ["s440", "s441"],
-      "objectives": [
-        { "type": "defeat", "species": ["Gekomon", "Tortomon"], "count": 4, "maps": ["s445"] }
+      "acceptAt": [
+        "s440",
+        "s441"
       ],
-      "reward": { "bits": 550, "items": [{ "name": "Revive Disk", "count": 1 }] }
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Gekomon",
+            "Tortomon"
+          ],
+          "count": 4,
+          "maps": [
+            "s445"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 550,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s440",
+          "s441"
+        ]
+      }
     },
     {
       "id": "quiet_route_wire_forest",
       "title": "The quiet route",
       "giver": "Park ranger board",
       "text": "Couriers lose time to fights in the Wire Forest. Show a fight-free way through.",
-      "acceptAt": ["s330", "s940"],
-      "requires": { "done": "forest_gate_survey" },
+      "acceptAt": [
+        "s330",
+        "s940"
+      ],
+      "requires": {
+        "done": "forest_gate_survey"
+      },
       "objectives": [
         {
-          "type": "reach", "map": "s335",
+          "type": "reach",
+          "map": "s335",
           "label": "Cross the Wire Forest entrance from the north-west gate to the south gate without a fight",
           "startLabel": "now reach the south gate",
-          "from": { "x": 64, "y": 96, "r": 120 },
-          "to": { "x": 688, "y": 832, "r": 90 }
+          "from": {
+            "x": 64,
+            "y": 96,
+            "r": 120
+          },
+          "to": {
+            "x": 688,
+            "y": 832,
+            "r": 90
+          }
         }
       ],
-      "reward": { "bits": 400, "items": [{ "name": "Sober Disk", "count": 1 }] }
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Sober Disk",
+            "count": 1
+          }
+        ]
+      }
     },
     {
       "id": "card_ladder_1",
@@ -69,70 +200,198 @@
       "giver": "Card players' board",
       "text": "Prove yourself at the card table. Beat any three tamers.",
       "objectives": [
-        { "type": "duelWin", "count": 3 }
+        {
+          "type": "duelWin",
+          "count": 3
+        }
       ],
-      "reward": { "bits": 500, "items": [{ "name": "Energy Disk", "count": 1 }] }
+      "reward": {
+        "bits": 500,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "duelWins": 1
+      }
     },
     {
       "id": "card_ladder_2",
       "title": "Card ladder: rising duelist",
       "giver": "Card players' board",
       "text": "Word is spreading. Beat six tamers in all.",
-      "requires": { "done": "card_ladder_1" },
+      "requires": {
+        "done": "card_ladder_1"
+      },
       "objectives": [
-        { "type": "duelWin", "count": 6 }
+        {
+          "type": "duelWin",
+          "count": 6
+        }
       ],
-      "reward": { "bits": 900, "items": [{ "name": "Life Disk", "count": 1 }] }
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      }
     },
     {
       "id": "double_trouble_park",
       "title": "Double trouble in Central Park",
       "giver": "Park ranger board",
       "text": "Two pests came out of the long grass at once. Face a Kunemon and a Tapirmon back to back, with no time to heal in between.",
-      "acceptAt": ["s330", "s940"],
+      "acceptAt": [
+        "s330",
+        "s940"
+      ],
       "objectives": [
         {
-          "type": "challenge", "screens": [34, 35], "startAt": ["s330", "s940"],
+          "type": "challenge",
+          "screens": [
+            34,
+            35
+          ],
+          "startAt": [
+            "s330",
+            "s940"
+          ],
           "label": "Beat a Kunemon and then a Tapirmon, back to back"
         }
       ],
-      "reward": { "bits": 350, "items": [{ "name": "Antidote Disk", "count": 1 }] }
+      "reward": {
+        "bits": 350,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      }
     },
     {
       "id": "seiryu_rematch",
       "title": "Seiryu's rematch",
       "giver": "Seiryu City notice board",
       "text": "Word is the Seiryu leader's team will take on all comers again. The same three fighters, in the same order.",
-      "acceptAt": ["s420", "s421"],
-      "requires": { "flag": 16402 },
-      "objectives": [
-        { "type": "challenge", "screen": 3, "startAt": ["s420", "s421"], "label": "Beat the three fighters in a row" }
+      "acceptAt": [
+        "s420",
+        "s421"
       ],
-      "reward": { "bits": 800, "items": [{ "name": "Revive Disk", "count": 1 }] }
+      "requires": {
+        "flag": 16402
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screen": 3,
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat the three fighters in a row"
+        }
+      ],
+      "reward": {
+        "bits": 800,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s420",
+          "s421"
+        ]
+      }
     },
     {
       "id": "seiryu_rematch_hard",
       "title": "Seiryu's rematch: the hard way",
       "giver": "Seiryu City notice board",
       "text": "The same three fighters, but they have been training. Stronger and tougher.",
-      "acceptAt": ["s420", "s421"],
-      "requires": { "done": "seiryu_rematch" },
-      "objectives": [
-        { "type": "challenge", "screen": 3, "scale": 22, "hpMult": 1.5, "startAt": ["s420", "s421"], "label": "Beat the three trained fighters in a row" }
+      "acceptAt": [
+        "s420",
+        "s421"
       ],
-      "reward": { "bits": 1500, "items": [{ "name": "Power Charge", "count": 1 }] }
+      "requires": {
+        "done": "seiryu_rematch"
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screen": 3,
+          "scale": 22,
+          "hpMult": 1.5,
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat the three trained fighters in a row"
+        }
+      ],
+      "reward": {
+        "bits": 1500,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 1
+          }
+        ]
+      }
     },
     {
       "id": "leaders_gauntlet",
       "title": "Three leaders, one afternoon",
       "giver": "Seiryu City notice board",
       "text": "Take on the Seiryu, Suzaku and Byakko teams one after another. No healing between rounds.",
-      "acceptAt": ["s420", "s421"],
-      "requires": { "flag": 16414 },
-      "objectives": [
-        { "type": "challenge", "screens": [3, 4, 5], "startAt": ["s420", "s421"], "label": "Beat all three leaders' teams in a row (eight fights)" }
+      "acceptAt": [
+        "s420",
+        "s421"
       ],
-      "reward": { "bits": 2500, "items": [{ "name": "Super Charge", "count": 1 }] }
+      "requires": {
+        "flag": 16414
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            3,
+            4,
+            5
+          ],
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat all three leaders' teams in a row (eight fights)"
+        }
+      ],
+      "reward": {
+        "bits": 2500,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s420",
+          "s421"
+        ],
+        "done": "seiryu_rematch"
+      }
     },
     {
       "id": "circuit_board_cartographer",
@@ -141,12 +400,54 @@
       "text": "The underground Circuit Board boards are not on any map. Chart six different ones.",
       "objectives": [
         {
-          "type": "visitSet", "count": 6,
-          "maps": ["s865", "s870", "s875", "s880", "s885", "s890", "s895", "s968", "s969", "s970", "s971", "s972", "s973", "s974"],
+          "type": "visitSet",
+          "count": 6,
+          "maps": [
+            "s865",
+            "s870",
+            "s875",
+            "s880",
+            "s885",
+            "s890",
+            "s895",
+            "s968",
+            "s969",
+            "s970",
+            "s971",
+            "s972",
+            "s973",
+            "s974"
+          ],
           "label": "Chart different Circuit Board boards"
         }
       ],
-      "reward": { "bits": 700, "items": [{ "name": "Energy Disk", "count": 2 }] }
+      "reward": {
+        "bits": 700,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s865",
+          "s870",
+          "s875",
+          "s880",
+          "s885",
+          "s890",
+          "s895",
+          "s968",
+          "s969",
+          "s970",
+          "s971",
+          "s972",
+          "s973",
+          "s974"
+        ]
+      }
     },
     {
       "id": "witness_the_change",
@@ -155,22 +456,121 @@
       "text": "The Main Lobby is not always the same place. See it as it is now, and again once the city has changed.",
       "objectives": [
         {
-          "type": "visitSet", "count": 2, "maps": ["s210", "s211"],
+          "type": "visitSet",
+          "count": 2,
+          "maps": [
+            "s210",
+            "s211"
+          ],
           "label": "Visit the Main Lobby once as Asuka City and once as Amaterasu City"
         }
       ],
-      "reward": { "bits": 600, "items": [{ "name": "Life Disk", "count": 1 }] }
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s210",
+          "s211"
+        ]
+      }
     },
     {
       "id": "arena_qualifiers",
       "title": "Arena qualifiers",
       "giver": "Arena front desk board",
       "text": "Three qualifier matches, back to back, on the arena floor. The game's own tournament rounds were never filled in; these are new.",
-      "acceptAt": ["s230", "s231"],
-      "objectives": [
-        { "type": "challenge", "screens": [49, 53, 48], "startAt": ["s232", "s233"], "label": "Win three qualifier matches in a row on the arena floor" }
+      "acceptAt": [
+        "s230",
+        "s231"
       ],
-      "reward": { "bits": 900, "items": [{ "name": "Energy Disk", "count": 1 }] }
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            49,
+            53,
+            48
+          ],
+          "startAt": [
+            "s232",
+            "s233"
+          ],
+          "label": "Win three qualifier matches in a row on the arena floor"
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s230",
+          "s231"
+        ]
+      }
+    },
+    {
+      "id": "guilmon_lost_tamer",
+      "title": "Guilmon cannot find his tamer",
+      "giver": "Your Guilmon",
+      "text": "Your Guilmon keeps looking past you for a tamer who is not there. Follow the trail and bring them together.",
+      "unlock": {
+        "partner": "p008giru",
+        "met": [
+          {
+            "npc": 179,
+            "map": "s956"
+          }
+        ]
+      },
+      "ordered": true,
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 365,
+          "name": "Agumon",
+          "maps": [
+            "s955"
+          ],
+          "lines": [
+            "Guilmon is looking for his tamer? He is not in the station.",
+            "I saw a tamer with a very familiar hat heading for Qing Long City. Try there."
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 179,
+          "name": "Takato",
+          "maps": [
+            "s956"
+          ],
+          "lines": [
+            "Guilmon? Is that you? I looked everywhere!",
+            "I am sorry I kept you waiting. Thank you for bringing him to me."
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 800,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      }
     }
   ]
 }

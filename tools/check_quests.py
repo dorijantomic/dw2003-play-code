@@ -102,6 +102,47 @@ for q in quests:
     for it in q.get("reward", {}).get("items", []):
         if it["name"] not in item_names:
             errors.append(f"{qid}: reward item '{it['name']}' is not in the in-game item table")
+# ---- characters (NPCs) and unlock rules
+import glob
+scene_npcs = {}                      # (stage id, npc_id) -> set of (x, y) with a real position (0,0 = scripted/cutscene only)
+for f in glob.glob(os.path.join(A, "scenes", "*.json")):
+    sid = os.path.basename(f)[:-5]
+    for n in load(f).get("npcs", []):
+        if n.get("x") or n.get("y"):
+            scene_npcs.setdefault((sid, n.get("npc_id")), set()).add((n["x"], n["y"]))
+char_ids = {c["id"] for c in load(os.path.join(A, "manifest.json")).get("characters", [])}
+
+def check_npc(qid, what, ref):
+    for m in ref["maps"]:
+        if m not in maps:
+            errors.append(f"{qid}: {what} names unknown map '{m}'")
+    if not any((m, ref["npc"]) in scene_npcs for m in ref["maps"]):
+        errors.append(f"{qid}: {what}: npc {ref['npc']} has no field position on any of {ref['maps']}")
+
+for q in quests:
+    qid = q["id"]
+    for o in q["objectives"]:
+        if o["type"] == "talk":
+            check_npc(qid, "talk objective", o)
+    for key in ("offer", "turnIn"):
+        if key in q:
+            check_npc(qid, key, q[key])
+            if not q[key].get("name"):
+                errors.append(f"{qid}: {key} needs a name")
+    if "offer" in q and not q["offer"].get("lines"):
+        errors.append(f"{qid}: offer needs lines")
+    u = q.get("unlock", {})
+    for m in u.get("visited", []):
+        if m not in maps:
+            errors.append(f"{qid}: unlock.visited names unknown map '{m}'")
+    if u.get("done") and u["done"] not in ids:
+        errors.append(f"{qid}: unlock.done names unknown quest '{u['done']}'")
+    for r in u.get("met", []):
+        if r["map"] not in maps or (r["map"], r["npc"]) not in scene_npcs:
+            errors.append(f"{qid}: unlock.met: npc {r['npc']} has no field position on '{r['map']}'")
+    if u.get("partner") and u["partner"] not in char_ids:
+        errors.append(f"{qid}: unlock.partner '{u['partner']}' is not a character in the manifest")
+
 known_flags = {r["flag"] for r in load(os.path.join(A, "data/chapter_progression.json"))["ladder"]}
 for q in quests:
     r = q.get("requires", {}).get("done")

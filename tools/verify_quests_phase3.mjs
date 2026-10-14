@@ -46,10 +46,10 @@ for (let attempt = 0; attempt < 4; attempt++) {     // a previous run's tab can 
   await boot("s330");
   await ev(`localStorage.removeItem("dw.quests.v1"); localStorage.removeItem("dw.fx.v1")`);
   await boot("s330");
-  if ((await ev(`JSON.stringify(window.__quests.state)`)) === '{"v":1,"active":{},"done":{}}') break;
+  if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(window.__quests.state.done).length`)) === 0) break;
   await sleep(1500);
 }
-if ((await ev(`JSON.stringify(window.__quests.state)`)) !== '{"v":1,"active":{},"done":{}}') { console.log("ABORT: dirty start"); process.exit(2); }
+if ((await ev(`Object.keys(window.__quests.state.active).length + Object.keys(window.__quests.state.done).length`)) !== 0) { console.log("ABORT: dirty start"); process.exit(2); }
 // a real partner, so a fight can start
 await ev(`(()=>{const s=document.querySelector("#charSelect");const o=[...s.options].find(o=>/^p00[2-9]/.test(o.value));s.value=o.value;s.dispatchEvent(new Event("change",{bubbles:true}));})()`); await sleep(2500);
 await ev(`window.__state.party=[window.__state.manifest.characters[window.__state.charIdx].id]`);   // the story normally gives you a field party

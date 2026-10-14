@@ -3828,7 +3828,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     await loadData();
     const roll = pickEnemy(mapId, x, y);
     if (!roll) return false;
-    return startParty([roll.party[0]], onWin, onFlee, onLose, { screenId: roll.screen, mapId, kind: "random" });
+    return startParty([roll.party[0]], onWin, onFlee, onLose, { screenId: roll.screen, mapId });
   }
 
   // The authentic party for a global screen_id (field_encounters.json), e.g. screen
@@ -3863,11 +3863,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       console.warn("[battle] no party for screen", screenId, "on", mapId);
       return false;
     }
-    return startParty(lead ? [party[0]] : party, onWin, onFlee, onLose, { screenId, mapId, kind: "scripted" });
+    return startParty(lead ? [party[0]] : party, onWin, onFlee, onLose, { screenId, mapId });
   }
 
   // Start a battle from a resolved party array (1v1: take the lead, as startRandom).
-  async function startParty(party, onWin, onFlee, onLose, { screenId, mapId, kind } = {}) {
+  async function startParty(party, onWin, onFlee, onLose, { screenId, mapId } = {}) {
     await loadData();
     if (!party || !party.length) return false;
     // F0x8008B798: the field's handoff runs its pre-battle presentation first —
@@ -3879,8 +3879,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       enemyId: e.name, enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp,
       enemyStatScale: e.stat_scale ?? 16,
     }));
-    // optional layers (extra quests, co-op) may adjust the enemy party in place before the fight starts
-    emitGameEvent("partyBuilt", { entries, screenId, mapId, kind });
     await start({ party: entries, screenId, mapId, onWin, onFlee, onLose });
     return true;
   }
