@@ -509,22 +509,52 @@ async function showQuest(d) {
     return pick < acts.length ? acts[pick][1]() : null;
 }
 /** The quest log: a choice list of quests (4 to a page), each opening its details in the conversation box. */
+// a quest whose giver (or notice board) is in the place the player is standing in
+const isHere = (d) => !!lastMap && (d.offer ? d.offer.maps : d.acceptAt ?? []).some((m) => sameMapId(m, lastMap));
+const placeOf = (d) => (d.offer ? mapLabel(d.offer.maps[0]) : d.acceptAt ? mapLabel(d.acceptAt[0]) : "Wanted board");
+
+/** The game's choice list over any number of labels, four at a time. Returns the index picked, or -1 for Back. */
+async function pagedPick(prompt, labels) {
+    const PER = 4, pages = Math.max(1, Math.ceil(labels.length / PER));
+    let page = 0;
+    for (;;) {
+        const slice = labels.slice(page * PER, page * PER + PER);
+        const pick = await ask(prompt, [...slice, ...(pages > 1 ? [`More (${page + 1}/${pages})`] : []), "Back"]);
+        if (pick < slice.length) return page * PER + pick;
+        if (pages > 1 && pick === slice.length) { page = (page + 1) % pages; continue; }
+        return -1;
+    }
+}
+/** A list of quests; "leave" when one of them starts a fight (the log closes). */
+async function listQuests(prompt, ds) {
+    const i = await pagedPick(prompt, ds.map((d) => `${MARK[statusOf(d)]} ${clip(d.title, 34)}`));
+    if (i < 0) return null;
+    return (await showQuest(ds[i])) === "leave" ? "leave" : null;     // afterwards the menu is rebuilt: the quest may have changed bucket
+}
+
 export async function openLog() {
     if (!enabled() || logOpen || dialogBusy || (api?.idle && !api.idle())) return false;
     logOpen = true;
     try {
-        let page = 0;
         for (;;) {
-            const list = logEntries();
-            if (!list.length) { await say("Quests", "No quests yet.\n\nExplore, fight and talk to people: quests unlock as you play."); return true; }
-            const PER = 4, pages = Math.ceil(list.length / PER);
-            page = Math.min(page, pages - 1);
-            const slice = list.slice(page * PER, page * PER + PER);
-            const options = [...slice.map(({ d, s }) => `${MARK[s]} ${clip(d.title, 34)}`), ...(pages > 1 ? [`More (${page + 1}/${pages})`] : []), "Reset quests", "Close"];
-            const pick = await ask("Quests: ! ready > open * new", options);
-            if (pick < slice.length) { if ((await showQuest(slice[pick].d)) === "leave") return true; }
-            else if (pages > 1 && pick === slice.length) page = (page + 1) % pages;
-            else if (options[pick] === "Reset quests") {
+            const all = logEntries();
+            if (!all.length) { await say("Quests", "No quests yet.\n\nExplore, fight and talk to people: quests unlock as you play."); return true; }
+            const by = (k) => all.filter((e) => e.s === k).map((e) => e.d);
+            const avail = by("available");
+            const buckets = [["Ready to claim", by("ready")], ["Open quests", by("active")], ["New here", avail.filter(isHere)], ["Elsewhere", avail.filter((d) => !isHere(d))], ["Finished", by("done")]].filter(([, l]) => l.length);
+            const options = [...buckets.map(([n, l]) => `${n} (${l.length})`), "Reset quests", "Close"];
+            const pick = await ask("Quests", options);
+            if (pick < buckets.length) {
+                const [name, list] = buckets[pick];
+                if (name === "Elsewhere") {                                  // by place, so the player can see where jobs are waiting
+                    const places = [...new Set(list.map(placeOf))].sort();
+                    for (;;) {
+                        const i = await pagedPick("Where?", places.map((p) => `${p} (${list.filter((d) => placeOf(d) === p).length})`));
+                        if (i < 0) break;
+                        if ((await listQuests(places[i], list.filter((d) => placeOf(d) === places[i]))) === "leave") return true;
+                    }
+                } else if ((await listQuests(name, list)) === "leave") return true;
+            } else if (options[pick] === "Reset quests") {
                 if ((await ask("Reset ALL quest progress?", ["Reset", "Cancel"])) === 0) { st = { ...freshState(), visited: st.visited, duelWins: st.duelWins }; saveState(); toast("Quest progress reset"); ensureGenerated(); announceUnlocks(); }
             } else return true;
         }
@@ -553,7 +583,7 @@ const forGameText = (s) => String(s).replace(/(\d+)\/(\d+)/g, "$1 of $2").replac
 export function questsPauseRow() {
     if (!enabled() || !defs.length) return null;
     const all = logEntries();
-    const n = all.filter(({ s }) => s === "ready" || s === "available").length;
+    const n = all.filter(({ d, s }) => s === "ready" || (s === "available" && isHere(d))).length;     // what wants attention in THIS place
     return { label: n ? `QUESTS ${n}` : "QUESTS" };
 }
 
@@ -571,7 +601,7 @@ export function questsPausePage() {
     if (!enabled() || !defs.length) return null;
     const MARK = { ready: "! ", active: "- ", available: "? " };
     const cut = (t, n) => (t.length > n ? t.slice(0, n) : t);           // the page has no room for an ellipsis
-    const entries = logEntries().filter(({ s }) => s !== "done").map(({ d, s }) => {
+    const entries = logEntries().filter(({ d, s }) => s === "ready" || s === "active" || (s === "available" && isHere(d))).map(({ d, s }) => {
         const a = st.active[d.id];
         const k = d.objectives.findIndex((_, j) => ((a?.p[j]) || 0) < targetOf(d, j));
         const ref = turnInRef(d);

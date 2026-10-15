@@ -6542,6 +6542,4163 @@
           "arrive": 102
         }
       ]
+    },
+    {
+      "id": "p_leomon_trainee",
+      "title": "A stance worth learning",
+      "giver": "Leomon",
+      "short": "Learn a stance",
+      "text": "Leomon will teach you a proper stance once your best partner reaches level ten.",
+      "objectives": [
+        {
+          "type": "level",
+          "level": 10
+        }
+      ],
+      "reward": {
+        "bits": 450,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 5,
+        "done": "park_pest_control"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "There is a stance I teach to people who stop thinking about their feet. It is not hard. It is only rarely done.",
+          "Come back at level ten. Not before. Your partner needs to know what it feels like to be tired and keep standing.",
+          "I will not rush you. The gym has stood a long time. It will stand a little longer."
+        ],
+        "doneLines": [
+          "Look at how you stand. The weight is in the right place now. You did that, not me.",
+          "Take this. A trainee should never walk away empty-handed. It is bad manners."
+        ],
+        "remindLines": [
+          "Level ten. Fight, rest, fight. The stance waits for tired feet.",
+          "A stance is only a way of standing. It is the standing that takes years."
+        ],
+        "ask": "Come back at level ten?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "There is a stance I teach to people who stop thinking about their feet. It is not hard. It is only rarely done."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Come back at level ten. Not before. Your partner needs to know what it feels like to be tired and keep standing."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "I will not rush you. The gym has stood a long time. It will stand a little longer."
+          },
+          {
+            "ask": "Come back at level ten?",
+            "options": [
+              "I will",
+              "Not yet"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Look at how you stand. The weight is in the right place now. You did that, not me."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Take this. A trainee should never walk away empty-handed. It is bad manners."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_leomon_roost",
+      "title": "Chewed dummies",
+      "giver": "Leomon",
+      "short": "Chewed dummies",
+      "text": "Tapirmon have started roosting in the east grass and chewing the gym's training dummies. Drive off four.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Tapirmon"
+          ],
+          "count": 4,
+          "maps": [
+            "s330",
+            "s331"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 380,
+        "items": [
+          {
+            "name": "Sober Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 6,
+        "done": "p_leomon_trainee"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Every morning the dummies are shorter. By the weekend I will be training against stumps.",
+          "It is the Tapirmon. They roost in the east grass and treat my straw like breakfast.",
+          "Drive off four. Not harshly. They will learn. They are not bad, only hungry and rude."
+        ],
+        "doneLines": [
+          "Four fewer, and the dummies look relieved, if straw can look anything.",
+          "A small reward. Do not tell the Tapirmon. They think I am angry. It keeps them honest."
+        ],
+        "remindLines": [
+          "Four Tapirmon in the east grass. Gently, if you can. Firmly, if you must.",
+          "The dummies are getting shorter. I count every morning."
+        ],
+        "ask": "Drive them off?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Every morning the dummies are shorter. By the weekend I will be training against stumps."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "It is the Tapirmon. They roost in the east grass and treat my straw like breakfast."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Drive off four. Not harshly. They will learn. They are not bad, only hungry and rude."
+          },
+          {
+            "ask": "Drive them off?",
+            "options": [
+              "Of course",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_leomon_trainee"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Four fewer, and the dummies look relieved, if straw can look anything."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "A small reward. Do not tell the Tapirmon. They think I am angry. It keeps them honest."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_leomon_walk_the_shore",
+      "title": "Four shores",
+      "giver": "Leomon",
+      "short": "Four shores",
+      "text": "Leomon wants to know how the four shores around Central Park look today. See the Wire Forest entrance, Shell Beach, Plug Cape and the west forest.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "maps": [
+            "s335",
+            "s340",
+            "s345",
+            "s350"
+          ],
+          "count": 4,
+          "label": "Visit the Wire Forest entrance, Shell Beach, Plug Cape and the west forest"
+        }
+      ],
+      "reward": {
+        "bits": 550,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 6,
+        "done": "p_leomon_roost"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "A keeper of a park should know where the park ends. I have never seen the edge. I only hear about it.",
+          "Four edges. The forest gate, the beach, the cape, and the forest to the west. Walk each, stand a moment, look for what has changed.",
+          "I trust your eyes more than my memory. My memory is mostly this gym."
+        ],
+        "doneLines": [
+          "So the beach has a new sandbar, and the cape smells of rain. Good. Good. I will remember that.",
+          "Here, for the long walk. The edge of a park is a fine place to learn what a park is."
+        ],
+        "remindLines": [
+          "Forest gate, beach, cape, west forest. Look for what has changed.",
+          "I will keep the gym. You keep your eyes open."
+        ],
+        "ask": "Walk the four edges?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "A keeper of a park should know where the park ends. I have never seen the edge. I only hear about it."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Four edges. The forest gate, the beach, the cape, and the forest to the west. Walk each, stand a moment, look for what has changed."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "I trust your eyes more than my memory. My memory is mostly this gym."
+          },
+          {
+            "ask": "Walk the four edges?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_leomon_roost"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "So the beach has a new sandbar, and the cape smells of rain. Good. Good. I will remember that."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Here, for the long walk. The edge of a park is a fine place to learn what a park is."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_leomon_disk_supply",
+      "title": "Supplies for the trainees",
+      "giver": "Leomon",
+      "short": "Trainee supply",
+      "text": "Leomon's trainees go through Energy Disks like water. Bring him three.",
+      "objectives": [
+        {
+          "type": "bring",
+          "item": "Energy Disk",
+          "count": 3
+        }
+      ],
+      "reward": {
+        "bits": 420
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 6,
+        "done": "p_leomon_roost"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "My trainees train hard and recover harder, and the gym is nearly out of Energy Disks.",
+          "Three would see us through the week. I would go myself, but the gym cannot leave me and I cannot leave the gym.",
+          "Will you bring them?"
+        ],
+        "doneLines": [
+          "Three disks. The gym breathes easier. They will be glad.",
+          "Payment, and my thanks. I rarely say thanks. Remember it."
+        ],
+        "remindLines": [
+          "Three Energy Disks for the trainees. They are getting very quiet. That is not good.",
+          "A hungry trainee is a slow trainee."
+        ],
+        "ask": "Bring three Energy Disks?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "My trainees train hard and recover harder, and the gym is nearly out of Energy Disks."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Three would see us through the week. I would go myself, but the gym cannot leave me and I cannot leave the gym."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Will you bring them?"
+          },
+          {
+            "ask": "Bring three Energy Disks?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_leomon_roost"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Three disks. The gym breathes easier. They will be glad."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Payment, and my thanks. I rarely say thanks. Remember it."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_leomon_three_in_a_row",
+      "title": "The gym's own test",
+      "giver": "Leomon",
+      "short": "The gym's test",
+      "text": "Leomon's old test for new trainees: three fights in a row, a Vegiemon, a Kiwimon and a Goburimon, with no breaks.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            40,
+            43,
+            45
+          ],
+          "startAt": [
+            "s330",
+            "s331"
+          ],
+          "label": "Win three fights in a row: Vegiemon, Kiwimon, Goburimon",
+          "scale": 20,
+          "hpMult": 1.3
+        }
+      ],
+      "reward": {
+        "bits": 700,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 8,
+        "done": "p_leomon_walk_the_shore"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Every trainee used to face this on their first day. I stopped asking, because they all passed and nobody remembered.",
+          "Three fights. Vegiemon, Kiwimon, Goburimon. No breaks, no tricks, no excuses.",
+          "Begin it from the quest list when you are ready. I will watch from the door."
+        ],
+        "doneLines": [
+          "Three, and you finished on your feet. That is the whole test.",
+          "A Super Charge, from the gym's shelf. And you have my respect, which is rarer."
+        ],
+        "remindLines": [
+          "Vegiemon, Kiwimon, Goburimon, one after the other. I will be at the door.",
+          "Do not rush. A rushed test is a failed test."
+        ],
+        "ask": "Take the gym's test?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Every trainee used to face this on their first day. I stopped asking, because they all passed and nobody remembered."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Three fights. Vegiemon, Kiwimon, Goburimon. No breaks, no tricks, no excuses."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Begin it from the quest list when you are ready. I will watch from the door."
+          },
+          {
+            "ask": "Take the gym's test?",
+            "options": [
+              "I am ready",
+              "Not yet"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_leomon_walk_the_shore"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Three, and you finished on your feet. That is the whole test."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "A Super Charge, from the gym's shelf. And you have my respect, which is rarer."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_leomon_betamon_form",
+      "title": "A calmer shape",
+      "giver": "Leomon",
+      "short": "A calmer shape",
+      "text": "Leomon thinks your partner should know what it is like to be as calm as a Betamon. Learn the Betamon form.",
+      "objectives": [
+        {
+          "type": "ownForm",
+          "species": "Betamon"
+        }
+      ],
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 12,
+        "done": "p_leomon_three_in_a_row"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "You fight well. But a fighter who can only fight is a very small thing.",
+          "Betamon are calm. They watch. They wait for the right moment, and they do not pretend to be angrier than they are.",
+          "Learn the Betamon form. Not to fight with. To remember how it feels to be still."
+        ],
+        "doneLines": [
+          "Look at that stillness. It suits your partner. It suits you.",
+          "Here. A small gift. Be still, now and then. It is worth it."
+        ],
+        "remindLines": [
+          "The Betamon form. It comes after a victory, at some level, when you are not looking.",
+          "Be calm. It helps."
+        ],
+        "ask": "Learn the Betamon form?",
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "You fight well. But a fighter who can only fight is a very small thing."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Betamon are calm. They watch. They wait for the right moment, and they do not pretend to be angrier than they are."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Learn the Betamon form. Not to fight with. To remember how it feels to be still."
+          },
+          {
+            "ask": "Learn the Betamon form?",
+            "options": [
+              "I will try",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_leomon_three_in_a_row"
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Look at that stillness. It suits your partner. It suits you."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Here. A small gift. Be still, now and then. It is worth it."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "p_school_three_questions",
+      "title": "The strangest thing",
+      "giver": "Schoolgirl",
+      "short": "Strange things",
+      "text": "The Schoolgirl is asking everyone in the park the same question: what is the strangest thing you have ever seen? Ask Leomon, the Old Woman and the Yellow Coat for her.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 27,
+          "name": "Leomon",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "The strangest thing? A Kunemon that bowed. It was a great honour. I returned the bow."
+          ],
+          "scene": [
+            {
+              "walk": 27,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 27
+            },
+            {
+              "say": 27,
+              "name": "Leomon",
+              "text": "The strangest thing? A Kunemon that bowed. It was a great honour. I returned the bow."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 27,
+              "to": "origin"
+            },
+            {
+              "arrive": 27
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 58,
+          "name": "Old Woman",
+          "maps": [
+            "s330",
+            "s331"
+          ],
+          "lines": [
+            "Strangest, dear? A Tapirmon eating a soup I had not yet cooked. It was early. It was very pleased with itself."
+          ],
+          "scene": [
+            {
+              "walk": 58,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 58
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "Strangest, dear? A Tapirmon eating a soup I had not yet cooked. It was early. It was very pleased with itself."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 58,
+              "to": "origin"
+            },
+            {
+              "arrive": 58
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 102,
+          "name": "Yellow Coat",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "Strange? A man who wanted to be beaten and was upset when he won. I never found out why."
+          ],
+          "scene": [
+            {
+              "walk": 102,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 102
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Strange? A man who wanted to be beaten and was upset when he won. I never found out why."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 102,
+              "to": "origin"
+            },
+            {
+              "arrive": 102
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 380,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 48,
+            "map": "s330"
+          },
+          {
+            "npc": 27,
+            "map": "s330"
+          },
+          {
+            "npc": 58,
+            "map": "s330"
+          },
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ],
+        "level": 2
+      },
+      "offer": {
+        "npc": 48,
+        "name": "Schoolgirl",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "Okay okay okay. I am doing a project. It is called What Is The Strangest Thing You Have Seen, and I need three answers.",
+          "I need Leomon, the Old Woman and the man in the yellow coat. They are all in the park and none of them will tell me, because I talk too much.",
+          "You do not talk too much. They will answer you. Please? I will write your name in the footnote."
+        ],
+        "doneLines": [
+          "A Kunemon that bowed! A soup that was not yet cooked! A man who was upset he won! These are PERFECT.",
+          "I put your name in the footnote. It is a very small footnote. Take this as well."
+        ],
+        "remindLines": [
+          "Leomon, the Old Woman, the Yellow Coat. One question each. The strangest thing.",
+          "I have been rehearsing. I will cry if the answers are boring."
+        ],
+        "ask": "Ask the three of them?",
+        "scene": [
+          {
+            "walk": 48,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 48
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "Okay okay okay. I am doing a project. It is called What Is The Strangest Thing You Have Seen, and I need three answers."
+          },
+          {
+            "together": 48,
+            "dist": 130
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I need Leomon, the Old Woman and the man in the yellow coat. They are all in the park and none of them will tell me, because I talk too much."
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "You do not talk too much. They will answer you. Please? I will write your name in the footnote."
+          },
+          {
+            "ask": "Ask the three of them?",
+            "options": [
+              "Okay",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 48
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 48,
+            "to": "origin"
+          },
+          {
+            "arrive": 48
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 48,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 48
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "A Kunemon that bowed! A soup that was not yet cooked! A man who was upset he won! These are PERFECT."
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "I put your name in the footnote. It is a very small footnote. Take this as well."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 48,
+          "to": "origin"
+        },
+        {
+          "arrive": 48
+        }
+      ]
+    },
+    {
+      "id": "p_school_field_trip",
+      "title": "A field trip for one",
+      "giver": "Schoolgirl",
+      "short": "Field trip",
+      "text": "The Schoolgirl cannot go on her class trip. Go instead: see the Wire Forest entrance, Shell Beach and Plug Cape, and tell her all about them.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "maps": [
+            "s335",
+            "s340",
+            "s345"
+          ],
+          "count": 3,
+          "label": "See the Wire Forest entrance, Shell Beach and Plug Cape"
+        }
+      ],
+      "reward": {
+        "bits": 420,
+        "items": [
+          {
+            "name": "Ribbon",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 48,
+            "map": "s330"
+          }
+        ],
+        "level": 3,
+        "done": "p_school_three_questions"
+      },
+      "offer": {
+        "npc": 48,
+        "name": "Schoolgirl",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "My class trip got cancelled because of a typo. A typo! We were going to see the shore, and now we are going nowhere.",
+          "Could you go in my place? The entrance of the Wire Forest, Shell Beach, Plug Cape. And remember everything. I am going to ask you.",
+          "I will draw it all. I draw really badly, but with enthusiasm."
+        ],
+        "doneLines": [
+          "Shell Beach smelled like pickled sea! I wrote that down. The cape had wind that tasted! I drew it as a blue scribble!",
+          "This is for being my eyes. I made it myself. It is a little bit crooked."
+        ],
+        "remindLines": [
+          "Wire Forest entrance, Shell Beach, Plug Cape. Remember everything. Smells too.",
+          "I have a fresh page for each place."
+        ],
+        "ask": "Go in her place?",
+        "scene": [
+          {
+            "walk": 48,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 48
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "My class trip got cancelled because of a typo. A typo! We were going to see the shore, and now we are going nowhere."
+          },
+          {
+            "together": 48,
+            "dist": 130
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "Could you go in my place? The entrance of the Wire Forest, Shell Beach, Plug Cape. And remember everything. I am going to ask you."
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I will draw it all. I draw really badly, but with enthusiasm."
+          },
+          {
+            "ask": "Go in her place?",
+            "options": [
+              "Okay",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 48
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 48,
+            "to": "origin"
+          },
+          {
+            "arrive": 48
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_school_three_questions"
+      },
+      "doneScene": [
+        {
+          "walk": 48,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 48
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "Shell Beach smelled like pickled sea! I wrote that down. The cape had wind that tasted! I drew it as a blue scribble!"
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "This is for being my eyes. I made it myself. It is a little bit crooked."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 48,
+          "to": "origin"
+        },
+        {
+          "arrive": 48
+        }
+      ]
+    },
+    {
+      "id": "p_school_tapirmon_notes",
+      "title": "Notes on a Tapirmon",
+      "giver": "Schoolgirl",
+      "short": "Tapirmon notes",
+      "text": "The Schoolgirl wants close-up notes on Tapirmon, and she wants you to learn the Tapirmon form to see what one feels like.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Tapirmon"
+          ],
+          "count": 2,
+          "maps": [
+            "s330",
+            "s331"
+          ]
+        },
+        {
+          "type": "ownForm",
+          "species": "Tapirmon"
+        }
+      ],
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 48,
+            "map": "s330"
+          }
+        ],
+        "level": 8,
+        "done": "p_school_field_trip"
+      },
+      "offer": {
+        "npc": 48,
+        "name": "Schoolgirl",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "I want to know everything about Tapirmon. What they eat. How they sleep. Whether their nose twitches when they think.",
+          "Meet two of them first, then learn the Tapirmon form. I heard partners can. Then tell me how it twitches.",
+          "I have a whole notebook ready. It has a title page. I made it very serious."
+        ],
+        "doneLines": [
+          "It twitches when it is thinking AND when it is embarrassed? That is two entries!",
+          "This is for the science. And for the notebook, which says thank you in its own way."
+        ],
+        "remindLines": [
+          "Two Tapirmon, then the Tapirmon form. Does the nose twitch?",
+          "The notebook is waiting. It is very serious."
+        ],
+        "ask": "Study the Tapirmon?",
+        "scene": [
+          {
+            "walk": 48,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 48
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I want to know everything about Tapirmon. What they eat. How they sleep. Whether their nose twitches when they think."
+          },
+          {
+            "together": 48,
+            "dist": 130
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "Meet two of them first, then learn the Tapirmon form. I heard partners can. Then tell me how it twitches."
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I have a whole notebook ready. It has a title page. I made it very serious."
+          },
+          {
+            "ask": "Study the Tapirmon?",
+            "options": [
+              "Let's do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 48
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 48,
+            "to": "origin"
+          },
+          {
+            "arrive": 48
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_school_field_trip"
+      },
+      "doneScene": [
+        {
+          "walk": 48,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 48
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "It twitches when it is thinking AND when it is embarrassed? That is two entries!"
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "This is for the science. And for the notebook, which says thank you in its own way."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 48,
+          "to": "origin"
+        },
+        {
+          "arrive": 48
+        }
+      ]
+    },
+    {
+      "id": "p_school_dare_kunemon",
+      "title": "A dare at recess",
+      "giver": "Schoolgirl",
+      "short": "Recess dare",
+      "text": "The Schoolgirl dared herself to see a Kunemon fight up close. You do the fighting, she does the watching.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            34
+          ],
+          "startAt": [
+            "s330",
+            "s331"
+          ],
+          "label": "Win a fight against a Kunemon",
+          "scale": 18
+        }
+      ],
+      "reward": {
+        "bits": 300
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 48,
+            "map": "s330"
+          }
+        ],
+        "level": 1
+      },
+      "offer": {
+        "npc": 48,
+        "name": "Schoolgirl",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "I dared myself to see a real fight up close. Not a big one. A small one. A Kunemon one.",
+          "I will stand over there, behind the bench, and watch. You do the fighting. I do the oohing.",
+          "Are you willing to be watched?"
+        ],
+        "doneLines": [
+          "Oooooh! That was so quick! I did not even blink! Well, I blinked once.",
+          "Thank you. This is yours. I would give you a medal, but I do not have a medal."
+        ],
+        "remindLines": [
+          "One Kunemon. I am behind the bench. Ooh ready.",
+          "I promise to stay behind the bench. Mostly."
+        ],
+        "ask": "Give her a show?",
+        "scene": [
+          {
+            "walk": 48,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 48
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I dared myself to see a real fight up close. Not a big one. A small one. A Kunemon one."
+          },
+          {
+            "together": 48,
+            "dist": 130
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "I will stand over there, behind the bench, and watch. You do the fighting. I do the oohing."
+          },
+          {
+            "say": 48,
+            "name": "Schoolgirl",
+            "text": "Are you willing to be watched?"
+          },
+          {
+            "ask": "Give her a show?",
+            "options": [
+              "Sure",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 48
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 48,
+            "to": "origin"
+          },
+          {
+            "arrive": 48
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 48,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 48
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "Oooooh! That was so quick! I did not even blink! Well, I blinked once."
+        },
+        {
+          "say": 48,
+          "name": "Schoolgirl",
+          "text": "Thank you. This is yours. I would give you a medal, but I do not have a medal."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 48,
+          "to": "origin"
+        },
+        {
+          "arrive": 48
+        }
+      ]
+    },
+    {
+      "id": "p_oldwoman_soup",
+      "title": "Soup for the gym",
+      "giver": "Old Woman",
+      "short": "Soup for gym",
+      "text": "The Old Woman is making stew for the gym's trainees and wants two Energy Disks for the secret ingredient.",
+      "objectives": [
+        {
+          "type": "bring",
+          "item": "Energy Disk",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "bits": 380,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ],
+        "level": 3,
+        "done": "park_messages"
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "Trainees eat nothing but nerves. I am making a stew, a proper one, and the secret ingredient is crushed Energy Disk.",
+          "Two of them, dear. Do not look at me like that. It is the only thing that makes the stew taste like victory.",
+          "Bring them and I will give you a bowl. A big one."
+        ],
+        "doneLines": [
+          "Beautiful. Hear that bubbling? That is victory, simmering.",
+          "Here is your bowl, and a little extra for the road. Do eat. You look thin."
+        ],
+        "remindLines": [
+          "Two Energy Disks for the stew, dear. The pot is already warm.",
+          "It is a secret recipe. Do not tell the Tapirmon."
+        ],
+        "ask": "Bring two Energy Disks?",
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Trainees eat nothing but nerves. I am making a stew, a proper one, and the secret ingredient is crushed Energy Disk."
+          },
+          {
+            "together": 58,
+            "dist": 130
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Two of them, dear. Do not look at me like that. It is the only thing that makes the stew taste like victory."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Bring them and I will give you a bowl. A big one."
+          },
+          {
+            "ask": "Bring two Energy Disks?",
+            "options": [
+              "Of course",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 58
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_messages"
+      },
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Beautiful. Hear that bubbling? That is victory, simmering."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Here is your bowl, and a little extra for the road. Do eat. You look thin."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
+    },
+    {
+      "id": "p_oldwoman_walking_weeds",
+      "title": "Weeds that walk",
+      "giver": "Old Woman",
+      "short": "Walking weeds",
+      "text": "The Old Woman's garden is being trampled by weeds that walk. Beat three Vegiemon down at Shell Beach.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Vegiemon"
+          ],
+          "count": 3,
+          "maps": [
+            "s340",
+            "s341"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Sober Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ],
+        "level": 4,
+        "done": "p_oldwoman_soup"
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "There are weeds that walk, dear. I did not believe it either, and then one stepped on my carrots and apologised.",
+          "They come from Shell Beach, the green ones with the face. Vegiemon. Three of them, and the garden will recover.",
+          "I would go, but my knee is forty years older than the rest of me."
+        ],
+        "doneLines": [
+          "The carrots have stopped screaming. Good.",
+          "Here is a little something. And a message for the Vegiemon, if you see them again: sorry about the carrots."
+        ],
+        "remindLines": [
+          "Three Vegiemon at Shell Beach. The walking weeds. The carrots will thank you.",
+          "Do be polite to them. Some of them apologise."
+        ],
+        "ask": "Weed the beach?",
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "There are weeds that walk, dear. I did not believe it either, and then one stepped on my carrots and apologised."
+          },
+          {
+            "together": 58,
+            "dist": 130
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "They come from Shell Beach, the green ones with the face. Vegiemon. Three of them, and the garden will recover."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "I would go, but my knee is forty years older than the rest of me."
+          },
+          {
+            "ask": "Weed the beach?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 58
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_oldwoman_soup"
+      },
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "The carrots have stopped screaming. Good."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Here is a little something. And a message for the Vegiemon, if you see them again: sorry about the carrots."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
+    },
+    {
+      "id": "p_oldwoman_gossip_chain",
+      "title": "Pass it on",
+      "giver": "Old Woman",
+      "short": "Pass it on",
+      "text": "The Old Woman has a bit of gossip she wants passed to the Schoolgirl, the Yellow Coat and Leomon, in that order, each one a little differently.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 48,
+          "name": "Schoolgirl",
+          "maps": [
+            "s330",
+            "s331"
+          ],
+          "lines": [
+            "Gossip? From the Old Woman? Tell me, tell me! A Tapirmon did WHAT?"
+          ],
+          "scene": [
+            {
+              "walk": 48,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 48
+            },
+            {
+              "say": 48,
+              "name": "Schoolgirl",
+              "text": "Gossip? From the Old Woman? Tell me, tell me! A Tapirmon did WHAT?"
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 48,
+              "to": "origin"
+            },
+            {
+              "arrive": 48
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 102,
+          "name": "Yellow Coat",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "Hm. A Tapirmon with opinions. I have met worse."
+          ],
+          "scene": [
+            {
+              "walk": 102,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 102
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Hm. A Tapirmon with opinions. I have met worse."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 102,
+              "to": "origin"
+            },
+            {
+              "arrive": 102
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 27,
+          "name": "Leomon",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "I am told the Tapirmon has an opinion about my dummies. I shall have a word."
+          ],
+          "scene": [
+            {
+              "walk": 27,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 27
+            },
+            {
+              "say": 27,
+              "name": "Leomon",
+              "text": "I am told the Tapirmon has an opinion about my dummies. I shall have a word."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 27,
+              "to": "origin"
+            },
+            {
+              "arrive": 27
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 450,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          },
+          {
+            "npc": 48,
+            "map": "s330"
+          },
+          {
+            "npc": 102,
+            "map": "s330"
+          },
+          {
+            "npc": 27,
+            "map": "s330"
+          }
+        ],
+        "level": 5,
+        "done": "p_oldwoman_walking_weeds"
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "Listen, dear. I have a bit of gossip, and it is too good to keep and too silly to say twice.",
+          "A Tapirmon has opinions about the gym's dummies. Tell the Schoolgirl first, then the man in the yellow coat, then Leomon.",
+          "Each one will react differently. I want to know which way. It is a hobby of mine."
+        ],
+        "doneLines": [
+          "So the Schoolgirl gasped, the Yellow Coat grunted, and Leomon went to scold the dummies? Perfect. Absolutely perfect.",
+          "A reward for good service. And a bowl, if you are quick."
+        ],
+        "remindLines": [
+          "The Schoolgirl, then the Yellow Coat, then Leomon. A Tapirmon with opinions.",
+          "I want to hear each reaction. Do not leave anything out."
+        ],
+        "ask": "Spread the gossip?",
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Listen, dear. I have a bit of gossip, and it is too good to keep and too silly to say twice."
+          },
+          {
+            "together": 58,
+            "dist": 130
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "A Tapirmon has opinions about the gym's dummies. Tell the Schoolgirl first, then the man in the yellow coat, then Leomon."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Each one will react differently. I want to know which way. It is a hobby of mine."
+          },
+          {
+            "ask": "Spread the gossip?",
+            "options": [
+              "Gladly",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 58
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_oldwoman_walking_weeds"
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "So the Schoolgirl gasped, the Yellow Coat grunted, and Leomon went to scold the dummies? Perfect. Absolutely perfect."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "A reward for good service. And a bowl, if you are quick."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
+    },
+    {
+      "id": "p_oldwoman_vegiemon_form",
+      "title": "Sympathy for a weed",
+      "giver": "Old Woman",
+      "short": "Weed sympathy",
+      "text": "The Old Woman thinks you should understand the Vegiemon you keep beating. Learn the Vegiemon form.",
+      "objectives": [
+        {
+          "type": "ownForm",
+          "species": "Vegiemon"
+        }
+      ],
+      "reward": {
+        "bits": 550,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ],
+        "level": 10,
+        "done": "p_oldwoman_gossip_chain"
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330",
+          "s331"
+        ],
+        "lines": [
+          "You have beaten a good many walking weeds by now. Have you ever wondered what it is like to be one?",
+          "Learn the Vegiemon form, dear. It is a humbling thing. It teaches you to stand still in the rain.",
+          "I am old, and I find it helps."
+        ],
+        "doneLines": [
+          "Look at the two of you. A little greener. A little wiser.",
+          "Here, a Life Disk. Keep it for a day you are not at your best."
+        ],
+        "remindLines": [
+          "The Vegiemon form. It will arrive after a win, when you are not looking.",
+          "Stand still in the rain. It helps."
+        ],
+        "ask": "Learn the Vegiemon form?",
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "You have beaten a good many walking weeds by now. Have you ever wondered what it is like to be one?"
+          },
+          {
+            "together": 58,
+            "dist": 130
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Learn the Vegiemon form, dear. It is a humbling thing. It teaches you to stand still in the rain."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "I am old, and I find it helps."
+          },
+          {
+            "ask": "Learn the Vegiemon form?",
+            "options": [
+              "I will try",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 58
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_oldwoman_gossip_chain"
+      },
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Look at the two of you. A little greener. A little wiser."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Here, a Life Disk. Keep it for a day you are not at your best."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
+    },
+    {
+      "id": "p_yc_rematch_one",
+      "title": "The first rematch",
+      "giver": "Yellow Coat",
+      "short": "First rematch",
+      "text": "The man in the yellow coat has not forgiven the loss. Win another three fights in a row, harder this time.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            36,
+            37,
+            39
+          ],
+          "startAt": [
+            "s330",
+            "s331"
+          ],
+          "label": "Win three fights in a row: Crabmon, Gizamon, Betamon",
+          "scale": 22,
+          "hpMult": 1.4
+        }
+      ],
+      "reward": {
+        "bits": 650,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ],
+        "level": 6,
+        "done": "yellowcoat_duel"
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "You won. I have been thinking about it. I do not enjoy thinking about it.",
+          "A rematch. Three fights, stronger than last time. I trained.",
+          "I trained a lot. My feet hurt. This better be worth it."
+        ],
+        "doneLines": [
+          "Again. You won again. Fine. FINE.",
+          "Take it. And do not tell anyone I am going to train more."
+        ],
+        "remindLines": [
+          "Three fights, harder than before. I trained. My feet are on record.",
+          "Do not keep me waiting."
+        ],
+        "ask": "Take the rematch?",
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "You won. I have been thinking about it. I do not enjoy thinking about it."
+          },
+          {
+            "together": 102,
+            "dist": 130
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "A rematch. Three fights, stronger than last time. I trained."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "I trained a lot. My feet hurt. This better be worth it."
+          },
+          {
+            "ask": "Take the rematch?",
+            "options": [
+              "Bring it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 102
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "requires": {
+        "done": "yellowcoat_duel"
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Again. You won again. Fine. FINE."
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Take it. And do not tell anyone I am going to train more."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
+      "id": "p_yc_rematch_two",
+      "title": "The second rematch",
+      "giver": "Yellow Coat",
+      "short": "Second rematch",
+      "text": "The man in the yellow coat is back, angrier and more careful. Win four fights in a row.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            44,
+            45,
+            47,
+            38
+          ],
+          "startAt": [
+            "s330",
+            "s331"
+          ],
+          "label": "Win four fights in a row: Dokugumon, Goburimon, Minotarumon, DemiDevimon",
+          "scale": 24,
+          "hpMult": 1.5
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ],
+        "level": 9,
+        "done": "p_yc_rematch_one"
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Two losses. I have been rethinking everything. My grip. My breakfast. My coat.",
+          "Four fights this time. Dokugumon, Goburimon, Minotarumon, DemiDevimon. No tricks.",
+          "If you win, I will accept it. If you do not, I will pretend I was just testing. Either way."
+        ],
+        "doneLines": [
+          "Four in a row. And you were not even sweating. I am calm. I am extremely calm.",
+          "Take this, and the respect that comes with it. A small respect. But growing."
+        ],
+        "remindLines": [
+          "Four fights, no tricks. I changed my breakfast. It may help.",
+          "I am calm. I am extremely calm."
+        ],
+        "ask": "Take the second rematch?",
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Two losses. I have been rethinking everything. My grip. My breakfast. My coat."
+          },
+          {
+            "together": 102,
+            "dist": 130
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Four fights this time. Dokugumon, Goburimon, Minotarumon, DemiDevimon. No tricks."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "If you win, I will accept it. If you do not, I will pretend I was just testing. Either way."
+          },
+          {
+            "ask": "Take the second rematch?",
+            "options": [
+              "Let's go",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 102
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_yc_rematch_one"
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Four in a row. And you were not even sweating. I am calm. I am extremely calm."
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Take this, and the respect that comes with it. A small respect. But growing."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
+      "id": "p_yc_final_rematch",
+      "title": "A respect earned",
+      "giver": "Yellow Coat",
+      "short": "Last rematch",
+      "text": "The man in the yellow coat challenges you one last time with five hard fights in a row, and says he will stop if you win.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            46,
+            48,
+            50,
+            51,
+            52
+          ],
+          "startAt": [
+            "s330",
+            "s331"
+          ],
+          "label": "Win five fights in a row: Baronmon, Flymon, Tyrannomon, Triceramon, Airdramon",
+          "scale": 24,
+          "hpMult": 1.6
+        }
+      ],
+      "reward": {
+        "bits": 1400,
+        "items": [
+          {
+            "name": "Kung Fu Cap",
+            "count": 1
+          },
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ],
+        "level": 12,
+        "done": "p_yc_rematch_two"
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "This is the last one. I swear on the coat.",
+          "Five fights. The hardest I can make. If you win, I stop. For good. I have thought it through.",
+          "If you lose, we do it again. Either way, I am grateful. Do not tell anyone I said that."
+        ],
+        "doneLines": [
+          "You won. You really won. And I am not even angry, which surprises me.",
+          "Take the cap. It is my second one. I do not need two. I need a different kind of coat."
+        ],
+        "remindLines": [
+          "Five fights, the hardest I could find. I will stop if you win.",
+          "I have never been this nervous. I am enjoying it."
+        ],
+        "ask": "Accept the last rematch?",
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "This is the last one. I swear on the coat."
+          },
+          {
+            "together": 102,
+            "dist": 130
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Five fights. The hardest I can make. If you win, I stop. For good. I have thought it through."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "If you lose, we do it again. Either way, I am grateful. Do not tell anyone I said that."
+          },
+          {
+            "ask": "Accept the last rematch?",
+            "options": [
+              "Last one",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 102
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_yc_rematch_two"
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "You won. You really won. And I am not even angry, which surprises me."
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Take the cap. It is my second one. I do not need two. I need a different kind of coat."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
+      "id": "p_res_samples",
+      "title": "Two kinds of sample",
+      "giver": "Researcher",
+      "short": "Two samples",
+      "text": "A Researcher needs defeated Kunemon and Tapirmon for comparison: two of each.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Kunemon"
+          ],
+          "count": 2,
+          "maps": [
+            "s330",
+            "s331"
+          ]
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Tapirmon"
+          ],
+          "count": 2,
+          "maps": [
+            "s330",
+            "s331"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 350,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 43,
+            "map": "s330"
+          }
+        ],
+        "level": 1
+      },
+      "offer": {
+        "npc": 43,
+        "name": "Researcher",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Fascinating. Two species, same habitat, completely different behaviour. And nobody has measured either.",
+          "Two Kunemon, two Tapirmon, if you do not mind. I will take it from there.",
+          "I would catch them myself, but they notice my clipboard."
+        ],
+        "doneLines": [
+          "Excellent! Notice the difference in the shell texture? No? Neither do I, but the clipboard does.",
+          "Your payment, and a promise to thank you in the footnote. Everyone gets a footnote."
+        ],
+        "remindLines": [
+          "Two Kunemon and two Tapirmon. The clipboard is empty and sad.",
+          "They notice the clipboard. Do not ask me how."
+        ],
+        "ask": "Collect the samples?",
+        "scene": [
+          {
+            "walk": 43,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 43
+          },
+          {
+            "say": 43,
+            "name": "Researcher",
+            "text": "Fascinating. Two species, same habitat, completely different behaviour. And nobody has measured either."
+          },
+          {
+            "together": 43,
+            "dist": 130
+          },
+          {
+            "say": 43,
+            "name": "Researcher",
+            "text": "Two Kunemon, two Tapirmon, if you do not mind. I will take it from there."
+          },
+          {
+            "say": 43,
+            "name": "Researcher",
+            "text": "I would catch them myself, but they notice my clipboard."
+          },
+          {
+            "ask": "Collect the samples?",
+            "options": [
+              "Sure",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 43
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 43,
+            "to": "origin"
+          },
+          {
+            "arrive": 43
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 43,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 43
+        },
+        {
+          "say": 43,
+          "name": "Researcher",
+          "text": "Excellent! Notice the difference in the shell texture? No? Neither do I, but the clipboard does."
+        },
+        {
+          "say": 43,
+          "name": "Researcher",
+          "text": "Your payment, and a promise to thank you in the footnote. Everyone gets a footnote."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 43,
+          "to": "origin"
+        },
+        {
+          "arrive": 43
+        }
+      ]
+    },
+    {
+      "id": "p_res_signal_walk",
+      "title": "Signal strength",
+      "giver": "Researcher",
+      "short": "Signal walk",
+      "text": "A Researcher is measuring the signal along the forest edge. Visit the Wire Forest entrance and the west forest and tell him what you notice.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s335"
+        },
+        {
+          "type": "visit",
+          "map": "s350"
+        }
+      ],
+      "reward": {
+        "bits": 480,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 44,
+            "map": "s330"
+          }
+        ],
+        "level": 4,
+        "done": "p_res_samples"
+      },
+      "offer": {
+        "npc": 44,
+        "name": "Researcher",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "The signal gets strange at the edge of the Wire Forest. I need someone to walk it and tell me what they notice.",
+          "Not numbers. Feelings. Does the air feel different? Do your teeth buzz? These are scientific questions.",
+          "Start at the entrance and walk to the west forest. Report back."
+        ],
+        "doneLines": [
+          "Teeth buzzing, and a faint hum, and a feeling of being watched by a tree? Marvellous. Data!",
+          "A little reward, and a promise to credit you. Under Feelings."
+        ],
+        "remindLines": [
+          "Wire Forest entrance, then the west forest. Does anything hum? Do your teeth buzz?",
+          "I am writing a section called Feelings. It is very short."
+        ],
+        "ask": "Walk the signal?",
+        "scene": [
+          {
+            "walk": 44,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 44
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "The signal gets strange at the edge of the Wire Forest. I need someone to walk it and tell me what they notice."
+          },
+          {
+            "together": 44,
+            "dist": 130
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "Not numbers. Feelings. Does the air feel different? Do your teeth buzz? These are scientific questions."
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "Start at the entrance and walk to the west forest. Report back."
+          },
+          {
+            "ask": "Walk the signal?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 44
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 44,
+            "to": "origin"
+          },
+          {
+            "arrive": 44
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_res_samples"
+      },
+      "doneScene": [
+        {
+          "walk": 44,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 44
+        },
+        {
+          "say": 44,
+          "name": "Researcher",
+          "text": "Teeth buzzing, and a faint hum, and a feeling of being watched by a tree? Marvellous. Data!"
+        },
+        {
+          "say": 44,
+          "name": "Researcher",
+          "text": "A little reward, and a promise to credit you. Under Feelings."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 44,
+          "to": "origin"
+        },
+        {
+          "arrive": 44
+        }
+      ]
+    },
+    {
+      "id": "p_res_emergency_kit",
+      "title": "A kit for the field",
+      "giver": "Researcher",
+      "short": "Field kit",
+      "text": "A Researcher wants a Revive Disk for his emergency kit before going deeper into the forest.",
+      "objectives": [
+        {
+          "type": "bring",
+          "item": "Revive Disk",
+          "count": 1
+        }
+      ],
+      "reward": {
+        "bits": 450
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 43,
+            "map": "s330"
+          }
+        ],
+        "level": 3
+      },
+      "offer": {
+        "npc": 43,
+        "name": "Researcher",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "I am going deeper into the forest next week, and a good researcher always carries an emergency kit.",
+          "I have everything but a Revive Disk. Could you spare one? I will make it worth it."
+        ],
+        "doneLines": [
+          "Perfect. The kit is complete. The forest will never see me coming.",
+          "Here is a bit of money. And I will name a very small beetle after you."
+        ],
+        "remindLines": [
+          "One Revive Disk for the kit. Without it, I am not going anywhere.",
+          "I will make a very good notebook entry about you."
+        ],
+        "ask": "Hand over a Revive Disk?",
+        "scene": [
+          {
+            "walk": 43,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 43
+          },
+          {
+            "say": 43,
+            "name": "Researcher",
+            "text": "I am going deeper into the forest next week, and a good researcher always carries an emergency kit."
+          },
+          {
+            "together": 43,
+            "dist": 130
+          },
+          {
+            "say": 43,
+            "name": "Researcher",
+            "text": "I have everything but a Revive Disk. Could you spare one? I will make it worth it."
+          },
+          {
+            "ask": "Hand over a Revive Disk?",
+            "options": [
+              "Here you go",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 43
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 43,
+            "to": "origin"
+          },
+          {
+            "arrive": 43
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 43,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 43
+        },
+        {
+          "say": 43,
+          "name": "Researcher",
+          "text": "Perfect. The kit is complete. The forest will never see me coming."
+        },
+        {
+          "say": 43,
+          "name": "Researcher",
+          "text": "Here is a bit of money. And I will name a very small beetle after you."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 43,
+          "to": "origin"
+        },
+        {
+          "arrive": 43
+        }
+      ]
+    },
+    {
+      "id": "p_res_kunemon_closeup",
+      "title": "A Kunemon up close",
+      "giver": "Researcher",
+      "short": "Kunemon close",
+      "text": "The Researcher wants to know what a Kunemon sees. Learn the Kunemon form and tell him.",
+      "objectives": [
+        {
+          "type": "ownForm",
+          "species": "Kunemon"
+        }
+      ],
+      "reward": {
+        "bits": 520,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 44,
+            "map": "s330"
+          }
+        ],
+        "level": 6,
+        "done": "p_res_signal_walk"
+      },
+      "offer": {
+        "npc": 44,
+        "name": "Researcher",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "I want to see a Kunemon from the inside. Not literally. Through the partner's eyes, when it takes the form.",
+          "They say a partner can learn the Kunemon form after enough victories. Do it, and tell me what the world looks like.",
+          "I will write every word down. I have a new pencil."
+        ],
+        "doneLines": [
+          "Everything is slightly sideways? And much louder? Incredible. Absolutely incredible.",
+          "Take this. And thank your partner for me. I would shake its hand if it had one."
+        ],
+        "remindLines": [
+          "The Kunemon form, and what the world looks like from there. New pencil, ready.",
+          "Keep winning. It arrives when you are not looking."
+        ],
+        "ask": "Learn the Kunemon form?",
+        "scene": [
+          {
+            "walk": 44,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 44
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "I want to see a Kunemon from the inside. Not literally. Through the partner's eyes, when it takes the form."
+          },
+          {
+            "together": 44,
+            "dist": 130
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "They say a partner can learn the Kunemon form after enough victories. Do it, and tell me what the world looks like."
+          },
+          {
+            "say": 44,
+            "name": "Researcher",
+            "text": "I will write every word down. I have a new pencil."
+          },
+          {
+            "ask": "Learn the Kunemon form?",
+            "options": [
+              "I will try",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 44
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 44,
+            "to": "origin"
+          },
+          {
+            "arrive": 44
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_res_signal_walk"
+      },
+      "doneScene": [
+        {
+          "walk": 44,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 44
+        },
+        {
+          "say": 44,
+          "name": "Researcher",
+          "text": "Everything is slightly sideways? And much louder? Incredible. Absolutely incredible."
+        },
+        {
+          "say": 44,
+          "name": "Researcher",
+          "text": "Take this. And thank your partner for me. I would shake its hand if it had one."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 44,
+          "to": "origin"
+        },
+        {
+          "arrive": 44
+        }
+      ]
+    },
+    {
+      "id": "p_trav_the_goat",
+      "title": "The goat story",
+      "giver": "Traveler",
+      "short": "The goat story",
+      "text": "The Traveler keeps promising a story about a goat. He will tell it if you walk Shell Beach and Plug Cape and bring him a detail from each.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "maps": [
+            "s340",
+            "s345"
+          ],
+          "count": 2,
+          "label": "Visit Shell Beach and Plug Cape"
+        }
+      ],
+      "reward": {
+        "bits": 420,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 47,
+            "map": "s335"
+          }
+        ],
+        "level": 5,
+        "done": "a_trav_flymon_road"
+      },
+      "offer": {
+        "npc": 47,
+        "name": "Traveler",
+        "maps": [
+          "s335"
+        ],
+        "lines": [
+          "About that goat. I owe you a story. The trouble is I have forgotten the middle, and the end.",
+          "It happened somewhere on a coast. If you go to Shell Beach and Plug Cape, one of them might remind me. Bring me a detail from each.",
+          "A smell. A sound. Whatever you remember. Then I will tell it properly."
+        ],
+        "doneLines": [
+          "A bell! A BELL! Of course. The goat rang it to scare the tide. Now I remember the whole thing.",
+          "Here is a little something for the story. The goat sends its regards, if goats could."
+        ],
+        "remindLines": [
+          "Shell Beach and Plug Cape. A smell, a sound, any detail. The goat is waiting.",
+          "It had a bell. I am almost sure it had a bell."
+        ],
+        "ask": "Help him remember?",
+        "scene": [
+          {
+            "walk": 47,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 47
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "About that goat. I owe you a story. The trouble is I have forgotten the middle, and the end."
+          },
+          {
+            "together": 47,
+            "dist": 130
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "It happened somewhere on a coast. If you go to Shell Beach and Plug Cape, one of them might remind me. Bring me a detail from each."
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "A smell. A sound. Whatever you remember. Then I will tell it properly."
+          },
+          {
+            "ask": "Help him remember?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 47
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 47,
+            "to": "origin"
+          },
+          {
+            "arrive": 47
+          }
+        ]
+      },
+      "requires": {
+        "done": "a_trav_flymon_road"
+      },
+      "doneScene": [
+        {
+          "walk": 47,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 47
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "A bell! A BELL! Of course. The goat rang it to scare the tide. Now I remember the whole thing."
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "Here is a little something for the story. The goat sends its regards, if goats could."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 47,
+          "to": "origin"
+        },
+        {
+          "arrive": 47
+        }
+      ]
+    },
+    {
+      "id": "p_trav_postcard",
+      "title": "A postcard for nobody",
+      "giver": "Traveler",
+      "short": "Postcard",
+      "text": "The Traveler has a postcard and no address. He asks you to carry it to the Old Woman in Central Park, since she knows everyone.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 58,
+          "name": "Old Woman",
+          "maps": [
+            "s330",
+            "s331"
+          ],
+          "lines": [
+            "A postcard? For nobody? Let me see. Ah, I know that handwriting. That is the Traveler's. He sends them to everyone and nobody."
+          ],
+          "scene": [
+            {
+              "walk": 58,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 58
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "A postcard? For nobody? Let me see. Ah, I know that handwriting. That is the Traveler's. He sends them to everyone and nobody."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 58,
+              "to": "origin"
+            },
+            {
+              "arrive": 58
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 350
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 47,
+            "map": "s335"
+          },
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ],
+        "level": 5,
+        "done": "p_trav_the_goat"
+      },
+      "offer": {
+        "npc": 47,
+        "name": "Traveler",
+        "maps": [
+          "s335"
+        ],
+        "lines": [
+          "I have a postcard and no address. I wrote it in a very good mood and forgot who it was for.",
+          "The Old Woman in Central Park knows everyone. Would you take it to her and ask who it belongs to?",
+          "I would go, but this forest gate is surprisingly comfortable."
+        ],
+        "doneLines": [
+          "She knew. Of course she knew. She said it was for her, which is strange, because I have never met her. Or have I.",
+          "Here. Thank you for the mystery. It was worth the walk."
+        ],
+        "remindLines": [
+          "One postcard, for the Old Woman. She will know whose it is.",
+          "It is a very good postcard. It has a picture of a goat."
+        ],
+        "ask": "Deliver the postcard?",
+        "scene": [
+          {
+            "walk": 47,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 47
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "I have a postcard and no address. I wrote it in a very good mood and forgot who it was for."
+          },
+          {
+            "together": 47,
+            "dist": 130
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "The Old Woman in Central Park knows everyone. Would you take it to her and ask who it belongs to?"
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "I would go, but this forest gate is surprisingly comfortable."
+          },
+          {
+            "ask": "Deliver the postcard?",
+            "options": [
+              "Sure",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 47
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 47,
+            "to": "origin"
+          },
+          {
+            "arrive": 47
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_trav_the_goat"
+      },
+      "doneScene": [
+        {
+          "walk": 47,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 47
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "She knew. Of course she knew. She said it was for her, which is strange, because I have never met her. Or have I."
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "Here. Thank you for the mystery. It was worth the walk."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 47,
+          "to": "origin"
+        },
+        {
+          "arrive": 47
+        }
+      ]
+    },
+    {
+      "id": "p_fisher_bite",
+      "title": "Waiting for a bite",
+      "giver": "Fisherman",
+      "short": "Waiting bite",
+      "text": "The Fisherman says the fish are scared of the Gizamon. Beat four Gizamon at Shell Beach so the water goes quiet.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Gizamon"
+          ],
+          "count": 4,
+          "maps": [
+            "s340",
+            "s341"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 380,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 282,
+            "map": "s340"
+          }
+        ],
+        "level": 3
+      },
+      "offer": {
+        "npc": 282,
+        "name": "Fisherman",
+        "maps": [
+          "s340"
+        ],
+        "lines": [
+          "The water is not the problem. The fish are not the problem. The Gizamon are the problem.",
+          "Four of them, thrashing about, and every fish within a mile is hiding. Quieter water, better bite.",
+          "I do not mind waiting. But I would like to wait with a bite."
+        ],
+        "doneLines": [
+          "The water is quiet. A fish nibbled just now. It was polite about it.",
+          "Take this. The sea gave it to me, and I am giving it to you. That is how the sea works."
+        ],
+        "remindLines": [
+          "Four Gizamon at Shell Beach. The fish are watching from the deep.",
+          "I am in no hurry. But the tide is."
+        ],
+        "ask": "Quiet the water?",
+        "scene": [
+          {
+            "walk": 282,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 282
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "The water is not the problem. The fish are not the problem. The Gizamon are the problem."
+          },
+          {
+            "together": 282,
+            "dist": 130
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "Four of them, thrashing about, and every fish within a mile is hiding. Quieter water, better bite."
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "I do not mind waiting. But I would like to wait with a bite."
+          },
+          {
+            "ask": "Quiet the water?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 282
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 282,
+            "to": "origin"
+          },
+          {
+            "arrive": 282
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 282,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 282
+        },
+        {
+          "say": 282,
+          "name": "Fisherman",
+          "text": "The water is quiet. A fish nibbled just now. It was polite about it."
+        },
+        {
+          "say": 282,
+          "name": "Fisherman",
+          "text": "Take this. The sea gave it to me, and I am giving it to you. That is how the sea works."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 282,
+          "to": "origin"
+        },
+        {
+          "arrive": 282
+        }
+      ]
+    },
+    {
+      "id": "p_fisher_big_one",
+      "title": "The big one",
+      "giver": "Fisherman",
+      "short": "The big one",
+      "text": "The Fisherman swears there is a Shellmon big as a boat off Plug Cape. Defeat one.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Shellmon"
+          ],
+          "count": 1,
+          "maps": [
+            "s345",
+            "s346"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 800,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 282,
+            "map": "s340"
+          }
+        ],
+        "level": 12,
+        "done": "p_fisher_bite"
+      },
+      "offer": {
+        "npc": 282,
+        "name": "Fisherman",
+        "maps": [
+          "s340"
+        ],
+        "lines": [
+          "There is a shell off Plug Cape the size of a rowboat. Everyone tells me it is a rock. It moves.",
+          "A Shellmon. Maybe the oldest one. It has been listening to the sea since before the pier. I would like to know it is not angry.",
+          "Fight it, if you must. Gently, if you can. And tell me what it said."
+        ],
+        "doneLines": [
+          "So it was a Shellmon, and it was only sleepy. That explains the tide.",
+          "Here is your pay, and my thanks. The sea sends hers too."
+        ],
+        "remindLines": [
+          "The big shell off Plug Cape. It moves. It listens. It has opinions.",
+          "Be gentle with it. It is older than the pier."
+        ],
+        "ask": "Find the big one?",
+        "scene": [
+          {
+            "walk": 282,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 282
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "There is a shell off Plug Cape the size of a rowboat. Everyone tells me it is a rock. It moves."
+          },
+          {
+            "together": 282,
+            "dist": 130
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "A Shellmon. Maybe the oldest one. It has been listening to the sea since before the pier. I would like to know it is not angry."
+          },
+          {
+            "say": 282,
+            "name": "Fisherman",
+            "text": "Fight it, if you must. Gently, if you can. And tell me what it said."
+          },
+          {
+            "ask": "Find the big one?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 282
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 282,
+            "to": "origin"
+          },
+          {
+            "arrive": 282
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_fisher_bite"
+      },
+      "doneScene": [
+        {
+          "walk": 282,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 282
+        },
+        {
+          "say": 282,
+          "name": "Fisherman",
+          "text": "So it was a Shellmon, and it was only sleepy. That explains the tide."
+        },
+        {
+          "say": 282,
+          "name": "Fisherman",
+          "text": "Here is your pay, and my thanks. The sea sends hers too."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 282,
+          "to": "origin"
+        },
+        {
+          "arrive": 282
+        }
+      ]
+    },
+    {
+      "id": "p_lookout_ship",
+      "title": "A ship, maybe",
+      "giver": "Lookout Boy",
+      "short": "A ship, maybe",
+      "text": "The Lookout Boy thinks he saw a ship on the horizon. Visit Shell Beach and the Wire Forest entrance and see whether anyone else saw it too.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "maps": [
+            "s340",
+            "s335"
+          ],
+          "count": 2,
+          "label": "Visit Shell Beach and the Wire Forest entrance"
+        }
+      ],
+      "reward": {
+        "bits": 300,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 283,
+            "map": "s345"
+          }
+        ],
+        "level": 3
+      },
+      "offer": {
+        "npc": 283,
+        "name": "Lookout Boy",
+        "maps": [
+          "s345"
+        ],
+        "lines": [
+          "Report! I saw a ship on the horizon. A real one. White sails. I think.",
+          "Nobody believes me. The cape is too windy to hear properly. Could you go to Shell Beach and the forest gate and ask around?",
+          "If someone else saw it, I will stop being sure I was dreaming."
+        ],
+        "doneLines": [
+          "Someone saw it! Not sails, a very big cloud shaped like sails. But it counts!",
+          "Here. A lookout always pays his scouts. It is in the manual. I am writing the manual."
+        ],
+        "remindLines": [
+          "Shell Beach and the forest gate. Did anyone see white sails? Report back.",
+          "I am watching the horizon. Do not worry. I never blink."
+        ],
+        "ask": "Ask around?",
+        "scene": [
+          {
+            "walk": 283,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 283
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "Report! I saw a ship on the horizon. A real one. White sails. I think."
+          },
+          {
+            "together": 283,
+            "dist": 130
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "Nobody believes me. The cape is too windy to hear properly. Could you go to Shell Beach and the forest gate and ask around?"
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "If someone else saw it, I will stop being sure I was dreaming."
+          },
+          {
+            "ask": "Ask around?",
+            "options": [
+              "Aye aye",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 283
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 283,
+            "to": "origin"
+          },
+          {
+            "arrive": 283
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 283,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 283
+        },
+        {
+          "say": 283,
+          "name": "Lookout Boy",
+          "text": "Someone saw it! Not sails, a very big cloud shaped like sails. But it counts!"
+        },
+        {
+          "say": 283,
+          "name": "Lookout Boy",
+          "text": "Here. A lookout always pays his scouts. It is in the manual. I am writing the manual."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 283,
+          "to": "origin"
+        },
+        {
+          "arrive": 283
+        }
+      ]
+    },
+    {
+      "id": "p_lookout_tuskmon",
+      "title": "Something large in the surf",
+      "giver": "Lookout Boy",
+      "short": "Surf shape",
+      "text": "The Lookout Boy keeps reporting a large grey shape near Plug Cape. Beat a Coelamon and a Tuskmon and see if the shape is gone.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Coelamon"
+          ],
+          "count": 2,
+          "maps": [
+            "s345",
+            "s346"
+          ]
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Tuskmon"
+          ],
+          "count": 1,
+          "maps": [
+            "s345",
+            "s346"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 650,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 283,
+            "map": "s345"
+          }
+        ],
+        "level": 10,
+        "done": "p_lookout_ship"
+      },
+      "offer": {
+        "npc": 283,
+        "name": "Lookout Boy",
+        "maps": [
+          "s345"
+        ],
+        "lines": [
+          "Report! A large grey shape in the surf. It moves slowly. It blows water. I think it is thinking about me.",
+          "A couple of Coelamon and a Tuskmon have been hanging around. I think one of them is the shape.",
+          "I cannot fight. I can only report. Please. For the cape."
+        ],
+        "doneLines": [
+          "The shape is gone! Or it is hiding. Either way, I am safe. Mostly.",
+          "A reward, from the lookout fund. It is mostly pebbles, but some of it is real."
+        ],
+        "remindLines": [
+          "Two Coelamon and a Tuskmon around Plug Cape. The shape is watching me.",
+          "I will keep reporting. That is my job. It is a good job."
+        ],
+        "ask": "Clear the surf?",
+        "scene": [
+          {
+            "walk": 283,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 283
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "Report! A large grey shape in the surf. It moves slowly. It blows water. I think it is thinking about me."
+          },
+          {
+            "together": 283,
+            "dist": 130
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "A couple of Coelamon and a Tuskmon have been hanging around. I think one of them is the shape."
+          },
+          {
+            "say": 283,
+            "name": "Lookout Boy",
+            "text": "I cannot fight. I can only report. Please. For the cape."
+          },
+          {
+            "ask": "Clear the surf?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 283
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 283,
+            "to": "origin"
+          },
+          {
+            "arrive": 283
+          }
+        ]
+      },
+      "requires": {
+        "done": "p_lookout_ship"
+      },
+      "doneScene": [
+        {
+          "walk": 283,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 283
+        },
+        {
+          "say": 283,
+          "name": "Lookout Boy",
+          "text": "The shape is gone! Or it is hiding. Either way, I am safe. Mostly."
+        },
+        {
+          "say": 283,
+          "name": "Lookout Boy",
+          "text": "A reward, from the lookout fund. It is mostly pebbles, but some of it is real."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 283,
+          "to": "origin"
+        },
+        {
+          "arrive": 283
+        }
+      ]
     }
   ]
 }
