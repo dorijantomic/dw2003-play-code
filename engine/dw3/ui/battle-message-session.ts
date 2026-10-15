@@ -83,6 +83,12 @@ export interface BattleMessageSessionOptions {
     textOf: BattleMessageTextOf;
     /** Draws the window picture and the prompt. Supplied by the browser adapter. */
     paint: (frame: BattleMessageFrame) => void;
+    /**
+     * `[0x80055C48](id)`: the packed-sound player. The reveal machine calls it with
+     * `BATTLE_MESSAGE_PRESS_SOUND` on the Circle press that reads the line — the
+     * original's own blip, and the loss's "Annihilated..." close is one of its calls.
+     */
+    playSound?: ((id: number) => void) | undefined;
 }
 
 /**
@@ -206,7 +212,7 @@ export class BattleMessageSession {
             ? String(lines[0] ?? "")
             : this.options.textOf(BATTLE_MESSAGE_BANK, this.index1);
         this.template2 = this.options.textOf(BATTLE_MESSAGE_BANK, this.index2);
-        this.reveal = new BattleMessageReveal(lines);
+        this.reveal = new BattleMessageReveal(lines, { playSound: this.options.playSound });
         this.reveal.builtByVm();
         this.up = true;
         this.closed = false;
@@ -251,7 +257,8 @@ export class BattleMessageSession {
         this.index2 = battleMessageLineIndex(kind, 1, payload) ?? 0;
         this.template1 = this.options.textOf(BATTLE_MESSAGE_BANK, this.index1);
         this.template2 = this.options.textOf(BATTLE_MESSAGE_BANK, this.index2);
-        this.reveal = new BattleMessageReveal(this.index2 < 0 ? [""] : ["", ""]);
+        this.reveal = new BattleMessageReveal(this.index2 < 0 ? [""] : ["", ""],
+            { playSound: this.options.playSound });
         // The VM's own two writes on the way in: `.L0x800995b4 sw $v0, 0x74($s4)` sets the
         // "a message was built" flag phase 0 waits on, and `.L0x80099614 sw $zr,
         // 0x78($s4)` rewinds the cursor the reveal machine walks.

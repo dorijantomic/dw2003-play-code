@@ -440,22 +440,25 @@ export function lossFadeArm(
 
 /**
  * F0x8008AA08(self). A state under 1 raises itself to 1 and draws nothing; state 1
- * adds the step to the level, and on the fade-IN arm only stores it: the fade-out arm
- * (`.L0x8008AA84`) leaves the level word alone while it still has room and writes 0 plus
- * state 2 the tick it first goes under, so a level read during a fade-out is the one the
- * arm started at. State 1 bounds pass -> state 2; state 2 draws and stops moving; state 3
- * draws nothing. The draw itself is F0x8008A8C4's GPU primitive, which is the painter's;
- * what the port owns is the level it reads.
+ * adds the step to the level and stores it — `.L0x8008AA68 sw $v0, 0x5c($a1)` is the
+ * DIRECTION TEST's own delay slot, so the store happens on both arms, and the
+ * fade-out arm (`.L0x8008AA84`) is the one that ends the ramp: `bgez $v0, .L0x8008AA94`
+ * draws while the level is still >= 0, and the first tick the sum would go under zero
+ * stores 0 and raises state 2. State 1 bounds pass -> state 2; state 2 draws and stops
+ * moving; state 3 draws nothing, and any state past the table (or under 2) is written
+ * back to 1 and left there. The draw itself is F0x8008A8C4's GPU primitive, which is
+ * the painter's; what the port owns is the level it reads.
  */
 export function lossFadeTick(mem: BattleLossMemory, fade: number): void {
     const state = s32(mem.read32(fade + LOSS_STATE));
-    if (state === 3) return;
-    if (state === 0) { mem.write32(fade + LOSS_STATE, 1); return; }
-    if (state !== 1) return;
+    if (state === 2 || state === 3) return;
+    if (state !== 1) { mem.write32(fade + LOSS_STATE, 1); return; }
     if (s32(mem.read32(fade + LOSS_FADE_RAMP)) === 0) return;
     const level = s32(mem.read32(fade + LOSS_FADE_LEVEL)) + s32(mem.read32(fade + LOSS_FADE_STEP));
+    // The delay-slot store: the level the tick computed lands in the word on BOTH arms,
+    // so a level read during a fade-out is the ramping value, never the arming one.
+    mem.write32(fade + LOSS_FADE_LEVEL, level);
     if (s32(mem.read32(fade + LOSS_FADE_DIRECTION)) === 0) {
-        mem.write32(fade + LOSS_FADE_LEVEL, level);
         if (level > LOSS_FADE_LEVEL_MAX) {
             mem.write32(fade + LOSS_FADE_LEVEL, LOSS_FADE_LEVEL_MAX);
             mem.write32(fade + LOSS_STATE, 2);

@@ -146,16 +146,20 @@ async function driveToLoss(page, query) {
   // Let the turn play out. The message line holds the turn until Circle, so the
   // attack's own line has to be dismissed for the blow to land; but once the loss
   // beat (state 9) is up, pressing again would skip the very camera this check
-  // samples. So press only while an action or a result line is waiting; the states
-  // of a replacement chain (11 the Tag list, 12 the species strip, 14 the arrival
-  // prompt, 15 the DNA row list) are here for the case where one is ever reached.
+  // samples. So press while an action or a result line is waiting, and while the
+  // command menu (state 2) is back up: a MISSED enemy blow returns the turn there
+  // without touching the party, and only a landed blow can lose this fight, so the
+  // loop keeps choosing FIGHT until one lands. The states of a replacement chain
+  // (11 the Tag list, 12 the species strip, 14 the arrival prompt, 15 the DNA row
+  // list) are here for the case where one is ever reached.
   const trail = [];
   let guard = 0;
   while (guard++ < 200) {
     const s = await state(page);
     if (trail.at(-1) !== s) trail.push(s);
     if (s === 9) break;
-    if (s === 5 || s === 6 || s === 7 || s === 11 || s === 14 || s === 15) await pressFrame(page, "Enter");
+    if (s === 2 || s === 5 || s === 6 || s === 7 || s === 11 || s === 14 || s === 15)
+      await pressFrame(page, "Enter");
     await page.waitForTimeout(150);
   }
   console.log("state trail", JSON.stringify({ armed, trail, polls: guard }));

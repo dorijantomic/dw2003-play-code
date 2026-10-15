@@ -149,8 +149,16 @@ export function createSaveTranslated(sfx = null) {
             const c = JSON.parse(localStorage.getItem("cardCollection") ?? "null");
             if (c) cards = { ...c, folders: (c.folders ?? []).map(f => ({ cards: f.cards })) };
         } catch {}
+        // The card's block describes the last-saved slot (the disc stamps it at
+        // save time and reads it back on every open), so the chooser opens on
+        // the file the player last wrote. writeSlot records it on every save.
+        let lastSlot;
+        try {
+            const v = Number(localStorage.getItem("mcardLastSlot"));
+            if (Number.isInteger(v) && v >= 0 && v <= 2) lastSlot = v;
+        } catch {}
         return {
-            reserves, residentImage, cards,
+            reserves, residentImage, cards, lastSlot,
             storedFlags: JSON.parse(localStorage.getItem("engineFlags") ?? "{}"),
             progressOrdinal: state.progressOrdinal ?? 0,
             packId: ({A:0,B:1,C:2})[state.packId] ?? 0,

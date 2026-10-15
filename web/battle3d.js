@@ -17,7 +17,8 @@ import { createIdleDirector, createIdleClock, idleDirectorTick } from "./fight/b
 import { FightCoordinator } from "./fight/fight-coordinator.js";
 import { setMoveSpeed } from "./fight/action-vm.js";
 import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
-import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP } from "./fight/fight-tables.js";
+import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP, setItemUseEffects, itemUseEffect,
+         setThrowItemEffects, throwItemEffect } from "./fight/fight-tables.js";
 import { setFallbackDonor } from "./fight/clip-fallback.js";
 import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
@@ -33,6 +34,7 @@ import { ui, arenaPlacement, patchCopyRect, ARENA_BASE_Z,
   slowMotionStep, setSlowMotion as engineSetSlowMotion,
   SLOW_MO_PUBLISH_AT, SLOW_MO_ACCUM_COST,
   actorTeardown, ACTOR_RES_OFFSETS, ACTOR_TEARDOWN_STATE,
+  RAND_U16,
   createBattleOpenCamera } from "./vendor/engine.js";
 const { createBattleFaceBox, battleFaceBoxVisible } = ui;
 
@@ -1399,6 +1401,24 @@ export function createBattle3D(canvas, sfx = null) {
     // sig-0 special is silent on this path in the original too — do not invent one.
     specialLoopKey = entry.sound >= 0 ? (specialLoopMap[String(entry.sound)] || null) : null;
   }
+  // The THROW band's element pack: the item arm's motion id IS the sig (34/37/40/43/46/49/52
+  // for the seven field items), so the pack is bySig[motion] — the same MEFT10<motion> pack the
+  // tech path shows for that element. Item 84 rolls its motion, so its pack follows the rolled
+  // element. Clips 14/17 (items 85-90) carry no op4, so arming is a no-op for them.
+  function backdropEntryForSig(sig) {
+    const m = backdropManifest;
+    if (!m || !m.bySig || sig == null) return null;
+    const entry = m.bySig[String(sig)];
+    return entry ? { pack: entry.pack, sound: entry.sound != null ? entry.sound : -1 } : null;
+  }
+  function armThrowBackdrop(sig) {
+    const entry = backdropEntryForSig(sig);
+    dataFieldArmed = !!entry;
+    dataFieldOn = false;
+    if (!entry) return;
+    activeBackdrop = loadBackdropPack(entry.pack);
+    specialLoopKey = entry.sound >= 0 ? (specialLoopMap[String(entry.sound)] || null) : null;
+  }
   /** The acting clip's op4 motion, straight from the VM: 0 = return to the arena, else the pack. */
   function dataFieldMotion(motion) {
     if (!dataFieldArmed) return;
@@ -1615,6 +1635,15 @@ export function createBattle3D(canvas, sfx = null) {
   // The donor for clips a model lacks (enemy-only species): a player species with the whole set. Greymon's pack.
   fetch("assets/battle/models/m005grey/anim.json")
     .then(r => (r.ok ? r.json() : null)).then(j => setFallbackDonor(j?.actions)).catch(() => {});
+  // The item machine's use-effect table (fightstg 0x800a336c, tools/extract_item_use_effects.py):
+  // the used item's op3 effect type and its op10 contact sound. Feeds playPlayerItemUse below.
+  fetch("assets/data/item_use_effects.json")
+    .then(r => (r.ok ? r.json() : null)).then(setItemUseEffects).catch(() => {});
+  // The item machine's THROW-band table (fightstg 0x80082ee4's typed arms,
+  // tools/extract_throw_item_effects.py): per item 77-90 the clip, motion, effect and sound its
+  // arm writes. Feeds playPlayerThrowItem below.
+  fetch("assets/data/throw_item_effects.json")
+    .then(r => (r.ok ? r.json() : null)).then(setThrowItemEffects).catch(() => {});
   loadEffectAssets().then(a => {
     effectAssets = a;
     effectPlayer = new EffectPlayer(a.manifest);
@@ -2612,6 +2641,51 @@ export function createBattle3D(canvas, sfx = null) {
       ? playerAnim8r.setAction(clip, _playerHooks(_fxHooks("player", hooks)))
       : false;
   }
+  // The item machine's own entry (FIGHTSTG_F0x8008d3b4's default arm, fightstg.s:11008-11030):
+  // clip 10 plus the used item's record fields from the 0x800a336c table — effect -> actor+0x6c
+  // (clip 10's op3 9999 spawn resolves it) and sound -> actor+0x70 (the item's op10 99 strike
+  // reads it; the attack path's own writer .L0x8008f21c-.L0x8008f234 is what contactSoundTypeFor
+  // ports). An item with no table record writes neither field, exactly as the disc's scan falls
+  // through — so contactSoundType is cleared rather than left holding the previous attack's.
+  function playPlayerItemUse(itemId, hooks = {}) {
+    const rec = itemUseEffect(itemId);
+    playerAnim = `item:${itemId}`;
+    contactSoundType.player = rec ? rec.sound : null;
+    contactEvade.player = false;   // no accuracy roll on the item path
+    return playerAnim8r
+      ? playerAnim8r.setAnimByItem(itemId, _playerHooks(_fxHooks("player", hooks)))
+      : false;
+  }
+  // The item machine's THROW entry (FIGHTSTG_F0x8008d3b4's state-0 typed arms, ids 77-90): the
+  // item's record names the clip and the fresh action actor's motion (+0x68), effect (+0x6c) and
+  // sound (+0x70) — tools/extract_throw_item_effects.py. The clip plays with the record's effect
+  // as its current effect (op3's 9999 sentinel) and its motion as the actor's current motion
+  // (op4's 0x38 sentinel); the record's sound is the op10 99 strike's contact-sound type. The
+  // clip-15 items (77-84) are the element fields: their motion is the element's sig, so the pack
+  // MEFT10<motion> is armed for the clip's own op4 to switch in and out — exactly the tech
+  // backdrop's rule (armDataField above). `branch` picks item 88's STR/DEF effect/sound pair;
+  // `elementIndex` supplies item 84's rolled element (the draw the engine's handler already made)
+  // so the motion, the pack and the field all agree on one roll.
+  function playPlayerThrowItem(itemId, { branch = null, elementIndex = null, hooks = {} } = {}) {
+    const rec = throwItemEffect(itemId);
+    if (!rec) return false;   // table not loaded -> the caller keeps the default clip-10 entry
+    playerAnim = `throw:${itemId}`;
+    contactSoundType.player = (branch != null && rec.sound_branch && rec.sound_branch[branch] != null)
+      ? rec.sound_branch[branch]
+      : rec.sound;
+    contactEvade.player = false;   // no accuracy roll on the item path
+    let motion = rec.motion;
+    if (rec.motion_random) {
+      const count = rec.motion_random.count | 0;
+      const k = (elementIndex != null ? elementIndex | 0 : (RAND_U16() % count)) % count;
+      motion = rec.motion_random.base + rec.motion_random.step * k;
+    }
+    armThrowBackdrop(motion);      // the clip's op4 switches the element pack in and out
+    const h = { ...hooks, onMotion: (m) => { dataFieldMotion(m); hooks.onMotion?.(m); } };
+    return playerAnim8r
+      ? playerAnim8r.setAnimByThrowItem(itemId, _playerHooks(_fxHooks("player", h)), { branch, motion })
+      : false;
+  }
   // A presentation plays as several successive scripts — the DNA cut-in is split at its op0
   // barriers — and NOTHING here touches the camera record. The record outlives the script that
   // installed it (there is no expiry anywhere in the original), so a segment's op5 carries into
@@ -3184,7 +3258,14 @@ export function createBattle3D(canvas, sfx = null) {
     //
     // The retire cut itself is applied by `retireIdleDirector` on the confirm edge, not here.
     const modeH = 120 / Math.tan(fovRad / 2);
-    if (!camScriptOwned) {
+    // The defeat shot is the ONE exception to the script gate: F0x8008C93C's entry tick cuts
+    // `camMgr->[0x104](0, 0xB)` and its phases re-apply that record through [0xf8] every
+    // frame with no test of any script — and the loss branch fires while the enemy's own
+    // action script is still running (the controller's step runs before its children's), so
+    // gating this cut on `camScriptOwned` left the retire shot on screen for the whole loss
+    // beat and the defeat shot was never seen. The loss camera takes the one live record,
+    // exactly as `setCameraMode`'s own note says the victory / loss / tag cameras do.
+    if (!camScriptOwned || camMode === "defeat") {
       // The opening flourish installed its own record in the "opening" arm above — a cut or a
       // glide — and once it self-destructs the record holds the plain arena re-cut it left. The
       // battle's generic behind/over-the-shoulder shot must not overwrite it.
@@ -3789,6 +3870,8 @@ export function createBattle3D(canvas, sfx = null) {
     setEnemyAnim,
     playPlayerVictory,
     playPlayerActionClip,
+    playPlayerItemUse,
+    playPlayerThrowItem,
     playPlayerScript,
     setPlayerAnimByTech,
     setEnemyAnimByTech,

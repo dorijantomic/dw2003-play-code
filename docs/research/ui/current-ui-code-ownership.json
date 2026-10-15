@@ -1,13 +1,13 @@
 {
   "generatedBy": "tools/report_ui_code_ownership.mjs",
-  "generatedAt": "2026-10-14T11:53:55.906Z",
+  "generatedAt": "2026-10-14T22:52:22.032Z",
   "scope": "Normal default browser routes, named subpanels, top-level web JS/HTML files, every translation registry row and every shipped bridge entry. Original binary instruction coverage is bounded by the optional runtime probe; not all gameplay paths have been executed.",
   "sourceHashes": {
-    "web/game.js": "4a7ebd15f68274ee296a5b14ef7555e1ca882f9f214054ffa7d2597ad19f872d",
-    "web/battle.js": "9ff6b81991772ea964d706b56aba1523c31fa27f74835541f422ebd9fa23d954",
+    "web/game.js": "d26a59aeab6920b5658b073d697444d479969b5f9288662cbe00e851416f4240",
+    "web/battle.js": "66677f613b3d53548f5c4a2dbb7b1e9fb0cceb99d945c176d01e3c99e91bcb9c",
     "web/native-screen-host.js": "71af02373050f4d98e821555b11a0255221a182670a475832b21cf57dd881299",
     "web/native-screen.js": "1072400c655b16c5b9319ad2faf32ab622f628cd70c8f0292c9b5833ae2e1ef2",
-    "web/vendor/engine.js": "3e4af3ece2448cfdb11e458685da029fafca105da505732ec2552d1c35f9a440",
+    "web/vendor/engine.js": "8df3b3efcb4fdad81ef4d776e11ce020d8e77bd0327cdd2cf5aeac95fb25d9fa",
     "engine/native/bridge.ts": "e6ea3af4d17699245e53cd9fa000e70e93c449a25cc4663ba4a75988899c44b9",
     "data/translated_functions.json": "636d4c67d36c0a717a60ed2568dcda5069beed267392bb3eb43de0003f4071fa",
     "web/assets/native/screens/manifest.json": "35384e62a16c63c409a9a2cde42dd7de8043b799091f85f0de8ece167f1cda08"
@@ -878,6 +878,7 @@
         "./wfightmn-native.js",
         "./wfight-translated.js",
         "./fight/effect-player.js",
+        "./fight/fight-tables.js",
         "./blast-presentation.js",
         "./assets.js",
         "./vendor/engine.js",

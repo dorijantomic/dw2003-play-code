@@ -80,7 +80,7 @@ function detachedSlot() {
 }
 
 export class ActionVM {
-  constructor(script, { timelineForTable = null, baseTable = null, moveSpeed = MOVE_SPEED, hooks = {}, currentEffect = null, slot = null } = {}) {
+  constructor(script, { timelineForTable = null, baseTable = null, moveSpeed = MOVE_SPEED, hooks = {}, currentEffect = null, currentMotion = null, slot = null } = {}) {
     this.ops = Array.isArray(script?.ops) ? script.ops : [];
     this.timelineForTable = timelineForTable;   // (tableIndex) -> TimelinePlayer | null  (op2 bind)
     // () -> the actor's BASE idle table (the anim object's +0x18): 0 = normal idle, 1 = the low-HP
@@ -90,6 +90,10 @@ export class ActionVM {
     this.slot = slot || detachedSlot();         // the motion object's write target (F0x8009b13c +0x5c)
     this.hooks = hooks;
     this.currentEffect = currentEffect;         // actor +0x6c: the tech's effect type (op3 9999)
+    // actor +0x68: the motion the machine wrote before the clip started (the item machine's typed
+    // arms write it; techs leave it unset). Read by op4's 0x38 sentinel — a clip that plays "the
+    // current motion" resolves it from here. null = no machine-supplied motion.
+    this.currentMotion = currentMotion;
     this.ip = 0;
     this.player = null;          // active TimelinePlayer (the single slot's motion sampler)
     this.lastMotion = null;      // motionId of the last op4 envelope (0 = return-to-base)
@@ -124,7 +128,7 @@ export class ActionVM {
     //      motion object outlives the script, so its landing pose must be written before the VM ends.
     if (this._terminating) {
       this._holdTicks += delta;
-      if (((!this.player || this.player.ended) && !this._rampBusy()) || this._holdTicks > HOLD_CAP) {
+      if (this._motionSettled() || this._holdTicks > HOLD_CAP) {
         this.ended = true;
       }
       return;
@@ -146,7 +150,7 @@ export class ActionVM {
         // op4 motion 0 explicitly returned the actor to its base/idle envelope.  That table loops,
         // so waiting for player.ended would incorrectly pin the preceding tech/low-HP stance until
         // HOLD_CAP.  The script's authored waits already completed before this terminator.
-        if (this.lastMotion === 0 || ((!this.player || this.player.ended) && !this._rampBusy())) this.ended = true;
+        if (this._motionSettled()) this.ended = true;
         return;
       }
 
@@ -172,8 +176,21 @@ export class ActionVM {
     }
     if (this.ip >= this.ops.length) {                         // ran off the end → hold until motion ends
       this._terminating = true;
-      if (this.lastMotion === 0 || ((!this.player || this.player.ended) && !this._rampBusy())) this.ended = true;
+      if (this._motionSettled()) this.ended = true;
     }
+  }
+
+  // The terminator hold waits for the motion the script itself started. The settled cases:
+  //   lastMotion === 0    op4 returned the actor to its base envelope (that table loops, so
+  //                       waiting for player.ended would pin the pose until HOLD_CAP);
+  //   lastMotion === null no table envelope was ever played by the script — a seeded idle
+  //                       envelope must NOT pin the pose to HOLD_CAP (the op4-less typed item
+  //                       clips 14/17), but a slot RAMP (op2 mode 5) still has to land;
+  //   otherwise           the bound table has ended and no slot motion is still running.
+  _motionSettled() {
+    if (this.lastMotion === 0) return true;
+    if (this.lastMotion === null) return !this._rampBusy();
+    return (!this.player || this.player.ended) && !this._rampBusy();
   }
 
   // op2 [mode, slot, table?] — returns false if this op BLOCKS (caller rewinds IP and yields this tick),
@@ -372,8 +389,12 @@ export class ActionVM {
     const mem = this._portMem(rec);
     mem.write32(ACT + 0x8c, OP);                       // the handler's IP = the operand scratch
     mem.write32(ACT + 0x50, this.slot?.sideSign === -1 ? 1 : 0);   // side
-    mem.write32(ACT + 0x68, this.lastMotion || 0);      // the actor's current motion
-    mem.write32(ACT + 0x6c, this.currentEffect || 0);   // current effect (+0x6c / +0x70)
+    mem.write32(ACT + 0x68, this.currentMotion ?? this.lastMotion ?? 0);   // the actor's current motion
+    // actor+0x6c is the CURRENT EFFECT (op3's 9999 sentinel reads it: fightstg.s .L0x8008bcc0).
+    // actor+0x70 is a DIFFERENT field — the CONTACT SOUND op10's 0x62/0x63 strike reads
+    // (F0x8008c454). The browser resolves that sound itself in battle3d (contactSoundTypeFor)
+    // and the ported op10 does not consume the value, so the effect stands in for it here.
+    mem.write32(ACT + 0x6c, this.currentEffect || 0);
     mem.write32(ACT + 0x70, this.currentEffect || 0);
     const host = this._portHost(rec);
     const fn = { op1: op1Handler, op3: op3Handler, op4: op4Handler, op5: op5Handler, op6: op6Handler, op7: op7Handler, op10: op10Handler }[name];

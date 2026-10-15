@@ -241,6 +241,13 @@ export interface BattleItemResult {
   pages: BattleItemPage[];
   /** True when the handler dealt direct damage (caller re-checks enemy KO). */
   dealtDamage?: boolean;
+  /** Item 84 (UnknownField): the element roll this handler made, 0..6 (FIELD_ELEMENTS order).
+   *  The item machine's throw arm rolls the SAME %7 for its motion (fightstg .L0x8008d44c), so
+   *  the presentation reads this draw instead of rolling a second time. */
+  elementIndex?: number;
+  /** Item 88 (CursedPuppet): the STR/DEF branch the handler took — the same ctx+0x7c flag the
+   *  arm's producer sets, which selects the effect/sound pair in its tail. */
+  statBranch?: "str" | "def";
 }
 
 const ALL_AILMENTS = ["poison", "frozen", "confuse", "sleep"];
@@ -503,7 +510,11 @@ export function useBattleItem(
     case 84: { // UnknownField — random element, power 127; the id is element + 0x61
       const el = FIELD_ELEMENTS[rng() % FIELD_ELEMENTS.length]!;
       opts.setField?.(el, 127);
-      return { ok: true, pages: [oneLinePage(fieldMessageId(FIELD_ELEMENTS.indexOf(el) + 2))] };
+      // elementIndex: the one roll above also picks the item machine's throw motion (arm
+      // .L0x8008d44c: motion = 0x22 + 3*(rand%7)) and with it the element pack the clip
+      // shows, so the presentation reads the SAME draw rather than rolling again.
+      return { ok: true, pages: [oneLinePage(fieldMessageId(FIELD_ELEMENTS.indexOf(el) + 2))],
+               elementIndex: FIELD_ELEMENTS.indexOf(el) };
     }
 
     case 85: { // CrimsonCable — exactly maxHP/5; a KO hands the user NOTHING
@@ -553,7 +564,11 @@ export function useBattleItem(
       if (enemy.str === enemy.def) return none;
       const stat = enemy.str > enemy.def ? "str" : "def";
       reduceStatBy(enemy, stat, Math.abs(enemy.str - enemy.def));
-      return { ok: true, pages: [enemyPage(stat === "str" ? 0x33 : 0x34, enemyName)] };
+      // statBranch: the arm's own producer (.L0x8008d550-.L0x8008d69c) sets ctx+0x7c to
+      // 1 (STR) or 2 (DEF) and its tail picks the effect/sound pair from it, so the
+      // presentation needs the branch this handler just took.
+      return { ok: true, pages: [enemyPage(stat === "str" ? 0x33 : 0x34, enemyName)],
+               statBranch: stat };
     }
 
     case 89:

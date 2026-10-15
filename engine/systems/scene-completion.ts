@@ -190,6 +190,34 @@ export function applySetFlag(
   if (policy.stored(bank)) sink.setFlag(id, value);
 }
 
+/** The screen-pack kind of a card duel (`D0x8008b770(0x700, …)`). */
+export const CARD_DUEL_SCREEN_CODE = 0x700;
+
+/** The field's screen-close housekeeping for a card duel — `F0x800169e0`, the
+ *  resident export slot `D0x80048ad4` (`fns.s` `.L0x800169e0-.L0x80016a90`). The
+ *  field calls it on (re)entry (`pro/fieldstg.s` `.L0x00007ff4-.L0x00008000`
+ *  loads slot `+0x18` of the export base `D0x80048abc`, right before the entry
+ *  writes the screen's own visited marker at `0x1e00 + screen`), and it asks the
+ *  previous-screen-code getter (`D0x8004b448` = `F0x80016b58` → `D0x8004b400`):
+ *
+ *    previous screen == 0x700 (the card duel):
+ *      set_flag(0x11, 1)          — flag 17: a duel was played
+ *      set_flag(0x12, 1)          — flag 18: set together with 17
+ *      set_flag(0x10, latch != 0) — flag 16: the duel's own result (1 = won)
+ *      D0x80048ac0 = 0            — clear the latch (bank-0 word 1)
+ *
+ *  The latch is what `pro/cardgame` writes on a player win (1) or loss (0)
+ *  (claim `cardgame-writes-the-flag-bank-latch-base-relative`); every tamer's
+ *  post-duel dialogue states gate on flags 17/16, and their own close lists
+ *  clear the pair again, which is what makes a challenge one-shot. */
+export function cardDuelCloseWrites(won: boolean): readonly { id: number; value: number }[] {
+  return [
+    { id: 0x11, value: 1 },
+    { id: 0x12, value: 1 },
+    { id: 0x10, value: won ? 1 : 0 },
+  ];
+}
+
 /** Run one event's completion routine: every write, in the original's order.
  *  `policy` is optional; without one, only stored banks are written. */
 export function runSceneCompletion(

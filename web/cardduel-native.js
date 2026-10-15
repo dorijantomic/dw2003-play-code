@@ -131,6 +131,7 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         const state = d._state;
         if (!host || !state) return;
         const won = (host.read(DUEL_WON, 4) >>> 0) === 1;
+        d._won = won; // the field's close housekeeping reads this (resultWon)
         commitBoosterStock(state, BOOSTER_ITEM_IDS, (address, size) => host.read(address, size));
         if (typeof localStorage !== "undefined") localStorage.setItem("inventory", JSON.stringify(state.inventory));
         state.duelWon = won;
@@ -177,6 +178,11 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
     };
 
     d.isOpen = () => d._open;
+
+    /** The duel's own result, for the field's screen-close housekeeping
+     *  (F0x800169e0 writes flags 17/18/16 from the result latch). Set by
+     *  commit() while the screen's RAM is still alive. */
+    d.resultWon = () => d._won === true;
 
     // Input arrives as key events, but the native screen reads the pad service's
     // held word once per frame (state.keys carries every held button).

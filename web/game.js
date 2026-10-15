@@ -1,5 +1,5 @@
 import "./extra-roster.js";   // first: it wraps fetch so digimon.json / evolutions.json carry the extra species
-import { storyCommand } from './vendor/engine.js';
+import { storyCommand, cardDuelCloseWrites } from './vendor/engine.js';
 import { bindCardInventory } from "./cardstate.js";
 import { paintScreenDim, subtractLayer, dimFillStyle } from "./screendim.js";
 import {
@@ -87,6 +87,7 @@ import {
     heldCount,
     listItemIds,
     ownsItem,
+    carriesFolderBag,
     wornCount,
     syncWornFromEquipment,
     setHeldCount,
@@ -307,7 +308,7 @@ import { nativeTextWidgets } from "./native-screen.js";
 import { encodeNativeScreenText } from "./native-screen.js";
 import { decodeNativeText } from "./native-screen-text.js";
 import { createDriMenu } from "./dri.js";
-import { createDriNative } from "./dri-native.js";
+import { createDriNative, slotStats } from "./dri-native.js";
 import { createLabTranslated } from "./lab-translated.js";
 import { createDialogueTranslated } from "./dialogue-translated.js";
 import { createYesNoTranslated } from "./yesno-translated.js";
@@ -820,10 +821,14 @@ const statusOptions = {
     // The map page asks the flag store which places you have walked into — the bits the
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
     map: (state) => pauseMapContext(state, undefined, engineFlagSeen),
-    cardFoldersUnlocked: () => (cards()?.folders?.length ?? 0) > 0,
     // Extra quests: one more row on the pause list (after CARD FOLDERS) and the page it opens.
     extraRow: () => questsPauseRow(),
     questsPage: () => questsPausePage(),
+    // The CARD FOLDERS row's gate: the resident home list's own byte, D0x80048f42 =
+    // save+0x20E = carried[402] — the Folder Bag key item (claim
+    // UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14). It used to read "has
+    // folders", which the boot starter grant makes true for everyone.
+    cardFoldersUnlocked: () => carriesFolderBag(state),
 };
 const status = !USE_NATIVE_STATUS ? null
     : USE_REFERENCE_STATUS ? createStatusNative(sfx, statusOptions)
@@ -936,7 +941,9 @@ menu.onNativePage = (label) => {
 };
 // The same flag store answers the legacy MAP pane's markers (?legacyStatus=1 rollback).
 menu.mapSeen = engineFlagSeen;
-menu.cardFolderUnlocked = () => (cards()?.folders?.length ?? 0) > 0;
+// The same gate as the translated page's seed: the resident byte D0x80048f42 is
+// carried[402], the Folder Bag (UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14).
+menu.cardFolderUnlocked = () => carriesFolderBag(state);
 // Both are hand-offs, not exits: on the disc the Card Album and the folder
 // editor are separate SCREENS the pause page launches through the resident
 // screen launcher (0x1200 / 0x400), and the game's screen manager brings the
@@ -1077,14 +1084,26 @@ window.__fieldMovie = () => fieldMovie.diagnostics();
 // = WSTAG780_PRO (stage 780, Kusanagi City Street Corner — the same place the
 // title's Start option lands).
 //
-// The chain plays through the one field movie adapter. A row whose stream is not
-// shipped yet (MOVIEE01/MOVIEE02 are not in assets/movie/) ends through the
-// adapter's browser-safety abort — logged, not fatal — and the chain still
-// resolves the row's return selector, so the win is never stranded; adding the
-// mp4s to the manifest makes the same code play them. The ordinary win's cue
-// (0x1400) never enters here: the battle only calls this for the 0xE0B cue.
+// The chain plays through the one field movie adapter. Both ending streams ship
+// (web/assets/movie/moviee01.mp4 and moviee02.mp4, by their disc file indices 2035
+// and 2213 in the manifest the title/movie audit verified), so the chain plays them
+// on the movie object's own blank cadence and ends each on the row's own picture
+// count or the pad's START — both decoded end arms. A row whose stream cannot load
+// still ends through the adapter's browser-safety abort — logged, not fatal — and the
+// chain resolves the row's return selector either way, so the win is never stranded.
+// The ordinary win's cue (0x1400) never enters here: the battle only calls this for
+// the 0xE0B cue. Driven end to end by tools/verify_finale_ending_chain.mjs.
 const ENDING_CHAIN_MAX_STEPS = 4;
-async function playEndingChain(launchCode) {
+
+// The movie rows' return chain, shared by every host path that reaches the
+// title overlay's player (the finale's ending hand-off below and a story
+// HANDOFF that names a movie row in doStoryHandoff): play each row the launch
+// code names on the one field movie adapter, and step to the row's own return
+// selector until a selector names no movie — movie row 2's own 0x207 is
+// re-pointed to 0x276 at master ordinal 0x2d (engine/dw3/screen-routing.ts
+// movieReturnScreen, the same rule the router applies below). Returns the
+// first selector that is not a movie (0 when the chain is malformed).
+async function playMovieChain(launchCode) {
     let selector = launchCode | 0;
     for (let step = 0; step < ENDING_CHAIN_MAX_STEPS; step++) {
         if (movieRow(selector) == null) break;
@@ -1094,8 +1113,15 @@ async function playEndingChain(launchCode) {
                 if (!row) { fieldMovieDone = null; resolve(); } // unknown code: never strand
             });
         });
-        selector = movieReturnScreen(selector, state.progressOrdinal === 0x2d) ?? 0;
+        // The ordinal predicate is the router's own (state.progressOrdinal
+        // proxies the engine's $story.ordinal — one source of truth).
+        selector = movieReturnScreen(selector, screenRouterOptions.useAlt()) ?? 0;
     }
+    return selector;
+}
+
+async function playEndingChain(launchCode) {
+    const selector = await playMovieChain(launchCode);
     const routed = screenRouter.route(selector, currentMap().id);
     if (routed?.kind === "warp") {
         startTransition({ to: routed.to, spawnX: null, spawnY: null, dir: "down", scripted: true });
@@ -4854,6 +4880,23 @@ const storyFlags = createFlagStore(flagBackend, {
     // command maintains it in $roster.owned; unset = nothing obtained yet.
     ownedSlots: () =>
         engine ? Number(engine.state.vars.get("$roster.owned") ?? 0) : 0,
+    // Per-slot partner LEVELS for the bank-0x70 op-0x10 case-7 predicate (0x7095:
+    // every OBTAINED slot at level 45+ — the walkthrough's "all 8 partners at
+    // level 45+" gate on the post-game circuit-board cast). A slot's record is
+    // resolved exactly as the DRI resolves it (web/dri-native.js slotStats): the
+    // deployed party's live blocks or the reserve store. An obtained slot with no
+    // record stays out of the map, which keeps the predicate dormant (null)
+    // rather than inventing a level — the walker's never-a-false-spawn rule.
+    partnerLevels: () => {
+        const levels = new Map();
+        const mask = Number(state.rosterOwned) || 0;
+        for (let slot = 0; slot < 8; slot++) {
+            if (!((mask >> slot) & 1)) continue;
+            const rec = slotStats(state, slot);
+            if (rec && Number.isFinite(Number(rec.level))) levels.set(slot, Number(rec.level));
+        }
+        return levels;
+    },
     // Bank 0x7E = the route pair [0x80048d78]/[0x80048d7a], written on every map
     // transition from the step record's params[5]/[6]. It gates the 161 family-B
     // maze NPCs (Seabed/Circuit/endgame + s635/s636): the same physical screen
@@ -5026,6 +5069,19 @@ function applyStoryFlag(id, expected) {
         localStorage.setItem("inventory", JSON.stringify(state.inventory));
         return;
     }
+    // Bank-0x70 op 0x50 (F0x80015d4c): the ACQUISITION FLOURISH — the one table entry
+    // that is a resident-object action rather than a flag. The handler resolves the
+    // player's type-0x16 FIELDCOM actor and calls setSub1(3) (obj+0x10 = 3), which runs
+    // sparkle program 3 and plays packed sound 0x00040009 (ITEM_GET); it is
+    // unconditional, so the written value is discarded (`li $v0,1` / `jr $ra`). The
+    // disc ships it only inside dialogue-state on_close tables, beside the grant — the
+    // talk-close arm is where it fires, so a talk grant's flourish lands with its item
+    // instead of being dropped. The engine's PlaySparkle op drives the same actor.
+    if (id === 0x7013) {
+        state.sparkleActor = { program: 3, start: fieldcomTick() };
+        sfx.play("item_get");
+        return;
+    }
     const command = storyCommand(id);
     if (command) {
         if (engine) engine.writeStoryFlag(id, expected);
@@ -5170,6 +5226,19 @@ function applyStoryCommand(command) {
         }
         return;
     }
+}
+
+// The field's screen-close housekeeping for a card duel — F0x800169e0, the resident
+// export slot 0x80048ad4 (engine/systems/scene-completion.ts cardDuelCloseWrites has
+// the full read). The field runs it on (re)entry; when the previous screen code
+// (D0x8004b400) is 0x700 — the card duel — it sets story flags 17 (a duel was
+// played) and 18, sets flag 16 from the duel's own result latch (1 = the player
+// won), and clears the latch. Every tamer's post-duel dialogue states gate on
+// 17/16 and their close lists clear the pair, which is what makes a challenge
+// one-shot: without these writes the challenge state stays the only reachable
+// one and the NPC re-challenges forever (the walker's pre-fix behaviour).
+function applyCardDuelCloseHousekeeping(won) {
+    for (const write of cardDuelCloseWrites(won === true)) storyFlags.set(write.id, write.value);
 }
 
 /** Open the naming screen: the native pro/stdgname overlay by default, the
@@ -6213,9 +6282,39 @@ function doStoryHandoff(ev, handoff) {
         openMemoryCard("save", null, sp);
         return;
     }
+
+    // A HANDOFF that names a movie row (launch codes 0xE01..0xE0C) is not a
+    // field screen: the disc's resident launcher hands it to the title
+    // overlay's movie player, which plays the row on the console's blank
+    // cadence and only then launches the row's own return selector. The walker
+    // plays the same rows through the one field movie adapter, then routes the
+    // selector the chain ended on. This is the s780 reunion's own handoff:
+    // event 1500's `HANDOFF 0xE03` = STTITL mode 3 = movie row 2 = MOVIED01_STR
+    // (pro/stdwtitl.s .L0x00005000), whose return 0x207 is re-pointed to 0x276
+    // (the alias s925) at master ordinal 0x2d — the post-game world's own
+    // entry movie. The chain host is playMovieChain, the same rows' mechanism
+    // the finale's ending hand-off runs.
+    if (handoff?.screenId != null && movieRow(handoff.screenId) != null) {
+        playMovieChain(handoff.screenId)
+            .then((selector) => routeStoryHandoff(ev, handoff, selector))
+            .catch((error) => {
+                // The adapter already ends an unloadable stream through its
+                // browser-safety abort (logged, not thrown); this is only so a
+                // broken chain can never strand the warp — route the id itself.
+                console.error("[handoff] movie chain", error);
+                routeStoryHandoff(ev, handoff, handoff.screenId);
+            });
+        return;
+    }
+    routeStoryHandoff(ev, handoff, handoff.screenId);
+}
+
+// The routing tail of doStoryHandoff over `screenId` — the event's own handoff
+// id, or the selector a movie chain ended on (playMovieChain).
+function routeStoryHandoff(ev, handoff, screenId) {
     const routed =
-        handoff?.screenId != null
-            ? screenRouter.route(handoff.screenId, currentMap().id)
+        screenId != null
+            ? screenRouter.route(screenId, currentMap().id)
             : null;
     if (ev.handoff_to) {
         // A cutscene handoff to a mapped stage. The DESTINATION now comes from the
@@ -6247,14 +6346,14 @@ function doStoryHandoff(ev, handoff) {
         if (!r)
             console.warn(
                 "[handoff] unresolved screen id",
-                handoff.screenId,
+                screenId,
                 "on",
                 currentMap().id,
             );
         if (r?.kind === "warp") {
             storyDbg(
                 "WARP (screen",
-                handoff.screenId + ")",
+                screenId + ")",
                 currentMap().id,
                 "→",
                 r.to,
@@ -6889,6 +6988,12 @@ function dispatchInput(k, e, raw = "") {
             // once we're already at the top-level list, matching the real menu's
             // "[triangle] Button: Back to Menu" / "Close Status" footer prompts.
             if (menu.screen === "home") {
+                // The list's own back word folds it shut: 0x800450BD
+                // (exe/fns.s:3420 plays it on the back arm of F0x8001270c).
+                // The host owns the fold — the list's port is what plays the
+                // word, and this branch IS that fold on the rollback route
+                // (?legacyStatus=1). The translated page plays its own.
+                sfx.play("system01");
                 state.menuOpen = false;
                 menu.reset();
             } else {
@@ -7293,7 +7398,16 @@ function dispatchInput(k, e, raw = "") {
                                 // (ids 1..170), so passing the packed value
                                 // straight through is exactly right.
                                 // Record number, 0-based, = index*2 + mode.
-                                cardDuel.open(null, npc.sprite ?? "Duelist", null, duelId, state);
+                                //
+                                // The close callback is the field's screen-close
+                                // housekeeping (F0x800169e0): the duel's result
+                                // lands in story flags 17/18/16 as the field
+                                // resumes, which is what every tamer's post-duel
+                                // dialogue states gate on.
+                                cardDuel.open(
+                                    () => applyCardDuelCloseHousekeeping(cardDuel.resultWon?.() === true),
+                                    npc.sprite ?? "Duelist", null, duelId, state,
+                                );
                             }
                         },
                         npc,

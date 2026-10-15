@@ -23,7 +23,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { NativeStageRuntime } from "../engine/native/runtime.ts";
 import {
   ROUTE_KEY_OFFSET, ROUTE_COMPANION_OFFSET, ROUTE_PAIR_BANK,
@@ -266,9 +266,28 @@ test("only the bank dispatcher ever reads the pair, and the sparkle handler name
 test("the sparkle rides the authored record, not a per-item latch", () => {
   // op 0x50 is an unconditional action (`li $v0,1` then `jr $ra`, no branch and no
   // load of either half), so the disc plays it once per authored 0x7013 and never
-  // suppresses it. The walker emits it from those same records, beside the grant.
+  // suppresses it. The walker applies it from those same records: every shipped 0x7013
+  // sits in a dialogue-state on_close, which the walker's talk-close arm applies (grant
+  // and flourish together), and the money/partner rows that survive in the converted
+  // content still carry it beside their own grant.
   const w = wordAt(SPARKLE_HANDLER + 0x38);
   assert.equal(w >>> 0, 0x24020001, "op 0x50 ends in `li $v0, 1`");
+  let authored = 0;
+  let alone = 0;
+  for (const file of readdirSync("web/assets/scenes")) {
+    if (!/^s\d+\.json$/.test(file)) continue;
+    const scene = read(`web/assets/scenes/${file}`);
+    for (const npc of scene.npcs ?? []) {
+      for (const ds of npc.dialogue_states ?? []) {
+        const closes = ds.on_close ?? [];
+        const n = closes.filter((c) => c.id === 0x7013).length;
+        authored += n;
+        if (n > 0 && closes.length === 1) alone += n;   // "never alone": always beside the grant
+      }
+    }
+  }
+  assert.ok(authored >= 120, `the shipped sparkle records (${authored})`);
+  assert.equal(alone, 0, "every authored 0x7013 sits beside another on_close entry");
   const content = read("web/assets/engine-content.json");
   let sparkles = 0;
   let besideGrant = 0;
@@ -277,12 +296,14 @@ test("the sparkle rides the authored record, not a per-item latch", () => {
       const ops = (script.program ?? []).map((i) => i.op);
       if (!ops.includes("PlaySparkle")) continue;
       sparkles++;
-      if (ops.includes("GiveItem") || ops.includes("AddMoney") || ops.includes("SetFlag")) {
+      if (ops.includes("GiveItem") || ops.includes("AddMoney") ||
+          ops.includes("SetFlag") || ops.includes("GrantPartner")) {
         besideGrant++;
       }
     }
   }
-  assert.ok(sparkles > 100, `the shipped sparkle records (${sparkles})`);
-  assert.ok(besideGrant / sparkles > 0.9,
-    `almost every sparkle rides a grant record (${besideGrant}/${sparkles})`);
+  // The talk-grant rows moved to the walker's close arm (tests/talk-grant-single-count.test.js);
+  // the money/partner rows still carry the flourish beside their grant.
+  assert.ok(sparkles >= 20, `the surviving sparkle scripts (${sparkles})`);
+  assert.equal(besideGrant, sparkles, `every sparkle rides a grant record (${besideGrant}/${sparkles})`);
 });

@@ -456,10 +456,12 @@ export function memcardStateMachine(
             };
             if ((mem.read32(record + 4) | 0) !== MEMCARD_TAG) {
                 // 0x2B34-0x2B48: initialise the record and jump straight to the
-                // hide path; no copy and no stage byte are written.
+                // hide path; no copy and no stage byte are written. The format
+                // store is a BYTE (`sb`, .L0x00002B4C): the retained +3 byte is
+                // not rewritten.
                 host.memZero(record, MEMCARD_SLOT_STRIDE);
                 mem.write32(record + 4, MEMCARD_TAG >>> 0);
-                mem.write16(record + 2, MEMCARD_FORMAT);
+                mem.write8(record + 2, MEMCARD_FORMAT);
                 finish();
                 return;
             }
@@ -522,9 +524,14 @@ export function memcardStateMachine(
                     return;
                 }
                 const record = (header() + Math.imul(mem.read32(MEMCARD_STAGE + 0x04) | 0, 0x44)) >>> 0;
-                if ((mem.read32(record + 8) | 0) === 0) {
+                // The presence test is the record's FIRST BYTE (`lbu`, .L0x00002ECC),
+                // the same byte the binder reads as "empty slot"; a word read would
+                // fold in the name bytes after a NUL.
+                if (mem.read8(record + 8) === 0) {
+                    // .L0x00003524-.L0x0000352C: queue the write and RETURN; the
+                    // state word stays 0x190, so 0x190 -> 0x191 re-checks the card
+                    // status and swaps the queued state in before 0x32 runs.
                     mem.write32(screen + MEMCARD.queued, 0x32);
-                    mem.write32(screen + MEMCARD.state, 0x32);
                     return;
                 }
                 setLine(MEMCARD_W.strip, 7);
@@ -660,7 +667,9 @@ export function memcardStateMachine(
 
         case 0x46: {
             const record = stageRec(mem.read32(MEMCARD_STAGE + 0x04) | 0);
-            if ((mem.read32(record + 8) | 0) === 0) {
+            // The presence test is the record's FIRST BYTE (`lbu`, .L0x00003168),
+            // not its first word.
+            if (mem.read8(record + 8) === 0) {
                 setLine(MEMCARD_W.strip, 0x18);
                 mem.write32(screen + MEMCARD.state, 0x1f5);
                 mem.write32(screen + MEMCARD.confirmLatch, 1);
@@ -905,7 +914,8 @@ export function memcardStateMachine(
             const record = header();
             host.memZero(record, MEMCARD_HEADER_SIZE);
             mem.write32(record + 4, MEMCARD_TAG >>> 0);
-            mem.write16(record + 2, MEMCARD_FORMAT);
+            // A BYTE (`sb`, .L0x0000455C): +3 is not rewritten.
+            mem.write8(record + 2, MEMCARD_FORMAT);
             mem.write8(record, host.checksum(record + 4, MEMCARD_RECORD_SIZE) & 0xff);
             for (let i = 0; i < MEMCARD_RECORD_SIZE; i += 1) {
                 mem.write8((box() + i) >>> 0, mem.read8(record + i));

@@ -556,6 +556,7 @@ export {
 // story), ported once; each event's write list is data.
 export {
   runSceneCompletion, applySetFlag, shapeOf, isCollectionBank, collectionWrite,
+  cardDuelCloseWrites, CARD_DUEL_SCREEN_CODE,
   setSceneCompletions, setStageCompletions, sceneCompletion, sceneCompletions,
   type SceneCompletion, type SceneWrite, type CompletionSink, type SetFlagPolicy,
   type CollectionStore,
@@ -749,6 +750,7 @@ export {
   op1Handler, op2Handler, op3Handler, op4Handler, op5Handler, op6Handler, op7Handler, op10Handler,
   CAMERA_PRESET_ARMS, CAMERA_PRESET_METHODS, CAMERA_STRUCT,
   ACTOR_IP, ACTOR_SIDE, ACTOR_OUTCOME, ACTOR_CURRENT_MOTION, ACTOR_CURRENT_EFFECT,
+  ACTOR_CONTACT_SOUND,
   ACTOR_ANIM_OBJECT, ACTOR_CONTACT_COUNTER, ACTOR_STRIKE_COUNTER,
   ACTOR_PRELOAD_STATE, ACTOR_PRELOAD_A, ACTOR_PRELOAD_B, ACTOR_PRELOAD_C,
   ACTOR_STRIKE_TABLE, ACTOR_CONTACT_MODE, EFFECT_CURRENT_SENTINEL, MOTION_CURRENT_SENTINEL,
@@ -988,6 +990,7 @@ export {
 export { ITEMS, ITEM_BY_ID, ITEM_BY_NAME, addItem, removeItem, useItem, itemUsableInField, itemUsableInBattle } from "./dw3/items.ts";
 export {
   addItem as storeAddItem, removeItem as storeRemoveItem, heldCount, wornCount, ownsItem,
+  carriesFolderBag,
   listItemIds, setHeldCount, reconcileHeldCounts, clearBag, inventoryDirectoryAdmits,
   wearOne, unwearOne, setEquippedItem, commitEquipSlot, commitEquipEvent,
   syncWornFromEquipment, WORN_MAX, wornItemIds,
@@ -1113,7 +1116,8 @@ export {
   BATTLE_MESSAGE_PANEL_PACK, BATTLE_MESSAGE_PANEL_W, BATTLE_MESSAGE_PANEL_X,
   BATTLE_MESSAGE_PANEL_Y, BATTLE_MESSAGE_PHASE_AUTO, BATTLE_MESSAGE_PHASE_GAP,
   BATTLE_MESSAGE_PHASE_READY, BATTLE_MESSAGE_PHASE_SHOW, BATTLE_MESSAGE_PHASE_TABLE,
-  BATTLE_MESSAGE_PHASE_WAIT, BATTLE_MESSAGE_PROMPT_CEL, BATTLE_MESSAGE_PROMPT_CLIP,
+  BATTLE_MESSAGE_PHASE_WAIT, BATTLE_MESSAGE_PRESS_SOUND, BATTLE_MESSAGE_PROMPT_CEL,
+  BATTLE_MESSAGE_PROMPT_CLIP,
   BATTLE_MESSAGE_PROMPT_FRAMES, BATTLE_MESSAGE_PROMPT_GATE, BATTLE_MESSAGE_PROMPT_PACK,
   BATTLE_MESSAGE_PROMPT_SIZE, BATTLE_MESSAGE_PROMPT_TICKS, BATTLE_MESSAGE_PROMPT_X,
   BATTLE_MESSAGE_PROMPT_Y, BATTLE_MESSAGE_REVEAL, BATTLE_MESSAGE_SET_VISIBLE,

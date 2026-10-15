@@ -25,7 +25,7 @@ import { paintScreenDim } from "./screendim.js";
 import { asButton } from "./input.js";
 import {
   ITEM_BY_ID, useItem, itemUsableInField, EQUIPMENT_BY_ID, EQUIP_SLOTS as EQUIP_ROW_SLOTS, equipItem, unequipItem, equipmentBonuses, ui,
-  pauseEquipListIds, rosterSlotOfCharId, elementValue,
+  pauseEquipListIds, pauseEquipRowAdmits, rosterSlotOfCharId, elementValue,
   fieldTechniqueRows, isPartyWide, useFieldTechnique, HEAL_SCALE_STAT,
   listScrollbarThumb, padRepeatFires, screenIdForStage,
   listItemIds, heldCount, wornCount, commitEquipSlot, syncWornFromEquipment,
@@ -250,8 +250,12 @@ function clampIndex(i, n) {
 // (F0x8001270c.c:168), and the ITEMS bag guards BOTH its page step and its
 // row/column step the same way (F0x80092524.c:63,126). Every list in this file
 // moves through here, so the guard cannot be forgotten on the next screen.
-function moveCursor(from, to, sfx) {
-  if (to !== from) sfx?.play("system02");
+// `cue` is the list's own cursor word: the general lists play 0x8004513E
+// (system02), the PARTY-CARD lists play 0x4001B (system06) — see
+// pause-home-button-table-2026-10-04.md §2, "0x4001B = the cursor stepped, on
+// a party-card list".
+function moveCursor(from, to, sfx, cue = "system02") {
+  if (to !== from) sfx?.play(cue);
   return to;
 }
 
@@ -841,11 +845,14 @@ export function createMenu(sfx = null) {
     // (same shape as Status U-32 / Techniques U-15).
     if (m.itemMode === "use_target") {
       const n = roster(state).length;
-      if (key === "up") m.itemTarget = moveCursor(m.itemTarget, clampIndex(m.itemTarget - 1, n), sfx);
-      else if (key === "down") m.itemTarget = moveCursor(m.itemTarget, clampIndex(m.itemTarget + 1, n), sfx);
+      if (key === "up") m.itemTarget = moveCursor(m.itemTarget, clampIndex(m.itemTarget - 1, n), sfx, "system06");
+      else if (key === "down") m.itemTarget = moveCursor(m.itemTarget, clampIndex(m.itemTarget + 1, n), sfx, "system06");
       else if (key === "cross") { sfx?.play("system01"); m.itemMode = "list"; }
       else if (key === "circle") {
-        sfx?.play("system00");
+        // §4.3: this confirm has NO click of its own — it goes straight into
+        // the apply (ststatus.s:14643 calls F0x8008F584), and the applier is
+        // what you hear: 0x40014 on the applied arm, 0x4001c SYSTEM07 with
+        // "No effect." on the refusal arm (file 0xcbc8 / 0xcc10).
         const list = m.itemList(state);
         const slot = list[m.itemCursor];
         if (slot) {
@@ -957,8 +964,14 @@ export function createMenu(sfx = null) {
           m.itemCat = moveCursor(m.itemCat, Math.min(ITEM_CATS.length - 1, m.itemCat + 1), sfx);
           m.itemCursor = 0;
         } else if (key === "circle") {
-          if (m.itemList(state).length > 0) { sfx?.play("system00"); m.itemMode = "list"; m.itemCursor = 0; }
-          else sfx?.play("system01");
+          // §4.1: the confirm word plays FIRST and unconditionally — the
+          // original plays 0x8004503C (ststatus.s:14238) BEFORE it counts the
+          // tab. A stocked tab then opens the bag; an empty one shows
+          // esstatus 0x64+cat ("No Items." … "No Important Items.", :14286)
+          // and STAYS, with no second sound.
+          sfx?.play("system00");
+          if (m.itemList(state).length > 0) { m.itemMode = "list"; m.itemCursor = 0; }
+          else m.showFeedback(ITEM_CAT_EMPTY[m.itemCat]);
         }
         return;
       }
@@ -992,7 +1005,11 @@ export function createMenu(sfx = null) {
       const n = roster(state).length;
       if (m.sortSwapping) return; // states 8/9 own the pad while the cards fold
       if (key === "cross") {
-        sfx?.play("system01");
+        // §5: BOTH real SORT states play the back word 0x800450BD on Back
+        // (ststatus.s:21306 "Switch who?", :21480 "Switch with who?"), but the
+        // party-of-one refusal screen leaves with NO click at all
+        // (:21577-21590 reads 0xE and stores the state, with no playSound).
+        if (n >= 2) sfx?.play("system01");
         if (m.sortPick != null) m.sortPick = null; else m.screen = "home";
         return;
       }
@@ -1003,15 +1020,17 @@ export function createMenu(sfx = null) {
       // Both cursors WRAP here (unlike the top menu, which clamps), and on the
       // second pick the cursor SKIPS the slot already chosen — the original's
       // `do { ... } while (arg0->unk84 == temp)` loops in states 6 and 7.
+      // The cues are the party-card pair: cursor 0x4001B (:21228, :21408),
+      // confirm 0x4001C (:21249, :21429).
       const step = (from, d) => {
         let i = from;
         do { i = (i + d + n) % n; } while (m.sortPick != null && i === m.sortPick);
         return i;
       };
-      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, step(m.statusCursor, -1), sfx);
-      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, step(m.statusCursor, 1), sfx);
+      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, step(m.statusCursor, -1), sfx, "system06");
+      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, step(m.statusCursor, 1), sfx, "system06");
       else if (key === "circle") {
-        sfx?.play("system00");
+        sfx?.play("system07");
         if (m.sortPick == null) {
           m.sortPick = m.statusCursor;
           // The second cursor may never rest on the first pick.
@@ -1086,9 +1105,11 @@ export function createMenu(sfx = null) {
     if (m.screen === "techniques-pick") {
       const n = roster(state).length;
       if (key === "cross") { back(); return; }
-      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor - 1, n), sfx);
-      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor + 1, n), sfx);
-      else if (key === "circle") { sfx?.play("system00"); m.screen = "techniques-list"; m.techCursor = 0; }
+      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor - 1, n), sfx, "system06");
+      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor + 1, n), sfx, "system06");
+      // §7.1: the party list's confirm is the party-card word 0x4001C
+      // (ststatus.s:18971) — it opens "Choose a technique".
+      else if (key === "circle") { sfx?.play("system07"); m.screen = "techniques-list"; m.techCursor = 0; }
       return;
     }
 
@@ -1097,11 +1118,14 @@ export function createMenu(sfx = null) {
       // "Use it on who?" (esstatus 43) — only the single-target heals ask.
       if (m.techMode === "use_target") {
         const n = roster(state).length;
-        if (key === "up") m.techTarget = moveCursor(m.techTarget, clampIndex(m.techTarget - 1, n), sfx);
-        else if (key === "down") m.techTarget = moveCursor(m.techTarget, clampIndex(m.techTarget + 1, n), sfx);
+        if (key === "up") m.techTarget = moveCursor(m.techTarget, clampIndex(m.techTarget - 1, n), sfx, "system06");
+        else if (key === "down") m.techTarget = moveCursor(m.techTarget, clampIndex(m.techTarget + 1, n), sfx, "system06");
         else if (key === "cross") { sfx?.play("system01"); m.techMode = null; }
         else if (key === "circle") {
-          sfx?.play("system00");
+          // §7.3: the apply path plays NO click of its own before the applier —
+          // F0x80093A58 is called with 0x4001C and plays 0x40014 on a heal,
+          // its caller's 0x4001C on a refusal (state 0x20,
+          // engine/dw3/ui/native/pause-techniques.ts:616-632).
           m.applyTechnique(state, rows[m.techCursor], m.techTarget);
           m.techMode = null;
         }
@@ -1130,10 +1154,12 @@ export function createMenu(sfx = null) {
     if (m.screen === "status-list") {
       const n = roster(state).length;
       if (key === "cross") { back(); return; }
-      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor - 1, n), sfx);
-      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor + 1, n), sfx);
+      if (key === "up") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor - 1, n), sfx, "system06");
+      else if (key === "down") m.statusCursor = moveCursor(m.statusCursor, clampIndex(m.statusCursor + 1, n), sfx, "system06");
       else if (key === "circle") {
-        sfx?.play("system00");
+        // §8.1: party-card cursor 0x4001B, confirm 0x4001C (ststatus.s:11664,
+        // :11687) — it opens that partner's sheet.
+        sfx?.play("system07");
         m.detailIdx = m.statusCursor; m.detailFocus = 0; m.detailSel = 0;
         m.detailStep = "opening";
         m.screen = "status-detail";
@@ -1934,19 +1960,20 @@ function _stepHeldLists(m, state, sfx) {
     } else if (m.screen === "sort") {
       // Both picks repeat. The second one skips the slot already chosen, the
       // same wrap-and-skip the press path uses, so holding a direction on
-      // "Switch with who?" moves the arrow instead of sticking.
+      // "Switch with who?" moves the arrow instead of sticking. The repeat
+      // carries the same party-card cursor word as the press path (0x4001B).
       const n = (state.party ?? []).length;
       if (n >= 2) {
         let i = m.statusCursor;
         do { i = (i + up + n) % n; } while (m.sortPick != null && i === m.sortPick);
-        if (i !== m.statusCursor) { m.statusCursor = i; sfx?.play("system02"); }
+        if (i !== m.statusCursor) { m.statusCursor = i; sfx?.play("system06"); }
       }
     } else if (m.screen === "status-list" || m.screen === "techniques-pick") {
       // The two partner-choosers repeat as well; they CLAMP rather than wrap,
-      // matching their own press path.
+      // matching their own press path, and play that path's party-card word.
       const n = (state.party ?? []).length;
       const next = Math.max(0, Math.min(n - 1, m.statusCursor + up));
-      if (next !== m.statusCursor) { m.statusCursor = next; sfx?.play("system02"); }
+      if (next !== m.statusCursor) { m.statusCursor = next; sfx?.play("system06"); }
     }
   }
 }
@@ -2117,8 +2144,11 @@ function _drawItems(ctx, state, m, roster, t, fold = null) {
     _drawHomeBit(ctx, state);
     _drawHome(ctx, { ...m, mainCursor: m.itemCat, cardFolderUnlocked: () => false }, t, fold,
       ITEM_CATS);
-    const list = m.itemList(state);
-    const line1 = list.length ? ITEM_CAT_ACTIONS[m.itemCat] : ITEM_CAT_EMPTY[m.itemCat];
+    // §4.1: the label beside the highlighted category is esstatus 0x1B+cat
+    // ("Use Item" … "All Important Items") whatever the tab holds — the empty
+    // line ("No Items." …) is esstatus 0x64+cat and appears only on the confirm
+    // press (see the cats arm in handleKey). It used to stand in here.
+    const line1 = ITEM_CAT_ACTIONS[m.itemCat];
     _drawFooter(ctx, state, t, line1, "[triangle] Button: Back to Menu", fold, { hideBit: true });
     return;
   }
@@ -2587,6 +2617,14 @@ function _drawEquip(ctx, state, m, p, t, fold) {
   // bag-list window (only while picking an item for the chosen slot)
   if (m.equipFocus === "list") {
     const LW = E.list_window;
+    // F0x80086900 .L0x00003d14-.L0x00003d50: for every row item the original
+    // calls [0x8009b5f0] (= F0x8009A344, the row admission test the walker
+    // ports as pauseEquipRowAdmits) and paints the row's NAME widget with
+    // palette 0 when it admits the piece, palette 7 when it refuses. The
+    // take-off row (id -1) is skipped by the `blez` at :3d04, so it keeps its
+    // own grey. The refusal colour had been open since 2026-07-10.
+    const listRow = EQUIP_ROW_SLOTS.indexOf(slotKey);
+    const listLine = rosterSlotOfCharId(String(state.party?.[m.detailIdx ?? 0] ?? ""));
     if (fold("eqList", ...LW.pivot, "x", () => drawClip(ctx, ststat, LW.clip, LW.x, LW.y)) >= 1) {
       const L = E.list;
       drawText(ctx, E.slot_names[m.equipCursor], L.header.x, L.header.y, GREY);
@@ -2599,7 +2637,8 @@ function _drawEquip(ctx, state, m, p, t, fold) {
           drawText(ctx, E.unequip_label, L.label_x, y, GREY);
         } else {
           drawItemIcon(ctx, opt.id, L.icon_x, y - 1);
-          drawText(ctx, opt.name, L.label_x, y);
+          const refused = !pauseEquipRowAdmits(listLine, listRow, opt.id);
+          drawText(ctx, opt.name, L.label_x, y, refused ? { clut: 7 } : undefined);
           const qty = heldCount(state, opt.id);
           drawText(ctx, E.x_label, L.x_label_x - textWidth(E.x_label), y, GREY);
           valueText(ctx, qty, L.qty_x, y);

@@ -38,6 +38,13 @@
 //     an extracted "set" of a 0x72xx id is inert. This is the gate a roaming card tamer checks
 //     before agreeing to a duel (rung 0 = 60); while it was unmodelled the brush-off line won
 //     every ladder and no wandering tamer would ever fight. See web/charisma.js.
+//   • bank 0x70 case-7 → every OBTAINED roster slot's level >= 45 (0x7095) — via
+//     ownedSlots + partnerLevels. The walker's per-slot levels come from the same
+//     records the DRI resolves a slot with (web/dri-native.js slotStats). An owned
+//     slot with no resolvable record keeps the gate dormant (null), never a guess.
+//     This is the condition the walkthrough states as "all 8 partners at level
+//     45+": it gates the post-game circuit-board cast (the Epic-Weapon forgers on
+//     s970/s974 and the DDNA givers on s970/s971).
 //   • command banks 0x74/76/78/7a/7c/90/94 → get_flag success for either polarity.
 //     matches() preserves this distinction from stored-bit values; set() routes commands
 //     through the optional host command callback and never stores them.
@@ -47,6 +54,7 @@
 // opts: { getOrdinal:()=>number, rosterTable:{...}, hasItem:(bit)=>boolean,
 //         hasCard:(cardId)=>boolean,
 //         packIndex:()=>0|1|2|null, ownedSlots:()=>number,
+//         partnerLevels:()=>Map<slot, level>,
 //         routePair:()=>[key, companion] } (all optional).
 // ownedSlots returns the obtained-partner bitmask (bit n = roster slot n obtained), the
 // walker's model of the original's `roster_owned[slot] != 0` (see dw3-config ROSTER_OWNED_VAR).
@@ -58,7 +66,7 @@ const CHARISMA_BANK = 0x72;
 export function createFlagStore(backend, opts = {}) {
   const {
     getOrdinal, rosterTable, hasItem, hasCard, packIndex, ownedSlots, routePair,
-    partyCharisma,
+    partyCharisma, partnerLevels,
   } = opts;
   function get(id) {
     const bank = (id >> 8) & 0xfe;
@@ -86,8 +94,8 @@ export function createFlagStore(backend, opts = {}) {
       }
       // Everything else dispatches on the extractor's decoded `semantics` (see
       // tools/extract_roster_predicate_table.py). A record with no semantics, or one whose
-      // semantics need state the walker doesn't simulate (the 3-slot ACTIVE party, per-partner
-      // levels, currency compares), stays null = unmodelled/dormant.
+      // semantics need state the walker doesn't simulate (the 3-slot ACTIVE party, currency
+      // compares, per-slot levels it has no record for), stays null = unmodelled/dormant.
       const sem = rec && rec.semantics;
       if (!sem) return null;
       switch (sem.kind) {
@@ -112,6 +120,26 @@ export function createFlagStore(backend, opts = {}) {
           return ownedSlots ? ((ownedSlots() >> sem.slot) & 1 ? 0 : 1) : null;
         case "every_slot_owned":
           return ownedSlots ? (ownedSlots() === 0xff ? 1 : 0) : null;
+        // op0x10 case 7 (F0x80015944): every OBTAINED slot's level >= 45 — the
+        // walkthrough's "all 8 partners at level 45+". The disc skips unowned
+        // slots with no level test at all (`lw 0x760($v1)` / `beqz` straight to
+        // the next slot), so the predicate is vacuously TRUE with nothing
+        // obtained, and it answers 0 the moment any owned slot is below the
+        // floor. The walker keeps no record for a partner it never deployed, so
+        // an owned slot whose level cannot be resolved leaves the gate DORMANT
+        // (null) rather than inventing a level — never a false spawn.
+        case "every_owned_at_level": {
+          if (!ownedSlots || !partnerLevels) return null;
+          const owned = ownedSlots();
+          const levels = partnerLevels();
+          for (let slot = 0; slot < (sem.slots ?? 8); slot++) {
+            if (!((owned >> slot) & 1)) continue;
+            const level = levels?.get ? levels.get(slot) : levels?.[slot];
+            if (level == null) return null;
+            if (Number(level) < sem.min_level) return 0;
+          }
+          return 1;
+        }
         // op0x40 (F0x80015bd8): both subops are plain stored-bit reads (F0x80015590) on
         // banks 0x1c/0x10, which the backend already stores — so these resolve exactly.
         case "stored_bits_all_set":

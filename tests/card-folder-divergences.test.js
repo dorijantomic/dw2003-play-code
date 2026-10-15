@@ -48,3 +48,20 @@ test("the card shop's Edit Folder opens the same folder screen as the pause menu
     // one function (the field merchant route and the lab route).
     assert.equal((game.match(/cardShop\.open\(state, null, openCardShopFolder/g) ?? []).length, 2);
 });
+
+// The third divergence, settled 2026-10-14 (claim
+// UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14): the resident pause list
+// gates its sixth row on D0x80048f42 (exe/fns.s:3083-3086), which is
+// save+0x20E = carried[402] — the "Folder Bag" key item, granted by the s270
+// Yellow Cruiser cutscene (event 1415). The walker used to ask "does the
+// player have folders", which the boot starter grant makes true for everyone,
+// so the row showed from boot. Both routes now ask the item store's own
+// predicate; this pin fails if either reverts to the folder-count gate.
+test("the CARD FOLDERS row gates on the Folder Bag item, not on having folders", () => {
+    const game = read("web/game.js");
+    assert.equal((game.match(/carriesFolderBag\(state\)/g) ?? []).length, 2,
+        "both the translated seed and the legacy menu must ask carriesFolderBag");
+    assert.doesNotMatch(game, /cardFolders?Unlocked\s*[:=][^\n]*folders/,
+        "the row must not gate on the starter folders again");
+    assert.match(read("engine/dw3/item-store.ts"), /export function carriesFolderBag/);
+});

@@ -11889,7 +11889,7 @@
       "authority": 5,
       "summary": "1. Per-battle reward table \u2014 battle id = encounter screen id",
       "exact": "## 1. Per-battle reward table \u2014 battle id = encounter screen id\n\n- `disasm:` stfgtrep.s `0x2ce4/0x2d14/0x2d5c/0x26a0/0x133c` index\n  `0x80086a88 + battle_id*12`; wfightmn.s `0x1eb4` copies `[0x80042b2c]` (the battle id) into\n  the report workspace `[0x80042b84]`.\n- `data:` `STFGTREP_D0x00003dd8 @ 0x80086a88` = `[u32; 1005]` = **335 records \u00d7 3 words**:\n  **`[dvexp_base, exp_base, bits_base]`**.\n- Battle id \u2194 `field_encounters.json` screen key (334 screens, ids 1..334; record 0 is zero).\n  Cross-check: battle 5 = 2\u00d7Numemon lv27 \u2192 `[27, 268, 645]`; battle 30 = Knightmon lv99 \u2192\n  `[99, 990, 1980]`. wfightmn's special-case battle ids 0xb/0x1e/0x143/0x144 are story fights.\n\nPer-recipient share (exp fn `0x80086924`, bits paths `0x2cbc..0x2d88`): **1 participant \u2192 100%,\n2 \u2192 \u00d76/10, n\u22653 \u2192 \u00f7n**.\n\n- **EXP** (word1): widget `0x80084aec` (created at `0x1e3c`) adds the share into roster\n  `exp @ +0x18`, cap **999,999** (`0xf423f`). **EXPAdapter** (item `0x141`=321) equipped in\n  either accessory halfword (`roster +0x3c8/+0x3ca`) \u2192 **+20%** (`+ x/5`, `0x1dd0`).\n- **Bits** (word2): single payout; **BITAdapter** (item `0x142`=322) \u2192 **+20%** (`0x26c0`).\n  **2026-10-14 (second pass) \u2014 which member's adapter the bits arm reads.** The check\n  resolves workspace `+0x04` to a member (`stfgtrep` file `0x2674`, through the same\n  `ctx+0x2718/+0x2750` resolve the EXP arm uses). That field is written ONCE, by the\n  battle's END arm \u2014 not at setup: wfightmn file `0x1EC8` sits in `F0x800a7c00` (the\n  endBattle arm, action-table index 4 / phase 7), guarded by the result byte\n  `0x800a435c`, and the only producer of that byte and the END_BATTLE event is FIGHTSTG\n  `F0x8009c534`, called from the win (`.L0x00003498`), loss (`.L0x00003450`) and flee\n  (`.L0x00002300`) branches. The value it stores is the battle active slot `0x800a4468`\n  (`lhu` at file `0x1EC0`). A Tag commit writes that slot \u2014 `F0x800a78d8` state 2, file\n  `0x1C80` = RAM `0x800a7a60`, the instruction \u00a79f of the digivolution doc calls \"the\n  commit\" \u2014 and does not restore it; the set-and-restore in state 1 is the spawn phase\n  only. So the +20% is read from the member IN FRONT WHEN THE BATTLE ENDED (the last\n  Tagged-in member): a KO'd setup leader's adapter does not count, and the finishing\n  partner's does. Both arms were driven through the committed original code with\n  engine/native (the runtime `tests/lane-b` uses): the full Tag sequence leaves the slot\n  on the tagged-in position and the marker runs with it; the end arm copies slot 0/1/2\n  into workspace `+0x04` and skips the write when the result byte is 0. The walker's\n  `winRewards` (equipment of `b.activePlayerIndex` at the outcome) and the report seed\n  (`web/game.js` handoff) already match; an earlier \"written at setup / not updated on a\n  Tag\" reading of the same instruction is corrected here. Guard:\n  `tests/bit-adapter-position.test.js` (fails if a setup-time index is ever used).\n- **DVEXP** (word0): per participating form, `gain = word0*10 / min(partnerLevel, 50)`,\n  then the share, **min 1**, capped **10** while the form's DV level < the profile's DV\n  cap (profile byte `+0x3e\u22122 = +0x3c`, `unknown1[0]`) and **50** at/past it (`0x80086924` tail).\n  Accumulates to a per-form DVEXP (cap **9,999,999**) with its own ladder (\u00a73).\n  **2026-10-14 audit \u2014 the share divisor:** the \"share\" divides by the number of MARKED\n  FORMS, not the number of standing positions. The report root's tick counts one per set\n  form flag byte (`stfgtrep` file 0x2C8C-0x2C98, `lw/sw` on `obj+0x70`), and each row's\n  dvGain call passes that count (`file 0x1368` `lw $a3, 0x70($v1)`, `v1` = the row's\n  `+0x50` parent \u2014 the same field `reportRowTick` passes as `scoreCount`). So a form\n  taken mid-battle adds a second mark to its row and enlarges the divisor: a solo lead\n  that DV'd once splits each form's DVEXP two ways (60% each), not 100%. The walker used\n  the standing-position count; it now uses `dvexpShareCount`.\n\nItem drop (wfightmn `0x1f84`): `rand % 1024 < drop_rate+1` \u2192 the enemy record's drop item.",
-      "source_sha256": "ae117d71b971b027e59b278af8124e784846c5f9901d0dbcd0185c24b03490bc"
+      "source_sha256": "255773d0113a247d87cab092c1eb0c89fab4944c58224ca904f61c1ef74d52f5"
     },
     {
       "id": "EV-94e546e13f63",
@@ -11899,7 +11899,7 @@
       "authority": 5,
       "summary": "The effect registry (static fightstg data) \u2014 DECODED",
       "exact": "## The effect registry (static fightstg data) \u2014 DECODED\n\nOne continuous table of **8-byte records** `{type:i16, texArchIdx:i16, (fileId<<16)|binIdx:u32}`\nstarting at **`0x800a2ea4`** (RAM), terminated by `type == -1`. Reader\n`FIGHTSTG_F0x80089978(type, &texA, &texB, &texC[2])` linear-scans it; constructor\n`F0x80089be4` scans it independently.\n\n- `fileId` = **LBA file index** (== resource id; `~/ddw3/rust/dw2003_exe_data/src/lba.rs`),\n  e.g. `0x79d`=E000COM1, `0x7a3`=E000COM2, `0x7e0`=E000COM3, `0x7e2`=E000COM4, `0x8a2`=E000EVOL,\n  `0x7e8`=E373RENA. `binIdx` = entry inside that pack (the pack dirs in\n  `~/ddw3/pack/dw2003/fight/effect/`).\n- **Verified end-to-end:** Renamon clip 11 op3 types `2041/2042` \u2192 registry\n  `{2041, 0x22, E373RENA bin 1}` / `{2042, 0x22, E373RENA bin 2}` (words `0x002207f9\n  0x07e80001 / 0x002207fa 0x07e80002` @`0x800a3258`). Small types (2, 4, 11 \u2026) \u2192 E000COM1 bins.\n- `texArchIdx` indexes the **texture-archive table @`0x800a2b74`**: 16-byte records\n  `{flags?, (fileId<<16)|texBin, vramSlot(0x140/0x1c0/0x200/0x240/0x300/0x380\u2026), 0x100}` \u2014\n  the RLEN texture atlas of that pack + its VRAM upload slot.",
-      "source_sha256": "2b373acf8b0e4ae87744c7fecc65c67da43b2df4bb0292591e58191c408f0287"
+      "source_sha256": "de1edb3102f05db1055d79502f8065e57467eb09cd707e5d818a72590bb833a5"
     },
     {
       "id": "EV-95611f629765",
@@ -22821,7 +22821,7 @@
       "locator": "## The status sheet",
       "summary": "On the pause menu's status sheet a value and its label are always two widgets, never one string: the EXP number is right-anchored at (66,69) with the 'EXP' label at (70,69), and the TP number is right-anchored at (45,203) with the 'TP' label at (16,203). Both pairs are filled and hidden together. Constructor F0x8008b520, fillers F0x8008d684 and F0x8008c1c0, draw F0x8008c954. RECONSTRUCTED 2026-09-03 from docs/research/ui/pause-menu-layout.md after the lead lost the original entry to `git checkout -- docs/research/evidence/ledger.json`; the wording is not the original wording.",
       "exact": "is right-anchored at (66,69) with the \"EXP\" label at (70,69), and the TP number",
-      "source_sha256": "ce6cdf679f2c738d456d40487583dea777ae24c4f6a3aa9fa1e71ffff0da696b"
+      "source_sha256": "5a5e745a74ad402b15420dc50933a6e6f2809cecf72771402b08ef70d93ecf9f"
     },
     {
       "id": "EV-DIGIMON-PROFILES-0x8003ef5c-2026-09-13",
@@ -26211,7 +26211,7 @@
       "locator": "## The map",
       "summary": "The pause map's hover label is BUILT at (20,22) and moved to (16,25) or (16,185) before it is ever shown, so the constructor position must not be treated as a drawn one. The JSON keeps it under ctor_x / ctor_y for that reason. RECONSTRUCTED 2026-09-03 from docs/research/ui/pause-menu-layout.md after the lead lost the original entry to `git checkout -- docs/research/evidence/ledger.json`; the wording is not the original wording.",
       "exact": "The hover label is **built** at (20,22) and moved to (16,25) or (16,185) before",
-      "source_sha256": "ce6cdf679f2c738d456d40487583dea777ae24c4f6a3aa9fa1e71ffff0da696b"
+      "source_sha256": "5a5e745a74ad402b15420dc50933a6e6f2809cecf72771402b08ef70d93ecf9f"
     },
     {
       "id": "EV-MAP-refusal-sounds-the-confirm",
@@ -26960,7 +26960,7 @@
       "locator": "## The item bag",
       "summary": "The bag's page counter and shoulder hints, from ctor F0x80091e94, filler F0x80092340 and draw F0x80092fac: page number right-anchored at x 155, '/' at 158, total right-anchored at 178, all on y 156; 'L1' at (45,151) hidden on the first page and 'R1' at (258,151) hidden on the last. RECONSTRUCTED 2026-09-03. The original entry was lost when the lead ran `git checkout -- docs/research/evidence/ledger.json` over uncommitted work. It is rebuilt from the canonical document that survived, which cites the same routines and numbers; the wording is not the original wording.",
       "exact": "on y 156. Beside the two page arrows sit the **shoulder hints**: \"L1\" at",
-      "source_sha256": "ce6cdf679f2c738d456d40487583dea777ae24c4f6a3aa9fa1e71ffff0da696b"
+      "source_sha256": "5a5e745a74ad402b15420dc50933a6e6f2809cecf72771402b08ef70d93ecf9f"
     },
     {
       "id": "EV-PAUSE-HOME-LIST-WINDOW-EDGES",
@@ -27830,7 +27830,7 @@
       "locator": "## See Digivolve",
       "summary": "The See Digivolve screen's text layout, from pictures F0x800895c8, text F0x8008833c and states F0x80089bf0: three candidates at (189,49+14i) cursor x 176; two action rows at (189,58+14i) cursor x 180; partner name (94,77); highlighted form (178,42); technique row name 79, 'Skill LV' 235, level 303 on y 104; six stats (113,124+14i); seven resistances (155,124+14i); six technique slots (196,136+14i) cursor (169,136). RECONSTRUCTED 2026-09-03. The original entry was lost when the lead ran `git checkout -- docs/research/evidence/ledger.json` over uncommitted work. It is rebuilt from the canonical document that survived, which cites the same routines and numbers; the wording is not the original wording.",
       "exact": "- three digivolution candidates at (189, 49 + 14*i), cursor at (176, \u2026);",
-      "source_sha256": "ce6cdf679f2c738d456d40487583dea777ae24c4f6a3aa9fa1e71ffff0da696b"
+      "source_sha256": "5a5e745a74ad402b15420dc50933a6e6f2809cecf72771402b08ef70d93ecf9f"
     },
     {
       "id": "EV-SEEDV-CAPTURE-2026-09-03",
@@ -28718,7 +28718,7 @@
       "source": "/home/dorij/ddw3/asm/dw2003/pro/ststatus.s",
       "source_sha256": "7638970d9779af2f9b7deb41beeba3707579629643a07d5a4c55ed09d79aecdb",
       "locator": "line 8940, inside the sheet ctor F0x8008b520",
-      "summary": "The sheet ctor loads a1 = 1 before each F0x8001ae38 widget call for the six stat values at a2 = 0x32, the seven resistance values at a2 = 0x5b, and the TP label and value at a2 = 0x10 and 0x2d with a3 = 0xcb. a1 is the text face and 1 is the white face. The only kind 3 calls in this ctor are the EXP value and label at 0x42 and 0x46.",
+      "summary": "The sheet ctor loads a1 = 1 before each F0x8001ae38 widget call for the six stat values at a2 = 0x32, the seven resistance values at a2 = 0x5b, and the TP label and value at a2 = 0x10 and 0x2d with a3 = 0xcb. a1 is the text face and 1 is the white face. The ctor's other kind 3 calls build the party card's LV/HP/MP label and value widgets (the two five-iteration loops at file 0x8924 and 0x897C); among the sheet's value widgets, only the EXP value and label pair at 0x42 and 0x46 is kind 3.",
       "exact": ".L0x00008b94: li $a1, 0x1                         # .word 0x24050001"
     },
     {
@@ -30193,8 +30193,8 @@
       "id": "EV-UI-Q002-TITLE-DIM",
       "kind": "research",
       "source": "docs/research/overlays/stdwtitl.md",
-      "source_sha256": "71f6601a4d5ac5f54317435e983f1ade0e95afbc0805825b47db6fdc2445bb2a",
-      "locator": "L205",
+      "source_sha256": "ab7e0b8164d3660311eec44105d973f714c0fad16ea1747322cb9715e1420d8f",
+      "locator": "L216",
       "authority": 5,
       "summary": "The title's former alpha dim was a browser approximation; it was replaced by the decoded palette row.",
       "exact": "previously used a 45% alpha stand-in. The title pack extractor now preserves"
@@ -38165,7 +38165,7 @@
       "id": "EV-map-layer-order-build-stage-2026-08-21",
       "kind": "tool",
       "source": "build_all.py",
-      "source_sha256": "4a7e833f242b93edffffb73d2b8cef55e6f9677cd1dd89a6c88b20056a06942c",
+      "source_sha256": "bd4fae1bb86b7004ba9e45a8be009e4aea8162ae5977ac890de242c92382d5f8",
       "locator": "L785",
       "authority": 6,
       "summary": "The repair is part of the dependency-ordered asset build, not a one-off run: map_layer_order depends on map_stp_solid so a moved pixel carries the solid colour, and map_hairlines now depends on map_layer_order so the seams are closed last. The HD upscale stage lists it too, so an HD build cannot be derived from unrepaired maps.",
@@ -51697,7 +51697,7 @@
       "authority": 6,
       "summary": "web/battle.js's damageSpec now hands the record and the action context to damageTermPage() and takes the box's page from the record machine, including the heal context a category-4 record needs. The call sites no longer pass a hit-count term, so a multi-hit attack puts up the original's kind 4 page instead of a walker's own sentence with \"(N hits)\" in it.",
       "exact": "  function damageSpec(name, total, extra, techniqueId = 0, side = 1, heal = null) {",
-      "source_sha256": "9ff6b81991772ea964d706b56aba1523c31fa27f74835541f422ebd9fa23d954"
+      "source_sha256": "66677f613b3d53548f5c4a2dbb7b1e9fb0cceb99d945c176d01e3c99e91bcb9c"
     },
     {
       "id": "EV-STDNAME-WALL-PHASE-SLTI-2026-10-04",
@@ -51841,7 +51841,7 @@
       "authority": 6,
       "summary": "One shared rule replaces the per-technique gap: every one of the three commitImpact sites arms its result before the attack starts, and the ST.RESULT_MSG tick commits an armed result as soon as no action is playing. The strike stays the early commit, so a technique that lands on a blow still puts its page up at the blow, and a script that fires no strike still gets its page. Before this the page was built only inside the strike, so seventeen techniques whose animation never strikes put up no line at all.",
       "exact": "  function commitPendingImpact(b) {",
-      "source_sha256": "9ff6b81991772ea964d706b56aba1523c31fa27f74835541f422ebd9fa23d954"
+      "source_sha256": "66677f613b3d53548f5c4a2dbb7b1e9fb0cceb99d945c176d01e3c99e91bcb9c"
     },
     {
       "id": "EV-BATTLETERM-HEALAPPLIED-2026-10-04",
@@ -51851,7 +51851,7 @@
       "authority": 6,
       "summary": "Techniques 184-186 now heal the acting Digimon by the disc's own formula and report the capped amount, on both the player's and the enemy's side. The amount is FIGHTSTG_F0x800a0108 over the record's power and the actor's WISDOM; the cap is MAXIMUM - CURRENT, and the heal is applied before the page is built, which is the order the original's arm uses.",
       "exact": "    wisdom: Number(options.wisdom ?? actor?.wis ?? 0),",
-      "source_sha256": "9ff6b81991772ea964d706b56aba1523c31fa27f74835541f422ebd9fa23d954"
+      "source_sha256": "66677f613b3d53548f5c4a2dbb7b1e9fb0cceb99d945c176d01e3c99e91bcb9c"
     },
     {
       "id": "EV-BATTLETERM-CENSUS-2026-10-04",
@@ -52787,7 +52787,7 @@
       "authority": 6,
       "summary": "One gate on the record's own category byte, run on both sides and nowhere else: the player's technique path and the enemy's each ask battleRestorePlanFor first and return before the resolver, so no category-4 technique can roll for accuracy or damage the other side, and neither path has a per-id exception. battleRestoreParty maps the original's three 0x20-stride combatant records onto b.playerRecords[0..2] - the same order the HP plate's three pips read - and onto the enemy's single fighter as record 0.",
       "exact": "      const restore = battleRestorePlanFor(b, 0, restoreRecord, skill.id, { name: pname });",
-      "source_sha256": "9ff6b81991772ea964d706b56aba1523c31fa27f74835541f422ebd9fa23d954"
+      "source_sha256": "66677f613b3d53548f5c4a2dbb7b1e9fb0cceb99d945c176d01e3c99e91bcb9c"
     },
     {
       "id": "EV-ITEMKEYS-POOL-MEMBER-2026-10-04",
@@ -80379,6 +80379,355 @@
       "authority": 2,
       "summary": "F0x80017174 subtracts the block's three counters from the first, second and fifth stat halfwords, flooring at zero: block+0x26 from +0xC (L7919-L7927: lhu $v0, 0xc($s3) / lhu $v1, 0x26($s3) / subu / sh, with sh $zr on the negative branch), block+0x28 from +0xE (L7928-L7936) and block+0x2A from +0x14 (L7937-L7945). The counters sit inside the 0x2C-byte block copied from the roster record at +0x784 (block+0x26..+0x2A = record+0x7AA..+0x7AE) -- the same three offsets the equip preview F0x8008C460 tests for its grey palette 6 (snapshot sp+0x36/+0x38/+0x3A; EV-STATUS-PREVIEW-PALETTE-ASM-2026-10-14).",
       "exact": ".L0x80017440: lhu $v0, 0xc($s3)\n.L0x80017444: lhu $v1, 0x26($s3)\n.L0x80017448: nop\n.L0x8001744c: subu $v0, $v1\n.L0x80017450: sh $v0, 0xc($s3)\n.L0x80017454: sll $v0, 0x10\n.L0x80017458: bgez $v0, .L0x80017464\n.L0x8001745c: nop\n.L0x80017460: sh $zr, 0xc($s3)\n.L0x80017464: lhu $v0, 0xe($s3)\n.L0x80017468: lhu $v1, 0x28($s3)\n.L0x8001746c: nop\n.L0x80017470: subu $v0, $v1\n.L0x80017474: sh $v0, 0xe($s3)\n.L0x80017478: sll $v0, 0x10\n.L0x8001747c: bgez $v0, .L0x80017488\n.L0x80017480: nop\n.L0x80017484: sh $zr, 0xe($s3)\n.L0x80017488: lhu $v0, 0x14($s3)\n.L0x8001748c: lhu $v1, 0x2a($s3)\n.L0x80017490: nop\n.L0x80017494: subu $v0, $v1\n.L0x80017498: sh $v0, 0x14($s3)\n.L0x8001749c: sll $v0, 0x10\n.L0x800174a0: bgez $v0, .L0x800174ac\n.L0x800174a4: lui $v0, %hi(D0x8004b53c)\n.L0x800174a8: sh $zr, 0x14($s3)"
+    },
+    {
+      "id": "EV-FIGHTSTG-ATTACK-EFFECT-FIELD-2026-10-14",
+      "kind": "assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "F0x8008ee84 state 1: L12612-L12640 (.L0x8008f2ec-.L0x8008f330, the +0x6c/+0x70 writes); op3 F0x8008bc80 .L0x8008bcb4-.L0x8008bcc0 (the 0x270f sentinel read); op10 F0x8008c454 .L0x8008c4b0 / .L0x8008c4d4 (the +0x70 contact read)",
+      "authority": 2,
+      "summary": "The standard attack setup FIGHTSTG_F0x8008ee84 state 1 is the writer of the action actor's CURRENT-EFFECT word +0x6c that the 2026-07-05 tech-effects decode left unpinned: it stores the tech record's +0x0e byte when that is nonzero, and when it is ZERO and the record's action clip (+0x10) is 5 (the plain basic) it stores the fixed 0x2e instead; a zero +0x0e on any other clip leaves the field as constructed. The same block writes the CONTACT-SOUND word +0x70 from the record's +0x0f byte, or 0x1e for that same plain clip-5 basic. The two are DIFFERENT fields: op3's 9999 (0x270f) sentinel reads +0x6c (`lw $a0, 0x6c($s1)`), while op10's 0x62/0x63 strike reads +0x70 (`lw $a0, 0x70($a2)`).",
+      "exact": ".L0x8008f2ec: lbu $v0, 0xe($s0)\n.L0x8008f2f4: beqz $v0, .L0x8008f308\n.L0x8008f2fc: lw $v1, ($s3)\n.L0x8008f300: j .L0x8008f330\n.L0x8008f304: sw $v0, 0x6c($v1)\n.L0x8008f308: lbu $v1, 0x10($s0)\n.L0x8008f30c: li $v0, 0x5\n.L0x8008f310: bne $v1, $v0, .L0x8008f334\n.L0x8008f31c: li $v0, 0x2e\n.L0x8008f320: sw $v0, 0x6c($v1)\n.L0x8008f328: li $v0, 0x1e\n.L0x8008f32c: sw $v0, 0x70($v1)\n\nop3 sentinel: .L0x8008bcb4: li $v0, 0x270f\n.L0x8008bcb8: bne $a0, $v0, .L0x8008bcc4\n.L0x8008bcc0: lw $a0, 0x6c($s1)\n\nop10 contact: .L0x8008c4b0: lw $a0, 0x70($a2)\n.L0x8008c4d4: lw $a0, 0x70($a2)"
+    },
+    {
+      "id": "EV-FIGHTSTG-SPRITE-DRAW-BEFORE-END-2026-10-14",
+      "kind": "assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "F0x800893dc state 1: L6555-L6603 (.L0x800895bc-.L0x80089640)",
+      "authority": 2,
+      "summary": "The effect sprite's per-tick stepper draws INSIDE its state-0/state-1 body, BEFORE it advances the frame counter: the draw-callback gate (both scale channels nonzero, then the registry getter and the draw entry) runs at .L0x800895bc-.L0x8008960c, and only then does the body read the frame at +0x6c, add the tick delta [0x800a4464], store it back, compare it against the duration +0x78 and, once frame >= duration, call the object's +0x28 end entry with 2. So the tick on which the counter reaches the duration still DRAWS the row it just applied, and only the following call (state 2 -> 3) is drawless; the object is freed after that. A player that drops the sprite the moment the stepper reports the end loses the final authored frame of every op3 effect.",
+      "exact": ".L0x800895bc: lh $v0, 0x84($s0)\n.L0x800895c0: beqz $v0, .L0x80089610\n.L0x800895dc: lw $a0, 0x68($s0)\n.L0x800895e8: jalr $v0\n...\n.L0x80089610: lw $v0, 0x6c($s0)\n.L0x80089614: lw $v1, 0x4464($v1)\n.L0x80089618: lw $a0, 0x78($s0)\n.L0x8008961c: addu $v0, $v1\n.L0x80089620: sw $v0, 0x6c($s0)\n.L0x80089624: slt $v0, $a0\n.L0x80089628: bnez $v0, .L0x8008965c\n.L0x80089634: lw $v0, 0x28($s0)\n.L0x80089640: li $a1, 0x2"
+    },
+    {
+      "id": "EV-FIGHTSTG-ITEM-USE-EFFECT-TABLE-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "F0x8008d3b4 default arm .L0x8008d8e0-.L0x8008d934 (L11008-L11029): the clip-10 store .L0x8008d8ec, +0x68 = -1 .L0x8008d8f8, the 0x800a336c table scan .L0x8008d8fc-.L0x8008d934; apply arm .L0x8008d8c0-.L0x8008d8dc (L11000-L11007): +0x6c = record+2, +0x70 = record+4. Table .L0x800a336c (L33831) to the -1 item terminator at halfword 0x800a33c6 (the high half of the word at .L0x800a33c4, L33853); raw overlay image web/assets/native/screens/pro_fightstg.bin file 0x206bc (RAM base 0x80082cb0). op10 consumer F0x8008c454 .L0x8008c4b0/.L0x8008c4d4 (L9692/L9701) -> F0x8009b774.",
+      "authority": 2,
+      "summary": "The item-use effect table and its apply arm: the clip-10 default arm scans the 6-byte {item, effect, sound} records at 0x800a336c (first match on the used item id wins; item == -1 terminates) and writes record+2 to the new action actor's current-effect word +0x6c and record+4 to its contact-sound word +0x70; a run with no match writes neither field. 15 records, item ids 43-46 and 66-76; re-read from the raw overlay bytes at file 0x206bc - identical to the assembly words.",
+      "exact": ".L0x8008d8c0: lw $v1, ($s0)\n.L0x8008d8c4: lh $v0, 0x2($a0)\n.L0x8008d8c8: nop\n.L0x8008d8cc: sw $v0, 0x6c($v1)\n.L0x8008d8d0: lw $v1, ($s0)\n.L0x8008d8d4: lh $v0, 0x4($a0)\n.L0x8008d8d8: j .L0x8008d938\n.L0x8008d8dc: sw $v0, 0x70($v1)\n.L0x8008d8e0: li $v0, 0xa\n.L0x8008d8e4: lw $v1, ($s0)\n.L0x8008d8e8: lui $a0, 0x800a\n.L0x8008d8ec: sw $v0, 0x54($v1)\n.L0x8008d8f0: lw $v0, ($s0)\n.L0x8008d8f4: li $v1, -0x1\n.L0x8008d8f8: sw $v1, 0x68($v0)\n.L0x8008d8fc: lh $v0, 0x336c($a0)\n.L0x8008d900: nop\n.L0x8008d904: beq $v0, $v1, .L0x8008d938\n.L0x8008d908: addiu $a0, 0x336c\n.L0x8008d90c: lw $v1, 0x70($s2)\n.L0x8008d910: li $a1, -0x1\n.L0x8008d914: lh $v0, ($a0)\n.L0x8008d918: nop\n.L0x8008d91c: beq $v0, $v1, .L0x8008d8c0\n.L0x8008d920: nop\n.L0x8008d924: addiu $a0, 0x6\n.L0x8008d928: lh $v0, ($a0)\n.L0x8008d92c: nop\n.L0x8008d930: bne $v0, $a1, .L0x8008d918\n.L0x8008d934: nop"
+    },
+    {
+      "id": "EV-FIGHTSTG-DEFEAT-CAMERA-OWNERSHIP-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "fightstg.s L9994-L10075 @0x8008c93c (F0x8008C93C: dispatch L9994-L10012, the entry arm L10014-L10061, the phase-2 orbit L10090-L10105); the cut call site .L0x8008c9c0 and the +0x34 hide .L0x8008ca44",
+      "authority": 2,
+      "summary": "F0x8008C93C's entry arm (state 0, and every state from 4 up) takes the one live camera record UNCONDITIONALLY: it resolves the class-0x12 camera through the class allocator [0x8004B7BC] and calls its +0x104 with (0, 0xB) - our Digimon's near shot 11 - then keeps the object at the effect's +0x50; builds the class-0x15 animation manager and calls its +0xE8(0x17, 0x1E, 0x1E); builds the class-0x14 object and calls its +0x188(0x10), and writes ZERO into the return value's +0x34 - the slot's visibility/side flag - so the FAR slot (key 0x10) is hidden for the defeat turn; then stores the slow-motion level 2 through [0x800A4548]. No instruction in the arm reads any script, battle state or pad word: the loss effect owns the camera from its first tick, and its phase-1/2 arms re-apply the same record every frame through [0xf8] with the Y angle grown by `delta * 2`.",
+      "exact": ".L0x8008c988: li $a0, 0x12 / .L0x8008c998: lw $v0, 0x1ac($s0) / .L0x8008c9a0: jalr $v0 / .L0x8008c9a8: move_ $s2, $v0 / .L0x8008c9b4: sw $s2, 0x50($s1) / .L0x8008c9b8: lw $v0, 0x104($s2) / .L0x8008c9c0: jalr $v0 / .L0x8008c9c4: li $a2, 0xb / .L0x8008c9c8: li $a0, 0x15 / .L0x8008ca00: li $a1, 0x17 / .L0x8008ca04: li $a2, 0x1e / .L0x8008ca18: li $a0, 0x14 / .L0x8008ca34: lw $v0, 0x188($a0) / .L0x8008ca3c: jalr $v0 / .L0x8008ca40: li $a1, 0x10 / .L0x8008ca44: sw $zr, 0x34($v0) / .L0x8008ca48: lui $v0, 0x800a / .L0x8008ca4c: lw $v0, 0x4548($v0)."
+    },
+    {
+      "id": "EV-FIGHTSTG-FADE-TICK-ARMS-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "fightstg.s L7789-L7811 @0x8008a83c (F0x8008A83C: the arming, both directions); L7910-L7952 @0x8008aa08 (F0x8008AA08: the state dispatch, the delay-slot store, both arms' bounds tests, the write-back to 1)",
+      "authority": 2,
+      "summary": "F0x8008A83C(self, direction, ticks) raises the state to 1 through +0x28, stores the direction at +0x58, arms the ramp at +0x10 and sets the level to 0 with step +0xFF00/ticks when direction is 0, or to 0xFF00 with step -(0xFF00/ticks) otherwise. F0x8008AA08 then, in state 1 with the ramp armed, computes level+step and stores it - `.L0x8008AA68 sw $v0, 0x5c($a1)` is the delay slot of the direction test at `.L0x8008AA64 bnez $a0`, so BOTH arms store the computed level, the fade-out arm included. The fade-IN arm clamps to 0xFF00 and raises state 2 the tick the sum passes it (`slt $v0, 0xFF00, level`); the fade-OUT arm (`bgez $v0, .L0x8008AA94`) keeps state 1 while the sum is >= 0 - so the tick that lands exactly ON zero still ramps - and the first tick the sum would pass zero stores 0 and raises state 2. State 2 draws and stops; state 3 draws nothing; a state under 2 or past the table (>= 4) is written back to 1 and returns.",
+      "exact": ".L0x8008aa14: lw $v1, 0xc($a1) / .L0x8008aa1c: beq $v1, $a0, .L0x8008aa44 / .L0x8008aa24: bnez $v0, .L0x8008aa3c / .L0x8008aa40: sw $a0, 0xc($a1) / .L0x8008aa44: lw $v0, 0x10($a1) / .L0x8008aa54: lw $v0, 0x5c($a1) / .L0x8008aa58: lw $v1, 0x60($a1) / .L0x8008aa5c: lw $a0, 0x58($a1) / .L0x8008aa60: addu $v0, $v1 / .L0x8008aa64: bnez $a0, .L0x8008aa84 / .L0x8008aa68: sw $v0, 0x5c($a1) / .L0x8008aa70: slt $v0, $v1, $v0 / .L0x8008aa84: bgez $v0, .L0x8008aa94 / .L0x8008aa8c: sw $zr, 0x5c($a1)."
+    },
+    {
+      "id": "EV-WALKER-LOSS-FLOW-2026-10-14",
+      "kind": "code",
+      "source": "/home/dorij/ddw3-walker/engine/dw3/ui/native/battle-loss.ts",
+      "source_sha256": "6ebf8cb513436ebf6814d0a1906e7f2a21b123e24d55b5226ae65038fdcb9900",
+      "locator": "battle-loss.ts lossFadeTick (:450-475); battle-message-line.ts BATTLE_MESSAGE_PRESS_SOUND (:164-173) and the phase-3 arm (:707-716); battle-message-session.ts the playSound option (:86-92, :215, :260-261); web/battle.js the msgSession wiring (:2889-2897); web/battle3d.js the defeat cut's ownership gate (:3006-3014); tools/verify_battle_loss_camera.mjs the press policy (:146-165)",
+      "authority": 1,
+      "summary": "The walker side of the 2026-10-14 loss-flow audit: the fade tick now stores the computed level on both arms and ends the fade-out ramp exactly where the original does; the ported message line plays SYSTEM07 (0x4001c) on the Circle press through a playSound edge threaded from the session to the reveal machine and wired in web/battle.js to sfx.play(\"system07\"); the defeat camera's record cut is no longer gated on camScriptOwned (the loss branch fires while the enemy's action VM is still running, so the gate left the retire shot on screen for the whole loss beat); and the loss camera check keeps choosing FIGHT when a missed enemy blow returns the turn to the command menu (state 2).",
+      "exact": "mem.write32(fade + LOSS_FADE_LEVEL, level);"
+    },
+    {
+      "id": "EV-FIGHTSTG-THROW-ITEM-ARMS-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fightstg.s",
+      "source_sha256": "a0c285c432db97814467a0c9dc4e225e477469a78e5354e48403c404e6d2ab8c",
+      "locator": "F0x8008d3b4 state-0 dispatch .L0x8008d400-.L0x8008d430 (L10696-L10708) and the 14-word jump table at 0x80082ee4 (L131-L144); the eight typed arms (L10709-L11030): 77-83 .L0x8008d434, 84 .L0x8008d44c, 85 .L0x8008d714, 86 .L0x8008d4dc, 87 .L0x8008d510, 88 .L0x8008d550 (producer) -> tail .L0x8008d6a0, 89 .L0x8008d52c, 90 .L0x8008d7e8; the shared tail .L0x8008d9b0 (L11060); item 85's state-1 fallback L11082-L11127; item 90's bytes at resident 0x8004356c+0xd/e/f (web/assets/native/screens/resident.bin, base 0x80010000). Raw overlay image web/assets/native/screens/pro_fightstg.bin (RAM base 0x80082cb0).",
+      "authority": 2,
+      "summary": "The item machine's THROW band: ids 77-90 take the 14-word jump table at 0x80082ee4 (.L0x8008d400-.L0x8008d430) and reach eight typed arms, each allocating a fresh presentation actor (FIGHTSTG_F0x8008c910) and writing its clip +0x54, motion +0x68, effect +0x6c and sound +0x70: 77-83 clip 15, motion 0x22+3*(id-77) = 34..52, effect 2, sound 0x39; 84 clip 15, motion 0x22+3*(rand_u16()%7) (0x92492493 is the signed /7 magic; the same tail computes n - 7q), effect 2, sound 0x39; 85 clip 14, motion -1, effect 0x1c, sound 0x27; 86 clip 17, motion -1, effect 0x15, sound 0x1b; 87 clip 17, motion -1, effect 0x27, sound 0x31; 88 clip 17, motion -1, effect 0x25/0x27/0x2e and sound 0x31/0x31/0x1e selected by ctx+0x7c (1/2/else - the STR/DEF branch its own producer sets); 89 clip 17, motion -1, effect 0x29, sound 0x31; 90 clip 14, motion/effect/sound = resident bytes 0x21/0x04/0x19 at 0x8004356c+0xd/e/f. Item 85 alone also has a state-1 fallback (actor == null, ctx+0x18 == 0, gate byte 0x80042b5f == 0): a second actor with clip 10, effect 0x21, sound 0x1f. Re-read from the raw overlay bytes (pro_fightstg.bin) and the resident image - identical to the assembly.",
+      "exact": ".L0x8008d434: lw $v1, ($s0)\n.L0x8008d438: li $v0, 0xf\n.L0x8008d43c: sw $v0, 0x54($v1)\n.L0x8008d440: lw $v0, 0x70($s2)\n.L0x8008d444: j .L0x8008d4ac\n.L0x8008d448: addiu $v0, -0x4d\n.L0x8008d44c: lui $v0, 0x8005\n.L0x8008d450: lw $v0, -0x23f4($v0)\n.L0x8008d454: nop\n.L0x8008d458: jalr $v0\n.L0x8008d45c: nop\n.L0x8008d460: lui $v1, 0x9249\n.L0x8008d464: ori $v1, 0x2493\n.L0x8008d468: mult $v0, $v1\n.L0x8008d46c: sra $v1, $v0, 0x1f\n.L0x8008d470: mfhi $t0\n.L0x8008d474: addu $a0, $t0, $v0\n.L0x8008d478: sra $a0, 0x2\n.L0x8008d47c: subu $a0, $v1\n.L0x8008d480: sll $v1, $a0, 0x3\n.L0x8008d484: subu $v1, $a0\n.L0x8008d488: subu $v0, $v1\n.L0x8008d48c: addiu $v0, 0x2\n.L0x8008d490: sw $v0, 0x74($s2)\n.L0x8008d494: lw $v1, ($s0)\n.L0x8008d498: li $v0, 0xf\n.L0x8008d49c: sw $v0, 0x54($v1)\n.L0x8008d4a0: lw $v0, 0x74($s2)\n.L0x8008d4a4: nop\n.L0x8008d4a8: addiu $v0, -0x2\n.L0x8008d4ac: sll $v1, $v0, 0x1\n.L0x8008d4b0: addu $v1, $v0\n.L0x8008d4b4: lw $v0, ($s0)\n.L0x8008d4b8: addiu $v1, 0x22\n.L0x8008d4bc: sw $v1, 0x68($v0)\n.L0x8008d4c0: lw $v1, ($s0)\n.L0x8008d4c4: li $v0, 0x2\n.L0x8008d4c8: sw $v0, 0x6c($v1)\n.L0x8008d4cc: lw $v1, ($s0)\n.L0x8008d4d0: li $v0, 0x39\n.L0x8008d4d4: j .L0x8008d9b0\n.L0x8008d4d8: sw $v0, 0x70($v1)\n\n.L0x8008d7e8: lw $v1, ($s0)\n.L0x8008d7ec: li $v0, 0xe\n.L0x8008d7f0: sw $v0, 0x54($v1)\n.L0x8008d7f4: lui $v1, 0x8004\n.L0x8008d7f8: addiu $v1, 0x356c\n.L0x8008d7fc: lw $a0, ($s0)\n.L0x8008d800: lbu $v0, 0xd($v1)\n.L0x8008d804: nop\n.L0x8008d808: sw $v0, 0x68($a0)\n.L0x8008d80c: lw $a0, ($s0)\n.L0x8008d810: lbu $v0, 0xe($v1)\n.L0x8008d814: nop\n.L0x8008d818: sw $v0, 0x6c($a0)\n.L0x8008d81c: lw $a1, ($s0)\n.L0x8008d820: lbu $v0, 0xf($v1)\n.L0x8008d824: move_ $a0, $zr\n.L0x8008d828: sw $v0, 0x70($a1)\n.L0x8008d82c: lui $v0, 0x800a"
+    },
+    {
+      "id": "EV-STGMCARD-CHOOSER-TWEENS-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L1445-L1487 (F0x80084328 reset, file 0x1678-0x1724); L1310-L1340 (F0x8008410C); L1344-L1370 (F0x80084194); L1387-L1406 (F0x80084240); L1411-L1424 (F0x800842A0); L1428-L1441 (F0x800842E4); L1489- (F0x800843D8)",
+      "authority": 2,
+      "summary": "The slot chooser's four 8.8 tweens and the order they run. Reset starts cardsX (+0x5C) 0xDE->0 in 0xA, stripY (+0x78) -0x55->0 in 0xA, consoleX (+0x94) 0->0x2F in 8 and cursorX (+0xB0) -1->0 in 1 (L1445-L1487). F0x8008410C re-starts stripY (L1310); F0x80084194 re-starts consoleX and writes the shared block's selected index +4 = a1 and previous +8 = 0 (L1344); F0x80084240 starts cursorX from shared+8 * 0x44 to shared+4 * 0x44 in 5 (L1387); F0x800842A0 re-starts cardsX 0xDE->0 (L1411) and F0x800842E4 the reverse 0->0xDE in 5 (L1428). F0x800843D8's substate arms tick one tween each - 1 stripY, 2 cardsX, 3 cardsX (out), 5 consoleX then placeCursor, 7 cursorX - and only substate 6 reads the pad (bits 7/5 = left/right, clamp 0..2, refresh + placeCursor + 0x4001B on a real change)."
+    },
+    {
+      "id": "EV-STGMCARD-CHOOSER-DRAW-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L1786-L1869 (F0x800843D8 draw tail, file 0x1BCC-0x1D18); L1879 (F0x800849F0 ctor)",
+      "authority": 2,
+      "summary": "The slot chooser's draw tail, in order: console clip 0x23 at (screen[0x9C] + screen[0xB8] + 0x30, screen[0x80] + 0x12) with paletteShift(screen[0xD4]) (L1786); bar clip 0x20 at (0, screen[0x80] + 0x10); the header widget moved to (0x15, screen[0x80] + 0x18) (L1813); for each slot i < 3 with parent[i*0x44+0x74] != 0, nameplate 0x800882E4[parent[i*0x44+0xA4] - 3] at (0x80088304[i] + screen[0x64], 0x23) (L1826); cards clip 0x22 at (screen[0x64] + 0x62, 0x20), drawn last (L1857). The console's CLUT ping-pong (+0xD4, direction +0xD8, stamp +0xD0): advances when frameTick - stamp >= 3, climbing 0..0xB and snapping to 0xA with direction 1 when the increment would reach 0xC. The console x is the sum of the console's own slide and the cursor column over a 0x30 base - NOT the nameplate x (0x6D + slot*0x44), which stgmcard-decoded-2026-08-05.md section 4 misread there."
+    },
+    {
+      "id": "EV-STGMCARD-SLOT-ROWS-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L2354 (open body, widget +0x14 <- 0xF); L2343-2347 (widget +0x14 <- 2); L2384-L2412 (the rows, file 0x2524-0x2594); L2419 (cursor position)",
+      "authority": 2,
+      "summary": "The slot chooser's two rows and cursor. The YES widget (child +0x0C) is set to esmemcrd 3 '{1}' and numbered 1 (L2384-L2396), the NO widget (child +0x10) to the same string and numbered 2 (L2400-L2412); the cursor (child +0x18) is shown and placed at (0xC2, screen[0x64] * 0x0E + 0xBD) (L2419). The same two widgets sit at (207,189)/(207,203) in the window's own construction. Up/down pick rows 0/1 on the pad's bits 4/6 read every frame (F0x80084DCC state 2), a repeat of the same direction is silent and a change plays 0x8004513E."
+    },
+    {
+      "id": "EV-STGMCARD-BLINK-ARROW-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L4533 (F0x80087368); L4550-L4580 (file 0x46FC-0x4774, the blink block)",
+      "authority": 2,
+      "summary": "The memory-card screen's only five-frame/three-tick indicator: gated on +0x2840, the frame counter +0x2848 advances when frameTick - +0x2844 >= 3 (the stamp +0x2844 is stored on the advance path only, at L4573), increments and wraps at 5 (slti 0x5 -> 0), and is passed to paletteShift before cmfont clip 0x0A is drawn at (0x126,0xD0) = (294,208) (L4572-L4580). The overlay's other cyclic counter is the console's CLUT ping-pong (+0xD4, 0..0xB every 3 vsyncs)."
+    },
+    {
+      "id": "EV-STGMCARD-LANGUAGE-PLACEHOLDER-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L674-L681 (F0x800836C4's build band, file 0xA6C-0xA88)",
+      "authority": 2,
+      "summary": "The save card's only language-dependent string. The build band loads 0x20 into v1, reads the language global 0x8005CCA8, and on a nonzero value replaces v1 with 0x21 before storing it to 0x80088088 - the widget descriptor table's first word, which is the FILE NAME record's string index (esmemcrd 0x20 '-----' vs 0x21 '--------'). It is not a layout constant and does not change the panel's height."
+    },
+    {
+      "id": "EV-STGMCARD-WINDOW-HEADER-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stgmcard.s",
+      "source_sha256": "fc23ab30083c4ab4813f282e338c8757ce01e515d02967addad9b619f165dcad",
+      "locator": "L2354 (widget +0x14 <- 0xF); L2343-2347 (widget +0x14 <- 2); L1489- (the title widget in F0x800843D8's state-0 arm and F0x80084DCC's per-frame header re-placement, L2434-2449)",
+      "authority": 2,
+      "summary": "The message window's two header lines. The widget at (20,113) (child +0x14) is the mode WORD: the open body sets it to 0xF 'LOADING' or 2 'SAVING' and no other +0x114 site re-binds it. The SAVE/LOAD title (esmemcrd 1/0x0E) is the header widget at (205, 98) which F0x80084DCC re-places each frame (L2434-2449) so it follows the fold. The message-binding census's 'lines[0] (+0x14) is never touched' counted only sixteen of F0x80084DCC's 26 vtable-0x114 call sites and missed the open body."
+    },
+    {
+      "id": "EV-STGMCARD-STATES-ENUM-2026-10-14",
+      "kind": "decompilation",
+      "source": "/home/dorij/ddw3-walker-undec/exe-decomp/stgmcard_c/F0x80084dcc.c",
+      "source_sha256": "c7c0e6b56ca8286ef7764eaacdd02f7e67ca08fba8c5ca5d98b42411e71f08b3",
+      "locator": "whole file (1116 lines); the state constants and the eight card-service slots",
+      "authority": 3,
+      "summary": "The state machine's complete path set, enumerated from the decompiled C: state constants 0,1,2,10,11,12,20,22,23,30,31,32,33,34,35,40,41,50-53,70,71,90,100,110,111,120,121,123-125,400,401,500-502,600,601; card-service slots 0x80048A84 (list/selection status), A88/A94/A98/A9C (four card status services), A8C and A90 (the 0x26C4-byte read/write pair), AA8 (block checksum). No state calls a delete or a copy service, and esmemcrd (all 41 strings) has no delete/copy string. The destructive path is FORMAT (0x19 prompt -> 0x6E format via A9C)."
+    },
+    {
+      "id": "EV-STGMCARD-PORT-BLOCK-GRID-2026-10-14",
+      "kind": "code",
+      "source": "/home/dorij/ddw3-walker-undec/engine/dw3/ui/memcard-block-grid.ts",
+      "source_sha256": "bc287e470ad61a80e1d656de97146f1e63130e7a9882ead267238569d4509331",
+      "locator": "whole file (345 lines); the oracle at tests/memcard-block-grid-oracle.test.js",
+      "authority": 3,
+      "summary": "The ported block view (phase-4 translation), whose oracle runs the ORIGINAL F0x800843D8 through engine/native with the object factory, tween pair, pad service, widget factory and draw context stubbed and compares every ordered call and field over 25 seeded cases - including a 'draw records' case that seeds scrollX 0x1E and cursorX 8 and compares the console call's x and y. Its constants: cardsX/scrollY/scrollX/cursorX as above, console x = scrollX + cursorX + 0x30, nameplates at XPOS[i] + screen[0x64], cards at screen[0x64] + 0x62, CLUT 0..0xB with the 0xC->0xA snap."
+    },
+    {
+      "id": "EV-STGMCARD-PORT-MACHINE-2026-10-14",
+      "kind": "code",
+      "source": "/home/dorij/ddw3-walker-undec/engine/dw3/ui/memcard-machine.ts",
+      "source_sha256": "5371ea235a0a5ffaaf14158b256cf454ed300ab7d7b976299c78339e7cef638f",
+      "locator": "the state-2 arm (the slot chooser) and the open body",
+      "authority": 3,
+      "summary": "The ported screen state machine. State 2: row = screen+0x64; up -> 0, down -> 1; on a change cursorPos(0xC2, row*0x0E + 0xBD) + 0x8004513E; circle sets the 5-line box to string 4, hides the rows and the cursor and creates the transition quad; cross backs out. The open body sets the strip to 0x1D, the yes/no rows to string 3 numbered 1/2 and the cursor to (0xC2, screen[0x64]*0x0E + 0xBD)."
+    },
+    {
+      "id": "EV-STGMCARD-PORT-MSGWIN-SAVECARD-2026-10-14",
+      "kind": "code",
+      "source": "/home/dorij/ddw3-walker-undec/engine/dw3/ui/memcard-message-window.ts",
+      "source_sha256": "db57aaa3c0402f1f50d93b0d5f85aa0e2e55b1b71bb07cf80618f2eab9d0f644",
+      "locator": "whole file; companion engine/dw3/ui/memcard-save-card.ts",
+      "authority": 3,
+      "summary": "The ported message window (F0x80087534/F0x80087368): the six text widgets with their positions ((205,98) header following the fold, (20,113) mode line, the 5-line and 2-line boxes, YES (207,189) and NO (207,203)), the cursor icon, the footer blink arrow (cmfont 0x0A at (294,208), rows 0..4 every 3 ticks, gated on +0x2840) and the window frame clip 0x21 at (boxX+foldX, boxY+foldY). The save card's port carries the widget table built from 0x80088088 and the language write (0x21 non-Japanese / 0x20 Japanese)."
+    },
+    {
+      "id": "EV-STITSHOP-POST-PURCHASE-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stitshop.s",
+      "source_sha256": "cb363db2e6555b343a2e3e4b2c1b7777159c83f97efaf0c4a1de92d5899d2b6e",
+      "locator": "L1159 (F0x80083EB0, the BUY machine; table at file 0x0); L2658 (state 0x27); L2690 (state 0x28); L1888-L1914 (the commit in the confirm state)",
+      "authority": 2,
+      "summary": "The BUY controller's post-purchase flow. The state table at file 0x0 maps 0x27 -> F0x8008561C, 0x28 -> F0x8008569C, 0x23 -> F0x8008553C (back to the list), 0x1E -> F0x800850DC (the Equip-who picker). State 0x26 (F0x800855C8) sets the message widget's line 0 to esitshop 9 'Equipped.'; 0x27 holds the message (circle plays 0x4001C, hides the widget, folds the window shut); 0x28 reads the bought item's held-count byte 0x80048D34+0x7C+id - <= 0 takes 0x23 (the list), > 0 takes 0x1E + the purchase flag. The commit (L1888-L1914) adds qty to the count capped at 0x63 and subtracts price*qty from the BIT total at save+0x6C. esitshop has no 'anything else' string."
+    },
+    {
+      "id": "EV-CARDFOLDERS-GATE-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/exe/fns.s",
+      "source_sha256": "803f8ebc589e856d801b173663f7ff1408cdfab36cf5419125d2b8286c647339",
+      "locator": "L3083-L3086 (lb D0x80048F42 / beqz inside F0x8001270C); L7102-L7112 (the bank-0x80 set_flag arm's grant)",
+      "authority": 2,
+      "summary": "The CARD FOLDERS row's gate. F0x8001270C loads the byte at D0x80048F42 and branches on it: nonzero takes the six-row list variant, zero the five-row one. D0x80048D34 + 0x20E = D0x80048F42 = the carried array's byte for id 402 (0x7C + 402), i.e. the Folder Bag's carried count; nothing writes a dedicated flag byte there, and the byte moves through the ordinary grant F0x800161D8 (+1 capped at 99), which the bank-0x80 set_flag arm calls (L7102-L7112)."
+    },
+    {
+      "id": "EV-CARDFOLDERS-GRANT-SCENE-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/wstag270.s",
+      "source_sha256": "34f60ce7d90dd5060c6df318a10179770fe92aa4b9e2c6f978b47d7e85f1a6fd",
+      "locator": "L826-L840 (file 0xCD4-0xD0C, the s270 completion's three set_flag calls)",
+      "authority": 2,
+      "summary": "The s270 Yellow Cruiser cutscene's completion sets three flags: set_flag(0x8192, 1) at L836 (.L0x00000CF4 - the call that grants the Folder Bag: 0x8192 & 0x1FF = 0x192 = 402, the collection bank's id), then set_flag(0x1A1C, 1) and set_flag(0x40A1, 1). This is the grant site that makes the CARD FOLDERS row appear."
+    },
+    {
+      "id": "EV-CARDFOLDERS-ITEM-402-2026-10-14",
+      "kind": "extraction",
+      "source": "/home/dorij/ddw3/lang_file/dw2003/eng/esitmnam.toml",
+      "source_sha256": "813940b98662e0ecf04032e61b55e282da6674c24beb04efe6199d52892a54e4",
+      "locator": "the item-name bank's entry for id 402",
+      "authority": 4,
+      "summary": "esitmnam's id-402 entry is the key item 'Folder Bag' - the item the collection byte at save+0x20E counts, and the scene reward whose grant opens the pause home list's CARD FOLDERS row."
+    },
+    {
+      "id": "EV-POSTGAME-KOC-951-RUNS-2026-10-14",
+      "kind": "assembly_label",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/wstag951.s",
+      "source_sha256": "f7f9cbc59959904c7075d48a8948f303046bea8a0077e45f41939c3578418d7d",
+      "locator": "L205 @.L0x00000314 (Keith 81), L211 @.L0x0000032c (Keith 82), L224 @.L0x00000360 (Keith 84), L367 @.L0x0000059c (Haruka 107), L380 @.L0x000005d0 (Haruka 109)",
+      "authority": 2,
+      "summary": "wstag951.s (the ordinal-45 alias of Duel Island) stores the six duelists' flag-list runs verbatim: Keith's greet [0x1011,0x11,0x0,0xffff,0x10000,0xffff] at .L0x00000314, his challenge carrying launcher 0x7848 [0x1011,0x11,0x10000,0xffff,0x17848,0xffff] at .L0x0000032c, his win line [0x1011,0x10011,0x10010,0xffff,0x11,0x10,0x0,0x11011,0x18024,0x17013,0xffff] at .L0x00000360, Haruka's challenge carrying launcher 0x784e at .L0x0000059c and her win line carrying the farewell write 0x19074 (event 1620) at .L0x000005d0.",
+      "exact": ".L0x0000032c: .word 0x00001011  /  .L0x00000330: .word 0x00000011  /  .L0x00000334: .word 0x00010000  /  .L0x00000338: .word 0x0000ffff  /  .L0x0000033c: .word 0x00017848  /  .L0x00000340: .word 0x0000ffff"
+    },
+    {
+      "id": "EV-POSTGAME-FORGE-RUNS-2026-10-14",
+      "kind": "assembly_label",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/wstag974.s",
+      "source_sha256": "0dcbcafdf369c514865e6089221845cad2784e06ef3cbcec1f669c8e86b8ef19",
+      "locator": "L914 @.L0x00000e28 (Nohemon Zodiac close), L800 @.L0x00000c60 (Ponchomon Twinkle close); wstag970.s L596 @.L0x00000930 (Yashamon Muramasa close), L539 @.L0x0000084c (Sagitarimon Punishment close)",
+      "authority": 2,
+      "summary": "The forger boards store every forge state verbatim. Nohemon's Zodiac close [0x8471,0x18675,0x8674,0xffff] (consume KaiserFist 113 + RustyGlove 116, grant Zodiac 117) at .L0x00000e28; Ponchomon's Twinkle close at .L0x00000c60; Yashamon's Muramasa close [0x18669,0x8668,0x8465,0xffff] (consume Masamune 104 + FuujinBlade 101, grant Muramasa 105) at wstag970 .L0x00000930; Sagitarimon's Punishment close at .L0x0000084c.",
+      "exact": ".L0x00000e28: .word 0x00008471  /  .L0x00000e2c: .word 0x00018675  /  .L0x00000e30: .word 0x00008674  /  .L0x00000e34: .word 0x0000ffff"
+    },
+    {
+      "id": "EV-CARD-DUEL-CLOSE-ASM-2026-10-14",
+      "kind": "assembly_label",
+      "source": "/home/dorij/ddw3/asm/dw2003/exe/fns.s",
+      "source_sha256": "803f8ebc589e856d801b173663f7ff1408cdfab36cf5419125d2b8286c647339",
+      "locator": "L7255 @0x80016a20",
+      "authority": 2,
+      "summary": "F0x800169e0's tail (the export slot D0x80048ad4) reads the previous-screen-code getter [D0x8004b448] (= F0x80016b58 -> D0x8004b400), compares it with 0x700 (the card duel), then sets flag 0x11, sets flag 0x12, sets flag 0x10 from the latch word D0x80048ac0 and clears the latch. The head, gated on [D0x8004b40c] != 0, clears bank-0 bytes 0..2 and sets flag 0x12 = 0.",
+      "exact": ".L0x80016a20: lui $v0, %hi(D0x8004b448) / .L0x80016a34: li $v1, 0x700 / .L0x80016a3c: li $a0, 0x11 / .L0x80016a48: li $a0, 0x12 / .L0x80016a64: li $a0, 0x10 / .L0x80016a80: sw $zr, %lo(D0x80048ac0)($v0)"
+    },
+    {
+      "id": "EV-CARD-DUEL-CLOSE-FIELD-CALL-2026-10-14",
+      "kind": "assembly_label",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fieldstg.s",
+      "source_sha256": "0542f9027107b2655b4485786eca32e8aca8e063b9bd1d85df741118a1188af8",
+      "locator": "L8196 @.L0x00007ff4",
+      "authority": 2,
+      "summary": "The field loads the export base D0x80048abc and calls slot +0x18 (= D0x80048ad4 = F0x800169e0) from its entry path, immediately before it writes the arriving screen's own visited marker set_flag(0x1e00 + screen, 1) through slot +0xc.",
+      "exact": ".L0x00007ff4: addiu $s0, -0x7544   # s0 = 0x80048abc\n.L0x00007ff8: lw $v0, 0x18($s0)   # F0x800169e0\n.L0x00008000: jalr $v0"
+    },
+    {
+      "id": "EV-POSTGAME-KOC-TABLES-2026-10-14",
+      "kind": "checked_extraction",
+      "source": "web/assets/data/card_opponents.json",
+      "source_sha256": "483a4ba5cc59350fab22af005355c0dc07d3d4f66f246c40440a41345e830228",
+      "locator": "opponents 146/150/154/158/160/162",
+      "authority": 3,
+      "summary": "CARD_NPC.BIN records 146 (Bombard Folder LV 92), 150 (Miserable Folder LV 92), 154 (Fire Guardian Folder LV 87), 158 (Shining Empress LV 87), 160 (Dark Evil King LV 87) and 162 (Fairies of the Sea LV 87) are the six Duel Island decks the bank-0x78 launchers select (index*2+mode+1). The folder names and levels are the walkthrough's own list, in its own order."
+    },
+    {
+      "id": "EV-POSTGAME-KOC-FAREWELL-TABLE-2026-10-14",
+      "kind": "checked_extraction",
+      "source": "web/assets/data/talk_event_launches.json",
+      "source_sha256": "4f1a85ba476ba9f4c24403df5d061d570248994580308815eda737cafaeb383d",
+      "locator": "events[116..120]",
+      "authority": 3,
+      "summary": "The resident bank-0x90 event table's indices 116..120 (0x74..0x78) name events 1620/1622/1624/1626/1628 - the five Duel Island farewell cutscenes, in the walkthrough's order (Haruka, Poemy, Pierre, Bomujii, Alice); s951's wstag event table holds exactly those five ids."
+    },
+    {
+      "id": "EV-POSTGAME-FORGE-GRANTS-2026-10-14",
+      "kind": "checked_extraction",
+      "source": "web/assets/data/talk_item_grants.json",
+      "source_sha256": "c9a07d50ef0d0b81c4c23c57ad4d0a6c49aed4079eba913354ef186635242698",
+      "locator": "rows for s970/s974 and s586",
+      "authority": 3,
+      "summary": "The shipped talk-grant extraction carries every forge: s974/173 grants Zodiac (117) and SuperNova (119); s974/28 Twinkle (142); s974/31 Immaculate (143) and Eternally (144); s974/166 Kotetsu (103); s974/171 Justice (129); s970/167 Judgment (130) and Punishment (131); s970/169 Vanquish (154) and Invincible (156); s970/172 Masamune (104) and Muramasa (105); s951/102 the KocTrophy (36); the four pre-game ingredient boxes s586/70..73 hand the twenty inputs; the post-game copies are the seabed and board boxes (s964/33, s967/33, s970/33, s972/33+77+78, s973/33) plus the two mid-level seabed forges (s964/168 Prominence, s964/170 Destruction)."
+    },
+    {
+      "id": "EV-POSTGAME-FORGE-PREDICATES-2026-10-14",
+      "kind": "checked_extraction",
+      "source": "web/assets/data/roster_predicate_table.json",
+      "source_sha256": "15f4e5d424e57f7ad1b76e357b3adc4033d4a3b2d616bddd8967e487391ff8af",
+      "locator": "records 85 (0x7055) and 149 (0x7095)",
+      "authority": 3,
+      "summary": "0x7055 = every_slot_owned (all eight roster slots obtained; F0x800159fc checks the eight 0x3dc-stride slots at 0x760/0xb3c/.../0x2264). 0x7095 = every_owned_at_level min 45 over 8 slots (F0x80015944 skips unowned slots with no level test and returns false the moment an owned slot's halfword at +0x784 is below 0x2d). Every post-game forger spawns only behind both; the DDNA givers behind 0x7095 alone."
+    },
+    {
+      "id": "EV-POSTGAME-ITEM-IDS-2026-10-14",
+      "kind": "checked_extraction",
+      "source": "/home/dorij/ddw3/rust/types/src/item_id.rs",
+      "source_sha256": "c73776d36e7fa8af4203c22c8c1ad55733c087a4e1adf1bf9d847cd2eb87e1bc",
+      "locator": "ItemId enum",
+      "authority": 3,
+      "summary": "The item table the extractors read: 36 KocTrophy, 99 Onimaru, 100 Tenjinmaru, 101 FuujinBlade, 102 RustyKatana, 103 Kotetsu, 104 Masamune, 105 Muramasa, 113 KaiserFist, 114 TempestArm, 115 RaijinFist, 116 RustyGlove, 117 Zodiac, 118 Prominence, 119 SuperNova, 125 ClusterCannon, 126 LaserCannon, 127 SuijinCannon, 128 RustyRifle, 129 Justice, 130 Judgment, 131 Punishment, 138 Khakkhara, 139 CrystalRod, 140 Millenium, 141 OldWand, 142 Twinkle, 143 Immaculate, 144 Eternally, 150 SaberFang, 151 VenomFang, 152 BelialFang, 153 OldClaw, 154 Vanquish, 155 Destruction, 156 Invincible."
+    },
+    {
+      "id": "EV-TALK-GRANT-CLOSE-ARM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/fieldstg.s",
+      "source_sha256": "0542f9027107b2655b4485786eca32e8aca8e063b9bd1d85df741118a1188af8",
+      "locator": "F0x80090afc (file 0xde4c): the start arm's ptr2 store .L0x0000dee4-.L0x0000deec (the box-family branch's delay slot) and the close arm's single apply .L0x0000df94-.L0x0000e010 (the entity+0xFC load and the jalr through [0x80048ad0])",
+      "authority": 2,
+      "summary": "The field talk handler F0x80090afc stores the SELECTED ptrB triple's ptr2 into entity+0xFC at talk start -- the sw at file 0xdeec sits in the delay slot of the box-family branch at 0xdee8, so it executes on every path -- and applies it EXACTLY ONCE, from its close arm, on the first tick the dialogue handle reads closed (0xdf94: lw $v0,0xc($s5); 0xdf9c: bnez). The close arm loads entity+0xFC (0xdff8) and, when non-null, calls the applier through the function cell [0x80048ad0] (0xe008-0xe010), which is F0x80016988. No other apply site exists on the talk path: the start arm only stores the pointer and opens the dialogue (F0x80088d38(speaker, id) at 0xdf48). A talk grant therefore lands once, at close.",
+      "exact": ".L0x0000dee4: lw $v0, 0x4($s1)\n.L0x0000dee8: bnez $s2, .L0x0000df1c\n.L0x0000deec: sw $v0, 0xfc($s0)\n...\n.L0x0000df94: lw $v0, 0xc($s5)\n.L0x0000df9c: bnez $v0, .L0x0000e19c\n...\n.L0x0000dff8: lw $a0, 0xfc($s0)\n.L0x0000dffc: nop\n.L0x0000e000: beqz $a0, .L0x0000e098\n.L0x0000e004: lui $v0, 0x8005\n.L0x0000e008: lw $v0, -0x7530($v0)\n.L0x0000e010: jalr $v0"
+    },
+    {
+      "id": "EV-TALK-GRANT-APPLIER-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/exe/fns.s",
+      "source_sha256": "803f8ebc589e856d801b173663f7ff1408cdfab36cf5419125d2b8286c647339",
+      "locator": "F0x80016988 .L0x80016988-.L0x800169cc (L7214-L7231); the set_flag dispatcher F0x800165ac's collection arm .L0x800167e8-.L0x80016810 (L7102-L7112); the collection routine F0x800161d8 .L0x800161d8-.L0x80016228 (L6715-L6734)",
+      "authority": 2,
+      "summary": "F0x80016988 walks a {u16 id, u16 value} table until id == 0xFFFF (lhu $a0,($s0) / li $v0,0xffff / beq) and calls F0x800165ac(id, value) for every pair -- one call per entry, no dedup, no revisit. F0x800165ac's collection arm forms the id's bank as $s3 - 0x80 (the addiu sits in the bne delay slot at .L0x800167ec) and sltiu $v0,0xf on the DIFFERENCE (the short form at .L0x80016800), routing banks 0x80..0x8E to F0x800161d8(index, value) (jal at .L0x8001680c, a1 = the written value). F0x800161d8 with a nonzero value does lbu A[id] (base 0x80048D34 + 0x7C + id), +1, sb, then sign-extends and clamps at 99 (slti $v0,0x64 / li $v0,0x63). One table entry = one +1, capped at 99: the disc's talk grant is a single collection write.",
+      "exact": ".L0x80016988: addiu $sp, -0x20\n.L0x8001699c: lhu $a0, ($s0)\n.L0x800169a0: li $v0, 0xffff\n.L0x800169a4: beq $a0, $v0, .L0x800169cc\n.L0x800169b0: lhu $a1, ($s0)\n.L0x800169b4: jal F0x800165ac\n...\n.L0x800167e8: bne $s1, $v0, .L0x80016800\n.L0x800167ec: addiu $v0, $s3, -0x80\n.L0x80016800: sltiu $v0, 0xf\n.L0x80016804: beqz $v0, .L0x80016814\n.L0x80016808: move_ $a0, $s0\n.L0x8001680c: jal F0x800161d8\n.L0x80016810: move_ $a1, $s2\n...\n.L0x800161f4: la_ $v0, D0x80048d34\n.L0x800161fc: addu $v1, $s2, $v0\n.L0x80016200: lbu $v0, 0x7c($v1)\n.L0x80016208: addiu $v0, 0x1\n.L0x8001620c: sb $v0, 0x7c($v1)\n.L0x80016218: slti $v0, 0x64\n.L0x80016220: li $v0, 0x63"
+    },
+    {
+      "id": "EV-LEVELUP-CURVE-STARTER-ROW-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stfgtrep.s",
+      "source_sha256": "5c90480763be3db826532dfa905449e9502b48183cea2317bf7845ea1c33599c",
+      "locator": "L3345-L3387 (.L0x00003514-.L0x00003548, .L0x000035bc; F0x80086184, overlay base 0x80082cb0)",
+      "authority": 2,
+      "summary": "The level curve's growth source is the STARTER species' row, not the live form's: F0x80086184 builds s4 = 0x8003EF5C + slot*0x58 from its slot argument (sll 1 / addu / sll 2 / subu / sll 3 = *0x58, then lui 0x8004 + addiu -0x10a4 = 0x8003EF5C) and reads the threshold byte with `lbu $v1, 0x3e($s4)` at .L0x000035bc \u2014 profile byte +0x3E is growth_xp. The slot is the same arg0 the routine hands to the stat-roll callee F0x80085E3C, and rows 0..7 of 0x8003EF5C are the eight starters (row = starter index; row = id-1 in digimon.json). The m2c body states the same expression \u2014 see EV-LEVELUP-CURVE-STARTER-ROW-DECOMP-2026-10-14.",
+      "exact": ".L0x00003514: sll $v0, $s2, 0x1                   # .word 0x00121040\n.L0x00003518: addu $v0, $s2                       # .word 0x00521021\n.L0x0000351c: sll $v0, 0x2                        # .word 0x00021080\n.L0x00003520: subu $v0, $s2                       # .word 0x00521023\n.L0x00003524: sll $v0, 0x3                        # .word 0x000210c0\n.L0x00003528: lui $v1, 0x8004                     # .word 0x3c038004\n.L0x0000352c: addiu $v1, -0x10a4                  # .word 0x2463ef5c\n.L0x00003530: lw $a0, 0x18($s1)                   # .word 0x8e240018\n.L0x00003534: nop                                 # .word 0x00000000\n.L0x00003538: addu $a0, $s0                       # .word 0x00902021\n.L0x0000353c: sw $a0, 0x18($s1)                   # .word 0xae240018\n.L0x00003540: slt $a0, $a1, $a0                   # .word 0x00a4202a\n.L0x00003544: beqz $a0, .L0x00003550              # .word 0x10800002\n.L0x00003548: addu $s4, $v0, $v1                  # .word 0x0043a021"
+    },
+    {
+      "id": "EV-LEVELUP-ROLLS-STARTER-ROW-ASM-2026-10-14",
+      "kind": "original_assembly",
+      "source": "/home/dorij/ddw3/asm/dw2003/pro/stfgtrep.s",
+      "source_sha256": "5c90480763be3db826532dfa905449e9502b48183cea2317bf7845ea1c33599c",
+      "locator": "L3136-L3158, L3191, L3245-L3247, L3287-L3289 (.L0x000031d0-.L0x000031ec, .L0x00003228, .L0x000032ac, .L0x00003384-.L0x0000338c, .L0x0000342c-.L0x00003434; F0x80085E3C)",
+      "authority": 2,
+      "summary": "The per-level stat rolls read the growth bytes from the same STARTER row: F0x80085E3C builds s5 = 0x8003EF5C + slot*0x58 at .L0x000031d0-.L0x000031ec (same *0x58 sequence, lui 0x8004 / addiu -0x10a4), then reads `lbu $s2, 0x41($s5)` (HP, .L0x00003228), `lbu $s2, 0x42($s5)` (MP, .L0x000032ac), and in the two loops `addu $v1, $s5, $s1` + `lbu $s2, 0x43($v1)` (core, .L0x00003384-.L0x0000338c) and `addu $v1, $s5, $s1` + `lbu $s2, 0x49($v1)` (element, .L0x0000342c-.L0x00003434), with $s1 the loop index \u2014 profile bytes +0x41/+0x42/+0x43+i/+0x49+i. Coverage: those five lbu loads are the only reads of the growth offsets in either routine's complete body (.L0x0000318c-.L0x000034d0 ends `jr $ra` at .L0x000034cc; .L0x000034d4-.L0x00003698 ends `jr $ra` at .L0x00003694), and no other profile base is constructed in either body.",
+      "exact": ".L0x000031d0: sll $v0, $s0, 0x1                   # .word 0x00101040\n.L0x000031d4: addu $v0, $s0                       # .word 0x00501021\n.L0x000031d8: sll $v0, 0x2                        # .word 0x00021080\n.L0x000031dc: subu $v0, $s0                       # .word 0x00501023\n.L0x000031e0: sll $v0, 0x3                        # .word 0x000210c0\n.L0x000031e4: lui $v1, 0x8004                     # .word 0x3c038004\n.L0x000031e8: addiu $v1, -0x10a4                  # .word 0x2463ef5c\n.L0x000031ec: addu $s5, $v0, $v1                  # .word 0x0043a821"
+    },
+    {
+      "id": "EV-LEVELUP-CURVE-STARTER-ROW-DECOMP-2026-10-14",
+      "kind": "checked_decompilation",
+      "source": "/home/dorij/ddw3-walker/recovered/ddw3/decomp/pro/stfgtrep/F0x80086184.c",
+      "source_sha256": "a21d7a05b89fe407b2a6c9bff20eeae1a6073e768cf6cf33647a5abbbef0bb8e",
+      "locator": "line 25",
+      "authority": 3,
+      "summary": "The m2c body of F0x80086184 computes the level threshold as ((arg0 * 0x58) + 0x8003EF5C)->unk3E: arg0 is the roster slot, 0x58 the profile stride and 0x8003EF5C the starter species table \u2014 the same row source the assembly shows in EV-LEVELUP-CURVE-STARTER-ROW-ASM-2026-10-14.",
+      "exact": "        if (((((((var_s0 * var_s0 * var_s0) + (var_s0 * 5)) - 6) * ((arg0 * 0x58) + 0x8003EF5C)->unk3E) / 10) + *((var_a0 * 4) + 0x8008916C)) < temp_v0->unk18) {"
+    },
+    {
+      "id": "EV-LEVELUP-STARTER-ROW-RAM-CROSSCHECK-2026-10-14",
+      "kind": "runtime_observation",
+      "source": "/home/dorij/vm-spike/dumps/slot1_ram.bin",
+      "source_sha256": "505d11cdbb5a2680435586f35a52fc8cc08820aa321832d356349322c87906c4",
+      "locator": "slot0 record at 0x8004949C (file 0x4949C): +0x18 exp, +0x1C level; the form value sits at 0x80049498, -0x04 of this base (= roster record 0x80049494 + 0x04); profile table 0x8003EF5C rows 0 and 8",
+      "authority": 1,
+      "summary": "A real save stands slot0 in Dinohumon while its level follows the STARTER's curve. slot1_ram.bin slot0: form value (at 0x80049498 = the record base 0x8004949C - 0x04) = 0x182 = profile row 8's +0x00 value (Dinohumon, walker id 9); exp (record +0x18) = 2985; level (record +0x1C) = 15. With the starter row 0 (Kotemon) growth_xp = 8: thr(15) = 8*(3375+75-6)/10 + 50 = 2805 < 2985 < thr(16) = 3386 -> level 15, matching the dump. With the standing form's own row 8 growth_xp = 1 the same exp sits at level 27 (thr(27) = 2781 < 2985 < thr(28) = 3008). docs/research/ui/dri-states/dri_s1.bin slot0 shows the same form value 0x182 at level 15 (its exp field reads 99,999,999 - an anomalous dump value, not the disc cap (999,999) - so only slot1_ram.bin carries a usable exp/level pair). tests/progression.test.js 'levelForExp matches the slot1 RAM-dump observations' already pins the 2985 -> 15 arithmetic.",
+      "exact": "slot0 +0x04 u32 = 0x00000182; +0x18 u32 = 2985 (0x00000BA9); +0x1C u16 = 15; profile row 0 +0x00 = 0x017F, +0x3E = 8; profile row 8 +0x00 = 0x0182, +0x3E = 1"
+    },
+    {
+      "id": "EV-LEVELUP-STARTER-ROW-NATIVE-PORT-2026-10-14",
+      "kind": "browser_code",
+      "source": "/home/dorij/ddw3-walker/engine/dw3/ui/native/fight-report-rewards.ts",
+      "locator": "L52-L66 (REWARD_SPECIES_BASE/STRIDE + species), L69-L102 (reportLevelUp), L105-L133 (reportAddExperience)",
+      "authority": 5,
+      "summary": "The walker's translated stfgtrep already reads the starter row for both the curve and the rolls: species(slot) = REWARD_SPECIES_BASE (0x8003EF5C) + slot*0x58; reportAddExperience reads growth_xp at prof + 0x3E; reportLevelUp reads the growth bytes at prof + 0x41 / +0x42 / +0x43+i / +0x49+i. The port is oracle-tested against the shipped pro_stfgtrep.bin (tests/lane-b/fight-report-rewards.test.js runs the original through engine/native on the resident image). The browser reward path (web/battle.js applyParticipantProgress) handed it the live form's profile until 2026-10-14; it now uses levelUpGrowthProfile (digimonDB[rookieId]), pinned by tests/levelup-growth-source.test.js and tools/verify_levelup_growth_source.mjs."
     }
   ],
   "claims": [
@@ -84208,7 +84557,7 @@
       ],
       "statement": "A digivolution candidate row is NOT drawn in the gold face for being the partner's current form. In the archived Choose digivolve capture the single row is the current form and it is white, while a technique name in the same frame is gold. Whether the original ever colours a candidate row, and on what test, is NOT established.",
       "coverage": "One frame, one row. The quantifier in the statement is negative and needs only this single counter-example: a row that IS the current form and is NOT gold. Both faces appear in the same frame, so the reading cannot be a palette or capture artefact. It does not enumerate the other rows, because the capture has only one. || Isolated review 2026-10-05 (reviews/ui-chrome-2026-10-05.json): The capture's reading reproduces with independent pixel sampling. docs/research/ui/captures/original-status-2026-09-03/03-choose-digivolve.png (sha256 9df003670270222b086360ac4edc3ae8b1b764533ec59e4553b7747b4ff1c81e - matches the evidence record) contains one candidate row (Kotemon, which is also the partner shown in the status panel, i.e. the current form) and the technique na Anchors re-read: docs/research/ui/captures/original-status-2026-09-03/03-choose-digivolve.png (sha256 verified; PIL sampling of the row and the technique name reproduced the quoted colours).; Ledger evidence EV-DIGIVOLVE-ROW-IS-WHITE and the claim's coverage/limitations (single frame, negative quantifier).",
-      "notes": "Raised by the operator, who saw the walker draw a form name in orange. The walker drew a candidate row gold whenever it matched the partner's current form, in both the status sheet's digivolve panel and the See Digivolve screen. No claim ever supported that; it was a walker invention. Removed on 2026-09-04, so both places now draw every candidate row in the plain face. No search was made for what the original DOES colour. Canonical document read first: docs/research/ui/pause-menu-layout.md. It records several face corrections on these screens already -- the stat numbers are white and only the EXP pair is gold, and an empty equipment slot is named in the white face -- but says nothing about a candidate row's face, so this is new rather than a re-derivation.",
+      "notes": "Raised by the operator, who saw the walker draw a form name in orange. The walker drew a candidate row gold whenever it matched the partner's current form, in both the status sheet's digivolve panel and the See Digivolve screen. No claim ever supported that; it was a walker invention. Removed on 2026-09-04, so both places now draw every candidate row in the plain face. No search was made for what the original DOES colour. Canonical document read first: docs/research/ui/pause-menu-layout.md. It records several face corrections on these screens already -- the stat numbers are white and only the sheet's EXP pair is gold, and an empty equipment slot is named in the white face -- but says nothing about a candidate row's face, so this is new rather than a re-derivation.",
       "limitations": [
         "Keep the three recorded limitations. Note the review reproduced the pixel sampling exactly (2026-10-06); the promotion path is the fill site's face argument in the now-lifted ststatus routines."
       ],
@@ -86969,17 +87318,18 @@
     {
       "id": "STATUS-SHEET-VALUE-FACE-001",
       "system": "ui-chrome",
-      "statement": "The status sheet builds its six stat values at x 0x32, its seven resistance values at x 0x5B, and its TP label and value at (0x10,0xCB) and (0x2D,0xCB), in the white text face. Only the EXP value and label pair at 0x42 and 0x46 uses the gold number face. The sheet's value filler F0x8008C1C0 drops all thirteen stat and resistance widgets to palette 0 and raises three of them to palette 6; the equip preview F0x8008C460 passes palette 1 (raised) and 5 (lowered) to the same thirteen widgets, so the original clause 'no routine in this overlay passes palette 1 or 5 to them' is false: it described the value filler, not the overlay. The equip sub-screen builds no stat or resistance widget of its own and never draws the stat window, so the values on screen while equipping are the sheet's own widgets.",
-      "status": "partially_verified",
+      "statement": "The status sheet builds its six stat values at x 0x32, its seven resistance values at x 0x5B, and its TP label and value at (0x10,0xCB) and (0x2D,0xCB), in the white text face. Of the sheet's value widgets, only the EXP value and label pair at 0x42 and 0x46 uses the gold number face; the party card's own LV/HP/MP label and value widgets, built by the same ctor with the same kind-3 calls (file 0x8924 and 0x897C), are gold too. The sheet's value filler F0x8008C1C0 drops all thirteen stat and resistance widgets to palette 0 and raises three of them to palette 6; the equip preview F0x8008C460 passes palette 1 (raised) and 5 (lowered) to the same thirteen widgets, so the original clause 'no routine in this overlay passes palette 1 or 5 to them' is false: it described the value filler, not the overlay. The equip sub-screen builds no stat or resistance widget of its own and never draws the stat window, so the values on screen while equipping are the sheet's own widgets.",
+      "status": "verified",
       "evidence": [
         "EV-STATUS-SHEET-VALUE-FACE",
         "EV-STATUS-SHEET-VALUE-PALETTE",
         "EV-STATUS-PREVIEW-PALETTE-ASM-2026-10-14",
         "EV-EFFSTATS-SUBTRACT-COUNTERS-ASM-2026-10-14"
       ],
-      "notes": "Reference capture docs/research/ui/captures/original-status-2026-09-03/02-status-sheet.png shows white stat and resistance numbers, a white TP 0 and a gold 4 EXP. Shipped in web/menu.js valueText, _drawDetail and _drawEquip. Canonical doc read first: docs/research/ui/pause-menu-layout.md. The clause 'no routine in this overlay passes palette 1 or 5 to them' was corrected 2026-10-14 (the equip preview F0x8008C460 passes 1/5; claim STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14); left for the review gate.",
-      "coverage": "Every F0x8001ae38 call in the sheet ctor F0x8008b520 was read and its face argument recorded from the assembly: 6 stat, 7 resistance, 2 TP and 2 EXP widgets, 17 of 17 accounted for. The equip sub-screen clause rests on the earlier reading of its ctor F0x80086498 and draw F0x80086dd4 (no stat or resistance widget built, no stat window laid down); unchanged by this correction. The F0x*.c sweep behind the original 'no palette 1 or 5' clause did not see the equip preview's register-passed pair (its C passes var_a1 = 1/5; the asm's li $a1 sites are at file 0x9A9C/0x9ABC/0x9BF8/0x9C18); re-read from the assembly on 2026-10-14, the preview F0x8008C460 passes 1 and 5 to the same thirteen widgets, so the clause held for the value filler alone (claim STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14). Now established: the three palette-6 flags are the stat snapshot counters at +0x26/+0x28/+0x2A, the halfwords F0x80017174 subtracts from the block's +0xC/+0xE/+0x14 with floor 0 (exe/fns.s L7919-L7945). The walker paints the preview's 1/5 pair via sheetPreviewFace (web/menu.js).",
-      "frontier_rationale": "Closes a colour divergence the player reported on the See Equipment screen; no open frontier covers the status sheet's text faces or the equip preview's colours."
+      "notes": "Reference capture docs/research/ui/captures/original-status-2026-09-03/02-status-sheet.png shows white stat and resistance numbers, a white TP 0 and a gold 4 EXP. Shipped in web/menu.js valueText, _drawDetail and _drawEquip. Canonical doc read first: docs/research/ui/pause-menu-layout.md. The clause 'no routine in this overlay passes palette 1 or 5 to them' was corrected 2026-10-14 (the equip preview F0x8008C460 passes 1/5; claim STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14). Reviewed 2026-10-14 by the independent subagent review (VERDICT.md, ~/.hermes/cache/scratch/party-review/VERDICT.md; the same verdict covers this correction): the review's remaining text defects (the over-broad gold-face clause, the evidence summary and the coverage scope) fixed and re-checked against the assembly before re-recording; the canonical doc pause-menu-layout.md updated in the same pass.",
+      "coverage": "Every F0x8001ae38 call in the sheet ctor F0x8008b520 that builds the sheet's stat, resistance, TP and EXP value widgets was read and its face argument recorded from the assembly: 6 stat, 7 resistance, 2 TP and 2 EXP widgets, 17 of 17 accounted for (the ctor's other call sites build the party card's per-member widgets \u2014 the two five-iteration kind-3 loops at file 0x8924/0x897C are its LV/HP/MP label and value widgets \u2014 and the screen's other labels). The equip sub-screen clause rests on the earlier reading of its ctor F0x80086498 and draw F0x80086dd4 (no stat or resistance widget built, no stat window laid down); unchanged by this correction. The F0x*.c sweep behind the original 'no palette 1 or 5' clause did not see the equip preview's register-passed pair (its C passes var_a1 = 1/5; the asm's li $a1 sites are at file 0x9A9C/0x9ABC/0x9BF8/0x9C18); re-read from the assembly on 2026-10-14, the preview F0x8008C460 passes 1 and 5 to the same thirteen widgets, so the clause held for the value filler alone (claim STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14). Now established: the three palette-6 flags are the stat snapshot counters at +0x26/+0x28/+0x2A, the halfwords F0x80017174 subtracts from the block's +0xC/+0xE/+0x14 with floor 0 (exe/fns.s L7919-L7945). The walker paints the preview's 1/5 pair via sheetPreviewFace (web/menu.js).",
+      "frontier_rationale": "Closes a colour divergence the player reported on the See Equipment screen; no open frontier covers the status sheet's text faces or the equip preview's colours.",
+      "review": "docs/research/evidence/reviews/STATUS-SHEET-VALUE-FACE-001.review.json"
     },
     {
       "id": "STFGTREP-PARTY-ROW-READING-CONTRADICTED-001",
@@ -90675,7 +91025,7 @@
         "EV-c6e5f2682b8a",
         "EV-9fd0b556ae3a"
       ],
-      "notes": "Closes most of the stgmcard_ui.json gap that called this an untraced 1116-line state machine. Wired: message_window.binding and message_window.result_messages in stgmcard_ui.json, and web/save.js now routes a message to the box its string is bound to instead of putting everything in the five-line box - 'Saved.', 'LOADED.' and 'No data here.' move 63 pixels down. STILL OPEN: the one-line box at +0x14 (20, 113) is bound by NONE of the sixteen sites, so what it holds is unestablished and the walker's SAVE/LOAD title there remains an assumption; esmemcrd 6 'Save here?' and 0x10 'Load which game?' are set somewhere other than a +0x114 site and were not traced; and the result table's LENGTH is inferred, not read - it has no terminator and the index is not bounds-checked, so the eleven-entry extent rests on entries 0..10 all being valid esmemcrd indices while entry 11 onward exceeds the bank's 41 strings and forms a consecutive ascending run. The evidence for both functions is checked decompilation at authority 3; the table itself is assembly at authority 2.",
+      "notes": "Closes most of the stgmcard_ui.json gap that called this an untraced 1116-line state machine. Wired: message_window.binding and message_window.result_messages in stgmcard_ui.json, and web/save.js now routes a message to the box its string is bound to instead of putting everything in the five-line box - 'Saved.', 'LOADED.' and 'No data here.' move 63 pixels down. STILL OPEN: the one-line box at +0x14 (20, 113) is bound by NONE of the sixteen sites, so what it holds is unestablished and the walker's SAVE/LOAD title there remains an assumption; esmemcrd 6 'Save here?' and 0x10 'Load which game?' are set somewhere other than a +0x114 site and were not traced; and the result table's LENGTH is inferred, not read - it has no terminator and the index is not bounds-checked, so the eleven-entry extent rests on entries 0..10 all being valid esmemcrd indices while entry 11 onward exceeds the bank's 41 strings and forms a consecutive ascending run. The evidence for both functions is checked decompilation at authority 3; the table itself is assembly at authority 2. Correction 2026-10-14 (per the UI-STGMCARD-WINDOW-HEADER-LINES-2026-10-14 review): F0x80084dcc carries 26 calls through widget slot +0x114, not sixteen - the sixteen attributed here are a subset, and the open body's two +0x14 writes (the SAVING/LOADING mode word, L2343-2347 and L2354-2358) are among the ten it missed.",
       "coverage": "The sixteen sites are the complete set, not a sample: the decompilation of F0x80084dcc was searched for every call through slot +0x114 and each of the sixteen hits was followed back to the assignment naming which of the caller-block widgets it targets, so no call is left unattributed. A census of the same file for the other widget-method slots found only +0x144 (visibility), +0x114, +0x118, +0x134 and +0x15C, which bounds the search. The eleven result-table entries were read word by word from stgmcard.s file offsets 0x5660 through 0x5688, and every one was checked to be a valid esmemcrd index whose text matches what the extractor records, asserted in tests/save-screen.test.js.",
       "frontier_ids": [
         "UI-Q002"
@@ -128508,14 +128858,262 @@
       "id": "STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14",
       "system": "ui-chrome",
       "statement": "The equip preview F0x8008C460 (ststatus file 0x97B0) repaints the thirteen stat and resistance widgets through their palette method: palette 1 when the previewed value is higher than the snapshot value, 5 when lower, 0 when unchanged; the grey palette 6 lands only on the unchanged path of a first, second or fifth stat widget (object offsets 0xD0, 0xD4, 0xE0) whose snapshot counter at block+0x26, +0x28 or +0x2A is non-zero. Those three counters are the halfwords F0x80017174 subtracts (floor 0) from the block's +0xC, +0xE and +0x14 values. This routine is the counterexample that falsifies STATUS-SHEET-VALUE-FACE-001's clause 'no routine in this overlay passes palette 1 or 5 to them'.",
-      "status": "candidate",
+      "status": "verified",
       "evidence": [
         "EV-STATUS-PREVIEW-PALETTE-ASM-2026-10-14",
         "EV-EFFSTATS-SUBTRACT-COUNTERS-ASM-2026-10-14"
       ],
       "notes": "Recorded 2026-10-14 by the party/status audit (branch audit/party-status-vs-decode) as the correction of STATUS-SHEET-VALUE-FACE-001's false clause 'no routine in this overlay passes palette 1 or 5 to them'; that claim's text was corrected the same day and left for the review gate. Shipped in web/menu.js sheetPreviewFace, pinned by tests/menu-pause-flow.test.js ('See Equipment numbers take the rise/fall palette pair'). Candidate; review path pending.",
       "coverage": "Read in full from the assembly: the equip preview F0x8008C460 (ststatus.s L9715-L10030, file 0x97B0-0x9CA4), including both marking loops and the grey branches. All seven palette-method (0x138) call sites enumerated: file 0x9AA8 (a1=1 set at 0x9A9C), 0x9AC8 (a1=5 at 0x9ABC), 0x9ADC (a1=0) for the six stats; 0x9BF0/0x9C10/0x9C24 (a1=1/5/0) for the seven resists; 0x9B54 (a1=6 at 0x9B58) reachable only from the three flagged branches (0x9AEC/0x9B10/0x9B34), which the raised and lowered arms skip (they jump to the shared jalr at 0x9B5C / 0x9C2C). The flagged branches test s3==0/1/4 and the snapshot counters lh 0x36($sp)/0x38($sp)/0x3A($sp) (L9924/L9933/L9942). The counter producer was read at exe/fns.s F0x80017174 L7919-L7945 (subtracts +0x26/+0x28/+0x2A from +0xC/+0xE/+0x14, floor 0).",
-      "frontier_rationale": "No catalogued frontier covers the equip preview's colours or the status sheet's text faces; recorded as the correction of a false clause in STATUS-SHEET-VALUE-FACE-001 rather than a new frontier."
+      "frontier_rationale": "No catalogued frontier covers the equip preview's colours or the status sheet's text faces; recorded as the correction of a false clause in STATUS-SHEET-VALUE-FACE-001 rather than a new frontier.",
+      "review": "docs/research/evidence/reviews/STATUS-EQUIP-PREVIEW-COLOURS-2026-10-14.review.json"
+    },
+    {
+      "id": "battle-attack-effect-field-and-sprite-end-tick-2026-10-14",
+      "system": "battle",
+      "status": "candidate",
+      "statement": "The attack actor's current-effect word (actor+0x6c) is written by the standard attack setup F0x8008ee84 state 1 from the tech record's +0x0e byte, with a fixed 0x2e when +0x0e is zero and the record's action clip is 5 (the plain basic); a zero +0x0e on any other clip leaves the constructed value. The contact-sound word the op10 strike reads is a DIFFERENT field, +0x70 (tech+0x0f, or 0x1e on that same plain basic). op3's 9999 sentinel reads +0x6c, never +0x70. The effect sprite's per-tick stepper draws before it advances the frame counter and tests the end, so the tick that reaches the duration still draws its row and the object lives one further, drawless tick. Audited against the walker on 2026-10-14: the walker had no clip-5 fallback, read one field for both sentinels, and dropped the sprite's final drawn frame; all three are fixed (web/fight/fight-tables.js techEffectType; engine/dw3/battle-action-opcodes.ts ACTOR_CURRENT_EFFECT vs ACTOR_CONTACT_SOUND; web/fight/effect-player.js step). Three further clauses were checked and CLEAR on the shipped data: no clip reaches 8 concurrent effect objects (the ctx+0x10 slot limit never fires), reaction clips 1-4 carry no op3 at all, and no clip spawns a 0x7fff screen sprite before a -1 one (the ordering-table depth order coincides with spawn order).",
+      "evidence": [
+        "EV-FIGHTSTG-ATTACK-EFFECT-FIELD-2026-10-14",
+        "EV-FIGHTSTG-SPRITE-DRAW-BEFORE-END-2026-10-14"
+      ],
+      "notes": "Guards: tests/fight-tables.test.js (techEffectType + the shipped-table census: the fallback is unreachable because the only zero-+0x0e records, 125/126, are clip 6), tests/action-vm-wiring.test.js (the VM's current-effect seed including the fallback), tests/effect-player.test.js (the ending tick still draws its final row), tests/engine/unit/battle-action-opcodes-oracle.test.ts (the 9999 sentinel read against the ORIGINAL words, seeding only +0x6c). Recorded candidate; the isolated review path is pending. ADJACENT GAP NAMED, NOT FIXED: the ITEM-use effect - F0x8008d3b4's clip-10 default arm (.L0x8008d8e0, .L0x8008d8fc-.L0x8008d8dc) looks the used item's id up in the 6-byte table at 0x800a336c {kind, effect, sound} and writes actor+0x6c/+0x70 (item 43-46 -> effect 33; 66-69 -> 34; 70 -> 35; 71 -> 33; 72 -> 40; 73 -> 36; 74 -> 38; 75/76 -> 46), but the walker's item path (web/battle.js playPlayerActionClip(ITEM_USE_CLIP)) passes no current effect, so clip 10's own op3 9999 spawn at (0,0,32767) is skipped."
+    },
+    {
+      "id": "item-use-effect-table-plays-the-items-effect-2026-10-14",
+      "system": "battle",
+      "status": "verified",
+      "statement": "The item machine FIGHTSTG_F0x8008d3b4's clip-10 default arm (reached for a used item outside the 0x4d..0x5a band; BATTLE-Q003-C01) scans the 6-byte table at 0x800a336c {item:u16, effect:u16, sound:u16}, terminated by item == -1, and on the FIRST record whose item equals the used item id (the kind object's +0x70) writes record+2 into the new action actor's current-effect word +0x6c and record+4 into its contact-sound word +0x70 (scan .L0x8008d8fc-.L0x8008d934, apply arm .L0x8008d8c0-.L0x8008d8dc); no matching record writes neither field. The table's 15 records: 43-46 -> effect 33 sound 31; 66-69 -> 34/31; 70 -> 35/31; 71 -> 33/31; 72 -> 40/31; 73 -> 36/31; 74 -> 38/31; 75 and 76 -> 46/30. op3's 9999 sentinel reads +0x6c (the clip-10 use clip's own spawn at (0,0,32767)) and op10's 98/99 strike reads +0x70 (F0x8008c454 .L0x8008c4b0/.L0x8008c4d4), the word F0x8009b774 turns into the played packed sound, so a table hit gives the item use both its effect sprite and its contact sound.",
+      "evidence": [
+        "EV-FIGHTSTG-ITEM-USE-EFFECT-TABLE-2026-10-14"
+      ],
+      "notes": "Re-derived 2026-10-14 from BOTH the fightstg.s words and the raw overlay bytes (web/assets/native/screens/pro_fightstg.bin, file 0x206bc, RAM base 0x80082cb0) - byte-identical; the battle-FX audit's decode (audit/battle-fx-vs-decode, 2026-10-14) confirmed with no corrections. Walker side: the item path passed no current effect (web/battle.js playPlayerActionClip(ITEM_USE_CLIP)), so clip 10's op3 9999 spawn was skipped and an item showed no effect sprite - the audit's named gap. Closed by: web/assets/data/item_use_effects.json (tools/extract_item_use_effects.py, --check), web/fight/fight-tables.js setItemUseEffects/itemUseEffect + ITEM_USE_CLIP, web/fight/actor-animator.js setAnimByItem, web/battle3d.js playPlayerItemUse (record.effect -> the actor's current effect, record.sound -> contactSoundType), web/battle.js's item branch. Guards: tests/item-use-effect.test.js (census vs the .s words + the tracked bin; VM-level fail-before/pass-after; the wiring), tests/battle-item-use-motion.test.js. Headless before/after: captures/playtest-2026-10-14-itemfx/item-use-effect (pristine master: no effect instance ever appears, currentEffect stays null; branch: currentEffect 33, five type-33 instances on screen at (0,0,32767)). NOT this claim: items 77-90 (the throw band) take F0x8008d3b4's typed arms (clips 15/14/17/...) with their own +0x6c/+0x70 writes; the walker plays clip 10 for them too - named and left alone.",
+      "coverage": "The scan loop, the first-match rule, the -1 terminator and the two halfword writes are quoted from pro/fightstg.s L11000-L11029 (.L0x8008d8c0-.L0x8008d934); the table is quoted at L33831-L33853 (.L0x800a336c to the -1 item terminator at halfword 0x800a33c6, the high half of the word at .L0x800a33c4) and re-read from the raw overlay image at file 0x206bc. The +0x6c/+0x70 consumers are the already-recorded op3 .L0x8008bcc0 read and op10 .L0x8008c4b0/.L0x8008c4d4 read (L9692/L9701). The used item id at kind+0x70 is BATTLE-Q003B-ITEMID-KIND-2026-10-05. The isolated review path is pending.",
+      "review": "docs/research/evidence/reviews/item-use-effect-table-plays-the-items-effect-2026-10-14.review.json"
+    },
+    {
+      "id": "battle-loss-defeat-camera-ownership-and-fade-arms-2026-10-14",
+      "system": "battle",
+      "status": "verified",
+      "statement": "The defeat effect F0x8008C93C takes the one live camera record UNCONDITIONALLY - its entry arm calls `camMgr->[0x104](0, 0xB)` (our Digimon's near shot 11) and its phases re-apply that record through [0xf8] with the Y angle grown by `delta * 2`, with no test of any script or state - and the same arm resolves the FAR slot (class-0x14 `+0x188(0x10)`) and zeroes its visibility/side flag +0x34, hiding the enemy model for the defeat turn. The loss fade's tick F0x8008AA08 stores the level it computed on BOTH arms (the store is the direction test's own delay slot, `.L0x8008AA68`), and the fade-OUT arm ends the ramp the first tick the sum would pass zero - one tick after the level lands exactly ON zero - pinning the level to 0 and raising state 2; a state under 2 or past the table is written back to 1. The exit's own arming call is `F0x8008A83C(fade, 0, 10)`, so the fade-out arm is unreachable on the shipped loss path. The battle message line's phase-3 Circle press plays SYSTEM07 (0x4001C) through [0x80055C48] BEFORE it steps the page and closes (`.L0x80098BC4`-`.L0x80098BD4`).",
+      "evidence": [
+        "EV-FIGHTSTG-DEFEAT-CAMERA-OWNERSHIP-ASM-2026-10-14",
+        "EV-FIGHTSTG-FADE-TICK-ARMS-ASM-2026-10-14",
+        "EV-WALKER-LOSS-FLOW-2026-10-14"
+      ],
+      "notes": "2026-10-14 loss-flow audit. Three walker divergences came out of it, all fixed with fail-before/pass-after proofs: (1) engine/dw3/ui/native/battle-loss.ts's lossFadeTick held the fade-out level at 0xFF00 forever and never reached state 2 (the level store was fade-in-only) - tests/lane-b/battle-loss.test.js's fade-out test fails on the pre-fix file (port 65280 vs the original's 58752 at frame 0); (2) the ported message line was SILENT on the close press (the reveal machine had no sound edge) - tests/lane-b/battle-message-line.test.js drives F0x80098A84 and the port through the same pad words (pre-fix the port plays nothing, the original 0x4001c); (3) web/battle3d.js gated the defeat shot's record cut on `camScriptOwned`, and the loss branch fires while the enemy's action VM is still running (the controller's step runs before its children's) - so the whole loss beat showed the retire shot and the defeat shot was never seen, the regression the 2026-10-08 removal of SCRIPT_OWNED_CAMERA_STATES dropped the old state-list exemption into; tools/verify_battle_loss_camera.mjs proves the eye orbits again. Its drive loop also had to be fixed: a missed enemy blow returns the turn to the command menu (state 2), and the loop never pressed there, so the check hung before the loss - tools/_probe_audit_s200_loss.mjs is the s200 trace that pinned it. The class-0x14 hide stays a NAMED renderer gap: the defeat shot frames the near side and the far model is out of frame, so the two sides agree in what the player sees without it (see the loss doc's Open section).",
+      "coverage": "fightstg.s L9994-L10075 (F0x8008C93C's dispatch, entry arm, orbit), L7789-L7811 (F0x8008A83C both directions), L7910-L7952 (F0x8008AA08's delay-slot store and both bounds tests), L22694-L22698 (the press blip) re-read from the listing; the walker side read from the branch's own files and its three headless checks (verify_battle_loss_camera, verify_wild_loss, verify_arena_loss).",
+      "limitations": "The +0x34 hide's consumer is not built in the walker's renderer, so the two sides are compared for the shot and the blip only, not the model visibility; the fade-out arm is unreachable from the exit (direction 0 only), so its fix is oracle-only; the press blip is proved by its own headless probe (`tools/_probe_audit_press_blip.mjs`: system07 arrives on the press, nothing before the wiring), not inside the loss verifiers.",
+      "review": "docs/research/evidence/reviews/battle-loss-defeat-camera-ownership-and-fade-arms-2026-10-14.review.json"
+    },
+    {
+      "id": "throw-band-typed-item-arms-play-clips-2026-10-14",
+      "system": "battle",
+      "status": "candidate",
+      "statement": "The item machine FIGHTSTG_F0x8008d3b4's state-0 dispatch sends used item ids 77..90 (the kind object's +0x70; BATTLE-Q003-C01's 0x4d..0x5a band) through the 14-word jump table at 0x80082ee4 to eight TYPED arms; every other id reaches the default arm (BATTLE-Q003-C01; the sibling item-use fix). Each typed arm allocates a fresh presentation actor (FIGHTSTG_F0x8008c910) and writes four actor fields: +0x54 the clip the actor runs, +0x68 its motion id (read by the clip's op4 0x38 sentinel), +0x6c its effect type (op3's 9999 sentinel) and +0x70 its sound type (op10's 99 strike reads it; F0x8008c454 -> F0x8009b774). The records: 77-83 clip 15, motion 0x22+3*(id-77) = 34,37,...,52, effect 2, sound 0x39; 84 clip 15, motion 0x22+3*(rand_u16()%7) (0x92492493 = the signed division-by-7 magic), effect 2, sound 0x39; 85 clip 14, motion -1, effect 0x1c, sound 0x27; 86 clip 17, motion -1, effect 0x15, sound 0x1b; 87 clip 17, motion -1, effect 0x27, sound 0x31; 88 clip 17, motion -1, effect 0x25/0x27/0x2e with sound 0x31/0x31/0x1e selected by ctx+0x7c (1 = STR, 2 = DEF, else none - the branch its own producer sets); 89 clip 17, motion -1, effect 0x29, sound 0x31; 90 clip 14, motion/effect/sound = the resident bytes 0x21/0x04/0x19 at 0x8004356c+0xd/e/f. Item 85 alone also has a state-1 fallback arm (actor == null && ctx+0x18 == 0 && gate byte 0x80042b5f == 0) that allocates a second actor with clip 10, effect 0x21, sound 0x1f.",
+      "evidence": [
+        "EV-FIGHTSTG-THROW-ITEM-ARMS-2026-10-14"
+      ],
+      "notes": "Re-derived 2026-10-14 from the fightstg.s words AND the raw overlay bytes (web/assets/native/screens/pro_fightstg.bin, RAM base 0x80082cb0) site by site - identical - plus the resident image (web/assets/native/screens/resident.bin, base 0x80010000) for item 90's three bytes; the /7 magic was checked numerically as the signed-division constant. The band's clips 14/15/17 are the same three the earlier BATTLE-Q003-C01 packet read (it framed +0x70 as a 'kind'; the item dispatcher F0x8008dac0 and the 0x800a336c item table establish it as the item id - the sibling item-use fix's reading). Walker side: items 77-90 played clip 10 (the default arm's clip) with no effect/sound write; now web/assets/data/throw_item_effects.json (tools/extract_throw_item_effects.py, --check; build_all stage throw_item_effects) feeds web/fight/fight-tables.js setThrowItemEffects/throwItemEffect/isThrowItem, web/fight/actor-animator.js setAnimByThrowItem (record.effect -> the VM's current effect, record.motion -> its current motion via the new ActionVM currentMotion seed), web/battle3d.js playPlayerThrowItem (record.sound -> contactSoundType; the clip-15 items arm the element pack MEFT10<motion> for the clip's own op4 to switch in and out), web/battle.js's item branch (77-90 -> playPlayerThrowItem, every other id keeps the clip-10 entry). The action VM gained one terminator rule (a script that never ran a play-motion op ends at its own terminator instead of holding on the seeded idle table to HOLD_CAP) - corpus-checked across all 245 packs / 2153 clips: only op4-less clips changed, none became stuck. Guards: tests/throw-item-effect.test.js (census vs the .s sites, the tracked bin and the resident image; VM-level fail-before/pass-after; the wiring). The isolated review path is pending.",
+      "coverage": "The dispatch, the 14 table words and every arm's clip/motion/effect/sound store are quoted from pro/fightstg.s L10696-L11127 (the item-85 fallback included) and re-read word by word from the raw overlay image; the /7 sequence is quoted at L10720-L10728 and verified numerically over the full u16 range. The +0x68 sentinel consumer is op4's 0x38 read (engine/dw3/battle-action-handlers.ts op4MotionId, already recorded); the +0x6c and +0x70 consumers are the already-recorded op3 9999 and op10 99 reads (tech-effects-decode.md). The item id at kind+0x70 is BATTLE-Q003B-ITEMID-KIND-2026-10-05; the band's existence is BATTLE-Q003-C01."
+    },
+    {
+      "id": "UI-STGMCARD-CHOOSER-ENTRY-TWEENS-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The slot chooser (the block view F0x800843D8 / F0x800849F0) enters with four 8.8 tweens, run one at a time: cardsX (screen+0x5C, value +0x64) 0xDE -> 0 in 10 steps slides the three cards and the nameplates in from the right; stripY (+0x78/+0x80) -0x55 -> 0 in 10 steps slides the bar, the console and the header down from above; consoleX (+0x94/+0x9C) 0 -> 0x2F in 8 steps is the console's own slide; cursorX (+0xB0/+0xB8) runs previous*0x44 -> selected*0x44 in 5 steps (reset arms it -1 -> 0 in 1). The substates tick in the order 1 (stripY), 2 (cardsX), 5 (consoleX, then placeCursor F0x80084240), 7 (cursorX), and only substate 6 reads the pad: left/right are dead until the cursor lands. A slot move restarts cursorX alone, 0x44 px per column, clamped 0..2. The old reading (stgmcard-decoded-2026-08-05.md section 4, town-gap row T3) of a grid of blocks at 68 px pitch in both directions is corrected: it is one axis, three save slots in a row.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-CHOOSER-TWEENS-ASM-2026-10-14",
+        "EV-STGMCARD-CHOOSER-DRAW-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-BLOCK-GRID-2026-10-14"
+      ],
+      "notes": "Recorded by the 2026-10-14 UI undecoded-rows sweep. The walker implements the four tweens in web/save.js (s.grid, tickGrid) with tests/save-slot-chooser.test.js and tools/verify_save_slot_chooser.mjs. Candidate: review left for the lead.",
+      "coverage": "Every tween start was read at its own call site (F0x80084328, F0x8008410C, F0x80084194, F0x80084240, F0x800842A0, F0x800842E4) and each substate arm of F0x800843D8 was read in full rather than sampled; the ported block view agrees with the original's own execution under tests/memcard-block-grid-oracle.test.js, which compares every ordered draw call and every field for 25 seeded cases. The corrected 'one axis' clause is tested by the cursor tween's own arithmetic (one 0x44 pitch on +0xB0) and by the draw tail, which adds no second axis.",
+      "frontier_rationale": "No open ui-chrome frontier covers this: UI-Q001..Q003 are resolved. It closes the town-gap audit's T3 slide half instead, with the walker fix in web/save.js.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-CHOOSER-ENTRY-TWEENS-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-CHOOSER-DRAW-GEOMETRY-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The slot chooser's draw tail, in order: console clip 0x23 at (consoleX + cursorX + 0x30, stripY + 0x12) with the CLUT row from +0xD4; bar clip 0x20 at (0, stripY + 0x10); the header widget at (0x15, stripY + 0x18) showing esmemcrd 3 '{1}' numbered slot+1; each occupied card's nameplate 0x800882E4[parent[i*0x44+0xA4] - 3] at (0x80088304[i] + cardsX, 0x23); cards clip 0x22 at (cardsX + 0x62, 0x20), drawn last over the plates. The console's x is NOT the nameplate x: the 2026-08-05 decode read slotX[sel] there (0x6D + slot*0x44, 14 px right of the original). The console's CLUT ping-pong (+0xD4) climbs 0..0xB and snaps to 0xA with direction 1 when the increment would reach 0xC, one step per 3 vsyncs: the 0xC row is never drawn, so the old '0..0xC ping-pong' reading is corrected too.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-CHOOSER-DRAW-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-BLOCK-GRID-2026-10-14"
+      ],
+      "notes": "The walker's console moved 14 px right until this fix (it used slotX, the nameplate x); web/save.js now draws consoleX + cursorX + 0x30 and runs the decoded CLUT machine. Candidate: review left for the lead.",
+      "coverage": "The draw tail was read as a whole, from its context setup to the last clip (L1786-L1869), and the CLUT block including both of its arms and its delay slots; the oracle test's 'draw records' case seeds scrollX 0x1E and cursorX 8 and compares the console call's x and y against the original's own execution, and its clut wrap/decay cases pin the 0xB/0xA/0 bounds. No other site writes +0xD4 or +0x9C in the overlay.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it is the geometry half of the same T3/T1 fix as UI-STGMCARD-CHOOSER-ENTRY-TWEENS-2026-10-14.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-CHOOSER-DRAW-GEOMETRY-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-SLOT-ROWS-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "On the slot chooser the message window's YES/NO widgets are re-purposed as the console's two card slots: both are set to esmemcrd 3 '{1}' and then numbered 1 (YES, at (207,189)) and 2 (NO, at (207,203)), and the cursor is shown and placed at (0xC2, screen+0x64 * 0x0E + 0xBD). Up picks row 0, down picks row 1 - the pad is read every frame, so a repeat of the same direction is silent - and a change plays 0x8004513E (SYSTEM02). screen+0x64 is also the handle the card services receive.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-SLOT-ROWS-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-MACHINE-2026-10-14"
+      ],
+      "notes": "The walker (web/save.js) draws the two rows and the cursor and moves them with up/down; its single storage has no second card for the row to address, which the code states. Candidate: review left for the lead.",
+      "coverage": "The row binding was read at both of its sites - the open body (L2354/L2343-2347 for the mode word, L2384-L2412 for the two rows) and the cursor placement at L2419 - and the state-2 pad read, its change test and its sound were read in full and are exercised state-by-state by tests/memcard-machine-oracle.test.js. The (207,189)/(207,203) positions are the window's own widget construction, read in F0x80087534.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it closes the town-gap audit's T4 row.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-SLOT-ROWS-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-BLINK-ARROW-ONLY-INDICATOR-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The memory-card screen has no spinner. Its only five-frame/three-tick indicator is the result window's footer blink arrow: cmfont clip 0x0A at (294,208), CLUT rows 0..4 advanced by +0x2848 when the frame clock has moved at least 3 ticks past the stamp +0x2844 and wrapping at 5, gated on +0x2840 (blinkOn). The overlay's other cyclic counter is the console's CLUT ping-pong (+0xD4, 0..0xB every 3 vsyncs). The 'a spinner turns while the card is being read or written' sentence in docs/research/overlays/stgmcard.md is corrected: what turns is this arrow, and it is a prompt to continue, not a busy indicator.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-BLINK-ARROW-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-MSGWIN-SAVECARD-2026-10-14"
+      ],
+      "notes": "The walker already drew the arrow (web/save.js drawMessage, blinkArrow from the layout json); no code change was needed, only the record. Candidate: review left for the lead.",
+      "coverage": "The blink block was read in full (L4550-L4580) including both arms (the stamp +0x2844 is stored on the advance path only, at L4573); a sweep of every 'advance every N ticks' counter in the overlay finds +0x2848 (this arrow), +0xD4 (the console's palette) and the save card's party-icon counter (+0x68, advance when frameTick - +0x64 >= 13, wrap at 8; L820-853), and esmemcrd was read whole - its only 'accessing' text is 0x28 'Accessing MEMORY CARD slot {1}', a message, not a graphic.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it reconciles the town-gap audit's T5 row, whose 'MISSING (spinner)' mark was wrong.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-BLINK-ARROW-ONLY-INDICATOR-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-LANGUAGE-NAME-PLACEHOLDER-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The save screen's only language-dependent string is the empty file-name row's dashes: F0x800836C4's build band writes the save card's widget-table first word (0x80088088) as esmemcrd 0x20 '-----' for language 0 (Japanese) and 0x21 '--------' for every other language. It is a placeholder string pick, not a layout constant: the overlays/stgmcard.md sentence 'picks one of two layout constants from the language global, so the panel is one row taller in every language but the first' is wrong - nothing about the panel's rows or height changes.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-LANGUAGE-PLACEHOLDER-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-MSGWIN-SAVECARD-2026-10-14"
+      ],
+      "notes": "web/save.js now picks the placeholder by the player's languageByte (fileCardPlaceholder), tested in tests/save-screen.test.js. Candidate: review left for the lead.",
+      "coverage": "The branch was read in full (L674-L681): the default 0x20, the single language test against 0x8005CCA8, the 0x21 replacement and the store to 0x80088088. That word's role as the first widget record's string index is fixed by the table's own layout (record +0x00 string, +0x04 kind, +0x08/+0x0C position) and by the extractor's widgets[0], which already ships both indices as string_by_language. No other language branch exists in the overlay's text setup.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it closes the town-gap audit's U6 row.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-LANGUAGE-NAME-PLACEHOLDER-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-WINDOW-HEADER-LINES-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The message window's two header lines: the SAVE/LOAD title is the widget at (205, 98) (esmemcrd 1/0x0E), re-placed each frame by F0x80084DCC so it follows the window fold; the widget at (20,113) is the mode WORD, esmemcrd 2 'SAVING' / 0xF 'LOADING', set once by F0x80084DCC's open body and never re-bound. The (20,113) widget is therefore bound: the message-binding census's 'lines[0] (+0x14) is never touched by any of the sixteen +0x114 sites' counted only the state machine (sixteen of F0x80084DCC's 26 vtable-0x114 call sites) and missed the open body, which is where the write is.",
+      "status": "verified",
+      "evidence": [
+        "EV-STGMCARD-WINDOW-HEADER-ASM-2026-10-14",
+        "EV-STGMCARD-PORT-MSGWIN-SAVECARD-2026-10-14"
+      ],
+      "notes": "web/save.js now draws the title at the (205,98) tab and the SAVING/LOADING word at (20,113); tools/verify_save_slot_chooser.mjs asserts both strings reach the canvas. Candidate: review left for the lead.",
+      "coverage": "Both writes to child +0x14 were read (L2354 with 0xF, L2343-2347 with 2) together with the surrounding open body, and the header widget's per-frame re-placement was read in F0x80084DCC (L2434-2449); the ported message window reproduces both and its oracle compares the widget calls and positions. A sweep of every +0x114 site in F0x80084DCC finds no other writer of child +0x14.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it closes the town-gap audit's V4 row.",
+      "review": "docs/research/evidence/reviews/UI-STGMCARD-WINDOW-HEADER-LINES-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-STGMCARD-NO-DELETE-COPY-PATH-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The stgmcard state machine has no delete and no copy path. Its full path set is the slot chooser (2), the card-access transition (0xA-0x17), the save-file card (0x1E-0x21), the overwrite prompt (0x28/0x29), the save write (0x30-0x35 and 0x78-0x7D), the load flow (0x1F4-0x1F7), the result windows (0x190/0x191, 0x258/0x259) and the FORMAT / create-new prompts (0x64/0x65 -> 0x6E, format via 0x80048A9C; 'Create new data?' when the file is missing). Its eight card-service slots are status/read/write/create/format/checksum, and esmemcrd (all 41 strings) contains no delete or copy string. The destructive path the screen does have is FORMAT ('Format MEMORY CARD? YES / NO', string 0x19), which the walker deliberately does not fake (W1).",
+      "status": "contradicted",
+      "evidence": [
+        "EV-STGMCARD-STATES-ENUM-2026-10-14"
+      ],
+      "notes": "The walker ships save and load only, which this confirms as correct rather than incomplete. Candidate: review left for the lead.",
+      "coverage": "Every state constant the machine compares was enumerated from the decompiled C (1,2,10-12,20,22,23,30-33,40,41,50-53,70,71,90,100,110,120,121,123-125,400,401,500-502,600,601) and each was attributed to a path; the card-service slots were enumerated from the call sites (0x80048A84/A88/A8C/A90/A94/A98/A9C/AA8); and the string bank was read whole. The census is over the machine's own constants, not over a grep for a word.",
+      "contradiction_rationale": "The 2026-09-02 audit row W2 asserted that delete and copy exist as paths in the state machine without naming a state, a service or a string; the state enumeration, the service enumeration and the whole string bank show neither exists."
+    },
+    {
+      "id": "shop-post-purchase-loop-is-a-message-2026-10-14",
+      "system": "shops",
+      "statement": "After a purchase the BUY controller (F0x80083EB0) shows a result message and then loops; there is no 'anything else?' prompt - no such string exists in esitshop. Its post-purchase states: 0x26 sets esitshop 9 'Equipped.' into the message widget; 0x27 holds the message (circle plays 0x4001C and folds the window shut); 0x28 reads the bought item's held-count byte (0x80048D34 + 0x7C + id) - zero copies left takes state 0x23 back to the BUY list, a remaining copy takes state 0x1E back to the Equip-who picker with the purchase flag set. The commit itself (state 0x11's confirm) subtracts price*quantity from the BIT total at save+0x6C and adds the quantity to the count, capped at 99.",
+      "status": "verified",
+      "evidence": [
+        "EV-STITSHOP-POST-PURCHASE-ASM-2026-10-14"
+      ],
+      "notes": "The walker already implements the message and the loop-back (engine/dw3/ui/shop-buy-branches.ts shopBuyAfterEquip, consumed by web/shop.js), so P4 is MATCHES after the premise correction. Candidate: review left for the lead.",
+      "coverage": "The three post-purchase states were read whole (0x26, 0x27, 0x28) together with the commit at L1888-L1914, and the machine's state table at file 0x0 was read entry by entry so the 0x27 -> 0x28 -> 0x23/0x1E transitions are the table's own values, not inferred. esitshop was read whole: 0x2B strings, none an 'anything else' prompt. The old row's cited states (0x27-0x29 of the MAIN machine's table, F0x80087044..) are the post-SELL list rebuild, which was read separately.",
+      "frontier_rationale": "No open shops frontier covers this; it corrects the town-gap audit's P4 row, which credited the wrong machine's states and a prompt that does not exist.",
+      "review": "docs/research/evidence/reviews/shop-post-purchase-loop-is-a-message-2026-10-14.review.json"
+    },
+    {
+      "id": "UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14",
+      "system": "ui-chrome",
+      "statement": "The pause home list's CARD FOLDERS row is gated by the carried count of item id 402, the Folder Bag - not by a dedicated flag byte. F0x8001270C decides the row from the byte at D0x80048F42 (= save + 0x20E = the carried array's byte for id 402, base 0x80048D34 + 0x7C): nonzero takes the six-row list variant, zero the five-row one. The byte moves through the ordinary grant F0x800161D8 (+1 capped at 99, the bank-0x80 set_flag arm), and the grant site is the s270 Yellow Cruiser cutscene's completion, set_flag(0x8192, 1) at wstag270.s .L0x00000CF4 (0x8192 & 0x1FF = 0x192 = 402).",
+      "status": "verified",
+      "evidence": [
+        "EV-CARDFOLDERS-GATE-ASM-2026-10-14",
+        "EV-CARDFOLDERS-GRANT-SCENE-2026-10-14",
+        "EV-CARDFOLDERS-ITEM-402-2026-10-14"
+      ],
+      "notes": "The walker now gates on carriesFolderBag (engine/dw3/item-store.ts, web/game.js) with tests in tests/lane-b/collection-bank-write.test.js and tests/card-folder-divergences.test.js. Candidate: review left for the lead.",
+      "coverage": "The predicate was read at its own site (fns.s L3083-L3086: lb D0x80048F42, beqz) inside F0x8001270C, the grant arm at fns.s L7102-L7112, and the scene's completion call at wstag270.s L826-L840; the byte arithmetic (0x80048D34 + 0x20E = 0x80048F42 = 0x7C + 402) was checked, and item 402's identity as the Folder Bag is the item-name bank's own entry. The negative half - 'nothing writes a dedicated flag byte' - was tested by tracing every writer of the byte through the grant routine and by the absence of any other store to 0x80048F42 in the resident image's set_flag path.",
+      "frontier_rationale": "No open ui-chrome frontier covers this (UI-Q001..Q003 resolved); it records the sweep's B2 finding.",
+      "review": "docs/research/evidence/reviews/UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14.review.json"
+    },
+    {
+      "id": "POSTGAME-KING-OF-CARDS-DUEL-ISLAND-2026-10-14",
+      "system": "post-game",
+      "status": "verified",
+      "statement": "The King of Cards quest (POST_GAME_WALKTHROUGH quest b) is the s951 stage - the ordinal-45 alias of s386 (East Sector - Duel Island; data/screen_table.json row 663: base WSTAG386_PRO lbaIdx 1235 -> alt WSTAG951_PRO lbaIdx 2248) - and its six tamers are six dialogue-state machines whose challenge lines launch CARD_NPC duels through bank 0x78. F0x80016378 packs the argument as index*2 + mode + 1 (mode 1 for bank 0x78) and loadOpponentDeck indexes (argument-1)*0xD0, so the write IS the 1-based record: Keith npc 102 writes 0x7848 -> record 146 \"Bombard Folder\" LV 92; Alice npc 399 0x784F -> 160 \"Dark Evil King\" LV 87; Bomujii npc 400 0x784C -> 154 \"Fire Guardian Folder\" LV 87; Pierre npc 401 0x7850 -> 162 \"Fairies of the Sea\" LV 87; Poemy npc 402 0x784A -> 150 \"Miserable Folder\" LV 92; Haruka npc 403 0x784E -> 158 \"Shining Empress\" LV 87 - the walkthrough's six folders and levels exactly. Each duelist has a clear bit (Keith 0x1011, Alice 0x1012, Bomujii 0x1013, Pierre 0x1014, Poemy 0x1015, Haruka 0x1016): the challenge state (own bit 0, flag 17 = 0, talked seq flag 1) launches the duel; the win line (own bit 0, 17 = 1, 16 = 1) sets the bit, resets the result pair, and - for the five gatekeepers - writes 0x9074..0x9078, which the bank-0x90 table turns into the five farewell events 1620/1622/1624/1626/1628 (one per duelist, walkthrough order). The before-position stands behind spawn gate {bit:0} and the after-position (\"you may pass\") behind {bit:1}, so the cast flips on the next arrival; Keith stands unconditionally at (159,177) and his win line writes 0x8024 = the KocTrophy, item 36 - the quest's reward. The order the walkthrough states (\"only once, in order\") is the island's own path: no flag gates any duelist on another's bit.",
+      "evidence": [
+        "EV-POSTGAME-KOC-951-RUNS-2026-10-14",
+        "EV-POSTGAME-KOC-TABLES-2026-10-14",
+        "EV-POSTGAME-KOC-FAREWELL-TABLE-2026-10-14",
+        "EV-POSTGAME-ITEM-IDS-2026-10-14"
+      ],
+      "notes": "LIMITS: the walk order Haruka->Poemy->Pierre->Bomujii->Alice->Keith is the walkthrough's and the six clear-bit/after-position pairs corroborate it, but no single data structure encodes the order - it is the layout (one corridor, one exit at .L0x00000a?? to s960). Keith's dialogue (estalk09 81-85) names him the Card King outright (\"the Card King-that would be me-is perfect\"). Not runtime-captured on the original console; every anchor is assembly + extracted data.",
+      "implementation": "Walker: s951 ships as a scene; the challenge lines launch the native duel through the existing bank-0x76/0x78 path (web/game.js pendingDuelId), the win lines apply their on_close writes through applyStoryFlag, and tools/verify_king_of_cards.mjs drives all six duels end to end (win each, watch the result flags, the clear bit, the farewell cutscene and Keith's trophy).",
+      "review": "docs/research/evidence/reviews/POSTGAME-KING-OF-CARDS-DUEL-ISLAND-2026-10-14.review.json"
+    },
+    {
+      "id": "POSTGAME-EPIC-WEAPON-FORGE-BOARD-2026-10-14",
+      "system": "post-game",
+      "status": "verified",
+      "statement": "The post-game Epic Weapon forging board is the Armor-Digimon cast on s970 (Sagitarimon npc 167, Shadramon npc 169, Yashamon npc 172) and s974 (Nohemon npc 173 x2, Kongoumon npc 31 x2, Kabukimon npc 166, Shurimon npc 171, Ponchomon npc 28), plus the two mid-level forgers on the post-game seabed (s964 npc 168 Seehomon, s964 npc 170 Depthmon). Each forge is ONE dialogue state: its gate holds the second input's collection flag (id & 0x1ff = the item) and requires the product's flag clear; its on_close GRANTS the product's collection flag and CLEARS both inputs' - the whole forge, in the disc's own bank-0x80..0x8e collection semantics. The thirteen post-game recipes: RustyGlove+KaiserFist=Zodiac (s974/173); Prominence+RaijinFist=SuperNova (s974/173); OldWand+Khakkhara=Twinkle (s974/28); Twinkle+CrystalRod=Immaculate (s974/31); Immaculate+Millenium=Eternally (s974/31); RustyKatana+Onimaru=Kotetsu (s974/166); RustyRifle+ClusterCannon=Justice (s974/171); Justice+LaserCannon=Judgment (s970/167); Judgment+SuijinCannon=Punishment (s970/167); OldClaw+SaberFang=Vanquish (s970/169); Destruction+BelialFang=Invincible (s970/169); Kotetsu+Tenjinmaru=Masamune (s970/172); Masamune+FuujinBlade=Muramasa (s970/172) - the walkthrough's board IV table, every pair and every order. Every forger spawns only behind BOTH 0x7055 (all eight roster slots obtained, F0x800159fc) and 0x7095 (every obtained slot at level >= 45, F0x80015944) plus its area flags - the walkthrough's \"all 8 partners at level 45 or over\". The five Epic Weapons the Amaterasu Leaders' 0x7096 gate collects are the level-4 outputs: Muramasa 105 (s970/172), SuperNova 119 (s974/173), Punishment 131 (s970/167), Eternally 144 (s974/31), Invincible 156 (s970/169). The materials ship as talk grants: the four pre-game boxes s586 npcs 70..73 hand the twenty inputs in four sets of five; post-game copies sit in the seabed and board boxes (s964/33, s967/33, s970/33, s972/33+77+78, s973/33, s795/85-86) and the two mid-level forges on s964 (168/170) close the chain.",
+      "evidence": [
+        "EV-POSTGAME-FORGE-RUNS-2026-10-14",
+        "EV-POSTGAME-FORGE-GRANTS-2026-10-14",
+        "EV-POSTGAME-FORGE-PREDICATES-2026-10-14",
+        "EV-POSTGAME-ITEM-IDS-2026-10-14"
+      ],
+      "notes": "The prior verification pass recorded \"no dialogue state anywhere writes item ids 105/119/131/144/156\" - that search looked for the item ids as flag ids. The writes are bank-encoded collection flags (e.g. 34409 = 0x8669 -> item 105), which tools/extract_talk_grants.py had already mined into talk_item_grants.json. LIMITS: the 0x7095 semantics read the owned slots' level halfwords at roster+0x784; the walker keeps no per-slot record for a partner it never deployed, so its port leaves that gate dormant for such a slot rather than inventing a level.",
+      "implementation": "Walker: the forge states apply through the existing collection-bank on_close path; the 0x7095 predicate is now handled by web/flag-store.js (every_owned_at_level) with web/game.js supplying per-slot levels from the same records the DRI resolves (web/dri-native.js slotStats). tests/postgame-quests-decode.test.js pins the recipes, the grants and the predicate.",
+      "review": "docs/research/evidence/reviews/POSTGAME-EPIC-WEAPON-FORGE-BOARD-2026-10-14.review.json"
+    },
+    {
+      "id": "CARD-DUEL-CLOSE-HOUSEKEEPING-2026-10-14",
+      "system": "card-battle",
+      "status": "verified",
+      "statement": "A card duel's result becomes story flags through ONE resident routine: F0x800169e0 (the export slot D0x80048ad4; fns.s .L0x800169e0-.L0x80016a90), which the field's entry path calls (fieldstg.s .L0x00007ff4-.L0x00008000 loads slot +0x18 of the export base D0x80048abc, immediately before the entry writes the arriving screen's visited marker 0x1e00+screen). It reads the previous-screen-code getter ([D0x8004b448] = F0x80016b58 -> D0x8004b400) and when that code is 0x700 - the card duel, launched by D0x8008b770(0x700, ...) - it writes set_flag(0x11, 1), set_flag(0x12, 1), set_flag(0x10, latch != 0) and clears the latch word D0x80048ac0 (the second word of flag bank 0, which pro/cardgame's outcome path writes 1 on a player win and 0 on a loss). Flags 17/16 are what every tamer's post-duel dialogue states gate on - {17 = 1, 16 = 1} is the win line, {17 = 1, 16 = 0} the loss line - and their close lists clear the pair (and the talked bit), which is what makes a challenge one-shot: without the routine the challenge state stays live forever and the NPC re-challenges. The routine's head, gated on [D0x8004b40c] != 0, clears bank-0 bytes 0..2 (flags 0..23) and sets flag 0x12 = 0 - the new-game reset the resident-behaviour campaign named initNewGameState. Flag 18 is set together with 17 and consumed by content this pass did not search.",
+      "evidence": [
+        "EV-CARD-DUEL-CLOSE-ASM-2026-10-14",
+        "EV-CARD-DUEL-CLOSE-FIELD-CALL-2026-10-14"
+      ],
+      "notes": "LIMITS: the routine is called through the export table, so its call sites are found by the base-register form (slot +0x18 of 0x80048abc), not by a named jal; the fieldstg site at .L0x00007ff4 is the one read, inside the overlay's stage-entry/return path. The exact consumer set of flag 18 was not searched. The walker port writes the three flags when a field-launched duel closes (web/game.js applyCardDuelCloseHousekeeping) - before that fix every field tamer re-offered its challenge forever.",
+      "implementation": "engine/systems/scene-completion.ts exports cardDuelCloseWrites(won) (the three writes) + CARD_DUEL_SCREEN_CODE; web/game.js applies them from the duel launch's close callback (web/cardduel-native.js / web/cardduel.js expose resultWon). tests/postgame-quests-decode.test.js pins the write list against fns.s and drives the Keith state machine through win/loss; tools/verify_king_of_cards.mjs asserts flags 17/18/16 after each of the six duels.",
+      "review": "docs/research/evidence/reviews/CARD-DUEL-CLOSE-HOUSEKEEPING-2026-10-14.review.json"
+    },
+    {
+      "id": "talk-grant-applied-once-at-dialogue-close-2026-10-14",
+      "system": "quest-events",
+      "statement": "A dialogue-state on_close table is applied exactly once, on the tick the talk's dialogue reads closed, by the field talk handler F0x80090afc's close arm: the handler stores the selected ptrB triple's ptr2 into entity+0xFC at talk start (file 0xdee8-0xdeec, the box-family branch's delay slot) and at close runs it through the applier cell [0x80048ad0] = F0x80016988, which calls F0x800165ac(id, value) once per {id, value} pair; a collection-bank pair (0x80..0x8E) lands in F0x800161d8 as ONE copy (+1, capped at 99). There is no second apply site on the talk path, so a talk grant lands once, at close.",
+      "status": "verified",
+      "evidence": [
+        "EV-TALK-GRANT-CLOSE-ARM-2026-10-14",
+        "EV-TALK-GRANT-APPLIER-2026-10-14"
+      ],
+      "notes": "Found while fixing a measured double-count in the walker: the converted once OnTalk GiveItem row fired at talk start AND the scene on_close wrote the same copy at close, so every talk grant landed twice (measured on Nohemon's forge: Zodiac 0->1->2, and the King-of-Cards trophy). Fixed on fix/talk-grant-double-count: the converter now accepts and ignores talk_item_grants.json (the walker's talk onClose applies the same table, grant and consume, every bank; applyStoryFlag owns the 0x7013 -> PlaySparkle(3) arm). Pinned by tests/talk-grant-single-count.test.js (fail-before: 198 give rows, 198 GiveItem instructions, and an engine-side grant on talk) and tools/verify_talk_grant_single.mjs (fail-before: s300's box gave PowerCharge twice, qty=2, and armed the flourish while the line was up).",
+      "coverage": "Both sites read from the listings: the close arm's single apply call at fieldstg file 0xdfa4-0xe010, the start arm's delay-slot store at 0xdee8-0xdeec, the applier's pair loop at fns.s L7214-L7231, the dispatcher's collection arm at L7102-L7112 and the +1/clamp at L6715-L6734. NOT established: no runtime capture of the original applying the table was made (the 'once' claim is static -- a single call site); the double-count itself was measured in the walker, not the disc.",
+      "review": "docs/research/evidence/reviews/talk-grant-applied-once-at-dialogue-close-2026-10-14.review.json"
+    },
+    {
+      "id": "levelup-growth-reads-starter-row-2026-10-14",
+      "system": "exp-leveling",
+      "statement": "The main level curve and the level-up stat rolls always read the STARTER species' profile row for the member's roster slot (0x8003EF5C + slot*0x58), never the active form's row: a partner fighting as a digivolution levels on its starter's growth_xp and rolls its starter's growth bytes. F0x80086184 (add EXP + the level loop) reads growth_xp at +0x3E of that row, and F0x80085E3C (the per-level stat rolls it calls) reads the growth bytes +0x41/+0x42/+0x43+i/+0x49+i from the same row.",
+      "status": "verified",
+      "evidence": [
+        "EV-LEVELUP-CURVE-STARTER-ROW-ASM-2026-10-14",
+        "EV-LEVELUP-ROLLS-STARTER-ROW-ASM-2026-10-14",
+        "EV-LEVELUP-CURVE-STARTER-ROW-DECOMP-2026-10-14",
+        "EV-LEVELUP-STARTER-ROW-RAM-CROSSCHECK-2026-10-14",
+        "EV-LEVELUP-STARTER-ROW-NATIVE-PORT-2026-10-14"
+      ],
+      "notes": "Recorded 2026-10-14 by the fix/levelup-growth-source task after re-deriving the assembly from ~/ddw3 (the decomp line, both disasm ranges and the dumps were re-read, not taken from a summary). The walker's browser reward path (web/battle.js applyParticipantProgress) had read the record's active-form profile for levelForExp + applyLevelUp; a Dinohumon-standing partner therefore levelled on growth_xp 1 (probe: level 10 + 4 EXP -> level 16, HP/str rolled from all-1 growth bytes) while the translated stfgtrep screen replaying the disc rules on its own record showed level 10 \u2014 display and state disagreed. Fixed in the same change: applyParticipantProgress resolves levelUpGrowthProfile (digimonDB[rookieId]; row = rookieId-1 for the eight starters) and passes it to applyLevelUp, whose stored-stat seed and no-table fallback keep the active form (host-side only, no disc counterpart). Pinned by tests/levelup-growth-source.test.js (fail-before: the export is absent; pass-after) and tools/verify_levelup_growth_source.mjs (pre-fix FAIL level 16, post-fix PASS level 10 with native record == walker state == exp 504). The native port engine/dw3/ui/native/fight-report-rewards.ts already read species(slot) and needed no change; the report memory installs the disc's own 55-row profile table (web/resident-data.js loadProfileRecords) and nothing writes the live form over row[slot]. Candidate: promotion needs the isolated review.",
+      "coverage": "Both routines were read in full and their growth-byte reads enumerated: F0x80085E3C spans .L0x0000318c-.L0x000034d0 (jr $ra at .L0x000034cc) and F0x80086184 .L0x000034d4-.L0x00003698 (jr $ra at .L0x00003694); a grep for `lbu` over the two complete ranges returns exactly five loads, all through s4/s5 = 0x8003EF5C + slot*0x58 (or s5 + loop index for the core and element loops). No other construction of the profile base exists in either body. The counterexample that would falsify the quantifier \u2014 a growth-byte read through any base other than 0x8003EF5C + slot*0x58 \u2014 does not exist in either body. Runtime side: two independent RAM dumps (slot1_ram.bin: exp 2985, level 15, form value 0x182; dri_s1.bin: same form value at level 15) only fit the starter row's growth_xp 8, not the standing form's 1. The divergence was also reproduced and removed live: the browser probe failed pre-fix (level 16) and passes post-fix (level 10).",
+      "frontier_rationale": "No open exp-leveling frontier covers this: EXP-Q001 is resolved and asked a different question (reward/participation branches by battle type and KO state). Recorded as candidate during the 2026-10-14 growth-source fix; the evidence is static assembly plus runtime dumps, so promotion is a review step.",
+      "review": "docs/research/evidence/reviews/levelup-growth-reads-starter-row-2026-10-14.review.json"
     }
   ]
 }

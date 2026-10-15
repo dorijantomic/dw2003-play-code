@@ -572,15 +572,26 @@ export function createGym(sfx = null) {
     const k = asButton(rawKey);
     if (!g._open) return false;
     if (g.fadeLeaving) return true;
-    const nav = (sel, len, dir) => (sel + dir + len) % len;
 
     if (g.screen === "select") {
       // Pod-select ("Train which Digimon?") — docs/research/ui/
       // stgtrain-pod-select-decoded-2026-07-12.md. Real screen navigates a
-      // horizontal row of up to 3 pods with left/right only (F0x80084838).
+      // horizontal row of up to 3 pods with left/right only (F0x80084838 is
+      // its render fn; the input arms are stgtrain.s .L0x00002720-.L0x000028a4,
+      // RAM 0x800853d0-0x80085554). The cursor CLAMPS — left floors at 0
+      // (.L0x00002798: sel-1, store 0 when negative) and right ceilings at
+      // count-1 (.L0x00002824-.L0x00002844: sel+1, slt against count-1) — it
+      // does not wrap; and the cursor word 0x4001B plays only when the slot
+      // actually changed (`beq $s4,$v0` at .L0x00002850; the play is
+      // .L0x0000285c-.L0x00002868). The walker used to wrap and blip on a
+      // blocked press.
       const n = g.roster.length;
-      if (k === "left")  { sfx?.play("system06"); g.selSlot = nav(g.selSlot, n, -1); return true; }
-      if (k === "right") { sfx?.play("system06"); g.selSlot = nav(g.selSlot, n, 1); return true; }
+      const move = (d) => {
+        const next = Math.max(0, Math.min(n - 1, g.selSlot + d));
+        if (next !== g.selSlot) { g.selSlot = next; sfx?.play("system06"); }
+      };
+      if (k === "left")  { move(-1); return true; }
+      if (k === "right") { move(1); return true; }
       if (k === "circle") {
         sfx?.play("system07"); g.trainSlot = g.selSlot; g.drillSel = 0;
         g.screen = "drill"; g._animStart("drill"); return true;

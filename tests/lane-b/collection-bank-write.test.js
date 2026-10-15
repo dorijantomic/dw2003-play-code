@@ -161,6 +161,7 @@ test("past the cap the disc's byte wraps; the walker's store floors instead", ()
 // plays, and its completion routine runs.
 import { GameEngine } from "../../engine/index.ts";
 import { createEngineBridge } from "../../web/engine-bridge.js";
+import { carriesFolderBag } from "../../engine/dw3/item-store.ts";
 
 const content = JSON.parse(readFileSync("web/assets/engine-content.json", "utf8"));
 
@@ -221,4 +222,27 @@ test("the completion routine's own write list carries the collection writes", ()
   const stage = content.stages.find((s) => s.mapId === "s420");
   const gives = stage.scripts.filter((s) => s.program.some((i) => i.op === "GiveItem"));
   assert.deepEqual(gives.map((s) => s.id), [], "no converted GiveItem row for a completion grant");
+});
+
+// ── The Folder Bag scene is what opens the CARD FOLDERS row ─────────────────────────
+// The resident pause list's sixth row is gated on the byte D0x80048f42
+// (exe/fns.s:3083-3086 `lb`/`beqz`), which is save+0x20E = carried[402] — the LAST
+// carried byte of the per-id array (`base + 0x7C + id`). Item 402 is the key item
+// "Folder Bag". Its grant is the s270 Yellow Cruiser cutscene's completion routine:
+// set_flag(0x8192,1) (pro/wstag270.s .L0x00000cf4, event 1415, the Divermon Folder Bag
+// scene). Driven through the real engine: the row's own predicate is false before the
+// scene completes and true after, with no folders involved either way.
+test("the Folder Bag scene's grant is what opens the CARD FOLDERS row", () => {
+  const engine = new GameEngine(content, { driven: true });
+  engine.loadStage("s270");
+  // The predicate's own view of the store, the shape web/game.js passes
+  // (state.inventory is [{id, qty}] there; the engine's Inventory serialises to it).
+  const view = () => ({ inventory: engine.state.inventory.toJSON().map(([id, qty]) => ({ id, qty })) });
+  assert.equal(carriesFolderBag(view()), false, "no Folder Bag before the scene");
+  engine.completeEvent(1415);
+  assert.equal(countOf(engine, 402), 1, "the scene's set_flag(0x8192,1) puts one Folder Bag in the bag");
+  assert.equal(carriesFolderBag(view()), true, "and the row's own predicate reads that byte");
+  // The original reads exactly that one carried byte: lose the copy and the row closes.
+  S.collectionWrite(402, 0, engine.state.inventory);
+  assert.equal(carriesFolderBag(view()), false, "the gate is the carried count itself");
 });

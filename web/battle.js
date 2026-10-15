@@ -47,6 +47,7 @@ import { battleMsgBank, battleMsgBankSync, battleMsgPaint, battleMsgText, transl
 import { createWfightNative } from "./wfightmn-native.js";
 import { createWfightTranslated } from "./wfight-translated.js";
 import { drawEffects } from "./fight/effect-player.js";
+import { isThrowItem } from "./fight/fight-tables.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
 import {
@@ -130,7 +131,7 @@ import {
   stealProc,
   spawnFightTask, spawnPlateHud,
   FIGHT_TASK_ARG_BYTE_OFF, FIGHT_TASK_ARG_WORD_OFF,
-  BATTLE_MESSAGE_CLOSE_BIT, BattleMessageSession,
+  BATTLE_MESSAGE_CLOSE_BIT, BATTLE_MESSAGE_PRESS_SOUND, BattleMessageSession,
   advanceFrameClock, frameDelta,
   newOpeningState, stepOpeningPhase, openingLineRoll, ambushRoll, introVariantFor,
   OPENING_PHASES, OPENING_PHASE_COUNT, openingPhaseFor,
@@ -756,11 +757,11 @@ const ST = {
 
 const DNA_PARENT_CLIP = 12;
 const DNA_RESULT_TABLE = 30;
-// The item-use action clip. The original's item machine FIGHTSTG_F0x8008d3b4 allocates a
-// fresh action actor (FIGHTSTG_F0x8008c910) and writes its clip slot +0x54 = 10
-// (pro/fightstg.s:11099-11105), so an item runs the SAME action-VM script an attack does,
-// clip 10 = the item-use motion (tables 44/45 in every pack; user visual ground truth).
-const ITEM_USE_CLIP = 10;
+// The item-use action clip (10) now lives with the item-use table in web/fight/fight-tables.js
+// (ITEM_USE_CLIP) — the original's item machine FIGHTSTG_F0x8008d3b4 allocates a fresh action
+// actor and writes its clip slot +0x54 = 10, so an item runs the SAME action-VM script an
+// attack does (tables 44/45 in every pack; user visual ground truth). The renderer's
+// playPlayerItemUse plays it with the used item's effect/sound from the 0x800a336c table.
 
 // The three HUD facts the close-up face box's object rule reads each frame. All three are
 // states of the battle HUD rather than of one screen: the box is one of the HUD's own
@@ -1471,12 +1472,17 @@ export function applyLevelUpGains(ps, gains, lu) {
 // block's level/TP/maxHP/maxMP/stat halfwords (the current-HP halfword at record
 // +0x20 and current MP at +0x24 are never a store target there), so a level-up keeps
 // the damage the battle left. The old walker code healed the partner to full here.
-export function applyLevelUp(ps, prof, oldLevel, newLevel, lu) {
+//
+// `growthProfile` is the row the disc's rolls read: the member's STARTER species'
+// (levelUpGrowthProfile), never the active form's. `prof` stays the active form for
+// the two host-side fallbacks — the stored-stat seed (ensureStoredStats) and the
+// no-progression-table branch — which have no disc counterpart.
+export function applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
     ensureStoredStats(ps, prof);
     for (let lv = oldLevel + 1; lv <= newLevel; lv++)
-      applyLevelUpGains(ps, rollLevelUpGains(prof, lv, lu), lu);
+      applyLevelUpGains(ps, rollLevelUpGains(growthProfile, lv, lu), lu);
   } else {
     ps.maxHp = scaledStat(prof, "hp", newLevel) + (ps.bonuses?.hp ?? 0);
     ps.maxMp = scaledStat(prof, "mp", newLevel) + (ps.bonuses?.mp ?? 0);
@@ -1484,6 +1490,23 @@ export function applyLevelUp(ps, prof, oldLevel, newLevel, lu) {
   const tpCap = lu?.tp_cap ?? 99;
   ps.tp = Math.min((ps.tp ?? 0) + (lu?.tp_per_level ?? 5) * (newLevel - oldLevel), tpCap);
   return ps;
+}
+
+// The profile whose growth bytes the disc's level curve and level-up rolls read:
+// the member's STARTER species' row for its roster slot — `0x8003EF5C + slot*0x58`
+// — never the active form's row. F0x80086184 computes that address and reads
+// growth_xp at +0x3E (recovered/ddw3/decomp/pro/stfgtrep/F0x80086184.c line 25;
+// pro/stfgtrep.s .L0x00003548 builds s4, .L0x000035BC `lbu 0x3e($s4)`), and
+// F0x80085E3C reads the growth bytes +0x41/+0x42/+0x43+i/+0x49+i from the same row
+// (.L0x000031EC builds s5, then .L0x00003228 / .L0x000032AC / .L0x0000338C /
+// .L0x00003434 read them). For the eight starters the slot's row is exactly
+// `rookieId - 1` (ROSTER_SLOT_CHARIDS), so the source is the rookie profile. A
+// partner fighting as a digivolution therefore keeps the starter's curve and rolls:
+// the slot1_ram RAM dump (slot0 standing in Dinohumon, exp 2985 -> level 15) only
+// fits the starter's growth_xp 8, not the form's 1.
+export function levelUpGrowthProfile(player, profiles) {
+  const rookie = profiles?.[Number(player?.rookieId)];
+  return rookie ?? player?.profile ?? null;
 }
 
 // DV form level from banked DVEXP (fn 0x800865c0): while L<99 and dvexp >= thr(L), L+=1;
@@ -2888,7 +2911,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   const USE_TRANSLATED_MSG = typeof location !== "undefined" &&
     translatedBattleMsgEnabled(location.search);
   const msgSession = USE_TRANSLATED_MSG
-    ? new BattleMessageSession({ textOf: battleMsgText, paint: () => {} })
+    ? new BattleMessageSession({
+        textOf: battleMsgText, paint: () => {},
+        // The reveal machine's phase-3 press blip: `lui $a0, 0x4` with `ori $a0, 0x1c`
+        // in the `jalr` delay slot (pro/fightstg.s .L0x80098bd4) — SYSTEM07 0x4001C
+        // through [0x80055C48], the same confirm blip the menus play. Every battle
+        // line sounds it on the Circle press that reads it, "Annihilated..." included.
+        playSound: (id) => { if ((id >>> 0) === BATTLE_MESSAGE_PRESS_SOUND) sfx?.play("system07"); },
+      })
     : null;
   // The battle's OPENING PHASE MACHINE (engine/dw3/battle-opening-machine.ts), the
   // port of pro/wfightmn's #2 arm (F0x800a6c44): the seven phases whose exit hands
@@ -6567,14 +6597,21 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const state = getState();
       const pname = b.player.profile.name;
       const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
-      // Start the item-use motion through the SAME 3-D action entry the attack paths use
-      // (`ActorAnimator.setAction`, reached here through the renderer's shared
-      // `playPlayerActionClip`). The original's item machine allocates an action actor and
-      // writes its clip +0x54 = 10 (fightstg.s:11099-11105), so the acting Digimon plays
-      // action clip 10 — its op2 tables 44/45, its op5 camera and its op10 effect — exactly
-      // as a technique plays its own clip. With no op1 in that script there is no defender
-      // reaction, which is why the item does not go through `playerAttack`/the coordinator.
-      renderer3d?.playPlayerActionClip(ITEM_USE_CLIP);
+      // Start the item-use motion through the item machine's own 3-D entries. The original's
+      // FIGHTSTG_F0x8008d3b4 dispatches on the used item id: ids 77-90 take the 14-word jump
+      // table at 0x80082ee4 — the typed THROW arms (clips 15/14/17, each with its own motion,
+      // effect and sound writes; fightstg.s:131-144, arms at :10709-:11030) — and every other
+      // id takes the default arm, which allocates an action actor and writes its clip
+      // +0x54 = 10 plus the used item's record from the 0x800a336c table into +0x6c (effect)
+      // and +0x70 (sound) (fightstg.s:11008-11030), so the acting Digimon plays action clip
+      // 10 — its op2 tables 44/45, its op5 camera and its op3 effect spawn — with the item's
+      // own effect sprite and contact sound. An item with no table record writes neither
+      // field, exactly as the disc's scan falls through. The throw band's entry starts inside
+      // the battle-effect arm below, because item 88's effect type is chosen by the STR/DEF
+      // branch its own producer computes there. With no op1 in either script there is no
+      // defender reaction, which is why the item does not go through `playerAttack`/the
+      // coordinator.
+      if (!isThrowItem(item.id)) renderer3d?.playPlayerItemUse(item.id);
       if (item.effect === "full_hp" && !isBattleEffectItem(item.id)) {
         const healed = b.player.maxHp - b.player.hp;
         b.player.hp = b.player.maxHp;
@@ -6613,6 +6650,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
               { power, element, base_acc: 128, crit_bonus: 0, magical: true }, RAND_U16, b.field));
           },
         });
+        // The throw band's presentation (ids 77-90, FIGHTSTG_F0x8008d3b4's typed arms):
+        // its own clip plus the arm's motion/effect/sound. Started here so item 88's
+        // effect pair follows the STR/DEF branch the handler just took, and so item 84's
+        // presentation reads the element roll the handler just made. When the extracted
+        // table is not loaded yet the entry declines, so keep the default-arm clip-10 entry.
+        if (isThrowItem(item.id) && !renderer3d?.playPlayerThrowItem(item.id, {
+          branch: r.statBranch ?? null,
+          elementIndex: r.elementIndex ?? null,
+        })) {
+          renderer3d?.playPlayerItemUse(item.id);
+        }
         // Every handler in the band ends by asking the shared battle message box for its
         // own page(s); `r.pages` is that call verbatim (message id + kind + payload), so
         // the words on screen are the disc's own and not this file's sentences.
@@ -7075,6 +7123,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const player = b.playerRecords[rosterIndex];
     const ps = player.statsRecord;
     const prof = player.profile;
+    // The disc's level curve and level-up rolls read the member's STARTER
+    // species' profile row (0x8003EF5C + slot*0x58), never the active form's
+    // row — see levelUpGrowthProfile. `prof` stays the active form for every
+    // other use below (the dvexpByForm migration key, the returned formId, the
+    // per-form DVEXP caps, the stored-stat seed).
+    const growthProfile = levelUpGrowthProfile(player, digimonDB) ?? prof;
     const reward = winRewards(b, rosterIndex);
     const lu = progressionDB?.level_up;
     // The partner as it stood BEFORE this battle's rewards: the results screen
@@ -7084,7 +7138,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const oldXp = ps.xp ?? 0;
     const newXp = Math.min(oldXp + reward.xp, lu?.exp_cap ?? 999999);
     const oldLevel = ps.level ?? 1;
-    const newLevel = lu ? levelForExp(oldLevel, newXp, prof.growth_xp ?? 8, lu)
+    const newLevel = lu ? levelForExp(oldLevel, newXp, growthProfile.growth_xp ?? 8, lu)
                         : 1 + Math.floor(newXp / 100);
     let levelUp = false;
     let availableEvos = [];
@@ -7097,8 +7151,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (newLevel > oldLevel) {
       levelUp = true;
       // The disc's level-up writes the level, the rolls, and TP — never HP or MP,
-      // so the partner keeps the damage the battle left (applyLevelUp).
-      applyLevelUp(ps, prof, oldLevel, newLevel, lu);
+      // so the partner keeps the damage the battle left (applyLevelUp). The rolls
+      // read the STARTER row's growth bytes (growthProfile), not the form's.
+      applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile);
       if (rosterIndex === 0)
         availableEvos = treeCandidatesFor(evolutionTrees, digimonDB, partyFormState(getState(), rosterIndex));
     }

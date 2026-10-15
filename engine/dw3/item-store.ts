@@ -184,6 +184,34 @@ export function ownsItem(state: ItemStoreState, id: number): boolean {
   return heldCount(state, id) !== 0 || wornCount(state, id) !== 0;
 }
 
+/**
+ * The CARD FOLDERS home row's unlock test — the resident pause list's own
+ * predicate, ported.
+ *
+ * `F0x8001270c` decides the sixth row from the byte at `D0x80048f42`
+ * (exe/fns.s:3083-3086: `lui $v0,%hi(D0x80048f42)` / `lb $v0,%lo(...)` /
+ * `beqz`): non-zero → the variant-1 row list and `rowCount = 6`; zero → five
+ * rows and no CARD FOLDERS. That address is `save + 0x20E`
+ * (`D0x80048d34 + 0x20E`) — the LAST carried byte of the per-id collection
+ * array this store addresses (`base + 0x7C + id`, id 402): the carried count of
+ * item id 402, the key item "Folder Bag" (esitmnam index 402; item_effects.json
+ * id 402, category key).
+ *
+ * Nothing writes a dedicated flag byte. The byte moves through the ordinary
+ * grant `F0x800161d8` (+1 capped at 99), which is what the bank-0x80 `set_flag`
+ * arm calls (`exe/fns.s` .L0x80016800-.L0x80016810). The grant site is the s270
+ * Yellow Cruiser cutscene's completion: `set_flag(0x8192, 1)` at
+ * `pro/wstag270.s` .L0x00000cf4 (event 1415 — "Divermon: Then I'll give you a
+ * Folder Bag"), so the row appears exactly when carried[402] is non-zero.
+ *
+ * The original reads exactly one byte (`lb`), so this tests the carried count
+ * only — not the worn array. Key items cannot be worn.
+ * — claim UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14
+ */
+export function carriesFolderBag(state: ItemStoreState): boolean {
+  return heldCount(state, 402) !== 0;
+}
+
 // ---------------------------------------------------------------------------
 // The two arrays as they sit in the save block (D0x80048D34).
 // ---------------------------------------------------------------------------

@@ -151,6 +151,16 @@ export interface MemcardSeed {
   mode: "save" | "load";
   /** The save point's slot (1..25) for a save; the launch code is 0xC00 | slot. */
   savePointSlot?: number;
+  /**
+   * The slot the card's directory block describes (0..2) — the block's +1 byte
+   * the writer stamps at save time (stgmcard.s .L0x00003840-.L0x00003848) and
+   * every card open reads back as `stage` (state 0x16, .L0x00002BE4), so the
+   * chooser opens on the last-saved file (state 0x1F mode 2, `blockDir(stage)`).
+   * The browser's card has no stored block; the platform's card-check read
+   * (file 1) resolves to `this slot + 2` (memcard-platform.ts fileOf), so this
+   * seeds the shared index the read is derived from.
+   */
+  lastSlot?: number;
   bits: number;
   /**
    * The bag as the block's two arrays: `ctx+0x7C+id` carried, `ctx+0x20F+id` worn,
@@ -319,6 +329,12 @@ export class MemcardSession {
   private seedSave(seed: MemcardSeed): void {
     const mem = this.mem;
     if (seed.residentImage) writeSaveBlock(mem, seed.residentImage);
+    // The card's block describes the last-saved slot; the platform's card-check
+    // read (file 1) derives from this shared index, so the chooser opens on it
+    // (state 0x16 -> 0x1F mode 2 `blockDir(stage)`), as the disc does.
+    if (Number.isInteger(seed.lastSlot) && seed.lastSlot! >= 0 && seed.lastSlot! <= 2) {
+      mem.write32(SHARED + 4, seed.lastSlot! >>> 0);
+    }
     mem.write32(MEMCARD_MODE_WORD, seed.mode === "save" ? 0x80000000 : 0);
     const sp = seed.savePointSlot;
     mem.write32(MEMCARD_CODE_WORD,

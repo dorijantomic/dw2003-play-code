@@ -112,6 +112,13 @@ test("a duel opened from the field carries the walker state, so seed cannot read
 test("the game's duel adapter is constructed with the walker's own state accessor", () => {
   const source = readFileSync("web/game.js", "utf8");
   assert.match(source, /createCardDuelNative\(sfx, bgm, \{ getState: \(\) => state \}\)/);
-  // Both launchers pass it too, so the accessor is a backstop rather than the only route.
-  assert.equal((source.match(/cardDuel\.open\([^)]*, state\)/g) ?? []).length, 2);
+  // Both launchers pass it too, so the accessor is a backstop rather than the only
+  // route. The challenge launcher carries the close callback (the field's screen-
+  // close housekeeping) as its first argument, so its argument list holds a `)`
+  // before the trailing `state`; the match is anchored to statement starts so the
+  // doc comment above the adapter cannot pass for a call.
+  assert.equal(
+    (source.match(/(?:^|\n)[ \t]*cardDuel\.open\([^;]*?,\s*state,?\s*\)\s*;/g) ?? []).length,
+    2,
+  );
 });

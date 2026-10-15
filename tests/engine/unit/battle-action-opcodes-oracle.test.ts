@@ -378,6 +378,25 @@ test("op3 F0x8008bc80: sub 0 spawns an effect of the resolved type", SKIP, () =>
   assert.deepEqual(port, orig, `the port's effect calls equal the original's`);
 });
 
+// The 9999 (0x270f) sentinel reads the actor's CURRENT-EFFECT field at +0x6c — the field
+// F0x8008ee84 state 1 fills from the tech record's +0x0e byte (fightstg.s .L0x8008f2ec-:
+// .L0x8008f320). The contact-sound field the op10 strike reads is a DIFFERENT word, +0x70
+// (F0x8008c454 @.L0x8008c4b0/.L0x8008c4d4: `lw $a0, 0x70($a2)`). The port used one constant
+// (0x70) for both; the browser masked that by writing the same value to both fields, so this
+// seeds ONLY +0x6c and lets the original and the port disagree if the field is wrong.
+test("op3 F0x8008bc80: the 9999 sentinel reads the CURRENT-EFFECT field +0x6c, not +0x70", SKIP, () => {
+  const seed = (rt: NativeStageRuntime) => {
+    rt.mem.write32(ACTOR + 0x6c, 42);   // the current-effect field
+    rt.mem.write32(ACTOR + 0x70, 77);   // the contact-sound field must NOT be read
+  };
+  const [orig, oip] = runOriginal("op3", [0, 9999, 1, 2, 3], seed);
+  const [port, pip] = runPort("op3", [0, 9999, 1, 2, 3], seed, NO_REG);
+  assert.equal(pip, oip, "IP advance");
+  assert.ok(orig.includes("fxSpawn(a0=42)"), `the original spawns the +0x6c type: ${orig}`);
+  assert.ok(!orig.includes("fxSpawn(a0=77)"), `the original never reads +0x70 here: ${orig}`);
+  assert.deepEqual(port, orig, `the port's effect calls equal the original's`);
+});
+
 // ── negative control: the oracle discriminates ───────────────────────────────
 
 test("negative control: a mutated op6 id changes the port's recorded argument", SKIP, () => {
