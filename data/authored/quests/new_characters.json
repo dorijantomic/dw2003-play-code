@@ -74,6 +74,13 @@
           "dir": "down"
         }
       ]
+    },
+    {
+      "npc_id": 1005,
+      "name": "Cyber",
+      "sheet_picture": "data/authored/quests/art/cyber.png",
+      "height": 35,
+      "residents": []
     }
   ]
 }

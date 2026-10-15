@@ -210,6 +210,11 @@
       "name": "Ren",
       "look": "red-haired girl with goggles in a white and blue poncho, cargo trousers",
       "voice": "calm, dry and direct, a drifter who teases a little and never stays; short sentences; respects people who try"
+    },
+    "1005": {
+      "name": "Cyber",
+      "look": "armoured figure in dark plating with a blue chest gem, red visor and gold headphones",
+      "voice": "terse and precise, speaks like a system message, secretly curious about people (placeholder, no quest yet)"
     }
   },
   "_threads": {

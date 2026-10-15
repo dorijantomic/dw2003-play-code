@@ -64,3 +64,13 @@ Prompt template (use one of the game's own NPC sprites, three views, as the atta
 > The attached picture is a character sprite from the PS1 game Digimon World 3, shown three times: facing the camera, facing right, facing away. Draw a NEW, DIFFERENT character in exactly the same pixel-art style, proportions, size, dark-outline and shading look, and layout: the same new character three times, evenly spaced, same size, feet on one line, left = facing the camera, middle = facing right, right = facing away. Do not copy the reference character's clothes, face or hair. Plain flat bright green background, no shadow, no text, no border. New character: <describe>.
 
 (The reference pictures cut from game sprites are made locally under `art/ref/` and are git-ignored: they are game art.)
+
+## Option 4: a whole sprite sheet from an image generator (best result, real directions)
+
+Give the generator `art/ref/ref_allframes_p066frtm.png` (the whole sheet of one game sprite, enlarged; made locally, git-ignored)
+and ask for a NEW character as a complete sheet in the same layout: 8 rows top to bottom (down, down-left, left, right,
+up-left, up, down-right, up-right), 3 frames across, flat green background. Save it as `data/authored/quests/art/<name>.png`
+and use `"sheet_picture": "..."` instead of `"views"` in `new_characters.json`. The tool cuts the background out, finds the
+8 rows and the frames, takes frame 0 of each row as the standing pose, sizes it like the disc's people and builds the idle
+and walk clips. First proven with `cyber.png` (npc 1005, a placeholder name with no quest yet). If rows touch or a row is
+missing, it names the file and says so.

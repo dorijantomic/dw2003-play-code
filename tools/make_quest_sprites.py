@@ -6,6 +6,9 @@
 Input: data/authored/quests/new_characters.json (see docs/quests-bible.md, "New characters"). Each character is either
 
   * "look": {...}   a figure drawn here from a few parameters (skin, hair, outfit...), original art, no game assets used; or
+  * "sheet_picture": "path.png"   a WHOLE sprite sheet drawn by an image generator in the game's layout (8 rows top to bottom:
+                          down, down-left, left, right, up-left, up, down-right, up-right; a few frames across; flat background).
+                          Needs a reference such as art/ref/ref_allframes_*.png in the prompt. Real directions, no faked ones.
   * "views": "path.png"   ONE picture from an image generator: 1 to 4 figures of the same character in a row (front, side facing
                           right, back; a fourth, the other side, is skipped), on ANY flat background. The tool removes the
                           background itself, finds the figures, shrinks them to game size ("height", default 34, the disc's
@@ -324,6 +327,45 @@ def views_from_picture(path, height=34, flip_side=False, aspect=0.6):
     return views
 
 
+def find_bands(im, gap=8):
+    """Horizontal bands of a cut-out picture that hold something (the rows of a sprite sheet), top to bottom."""
+    a = im.getchannel("A").point(lambda v: 255 if v > 128 else 0)
+    w, h = a.size
+    rows = [a.crop((0, y, w, y + 1)).getbbox() is not None for y in range(h)]
+    bands, start, empty, last = [], None, 0, 0
+    for y in range(h):
+        if rows[y]:
+            if start is None:
+                start = y
+            empty, last = 0, y
+        elif start is not None:
+            empty += 1
+            if empty >= gap:
+                bands.append((start, last + 1))
+                start, empty = None, 0
+    if start is not None:
+        bands.append((start, last + 1))
+    return [b for b in bands if b[1] - b[0] >= 20]
+
+
+def base_from_sheet_picture(path, height=34, aspect=0.6, frame=0):
+    """A whole sprite sheet drawn by an image generator in the game's layout: 8 rows (down, down-left, left, right, up-left,
+    up, down-right, up-right), a few frames across. The tool takes frame `frame` of each row as the standing pose."""
+    im = cutout(Image.open(path))
+    bands = find_bands(im)
+    if len(bands) != 8:
+        raise ValueError(f"{os.path.basename(path)}: found {len(bands)} rows, a sheet needs 8 (one per direction, no rows touching)")
+    frames = {}
+    for name, (y0, y1) in zip(ROWS, bands):
+        strip = im.crop((0, y0, im.width, y1))
+        figs = find_figures(strip, gap=10)
+        if not figs:
+            raise ValueError(f"{os.path.basename(path)}: row {name} is empty")
+        f = figs[min(frame, len(figs) - 1)]
+        frames[name] = _fit(strip.crop((f[0] - 2, 0, f[1] + 2, strip.height)), height, aspect)
+    return lambda name: frames[name]
+
+
 def base_from_views(views):
     def base(name):
         if name.startswith("down"):
@@ -407,7 +449,10 @@ def main():
             problems.append(f"{ch['name']}: npc_id {nid} must be 1000 or more (below that are the game's own characters)")
             continue
         try:
-            if "views" in ch:
+            if "sheet_picture" in ch:
+                base = base_from_sheet_picture(os.path.join(ROOT, ch["sheet_picture"]), ch.get("height", 34), ch.get("aspect", 0.6))
+                img = sheet_from_base(base)
+            elif "views" in ch:
                 base = base_from_views(views_from_picture(os.path.join(ROOT, ch["views"]), ch.get("height", 34), ch.get("flip_side", False), ch.get("aspect", 0.6)))
                 img = sheet_from_base(base)
             elif "sheet" in ch:
