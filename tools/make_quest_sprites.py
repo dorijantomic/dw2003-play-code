@@ -277,15 +277,17 @@ def find_figures(im, gap=14):
     return [r for r in runs if r[1] - r[0] >= 20]
 
 
-def _fit(view, height=34):
+def _fit(view, height=34, aspect=0.6):
     """Crop to the figure, shrink to `height` px tall (the disc's townspeople are 26 to 40 tall, mostly 33 to 35), with the
     colours reduced to a game-like palette, hard edges, and a dark outline."""
     box = view.getbbox()
     if not box:
         return Image.new("RGBA", (W, H), (0, 0, 0, 0))
     view = view.crop(box)
+    height -= 2                                  # the outline added below makes the sprite 2 px taller and wider
     scale = height / view.height
-    nw = max(1, min(22, round(view.width * scale)))
+    # generated characters come out slimmer than the disc's chunky chibi people, so never narrower than `aspect` x height
+    nw = max(1, min(21, max(round(view.width * scale), round(height * aspect))))
     small = view.convert("RGBa").resize((nw, height), Image.LANCZOS).convert("RGBA")      # premultiplied: edges do not smear
     spx = small.load()
     solid = [(x, y) for y in range(height) for x in range(nw) if spx[x, y][3] > 128]
@@ -307,7 +309,7 @@ def _fit(view, height=34):
     return c.outline()
 
 
-def views_from_picture(path, height=34, flip_side=False):
+def views_from_picture(path, height=34, flip_side=False, aspect=0.6):
     """Front, side (facing right) and back figures from one picture with 2 to 4 figures in a row: 3 = front, side, back;
     4 = front, side, other side, back; 2 = front, side (the back is the front)."""
     im = cutout(Image.open(path))
@@ -316,7 +318,7 @@ def views_from_picture(path, height=34, flip_side=False):
     if pick is None:
         raise ValueError(f"{os.path.basename(path)}: found {len(figs)} separate figures, expected 1 to 4 in a row "
                          "(they must not touch, and the background must be one flat colour)")
-    views = [_fit(im.crop((figs[i][0] - 2, 0, figs[i][1] + 2, im.height)), height) for i in pick]
+    views = [_fit(im.crop((figs[i][0] - 2, 0, figs[i][1] + 2, im.height)), height, aspect) for i in pick]
     if flip_side:
         views[1] = views[1].transpose(Image.FLIP_LEFT_RIGHT)
     return views
@@ -406,7 +408,7 @@ def main():
             continue
         try:
             if "views" in ch:
-                base = base_from_views(views_from_picture(os.path.join(ROOT, ch["views"]), ch.get("height", 34), ch.get("flip_side", False)))
+                base = base_from_views(views_from_picture(os.path.join(ROOT, ch["views"]), ch.get("height", 34), ch.get("flip_side", False), ch.get("aspect", 0.6)))
                 img = sheet_from_base(base)
             elif "sheet" in ch:
                 img = Image.open(os.path.join(ROOT, ch["sheet"])).convert("RGBA")
