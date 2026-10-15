@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quest lab</title>
+<style>body{font:16px system-ui,sans-serif;background:#0d1b2a;color:#e8f1fa;padding:24px}a{color:#7fc4ff}</style>
+<h1>Quest lab</h1>
+<p>Opening the game with the quest test panel. If you have no saved game in this browser, a small test party is set up first (nothing is overwritten if you do).</p>
+<p>If nothing happens, <a id="go" href="index.html?skipTitle=1&map=s330&questlab=1&noEncounters=1">click here</a>.</p>
+<script>
+  // only fill in what is missing, so an existing game is left alone
+  const put = (k, v) => { try { if (localStorage.getItem(k) == null) localStorage.setItem(k, v); } catch (_) { /* storage blocked */ } };
+  put("assetMode", "authentic"); put("engineSchema", "2"); put("progressOrdinal", "3"); put("playerName", "Junior");
+  put("charId", "p005koet"); put("party", JSON.stringify(["p005koet", "p006agum", "p009rena"])); put("packId", "B");
+  put("bits", "1000"); put("inventory", "[]");
+  location.replace(document.getElementById("go").getAttribute("href"));
+</script>

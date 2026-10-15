@@ -543,6 +543,7 @@ installQuests({
         localStorage.setItem("bits", String(state.bits));
     },
 });
+if (/[?&]questlab=1\b/.test(location.search)) import("./quest-lab.js");   // test panel for the extra quests
 // Type-to-chat: T opens a line box, Enter shows it as a speech bubble over the player.
 installChat({
     stage: document.getElementById("stage"),

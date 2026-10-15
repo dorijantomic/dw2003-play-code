@@ -593,5 +593,36 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         get state() { return st; }, get defs() { return defs; }, accept, claim, status: (id) => (defOf(id) ? statusOf(defOf(id)) : null),
         openLog, npcMark: questNpcMark, isLogOpen: () => logOpen, entries: () => logEntries().map(({ d, s }) => ({ id: d.id, title: d.title, status: s })), detail: (id) => (defOf(id) ? detailText(defOf(id), statusOf(defOf(id))) : null), bump, beginChallenge, questTalk, save: saveState, generateBounty, ensureGenerated, announceUnlocks, get roam() { return roam; },
         where: () => ({ lastMap, lastX, lastY, enabled: enabled() }),
+        // test panel hooks (web/quest-lab.js, ?questlab=1): bend the quest state so a quest can be tried at once.
+        // They only touch the quest layer's own store, never the story.
+        lab: {
+            /** Make a quest startable: its prerequisites done, and it is neither active nor done. */
+            prepare(id) {
+                const seen = new Set();
+                const markDone = (q) => {
+                    const d = defOf(q);
+                    if (!d || seen.has(q)) return;
+                    seen.add(q);
+                    for (const p of [d.requires?.done, d.unlock?.done]) if (p) { markDone(p); st.done[p] ??= Date.now(); delete st.active[p]; }
+                };
+                markDone(id);
+                delete st.active[id]; delete st.done[id]; delete st.announced[id];
+                const d = defOf(id);
+                for (const r of d?.unlock?.met ?? []) { const key = `${r.npc}@${canon(r.map)}`; if (!st.met.includes(key)) st.met.push(key); }
+                for (const m of d?.unlock?.visited ?? []) { const key = canon(m); if (!st.visited.includes(key)) st.visited.push(key); }
+                declined.clear(); saveState();
+                return { level: d?.unlock?.level ?? 1, status: statusOf(d) };
+            },
+            /** Meet every objective at once (taking the quest first if needed). */
+            finishGoals(id) {
+                const d = defOf(id);
+                if (!d) return false;
+                if (!st.active[id]) { if (st.done[id]) return false; st.active[id] = { p: d.objectives.map(() => 0), seen: d.objectives.map(() => []), at: Date.now() }; }
+                d.objectives.forEach((_, i) => { st.active[id].p[i] = targetOf(d, i); });
+                saveState(); toast(`Goals met: ${d.title}`);
+                return true;
+            },
+            reset() { st = freshState(); declined.clear(); saveState(); },
+        },
     };
 }
