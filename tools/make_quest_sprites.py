@@ -6,6 +6,9 @@
 Input: data/authored/quests/new_characters.json (see docs/quests-bible.md, "New characters"). Each character is either
 
   * "look": {...}   a figure drawn here from a few parameters (skin, hair, outfit...), original art, no game assets used; or
+  * "views": "path.png"   ONE picture holding the same character three times side by side, left to right: facing the camera,
+                          facing right (side), facing away; pixel-art style, on a flat single-colour background; the tool
+                          cuts them out, shrinks them to game size and makes the walk frames. See docs/quests-art-brief.md.
   * "sheet": "path.png"   a finished sprite sheet someone drew (any tool): 120 x 384 px, 8 rows (down, down-left, left, right,
                           up-left, up, down-right, up-right) of 5 frames, each 24 x 48, transparent background.
 
@@ -198,6 +201,67 @@ def sheet_for(look):
     return sheet
 
 
+def _key_out(im):
+    """Make the flat background transparent: the colour of the four corners, with some tolerance."""
+    im = im.convert("RGBA")
+    px = im.load()
+    w, h = im.size
+    corners = [px[0, 0], px[w - 1, 0], px[0, h - 1], px[w - 1, h - 1]]
+    bg = max(set(corners), key=corners.count)
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) < 90:
+                px[x, y] = (0, 0, 0, 0)
+    return im
+
+
+def _fit(view):
+    """Crop to the figure, shrink to about 40 px tall with the colours reduced, hard edges, and a dark outline."""
+    box = view.getbbox()
+    if not box:
+        return Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    view = view.crop(box)
+    scale = 40.0 / view.height
+    nw = max(1, min(20, round(view.width * scale)))
+    small = view.resize((nw, 40), Image.LANCZOS)
+    rgb_ = small.convert("RGB").quantize(colors=14, method=Image.MEDIANCUT).convert("RGB")
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    spx, opx = small.load(), rgb_.load()
+    cell = Image.new("RGBA", (nw, 40), (0, 0, 0, 0))
+    cpx = cell.load()
+    for y in range(40):
+        for x in range(nw):
+            if spx[x, y][3] > 128:
+                cpx[x, y] = opx[x, y] + (255,)
+    out.alpha_composite(cell, ((W - nw) // 2, 44 - 40))
+    c = Canvas()
+    c.im = out
+    c.px = out.load()
+    return c.outline()
+
+
+def sheet_from_views(path):
+    """One picture with three figures side by side (front, side facing right, back) on a flat background."""
+    im = _key_out(Image.open(path))
+    third = im.width // 3
+    views = [_fit(im.crop((i * third, 0, (i + 1) * third, im.height))) for i in range(3)]
+    sheet = Image.new("RGBA", (W * COLS, H * len(ROWS)), (0, 0, 0, 0))
+    steps = [0, 1, 0, 2, 0]
+    for r, name in enumerate(ROWS):
+        for col in range(COLS):
+            if name.startswith("down"):
+                v, dx = views[0], {"down": 0, "down-left": -1, "down-right": 1}[name]
+            elif name.startswith("up"):
+                v, dx = views[2], {"up": 0, "up-left": -1, "up-right": 1}[name]
+            else:
+                v, dx = (views[1].transpose(Image.FLIP_LEFT_RIGHT) if name == "left" else views[1]), 0
+            f = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            f.alpha_composite(v, (dx, -1 if steps[col] else 0))
+            sheet.alpha_composite(f, (col * W, r * H))
+    return sheet
+
+
 def record(rid, name):
     return {
         "id": rid, "name": name, "sheet": f"extra_sprites/{rid}.png", "frameW": W, "frameH": H, "rows": ROWS,
@@ -217,7 +281,9 @@ def main():
         if nid < 1000:
             problems.append(f"{ch['name']}: npc_id {nid} must be 1000 or more (below that are the game's own characters)")
             continue
-        if "sheet" in ch:
+        if "views" in ch:
+            img = sheet_from_views(os.path.join(ROOT, ch["views"]))
+        elif "sheet" in ch:
             img = Image.open(os.path.join(ROOT, ch["sheet"])).convert("RGBA")
             if img.size != (W * COLS, H * len(ROWS)):
                 problems.append(f"{ch['name']}: sheet is {img.size}, must be {(W * COLS, H * len(ROWS))}")

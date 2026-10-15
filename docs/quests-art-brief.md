@@ -42,3 +42,19 @@ the `image_gen` toolset, but the provider (FAL_KEY, or a DeepInfra block under `
 drawn. Once a provider is working, give it the Option 2 spec above plus the character's `look` line from
 `characters.json`, then save the result into `data/authored/quests/art/` and reference it as the `sheet`. Nothing in the game
 changes. Do not commit game art: sheets must be original.
+
+## Option 3: three views from an image generator (Gemini and the like) - the easy one
+
+Ask the generator for ONE picture with the same character three times, side by side, left to right: facing the camera,
+facing right (side view), facing away. Pixel-art style, flat single-colour background, nothing else in the picture. Save it
+to `data/authored/quests/art/<name>.png` and give the character `"views": "data/authored/quests/art/<name>.png"` in
+`new_characters.json` (instead of `look`). `tools/make_quest_sprites.py` cuts the three out, makes the background transparent,
+shrinks each to game size (about 20 x 40), reduces the colours, adds the outline and builds the walk frames. Tested with a
+synthetic picture only; real generator output may need a second try (a busy or gradient background is the usual failure).
+
+Prompt that works as a template (change the character line):
+
+> Pixel art character reference sheet in the style of a 32-bit PlayStation JRPG (chibi, about 2 heads tall, flat colours, dark
+> outline, no gradients, no anti-aliasing). THE SAME CHARACTER THREE TIMES in one wide image, evenly spaced, same size, full
+> body, feet on the same line: left = facing the camera, middle = facing right in side view, right = facing away. Plain flat
+> bright green background (#00FF00), no shadow, no text, no border. Character: <describe>.
