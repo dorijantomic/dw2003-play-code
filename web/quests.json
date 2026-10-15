@@ -56,8 +56,7 @@
             "walk": 27,
             "to": {
               "near": "player",
-              "dx": 34,
-              "dy": -22
+              "gap": 40
             }
           },
           {
@@ -67,6 +66,10 @@
             "say": 27,
             "name": "Leomon",
             "text": "Hey there. The Kunemon have been wandering into Central Park again, and I cannot leave the gym to deal with them."
+          },
+          {
+            "together": 27,
+            "dist": 130
           },
           {
             "say": 27,
@@ -86,6 +89,9 @@
             ]
           },
           {
+            "apart": 27
+          },
+          {
             "wait": 12
           },
           {
@@ -103,8 +109,7 @@
           "walk": 27,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {
@@ -174,8 +179,7 @@
             "walk": 27,
             "to": {
               "near": "player",
-              "dx": 34,
-              "dy": -22
+              "gap": 40
             }
           },
           {
@@ -185,6 +189,10 @@
             "say": 27,
             "name": "Leomon",
             "text": "You have been keeping the park clear. That is good work."
+          },
+          {
+            "together": 27,
+            "dist": 130
           },
           {
             "say": 27,
@@ -204,6 +212,9 @@
             ]
           },
           {
+            "apart": 27
+          },
+          {
             "wait": 12
           },
           {
@@ -221,8 +232,7 @@
           "walk": 27,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {
@@ -823,8 +833,7 @@
             "walk": 27,
             "to": {
               "near": "player",
-              "dx": 34,
-              "dy": -22
+              "gap": 40
             }
           },
           {
@@ -836,26 +845,13 @@
             "text": "You have beaten a lot of Kunemon by now. Did you notice how they move?"
           },
           {
+            "together": 27,
+            "dist": 130
+          },
+          {
             "say": 27,
             "name": "Leomon",
             "text": "A partner that knows an enemy that well can take on its shape."
-          },
-          {
-            "walk": 27,
-            "to": {
-              "near": "player",
-              "dx": 90,
-              "dy": -40
-            }
-          },
-          {
-            "arrive": 27
-          },
-          {
-            "look": 27
-          },
-          {
-            "wait": 20
           },
           {
             "say": 27,
@@ -863,7 +859,9 @@
             "text": "Fight on. Around level fourteen, your partner should learn the Kunemon form."
           },
           {
-            "look": "player"
+            "say": 27,
+            "name": "Leomon",
+            "text": "Will you try?"
           },
           {
             "ask": "Will you try?",
@@ -871,6 +869,9 @@
               "I will do it",
               "Not now"
             ]
+          },
+          {
+            "apart": 27
           },
           {
             "wait": 12
@@ -889,8 +890,7 @@
           "walk": 27,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {
@@ -942,8 +942,7 @@
               "walk": 58,
               "to": {
                 "near": "player",
-                "dx": 30,
-                "dy": -20
+                "gap": 40
               }
             },
             {
@@ -955,9 +954,21 @@
               "text": "A note from Leomon? Oh, that big softie."
             },
             {
+              "together": 58,
+              "dist": 130
+            },
+            {
               "say": 58,
               "name": "Old Woman",
-              "text": "Tell him the weeds by the east path are worse this year. And tell him to eat something."
+              "text": "Tell him the weeds by the east path are worse this year."
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "And tell him to eat something."
+            },
+            {
+              "apart": 58
             },
             {
               "wait": 12
@@ -987,8 +998,7 @@
               "walk": 102,
               "to": {
                 "near": "player",
-                "dx": 30,
-                "dy": -20
+                "gap": 40
               }
             },
             {
@@ -1000,28 +1010,21 @@
               "text": "Leomon's note. Hm."
             },
             {
+              "together": 102,
+              "dist": 130
+            },
+            {
               "say": 102,
               "name": "Yellow Coat",
               "text": "Tell him I will watch the south side."
             },
             {
-              "walk": 102,
-              "to": {
-                "near": "player",
-                "dx": 70,
-                "dy": 30
-              }
-            },
-            {
-              "arrive": 102
-            },
-            {
-              "wait": 10
-            },
-            {
               "say": 102,
               "name": "Yellow Coat",
               "text": "And tell him he owes me a rematch."
+            },
+            {
+              "apart": 102
             },
             {
               "wait": 12
@@ -1082,8 +1085,7 @@
             "walk": 27,
             "to": {
               "near": "player",
-              "dx": 34,
-              "dy": -22
+              "gap": 40
             }
           },
           {
@@ -1093,6 +1095,10 @@
             "say": 27,
             "name": "Leomon",
             "text": "I have two notes to deliver and I cannot leave my post."
+          },
+          {
+            "together": 27,
+            "dist": 130
           },
           {
             "say": 27,
@@ -1112,6 +1118,9 @@
             ]
           },
           {
+            "apart": 27
+          },
+          {
             "wait": 12
           },
           {
@@ -1128,8 +1137,7 @@
           "walk": 27,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {
@@ -1221,8 +1229,7 @@
             "walk": 102,
             "to": {
               "near": "player",
-              "dx": 34,
-              "dy": -22
+              "gap": 40
             }
           },
           {
@@ -1234,23 +1241,18 @@
             "text": "So Leomon sent you. Good."
           },
           {
+            "together": 102,
+            "dist": 130
+          },
+          {
             "say": 102,
             "name": "Yellow Coat",
             "text": "I have been training my own team. Three fights in a row, no resting."
           },
           {
-            "walk": 102,
-            "to": {
-              "near": "player",
-              "dx": 80,
-              "dy": 40
-            }
-          },
-          {
-            "arrive": 102
-          },
-          {
-            "wait": 15
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Are you in?"
           },
           {
             "ask": "Are you in?",
@@ -1258,6 +1260,9 @@
               "I am in",
               "Not now"
             ]
+          },
+          {
+            "apart": 102
           },
           {
             "wait": 12
@@ -1276,8 +1281,7 @@
           "walk": 102,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {
@@ -1351,7 +1355,8 @@
         "lines": [
           "Come here, dear. I hear things.",
           "They say something strange has been seen on the Wire Forest road, a Digimon in a shape it was not born with.",
-          "Go and see, and then learn the Betamon form yourself. Do you think you can?"
+          "Go and see, and then learn the Betamon form yourself.",
+          "Will you go?"
         ],
         "doneLines": [
           "You went, and you came back with a new shape. Clever.",
@@ -1362,8 +1367,7 @@
             "walk": 58,
             "to": {
               "near": "player",
-              "dx": 30,
-              "dy": -20
+              "gap": 40
             }
           },
           {
@@ -1375,15 +1379,8 @@
             "text": "Come here, dear. I hear things."
           },
           {
-            "walk": 58,
-            "to": {
-              "near": "player",
-              "dx": -60,
-              "dy": 30
-            }
-          },
-          {
-            "arrive": 58
+            "together": 58,
+            "dist": 130
           },
           {
             "say": 58,
@@ -1396,11 +1393,19 @@
             "text": "Go and see, and then learn the Betamon form yourself."
           },
           {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Will you go?"
+          },
+          {
             "ask": "Will you go?",
             "options": [
               "I will do it",
               "Not now"
             ]
+          },
+          {
+            "apart": 58
           },
           {
             "wait": 12
@@ -1419,8 +1424,7 @@
           "walk": 58,
           "to": {
             "near": "player",
-            "dx": 34,
-            "dy": -22
+            "gap": 40
           }
         },
         {

@@ -34,18 +34,22 @@ async function talkToLeomon(tag) {
   await page.evaluate(() => { const s = window.__state; s.x = 923; s.y = 410; s.dir = "up"; s.moving = false; });
   await page.waitForTimeout(600);
   const home = await leo();
+  const p0 = await page.evaluate(() => ({ x: window.__state.x, y: window.__state.y }));
   await page.keyboard.press("Enter");
-  const t0 = Date.now(); let n = 0, sawWalk = false, maxDist = 0;
+  const t0 = Date.now(); let n = 0, sawWalk = false, maxDist = 0, playerMax = 0;
   while (Date.now() - t0 < 90000) {
     await page.waitForTimeout(450);
     const s = await page.evaluate(() => ({ cs: window.__cutscene.isActive(), tb: window.__textbox?.isOpen?.() ?? false, ch: window.__choice?.isOpen?.() ?? false }));
     const l = await leo();
+    const pp = await page.evaluate(() => ({ x: window.__state.x, y: window.__state.y }));
+    playerMax = Math.max(playerMax, Math.hypot(pp.x - p0.x, pp.y - p0.y));
     const d = Math.hypot(l.x - home.x, l.y - home.y); maxDist = Math.max(maxDist, d); if (d > 20) sawWalk = true;
-    if (n < 40) await shot(`${tag}-${String(++n).padStart(2, "0")}`);
+    if (n < 60) await shot(`${tag}-${String(++n).padStart(2, "0")}`);
     if (s.ch || s.tb) await page.keyboard.press("Enter");
     if (!s.cs && !s.tb && !s.ch && n > 2) { await page.waitForTimeout(700); const s2 = await page.evaluate(() => window.__cutscene.isActive() || (window.__textbox?.isOpen?.() ?? false)); if (!s2) break; }
   }
-  return { sawWalk, maxDist, home, end: await leo() };
+  const p1 = await page.evaluate(() => ({ x: window.__state.x, y: window.__state.y }));
+  return { sawWalk, maxDist, playerMax: Math.round(playerMax), playerBack: Math.round(Math.hypot(p1.x - p0.x, p1.y - p0.y)), home, end: await leo() };
 }
 
 try {
@@ -58,6 +62,8 @@ try {
   console.log("  offer scene", JSON.stringify(a));
   expect(a.sawWalk && a.maxDist > 30, "Leomon walked away from his post during the offer");
   expect(Math.hypot(a.end.x - a.home.x, a.end.y - a.home.y) < 3, "and is back at his post afterwards");
+  expect(a.playerMax > 40, `the player walked along with him (${a.playerMax}px)`);
+  expect(a.playerBack < 4, `and is back where they started (${a.playerBack}px off)`);
   const q1 = await quest();
   console.log("  quest state", JSON.stringify(q1.active));
   expect(!!q1.active.leomon_kunemon_form, "the Kunemon-form quest was taken through the scene's own question");

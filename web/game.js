@@ -2250,7 +2250,12 @@ function playQuestScene(steps) {
         if (need.length) { console.warn(`[quest scene] ${need.join(", ")} not on ${mapId}; skipped`); return resolve(null); }
         const playerId = state.playerCharOne ? 1 : 2;
         const pos = (id) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
-        const { opcodes, speech, errors } = compileScene(steps, { playerId, pos });
+        const grid = state.collision[mapId];
+        // walkable ground by the player's own foot-box test, and clear of every character the scene is not moving
+        const cast = new Set(castOf(steps));
+        const others = sceneCast(scene).filter((n) => !cast.has(n.npc_id) && !n._ephemeral && (n.x || n.y));
+        const free = grid ? (x, y) => !rectBlocked(grid, x - 6, y - 8, x + 6, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30) : null;
+        const { opcodes, speech, errors } = compileScene(steps, { playerId, pos, free });
         if (errors.length) { console.warn("[quest scene]", errors.join("; ")); return resolve(null); }
         for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
         const hooks = { afterSay: {} };
@@ -2261,7 +2266,9 @@ function playQuestScene(steps) {
                 : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
         }
         cutsceneEsdmgRef = null;
+        state._questScene = true;
         cutscene.start(opcodes, null, () => {
+            state._questScene = false;
             for (const npc of scene.npcs) {
                 if (npc._origX !== undefined) { npc.x = npc._origX; npc.y = npc._origY; }
                 delete npc._origX; delete npc._origY; delete npc._inCutscene; delete npc.activeClip; delete npc._cutTarget;
@@ -9666,6 +9673,7 @@ function render() {
     // ground with him — the Protocol Ruins tunnel (s375).
     function partyFollowerDraws() {
         const out = [];
+        if (state._questScene) return out;   // a quest scene: your partners step out of sight, so nothing walks through them
         const drawCount = activeFollowerCount();
         for (let i = 0; i < drawCount; i++) {
             const f = followers[i];
