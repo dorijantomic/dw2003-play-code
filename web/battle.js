@@ -7245,7 +7245,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         ps.equippedForms = fitted.equipped;
         slotFull = !fitted.equippedNow;
       }
-      unlocked.push({ name: acquiredProf.name, slotFull });
+      unlocked.push({ name: acquiredProf.name, slotFull, id: acquiredProf.id });
     }
 
     return {
