@@ -1410,7 +1410,7 @@
   },
   {
    "id": "q1005",
-   "name": "Cyber",
+   "name": "Cipher",
    "sheet": "extra_sprites/q1005.png",
    "frameW": 24,
    "frameH": 48,
@@ -1817,6 +1817,13 @@
    "x": 576,
    "y": 512,
    "dir": "down"
+  },
+  {
+   "npc_id": 1005,
+   "map": "s205",
+   "x": 896,
+   "y": 296,
+   "dir": "down-left"
   }
  ]
 }

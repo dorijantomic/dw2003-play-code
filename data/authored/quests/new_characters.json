@@ -77,10 +77,17 @@
     },
     {
       "npc_id": 1005,
-      "name": "Cyber",
+      "name": "Cipher",
       "sheet_picture": "data/authored/quests/art/cyber.png",
       "height": 35,
-      "residents": []
+      "residents": [
+        {
+          "map": "s205",
+          "x": 896,
+          "y": 296,
+          "dir": "down-left"
+        }
+      ]
     }
   ]
 }

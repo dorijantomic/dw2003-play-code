@@ -212,9 +212,9 @@
       "voice": "calm, dry and direct, a drifter who teases a little and never stays; short sentences; respects people who try"
     },
     "1005": {
-      "name": "Cyber",
-      "look": "armoured figure in dark plating with a blue chest gem, red visor and gold headphones",
-      "voice": "terse and precise, speaks like a system message, secretly curious about people (placeholder, no quest yet)"
+      "name": "Cipher",
+      "look": "armoured security unit in dark plating with a blue chest gem, red visor and gold headphones",
+      "voice": "terse and precise, talks like a system message with Query and Status lines, quietly curious about people and learning jokes"
     }
   },
   "_threads": {
@@ -227,6 +227,7 @@
     "Office Worker": "errands: carries messages and parcels between towns",
     "Yellow Coat": "the rival: appears in many places, challenges you again and again",
     "Black Hat": "secrets: sells hints, then asks a favour that turns out bigger than it sounded",
-    "Ren": "a wandering tamer met four times, always somewhere new (Shell Beach, Wind Prairie, Phoenix Bay, Mobius Desert); her partner grows stronger each time"
+    "Ren": "a wandering tamer met four times, always somewhere new (Shell Beach, Wind Prairie, Phoenix Bay, Mobius Desert); her partner grows stronger each time",
+    "Cipher": "a security unit posted at the Asuka Bridge, bound by orders and slowly learning why people matter more"
   }
 }

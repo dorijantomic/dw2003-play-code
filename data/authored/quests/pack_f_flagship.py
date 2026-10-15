@@ -201,3 +201,32 @@ QUESTS += [
                    "after": [["Walk with you. Hm. Maybe for a bit. Do not tell anyone I said so."],
                              ["Yes. Keep walking. And if I end up somewhere you stand, I will say hello. That is a promise."]]}),
 ]
+
+
+# ------------------------------------------------------------------ Cipher, a security unit on the Asuka Bridge (art: Gemini)
+QUESTS += [
+
+    quest("f_cipher_standing_orders", "Standing Orders", 1005, BRIDGE,
+          text="A security unit on the Asuka Bridge has orders to stop everyone and has begun to wonder why. Ask the Old Man what waiting means, and win a card duel to show it what play looks like.",
+          goal=[talk(57, ASUKA_OUT, ["A machine asking about waiting? Sit down. The river never hurries and still reaches the sea.",
+                                     "Tell it that standing at a bridge is not the same as being stuck. A guard who knows why he stands is a guard. One who does not is only a statue.",
+                                     "And tell it to look at who crosses. Every face is a different reason."],
+                     label="Ask the Old Man about waiting"),
+                duel(1)],
+          ordered=True, lvl=4, short="Orders",
+          pay=pay(250),
+          offer=["Halt. Identification required.",
+                 "Query: you carry no Administrative Pass, yet I hesitated. My orders do not mention hesitation. Status: confused.",
+                 "Assignment for you. Ask the old human by the plaza what waiting means. Then show me what a game looks like. One duel."],
+          ask="Help the unit?", options=("I will help", "Not now"),
+          remind=["Status: waiting. Data requested: the meaning of waiting, and one duel.",
+                  "Take your time. That is not a joke. I am learning jokes."],
+          done=["Data received. Waiting is not being stuck. Playing is not idleness. Updating internal notes.",
+                "Query: when orders say stop, and a person says please, which is correct?"],
+          verdict={"ask": "What do you tell Cipher?", "options": ["Orders are orders", "Use your judgement"],
+                   "pay": [pay(0, ("Armor Chip", 1)), pay(0, ("Charisma Chip", 1))],
+                   "after": [["Acknowledged. Orders are orders. Logging.",
+                              "But I will log the person's reason too. Every time. That is within the rules."],
+                             ["Acknowledged. Judgement is permitted if it is documented.",
+                              "I will document it. In writing. With diagrams. Thank you, Tamer."]]}),
+]

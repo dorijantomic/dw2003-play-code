@@ -5039,6 +5039,233 @@
       ]
     },
     {
+      "id": "f_cipher_standing_orders",
+      "title": "Standing Orders",
+      "giver": "Cipher",
+      "short": "Orders",
+      "text": "A security unit on the Asuka Bridge has orders to stop everyone and has begun to wonder why. Ask the Old Man what waiting means, and win a card duel to show it what play looks like.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 57,
+          "name": "Old Man",
+          "maps": [
+            "s202"
+          ],
+          "lines": [
+            "A machine asking about waiting? Sit down. The river never hurries and still reaches the sea.",
+            "Tell it that standing at a bridge is not the same as being stuck. A guard who knows why he stands is a guard. One who does not is only a statue.",
+            "And tell it to look at who crosses. Every face is a different reason."
+          ],
+          "scene": [
+            {
+              "walk": 57,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 57
+            },
+            {
+              "say": 57,
+              "name": "Old Man",
+              "text": "A machine asking about waiting? Sit down. The river never hurries and still reaches the sea."
+            },
+            {
+              "together": 57,
+              "dist": 130
+            },
+            {
+              "say": 57,
+              "name": "Old Man",
+              "text": "Tell it that standing at a bridge is not the same as being stuck. A guard who knows why he stands is a guard. One who does not is only a statue."
+            },
+            {
+              "say": 57,
+              "name": "Old Man",
+              "text": "And tell it to look at who crosses. Every face is a different reason."
+            },
+            {
+              "apart": 57
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 57,
+              "to": "origin"
+            },
+            {
+              "arrive": 57
+            }
+          ],
+          "label": "Ask the Old Man about waiting"
+        },
+        {
+          "type": "duelWin",
+          "count": 1
+        }
+      ],
+      "reward": {
+        "bits": 250
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1005,
+            "map": "s205"
+          },
+          {
+            "npc": 57,
+            "map": "s202"
+          }
+        ],
+        "level": 4
+      },
+      "offer": {
+        "npc": 1005,
+        "name": "Cipher",
+        "maps": [
+          "s205"
+        ],
+        "lines": [
+          "Halt. Identification required.",
+          "Query: you carry no Administrative Pass, yet I hesitated. My orders do not mention hesitation. Status: confused.",
+          "Assignment for you. Ask the old human by the plaza what waiting means. Then show me what a game looks like. One duel."
+        ],
+        "doneLines": [
+          "Data received. Waiting is not being stuck. Playing is not idleness. Updating internal notes.",
+          "Query: when orders say stop, and a person says please, which is correct?"
+        ],
+        "remindLines": [
+          "Status: waiting. Data requested: the meaning of waiting, and one duel.",
+          "Take your time. That is not a joke. I am learning jokes."
+        ],
+        "ask": "Help the unit?",
+        "scene": [
+          {
+            "walk": 1005,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1005
+          },
+          {
+            "say": 1005,
+            "name": "Cipher",
+            "text": "Halt. Identification required."
+          },
+          {
+            "together": 1005,
+            "dist": 130
+          },
+          {
+            "say": 1005,
+            "name": "Cipher",
+            "text": "Query: you carry no Administrative Pass, yet I hesitated. My orders do not mention hesitation. Status: confused."
+          },
+          {
+            "say": 1005,
+            "name": "Cipher",
+            "text": "Assignment for you. Ask the old human by the plaza what waiting means. Then show me what a game looks like. One duel."
+          },
+          {
+            "ask": "Help the unit?",
+            "options": [
+              "I will help",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 1005
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1005,
+            "to": "origin"
+          },
+          {
+            "arrive": 1005
+          }
+        ]
+      },
+      "ordered": true,
+      "verdict": {
+        "ask": "What do you tell Cipher?",
+        "options": [
+          "Orders are orders",
+          "Use your judgement"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Armor Chip",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "Charisma Chip",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "Acknowledged. Orders are orders. Logging.",
+            "But I will log the person's reason too. Every time. That is within the rules."
+          ],
+          [
+            "Acknowledged. Judgement is permitted if it is documented.",
+            "I will document it. In writing. With diagrams. Thank you, Tamer."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1005,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1005
+        },
+        {
+          "say": 1005,
+          "name": "Cipher",
+          "text": "Data received. Waiting is not being stuck. Playing is not idleness. Updating internal notes."
+        },
+        {
+          "say": 1005,
+          "name": "Cipher",
+          "text": "Query: when orders say stop, and a person says please, which is correct?"
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1005,
+          "to": "origin"
+        },
+        {
+          "arrive": 1005
+        }
+      ]
+    },
+    {
       "id": "w_yellowcoat_last",
       "title": "A word for the winner",
       "giver": "Yellow Coat",
