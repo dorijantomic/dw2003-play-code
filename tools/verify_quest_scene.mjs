@@ -68,6 +68,11 @@ try {
   console.log("  quest state", JSON.stringify(q1.active));
   expect(!!q1.active.leomon_kunemon_form, "the Kunemon-form quest was taken through the scene's own question");
 
+  // talking to the giver again while the job is open must bring up the job, not the park chat
+  const r = await talkToLeomon("remind");
+  console.log("  reminder", JSON.stringify(r));
+  expect(!(await quest()).done.leomon_kunemon_form, "the reminder did not finish or restart the quest");
+
   // meet the goal: the lead learns the form (what the victory screen does), then the scan notices it
   await page.evaluate(() => window.__extraRoster.learnAll([56]));
   await page.waitForTimeout(3500);

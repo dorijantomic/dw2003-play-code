@@ -115,13 +115,15 @@ function statusOf(d) {
 }
 // tell the player once when something new opens up
 function announceUnlocks() {
-    let changed = false;
+    const fresh = [];
     for (const d of allDefs()) {
         if (st.announced[d.id] || statusOf(d) !== "available") continue;
-        st.announced[d.id] = 1; changed = true;
-        toast(`New quest: ${d.title}`);
+        st.announced[d.id] = 1; fresh.push(d);
     }
-    if (changed) saveState();
+    if (!fresh.length) return;
+    saveState();
+    // one notice per moment, however many givers came into view at once (a busy room can show a dozen)
+    toast(fresh.length === 1 ? `New quest: ${fresh[0].title}` : `${fresh.length} new quests nearby  (look for the red ?, or press F3)`);
 }
 
 const placesOf = (maps) => [...new Set(maps.map(mapLabel))].join(" / ");
