@@ -1097,6 +1097,9 @@ export {
   registerExtraProfiles, extraProfileCount, extraRowFormId, EXTRA_FIRST_ID, EXTRA_PROFILE_BASE,
   type ProfileTableMemory,
 } from "./dw3/ui/native/pause-status.ts";
+// The extra species' unlock records, tried by the results screen's unlock routine after the disc's own 44 per line
+// (web/extra-roster.js registers them; web/fightreport-translated.js says what each partner already owns).
+export { registerExtraEvolutionRows, setReportOwnedForms } from "./dw3/ui/native/fight-report-rewards.ts";
 // The in-battle message line: the pro/fightstg panel's ports, promoted for the browser
 // adapter web/battlemsg-translated.js and its consumer web/battle.js.
 // Decode: .bunny-scratch/battlemsg-report.md (2026-10-02).

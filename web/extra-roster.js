@@ -12,7 +12,7 @@
 //
 // Nothing here changes a byte of the disc's data; with no extra_species.json (or ?noextras=1) the game is
 // exactly the original 55 species.
-import { registerExtraProfiles } from "./vendor/engine.js";
+import { registerExtraProfiles, registerExtraEvolutionRows } from "./vendor/engine.js";
 
 const DATA = /assets\/data\/(digimon|evolutions)\.json(?:\?|$)/;
 
@@ -47,6 +47,8 @@ export function loadExtraRoster(realFetch = globalThis.fetch.bind(globalThis)) {
       if (!meta.ok || !bin.ok) return null;
       const data = await meta.json();
       registerExtraProfiles(new Uint8Array(await bin.arrayBuffer()));
+      // the results screen runs the disc's unlock routine, which only reads the disc's 44 records per line
+      registerExtraEvolutionRows(Array.from({ length: 8 }, (_, slot) => data.tree?.[String(slot)] ?? []));
       return data;
     } catch (_) {
       return null;

@@ -80,6 +80,8 @@ try {
   console.log("  progress", JSON.stringify(learned).slice(0, 400));
   await page.waitForTimeout(2500);
   await shot("report");
+  // the disc's results screen itself must announce the form, as it does a base form: step to the page that names it
+  for (let i = 0; i < 6; i++) { await press("Enter", 300); await page.waitForTimeout(900); await shot("report-" + (i + 1)); }
   for (let i = 0; i < 25 && (await page.evaluate(() => !!window.__battle?.isActive?.())); i++) await press("Enter", 600);
   await page.waitForFunction(() => !window.__battle?.isActive?.(), null, { timeout: 30_000 });
   const after = await ledgerIds();

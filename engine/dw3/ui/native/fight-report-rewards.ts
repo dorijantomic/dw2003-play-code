@@ -29,7 +29,7 @@ import { persistentRosterSlot } from "../../party-context.ts";
 import { validateEquippedForm } from "../../form-ledger.ts";
 import { addForm, setEquippedForms, writeFormEntry } from "../../form-ledger-edit.ts";
 import { formEntryCopy } from "./pause-techniques.ts";
-import { profileRecord } from "./pause-status.ts";
+import { gameFormId, profileRecord } from "./pause-status.ts";
 
 export interface RewardMemory {
     read8(addr: number): number;
@@ -132,6 +132,76 @@ export function reportAddExperience(mem: RewardMemory, slot: number, gain: numbe
     }
 }
 
+/**
+ * The extra species' unlock records (web/extra-roster.js registers them), per roster slot: the same {to, prerequisites,
+ * kind, threshold} shape as the disc's 0x10-byte rows, but in walker ids, because the disc's own table of 44 rows
+ * per line has no room for them. They are tried after the disc's 44, in order, so the routine still grants the FIRST
+ * passing record and nothing else.
+ */
+export interface ExtraEvolutionRow {
+    to: number; req0: number; req0Level: number; req1: number; req1Level: number; kind: number; threshold: number;
+}
+let extraEvolutionRows: ExtraEvolutionRow[][] = [];
+/** Register the extra unlock records per roster slot (index = slot), or clear them with null. */
+export function registerExtraEvolutionRows(rows: ExtraEvolutionRow[][] | null): void {
+    extraEvolutionRows = rows ?? [];
+}
+/** The forms (walker id -> form level) a slot owns beyond what the record's 44 ledger cells show. */
+let ownedOutsideCells: Map<number, number>[] = [];
+/** A slot that has been granted a form in this report: the game learns one form per fight, so no extra follows it. */
+let grantedThisReport: boolean[] = [];
+export function setReportOwnedForms(slot: number, owned: ReadonlyMap<number, number> | null): void {
+    ownedOutsideCells[slot | 0] = new Map(owned ?? []);
+    grantedThisReport[slot | 0] = false;
+}
+
+/** The extra records' pass of F0x8008634C: same rules as the disc's loop, over walker ids. */
+function reportUnlockExtraForm(mem: RewardMemory, slot: number, host: RewardHost): number {
+    const rows = extraEvolutionRows[slot | 0];
+    if (!rows?.length || grantedThisReport[slot | 0]) return 0;
+    const buf = host.scratch;
+    const equipped = host.scratch + 0x20;
+    const valueOf = (id: number): number => gameFormId(mem as never, id);
+    // a form's level: from its ledger cell, else from the owned list; -1 when the slot does not have it
+    const levelOf = (id: number): number => {
+        const value = valueOf(id);
+        if (value > 0 && formEntryCopy(mem, slot, value, buf) !== -1) return s8(mem.read8(buf + 2));
+        return ownedOutsideCells[slot | 0]?.get(id) ?? -1;
+    };
+    for (const row of rows) {
+        let form = valueOf(row.to);
+        if (form <= 0 || levelOf(row.to) !== -1) continue; // not a species here, or already acquired
+        for (const [req, need] of [[row.req0, row.req0Level], [row.req1, row.req1Level]] as const) {
+            if (req === 0) continue;
+            const have = levelOf(req);
+            if (have === -1 || have < need) form = -1;
+        }
+        if (form <= 0) continue;
+        if (row.kind !== 0) {
+            const record = persistentRosterSlot(slot);
+            let value: number;
+            if (row.kind < 7) value = s16(mem.read16(record + row.kind * 2 + 0x26));
+            else if (row.kind === 7) value = s16(mem.read16(record + 0x1c));
+            else value = s16(mem.read16(record + row.kind * 2 + 0x24));
+            if (value < row.threshold) continue;
+        }
+        addForm(mem, slot, form);
+        // a form the 44 cells had no room for still counts as owned for the rest of this report
+        (ownedOutsideCells[slot | 0] ??= new Map()).set(row.to, 1);
+        grantedThisReport[slot | 0] = true;
+        validateEquippedForm(mem, slot, equipped);
+        for (let i = 0; i < 3; i++) {
+            if (s16(mem.read16(equipped + i * 2)) < 3) {
+                mem.write16(equipped + i * 2, form & 0xffff);
+                setEquippedForms(mem, slot, equipped);
+                return form;
+            }
+        }
+        return form;
+    }
+    return 0;
+}
+
 /** F0x8008634C(slot): grant the first evolution row whose requirements are met; the form value, else 0. */
 export function reportUnlockForm(mem: RewardMemory, slot: number, host: RewardHost): number {
     const buf = host.scratch;
@@ -166,12 +236,14 @@ export function reportUnlockForm(mem: RewardMemory, slot: number, host: RewardHo
             if (s16(mem.read16(equipped + i * 2)) < 3) {
                 mem.write16(equipped + i * 2, form & 0xffff);
                 setEquippedForms(mem, slot, equipped);
+                grantedThisReport[slot | 0] = true;
                 return form;
             }
         }
+        grantedThisReport[slot | 0] = true;
         return form;
     }
-    return 0;
+    return reportUnlockExtraForm(mem, slot, host);
 }
 
 /** F0x800865C0(slot, form, gain): add DVEXP and raise the form level; 1 when a level was gained. */

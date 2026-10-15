@@ -1192,26 +1192,7 @@ function openNativeReport(b, onClose) {
         });
         return fightReportNative.isOpen();
 }
-// The results screen is the disc's own routine and only knows the disc's 44 forms, so a form from the extra species
-// (web/extra-roster.js) is learned without it saying so. Say it on the field once the fight is over, in the game's
-// textbox, in the report's own words ("Digivolve learned:" / the slot-full line).
-function announceExtraForms(b) {
-    const lines = [];
-    for (const p of b._winProgress ?? [])
-        for (const u of p.unlocked ?? [])
-            if (Number(u.id) > 55) lines.push({ who: p.name || "", form: u.name, full: !!u.slotFull });
-    if (!lines.length) return;
-    let tries = 0;
-    const timer = setInterval(() => {
-        if (++tries > 600) return clearInterval(timer);
-        if (battle.isActive() || fade.dir !== 0 || textbox.isOpen() || cutscene.isActive()) return;
-        clearInterval(timer);
-        textbox.open({ name: lines[0].who, pages: lines.flatMap((l) => (l.full
-            ? [["Digivolve learned:", l.form], ["Digivolve Slot full.", "Storing to Digimon Lab."]]
-            : [["Digivolve learned:", l.form]])) }, null);
-    }, 100);
-}
-battle.setReportHandoff({ open: (b) => openNativeReport(b, () => { battle.finishNativeReport(); announceExtraForms(b); }) });
+battle.setReportHandoff({ open: (b) => openNativeReport(b, () => { battle.finishNativeReport(); }) });
 
 // Gym greeters are no longer a hardcoded map: a greeter is any NPC whose
 // dialogue state writes flag bank 0x94, the decoded STGTRAIN launcher bank

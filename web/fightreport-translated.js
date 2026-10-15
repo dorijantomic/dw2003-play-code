@@ -26,7 +26,7 @@
 //
 // Same public API as createFightReportNative: open/isOpen/handleKey/update/draw/
 // close/diagnostics.
-import { heldCount, itemCountEntries, setHeldCount, ui } from "./vendor/engine.js";
+import { heldCount, itemCountEntries, setHeldCount, setReportOwnedForms, ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
@@ -92,6 +92,11 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         const state = r._state ?? {};
         const members = (o.participants ?? []).slice()
             .sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))
+            .map((p) => {
+                // the record has 44 ledger cells; the unlock routine must still know every form this partner owns
+                setReportOwnedForms(p.rosterSlot ?? 0, new Map((p.forms?.formLedger ?? []).map((e) => [Number(e.id), Number(e.formLevel ?? 1)])));
+                return p;
+            })
             .map((p) => ({
                 position: p.pos ?? 0,
                 rosterSlot: p.rosterSlot ?? 0,
