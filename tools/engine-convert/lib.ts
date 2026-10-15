@@ -679,31 +679,21 @@ export function convertStages(input: ConvertStagesInput): {
     return undefined;  // bank 0x60 (virtual ordinal) and other un-modelled banks: no engine setter
   };
 
-  // ── Talk grants: emit a once OnTalk give event per NPC item-give (tools/extract_talk_grants.py).
-  // The NPC's dialogue-state on_close writes a collection-bank flag = "you now own item N"; the
-  // engine models possession via the bag, so we translate it to GiveItem(N) gated by the same
-  // dialogue-state `gate`. Non-collection on_close sets ride along, classified by classifyAlsoSet. ──
-  for (const g of input.talkGrants ?? []) {
-    let stage = byMap.get(g.stage);
-    if (!stage) { stage = { mapId: g.stage, events: [], scripts: [] }; byMap.set(g.stage, stage); stages.push(stage); }
-    const variant = variantScriptId(
-      `${g.stage}.give.${g.npc_id}.${g.item_id}`,
-      (g.gate ?? []).map(c => [c.id, c.expected] as [number, number]),
-      (g.also_sets ?? []).map(x => [x.id, x.val] as [number, number]));
-    if (variant === null) continue;                             // an identical row
-    const scriptId = `${variant}.script`;
-    const program: Instruction[] = [{ op: "GiveItem", args: [{ t: "INT", v: g.item_id }] as TaggedArg[] }];
-    for (const s of g.also_sets ?? []) {
-      const inst = classifyAlsoSet(s);
-      if (inst) program.push(inst);
-    }
-    stage.scripts.push({ id: scriptId, program });
-    const ev: EventRow = { id: variant, on: "OnTalk", match: { npc: g.npc_id }, do: scriptId, once: true };
-    const gate = (g.gate ?? []).map(c => flagLeaf(c.id, c.expected));
-    if (gate.length === 1) ev.if = gate[0]!;
-    else if (gate.length > 1) ev.if = { kind: "all", children: gate };
-    stage.events.push(ev);
-  }
+  // ── Talk grants: NOT converted here — the walker's talk-close arm is their single home. ──
+  // A talk grant is a dialogue-state on_close collection write, and the disc applies it ONCE,
+  // on the tick the dialogue reads closed: the talk handler (fieldstg F0x80090afc) stores the
+  // selected ptrB triple's ptr2 into entity+0xFC at talk start (file 0xdee8-0xdeec, the branch
+  // delay slot) and, in its close arm (file 0xdfa4-0xe010), runs that table through the applier
+  // F0x80016988 -> set_flag F0x800165ac -> collection handler F0x800161d8 ("+1 copy of id",
+  // capped at 99). web/game.js's talk onClose is the port of that arm and applies the SAME
+  // table (web/assets/scenes/*.json dialogue_states[].on_close) — grant AND consume, every
+  // bank, in the table's order. This used to be a second home: `input.talkGrants`
+  // (talk_item_grants.json) emitted a once OnTalk GiveItem row per item-give, so the fact
+  // existed twice and every granted item landed twice (engine row at talk start + scene write
+  // at close; measured on Nohemon's forge and the King-of-Cards trophy). The extractor's data
+  // still feeds the report/index tools (build_item_obtain_index, report_stage_interactions).
+  // The non-collection on_close sets (stored-bank flags, 0x7013 sparkle) ride the same walker
+  // arm; the walker's applyStoryFlag owns the 0x7013 -> PlaySparkle(3) arm (game.js).
 
   // ── Money grants: emit a once OnTalk give event per NPC/search-point BIT-give
   // (tools/extract_bank70_money_grants.py). Same shape as talkGrants but the primary write is a

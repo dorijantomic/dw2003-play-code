@@ -60,3 +60,31 @@ test("confirming a pod-select slot routes training onto that party member, not a
   assert.equal(g.trainSlot, 1);
   assert.equal(g.screen, "drill");
 });
+
+test("pod-select clamps at both ends and blips only on a real move", async () => {
+  // stgtrain.s .L0x00002720-.L0x000028a4 (RAM 0x800853d0-0x80085554): left
+  // floors at 0 (.L0x00002798), right ceilings at count-1 (.L0x00002824-
+  // .L0x00002844) — the cursor does not wrap — and 0x4001B plays only when
+  // the slot changed (`beq $s4,$v0` at .L0x00002850; play at .L0x0000285c).
+  const played = [];
+  const g = createGym({ play: (n) => played.push(n) });
+  const state = fakeState(3);
+  await g.open(state);
+  assert.equal(g.screen, "select");
+  assert.equal(g.selSlot, 0);
+  played.length = 0;                          // drop the entry fold cue (system03)
+
+  g.handleKey("left", state);                 // blocked at the first pod
+  assert.equal(g.selSlot, 0);
+  assert.deepEqual(played, [], "a blocked Left is silent");
+
+  g.handleKey("right", state);                // 0 -> 1
+  assert.equal(g.selSlot, 1);
+  assert.deepEqual(played, ["system06"]);
+
+  played.length = 0;
+  g.handleKey("right", state);                // 1 -> 2
+  g.handleKey("right", state);                // blocked at the last pod
+  assert.equal(g.selSlot, 2, "right clamps at count-1, it does not wrap");
+  assert.deepEqual(played, ["system06"], "only the real move blips");
+});

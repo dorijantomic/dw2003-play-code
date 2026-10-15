@@ -52,6 +52,9 @@ const JSON_OUT = process.argv.includes("--json");
 // completion writes at all and no beat can advance — the same file the converter reads, and the
 // producer index below reads the collection writes out of it.
 const sceneCompletion = readJson(resolve(assets, "scene/scene_completion.json"));
+// The talk grants (tools/extract_talk_grants.py): dialogue-state on_close collection writes,
+// which the walker's own talk-close arm applies (see the producer index below).
+const talkGrantData = readJson(resolve(assets, "talk_item_grants.json")).grants;
 const screenTable = readJson(resolve(root, "data/screen_table.json"));
 function buildContent() {
   const storySteps = readJson(resolve(assets, "story_steps.json"));
@@ -145,6 +148,13 @@ for (const stage of Object.keys(sceneCompletion.stages ?? {}))
   for (const row of Object.values<any>(sceneCompletion.stages[stage].events))
     for (const w of row.writes ?? [])
       if (w.op === "set_flag" && isCollectionBank((w.flag >> 8) & 0xfe)) producesItem.add(w.flag & 0x1ff);
+// A TALK grant is produced by the walker's own talk-close arm — the port of the disc's close
+// arm (fieldstg F0x80090afc -> F0x80016988 -> F0x800165ac -> F0x800161d8) in web/game.js,
+// which applies the SAME table the extractor mined (web/assets/scenes/*.json
+// dialogue_states[].on_close -> talk_item_grants.json). The converter no longer emits a give
+// row for it (a second home made every granted item land twice), so the producer is read from
+// the table itself — exactly as the scene-completion arm above is read from its routine.
+for (const g of talkGrantData) producesItem.add(Number(g.item_id));
 if (existsSync(resolve(assets, "flag_setters.json")))
   for (const k of Object.keys(readJson(resolve(assets, "flag_setters.json"))))
     producesFlag.add(Number(k));
@@ -195,13 +205,16 @@ const holes: Hole[] = [];
 const seen = new Set<string>();
 for (const st of content.stages)
   for (const ev of st.events) {
-    // `.give.` rows are talk-give PRODUCERS, not spine gates: their `if` is the NPC dialogue-state
-    // condition (e.g. "don't already have the card", or an area/progress orphan flag the gameplay
-    // subsystem sets — the same category as the s580/s685 orphans). Those conditions are evaluated
-    // by the NPC dialogue-state subsystem, not the progression graph, so they are not unwired
-    // links. We still count the item the row PRODUCES (the producer index above already scanned it).
-    // `.flagset.` rows are the same: per-actor ptrB on_close flag PRODUCERS (the gondola reject
-    // npc63 → 0x1c46, etc.), gated by the actor's dialogue-state/spawn conditions, not spine gates.
+    // `.give.` rows no longer exist (the walker's talk-close arm owns talk grants); the guard
+    // stays so a stray one could never pollute the punch-list. When they existed they were
+    // talk-give PRODUCERS, not spine gates: their `if` was the NPC dialogue-state condition
+    // (e.g. "don't already have the card", or an area/progress orphan flag the gameplay
+    // subsystem sets — the same category as the s580/s685 orphans), evaluated by the NPC
+    // dialogue-state subsystem, not the progression graph. The item a talk grant PRODUCES is
+    // counted by the producer index above, from talk_item_grants.json (the table the walker's
+    // close arm applies). `.flagset.` rows are the same: per-actor ptrB on_close flag
+    // PRODUCERS (the gondola reject npc63 → 0x1c46, etc.), gated by the actor's
+    // dialogue-state/spawn conditions, not spine gates.
     if (ev.id.includes(".give.") || ev.id.includes(".flagset.")) continue;
     for (const lf of leavesOf(ev.if)) {
       const info = classifyLeaf(lf);

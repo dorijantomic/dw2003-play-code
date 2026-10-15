@@ -60,13 +60,19 @@ test("the slot list's left/right plays 0x0004001b only on a real change", () => 
   const sfx = mockSfx();
   const s = createSaveScreen(sfx);
   s.open({}, "save");
+  // The chooser's entry animation runs first; left/right are read only once it
+  // lands (F0x800843D8 substate 7 takes no pad — decoded 2026-10-14), so the
+  // frames have to pass before the presses, exactly as they do in play.
+  settleSlots(s);
   assert.equal(s.slot, 0);
   s.handleKey("left");                        // clamped at card 0 — silent
   assert.deepEqual(sfx.plays, [], `plays=${sfx.plays}`);
   s.handleKey("right");
   assert.deepEqual(sfx.plays, ["system06"]);
+  settleSlots(s);
   s.handleKey("right");
   assert.deepEqual(sfx.plays, ["system06", "system06"]);
+  settleSlots(s);
   s.handleKey("right");                       // clamped at card 2 — silent
   assert.deepEqual(sfx.plays, ["system06", "system06"], `plays=${sfx.plays}`);
   __clearStore();
@@ -119,6 +125,14 @@ function stubCtx() {
     set font(_v) {}, set globalAlpha(_v) {}, set globalCompositeOperation(_v) {},
     set imageSmoothingEnabled(_v) {},
   };
+}
+
+/** Run the slot chooser's entry animation out (left/right wait for it). */
+function settleSlots(s) {
+  const ctx = stubCtx();
+  for (let i = 0; i < 60 && s.screen === "slots" && s.grid.phase !== "idle"; i++) {
+    s.draw(ctx, 320, 240);
+  }
 }
 
 test("YES commits with 0x8004503c and the result window dismisses with 0x0004001c", () => {

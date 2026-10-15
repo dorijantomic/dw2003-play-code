@@ -162,6 +162,15 @@ export const BATTLE_MESSAGE_LINE_DELAY_TICKS = 3;
  */
 export const BATTLE_MESSAGE_CLOSE_BIT = 0x2000;
 /**
+ * `.L0x80098bc4`-`.L0x80098bd4` — `lui $a0, 0x4` with `ori $a0, 0x1c` in the `jalr`
+ * delay slot, through `[0x80055C48]`: the Circle press that reads the line plays
+ * SYSTEM07 (`0x0004001C`) BEFORE the page step and the close. It fires on every press
+ * that gets past `.L0x80098bbc`, so the close and the (never-reached) next-page
+ * advance sound alike. docs/research/audio/system-blip-semantics.md:223 names
+ * 0x4001C SYSTEM07 = confirm.
+ */
+export const BATTLE_MESSAGE_PRESS_SOUND = 0x4001c;
+/**
  * There is no timeout on the path the game takes. .L0x80098bbc — `beqz $v0, .L0x80098c88`
  * — returns out of phase 3 with the line still up until the close bit is held, and phase 4
  * (the timed close) has no caller.
@@ -552,6 +561,15 @@ export interface BattleMessageKindResult {
  * The message is on screen from phase 1 onward and there is no timeout on the path the
  * game takes, which is why `BATTLE_MESSAGE_HOLD_TICKS` is `Infinity`.
  */
+export interface BattleMessageRevealOptions {
+    /**
+     * `[0x80055C48](id)`: the packed-sound player. The machine's phase-3 arm calls it
+     * with `BATTLE_MESSAGE_PRESS_SOUND` on the press that reads the line — the
+     * original's own call site, `.L0x80098bc8`/`.L0x80098bd0`.
+     */
+    playSound?: ((id: number) => void) | undefined;
+}
+
 export class BattleMessageReveal {
     /** `self+0x0c` — the controller's own state. 0 fresh, 1 up, 3 finished. */
     private objState: number;
@@ -575,8 +593,12 @@ export class BattleMessageReveal {
     /** The message's lines; the machine shows at most the first two. */
     readonly lines: readonly string[];
 
-    constructor(lines: readonly string[]) {
+    /** The host's sound edge; only the phase-3 press calls it. */
+    private readonly playSound: ((id: number) => void) | undefined;
+
+    constructor(lines: readonly string[], options: BattleMessageRevealOptions = {}) {
         this.lines = lines;
+        this.playSound = options.playSound;
         this.lineCount = Math.max(1, Math.min(2, lines.length));
         // `.L0x80099614 sw $zr, 0x78($s4)` and `.L0x8009a200 sw $v0, 0x7c($s4)`: the VM
         // rewinds the cursor and sets the count on every arm, so a fresh line is
@@ -684,8 +706,12 @@ export class BattleMessageReveal {
             // page list at `self+0x50` is empty on a single-page line, so the press ends it.
             case BATTLE_MESSAGE_PHASE_WAIT:
                 if (!close) return BATTLE_MESSAGE_PHASE_WAIT;
-                this.promptGate = false;
+                // `.L0x80098bc4`-`.L0x80098bd4`: the press plays SYSTEM07 before the
+                // page step, and the state store comes before the gate clear (aa00/aa08
+                // store state 3, the aa34 delay slot clears `self+0x98`).
+                this.playSound?.(BATTLE_MESSAGE_PRESS_SOUND);
                 this.objState = BATTLE_MESSAGE_STATE_DONE;
+                this.promptGate = false;
                 return BATTLE_MESSAGE_PHASE_WAIT;
             // .L0x80098c38 — the timed close: 21 ticks, or Circle.
             case BATTLE_MESSAGE_PHASE_AUTO: {

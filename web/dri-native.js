@@ -89,8 +89,9 @@ function ownedSlots(state) {
 }
 
 /** The walker's stats object for a roster slot: the deployed party's live
- *  block, or the reserve store keyed by character id. */
-function slotStats(state, slot) {
+ *  block, or the reserve store keyed by character id. Shared with web/game.js
+ *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
+export function slotStats(state, slot) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId);
     if (pos === 0) return state.partnerStats ?? null;

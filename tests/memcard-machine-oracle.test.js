@@ -491,3 +491,61 @@ test("state 0x7b stores the next index before the continuation test and copies t
     assert.equal(runCont(false), 3, "original stores the next index even when more files remain");
     assert.equal(runCont(true), 3, "port stores the next index even when more files remain");
 });
+
+// ── The multi-slot corners, 2026-10-14 ─────────────────────────────────────
+// The empty-slot presence test is the record's FIRST BYTE: state 0x21 reads
+// `lbu 0x8(record)` at .L0x00002ECC and state 0x46 the same at .L0x00003168 —
+// the byte F0x8008316c's binder also reads as "empty slot". The port read the
+// first WORD, so a record whose byte 0 is zero while a later name byte is set
+// (strcpy stops at the NUL and leaves the old tail) was taken as occupied: the
+// save path asked "Writing over previous data." for an empty slot, and the load
+// path read the file instead of reporting "No data here.".
+//
+// The empty-record save branch also writes ONLY the queued state and returns
+// (.L0x00003524-.L0x0000352C: `li $v0, 0x32; j <return>; sw $v0, 0x14(screen)`);
+// the state word stays 0x190, so the card status is re-checked (0x190 -> 0x191
+// -> the queued/scratch swap) before the write. The port jumped straight to
+// state 0x32 and skipped that gate.
+test("the save/load presence test is the record's first byte, and the empty save re-checks the card", () => {
+    for (const state of [0x21, 0x46]) {
+        const variant = { ...VARIANTS[0], pad: 1 << 0xd, services: 1 };
+        const run = (translated) => {
+            seed(state, variant);
+            // The selected slot is 1 (STAGE+4 = 1, seed() writes it): its record
+            // starts at REC + 0x44, first byte 0, second byte set.
+            rt.mem.write32(REC + 0x44 + 8, 0x00000100);
+            rt.mem.write32(REC + 8, 0x00000100);
+            if (translated) memcardStateMachine(rt.mem, SCREEN, WIDGETS, 0x26c4, portHost);
+            else rt.cpu.call(FN, [SCREEN, WIDGETS, 0x26c4], 400000);
+            return {
+                events: EVENTS.map((e) => e.map((v) => v | 0)),
+                state: rt.mem.read32(SCREEN + MEMCARD.state) | 0,
+                queued: rt.mem.read32(SCREEN + MEMCARD.queued) | 0,
+                latch: rt.mem.read32(SCREEN + MEMCARD.confirmLatch) | 0,
+                afterLoad: rt.mem.read32(SCREEN + MEMCARD.afterLoad) | 0,
+            };
+        };
+        const original = run(false);
+        assert.deepEqual(run(true), original,
+            `state 0x${state.toString(16)} treats the record as empty the way the interpreter does`);
+    }
+    // The interpreter's own answers, so the comparison cannot silently pin two
+    // wrong branches: save returns with 0x190 pending and 0x32 queued; load
+    // shows "No data here." (state 0x1F5, latch raised, 0x20 queued).
+    const save = (() => {
+        const variant = { ...VARIANTS[0], pad: 1 << 0xd, services: 1 };
+        seed(0x21, variant);
+        rt.mem.write32(REC + 0x44 + 8, 0x00000100);
+        rt.cpu.call(FN, [SCREEN, WIDGETS, 0x26c4], 400000);
+        return { state: rt.mem.read32(SCREEN + MEMCARD.state) | 0, queued: rt.mem.read32(SCREEN + MEMCARD.queued) | 0 };
+    })();
+    assert.deepEqual(save, { state: 0x190, queued: 0x32 }, "the empty save queues the write and keeps state 0x190");
+    const load = (() => {
+        const variant = { ...VARIANTS[0], pad: 1 << 0xd, services: 1 };
+        seed(0x46, variant);
+        rt.mem.write32(REC + 0x44 + 8, 0x00000100);
+        rt.cpu.call(FN, [SCREEN, WIDGETS, 0x26c4], 400000);
+        return { state: rt.mem.read32(SCREEN + MEMCARD.state) | 0, latch: rt.mem.read32(SCREEN + MEMCARD.confirmLatch) | 0, afterLoad: rt.mem.read32(SCREEN + MEMCARD.afterLoad) | 0 };
+    })();
+    assert.deepEqual(load, { state: 0x1f5, latch: 1, afterLoad: 1 }, "the empty load reports no data");
+});

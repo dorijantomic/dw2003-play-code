@@ -4,6 +4,10 @@
 //
 //   * rows 0/1 (MOVIEOP2/MOVIEOPN): the title's attract loop, launch codes
 //     0xE01/0xE02;
+//   * row 2 (MOVIED01_STR): the post-game story handoff — the s780 reunion's
+//     event 1500 hands off 0xE03 = STTITL mode 3 = row 2, whose return 0x207
+//     is re-pointed to 0x276 at master ordinal 0x2d (web/game.js
+//     doStoryHandoff plays it through the shared field movie chain);
 //   * row 9 (MOVIED08_STR): the ordinal-43 field battle handoff, 0xE0A
 //     (F0x8008B798; engine/dw3/screen-routing.ts battleHandoff);
 //   * rows 10/11 (MOVIEE01_STR/MOVIEE02_STR): the finale's ending chain — the
@@ -27,7 +31,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { movieRow } from "../engine/index.ts";
+import { movieReturnScreen, movieRow } from "../engine/index.ts";
 import { MOVIE_ROWS } from "../engine/dw3/movie-destinations.ts";
 
 const manifest = JSON.parse(readFileSync("web/assets/movie/manifest.json", "utf8"));
@@ -48,8 +52,8 @@ function isLfsPointer(path) {
 }
 
 // The launch codes whose rows the walker plays: the two openings, the
-// ordinal-43 field movie and the two ending rows.
-const PLAYED_CODES = [0xe01, 0xe02, 0xe0a, 0xe0b, 0xe0c];
+// post-game story handoff, the ordinal-43 field movie and the two ending rows.
+const PLAYED_CODES = [0xe01, 0xe02, 0xe03, 0xe0a, 0xe0b, 0xe0c];
 
 test("the finale's ending rows resolve to shipped streams", () => {
   for (const [code, index, file] of [[0xe0b, 10, "MOVIEE01_STR"], [0xe0c, 11, "MOVIEE02_STR"]]) {
@@ -103,4 +107,36 @@ test("each shipped stream carries at least the pictures its row counts", () => {
   const ending = shippedRecord(movieRow(0xe0c));
   assert.equal(ending.frames, 1665, "MOVIEE02_STR carries all 1665 stream pictures");
   assert.equal(shippedRecord(movieRow(0xe0b)).frames, 671, "MOVIEE01_STR carries all 671");
+});
+
+test("the post-game story handoff's row ships and resolves where the disc sends it", () => {
+  // The s780 reunion (event 1500) hands off 0xE03 = STTITL mode 3 = movie row
+  // 2 = MOVIED01_STR (pro/stdwtitl.s .L0x00005000; web/game.js doStoryHandoff
+  // plays it through the shared field movie chain before routing). Below the
+  // post-game marker the row's own return 0x207 stands; at master ordinal 0x2d
+  // it is re-pointed to 0x276 = screen 630 = the {226, alt 925} row — the
+  // alias stage s925 (engine/dw3/screen-routing.ts).
+  const row = movieRow(0xe03);
+  assert.ok(row, "0xE03 names a movie row");
+  assert.equal(row.index, 2, "the launch code's low byte minus one");
+  assert.equal(row.file, "MOVIED01_STR");
+  assert.equal(row.fileIndex, 2026, "the row's own disc file index");
+  assert.equal(row.frames, 465, "row 2's own picture count");
+  assert.equal(row.destination, 0x207, "the row's tabled return selector");
+  assert.equal(movieReturnScreen(0xe03, false), 0x207);
+  assert.equal(movieReturnScreen(0xe03, true), 0x276, "the post-game re-pointing");
+  const record = shippedRecord(row);
+  assert.ok(record, "no shipped stream for MOVIED01_STR (disc file 2026)");
+  assert.equal(record.index, 2026, "the record carries the row's disc file index");
+  assert.equal(record.file, "movied01.mp4");
+  assert.equal(record.sectors, record.counts.video + record.counts.audio + record.counts.zero,
+    "the whole stream was read");
+  assert.equal(record.rawSha256.length, 64);
+  const path = `web/assets/movie/${record.file}`;
+  assert.ok(existsSync(path), `${path} is shipped`);
+  if (!isLfsPointer(path)) assert.equal(statSync(path).size, record.size, path);
+  // The player counts the row's 465 pictures against the stream; an encode cut
+  // before that (the MOVIEE02 tail regression's class) would stall the movie.
+  assert.ok(record.frames >= row.frames,
+    `movied01.mp4 carries ${record.frames} pictures, the row counts ${row.frames}`);
 });

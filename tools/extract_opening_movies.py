@@ -3,12 +3,15 @@
 
 The walker ships every movie any launch code it implements can ask for: the two
 opening movies (the title's attract loop), MOVIED08_STR (the ordinal-43 field
-battle handoff, F0x8008B798 -> selector 0xE0A -> movie row 9) and the two ending
-movies (the finale's win chain: wfightmn.s:2165-2174 takes 0xE0B at battle kind
-6, STTITL mode 11 = movie row 10 = MOVIEE01_STR, whose own return selector
-0xE0C is row 11 = MOVIEE02_STR, whose return selector is 0x2d7). The list
-below is the shipped set; the disc indices are the movie table's own first
-words (pro/stdwtitl.s .L0x00004fe8, twelve 12-byte rows, and the generated copy
+battle handoff, F0x8008B798 -> selector 0xE0A -> movie row 9), MOVIED01_STR
+(the story handoff: the s780 reunion's event 1500 hands off 0xE03 = STTITL
+mode 3 = movie row 2, whose return selector 0x207 is re-pointed to 0x276 at
+master ordinal 0x2d, the post-game alias s925) and the two ending movies (the
+finale's win chain: wfightmn.s:2165-2174 takes 0xE0B at battle kind 6, STTITL
+mode 11 = movie row 10 = MOVIEE01_STR, whose own return selector 0xE0C is row
+11 = MOVIEE02_STR, whose return selector is 0x2d7). The list below is the
+shipped set; the disc indices are the movie table's own first words
+(pro/stdwtitl.s .L0x00004fe8, twelve 12-byte rows, and the generated copy
 engine/dw3/movie-destinations.ts).
 
 Row 11 is one movie in three language variants: F0x80083CC0's mode-11 arm reads
@@ -66,6 +69,9 @@ MOVIES = (
     ("movieopn", 0x7F4, {"sectors": 18088, "frames": 1792, "video": 15680, "audio": 2261, "zero": 147}),
     # MOVIED08_STR: 434 frames at 15 fps in the row; the stream carries 450.
     ("movied08", 0x7F0, {"sectors": 4512, "frames": 450, "video": 3938, "audio": 564, "zero": 10}),
+    # MOVIED01_STR (row 2; 465 frames in the row): the s780 reunion's story
+    # handoff, 0xE03. The stream carries 480 pictures; measured 2026-10-14.
+    ("movied01", 0x7EA, {"sectors": 4808, "frames": 480, "video": 4200, "audio": 601, "zero": 7}),
     # MOVIEE01_STR (row 10; 655 frames in the row) and MOVIEE02_STR (row 11;
     # 1649): the finale's win chain. Censuses measured 2026-10-10.
     ("moviee01", 0x7F3, {"sectors": 6712, "frames": 671, "video": 5872, "audio": 839, "zero": 1}),

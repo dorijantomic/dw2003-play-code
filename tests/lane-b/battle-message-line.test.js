@@ -40,7 +40,7 @@ import {
     BATTLE_MESSAGE_AUTO_CLOSE, BATTLE_MESSAGE_AUTO_CLOSE_TICKS, BATTLE_MESSAGE_OBJECT,
     BATTLE_MESSAGE_PHASE_AUTO, BATTLE_MESSAGE_PHASE_GAP, BATTLE_MESSAGE_PHASE_READY,
     BATTLE_MESSAGE_PHASE_SHOW, BATTLE_MESSAGE_PHASE_TABLE, BATTLE_MESSAGE_PHASE_WAIT,
-    BATTLE_MESSAGE_PROMPT_GATE,
+    BATTLE_MESSAGE_PRESS_SOUND, BATTLE_MESSAGE_PROMPT_GATE,
     BATTLE_MESSAGE_TEXT_SCALE, BATTLE_MESSAGE_DRAW, BattleMessageReveal, battleMessageArm,
     battleMessageBuildWidgets, battleMessageDraw, battleMessageKindFor,
     battleMessageLineIndex, battleMessagePromptClipId, battleMessagePromptFrame,
@@ -426,6 +426,82 @@ test("the timed close is 21 ticks and only `+0xb0` reaches it", () => {
     assert.equal(plain.state, BATTLE_MESSAGE_STATE_OPEN,
         "phase 3 holds forever; nothing falls through to phase 4");
     assert.equal(plain.phase, BATTLE_MESSAGE_PHASE_WAIT);
+});
+
+test("the reveal machine's Circle press plays SYSTEM07 before the close, as the original does", () => {
+    // FIGHTSTG_F0x80098a84 phase 3 (`.L0x80098ba4`): a Circle press reaches
+    // `.L0x80098bc4`-`.L0x80098bd4` — `lui $a0, 0x4` with `ori $a0, 0x1c` in the
+    // `jalr` delay slot, through [0x80055C48] — and only THEN steps the page index and
+    // takes the state to 3 (`.L0x80098c00`/`.L0x80098c08`). The original runs here on
+    // the shipped pro_fightstg.bin; the port's machine is driven by the same pad words
+    // on the same ticks, and the two are compared phase, gate and state, tick by tick.
+    const sounds = [];
+    const rt = new NativeStageRuntime(fight, entry,
+        { setFlag() {}, getFlag: () => 0, rand16: () => 0x777 },
+        undefined, undefined, 0x80082cb0, { image: resident, base: 0x80010000 });
+    // The pad word and the packed-sound player are this test's own stubs, so the id the
+    // machine passes is read whole (the runtime's SFX cursor would resolve it first).
+    // Both are reached through a cell that holds the function pointer — `lui 0x8005 /
+    // lw -0x443c` is [0x8004BBC4], `lw 0x5c48` is [0x80055C48] — so the stub's address
+    // goes INTO the cell, as battle-loss.test.js does for its sound cell.
+    const PAD = { pressed: 0 };
+    const PAD_FN = 0x0fcc3000;
+    rt.cpu.setStub(PAD_FN, () => PAD.pressed);
+    rt.mem.write32(0x8004bbc4, PAD_FN);
+    const SOUND = 0x0fcc1000;
+    rt.cpu.setStub(SOUND, (c) => { sounds.push(c.reg(4) >>> 0); return 0; });
+    rt.mem.write32(0x80055c48, SOUND);
+    // The line the phase-1 arm makes visible: `*(arg1 + self+0x78 * 4)` then +0x144.
+    const WIDGETS = 0x80500000;
+    const ELEMENT = 0x80500100;
+    const ELEMENT_VISIBLE = 0x0fcc2000;
+    rt.cpu.setStub(ELEMENT_VISIBLE, () => 0);
+    // The state F0x80098c9c leaves behind: state 1, phase 0, the VM's built flag set,
+    // one line, the cursor rewound, and no second page in the list at self+0x50.
+    rt.mem.write32(SELF + 0x0c, 1);
+    rt.mem.write32(SELF + 0x10, 0);
+    rt.mem.write32(SELF + 0x74, 1);
+    rt.mem.write32(SELF + 0x78, 0);
+    rt.mem.write32(SELF + 0x7c, 1);
+    rt.mem.write32(SELF + 0x80, 0);
+    rt.mem.write32(SELF + 0x84, 0);
+    rt.mem.write32(SELF + 0x88, 0);
+    rt.mem.write32(SELF + 0x98, 0);
+    for (let i = 0; i < 4; i++) rt.mem.write32(SELF + 0x50 + i * 4, 0);
+    rt.mem.write32(WIDGETS, ELEMENT);
+    rt.mem.write32(ELEMENT + 0x144, ELEMENT_VISIBLE);
+
+    // One line arriving whole, four ticks of gap, then the Circle press on tick 7.
+    const PAD_WORDS = [0, 0, 0, 0, 0, 0, 0, BATTLE_MESSAGE_CLOSE_BIT, 0];
+    const original = [];
+    for (let t = 0; t < PAD_WORDS.length; t++) {
+        PAD.pressed = PAD_WORDS[t];
+        rt.mem.write32(0x8004de20, t);   // [0x8004DF98]() — the display tick
+        rt.cpu.call(BATTLE_MESSAGE_REVEAL, [SELF, WIDGETS], 400000);
+        original.push([rt.mem.read32(SELF + 0x10) | 0, rt.mem.read32(SELF + 0x98) | 0,
+            rt.mem.read32(SELF + 0x0c) | 0]);
+    }
+    assert.deepEqual(original.map((r) => r[0]), [1, 2, 2, 2, 2, 3, 3, 3, 3],
+        "phase 0 -> 1, the four-tick gap, then the wait for Circle");
+    assert.deepEqual(original.map((r) => r[1]), [0, 0, 0, 0, 0, 1, 1, 0, 0],
+        "the glyph's gate comes on with the wait and clears on the press");
+    assert.equal(original[7][2], BATTLE_MESSAGE_STATE_DONE, "the press takes the state to 3");
+    assert.deepEqual(sounds, [BATTLE_MESSAGE_PRESS_SOUND],
+        "one press, one SYSTEM07 blip — the original's own phase-3 call");
+
+    // The port: the same pad words on the same ticks, one fresh-state tick spent first
+    // (that is F0x80098c9c's own `self+0x38()` step, which this machine does not model).
+    const portSounds = [];
+    const reveal = new BattleMessageReveal(["Battle won!"],
+        { playSound: (id) => portSounds.push(id >>> 0) });
+    reveal.tick(-1, 0);
+    const port = [];
+    for (let t = 0; t < PAD_WORDS.length; t++) {
+        reveal.tick(t, PAD_WORDS[t]);
+        port.push([reveal.phase, reveal.promptVisible ? 1 : 0, reveal.state]);
+    }
+    assert.deepEqual(port, original, "phase, gate and state, tick by tick");
+    assert.deepEqual(portSounds, sounds, "and the same blip, on the same press");
 });
 
 test("the table has exactly the 22 arms the jump table holds", () => {

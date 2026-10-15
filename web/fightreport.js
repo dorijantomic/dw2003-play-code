@@ -342,10 +342,11 @@ export function createFightReport(sfx = null) {
       }
       return true;
     }
-    if (k === "cross") {
-      requestLeave();
-      return true;
-    }
+    // No cancel bit on this screen: every pad read in pro/stfgtrep is logical
+    // 0xD — the confirm (stfgtrep.s:1461/1488/2339/2584/2610 all load bit
+    // 0x0D through the +0x408 lookup). Triangle (0xE) is not read at all, so
+    // it does nothing here; the close dim starts from the confirm on the last
+    // page. The walker used to let Triangle leave from any page.
     return true;
   };
 

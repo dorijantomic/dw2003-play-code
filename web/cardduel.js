@@ -684,6 +684,13 @@ export function createCardDuel(sfx = null, bgm = null) {
   const board = loadPack("carddata3");
 
   c.isOpen = () => c._open;
+
+  /** The duel's own result, for the field's screen-close housekeeping
+   *  (F0x800169e0 writes flags 17/18/16 from the result latch). The legacy
+   *  duel's outcome lives on its internal duel object, which `close()` does
+   *  not clear — this is the rollback's equivalent of the native adapter's
+   *  `resultWon`. */
+  c.resultWon = () => c.duel?.outcome === "win";
   /** debug-only: the current phase key, for headless animation capture */
   c.phaseKey = () => (c.duel ? phase(c.duel).key : null);
   /** debug-only: re-derive the sprite set after a test has posed the model */

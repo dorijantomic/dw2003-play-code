@@ -1162,6 +1162,13 @@ STAGES = [
     Stage("fight_tech_table", ["tools/extract_fight_tech_table.py"], str(REPO),
           inputs=(str(DDW3 / "rust/dw2003_exe_data/src/data.rs"),),
           outputs=("web/assets/data/fight_tech_table.json",)),
+    # The item machine's use-effect table (fightstg 0x800a336c, 6-byte {item, effect, sound}
+    # records, -1-terminated): the used item's op3 effect type (actor+0x6c) and op10 contact
+    # sound (actor+0x70), played by the clip-10 item-use motion. See
+    # docs/research/fight-3d/tech-effects-decode.md.
+    Stage("item_use_effects", ["tools/extract_item_use_effects.py"], str(REPO),
+          inputs=(str(DDW3 / "asm/dw2003/pro/fightstg.s"),),
+          outputs=("web/assets/data/item_use_effects.json",)),
     # Special-attack per-element BACKDROPS = MEFT10<tech.sigEffect> (fallback meft1055 data-field).
     # Each pack's 3D MESHES (wall+floor) + atlas pages, drawn additively through the battle camera —
     # faithful per element from game data (no rig capture). Confirmed live 2026-07-07 (Inferno→meft1034,
@@ -1172,6 +1179,15 @@ STAGES = [
                   "web/assets/data/fight_tech_table.json",
                   "docs/research/fight-3d/data/sfstdata_effect_table.json"),
           outputs=("web/assets/battle/backdrops/manifest.json",)),
+    # The item machine's THROW-band typed arms (FIGHTSTG_F0x8008d3b4 state 0): the 14-word
+    # jump table at fightstg 0x80082ee4 sends ids 77-90 to eight typed arms, each writing the
+    # fresh action actor's clip/motion/effect/sound. Source = the fightstg assembly plus the
+    # resident image for item 90's three bytes (tools/extract_throw_item_effects.py --check).
+    Stage("throw_item_effects", ["tools/extract_throw_item_effects.py"], str(REPO),
+          inputs=(str(DDW3 / "asm/dw2003/pro/fightstg.s"),
+                  "web/assets/native/screens/pro_fightstg.bin",
+                  "web/assets/native/screens/resident.bin"),
+          outputs=("web/assets/data/throw_item_effects.json",)),
     Stage("ui_assets", ["tools/build_ui_assets.py"], str(REPO), uv_with=("pillow",),
           outputs=("web/assets/ui",), setup=setup_lfs),
     Stage("screen_packs", ["tools/extract_screen_packs.py"], str(REPO), uv_with=("pillow",),
@@ -1256,8 +1272,8 @@ STAGES = [
     Stage("opening_movies", ["tools/extract_opening_movies.py"], str(REPO),
           uv_with=("imageio-ffmpeg",), inputs=(DISC,),
           outputs=("web/assets/movie/movieop2.mp4", "web/assets/movie/movieopn.mp4",
-                   "web/assets/movie/movied08.mp4", "web/assets/movie/moviee01.mp4",
-                   "web/assets/movie/moviee02.mp4",
+                   "web/assets/movie/movied08.mp4", "web/assets/movie/movied01.mp4",
+                   "web/assets/movie/moviee01.mp4", "web/assets/movie/moviee02.mp4",
                    "web/assets/movie/manifest.json")),
     Stage("ui_font", ["tools/extract_ui_font.py"], str(REPO), uv_with=("pillow",),
           inputs=(DISC,),

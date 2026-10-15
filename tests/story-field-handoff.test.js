@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { GameEngine, createScreenRouter } from "../engine/index.ts";
+import { GameEngine, createScreenRouter, movieReturnScreen, movieRow } from "../engine/index.ts";
 import { MOVIE_DESTINATIONS } from "../engine/dw3/movie-destinations.ts";
 
 const table = JSON.parse(readFileSync("data/screen_table.json", "utf8"));
@@ -53,4 +53,36 @@ test("field entry writes the visited flag before arrival through the flag store"
       assert.equal(engine.state.flags.get(flag), true, `s${stage}, screen ${id}`);
     }
   }
+});
+
+test("the host plays a movie-naming handoff through the shared chain before routing", () => {
+  // web/game.js doStoryHandoff: a HANDOFF that names a movie row (the s780
+  // reunion's 0xE03 = row 2 = MOVIED01_STR) plays the row chain through the one
+  // field movie adapter and then routes the selector the chain ended on; the
+  // finale's ending hand-off runs the same playMovieChain.
+  const src = readFileSync("web/game.js", "utf8");
+  const at = src.indexOf("function doStoryHandoff(");
+  assert.ok(at > 0, "doStoryHandoff exists");
+  const body = src.slice(at, src.indexOf("function routeStoryHandoff(", at));
+  assert.ok(body.includes("movieRow(handoff.screenId) != null"),
+    "a movie-naming handoff is recognised");
+  assert.ok(body.includes("playMovieChain(handoff.screenId)"),
+    "it plays through the shared row chain");
+  assert.ok(body.includes("routeStoryHandoff(ev, handoff, selector)"),
+    "the selector the chain ends on is what routes");
+  const chainAt = src.indexOf("async function playMovieChain");
+  assert.ok(chainAt > 0, "the shared chain exists");
+  const chain = src.slice(chainAt, src.indexOf("async function playEndingChain", chainAt));
+  assert.ok(chain.includes("movieRow(selector)") && chain.includes("fieldMovie.open(selector)"),
+    "the chain plays each row through the field movie adapter");
+  assert.ok(chain.includes("movieReturnScreen(selector, screenRouterOptions.useAlt())"),
+    "each row's return selector is read with the router's own ordinal rule");
+  const endingAt = src.indexOf("async function playEndingChain");
+  assert.ok(src.slice(endingAt, src.indexOf("battle.setEndingHandoff({", endingAt))
+    .includes("await playMovieChain(launchCode)"), "the ending hand-off shares the chain");
+  // The row the reunion names is the one the shipped stream covers.
+  const row = movieRow(0xe03);
+  assert.equal(row.fileIndex, 2026);
+  assert.equal(row.frames, 465);
+  assert.equal(movieReturnScreen(0xe03, true), 0x276);
 });

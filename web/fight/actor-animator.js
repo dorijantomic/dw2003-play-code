@@ -19,7 +19,7 @@
 // currentFrame() is sane before tick 1 (and clips with neither op2 nor op4 fall back to idle).
 import { TimelinePlayer, PlaylistPlayer } from "./timeline-player.js";
 import { ActionVM } from "./action-vm.js";
-import { techToClip, techRecord } from "./fight-tables.js";
+import { techToClip, techRecord, techEffectType, ITEM_USE_CLIP, itemUseEffect, throwItemEffect } from "./fight-tables.js";
 // The animation-slot system the original runs is ported in
 // engine/dw3/battle-actor-animation.ts: the op2 movement arms of FIGHTSTG_F0x8008b7f4
 // (`animSlotMoveDelta`) and the live=home write of mode 7 / the placement FIGHTSTG_F0x80087f38
@@ -255,7 +255,7 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip, hooks = {}, { currentEffect = null, holdFinalPose = false } = {}) {
+  setAction(clip, hooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false } = {}) {
     const script = (clip != null) ? this.model?.actions?.[clip] : null;
     if (script && Array.isArray(script.ops) && script.ops.length) {
       this._clip = clip;
@@ -277,7 +277,7 @@ export class ActorAnimator {
         },
       };
       this.vm = new ActionVM(script, {
-        timelineForTable: (i) => this._playerForTable(i), hooks: h2, currentEffect,
+        timelineForTable: (i) => this._playerForTable(i), hooks: h2, currentEffect, currentMotion,
         baseTable: () => this.baseTable | 0,
         slot: this._slotAdapter(),
       });
@@ -323,11 +323,41 @@ export class ActorAnimator {
     return true;
   }
 
+  // The THROW band's typed arm (the item machine FIGHTSTG_F0x8008d3b4's state-0 jump table at
+  // 0x80082ee4, items 77-90): each arm names the clip AND the fresh actor's motion (+0x68),
+  // effect (+0x6c) and sound (+0x70) — tools/extract_throw_item_effects.py. The clip runs with
+  // the record's effect as its current effect (op3's 9999 sentinel) and its motion as the
+  // actor's current motion (op4's 0x38 sentinel). `branch` picks item 88's STR/DEF effect pair;
+  // `motion` overrides the record's motion (item 84's rand_u16()%7 roll is resolved by the
+  // caller, which owns the RNG and the element draw it shares). No record -> false, so the
+  // caller keeps the default-arm clip-10 entry.
+  setAnimByThrowItem(itemId, hooks = {}, { branch = null, motion = undefined } = {}) {
+    const rec = throwItemEffect(itemId);
+    if (!rec) return false;
+    const effect = (branch != null && rec.effect_branch && rec.effect_branch[branch] != null)
+      ? rec.effect_branch[branch]
+      : rec.effect;
+    return this.setAction(rec.clip, hooks,
+      { currentEffect: effect, currentMotion: motion !== undefined ? motion : rec.motion });
+  }
+
   // The tech's clip AND its effect type (tech record +0x0e → the actor's +0x6c "current
-  // effect", resolved by op3's 9999 sentinel). Both come from the extracted tech table.
+  // effect", resolved by op3's 9999 sentinel). Both come from the extracted tech table;
+  // techEffectType applies the F0x8008ee84 fallback (a zero +0x0e on a clip-5 basic plays
+  // the fixed 0x2e effect).
   setAnimByTech(techId, hooks = {}) {
     const rec = techRecord(techId);
-    return this.setAction(techToClip(techId), hooks, { currentEffect: rec?.effect ?? null });
+    return this.setAction(techToClip(techId), hooks, { currentEffect: techEffectType(rec) });
+  }
+
+  // The item's use clip AND its effect type: the item machine's default arm plays clip 10 and
+  // writes the used item's record effect (0x800a336c record+2) into the actor's +0x6c, which
+  // clip 10's op3 9999 spawn resolves (pro/fightstg.s .L0x8008d8c0). Both come from the
+  // extracted item-use table; an item with no record leaves the effect unset (no write), as
+  // the original leaves the fresh actor's field alone.
+  setAnimByItem(itemId, hooks = {}) {
+    const rec = itemUseEffect(itemId);
+    return this.setAction(ITEM_USE_CLIP, hooks, { currentEffect: rec?.effect ?? null });
   }
 
   // "Active" = something authored is driving the frame (a running VM, or the idle table while

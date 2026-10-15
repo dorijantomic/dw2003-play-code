@@ -47,7 +47,8 @@ import { lossExitFrame } from "../../web/battle.js";
 import {
     LOSS_EFFECT_CHILD_EXTRA, LOSS_EFFECT_CHILD_SIZE, LOSS_EFFECT_CHILD_TICK,
     LOSS_EFFECT_COUNTER, LOSS_EFFECT_EXTRA, LOSS_EFFECT_PHASE2_UNITS,
-    LOSS_EFFECT_SIZE, LOSS_EFFECT_TICK, LOSS_FADE_CREATE, LOSS_FADE_LEVEL, LOSS_FADE_RAMP,
+    LOSS_EFFECT_SIZE, LOSS_EFFECT_TICK, LOSS_FADE_CREATE, LOSS_FADE_DIRECTION, LOSS_FADE_LEVEL,
+    LOSS_FADE_RAMP,
     LOSS_FADE_STEP, LOSS_FADE_TICK, LOSS_GAMEOVER_SOUND, LOSS_LAUNCH_TITLE,
     LOSS_MESSAGE_ID, LOSS_MESSAGE_KIND, LOSS_MESSAGE_WORD, LOSS_MODE, LOSS_RESULT_BYTE,
     LOSS_RESULT_RECORD, LOSS_SET_RESULT, LOSS_SLOT_EFFECT, LOSS_SLOT_FADE, LOSS_STATE,
@@ -509,6 +510,61 @@ test("the fade: 0xFF00 in ten steps, the grey it is drawn with, and the level he
     assert.equal(o.out[9][0], 1, "and the object is still ramping");
     assert.equal(o.out[10][0], 2, "state 2 on the tick that passes 0xFF00");
     assert.deepEqual(o.out.slice(10).map((r) => r[0]), [2, 2, 2], "and it is held there");
+});
+
+test("the fade-out arm: the level ramps down to zero and lands on state 2 as the original does", () => {
+    // F0x8008A83C(fade, 1, 10): the same arming call with a non-zero direction. The
+    // tick's level store is the DIRECTION TEST's own delay slot (`.L0x8008AA68 sw $v0,
+    // 0x5c($a1)`), so the fade-out arm writes the ramping level too — the arm the port
+    // used to hold at 0xFF00 — and `bgez $v0, .L0x8008AA94` keeps the state at 1 while
+    // the sum is still >= 0: the tick that lands ON zero keeps ramping, and the first
+    // tick that would pass it stores 0 and raises state 2 (`.L0x8008AA8C sw $zr`).
+    const run = (original) => {
+        seed();
+        const out = [];
+        let fade = 0;
+        if (original) {
+            fade = rt.cpu.call(LOSS_FADE_CREATE, [], 20000) >>> 0;
+            mem.write32(fade + 0x64, FIGHTSTG_FADE_ARM);   // the class's arming method
+            rt.cpu.call(FIGHTSTG_FADE_ARM, [fade, 1, 10], 20000);
+        } else {
+            fade = lossFadeCreate(mem, portHost());
+            lossFadeArm(mem, portHost(), fade, 1, 10);
+        }
+        for (let f = 0; f < 14; f++) {
+            LOG.length = 0;
+            if (original) rt.cpu.call(mem.read32(fade + 0x48), [fade], 400000);
+            else lossFadeTick(mem, fade);
+            out.push([mem.read32(fade + LOSS_STATE) | 0, lossFadeLevel(mem, fade),
+                original ? mem.read8(mem.read32(0x8004de30) - 0x20 + 6) : lossFadeGrey(mem, fade),
+                mem.read32(fade + LOSS_FADE_STEP) | 0, mem.read32(fade + LOSS_FADE_RAMP) | 0,
+                mem.read32(fade + LOSS_FADE_DIRECTION) | 0]);
+        }
+        return { out, fade };
+    };
+    const o = run(true);
+    const p = run(false);
+    assert.equal(o.fade, p.fade, "the fade object's address");
+    for (let f = 0; f < o.out.length; f++) {
+        assert.deepEqual(p.out[f], o.out[f], `frame ${f}: state, level, grey, step, ramp, direction`);
+    }
+    // The arming call starts the level at 0xFF00 with step -0xFF00/10 and every tick
+    // subtracts it. The tenth tick lands the level exactly ON zero and the object is
+    // still ramping there; the eleventh is the first sum that would pass zero, so that
+    // is where the level is pinned to 0 and state 2 arrives.
+    const step = 0xff00 / 10;
+    assert.deepEqual(o.out[0], [1, 0xff00 - step, (0xff00 - step) >> 8, -step, 1, 1],
+        "the first tick after the arming call");
+    assert.deepEqual(o.out.map((r) => r[1]), [0xff00 - step, 0xff00 - 2 * step, 0xff00 - 3 * step,
+        0xff00 - 4 * step, 0xff00 - 5 * step, 0xff00 - 6 * step, 0xff00 - 7 * step,
+        0xff00 - 8 * step, 0xff00 - 9 * step, 0, 0, 0, 0, 0],
+        "the level, tenth by tenth, down to zero and held");
+    assert.deepEqual(o.out.map((r) => r[0]), [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2],
+        "state 2 on the tick whose sum would pass zero, not on the one that lands on it");
+    // The grey the quad is drawn with, the level's high byte: the same readout the
+    // fade-in test uses, from the draw the fade-out arm still makes every tick.
+    assert.deepEqual(o.out.map((r) => r[2]),
+        [229, 204, 178, 153, 127, 102, 76, 51, 25, 0, 0, 0, 0, 0]);
 });
 
 test("the whole loss, frame by frame: the same calls, the same words, the same launch frame", () => {

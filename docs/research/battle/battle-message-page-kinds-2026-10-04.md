@@ -29,8 +29,14 @@ This is **not** a converted copy with hand rows. The walker already runs a port 
 * `engine/dw3/ui/native/battle-message-line.ts` — the 22-arm table (`BATTLE_MESSAGE_ARMS`),
   the element method offsets, the window art, the reveal cadence, and an oracle
   (`tests/lane-b/battle-message-line.test.js`) that runs the original VM through
-  `engine/native` and compares the ordered element calls.
-* `engine/dw3/ui/battle-message-session.ts` — the session that owns the two elements.
+  `engine/native` and compares the ordered element calls. The reveal machine's
+  phase-3 Circle press plays SYSTEM07 (`0x4001C`) through `[0x80055C48]` before it
+  steps the page and closes (`.L0x80098bc4`-`.L0x80098bd4`); the same oracle file
+  now drives `F0x80098a84` against the port's machine tick by tick, and
+  `web/battle.js` wires the blip to `sfx.play("system07")` (2026-10-14 loss-flow
+  audit; ledger claim `battle-loss-defeat-camera-ownership-and-fade-arms-2026-10-14`).
+* `engine/dw3/ui/battle-message-session.ts` — the session that owns the two elements
+  and carries the `playSound` edge the press blip goes through.
 * `web/battle.js` — `sayOriginal(b, spec, walker)` / `sayWalker(b, walker)`: `spec` is the
   `+0xac` call, `walker` is the walker's own sentence kept for `?legacyBattleMsg=1` and
   for `peek()`.
@@ -425,16 +431,16 @@ those four sites sits *after* the `if (ts.skipped) return`. The test
 
 | line in `web/battle.js` | where | why it is still there |
 |---:|---|---|
-| 4548 | `setResultPages` | the first page of a sequence the walker composed and the original has no single page for. Every page that does have one is passed as `{ text, spec }` and goes through `sayOriginal`, so this is the fallback, not the rule |
-| 4579 | `showItemPage` | an item handler's single page when that handler asks for none. Every handler in the band 66-90 returns its own `+0xac` call (`engine/dw3/battle-items.ts`), so this is reached only by an item effect the walker invented |
-| 4776 | `advanceAfterResult` | the turn's status pages when one of them has no page. The poison tick (`kind 15`) and the regen tick (`kind 10`) are pages; the timed cures are not, because the disc has no writer for a frozen/confused/poison cure word — see the note at `web/battle.js:4491` |
-| 6772 | `applyEnemyAction` | the enemy's whole **category-5** arm (2026-10-05), for the same reason as the category-4 arm below: `battleScriptedPlanFor` builds the record machine's own page — kind 2 with `esmfight[0x36]` "Saving Chi!" for Soul Charge 209 / Misshukikou 210 and `esmfight[0x46]` "Generating!" for Gilead Plant 400 (`pro/fightstg.s:13877` and `:14048`), kind 2 with the stat words and the two lock words for the rest, kind 9 for the three party-wide ones, kind 18 for the MP drain — so this fires only when that page is null, i.e. never for a technique that reaches an arm at all, and for 391 (Helter Skelter), whose arm deliberately builds **no** page (`:13930` writes 3 into the panel's own `+0xc`). Knightmon's `move_2` is 209 and Raidenmon's `move_1` is 400, so an enemy does charge; the byte the arm writes (combatant record `+0x0E`) is the damage tail's stage-3 operand on whichever side acts next. |
-| 6783 | `applyEnemyAction` | the category-4 arm, for the same reason as `setResultPages`: the record machine's own page is passed as `{ text, spec }`, so this fires only when `restore.page` declines it. The enemy's heal and cure put up `restore.page` through `sayOriginal` one line above, because the record machine's category-4 handler always builds a page (§11). |
-| 6881 | `applyEnemyAction` | the enemy's page sequence, when `damageSpec` declines it, and it now declines it for **one** reason only: a counter reaction. The record machine (`§9`, `engine/dw3/battle-damage-terms.ts`) owns the hit page, so the single-hit and the multi-hit case both put up the box's own `kind 4` page; the counters still have no page on this path, because the only `esmfight[0x0a]` page is `kind 5` inside `FIGHTSTG_F0x8008ee84` — and that machine announces a technique being **used**, not a counter reaction landing |
-| 7859 | `handleKey` | a later page of the same sequence, for the same reason as the first |
+| 4578 | `setResultPages` | the first page of a sequence the walker composed and the original has no single page for. Every page that does have one is passed as `{ text, spec }` and goes through `sayOriginal`, so this is the fallback, not the rule |
+| 4609 | `showItemPage` | an item handler's single page when that handler asks for none. Every handler in the band 66-90 returns its own `+0xac` call (`engine/dw3/battle-items.ts`), so this is reached only by an item effect the walker invented |
+| 4806 | `advanceAfterResult` | the turn's status pages when one of them has no page. The poison tick (`kind 15`) and the regen tick (`kind 10`) are pages; the timed cures are not, because the disc has no writer for a frozen/confused/poison cure word — see the note at `web/battle.js:4521` |
+| 6820 | `applyEnemyAction` | the enemy's whole **category-5** arm (2026-10-05), for the same reason as the category-4 arm below: `battleScriptedPlanFor` builds the record machine's own page — kind 2 with `esmfight[0x36]` "Saving Chi!" for Soul Charge 209 / Misshukikou 210 and `esmfight[0x46]` "Generating!" for Gilead Plant 400 (`pro/fightstg.s:13877` and `:14048`), kind 2 with the stat words and the two lock words for the rest, kind 9 for the three party-wide ones, kind 18 for the MP drain — so this fires only when that page is null, i.e. never for a technique that reaches an arm at all, and for 391 (Helter Skelter), whose arm deliberately builds **no** page (`:13930` writes 3 into the panel's own `+0xc`). Knightmon's `move_2` is 209 and Raidenmon's `move_1` is 400, so an enemy does charge; the byte the arm writes (combatant record `+0x0E`) is the damage tail's stage-3 operand on whichever side acts next. |
+| 6831 | `applyEnemyAction` | the category-4 arm, for the same reason as `setResultPages`: the record machine's own page is passed as `{ text, spec }`, so this fires only when `restore.page` declines it. The enemy's heal and cure put up `restore.page` through `sayOriginal` one line above, because the record machine's category-4 handler always builds a page (§11). |
+| 6929 | `applyEnemyAction` | the enemy's page sequence, when `damageSpec` declines it, and it now declines it for **one** reason only: a counter reaction. The record machine (`§9`, `engine/dw3/battle-damage-terms.ts`) owns the hit page, so the single-hit and the multi-hit case both put up the box's own `kind 4` page; the counters still have no page on this path, because the only `esmfight[0x0a]` page is `kind 5` inside `FIGHTSTG_F0x8008ee84` — and that machine announces a technique being **used**, not a counter reaction landing |
+| 7914 | `handleKey` | a later page of the same sequence, for the same reason as the first |
 
 **Menu messages that are not the battle box.** `"Cannot digivolve."` and now
-`"No techs!"` are `b.menuNotice`, drawn by `drawMenuNotice` (`web/battle.js:8503`) in a
+`"No techs!"` are `b.menuNotice`, drawn by `drawMenuNotice` (`web/battle.js:8558`) in a
 panel at (118, 194, 186, 25) — the walker's own notice strip over the list. The original's
 nearest counterparts are `esmfight[0x45]` "Can't digivolve!" and `esmfight[0x44]`
 "Can't run away!", and both are **story-flag** refusals in the damage machine

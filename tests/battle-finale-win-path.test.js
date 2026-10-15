@@ -135,16 +135,23 @@ test("the ending exit is a host hand-off with its own finish, and the guards hol
 
 test("the host plays the chain through the movie plumbing and warps to its end", () => {
   const src = gameJs();
-  const at = src.indexOf("async function playEndingChain");
-  assert.ok(at > 0, "the chain function exists");
-  const chain = src.slice(at, src.indexOf("battle.setEndingHandoff({", at));
+  // The rows' return chain is shared with the story-handoff path (playMovieChain,
+  // web/game.js doStoryHandoff); playEndingChain routes the selector it ends on.
+  const at = src.indexOf("async function playMovieChain");
+  assert.ok(at > 0, "the shared chain function exists");
+  const chain = src.slice(at, src.indexOf("async function playEndingChain", at));
   assert.ok(chain.includes("movieRow(selector)"), "the launch code names its row");
   assert.ok(chain.includes("fieldMovie.open(selector)"), "the one field movie adapter plays it");
-  assert.ok(chain.includes("movieReturnScreen(selector, state.progressOrdinal === 0x2d)"),
-    "each row's own return selector drives the chain");
-  assert.ok(chain.includes("screenRouter.route(selector, currentMap().id)"),
+  assert.ok(chain.includes("movieReturnScreen(selector, screenRouterOptions.useAlt())"),
+    "each row's own return selector drives the chain (the router's own ordinal predicate)");
+  const atEnd = src.indexOf("async function playEndingChain", at);
+  assert.ok(atEnd > 0, "the ending chain exists");
+  const ending = src.slice(atEnd, src.indexOf("battle.setEndingHandoff({", atEnd));
+  assert.ok(ending.includes("await playMovieChain(launchCode)"),
+    "the ending hand-off runs the shared row chain");
+  assert.ok(ending.includes("screenRouter.route(selector, currentMap().id)"),
     "the final selector resolves through the shared screen router");
-  assert.ok(chain.includes("startTransition({ to: routed.to"),
+  assert.ok(ending.includes("startTransition({ to: routed.to"),
     "the chain lands on the field screen it resolves to");
   const start = src.indexOf("battle.setEndingHandoff({");
   const reg = src.slice(start, src.indexOf("\n});", start) + 4);

@@ -73,6 +73,7 @@ const store = typeof localStorage !== "undefined" ? localStorage : {
 export const SLOT_COUNT = 3;
 const SLOT_KEY = (i) => `mcardSlot${i}`;
 const LAST_SLOT_KEY = "mcardLastSlot";
+const BLOCK_SLOT_KEY = "mcardBlockSlot";
 
 // Leave dim (SCREEN-OBJECT-METHODS-001, fadeStart_stgmcard). The only
 // overlay call is direction 0, duration 0x1E: the 8.8 dim word runs
@@ -140,6 +141,11 @@ export function writeSlot(i, { record, image = null, data = null, playSeconds = 
   if (playSeconds !== null) store.setItem("playSeconds", String(Math.floor(playSeconds)));
   store.setItem(SLOT_KEY(i), JSON.stringify(entry));
   store.setItem(LAST_SLOT_KEY, String(i));
+  // The card's directory block describes the last-SAVED slot: the original
+  // stamps its +1 byte at save time (stgmcard.s .L0x00003840-.L0x00003848) and
+  // reads it back on every card open, selecting that slot; a load never rewrites
+  // it. LAST_SLOT_KEY stays the "last used" slot the rollback screen opens on.
+  store.setItem(BLOCK_SLOT_KEY, String(i));
   return true;
 }
 
@@ -226,6 +232,24 @@ export function buildRecord(state, opts = {}) {
   };
 }
 
+/**
+ * The empty file-name row's dashes — the one language-dependent string on this
+ * screen. DECODED 2026-10-14 from F0x800836c4's build band
+ * (stgmcard.s .L0x00000a6c-.L0x00000a88): `v1 = 0x20; if (language != 0) v1 =
+ * 0x21; sw v1, 0x80088088` — the save card's widget table first word is the
+ * FILE NAME row's string index, esmemcrd 0x20 "-----" for language 0
+ * (Japanese) and 0x21 "--------" for every other language. It is a placeholder
+ * length, not a layout constant: the old reading ("the panel is one row taller
+ * in every language but the first") is corrected. The table ships both indices
+ * as `string_by_language` on widget 0, so the rule reads from the data.
+ */
+export function fileCardPlaceholder(layout, languageByte) {
+  const w = layout?.file_card?.widgets?.[0];
+  const idx = w?.string_by_language?.[Number(languageByte) === 0 ? "0" : "nonzero"];
+  const all = layout?.strings?.all ?? [];
+  return Number.isInteger(idx) ? (all[idx] ?? null) : null;
+}
+
 export function createSaveScreen(sfx = null) {
   const s = {
     _open: false,
@@ -254,6 +278,82 @@ export function createSaveScreen(sfx = null) {
   /** Lab seam: raise the decoded card-access transition quad. */
   s.showTransitionQuad = (on = true) => { s.showQuad = !!on; s.quadAngle = 0; };
 
+  // ── The block grid's four 8.8 tweens (F0x800843D8, the slot chooser) ──────
+  // DECODED 2026-10-14 from pro/stgmcard.s, re-checked against the ported
+  // reference engine/dw3/ui/memcard-block-grid.ts (whose oracle test runs the
+  // original through engine/native and compares every ordered draw call, so
+  // these are the original's own values, not a reading):
+  //   +0x5C/+0x64  cardsX    0xDE -> 0, 10 steps   the three cards + nameplates
+  //   +0x78/+0x80  stripY    -0x55 -> 0, 10 steps  the bar, console and header
+  //   +0x94/+0x9C  consoleX  0 -> 0x2F, 8 steps    the console's own slide-in
+  //   +0xB0/+0xB8  cursorX   previous*0x44 -> slot*0x44, 5 steps
+  // The entry runs them one at a time in exactly that order (F0x800843D8
+  // substates 1, 2, 5, 7, fed by F0x80084DCC's state 0x1F); a slot move
+  // restarts only cursorX, and left/right are ignored until it lands —
+  // substate 7 accepts no pad, and the walker's old code jumped instantly.
+  s.grid = {
+    cardsX: ui.createFoldTween(),
+    stripY: ui.createFoldTween(),
+    consoleX: ui.createFoldTween(),
+    cursorX: ui.createFoldTween(),
+    phase: "idle",     // in-strip -> in-cards -> in-console -> in-cursor -> idle
+    slotRow: 0,        // screen+0x64 — the console's two card slots (rows "1"/"2")
+    clutFrame: 0,      // +0xD4 — the console's CLUT row
+    clutDir: 0,        // +0xD8 — ping-pong direction
+    clutStamp: -3,     // +0xD0 — the vsync the row last moved
+  };
+
+  /** F0x80084328: reset the grid and start its four tweens at their entry poses. */
+  function gridReset() {
+    const g = s.grid;
+    ui.startFold(g.cardsX, 0xDE, 0, 10);
+    ui.startFold(g.stripY, -0x55, 0, 10);
+    ui.startFold(g.consoleX, 0, 0x2F, 8);
+    ui.startFold(g.cursorX, -1, 0, 1);
+    g.phase = "in-strip";
+  }
+
+  /** One frame of the grid's own state machine (F0x800843D8 substates 1..7). */
+  function tickGrid() {
+    const g = s.grid;
+    if (g.phase === "in-strip") {
+      if (ui.tickFold(g.stripY)) g.phase = "in-cards";
+    } else if (g.phase === "in-cards") {
+      if (ui.tickFold(g.cardsX)) g.phase = "in-console";
+    } else if (g.phase === "in-console") {
+      // F0x80084194 -> F0x80084240: the console's own slide lands, then the
+      // cursor tween runs from the previous column (0 after a reset) to the
+      // selected one.
+      if (ui.tickFold(g.consoleX)) {
+        ui.startFold(g.cursorX, 0, s.slot * 0x44, 5);
+        g.phase = "in-cursor";
+      }
+    } else if (g.phase === "in-cursor" || g.phase === "move") {
+      if (ui.tickFold(g.cursorX)) g.phase = "idle";
+    }
+  }
+
+  /**
+   * The console's CLUT ping-pong (+0xD4/+0xD8, F0x800843D8): rows 0..0xB, one
+   * step every 3 vsyncs, snapping to 0xA when the counter would reach 0xC.
+   * The 2026-08-05 reading of "0..0xC ping-pong" never reaches the 0xC row —
+   * the threshold branch rewrites the counter to 0xA and turns it back — so
+   * the old floor(time*20) 0..12 ramp was a divergence, not just a cadence.
+   */
+  function tickGridClut() {
+    const g = s.grid;
+    const now = Math.floor(s.time / VSYNC_S);
+    if (now - g.clutStamp < 3) return;
+    g.clutStamp = now;
+    if (g.clutDir !== 0) {
+      g.clutFrame -= 1;
+      if (g.clutFrame <= 0) { g.clutFrame = 0; g.clutDir = 0; }
+    } else {
+      g.clutFrame += 1;
+      if (g.clutFrame >= 0xC) { g.clutFrame = 0xA; g.clutDir = 1; }
+    }
+  }
+
   /**
    * @param opts { areaName, placeName, playSeconds } — the city and save-point
    * names to resolve against the original's own banks, and the play clock.
@@ -272,6 +372,10 @@ export function createSaveScreen(sfx = null) {
     s.fadeLeaving = false;
     s.state = gameState ?? null;
     s.onClose = onClose;
+    // The screen opens on the slot chooser with its entry animation (the
+    // original builds the block grid and runs F0x80084DCC's 0x1E/0x1F states).
+    s.grid.slotRow = 0;
+    gridReset();
   };
 
   s.close = () => {
@@ -398,11 +502,29 @@ export function createSaveScreen(sfx = null) {
     if (s.fadeLeaving) return true;
     const back = k === "cross";
     if (s.screen === "slots") {
-      // A press that cannot move the slot is silent — the block view compares
-      // the index before and after and only then plays (site file 0x1a94).
+      // Left/right are read only in the grid's input substate: while the entry
+      // animation runs or the cursor is still sliding a press is swallowed
+      // (F0x800843D8 substate 7 takes no pad; the screen's own state 2 reads
+      // up/down/confirm/cancel throughout, so those stay live).
       if (k === "left" || k === "right") {
-        const next = k === "left" ? Math.max(0, s.slot - 1) : Math.min(SLOT_COUNT - 1, s.slot + 1);
-        if (next !== s.slot) { s.slot = next; sfx?.play("system06"); }
+        if (s.grid.phase === "idle") {
+          const next = k === "left" ? Math.max(0, s.slot - 1) : Math.min(SLOT_COUNT - 1, s.slot + 1);
+          if (next !== s.slot) {
+            // F0x80084240: the console tweens from the previous column to the
+            // new one over 5 frames (0x44 px per column) — a move, not a jump.
+            ui.startFold(s.grid.cursorX, s.slot * 0x44, next * 0x44, 5);
+            s.grid.phase = "move";
+            s.slot = next;
+            sfx?.play("system06");
+          }
+        }
+        return true;
+      }
+      // The two rows are the console's card slots: up picks row 1, down row 2,
+      // and repeating the same direction is silent (F0x80084DCC state 2).
+      if (k === "up" || k === "down") {
+        const row = k === "up" ? 0 : 1;
+        if (row !== s.grid.slotRow) { s.grid.slotRow = row; sfx?.play("system02"); }
         return true;
       }
       if (k === "circle") { sfx?.play("system07"); enterFile(); return true; }
@@ -488,13 +610,20 @@ export function createSaveScreen(sfx = null) {
   function drawSlotSelect(ctx) {
     const L = LAYOUT;
     const sel = L.slot_select;
-    // Purple header bar (clip 0x20) then the three cards (clip 0x22) and the
-    // console (clip 0x23), whose CLUT row pulses 0..0xC every 3 ticks.
-    drawClip(ctx, mcard, sel.bar.clip, sel.bar.x, sel.bar.yOffset);
-    drawClip(ctx, mcard, sel.cards.clip, sel.cards.xOffset, sel.cards.y);
-    const pulse = Math.floor(s.time * 20) % (sel.console.clutPulse[1] * 2);
-    const row = pulse <= sel.console.clutPulse[1] ? pulse : sel.console.clutPulse[1] * 2 - pulse;
-    drawClipAtPaletteRow(ctx, mcard, sel.console.clip, row, sel.slotX[s.slot], sel.console.y);
+    const g = s.grid;
+    // Every position below is F0x800843D8's decoded draw tail:
+    //   console  clip 0x23 at (consoleX + cursorX + 0x30, stripY + 0x12)
+    //   bar      clip 0x20 at (0, stripY + 0x10)
+    //   plates   nameplate table at (slotX[i] + cardsX, 0x23)
+    //   cards    clip 0x22 at (cardsX + 0x62, 0x20)  — drawn LAST, over the plates
+    // The console x is NOT the nameplate x: stgmcard-decoded-2026-08-05.md read
+    // slotX there, but the original adds the console's own slide and the cursor
+    // column to a 0x30 base (memcard-block-grid.ts; the oracle compares this
+    // exact call). The order matters: the cards clip covers the console's upper
+    // half, which is why the console is only visible below the cards.
+    drawClipAtPaletteRow(ctx, mcard, sel.console.clip, g.clutFrame,
+      g.consoleX.value + g.cursorX.value + 0x30, g.stripY.value + sel.console.y);
+    drawClip(ctx, mcard, sel.bar.clip, sel.bar.x, g.stripY.value + sel.bar.yOffset);
 
     // Per-card starter nameplate, drawn only for a card that holds data.
     for (let i = 0; i < sel.slots; i++) {
@@ -502,11 +631,26 @@ export function createSaveScreen(sfx = null) {
       const type = rec?.partyTypes?.[0] ?? -1;
       const idx = type - sel.typeBase;
       if (idx < 0 || idx >= sel.plateClipByType.length) continue;
-      drawClip(ctx, mcard, sel.plateClipByType[idx], sel.slotX[i], sel.plateY);
+      drawClip(ctx, mcard, sel.plateClipByType[idx], sel.slotX[i] + g.cardsX.value, sel.plateY);
     }
+    drawClip(ctx, mcard, sel.cards.clip, g.cardsX.value + sel.cards.xOffset, sel.cards.y);
+
     const header = (L.strings.all[sel.header.string] ?? "{1}")
       .replace("{1}", String(s.slot + 1));
-    drawText(ctx, header, sel.header.xy[0], sel.header.xy[1]);
+    drawText(ctx, header, sel.header.xy[0], g.stripY.value + sel.header.xy[1]);
+
+    // The console's two card slots (F0x80084DCC state 1, the slot chooser):
+    // the YES/NO widgets are both set to esmemcrd 3 "{1}" and then numbered 1
+    // and 2, so on this screen the two option rows read "1" and "2", and the
+    // cursor sits at (0xC2, 0xBD + 0x0E*row). The walker keeps one storage, so
+    // the row is the original's own two-slot choice — drawn and moved by
+    // up/down — with no second card for it to address.
+    const mw = L.message_window;
+    const rowText = (n) => (L.strings.all[3] ?? "{1}").replace("{1}", String(n));
+    drawText(ctx, rowText(1), mw.yes.xy[0], mw.yes.xy[1]);
+    drawText(ctx, rowText(2), mw.no.xy[0], mw.no.xy[1]);
+    const cy = g.slotRow === 0 ? mw.yes.xy[1] : mw.no.xy[1];
+    drawText(ctx, "[arrow-right]", 0xC2, cy);
   }
 
   function drawFileCard(ctx) {
@@ -524,6 +668,10 @@ export function createSaveScreen(sfx = null) {
       drawClip(ctx, mcard, fc.layers.front, fc.layers.xy[0], fc.layers.xy[1] + dy);
       drawClip(ctx, mcard, fc.layers.back, fc.layers.xy[0], fc.layers.xy[1] + dy);
     }
+    // The window's two header lines are up in EVERY state of this window
+    // (F0x80087368): the SAVE/LOAD tab and the SAVING/LOADING word. Only the
+    // 19 record widgets hide behind +0x60.
+    drawWindowHeader(ctx);
 
     // F0x8008316c's first branch (`arg0->unk60 == 0`) calls +0x144(0) on every
     // one of the 19 record widgets, i.e. the card's contents are HIDDEN while
@@ -562,6 +710,9 @@ export function createSaveScreen(sfx = null) {
           case "timeSecondsLeadingZero": text = rec.seconds < 10 ? "0" : ""; break;
           default: break;
         }
+      } else if (w.role === "fileName") {
+        // An empty card: the dash row the language picks (F0x800836c4).
+        text = fileCardPlaceholder(L, s.state?.languageByte ?? 2) ?? text;
       } else if (w.role.startsWith("time") && w.role.endsWith("LeadingZero")) {
         text = "";
       }
@@ -613,9 +764,7 @@ export function createSaveScreen(sfx = null) {
     return mw.lines[1];
   }
 
-  function drawWindowText(ctx, title, body, stringIndex = null) {
-    const mw = LAYOUT.message_window;
-    if (title) drawText(ctx, title, mw.lines[0].xy[0], mw.lines[0].xy[1]);
+  function drawWindowText(ctx, body, stringIndex = null) {
     const box = bodyBoxFor(stringIndex);
     let ly = box.xy[1];
     for (const line of String(body ?? "").split("\n")) {
@@ -625,6 +774,21 @@ export function createSaveScreen(sfx = null) {
   }
 
   const modeTitle = () => (LAYOUT.strings.all[s.mode === "save" ? 1 : 14] ?? "");
+  const modeLine = () => (LAYOUT.strings.all[s.mode === "save" ? 2 : 15] ?? "");
+
+  // The message window's own two header lines (F0x80087534's widget set +
+  // F0x80084dcc's open body). DECODED 2026-10-14 (closes V4): the SAVE / LOAD
+  // title is the widget at (205, 98+fold) — the tab at the panel's top right,
+  // the one place the mode is named — and the widget at (20,113) is the mode
+  // WORD: esmemcrd 2 "SAVING" / 0xF "LOADING", set once by the open body
+  // (stgmcard.s file 0x24ac-0x24e4) and never re-bound. The walker used to
+  // draw the title on the (20,113) widget and leave the tab empty.
+  function drawWindowHeader(ctx) {
+    const mw = LAYOUT.message_window;
+    const dy = foldY();
+    drawText(ctx, modeTitle(), mw.text.xy[0], mw.text.xy[1] + dy);
+    drawText(ctx, modeLine(), mw.lines[0].xy[0], mw.lines[0].xy[1]);
+  }
 
   function drawConfirm(ctx) {
     const L = LAYOUT;
@@ -642,14 +806,15 @@ export function createSaveScreen(sfx = null) {
     // 0x10 are set somewhere other than a +0x114 site and were not traced, so
     // they keep the default box.
     const promptIdx = s.mode === "save" ? (s.record ? 7 : 6) : 16;
-    drawWindowText(ctx, modeTitle(), str[promptIdx], promptIdx);
+    drawWindowText(ctx, str[promptIdx], promptIdx);
   }
 
   function drawMessage(ctx) {
     const mw = LAYOUT.message_window;
-    drawWindowText(ctx, modeTitle(), s.message, s.messageIndex);
+    drawWindowText(ctx, s.message, s.messageIndex);
     // Footer blink arrow: cmfont clip 0x0A, CLUT row cycling 0..4 every 3
-    // ticks (F0x80087368).
+    // ticks (F0x80087368). This is the ONLY five-frame/three-tick indicator
+    // the overlay has — the "spinner" T5 hunted for does not exist.
     const a = mw.blinkArrow;
     const row = Math.floor(s.time * (60 / a.frameTicks)) % a.clutRows;
     drawClipAtPaletteRow(ctx, cmfont, a.clip, row, a.xy[0], a.xy[1]);
@@ -663,6 +828,10 @@ export function createSaveScreen(sfx = null) {
       if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { s.close(); return; }
     }
     tickFold();
+    // The slot chooser's own state machine runs every frame, before the pack
+    // check: in the original the tick and the draw are one function, so the
+    // grid keeps advancing on a frame the pack cannot paint.
+    if (s.screen === "slots") { tickGrid(); tickGridClut(); }
     // The fold-out landing is what finally drops the card, mirroring
     // F0x800836c4 clearing screen+0x5C on its fold-done poll. Only then does
     // the screen fall back to the slot list.
@@ -674,6 +843,9 @@ export function createSaveScreen(sfx = null) {
       s.closing = false;
       s.showRecordText = true;
       s.screen = "slots";
+      // Back on the chooser: the original resets the block grid and runs its
+      // entry again (F0x80084DCC's 0x1E/0x1F states), so the cards slide back in.
+      gridReset();
     }
     const scale = Math.max(1, Math.min(w / 320, h / 240));
     ctx.save();

@@ -177,10 +177,18 @@ export class EffectPlayer {
       // into the first frame; every later call overwrites only the mask-selected
       // channels at the current frame, adds `delta` to `frame`, and ends once that
       // reaches `duration`. One row per call — a delta above 1 skips rows.
+      //
+      // The DRAW lives inside that body, BEFORE the frame increment and the end test
+      // (fightstg.s .L0x800895bc-.L0x80089640: the scale gate and the registry/draw call,
+      // then `frame += delta` and `frame < duration`). So the tick on which `frame`
+      // reaches `duration` still DRAWS the row it just applied, and only the next call
+      // (state 2 -> 3) is drawless. Dropping the instance the moment the stepper reports
+      // the end loses the final authored frame of every op3 effect.
+      const preState = ins.fx.state | 0;
       const alive = stepEffectSprite(ins.fx, delta);
       ins.chans = ins.fx.chans;
       ins.t = ins.fx.frame;
-      if (alive) keep.push(ins);
+      if (alive || preState <= 1) keep.push(ins);   // state 0/1 on entry = it drew this tick
     }
     this.instances = keep;
 

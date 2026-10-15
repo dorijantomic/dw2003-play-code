@@ -112,7 +112,20 @@ export const ACTOR_IP = 0x8c;
 export const ACTOR_SIDE = 0x50;
 export const ACTOR_OUTCOME = 0x64;
 export const ACTOR_CURRENT_MOTION = 0x68;
-export const ACTOR_CURRENT_EFFECT = 0x70;
+/**
+ * The CURRENT-EFFECT word at actor+0x6c: op3's 9999 (0x270f) sentinel reads it
+ * (`lw $a0, 0x6c($s1)` at fightstg.s .L0x8008bcc0), and the standard attack setup
+ * F0x8008ee84 state 1 fills it from the tech record's +0x0e byte (.L0x8008f2fc-:
+ * `.L0x8008f320`, with the clip-5 plain-basic fallback 0x2e).
+ */
+export const ACTOR_CURRENT_EFFECT = 0x6c;
+/**
+ * The CONTACT-SOUND word at actor+0x70 — a DIFFERENT field. The op10 strike
+ * (F0x8008c454, .L0x8008c4b0 / .L0x8008c4d4: `lw $a0, 0x70($a2)`) reads it, and
+ * F0x8008ee84 writes it from the tech record's +0x0f byte (or 0x1e for a plain
+ * clip-5 basic). It is not the effect type and op3 never reads it.
+ */
+export const ACTOR_CONTACT_SOUND = 0x70;
 export const ACTOR_ANIM_OBJECT = 0x88;
 export const ACTOR_CONTACT_COUNTER = 0x90;
 export const ACTOR_STRIKE_COUNTER = 0x94;
@@ -351,11 +364,11 @@ export function op10Handler(
   if (type === 0x62) {
     const n = mem.read32(actor + ACTOR_STRIKE_COUNTER) | 0;
     const part = mem.read32(actor + ACTOR_STRIKE_TABLE + n * 4) | 0;
-    effect = (part === ACTOR_CONTACT_MODE) ? MOTION_CURRENT_SENTINEL : (mem.read32(actor + ACTOR_CURRENT_EFFECT) | 0);
+    effect = (part === ACTOR_CONTACT_MODE) ? MOTION_CURRENT_SENTINEL : (mem.read32(actor + ACTOR_CONTACT_SOUND) | 0);
     mem.write32(actor + ACTOR_STRIKE_COUNTER, (n + 1) | 0);
   } else if (type === 0x63) {
     const mode = mem.read32(actor + ACTOR_OUTCOME) | 0;
-    effect = (mode === ACTOR_CONTACT_MODE) ? MOTION_CURRENT_SENTINEL : (mem.read32(actor + ACTOR_CURRENT_EFFECT) | 0);
+    effect = (mode === ACTOR_CONTACT_MODE) ? MOTION_CURRENT_SENTINEL : (mem.read32(actor + ACTOR_CONTACT_SOUND) | 0);
     mem.write32(actor + ACTOR_STRIKE_COUNTER, ((mem.read32(actor + ACTOR_STRIKE_COUNTER) | 0) + 1) | 0);
   }
   if (mem.read32(ctx + 0x0c) === 0) {
