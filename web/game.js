@@ -524,6 +524,14 @@ installQuests({
     // the yes/no questions are the game's choice widget. Both resolve when the player is done.
     speak: (npcId, name, text) => questSpeak(npcId, name, text),
     scene: (steps) => playQuestScene(steps),
+    countItem: (name) => { const it = ITEM_BY_NAME?.[name]; return it ? heldCount(state, it.id) : 0; },
+    takeItem: (name, n) => {
+        const it = ITEM_BY_NAME?.[name];
+        if (!it) return false;
+        storeRemoveItem(state, it.id, Math.min(n, heldCount(state, it.id)));
+        localStorage.setItem("inventory", JSON.stringify(state.inventory));
+        return true;
+    },
     ownsForm: (id) => [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats : [])].some((p) => p?.formLedger?.some((f) => Number(f.id) === id)),
     ask: (prompt, options) => new Promise((resolve) => choice.open(prompt, options, resolve)),
     onDone: (title) => socialQuestDone(title),

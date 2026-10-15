@@ -35,6 +35,11 @@ const OBJECTIVES = {
     talk: { target: () => 1, valid: (o) => Number.isInteger(o.npc) && Array.isArray(o.maps) && o.maps.length > 0 && Array.isArray(o.lines) && o.lines.length > 0 },
     // walk from one gate to another in one go; any fight (or leaving the map) sends you back to the start
     // learn a form of this species (the lead or a party member has it in their ledger; read only)
+    // hand over N of an item (the giver keeps them): progress follows what the player carries, and the items are taken
+    // when the quest is claimed
+    bring: { target: (o) => Math.max(1, o.count | 0), valid: (o) => typeof o.item === "string" && (o.count | 0) >= 1 && (o.count | 0) <= 99 },
+    // the party's highest level reaches N (read only)
+    level: { target: () => 1, valid: (o) => (o.level | 0) >= 2 },
     // (a scene may also hang off any step: offer.scene, acceptScene, doneScene, or an objective's own scene)
     ownForm: { target: () => 1, valid: (o) => typeof o.species === "string" },
     reach: { target: () => 2, valid: (o) => typeof o.map === "string" && o.from && o.to && [o.from.x, o.from.y, o.from.r, o.to.x, o.to.y, o.to.r].every(Number.isFinite) },
@@ -134,8 +139,11 @@ function claim(id, viaNpc = false) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "ready") return false;
     if (turnInRef(d) && !viaNpc) return false;               // report to the character instead
+    syncCounts();
+    if (statusOf(d) !== "ready") { toast("You no longer have everything this job needs."); return false; }
     // mark done and save FIRST, so a reload can never pay the reward twice
     delete st.active[id]; st.done[id] = Date.now(); saveState();
+    for (const o of d.objectives) if (o.type === "bring") api.takeItem?.(o.item, o.count | 0);   // handed over
     const got = [];
     if (d.reward?.bits) { api.giveBits(d.reward.bits); got.push(`${d.reward.bits} BIT`); }
     for (const it of d.reward?.items ?? []) {
@@ -249,8 +257,27 @@ function scanMet(mapId) {
     }
     if (changed) { saveState(); announceUnlocks(); }
 }
+// "bring" and "level" follow the game's own state, so they are re-read whenever something may have changed
+function syncCounts() {
+    let changed = false;
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        const wasReady = isReady(id);
+        d.objectives.forEach((o, i) => {
+            let now = null;
+            if (o.type === "bring" && api?.countItem) now = Math.min(targetOf(d, i), api.countItem(o.item));
+            else if (o.type === "level" && api?.partyLevel) now = api.partyLevel() >= o.level ? 1 : 0;
+            if (now == null || (a.p[i] || 0) === now) return;
+            a.p[i] = now; changed = true;
+        });
+        if (!wasReady && isReady(id)) toast(`Quest ready: ${d.title}${turnInRef(d) ? "" : "  (F3)"}`);
+    }
+    if (changed) saveState();
+}
 // "ownForm": checked about twice a second, only while such a quest is running
 async function scanForms() {
+    syncCounts();
     if (!api?.ownsForm || !Object.keys(st.active).some((id) => defOf(id)?.objectives.some((o) => o.type === "ownForm"))) return;
     if (!speciesIds) {
         try { speciesIds = Object.fromEntries((await fetch("assets/data/digimon.json").then((r) => r.json())).digimon.map((d) => [d.name, d.id])); }
@@ -326,6 +353,7 @@ const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a
 /** Returns true when a quest took this conversation (the game then skips the character's normal line). */
 export function questTalk(npcId, mapId) {
     if (!enabled() || dialogBusy || logOpen || !mapId) return false;
+    syncCounts();                                            // what the player carries and their level right now
     // 1. a "talk" step of a running quest
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), a = st.active[id];
@@ -361,6 +389,14 @@ export function questTalk(npcId, mapId) {
                 if (d.acceptScene) await perform(d.acceptScene, d.offer.name, d.offer.acceptLines ?? [], npcId);
             } else declined.add(d.id);
         });
+        return true;
+    }
+    // 4. a job you took from this character and have not finished: they talk about it, not about the weather. The words are
+    // the quest's own (offer.remindLines); without them, the quest text and what is still to do.
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), ref = d?.offer;
+        if (!d || isReady(id) || !atNpc(ref, npcId, mapId)) continue;
+        busy(async () => { await say(ref.name, ref.remindLines ?? [`About the job: ${d.title}.`, d.text], npcId); });
         return true;
     }
     return false;
@@ -442,6 +478,9 @@ function objectiveText(d, i) {
     if (o.type === "visitSet") return `${o.label ?? `Visit ${t} different places`}  ${a ? `${p}/${t}` : `(${t} of ${o.maps.length})`}`;
     if (o.type === "duelWin") return `Win ${t} card duel${t > 1 ? "s" : ""}  ${a ? `${p}/${t}` : `x${t}`}`;
     if (o.type === "visit") return `Visit ${mapLabel(o.map)}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
+    if (o.type === "ownForm") return `${o.label ?? `Learn the ${o.species} form`}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
+    if (o.type === "bring") return `${o.label ?? `Bring ${t} ${o.item}`}  ${a ? `${p}/${t}` : `x${t}`}`;
+    if (o.type === "level") return `${o.label ?? `Reach level ${o.level}`}${a ? (p >= 1 ? "  (done)" : "") : ""}`;
     if (o.type === "reach") return `${o.label ?? `Cross ${mapLabel(o.map)} without a fight`}${a ? (p >= 2 ? "  (done)" : p === 1 ? "  (on the route - no fights!)" : "  (go to the start)") : ""}`;
     return "?";
 }
@@ -568,9 +607,9 @@ function installUi(stageEl) {
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem }) {
     if (!stageEl || api) return;
-    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm };
+    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem };
     installUi(stageEl);
     try {
         const [q, v, m] = await Promise.all([

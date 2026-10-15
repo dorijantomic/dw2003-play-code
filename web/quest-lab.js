@@ -60,25 +60,35 @@ function build() {
   const msg = $("div", { className: "msg" });
   const say = (t) => { msg.textContent = t; };
   const list = $("div");
+  const search = $("input", { type: "search", placeholder: "search title, giver, place, id..." });
+  search.style.cssText = "width:100%;box-sizing:border-box;margin:4px 0;padding:3px 6px;font:inherit";
+  const count = $("div", { className: "s" });
+  search.addEventListener("input", () => refresh());
   const refresh = () => {
     list.textContent = "";
+    const needle = search.value.trim().toLowerCase();
+    let shown = 0;
     for (const d of window.__quests.defs) {
       if (!d.offer && !d.objectives.some((o) => o.type === "talk")) continue;      // board and route jobs have no scene to see
+      if (needle && !`${d.id} ${d.title} ${d.giver ?? ""} ${d.short ?? ""} ${(d.offer?.maps ?? []).join(" ")} ${window.__quests.status(d.id)}`.toLowerCase().includes(needle)) continue;
+      if (++shown > 40) continue;                                                  // keep the panel light with hundreds of quests
       list.append($("div", { className: "q" },
         $("div", { className: "t" }, d.title),
         $("div", { className: "s" }, `${d.giver ?? ""} · ${window.__quests.status(d.id)}${d.offer?.scene || d.objectives.some((o) => o.scene) ? " · scene" : ""}`),
         $("button", { textContent: "Go", onclick: () => { go(d, say); setTimeout(refresh, 300); } }),
         $("button", { textContent: "Goals", onclick: () => { say(window.__quests.lab.finishGoals(d.id) ? "Goals met. Talk to the giver." : "Nothing to finish."); refresh(); } })));
     }
+    const total = window.__quests.defs.filter((d) => d.offer || d.objectives.some((o) => o.type === "talk")).length;
+    count.textContent = `${Math.min(shown, 40)} shown of ${shown} matching, ${total} quests with a giver`;
   };
   const head = $("h4", {}, "Quest lab",
     $("button", { textContent: "Reset quests", onclick: () => { window.__quests.lab.reset(); say("Quest progress cleared."); refresh(); } }));
-  box.append(head, msg, list);
+  box.append(head, msg, search, count, list);
   document.body.append(box);
   // keys typed into the game must not be taken by the panel
   box.addEventListener("keydown", (e) => e.stopPropagation());
   refresh();
-  setInterval(refresh, 4000);
+  setInterval(() => { if (document.activeElement !== search) refresh(); }, 4000);
   const pending = sessionStorage.getItem("questlabGo");
   if (pending) { sessionStorage.removeItem("questlabGo"); const d = window.__quests.defs.find((x) => x.id === pending); if (d) setTimeout(() => go(d, say), 800); }
 }

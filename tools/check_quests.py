@@ -143,7 +143,53 @@ for q in quests:
     if u.get("partner") and u["partner"] not in char_ids:
         errors.append(f"{qid}: unlock.partner '{u['partner']}' is not a character in the manifest")
 
+# ---- the objective types added with the large set, scenes, and wording
+species_names = {d["name"] for d in load(os.path.join(A, "data/digimon.json"))["digimon"]}
+extra_path = os.path.join(A, "data/extra_species.json")
+if os.path.exists(extra_path):
+    species_names |= {d["name"] for d in load(extra_path)["digimon"]}
+for q in quests:
+    qid = q["id"]
+    for o in q["objectives"]:
+        if o["type"] == "bring":
+            if o["item"] not in item_names:
+                errors.append(f"{qid}: bring item '{o['item']}' is not in the in-game item table")
+            if not (1 <= o.get("count", 0) <= 99):
+                errors.append(f"{qid}: bring count must be 1..99")
+        elif o["type"] == "level":
+            if not (2 <= o.get("level", 0) <= 99):
+                errors.append(f"{qid}: level objective must be 2..99")
+        elif o["type"] == "ownForm":
+            if o["species"] not in species_names:
+                errors.append(f"{qid}: ownForm species '{o['species']}' is not a known Digimon (digimon.json or extra_species.json)")
+    if q.get("offer"):
+        if not q["offer"].get("remindLines"):
+            errors.append(f"{qid}: offer has no remindLines (the giver would fall back to ordinary chat mid-quest)")
+        if not q["offer"].get("doneLines"):
+            errors.append(f"{qid}: offer has no doneLines")
+    # a scene may only move or speak as characters that stand on the giver's map (otherwise it is skipped and the plain lines are used)
+    for where, sc, home in ([("offer.scene", q["offer"].get("scene"), q["offer"]["maps"])] if q.get("offer") else []) + \
+            ([("doneScene", q.get("doneScene"), q["offer"]["maps"])] if q.get("offer") else []) + \
+            [(f"objective {i + 1} scene", o.get("scene"), o.get("maps", [])) for i, o in enumerate(q["objectives"])]:
+        if not sc:
+            continue
+        cast = set()
+        for st in sc:
+            for k in ("walk", "arrive", "face", "put", "look", "say", "together", "apart"):
+                if isinstance(st.get(k), int):
+                    cast.add(st[k])
+        for npc in cast:
+            if not any((m, npc) in scene_npcs for m in home):
+                errors.append(f"{qid}: {where} uses npc {npc}, who does not stand on {home}")
+    r = q.get("reward", {})
+    if r.get("bits", 0) > 20000:
+        errors.append(f"{qid}: reward of {r['bits']} bits is not sane")
+
 known_flags = {r["flag"] for r in load(os.path.join(A, "data/chapter_progression.json"))["ladder"]}
+for q in quests:
+    fl = q.get("unlock", {}).get("flag")
+    if fl is not None and fl not in known_flags:
+        errors.append(f"{q['id']}: unlock.flag {fl} is not one of the decoded story-beat flags {sorted(known_flags)}")
 for q in quests:
     r = q.get("requires", {}).get("done")
     if r and r not in ids:
