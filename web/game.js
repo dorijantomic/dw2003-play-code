@@ -2183,6 +2183,7 @@ const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResolver, {
     },
 });
 window.__cutscene = cutscene;
+let extraResidents = [];   // where the extra quests' own characters stand (see extra_npcs.json)
 
 /**
  * Open an NPC talk line. estalkNN refs go to the translated box (raw pack, line = index, the NPC's
@@ -2366,6 +2367,23 @@ async function init() {
     } catch {
         /* fall back to empty (resolvers degrade gracefully) */
     }
+    // New characters the extra quests add (tools/make_quest_sprites.py): their drawn sprites join the game's own tables, and
+    // "residents" are where they stand. Optional: without the file the game is exactly as before.
+    extraResidents = [];
+    try {
+        const ex = await fetch("extra_npcs.json");
+        if (ex.ok) {
+            const x = await ex.json();
+            for (const rec of x.npcs ?? []) {
+                state.manifest.npcs.push(rec);
+                manifestSprites.set(rec.id, { record: rec, kind: "npc" });
+            }
+            Object.assign(state.npcSprites, x.npc_sprites ?? {});
+            extraResidents = x.residents ?? [];
+        }
+    } catch {
+        /* no extra characters */
+    }
     // Real screen→map table (data/screen_table.json) for HANDOFF routing. Tolerate 404.
     try {
         const st = await fetch("assets/data/screen_table.json");
@@ -2414,6 +2432,11 @@ async function init() {
             // record that somehow has no dir at all.
             for (const npc of scene.npcs) {
                 if (!npc.dir) npc.dir = "down-left";
+            }
+            for (const r of extraResidents) {
+                if (r.map === m.id && state.npcSprites[r.npc_id]) {
+                    scene.npcs.push({ id: "res_" + r.npc_id, npc_id: r.npc_id, sprite: state.npcSprites[r.npc_id], x: r.x, y: r.y, dir: r.dir || "down", _quest: true });
+                }
             }
             state.scenes[m.id] = scene;
         } catch {

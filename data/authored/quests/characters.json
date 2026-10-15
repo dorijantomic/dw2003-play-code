@@ -190,6 +190,21 @@
       "name": "Lookout Boy",
       "look": "small boy in a white shirt watching the sea",
       "voice": "serious little lookout; reports like a sentry; dreams of ships"
+    },
+    "1001": {
+      "name": "Moss",
+      "look": "tired young player in a grey hoodie with red headphones around the neck",
+      "voice": "flat and dry, long-shift humour; says small true things quietly; never complains out loud"
+    },
+    "1002": {
+      "name": "Maintenance Tech",
+      "look": "MAGAMI maintenance tech in a blue cap and light blue coveralls, glasses",
+      "voice": "harried and exact; speaks in ticket numbers and apologies; secretly delighted by a good bug"
+    },
+    "1003": {
+      "name": "Runner",
+      "look": "kid in a red cap, yellow scarf and a green pack",
+      "voice": "quick and cagey; talks in half-hints, enjoys being mysterious, drops it when thanked"
     }
   },
   "_threads": {

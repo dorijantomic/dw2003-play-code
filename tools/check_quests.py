@@ -110,6 +110,10 @@ for f in glob.glob(os.path.join(A, "scenes", "*.json")):
     for n in load(f).get("npcs", []):
         if n.get("x") or n.get("y"):
             scene_npcs.setdefault((sid, n.get("npc_id")), set()).add((n["x"], n["y"]))
+_extra = os.path.join(os.path.dirname(A), "extra_npcs.json")
+if os.path.exists(_extra):                         # the quests' own characters stand where extra_npcs.json says
+    for r in load(_extra).get("residents", []):
+        scene_npcs.setdefault((r["map"], r["npc_id"]), set()).add((r["x"], r["y"]))
 char_ids = {c["id"] for c in load(os.path.join(A, "manifest.json")).get("characters", [])}
 
 def check_npc(qid, what, ref):

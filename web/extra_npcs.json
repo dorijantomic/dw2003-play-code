@@ -1,0 +1,461 @@
+{
+ "npcs": [
+  {
+   "id": "q1001",
+   "name": "Moss",
+   "sheet": "extra_sprites/q1001.png",
+   "frameW": 24,
+   "frameH": 48,
+   "rows": [
+    "down",
+    "down-left",
+    "left",
+    "right",
+    "up-left",
+    "up",
+    "down-right",
+    "up-right"
+   ],
+   "frameCounts": {
+    "down": 5,
+    "down-left": 5,
+    "left": 5,
+    "right": 5,
+    "up-left": 5,
+    "up": 5,
+    "down-right": 5,
+    "up-right": 5
+   },
+   "frameDurations": {
+    "down": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ]
+   },
+   "frameBottomShift": {
+    "down": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ]
+   }
+  },
+  {
+   "id": "q1002",
+   "name": "Maintenance Tech",
+   "sheet": "extra_sprites/q1002.png",
+   "frameW": 24,
+   "frameH": 48,
+   "rows": [
+    "down",
+    "down-left",
+    "left",
+    "right",
+    "up-left",
+    "up",
+    "down-right",
+    "up-right"
+   ],
+   "frameCounts": {
+    "down": 5,
+    "down-left": 5,
+    "left": 5,
+    "right": 5,
+    "up-left": 5,
+    "up": 5,
+    "down-right": 5,
+    "up-right": 5
+   },
+   "frameDurations": {
+    "down": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ]
+   },
+   "frameBottomShift": {
+    "down": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ]
+   }
+  },
+  {
+   "id": "q1003",
+   "name": "Runner",
+   "sheet": "extra_sprites/q1003.png",
+   "frameW": 24,
+   "frameH": 48,
+   "rows": [
+    "down",
+    "down-left",
+    "left",
+    "right",
+    "up-left",
+    "up",
+    "down-right",
+    "up-right"
+   ],
+   "frameCounts": {
+    "down": 5,
+    "down-left": 5,
+    "left": 5,
+    "right": 5,
+    "up-left": 5,
+    "up": 5,
+    "down-right": 5,
+    "up-right": 5
+   },
+   "frameDurations": {
+    "down": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-left": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "down-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ],
+    "up-right": [
+     12,
+     9,
+     12,
+     9,
+     12
+    ]
+   },
+   "frameBottomShift": {
+    "down": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-left": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "down-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ],
+    "up-right": [
+     4,
+     4,
+     4,
+     4,
+     4
+    ]
+   }
+  }
+ ],
+ "npc_sprites": {
+  "1001": "q1001",
+  "1002": "q1002",
+  "1003": "q1003"
+ },
+ "residents": [
+  {
+   "npc_id": 1001,
+   "map": "s202",
+   "x": 656,
+   "y": 312,
+   "dir": "down-left"
+  },
+  {
+   "npc_id": 1002,
+   "map": "s212",
+   "x": 448,
+   "y": 336,
+   "dir": "down"
+  },
+  {
+   "npc_id": 1003,
+   "map": "s330",
+   "x": 856,
+   "y": 432,
+   "dir": "down-left"
+  }
+ ]
+}

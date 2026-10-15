@@ -51,10 +51,15 @@ def group(m):
     return _GROUP.get(canon(m), [canon(m)])
 
 
+_EXTRA = os.path.join(WEB, "extra_npcs.json")
+_RESIDENTS = json.load(open(_EXTRA, encoding="utf-8")).get("residents", []) if os.path.exists(_EXTRA) else []
+
+
 def _npcs_on(m):
     if m not in _scenes:
         p = os.path.join(A, "scenes", f"{m}.json")
         _scenes[m] = {n["npc_id"] for n in json.load(open(p, encoding="utf-8")).get("npcs", []) if (n.get("x") or n.get("y")) and not n.get("cutsceneOnly")} if os.path.exists(p) else set()
+        _scenes[m] |= {r["npc_id"] for r in _RESIDENTS if r["map"] == m}      # the quests' own characters (tools/make_quest_sprites.py)
     return _scenes[m]
 
 
@@ -201,7 +206,8 @@ def _short(title):
 
 # ------------------------------------------------------------------ the quest
 def quest(id, title, who, place, text, goal, pay, offer, remind, done, ask="Take the job?", options=("I will do it", "Not now"),
-          lvl=None, after=None, short=None, flag=None, seen=None, ordered=False, plain=False):
+          lvl=None, after=None, short=None, flag=None, seen=None, ordered=False, plain=False,
+          verdict=None):
     """One quest handed out by character `who` standing in `place` (a map id; its night/story variants are found automatically).
 
     offer  the lines the giver says; the last one is the question
@@ -210,6 +216,9 @@ def quest(id, title, who, place, text, goal, pay, offer, remind, done, ask="Take
     lvl    the party must have reached this level; after: another quest id that must be done first
     seen   place ids of which the player must have visited any one; flag: a read-only story flag (see the bible)
     plain  say the lines in place, no walking scene
+    verdict  a choice made when the job is handed in: {"ask": "question", "options": [a, b], "pay": [pay(..), pay(..)],
+             "after": [[lines said after choice a], [lines after choice b]]}; the pay replaces `pay` (which then only
+             needs to be what both give), and nothing here ever touches a story flag
     """
     name = name_of(who)
     maps = maps_for(who, place)
@@ -253,6 +262,18 @@ def quest(id, title, who, place, text, goal, pay, offer, remind, done, ask="Take
         q["requires"] = {"done": after}
     if ordered:
         q["ordered"] = True
+    if verdict:
+        opts = verdict["options"]
+        if not (len(opts) == len(verdict["pay"]) == len(verdict["after"]) >= 2):
+            problem(f"{id}: verdict needs the same number (2 or more) of options, pays and after-lines")
+        for ls in verdict["after"]:
+            for l in ls:
+                lint(id, "verdict line", l)
+        for o in opts:
+            lint(id, "verdict option", o)
+            if len(o) > 28:
+                problem(f"{id}: verdict option {o!r} is over 28 characters")
+        q["verdict"] = {"ask": verdict["ask"], "options": list(opts), "pay": verdict["pay"], "after": verdict["after"]}
     if not plain:
         sc = scene(who, offer, ask=ask, options=options)
         if sc:

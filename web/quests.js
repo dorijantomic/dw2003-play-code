@@ -137,7 +137,7 @@ function accept(id, viaNpc = false) {
     return true;
 }
 
-function claim(id, viaNpc = false) {
+function claim(id, viaNpc = false, pick = null) {
     const d = defOf(id);
     if (!enabled() || !d || statusOf(d) !== "ready") return false;
     if (turnInRef(d) && !viaNpc) return false;               // report to the character instead
@@ -147,10 +147,14 @@ function claim(id, viaNpc = false) {
     delete st.active[id]; st.done[id] = Date.now(); saveState();
     for (const o of d.objectives) if (o.type === "bring") api.takeItem?.(o.item, o.count | 0);   // handed over
     const got = [];
-    if (d.reward?.bits) { api.giveBits(d.reward.bits); got.push(`${d.reward.bits} BIT`); }
-    for (const it of d.reward?.items ?? []) {
-        if (api.giveItem(it.name, it.count ?? 1)) got.push(`${it.count ?? 1} x ${it.name}`);
-        else console.warn(`[quests] reward item "${it.name}" is not in the game's item table; skipped`);
+    const extra = pick != null ? d.verdict?.pay?.[pick] : null;           // what the choice made at the hand-in adds
+    const pays = [d.reward ?? {}, extra ?? {}];
+    for (const rw of pays) {
+        if (rw.bits) { api.giveBits(rw.bits); got.push(`${rw.bits} BIT`); }
+        for (const it of rw.items ?? []) {
+            if (api.giveItem(it.name, it.count ?? 1)) got.push(`${it.count ?? 1} x ${it.name}`);
+            else console.warn(`[quests] reward item "${it.name}" is not in the game's item table; skipped`);
+        }
     }
     toast(`Quest complete: ${d.title}${got.length ? "  (" + got.join(", ") + ")" : ""}`);
     try { api.onDone?.(d.title); } catch { /* a listener must never break the reward */ }
@@ -378,7 +382,13 @@ export function questTalk(npcId, mapId, hasChat = false) {
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), ref = d && turnInRef(d);
         if (!d || !isReady(id) || !atNpc(ref, npcId, mapId)) continue;
-        busy(async () => { await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId); claim(id, true); });
+        busy(async () => {
+            const r = await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId);
+            let pick = null;
+            if (d.verdict) pick = r.answer ?? await ask(d.verdict.ask, d.verdict.options);
+            claim(id, true, pick);
+            if (pick != null && d.verdict.after?.[pick]?.length) await say(ref.name, d.verdict.after[pick], npcId);
+        });
         return true;
     }
     // Offers and reminders never replace what a character normally says (it may be a hint the player needs): the first

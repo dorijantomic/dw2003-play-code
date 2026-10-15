@@ -3186,6 +3186,1171 @@
       ]
     },
     {
+      "id": "f_moss_long_shift",
+      "title": "The Long Shift",
+      "giver": "Moss",
+      "short": "The Long Shift",
+      "text": "Moss has been logged in for longer than he can say, and cannot send his little sister even one line. Ask around whether anything can get out.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 53,
+          "name": "Office Worker",
+          "maps": [
+            "s212"
+          ],
+          "lines": [
+            "A message to the other side? You are the third person today. No. Since the error, nothing leaves the servers.",
+            "I have a pile of tickets about it taller than I am. Nobody out there can read us and we cannot write to them.",
+            "If you must send something, tell the Old Woman. She says saying a thing out loud does something. I have not checked."
+          ],
+          "scene": [
+            {
+              "walk": 53,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 53
+            },
+            {
+              "say": 53,
+              "name": "Office Worker",
+              "text": "A message to the other side? You are the third person today. No. Since the error, nothing leaves the servers."
+            },
+            {
+              "together": 53,
+              "dist": 130
+            },
+            {
+              "say": 53,
+              "name": "Office Worker",
+              "text": "I have a pile of tickets about it taller than I am. Nobody out there can read us and we cannot write to them."
+            },
+            {
+              "say": 53,
+              "name": "Office Worker",
+              "text": "If you must send something, tell the Old Woman. She says saying a thing out loud does something. I have not checked."
+            },
+            {
+              "apart": 53
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 53,
+              "to": "origin"
+            },
+            {
+              "arrive": 53
+            }
+          ],
+          "label": "Ask the Office Worker"
+        },
+        {
+          "type": "talk",
+          "npc": 58,
+          "name": "Old Woman",
+          "maps": [
+            "s202"
+          ],
+          "lines": [
+            "Something for the other side? Sit down, dear. I say one every day since this started.",
+            "It never arrives, of course. But a thing said to someone who listens is already half delivered.",
+            "Tell the boy he does not have to send it. He has to say it. I will remember every word, and so will you."
+          ],
+          "scene": [
+            {
+              "walk": 58,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 58
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "Something for the other side? Sit down, dear. I say one every day since this started."
+            },
+            {
+              "together": 58,
+              "dist": 130
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "It never arrives, of course. But a thing said to someone who listens is already half delivered."
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "Tell the boy he does not have to send it. He has to say it. I will remember every word, and so will you."
+            },
+            {
+              "apart": 58
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 58,
+              "to": "origin"
+            },
+            {
+              "arrive": 58
+            }
+          ],
+          "label": "Ask the Old Woman"
+        }
+      ],
+      "reward": {
+        "bits": 100
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1001,
+            "map": "s202"
+          },
+          {
+            "npc": 53,
+            "map": "s212"
+          },
+          {
+            "npc": 58,
+            "map": "s202"
+          }
+        ],
+        "level": 1
+      },
+      "offer": {
+        "npc": 1001,
+        "name": "Moss",
+        "maps": [
+          "s202"
+        ],
+        "lines": [
+          "Hey. Do you know what day it is? Me neither. I logged in for an hour and that was a long time ago.",
+          "My little sister is eight. She will not go to bed until I say goodnight, and I cannot even send her a line.",
+          "Could you ask around if anyone can get a message out? Start with the Office Worker in the main lobby. He knows the rules."
+        ],
+        "doneLines": [
+          "You are back. Be honest with me, I can take it. Is there a way?"
+        ],
+        "remindLines": [
+          "Any news? I keep watching the gate. Nothing goes through it, as far as I can tell.",
+          "The Office Worker is in the main lobby. And the Old Woman is around here somewhere. She always knows something."
+        ],
+        "ask": "Will you ask for me?",
+        "scene": [
+          {
+            "walk": 1001,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1001
+          },
+          {
+            "say": 1001,
+            "name": "Moss",
+            "text": "Hey. Do you know what day it is? Me neither. I logged in for an hour and that was a long time ago."
+          },
+          {
+            "together": 1001,
+            "dist": 130
+          },
+          {
+            "say": 1001,
+            "name": "Moss",
+            "text": "My little sister is eight. She will not go to bed until I say goodnight, and I cannot even send her a line."
+          },
+          {
+            "say": 1001,
+            "name": "Moss",
+            "text": "Could you ask around if anyone can get a message out? Start with the Office Worker in the main lobby. He knows the rules."
+          },
+          {
+            "ask": "Will you ask for me?",
+            "options": [
+              "Yes, I will ask",
+              "Not right now"
+            ]
+          },
+          {
+            "apart": 1001
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1001,
+            "to": "origin"
+          },
+          {
+            "arrive": 1001
+          }
+        ]
+      },
+      "ordered": true,
+      "verdict": {
+        "ask": "What do you tell him?",
+        "options": [
+          "The truth, plainly",
+          "That it was sent"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Energy Disk",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "bits": 150
+          }
+        ],
+        "after": [
+          [
+            "Right. So nothing leaves. I sort of knew.",
+            "But the Old Woman is right. I do not have to send it. I have to say it. Goodnight, Ellie. See you when the doors open.",
+            "Thanks for not lying to me. Everyone else just says it will be fine."
+          ],
+          [
+            "Sent. Okay. Good.",
+            "She will be asleep by now. She is the kind of kid who sleeps once someone tells her it is fine.",
+            "Thanks. I mean it. I think I can finally sit down."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1001,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1001
+        },
+        {
+          "say": 1001,
+          "name": "Moss",
+          "text": "You are back. Be honest with me, I can take it. Is there a way?"
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1001,
+          "to": "origin"
+        },
+        {
+          "arrive": 1001
+        }
+      ]
+    },
+    {
+      "id": "f_tech_ticket_4411",
+      "title": "Ticket 4411",
+      "giver": "Maintenance Tech",
+      "short": "Ticket 4411",
+      "text": "A Maintenance Tech has a bug report: the Pink-haired Girl is standing in two places at once. Ask her in both and report what she says.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 178,
+          "name": "Pink-haired Girl",
+          "maps": [
+            "s202"
+          ],
+          "lines": [
+            "Hi! Oh, a clipboard. Is that for me? I have been right here all afternoon. I have not moved. Not once.",
+            "Well, I did get a snack. But that was in here too. This whole place is basically here."
+          ],
+          "scene": [
+            {
+              "walk": 178,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 178
+            },
+            {
+              "say": 178,
+              "name": "Pink-haired Girl",
+              "text": "Hi! Oh, a clipboard. Is that for me? I have been right here all afternoon. I have not moved. Not once."
+            },
+            {
+              "together": 178,
+              "dist": 130
+            },
+            {
+              "say": 178,
+              "name": "Pink-haired Girl",
+              "text": "Well, I did get a snack. But that was in here too. This whole place is basically here."
+            },
+            {
+              "apart": 178
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 178,
+              "to": "origin"
+            },
+            {
+              "arrive": 178
+            }
+          ],
+          "label": "Ask her in the outer city"
+        },
+        {
+          "type": "talk",
+          "npc": 178,
+          "name": "Pink-haired Girl",
+          "maps": [
+            "s200"
+          ],
+          "lines": [
+            "Hi! Are you following me? Because I was just over by the east side, and then I was here. That is very fast of me!",
+            "I have been standing here all afternoon. Do not write that down. Wait, are you writing that down?"
+          ],
+          "scene": [
+            {
+              "walk": 178,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 178
+            },
+            {
+              "say": 178,
+              "name": "Pink-haired Girl",
+              "text": "Hi! Are you following me? Because I was just over by the east side, and then I was here. That is very fast of me!"
+            },
+            {
+              "together": 178,
+              "dist": 130
+            },
+            {
+              "say": 178,
+              "name": "Pink-haired Girl",
+              "text": "I have been standing here all afternoon. Do not write that down. Wait, are you writing that down?"
+            },
+            {
+              "apart": 178
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 178,
+              "to": "origin"
+            },
+            {
+              "arrive": 178
+            }
+          ],
+          "label": "Ask her at the old gate"
+        }
+      ],
+      "reward": {
+        "bits": 120
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1002,
+            "map": "s212"
+          },
+          {
+            "npc": 178,
+            "map": "s202"
+          },
+          {
+            "npc": 178,
+            "map": "s200"
+          }
+        ],
+        "level": 1
+      },
+      "offer": {
+        "npc": 1002,
+        "name": "Maintenance Tech",
+        "maps": [
+          "s212"
+        ],
+        "lines": [
+          "Hello. I am so sorry to bother you. I have forty open tickets and this one is the only one that makes me laugh.",
+          "Ticket 4411. A Pink-haired Girl is reported standing in two places at once. Two. At the same time.",
+          "Could you ask her in both places what she was doing? I cannot leave the desk. I have forty tickets."
+        ],
+        "doneLines": [
+          "Let me see the notes. Both times she says she has not moved? And both times she has a snack?",
+          "Oh, this is wonderful. I do not know what it is yet."
+        ],
+        "remindLines": [
+          "Two places, same afternoon. Ask her what she says each time. Word for word if you can.",
+          "I am hoping it is a copy bug. I am secretly hoping it is not."
+        ],
+        "ask": "Take the ticket?",
+        "scene": [
+          {
+            "walk": 1002,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1002
+          },
+          {
+            "say": 1002,
+            "name": "Maintenance Tech",
+            "text": "Hello. I am so sorry to bother you. I have forty open tickets and this one is the only one that makes me laugh."
+          },
+          {
+            "together": 1002,
+            "dist": 130
+          },
+          {
+            "say": 1002,
+            "name": "Maintenance Tech",
+            "text": "Ticket 4411. A Pink-haired Girl is reported standing in two places at once. Two. At the same time."
+          },
+          {
+            "say": 1002,
+            "name": "Maintenance Tech",
+            "text": "Could you ask her in both places what she was doing? I cannot leave the desk. I have forty tickets."
+          },
+          {
+            "ask": "Take the ticket?",
+            "options": [
+              "I will look",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 1002
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1002,
+            "to": "origin"
+          },
+          {
+            "arrive": 1002
+          }
+        ]
+      },
+      "verdict": {
+        "ask": "How do I file it?",
+        "options": [
+          "A bug",
+          "A feature"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "HP Chip",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "MP Chip",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "A bug. Right. Closed, with a note: duplicate suspected, cause unknown.",
+            "Thank you. I will tell nobody that I hoped it was the other thing."
+          ],
+          [
+            "A feature! I love it. I will file it as Working As Intended.",
+            "Then she is meant to be in two places at once. Honestly, that explains a lot about this afternoon."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1002,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1002
+        },
+        {
+          "say": 1002,
+          "name": "Maintenance Tech",
+          "text": "Let me see the notes. Both times she says she has not moved? And both times she has a snack?"
+        },
+        {
+          "say": 1002,
+          "name": "Maintenance Tech",
+          "text": "Oh, this is wonderful. I do not know what it is yet."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1002,
+          "to": "origin"
+        },
+        {
+          "arrive": 1002
+        }
+      ]
+    },
+    {
+      "id": "f_runner_dead_drop",
+      "title": "Dead Drop",
+      "giver": "Runner",
+      "short": "Dead Drop",
+      "text": "The Runner wants a message carried past three places before sundown, and wants nobody following you. Stand at each place, and deal with whoever follows.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "maps": [
+            "s335",
+            "s340",
+            "s345"
+          ],
+          "count": 3,
+          "label": "Stand at all three places"
+        },
+        {
+          "type": "challenge",
+          "screens": [
+            38
+          ],
+          "startAt": [
+            "s340",
+            "s341"
+          ],
+          "label": "Shake off the tail at Shell Beach",
+          "scale": 20
+        }
+      ],
+      "reward": {
+        "bits": 300,
+        "items": [
+          {
+            "name": "HP Chip",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1003,
+            "map": "s330"
+          }
+        ],
+        "level": 2
+      },
+      "offer": {
+        "npc": 1003,
+        "name": "Runner",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Do not look at me. Look at the trees. I am not here.",
+          "A message has to cross three places before sundown. I cannot carry it. Somebody is following me, and they are not very good at it.",
+          "Wire Forest gate. Shell Beach. Plug Cape. Stand at each long enough to look suspicious. Then come back and tell me nothing."
+        ],
+        "doneLines": [
+          "You are back. And everyone who left behind you stayed behind you. Good.",
+          "The message was empty. I wanted to see who would follow the route. Nobody did, apart from one little pest. You dealt with it.",
+          "Here, take this. Lucky Mouse says thank you. He never says thank you. Do not tell him I told you."
+        ],
+        "remindLines": [
+          "Three places. If someone follows you, do not look. Fight them, but do not look.",
+          "I am not here. You have not seen me."
+        ],
+        "ask": "Carry the message?",
+        "scene": [
+          {
+            "walk": 1003,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1003
+          },
+          {
+            "say": 1003,
+            "name": "Runner",
+            "text": "Do not look at me. Look at the trees. I am not here."
+          },
+          {
+            "together": 1003,
+            "dist": 130
+          },
+          {
+            "say": 1003,
+            "name": "Runner",
+            "text": "A message has to cross three places before sundown. I cannot carry it. Somebody is following me, and they are not very good at it."
+          },
+          {
+            "say": 1003,
+            "name": "Runner",
+            "text": "Wire Forest gate. Shell Beach. Plug Cape. Stand at each long enough to look suspicious. Then come back and tell me nothing."
+          },
+          {
+            "ask": "Carry the message?",
+            "options": [
+              "Fine, I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 1003
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1003,
+            "to": "origin"
+          },
+          {
+            "arrive": 1003
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 1003,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1003
+        },
+        {
+          "say": 1003,
+          "name": "Runner",
+          "text": "You are back. And everyone who left behind you stayed behind you. Good."
+        },
+        {
+          "say": 1003,
+          "name": "Runner",
+          "text": "The message was empty. I wanted to see who would follow the route. Nobody did, apart from one little pest. You dealt with it."
+        },
+        {
+          "say": 1003,
+          "name": "Runner",
+          "text": "Here, take this. Lucky Mouse says thank you. He never says thank you. Do not tell him I told you."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1003,
+          "to": "origin"
+        },
+        {
+          "arrive": 1003
+        }
+      ]
+    },
+    {
+      "id": "f_digimon_surprise",
+      "title": "The Same Surprise",
+      "giver": "Agumon",
+      "short": "Same Surprise",
+      "text": "Agumon is planning a surprise for Patamon and needs it kept secret. Find out what Patamon is up to, and bring Energy Disks for the party.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 371,
+          "name": "Patamon",
+          "maps": [
+            "s200"
+          ],
+          "lines": [
+            "Oh. Hello. Um. Could you do me a favour? Could you keep Agumon busy for a bit?",
+            "It is for tomorrow. It is a secret. It is his day, the day he came online. I want to give him a surprise.",
+            "I do not know how to bake. Is there any sort of party food in this world? Thank you. Thank you twice."
+          ],
+          "scene": [
+            {
+              "walk": 371,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 371
+            },
+            {
+              "say": 371,
+              "name": "Patamon",
+              "text": "Oh. Hello. Um. Could you do me a favour? Could you keep Agumon busy for a bit?"
+            },
+            {
+              "together": 371,
+              "dist": 130
+            },
+            {
+              "say": 371,
+              "name": "Patamon",
+              "text": "It is for tomorrow. It is a secret. It is his day, the day he came online. I want to give him a surprise."
+            },
+            {
+              "say": 371,
+              "name": "Patamon",
+              "text": "I do not know how to bake. Is there any sort of party food in this world? Thank you. Thank you twice."
+            },
+            {
+              "apart": 371
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 371,
+              "to": "origin"
+            },
+            {
+              "arrive": 371
+            }
+          ],
+          "label": "Ask Patamon what he is up to"
+        },
+        {
+          "type": "bring",
+          "item": "Energy Disk",
+          "count": 2,
+          "label": "Bring two Energy Disks"
+        }
+      ],
+      "reward": {
+        "bits": 150
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 365,
+            "map": "s200"
+          },
+          {
+            "npc": 371,
+            "map": "s200"
+          }
+        ],
+        "level": 3
+      },
+      "offer": {
+        "npc": 365,
+        "name": "Agumon",
+        "maps": [
+          "s200"
+        ],
+        "lines": [
+          "Psst. Hey. Hey! Tomorrow is Patamon's day! The day he came online! He does not know I know!",
+          "I want to throw him a surprise, but I cannot bake, and I cannot hide things, and I am not good at secrets.",
+          "Could you check what Patamon is doing so he does not suspect? And could we find some party food?"
+        ],
+        "doneLines": [
+          "Two Energy Disks! This is the best party food ever. I think.",
+          "Wait. Why was Patamon so nervous when I walked past just now? He kept hiding something behind his wing."
+        ],
+        "remindLines": [
+          "Did you check on Patamon? Is he suspicious? He always knows when I am up to something.",
+          "And food! We need food! Disks are the closest thing we have to cake."
+        ],
+        "ask": "Help Agumon?",
+        "scene": [
+          {
+            "walk": 365,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 365
+          },
+          {
+            "say": 365,
+            "name": "Agumon",
+            "text": "Psst. Hey. Hey! Tomorrow is Patamon's day! The day he came online! He does not know I know!"
+          },
+          {
+            "together": 365,
+            "dist": 130
+          },
+          {
+            "say": 365,
+            "name": "Agumon",
+            "text": "I want to throw him a surprise, but I cannot bake, and I cannot hide things, and I am not good at secrets."
+          },
+          {
+            "say": 365,
+            "name": "Agumon",
+            "text": "Could you check what Patamon is doing so he does not suspect? And could we find some party food?"
+          },
+          {
+            "ask": "Help Agumon?",
+            "options": [
+              "Of course",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 365
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 365,
+            "to": "origin"
+          },
+          {
+            "arrive": 365
+          }
+        ]
+      },
+      "ordered": true,
+      "verdict": {
+        "ask": "What do you say to Agumon?",
+        "options": [
+          "Suggest one party",
+          "Keep both secrets"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Antidote Disk",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "bits": 200
+          }
+        ],
+        "after": [
+          [
+            "Wait. Patamon is planning one too? For ME?",
+            "Then let us not hide. Let us have one party for both of us. That is much easier, and the food is already here.",
+            "I feel a bit silly. Also a bit very happy. Thank you."
+          ],
+          [
+            "You are keeping something from me, aren't you. I can tell. Your face is doing a thing.",
+            "Fine. Fine! I will pretend I did not notice. Tomorrow I am going to act so surprised. You have no idea."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 365,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 365
+        },
+        {
+          "say": 365,
+          "name": "Agumon",
+          "text": "Two Energy Disks! This is the best party food ever. I think."
+        },
+        {
+          "say": 365,
+          "name": "Agumon",
+          "text": "Wait. Why was Patamon so nervous when I walked past just now? He kept hiding something behind his wing."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 365,
+          "to": "origin"
+        },
+        {
+          "arrive": 365
+        }
+      ]
+    },
+    {
+      "id": "f_two_sides_bridge",
+      "title": "Two Sides of One Bridge",
+      "giver": "Yellow Coat",
+      "short": "Two Bridges",
+      "text": "Keith and Nick met on a bridge every day until a second server split them onto two copies of it. Take Keith's message across, and win two card duels for Nick.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 103,
+          "name": "Black Hat",
+          "maps": [
+            "s206"
+          ],
+          "lines": [
+            "Keith sent you. Of course he did. Tell him I am busy. Tell him I am very, very busy.",
+            "Fine. The truth. I have lost four duels in a row and I did not want him to see. That is all it is.",
+            "Before I answer him, I need proof the cards are still worth it. Win two duels. If a stranger can do it, so can I."
+          ],
+          "scene": [
+            {
+              "walk": 103,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 103
+            },
+            {
+              "say": 103,
+              "name": "Black Hat",
+              "text": "Keith sent you. Of course he did. Tell him I am busy. Tell him I am very, very busy."
+            },
+            {
+              "together": 103,
+              "dist": 130
+            },
+            {
+              "say": 103,
+              "name": "Black Hat",
+              "text": "Fine. The truth. I have lost four duels in a row and I did not want him to see. That is all it is."
+            },
+            {
+              "say": 103,
+              "name": "Black Hat",
+              "text": "Before I answer him, I need proof the cards are still worth it. Win two duels. If a stranger can do it, so can I."
+            },
+            {
+              "apart": 103
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 103,
+              "to": "origin"
+            },
+            {
+              "arrive": 103
+            }
+          ],
+          "label": "Take the message to Nick"
+        },
+        {
+          "type": "duelWin",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "bits": 500
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 102,
+            "map": "s205"
+          },
+          {
+            "npc": 103,
+            "map": "s206"
+          }
+        ],
+        "level": 38,
+        "visited": [
+          "s206"
+        ]
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s205"
+        ],
+        "lines": [
+          "Nick. The Black Hat. You know him? Of course you do.",
+          "We stood on this bridge every day. Then the second server opened and he was on the other side. Same bridge. Different world.",
+          "Go across. Ask if he still owes me a rematch. Do not say I asked nicely."
+        ],
+        "doneLines": [
+          "You crossed over. And?",
+          "Tell me what he said. Do not make it soft."
+        ],
+        "remindLines": [
+          "Did you reach him? What did he say? Short version.",
+          "Never mind. Finish the job first."
+        ],
+        "ask": "Carry the message?",
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Nick. The Black Hat. You know him? Of course you do."
+          },
+          {
+            "together": 102,
+            "dist": 130
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "We stood on this bridge every day. Then the second server opened and he was on the other side. Same bridge. Different world."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Go across. Ask if he still owes me a rematch. Do not say I asked nicely."
+          },
+          {
+            "ask": "Carry the message?",
+            "options": [
+              "I will carry it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 102
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "ordered": true,
+      "verdict": {
+        "ask": "What do you tell Keith?",
+        "options": [
+          "Everything Nick said",
+          "That Nick is just busy"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Charisma Ring",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "Wisdom Ring",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "Four. In a row. Ha.",
+            "That is the first honest thing he has said since the servers split. Tell him to come over. I will go easy on him.",
+            "Maybe. A little."
+          ],
+          [
+            "Busy. Sure.",
+            "He is a bad liar, that one. I will wait on the bridge. It is the only place I know where he can find me.",
+            "Thank you. For the soft version. Do not tell him I said that."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "You crossed over. And?"
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Tell me what he said. Do not make it soft."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
       "id": "w_yellowcoat_last",
       "title": "A word for the winner",
       "giver": "Yellow Coat",

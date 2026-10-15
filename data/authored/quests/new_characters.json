@@ -1,0 +1,20 @@
+{
+  "_comment": "The characters the extra quests add (npc_id 1000 and up; below that are the game's own). tools/make_quest_sprites.py draws each from `look`, or takes a finished 120x384 `sheet`, and writes web/extra_npcs.json. `residents` say where they stand: map id and the pixel position of their feet (checked walkable). Their words and voices live in characters.json.",
+  "characters": [
+    {
+      "npc_id": 1001, "name": "Moss",
+      "look": {"skin": "#e8bd98", "hair": "#3a2a22", "hairstyle": "short", "top": "#7a808c", "bottom": "#2c3040", "shoes": "#d8d8d8", "headphones": "#d8503c", "accent": "#aab0bc"},
+      "residents": [{"map": "s202", "x": 656, "y": 312, "dir": "down-left"}]
+    },
+    {
+      "npc_id": 1002, "name": "Maintenance Tech",
+      "look": {"skin": "#d9a67c", "hair": "#222222", "hairstyle": "short", "hat": "#2f6fb5", "top": "#7fb0da", "bottom": "#4a6e96", "shoes": "#555566", "accent": "#f4c542", "glasses": "#334455"},
+      "residents": [{"map": "s212", "x": 448, "y": 336, "dir": "down"}]
+    },
+    {
+      "npc_id": 1003, "name": "Runner",
+      "look": {"skin": "#c88c64", "hair": "#202020", "hairstyle": "spiky", "hat": "#d04a3c", "top": "#3b3f58", "bottom": "#6a5a42", "shoes": "#2a2a2a", "scarf": "#f1d04b", "pack": "#3a5a40"},
+      "residents": [{"map": "s330", "x": 856, "y": 432, "dir": "down-left"}]
+    }
+  ]
+}

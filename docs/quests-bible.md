@@ -147,4 +147,15 @@ Ids are `<region>_<slug>` and are **append-only**: never reuse or rename an id, 
 - Giver positions are real, but whether a character stands somewhere at a given story moment is unknown for most places: the
   `met` unlock covers it by waiting until the player has seen them.
 - Balance (rewards, scale numbers) is a first guess.
-- New sprites are possible (a scene may name any npc id whose sprite is in the manifest) but none were made.
+- New characters now exist (npc_id 1000+, drawn by `tools/make_quest_sprites.py`; see `docs/quests-art-brief.md`), three so far.
+
+## 9. Quality over quantity (decided 2026-10-15)
+
+The first 190 quests were judged too thin: 180 had a single kind of step ("go here, talk to X, kill N"). Only 31 of them ship
+(`data/authored/quests/shipped.txt`; the rest stay as drafts in the packs, unshipped). The new rule for what ships: **a small
+story with a turn, more than one kind of step, and often a choice at the hand-in** (`verdict=` in the DSL: the answer picks
+the reward and the closing lines). Lore to draw on: `docs/quests-lore.md`. The flagship set is `pack_f_flagship.py`.
+
+Also decided: a character's ordinary words always come first. The first talk with anyone in a session is their normal
+chat (it may be a hint the player needs); an offer or a reminder waits for the next talk. Handing in a finished job is
+immediate.

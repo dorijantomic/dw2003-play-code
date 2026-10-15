@@ -12,3 +12,8 @@ a_takato_goggles
 p_school_three_questions
 w_oldwoman_herself
 w_oldwoman_rumour_name
+f_moss_long_shift
+f_tech_ticket_4411
+f_runner_dead_drop
+f_digimon_surprise
+f_two_sides_bridge
