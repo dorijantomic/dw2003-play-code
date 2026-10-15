@@ -1,12 +1,9 @@
-"""Flagship quests: few, each its own small story, several kinds of step, a choice at the end, and three characters drawn
-for the purpose (Moss, Maintenance Tech, Runner: data/authored/quests/new_characters.json). Lore: docs/quests-lore.md.
+"""Flagship quests: few, each its own small story, several kinds of step, a choice at the end, and characters drawn
+for the purpose (data/authored/quests/new_characters.json). Lore: docs/quests-lore.md.
 Written 2026-10-15 after the first 190 quests were judged too much of "go there, talk to X".
 
 What each one is about:
-  f_moss_long_shift    a player who has been logged in too long, a sister he cannot message, and the truth or a kind lie
-  f_tech_ticket_4411   a maintenance tech chasing a duplicate Digimon girl, who is just very busy
   f_two_sides_bridge   Keith and Nick, rival friends split across the two servers, one bridge apart
-  f_runner_dead_drop   Lucky Mouse's courier sends you on a route that turns out to be a test, and a tail to shake off
   f_digimon_surprise   Agumon and Patamon each plan a surprise for the other
 """
 from dsl import *
@@ -16,75 +13,6 @@ ASUKA_OUT, ASUKA_OLD, LOBBY = "s202", "s200", "s212"
 BRIDGE, BRIDGE2 = "s205", "s206"
 
 QUESTS = [
-
-    quest("f_moss_long_shift", "The Long Shift", 1001, ASUKA_OUT,
-          text="Moss has been logged in for longer than he can say, and cannot send his little sister even one line. Ask around whether anything can get out.",
-          goal=[talk(53, LOBBY, ["A message to the other side? You are the third person today. No. Since the error, nothing leaves the servers.",
-                                 "I have a pile of tickets about it taller than I am. Nobody out there can read us and we cannot write to them.",
-                                 "If you must send something, tell the Old Woman. She says saying a thing out loud does something. I have not checked."],
-                     label="Ask the Office Worker"),
-                talk(58, ASUKA_OUT, ["Something for the other side? Sit down, dear. I say one every day since this started.",
-                                     "It never arrives, of course. But a thing said to someone who listens is already half delivered.",
-                                     "Tell the boy he does not have to send it. He has to say it. I will remember every word, and so will you."],
-                     label="Ask the Old Woman")],
-          ordered=True, lvl=1, short="The Long Shift",
-          pay=pay(100),
-          offer=["Hey. Do you know what day it is? Me neither. I logged in for an hour and that was a long time ago.",
-                 "My little sister is eight. She will not go to bed until I say goodnight, and I cannot even send her a line.",
-                 "Could you ask around if anyone can get a message out? Start with the Office Worker in the main lobby. He knows the rules."],
-          ask="Will you ask for me?", options=("Yes, I will ask", "Not right now"),
-          remind=["Any news? I keep watching the gate. Nothing goes through it, as far as I can tell.",
-                  "The Office Worker is in the main lobby. And the Old Woman is around here somewhere. She always knows something."],
-          done=["You are back. Be honest with me, I can take it. Is there a way?"],
-          verdict={"ask": "What do you tell him?", "options": ["The truth, plainly", "That it was sent"],
-                   "pay": [pay(0, ("Energy Disk", 2)), pay(150)],
-                   "after": [["Right. So nothing leaves. I sort of knew.",
-                              "But the Old Woman is right. I do not have to send it. I have to say it. Goodnight, Ellie. See you when the doors open.",
-                              "Thanks for not lying to me. Everyone else just says it will be fine."],
-                             ["Sent. Okay. Good.",
-                              "She will be asleep by now. She is the kind of kid who sleeps once someone tells her it is fine.",
-                              "Thanks. I mean it. I think I can finally sit down."]]}),
-
-    quest("f_tech_ticket_4411", "Ticket 4411", 1002, LOBBY,
-          text="A Maintenance Tech has a bug report: the Pink-haired Girl is standing in two places at once. Ask her in both and report what she says.",
-          goal=[talk(178, ASUKA_OUT, ["Hi! Oh, a clipboard. Is that for me? I have been right here all afternoon. I have not moved. Not once.",
-                                      "Well, I did get a snack. But that was in here too. This whole place is basically here."],
-                     label="Ask her in the outer city"),
-                talk(178, ASUKA_OLD, ["Hi! Are you following me? Because I was just over by the east side, and then I was here. That is very fast of me!",
-                                      "I have been standing here all afternoon. Do not write that down. Wait, are you writing that down?"],
-                     label="Ask her at the old gate")],
-          lvl=1, short="Ticket 4411",
-          pay=pay(120),
-          offer=["Hello. I am so sorry to bother you. I have forty open tickets and this one is the only one that makes me laugh.",
-                 "Ticket 4411. A Pink-haired Girl is reported standing in two places at once. Two. At the same time.",
-                 "Could you ask her in both places what she was doing? I cannot leave the desk. I have forty tickets."],
-          ask="Take the ticket?", options=("I will look", "Not now"),
-          remind=["Two places, same afternoon. Ask her what she says each time. Word for word if you can.",
-                  "I am hoping it is a copy bug. I am secretly hoping it is not."],
-          done=["Let me see the notes. Both times she says she has not moved? And both times she has a snack?",
-                "Oh, this is wonderful. I do not know what it is yet."],
-          verdict={"ask": "How do I file it?", "options": ["A bug", "A feature"],
-                   "pay": [pay(0, ("HP Chip", 1)), pay(0, ("MP Chip", 1))],
-                   "after": [["A bug. Right. Closed, with a note: duplicate suspected, cause unknown.",
-                              "Thank you. I will tell nobody that I hoped it was the other thing."],
-                             ["A feature! I love it. I will file it as Working As Intended.",
-                              "Then she is meant to be in two places at once. Honestly, that explains a lot about this afternoon."]]}),
-
-    quest("f_runner_dead_drop", "Dead Drop", 1003, PARK,
-          text="The Runner wants a message carried past three places before sundown, and wants nobody following you. Stand at each place, and deal with whoever follows.",
-          goal=[tour([WIRE, BEACH, CAPE], 3, "Stand at all three places"),
-                fight(38, [BEACH], "Shake off the tail at Shell Beach", scale=20)],
-          ordered=True, lvl=2, short="Dead Drop",
-          pay=pay(300, ("HP Chip", 1)),
-          offer=["Do not look at me. Look at the trees. I am not here.",
-                 "A message has to cross three places before sundown. I cannot carry it. Somebody is following me, and they are not very good at it.",
-                 "Wire Forest gate. Shell Beach. Plug Cape. Stand at each long enough to look suspicious. Then come back and tell me nothing."],
-          ask="Carry the message?", options=("Fine, I will do it", "Not now"),
-          remind=["Three places. If someone follows you, do not look. Fight them, but do not look.",
-                  "I am not here. You have not seen me."],
-          done=["You are back. And everyone who left behind you stayed behind you. Good.",
-                "The message was empty. I wanted to see who would follow the route. Nobody did, apart from one little pest. You dealt with it.",
-                "Here, take this. Lucky Mouse says thank you. He never says thank you. Do not tell him I told you."]),
 
     quest("f_digimon_surprise", "The Same Surprise", 365, ASUKA_OLD,
           text="Agumon is planning a surprise for Patamon and needs it kept secret. Find out what Patamon is up to, and bring Energy Disks for the party.",
