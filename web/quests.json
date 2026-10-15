@@ -50,9 +50,87 @@
         "doneLines": [
           "Three less to worry about. Thank you.",
           "Take this, you earned it."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "dx": 34,
+              "dy": -22
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Hey there. The Kunemon have been wandering into Central Park again, and I cannot leave the gym to deal with them."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "If you could thin out three of them, I would be grateful. I will make it worth your while."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Can you do that?"
+          },
+          {
+            "ask": "Take the job?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
         ]
       },
-      "short": "Park pests"
+      "short": "Park pests",
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Three less to worry about. Thank you."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Take this, you earned it."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
     },
     {
       "id": "forest_gate_survey",
@@ -90,9 +168,87 @@
         "doneLines": [
           "So the road holds. That is a weight off my mind.",
           "Here, for your trouble."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "dx": 34,
+              "dy": -22
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "You have been keeping the park clear. That is good work."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Now I need eyes further out. Walk the Wire Forest entrance and the forest beyond it, and tell me whether the road is safe."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Will you do that?"
+          },
+          {
+            "ask": "Take the job?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
         ]
       },
-      "short": "Forest survey"
+      "short": "Forest survey",
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "So the road holds. That is a weight off my mind."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Here, for your trouble."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
     },
     {
       "id": "east_station_greens",
@@ -616,6 +772,681 @@
         ]
       },
       "short": "Lost tamer"
+    },
+    {
+      "id": "leomon_kunemon_form",
+      "title": "A Kunemon inside you",
+      "giver": "Leomon",
+      "short": "Kunemon form",
+      "text": "Leomon says a partner that has fought a Kunemon long enough can take on its shape. Win fights until your partner learns the Kunemon form. It shows in the victory screen as Digivolve learned: Kunemon.",
+      "objectives": [
+        {
+          "type": "ownForm",
+          "species": "Kunemon"
+        }
+      ],
+      "reward": {
+        "bits": 500,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "unlock": {
+        "done": "park_pest_control",
+        "level": 6
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "You have beaten a lot of Kunemon by now. Did you notice how they move?",
+          "A partner that knows an enemy that well can take on its shape.",
+          "Fight on. Around level fourteen, your partner should learn the Kunemon form.",
+          "Will you try?"
+        ],
+        "doneLines": [
+          "I saw it in the way your partner stood. That is the Kunemon form.",
+          "It is not a real Digivolution, but it is yours. Here, take this."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "dx": 34,
+              "dy": -22
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "You have beaten a lot of Kunemon by now. Did you notice how they move?"
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "A partner that knows an enemy that well can take on its shape."
+          },
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "dx": 90,
+              "dy": -40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "look": 27
+          },
+          {
+            "wait": 20
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Fight on. Around level fourteen, your partner should learn the Kunemon form."
+          },
+          {
+            "look": "player"
+          },
+          {
+            "ask": "Will you try?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "I saw it in the way your partner stood. That is the Kunemon form."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "It is not a real Digivolution, but it is yours. Here, take this."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "park_messages",
+      "title": "Messages for the park",
+      "giver": "Leomon",
+      "short": "Park messages",
+      "ordered": true,
+      "text": "Leomon cannot leave the gym, so he asks you to carry two notes: one to the old woman, one to the man in the yellow coat. Then report back.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 58,
+          "name": "Old Woman",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "A note from Leomon? Oh, that big softie.",
+            "Tell him the weeds by the east path are worse this year."
+          ],
+          "scene": [
+            {
+              "walk": 58,
+              "to": {
+                "near": "player",
+                "dx": 30,
+                "dy": -20
+              }
+            },
+            {
+              "arrive": 58
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "A note from Leomon? Oh, that big softie."
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "Tell him the weeds by the east path are worse this year. And tell him to eat something."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 58,
+              "to": "origin"
+            },
+            {
+              "arrive": 58
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 102,
+          "name": "Yellow Coat",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "Leomon's note. Hm.",
+            "Tell him I will watch the south side. And that he owes me a rematch."
+          ],
+          "scene": [
+            {
+              "walk": 102,
+              "to": {
+                "near": "player",
+                "dx": 30,
+                "dy": -20
+              }
+            },
+            {
+              "arrive": 102
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Leomon's note. Hm."
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Tell him I will watch the south side."
+            },
+            {
+              "walk": 102,
+              "to": {
+                "near": "player",
+                "dx": 70,
+                "dy": 30
+              }
+            },
+            {
+              "arrive": 102
+            },
+            {
+              "wait": 10
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "And tell him he owes me a rematch."
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 102,
+              "to": "origin"
+            },
+            {
+              "arrive": 102
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 2
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "unlock": {
+        "done": "park_pest_control",
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          },
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "I have two notes to deliver and I cannot leave my post.",
+          "One is for the old woman, one for the man in the yellow coat. They are both in the park.",
+          "Can you carry them?"
+        ],
+        "doneLines": [
+          "So the weeds are bad, and he wants a rematch. Typical.",
+          "Thank you for running my errands. Take this."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "dx": 34,
+              "dy": -22
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "I have two notes to deliver and I cannot leave my post."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "One is for the old woman, one for the man in the yellow coat. They are both in the park."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Can you carry them?"
+          },
+          {
+            "ask": "Carry the notes?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "So the weeds are bad, and he wants a rematch. Typical."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Thank you for running my errands. Take this."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "yellowcoat_duel",
+      "title": "The man in the yellow coat",
+      "giver": "Yellow Coat",
+      "short": "Yellow coat duel",
+      "text": "The man in the yellow coat wants his rematch: three fights in a row on Central Park grass. Win them all, then tell him.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            38,
+            39,
+            40
+          ],
+          "scale": 24,
+          "hpMult": 1.6,
+          "startAt": [
+            "s330",
+            "s940"
+          ],
+          "label": "Win three fights in a row: DemiDevimon, Betamon, Vegiemon"
+        }
+      ],
+      "reward": {
+        "bits": 700,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_messages"
+      },
+      "unlock": {
+        "done": "park_messages",
+        "met": [
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "So Leomon sent you. Good.",
+          "I have been training my own team. Three fights in a row, no resting.",
+          "Are you in?"
+        ],
+        "doneLines": [
+          "Three in a row. You really are something.",
+          "Take it. You earned it, and so did he."
+        ],
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "dx": 34,
+              "dy": -22
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "So Leomon sent you. Good."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "I have been training my own team. Three fights in a row, no resting."
+          },
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "dx": 80,
+              "dy": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "wait": 15
+          },
+          {
+            "ask": "Are you in?",
+            "options": [
+              "I am in",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Three in a row. You really are something."
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Take it. You earned it, and so did he."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
+      "id": "oldwoman_rumour",
+      "title": "A rumour from the old woman",
+      "giver": "Old Woman",
+      "short": "Rumour",
+      "text": "The old woman heard that a Digimon wearing a strange shape has been seen near the Wire Forest road. See the road for yourself, and learn the Betamon form.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s335"
+        },
+        {
+          "type": "ownForm",
+          "species": "Betamon"
+        }
+      ],
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_messages"
+      },
+      "unlock": {
+        "done": "park_messages",
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Come here, dear. I hear things.",
+          "They say something strange has been seen on the Wire Forest road, a Digimon in a shape it was not born with.",
+          "Go and see, and then learn the Betamon form yourself. Do you think you can?"
+        ],
+        "doneLines": [
+          "You went, and you came back with a new shape. Clever.",
+          "Here, buy yourself something. And do not tell Leomon I fussed."
+        ],
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "dx": 30,
+              "dy": -20
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Come here, dear. I hear things."
+          },
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "dx": -60,
+              "dy": 30
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "They say something strange has been seen on the Wire Forest road, a Digimon in a shape it was not born with."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Go and see, and then learn the Betamon form yourself."
+          },
+          {
+            "ask": "Will you go?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "dx": 34,
+            "dy": -22
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "You went, and you came back with a new shape. Clever."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Here, buy yourself something. And do not tell Leomon I fussed."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
     }
   ]
 }

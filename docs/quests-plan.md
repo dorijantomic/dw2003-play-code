@@ -75,6 +75,25 @@ current story state cannot deliver.
   the player-name code) are dropped from quest text. The small "New quest" notice is still a page-level box styled like
   the game's windows, not drawn on the game canvas.
 
+## Scripted scenes
+
+A quest step (an offer, a talk step, the turn-in, or an `acceptScene`/`doneScene`) may carry a `scene`: a list of data
+steps that make characters walk, turn, speak and ask, played on the game's own cutscene VM
+(`engine/systems/cutscene-manager.ts`), so walking, facing and the camera are the story scenes' own code.
+`web/quest-scenes.js` turns the steps into the VM's opcodes (`WALKTO`, `WAITIDLE`, `SAY`, `FN6A`...); only the words come
+from the quest. The step list is documented at the top of that file. With no scene, or when a character it needs is not on
+the map, the quest speaks its plain `lines` instead, so a scene can never block a quest.
+
+- Existing NPCs only (their `npc_id` from the scene files). A character not on the map is spawned if the game knows a sprite
+  for that id, so a visitor can walk in from the edge. New sprites are just manifest entries; nothing in the scene code changes.
+- The `ask` step puts the game's choice list inside the scene, with the NPC still standing there; the answer goes to the quest.
+- The `ownForm` objective is met when the lead or a party member has a form of that species in their ledger (read only).
+- Tests: `node --test tests/quest-scenes.test.js` (compiler and every shipped scene) and
+  `tools/verify_quest_scene.mjs` (Leomon walks over, asks, the quest is taken, the form is learned, the turn-in pays).
+- New quests (all invented writing, not game content): A Kunemon inside you, Messages for the park, The man in the yellow coat,
+  A rumour from the old woman. The two Leomon jobs that already existed got scenes as well. Not yet browser-tested: the
+  message chain, the yellow-coat challenge and the rumour (their characters appear depending on the story state).
+
 ## Generated jobs ("Wanted board")
 
 `generateBounty(visited, level, n, table)` (pure, seeded) builds one job at a time from the places you have been

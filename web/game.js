@@ -24,7 +24,8 @@ import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
-import { installQuests, questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
+import { compileScene, castOf } from "./quest-scenes.js";
+import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
@@ -522,6 +523,8 @@ installQuests({
     // Speech goes through the game's own conversation box (translated, same balloon and font as a real NPC); the list and
     // the yes/no questions are the game's choice widget. Both resolve when the player is done.
     speak: (npcId, name, text) => questSpeak(npcId, name, text),
+    scene: (steps) => playQuestScene(steps),
+    ownsForm: (id) => [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats : [])].some((p) => p?.formLedger?.some((f) => Number(f.id) === id)),
     ask: (prompt, options) => new Promise((resolve) => choice.open(prompt, options, resolve)),
     onDone: (title) => socialQuestDone(title),
     idle: () =>
@@ -2226,6 +2229,52 @@ function questSpeak(npcId, name, text) {
         dialogueBox.open({ pack: buildPack(name, pages), index: 0 }, mode, resolve, project, opts);
     });
 }
+
+/**
+ * Play a quest's scripted scene (web/quest-scenes.js) on the game's own cutscene VM, so characters walk, turn and the camera
+ * follows exactly as in a story scene; only the words come from the quest. Resolves { answer } when it ends (answer = the
+ * index picked in an "ask" step, else null), or at once with null if the scene cannot run here: the characters it needs
+ * are not on this map, or the game is busy).
+ */
+function playQuestScene(steps) {
+    return new Promise((resolve) => {
+        const mapId = currentMap()?.id;
+        const scene = state.scenes[mapId];
+        if (!scene || cutscene.isActive() || textbox.isOpen() || battle.isActive()) {
+            console.warn(`[quest scene] game busy: scene=${!!scene} cutscene=${cutscene.isActive()} textbox=${textbox.isOpen()} battle=${battle.isActive()}`);
+            return resolve(null);
+        }
+        const here = (id) => id === "player" || sceneCast(scene).some((n) => n.npc_id === Number(id) && !n.cutsceneOnly) || !!state.npcSprites?.[Number(id)];
+        const need = castOf(steps).filter((id) => !here(id));
+        if (need.length) { console.warn(`[quest scene] ${need.join(", ")} not on ${mapId}; skipped`); return resolve(null); }
+        const playerId = state.playerCharOne ? 1 : 2;
+        const pos = (id) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
+        const { opcodes, speech, errors } = compileScene(steps, { playerId, pos });
+        if (errors.length) { console.warn("[quest scene]", errors.join("; ")); return resolve(null); }
+        for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
+        const hooks = { afterSay: {} };
+        let answer = null;
+        for (const [n, s] of Object.entries(speech)) {
+            hooks.afterSay[n] = s.ask
+                ? (resume) => choice.open(s.ask, s.options, (i) => { answer = i; resume(); })
+                : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
+        }
+        cutsceneEsdmgRef = null;
+        cutscene.start(opcodes, null, () => {
+            for (const npc of scene.npcs) {
+                if (npc._origX !== undefined) { npc.x = npc._origX; npc.y = npc._origY; }
+                delete npc._origX; delete npc._origY; delete npc._inCutscene; delete npc.activeClip; delete npc._cutTarget;
+            }
+            scene.npcs = scene.npcs.filter((n) => !n._ephemeral);
+            delete state._inCutscene; delete state._cutTarget; delete state.activeClip;
+            state._animTime = 0;
+            resetFollowers();
+            resolve({ answer });
+        }, hooks);
+    });
+}
+
+window.__playQuestScene = playQuestScene;   // testing aid (tools/verify_quest_scene.mjs)
 
 function getDialogue(ref) {
     return parseEntry(

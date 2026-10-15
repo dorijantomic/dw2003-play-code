@@ -19,6 +19,7 @@
 import { fx } from "./ambience.js";
 import { on } from "./gameEvents.js";
 import { wrap } from "./dialogue-pack.js";
+import { validateScene } from "./quest-scenes.js";
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -33,10 +34,14 @@ const OBJECTIVES = {
     // speak to one of the game's own NPCs (npc_id from the scene files), on one of the listed maps
     talk: { target: () => 1, valid: (o) => Number.isInteger(o.npc) && Array.isArray(o.maps) && o.maps.length > 0 && Array.isArray(o.lines) && o.lines.length > 0 },
     // walk from one gate to another in one go; any fight (or leaving the map) sends you back to the start
+    // learn a form of this species (the lead or a party member has it in their ledger; read only)
+    // (a scene may also hang off any step: offer.scene, acceptScene, doneScene, or an objective's own scene)
+    ownForm: { target: () => 1, valid: (o) => typeof o.species === "string" },
     reach: { target: () => 2, valid: (o) => typeof o.map === "string" && o.from && o.to && [o.from.x, o.from.y, o.from.r, o.to.x, o.to.y, o.to.r].every(Number.isFinite) },
 };
 
 let defs = [];
+let speciesIds = null;                                       // name -> species id, for "ownForm" (digimon.json, extras included)
 let st = loadState();
 let api = null, fieldEnc = null, challengeBusy = false;
 let variants = {};
@@ -67,6 +72,11 @@ const mapLabel = (id) => (mapNames[id] ?? mapNames[canon(id)] ?? id).replace(/^.
 function validate(d) {
     if (!d || typeof d.id !== "string" || !Array.isArray(d.objectives) || !d.objectives.length) return "needs an id and objectives";
     for (const o of d.objectives) { const t = OBJECTIVES[o.type]; if (!t || !t.valid(o)) return `bad objective ${JSON.stringify(o)}`; }
+    for (const sc of [d.offer?.scene, d.acceptScene, d.doneScene, d.turnIn?.scene, ...d.objectives.map((o) => o.scene)]) {
+        if (!sc) continue;
+        const bad = validateScene(sc);
+        if (bad.length) return `bad scene in "${d.id}": ${bad.join("; ")}`;
+    }
     return null;
 }
 
@@ -225,7 +235,7 @@ function resetRoutes(why, onlyMap) {
 on("battleStarted", (e) => { if (enabled()) resetRoutes("A fight broke out. Start the route again.", null); });
 // A quest about a character unlocks once you have actually seen that character where the quest says (story-gated
 // characters only appear at certain points of the story, so the quest waits for you to meet them).
-let metTick = 0;
+let metTick = 0, lastFormScan = 0;
 function scanMet(mapId) {
     if (!api?.npcsHere || !mapId) return;
     const here = api.npcsHere();
@@ -239,9 +249,30 @@ function scanMet(mapId) {
     }
     if (changed) { saveState(); announceUnlocks(); }
 }
+// "ownForm": checked about twice a second, only while such a quest is running
+async function scanForms() {
+    if (!api?.ownsForm || !Object.keys(st.active).some((id) => defOf(id)?.objectives.some((o) => o.type === "ownForm"))) return;
+    if (!speciesIds) {
+        try { speciesIds = Object.fromEntries((await fetch("assets/data/digimon.json").then((r) => r.json())).digimon.map((d) => [d.name, d.id])); }
+        catch { speciesIds = {}; return; }
+    }
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        d.objectives.forEach((o, i) => {
+            if (o.type !== "ownForm" || (a.p[i] || 0) >= 1 || speciesIds[o.species] == null || !api.ownsForm(speciesIds[o.species])) return;
+            const was = isReady(id);
+            a.p[i] = 1; saveState();
+            toast(`You learned the ${o.species} form!`);
+            if (!was && isReady(id)) toast(`Quest ready: ${d.title}${turnInRef(d) ? "" : "  (F3)"}`);
+        });
+    }
+}
 export function questsTick(mapId, x, y) {
     lastX = x ?? lastX; lastY = y ?? lastY;
     if (++metTick % 45 === 0) scanMet(mapId);
+    const now = performance.now();
+    if (now - lastFormScan > 500) { lastFormScan = now; scanForms(); }
     if (mapId !== lastMap) {
         lastMap = mapId;
         if (enabled()) resetRoutes("You left the route. Start it again.", mapId);   // leaving the route's map abandons it
@@ -279,6 +310,15 @@ const declined = new Set();                                  // offers you said 
 // looks and sounds like any other NPC; a blank line in the text starts a new page.
 const say = (name, lines, npcId = null) => (api?.speak ? api.speak(npcId, name, Array.isArray(lines) ? lines.join("\n\n") : lines) : Promise.resolve());
 const ask = (prompt, options) => (api?.ask ? api.ask(prompt, options) : Promise.resolve(options.length - 1));
+// A step of a quest may carry a scripted scene (web/quest-scenes.js): characters walk and talk on the game's own cutscene
+// engine. Without one, or when it cannot run here (a character is not on this map), the plain lines are spoken instead.
+// Returns { ran, answer }: whether the scene ran, and the choice made inside it (null when it had none).
+async function perform(scene, name, lines, npcId) {
+    const r = scene && api?.scene ? await api.scene(scene) : null;
+    if (r) return { ran: true, answer: r.answer };
+    if (lines?.length) await say(name, lines, npcId);
+    return { ran: false, answer: null };
+}
 async function busy(fn) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
 const atNpc = (ref, npcId, mapId) => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
 const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
@@ -295,7 +335,7 @@ export function questTalk(npcId, mapId) {
             if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !atNpc(o, npcId, mapId)) continue;
             if (d.ordered && !talksDone(d, a, i)) continue;
             busy(async () => {
-                await say(o.name ?? "", o.lines, npcId);
+                await perform(o.scene, o.name ?? "", o.lines, npcId);
                 const was = isReady(id);
                 a.p[i] = 1; saveState();
                 if (!was && isReady(id)) toast(`Quest ready: ${d.title}${turnInRef(d) ? "" : "  (F3)"}`);
@@ -307,16 +347,19 @@ export function questTalk(npcId, mapId) {
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), ref = d && turnInRef(d);
         if (!d || !isReady(id) || !atNpc(ref, npcId, mapId)) continue;
-        busy(async () => { await say(ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId); claim(id, true); });
+        busy(async () => { await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId); claim(id, true); });
         return true;
     }
     // 3. an offer
     for (const d of allDefs()) {
         if (statusOf(d) !== "available" || !d.offer || declined.has(d.id) || !atNpc(d.offer, npcId, mapId)) continue;
         busy(async () => {
-            await say(d.offer.name, d.offer.lines, npcId);
-            const pick = await ask("Take the job?", ["I will do it", "Not now"]);
-            if (pick === 0) accept(d.id, true); else declined.add(d.id);
+            const r = await perform(d.offer.scene, d.offer.name, d.offer.lines, npcId);
+            const pick = r.answer ?? await ask(d.offer.ask ?? "Take the job?", ["I will do it", "Not now"]);
+            if (pick === 0) {
+                accept(d.id, true);
+                if (d.acceptScene) await perform(d.acceptScene, d.offer.name, d.offer.acceptLines ?? [], npcId);
+            } else declined.add(d.id);
         });
         return true;
     }
@@ -525,9 +568,9 @@ function installUi(stageEl) {
 }
 
 // ------------------------------------------------------------ install
-export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone }) {
+export async function installQuests({ stageEl, giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm }) {
     if (!stageEl || api) return;
-    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone };
+    api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm };
     installUi(stageEl);
     try {
         const [q, v, m] = await Promise.all([
