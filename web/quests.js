@@ -353,7 +353,8 @@ const atNpc = (ref, npcId, mapId) => ref && ref.npc === npcId && ref.maps.some((
 const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
 
 /** Returns true when a quest took this conversation (the game then skips the character's normal line). */
-export function questTalk(npcId, mapId) {
+const chatted = new Set();   // characters whose ordinary words you have already heard this session
+export function questTalk(npcId, mapId, hasChat = false) {
     if (!enabled() || dialogBusy || logOpen || !mapId) return false;
     syncCounts();                                            // what the player carries and their level right now
     // 1. a "talk" step of a running quest
@@ -380,6 +381,9 @@ export function questTalk(npcId, mapId) {
         busy(async () => { await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId); claim(id, true); });
         return true;
     }
+    // Offers and reminders never replace what a character normally says (it may be a hint the player needs): the first
+    // talk is always the ordinary chat; the quest business comes on the next one (the marker over their head says it waits).
+    if (hasChat && !chatted.has(npcId)) { chatted.add(npcId); return false; }
     // 3. an offer
     for (const d of allDefs()) {
         if (statusOf(d) !== "available" || !d.offer || declined.has(d.id) || !atNpc(d.offer, npcId, mapId)) continue;

@@ -1,0 +1,14 @@
+# Non-legacy quests that ship. Everything else in the packs is a draft: kept as source, not in the game.
+# Quality bar: more than one kind of step, or a real story/choice; not just "go there / talk to X".
+a_gent_hat_mystery
+a_girl_el_dorado
+a3_girl_swap_meet
+p_school_tapirmon_notes
+w_yellowcoat_last
+a_gent_full_set
+p_lookout_tuskmon
+a3_gent_tea
+a_takato_goggles
+p_school_three_questions
+w_oldwoman_herself
+w_oldwoman_rumour_name

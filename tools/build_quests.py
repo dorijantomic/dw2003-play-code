@@ -45,6 +45,18 @@ def main():
         for p in dsl.PROBLEMS:
             print("  -", p)
         return 1
+    shipped = {l.strip() for l in open(os.path.join(SRC, "shipped.txt"), encoding="utf-8") if l.strip() and not l.startswith("#")}
+    drafts = [q["id"] for q in quests if where[q["id"]] != "legacy" and q["id"] not in shipped]
+    quests = [q for q in quests if q["id"] not in set(drafts)]
+    for q in quests:                      # a shipped quest never waits on a draft
+        u = q.get("unlock") or {}
+        if u.get("done") in drafts:
+            del u["done"]
+        r = q.get("requires") or {}
+        if r.get("done") in drafts:
+            del r["done"]
+            if not r:
+                del q["requires"]
     text = json.dumps({"_comment": COMMENT, "quests": quests}, indent=2, ensure_ascii=False)
     if "--check" in sys.argv:
         ok = os.path.exists(OUT) and open(OUT, encoding="utf-8").read() == text

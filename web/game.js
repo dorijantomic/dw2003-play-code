@@ -7365,7 +7365,7 @@ function dispatchInput(k, e, raw = "") {
                     // still apply) so we go on to show this NPC's spoken line.
                     const dlgState = pickDialogueFor(npc, state.flags);
                     if (engineBridge && engineBridge.onTalk(npc.npc_id)) return;
-                    if (questTalk(npc.npc_id, currentMap().id)) return;   // an extra quest takes this conversation (never a story one)
+                    if (questTalk(npc.npc_id, currentMap().id, !!dlgState)) return;   // an extra quest takes this conversation (never a story one)
                     if (!dlgState) return; // no ptrB dialogue — non-speaking variant
                     openTalkLine(
                         dlgState.dialogue,
