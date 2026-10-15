@@ -205,6 +205,11 @@
       "name": "Runner",
       "look": "kid in a red cap, yellow scarf and a green pack",
       "voice": "quick and cagey; talks in half-hints, enjoys being mysterious, drops it when thanked"
+    },
+    "1004": {
+      "name": "Ren",
+      "look": "red-haired girl with goggles in a white and blue poncho, cargo trousers",
+      "voice": "calm, dry and direct, a drifter who teases a little and never stays; short sentences; respects people who try"
     }
   },
   "_threads": {
@@ -216,6 +221,7 @@
     "Boy": "dares and growing up: fights, levels, proving himself",
     "Office Worker": "errands: carries messages and parcels between towns",
     "Yellow Coat": "the rival: appears in many places, challenges you again and again",
-    "Black Hat": "secrets: sells hints, then asks a favour that turns out bigger than it sounded"
+    "Black Hat": "secrets: sells hints, then asks a favour that turns out bigger than it sounded",
+    "Ren": "a wandering tamer met four times, always somewhere new (Shell Beach, Wind Prairie, Phoenix Bay, Mobius Desert); her partner grows stronger each time"
   }
 }

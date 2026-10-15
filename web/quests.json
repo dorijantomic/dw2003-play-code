@@ -4351,6 +4351,694 @@
       ]
     },
     {
+      "id": "f_ren_1_beach",
+      "title": "A Stranger on the Sand",
+      "giver": "Ren",
+      "short": "On the Sand",
+      "text": "A red-haired drifter named Ren wants to see how you play before she says anything else. Win one card duel against the way she sees it.",
+      "objectives": [
+        {
+          "type": "duelWin",
+          "count": 1
+        }
+      ],
+      "reward": {
+        "bits": 150
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1004,
+            "map": "s340"
+          }
+        ],
+        "level": 3
+      },
+      "offer": {
+        "npc": 1004,
+        "name": "Ren",
+        "maps": [
+          "s340"
+        ],
+        "lines": [
+          "Hold still. You walk like someone who just logged in and is still checking that their legs work.",
+          "I am Ren. I never stay anywhere long, but I like to see how new people play. One card duel. Winner picks what we talk about.",
+          "Do not worry. I go easy on the first one."
+        ],
+        "doneLines": [
+          "Not bad. You hesitate before you play your best card. Everybody does, at first.",
+          "Here, for the road. And a tip. The world is bigger than the water you are standing next to. Go east, where the wind is."
+        ],
+        "remindLines": [
+          "The duel first. Then I talk. That is the deal.",
+          "I will be right here. I am always right somewhere."
+        ],
+        "ask": "Play a duel?",
+        "scene": [
+          {
+            "walk": 1004,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1004
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "Hold still. You walk like someone who just logged in and is still checking that their legs work."
+          },
+          {
+            "together": 1004,
+            "dist": 130
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "I am Ren. I never stay anywhere long, but I like to see how new people play. One card duel. Winner picks what we talk about."
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "Do not worry. I go easy on the first one."
+          },
+          {
+            "ask": "Play a duel?",
+            "options": [
+              "Let us play",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 1004
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1004,
+            "to": "origin"
+          },
+          {
+            "arrive": 1004
+          }
+        ]
+      },
+      "verdict": {
+        "ask": "What do you tell her?",
+        "options": [
+          "I won fair",
+          "You went easy"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Energy Disk",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "Antidote Disk",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "Fair. I will remember that. See you down the road. Probably in the wind."
+          ],
+          [
+            "Ha. Sharp. Next time I will not. Try to keep up."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1004,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1004
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "Not bad. You hesitate before you play your best card. Everybody does, at first."
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "Here, for the road. And a tip. The world is bigger than the water you are standing next to. Go east, where the wind is."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1004,
+          "to": "origin"
+        },
+        {
+          "arrive": 1004
+        }
+      ]
+    },
+    {
+      "id": "f_ren_2_prairie",
+      "title": "The Wind Still Blows",
+      "giver": "Ren",
+      "short": "Wind Blows",
+      "text": "Ren was right about the wind. Her partner has been training, and she wants to see if you can take him on.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            268
+          ],
+          "startAt": [
+            "s395",
+            "s396"
+          ],
+          "label": "Beat Ren's partner on the prairie",
+          "scale": 10
+        }
+      ],
+      "reward": {
+        "bits": 500
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1004,
+            "map": "s395"
+          }
+        ],
+        "level": 12,
+        "done": "f_ren_1_beach"
+      },
+      "offer": {
+        "npc": 1004,
+        "name": "Ren",
+        "maps": [
+          "s395"
+        ],
+        "lines": [
+          "Told you. East, in the wind.",
+          "My partner has been training. He got serious. The little Kotemon I started with is gone. Now there is only Kyukimon, and he is fast.",
+          "One fight. I will not call it off, so keep your medicine close."
+        ],
+        "doneLines": [
+          "Good. Better than good. He is grinning, you cannot see it, but he is.",
+          "Take this. It keeps the wind off your back."
+        ],
+        "remindLines": [
+          "He is waiting. Take your time, then take the fight.",
+          "Kyukimon does not wait for anyone. I do."
+        ],
+        "ask": "Take the fight?",
+        "scene": [
+          {
+            "walk": 1004,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1004
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "Told you. East, in the wind."
+          },
+          {
+            "together": 1004,
+            "dist": 130
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "My partner has been training. He got serious. The little Kotemon I started with is gone. Now there is only Kyukimon, and he is fast."
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "One fight. I will not call it off, so keep your medicine close."
+          },
+          {
+            "ask": "Take the fight?",
+            "options": [
+              "I am ready",
+              "Not yet"
+            ]
+          },
+          {
+            "apart": 1004
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1004,
+            "to": "origin"
+          },
+          {
+            "arrive": 1004
+          }
+        ]
+      },
+      "requires": {
+        "done": "f_ren_1_beach"
+      },
+      "verdict": {
+        "ask": "What do you say?",
+        "options": [
+          "Your partner is strong",
+          "You trained him well"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Wind Ring",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "Power Ring",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "Strong. Yes. He would want you to say that, and he would never say it himself."
+          ],
+          [
+            "I did not train him. He trained himself and let me stand nearby. But thank you."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1004,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1004
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "Good. Better than good. He is grinning, you cannot see it, but he is."
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "Take this. It keeps the wind off your back."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1004,
+          "to": "origin"
+        },
+        {
+          "arrive": 1004
+        }
+      ]
+    },
+    {
+      "id": "f_ren_3_bay",
+      "title": "Salt and Steel",
+      "giver": "Ren",
+      "short": "Salt and Steel",
+      "text": "Ren wants a rematch at Phoenix Bay, but only when you are strong enough to make it fair. Reach level 22 and beat her partner again.",
+      "objectives": [
+        {
+          "type": "level",
+          "level": 22,
+          "label": "Reach level 22"
+        },
+        {
+          "type": "challenge",
+          "screens": [
+            268
+          ],
+          "startAt": [
+            "s485",
+            "s486"
+          ],
+          "label": "Beat Ren's partner at the bay",
+          "scale": 15
+        }
+      ],
+      "reward": {
+        "bits": 900
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1004,
+            "map": "s485"
+          }
+        ],
+        "level": 16,
+        "done": "f_ren_2_prairie"
+      },
+      "offer": {
+        "npc": 1004,
+        "name": "Ren",
+        "maps": [
+          "s485"
+        ],
+        "lines": [
+          "You found me. Good. The bay is quiet and the water makes everyone honest.",
+          "I want a rematch, but a fair one. I do not fight people who are not ready, it is no fun. Come back at level twenty two.",
+          "Then we go again. This time my partner will not hold back."
+        ],
+        "doneLines": [
+          "That was a real fight. I felt every one of those hits.",
+          "I am going to say something I do not say often. I was glad it was you."
+        ],
+        "remindLines": [
+          "Level twenty two. Not twenty one. I am quite particular about it.",
+          "The bay will be here. So will I, probably."
+        ],
+        "ask": "Come back stronger?",
+        "scene": [
+          {
+            "walk": 1004,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1004
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "You found me. Good. The bay is quiet and the water makes everyone honest."
+          },
+          {
+            "together": 1004,
+            "dist": 130
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "I want a rematch, but a fair one. I do not fight people who are not ready, it is no fun. Come back at level twenty two."
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "Then we go again. This time my partner will not hold back."
+          },
+          {
+            "ask": "Come back stronger?",
+            "options": [
+              "I will",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 1004
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1004,
+            "to": "origin"
+          },
+          {
+            "arrive": 1004
+          }
+        ]
+      },
+      "requires": {
+        "done": "f_ren_2_prairie"
+      },
+      "ordered": true,
+      "verdict": {
+        "ask": "How do you answer?",
+        "options": [
+          "Same here",
+          "Do not get used to it"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Guard Ring",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "bits": 200
+          }
+        ],
+        "after": [
+          [
+            "Good. Then it was worth the walk."
+          ],
+          [
+            "Ha. Fair. I will try not to."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1004,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1004
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "That was a real fight. I felt every one of those hits."
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "I am going to say something I do not say often. I was glad it was you."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1004,
+          "to": "origin"
+        },
+        {
+          "arrive": 1004
+        }
+      ]
+    },
+    {
+      "id": "f_ren_4_desert",
+      "title": "Where She Started",
+      "giver": "Ren",
+      "short": "Her Start",
+      "text": "Ren is in the Mobius Desert, where she says she started. She wants one last hard fight and will tell you why she never stays anywhere.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            268
+          ],
+          "startAt": [
+            "s640",
+            "s635",
+            "s636",
+            "s641"
+          ],
+          "label": "Face Ren and Kyukimon in the desert",
+          "scale": 21,
+          "hpMult": 1.4
+        }
+      ],
+      "reward": {
+        "bits": 1500
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 1004,
+            "map": "s640"
+          }
+        ],
+        "level": 26,
+        "done": "f_ren_3_bay"
+      },
+      "offer": {
+        "npc": 1004,
+        "name": "Ren",
+        "maps": [
+          "s640"
+        ],
+        "lines": [
+          "The desert. This is where I started. A long time ago, or a week, I lose track. Everybody here does.",
+          "I never stay anywhere because stopping makes me think. If I keep walking, I have not been logged in too long. Not yet.",
+          "One last hard fight. Not to win. To remember I can still choose to stand still. Will you?"
+        ],
+        "doneLines": [
+          "That was it. That was what I wanted. Thank you.",
+          "I am not going to stand still forever. But it is nice to know that I can."
+        ],
+        "remindLines": [
+          "I will wait. For once I am good at it.",
+          "Take your time. The sand is warm."
+        ],
+        "ask": "Fight Ren?",
+        "scene": [
+          {
+            "walk": 1004,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 1004
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "The desert. This is where I started. A long time ago, or a week, I lose track. Everybody here does."
+          },
+          {
+            "together": 1004,
+            "dist": 130
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "I never stay anywhere because stopping makes me think. If I keep walking, I have not been logged in too long. Not yet."
+          },
+          {
+            "say": 1004,
+            "name": "Ren",
+            "text": "One last hard fight. Not to win. To remember I can still choose to stand still. Will you?"
+          },
+          {
+            "ask": "Fight Ren?",
+            "options": [
+              "I will",
+              "Not yet"
+            ]
+          },
+          {
+            "apart": 1004
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 1004,
+            "to": "origin"
+          },
+          {
+            "arrive": 1004
+          }
+        ]
+      },
+      "requires": {
+        "done": "f_ren_3_bay"
+      },
+      "verdict": {
+        "ask": "What do you tell her?",
+        "options": [
+          "Walk with me",
+          "Keep walking"
+        ],
+        "pay": [
+          {
+            "items": [
+              {
+                "name": "Spirit Ring",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "items": [
+              {
+                "name": "Awake Ring",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "after": [
+          [
+            "Walk with you. Hm. Maybe for a bit. Do not tell anyone I said so."
+          ],
+          [
+            "Yes. Keep walking. And if I end up somewhere you stand, I will say hello. That is a promise."
+          ]
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 1004,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1004
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "That was it. That was what I wanted. Thank you."
+        },
+        {
+          "say": 1004,
+          "name": "Ren",
+          "text": "I am not going to stand still forever. But it is nice to know that I can."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 1004,
+          "to": "origin"
+        },
+        {
+          "arrive": 1004
+        }
+      ]
+    },
+    {
       "id": "w_yellowcoat_last",
       "title": "A word for the winner",
       "giver": "Yellow Coat",

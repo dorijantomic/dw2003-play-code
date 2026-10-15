@@ -43,18 +43,24 @@ drawn. Once a provider is working, give it the Option 2 spec above plus the char
 `characters.json`, then save the result into `data/authored/quests/art/` and reference it as the `sheet`. Nothing in the game
 changes. Do not commit game art: sheets must be original.
 
-## Option 3: three views from an image generator (Gemini and the like) - the easy one
+## Option 3: a picture from an image generator (Gemini and the like) - the easy one, fully automatic
 
-Ask the generator for ONE picture with the same character three times, side by side, left to right: facing the camera,
-facing right (side view), facing away. Pixel-art style, flat single-colour background, nothing else in the picture. Save it
-to `data/authored/quests/art/<name>.png` and give the character `"views": "data/authored/quests/art/<name>.png"` in
-`new_characters.json` (instead of `look`). `tools/make_quest_sprites.py` cuts the three out, makes the background transparent,
-shrinks each to game size (about 20 x 40), reduces the colours, adds the outline and builds the walk frames. Tested with a
-synthetic picture only; real generator output may need a second try (a busy or gradient background is the usual failure).
+1. Get ONE picture with 1 to 4 figures of the character in a row: front, side facing right, back (a 4th, the other side, is
+   skipped). Any flat background colour; the figures must not touch.
+2. Save it as `data/authored/quests/art/<name>.png`.
+3. Add the character to `data/authored/quests/new_characters.json`:
+   `{"npc_id": 1005, "name": "Name", "views": "data/authored/quests/art/<name>.png", "height": 35, "residents": [{"map": "s340", "x": 440, "y": 392}]}`
+   and a name/look/voice line for the same id in `characters.json`.
+4. `python3 tools/make_quest_sprites.py` (takes a few seconds). Nothing else.
 
-Prompt that works as a template (change the character line):
+What the tool does by itself: removes the background (the picture's border colour, only where it connects to the edge, so a
+green backpack or white shoes survive), finds the figures, shrinks them to `height` (the disc's townspeople are 26 to 40,
+mostly 33 to 35; kids about 31), reduces to a game-like palette, adds the outline, builds the walk frames and the idle
+"breathing" clip the game plays for anyone standing still (without it a character looks frozen next to the disc's). If it
+cannot find 1 to 4 figures it says so and names the file. A side view that faces LEFT in the picture needs `"flip_side": true`.
 
-> Pixel art character reference sheet in the style of a 32-bit PlayStation JRPG (chibi, about 2 heads tall, flat colours, dark
-> outline, no gradients, no anti-aliasing). THE SAME CHARACTER THREE TIMES in one wide image, evenly spaced, same size, full
-> body, feet on the same line: left = facing the camera, middle = facing right in side view, right = facing away. Plain flat
-> bright green background (#00FF00), no shadow, no text, no border. Character: <describe>.
+Prompt template (use one of the game's own NPC sprites, three views, as the attached reference, and change the last line):
+
+> The attached picture is a character sprite from the PS1 game Digimon World 3, shown three times: facing the camera, facing right, facing away. Draw a NEW, DIFFERENT character in exactly the same pixel-art style, proportions, size, dark-outline and shading look, and layout: the same new character three times, evenly spaced, same size, feet on one line, left = facing the camera, middle = facing right, right = facing away. Do not copy the reference character's clothes, face or hair. Plain flat bright green background, no shadow, no text, no border. New character: <describe>.
+
+(The reference pictures cut from game sprites are made locally under `art/ref/` and are git-ignored: they are game art.)

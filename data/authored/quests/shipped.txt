@@ -17,3 +17,7 @@ f_tech_ticket_4411
 f_runner_dead_drop
 f_digimon_surprise
 f_two_sides_bridge
+f_ren_1_beach
+f_ren_2_prairie
+f_ren_3_bay
+f_ren_4_desert
