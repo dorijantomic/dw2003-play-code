@@ -24,9 +24,12 @@ ap.add_argument("--height", type=int, default=28)
 ap.add_argument("--colors", type=int, default=24)
 ap.add_argument("--duration", default="6", help="ticks per frame (60 a second); a list like 2,1 repeats across the frames")
 ap.add_argument("--clips", default="",
-                help="also write field clips: id=first-last@ticks/ticks/..., frames counted along a row, the tick "
-                     "list repeating, ';' between clips. Patamon's: 1=0-8@6;4=9-13@6/4/4/6/4;5=9-13@4/2/2/4/4;"
+                help="also write field clips: id=first-last@ticks/ticks/...[^bob/bob/...], frames counted along a "
+                     "row, the tick (and pixel bob) lists repeating, ';' between clips. Patamon's:1=0-8@6;4=9-13@6/4/4/6/4;5=9-13@4/2/2/4/4;"
                      "6=14-19@4/4/4/4/6/6 (idle, walk, run, stop)")
+ap.add_argument("--grid", default="",
+                help="COLSxROWS: the sheet is an exact grid shot from one fixed camera (tools/sprite-views.sh): "
+                     "every frame is cut with the same box, so the body stays put while wings and feet move")
 a = ap.parse_args()
 ticks = [int(t) for t in a.duration.split(",")]
 
@@ -61,30 +64,42 @@ def runs(on, min_gap, min_len):
 
 
 H, W = fg.shape
-rows = runs(fg.sum(1) > 2, max(4, H // 200), max(10, H // 40))
-if len(rows) != len(DRAWN):
-    raise SystemExit(f"found {len(rows)} rows, expected {len(DRAWN)} (down, down-left, left, up-left, up)")
-
-cells = []  # per row: list of (box)
-for y0, y1 in rows:
-    band = fg[y0:y1]
-    cols = runs(band.sum(0) > 1, max(3, W // 400), max(8, W // 100))
-    typical = float(np.median([c1 - c0 for c0, c1 in cols]))
-    row = []
-    for c0, c1 in cols:
-        k = max(1, round((c1 - c0) / typical))
-        prof = band[:, c0:c1].sum(0)
-        cuts = [c0]
-        for j in range(1, k):
-            c = (c1 - c0) * j // k
-            lo, hi = max(0, c - int(typical * 0.3)), min(c1 - c0, c + int(typical * 0.3))
-            cuts.append(c0 + lo + int(np.argmin(prof[lo:hi])))
-        cuts.append(c1)
-        for i in range(k):
-            x0, x1 = cuts[i], cuts[i + 1]
-            ys, xs = np.nonzero(fg[y0:y1, x0:x1])
-            row.append((x0 + xs.min(), y0 + ys.min(), x0 + xs.max() + 1, y0 + ys.max() + 1))
-    cells.append(row)
+if a.grid:
+    gc, gr = (int(v) for v in a.grid.lower().split("x"))
+    if gr != len(DRAWN):
+        raise SystemExit(f"--grid wants {len(DRAWN)} rows")
+    cw, ch = W // gc, H // gr
+    cellfg = np.zeros((ch, cw), bool)
+    for ri in range(gr):
+        for ci in range(gc):
+            cellfg |= fg[ri * ch:(ri + 1) * ch, ci * cw:(ci + 1) * cw]
+    ys, xs = np.nonzero(cellfg)
+    bx0, by0, bx1, by1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
+    cells = [[(ci * cw + bx0, ri * ch + by0, ci * cw + bx1, ri * ch + by1) for ci in range(gc)] for ri in range(gr)]
+else:
+    rows = runs(fg.sum(1) > 2, max(4, H // 200), max(10, H // 40))
+    if len(rows) != len(DRAWN):
+        raise SystemExit(f"found {len(rows)} rows, expected {len(DRAWN)} (down, down-left, left, up-left, up)")
+    cells = []  # per row: list of (box)
+    for y0, y1 in rows:
+        band = fg[y0:y1]
+        cols = runs(band.sum(0) > 1, max(3, W // 400), max(8, W // 100))
+        typical = float(np.median([c1 - c0 for c0, c1 in cols]))
+        row = []
+        for c0, c1 in cols:
+            k = max(1, round((c1 - c0) / typical))
+            prof = band[:, c0:c1].sum(0)
+            cuts = [c0]
+            for j in range(1, k):
+                c = (c1 - c0) * j // k
+                lo, hi = max(0, c - int(typical * 0.3)), min(c1 - c0, c + int(typical * 0.3))
+                cuts.append(c0 + lo + int(np.argmin(prof[lo:hi])))
+            cuts.append(c1)
+            for i in range(k):
+                x0, x1 = cuts[i], cuts[i + 1]
+                ys, xs = np.nonzero(fg[y0:y1, x0:x1])
+                row.append((x0 + xs.min(), y0 + ys.min(), x0 + xs.max() + 1, y0 + ys.max() + 1))
+        cells.append(row)
 nframes = min(len(row) for row in cells)
 print("frames per row:", [len(row) for row in cells], "-> using", nframes)
 
@@ -154,12 +169,15 @@ if a.clips:
         cid, rest = spec.split("=")
         span, tl = rest.split("@")
         first, last = (int(v) for v in span.split("-"))
+        tl, _, bob = tl.partition("^")
         tl = [int(t) for t in tl.split("/")]
+        bob = [int(v) for v in bob.split("/")] if bob else [0]
         pick = list(range(first, last + 1))
         if last >= nframes:
             raise SystemExit(f"clip {cid}: frame {last} but the rows have {nframes}")
         durs = [tl[i % len(tl)] for i in range(len(pick))]
-        clips[cid] = {d: {"cols": [di * nframes + p for p in pick], "durations": durs, "bottoms": [0] * len(pick)}
+        clips[cid] = {d: {"cols": [di * nframes + p for p in pick], "durations": durs,
+                          "bottoms": [bob[i % len(bob)] for i in range(len(pick))]}
                       for di, d in enumerate(DRAWN)}
     rec.update({"clipSheet": crel, "clipFrameW": fw, "clipFrameH": fh, "clips": clips})
     print("clips:", {c: sum(v["down"]["durations"]) for c, v in clips.items()}, "ticks ->", f"web/{crel}")

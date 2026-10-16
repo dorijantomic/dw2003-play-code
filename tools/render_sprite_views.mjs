@@ -31,6 +31,19 @@ const loop = process.env.LOOP ? process.env.LOOP.split(":").map(Number) : await 
   return [0, back ? back[3] : 60];
 });
 console.log("loop:", loop.join(".."));
+if (process.env.HOLD_ROOT) {
+  // Hold the root bone where it starts the loop: the body's own drift (a hover bob on a longer cycle than the
+  // wing beat) would jump at every wrap of a short field loop. The field clip adds its own bob.
+  // Its tilt too: on the same long cycle, it swings the head and wings back and forth from the side.
+  await page.evaluate((f0) => {
+    const anim = window._model.bones[0].anim;
+    for (const name of ["ch1", "ch2"]) {
+      const ch = anim[name];
+      const k = [...ch].reverse().find((x) => x[3] <= f0) ?? ch[0];
+      anim[name] = [[k[0], k[1], k[2], 0], [k[0], k[1], k[2], 30000]];
+    }
+  }, loop[0]);
+}
 await page.evaluate(() => { window._mv.clear = [0, 1, 0, 1]; document.getElementById("overlay").style.display = "none"; });
 
 const canvas = page.locator("#c");
