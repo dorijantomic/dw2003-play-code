@@ -6,6 +6,8 @@
 #   tools/partner-from-model.sh <model> <charId> <beatStart> <beatLen> [height]
 #   e.g. tools/partner-from-model.sh m217pdev x191demi 10 20 44
 # beatStart/beatLen: one wing beat in model frames (read the wing bones' ch2 keys; DemiDevimon: 10, 20).
+# IDLE_BEATS (default 3, Patamon's): beats the idle's 9 frames span. A model with no wing beat, only one slow
+# loop, uses that loop as the beat and IDLE_BEATS=1 (Hagurumon: m122hagu x193hagu 10 61, IDLE_BEATS=1).
 # Needs the web server: python3 -m http.server ${VERIFY_PORT:-8770} --directory web
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -13,7 +15,7 @@ model="${1:?model}"; char="${2:?charId}"; s="${3:?beatStart}"; n="${4:?beatLen}"
 w="captures/partner-from-model/$model"
 mkdir -p "$w/idle" "$w/walk" "$w/stop" "$w/all"
 r() { HOLD_ROOT=1 LOOP=$1 VERIFY_PORT="${VERIFY_PORT:-8770}" tools/run-playwright.sh tools/render_sprite_views.mjs "$model" "$2" "$3"; }
-r "$s:$((s + 3 * n))" "$w/idle" 9
+r "$s:$((s + ${IDLE_BEATS:-3} * n))" "$w/idle" 9
 r "$s:$((s + n))" "$w/walk" 5
 r "$s:$((s + n))" "$w/stop" 6
 # one row per direction: idle 0-8, walk 9-13, stop 14-19
