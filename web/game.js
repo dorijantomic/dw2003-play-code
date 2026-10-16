@@ -229,6 +229,7 @@ import {
     isInnLauncherIndex,
     rosterMaskForParty,
     rosterSlotOfCharId,
+    newPartnerList,
     savePointForStage,
     savePointBySlot,
     setPadLanguage,
@@ -2384,6 +2385,26 @@ async function init() {
     } catch {
         /* no extra characters */
     }
+    // The new partners' field sprites (web/extra_partners.json): they join the character table the
+    // starters walk from, so a new partner leading the party is a character like any starter.
+    try {
+        const ep = await fetch("extra_partners.json");
+        if (ep.ok) {
+            for (const rec of (await ep.json()).characters ?? []) {
+                if (state.manifest.characters.some((c) => c.id === rec.id)) continue;
+                state.manifest.characters.push(rec);
+                manifestSprites.set(rec.id, { record: rec, kind: "character" });
+            }
+        }
+    } catch {
+        /* no new partners */
+    }
+    // ... and their roster slots and starter ids, before the saved party is read back.
+    try {
+        await window.__extraRoster?.load?.();
+    } catch {
+        /* no extra species */
+    }
     // Real screen→map table (data/screen_table.json) for HANDOFF routing. Tolerate 404.
     try {
         const st = await fetch("assets/data/screen_table.json");
@@ -3442,6 +3463,7 @@ async function startGame(mapId = null) {
     canvas.hidden = false;
     document.getElementById("hud").classList.add("visible");
     setMap(idx >= 0 ? idx : 0, saved);
+    grantNewPartners();
     checkStageCutscene(currentMap().id);
     requestAnimationFrame(frame);
 }
@@ -4709,7 +4731,24 @@ async function loadAndSetMap(i, spawn = null) {
     // Levelling and gym work move Charisma, and the tamers who care about it are on the
     // next screen. A screen change is the cheapest place that always precedes meeting one.
     refreshPartyCharisma();
+    grantNewPartners();
 }
+
+// EXTRA: the new partners (data/authored/web/assets/data/new_starters.json, registered by
+// web/extra-roster.js) are an option, not a story reward: once you have a party they wait
+// in the Digimon Lab, and you switch one in there like any partner you have obtained. Their
+// bits sit above the disc's eight in the obtained set, so no story test of slots 0..7 sees them.
+function grantNewPartners() {
+    const partners = newPartnerList();
+    if (!partners.length || !fieldPartySize(state.party)) return false;
+    const before = Number(state.rosterOwned) || 0;
+    let mask = before;
+    for (const p of partners) mask |= 1 << p.slot;
+    if (mask === before) return false;
+    state.rosterOwned = mask;
+    return true;
+}
+window.__grantNewPartners = grantNewPartners;
 
 function setMap(i, spawn = null) {
     state.mapIdx =
@@ -6306,6 +6345,7 @@ function playStoryEvent(ev, onDone) {
                 // slot N" dialogue gates read back and what keeps the Digimon Lab from
                 // offering you a partner you are already walking around with.
                 state.rosterOwned = rosterMaskForParty(state.rosterOwned, state.party);
+                grantNewPartners();
                 refreshPartyCharisma();   // the party just came into existence
             }
             // Restore static NPC positions, clear cutscene state, remove ephemerals.

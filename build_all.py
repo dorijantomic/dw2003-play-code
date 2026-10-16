@@ -1386,7 +1386,8 @@ STAGES = [
                    "web/assets/battle/model_map.json",
                    "web/assets/data/maze_exits.json",
                    "web/assets/data/dna_clip12.json",
-                   "web/assets/data/extra_species_canon.json")),
+                   "web/assets/data/extra_species_canon.json",
+                   "web/assets/data/new_starters.json")),
     # Every STITSHOP shop's stock list (stitshop data.rs + esshpnam names), and
     # the merchant model (shop -> merchant type) built on it.
     Stage("shops", ["tools/extract_shops.py"], str(REPO),
@@ -1415,9 +1416,12 @@ STAGES = [
     Stage("extra_species", ["tools/build_extra_species.py"], str(REPO),
           inputs=("web/assets/data/enemies.json", "web/assets/data/digimon.json",
                   "web/assets/data/fight_tech_table.json", "web/assets/battle/model_map.json",
-                  "data/authored/web/assets/data/extra_species_canon.json"),
+                  "web/assets/data/evolutions.json",
+                  "data/authored/web/assets/data/extra_species_canon.json",
+                  "data/authored/web/assets/data/new_starters.json"),
           outputs=("web/assets/data/extra_species.json", "web/assets/data/extra_profiles.bin"),
-          deps=("model_map", "build_battle_data", "fight_tech_table", "translated_screen_data", "authored_data")),
+          deps=("model_map", "build_battle_data", "fight_tech_table", "translated_screen_data", "authored_data",
+                "evolutions")),
     # ---- data the private tree carried without a stage (each tool already
     # existed; these wire it into the build) ----
     Stage("arenas", ["tools/extract_arenas.py"], str(REPO),

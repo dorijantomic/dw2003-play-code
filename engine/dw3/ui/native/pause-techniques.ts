@@ -27,7 +27,7 @@ import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } 
 import { buildEffectiveStats } from "../../effective-stats.ts";
 import { itemRecord } from "../../item-record.ts";
 import { findFormLedgerIndex, validateEquippedForm } from "../../form-ledger.ts";
-import { partyPositionToRosterSlot, persistentRosterSlot } from "../../party-context.ts";
+import { partyPositionToRosterSlot, persistentRosterSlot, rosterContextBase } from "../../party-context.ts";
 import { partyCardRows, ROWS_TECHNIQUES } from "./party-card-rows.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
 
@@ -57,7 +57,7 @@ const rowFill = (mem: PauseMemory, obj: number, ui: number, row: number, show: n
 export function formEntryCopy(mem: PauseMemory, slot: number, form: number, dst: number): number {
     const index = findFormLedgerIndex(mem, slot, form);
     if (index !== -1) {
-        const src = PAUSE_CTX + (slot | 0) * 0x3dc + 0x7b8 + index * 0x14;
+        const src = rosterContextBase(slot) + 0x7b8 + index * 0x14;
         for (let i = 0; i < 5; i++) mem.write32(dst + i * 4, mem.read32(src + i * 4));
     }
     return index;

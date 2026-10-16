@@ -94,7 +94,8 @@ test("every enemy-only Digimon is a form the player can learn", x, async () => {
   wanted.delete("BKWarGreymon");               // species 43, already a base form
   const byName = new Map(all.map((m) => [m.name, m]));
   for (const n of wanted) assert.ok(byName.has(n), `${n} is not a player species`);
-  assert.equal(all.length, 55 + wanted.size);
+  // the new partners (new_starters.json) are starter rows after the enemy-only species
+  assert.equal(all.length, 55 + wanted.size + (extra.starters?.length ?? 0));
 
   const formLevels = (line) => {
     const have = {};
@@ -111,10 +112,49 @@ test("every enemy-only Digimon is a form the player can learn", x, async () => {
     }
     return have;
   };
-  for (let line = 0; line < 8; line++) {
+  const lines = [...Array(8).keys(), ...(extra.starters ?? []).map((p) => p.slot)];
+  for (const line of lines) {
     const have = formLevels(line);
-    const missing = all.filter((m) => m.id >= 9 && m.id <= 52 || m.id >= 56).filter((m) => !have[m.id]).map((m) => m.name);
-    assert.deepEqual(missing, [], `line ${line} (${mons[line].name}) never learns ${missing.join(", ")}`);
+    // a new partner never learns its own species as a form
+    const own = extra.starters?.find((p) => p.slot === line)?.model;
+    const missing = all.filter((m) => !m.is_starter && m.name !== own && (m.id >= 9 && m.id <= 52 || m.id >= 56))
+      .filter((m) => !have[m.id]).map((m) => m.name);
+    assert.deepEqual(missing, [], `line ${line} (${trees.lines[line]?.digimonId}) never learns ${missing.join(", ")}`);
+  }
+});
+
+test("each new partner is a starter whose own canonical line comes first, at line level 5, 20 and 40", x, async () => {
+  const { mergeEvolutions, mergeDigimon, newPartnersOf } = await import("../web/extra-roster.js");
+  const authored = JSON.parse(fs.readFileSync(path.join(A, "data/new_starters.json"), "utf8")).starters;
+  const trees = mergeEvolutions(evo, extra);
+  const all = mergeDigimon(D, extra).digimon;
+  const byId = new Map(all.map((m) => [m.id, m]));
+  const idOf = (name) => all.find((m) => m.name === name && !m.is_starter)?.id;
+  assert.deepEqual(newPartnersOf(extra).map((p) => p.slot), authored.map((_, i) => 8 + i));
+  const profiles = fs.readFileSync(path.join(A, "data/extra_profiles.bin"));
+  for (const a of authored) {
+    const row = byId.get(a.id);
+    assert.ok(row?.is_starter, `${a.name} is a starter row`);
+    assert.equal(["str", "def", "spt", "wis", "spd"].reduce((t, k) => t + row[k], 0), 200, `${a.name}: starter stat budget`);
+    assert.deepEqual(row.blasts, a.blasts.map(idOf), `${a.name}: Blast forms are its own line`);
+    const rec = profiles.subarray(0x58 * (a.id - 56), 0x58 * (a.id - 55));
+    assert.equal(rec.readUInt16LE(0), a.formId, `${a.name}: game form id`);
+    assert.equal(rec.readUInt16LE(0x1c), a.tech_basic);
+    assert.equal(rec.readUInt16LE(0x28), a.tech_signature);
+    assert.equal(rec[0x3f], a.hp);
+    assert.equal(trees.lines[a.slot]?.digimonId, a.id, `${a.name}: line ${a.slot}`);
+    // base stats, no forms: no canonical form before line level 5 and never its own species, then the canonical forms in order
+    const base = { stats: Object.fromEntries(["str", "def", "spt", "wis", "spd", "chr"].map((k) => [k, row[k]])) };
+    const canonIds = a.canon.map(([name]) => idOf(name));
+    assert.ok(!trees.lines[a.slot].records.some((r) => r.to === idOf(a.model)), `${a.name}: never its own species as a form`);
+    const early = firstUnlockedTreeRecord(trees, a.slot, { formLevels: {}, level: 4, stats: base });
+    assert.ok(!canonIds.includes(early?.record.to), `${a.name}: nothing of its line before level 5`);
+    const have = {};
+    for (const [name, level] of a.canon) {
+      const hit = firstUnlockedTreeRecord(trees, a.slot, { formLevels: have, level, stats: base });
+      assert.equal(hit?.record.to, idOf(name), `${a.name} at level ${level} learns ${name}`);
+      have[hit.record.to] = 1;
+    }
   }
 });
 
@@ -138,7 +178,8 @@ test("every extra form has a game form id, a model, a name-bank entry and techni
     const value0 = rec.readUInt16LE(0);
     if (taken.has(value0)) problems.push(`${m.name}: game form id ${value0} is taken`);
     taken.add(value0);
-    if (extra.meta[m.name].value0 !== value0) problems.push(`${m.name}: record and meta disagree`);
+    const meta = m.is_starter ? extra.starters.find((p) => p.id === m.id) : extra.meta[m.name];
+    if ((m.is_starter ? meta?.formId : meta?.value0) !== value0) problems.push(`${m.name}: record and meta disagree`);
     const folder = modelFolder(m.name);
     if (!folder || !fs.existsSync(path.join(A, "battle/models", folder, "anim.json"))) { problems.push(`${m.name}: no model`); return; }
     const anim = readJson(`battle/models/${folder}/anim.json`);

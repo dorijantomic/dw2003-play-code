@@ -61,6 +61,23 @@ export const DIGIMON_PICTURE_END = -1;
 export const DIGIMON_PICTURE_CLIPS = 29;
 
 /**
+ * EXTRA: the new partners (roster slots 8.., engine/dw3/roster.ts) have no row in the disc's
+ * table, whose ninth row is already other data. Their pictures are numbered from this base,
+ * 0x10 per slot (slot 8 = 0x400.., slot 9 = 0x410..), and walk this frame order; the browser
+ * draws them from the partner's own picture sheet, or nothing while it has none.
+ */
+export const NEW_PARTNER_PICTURE_BASE = 0x400;
+export const NEW_PARTNER_PICTURE_ROW: readonly number[] = [0, 1, 2, 1];
+const FIRST_NEW_ROW = 8;
+const LAST_NEW_ROW = 15;
+const isNewPartnerRow = (row: number): boolean => row >= FIRST_NEW_ROW && row <= LAST_NEW_ROW;
+/** A new partner's picture for `row` (its roster slot) at counter `counter`. */
+export function newPartnerPicture(row: number, counter: number): number {
+    const n = NEW_PARTNER_PICTURE_ROW.length;
+    return NEW_PARTNER_PICTURE_BASE + (row - FIRST_NEW_ROW) * 0x10 + NEW_PARTNER_PICTURE_ROW[((counter % n) + n) % n]!;
+}
+
+/**
  * The table, in the overlay's own row order (`ststatus.s:24396`), byte-identical
  * to the copies at stgdglab 0x8008F4C4, stplnmet 0x80089A8C, stdgname 0x80087A90,
  * stgmcard 0x80088204, stfgtrep 0x8008905C and stcrddek 0x8008B6FC, and to the
@@ -108,11 +125,12 @@ export function starterPictureRow(digimonId: number): number | undefined {
  * row, which is why the Lab's sites guard with `bltz` and the pause screen does not.
  */
 export function rosterSlotPictureRow(slot: number): number | undefined {
-    return slot >= 0 && slot < DIGIMON_PICTURE_ROWS ? slot : undefined;
+    return slot >= 0 && (slot < DIGIMON_PICTURE_ROWS || isNewPartnerRow(slot)) ? slot : undefined;
 }
 
 /** One row's picture numbers without the `-1` padding: the loop's own run. */
 export function digimonPictureRow(row: number): number[] {
+    if (isNewPartnerRow(row)) return NEW_PARTNER_PICTURE_ROW.map((_, i) => newPartnerPicture(row, i));
     const words = DIGIMON_PICTURE_TABLE[row];
     if (!words) return [];
     const out: number[] = [];
@@ -227,6 +245,10 @@ export function advanceDigimonPictures(options: PictureFramesOptions): void {
             const counter = (group.counterBase + 4 * i) >>> 0;
             const next = (mem.read32(counter) | 0) + 1;
             mem.write32(counter, next >>> 0);
+            if (isNewPartnerRow(row)) {
+                if (next >= NEW_PARTNER_PICTURE_ROW.length) mem.write32(counter, 0);
+                continue;
+            }
             const word = mem.read32((table + (row * DIGIMON_PICTURE_ROW_WORDS + next) * 4) >>> 0) | 0;
             if (word === DIGIMON_PICTURE_END || (group.wrapAt !== undefined && next >= group.wrapAt)) {
                 mem.write32(counter, 0);
@@ -258,5 +280,6 @@ export function digimonPictureAtBase(
     row: number,
     counter: number,
 ): number {
+    if (isNewPartnerRow(row | 0)) return newPartnerPicture(row | 0, counter | 0);
     return mem.read32((tableBase + (row * DIGIMON_PICTURE_ROW_WORDS + (counter | 0)) * 4) >>> 0) | 0;
 }

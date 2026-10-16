@@ -1,9 +1,10 @@
 // Compose the translated BUY actor, stock list and info band under one task tree.
 // The two actor classes share stock, detail panel, text and input services.
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import type { NativeMemory } from "../../native/memory.ts";
 import {
   partyPositionToRosterSlot, persistentRosterSlot, ROSTER_RECORDS, ROSTER_STRIDE,
-  ROSTER_EQUIP_OFFSETS,
+  ROSTER_EQUIP_OFFSETS, rosterRecordAddress
 } from "../party-context.ts";
 import { itemClassEquals, itemRecord } from "../item-record.ts";
 import { gearAccessibleForLine, shopEquipSlot, shopEquipSwap, EQUIP_SLOTS, type EquipmentSlots } from "../equipment.ts";
@@ -73,14 +74,14 @@ export class ShopTradeComposition {
     const rosterSlot = (position: number): number => partyPositionToRosterSlot(mem, position);
     const rosterHandle = (slot: number): number => persistentRosterSlot(slot);
     const memberHas = (slot: number, id: number): number => {
-      if (slot < 0 || slot > 8) return 0;
-      const starter = (mem.read32(ROSTER_RECORDS + slot * ROSTER_STRIDE) | 0) - 3;
+      if (slot < 0 || slot >= MAX_ROSTER_SLOTS) return 0;
+      const starter = (mem.read32(rosterRecordAddress(slot)) | 0) - 3;
       return Number(gearAccessibleForLine(id, starter));
     };
     const canEquip = memberHas;
     const equipmentOf = (slot: number): EquipmentSlots => {
-      if (slot < 0 || slot > 8) throw new Error("Invalid merchant roster slot");
-      const base = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+      if (slot < 0 || slot >= MAX_ROSTER_SLOTS) throw new Error("Invalid merchant roster slot");
+      const base = rosterRecordAddress(slot);
       const out: EquipmentSlots = {};
       for (const name of EQUIP_SLOTS) {
         const id = mem.read16(base + ROSTER_EQUIP_OFFSETS[name]);
@@ -106,7 +107,7 @@ export class ShopTradeComposition {
       if (!result || EQUIP_SLOTS.indexOf(result.slot) !== index) {
         throw new Error("Merchant equip slot differs from selected slot");
       }
-      const base = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+      const base = rosterRecordAddress(slot);
       for (const name of EQUIP_SLOTS) {
         mem.write16(base + ROSTER_EQUIP_OFFSETS[name], result.equipment[name] ?? 0);
       }

@@ -1060,12 +1060,16 @@ export {
   savePointLaunchCode, savePointPlaceIndex, type SavePoint,
   type SavePointAlias,
 } from "./dw3/save-points.ts";
-// The eight-slot partner roster and the Digimon Lab's obtained-minus-deployed rule.
+// The partner roster (the disc's eight slots, then the new partners) and the Digimon Lab's
+// obtained-minus-deployed rule.
 export {
-  ROSTER_SLOT_COUNT, DEPLOYED_PARTY_CAP, ROSTER_SLOT_CHARIDS,
+  ROSTER_SLOT_COUNT, DISC_ROSTER_SLOT_COUNT, MAX_ROSTER_SLOTS, DEPLOYED_PARTY_CAP, ROSTER_SLOT_CHARIDS,
   rosterSlotDigimonId, rosterSlotOfCharId, partyPositionRosterSlot, withRosterSlot, rosterSlotOwned,
   ownedRosterSlots, reserveRosterSlots, rosterMaskForParty,
+  registerNewPartners, newPartnerOfSlot, newPartnerList, isDiscRosterSlot, rosterSlotOfDigimonId,
+  isStarterDigimonId, isFormDigimonId, rosterGearSlot, type NewPartner,
 } from "./dw3/roster.ts";
+export { rosterRecordAddress, rosterContextBase, EXTRA_ROSTER_RECORDS } from "./dw3/roster-records.ts";
 // Shared UI object layer — the classes the original builds every screen from.
 export * as ui from "./dw3/ui/index.ts";
 // The in-battle DNA command's own rule, promoted for web/battle.js so the DNA

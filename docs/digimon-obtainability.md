@@ -68,3 +68,30 @@ own models. 20 are clip 12 on the DNA-capable species: that is the Jogress direc
 - `tests/fight-fallback-census.test.js`, `tests/extra-save-roundtrip.test.js` (48 forms through a card save and load).
 - Browser: `tools/verify_extra_roster.mjs` (the Digivolve list), `tools/verify_extra_learn.mjs` (win a fight, learn
   Kunemon, saved), `tools/verify_extra_tech_anim.mjs` (spell, combo and support on an enemy-only model).
+
+## New partners: DemiDevimon, Betamon, Hagurumon
+
+Three partners beyond the disc's eight, each with its whole line already in the game as 3D models
+(`data/authored/web/assets/data/new_starters.json`, built by `tools/build_extra_species.py` into `extra_species.json`'s
+`starters`):
+
+| Partner | Id | Roster slot | Own line (line level 5 / 20 / 40) | Gear from |
+|---|---|---|---|---|
+| DemiDevimon | 191 | 8 | Devimon, Myotismon, VenomMyotismon | Renamon's line |
+| Betamon | 192 | 9 | Seadramon, MegaSeadramon, MetalSeadramon | Kumamon's line |
+| Hagurumon | 193 | 10 | Guardromon, Andromon, HiAndromon | Monmon's line |
+
+Base numbers follow the disc's starter budget (stat total 200, resistances 680, status resistances 150). After its own
+line, each gets a donor line's gates for the disc's 44 forms (the donor's own forms ten levels later), then the
+enemy-only species by family. A line never learns its own species as a form.
+
+How you get them: once you have a party they are owned and wait in the Digimon Lab (Switch Digimon), like any partner
+you have obtained. Their bits sit above the disc's eight (`rosterOwned` bits 8..10), so story checks never see them.
+
+Engine: roster slots 8..15 (`engine/dw3/roster.ts`), their records at `0x801F8000` (`engine/dw3/roster-records.ts`);
+every record address goes through `rosterRecordAddress`. A card save keeps the disc's eight records; the new partners'
+blocks come back from the companion snapshot (`engine/persistence/memcard-state.ts`).
+
+Not done yet: the walking sprites and the lab/status pictures (they are blank until the art exists; the field sprite is a
+transparent placeholder in `web/extra_partners.json`). Browser check: `tools/verify_new_partners.mjs` (lab switch,
+a fight, card save and load, pause STATUS).

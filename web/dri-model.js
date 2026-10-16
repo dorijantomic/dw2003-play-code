@@ -4,7 +4,7 @@ import { CHARID_TO_DIGID, baseStatsFor } from "./party.js";
 import { applyFormTechGates } from "./form-tech-slots.js";
 import {
   ROSTER_SLOT_CHARIDS, reserveRosterSlots, rosterSlotDigimonId, rosterSlotOfCharId,
-  DEPLOYED_PARTY_CAP, syncWornFromEquipment,
+  DEPLOYED_PARTY_CAP, syncWornFromEquipment, isFormDigimonId,
 } from "./vendor/engine.js";
 
 export function ensureDriPartyStats(state, digimonById) {
@@ -61,7 +61,7 @@ export function ensureFormLedger(stats, digimonById) {
     record.techSlots = Array.isArray(record.techSlots) ? record.techSlots.slice(0, 6) : [];
     while (record.techSlots.length < 6) record.techSlots.push(0);
   }
-  if (stats.digimonId && stats.digimonId > 8 && !stats.formLedger.some((r) => r.id === stats.digimonId)) {
+  if (stats.digimonId && isFormDigimonId(stats.digimonId) && !stats.formLedger.some((r) => r.id === stats.digimonId)) {
     const profile = digimonById[stats.digimonId];
     if (profile) stats.formLedger.push({ id: profile.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
   }
@@ -215,7 +215,7 @@ export function setStandingForm(state, index, formId, digimonById) {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return false;
-  const id = !formId || formId <= 8 ? starter.id : formId;
+  const id = !formId || !isFormDigimonId(formId) ? starter.id : formId;
   if (id !== starter.id) {
     const equipped = ensureEquippedForms(stats, digimonById);
     if (!equipped.some((held) => Number(held) === id)) return false;
@@ -238,7 +238,7 @@ export function acquiredDriForms(state, index, digimonById) {
   return ensureFormLedger(stats, digimonById).flatMap((record) => {
     const id = Number(record.id);
     const profile = digimonById[id];
-    if (!profile || id <= 8 || seen.has(id)) return [];
+    if (!profile || !isFormDigimonId(id) || seen.has(id)) return [];
     seen.add(id);
     return [{ record, profile }];
   });

@@ -58,7 +58,9 @@ const LEDGERS = [
     { slot: 3, ids: new Array(FORM_ENTRY_COUNT).fill(0).map((_, i) => 3 + i) },
     { slot: 4, ids: new Array(FORM_ENTRY_COUNT - 1).fill(0).map((_, i) => 0x20 + i) },
     { slot: 5, ids: [0, 0, 0, 0x41] },
-    { slot: 8, ids: [1, 2, 0x44, 0, 0x45] },
+    // slot 7, the disc's last: slots 8.. are the new partners' own record window
+    // (engine/dw3/roster-records.ts), not the memory after the disc's array
+    { slot: 7, ids: [1, 2, 0x44, 0, 0x45] },
 ];
 
 test("setEquippedForms matches F0x800177D0", () => {

@@ -25,6 +25,7 @@
 //
 // Object fields read: session +0x50 screen, +0x5C roster slot, +0x60 drill id (13 or more is
 // a super drill), +0xD8 Ultra Training Chance won; screen +0x7C the TP choice (0, 1, 2).
+import { rosterSlotProfileAddress } from "./pause-status.ts";
 export const GYM_GAIN_TABLE = 0x8008c304;
 export const GYM_LOSS_TABLE = 0x8008c364;
 export const GYM_ELEMENT_POINTERS = 0x8008c454;
@@ -92,7 +93,7 @@ export function gymRollElementGain(mem: GymRollMemory, session: number, stat: nu
   const ptr = (block + stat * 2 + 0x24) >>> 0;
   const current = s16(mem.read16(ptr));
   const slot = mem.read32(session + 0x5c) | 0;
-  const growth = mem.read8((GYM_SPECIES_TABLE + slot * GYM_SPECIES_STRIDE + (stat - 8) + 0x49) >>> 0);
+  const growth = mem.read8((rosterSlotProfileAddress(mem, slot) + (stat - 8) + 0x49) >>> 0);
   const band = current < 0x64 ? 0 : current < 0x12c ? 1 : 2;
   const pointer = mem.read32((GYM_ELEMENT_POINTERS + (((growth - 1) * 3 + band) | 0) * 4) >>> 0);
   let variant = 0;

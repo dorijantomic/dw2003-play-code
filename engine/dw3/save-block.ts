@@ -1,7 +1,8 @@
 // Lossless resident save-image adapter. The card driver copies +0..+0x26C4;
 // unexplained bytes are data, not disposable padding. See SAVELOAD-Q001-BLOCK-2026-10-04.
+import { isFormDigimonId, rosterSlotDigimonId } from "./roster.ts";
 import { NativeMemory } from "../native/memory.ts";
-import { PARTY_CONTEXT, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES } from "./party-context.ts";
+import { PARTY_CONTEXT, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES, rosterRecordAddress } from "./party-context.ts";
 import { nativeFormIds } from "./ui/roster-form-state.ts";
 export const RESIDENT_SAVE_SIZE = 0x26c4;
 export const RESIDENT_ROSTER_COUNT = 8;
@@ -23,7 +24,7 @@ export function decodeSaveRoster(image: ArrayLike<number>, profiles: Uint8Array)
   mem.load(profiles, 0x8003ef5c);
   const ids = nativeFormIds(mem);
   return Array.from({ length: RESIDENT_ROSTER_COUNT }, (_, slot) => {
-    const r = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+    const r = rosterRecordAddress(slot);
     const current = mem.read32(r + 4);
     const ledger = Array.from({ length: RESIDENT_FORM_COUNT }, (_, index) => {
       const at = r + 0x58 + index * RESIDENT_FORM_SIZE;
@@ -32,14 +33,14 @@ export function decodeSaveRoster(image: ArrayLike<number>, profiles: Uint8Array)
         techSlots: Array.from({ length: 6 }, (_, j) => mem.read16(at + 8 + j * 2)) };
     });
     return { slot, owned: mem.read32(r), currentForm: current,
-      digimonId: current ? ids.walkerIdOf(current) : slot + 1,
+      digimonId: current ? ids.walkerIdOf(current) : rosterSlotDigimonId(slot),
       nameBytes: Array.from({ length: 24 }, (_, i) => mem.read8(r + 8 + i)),
       xp: mem.read32(r + 0x20), level: mem.read16(r + 0x24), tp: mem.read16(r + 0x26),
       hp: mem.read16(r + 0x28), maxHp: mem.read16(r + 0x2a), mp: mem.read16(r + 0x2c), maxMp: mem.read16(r + 0x2e),
       core: Array.from({ length: 6 }, (_, i) => mem.read16(r + 0x30 + i * 2)),
       elements: Array.from({ length: 7 }, (_, i) => mem.read16(r + 0x3c + i * 2)),
-      equippedForms: Array.from({ length: 3 }, (_, i) => ids.walkerIdOf(mem.read16(r + 0x50 + i * 2))).filter(id => id > 8),
-      formLedger: ledger.filter(e => e.nativeId >= 3 && e.id > 8), ledger,
+      equippedForms: Array.from({ length: 3 }, (_, i) => ids.walkerIdOf(mem.read16(r + 0x50 + i * 2))).filter(id => isFormDigimonId(id)),
+      formLedger: ledger.filter(e => e.nativeId >= 3 && isFormDigimonId(e.id)), ledger,
       equipment: Object.fromEntries(ROSTER_EQUIP_ENTRIES.map(([key, off]) => [key, mem.read16(r + off)])),
       lastUltraDrill: mem.read8(r + 0x3d4),
       rawRecord: Array.from({ length: ROSTER_STRIDE }, (_, i) => mem.read8(r + i)),

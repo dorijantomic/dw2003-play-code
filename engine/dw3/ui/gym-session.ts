@@ -45,6 +45,7 @@
 // record (the TP cost, the six stats, the seven element points, max HP and max MP, and the
 // remembered Ultra drill byte). The walker reads them back ONCE, after the screen has closed
 // (record()), and commits the difference to its own model.
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import { VramMap } from "../../native/vram.ts";
@@ -52,7 +53,7 @@ import type { PadButton } from "../../systems/input-map.ts";
 import {
   PARTY_CONTEXT, PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
   partyPositionToRosterSlot, persistentRosterSlot,
-  requestScreenTransition,
+  requestScreenTransition, rosterRecordAddress
 } from "../party-context.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemRecord } from "../item-record.ts";
@@ -279,7 +280,7 @@ export class GymSession {
     if (seed.members.length === 0 || seed.members.length > GYM_PARTY_SLOTS) throw new Error("Invalid gym party size");
     seed.members.forEach((member, i) => {
       if (member.position !== i) throw new Error("Gym party positions must be contiguous from 0");
-      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot >= 8) {
+      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot >= MAX_ROSTER_SLOTS) {
         throw new Error("Invalid gym roster slot");
       }
     });
@@ -381,7 +382,7 @@ export class GymSession {
     mem.write32(GYM_RANK_GROUP_CELL, seed.group >>> 0);
     mem.write32(GYM_PREVIOUS_SCREEN_CELL, seed.previousScreen >>> 0);
     for (const member of seed.members) {
-      const record = ROSTER_RECORDS + member.rosterSlot * ROSTER_STRIDE;
+      const record = rosterRecordAddress(member.rosterSlot);
       mem.write32(record, ((member.starterSlot ?? member.rosterSlot) + 3) >>> 0);
       mem.write16(record + 0x24, member.level & 0xffff);
       mem.write16(record + 0x26, member.tp & 0xffff);
@@ -786,7 +787,7 @@ export class GymSession {
     const mem = this.mem;
     const slot = partyPositionToRosterSlot(mem, position);
     if (slot < 0) throw new Error("No partner at that gym position");
-    const record = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+    const record = rosterRecordAddress(slot);
     const s16 = (v: number): number => (v << 16) >> 16;
     return {
       level: s16(mem.read16(record + 0x24)), tp: s16(mem.read16(record + 0x26)), hp: s16(mem.read16(record + 0x28)),

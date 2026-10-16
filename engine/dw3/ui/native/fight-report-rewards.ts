@@ -25,11 +25,12 @@
 //   [0x8005CCA0]        F0x800134E8 profileRecord           species record for a form value (pause-status.ts)
 //   +0x2738 validateEquippedForm, +0x273C setEquippedForms, +0x2744 addForm
 // Platform provider: [0x8004DC04+8] = F0x8001933C RAND_U16, injected as `host.rand`.
+import { isDiscRosterSlot } from "../../roster.ts";
 import { persistentRosterSlot } from "../../party-context.ts";
 import { validateEquippedForm } from "../../form-ledger.ts";
 import { addForm, setEquippedForms, writeFormEntry } from "../../form-ledger-edit.ts";
 import { formEntryCopy } from "./pause-techniques.ts";
-import { gameFormId, profileRecord } from "./pause-status.ts";
+import { gameFormId, profileRecord, rosterSlotProfileAddress } from "./pause-status.ts";
 
 export interface RewardMemory {
     read8(addr: number): number;
@@ -63,12 +64,12 @@ export const REWARD_DVEXP_CAP = 0x98967f;
 
 const s16 = (v: number): number => (v << 16) >> 16;
 const s8 = (v: number): number => (v << 24) >> 24;
-const species = (slot: number): number => (REWARD_SPECIES_BASE + Math.imul(slot | 0, REWARD_SPECIES_STRIDE)) >>> 0;
+const species = (mem: object, slot: number): number => rosterSlotProfileAddress(mem, slot);
 
 /** F0x80085E3C(slot, level): apply one level-up's stat gains to the slot's record. */
 export function reportLevelUp(mem: RewardMemory, slot: number, level: number, host: RewardHost): void {
     const record = persistentRosterSlot(slot);
-    const prof = species(slot);
+    const prof = species(mem, slot);
     level = s16(level);
     const bracket = level < 5 ? 0 : level < 0x14 ? 1 : level < 0x28 ? 2 : 3;
     const adjust = mem.read32(REWARD_HPMP_ADJUST + bracket * 4) | 0;
@@ -104,7 +105,7 @@ export function reportLevelUp(mem: RewardMemory, slot: number, level: number, ho
 /** F0x80086184(slot, gain): add EXP and run the level curve; 1 when a level was gained. */
 export function reportAddExperience(mem: RewardMemory, slot: number, gain: number, host: RewardHost): number {
     const record = persistentRosterSlot(slot);
-    const prof = species(slot);
+    const prof = species(mem, slot);
     let exp = ((mem.read32(record + 0x18) | 0) + (gain | 0)) | 0;
     mem.write32(record + 0x18, exp >>> 0);
     if (REWARD_EXP_CAP < exp) { exp = REWARD_EXP_CAP; mem.write32(record + 0x18, exp); }
@@ -206,6 +207,7 @@ function reportUnlockExtraForm(mem: RewardMemory, slot: number, host: RewardHost
 export function reportUnlockForm(mem: RewardMemory, slot: number, host: RewardHost): number {
     const buf = host.scratch;
     const equipped = host.scratch + 0x20;
+    if (!isDiscRosterSlot(slot)) return reportUnlockExtraForm(mem, slot, host);
     const group = mem.read32(REWARD_EVOLUTION_GROUPS + slot * 4) >>> 0;
     const formOf = (row: number): number => mem.read16(REWARD_SPECIES_BASE + Math.imul(mem.read32(row) - 1, REWARD_SPECIES_STRIDE));
     for (let row = group; row < group + 0x2c0; row += 0x10) {

@@ -27,6 +27,7 @@
 
 // ---------------------------------------------------------------- addresses
 /** FIGHTSTG_F0x800934f0 — the in-battle HUD draw. */
+import { persistentRosterSlot } from "../../party-context.ts";
 export const BATTLE_HUD_DRAW = 0x800934f0;
 /**
  * .L0x800a34c0 — six halfwords, three per side. Side 0 (the player's party) reads
@@ -796,8 +797,7 @@ export function battleHudBuildNames(
                 BATTLE_HUD_NAME_PLAYER.x, BATTLE_HUD_NAME_PLAYER.y) >>> 0;
             mem.write32(widget + BATTLE_HUD_SLOT_NAME_PLAYER, element);
         }
-        const source = (BATTLE_HUD_ROSTER + Math.imul(host.rosterSlot(activePlayer),
-            BATTLE_HUD_ROSTER_STRIDE)) | 0;
+        const source = persistentRosterSlot(host.rosterSlot(activePlayer)) | 0;
         host.callMethod(element, BATTLE_HUD_SET_STRING,
             [source, BATTLE_HUD_SET_STRING_LITERAL]);
         out.player = { element, rebuilt: true, source, index: BATTLE_HUD_SET_STRING_LITERAL };

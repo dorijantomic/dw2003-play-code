@@ -5,6 +5,7 @@
 // Authority: docs/research/battle/battle-formula-leaves.md (each function cites the decoded
 // source in ~/ddw3/asm/dw2003/pro/fightstg.s / wfightmn.s).
 
+import { isStarterDigimonId } from "./roster.ts";
 import { randU16 } from "./random-stream.ts";
 
 export interface EffStats {
@@ -232,7 +233,7 @@ export function enemyMoveCondition(
       // profiles (Kotemon..Patamon). The walker names the same rows by id 1..8.
       const formId = context?.partyProfileId;
       if (formId == null) return null;
-      return formId >= 1 && formId <= 8;
+      return isStarterDigimonId(formId);
     }
     case 9: {
       // .L004: `lw $v1, 0x8(0x800a4460)` is the ACTIVE PARTY member's index

@@ -12,12 +12,13 @@
 // the resident tables the pages read (partner profiles, technique records, signature
 // sets, item records, descriptors and directories), the resident font block, and the
 // seven text families the host loads.
+import { MAX_ROSTER_SLOTS, ROSTER_SLOT_COUNT } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
   PARTY_MAP, RECORD_FIELDS, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES,
   partyPositionToRosterSlot, persistentRosterSlot,
-  requestScreenTransition, SCREEN_TRANSITION_A, SCREEN_TRANSITION_B,
+  requestScreenTransition, SCREEN_TRANSITION_A, SCREEN_TRANSITION_B, rosterRecordAddress
 } from "../party-context.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemIconClip, itemRecord } from "../item-record.ts";
@@ -512,8 +513,8 @@ export class PauseRootSession {
     }
     const partyMap = [0, 1, 2].map((i) => mem.read32(PARTY_MAP + i * 4) | 0);
     const records = [];
-    for (let rosterSlot = 0; rosterSlot < 9; rosterSlot++) {
-      const base = ROSTER_RECORDS + rosterSlot * ROSTER_STRIDE;
+    for (let rosterSlot = 0; rosterSlot < Math.max(9, ROSTER_SLOT_COUNT); rosterSlot++) {
+      const base = rosterRecordAddress(rosterSlot);
       const equipment: Record<string, number> = {};
       for (const [name, off] of PAUSE_EQUIP_OFFSETS) equipment[name] = mem.read16(base + off);
       records.push({
@@ -564,10 +565,10 @@ export class PauseRootSession {
       // picture row the pedestal index, so a card drew whichever starter owned that
       // row and a SORT swap permuted those wrong sprites. Seat the identity.
       const slot = member.starterSlot ?? member.rosterSlot;
-      if (!Number.isInteger(slot) || slot < 0 || slot > 8 || seen.has(slot)) throw new Error("Invalid pause roster slot");
+      if (!Number.isInteger(slot) || slot < 0 || slot >= MAX_ROSTER_SLOTS || seen.has(slot)) throw new Error("Invalid pause roster slot");
       seen.add(slot);
       mem.write32(PARTY_MAP + position * 4, slot);
-      const base = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+      const base = rosterRecordAddress(slot);
       mem.write32(base, slot + 3);
       if (member.forms) seedRosterForms(mem, base, member.forms);
       if (member.exp !== undefined) mem.write32(base + RECORD_FIELDS.exp, member.exp >>> 0);

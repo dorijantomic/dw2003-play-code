@@ -1,5 +1,5 @@
 {
- "note": "Species the game only ever used as enemies, made obtainable as digivolution forms. 'from' = the canonical pre-evolution(s) (Digimon World 2 / anime lineage); ids are fixed - never renumber, append only. Stage, stats, techs and gating are derived from the disc's own enemy rows by tools/build_extra_species.py. 'lines' (optional) overrides the family default for which starter lines the form suits (0 Kotemon 1 Kumamon 2 Monmon 3 Agumon 4 Veemon 5 Guilmon 6 Renamon 7 Patamon).",
+ "note": "Species the game only ever used as enemies, made obtainable as digivolution forms. 'from' = the canonical pre-evolution(s) (Digimon World 2 / anime lineage); ids are fixed - never renumber, append only. Stage, stats, techs and gating are derived from the disc's own enemy rows by tools/build_extra_species.py. 'tier' (optional) sets the strength tier 1-5 where the enemy copy's stats put a form out of its canonical stage (Guardromon is a champion). 'lines' (optional) overrides the family default for which starter lines the form suits (0 Kotemon 1 Kumamon 2 Monmon 3 Agumon 4 Veemon 5 Guilmon 6 Renamon 7 Patamon).",
  "species": [
   {
    "id": 56,
@@ -49,7 +49,8 @@
   {
    "id": 65,
    "name": "Hagurumon",
-   "from": []
+   "from": [],
+   "tier": 1
   },
   {
    "id": 66,
@@ -244,7 +245,8 @@
    "name": "MetalSeadramon",
    "from": [
     "MegaSeadramon"
-   ]
+   ],
+   "tier": 3
   },
   {
    "id": 93,
@@ -335,7 +337,8 @@
    "name": "Guardromon",
    "from": [
     "Hagurumon"
-   ]
+   ],
+   "tier": 1
   },
   {
    "id": 106,
@@ -377,7 +380,8 @@
    "name": "Andromon",
    "from": [
     "Guardromon"
-   ]
+   ],
+   "tier": 2
   },
   {
    "id": 112,
@@ -451,7 +455,8 @@
    "name": "HiAndromon",
    "from": [
     "Andromon"
-   ]
+   ],
+   "tier": 3
   },
   {
    "id": 121,

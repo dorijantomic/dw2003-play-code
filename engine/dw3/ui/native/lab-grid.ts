@@ -20,6 +20,7 @@
 // Children: +0x00.. ten cells, +0x28 name, +0x2C heading, +0x30.. six technique names, +0x48.. the
 // 13 numbers, +0x7C the level, +0x80 prompt, +0x84.. four slot labels, +0x90 heading, +0x94 / +0x98
 // the two cursors.
+import { rosterRecordAddress } from "../../party-context.ts";
 import { padBitOf, type LabPadHost } from "./lab-pad.ts";
 import { LAB_TECHNIQUE_TABLE, type LabRosterHost, type LabRosterMemory } from "./lab-roster.ts";
 
@@ -192,7 +193,7 @@ export function labGridTick(mem: LabRosterMemory, self: number, aux: number, hos
   const cursorA = (): number => u32(mem.read32(aux + 0x94));
   const selected = (): number => half(mem, self + ((r(0x68) + r(0x64)) * 2 + r(0x60)) * 2 + 0x7a);
   const rows = (): number => { const n = r(0xd8); return n - Math.trunc(n / 2); };
-  const record = (): number => (RECORDS_MINUS_4 + r(0x58) * RECORD_STRIDE) >>> 0;
+  const record = (): number => (rosterRecordAddress(r(0x58)) - 4) >>> 0;
   const pack = (handle: number): number => u32(host.packResolve(handle));
 
   const state = r(0x0c);

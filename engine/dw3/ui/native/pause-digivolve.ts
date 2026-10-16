@@ -25,8 +25,8 @@
 // blink frame and timer; +0xAC.. panel folds at 0xAC, 0xBC, 0xCC, 0xDC, 0xEC.
 import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { formEntryCopy } from "./pause-techniques.ts";
-import { PROFILE_STRIDE, PROFILE_TABLE_BASE, profileRecord } from "./pause-status.ts";
-import { partyPositionToRosterSlot } from "../../party-context.ts";
+import { PROFILE_STRIDE, PROFILE_TABLE_BASE, profileRecord, rosterSlotProfileAddress } from "./pause-status.ts";
+import { partyPositionToRosterSlot, rosterContextBase } from "../../party-context.ts";
 import { validateEquippedForm } from "../../form-ledger.ts";
 
 export const DIGIVOLVE_HANDLER = 0x8008b3c8;
@@ -50,7 +50,7 @@ export interface DigivolveHost extends PauseServices {
 }
 
 const bankOf = (mem: PauseMemory, host: DigivolveHost, offset: number): number => host.languageBank(lang(mem) + offset);
-const cardWord = (slot: number): number => PAUSE_CTX + 0x75c + slot * 0x3dc + 8;
+const cardWord = (slot: number): number => rosterContextBase(slot) + 0x75c + 8;
 
 /** F0x80099E5C(tween, from, to, frames): start a linear tween. */
 export function tweenStart(mem: PauseMemory, tween: number, from: number, to: number, frames: number,
@@ -142,7 +142,7 @@ export function digivolveForms(mem: PauseMemory, obj: number, ui: number, show: 
             host.callMethod(w(i * 4), 0x144, [0]);
         }
     }
-    host.callMethod(w(0x10), 0x114, [host.languageBank(lang(mem) + 0x4e), mem.read8(PROFILE_TABLE_BASE + slot * PROFILE_STRIDE + 0x55)]);
+    host.callMethod(w(0x10), 0x114, [host.languageBank(lang(mem) + 0x4e), mem.read8(rosterSlotProfileAddress(mem, slot) + 0x55)]);
 }
 
 /** F0x8008886C(obj, ui, show): the chosen form's name and the two choices. */
@@ -210,7 +210,7 @@ export function digivolveStats(mem: PauseMemory, obj: number, ui: number, show: 
             }
         }
     } else {
-        const record = PROFILE_TABLE_BASE + slot * PROFILE_STRIDE;
+        const record = rosterSlotProfileAddress(mem, slot);
         host.copyStats(slot, stats);
         host.callMethod(w(0x28), 0x114, [bankOf(mem, host, 0x4e), mem.read8(record + 0x55)]);
         host.callMethod(w(0x30), 0x114, [bankOf(mem, host, 0xb0), 0x38]);
@@ -269,7 +269,7 @@ export function digivolveTechInfo(mem: PauseMemory, obj: number, ui: number, sho
         formEntryCopy(mem, slot, mem.read16s(obj + 0x74 + (mem.read32(obj + 0x5c) | 0) * 2), entry);
         tech = mem.read16(entry + 8 + (mem.read32(obj + 0x64) | 0) * 2) & 0x1fff;
     } else {
-        tech = mem.read16(PROFILE_TABLE_BASE + slot * PROFILE_STRIDE + (((mem.read32(obj + 0x64) | 0) + 1) * 2) + 0x1c);
+        tech = mem.read16(rosterSlotProfileAddress(mem, slot) + (((mem.read32(obj + 0x64) | 0) + 1) * 2) + 0x1c);
     }
     if (tech <= 0) return hide();
     host.callMethod(w(0x84), 0x114, [bankOf(mem, host, 0x9b), tech]);
@@ -326,7 +326,7 @@ export function digivolveDraw(mem: PauseMemory, obj: number, host: DigivolveHost
             } else {
                 // Six passes, the last reading the word at +0x28 (the loop tests before it increments).
                 for (let i = 1; i <= 6; i++) {
-                    const t = mem.read16(PROFILE_TABLE_BASE + slot * PROFILE_STRIDE + i * 2 + 0x1c);
+                    const t = mem.read16(rosterSlotProfileAddress(mem, slot) + i * 2 + 0x1c);
                     if (t > 0) host.drawSprite(pack(0x02860000), clip(t), 0xb6, r(0x8c) + ((i - 1) * 0xe + 0x88));
                 }
             }
@@ -561,7 +561,7 @@ export function digivolveTick(mem: PauseMemory, obj: number, ui: number, host: D
             return;
         case 0x1c:
             if (tick(0xec)) {
-                if ((mem.read32(PAUSE_CTX + slot() * 0x3dc + 0x764) | 0) !== 0) say(0x84, 0x3c);
+                if ((mem.read32(rosterContextBase(slot()) + 0x764) | 0) !== 0) say(0x84, 0x3c);
                 else say(0x84, 0x3d);
                 w(0xa0, 1);
                 advance();
@@ -735,7 +735,7 @@ export function digivolveTick(mem: PauseMemory, obj: number, ui: number, host: D
             return;
         case 0x3f:
             if (tick(0xec)) {
-                const tech = mem.read16(PROFILE_TABLE_BASE + (partyPositionToRosterSlot(mem, r(0x70)) * PROFILE_STRIDE) + 0x28);
+                const tech = mem.read16(rosterSlotProfileAddress(mem, partyPositionToRosterSlot(mem, r(0x70))) + 0x28);
                 w(0x64, 5);
                 host.callMethod(at(0x24), 0x84, [0xa9, r(0x8c) + 0xce]);
                 host.callMethod(at(0x24), 0x80, [1]);

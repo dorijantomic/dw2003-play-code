@@ -21,6 +21,7 @@
 // Children: +0x00 title, +0x04.. thirteen numbers (six statistics then seven elements), +0x38..
 // three form names, +0x44.. two menu rows, +0x4C message, +0x50 cursor, +0x54 the roster picker,
 // +0x58 the form grid, +0x5C the technique chooser.
+import { rosterRecordAddress } from "../../party-context.ts";
 import { labRosterCreate, type LabRosterHost, type LabRosterMemory } from "./lab-roster.ts";
 import { fillStatPanel } from "../stat-panel.ts";
 import { padBitOf, type LabPadHost } from "./lab-pad.ts";
@@ -105,7 +106,7 @@ export function labDetailFill(mem: LabRosterMemory, self: number, aux: number, f
     } else {
       const names = bank(0x4e);
       m(label, 0x114, [names, mem.read8(u32(host.profileRecord(form)) + 0x55)]);
-      m(label, 0x138, [s32(mem.read32(RECORDS_MINUS_4 + slot * RECORD_STRIDE + 8)) === form ? 1 : 0]);
+      m(label, 0x138, [s32(mem.read32(rosterRecordAddress(slot) - 4 + 8)) === form ? 1 : 0]);
     }
   }
   for (let k = 0; k < 2; k++) m(word(0x44 + 4 * k), 0x114, [bank(0x39), 0x21 + k]);

@@ -16,6 +16,7 @@
 // adder: code 7 adds to all six stats, codes 1..6 to one of +0x0C..+0x16, codes
 // 8..14 to one of +0x18..+0x24, anything else is ignored.
 
+import { rosterContextBase, rosterRecordAddress } from "./roster-records.ts";
 import { ROSTER_SLOT_STRIDE, SAVE_CONTEXT, s16 as sign16 } from "./form-ledger.ts";
 
 export interface EffectiveStatsMemory {
@@ -217,11 +218,11 @@ export function buildEffectiveStats(
     slot: number,
     buf: number,
 ): void {
-    const base = (SAVE_CONTEXT + (slot | 0) * ROSTER_SLOT_STRIDE) >>> 0;
+    const base = rosterContextBase(slot);
     const src = (base + EFFECTIVE_SRC_OFFSET) >>> 0;
     for (let i = 0; i < EFFECTIVE_BUFFER_SIZE; i++) mem.write8(buf + i, mem.read8(src + i) & 0xff);
 
-    const keys = (DIGIMON_CUR_STATS + (slot | 0) * ROSTER_SLOT_STRIDE + EQUIPPED_KEY_OFFSET) >>> 0;
+    const keys = (rosterRecordAddress(slot) + 8 + EQUIPPED_KEY_OFFSET) >>> 0;
     for (let k = 0; k < EQUIPPED_KEY_COUNT; k++) {
         const id = s16(mem.read16(keys + k * 2));
         if (id <= 0) continue;

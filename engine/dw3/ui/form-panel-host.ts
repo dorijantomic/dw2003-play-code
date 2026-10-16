@@ -24,6 +24,8 @@
 //           members OTHER than the row contribute their loadable (0x4000) ids,
 //           masked to 13 bits, into a ten-entry scratch table, which is compacted
 //           into +0xD4 with duplicates dropped.
+import { rosterContextBase } from "../roster-records.ts";
+import { rosterSlotProfileAddress } from "./native/pause-status.ts";
 import type { NativeMemory } from "../../native/memory.ts";
 import { frameDelta } from "../../systems/frame-clock.ts";
 import {
@@ -94,7 +96,7 @@ export function seedFormRoster(
     member: FormPanelMember,
 ): void {
     const slot = member.slotIndex;
-    const base = (SAVE_CONTEXT + slot * ROSTER_SLOT_STRIDE) >>> 0;
+    const base = rosterContextBase(slot);
     for (let i = 0; i < FORM_PANEL_BLOCK_HALFWORDS; i++) {
         mem.write16(base + EFFECTIVE_SRC_OFFSET + i * 2, (member.panelBlock[i] ?? 0) & 0xffff);
     }
@@ -145,7 +147,7 @@ export function seedFormRoster(
  * this table.
  */
 export function writeFormPanelProfile(mem: NativeMemory, rosterSlot: number, preselected: number): void {
-    const block = (FORM_PROFILE_BLOCK + Math.imul(rosterSlot, FORM_PROFILE_STRIDE)) >>> 0;
+    const block = rosterSlotProfileAddress(mem, rosterSlot);
     mem.write16(block + 0x28, preselected & 0xffff);
 }
 

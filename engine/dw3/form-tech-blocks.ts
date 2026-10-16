@@ -32,7 +32,8 @@
 // acquired form starts at level 1; the level itself is written later by the
 // whole-entry writer F0x80017AB4, the DRI menu's save path.
 
-import { ROSTER_SLOT_STRIDE, SAVE_CONTEXT, s16 as sign16 } from "./form-ledger.ts";
+import { s16 as sign16 } from "./form-ledger.ts";
+import { rosterContextBase } from "./party-context.ts";
 
 export interface FormTechBlockMemory {
     read8(addr: number): number;
@@ -64,12 +65,12 @@ export const TECH_LEVEL_NEW = 1;
 
 /** The block address for one roster slot and block index. */
 export function formTechBlockAddress(slot: number, index: number): number {
-    return (SAVE_CONTEXT + (slot | 0) * ROSTER_SLOT_STRIDE + TECH_BLOCK_BASE + (index | 0) * TECH_BLOCK_STRIDE) >>> 0;
+    return (rosterContextBase(slot) + TECH_BLOCK_BASE + (index | 0) * TECH_BLOCK_STRIDE) >>> 0;
 }
 
 /** The three equipped form ids of one roster slot. */
 export function equippedFormsAddress(slot: number): number {
-    return (SAVE_CONTEXT + (slot | 0) * ROSTER_SLOT_STRIDE + EQUIPPED_FORMS_OFFSET) >>> 0;
+    return (rosterContextBase(slot) + EQUIPPED_FORMS_OFFSET) >>> 0;
 }
 
 /**

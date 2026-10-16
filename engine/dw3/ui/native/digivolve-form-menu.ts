@@ -28,7 +28,7 @@
 // at (34,171) and (56,171) in palette 2, and its thirteen numbers are the thirteen
 // (x, y, slot) triples of the table at 0x800A350C.
 
-import { PROFILE_TABLE_BASE } from "./pause-status.ts";
+import { PROFILE_TABLE_BASE, rosterSlotProfileAddress } from "./pause-status.ts";
 /** The screen object handler and the factory arguments of F0x8009482C. */
 export const FORM_LIST_HANDLER = 0x80094478;
 export const FORM_LIST_SIZE = 0x74;
@@ -265,7 +265,7 @@ export function formListBuild(
     const profile = mem.read32(self + FORM_LIST_PROFILE) | 0;
     host.profileForms(profile, self + 0x6c);
     // .L0x80094504: lhu at the profile block's first halfword, stride 0x58.
-    const block = (FORM_PROFILE_BLOCK + Math.imul(profile, FORM_PROFILE_STRIDE)) >>> 0;
+    const block = rosterSlotProfileAddress(mem, profile);
     mem.write16(self + FORM_LIST_CURRENT, mem.read16(block + FORM_PROFILE_SPECIES));
     // .L0x80094510-0x8009453c: three slots, a value below 3 ends that slot's offer
     // and the count only advances for a kept one.
@@ -515,7 +515,7 @@ function formPanelPageOneData(
     cursor: number,
 ): void {
     if (cursor === 0) {
-        const block = (FORM_PROFILE_BLOCK + Math.imul(profile, FORM_PROFILE_STRIDE)) >>> 0;
+        const block = rosterSlotProfileAddress(mem, profile);
         mem.write32(self + 0x60, -1);
         mem.write32(self + 0xd4, (mem.read16(block + 0x28) | 0) | 0x8000);
         return;

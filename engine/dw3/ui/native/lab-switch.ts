@@ -30,9 +30,26 @@ import { padBitOf, type LabPadHost } from "./lab-pad.ts";
 import { LAB_LABEL_TABLE_CELL } from "./lab-select-labels.ts";
 import { advanceDigimonPictures, digimonPictureAt, DIGIMON_PICTURE_ROW_WORDS } from "../digimon-picture.ts";
 import type { LabRosterHost, LabRosterMemory } from "./lab-roster.ts";
+import { DISC_ROSTER_SLOT_COUNT, ROSTER_SLOT_COUNT } from "../../roster.ts";
+import { rosterRecordAddress } from "../../roster-records.ts";
 
 export const LAB_SWITCH_HANDLER = 0x8008c060;
 export const LAB_SWITCH_SIZE = 0x108;
+/**
+ * EXTRA: the candidate list holds one word per roster slot, +0xE4.. for the disc's eight
+ * (the count follows them at +0x104). With new partners (engine/dw3/roster.ts) the list
+ * continues past the original object, which then gets this many more bytes; with only the
+ * disc's eight the object is exactly the original's.
+ */
+const extraCandidateBytes = (): number =>
+  ROSTER_SLOT_COUNT > DISC_ROSTER_SLOT_COUNT ? (ROSTER_SLOT_COUNT + 1 - DISC_ROSTER_SLOT_COUNT) * 4 : 0;
+/**
+ * The candidate word `i`: +0xE4 + 4i, the original's own arithmetic whatever `i` is, while only the
+ * disc's eight slots exist; with new partners, the words after the eighth move past the original object.
+ */
+const candidateAt = (self: number, i: number): number =>
+  (ROSTER_SLOT_COUNT <= DISC_ROSTER_SLOT_COUNT || i < DISC_ROSTER_SLOT_COUNT
+    ? self + 0xe4 + i * 4 : self + LAB_SWITCH_SIZE + (i - DISC_ROSTER_SLOT_COUNT) * 4) >>> 0;
 export const LAB_SWITCH_EXTRA = 0x38;
 export const LAB_ANIMATION_CELL = 0x8008fd68;
 export const LAB_STAT_INDEX_TABLE_B = 0x8008f4a4;
@@ -40,8 +57,6 @@ export const LAB_PARTY_MAP = 0x80048d34 + 0x70;
 const LANGUAGE = 0x8005cca8;
 const PACK = 0x02c50000;
 const FONT_PACK = 0x02860000;
-const RECORD_BASE = 0x80048d34;
-const RECORD_STRIDE = 0x3dc;
 
 export type LabSwitchHost = LabRosterHost & {
   /** ctx+0x2728(position): the roster slot standing at a party position, negative when none. */
@@ -58,7 +73,7 @@ const s16 = (v: number): number => (v << 16) >> 16;
 export function labSwitchCreate(
   mem: LabRosterMemory, host: Pick<LabSwitchHost, "alloc">, root: number,
 ): number {
-  const obj = host.alloc(LAB_SWITCH_HANDLER, LAB_SWITCH_SIZE, LAB_SWITCH_EXTRA) >>> 0;
+  const obj = host.alloc(LAB_SWITCH_HANDLER, LAB_SWITCH_SIZE + extraCandidateBytes(), LAB_SWITCH_EXTRA) >>> 0;
   mem.write32(obj + 0x54, 0x1000);
   mem.write32(obj + 0x58, 2);
   mem.write32(obj + 0x50, u32(root));
@@ -97,7 +112,7 @@ export function labSwitchTexts(mem: LabRosterMemory, self: number, aux: number, 
     m(u32(mem.read32(aux + 4 + 4 * i)), 0x114, [bank(0x39), s32(mem.read32(record))]);
     place(4 + 4 * i, record);
   }
-  const slot = s32(mem.read32(self + s32(mem.read32(self + 0x60)) * 4 + 0xe4));
+  const slot = s32(mem.read32(candidateAt(self, s32(mem.read32(self + 0x60)))));
   const stats = host.scratch(0);
   if (slot >= 0) host.effectiveStats(slot, stats);
   for (let i = 0; i < 5; i++) {
@@ -133,7 +148,7 @@ export function labSwitchDraw(mem: LabRosterMemory, self: number, host: LabSwitc
   const pack = (handle: number): number => u32(host.packResolve(handle));
   const root = u32(mem.read32(self + 0x50));
   const rows = (): number => s32(mem.read32(root + 0x5c));
-  const slot = s32(mem.read32(self + r(0x60) * 4 + 0xe4));
+  const slot = s32(mem.read32(candidateAt(self, r(0x60))));
   const shift = r(0x5c) * 0x7a;
   const unit = (): void => host.setScale(0x1000, 0x1000, 0x1000);
   // The candidate (0xD8) caps the row at seven words; the party figures (0xCC,
@@ -259,7 +274,7 @@ export function labSwitchTick(mem: LabRosterMemory, self: number, aux: number, h
   const advance = (): void => w(0x10, r(0x10) + 1);
   const root = u32(mem.read32(self + 0x50));
   const fold = (offset: number): number => (self + offset) >>> 0;
-  const candidate = (): number => s32(mem.read32(self + r(0x60) * 4 + 0xe4));
+  const candidate = (): number => s32(mem.read32(candidateAt(self, r(0x60))));
 
   const phase = u32(r(0x10));
   switch (phase > 11 ? 0 : phase) {
@@ -364,7 +379,7 @@ export function labSwitchTick(mem: LabRosterMemory, self: number, aux: number, h
         w(0x5c, 0);
         host.foldStart(fold(0x64), 1);
         if (mem.read32(aux + 0x34) === 0) {
-          mem.write32(aux + 0x34, labRosterCreate(mem, host, s32(mem.read32(self + r(0x60) * 4 + 0xe4)), 1, 1));
+          mem.write32(aux + 0x34, labRosterCreate(mem, host, s32(mem.read32(candidateAt(self, r(0x60)))), 1, 1));
         }
         advance();
         return;
@@ -417,9 +432,11 @@ export function labSwitchLifecycle(mem: LabRosterMemory, self: number, aux: numb
   mem.write32(self + 0x5c, 1);
   const standing = host.scratch(0);
   for (let i = 0; i < 3; i++) mem.write32(standing + i * 4, u32(host.followerSlot(i)));
-  for (let i = 0; i < 8; i++) {
-    const slot = s32(mem.read32(RECORD_BASE + i * RECORD_STRIDE + 0x760)) - 3;
-    mem.write32(self + 0xe4 + i * 4, 0xffffffff);
+  // every roster slot: the disc's eight, then the new partners' (their records are in their own window)
+  const slots = Math.max(DISC_ROSTER_SLOT_COUNT, ROSTER_SLOT_COUNT);
+  for (let i = 0; i < slots; i++) {
+    const slot = s32(mem.read32(rosterRecordAddress(i))) - 3;
+    mem.write32(candidateAt(self, i), 0xffffffff);
     let free = false;
     if (slot >= 0) {
       free = true;
@@ -430,12 +447,15 @@ export function labSwitchLifecycle(mem: LabRosterMemory, self: number, aux: numb
     }
     if (free) {
       const count = s32(mem.read32(self + 0x104));
-      mem.write32(self + 0xe4 + count * 4, u32(slot));
+      mem.write32(candidateAt(self, count), u32(slot));
       mem.write32(self + 0x104, u32(count + 1));
     }
   }
   const root = u32(mem.read32(self + 0x50));
   if (s32(mem.read32(root + 0x60)) >= 2 && s32(mem.read32(standing + s32(mem.read32(root + 0x64)) * 4)) >= 0) {
-    mem.write32(self + 0x104, u32(mem.read32(self + 0x104) + 1));
+    const count = s32(mem.read32(self + 0x104));
+    // the extra entry is the "put nobody here" row: with the disc's eight the loop has already left it -1
+    if (ROSTER_SLOT_COUNT > DISC_ROSTER_SLOT_COUNT && count >= slots) mem.write32(candidateAt(self, count), 0xffffffff);
+    mem.write32(self + 0x104, u32(count + 1));
   }
 }

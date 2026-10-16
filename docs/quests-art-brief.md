@@ -94,3 +94,15 @@ such as goggles are lost when shrunk to ~35 px); the generator's 3 frames per ro
 **Regenerating the references** (they are git-ignored game art): the all-frames one is the sheet `web/assets/sprites/p066frtm.png`
 enlarged 8 times with nearest-neighbour on a green (#00FF00) background; the three-view ones are the `down`, `right` and `up` first
 frames of a game NPC sheet (rows per `web/assets/manifest.json`), enlarged 14 times, side by side on green. (Pillow, ten lines.)
+
+**New partner Digimon (walking sheets).** Same prompt as Option 4, with the reference being a partner's own full sheet
+(`ref_<name>_allframes.png`: the game's sheet enlarged on green, git-ignored) and the frame count matching that sheet
+(Patamon 9 across, Agumon / Veemon / Renamon 4, Kotemon 5). Start a new chat for each. Paste, with the counts changed:
+
+> The attached picture is the complete sprite sheet of a character from the PS1 game Digimon World 3, enlarged so each game pixel is a big square block: 4 frames across and 8 directions down, in the same order. Draw a NEW, DIFFERENT creature as a complete sprite sheet in exactly the same layout: 4 columns by 8 rows, same cell size and spacing, same direction in each row, same chunky proportions and size, same pixel-block style with a thick dark outline. Make it a large image with hard square pixel blocks, flat colours, at most 16 colours, no smoothing. Do not copy the reference's colours, face or body details. Plain flat bright green background, no text, no border. New creature: [description], drawn in this PS1 pixel style.
+
+- DemiDevimon (Patamon sheet, 9 across): small black round bat-devil, big bat wings, one big blue eye showing, red claws, purple trim.
+- Betamon (Agumon sheet, 4 across): small green amphibian on four legs, orange belly, red fin on its head, big round eyes.
+- Hagurumon (Veemon sheet, 4 across): floating grey metal gear with a face in the middle, small gear arms on the sides.
+
+If the generator repaints the reference instead of a new creature, use a blank grid of the same size as the guide.

@@ -53,6 +53,7 @@
 // it back. The only state it changes for the walker is what the disc's screen itself
 // pays: the BIT (money) and the dropped item (held count), read back by result(). The
 // verifier proves the two computations agree (final EXP and level equal the walker's).
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
@@ -60,7 +61,7 @@ import { frameDelta } from "../../systems/frame-clock.ts";
 import {
   PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
   partyPositionToRosterSlot, persistentRosterSlot,
-  requestScreenTransition,
+  requestScreenTransition, rosterRecordAddress
 } from "../party-context.ts";
 import { validateEquippedForm } from "../form-ledger.ts";
 import { acquiredForms } from "../form-ledger-edit.ts";
@@ -248,7 +249,7 @@ export class FightReportSession {
     }
     seed.members.forEach((member, i) => {
       if (member.position !== i) throw new Error("Fight report party positions must be contiguous from 0");
-      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot >= 8) {
+      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot >= MAX_ROSTER_SLOTS) {
         throw new Error("Invalid fight report roster slot");
       }
     });
@@ -323,7 +324,7 @@ export class FightReportSession {
       mem.write32(PARTY_MAP + i * 4, member ? member.rosterSlot >>> 0 : 0xffffffff);
     }
     for (const member of seed.members) {
-      const record = ROSTER_RECORDS + member.rosterSlot * ROSTER_STRIDE;
+      const record = rosterRecordAddress(member.rosterSlot);
       mem.write32(record, ((member.starterSlot ?? member.rosterSlot) + 3) >>> 0);
       if (member.forms) seedRosterForms(mem, record, member.forms);
       mem.write32(record + 0x20, member.exp >>> 0);
@@ -638,7 +639,7 @@ export class FightReportSession {
     const mem = this.mem;
     const slot = partyPositionToRosterSlot(mem, position);
     if (slot < 0) throw new Error("No partner at that fight report position");
-    const record = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+    const record = rosterRecordAddress(slot);
     const ledger = [];
     for (let i = 0; i < 0x2c; i++) {
       const at = record + 0x58 + i * 0x14;

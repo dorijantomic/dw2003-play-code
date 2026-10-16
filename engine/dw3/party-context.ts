@@ -22,8 +22,8 @@ export const PARTY_CONTEXT = 0x80048d34;
 /** Party position 0..2 -> roster slot map, u32[3] at ctx+0x70. */
 export const PARTY_MAP = PARTY_CONTEXT + 0x70;
 /** Roster record array: 0x3DC-byte records, index = starter species slot. */
-export const ROSTER_RECORDS = 0x80049494;
-export const ROSTER_STRIDE = 0x3dc;
+export { ROSTER_RECORDS, ROSTER_STRIDE, EXTRA_ROSTER_RECORDS, rosterRecordAddress, rosterContextBase } from "./roster-records.ts";
+import { ROSTER_RECORDS, ROSTER_STRIDE, rosterRecordAddress } from "./roster-records.ts";
 /** The record's Unknown4 stats block (record + 0x08); F0x80017B4C returns it. */
 export const CUR_STATS = ROSTER_RECORDS + 0x08;
 /** Record-relative field offsets (u16 unless noted). */
@@ -82,7 +82,7 @@ export const ROSTER_EQUIP_OFFSETS_LIST = ROSTER_EQUIP_SLOTS.map((name) => ROSTER
 
 /** One member's equip halfword address, in this port's record base. */
 export function rosterEquipAddress(rosterSlot: number, name: RosterEquipSlot): number {
-    return ROSTER_RECORDS + (rosterSlot | 0) * ROSTER_STRIDE + ROSTER_EQUIP_OFFSETS[name];
+    return rosterRecordAddress(rosterSlot) + ROSTER_EQUIP_OFFSETS[name];
 }
 
 export interface MemoryReader {
@@ -97,7 +97,7 @@ export function partyPositionToRosterSlot(mem: MemoryReader, position: number): 
 
 /** F0x80017B4C: roster slot -> its Unknown4 stats-block address. */
 export function persistentRosterSlot(slot: number): number {
-    return (CUR_STATS + (slot | 0) * ROSTER_STRIDE) >>> 0;
+    return (rosterRecordAddress(slot) + 0x08) >>> 0;
 }
 
 /** The shared character/roster record bank: 0x1C0-byte records. */
@@ -354,7 +354,7 @@ export function requestScreenTransition(
 export function getFollowerRosterSlot(mem: MemoryReader, position: number): number {
     if ((position >>> 0) >= 3) return -1;
     const slot = mem.read32(PARTY_MAP + position * 4) | 0;
-    const addr = (PARTY_CONTEXT + Math.imul(slot, ROSTER_STRIDE) + 0x760) >>> 0;
+    const addr = rosterRecordAddress(slot);
     return ((mem.read32(addr) | 0) - 3) | 0;
 }
 

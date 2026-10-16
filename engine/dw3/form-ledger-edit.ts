@@ -22,6 +22,7 @@
 //               its result; that lookup is pure, so the port omits it.)
 //   F0x80017AB4 writeFormEntry    (+0x274C) (slot, form, in) copy five words from
 //               `in` over the form's ledger entry. Returns the entry index or -1.
+import { rosterContextBase } from "./roster-records.ts";
 import {
   EQUIPPED_FORM_BASE, EQUIPPED_FORM_COUNT, FORM_ENTRY_BASE, FORM_ENTRY_COUNT, FORM_ENTRY_STRIDE,
   FORM_MIN_ID, ROSTER_SLOT_STRIDE, SAVE_CONTEXT, findFormLedgerIndex, s16,
@@ -36,7 +37,7 @@ export interface FormLedgerEditMemory {
   write32(addr: number, value: number): void;
 }
 
-const slotBase = (slot: number): number => (SAVE_CONTEXT + Math.imul(slot | 0, ROSTER_SLOT_STRIDE)) >>> 0;
+const slotBase = (slot: number): number => rosterContextBase(slot);
 const entryAddress = (slot: number, index: number): number =>
   (slotBase(slot) + FORM_ENTRY_BASE + index * FORM_ENTRY_STRIDE) >>> 0;
 

@@ -9,11 +9,12 @@
 //
 // Data-only inputs: the overlay's data tail (grid, glyph and label tables), the
 // resident font block, and the two indexed text families the screen reads.
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
   PARTY_MAP, ROSTER_RECORDS, ROSTER_STRIDE, getFollowerRosterSlot,
-  partyPositionToRosterSlot, persistentRosterSlot, requestScreenTransition,
+  partyPositionToRosterSlot, persistentRosterSlot, requestScreenTransition, rosterRecordAddress
 } from "../party-context.ts";
 import { convertTextEncoding } from "./fetch-table.ts";
 import { ScreenTextBanks } from "./screen-text-banks.ts";
@@ -204,12 +205,12 @@ export class NameRootSession {
     for (let position = 0; position < 3; position++) {
       const member = party[position];
       if (!member) { this.mem.write32(PARTY_MAP + position * 4, 0xffffffff); continue; }
-      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot > 8 ||
+      if (!Number.isInteger(member.rosterSlot) || member.rosterSlot < 0 || member.rosterSlot >= MAX_ROSTER_SLOTS ||
           seen.has(member.rosterSlot)) throw new Error("Invalid naming roster slot");
       seen.add(member.rosterSlot);
       if (member.nameBytes.length > 23 || member.nameBytes.includes(0)) throw new Error("Invalid naming name bytes");
       this.mem.write32(PARTY_MAP + position * 4, member.rosterSlot);
-      const base = ROSTER_RECORDS + member.rosterSlot * ROSTER_STRIDE;
+      const base = rosterRecordAddress(member.rosterSlot);
       this.mem.write32(base, member.rosterSlot + 3);
       this.mem.load(member.nameBytes, base + 8);
       this.mem.write8(base + 8 + member.nameBytes.length, 0);

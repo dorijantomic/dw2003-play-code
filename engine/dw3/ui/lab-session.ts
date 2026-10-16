@@ -37,13 +37,14 @@
 // word of the position the player switched (ctx+0x70..), the partner's current form (record+0x04), the
 // equipped-form triple (record+0x50) and one form-ledger entry (record+0x58+i*0x14: the loaded flag of
 // a technique). The walker reads them back ONCE, after the screen has closed, and commits them.
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
   PARTY_CONTEXT, PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
   getFollowerRosterSlot, partyPositionToRosterSlot,
-  persistentRosterSlot, requestScreenTransition,
+  persistentRosterSlot, requestScreenTransition, rosterRecordAddress
 } from "../party-context.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemRecord } from "../item-record.ts";
@@ -100,7 +101,7 @@ export const LAB_TEXT_BANKS = [0x39, 0x4e, 0x47, 0xa2, 0x9b] as const;
 /** The save context cell the root reads the saved field id from (ctx+0x34). */
 export const LAB_SAVED_SELECTOR_CELL = PARTY_CONTEXT + 0x34;
 export const LAB_PARTY_SLOTS = 3;
-export const LAB_ROSTER_SLOTS = 8;
+export const LAB_ROSTER_SLOTS = MAX_ROSTER_SLOTS;
 export const LAB_LEDGER_ENTRIES = 0x2c;
 export const LAB_LEDGER_STRIDE = 0x14;
 /** The six equip halfwords of a roster record, in the original's order. */
@@ -329,7 +330,7 @@ export class LabSession {
     }
     mem.write32(LAB_SAVED_SELECTOR_CELL, seed.returnSelector >>> 0);
     for (const member of seed.members) {
-      const record = ROSTER_RECORDS + member.slot * ROSTER_STRIDE;
+      const record = rosterRecordAddress(member.slot);
       mem.write32(record, (member.slot + 3) >>> 0);
       mem.write32(record + RECORD_CURRENT_FORM, member.currentForm >>> 0);
       member.nameBytes.slice(0, 23).forEach((byte, i) => mem.write8(record + 0x08 + i, byte & 0xff));
@@ -582,7 +583,7 @@ export class LabSession {
   /** The cells the screen may have changed in one roster record (read once, after it closed). */
   record(slot: number): LabRecord {
     const mem = this.mem;
-    const record = ROSTER_RECORDS + slot * ROSTER_STRIDE;
+    const record = rosterRecordAddress(slot);
     return {
       currentForm: mem.read32(record + RECORD_CURRENT_FORM) >>> 0,
       equipped: Array.from({ length: 3 }, (_, i) => mem.read16(record + RECORD_EQUIPPED + i * 2)),

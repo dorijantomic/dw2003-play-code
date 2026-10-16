@@ -26,6 +26,7 @@
 import {
     ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, syncWornFromEquipment, ui,
     extraProfileCount, extraRowFormId, EXTRA_FIRST_ID,
+    isFormDigimonId,
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
@@ -38,7 +39,6 @@ import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from
 const PACK_NAMES = { 0x02c50000: "stdglabo", 0x02c50001: "stdglabo_portraits", 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 const PARTY_SLOTS = 3;
-const ROSTER_SLOTS = 8;
 const LEDGER_ENTRIES = 44;
 const EMPTY = 0xffff;
 const EQUIPMENT_SLOTS = ["head", "body", "right", "left", "acc0", "acc1"];
@@ -107,7 +107,7 @@ export function createLabTranslated(sfx = null) {
     const ownedSlots = (state) => {
         const mask = Number(state?.rosterOwned) || 0;
         const slots = new Set();
-        for (let s = 0; s < ROSTER_SLOTS; s++) if (mask & (1 << s)) slots.add(s);
+        for (let s = 0; s < ROSTER_SLOT_CHARIDS.length; s++) if (mask & (1 << s)) slots.add(s);
         for (const charId of state?.party ?? []) { const s = slotOfChar(charId); if (s >= 0) slots.add(s); }
         return [...slots].sort((a, b) => a - b);
     };
@@ -170,7 +170,7 @@ export function createLabTranslated(sfx = null) {
                 core: Array.from({ length: 6 }, (_, i) => Number(stats.core?.[i]) || 0),
                 elements: Array.from({ length: 7 }, (_, i) => Number(stats.elements?.[i]) || 0),
                 equipment: Object.fromEntries(EQUIPMENT_SLOTS.map((k) => [k, Number(equipment[k]) || 0])),
-                currentForm: form > 8 ? (v0ById.get(form) ?? 0) : 0,
+                currentForm: isFormDigimonId(form) ? (v0ById.get(form) ?? 0) : 0,
                 equipped, ledger,
             };
             g._members.push({ slot, stats, equipment, starterId, member, window: win.shown });

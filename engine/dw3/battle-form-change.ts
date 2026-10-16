@@ -25,6 +25,7 @@
 // with nothing written at the moment of the change.
 
 /** The five stats F0x8009EC94 adds (species record +0x02..+0x0A; CHR is not one). */
+import { rosterSlotProfileAddress } from "./ui/native/pause-status.ts";
 export interface FormChangeCoreStats {
   str: number; def: number; spt: number; wis: number; spd: number;
 }
@@ -208,7 +209,7 @@ export function formChangeRamView(
       return forms.length;
     },
     rosterSpecies: (rosterKey) =>
-      mem.read16(ROSTER_PROFILE_BASE + rosterKey * ROSTER_PROFILE_STRIDE) | 0,
+      mem.read16(rosterSlotProfileAddress(mem, rosterKey)) | 0,
   };
 }
 

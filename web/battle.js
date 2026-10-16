@@ -139,6 +139,7 @@ import {
   BATTLE_WIN_RESULT_SCREEN, FINALE_WIN_ENDING_MOVIE,
   battleWinLaunchCode, battleWinJinglePlays,
   FINALE_TAIL_DEFEAT_BEATS, finaleBattleKind, finaleRecordsTechnique, finaleCopiedAttackSkill,
+    isFormDigimonId, rosterSlotOfDigimonId,
 } from "./vendor/engine.js";
 // Three fight mechanisms wired onto the ordinary route above, each an engine port of the
 // original fightstg routine: the face-box cel draw (FIGHTSTG_F0x80093fec), the enemy-id
@@ -1012,7 +1013,7 @@ export function markedEquippedForms(flags, equipped) {
   for (let i = 0; i < 3; i++) {
     if (!Number(flags?.[7 + i] ?? 0)) continue;
     const id = triple[i];
-    if (id > 8 && !out.includes(id)) out.push(id);
+    if (isFormDigimonId(id) && !out.includes(id)) out.push(id);
   }
   return out;
 }
@@ -3731,7 +3732,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         index, charId, rookieId,
         // Which of the eight digivolution trees this line learns from. The unlock
         // routine is handed a roster slot, so the slot travels with the member.
-        slot: rosterSlotOfCharId(charId) ?? rookieId - 1,
+        slot: rosterSlotOfCharId(charId) ?? rosterSlotOfDigimonId(rookieId) ?? rookieId - 1,
         name: state.digimonNames?.[charId] ?? rookie?.name ?? charId,
         stats: index === 0 ? state.partnerStats : state.partyStats[index],
       };
@@ -7021,7 +7022,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const current = digimonDB?.[Number(stats?.digimonId ?? rookieId)] ?? rookie;
     // Which of the eight trees this member learns from. The unlock routine takes a
     // roster slot, so the slot is the member's identity here — not the form it is in.
-    const slot = rosterSlotOfCharId(charId) ?? rookieId - 1;
+    const slot = rosterSlotOfCharId(charId) ?? rosterSlotOfDigimonId(rookieId) ?? rookieId - 1;
     return { charId, rookieId, rookie, current, stats, slot };
   }
 
@@ -7045,10 +7046,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const level = ps.level ?? 1;
     const { maxHp, maxMp } = evolvedMaxStats(prof, level, ps.bonuses);
     ps.formLedger ??= [];
-    if (prof.id > 8 && !ps.formLedger.some((record) => Number(record.id) === Number(prof.id)))
+    if (isFormDigimonId(prof.id) && !ps.formLedger.some((record) => Number(record.id) === Number(prof.id)))
       ps.formLedger.push({ id: prof.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
     ps.equippedForms ??= [];
-    if (prof.id > 8 && !ps.equippedForms.includes(prof.id)) {
+    if (isFormDigimonId(prof.id) && !ps.equippedForms.includes(prof.id)) {
       // stfgtrep file 0x3898-0x38C0: first free slot, or nothing at all when
       // the three slots are full. The oldest form is never shifted out.
       const fitted = autoEquipForm(ps.equippedForms, prof.id);

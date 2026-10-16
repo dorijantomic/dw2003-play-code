@@ -1,0 +1,50 @@
+{
+  "note": "Partner Digimon beyond the disc's eight, each with its whole canonical line already in the game as 3D models. Ours, not disc data. Ids continue the walker's species numbering after the enemy-only species (append only, never renumber); roster slots continue after Patamon's 7. Base numbers follow the disc's own starter budget: stat total 200, HP+MP growth ~130, stat growth ~15, resistances sum 680 with growth 21, status resistances sum 150. 'model' names the existing battle model and name-bank entry; 'formId' is the row's game form id (no model uses it). Line tree: 'canon' as the line's own forms at line level 5/20/40 like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega ten levels later, since every other gate hangs off them), then the enemy-only species with 'families' counted as this line's affinity (never its own species). The donor line also lends its gear permissions (an item's wearMask bit).",
+  "starters": [
+    {
+      "id": 191, "slot": 8, "name": "DemiDevimon", "model": "DemiDevimon", "charId": "x191demi", "formId": 900,
+      "lore": "Virus, small bat imp. A trickster: quick, clever, frail; dark and ice resistant, weak to machine.",
+      "hp": 130, "mp": 190, "str": 30, "def": 24, "spt": 50, "wis": 54, "spd": 42, "chr": 1,
+      "growth": {"hp": 60, "mp": 75, "str": 2, "def": 1, "spt": 4, "wis": 5, "spd": 3, "chr": 3},
+      "resistances": {"fire": 80, "water": 95, "ice": 115, "wind": 100, "thunder": 100, "machine": 60, "dark": 130},
+      "resistance_growth": {"fire": 2, "water": 3, "ice": 4, "wind": 3, "thunder": 3, "machine": 1, "dark": 5},
+      "growth_xp": 7,
+      "status_resist": {"poison": 50, "paralyze": 20, "confuse": 40, "sleep": 30, "ko": 10},
+      "family": 3, "tech_basic": 7, "tech_signature": 182,
+      "blasts": ["Devimon", "Myotismon", "VenomMyotismon", "MaloMyotismon", "BK WarGreymon"],
+      "donor_line": 6,
+      "canon": [["Devimon", 5], ["Myotismon", 20], ["VenomMyotismon", 40]],
+      "families": [3, 4]
+    },
+    {
+      "id": 192, "slot": 9, "name": "Betamon", "model": "Betamon", "charId": "x192beta", "formId": 901,
+      "lore": "Vaccine amphibian with a shock fin. Sturdy and even; water and thunder resistant, weak to dark.",
+      "hp": 170, "mp": 110, "str": 44, "def": 50, "spt": 38, "wis": 32, "spd": 36, "chr": 1,
+      "growth": {"hp": 90, "mp": 45, "str": 3, "def": 4, "spt": 3, "wis": 3, "spd": 3, "chr": 4},
+      "resistances": {"fire": 95, "water": 130, "ice": 100, "wind": 80, "thunder": 125, "machine": 85, "dark": 65},
+      "resistance_growth": {"fire": 3, "water": 5, "ice": 3, "wind": 2, "thunder": 4, "machine": 2, "dark": 2},
+      "growth_xp": 8,
+      "status_resist": {"poison": 30, "paralyze": 50, "confuse": 20, "sleep": 30, "ko": 20},
+      "family": 6, "tech_basic": 2, "tech_signature": 156,
+      "blasts": ["Seadramon", "MegaSeadramon", "MetalSeadramon", "MaloMyotismon", "BK WarGreymon"],
+      "donor_line": 1,
+      "canon": [["Seadramon", 5], ["MegaSeadramon", 20], ["MetalSeadramon", 40]],
+      "families": [10, 11]
+    },
+    {
+      "id": 193, "slot": 10, "name": "Hagurumon", "model": "Hagurumon", "charId": "x193hagu", "formId": 902,
+      "lore": "Virus machine, a living gear. Very tough, slow, good with magic; machine resistant, weak to water.",
+      "hp": 150, "mp": 140, "str": 42, "def": 56, "spt": 40, "wis": 44, "spd": 18, "chr": 1,
+      "growth": {"hp": 70, "mp": 60, "str": 3, "def": 5, "spt": 3, "wis": 4, "spd": 1, "chr": 3},
+      "resistances": {"fire": 85, "water": 60, "ice": 100, "wind": 95, "thunder": 115, "machine": 130, "dark": 95},
+      "resistance_growth": {"fire": 2, "water": 1, "ice": 3, "wind": 3, "thunder": 4, "machine": 5, "dark": 3},
+      "growth_xp": 9,
+      "status_resist": {"poison": 50, "paralyze": 10, "confuse": 40, "sleep": 40, "ko": 10},
+      "family": 5, "tech_basic": 3, "tech_signature": 164,
+      "blasts": ["Guardromon", "Andromon", "HiAndromon", "BK WarGreymon", "GranKuwagamon"],
+      "donor_line": 2,
+      "canon": [["Guardromon", 5], ["Andromon", 20], ["HiAndromon", 40]],
+      "families": [5]
+    }
+  ]
+}

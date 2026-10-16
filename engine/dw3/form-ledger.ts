@@ -13,6 +13,7 @@
 // +0x7B8, each entry's own id at its +0x00. Entries with an id below 3 are
 // empty; the matcher returns the entry index or -1.
 
+import { rosterContextBase } from "./roster-records.ts";
 export interface FormLedgerMemory {
     read16(addr: number): number;
     write16(addr: number, value: number): void;
@@ -40,7 +41,7 @@ export const s16 = (v: number): number => (v << 16) >> 16;
  * Entries with an id below 3 are skipped without a comparison.
  */
 export function findFormLedgerIndex(mem: FormLedgerMemory, slot: number, form: number): number {
-    const base = (SAVE_CONTEXT + (slot | 0) * ROSTER_SLOT_STRIDE) >>> 0;
+    const base = rosterContextBase(slot);
     const want = form | 0;
     for (let i = 0; i < FORM_ENTRY_COUNT; i++) {
         const id = s16(mem.read16(base + FORM_ENTRY_BASE + i * FORM_ENTRY_STRIDE));
@@ -58,7 +59,7 @@ export function findFormLedgerIndex(mem: FormLedgerMemory, slot: number, form: n
  * number of accepted forms.
  */
 export function validateEquippedForm(mem: FormLedgerMemory, slot: number, out: number): number {
-    const base = (SAVE_CONTEXT + (slot | 0) * ROSTER_SLOT_STRIDE) >>> 0;
+    const base = rosterContextBase(slot);
     let count = 0;
     for (let i = 0; i < EQUIPPED_FORM_COUNT; i++) {
         const form = s16(mem.read16(base + EQUIPPED_FORM_BASE + i * 2));

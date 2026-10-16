@@ -44,8 +44,9 @@
 // The shared block 0x80088768 (selected slot, staging pointers, tween/fold method
 // words) is mutable: each session builds a fresh NativeMemory and loads its own copy
 // of the data tail, with the routine-pointer words zeroed (ports bind by name).
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import { writeSaveBlock, seedSaveCards, seedSaveFlags, type ResidentCards } from "../save-block.ts";
-import { ROSTER_EQUIP_ENTRIES, type RosterEquipment } from "../party-context.ts";
+import { ROSTER_EQUIP_ENTRIES, type RosterEquipment, rosterRecordAddress } from "../party-context.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
@@ -223,7 +224,7 @@ export class MemcardSession {
     if (seed.members.length > 3) throw new Error("Invalid memory card party size");
     seed.members.forEach((m, i) => {
       if (m.position !== i) throw new Error("Memory card party positions must be contiguous from 0");
-      if (!Number.isInteger(m.rosterSlot) || m.rosterSlot < 0 || m.rosterSlot >= 8) throw new Error("Invalid memory card roster slot");
+      if (!Number.isInteger(m.rosterSlot) || m.rosterSlot < 0 || m.rosterSlot >= MAX_ROSTER_SLOTS) throw new Error("Invalid memory card roster slot");
     });
     this.language = seed.language;
     this.mode = seed.mode;
@@ -355,7 +356,7 @@ export class MemcardSession {
       mem.write32(PARTY_MAP + i * 4, m ? m.rosterSlot >>> 0 : 0xffffffff);
     }
     for (const m of [...(seed.reserves ?? []), ...seed.members]) {
-      const record = ROSTER_RECORDS + m.rosterSlot * ROSTER_STRIDE;
+      const record = rosterRecordAddress(m.rosterSlot);
       mem.write32(record, ((m.starterSlot ?? m.rosterSlot) + 3) >>> 0);
       if (m.lastUltraDrill !== undefined) mem.write8(record + 0x3d4, m.lastUltraDrill ?? 0);
       if (m.forms) seedRosterForms(mem, record, m.forms);

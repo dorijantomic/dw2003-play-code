@@ -29,8 +29,16 @@
 // Pure and DW3-data-only: no DOM, no engine state object. The browser's DRI screen
 // and the walker's party code both read the same table from here.
 
-/** Roster slots in the original's order. Slot `s` holds `s + 3` once obtained. */
-export const ROSTER_SLOT_COUNT = 8;
+/** The disc's roster: eight slots in the original's order. Slot `s` holds `s + 3` once obtained. */
+export const DISC_ROSTER_SLOT_COUNT = 8;
+/**
+ * Every roster slot this game has: the disc's eight, then the new partners
+ * (data/authored/web/assets/data/new_starters.json, registered by web/extra-roster.js
+ * through registerNewPartners). The disc's screens hold eight records; the engine keeps
+ * a record for each extra slot in its own window (party-context.ts rosterRecordAddress).
+ */
+export const MAX_ROSTER_SLOTS = 16;
+export let ROSTER_SLOT_COUNT = DISC_ROSTER_SLOT_COUNT;
 
 /** The deployed party is three (the Switch builder's inner comparison loop). */
 export const DEPLOYED_PARTY_CAP = 3;
@@ -39,7 +47,9 @@ export const DEPLOYED_PARTY_CAP = 3;
 // `roster_slot + 3` (claim field-shadow-ctor-default-and-denylist, 2026-08-04) and the
 // npc/sprite table resolves kind k to the sprite whose number is k, which is why the
 // eight starters are p003..p010 in exactly this order. digimon.json id is slot + 1.
-export const ROSTER_SLOT_CHARIDS: readonly string[] = [
+// The array grows (never shrinks) when new partners register, so every reader that
+// holds it sees slots 8.. too.
+export const ROSTER_SLOT_CHARIDS: string[] = [
   "p003pken", // slot 0 — Kotemon
   "p004kogu", // slot 1 — Kumamon
   "p005koet", // slot 2 — Monmon
@@ -50,9 +60,82 @@ export const ROSTER_SLOT_CHARIDS: readonly string[] = [
   "p010pata", // slot 7 — Patamon
 ];
 
-/** digimon.json id for a roster slot (the table is 1-based, the roster 0-based). */
+/** A partner beyond the disc's eight (extra_species.json `starters`). */
+export interface NewPartner {
+  slot: number;
+  /** walker species id (digimon.json numbering, after the enemy-only species) */
+  id: number;
+  charId: string;
+  name: string;
+  /** the row's game form id (profile value0) */
+  formId: number;
+  /** the disc slot whose gear permissions (wearMask bit) and Lab picture stand-in this partner uses */
+  gearSlot?: number;
+}
+const newPartners: NewPartner[] = [];
+
+/**
+ * Register the new partners once their rows are loaded. Slots must follow the disc's eight
+ * in order; a second call with the same list is a no-op.
+ */
+export function registerNewPartners(list: readonly NewPartner[] | null | undefined): void {
+  for (const p of list ?? []) {
+    if (!p || !Number.isInteger(p.slot) || p.slot < DISC_ROSTER_SLOT_COUNT || p.slot >= MAX_ROSTER_SLOTS) continue;
+    if (ROSTER_SLOT_CHARIDS[p.slot] === p.charId) continue;
+    if (p.slot !== ROSTER_SLOT_CHARIDS.length) throw new Error(`new partner slot ${p.slot} out of order`);
+    ROSTER_SLOT_CHARIDS.push(String(p.charId));
+    newPartners[p.slot - DISC_ROSTER_SLOT_COUNT] = { ...p };
+  }
+  ROSTER_SLOT_COUNT = ROSTER_SLOT_CHARIDS.length;
+}
+
+/** The new partner in roster slot `slot`, or null for a disc slot / an unknown one. */
+export function newPartnerOfSlot(slot: number): NewPartner | null {
+  return newPartners[(slot | 0) - DISC_ROSTER_SLOT_COUNT] ?? null;
+}
+
+/** Every registered new partner, in slot order. */
+export function newPartnerList(): readonly NewPartner[] {
+  return newPartners.filter(Boolean);
+}
+
+/** True for one of the disc's eight slots. */
+export function isDiscRosterSlot(slot: number): boolean {
+  return Number.isInteger(slot) && slot >= 0 && slot < DISC_ROSTER_SLOT_COUNT;
+}
+
+/** digimon.json id for a roster slot (the disc's table is 1-based, the roster 0-based). */
 export function rosterSlotDigimonId(slot: number): number {
-  return slot + 1;
+  if (slot < DISC_ROSTER_SLOT_COUNT) return slot + 1;
+  return newPartnerOfSlot(slot)?.id ?? slot + 1;
+}
+
+/** The roster slot whose starter species is digimon.json id `id`, or null. */
+export function rosterSlotOfDigimonId(id: number): number | null {
+  const n = Number(id) | 0;
+  if (n >= 1 && n <= DISC_ROSTER_SLOT_COUNT) return n - 1;
+  const p = newPartners.find((q) => q && q.id === n);
+  return p ? p.slot : null;
+}
+
+/** Is `id` a starter species (one of the disc's eight or a new partner)? */
+export function isStarterDigimonId(id: number): boolean {
+  return rosterSlotOfDigimonId(id) !== null;
+}
+
+/** Is `id` a digivolved form (not one of the starters)? The disc's own test is `id > 8`. */
+export function isFormDigimonId(id: number): boolean {
+  const n = Number(id) | 0;
+  return n > DISC_ROSTER_SLOT_COUNT && !isStarterDigimonId(n);
+}
+
+/**
+ * The disc slot a roster slot borrows for things the disc keys by its eight slots and the
+ * new partners have no data of their own for: the gear wearMask bit.
+ */
+export function rosterGearSlot(slot: number): number {
+  if (slot < DISC_ROSTER_SLOT_COUNT) return slot;
+  return newPartnerOfSlot(slot)?.gearSlot ?? -1;
 }
 
 /** Which roster slot a manifest character id occupies, or null if it is not a partner. */

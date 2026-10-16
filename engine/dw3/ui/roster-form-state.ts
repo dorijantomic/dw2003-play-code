@@ -1,6 +1,7 @@
 // Browser/native adapter for the decoded roster record: current form +4,
 // equipped value0 triple +50, acquired ledger +58 (44 * 14h).
 // Contract: digivolution-tech-system-decoded-2026-07-11.md sections 1–3.
+import { isFormDigimonId } from "../roster.ts";
 import { EXTRA_FIRST_ID, extraProfileCount, gameFormId, PROFILE_ROWS, walkerIdOf } from "./native/pause-status.ts";
 export interface RosterFormMemory {
     read16(addr: number): number;
@@ -68,7 +69,7 @@ export function windowLedger<T extends { id: number }>(
 
 export function seedRosterForms(mem: RosterFormMemory, record: number, state: RosterFormState) {
     const { valueById } = nativeFormIds(mem);
-    const value = (id: number) => id > 8 ? valueById.get(id) : undefined;
+    const value = (id: number) => isFormDigimonId(id) ? valueById.get(id) : undefined;
     mem.write32(record + 4, value(Number(state.digimonId)) ?? 0);
     for (let i = 0; i < 3; i++) mem.write16(record + 0x50 + i * 2,
         value(Number(state.equippedForms?.[i])) ?? 0xffff);

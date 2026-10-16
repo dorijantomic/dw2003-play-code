@@ -1,10 +1,11 @@
 // Browser save state <-> resident data fields read and written by the translated
 // merchant tasks. This is an adapter, not a game rule interpreter.
+import { MAX_ROSTER_SLOTS } from "../roster.ts";
 import type { NativeMemory } from "../../native/memory.ts";
 import { syncWornFromEquipment, wornCount, wornItemIds, type ItemStoreState } from "../item-store.ts";
 import {
   PARTY_MAP, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES,
-  type RosterEquipment,
+  type RosterEquipment, rosterRecordAddress
 } from "../party-context.ts";
 
 export const SHOP_MONEY = 0x80048da0;
@@ -128,7 +129,7 @@ export interface ShopEquipSwap {
   displaced: number[];
 }
 
-const recordAt = (slot: number): number => ROSTER_RECORDS + slot * ROSTER_STRIDE;
+const recordAt = (slot: number): number => rosterRecordAddress(slot);
 const integer = (value: number, lo: number, hi: number, label: string): number => {
   if (!Number.isInteger(value) || value < lo || value > hi) throw new Error(`Invalid ${label}`);
   return value;
@@ -159,12 +160,12 @@ export function seedShopSaveState(mem: NativeMemory, seed: ShopSaveSeed): void {
       mem.write32(PARTY_MAP + position * 4, 0xffffffff);
       continue;
     }
-    const slot = integer(member.rosterSlot, 0, 8, "shop roster slot");
+    const slot = integer(member.rosterSlot, 0, MAX_ROSTER_SLOTS - 1, "shop roster slot");
     if (seenSlots.has(slot)) throw new Error(`Duplicate shop roster slot ${slot}`);
     seenSlots.add(slot);
     mem.write32(PARTY_MAP + position * 4, slot);
     const base = recordAt(slot);
-    mem.write32(base, integer(member.starterSlot ?? slot, 0, 8, "shop starter slot") + 3);
+    mem.write32(base, integer(member.starterSlot ?? slot, 0, MAX_ROSTER_SLOTS - 1, "shop starter slot") + 3);
     const word = (off: number, value: number | undefined, label: string): void => {
       if (value !== undefined) mem.write16(base + off, integer(value, 0, 0xffff, label));
     };
@@ -213,7 +214,7 @@ export function readShopSaveState(
   const equipment: ShopEquipment[] = [];
   for (let position = 0; position < 3; position++) {
     const slot = mem.read32(PARTY_MAP + position * 4) | 0;
-    if (slot < 0 || slot > 8) continue;
+    if (slot < 0 || slot >= MAX_ROSTER_SLOTS) continue;
     const equipped: ShopEquipment = {};
     const base = recordAt(slot);
     for (const [name, off] of ROSTER_EQUIP_ENTRIES) {

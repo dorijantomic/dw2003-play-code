@@ -8,12 +8,19 @@ Reads (all already built from the disc by the other stages, none of it is commit
   web/assets/data/fight_tech_table.json   per technique: element, power
   web/assets/battle/model_map.json        species -> model folder (the folder's number is the row's value0)
   web/assets/data/battlecmd/79.bin        the disc's English Digimon-name bank 0x4E (it already names every enemy)
-and data/authored/web/assets/data/extra_species_canon.json (ours: fixed ids + canonical pre-evolutions).
+  web/assets/data/evolutions.json         the disc's eight digivolution lines (donor gates for the new partners' lines)
+and data/authored/web/assets/data/extra_species_canon.json (ours: fixed ids + canonical pre-evolutions)
+and data/authored/web/assets/data/new_starters.json (ours: partners beyond the disc's eight, ids after the extras).
 
 Writes
   web/assets/data/extra_species.json   {digimon: [rows in digimon.json's shape, ids 56..], tree: {line: [records]},
-                                        meta: {name: {tier, family, affinity, parents}}}
+                                        meta: {name: {tier, family, affinity, parents}}, starters: [new partners]}
   web/assets/data/extra_profiles.bin   the same rows as 0x58-byte disc profile records (ids 56.. in order)
+
+New partners (new_starters.json) are starter-shaped rows after the extras (is_starter, their own base stats, growth and
+Blast forms) and each gets a whole line of its own in `tree` (roster slot 8..): its canonical forms at line level 5/20/40
+like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega
+ten levels later, since every other gate hangs off them), then every enemy-only species. `starters` lists them for the engine (slot, id, charId, formId).
 
 How a species becomes a form (the same shape the disc's 44 forms have, see tools/extract_evolutions.py):
   tier      from the enemy's stat total (A..E); sets the stat bonus total, resist cap and DV cap like the base forms
@@ -36,6 +43,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "web/assets/data"
 CANON = ROOT / "data/authored/web/assets/data/extra_species_canon.json"
+NEW_STARTERS = ROOT / "data/authored/web/assets/data/new_starters.json"
+DISC_LINES = 8
 
 STAT_KEYS = ("str", "def", "spt", "wis", "spd")
 ELEMS = ("fire", "water", "ice", "wind", "thunder", "machine", "dark")
@@ -117,6 +126,143 @@ def r5(v: float) -> int:
     return int(round(v / 5.0)) * 5
 
 
+STATUS_KEYS = ("poison", "paralyze", "confuse", "sleep", "ko")
+GROWTH_KEYS = ("str", "def", "spt", "wis", "spd", "chr")
+
+
+def encode_starter(row: dict, template: bytes, form_id: int, name_idx: int, blasts: list[int]) -> bytes:
+    """A starter row as the disc's 0x58-byte profile record (the layout of rows 0..7, checked against them)."""
+    rec = bytearray(template)
+    struct.pack_into("<H", rec, 0x00, form_id)
+    for i, k in enumerate(GROWTH_KEYS):
+        struct.pack_into("<H", rec, 0x02 + 2 * i, row[k])
+    for i, k in enumerate(ELEMS):
+        struct.pack_into("<H", rec, 0x0E + 2 * i, row["resistances"][k])
+    struct.pack_into("<H", rec, 0x1C, row["tech_basic"])
+    for i in range(5):
+        struct.pack_into("<H", rec, 0x1E + 2 * i, 0)
+    struct.pack_into("<H", rec, 0x28, row["tech_signature"])
+    struct.pack_into("<H", rec, 0x2A, 0)
+    for i, k in enumerate(STATUS_KEYS):
+        rec[0x2C + i] = row["status_resist"][k]
+    rec[0x31:0x3C] = bytes(11)
+    rec[0x3C] = row.get("dv_cap", 100)
+    rec[0x3D] = 0
+    rec[0x3E] = row["growth_xp"]
+    rec[0x3F] = row["hp"]
+    rec[0x40] = row["mp"]
+    rec[0x41] = row["growth"]["hp"]
+    rec[0x42] = row["growth"]["mp"]
+    for i, k in enumerate(GROWTH_KEYS):
+        rec[0x43 + i] = row["growth"][k]
+    for i, k in enumerate(ELEMS):
+        rec[0x49 + i] = row["resistance_growth"][k]
+    rec[0x50:0x55] = bytes(blasts)
+    rec[0x55] = name_idx
+    rec[0x56] = row["family"]
+    rec[0x57] = 0
+    return bytes(rec)
+
+
+def own_line_record(r: dict) -> bool:
+    """A line's own champion/ultimate/mega gate: no prerequisite, line level 5, 20 or 40."""
+    return not r["req0"] and not r["req1"] and r["kind"] == 7 and r["threshold"] in (5, 20, 40)
+
+
+def build_new_starters(ids, bank, profiles, base, extra_records, tree, problems, value_taken):
+    """The partners beyond the disc's eight: rows, profile records and a line each (see the module doc)."""
+    if not NEW_STARTERS.exists():
+        return [], [], []
+    authored = load(NEW_STARTERS)["starters"]
+    lines = load(DATA / "evolutions.json")["lines"]
+    # the encoder must reproduce the disc's own eight starter records byte for byte
+    for i, b in enumerate(base[:DISC_LINES]):
+        disc = profiles[0x58 * i: 0x58 * (i + 1)]
+        got = encode_starter(b, disc, struct.unpack_from("<H", disc, 0)[0], disc[0x55], b["blasts"])
+        if got != disc:
+            problems.append(f"starter encoder does not reproduce {b['name']}'s disc record")
+    out, rows, blobs = [], [], []
+    next_id = max(ids.values()) + 1
+    for k, st in enumerate(authored):
+        sid, slot, name = st["id"], st["slot"], st["name"]
+        if sid != next_id + k:
+            problems.append(f"{name}: id {sid} is not {next_id + k} (new partners follow the extras in order)")
+        if slot != DISC_LINES + k:
+            problems.append(f"{name}: slot {slot} is not {DISC_LINES + k} (slots follow the disc's eight in order)")
+        if st["formId"] in value_taken:
+            problems.append(f"{name}: form id {st['formId']} is taken")
+        value_taken.add(st["formId"])
+        idx = bank.get(re.sub(r"[^A-Za-z]", "", st["model"]))
+        if idx is None:
+            problems.append(f"{name}: {st['model']} not in the name bank")
+            continue
+        stat_total = sum(st[k2] for k2 in STAT_KEYS)
+        if stat_total != 200:
+            problems.append(f"{name}: stat total {stat_total}, the disc's starters all have 200")
+        if sum(st["resistances"].values()) != 680 or sum(st["resistance_growth"].values()) != 21:
+            problems.append(f"{name}: resistances must sum 680 (growth 21) like the disc's starters")
+        if sum(st["status_resist"].values()) != 150:
+            problems.append(f"{name}: status resistances must sum 150 like the disc's starters")
+        blasts = []
+        for bn in st["blasts"]:
+            if bn not in ids:
+                problems.append(f"{name}: Blast form {bn} unknown")
+            else:
+                blasts.append(ids[bn])
+        canon = []
+        for cn, lv in st["canon"]:
+            if cn not in ids:
+                problems.append(f"{name}: canonical form {cn} unknown")
+            else:
+                canon.append((ids[cn], lv))
+        if problems:
+            continue
+        row = {
+            "id": sid, "name": name, "hp": st["hp"], "mp": st["mp"],
+            **{k2: st[k2] for k2 in GROWTH_KEYS},
+            "growth": st["growth"], "resistances": st["resistances"], "resistance_growth": st["resistance_growth"],
+            "growth_xp": st["growth_xp"], "dv_cap": 100, "status_resist": st["status_resist"],
+            "family": st["family"], "tech_basic": st["tech_basic"], "tech_signature": st["tech_signature"],
+            "tech_dna_dv": 0, "tech_level_learn": [0] * 5, "tech_level_load": [0] * 5,
+            "tech_slots": [0, 0, 0, 0, 0, st["tech_signature"]], "tech_learn_levels": [0] * 6,
+            "tech_load_levels": [0] * 5, "blasts": blasts, "techs": [st["tech_basic"], st["tech_signature"]],
+            "is_starter": True,
+        }
+        rows.append(row)
+        blobs.append(encode_starter(row, profiles[0:0x58], st["formId"], idx, blasts))
+        # never its own species as a form: a DemiDevimon does not digivolve into a DemiDevimon, and a form that
+        # needs that species needs nothing more of this line than being it
+        own = ids.get(st["model"])
+        extras = []
+        for r in extra_records(slot, tuple(st["families"])):
+            if r["to"] == own:
+                continue
+            r = dict(r)
+            if r["req1"] == own:
+                r["req1"], r["req1Level"] = 0, 1
+            if r["req0"] == own:
+                r["req0"], r["req0Level"], r["req1"], r["req1Level"] = r["req1"], r["req1Level"], 0, 1
+            extras.append(r)
+        tree[str(slot)] = new_line_records(lines, st["donor_line"], canon, extras)
+        out.append({"id": sid, "slot": slot, "name": name, "model": st["model"], "charId": st["charId"],
+                    "formId": st["formId"], "bank": idx, "gearSlot": st["donor_line"]})
+    return out, rows, blobs
+
+
+def new_line_records(lines, donor: int, canon: list, extras: list) -> list[dict]:
+    """A new partner's whole line: its canonical forms first, then the disc's 44 on the donor's gates, then the extras."""
+    disc = [dict(r) for r in lines[donor]["records"][:44]]
+    for r in disc:
+        # the donor's own champion/ultimate/mega are this line's roots too (every other gate hangs off them), but
+        # they are not its own line: ten levels later than the donor's, so this line's canonical forms come first
+        if own_line_record(r):
+            r["threshold"] += OFF_LINE_EXTRA_LEVEL
+    canon_ids = {cid for cid, _ in canon}
+    head = [{"to": cid, "req0": 0, "req0Level": 1, "req1": 0, "req1Level": 1, "kind": 7, "threshold": lv}
+            for cid, lv in canon]
+    return head + [r for r in disc if r["to"] not in canon_ids] + [r for r in extras if r["to"] not in canon_ids]
+
+
 def main() -> int:
     canon = load(CANON)["species"]
     digi = load(DATA / "digimon.json")
@@ -137,7 +283,9 @@ def main() -> int:
     raw_tier: dict[str, int] = {}
     for sp in canon:
         e0 = enemies.get(sp["name"])
-        if e0:
+        if sp.get("tier"):
+            raw_tier[sp["name"]] = int(sp["tier"])
+        elif e0:
             raw_tier[sp["name"]] = tier_of(sum(e0[k] for k in STAT_KEYS))
     for b in base[8:52]:
         raw_tier[b["name"]] = base_tier(b)
@@ -291,11 +439,12 @@ def main() -> int:
     # the records appended to each of the eight lines
     kind_of = {"str": 1, "def": 2, "spt": 3, "wis": 4, "spd": 5}
     tree: dict[str, list[dict]] = {}
-    for line in range(8):
+
+    def extra_records(line: int, families: tuple = ()) -> list[dict]:
         recs = []
         for name, m in sorted(meta.items(), key=lambda kv: kv[1]["id"]):
             T = TIERS[m["tier"]]
-            on = line in m["affinity"]
+            on = line in m["affinity"] or m["family"] in families
             extra_lv = 0 if on else OFF_LINE_EXTRA_LEVEL
             parents = m["parents"][:2]
             r = {"to": m["id"], "req0": 0, "req0Level": 1, "req1": 0, "req1Level": 1, "kind": 0, "threshold": 0}
@@ -308,11 +457,24 @@ def main() -> int:
             else:
                 r["kind"], r["threshold"] = 7, T["root_lv"] + extra_lv
             recs.append(r)
-        tree[str(line)] = recs
+        return recs
 
-    (DATA / "extra_species.json").write_text(json.dumps({"digimon": rows, "tree": tree, "meta": meta}, separators=(",", ":")))
+    for line in range(DISC_LINES):
+        tree[str(line)] = extra_records(line)
+
+    starters, starter_rows, starter_blobs = build_new_starters(
+        ids, bank, profiles, base, extra_records, tree, problems, value_taken=used_values)
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        return 1
+    rows += starter_rows
+    blobs += starter_blobs
+
+    (DATA / "extra_species.json").write_text(json.dumps(
+        {"digimon": rows, "tree": tree, "meta": meta, "starters": starters}, separators=(",", ":")))
     (DATA / "extra_profiles.bin").write_bytes(b"".join(blobs))
-    print(f"{len(rows)} extra species -> extra_species.json, extra_profiles.bin ({len(blobs) * 0x58} bytes)")
+    print(f"{len(rows)} extra species ({len(starters)} new partners) -> extra_species.json, extra_profiles.bin "
+          f"({len(blobs) * 0x58} bytes)")
     return 0
 
 

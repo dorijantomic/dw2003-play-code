@@ -21,7 +21,7 @@
 export { EQUIPMENT, type EquipmentItem, type AccessoryEffect } from "./equipment-data.ts";
 import { EQUIPMENT, type EquipmentItem, type AccessoryEffect } from "./equipment-data.ts";
 import { itemDirectory } from "./item-directories.ts";
-import { rosterSlotOfCharId } from "./roster.ts";
+import { rosterSlotOfCharId, isDiscRosterSlot, rosterGearSlot } from "./roster.ts";
 
 export const EQUIPMENT_BY_ID: Record<number, EquipmentItem> = Object.fromEntries(EQUIPMENT.map(e => [e.id, e]));
 
@@ -140,11 +140,20 @@ export function pauseEquipRowCollects(row: number, itemId: number): boolean {
  * `rosterSlot(partyPosition)` in `F0x800882C8`); null means "unknown member",
  * which the original cannot express, so the mask test is skipped then.
  */
+/**
+ * EXTRA: the wearMask bit a roster slot reads. The disc's eight read their own; a new partner
+ * (engine/dw3/roster.ts) has no bit in the 8-bit mask and borrows its donor line's.
+ */
+function wearBit(lineSlot: number): number {
+  const gear = isDiscRosterSlot(lineSlot) ? -1 : rosterGearSlot(lineSlot);
+  return gear >= 0 ? gear : lineSlot;
+}
+
 export function pauseEquipAdmitsRecord(
   row: number, descriptor: number | undefined, wearMask: number | undefined, lineSlot: number | null,
 ): boolean {
   if (wearMask == null) return false;
-  if (lineSlot != null && ((wearMask >> (lineSlot & 31)) & 1) === 0) return false;
+  if (lineSlot != null && ((wearMask >> (wearBit(lineSlot) & 31)) & 1) === 0) return false;
   if (descriptor === 1) return row !== 3;
   if (descriptor === 2) return row !== 2;
   return true;
@@ -218,8 +227,9 @@ export function gearAccessibleForLine(itemId: number, lineSlot: number): boolean
   if (!item) return false;
   const mask = item.wearMask;
   if (mask == null) return true;            // non-gear / unknown => do not block
-  if (lineSlot < 0 || lineSlot > 7) return false;  // not a partner line (matches F0x80016d94 idx<3 guard spirit)
-  return ((mask >> lineSlot) & 1) === 1;
+  const bit = wearBit(lineSlot);
+  if (bit < 0 || bit > 7) return false;  // not a partner line (matches F0x80016d94 idx<3 guard spirit)
+  return ((mask >> bit) & 1) === 1;
 }
 
 /** Shop slot choice from stitshop F0x8008c510. Null means this item cannot

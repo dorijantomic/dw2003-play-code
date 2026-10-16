@@ -52,7 +52,7 @@ import { drawTextElement, type TextDrawerStepperHost } from "./text-drawer.ts";
 import { validateEquippedForm } from "../form-ledger.ts";
 import { nativeFormIds, seedRosterForms, type RosterFormState } from "./roster-form-state.ts";
 import { PROFILE_ROWS, PROFILE_TABLE_BASE, profileRecord } from "./native/pause-status.ts";
-import { partyPositionToRosterSlot, persistentRosterSlot, PARTY_MAP, ROSTER_RECORDS, ROSTER_STRIDE } from "../party-context.ts";
+import { partyPositionToRosterSlot, persistentRosterSlot, PARTY_MAP, ROSTER_RECORDS, ROSTER_STRIDE, rosterRecordAddress } from "../party-context.ts";
 import { frameDelta } from "../../systems/frame-clock.ts";
 import {
     commandMenuCreate, commandMenuStateMachine, commandMenuVsyncBlit,
@@ -199,7 +199,7 @@ export class FightTagSession {
             // record's 8-byte head that ctx+0x2750 returns. The same seat the pause
             // sheet uses (engine/dw3/ui/pause-root-session.ts).
             if (member.nameBytes && member.nameBytes.length > 0) {
-                const nameAt = (ROSTER_RECORDS + rosterSlot * ROSTER_STRIDE + 8) >>> 0;
+                const nameAt = (rosterRecordAddress(rosterSlot) + 8) >>> 0;
                 const bytes = member.nameBytes.slice(0, 23);
                 mem.load(Uint8Array.from(bytes, (b) => b & 0xff), nameAt);
                 mem.write8(nameAt + Math.min(23, bytes.length), 0);
@@ -211,7 +211,7 @@ export class FightTagSession {
             mem.write16(record + TAG_PARTY_MAX_MP, member.maxMp & 0xffff);
             mem.write16(record + TAG_PARTY_MP, member.mp & 0xffff);
             mem.write8(record + TAG_PARTY_BLAST, member.blast ? 1 : 0);
-            seedRosterForms(mem as never, (ROSTER_RECORDS + rosterSlot * ROSTER_STRIDE) >>> 0,
+            seedRosterForms(mem as never, (rosterRecordAddress(rosterSlot)) >>> 0,
                 { digimonId: member.digimonId, ...(member.forms ?? {}) });
         }
 

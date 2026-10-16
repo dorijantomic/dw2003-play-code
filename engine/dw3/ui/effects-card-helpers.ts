@@ -28,7 +28,7 @@
 //     record+0x5C and hide the unused widgets.
 
 import {
-  CUR_STATS, ORIGINAL_EQUIP_BASE, ROSTER_STRIDE,
+  CUR_STATS, ORIGINAL_EQUIP_BASE, ROSTER_STRIDE, persistentRosterSlot, rosterContextBase,
 } from "../party-context.ts";
 
 export interface EffectsCardMemory {
@@ -209,11 +209,10 @@ export function effectsStatBlock(
     dest: number,
     host: EffectsStatBlockHost,
 ): void {
-    const party = 0x80048d34;
-    const source = party + Math.imul(slot, ROSTER_STRIDE) + STAT_SOURCE_OFFSET;
+    const source = rosterContextBase(slot) + STAT_SOURCE_OFFSET;
     for (let i = 0; i < STAT_BLOCK_SIZE; i++) mem.write8(dest + i, mem.read8(source + i));
 
-    const gear = GEAR_SLOT_BASE + Math.imul(slot, ROSTER_STRIDE) + ORIGINAL_EQUIP_BASE;
+    const gear = persistentRosterSlot(slot) + ORIGINAL_EQUIP_BASE;
     for (let s5 = 0; s5 < 6; s5++) {
         const itemId = s16(mem.read16(gear + 2 * s5));
         if (itemId <= 0) continue;

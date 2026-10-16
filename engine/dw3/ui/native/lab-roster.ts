@@ -25,6 +25,7 @@
 // Children block words: +0x00 title, +0x04.. three form labels, +0x10 / +0x14 headings, +0x18..
 // six technique names, +0x30.. six statistic numbers, +0x48.. seven element numbers, +0x64 the
 // level number, +0x68 the cursor, +0x6C the scroll bar.
+import { rosterRecordAddress } from "../../party-context.ts";
 import { labCapsuleCreate, type LabCapsuleHost } from "./lab-capsule.ts";
 import { fillStatPanel } from "../stat-panel.ts";
 import { padBitOf, type LabPadHost } from "./lab-pad.ts";
@@ -130,7 +131,7 @@ export function labRosterFill(mem: LabRosterMemory, self: number, aux: number, f
 
   const slot = s32(mem.read32(self + 0x54));
   m(word(0x00), 0x114, [bank(0x39), s32(mem.read32(self + 0x15c)) === 0 ? 0x1e : 0x1f]);
-  const record = (slot * 0x3dc + LAB_RECORDS) >>> 0;
+  const record = (rosterRecordAddress(slot) - 4) >>> 0;
   for (let k = 0; k < 3; k++) {
     const form = s32(mem.read32(self + (first + k) * 4 + 0x90));
     const label = word(0x04 + 4 * k);

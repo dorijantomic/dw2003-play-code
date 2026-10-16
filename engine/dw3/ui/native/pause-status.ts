@@ -27,8 +27,9 @@
 // +0xA4/+0xA8 forms; +0xB4/+0xB8 equipment; +0xD0.. thirteen stats; +0x104 the
 // TP value and +0x108 its "TP" label (esstatus 0x4E; the value is the record's
 // own TP halfword at +0x26, block+2); +0x10C the child page object.
+import { isDiscRosterSlot, rosterSlotDigimonId } from "../../roster.ts";
 import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
-import { partyPositionToRosterSlot } from "../../party-context.ts";
+import { partyPositionToRosterSlot, rosterContextBase } from "../../party-context.ts";
 import { itemIconClip, itemRecord } from "../../item-record.ts";
 import { partyCardRows, ROWS_STATUS } from "./party-card-rows.ts";
 import { advanceDigimonPictures, digimonPictureAt, DIGIMON_PICTURE_ROW_WORDS } from "../digimon-picture.ts";
@@ -149,6 +150,24 @@ export interface StatusHost extends PauseServices {
     digivolveFactory(obj: number): number;
     /** F0x800882C8(obj): build the EQUIPMENT child page. */
     equipFactory(obj: number): number;
+}
+
+/**
+ * The starter profile row of a roster slot: `0x8003EF5C + slot*0x58` for the disc's
+ * eight (profile rows 0..7 ARE the starters), and the new partner's own extra row for a
+ * slot after them (engine/dw3/roster.ts). Every screen that indexed the table by roster
+ * slot asks this instead.
+ */
+export function rosterSlotProfileAddress(mem: object, slot: number): number {
+    const s = slot | 0;
+    if (!isDiscRosterSlot(s)) {
+        const row = rosterSlotDigimonId(s) - EXTRA_FIRST_ID;
+        if (extraRows && row >= 0 && row < extraRows.length / 0x58) {
+            installExtraProfiles(mem);
+            return (EXTRA_PROFILE_BASE + row * 0x58) >>> 0;
+        }
+    }
+    return (PROFILE_TABLE_BASE + Math.imul(s, PROFILE_STRIDE)) >>> 0;
 }
 
 /** F0x800134AC(form): the profile index for a form id, else -1. */
@@ -336,7 +355,7 @@ export function statusFormsFill(mem: PauseMemory, obj: number, ui: number, show:
         if (form >= 4) {
             const record = profileRecord(mem, form);
             host.callMethod(widget, 0x114, [bankOf(mem, host, 0x4e), mem.read8(record + 0x55)]);
-            const current = mem.read32(PAUSE_CTX + 0x75c + slot * 0x3dc + 8) | 0;
+            const current = mem.read32(rosterContextBase(slot) + 0x75c + 8) | 0;
             host.callMethod(widget, 0x138, [current === form ? 1 : 0]);
         } else {
             host.callMethod(widget, 0x144, [0]);
