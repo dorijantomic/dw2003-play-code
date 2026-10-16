@@ -285,6 +285,25 @@ void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
                 ];
             }
 
+            // Scripted capture (tools/render_sprite_views.mjs): set the camera and the frame from outside,
+            // and clear to a flat colour so the pictures can be cut out.
+            window._mv = {
+                setCamera({ theta, phi, dist, target } = {}) {
+                    if (theta != null) camTheta = theta;
+                    if (phi != null) camPhi = phi;
+                    if (dist != null) camDist = dist;
+                    if (target) camTarget = [...target];
+                },
+                getCamera() {
+                    return { theta: camTheta, phi: camPhi, dist: camDist, target: [...camTarget] };
+                },
+                setFrame(f) {
+                    autoPlay.checked = false;
+                    frameScrub.value = f;
+                },
+                clear: null,
+            };
+
             let drag = null;
             canvas.addEventListener("mousedown", (e) => {
                 drag = {
@@ -793,7 +812,7 @@ void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
                 const W = canvas.width,
                     H = canvas.height;
                 gl.viewport(0, 0, W, H);
-                gl.clearColor(0.06, 0.06, 0.12, 1);
+                gl.clearColor(...(window._mv?.clear ?? [0.06, 0.06, 0.12, 1]));
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
                 if (!model || !skelBufs) return;
