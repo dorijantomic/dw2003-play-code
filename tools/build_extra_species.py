@@ -245,7 +245,7 @@ def build_new_starters(ids, bank, profiles, base, extra_records, tree, problems,
             extras.append(r)
         tree[str(slot)] = new_line_records(lines, st["donor_line"], canon, extras)
         out.append({"id": sid, "slot": slot, "name": name, "model": st["model"], "charId": st["charId"],
-                    "formId": st["formId"], "bank": idx, "gearSlot": st["donor_line"]})
+                    "formId": st["formId"], "bank": idx, "gearSlot": st.get("gear_line", st["donor_line"])})
     return out, rows, blobs
 
 

@@ -1,5 +1,5 @@
 {
-  "note": "Partner Digimon beyond the disc's eight, each with its whole canonical line already in the game as 3D models. Ours, not disc data. Ids continue the walker's species numbering after the enemy-only species (append only, never renumber); roster slots continue after Patamon's 7. Base numbers follow the disc's own starter budget: stat total 200, HP+MP growth ~130, stat growth ~15, resistances sum 680 with growth 21, status resistances sum 150. 'model' names the existing battle model and name-bank entry; 'formId' is the row's game form id (no model uses it). Line tree: 'canon' as the line's own forms at line level 5/20/40 like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega ten levels later, since every other gate hangs off them), then the enemy-only species with 'families' counted as this line's affinity (never its own species). The donor line also lends its gear permissions (an item's wearMask bit).",
+  "note": "Partner Digimon beyond the disc's eight, each with its whole canonical line already in the game as 3D models. Ours, not disc data. Ids continue the walker's species numbering after the enemy-only species (append only, never renumber); roster slots continue after Patamon's 7. Base numbers follow the disc's own starter budget: stat total 200, HP+MP growth ~130, stat growth ~15, resistances sum 680 with growth 21, status resistances sum 150. 'model' names the existing battle model and name-bank entry; 'formId' is the row's game form id (no model uses it). Line tree: 'canon' as the line's own forms at line level 5/20/40 like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega ten levels later, since every other gate hangs off them), then the enemy-only species with 'families' counted as this line's affinity (never its own species). Gear permissions (an item's wearMask bit) come from 'gear_line', or the donor line when it is absent: DemiDevimon wears Renamon's (wands, magic caster), Kunemon Kumamon's (gloves/fists, for Kuwagamon's pincers), Hagurumon Monmon's (guns and cannons, for Guardromon's missiles).",
   "starters": [
     {
       "id": 191, "slot": 8, "name": "DemiDevimon", "model": "DemiDevimon", "charId": "x191demi", "formId": 900,
@@ -27,7 +27,7 @@
       "status_resist": {"poison": 40, "paralyze": 50, "confuse": 20, "sleep": 30, "ko": 10},
       "family": 8, "tech_basic": 5, "tech_signature": 157,
       "blasts": ["Kuwagamon", "Okuwamon", "HKabuterimon", "MaloMyotismon", "BK WarGreymon"],
-      "donor_line": 4,
+      "donor_line": 4, "gear_line": 1,
       "canon": [["Kuwagamon", 5], ["Okuwamon", 20], ["HKabuterimon", 40]],
       "families": [8]
     },
