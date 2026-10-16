@@ -23,6 +23,7 @@
 import { PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { partyPositionToRosterSlot } from "../../party-context.ts";
 import { partyCardRows, ROWS_CARD_FOLDERS } from "./party-card-rows.ts";
+import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
 import { findRegisteredHandleByKey } from "../../display-service.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
 
@@ -122,7 +123,7 @@ export function cardFoldersDraw(mem: PauseMemory, obj: number, host: CardFolders
             const slot = partyPositionToRosterSlot(mem, i);
             w(0x60 + i * 4, idx);
             const frames = mem.read32(FRAMES) | 0;
-            if ((mem.read32(frames + slot * 7 * 4 + idx * 4) | 0) === -1 || idx >= 7) w(0x60 + i * 4, 0);
+            if (digimonPictureRowEnded(mem, frames, slot, idx) || idx >= 7) w(0x60 + i * 4, 0);
         }
     }
     let y = 0x13;
@@ -139,7 +140,7 @@ export function cardFoldersDraw(mem: PauseMemory, obj: number, host: CardFolders
             const slot = partyPositionToRosterSlot(mem, i);
             host.draw74(0x280, 0x100);
             host.drawSprite(pack(0x04040000),
-                mem.read32((mem.read32(FRAMES) | 0) + slot * 0x1c + r(0x60 + i * 4) * 4) | 0, 0x6b, y);
+                digimonPictureAt(mem, FRAMES, slot, r(0x60 + i * 4)), 0x6b, y);
         }
         y += 0x2e;
         py += 0x2e;

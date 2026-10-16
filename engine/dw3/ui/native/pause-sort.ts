@@ -16,6 +16,7 @@
 import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { partyPositionToRosterSlot } from "../../party-context.ts";
 import { partyCardRows, ROWS_SORT } from "./party-card-rows.ts";
+import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
 
 export const SORT_HANDLER = 0x800980b0;
@@ -348,7 +349,7 @@ export function sortDraw(mem: PauseMemory, obj: number, host: SortHost): void {
             const slot = partyPositionToRosterSlot(mem, i);
             w(0x60 + i * 4, idx);
             const frames = mem.read32(FRAMES) | 0;
-            if ((mem.read32(frames + slot * 7 * 4 + idx * 4) | 0) === -1 || idx >= 7) w(0x60 + i * 4, 0);
+            if (digimonPictureRowEnded(mem, frames, slot, idx) || idx >= 7) w(0x60 + i * 4, 0);
         }
     }
     let y = 0x13;
@@ -376,7 +377,7 @@ export function sortDraw(mem: PauseMemory, obj: number, host: SortHost): void {
             }
             const slot = partyPositionToRosterSlot(mem, i);
             host.drawSprite(pack(0x04040000),
-                mem.read32((mem.read32(FRAMES) | 0) + slot * 0x1c + r(0x60 + i * 4) * 4) | 0, 0x6b, y);
+                digimonPictureAt(mem, FRAMES, slot, r(0x60 + i * 4)), 0x6b, y);
         }
         y += 0x2e;
         py += 0x2e;

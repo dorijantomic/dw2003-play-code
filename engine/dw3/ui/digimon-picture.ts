@@ -271,6 +271,22 @@ export function digimonPictureAt(
 }
 
 /**
+ * The restart test of the pasted loops that walk the row inline (pause Items, Sort,
+ * Techniques, card folders): true when counter `next` is past the row's end, i.e. it
+ * lands on the `-1` marker, or past a new partner's own frame order. The callers
+ * keep their own 7-word cap.
+ */
+export function digimonPictureRowEnded(
+    mem: PictureFramesMemory,
+    tableBase: number,
+    row: number,
+    next: number,
+): boolean {
+    if (isNewPartnerRow(row | 0)) return (next | 0) >= NEW_PARTNER_PICTURE_ROW.length;
+    return (mem.read32((tableBase + (row * DIGIMON_PICTURE_ROW_WORDS + (next | 0)) * 4) >>> 0) | 0) === DIGIMON_PICTURE_END;
+}
+
+/**
  * The same read where the overlay indexes the table's own address (the fight
  * report's 0x8008905C). One implementation of the word load either way.
  */

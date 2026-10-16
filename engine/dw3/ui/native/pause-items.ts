@@ -22,6 +22,8 @@
 // (engine/dw3/ui/native/**); lane A owns the shared engine/dw3/ui/index.ts barrel
 // and data/translated_functions.json.
 
+import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
+
 /** The items-root handler and geometry the factory allocates. */
 export const PAUSE_ITEMS_ROOT_HANDLER = 0x80091d18;
 export const PAUSE_ITEMS_ROOT_SIZE = 0x45c;
@@ -222,10 +224,10 @@ export function pauseItemsDraw(
             for (let i = 0; i < count; i++) {
                 const cell = obj + i * 4;
                 const next = (mem.read32(cell + 0x60) + 1) | 0;
-                const index = (host.cardIndexOf(i) | 0) * 7;
+                const card = host.cardIndexOf(i) | 0;
                 mem.write32(cell + 0x60, next);
                 const table = mem.read32(PAUSE_ITEMS_TABLE_PTR) | 0;
-                if ((mem.read32(table + index * 4 + next * 4) | 0) === -1 || next >= 7) {
+                if (digimonPictureRowEnded(mem, table, card, next) || next >= 7) {
                     mem.write32(cell + 0x60, 0);
                 }
             }
@@ -247,8 +249,7 @@ export function pauseItemsDraw(
                 }
                 const card = host.cardIndexOf(i) | 0;
                 host.setOrigin(0x280, 0x100);
-                const table = mem.read32(PAUSE_ITEMS_TABLE_PTR) | 0;
-                const sprite = mem.read32(table + card * 0x1c + (mem.read32(obj + i * 4 + 0x60) | 0) * 4) | 0;
+                const sprite = digimonPictureAt(mem, PAUSE_ITEMS_TABLE_PTR, card, mem.read32(obj + i * 4 + 0x60) | 0);
                 host.drawSprite(host.packResolve(PAUSE_ITEMS_PACK_ROWS), sprite, 0x6b, y);
             }
             y += 0x2e;
