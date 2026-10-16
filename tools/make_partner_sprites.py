@@ -22,8 +22,12 @@ ap.add_argument("sheet")
 ap.add_argument("charId")
 ap.add_argument("--height", type=int, default=28)
 ap.add_argument("--colors", type=int, default=24)
-ap.add_argument("--duration", type=int, default=6, help="ticks per frame (60 a second)")
+ap.add_argument("--duration", default="6", help="ticks per frame (60 a second); a list like 2,1 repeats across the frames")
+ap.add_argument("--clips", default="",
+                help="the rows are ONE loop (e.g. one wing beat): also write field clips, each playing that loop "
+                     "in the given ticks, e.g. 1=18,4=24,5=16,6=28 (idle, walk, run, stop - Patamon's beat)")
 a = ap.parse_args()
+ticks = [int(t) for t in a.duration.split(",")]
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DRAWN = ["down", "down-left", "left", "up-left", "up"]
@@ -130,9 +134,29 @@ if rec is None:
 rec.update({
     "sheet": rel, "frameW": fw, "frameH": fh,
     "frameCounts": {d: nframes for d in DIRS},
-    "frameDurations": {d: [a.duration] * nframes for d in DIRS},
+    "frameDurations": {d: [ticks[i % len(ticks)] for i in range(nframes)] for d in DIRS},
     "frameBottomShift": {d: [0] * nframes for d in DIRS},
     "art": True,
 })
+for k in ("clipSheet", "clipFrameW", "clipFrameH", "clips"):
+    rec.pop(k, None)
+if a.clips:
+    # The field's clip strip: the five drawn directions' frames in one row (the game mirrors the rest), and
+    # per clip a pick of them spread evenly over the loop, two ticks a frame, the loop taking the given ticks.
+    strip = Image.new("RGBA", (fw * nframes * len(DRAWN), fh), (0, 0, 0, 0))
+    for di, d in enumerate(DRAWN):
+        strip.paste(q.crop((0, DIRS.index(d) * fh, fw * nframes, (DIRS.index(d) + 1) * fh)), (di * fw * nframes, 0))
+    crel = f"extra_partners/{a.charId}_clips.png"
+    strip.save(os.path.join(ROOT, "web", crel))
+    clips = {}
+    for spec in a.clips.split(","):
+        cid, total = (int(v) for v in spec.split("="))
+        n = max(1, total // 2)
+        durs = [total // n + (1 if i < total % n else 0) for i in range(n)]
+        pick = [round(i * nframes / n) % nframes for i in range(n)]
+        clips[str(cid)] = {d: {"cols": [di * nframes + p for p in pick], "durations": durs, "bottoms": [0] * n}
+                           for di, d in enumerate(DRAWN)}
+    rec.update({"clipSheet": crel, "clipFrameW": fw, "clipFrameH": fh, "clips": clips})
+    print("clips:", {c: sum(v["down"]["durations"]) for c, v in clips.items()}, "ticks ->", f"web/{crel}")
 open(path, "w").write(json.dumps(doc, indent=1) + "\n")
 print(f"{a.charId}: {nframes} frames x {len(DIRS)} directions, frame {fw}x{fh} -> web/{rel}")
