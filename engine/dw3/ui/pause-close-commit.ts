@@ -37,7 +37,7 @@
 // for the same reason (engine/dw3/ui/shop-close-commit.ts).
 import { foldRecordStatsIntoBonuses, type StatCarrier } from "../party-context.ts";
 import { reconcileHeldCounts, setEquippedItem, type ItemStoreState } from "../item-store.ts";
-import { ROSTER_SLOT_COUNT, rosterSlotOfCharId } from "../roster.ts";
+import { ROSTER_SLOT_COUNT, rosterSlotDigimonId, rosterSlotOfCharId } from "../roster.ts";
 import { EQUIP_SLOTS, syncLeadEquipBonuses, type EquipmentSlots } from "../equipment.ts";
 
 /** The money ceiling the extracted bounds report (9,999,999; extract_bounds). */
@@ -212,7 +212,7 @@ export function commitPauseClose(input: PauseCloseInput): PauseCloseResult {
     if (!record) continue;
     const current = Number(record.formValue) || 0;
     rec.digimonId = current === 0
-      ? (rosterSlotOfCharId(state.party?.[slot] as string) ?? rosterSlot) + 1
+      ? rosterSlotDigimonId(rosterSlotOfCharId(state.party?.[slot] as string) ?? rosterSlot)
       : input.formId?.(current) ?? rec.digimonId;
     rec.level = Number(record.level) || 0;
     rec.tp = Number(record.tp) || 0;

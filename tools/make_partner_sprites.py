@@ -31,7 +31,12 @@ ap.add_argument("--grid", default="",
                 help="COLSxROWS: the sheet is an exact grid shot from one fixed camera (tools/sprite-views.sh): "
                      "every frame is cut with the same box, so the body stays put while wings and feet move")
 ap.add_argument("--ground", action="store_true", help="a walker, not a flyer: stand every direction on the ground line")
+ap.add_argument("--key", choices=["green", "magenta"], default="green",
+                help="the sheet's flat background colour; magenta for a Digimon that is itself green")
 ap.add_argument("--ground-each", default="", help="first-last: frames stood on the ground one by one (a roll)")
+ap.add_argument("--sink", type=int, default=0,
+                help="pixels the whole sprite is drawn below the ground point, so a low walker's feet sit in its "
+                     "shadow the way the tamer's do")
 a = ap.parse_args()
 ticks = [int(t) for t in a.duration.split(",")]
 
@@ -43,7 +48,10 @@ MIRROR = {"right": "left", "down-right": "down-left", "up-right": "up-left"}
 img = Image.open(a.sheet).convert("RGB")
 px = np.asarray(img).astype(int)
 r, g, b = px[..., 0], px[..., 1], px[..., 2]
-green = (g > 120) & (g > r + 45) & (g > b + 45)
+if a.key == "magenta":  # for a green Digimon (Betamon): the background is magenta instead
+    green = (r > 200) & (b > 200) & (g < 80)
+else:
+    green = (g > 120) & (g > r + 45) & (g > b + 45)
 fg = ~green
 
 
@@ -107,8 +115,9 @@ print("frames per row:", [len(row) for row in cells], "-> using", nframes)
 
 # cut out: RGBA with the green keyed away (and a little green spill pulled off the edges)
 rgba = np.dstack([px.clip(0, 255), np.where(fg, 255, 0)]).astype(np.uint8)
-spill = (g > r) & (g > b) & fg
-rgba[spill, 1] = np.maximum(r, b)[spill].astype(np.uint8)
+if a.key != "magenta":
+    spill = (g > r) & (g > b) & fg
+    rgba[spill, 1] = np.maximum(r, b)[spill].astype(np.uint8)
 src = Image.fromarray(rgba, "RGBA")
 
 tallest = max(y1 - y0 for row in cells for (_, y0, _, y1) in row[:nframes])
@@ -165,7 +174,7 @@ rec.update({
     "sheet": rel, "frameW": fw, "frameH": fh,
     "frameCounts": {d: nframes for d in DIRS},
     "frameDurations": {d: [ticks[i % len(ticks)] for i in range(nframes)] for d in DIRS},
-    "frameBottomShift": {d: [0] * nframes for d in DIRS},
+    "frameBottomShift": {d: [a.sink] * nframes for d in DIRS},
     "art": True,
 })
 for k in ("clipSheet", "clipFrameW", "clipFrameH", "clips"):
@@ -191,7 +200,7 @@ if a.clips:
             raise SystemExit(f"clip {cid}: frame {last} but the rows have {nframes}")
         durs = [tl[i % len(tl)] for i in range(len(pick))]
         clips[cid] = {d: {"cols": [di * nframes + p for p in pick], "durations": durs,
-                          "bottoms": [bob[i % len(bob)] for i in range(len(pick))]}
+                          "bottoms": [bob[i % len(bob)] + a.sink for i in range(len(pick))]}
                       for di, d in enumerate(DRAWN)}
     rec.update({"clipSheet": crel, "clipFrameW": fw, "clipFrameH": fh, "clips": clips})
     print("clips:", {c: sum(v["down"]["durations"]) for c, v in clips.items()}, "ticks ->", f"web/{crel}")

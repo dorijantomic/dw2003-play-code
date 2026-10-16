@@ -4,7 +4,7 @@ import { baseUrl } from "./verify-base-url.mjs";
 import { loadFromCard, openContinueCard, saveToCard, press } from "./memcard-continue.mjs";
 import { waitForCommandMenu } from "./verify-battle-wait.mjs";
 
-// The three new partners (data/authored/web/assets/data/new_starters.json): once a party exists they wait
+// The four new partners (data/authored/web/assets/data/new_starters.json): once a party exists they wait
 // in the Digimon Lab's Switch screen. Switch DemiDevimon in, fight with it, save to the card and load it back.
 //
 // Server: python3 -m http.server <port> --directory web (VERIFY_PORT)
@@ -66,7 +66,7 @@ try {
   await page.waitForFunction(() => window.__state?.started, null, { timeout: 60000 });
   await page.waitForTimeout(600);
   let s = await st();
-  check("the new partners are owned once a party exists", ((s.owned >> 8) & 7) === 7, `owned=${s.owned}`);
+  check("the new partners are owned once a party exists", ((s.owned >> 8) & 15) === 15, `owned=${s.owned}`);
 
   // 1. The lab: Switch Digimon, take the first candidate in Kotemon's place.
   await page.evaluate(() => window.__dri.open(window.__state, null));

@@ -43,6 +43,10 @@ test("the shared commit folds the record's stat groups before it copies them ove
     "the third argument is the element group seed");
   assert.equal(commit.split("foldRecordStatsIntoBonuses(").length - 1, 1,
     "exactly one fold call: this is the shared seam, not a per-screen patch");
+  // A member who did not evolve keeps its species: new partners (roster slots 8+) are not
+  // slot+1, so the id comes from the roster table, never from arithmetic on the slot.
+  assert.match(commit, /current === 0\s*\? rosterSlotDigimonId\(/,
+    "an un-evolved member's id comes from rosterSlotDigimonId");
 });
 
 test("both routes hand their page's numbers to that one commit", () => {

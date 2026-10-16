@@ -1,5 +1,5 @@
 {
-  "note": "Partner Digimon beyond the disc's eight, each with its whole canonical line already in the game as 3D models. Ours, not disc data. Ids continue the walker's species numbering after the enemy-only species (append only, never renumber); roster slots continue after Patamon's 7. Base numbers follow the disc's own starter budget: stat total 200, HP+MP growth ~130, stat growth ~15, resistances sum 680 with growth 21, status resistances sum 150. 'model' names the existing battle model and name-bank entry; 'formId' is the row's game form id (no model uses it). Line tree: 'canon' as the line's own forms at line level 5/20/40 like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega ten levels later, since every other gate hangs off them), then the enemy-only species with 'families' counted as this line's affinity (never its own species). Gear permissions (an item's wearMask bit) come from 'gear_line', or the donor line when it is absent: DemiDevimon wears Renamon's (wands, magic caster), Kunemon Veemon's (the insect horns and pincers: ScissorHorn, KabuteriHorn; an all-rounder's list for an all-rounder), Hagurumon Monmon's (guns and cannons, for Guardromon's missiles).",
+  "note": "Partner Digimon beyond the disc's eight, each with its whole canonical line already in the game as 3D models. Ours, not disc data. Ids continue the walker's species numbering after the enemy-only species (append only, never renumber); roster slots continue after Patamon's 7. Base numbers follow the disc's own starter budget: stat total 200, HP+MP growth ~130, stat growth ~15, resistances sum 680 with growth 21, status resistances sum 150. 'model' names the existing battle model and name-bank entry; 'formId' is the row's game form id (no model uses it). Line tree: 'canon' as the line's own forms at line level 5/20/40 like every disc starter's, then the donor line's gates for the disc's 44 forms (the donor's own champion/ultimate/mega ten levels later, since every other gate hangs off them), then the enemy-only species with 'families' counted as this line's affinity (never its own species). Gear permissions (an item's wearMask bit) come from 'gear_line', or the donor line when it is absent: DemiDevimon wears Renamon's (wands, magic caster), Kunemon Veemon's (the insect horns and pincers: ScissorHorn, KabuteriHorn; an all-rounder's list for an all-rounder), Hagurumon Monmon's (guns and cannons, for Guardromon's missiles), Betamon Kumamon's (a sturdy brawler; its donor line too).",
   "starters": [
     {
       "id": 191, "slot": 8, "name": "DemiDevimon", "model": "DemiDevimon", "charId": "x191demi", "formId": 900,
@@ -45,6 +45,21 @@
       "donor_line": 2,
       "canon": [["Guardromon", 5], ["Andromon", 20], ["HiAndromon", 40]],
       "families": [5]
+    },
+    {
+      "id": 194, "slot": 11, "name": "Betamon", "model": "Betamon", "charId": "x194beta", "formId": 903,
+      "lore": "Vaccine amphibian with a shock fin. Sturdy and even; water and thunder resistant, weak to dark.",
+      "hp": 170, "mp": 110, "str": 44, "def": 50, "spt": 38, "wis": 32, "spd": 36, "chr": 1,
+      "growth": {"hp": 90, "mp": 45, "str": 3, "def": 4, "spt": 3, "wis": 3, "spd": 3, "chr": 4},
+      "resistances": {"fire": 95, "water": 130, "ice": 100, "wind": 80, "thunder": 125, "machine": 85, "dark": 65},
+      "resistance_growth": {"fire": 3, "water": 5, "ice": 3, "wind": 2, "thunder": 4, "machine": 2, "dark": 2},
+      "growth_xp": 8,
+      "status_resist": {"poison": 30, "paralyze": 50, "confuse": 20, "sleep": 30, "ko": 20},
+      "family": 6, "tech_basic": 2, "tech_signature": 156,
+      "blasts": ["Seadramon", "MegaSeadramon", "MetalSeadramon", "MaloMyotismon", "BK WarGreymon"],
+      "donor_line": 1,
+      "canon": [["Seadramon", 5], ["MegaSeadramon", 20], ["MetalSeadramon", 40]],
+      "families": [10, 11]
     }
   ]
 }
