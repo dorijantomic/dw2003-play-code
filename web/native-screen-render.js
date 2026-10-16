@@ -20,6 +20,7 @@
 // intent stream yet. That is the named Phase 4 text-element item.
 
 import { drawClip, drawClipAtPaletteRow, loadPack, packReady } from "./screenpack.js";
+import { drawPartnerPicture, isPartnerPicture } from "./partner-pictures.js";
 
 // VRAM-backed sprites. The card class's +0x34 emit publishes a 32x32 textured
 // sprite whose texpage/clut words name a rectangle LoadImage wrote into the
@@ -352,6 +353,18 @@ export function createNativeScreenRenderer(entry, packNameForDir, options = {}) 
                     continue;
                 }
                 stats.paintOrder.push({ id: d.id, bucket: d.bucket });
+                if (isPartnerPicture(d.id)) {
+                    // A new partner's picture (web/partner-pictures.js): no pack holds it.
+                    ctx.save();
+                    if (d.sx !== 1 || d.sy !== 1) {
+                        ctx.translate(d.px, d.py);
+                        ctx.scale(d.sx, d.sy);
+                        ctx.translate(-d.px, -d.py);
+                    }
+                    if (drawPartnerPicture(ctx, d.id, d.x, d.y)) stats.clips += 1;
+                    ctx.restore();
+                    continue;
+                }
                 const name = packNameForDir ? packNameForDir(d.dir) : entry && entry.pack;
                 const pack = getPack(name);
                 if (!name) {

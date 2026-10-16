@@ -100,5 +100,13 @@ Patamon's; the output is disc-derived, so `web/extra_partners/*.png` stays uncom
 `IDLE_BEATS=1 ... m122hagu x193hagu 10 61 30`. Kunemon walks by rolling like his attack:
 `ZOOM=0.8 WALK_SPIN=720 IDLE_BEATS=1 IDLE_BOB=0 ... m032kune x192kune 10 61 30`.
 
-Not done yet: the lab/status pictures (blank until the art exists). Browser checks: `tools/verify_new_partners.mjs`
+Pictures: the engine numbers a new partner's lab/status/fight-report picture 0x400 + (slot-8)*0x10 + frame;
+`web/partner-pictures.js` paints it from the partner's own field sprite (idle, facing down-left, three frames
+fitted into the 32x32 cell). With no sprite imported the cell stays blank.
+
+Battle camera: an enemy-only model on our side (any extra species, a new partner, their forms) has a 0x48
+staging record with no near-side shots, so no camera record was ever cut and the arena did not draw.
+`nearCameraFor` (web/battle3d.js) lends it the twelve near shots of the partner with the closest stand-off.
+
+Browser checks: `tools/verify_new_partners.mjs`
 (lab switch, a fight, card save and load, pause STATUS), `tools/verify_partner_sprite.mjs [outdir] [charId]`.

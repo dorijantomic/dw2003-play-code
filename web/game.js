@@ -299,6 +299,7 @@ import { beginDrawOrderLog, takeDrawOrderLog, actorDrawsUnderMap, ENTITY_BUCKET,
 import { loadFallingObjects, fireStageObject, fireNativeStageObject, paceStageObjects, stageObjectDraws, streetScreenQuads, clearStageObjects, annotatorActive, annotatorMarkers, setAnnotatorRandom, setStageObjectSound, setStageObjectOrdinal, stageObjectState, stageAmbienceDiagnostics, STAGE_AMBIENCE_EXECUTION } from "./stage-objects.js";
 import { fieldCharPendingPixels, resetFieldChar, fieldCharState } from "./vendor/engine.js";
 import { fieldCameraFollow } from "./vendor/engine.js";
+import { preloadPartnerPictures } from "./partner-pictures.js";
 import { packedIsMusicStart, packedKey } from "./packed-sound.js";
 import { createMenu, pauseMapContext, migrateVisitedMaps } from "./menu.js";
 import { openPauseHome, returnToPauseCardFolders } from "./pause-home.js";
@@ -2402,6 +2403,7 @@ async function init() {
     // ... and their roster slots and starter ids, before the saved party is read back.
     try {
         await window.__extraRoster?.load?.();
+        preloadPartnerPictures();
     } catch {
         /* no extra species */
     }

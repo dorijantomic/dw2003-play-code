@@ -1141,13 +1141,43 @@ export function stagingRecordsReady(placementTable, playerFolder, enemyFolder) {
  * reproduce, so this returns null and the caller keeps the last record instead of cutting one.
  */
 export function arenaShotFor(placementTable, playerFolder, enemyFolder) {
-  const near = placementTable?.[modelKeyFromFolder(playerFolder)] ?? null;
+  const nearCam = nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
   const far = placementTable?.[modelKeyFromFolder(enemyFolder)] ?? null;
   const index = (far?.shot | 0) - 1;
-  if (index < 0 || !near?.camera) return null;
-  const eye = near.camera.eye?.[index], look = near.camera.look?.[index];
+  if (index < 0 || !nearCam) return null;
+  const eye = nearCam.eye?.[index], look = nearCam.look?.[index];
   if (!eye || !look) return null;
-  return { eye, target: look, H: near.camera.view?.[index] };
+  return { eye, target: look, H: nearCam.view?.[index] };
+}
+
+/**
+ * The twelve NEAR-side canned shots for the Digimon standing on our side.
+ *
+ * A partner's 0xC4 record carries them. A 0x48 record (the 193 Digimon the disc only ever puts
+ * on the far side) carries just its three far-side shots, so when one of those is OUR Digimon —
+ * an extra species, or a form of a new partner — there is no near table, nothing ever cuts a
+ * camera record and the arena never draws. (Not a disc case: the console never stages them on
+ * the near side.) Such a Digimon borrows the near table of the partner whose stand-off is
+ * closest to its own: the disc's near shots are authored per body size, not per species, and
+ * the stand-off is the record's own size measure.
+ */
+const _nearCamCache = new WeakMap();
+export function nearCameraFor(placementTable, key) {
+  const rec = key != null ? placementTable?.[key] : null;
+  if (!rec) return null;
+  if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
+  let cache = _nearCamCache.get(placementTable);
+  if (!cache) { cache = new Map(); _nearCamCache.set(placementTable, cache); }
+  if (cache.has(key)) return cache.get(key);
+  let best = null, bestD = Infinity;
+  for (const r of Object.values(placementTable)) {
+    if ((r?.camera?.eye?.length | 0) < 12) continue;
+    const d = Math.abs((r.standoff | 0) - (rec.standoff | 0)) * 4 + Math.abs((r.hover | 0) - (rec.hover | 0));
+    if (d < bestD) { best = r; bestD = d; }
+  }
+  const cam = best ? best.camera : null;
+  cache.set(key, cam);
+  return cam;
 }
 
 /**
@@ -1742,7 +1772,8 @@ export function createBattle3D(canvas, sfx = null) {
   // director passes the two arguments directly (fightstg.s:4766-4778, :4804-4812).
   function cannedShotSlot(side, index) {
     const key = modelKeyFromFolder(side === "player" ? playerFolder : enemyFolder);
-    const cam = key ? placementTable[key]?.camera : null;
+    const cam = !key ? null
+      : side === "player" ? nearCameraFor(placementTable, key) : placementTable[key]?.camera;
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
     if (eye && look) return { eye, target: look, H: cam.view?.[index] };
     return null;
@@ -1752,8 +1783,7 @@ export function createBattle3D(canvas, sfx = null) {
   // side (0 = the near table) and a2 for the shot, so this is NEAR shot 11 out of OUR
   // own record — the same entry op5 preset 4 reads, since it is near index p + 7.
   function lossShot() {
-    const key = modelKeyFromFolder(playerFolder);
-    const cam = key ? placementTable[key]?.camera : null;
+    const cam = nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
     const i = LOSS_CAM.shotIndex;
     const eye = cam?.eye?.[i], look = cam?.look?.[i];
     if (eye && look) return { eye, target: look, H: cam.view?.[i] };
