@@ -4,9 +4,9 @@
   {
    "id": "x191demi",
    "name": "DemiDevimon",
-   "sheet": "extra_partners/blank.png",
-   "frameW": 36,
-   "frameH": 32,
+   "sheet": "extra_partners/x191demi.png",
+   "frameW": 70,
+   "frameH": 42,
    "rows": [
     "down",
     "down-left",
@@ -18,70 +18,182 @@
     "up-right"
    ],
    "frameCounts": {
-    "down": 1,
-    "down-left": 1,
-    "left": 1,
-    "right": 1,
-    "up-left": 1,
-    "up": 1,
-    "down-right": 1,
-    "up-right": 1
+    "down": 8,
+    "down-left": 8,
+    "left": 8,
+    "right": 8,
+    "up-left": 8,
+    "up": 8,
+    "down-right": 8,
+    "up-right": 8
    },
    "frameDurations": {
     "down": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "down-left": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "left": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "right": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "up-left": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "up": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "down-right": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ],
     "up-right": [
-     12
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6,
+     6
     ]
    },
    "frameBottomShift": {
     "down": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "down-left": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "left": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "right": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "up-left": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "up": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "down-right": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ],
     "up-right": [
-     5
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
     ]
    },
    "starter": true,
    "newPartner": true,
-   "art": false
+   "art": true
   },
   {
    "id": "x192beta",
