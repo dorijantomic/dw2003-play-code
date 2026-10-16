@@ -73,3 +73,6 @@ exe-decomp/
 
 # Style references cut from the game's own sprites (for image generators); never committed.
 data/authored/quests/art/ref/
+
+# model renders (disc-derived reference pictures)
+captures/
