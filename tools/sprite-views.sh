@@ -6,7 +6,7 @@
 #   e.g. tools/sprite-views.sh m217pdev            -> captures/sprite-views/m217pdev/sheet.png + row_*.png
 # Models are the folders under web/assets/battle/models/ (the Model list in web/model-viewer.html).
 # Needs the web server: python3 -m http.server ${VERIFY_PORT:-8770} --directory web
-# Camera: ZOOM (fraction of the viewer's fitted distance, default 0.6), PITCH (radians, default 0.55),
+# Camera: ZOOM (fraction of the viewer's fitted distance, default 0.6), PITCH (radians, default 0.3),
 # FRONT (angle that sees the face, default 0), LOOP=start:end (frames, default: found from the model).
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -15,7 +15,7 @@ const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const probe = process.argv.includes("--probe");
 const [model = "m217pdev", OUT = "/tmp/sprite-views", framesArg = "8"] = args;
 const front = Number(process.env.FRONT ?? 0);        // camera angle that sees the model's face
-const pitch = Number(process.env.PITCH ?? 0.55);     // radians above the horizon (field camera)
+const pitch = Number(process.env.PITCH ?? 0.3);     // radians above the horizon (field camera)
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader"] });
