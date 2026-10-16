@@ -1140,8 +1140,8 @@ export function stagingRecordsReady(placementTable, playerFolder, enemyFolder) {
  * out of whatever the staging block's neighbours happen to hold, which is not a behaviour to
  * reproduce, so this returns null and the caller keeps the last record instead of cutting one.
  */
-export function arenaShotFor(placementTable, playerFolder, enemyFolder) {
-  const nearCam = nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
+export function arenaShotFor(placementTable, playerFolder, enemyFolder, nearCamOverride = null) {
+  const nearCam = nearCamOverride ?? nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
   const far = placementTable?.[modelKeyFromFolder(enemyFolder)] ?? null;
   const index = (far?.shot | 0) - 1;
   if (index < 0 || !nearCam) return null;
@@ -1157,9 +1157,9 @@ export function arenaShotFor(placementTable, playerFolder, enemyFolder) {
  * on the far side) carries just its three far-side shots, so when one of those is OUR Digimon —
  * an extra species, or a form of a new partner — there is no near table, nothing ever cuts a
  * camera record and the arena never draws. (Not a disc case: the console never stages them on
- * the near side.) Such a Digimon borrows the near table of the partner whose stand-off is
- * closest to its own: the disc's near shots are authored per body size, not per species, and
- * the stand-off is the record's own size measure.
+ * the near side.) This is the plain fallback — the near table of the partner whose stand-off is
+ * closest; the battle renderer fits a reference partner's table to the model's size instead
+ * (`fitNearCamera`) once both models are loaded.
  */
 const _nearCamCache = new WeakMap();
 export function nearCameraFor(placementTable, key) {
@@ -1178,6 +1178,49 @@ export function nearCameraFor(placementTable, key) {
   const cam = best ? best.camera : null;
   cache.set(key, cam);
   return cam;
+}
+
+/**
+ * A reference partner's near table refitted to another Digimon: every eye and look point is
+ * taken relative to the reference fighter's home slot, scaled by `k` (our size over the
+ * reference's) and put back relative to our own slot. Every shot keeps its direction and lens,
+ * so the framing is the reference partner's — Agumon's close-up of Agumon becomes the same
+ * close-up of Kunemon, however big or small Kunemon is.
+ */
+export function fitNearCamera(refCam, refSlot, ownSlot, k) {
+  if (!refCam) return null;
+  const fit = (p) => p && [
+    ownSlot.x + (p[0] - refSlot.x) * k,
+    ownSlot.y + (p[1] - refSlot.y) * k,
+    ownSlot.z + (p[2] - refSlot.z) * k,
+  ];
+  return { eye: refCam.eye.map(fit), look: refCam.look.map(fit), view: refCam.view.slice() };
+}
+
+/** The camera-framing size of a model: its rest pose (clip 0's first frame) in PS1 units,
+ *  the height or half the width, whichever is larger: the shots are about as wide as they
+ *  are tall and a partner fills roughly half the height, so only a very wide wingspan needs
+ *  the camera further back than its height asks for. */
+export function modelFrameSize(model) {
+  const r = modelRestSize(model);
+  return r ? Math.max(r.h, 0.5 * r.w) : null;
+}
+
+/** A model's rest pose (clip 0's first frame) height and width, PS1 units. */
+export function modelRestSize(model) {
+  if (!model?.bones) return null;
+  if (model._restSize !== undefined) return model._restSize;
+  const { mats } = buildBoneWorldMatrices(model, model.clips?.[0]?.start_frame ?? 0, null);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let b = 0; b < model.bones.length; b++) {
+    const bone = model.bones[b];
+    for (const face of bone.faces || []) for (const vi of face) {
+      const [x, y] = posedVertex(bone, vi, b, mats);
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  }
+  model._restSize = isFinite(x0) ? { h: y1 - y0, w: x1 - x0 } : null;
+  return model._restSize;
 }
 
 /**
@@ -1772,8 +1815,7 @@ export function createBattle3D(canvas, sfx = null) {
   // director passes the two arguments directly (fightstg.s:4766-4778, :4804-4812).
   function cannedShotSlot(side, index) {
     const key = modelKeyFromFolder(side === "player" ? playerFolder : enemyFolder);
-    const cam = !key ? null
-      : side === "player" ? nearCameraFor(placementTable, key) : placementTable[key]?.camera;
+    const cam = !key ? null : side === "player" ? playerNearCamera() : placementTable[key]?.camera;
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
     if (eye && look) return { eye, target: look, H: cam.view?.[index] };
     return null;
@@ -1783,7 +1825,7 @@ export function createBattle3D(canvas, sfx = null) {
   // side (0 = the near table) and a2 for the shot, so this is NEAR shot 11 out of OUR
   // own record — the same entry op5 preset 4 reads, since it is near index p + 7.
   function lossShot() {
-    const cam = nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
+    const cam = playerNearCamera();
     const i = LOSS_CAM.shotIndex;
     const eye = cam?.eye?.[i], look = cam?.look?.[i];
     if (eye && look) return { eye, target: look, H: cam.view?.[i] };
@@ -1799,7 +1841,54 @@ export function createBattle3D(canvas, sfx = null) {
   // place: arenaShotFor owns it, and returns null when the enemy's record carries no such
   // word, which is the case for every 0xC4 (partner) record.
   function introShot() {
-    return arenaShotFor(placementTable, playerFolder, enemyFolder);
+    return arenaShotFor(placementTable, playerFolder, enemyFolder, playerNearCamera());
+  }
+
+  // Our Digimon's twelve near shots. A partner has its own; an enemy-only model (no near table,
+  // see nearCameraFor) gets Agumon's, fitted to its size around its own slot (fitNearCamera), so
+  // it is framed the way the disc frames a partner instead of through a bigger or smaller
+  // Digimon's lens. Until both models have loaded, the plain closest-stand-off table stands in.
+  const NEAR_CAM_REF = "m003agum";
+  let nearCamRefModel = null, nearCamRefLoading = false;
+  let fittedNearCam = null;   // { folder, cam }
+  function playerNearCamera() {
+    const key = modelKeyFromFolder(playerFolder);
+    const rec = key != null ? placementTable[key] : null;
+    if (!rec) return null;
+    if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
+    if (fittedNearCam?.folder === playerFolder) return fittedNearCam.cam;
+    if (!nearCamRefModel && !nearCamRefLoading) {
+      nearCamRefLoading = true;
+      loadSkeletalModel(NEAR_CAM_REF).then((m) => { nearCamRefModel = m || null; }, () => {});
+    }
+    const refKey = modelKeyFromFolder(NEAR_CAM_REF);
+    const refRec = placementTable[refKey];
+    const own = playerModel ? modelFrameSize(playerModel) : null;
+    const ref = nearCamRefModel ? modelFrameSize(nearCamRefModel) : null;
+    if (!refRec?.camera || !own || !ref) return nearCameraFor(placementTable, key);
+    const k = Math.min(3, Math.max(0.5, own / ref));
+    const refSlot = arenaSlot(refRec, "player"), ownSlot = arenaSlot(rec, "player");
+    const cam = fitNearCamera(refRec.camera, refSlot, ownSlot, k);
+    // The face close-up the same way, but scaled by HEIGHT alone, so it lands on the head
+    // the way Agumon's lands on Agumon's. A 0x48 record's own face-box read runs past the
+    // record (see faceBoxShot) and frames nothing.
+    const kh = Math.min(3, Math.max(0.3, modelRestSize(playerModel).h / modelRestSize(nearCamRefModel).h));
+    const face = {};
+    for (const side of ["player", "enemy"]) {
+      const s = faceBoxSource(placementTable, refKey, side).shot;
+      const fit = (p) => [ownSlot.x + (p[0] - refSlot.x) * kh, ownSlot.y + (p[1] - refSlot.y) * kh,
+        ownSlot.z + (p[2] - refSlot.z) * kh];
+      face[side] = s ? { ...s, eye: fit(s.eye), target: fit(s.target) } : null;
+    }
+    fittedNearCam = { folder: playerFolder, cam, face };
+    return cam;
+  }
+
+  // The face-box shot for an enemy-only model on our side, fitted from Agumon's (null for a
+  // partner, which reads its own record).
+  function fittedFaceShot(side) {
+    playerNearCamera();
+    return fittedNearCam?.folder === playerFolder ? fittedNearCam.face?.[side] ?? null : null;
   }
   // The opening shot is the arena shot, installed as the record: FIGHTSTG_F0x800880f0 cuts it
   // with `[0xf8]` and the camera director then holds that same record, re-publishing it every
@@ -3688,7 +3777,7 @@ export function createBattle3D(canvas, sfx = null) {
     // render mapping as every other shot here: ps1ToRender, the one mapping.
     const fb = faceBoxSource(placementTable, modelKeyFromFolder(playerFolder),
                              enemySpeaks ? "enemy" : "player");
-    const faceShot = fb.shot;
+    const faceShot = fittedFaceShot(fb.side) ?? fb.shot;
     // Whether this record's own projection distance can put a picture in the box. It is the
     // console's arithmetic (see faceBoxDraws), not a judgement about the record: a record with
     // no projection distance shows the battle view's own picture through the window, because

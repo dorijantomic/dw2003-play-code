@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { nearCameraFor, arenaShotFor } = await import("../web/battle3d.js");
+const { nearCameraFor, arenaShotFor, fitNearCamera } = await import("../web/battle3d.js");
 
 const shots = (n, tag) => ({
   eye: Array.from({ length: n }, (_, i) => [tag, i, 0]),
@@ -31,6 +31,21 @@ test("an enemy-only Digimon borrows the near table of the closest stand-off", ()
 test("no record, no camera", () => {
   assert.equal(nearCameraFor(table, "999"), null);
   assert.equal(nearCameraFor(null, "5"), null);
+});
+
+test("a fitted table keeps every shot's direction and scales its distance about our slot", () => {
+  const ref = { eye: [[0, -100, -6000]], look: [[0, -100, 0]], view: [280] };
+  const fit = fitNearCamera(ref, { x: 0, y: 0, z: -5000 }, { x: 0, y: 0, z: -5500 }, 2);
+  assert.deepEqual(fit.eye[0], [0, -200, -7500]);    // twice as far behind our own slot
+  assert.deepEqual(fit.look[0], [0, -200, 4500]);
+  assert.deepEqual(fit.view, [280]);
+  assert.equal(fitNearCamera(null, {}, {}, 1), null);
+});
+
+test("an explicit near table wins over the fallback", () => {
+  const own = { eye: [[9, 9, 9], [8, 8, 8]], look: [[1, 1, 1], [2, 2, 2]], view: [100, 200] };
+  const shot = arenaShotFor(table, "m032kune", "m383pken", own);
+  assert.deepEqual(shot, { eye: [8, 8, 8], target: [2, 2, 2], H: 200 });
 });
 
 test("the opening arena shot resolves with an enemy-only Digimon on the near side", () => {
