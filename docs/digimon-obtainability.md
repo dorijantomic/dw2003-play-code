@@ -86,19 +86,23 @@ line, each gets a donor line's gates for the disc's 44 forms (the donor's own fo
 enemy-only species by family. A line never learns its own species as a form.
 
 How you get them: once you have a party they are owned and wait in the Digimon Lab (Switch Digimon), like any partner
-you have obtained. Their bits sit above the disc's eight (`rosterOwned` bits 8..10), so story checks never see them.
+you have obtained. Their bits sit above the disc's eight (`rosterOwned` bits 8..11), so story checks never see them.
 
 Engine: roster slots 8..15 (`engine/dw3/roster.ts`), their records at `0x801F8000` (`engine/dw3/roster-records.ts`);
 every record address goes through `rosterRecordAddress`. A card save keeps the disc's eight records; the new partners'
 blocks come back from the companion snapshot (`engine/persistence/memcard-state.ts`).
 
-(Slot 9 was Betamon until 2026-10-16; a four-legged walk was too hard to draw, so Kunemon took the slot, id and form id.)
+(Slot 9 was Betamon until 2026-10-16; a four-legged walk was too hard to draw, so Kunemon took the slot, id and form id.
+Betamon came back the same day as slot 11, id 194, `x194beta`, form id 903, from the user's own walk screenshots.)
 
 Field sprites come straight from each battle model: `tools/partner-from-model.sh` (frame counts and timing are
 Patamon's; the output is disc-derived, so `web/extra_partners/*.png` stays uncommitted and the committed
 `web/extra_partners.json` keeps the blank placeholders). DemiDevimon: `m217pdev x191demi 10 20 44`. Hagurumon:
 `IDLE_BEATS=1 ... m122hagu x193hagu 10 61 30`. Kunemon walks by rolling like his attack:
 `ZOOM=0.8 WALK_SPIN=720 IDLE_BEATS=1 IDLE_BOB=0 ... m032kune x192kune 10 61 30`.
+Betamon is hand-cut from five screenshots (five walk frames per direction): `tools/betamon_sheet_from_shots.py`
+builds the sheet (breathing idle, magenta background), then `make_partner_sprites.py` with the line in its header
+(`--key magenta`, `--sink 2` so the feet sit in the shadow).
 
 Pictures: the engine numbers a new partner's lab/status/fight-report picture 0x400 + (slot-8)*0x10 + frame;
 `web/partner-pictures.js` paints it from the partner's own field sprite (idle, facing down-left, three frames
