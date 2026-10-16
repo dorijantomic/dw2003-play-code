@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Try a New Partner</title>
+<style>
+  :root { --bg: #14141c; --fg: #e8e8f0; --muted: #9a9ab0; --btn: #2d3a6e; --btn2: #3e4f94; }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 24px 16px; }
+  main { max-width: 520px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { color: var(--muted); margin: 0 0 18px; }
+  button { display: block; width: 100%; margin: 0 0 10px; padding: 12px; border: 0; border-radius: 6px;
+    background: var(--btn); color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+  button:hover { background: var(--btn2); }
+  .small { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Try a new partner</h1>
+  <p>Starts the game in Asuka City with this partner leading your party. Your current browser save is backed up first;
+    the last button puts it back.</p>
+  <button data-char="x191demi" data-id="191">DemiDevimon</button>
+  <button data-char="x192beta" data-id="192">Betamon (no walking art yet: invisible on the map)</button>
+  <button data-char="x193hagu" data-id="193">Hagurumon (no walking art yet: invisible on the map)</button>
+  <button id="restore" class="small">Put my own save back</button>
+  <p id="msg" class="small"></p>
+</main>
+<script>
+  // Debug page: seeds the browser save the way tools/verify_partner_sprite.mjs does, then opens the game.
+  const KEYS = ["fieldLocation", "charId", "party", "partnerStats", "partyStats", "equipment", "reserveStats",
+    "reserveEquipment", "rosterOwned", "playerName"];
+  const BACKUP = "tryPartnerBackup";
+  const msg = (t) => { document.getElementById("msg").textContent = t; };
+  const store = (() => { try { return window.localStorage; } catch { return null; } })();
+  for (const b of document.querySelectorAll("button[data-char]")) {
+    b.addEventListener("click", () => {
+      if (!store) return msg("This browser blocks site storage, so the test can't start.");
+      if (!store.getItem(BACKUP)) store.setItem(BACKUP, JSON.stringify(Object.fromEntries(KEYS.map((k) => [k, store.getItem(k)]))));
+      const char = b.dataset.char;
+      const m = { digimonId: +b.dataset.id, level: 5, xp: 0, tp: 10, hp: 200, maxHp: 200, mp: 100, maxMp: 100, bonuses: {}, elemBonuses: {} };
+      store.setItem("playerName", store.getItem("playerName") || "Junior");
+      store.setItem("fieldLocation", JSON.stringify({ version: 1, mapId: "s245", x: 332, y: 390, dir: "left" }));
+      store.setItem("charId", char);
+      store.setItem("party", JSON.stringify([char]));
+      store.setItem("partnerStats", JSON.stringify(m));
+      store.setItem("partyStats", JSON.stringify([m]));
+      store.setItem("equipment", JSON.stringify([{}]));
+      location.href = "index.html?skipTitle=1&map=s245";
+    });
+  }
+  document.getElementById("restore").addEventListener("click", () => {
+    const saved = store && store.getItem(BACKUP);
+    if (!saved) return msg("Nothing to put back: no test was started from this page.");
+    for (const [k, v] of Object.entries(JSON.parse(saved))) v == null ? store.removeItem(k) : store.setItem(k, v);
+    store.removeItem(BACKUP);
+    msg("Your own save is back.");
+  });
+</script>
+</body>
+</html>
