@@ -30,6 +30,8 @@ ap.add_argument("--clips", default="",
 ap.add_argument("--grid", default="",
                 help="COLSxROWS: the sheet is an exact grid shot from one fixed camera (tools/sprite-views.sh): "
                      "every frame is cut with the same box, so the body stays put while wings and feet move")
+ap.add_argument("--ground", action="store_true", help="a walker, not a flyer: stand every direction on the ground line")
+ap.add_argument("--ground-each", default="", help="first-last: frames stood on the ground one by one (a roll)")
 a = ap.parse_args()
 ticks = [int(t) for t in a.duration.split(",")]
 
@@ -124,7 +126,19 @@ for d, row in zip(DRAWN, cells):
         out.append(small)
     frames[d] = out
 
-fw = max(f.width for fs in frames.values() for f in fs) + 2
+if a.ground:
+    # Stand it on the ground: one fixed box leaves each direction floating by its own camera height. Drop each
+    # direction as a whole until its lowest pixel touches the bottom (the body keeps its place between frames),
+    # and the --ground-each frames (a roll, whose lowest point moves) one by one.
+    lo, hi = (int(v) for v in a.ground_each.split("-")) if a.ground_each else (-1, -2)
+    def gap(f):
+        rows = np.nonzero(np.asarray(f)[..., 3].any(1))[0]
+        return f.height - 1 - int(rows.max()) if len(rows) else 0
+    for d, out in frames.items():
+        whole = min(gap(f) for i, f in enumerate(out) if not lo <= i <= hi)
+        frames[d] = [f.crop((0, 0, f.width, f.height - (gap(f) if lo <= i <= hi else whole))) for i, f in enumerate(out)]
+
+fw =max(f.width for fs in frames.values() for f in fs) + 2
 fh = max(32, max(f.height for fs in frames.values() for f in fs) + 2)
 fw += fw % 2
 sheet = Image.new("RGBA", (fw * nframes, fh * len(DIRS)), (0, 0, 0, 0))

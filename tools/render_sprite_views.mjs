@@ -74,11 +74,29 @@ if (process.env.FRAMES) {
   // A larger camera angle turns the model's face toward the screen's left.
   const dirs = [["1_down", 0], ["2_down-left", Math.PI / 4], ["3_left", Math.PI / 2], ["4_up-left", 3 * Math.PI / 4], ["5_up", Math.PI]];
   const n = Number(framesArg);
+  // SPIN=<frame>: hold the pose at that frame and turn the root through one full forward roll over the n
+  // pictures (Kunemon's rolling attack as his walk). The root keeps the lift the attack gives it there.
+  const spin = process.env.SPIN ? Number(process.env.SPIN) : null;
+  const root = spin == null ? null : await page.evaluate((f) => {
+    const a = window._model.bones[0].anim;
+    const at = (ch) => [...ch].reverse().find((k) => k[3] <= f) ?? ch[0];
+    return { ch1: at(a.ch1), ch2: a.ch2[0] };
+  }, spin);
   for (const [name, rel] of dirs) {
     await view({ theta: front + rel, phi: pitch });
     for (let i = 0; i < n; i++) {
       // mid-step samples: frame 0 itself is often the model's rest pose, not part of the loop
-      const f = Math.round(loop[0] + (loop[1] - loop[0]) * (i + 0.5) / n);
+      let f = Math.round(loop[0] + (loop[1] - loop[0]) * (i + 0.5) / n);
+      if (spin != null) {
+        f = spin;
+        await page.evaluate(({ r, ang }) => {
+          const a = window._model.bones[0].anim;
+          a.ch1 = [[r.ch1[0], r.ch1[1], r.ch1[2], 0], [r.ch1[0], r.ch1[1], r.ch1[2], 30000]];
+          a.ch2 = [[ang, r.ch2[1], r.ch2[2], 0], [ang, r.ch2[1], r.ch2[2], 30000]];
+        }, { r: root, ang: Math.round(4096 * i / n) });
+        await page.evaluate((x) => window._mv.setFrame(x), f - 1);
+        await page.waitForTimeout(50);
+      }
       await page.evaluate((x) => window._mv.setFrame(x), f);
       await page.waitForTimeout(200);
       await snap(`${OUT}/${name}_${i + 1}.png`);

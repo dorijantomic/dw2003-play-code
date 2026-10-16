@@ -17,19 +17,19 @@
       "families": [3, 4]
     },
     {
-      "id": 192, "slot": 9, "name": "Betamon", "model": "Betamon", "charId": "x192beta", "formId": 901,
-      "lore": "Vaccine amphibian with a shock fin. Sturdy and even; water and thunder resistant, weak to dark.",
-      "hp": 170, "mp": 110, "str": 44, "def": 50, "spt": 38, "wis": 32, "spd": 36, "chr": 1,
-      "growth": {"hp": 90, "mp": 45, "str": 3, "def": 4, "spt": 3, "wis": 3, "spd": 3, "chr": 4},
-      "resistances": {"fire": 95, "water": 130, "ice": 100, "wind": 80, "thunder": 125, "machine": 85, "dark": 65},
-      "resistance_growth": {"fire": 3, "water": 5, "ice": 3, "wind": 2, "thunder": 4, "machine": 2, "dark": 2},
-      "growth_xp": 8,
-      "status_resist": {"poison": 30, "paralyze": 50, "confuse": 20, "sleep": 30, "ko": 20},
-      "family": 6, "tech_basic": 2, "tech_signature": 156,
-      "blasts": ["Seadramon", "MegaSeadramon", "MetalSeadramon", "MaloMyotismon", "BK WarGreymon"],
-      "donor_line": 1,
-      "canon": [["Seadramon", 5], ["MegaSeadramon", 20], ["MetalSeadramon", 40]],
-      "families": [10, 11]
+      "id": 192, "slot": 9, "name": "Kunemon", "model": "Kunemon", "charId": "x192kune", "formId": 901,
+      "lore": "Virus larva with an electric thread; curls up and rolls. Quick and wiry; thunder resistant, weak to fire.",
+      "hp": 140, "mp": 150, "str": 36, "def": 30, "spt": 46, "wis": 38, "spd": 50, "chr": 1,
+      "growth": {"hp": 65, "mp": 65, "str": 3, "def": 2, "spt": 3, "wis": 3, "spd": 4, "chr": 3},
+      "resistances": {"fire": 80, "water": 95, "ice": 95, "wind": 100, "thunder": 125, "machine": 90, "dark": 95},
+      "resistance_growth": {"fire": 2, "water": 3, "ice": 3, "wind": 3, "thunder": 5, "machine": 2, "dark": 3},
+      "growth_xp": 7,
+      "status_resist": {"poison": 40, "paralyze": 50, "confuse": 20, "sleep": 30, "ko": 10},
+      "family": 8, "tech_basic": 5, "tech_signature": 157,
+      "blasts": ["Kuwagamon", "Okuwamon", "HKabuterimon", "MaloMyotismon", "BK WarGreymon"],
+      "donor_line": 4,
+      "canon": [["Kuwagamon", 5], ["Okuwamon", 20], ["HKabuterimon", 40]],
+      "families": [8]
     },
     {
       "id": 193, "slot": 10, "name": "Hagurumon", "model": "Hagurumon", "charId": "x193hagu", "formId": 902,

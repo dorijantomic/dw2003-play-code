@@ -69,7 +69,7 @@ own models. 20 are clip 12 on the DNA-capable species: that is the Jogress direc
 - Browser: `tools/verify_extra_roster.mjs` (the Digivolve list), `tools/verify_extra_learn.mjs` (win a fight, learn
   Kunemon, saved), `tools/verify_extra_tech_anim.mjs` (spell, combo and support on an enemy-only model).
 
-## New partners: DemiDevimon, Betamon, Hagurumon
+## New partners: DemiDevimon, Kunemon, Hagurumon
 
 Three partners beyond the disc's eight, each with its whole line already in the game as 3D models
 (`data/authored/web/assets/data/new_starters.json`, built by `tools/build_extra_species.py` into `extra_species.json`'s
@@ -78,7 +78,7 @@ Three partners beyond the disc's eight, each with its whole line already in the 
 | Partner | Id | Roster slot | Own line (line level 5 / 20 / 40) | Gear from |
 |---|---|---|---|---|
 | DemiDevimon | 191 | 8 | Devimon, Myotismon, VenomMyotismon | Renamon's line |
-| Betamon | 192 | 9 | Seadramon, MegaSeadramon, MetalSeadramon | Kumamon's line |
+| Kunemon | 192 | 9 | Kuwagamon, Okuwamon, HerculesKabuterimon | Veemon's line |
 | Hagurumon | 193 | 10 | Guardromon, Andromon, HiAndromon | Monmon's line |
 
 Base numbers follow the disc's starter budget (stat total 200, resistances 680, status resistances 150). After its own
@@ -92,6 +92,13 @@ Engine: roster slots 8..15 (`engine/dw3/roster.ts`), their records at `0x801F800
 every record address goes through `rosterRecordAddress`. A card save keeps the disc's eight records; the new partners'
 blocks come back from the companion snapshot (`engine/persistence/memcard-state.ts`).
 
-Not done yet: the walking sprites and the lab/status pictures (they are blank until the art exists; the field sprite is a
-transparent placeholder in `web/extra_partners.json`). Browser check: `tools/verify_new_partners.mjs` (lab switch,
-a fight, card save and load, pause STATUS).
+(Slot 9 was Betamon until 2026-10-16; a four-legged walk was too hard to draw, so Kunemon took the slot, id and form id.)
+
+Field sprites come straight from each battle model: `tools/partner-from-model.sh` (frame counts and timing are
+Patamon's; the output is disc-derived, so `web/extra_partners/*.png` stays uncommitted and the committed
+`web/extra_partners.json` keeps the blank placeholders). DemiDevimon: `m217pdev x191demi 10 20 44`. Hagurumon:
+`IDLE_BEATS=1 ... m122hagu x193hagu 10 61 30`. Kunemon walks by rolling like his attack:
+`ZOOM=0.8 WALK_SPIN=720 IDLE_BEATS=1 IDLE_BOB=0 ... m032kune x192kune 10 61 30`.
+
+Not done yet: the lab/status pictures (blank until the art exists). Browser checks: `tools/verify_new_partners.mjs`
+(lab switch, a fight, card save and load, pause STATUS), `tools/verify_partner_sprite.mjs [outdir] [charId]`.
