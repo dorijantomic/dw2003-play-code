@@ -9,7 +9,7 @@ import { baseUrl } from "./verify-base-url.mjs";
 
 const OUT = process.argv[2] ?? "/tmp/partner-sprite";
 const CHAR = process.argv[3] ?? "x191demi";
-const ID = { x191demi: 191, x192kune: 192, x193hagu: 193, x194beta: 194 }[CHAR];
+const ID = { x191demi: 191, x192kune: 192, x193hagu: 193, x194beta: 194, x195gobu: 195 }[CHAR];
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 960, height: 760 } });

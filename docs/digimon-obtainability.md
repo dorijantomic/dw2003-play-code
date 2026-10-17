@@ -86,7 +86,7 @@ line, each gets a donor line's gates for the disc's 44 forms (the donor's own fo
 enemy-only species by family. A line never learns its own species as a form.
 
 How you get them: once you have a party they are owned and wait in the Digimon Lab (Switch Digimon), like any partner
-you have obtained. Their bits sit above the disc's eight (`rosterOwned` bits 8..11), so story checks never see them.
+you have obtained. Their bits sit above the disc's eight (`rosterOwned` bits 8..12), so story checks never see them.
 
 Engine: roster slots 8..15 (`engine/dw3/roster.ts`), their records at `0x801F8000` (`engine/dw3/roster-records.ts`);
 every record address goes through `rosterRecordAddress`. A card save keeps the disc's eight records; the new partners'
@@ -103,6 +103,9 @@ Patamon's; the output is disc-derived, so `web/extra_partners/*.png` stays uncom
 Betamon is hand-cut from five screenshots (five walk frames per direction): `tools/betamon_sheet_from_shots.py`
 builds the sheet (breathing idle, magenta background), then `make_partner_sprites.py` with the line in its header
 (`--key magenta`, `--sink 2` so the feet sit in the shadow).
+Goburimon (slot 12, id 195, `x195gobu`, form 904; Ogremon 5 / Fugamon 20 / Boltmon 40, Kotemon's gear) is cut from
+the user's one-image sheet `goblimon.jpg` by the general cutter: `tools/partner_sheet_from_grid.py goblimon.jpg
+sheet.png "down=5,down-left=2,left=0m,up-left=1,up=4"`, then the same make_partner_sprites line at `--height 32`.
 
 Pictures: the engine numbers a new partner's lab/status/fight-report picture 0x400 + (slot-8)*0x10 + frame;
 `web/partner-pictures.js` paints it from the partner's own field sprite (idle, facing down-left, three frames

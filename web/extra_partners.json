@@ -440,6 +440,88 @@
    "starter": true,
    "newPartner": true,
    "art": false
+  },
+  {
+   "id": "x195gobu",
+   "name": "Goburimon",
+   "sheet": "extra_partners/blank.png",
+   "frameW": 36,
+   "frameH": 32,
+   "rows": [
+    "down",
+    "down-left",
+    "left",
+    "right",
+    "up-left",
+    "up",
+    "down-right",
+    "up-right"
+   ],
+   "frameCounts": {
+    "down": 1,
+    "down-left": 1,
+    "left": 1,
+    "right": 1,
+    "up-left": 1,
+    "up": 1,
+    "down-right": 1,
+    "up-right": 1
+   },
+   "frameDurations": {
+    "down": [
+     12
+    ],
+    "down-left": [
+     12
+    ],
+    "left": [
+     12
+    ],
+    "right": [
+     12
+    ],
+    "up-left": [
+     12
+    ],
+    "up": [
+     12
+    ],
+    "down-right": [
+     12
+    ],
+    "up-right": [
+     12
+    ]
+   },
+   "frameBottomShift": {
+    "down": [
+     5
+    ],
+    "down-left": [
+     5
+    ],
+    "left": [
+     5
+    ],
+    "right": [
+     5
+    ],
+    "up-left": [
+     5
+    ],
+    "up": [
+     5
+    ],
+    "down-right": [
+     5
+    ],
+    "up-right": [
+     5
+    ]
+   },
+   "starter": true,
+   "newPartner": true,
+   "art": false
   }
  ]
 }
