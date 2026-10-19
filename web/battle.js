@@ -4439,6 +4439,53 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b._pendingImpact = armed;
   }
 
+  /**
+   * A counter is an attack of its own: the defender swings back at the attacker AFTER the blow that provoked it has
+   * played out. It used to subtract the HP and print the line the instant the blow landed, so the damage appeared on
+   * the attacker with no swing at all. Now the outcome is decided where the blow lands (so the page can say it), and
+   * the swing is queued: when the provoking action's animation is over the defender plays its own basic attack
+   * toward the attacker, and the HP comes off at that attack's contact. `from` is the countering side.
+   */
+  function queueCounter(b, from, { dmg, hit = true, techId }) {
+    b._counter = { from, dmg: Math.max(0, dmg | 0), hit, techId, phase: "wait", applied: false };
+  }
+  function applyCounter(b, c) {
+    if (c.applied) return;
+    c.applied = true;
+    if (!c.hit) return;
+    const target = c.from === "player" ? b.enemy : b.player;
+    target.hp = Math.max(0, target.hp - c.dmg);
+  }
+  /** Advance the queued counter. True while it still owns the result phase (the next page must wait for it). */
+  function stepCounter(b) {
+    const c = b._counter;
+    if (!c) return false;
+    if (animBusy()) return true;             // the blow that provoked it is still playing
+    if (c.phase === "wait") {
+      const target = c.from === "player" ? b.enemy : b.player;
+      const attack = c.from === "player" ? renderer3d?.playerAttack : renderer3d?.enemyAttack;
+      const started = attack?.call(renderer3d, c.techId, {
+        lethal: c.hit && c.dmg >= target.hp, miss: !c.hit,
+        onHit: (rec) => { if (rec.type === 99) applyCounter(b, c); },
+      });
+      c.phase = "run";
+      if (started) return true;              // the swing is playing; its contact lands the damage
+    }
+    applyCounter(b, c);                      // the swing finished (or there is no renderer): settle whatever is left
+    b._counter = null;
+    return false;
+  }
+  /** A braced counter (a technique with the counter effect): the same swing back, `from` the side that braced. */
+  function triggerStanceCounter(b, from, attacker, defender, dmgTaken, attackerName) {
+    const cs = defender.counterStance;
+    if (!cs || cs.uses <= 0 || dmgTaken <= 0 || defender.hp <= 0) return "";
+    const back = counterDamage(dmgTaken);
+    if (back <= 0) return "";
+    if (--cs.uses <= 0) delete defender.counterStance;
+    queueCounter(b, from, { dmg: back, hit: true, techId: (from === "player" ? b.player : b.enemy).profile?.tech_basic });
+    return ` ${attackerName} took ${back} counter damage!`;
+  }
+
   /** Run an armed result once no action is playing. The armed closure is one-shot. */
   function commitPendingImpact(b) {
     const commit = b._pendingImpact;
@@ -5591,6 +5638,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // script that fires no contact — clip 15, the seven field techniques — must still
       // put its page up, so an armed result is committed as soon as the action is over.
       commitPendingImpact(b);
+      // A counter swings back once the blow that provoked it is over, and the page waits for it.
+      if (stepCounter(b)) return;
       // Hold the result message until the attack/recoil animation has finished (or a 5s safety cap),
       // so the next actor's turn starts AFTER the current action plays out — not mid-animation.
       if (b.timer > 1.0 && (!animBusy() || b.timer > 5.0)) {
@@ -6401,7 +6450,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           // persistent halfwords the inn later rests away.
           applyPostHitDispatch(b, fightTechDB?.[String(basicTechId)] ?? null);
           message += inflicted.text;
-          extra += weapon.text + stolen.text + triggerCounter(b.player, b.enemy, total, pname)
+          extra += weapon.text + stolen.text + triggerStanceCounter(b, "enemy", b.player, b.enemy, total, pname)
             + triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
           message += extra;
           const ailPage = ailmentBoxPage(enemyName, inflicted.ail ?? weapon.ail);
@@ -6584,7 +6633,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           applyPostHitDispatch(b, restoreRecord); if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._enemyFled = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c) — here the target is the enemy
           message += after.text;
           extra += after.text + weapon.text + stolen.text
-                      + triggerCounter(b.player, b.enemy, total, pname)
+                      + triggerStanceCounter(b, "enemy", b.player, b.enemy, total, pname)
                       + triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
           if (usedCounter) message += ` ${pname} braces to counter!`;
           const ailPage = ailmentBoxPage(enemyName, after.ail ?? weapon.ail);
@@ -7020,8 +7069,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
   }
 
+  // Our Digimon swings back (Counter Crest or a braced counter). The outcome is decided here, so the page can name it; the
+  // swing itself is queued and plays after the enemy's blow (queueCounter), where the damage lands at its contact.
   function triggerPlayerCounter(b, attacker, defender, damage, attackerName, defenderName) {
-    const stance = triggerCounter(attacker, defender, damage, attackerName);
+    const stance = triggerStanceCounter(b, "player", attacker, defender, damage, attackerName);
     if (stance) return stance;
     if (!defender.counterCrest || defender.hp <= 0 || damage <= 0 ||
         !counterCrestProc(damage, defender.maxHp, RAND_U16)) return "";
@@ -7029,8 +7080,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const skill = basic ? { ...basic, attack_category: "physical" } : null;
     const counterSkill = skill ? { ...skill, basic_attack: true } : null;
     const r = resolveAttack(defender, attacker, counterSkill, RAND_U16, b.field);
+    queueCounter(b, "player", { dmg: r.hit ? r.dmg : 0, hit: !!r.hit, techId: defender.profile?.tech_basic });
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
-    attacker.hp = Math.max(0, attacker.hp - r.dmg);
     return ` ${defenderName} countered for ${r.dmg} damage!`;
   }
 

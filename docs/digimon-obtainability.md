@@ -69,7 +69,16 @@ own models. 20 are clip 12 on the DNA-capable species: that is the Jogress direc
 - Browser: `tools/verify_extra_roster.mjs` (the Digivolve list), `tools/verify_extra_learn.mjs` (win a fight, learn
   Kunemon, saved), `tools/verify_extra_tech_anim.mjs` (spell, combo and support on an enemy-only model).
 
+## Aspect routes (optional, off by default)
+
+`ASPECT_ROUTES=1 python3 tools/build_extra_species.py` adds, for each extra form that has a parent, a second unlock record gated on the form's own element bonus (the disc's gate kinds 8-14), and orders each
+line's table weakest tier first. `EXTRA_SPECIES_OUT=<dir>` writes the build to a scratch folder instead of the shared data. The plan and the reasoning are in `docs/aspect-system-plan.md`; the checks are
+`tests/aspect-routes.test.js`, `tests/aspect-seed.test.js`, `tools/simulate_aspect_unlocks.mjs` (a modelled playthrough through the game's real unlock rule), `tools/verify_aspect_route.mjs` (a real fight in the browser), and the pages
+`web/extra-forms.html` and `web/aspect-planner.html`. `applyAspect` in `web/extra-roster.js` is the once-only, capped (40 points) starting element bonus; there is no selector screen for it yet.
+
 ## New partners: DemiDevimon, Kunemon, Hagurumon
+
+**Switched off (2026-10-19).** Each partner needs its own field sprite and gym workout art, more than there is time for. `NEW_PARTNERS_ENABLED = false` in `web/extra-roster.js` strips them at load (no roster slots, no starter rows, no lines of their own); the data, tools and sprites below stay, and `true` brings them back. The enemy-only species stay obtainable as digivolution forms.
 
 Three partners beyond the disc's eight, each with its whole line already in the game as 3D models
 (`data/authored/web/assets/data/new_starters.json`, built by `tools/build_extra_species.py` into `extra_species.json`'s
