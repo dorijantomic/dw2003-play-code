@@ -267,6 +267,8 @@ export class ActorAnimator {
   setAction(clip, hooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1 } = {}) {
     // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js)
     const script = (clip != null) ? resolveClipScript(this.model, clip, { element }) : null;
+    // a donor-built script keeps its camera operands as the donor authored them (see clip-fallback.js)
+    this._camFromDonor = script?.camAuthored === "donor";
     if (script && Array.isArray(script.ops) && script.ops.length) {
       this._clip = clip;
       this._heldPose = false;

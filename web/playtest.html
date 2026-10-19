@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Playtest Lab</title>
+<style>
+  :root { --bg: #14141c; --panel: #1d1d29; --panel2: #232333; --fg: #e8e8f0; --muted: #9a9ab0; --line: #2d2d40; --accent: #7aa2ff; --good: #5fd38d; --bad: #ff7a7a; --warn: #f2b25c; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 0 0 8px; } h3 { font-size: 13px; margin: 10px 0 6px; color: var(--muted); font-weight: 600; }
+  .sub { color: var(--muted); max-width: 980px; margin: 0 0 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+  label { display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 12px; }
+  label.inline { flex-direction: row; align-items: center; gap: 6px; }
+  input, select, textarea { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
+  input[type=number] { width: 78px; } input[type=text] { width: 150px; } input[type=checkbox] { width: auto; }
+  select { max-width: 280px; }
+  button { background: #2d3a6e; color: var(--fg); border: 0; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #3e4f94; } button.alt { background: var(--panel2); border: 1px solid var(--line); } button.go { background: #2f7d54; } button.go:hover { background: #3a9c68; } button.danger { background: #7d2f3a; }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .presets button { text-align: left; padding: 9px 11px; }
+  .presets b { display: block; } .presets span { color: #c4c4d6; font-size: 12px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 8px; } .tabs button.on { background: var(--accent); color: #0b0b12; }
+  table { border-collapse: collapse; width: 100%; } th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .techs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 10px; }
+  .techs div { display: flex; gap: 4px; align-items: center; } .techs select { max-width: 160px; }
+  .scroll { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+  .note { color: var(--muted); font-size: 12px; } .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .grid8 { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px 10px; }
+  .grid8 input { width: 100%; }
+  .sticky { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; z-index: 5; }
+  #msg { margin-left: 6px; }
+  details > summary { cursor: pointer; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Playtest Lab</h1>
+<p class="sub">Set up any build, then walk the overworld with it. Pick a ready-made scenario below or build your own: the party, levels, stats, element points, which forms each Digimon has and what it wears,
+what techniques every form can use (including which are lent to the others), gear such as the Counter Crest, items and money, and where to start. <b>Apply &amp; play</b> writes it into the browser save and opens the game; your own save is backed up first and
+<b>Put my own save back</b> restores it. Nothing is committed anywhere.</p>
+
+<div class="card"><h2>Scenarios</h2><div class="presets" id="presets"></div>
+  <p class="note" id="presetNote"></p></div>
+
+<div class="card"><h2>World</h2><div class="row">
+  <label>Your name <input type="text" id="name" /></label>
+  <label>Start map <select id="map"></select></label>
+  <label>Map search <input type="text" id="mapq" placeholder="filter maps…" /></label>
+  <label>Story chapter <select id="chapter"><option value="">leave as is (chapter 1)</option><option value="3">3 (partner received)</option><option value="5">5 (Seiryu leader beaten: East Sector open)</option><option value="6">6 (Suzaku)</option><option value="7">7 (Byakko, late game)</option></select></label>
+  <label>Bits <input type="number" id="bits" /></label>
+</div><div class="row" style="margin-top:8px">
+  <label class="inline"><input type="checkbox" id="noEnc" /> no random encounters (walk freely)</label>
+  <label class="inline"><input type="checkbox" id="aspectData" /> use the aspect routes (element gates) for the extra forms</label>
+  <label class="inline"><input type="checkbox" id="ownAll" /> own all eight partners (Digimon Lab)</label>
+  <label class="inline"><input type="checkbox" id="cleanStory" /> start from a clean story state (clears flags)</label>
+</div></div>
+
+<div class="card"><h2>Party</h2>
+  <div class="tabs" id="tabs"></div>
+  <div id="member"></div>
+</div>
+
+<div class="card"><h2>Items</h2>
+  <div class="row">
+    <label>Category <select id="itemCat"><option value="">all</option><option>consumable</option><option>booster</option><option>key</option><option>equipment</option><option>accessory</option></select></label>
+    <label>Item <select id="itemSel"></select></label>
+    <label>Amount <input type="number" id="itemQty" value="5" /></label>
+    <button id="itemAdd" class="alt">Add</button>
+    <button id="itemKit" class="alt">Add a test kit (heals, all element and stat chips, training chips)</button>
+  </div>
+  <div id="inv" style="margin-top:8px"></div>
+</div>
+
+<div class="card"><h2>Builds</h2><div class="row">
+  <label>Name <input type="text" id="buildName" placeholder="my build" /></label>
+  <button id="saveBuild" class="alt">Save this build</button>
+  <label>Saved <select id="savedSel"></select></label>
+  <button id="loadBuild" class="alt">Load</button><button id="delBuild" class="alt">Delete</button>
+  <button id="fromGame" class="alt">Load from my current game save</button>
+  <button id="exportBuild" class="alt">Show as JSON</button><button id="importBuild" class="alt">Load from the JSON box</button>
+</div><textarea id="json" rows="5" style="width:100%;margin-top:8px;display:none" spellcheck="false"></textarea></div>
+
+<div class="sticky">
+  <button id="play" class="go">Apply &amp; play</button>
+  <button id="apply" class="alt">Apply only (don't open the game)</button>
+  <button id="restore" class="alt">Put my own save back</button>
+  <span id="msg" class="note"></span>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------------------------------------------------
+// Data
+// ---------------------------------------------------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const get = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(p); return r.json(); });
+const ELEMS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
+const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
+const SLOTS = ["head", "body", "right", "left", "acc0", "acc1"];
+const SLOT_NAME = { head: "Head", body: "Body", right: "Right hand (weapon)", left: "Left hand (shield)", acc0: "Accessory 1", acc1: "Accessory 2" };
+const STARTERS = [
+  { name: "Kotemon", charId: "p003pken" }, { name: "Kumamon", charId: "p004kogu" }, { name: "Monmon", charId: "p005koet" }, { name: "Agumon", charId: "p006agum" },
+  { name: "Veemon", charId: "p007vmon" }, { name: "Guilmon", charId: "p008giru" }, { name: "Renamon", charId: "p009rena" }, { name: "Patamon", charId: "p010pata" },
+];
+const KEYS = ["fieldLocation", "charId", "party", "pendingParty", "partnerStats", "partyStats", "equipment", "worn", "reserveStats", "reserveEquipment", "rosterOwned", "playerName", "inventory", "bits",
+  "chapterOverride", "flags", "engineFlags", "progressOrdinal", "visitedMaps", "engineEvents", "packId", "engineSchema", "assetMode"];
+const BACKUP = "playtestLabBackup", BUILDS = "playtestLabBuilds";
+let D = {}, B = null, cur = 0, aspectLoaded = false;
+const store = (() => { try { return window.localStorage; } catch { return null; } })();
+const msg = (t, cls = "") => { const m = $("msg"); m.textContent = t; m.className = "note " + cls; };
+
+async function loadData() {
+  const aspect = $("aspectData")?.checked;
+  const [dig, extra, equip, items, prg, shops, maps] = await Promise.all([
+    get("assets/data/digimon.json"), get(aspect ? "assets/data/extra_species_aspect.json" : "assets/data/extra_species.json"), get("assets/data/equipment.json"),
+    get("assets/data/item_effects.json"), get("assets/data/progression.json"), get("assets/data/merchant_shops.json"), get("playtest-maps.json"),
+  ]);
+  const partner = new Set((extra.starters ?? []).map((p) => p.id));     // the switched-off new partners are not part of the game
+  const species = new Map(dig.digimon.map((d) => [d.id, { ...d, tier: 0 }]));
+  for (const d of extra.digimon) if (!partner.has(d.id)) species.set(d.id, { ...d, tier: extra.meta[d.name]?.tier ?? 0, extra: true });
+  D = {
+    species, skills: new Map(dig.skills.map((s) => [s.id, s])), equipment: equip.equipment.filter((e) => e.stat_bytes), items: items.items, lu: prg.level_up,
+    merchants: shops.merchants, maps, tree: extra.tree,
+  };
+  D.byName = new Map([...species.values()].map((s) => [s.name, s]));
+  D.itemByName = new Map(D.items.map((i) => [i.name, i]));
+  D.skillNames = [...D.skills.values()].filter((s) => s.name && s.name !== "Fight" || s.id === 1).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Rules: level-up growth (web/battle.js), gear (engine/dw3/equipment.ts), technique gates (web/form-tech-slots.js)
+// ---------------------------------------------------------------------------------------------------------------------
+function growth() {
+  const lu = D.lu, core = lu.core_table.flat(), block = core.concat(lu.elem_table);
+  const t6 = (lv) => { for (let i = 0; i < lu.core_tier_bounds.length; i++) if (lv < lu.core_tier_bounds[i]) return i; return lu.core_tier_bounds.length; };
+  const coreGain = (g, lv) => { let t = 0; for (let r = 0; r < 5; r++) t += block[t6(lv) * 9 + g + r] ?? 0; return t / 5; };
+  const elemGain = (g, lv) => { if (lv >= lu.elem_level_limit) return 0; let t = 0; for (let r = 0; r < 4; r++) t += block[core.length + g + r] ?? 0; return t / 4; };
+  const thr = (g, n) => { if (n <= 1) return 0; let t = lu.exp_tier_bounds.length - 1; for (let i = 0; i < lu.exp_tier_bounds.length; i++) if (n < lu.exp_tier_bounds[i]) { t = i; break; } return Math.floor(g * (n ** 3 + 5 * n - 6) / 10) + lu.exp_tier_const[t]; };
+  return { coreGain, elemGain, thr };
+}
+function autoStats(m) {
+  const g = growth(), r = D.species.get(m.slot + 1), L = m.level;
+  for (const k of CORE) { let v = r[k] ?? 0; for (let l = 2; l <= L; l++) v += g.coreGain(r.growth[k], l); m.stats[k] = Math.round(v); }
+  const adj = (l) => D.lu.hpmp_tier_adj[l < 5 ? 0 : l < 20 ? 1 : l < 40 ? 2 : 3];
+  let hp = r.hp, mp = r.mp;
+  for (let l = 2; l <= L; l++) { hp += r.growth.hp - adj(l); mp += r.growth.mp - adj(l); }
+  m.maxHp = m.hp = Math.max(1, Math.round(hp)); m.maxMp = m.mp = Math.max(0, Math.round(mp));
+  for (const e of ELEMS) { let v = 0; for (let l = 2; l <= L; l++) v += g.elemGain(r.resistance_growth[e], l); m.elem[e] = Math.round(v); }
+  m.bonuses = {};
+  m.tp = Math.min(99, 5 * (L - 1));
+}
+function xpFor(m) { const g = growth(); return m.level > 1 ? g.thr(D.species.get(m.slot + 1).growth_xp ?? 8, m.level) + 1 : 0; }
+function dvexpFor(id, F) { const cap = D.species.get(id)?.dv_cap ?? 100; return F <= cap ? 10 * (F - 1) : 10 * (cap - 1) + 50 * (F - cap); }
+function gearTotal(e) {
+  const b = e.stat_bytes, fam = e.family, u16 = (o) => b[o] | (b[o + 1] << 8), s16 = (o) => { const v = u16(o); return v > 32767 ? v - 65536 : v; };
+  const out = [0, 0, 0, 0, 0, 0], add = (c, a) => { if (c >= 1 && c <= 6) out[c - 1] += a; };
+  if (fam >= 2 && fam <= 14) { add(1, u16(0x0a)); add(b[0x0c], s16(0x06)); add(b[0x0d], s16(0x08)); }
+  else if (fam >= 15 && fam <= 20) { add(2, u16(0x0c)); add(b[0x0a], s16(0x06)); add(b[0x0b], s16(0x08)); }
+  else if (fam >= 21 && fam <= 24) add(b[0x08], s16(0x06));
+  add(6, u16(0x00));
+  return out;
+}
+const gearLine = (e) => { const g = gearTotal(e); return ["STR", "DEF", "SPT", "WIS", "SPD", "CHR"].map((n, i) => g[i] ? `${n}${g[i] > 0 ? "+" : ""}${g[i]}` : "").filter(Boolean).join(" "); };
+const gearSum = (e) => gearTotal(e).slice(0, 5).reduce((a, c) => a + c, 0);
+function wearable(e, slot) { return ((e.wear_mask >> slot) & 1) === 1; }
+// the best set the line can wear from the main-story shops opened by a level, within a share of a bit budget
+const SHOP_LEVEL = { s245: 1, s250: 1, s425: 8, s500: 20, s650: 22, s660: 22, s760: 41, s246: 60, s251: 60, s426: 60, s501: 60, s651: 60, s661: 60, s761: 60 };
+function autoGear(m, level, budget) {
+  const eq = new Map(D.equipment.map((e) => [e.name, e])), items = [];
+  for (const mm of D.merchants) { const lv = SHOP_LEVEL[mm.stage]; if (lv == null) continue; for (const n of mm.stock ?? []) { const e = eq.get(n); if (e) items.push({ e, lv }); } }
+  const share = { right: 0.45, body: 0.2, left: 0.15, head: 0.1, acc0: 0.1 };
+  m.equipment = {};
+  for (const [slot, sh] of Object.entries(share)) {
+    const kind = slot === "acc0" ? "accessory" : slot; let best = null;
+    for (const { e, lv } of items) if (e.slot === kind && lv <= level && e.buy_price <= budget * sh && wearable(e, m.slot) && (!best || gearSum(e) > gearSum(best))) best = e;
+    if (best) m.equipment[slot] = best.id;
+  }
+}
+// technique slots of a form: the learn / load gates of web/form-tech-slots.js, or everything at once
+function formTechs(id, formLevel, mode = "gates") {
+  const p = D.species.get(id); if (!p) return [0, 0, 0, 0, 0, 0];
+  const slots = (p.tech_slots ?? [0, 0, 0, 0, 0, 0]).slice(0, 6), learn = (p.tech_learn_levels ?? [0, 0, 0, 0, 0, 0]).slice(0, 6), load = (p.tech_load_levels ?? [0, 0, 0, 0, 0]).slice(0, 5);
+  return slots.map((t, i) => {
+    if (!t) return 0;
+    if (mode === "gates" && formLevel < (learn[i] ?? 0)) return 0;
+    let w = Number(t) & 0x1fff;
+    if (i === 5) w |= 0x8000;
+    else if (mode === "all" || formLevel >= (load[i] ?? 0)) w |= 0x2000;
+    return w;
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Build model
+// ---------------------------------------------------------------------------------------------------------------------
+function newMember(slot = 0, level = 1) {
+  const m = { slot, level, tp: 0, hp: 0, maxHp: 0, mp: 0, maxMp: 0, stats: {}, bonuses: {}, elem: {}, ledger: [], equipped: [], current: 0, equipment: {}, aspect: "" };
+  autoStats(m); return m;
+}
+function newBuild() { return { name: "Junior", map: "s245", chapter: "", bits: 5000, noEnc: false, aspectData: false, ownAll: true, cleanStory: true, members: [newMember(0, 1)], inventory: [] }; }
+function addForm(m, id, formLevel = 1, mode = "gates", equip = true) {
+  if (!D.species.get(id) || m.ledger.some((f) => f.id === id)) return;
+  m.ledger.push({ id, formLevel, techs: formTechs(id, formLevel, mode) });
+  if (equip && m.equipped.length < 3) m.equipped.push(id);
+}
+const ids = (names) => names.map((n) => D.byName.get(n)?.id).filter(Boolean);
+// The game only offers the (up to three) EQUIPPED forms in battle, so a ledger with forms but none equipped starts you as the
+// rookie with nothing to digivolve into. When none is equipped, equip the three strongest.
+function ensureEquipped(m) {
+  m.equipped = m.equipped.filter((id) => m.ledger.some((f) => f.id === id));
+  if (m.equipped.length || !m.ledger.length) return;
+  const power = (f) => { const p = D.species.get(f.id); return (p?.tier ?? 0) * 10000 + ["str", "def", "spt", "wis", "spd"].reduce((a, k) => a + (p?.[k] ?? 0), 0); };
+  m.equipped = [...m.ledger].sort((a, b) => power(b) - power(a)).slice(0, 3).map((f) => f.id);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Scenarios
+// ---------------------------------------------------------------------------------------------------------------------
+function preset(over, build) { const b = Object.assign(newBuild(), over); b.members = build.map((x) => makeMember(x)); return b; }
+function makeMember(x) {
+  const m = newMember(x.slot, x.level);
+  Object.assign(m.stats, x.stats ?? {}); if (x.train) for (const [k, v] of Object.entries(x.train)) { if (ELEMS.includes(k)) m.elem[k] = (m.elem[k] ?? 0) + v; else m.stats[k] = (m.stats[k] ?? 0) + v; }
+  if (x.tp != null) m.tp = x.tp;
+  for (const [n, f] of x.forms ?? []) { const id = D.byName.get(n)?.id; if (id) addForm(m, id, f, x.techs ?? "gates", false); }
+  m.equipped = ids(x.equipped ?? []).filter((id) => m.ledger.some((f) => f.id === id)).slice(0, 3);
+  const cur = x.current ? D.byName.get(x.current)?.id : 0; m.current = cur && m.ledger.some((f) => f.id === cur) ? cur : 0;
+  if (x.gear != null) autoGear(m, x.level, x.gear);
+  for (const [slot, n] of Object.entries(x.wear ?? {})) { const it = D.itemByName.get(n); if (it) m.equipment[slot] = it.id; }
+  m.aspect = x.aspect ?? "";
+  if (m.aspect) m.elem[m.aspect] = (m.elem[m.aspect] ?? 0) + 40;
+  return m;
+}
+const discAll = () => [...D.species.values()].filter((s) => s.id >= 9 && s.id <= 52).map((s) => [s.name, 99]);
+const tierForms = (t, F = 30) => [...D.species.values()].filter((s) => s.extra && s.tier === t).map((s) => [s.name, F]);
+const SCENARIOS = () => [
+  { title: "Fresh start", note: "Kotemon Lv 1 in Central Park: the baseline feel.",
+    make: () => preset({ map: "s330", bits: 500, noEnc: false, ownAll: false }, [{ slot: 0, level: 1 }]) },
+  { title: "On-curve, no training", note: "Kotemon Lv 20, levelled only, early-shop gear, two disc forms. Where the original expects you at the West Sector. Compare with the specialists.",
+    make: () => preset({ map: "s550", chapter: "6", bits: 8000 }, [{ slot: 0, level: 20, forms: [["Dinohumon", 20], ["Greymon", 15]], equipped: ["Dinohumon", "Greymon"], current: "Greymon", gear: 9000 }]) },
+  { title: "Early steamroller (STR grinder)", note: "Guilmon Lv 15 with STR trained to about 330 and a tier 3 form (Nanimon) at the East Sector's Protocol Forest (enemies Lv 4). How hard does it steamroll, and where does it stop?",
+    make: () => preset({ map: "s370", chapter: "5", bits: 5000 }, [{ slot: 5, level: 15, train: { str: 160 }, forms: [["Dinohumon", 20], ["Greymon", 15], ["Nanimon", 5]], equipped: ["Greymon", "Nanimon"], current: "Nanimon", gear: 4500 }]) },
+  { title: "Mid-game STR specialist", note: "Agumon Lv 30, STR all-in, in the West Sector (enemies Lv 20-25) with several tier 2-3 forms.",
+    make: () => preset({ map: "s580", chapter: "7", bits: 15000 }, [{ slot: 3, level: 30, train: { str: 300 }, forms: [["Dinohumon", 40], ["Greymon", 40], ["MetalGreymon", 30], ["Nanimon", 20], ["Meramon", 20]], equipped: ["MetalGreymon", "Nanimon", "Meramon"], current: "MetalGreymon", gear: 20000 }]) },
+  { title: "Dark specialist (aspect)", note: "Agumon Lv 30, Dark trained to about 220 plus the starting aspect bonus. Turn on 'use the aspect routes' to see the element gates open dark forms. Check the Digivolve list after a win.",
+    make: () => preset({ map: "s580", chapter: "7", bits: 15000, aspectData: true }, [{ slot: 3, level: 30, train: { dark: 180 }, aspect: "dark", forms: [["Dinohumon", 40], ["Greymon", 40], ["MetalGreymon", 30]], equipped: ["MetalGreymon"], current: "MetalGreymon", gear: 20000 }]) },
+  { title: "Machine specialist (aspect)", note: "Monmon Lv 35, Machine trained to about 260 plus the aspect, with the aspect routes on.",
+    make: () => preset({ map: "s690", chapter: "7", bits: 20000, aspectData: true }, [{ slot: 2, level: 35, train: { machine: 220 }, aspect: "machine", forms: [["Dinohumon", 40], ["Greymon", 40], ["MetalGreymon", 35]], equipped: ["MetalGreymon"], current: "MetalGreymon", gear: 30000 }]) },
+  { title: "Counter Crest tank", note: "Kumamon Lv 30 wearing a Counter Crest and the best defensive gear it can afford: how do counters and defence play out?",
+    make: () => preset({ map: "s550", chapter: "6", bits: 12000 }, [{ slot: 1, level: 30, train: { def: 220 }, forms: [["Dinohumon", 40], ["Greymon", 40]], equipped: ["Greymon", "Dinohumon"], current: "Greymon", gear: 15000, wear: { acc0: "CounterCrest", acc1: "RecoverCrest" } }]) },
+  { title: "Caster (SPT / WIS)", note: "Renamon Lv 30 trained in SPT and WIS, with spell techniques loaded on every form so they can all be used.",
+    make: () => preset({ map: "s580", chapter: "7", bits: 15000 }, [{ slot: 6, level: 30, train: { spt: 220, wis: 160 }, forms: [["Dinohumon", 60], ["Greymon", 60], ["Meramon", 40]], equipped: ["Dinohumon", "Greymon", "Meramon"], current: "Meramon", techs: "all", gear: 15000 }]) },
+  { title: "Late story (North Sector)", note: "Patamon Lv 45 with all 44 disc forms and the tier 1-3 extras, early-shop gear, in the North Sector (enemies Lv 41-49).",
+    make: () => preset({ map: "s690", chapter: "7", bits: 60000 }, [{ slot: 7, level: 45, train: { str: 120, spt: 120 }, forms: [...discAll(), ...tierForms(1), ...tierForms(2), ...tierForms(3)], equipped: ["Gallantmon", "MagnaAngemon", "Imperialdramon-F"], current: "MagnaAngemon", gear: 60000 }]) },
+  { title: "After the story (everything)", note: "Veemon Lv 70, every form including tier 4-5, best gear, chips and healing in the bag, at the Spy Satellite. The ceiling of the system.",
+    make: () => { const b = preset({ map: "s810", chapter: "7", bits: 500000 }, [{ slot: 4, level: 70, train: { str: 300, def: 300, spt: 300, wis: 300, spd: 300, fire: 300, water: 300, ice: 300, wind: 300, thunder: 300, machine: 300, dark: 300 }, forms: [...discAll(), ...tierForms(1), ...tierForms(2), ...tierForms(3), ...tierForms(4), ...tierForms(5)], equipped: ["Omnimon", "Gallantmon", "Beelzemon"], current: "Omnimon", gear: 500000 }]); kit(b); return b; } },
+  { title: "Tag team of three", note: "Kotemon, Agumon and Patamon at Lv 20, each with a form, to try tag swaps and the status screens.",
+    make: () => preset({ map: "s550", chapter: "6", bits: 8000 }, [
+      { slot: 0, level: 20, forms: [["Dinohumon", 20]], equipped: ["Dinohumon"], current: "Dinohumon", gear: 8000 },
+      { slot: 3, level: 20, forms: [["Greymon", 20]], equipped: ["Greymon"], current: "Greymon", gear: 8000 },
+      { slot: 7, level: 20, forms: [["Angemon", 20]], equipped: ["Angemon"], current: "Angemon", gear: 8000 }]) },
+  { title: "Every extra form (animations)", note: "Kotemon Lv 40 with all 135 extra forms learned, every technique unlocked, so any form can be put on and watched in battle. Use the Digimon Lab / Digivolve list.",
+    make: () => preset({ map: "s370", chapter: "7", bits: 99999, noEnc: false }, [{ slot: 0, level: 40, forms: [...discAll(), ...[1, 2, 3, 4, 5].flatMap((t) => tierForms(t, 60))], equipped: ["Kunemon", "Tapirmon", "Betamon"], current: "Kunemon", techs: "all", gear: 60000 }]) },
+];
+function kit(b) {
+  const add = (n, q) => { const it = D.itemByName.get(n); if (it) { const e = b.inventory.find((x) => x.id === it.id); e ? (e.qty += q) : b.inventory.push({ id: it.id, qty: q }); } };
+  for (const n of ["PowerCharge", "SuperCharge", "UltraCharge", "MaxCharge", "AntidoteDisk", "ReviveDisk", "SoberDisk", "EnergyDisk", "LifeDisk", "TrainChip1", "TrainChip3", "TrainChipV"]) add(n, 10);
+  for (const n of ["HPChip", "MPChip", "PowerChip", "ArmorChip", "MindChip", "WisdomChip", "BoostChip", "FireChip", "WaterChip", "IceChip", "WindChip", "ThunderChip", "MetalChip", "DevilChip"]) add(n, 20);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------------------------------------------------
+const opt = (v, t, sel) => `<option value="${v}"${sel ? " selected" : ""}>${t}</option>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function renderWorld() {
+  const q = $("mapq").value.trim().toLowerCase();
+  const maps = D.maps.filter((m) => !q || (m.id + " " + m.name).toLowerCase().includes(q) || m.id === B.map);
+  $("map").innerHTML = maps.map((m) => opt(m.id, `${m.id}  ${m.name}${m.lv ? `  (enemies ~Lv ${m.lv})` : ""}`, m.id === B.map)).join("");
+  $("name").value = B.name; $("bits").value = B.bits; $("chapter").value = B.chapter;
+  for (const k of ["noEnc", "aspectData", "ownAll", "cleanStory"]) $(k).checked = !!B[k];
+}
+function renderTabs() {
+  $("tabs").innerHTML = B.members.map((m, i) => `<button class="${i === cur ? "on" : "alt"}" data-t="${i}">${i + 1}. ${STARTERS[m.slot].name} Lv ${m.level}${i === 0 ? " (lead)" : ""}</button>`).join("") +
+    (B.members.length < 3 ? `<button class="alt" data-t="add">+ Add a party member</button>` : "") + (B.members.length > 1 && cur > 0 ? `<button class="danger" data-t="del">Remove this member</button>` : "");
+}
+function techSelect(w, i, fi, mi) {
+  const id = w & 0x1fff;
+  const options = [opt(0, "(empty)", !id)].concat(D.skillNames.map((s) => opt(s.id, `${s.name}  [${s.element ?? ""} ${s.mp_cost ?? 0}MP p${s.power ?? 0}]`, s.id === id)));
+  if (id && !D.skills.has(id)) options.push(opt(id, `#${id}`, true));
+  return `<div><select data-tech="${mi}:${fi}:${i}">${options.join("")}</select>
+    ${i < 5 ? `<label class="inline" title="loadable (learned for lending)"><input type="checkbox" data-flag="${mi}:${fi}:${i}:8192" ${w & 0x2000 ? "checked" : ""}/>L</label><label class="inline" title="loaded: lent to the other equipped forms in battle"><input type="checkbox" data-flag="${mi}:${fi}:${i}:16384" ${w & 0x4000 ? "checked" : ""}/>D</label>` : "<span class='note'>signature</span>"}</div>`;
+}
+function renderMember() {
+  const m = B.members[cur], mi = cur, sp = D.species;
+  const formOpts = [...sp.values()].filter((s) => s.id >= 9).sort((a, b) => a.id - b.id).map((s) => opt(s.id, `${s.name}${s.extra ? `  (extra, tier ${s.tier})` : ""}`)).join("");
+  const stats = CORE.map((k) => `<label>${k.toUpperCase()} <input type="number" data-stat="${k}" value="${m.stats[k] ?? 0}"></label>`).join("");
+  const elem = ELEMS.map((k) => `<label>${k} (trained) <input type="number" data-elem="${k}" value="${m.elem[k] ?? 0}"></label>`).join("");
+  const wear = SLOTS.map((slot) => {
+    const kind = slot.startsWith("acc") ? "accessory" : slot, list = D.equipment.filter((e) => e.slot === kind && (kind === "accessory" || wearable(e, m.slot))).sort((a, b) => gearSum(b) - gearSum(a) || a.name.localeCompare(b.name));
+    return `<label>${SLOT_NAME[slot]}<select data-wear="${slot}">${opt(0, "(nothing)", !m.equipment[slot])}${list.map((e) => opt(e.id, `${e.name}  ${gearLine(e)}${e.effect ? "  [" + e.effect.kind + "]" : ""}  ${e.buy_price ? e.buy_price + "b" : ""}`, e.id === m.equipment[slot])).join("")}</select></label>`;
+  }).join("");
+  const ledger = m.ledger.map((f, fi) => {
+    const p = sp.get(f.id), isEq = m.equipped.includes(f.id), isCur = m.current === f.id;
+    return `<tr><td><b>${esc(p?.name ?? "#" + f.id)}</b><br><span class="note">${p?.extra ? "extra, tier " + p.tier : "disc form"}</span></td>
+      <td><label>form Lv <input type="number" data-flv="${mi}:${fi}" value="${f.formLevel}" style="width:60px"></label>
+        <label class="inline"><input type="checkbox" data-eq="${mi}:${fi}" ${isEq ? "checked" : ""}/> equipped (max 3)</label>
+        <label class="inline"><input type="radio" name="cur${mi}" data-cur="${mi}:${fi}" ${isCur ? "checked" : ""}/> wearing it now</label>
+        <div><button class="small alt" data-auto="${mi}:${fi}:gates">techs by gates</button> <button class="small alt" data-auto="${mi}:${fi}:all">all techs</button> <button class="small alt" data-auto="${mi}:${fi}:none">clear</button> <button class="small danger" data-rm="${mi}:${fi}">remove</button></div></td>
+      <td><div class="techs">${f.techs.map((w, i) => techSelect(w, i, fi, mi)).join("")}</div></td></tr>`;
+  }).join("");
+  $("member").innerHTML = `
+    <div class="row"><label>Starter line <select id="mSlot">${STARTERS.map((s, i) => opt(i, s.name, i === m.slot)).join("")}</select></label>
+      <label>Level <input type="number" id="mLevel" min="1" max="99" value="${m.level}"></label>
+      <button id="mAuto" class="alt" title="Resets HP, MP, stats, trained element points and TP to what levelling alone gives for this line and level">Fill from level (levelling only)</button>
+      <label>TP <input type="number" id="mTp" value="${m.tp}" style="width:60px"></label>
+      <label>HP / max <input type="number" id="mHp" value="${m.maxHp}"></label><label>MP / max <input type="number" id="mMp" value="${m.maxMp}"></label>
+      <label>Aspect <select id="mAspect">${opt("", "none", !m.aspect)}${ELEMS.map((e) => opt(e, e, m.aspect === e)).join("")}</select></label></div>
+    <h3>Core stats (stored; level-ups, gym and chips add to these)</h3><div class="grid8">${stats}</div>
+    <h3>Trained element points (the bonus the gym and the element chips add; this is what the element gates count)</h3><div class="grid8">${elem}</div>
+    <div class="row" style="margin-top:6px"><label>Quick training <select id="qtTarget">${CORE.concat(ELEMS).map((k) => opt(k, k)).join("")}</select></label><label>Add <input type="number" id="qtAmt" value="50"></label><button id="qtAdd" class="alt">Add</button>
+      <span class="note">The simulation's all-in rate is about 1.5 points per training point; Lv ${m.level} has about ${5 * (m.level - 1)} points in total.</span></div>
+    <h3>Gear</h3><div class="row">${wear}</div>
+    <h3>Forms this Digimon has learned (max 3 equipped; the one it is wearing sets its stats and what it fights as)</h3>
+    <div class="row"><label>Add a form <select id="fAdd">${formOpts}</select></label><label>form Lv <input type="number" id="fLv" value="30" style="width:60px"></label><button id="fAddBtn" class="alt">Add</button>
+      <button id="fDisc" class="alt">Add all 44 disc forms</button><button id="fT1" class="alt">+ extra tier 1</button><button id="fT2" class="alt">+ tier 2</button><button id="fT3" class="alt">+ tier 3</button><button id="fT4" class="alt">+ tier 4</button><button id="fT5" class="alt">+ tier 5</button><button id="fClear" class="danger">Remove all</button></div>
+    <div class="scroll" style="margin-top:6px"><table><thead><tr><th>Form</th><th>Level, equip</th><th>Techniques (L = loadable, D = loaded: lent to the other equipped forms)</th></tr></thead><tbody>${ledger || `<tr><td colspan="3" class="note">No forms yet: it fights as its rookie.</td></tr>`}</tbody></table></div>`;
+}
+function renderInv() {
+  const rows = B.inventory.map((s, i) => `<tr><td>${esc(D.items.find((x) => x.id === s.id)?.name ?? "#" + s.id)}</td><td><input type="number" data-iq="${i}" value="${s.qty}" style="width:70px"></td><td><button class="small danger" data-ir="${i}">remove</button></td></tr>`).join("");
+  $("inv").innerHTML = rows ? `<table style="width:auto"><tbody>${rows}</tbody></table>` : `<span class="note">Empty bag.</span>`;
+  const cat = $("itemCat").value;
+  $("itemSel").innerHTML = D.items.filter((i) => !cat || i.category === cat).map((i) => opt(i.id, `${i.name}  (${i.category}${i.buy ? ", " + i.buy + "b" : ""})`)).join("");
+}
+function renderPresets() {
+  $("presets").innerHTML = SCENARIOS().map((s, i) => `<button class="alt" data-p="${i}"><b>${esc(s.title)}</b><span>${esc(s.note)}</span></button>`).join("");
+}
+function renderAll() { renderWorld(); renderTabs(); renderMember(); renderInv(); renderBuilds(); }
+function renderBuilds() {
+  const all = readBuilds();
+  $("savedSel").innerHTML = Object.keys(all).map((k) => opt(k, k)).join("") || opt("", "(none saved)");
+}
+const readBuilds = () => { try { return JSON.parse(store.getItem(BUILDS) ?? "{}"); } catch { return {}; } };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------------------------------------------------
+function pullWorld() {
+  B.name = $("name").value; B.map = $("map").value || B.map; B.chapter = $("chapter").value; B.bits = +$("bits").value || 0;
+  for (const k of ["noEnc", "aspectData", "ownAll", "cleanStory"]) B[k] = $(k).checked;
+}
+document.addEventListener("input", (e) => {
+  const t = e.target, m = B?.members[cur];
+  if (!m) return;
+  if (t.dataset.stat) m.stats[t.dataset.stat] = +t.value || 0;
+  else if (t.dataset.elem) m.elem[t.dataset.elem] = +t.value || 0;
+  else if (t.id === "mLevel") { m.level = Math.max(1, Math.min(99, +t.value || 1)); renderTabs(); }
+  else if (t.id === "mTp") m.tp = Math.max(0, Math.min(99, +t.value || 0));
+  else if (t.id === "mHp") { m.maxHp = m.hp = Math.max(1, +t.value || 1); }
+  else if (t.id === "mMp") { m.maxMp = m.mp = Math.max(0, +t.value || 0); }
+  else if (t.dataset.flv) { const [mi, fi] = t.dataset.flv.split(":").map(Number); B.members[mi].ledger[fi].formLevel = Math.max(1, +t.value || 1); }
+  else if (t.dataset.iq) B.inventory[+t.dataset.iq].qty = Math.max(0, +t.value || 0);
+  else if (["name", "bits", "chapter", "map", "noEnc", "ownAll", "cleanStory"].includes(t.id)) pullWorld();
+});
+document.addEventListener("change", async (e) => {
+  const t = e.target, m = B?.members[cur];
+  if (t.id === "mapq") return renderWorld();
+  if (t.id === "aspectData") { pullWorld(); await loadData(); return renderAll(); }
+  if (t.id === "itemCat") return renderInv();
+  if (!m) return;
+  if (t.id === "mSlot") { m.slot = +t.value; m.equipment = {}; autoStats(m); renderTabs(); renderMember(); }
+  else if (t.id === "mAspect") m.aspect = t.value;
+  else if (t.dataset.wear) { +t.value ? (m.equipment[t.dataset.wear] = +t.value) : delete m.equipment[t.dataset.wear]; }
+  else if (t.dataset.tech) { const [mi, fi, i] = t.dataset.tech.split(":").map(Number), f = B.members[mi].ledger[fi]; const old = f.techs[i]; f.techs[i] = (+t.value ? (+t.value | (i === 5 ? 0x8000 : (old & 0x6000) || 0x2000)) : 0); renderMember(); }
+  else if (t.dataset.flag) { const [mi, fi, i, bit] = t.dataset.flag.split(":").map(Number), f = B.members[mi].ledger[fi]; f.techs[i] = t.checked ? f.techs[i] | bit : f.techs[i] & ~bit; }
+  else if (t.dataset.eq) { const [mi, fi] = t.dataset.eq.split(":").map(Number), mm = B.members[mi], id = mm.ledger[fi].id; if (t.checked) { if (mm.equipped.length >= 3) { t.checked = false; return msg("At most three forms can be equipped.", "warn"); } if (!mm.equipped.includes(id)) mm.equipped.push(id); } else { mm.equipped = mm.equipped.filter((x) => x !== id); if (mm.current === id) mm.current = 0; } renderMember(); }
+  else if (t.dataset.cur) { const [mi, fi] = t.dataset.cur.split(":").map(Number), mm = B.members[mi], id = mm.ledger[fi].id; mm.current = id; if (!mm.equipped.includes(id)) { if (mm.equipped.length >= 3) mm.equipped.pop(); mm.equipped.push(id); } renderMember(); }
+});
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button, [data-p]"); if (!t) return;
+  const m = B?.members[cur];
+  if (t.dataset.p != null) { B = SCENARIOS()[+t.dataset.p].make(); cur = 0; $("presetNote").textContent = SCENARIOS()[+t.dataset.p].note; await loadDataIfNeeded(); return renderAll(); }
+  if (t.dataset.t) { if (t.dataset.t === "add") { B.members.push(newMember(1 + B.members.length, 10)); cur = B.members.length - 1; } else if (t.dataset.t === "del") { B.members.splice(cur, 1); cur = 0; } else cur = +t.dataset.t; renderTabs(); return renderMember(); }
+  if (t.dataset.auto) { const [mi, fi, mode] = t.dataset.auto.split(":"), f = B.members[+mi].ledger[+fi]; f.techs = mode === "none" ? [0, 0, 0, 0, 0, 0] : formTechs(f.id, f.formLevel, mode); return renderMember(); }
+  if (t.dataset.rm) { const [mi, fi] = t.dataset.rm.split(":").map(Number), mm = B.members[mi], id = mm.ledger[fi].id; mm.ledger.splice(fi, 1); mm.equipped = mm.equipped.filter((x) => x !== id); if (mm.current === id) mm.current = 0; return renderMember(); }
+  if (t.dataset.ir) { B.inventory.splice(+t.dataset.ir, 1); return renderInv(); }
+  switch (t.id) {
+    case "mAuto": autoStats(m); return renderMember();
+    case "qtAdd": { const k = $("qtTarget").value, a = +$("qtAmt").value || 0; if (ELEMS.includes(k)) m.elem[k] = (m.elem[k] ?? 0) + a; else m.stats[k] = (m.stats[k] ?? 0) + a; return renderMember(); }
+    case "fAddBtn": addForm(m, +$("fAdd").value, Math.max(1, +$("fLv").value || 1), "gates", false); ensureEquipped(m); return renderMember();
+    case "fDisc": for (const s of D.species.values()) if (s.id >= 9 && s.id <= 52) addForm(m, s.id, Math.max(1, +$("fLv").value || 1), "gates", false); ensureEquipped(m); return renderMember();
+    case "fT1": case "fT2": case "fT3": case "fT4": case "fT5": { let n = 0; for (const s of D.species.values()) if (s.extra && s.tier === +t.id[2] && !m.ledger.some((f) => f.id === s.id)) { addForm(m, s.id, Math.max(1, +$("fLv").value || 1), "gates", false); n++; }
+      ensureEquipped(m); renderMember(); return msg(n ? `Added ${n} tier ${t.id[2]} forms; equipped: ${m.equipped.map((id) => D.species.get(id)?.name).join(", ")}.` : `No tier ${t.id[2]} forms were added (they are already there, or this build has none).`, n ? "good" : "warn"); }
+    case "fClear": m.ledger = []; m.equipped = []; m.current = 0; return renderMember();
+    case "itemAdd": { const id = +$("itemSel").value, q = +$("itemQty").value || 1, ex = B.inventory.find((x) => x.id === id); ex ? (ex.qty += q) : B.inventory.push({ id, qty: q }); return renderInv(); }
+    case "itemKit": kit(B); return renderInv();
+    case "saveBuild": { const n = $("buildName").value.trim() || "my build"; pullWorld(); const all = readBuilds(); all[n] = B; store.setItem(BUILDS, JSON.stringify(all)); renderBuilds(); return msg(`Saved "${n}".`, "good"); }
+    case "loadBuild": { const b = readBuilds()[$("savedSel").value]; if (!b) return; B = b; cur = 0; await loadDataIfNeeded(); renderAll(); return msg("Loaded.", "good"); }
+    case "delBuild": { const all = readBuilds(); delete all[$("savedSel").value]; store.setItem(BUILDS, JSON.stringify(all)); return renderBuilds(); }
+    case "exportBuild": { pullWorld(); const j = $("json"); j.style.display = "block"; j.value = JSON.stringify(B, null, 1); return; }
+    case "importBuild": { try { B = JSON.parse($("json").value); cur = 0; await loadDataIfNeeded(); renderAll(); msg("Loaded from the box.", "good"); } catch (err) { msg("That is not valid build JSON.", "bad"); } return; }
+    case "fromGame": return importFromGame();
+    case "play": return apply(true);
+    case "apply": return apply(false);
+    case "restore": return restore();
+  }
+});
+async function loadDataIfNeeded() { if (B.aspectData !== aspectLoaded) { $("aspectData").checked = !!B.aspectData; await loadData(); aspectLoaded = !!B.aspectData; } }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Write the save
+// ---------------------------------------------------------------------------------------------------------------------
+function statBlock(m) {
+  ensureEquipped(m);
+  const dv = {}, ledger = m.ledger.map((f) => { const dvexp = dvexpFor(f.id, f.formLevel); dv[f.id] = dvexp; return { id: f.id, formLevel: f.formLevel, dvexp, techSlots: f.techs.map((w) => w & 0xffff) }; });
+  const stats = {}; for (const k of CORE) stats[k] = Math.round(m.stats[k] ?? 0);
+  const elem = {}; for (const e of ELEMS) if (m.elem[e]) elem[e] = Math.min(999, Math.round(m.elem[e]));
+  const cur = m.current && m.ledger.some((f) => f.id === m.current) ? m.current : m.slot + 1;
+  const equipped = m.equipped.filter((id) => m.ledger.some((f) => f.id === id)).slice(0, 3);
+  const ps = { digimonId: cur, level: m.level, xp: xpFor(m), tp: m.tp, hp: m.maxHp, maxHp: m.maxHp, mp: m.maxMp, maxMp: m.maxMp, stats, bonuses: { ...m.bonuses }, elemBonuses: elem, formLedger: ledger, equippedForms: equipped, dvexpByForm: dv };
+  if (m.aspect) ps.aspect = m.aspect;
+  return ps;
+}
+function apply(play) {
+  if (!store) return msg("This browser blocks site storage, so nothing can be written.", "bad");
+  pullWorld();
+  if (!store.getItem(BACKUP)) store.setItem(BACKUP, JSON.stringify(Object.fromEntries(KEYS.map((k) => [k, store.getItem(k)]))));
+  const members = B.members, blocks = members.map(statBlock), charIds = members.map((m) => STARTERS[m.slot].charId);
+  if (new Set(charIds).size !== charIds.length) return msg("Each party member needs a different starter line.", "bad");
+  const set = (k, v) => store.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+  set("engineSchema", "2"); if (!store.getItem("assetMode")) set("assetMode", "authentic");
+  set("playerName", B.name || "Junior"); set("charId", charIds[0]); set("party", charIds); store.removeItem("pendingParty"); store.removeItem("packId");
+  set("partnerStats", blocks[0]); set("partyStats", blocks);
+  set("equipment", members.map((m) => Object.fromEntries(Object.entries(m.equipment).filter(([, v]) => v)))); store.removeItem("worn");
+  set("inventory", B.inventory.filter((s) => s.qty > 0)); set("bits", String(B.bits));
+  set("rosterOwned", String(B.ownAll ? 255 : members.reduce((a, m) => a | (1 << m.slot), 0)));
+  store.removeItem("reserveStats"); store.removeItem("reserveEquipment"); store.removeItem("fieldLocation"); store.removeItem("visitedMaps");
+  if (B.cleanStory) for (const k of ["flags", "engineFlags", "progressOrdinal", "engineEvents"]) store.removeItem(k);
+  if (B.chapter) set("chapterOverride", String(B.chapter)); else store.removeItem("chapterOverride");
+  msg("Applied. Your own save is backed up.", "good");
+  if (play) location.href = `index.html?skipTitle=1&map=${encodeURIComponent(B.map)}${B.noEnc ? "&noEncounters=1" : ""}${B.aspectData ? "&aspect=1" : ""}`;
+}
+function restore() {
+  const saved = store?.getItem(BACKUP); if (!saved) return msg("Nothing to put back: no test was started from this page.", "warn");
+  for (const [k, v] of Object.entries(JSON.parse(saved))) v == null ? store.removeItem(k) : store.setItem(k, v);
+  store.removeItem(BACKUP); msg("Your own save is back.", "good");
+}
+function importFromGame() {
+  try {
+    const party = JSON.parse(store.getItem("party") ?? "[]"), ps = JSON.parse(store.getItem("partnerStats") ?? "null"), pst = JSON.parse(store.getItem("partyStats") ?? "[]"), eq = JSON.parse(store.getItem("equipment") ?? "[]");
+    if (!ps || !party.length) return msg("There is no party in the current save to load.", "warn");
+    const b = newBuild(); b.members = [];
+    party.forEach((c, i) => {
+      const st = i === 0 ? ps : (pst[i] ?? {}), slot = Math.max(0, STARTERS.findIndex((s) => s.charId === c)), m = newMember(slot, st.level ?? 1);
+      Object.assign(m, { tp: st.tp ?? 0, maxHp: st.maxHp ?? m.maxHp, hp: st.maxHp ?? m.maxHp, maxMp: st.maxMp ?? m.maxMp, mp: st.maxMp ?? m.maxMp });
+      for (const k of CORE) if (st.stats?.[k] != null) m.stats[k] = st.stats[k];
+      m.elem = { ...(st.elemBonuses ?? {}) }; m.bonuses = { ...(st.bonuses ?? {}) };
+      m.ledger = (st.formLedger ?? []).map((f) => ({ id: f.id, formLevel: f.formLevel ?? 1, techs: (f.techSlots ?? []).concat([0, 0, 0, 0, 0, 0]).slice(0, 6) }));
+      m.equipped = [...(st.equippedForms ?? [])]; m.current = st.digimonId && st.digimonId !== slot + 1 ? st.digimonId : 0; m.equipment = { ...(eq[i] ?? {}) }; m.aspect = st.aspect ?? "";
+      b.members.push(m);
+    });
+    b.name = store.getItem("playerName") ?? "Junior"; b.bits = Number(store.getItem("bits") ?? 0); b.inventory = JSON.parse(store.getItem("inventory") ?? "[]");
+    B = b; cur = 0; renderAll(); msg("Loaded from your current game save.", "good");
+  } catch (err) { msg("Could not read the current save: " + err.message, "bad"); }
+}
+
+(async function init() {
+  try { await loadData(); aspectLoaded = false; } catch (e) { document.body.insertAdjacentHTML("afterbegin", `<p class="bad">Could not load the game data (${e.message}). Open this page from the web server, e.g. http://localhost:8770/playtest.html</p>`); return; }
+  B = newBuild(); renderPresets(); renderAll();
+})();
+</script>
+</body>
+</html>

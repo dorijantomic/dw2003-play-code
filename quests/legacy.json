@@ -1,0 +1,1484 @@
+{
+  "_comment": "The quests written before the large set (kept verbatim, scenes included). tools/build_quests.py merges them with the packs.",
+  "quests": [
+    {
+      "id": "park_pest_control",
+      "title": "Central Park pest control",
+      "giver": "Leomon",
+      "text": "Leomon cannot leave the gym, and Kunemon keep wandering into Central Park. Thin them out.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Kunemon"
+          ],
+          "count": 3,
+          "maps": [
+            "s330",
+            "s940"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 300,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s330",
+          "s940",
+          "s331"
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "Hey there. The Kunemon have been wandering into Central Park again, and I cannot leave the gym to deal with them.",
+          "If you could thin out three of them, I would be grateful. I will make it worth your while.",
+          "Can you do that?"
+        ],
+        "doneLines": [
+          "Three less to worry about. Thank you.",
+          "Take this, you earned it."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Hey there. The Kunemon have been wandering into Central Park again, and I cannot leave the gym to deal with them."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "If you could thin out three of them, I would be grateful. I will make it worth your while."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Can you do that?"
+          },
+          {
+            "ask": "Take the job?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ],
+        "remindLines": [
+          "Three Kunemon, that is all I ask. They keep drifting in near the gym.",
+          "Come back when they are gone."
+        ]
+      },
+      "short": "Park pests",
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Three less to worry about. Thank you."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Take this, you earned it."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "forest_gate_survey",
+      "title": "Wire Forest survey",
+      "giver": "Leomon",
+      "text": "Leomon wants to know whether the road into the Wire Forest is safe. Walk the entrance and the forest beyond it, then report back.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s335"
+        },
+        {
+          "type": "visit",
+          "map": "s350"
+        }
+      ],
+      "reward": {
+        "bits": 200
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "You have been keeping the park clear. That is good work.",
+          "Now I need eyes further out. Walk the Wire Forest entrance and the forest beyond it, and tell me whether the road is safe.",
+          "Will you do that?"
+        ],
+        "doneLines": [
+          "So the road holds. That is a weight off my mind.",
+          "Here, for your trouble."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "You have been keeping the park clear. That is good work."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Now I need eyes further out. Walk the Wire Forest entrance and the forest beyond it, and tell me whether the road is safe."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Will you do that?"
+          },
+          {
+            "ask": "Take the job?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ],
+        "remindLines": [
+          "Have you walked the Wire Forest road yet? The entrance first, then the forest beyond it.",
+          "Tell me what you saw when you are back."
+        ]
+      },
+      "short": "Forest survey",
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "So the road holds. That is a weight off my mind."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Here, for your trouble."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "east_station_greens",
+      "title": "East Station bounty: forest greens",
+      "giver": "Station bounty board",
+      "text": "Plants are overrunning the Kicking Forest path. Cut four of them back.",
+      "acceptAt": [
+        "s410",
+        "s411",
+        "s955"
+      ],
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Vegiemon",
+            "RedVegiemon",
+            "Woodmon"
+          ],
+          "count": 4,
+          "maps": [
+            "s400"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 450,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s410",
+          "s411",
+          "s955"
+        ]
+      },
+      "short": "East greens"
+    },
+    {
+      "id": "south_station_swamp",
+      "title": "South Station bounty: swamp pests",
+      "giver": "Station bounty board",
+      "text": "The Bulk Swamp crossing is infested. Clear four of the worst offenders.",
+      "acceptAt": [
+        "s440",
+        "s441"
+      ],
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Gekomon",
+            "Tortomon"
+          ],
+          "count": 4,
+          "maps": [
+            "s445"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 550,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s440",
+          "s441"
+        ]
+      },
+      "short": "South swamp"
+    },
+    {
+      "id": "quiet_route_wire_forest",
+      "title": "The quiet route",
+      "giver": "Park ranger board",
+      "text": "Couriers lose time to fights in the Wire Forest. Show a fight-free way through.",
+      "acceptAt": [
+        "s330",
+        "s940"
+      ],
+      "requires": {
+        "done": "forest_gate_survey"
+      },
+      "objectives": [
+        {
+          "type": "reach",
+          "map": "s335",
+          "label": "Cross the Wire Forest entrance from the north-west gate to the south gate without a fight",
+          "startLabel": "now reach the south gate",
+          "from": {
+            "x": 64,
+            "y": 96,
+            "r": 120
+          },
+          "to": {
+            "x": 688,
+            "y": 832,
+            "r": 90
+          }
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Sober Disk",
+            "count": 1
+          }
+        ]
+      },
+      "short": "Quiet route"
+    },
+    {
+      "id": "card_ladder_1",
+      "title": "Card ladder: first steps",
+      "giver": "Card players' board",
+      "text": "Prove yourself at the card table. Beat any three tamers.",
+      "objectives": [
+        {
+          "type": "duelWin",
+          "count": 3
+        }
+      ],
+      "reward": {
+        "bits": 500,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "duelWins": 1
+      },
+      "short": "Card ladder 1"
+    },
+    {
+      "id": "card_ladder_2",
+      "title": "Card ladder: rising duelist",
+      "giver": "Card players' board",
+      "text": "Word is spreading. Beat six tamers in all.",
+      "requires": {
+        "done": "card_ladder_1"
+      },
+      "objectives": [
+        {
+          "type": "duelWin",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "short": "Card ladder 2"
+    },
+    {
+      "id": "double_trouble_park",
+      "title": "Double trouble in Central Park",
+      "giver": "Leomon",
+      "text": "Two pests came out of the long grass at once. Face a Kunemon and a Tapirmon back to back, with no time to heal in between.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            34,
+            35
+          ],
+          "startAt": [
+            "s330",
+            "s940"
+          ],
+          "label": "Beat a Kunemon and then a Tapirmon, back to back"
+        }
+      ],
+      "reward": {
+        "bits": 350,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "Something odd happened. Two pests came out of the long grass at the same time, a Kunemon and a Tapirmon.",
+          "Could you face them back to back? No time to heal in between. It is harder than it sounds.",
+          "Will you try?"
+        ],
+        "doneLines": [
+          "Both of them at once, and you are still standing. Impressive.",
+          "Here you go."
+        ],
+        "remindLines": [
+          "Still after those two? A Kunemon, then a Tapirmon, back to back.",
+          "Do not stop to rest in between. Good luck."
+        ]
+      },
+      "short": "Double trouble"
+    },
+    {
+      "id": "seiryu_rematch",
+      "title": "Seiryu's rematch",
+      "giver": "Seiryu City notice board",
+      "text": "Word is the Seiryu leader's team will take on all comers again. The same three fighters, in the same order.",
+      "acceptAt": [
+        "s420",
+        "s421"
+      ],
+      "requires": {
+        "flag": 16402
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screen": 3,
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat the three fighters in a row"
+        }
+      ],
+      "reward": {
+        "bits": 800,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s420",
+          "s421"
+        ]
+      },
+      "short": "Seiryu rematch"
+    },
+    {
+      "id": "seiryu_rematch_hard",
+      "title": "Seiryu's rematch: the hard way",
+      "giver": "Seiryu City notice board",
+      "text": "The same three fighters, but they have been training. Stronger and tougher.",
+      "acceptAt": [
+        "s420",
+        "s421"
+      ],
+      "requires": {
+        "done": "seiryu_rematch"
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screen": 3,
+          "scale": 22,
+          "hpMult": 1.5,
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat the three trained fighters in a row"
+        }
+      ],
+      "reward": {
+        "bits": 1500,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 1
+          }
+        ]
+      },
+      "short": "Rematch, hard"
+    },
+    {
+      "id": "leaders_gauntlet",
+      "title": "Three leaders, one afternoon",
+      "giver": "Seiryu City notice board",
+      "text": "Take on the Seiryu, Suzaku and Byakko teams one after another. No healing between rounds.",
+      "acceptAt": [
+        "s420",
+        "s421"
+      ],
+      "requires": {
+        "flag": 16414
+      },
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            3,
+            4,
+            5
+          ],
+          "startAt": [
+            "s420",
+            "s421"
+          ],
+          "label": "Beat all three leaders' teams in a row (eight fights)"
+        }
+      ],
+      "reward": {
+        "bits": 2500,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s420",
+          "s421"
+        ],
+        "done": "seiryu_rematch"
+      },
+      "short": "Three leaders"
+    },
+    {
+      "id": "circuit_board_cartographer",
+      "title": "Circuit Board cartographer",
+      "giver": "Surveyor's board",
+      "text": "The underground Circuit Board boards are not on any map. Chart six different ones.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "count": 6,
+          "maps": [
+            "s865",
+            "s870",
+            "s875",
+            "s880",
+            "s885",
+            "s890",
+            "s895",
+            "s968",
+            "s969",
+            "s970",
+            "s971",
+            "s972",
+            "s973",
+            "s974"
+          ],
+          "label": "Chart different Circuit Board boards"
+        }
+      ],
+      "reward": {
+        "bits": 700,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s865",
+          "s870",
+          "s875",
+          "s880",
+          "s885",
+          "s890",
+          "s895",
+          "s968",
+          "s969",
+          "s970",
+          "s971",
+          "s972",
+          "s973",
+          "s974"
+        ]
+      },
+      "short": "Circuit maps"
+    },
+    {
+      "id": "witness_the_change",
+      "title": "Before and after",
+      "giver": "Lobby clerk's board",
+      "text": "The Main Lobby is not always the same place. See it as it is now, and again once the city has changed.",
+      "objectives": [
+        {
+          "type": "visitSet",
+          "count": 2,
+          "maps": [
+            "s210",
+            "s211"
+          ],
+          "label": "Visit the Main Lobby once as Asuka City and once as Amaterasu City"
+        }
+      ],
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s210",
+          "s211"
+        ]
+      },
+      "short": "Before, after"
+    },
+    {
+      "id": "arena_qualifiers",
+      "title": "Arena qualifiers",
+      "giver": "Arena front desk board",
+      "text": "Three qualifier matches, back to back, on the arena floor. The game's own tournament rounds were never filled in; these are new.",
+      "acceptAt": [
+        "s230",
+        "s231"
+      ],
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            49,
+            53,
+            48
+          ],
+          "startAt": [
+            "s232",
+            "s233"
+          ],
+          "label": "Win three qualifier matches in a row on the arena floor"
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "visited": [
+          "s230",
+          "s231"
+        ]
+      },
+      "short": "Arena trials"
+    },
+    {
+      "id": "guilmon_lost_tamer",
+      "title": "Guilmon cannot find his tamer",
+      "giver": "Your Guilmon",
+      "text": "Your Guilmon keeps looking past you for a tamer who is not there. Follow the trail and bring them together.",
+      "unlock": {
+        "partner": "p008giru",
+        "met": [
+          {
+            "npc": 179,
+            "map": "s956"
+          }
+        ]
+      },
+      "ordered": true,
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 365,
+          "name": "Agumon",
+          "maps": [
+            "s955"
+          ],
+          "lines": [
+            "Guilmon is looking for his tamer? He is not in the station.",
+            "I saw a tamer with a very familiar hat heading for Qing Long City. Try there."
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 179,
+          "name": "Takato",
+          "maps": [
+            "s956"
+          ],
+          "lines": [
+            "Guilmon? Is that you? I looked everywhere!",
+            "I am sorry I kept you waiting. Thank you for bringing him to me."
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 800,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "short": "Lost tamer"
+    },
+    {
+      "id": "leomon_kunemon_form",
+      "title": "A Kunemon inside you",
+      "giver": "Leomon",
+      "short": "Kunemon form",
+      "text": "Leomon says a partner that has fought a Kunemon long enough can take on its shape. Win fights until your partner learns the Kunemon form. It shows in the victory screen as Digivolve learned: Kunemon.",
+      "objectives": [
+        {
+          "type": "ownForm",
+          "species": "Kunemon"
+        }
+      ],
+      "reward": {
+        "bits": 500,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "unlock": {
+        "done": "park_pest_control",
+        "level": 6
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "You have beaten a lot of Kunemon by now. Did you notice how they move?",
+          "A partner that knows an enemy that well can take on its shape.",
+          "Fight on. Around level fourteen, your partner should learn the Kunemon form.",
+          "Will you try?"
+        ],
+        "doneLines": [
+          "I saw it in the way your partner stood. That is the Kunemon form.",
+          "It is not a real Digivolution, but it is yours. Here, take this."
+        ],
+        "remindLines": [
+          "Still no Kunemon form? Keep fighting. Around level fourteen it should come to your partner.",
+          "It arrives after a victory, so do not stop now."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "You have beaten a lot of Kunemon by now. Did you notice how they move?"
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "A partner that knows an enemy that well can take on its shape."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Fight on. Around level fourteen, your partner should learn the Kunemon form."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Will you try?"
+          },
+          {
+            "ask": "Will you try?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "I saw it in the way your partner stood. That is the Kunemon form."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "It is not a real Digivolution, but it is yours. Here, take this."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "park_messages",
+      "title": "Messages for the park",
+      "giver": "Leomon",
+      "short": "Park messages",
+      "ordered": true,
+      "text": "Leomon cannot leave the gym, so he asks you to carry two notes: one to the old woman, one to the man in the yellow coat. Then report back.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 58,
+          "name": "Old Woman",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "A note from Leomon? Oh, that big softie.",
+            "Tell him the weeds by the east path are worse this year."
+          ],
+          "scene": [
+            {
+              "walk": 58,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 58
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "A note from Leomon? Oh, that big softie."
+            },
+            {
+              "together": 58,
+              "dist": 130
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "Tell him the weeds by the east path are worse this year."
+            },
+            {
+              "say": 58,
+              "name": "Old Woman",
+              "text": "And tell him to eat something."
+            },
+            {
+              "apart": 58
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 58,
+              "to": "origin"
+            },
+            {
+              "arrive": 58
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "npc": 102,
+          "name": "Yellow Coat",
+          "maps": [
+            "s330"
+          ],
+          "lines": [
+            "Leomon's note. Hm.",
+            "Tell him I will watch the south side. And that he owes me a rematch."
+          ],
+          "scene": [
+            {
+              "walk": 102,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 102
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Leomon's note. Hm."
+            },
+            {
+              "together": 102,
+              "dist": 130
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "Tell him I will watch the south side."
+            },
+            {
+              "say": 102,
+              "name": "Yellow Coat",
+              "text": "And tell him he owes me a rematch."
+            },
+            {
+              "apart": 102
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 102,
+              "to": "origin"
+            },
+            {
+              "arrive": 102
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 2
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_pest_control"
+      },
+      "unlock": {
+        "done": "park_pest_control",
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          },
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 27,
+        "name": "Leomon",
+        "maps": [
+          "s330",
+          "s941"
+        ],
+        "lines": [
+          "I have two notes to deliver and I cannot leave my post.",
+          "One is for the old woman, one for the man in the yellow coat. They are both in the park.",
+          "Can you carry them?"
+        ],
+        "doneLines": [
+          "So the weeds are bad, and he wants a rematch. Typical.",
+          "Thank you for running my errands. Take this."
+        ],
+        "remindLines": [
+          "Have you delivered the notes? The old woman first, then the man in the yellow coat.",
+          "Come back and tell me what they said."
+        ],
+        "scene": [
+          {
+            "walk": 27,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 27
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "I have two notes to deliver and I cannot leave my post."
+          },
+          {
+            "together": 27,
+            "dist": 130
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "One is for the old woman, one for the man in the yellow coat. They are both in the park."
+          },
+          {
+            "say": 27,
+            "name": "Leomon",
+            "text": "Can you carry them?"
+          },
+          {
+            "ask": "Carry the notes?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 27
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 27,
+            "to": "origin"
+          },
+          {
+            "arrive": 27
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 27,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 27
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "So the weeds are bad, and he wants a rematch. Typical."
+        },
+        {
+          "say": 27,
+          "name": "Leomon",
+          "text": "Thank you for running my errands. Take this."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 27,
+          "to": "origin"
+        },
+        {
+          "arrive": 27
+        }
+      ]
+    },
+    {
+      "id": "yellowcoat_duel",
+      "title": "The man in the yellow coat",
+      "giver": "Yellow Coat",
+      "short": "Yellow coat duel",
+      "text": "The man in the yellow coat wants his rematch: three fights in a row on Central Park grass. Win them all, then tell him.",
+      "objectives": [
+        {
+          "type": "challenge",
+          "screens": [
+            38,
+            39,
+            40
+          ],
+          "scale": 24,
+          "hpMult": 1.6,
+          "startAt": [
+            "s330",
+            "s940"
+          ],
+          "label": "Win three fights in a row: DemiDevimon, Betamon, Vegiemon"
+        }
+      ],
+      "reward": {
+        "bits": 700,
+        "items": [
+          {
+            "name": "Power Charge",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_messages"
+      },
+      "unlock": {
+        "done": "park_messages",
+        "met": [
+          {
+            "npc": 102,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 102,
+        "name": "Yellow Coat",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "So Leomon sent you. Good.",
+          "I have been training my own team. Three fights in a row, no resting.",
+          "Are you in?"
+        ],
+        "doneLines": [
+          "Three in a row. You really are something.",
+          "Take it. You earned it, and so did he."
+        ],
+        "remindLines": [
+          "Three fights in a row, no resting. Do it on the park grass and come tell me when you have won.",
+          "I will be here."
+        ],
+        "scene": [
+          {
+            "walk": 102,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 102
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "So Leomon sent you. Good."
+          },
+          {
+            "together": 102,
+            "dist": 130
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "I have been training my own team. Three fights in a row, no resting."
+          },
+          {
+            "say": 102,
+            "name": "Yellow Coat",
+            "text": "Are you in?"
+          },
+          {
+            "ask": "Are you in?",
+            "options": [
+              "I am in",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 102
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 102,
+            "to": "origin"
+          },
+          {
+            "arrive": 102
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 102,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 102
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Three in a row. You really are something."
+        },
+        {
+          "say": 102,
+          "name": "Yellow Coat",
+          "text": "Take it. You earned it, and so did he."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 102,
+          "to": "origin"
+        },
+        {
+          "arrive": 102
+        }
+      ]
+    },
+    {
+      "id": "oldwoman_rumour",
+      "title": "A rumour from the old woman",
+      "giver": "Old Woman",
+      "short": "Rumour",
+      "text": "The old woman heard that a Digimon wearing a strange shape has been seen near the Wire Forest road. See the road for yourself, and learn the Betamon form.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s335"
+        },
+        {
+          "type": "ownForm",
+          "species": "Betamon"
+        }
+      ],
+      "reward": {
+        "bits": 600,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "requires": {
+        "done": "park_messages"
+      },
+      "unlock": {
+        "done": "park_messages",
+        "met": [
+          {
+            "npc": 58,
+            "map": "s330"
+          }
+        ]
+      },
+      "offer": {
+        "npc": 58,
+        "name": "Old Woman",
+        "maps": [
+          "s330"
+        ],
+        "lines": [
+          "Come here, dear. I hear things.",
+          "They say something strange has been seen on the Wire Forest road, a Digimon in a shape it was not born with.",
+          "Go and see, and then learn the Betamon form yourself.",
+          "Will you go?"
+        ],
+        "doneLines": [
+          "You went, and you came back with a new shape. Clever.",
+          "Here, buy yourself something. And do not tell Leomon I fussed."
+        ],
+        "remindLines": [
+          "Have you seen the Wire Forest road yet, dear? And that Betamon form will not learn itself.",
+          "Come and tell me when you are back."
+        ],
+        "scene": [
+          {
+            "walk": 58,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 58
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Come here, dear. I hear things."
+          },
+          {
+            "together": 58,
+            "dist": 130
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "They say something strange has been seen on the Wire Forest road, a Digimon in a shape it was not born with."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Go and see, and then learn the Betamon form yourself."
+          },
+          {
+            "say": 58,
+            "name": "Old Woman",
+            "text": "Will you go?"
+          },
+          {
+            "ask": "Will you go?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 58
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 58,
+            "to": "origin"
+          },
+          {
+            "arrive": 58
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 58,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 58
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "You went, and you came back with a new shape. Clever."
+        },
+        {
+          "say": 58,
+          "name": "Old Woman",
+          "text": "Here, buy yourself something. And do not tell Leomon I fussed."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 58,
+          "to": "origin"
+        },
+        {
+          "arrive": 58
+        }
+      ]
+    }
+  ]
+}

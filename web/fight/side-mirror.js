@@ -47,6 +47,35 @@ export function mirrorOps(ops) {
   });
 }
 
+/**
+ * An op5 camera operand list turned around, for an enemy-authored script played from the NEAR side.
+ * An explicit transform (sub 1: eye at words 2-4, target at 5-7, anchor at 8-10) is absolute arena data, so the
+ * same x -> -x, z -> -z that turns the effects around turns the camera around (a shot that framed the near
+ * victim from the far side's point of view now frames the far victim from ours). A preset (sub 0) names a slot,
+ * not a position, so it is mirrored by mirrorPresetShot instead and is returned unchanged here.
+ */
+export function mirrorCameraWords(words) {
+  if (!Array.isArray(words) || words[1] !== 1) return words;
+  const w = words.slice();
+  for (const i of [2, 4, 5, 7, 8, 10]) w[i] = -(w[i] | 0);
+  return w;
+}
+
+/**
+ * Which shot a camera PRESET means when the model that authored it stands on the other side. The preset names a
+ * slot: 1-4 the NEAR fighter's shots 8-11, 5-7 the FAR fighter's shots 0-2. An enemy model's script is authored for
+ * a far-side attacker, so "the near fighter" is its victim; played from our side that fighter is the attacker
+ * itself, which is how Meramon's Flameball framed Meramon. Turned around: the victim shots (1-4) read the far
+ * fighter's three shots, the attacker's own shots (5-7) read the near fighter's closer shots 8-10.
+ * Returns { side, index } like op5ShotSlot, or null for a preset that names no slot (0 and >= 8).
+ */
+export function mirrorPresetShot(preset) {
+  const p = preset | 0;
+  if (p >= 1 && p <= 4) return { side: "enemy", index: Math.min(p - 1, 2) };
+  if (p >= 5 && p <= 7) return { side: "player", index: p + 3 };
+  return null;
+}
+
 /** The hooks an action VM reports to, with every arena position turned around. */
 export function mirrorHooks(h) {
   return {

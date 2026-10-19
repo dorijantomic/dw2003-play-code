@@ -1,0 +1,233 @@
+{
+  "_comment": "Who the quest givers are. Keyed by the game's own npc_id (the same id means the same character on every map, which is what lets one character be a thread through the whole world). 'name' is the name tab shown in the conversation box; 'look' says what the sprite shows (checked on a contact sheet of the sprites, 2026-10-15); 'voice' is how they talk. Named Digimon and the named shopkeepers carry the names the game gives them (merchants.json, map names); everyone else is a role described from the sprite, because the disc gives them no names. Everything a character says in a quest is new writing, not game text. See docs/quests-bible.md.",
+  "by_npc_id": {
+    "27": {
+      "name": "Leomon",
+      "look": "lion-headed warrior Digimon",
+      "voice": "noble, dutiful, plain-spoken; speaks of honour and keeping watch; never wastes words"
+    },
+    "12": {
+      "name": "Takato",
+      "look": "boy in goggles",
+      "voice": "earnest and eager, a little scattered, always sure it will work out"
+    },
+    "179": {
+      "name": "Takato",
+      "look": "boy in goggles",
+      "voice": "earnest and eager, a little scattered, always sure it will work out"
+    },
+    "365": {
+      "name": "Agumon",
+      "look": "yellow dinosaur Digimon",
+      "voice": "cheerful and direct, always hungry, food jokes, says what he feels"
+    },
+    "371": {
+      "name": "Patamon",
+      "look": "small orange winged Digimon",
+      "voice": "gentle, hopeful and a bit bashful; asks politely, thanks twice"
+    },
+    "373": {
+      "name": "Renamon",
+      "look": "yellow fox Digimon",
+      "voice": "terse, cool, observant; says less than she knows"
+    },
+    "20": {
+      "name": "Tailmon",
+      "look": "white cat Digimon, innkeeper",
+      "voice": "sharp, teasing, businesslike; fond of the guests she pretends to tolerate"
+    },
+    "120": {
+      "name": "Tailmon",
+      "look": "white cat Digimon, innkeeper",
+      "voice": "sharp, teasing, businesslike; fond of the guests she pretends to tolerate"
+    },
+    "121": {
+      "name": "Tailmon",
+      "look": "white cat Digimon, innkeeper",
+      "voice": "sharp, teasing, businesslike; fond of the guests she pretends to tolerate"
+    },
+    "22": {
+      "name": "Wizardmon",
+      "look": "hat-and-robe Digimon, item shop",
+      "voice": "polite and a little mysterious; talks about stock as if it were spells"
+    },
+    "23": {
+      "name": "Gargomon",
+      "look": "gun-armed Digimon, armory",
+      "voice": "loud, fast, enthusiastic; everything is a big deal; talks about gear"
+    },
+    "183": {
+      "name": "Gomamon",
+      "look": "white seal-like Digimon, pawn shop",
+      "voice": "laid-back, likes a bargain, calls everyone buddy"
+    },
+    "30": {
+      "name": "Smith",
+      "look": "workman, Smith's Shop in Asuka",
+      "voice": "gruff craftsman, proud of his work, few words"
+    },
+    "255": {
+      "name": "Wedge",
+      "look": "shop owner, Wedge's Shop",
+      "voice": "chatty merchant, flatters customers, always has a deal"
+    },
+    "43": {
+      "name": "Researcher",
+      "look": "man in a jacket with goggles",
+      "voice": "curious scientist; thinks out loud; gets distracted by details"
+    },
+    "44": {
+      "name": "Researcher",
+      "look": "man in a jacket with goggles",
+      "voice": "curious scientist; thinks out loud; gets distracted by details"
+    },
+    "45": {
+      "name": "Boy",
+      "look": "boy in a casual shirt",
+      "voice": "eager to prove himself; dares, boasts, secretly nervous"
+    },
+    "46": {
+      "name": "Girl",
+      "look": "girl in pink",
+      "voice": "chatty, card collector, speaks in exclamations, loves a swap"
+    },
+    "47": {
+      "name": "Traveler",
+      "look": "man in a brown vest",
+      "voice": "wry wanderer who has seen a bit of everything; dry humour"
+    },
+    "48": {
+      "name": "Schoolgirl",
+      "look": "girl with orange hair and a blue jacket",
+      "voice": "curious, fast-talking, asks too many questions, remembers everything"
+    },
+    "49": {
+      "name": "Young Man",
+      "look": "young man in a grey jacket",
+      "voice": "sporty and friendly; talks training, form and teamwork"
+    },
+    "50": {
+      "name": "Young Woman",
+      "look": "young woman in a light top",
+      "voice": "kind and practical; worries about her Digimon and yours"
+    },
+    "51": {
+      "name": "Geek",
+      "look": "boy in a green jacket",
+      "voice": "data nerd; excited about numbers, rare finds and stats; speaks in lists"
+    },
+    "52": {
+      "name": "Student",
+      "look": "girl in a pale dress",
+      "voice": "shy bookworm; quiet, precise, surprisingly brave once she trusts you"
+    },
+    "53": {
+      "name": "Office Worker",
+      "look": "man in a dark suit",
+      "voice": "tired and polite; always running an errand he cannot run himself"
+    },
+    "54": {
+      "name": "Office Lady",
+      "look": "woman in an office outfit",
+      "voice": "gossip with a sweet tooth; knows everyone's business and shares it"
+    },
+    "55": {
+      "name": "Gentleman",
+      "look": "man in a tidy teal coat",
+      "voice": "formal and old-fashioned; collects things; slightly pompous, genuinely kind"
+    },
+    "56": {
+      "name": "Kid",
+      "look": "small boy",
+      "voice": "playful, dares you, makes everything a game"
+    },
+    "57": {
+      "name": "Old Man",
+      "look": "elderly man",
+      "voice": "tells legends and riddles; slow, warm, a twinkle in every line"
+    },
+    "58": {
+      "name": "Old Woman",
+      "look": "grey-haired elderly woman",
+      "voice": "rumours and warm scolding; sly, knows more than she says, feeds everyone"
+    },
+    "101": {
+      "name": "Girl in Red Cap",
+      "look": "girl with a red cap and orange hair",
+      "voice": "sporty rival; competitive, quick to laugh, hates losing and loves a rematch"
+    },
+    "102": {
+      "name": "Yellow Coat",
+      "look": "person in a yellow coat and wide hat",
+      "voice": "gruff duelist who respects strength; short sentences; rematches are a point of honour"
+    },
+    "103": {
+      "name": "Black Hat",
+      "look": "man in a black hat and red tie",
+      "voice": "shady informant; smooth, hints more than he says; always selling a secret"
+    },
+    "178": {
+      "name": "Pink-haired Girl",
+      "look": "girl with pink hair",
+      "voice": "cheerful friend; warm, a little dreamy, wants everybody to get along"
+    },
+    "32": {
+      "name": "Operator",
+      "look": "white-suited operator",
+      "voice": "polite desk staff; official phrases; helpful within the rules"
+    },
+    "36": {
+      "name": "Operator",
+      "look": "white-suited operator",
+      "voice": "polite desk staff; official phrases; helpful within the rules"
+    },
+    "282": {
+      "name": "Fisherman",
+      "look": "bald man in dark clothes who stands at the shore",
+      "voice": "patient, few words, speaks in fishing metaphors, in no hurry about anything"
+    },
+    "283": {
+      "name": "Lookout Boy",
+      "look": "small boy in a white shirt watching the sea",
+      "voice": "serious little lookout; reports like a sentry; dreams of ships"
+    },
+    "1001": {
+      "name": "Moss",
+      "look": "tired young player in a grey hoodie with red headphones around the neck",
+      "voice": "flat and dry, long-shift humour; says small true things quietly; never complains out loud"
+    },
+    "1002": {
+      "name": "Maintenance Tech",
+      "look": "MAGAMI maintenance tech in a blue cap and light blue coveralls, glasses",
+      "voice": "harried and exact; speaks in ticket numbers and apologies; secretly delighted by a good bug"
+    },
+    "1003": {
+      "name": "Runner",
+      "look": "kid in a red cap, yellow scarf and a green pack",
+      "voice": "quick and cagey; talks in half-hints, enjoys being mysterious, drops it when thanked"
+    },
+    "1004": {
+      "name": "Ren",
+      "look": "red-haired girl with goggles in a white and blue poncho, cargo trousers",
+      "voice": "calm, dry and direct, a drifter who teases a little and never stays; short sentences; respects people who try"
+    },
+    "1005": {
+      "name": "Cipher",
+      "look": "armoured security unit in dark plating with a blue chest gem, red visor and gold headphones",
+      "voice": "terse and precise, talks like a system message with Query and Status lines, quietly curious about people and learning jokes"
+    }
+  },
+  "_threads": {
+    "_comment": "Recurring characters who can carry a storyline across many places. Each is an npc_id that appears in many towns, so one thread can walk the player through the world.",
+    "Old Woman": "rumours: always heard something about the next place; her quests point somewhere new",
+    "Old Man": "legends and riddles: sends the player to look at a landmark and answer what they saw",
+    "Geek": "data: wants a species met, a form learned, a count of something",
+    "Girl": "cards and swaps: duels and collecting",
+    "Boy": "dares and growing up: fights, levels, proving himself",
+    "Office Worker": "errands: carries messages and parcels between towns",
+    "Yellow Coat": "the rival: appears in many places, challenges you again and again",
+    "Black Hat": "secrets: sells hints, then asks a favour that turns out bigger than it sounded",
+    "Ren": "a wandering tamer met four times, always somewhere new (Shell Beach, Wind Prairie, Phoenix Bay, Mobius Desert); her partner grows stronger each time",
+    "Cipher": "a security unit posted at the Asuka Bridge, bound by orders and slowly learning why people matter more"
+  }
+}

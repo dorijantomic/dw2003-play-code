@@ -20,6 +20,7 @@ import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
 import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP, setItemUseEffects, itemUseEffect,
          setThrowItemEffects, throwItemEffect } from "./fight/fight-tables.js";
 import { setFallbackDonor } from "./fight/clip-fallback.js";
+import { authoredSide, mirrorCameraWords, mirrorPresetShot } from "./fight/side-mirror.js";
 import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
          projLayerWorlds, clipFrameAt, meshAbrMode } from "./fight/proj-layers.js";
@@ -1181,6 +1182,23 @@ export function nearCameraFor(placementTable, key) {
 }
 
 /**
+ * The partner whose own near camera suits a model best: the closest in camera-framing size (height or half the width)
+ * and, at half the weight, in shape (height over width). `sizes` is { modelKey: [height, width] } of every partner that
+ * carries its twelve shots (assets/battle/camera_ref_sizes.json); `rest` is the model's { h, w }. Null until both are known.
+ */
+export function closestCameraRef(sizes, rest, placementTable) {
+  if (!sizes || !rest || !(rest.h > 0) || !(rest.w > 0)) return null;
+  const frame = Math.max(rest.h, 0.5 * rest.w), shape = Math.log(rest.h / rest.w);
+  let best = null, bestD = Infinity;
+  for (const [key, [h, w]] of Object.entries(sizes)) {
+    if ((placementTable?.[key]?.camera?.eye?.length | 0) < 12 || !(h > 0) || !(w > 0)) continue;
+    const d = Math.abs(Math.log(Math.max(h, 0.5 * w) / frame)) + 0.5 * Math.abs(Math.log(h / w) - shape);
+    if (d < bestD) { best = { key, h, w }; bestD = d; }
+  }
+  return best;
+}
+
+/**
  * A reference partner's near table refitted to another Digimon: every eye and look point is
  * taken relative to the reference fighter's home slot, scaled by `k` (our size over the
  * reference's) and put back relative to our own slot. Every shot keeps its direction and lens,
@@ -1848,8 +1866,10 @@ export function createBattle3D(canvas, sfx = null) {
   // see nearCameraFor) gets Agumon's, fitted to its size around its own slot (fitNearCamera), so
   // it is framed the way the disc frames a partner instead of through a bigger or smaller
   // Digimon's lens. Until both models have loaded, the plain closest-stand-off table stands in.
-  const NEAR_CAM_REF = "m003agum";
-  let nearCamRefModel = null, nearCamRefLoading = false;
+  // The reference is the partner closest to the model in size and shape (closestCameraRef, from the measured
+  // rest-pose sizes in assets/battle/camera_ref_sizes.json), so a big model borrows a big partner's framing and a
+  // small one a small partner's, and the fit scale stays near 1.
+  let camRefSizes = null, camRefLoading = false;
   let fittedNearCam = null;   // { folder, cam }
   function playerNearCamera() {
     const key = modelKeyFromFolder(playerFolder);
@@ -1857,22 +1877,24 @@ export function createBattle3D(canvas, sfx = null) {
     if (!rec) return null;
     if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
     if (fittedNearCam?.folder === playerFolder) return fittedNearCam.cam;
-    if (!nearCamRefModel && !nearCamRefLoading) {
-      nearCamRefLoading = true;
-      loadSkeletalModel(NEAR_CAM_REF).then((m) => { nearCamRefModel = m || null; }, () => {});
+    if (!camRefSizes && !camRefLoading) {
+      camRefLoading = true;
+      fetch("assets/battle/camera_ref_sizes.json").then((r) => (r.ok ? r.json() : null)).then((j) => { camRefSizes = j?.sizes ?? null; }, () => {});
     }
-    const refKey = modelKeyFromFolder(NEAR_CAM_REF);
-    const refRec = placementTable[refKey];
-    const own = playerModel ? modelFrameSize(playerModel) : null;
-    const ref = nearCamRefModel ? modelFrameSize(nearCamRefModel) : null;
+    const ownRest = playerModel ? modelRestSize(playerModel) : null;
+    const pick = closestCameraRef(camRefSizes, ownRest, placementTable);
+    const refKey = pick?.key;
+    const refRec = refKey != null ? placementTable[refKey] : null;
+    const own = ownRest ? modelFrameSize(playerModel) : null;
+    const ref = pick ? Math.max(pick.h, 0.5 * pick.w) : null;
     if (!refRec?.camera || !own || !ref) return nearCameraFor(placementTable, key);
     const k = Math.min(3, Math.max(0.5, own / ref));
     const refSlot = arenaSlot(refRec, "player"), ownSlot = arenaSlot(rec, "player");
     const cam = fitNearCamera(refRec.camera, refSlot, ownSlot, k);
     // The face close-up the same way, but scaled by HEIGHT alone, so it lands on the head
-    // the way Agumon's lands on Agumon's. A 0x48 record's own face-box read runs past the
+    // the way the reference's lands on the reference's. A 0x48 record's own face-box read runs past the
     // record (see faceBoxShot) and frames nothing.
-    const kh = Math.min(3, Math.max(0.3, modelRestSize(playerModel).h / modelRestSize(nearCamRefModel).h));
+    const kh = Math.min(3, Math.max(0.3, ownRest.h / pick.h));
     const face = {};
     for (const side of ["player", "enemy"]) {
       const s = faceBoxSource(placementTable, refKey, side).shot;
@@ -2287,9 +2309,32 @@ export function createBattle3D(canvas, sfx = null) {
   // (OP5_PRESETS above). Reaction clips issue these presets — the real game's "cut to the
   // struck Digimon as the hit lands".
   function _camHookFor(side) {
-    return (rec) => {
+    // An enemy-only species the player owns stands on the near side with scripts authored for a far-side attacker: its
+    // camera operands name the OPPOSING fighter as "the near one", which from our side is itself (side-mirror.js).
+    const standsNearEnemyAuthored = () => {
+      const a = side === "enemy" ? enemyAnim8r : playerAnim8r;
+      // a script built from a donor (a spell, Double Guard) already aims its camera for our side; only the model's own are turned
+      return a?.homeSlot?.side === "player" && authoredSide(a.model) === "enemy" && !a._camFromDonor;
+    };
+    return (rawRec) => {
+      const turned = standsNearEnemyAuthored();
+      const rec = turned && rawRec?.words ? { ...rawRec, words: mirrorCameraWords(rawRec.words) } : rawRec;
       const cs = applyOp5({}, rec);
       if (!cs.op5) return;
+      if (turned && cs.op5.preset != null && (cs.op5.preset | 0) >= 1 && (cs.op5.preset | 0) <= 7) {
+        // a preset names a slot: take the shot of the OPPOSITE fighter, else keep the neutral arena shot, never our own
+        // Digimon as the struck one
+        const m = mirrorPresetShot(cs.op5.preset);
+        const shot = m ? cannedShotSlot(m.side, m.index) : null;
+        const fields = shot ? fieldsFromShot(shot) : _arenaFields();
+        const duration = Math.max(0, cs.op5.mode | 0);
+        if (fields) {
+          const installer = (side === "enemy" ? enemyAnim8r : playerAnim8r)?.vm;
+          if (duration > 0) camRec.move(fields, duration, { issuer: side, issuerVm: installer });
+          else camRec.cut(fields, { issuer: side, issuerVm: installer });
+        }
+        return;
+      }
       // WHICH ACTION installed this shot. `issuer` alone names a SIDE, and the one shared camera
       // record keeps that label after the action that set it ends — so a later action can read
       // another action's label. Tag every install with the live action VM, so "did MY current

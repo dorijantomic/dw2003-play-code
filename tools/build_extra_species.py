@@ -37,11 +37,22 @@ from __future__ import annotations
 import json
 import re
 import struct
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "web/assets/data"
+# Where extra_species.json / extra_profiles.bin are written (the default is the shared data folder; a scratch folder
+# lets a variant be built and simulated without touching it).
+OUT = Path(os.environ["EXTRA_SPECIES_OUT"]) if os.environ.get("EXTRA_SPECIES_OUT") else DATA
+# Aspect routes (docs/aspect-system-plan.md): ASPECT_ROUTES=1 gives every form that has a parent a second unlock record,
+# gated on an element bonus (the disc's own gate kinds 8..14) instead of a stat, and orders the whole table weakest tier first.
+ASPECT_ROUTES = os.environ.get("ASPECT_ROUTES", "0") == "1"
+# element bonus a fully committed player holds at the tier's intended level (planner: aspect-planner.html, Silver at Lv 10,
+# 5 training points a level, the normal drills, the line's own passive growth); a line that does not suit the family needs 25% more
+ELEMENT_GATE = {1: 110, 2: 150, 3: 200, 4: 290, 5: 350}
+ELEMENT_GATE_ADDS_BASE = False   # measured: the live game counts the trained points only, so the gate leaves out the line's base tolerance
 CANON = ROOT / "data/authored/web/assets/data/extra_species_canon.json"
 NEW_STARTERS = ROOT / "data/authored/web/assets/data/new_starters.json"
 DISC_LINES = 8
@@ -403,8 +414,10 @@ def main() -> int:
 
         # unlock rule
         top = max(STAT_KEYS, key=lambda k: e[k])
+        # the element it belongs to: its own attack's element (techs 2..8 are fire..dark), else its strongest resistance
+        signature_element = ELEMS[element - 2] if 2 <= element <= 8 else max(ELEMS, key=lambda k: (res[k], -ELEMS.index(k)))
         meta[name] = {
-            "id": sp["id"], "value0": value0, "tier": tier, "family": e["digimon_type"], "bank": idx,
+            "id": sp["id"], "value0": value0, "tier": tier, "family": e["digimon_type"], "bank": idx, "element": signature_element,
             "affinity": list(sp.get("lines") or AFFINITY.get(e["digimon_type"], ())), "parents": sp["from"],
             "gateStat": top, "gateValue": min(460, max(30, int(e[top] * 0.55 / 10) * 10)),
         }
@@ -457,6 +470,19 @@ def main() -> int:
             else:
                 r["kind"], r["threshold"] = 7, T["root_lv"] + extra_lv
             recs.append(r)
+            if ASPECT_ROUTES and parents:
+                # the element route: the same prerequisites, a gate on the form's own element bonus. A player who
+                # trains that element reaches the form without the stat gate; any one passing record unlocks it.
+                # The live game compares the TRAINED points only (tools/verify_aspect_route.mjs: a gate met only by adding the
+                # line's own base tolerance does not unlock). ELEMENT_GATE_ADDS_BASE keeps the disc's native reading open
+                # (base tolerance + trained points; engine/dw3/ui/native/fight-report-rewards.ts).
+                trained = ELEMENT_GATE[m["tier"]] if on else int(ELEMENT_GATE[m["tier"]] * OFF_LINE_GATE_FACTOR / 10) * 10
+                own_base = base[line]["resistances"][m["element"]] if (ELEMENT_GATE_ADDS_BASE and line < DISC_LINES) else 0
+                recs.append({**r, "kind": 8 + ELEMS.index(m["element"]), "threshold": min(999, own_base + trained)})
+        if ASPECT_ROUTES:
+            # the unlock rule takes the first passing record in table order, one form per battle: weakest tier first
+            tier_of_to = {m["id"]: m["tier"] for m in meta.values()}
+            recs.sort(key=lambda r: (tier_of_to[r["to"]], r["to"], r["kind"] >= 8))
         return recs
 
     for line in range(DISC_LINES):
@@ -470,9 +496,10 @@ def main() -> int:
     rows += starter_rows
     blobs += starter_blobs
 
-    (DATA / "extra_species.json").write_text(json.dumps(
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "extra_species.json").write_text(json.dumps(
         {"digimon": rows, "tree": tree, "meta": meta, "starters": starters}, separators=(",", ":")))
-    (DATA / "extra_profiles.bin").write_bytes(b"".join(blobs))
+    (OUT / "extra_profiles.bin").write_bytes(b"".join(blobs))
     print(f"{len(rows)} extra species ({len(starters)} new partners) -> extra_species.json, extra_profiles.bin "
           f"({len(blobs) * 0x58} bytes)")
     return 0

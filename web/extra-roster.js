@@ -61,16 +61,55 @@ export function installNewPartners(extra) {
   return partners;
 }
 
+/**
+ * The new partners (DemiDevimon, Kunemon, Hagurumon, Betamon, Goburimon) are switched off: each needs its own field
+ * sprite, gym workout art and so on, which is more art than there is time for. Their data, tools and sprites stay in
+ * the repo; set this to true to bring them back. The enemy-only species stay obtainable as digivolution forms.
+ */
+export const NEW_PARTNERS_ENABLED = false;
+
+/**
+ * Aspect (docs/aspect-system-plan.md): a one-time starting bonus to one element, written into the same stored element bonus the
+ * gym and the element chips raise, so the unlock rule's element gates (kinds 8-14) see it. At most ASPECT_SEED points, chosen once
+ * per partner: `ps.aspect` records the choice and a second call does nothing. Pure apart from `ps`.
+ */
+export const ASPECT_ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
+export const ASPECT_SEED = 40;
+export function applyAspect(ps, element, seed = ASPECT_SEED) {
+  if (!ps || !ASPECT_ELEMENTS.includes(element) || ps.aspect) return false;
+  const points = Math.max(0, Math.min(seed, ASPECT_SEED));
+  ps.aspect = element;
+  ps.elemBonuses ??= {};
+  ps.elemBonuses[element] = Math.min(999, (Number(ps.elemBonuses[element]) || 0) + points);
+  return true;
+}
+
+/** `extra` without the new partners: no starter rows, no roster slots, no lines of their own. Pure. */
+export function withoutNewPartners(extra) {
+  const gone = new Set((extra?.starters ?? []).map((p) => p.id));
+  if (!gone.size) return extra;
+  const slots = new Set(extra.starters.map((p) => String(p.slot)));
+  return {
+    ...extra,
+    starters: [],
+    digimon: (extra.digimon ?? []).filter((d) => !gone.has(d.id)),
+    tree: Object.fromEntries(Object.entries(extra.tree ?? {}).filter(([slot]) => !slots.has(slot))),
+  };
+}
+
 let loading = null;
 /** The extra species data (and registers their profile records), or null when the build has none. Cached. */
 export function loadExtraRoster(realFetch = globalThis.fetch.bind(globalThis)) {
   loading ??= (async () => {
     try {
       const [meta, bin] = await Promise.all([
-        realFetch("assets/data/extra_species.json"), realFetch("assets/data/extra_profiles.bin"),
+        // ?aspect=1 loads the build with the element routes (tools/build_extra_species.py, ASPECT_ROUTES=1), for play-testing
+        realFetch(/[?&]aspect=1\b/.test(globalThis.location?.search ?? "") ? "assets/data/extra_species_aspect.json" : "assets/data/extra_species.json"),
+        realFetch("assets/data/extra_profiles.bin"),
       ]);
       if (!meta.ok || !bin.ok) return null;
-      const data = await meta.json();
+      let data = await meta.json();
+      if (!NEW_PARTNERS_ENABLED) data = withoutNewPartners(data);
       registerExtraProfiles(new Uint8Array(await bin.arrayBuffer()));
       const partners = installNewPartners(data);
       // the results screen runs the disc's unlock routine, which only reads the disc's 44 records per line; a new
@@ -100,6 +139,13 @@ if (typeof window !== "undefined" && !/[?&]noextras=1\b/.test(window.location?.s
   };
   window.__extraRoster = {
     load: () => loadExtraRoster(realFetch),
+    /** Testing aid (browser console): choose the lead's Aspect, e.g. `__extraRoster.setAspect("dark")`. Once per partner; false when refused. */
+    setAspect(element) {
+      const st = window.__state?.partnerStats;
+      if (!applyAspect(st, element)) return false;
+      try { localStorage.setItem("partnerStats", JSON.stringify(st)); } catch (_) { /* storage blocked */ }
+      return true;
+    },
     /**
      * Testing aid (browser console): teach the lead Digimon every enemy-only species as a form at once, so they can be
      * picked in the Digimon Lab and the battle Digivolve list without playing for them. `ids` limits it to some.

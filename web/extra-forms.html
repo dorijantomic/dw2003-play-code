@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Extra Digivolution Forms</title>
+<style>
+  :root { --bg: #14141c; --panel: #1d1d29; --fg: #e8e8f0; --muted: #9a9ab0; --line: #2d2d40; --accent: #7aa2ff; --good: #5fd38d; --warn: #f2b25c; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 14px; max-width: 900px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; }
+  label { color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  select, input[type=search] { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+  .wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; max-height: calc(100vh - 150px); }
+  table { border-collapse: collapse; width: 100%; min-width: 1100px; }
+  th, td { padding: 5px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: var(--panel); cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; z-index: 1; }
+  th:hover { color: var(--fg); }
+  th.sorted { color: var(--accent); }
+  td.l, th.l { text-align: left; }
+  tbody tr:hover { background: #20202e; }
+  .t1 { color: #9aa0b4 } .t2 { color: #7fd0a0 } .t3 { color: #7aa2ff } .t4 { color: #d49bff } .t5 { color: #f2b25c }
+  .gate { color: var(--muted); }
+  .on { color: var(--good); }
+  .count { color: var(--muted); margin-left: auto; }
+  .bar-cell { display: inline-block; height: 6px; background: var(--accent); border-radius: 3px; vertical-align: middle; margin-left: 6px; opacity: .8; }
+</style>
+</head>
+<body>
+<h1>Extra digivolution forms</h1>
+<p class="sub">The 135 enemy-only Digimon that each of the eight starters can learn as a form, after the disc's own 44. Pick a starter line to see
+when it unlocks each one and how strong it is; click a column header to sort. "Depth" is how many prerequisite forms deep the unlock
+is (0 = no prerequisite). Gate: a stat the starter must have reached, or the line's own level.</p>
+<div class="bar">
+  <label>Starter line <select id="line"></select></label>
+  <label>Tier <select id="tier"><option value="">all</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+  <label><input type="checkbox" id="easiest" /> easiest line per form</label>
+  <label><input type="search" id="q" placeholder="search name…" /></label>
+  <span class="count" id="count"></span>
+</div>
+<div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+<script>
+const LINES = ["Kotemon", "Kumamon", "Monmon", "Agumon", "Veemon", "Guilmon", "Renamon", "Patamon"];
+const STAT = { 1: "STR", 2: "DEF", 3: "SPT", 4: "WIS", 5: "SPD" };
+const COLS = [
+  ["name", "Form", "l"], ["line", "Line", "l"], ["tier", "Tier"], ["total", "Total"], ["str", "STR"], ["def", "DEF"],
+  ["spt", "SPT"], ["wis", "WIS"], ["spd", "SPD"], ["res", "Resist"], ["family", "Family"],
+  ["depth", "Depth"], ["gateVal", "Gate", "l"], ["req", "Needs", "l"], ["onLine", "Suits"],
+];
+let rows = [], sortKey = "total", sortDir = -1;
+
+const $ = (id) => document.getElementById(id);
+const get = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(p); return r.json(); });
+
+(async function init() {
+  const [base, extra, evo] = await Promise.all([get("assets/data/digimon.json"), get("assets/data/extra_species.json"), get("assets/data/evolutions.json")]);
+  const partnerIds = new Set((extra.starters ?? []).map((p) => p.id));
+  const sp = new Map();
+  for (const d of base.digimon) sp.set(d.id, d);
+  for (const d of extra.digimon) if (!partnerIds.has(d.id)) sp.set(d.id, d);
+  const gateOf = (r) => r.kind === 7 ? { txt: "line level " + r.threshold, val: r.threshold, lvl: true }
+    : r.kind >= 1 && r.kind <= 5 ? { txt: STAT[r.kind] + " ≥ " + r.threshold, val: r.threshold }
+    : { txt: "-", val: 0 };
+  for (let slot = 0; slot < 8; slot++) {
+    const recs = [...(evo.lines[slot]?.records ?? []).slice(0, 44), ...(extra.tree[String(slot)] ?? [])];
+    const byTo = new Map(recs.map((r) => [r.to, r]));
+    const memo = new Map();
+    const depth = (id, seen = new Set()) => {
+      if (memo.has(id)) return memo.get(id);
+      const r = byTo.get(id);
+      if (!r || seen.has(id)) return 0;
+      seen.add(id);
+      const reqs = [r.req0, r.req1].filter(Boolean);
+      const d = reqs.length ? 1 + Math.max(...reqs.map((q) => depth(q, seen))) : 0;
+      memo.set(id, d);
+      return d;
+    };
+    for (const r of extra.tree[String(slot)] ?? []) {
+      const m = sp.get(r.to);
+      if (!m) continue;
+      const meta = extra.meta[m.name] ?? {};
+      const g = gateOf(r);
+      const req = [[r.req0, r.req0Level], [r.req1, r.req1Level]].filter(([id]) => id)
+        .map(([id, lv]) => (sp.get(id)?.name ?? "#" + id) + " Lv" + lv).join(" + ") || "-";
+      const stats = ["str", "def", "spt", "wis", "spd"].reduce((t, k) => t + m[k], 0);
+      rows.push({
+        id: m.id, name: m.name, slot, line: LINES[slot], tier: meta.tier ?? 0, total: stats,
+        str: m.str, def: m.def, spt: m.spt, wis: m.wis, spd: m.spd,
+        res: Object.values(m.resistances ?? {}).reduce((a, b) => a + b, 0), family: m.family,
+        depth: depth(r.to), gateTxt: g.txt, gateVal: g.val, req, onLine: (meta.affinity ?? []).includes(slot) ? "yes" : "",
+        hp: m.hp, mp: m.mp,
+      });
+    }
+  }
+  $("line").innerHTML = '<option value="">all 8 lines</option>' + LINES.map((n, i) => `<option value="${i}">${n}</option>`).join("");
+  for (const id of ["line", "tier", "easiest", "q"]) $(id).addEventListener("input", render);
+  $("tbl").tHead.innerHTML = "<tr>" + COLS.map(([k, label, cls]) => `<th data-k="${k}" class="${cls ?? ""}">${label}</th>`).join("") + "</tr>";
+  $("tbl").tHead.addEventListener("click", (e) => {
+    const k = e.target.dataset?.k;
+    if (!k) return;
+    sortDir = sortKey === k ? -sortDir : (k === "name" || k === "line" || k === "req" ? 1 : -1);
+    sortKey = k;
+    render();
+  });
+  render();
+})().catch((e) => { document.body.insertAdjacentHTML("beforeend", `<p style="color:#f66">Could not load the data (${e.message}). Serve the web folder, e.g. http://localhost:8770/extra-forms.html</p>`); });
+
+function render() {
+  const line = $("line").value, tier = $("tier").value, q = $("q").value.trim().toLowerCase();
+  let list = rows.filter((r) => (line === "" || r.slot === +line) && (!tier || r.tier === +tier) && (!q || r.name.toLowerCase().includes(q)));
+  if ($("easiest").checked) {
+    // the easiest line for a form: shallowest chain, then the lowest gate
+    const best = new Map();
+    for (const r of list) {
+      const b = best.get(r.id);
+      if (!b || r.depth < b.depth || (r.depth === b.depth && r.gateVal < b.gateVal)) best.set(r.id, r);
+    }
+    list = [...best.values()];
+  }
+  const dir = sortDir;
+  list.sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir || b.total - a.total || a.name.localeCompare(b.name);
+  });
+  const maxTotal = Math.max(1, ...rows.map((r) => r.total));
+  $("tbl").tBodies[0].innerHTML = list.map((r) => `<tr>
+    <td class="l">${r.name}</td><td class="l">${r.line}</td><td class="t${r.tier}">${r.tier}</td>
+    <td>${r.total}<span class="bar-cell" style="width:${Math.round(r.total / maxTotal * 50)}px"></span></td>
+    <td>${r.str}</td><td>${r.def}</td><td>${r.spt}</td><td>${r.wis}</td><td>${r.spd}</td><td>${r.res}</td><td>${r.family}</td>
+    <td>${r.depth}</td><td class="l gate">${r.gateTxt}</td><td class="l">${r.req}</td><td class="on">${r.onLine}</td></tr>`).join("");
+  for (const th of $("tbl").tHead.rows[0].cells) th.classList.toggle("sorted", th.dataset.k === sortKey);
+  $("count").textContent = list.length + " rows";
+}
+</script>
+</body>
+</html>

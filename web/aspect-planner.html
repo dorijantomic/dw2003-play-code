@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aspect Planner</title>
+<style>
+  :root { --bg: #14141c; --panel: #1d1d29; --fg: #e8e8f0; --muted: #9a9ab0; --line: #2d2d40; --accent: #7aa2ff; --good: #5fd38d; --bad: #ff7a7a; --warn: #f2b25c; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, sans-serif; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 18px 0 6px; }
+  .sub { color: var(--muted); max-width: 980px; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  label { color: var(--muted); display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+  label b { color: var(--fg); font-weight: 600; }
+  input[type=range] { width: 100%; }
+  select, input[type=number], input[type=search] { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; }
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; min-width: 150px; }
+  .card .n { font-size: 22px; font-weight: 700; } .card .t { color: var(--muted); font-size: 12px; }
+  .bad { color: var(--bad); } .good { color: var(--good); } .warn { color: var(--warn); }
+  .wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; max-height: 70vh; }
+  table { border-collapse: collapse; width: 100%; min-width: 1150px; }
+  th, td { padding: 5px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: var(--panel); cursor: pointer; color: var(--muted); font-weight: 600; z-index: 1; user-select: none; }
+  th.sorted { color: var(--accent); } td.l, th.l { text-align: left; }
+  tbody tr:hover { background: #20202e; }
+  .note { color: var(--muted); font-size: 12px; max-width: 980px; }
+  .bars { display: flex; gap: 3px; align-items: flex-end; height: 70px; margin: 6px 0; }
+  .bars div { flex: 1; background: var(--accent); min-width: 6px; border-radius: 2px 2px 0 0; position: relative; }
+  .bars div span { position: absolute; bottom: -16px; left: 0; font-size: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Aspect planner &amp; exploit audit</h1>
+<p class="sub">Measured timeline: Silver (the gym's element drills) opens at about Lv 8-12; element chips and the best gear are post-story shops. Gates are set from a <b>typical</b> build; the exploit audit uses the <b>best-case</b> drills.
+Proposes an <b>element route</b> for every extra form (an element bonus gate, the same kind the disc uses for SkullGreymon and friends) and
+checks how early a player could reach it by the cheapest legal means: gym element drills (limited by training points, 5 per level), element chips
+(limited by money) and a starting pack bonus. Nothing here changes the game: it only shows what the numbers would be.</p>
+
+<div class="grid" id="params"></div>
+<div class="cards" id="cards"></div>
+
+<h2>Pace of each line</h2>
+<p class="note">The starter's <code>growth_xp</code> sets how much EXP each level costs (higher = slower). Battles are estimated from the EXP of battles at the level you are playing at. Training points come from levels, so a fast line banks them in fewer battles.</p>
+<div class="wrap" style="max-height:none"><table id="paceTbl" style="min-width:600px"></table></div>
+<h2>Fighting strength against the enemies (the power check)</h2>
+<p class="note">For each tier at its intended level: the player's stored stats from level-ups (each line), plus the median stat bonus of a form of that tier, plus the gear that line can wear and afford (the main-story shops, budget split across the five slots; or the flat bonus), against the median stat total of the enemies in the maps of that level (walkable pools from <code>stage_encounters</code>).
+A ratio far above the limit means that tier arrives too strong for where it sits; move its intended level later. A rough comparison: it ignores HP, techniques and the real battle formula.</p>
+<div class="wrap" style="max-height:none"><table id="powerTbl" style="min-width:700px"></table></div>
+<h2>Power at the earliest arrival (the real "too strong too early" test)</h2>
+<p class="note">The worst case: the first level at which <b>any</b> build on any line learns a form of the tier (the simulation, <code>tools/simulate_aspect_unlocks.mjs</code>; set the sliders above to its numbers).
+Power there = the line's stored stats + the tier's form bonus + the gear that line can wear and afford, against the median enemy of that level.</p>
+<div class="wrap" style="max-height:none"><table id="arriveTbl" style="min-width:700px"></table></div>
+<h2>How early each tier can be reached</h2>
+<p class="note">Median over all forms of a tier. "Typical gate" is what an ordinary build holds at the intended level; "focused" puts every training point on that element with the normal drills (the exploit to guard against); "Platinum" assumes the best drill variants, whose timing in the story is not known.</p>
+<div class="wrap" style="max-height:none"><table id="leadTbl" style="min-width:600px"></table></div>
+<h2>Too strong too early? What a build can reach at each level</h2>
+<p class="note">Worst case for the chosen line: every training point goes into one element on the best drills, plus the chosen pack's bonus. Bars show how many forms (any tier)
+have their element gate met at that level; the table below counts them by tier.</p>
+<div class="bars" id="bars"></div>
+<div id="tierAtLevel" class="note"></div>
+
+<h2>Every form</h2>
+<div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
+  <label>Starter line <select id="line"></select></label>
+  <label>Tier <select id="tier"><option value="">all</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+  <label>Element <select id="elem"></select></label>
+  <label>Show <select id="show"><option value="">everything</option><option value="flag">flagged only</option></select></label>
+  <label>Search <input type="search" id="q" placeholder="name…" /></label>
+</div>
+<div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+<p class="note" id="foot"></p>
+
+<script>
+const ELEMS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
+const LINES = ["Kotemon", "Kumamon", "Monmon", "Agumon", "Veemon", "Guilmon", "Renamon", "Patamon"];
+const CHIP = { fire: ["FireChip", 2300], water: ["WaterChip", 2200], ice: ["IceChip", 2200], wind: ["WindChip", 1800], thunder: ["ThunderChip", 1900], machine: ["MetalChip", 2600], dark: ["DevilChip", 2800] };
+const CHIP_AVG = 5.5;                      // a chip rolls rand % 10 + 1
+const $ = (id) => document.getElementById(id);
+const get = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(p); return r.json(); });
+const P = { tierLv: [0, 14, 20, 28, 40, 50], spread: 4, share: 100, tpPerLevel: 5, bonusTp: 0, seed: 60, margin: 4, minBattles: 150, level: 30, focus: 100, packElem: "dark", typFocus: 40, silverLv: 10, chipsMode: "post", gear: 276, maxRatio: 125 };
+let gearAt, F = [], prog, gymBest, gymTyp, incomeAt, growthXp = [], pace, passiveAt, storedAt, enemyAt, tierBonus = [0, 0, 0, 0, 0, 0], sortKey = "early", sortDir = 1;
+
+// ---- gym model: element points per training point, from progression.gym ----------------------------------
+function buildGym(g) {
+  const costs = g.tp_costs, ptr = g.elem_ptr, tabs = g.elem_tables;
+  const rate = (value, mode) => {
+    const b = value < g.elem_brackets[0] ? 0 : value < g.elem_brackets[1] ? 1 : 2;
+    let best = 0;
+    const growths = mode === "best" ? ptr.map((_, i) => i) : [2];
+    for (const gi of growths) {
+      const t = tabs[ptr[gi][b]];
+      const variants = mode === "best" ? [0, 1, 2] : [0];      // best: ultra/super drills too; typical: the normal drill
+      for (const v of variants) costs.forEach((c, ci) => { best = Math.max(best, t[v + ci * 3][0] / c); });
+    }
+    return best;
+  };
+  // value after spending tp points, starting from `seed`, one point at a time at the best rate
+  return (mode) => {
+    const memo = new Map();
+    return (tp, seed = 0) => {
+      const k = seed * 1000 + tp;
+      if (memo.has(k)) return memo.get(k);
+      let v = seed;
+      for (let i = 0; i < tp; i++) v = Math.min(999, v + rate(v, mode));
+      memo.set(k, v);
+      return v;
+    };
+  };
+}
+const tpAt = (L) => Math.max(0, (L - 1)) * P.tpPerLevel + P.bonusTp;
+function levelFor(points, seed, fn) {
+  for (let L = 1; L <= 99; L++) if (fn(tpAt(L), seed) * (P.focus / 100) + (seed ? 0 : 0) >= points) return L;
+  return 100;
+}
+
+// ---- income: bits per battle by enemy level (battle_rewards joined with field_encounters) ---------------
+function buildIncome(rewards, screens) {
+  const pts = [];
+  for (const [id, enemies] of Object.entries(screens)) {
+    const r = rewards[+id];
+    if (!r || !r[2] || !enemies?.length) continue;
+    pts.push([Math.max(...enemies.map((e) => e.level)), r[2]]);
+  }
+  return (L) => {
+    let near = pts.filter(([lv]) => Math.abs(lv - L) <= 3).map((p) => p[1]).sort((a, b) => a - b);
+    if (!near.length) near = pts.sort((a, b) => Math.abs(a[0] - L) - Math.abs(b[0] - L)).slice(0, 5).map((p) => p[1]).sort((a, b) => a - b);
+    return near[Math.floor(near.length / 2)] || 1;
+  };
+}
+
+// ---- pace: the disc's level-up rule (web/battle.js levelUpThreshold); growth_xp is the starter's, not the form's ---
+function buildPace(lu, rewards, screens) {
+  const thr = (g, n) => {
+    if (n <= 1) return 0;
+    let tier = lu.exp_tier_bounds.length - 1;
+    for (let i = 0; i < lu.exp_tier_bounds.length; i++) if (n < lu.exp_tier_bounds[i]) { tier = i; break; }
+    return Math.floor(g * (n ** 3 + 5 * n - 6) / 10) + lu.exp_tier_const[tier];
+  };
+  const pts = [];
+  for (const [id, en] of Object.entries(screens)) {
+    const r = rewards[+id];
+    if (r && r[1] && en?.length) pts.push([Math.max(...en.map((e) => e.level)), r[1]]);
+  }
+  const expPer = (L) => {
+    let near = pts.filter(([lv]) => Math.abs(lv - L) <= 3).map((p) => p[1]).sort((a, b) => a - b);
+    if (!near.length) near = [...pts].sort((a, b) => Math.abs(a[0] - L) - Math.abs(b[0] - L)).slice(0, 5).map((p) => p[1]).sort((a, b) => a - b);
+    return near[Math.floor(near.length / 2)] || 1;
+  };
+  // battles to reach level L: each level's EXP over the typical EXP of a battle at that level (the player fights at their own level)
+  const cache = new Map();
+  const battles = (g, L) => {
+    const k = g * 1000 + L;
+    if (cache.has(k)) return cache.get(k);
+    let b = 0;
+    for (let l = 2; l <= L; l++) b += (thr(g, l) - thr(g, l - 1)) / expPer(l);
+    cache.set(k, b);
+    return b;
+  };
+  const levelAt = (g, nb) => { let L = 1; while (L < 99 && battles(g, L + 1) <= nb) L++; return L; };
+  return { thr, battles, levelAt };
+}
+
+// ---- level-up growth (web/battle.js rollLevelUpGains): index = tier row * 9 + growth + rand ---------------------------
+function buildGrowth(lu, dig) {
+  const core = lu.core_table.flat(), block = core.concat(lu.elem_table);
+  const t6 = (lv) => { for (let i = 0; i < lu.core_tier_bounds.length; i++) if (lv < lu.core_tier_bounds[i]) return i; return lu.core_tier_bounds.length; };
+  const coreGain = (g, lv) => { let t = 0; for (let r = 0; r < 5; r++) t += block[t6(lv) * 9 + g + r] ?? 0; return t / 5; };
+  const elemGain = (g, lv) => { if (lv >= lu.elem_level_limit) return 0; let t = 0; for (let r = 0; r < 4; r++) t += block[core.length + g + r] ?? 0; return t / 4; };
+  const pm = new Map(), sm = new Map();
+  const passive = (slot, el, L) => {
+    const k = slot * 1000 + ELEMS.indexOf(el) * 100 + L;
+    if (pm.has(k)) return pm.get(k);
+    let v = 0; const g = dig[slot].resistance_growth[el] ?? 0;
+    for (let l = 2; l <= L; l++) v += elemGain(g, l);
+    pm.set(k, v); return v;
+  };
+  const stored = (slot, L) => {
+    const k = slot * 1000 + L;
+    if (sm.has(k)) return sm.get(k);
+    let v = 0;
+    for (const st of ["str", "def", "spt", "wis", "spd"]) { v += dig[slot][st]; for (let l = 2; l <= L; l++) v += coreGain(dig[slot].growth[st], l); }
+    sm.set(k, v); return v;
+  };
+  return { passive, stored };
+}
+
+// ---- gear: the best set each line can wear and afford, by the shops the story has opened -----------------------------
+// stat contribution of one item, as engine/dw3/equipment.ts gearStatContributions reads the stat bytes
+function gearTotal(e) {
+  const b = e.stat_bytes, fam = e.family, u16 = (o) => b[o] | (b[o + 1] << 8), s16 = (o) => { const v = u16(o); return v > 32767 ? v - 65536 : v; };
+  const out = [0, 0, 0, 0, 0, 0];
+  const add = (code, amt) => { if (code >= 1 && code <= 6) out[code - 1] += amt; };
+  if (fam >= 2 && fam <= 14) { add(1, u16(0x0a)); add(b[0x0c], s16(0x06)); add(b[0x0d], s16(0x08)); }
+  else if (fam >= 15 && fam <= 20) { add(2, u16(0x0c)); add(b[0x0a], s16(0x06)); add(b[0x0b], s16(0x08)); }
+  else if (fam >= 21 && fam <= 24) add(b[0x08], s16(0x06));
+  else return 0;
+  return out.slice(0, 5).reduce((a, c) => a + c, 0);          // STR DEF SPT WIS SPD
+}
+// the level a player reaches each main-story shop (measured: enemy level of the maps leading there, docs/aspect-system-plan.md 2.3b)
+const SHOP_LEVEL = { s245: 1, s250: 1, s425: 8, s500: 20, s650: 22, s660: 22, s760: 41 };
+const SLOT_SHARE = { right: 0.45, body: 0.2, left: 0.15, head: 0.1, accessory: 0.1 };      // how the gear budget is split
+function buildGear(equipment, merchants, cumGold) {
+  const eq = new Map(equipment.filter((e) => e.stat_bytes).map((e) => [e.name, e]));
+  const items = [];
+  for (const m of merchants) {
+    const lv = SHOP_LEVEL[m.stage];
+    if (lv == null) continue;
+    for (const n of m.stock ?? []) { const e = eq.get(n); if (e) items.push({ slot: e.slot, tot: gearTotal(e), price: e.buy_price, mask: e.wear_mask, lv }); }
+  }
+  return (line, L, spend) => {
+    const budget = cumGold(L) * spend;
+    let total = 0;
+    for (const [slot, share] of Object.entries(SLOT_SHARE)) {
+      let best = 0;
+      for (const it of items) if (it.slot === slot && it.lv <= L && it.price <= budget * share && (it.mask >> line) & 1 && it.tot > best) best = it.tot;
+      total += best;
+    }
+    return total;
+  };
+}
+
+// median stat total of the enemies in the walkable encounter pools, by enemy level (stage_encounters + field_encounters + enemies)
+function buildEnemyPower(stageEnc, screens, enemies) {
+  const by = new Map(enemies.map((e) => [e.enemy_id, e]));
+  const pts = [];
+  for (const z of Object.values(stageEnc.stages)) for (const zone of z.zones) {
+    if (!zone.rate_level) continue;
+    for (const slot of zone.slots) {
+      const es = screens[String(slot)];
+      if (!slot || !es?.length) continue;
+      const tot = es.map((e) => { const r = by.get(e.name) ?? by.get(e.name.replace(/\d+$/, "")); return r ? r.str + r.def + r.spt + r.wis + r.spd : null; }).filter((x) => x != null);
+      if (tot.length) pts.push([Math.max(...es.map((e) => e.level)), tot.reduce((a, b) => a + b, 0) / tot.length]);
+    }
+  }
+  return (L) => {
+    let near = pts.filter(([lv]) => Math.abs(lv - L) <= 3).map((p) => p[1]).sort((a, b) => a - b);
+    if (!near.length) near = [...pts].sort((a, b) => Math.abs(a[0] - L) - Math.abs(b[0] - L)).slice(0, 5).map((p) => p[1]).sort((a, b) => a - b);
+    return near[Math.floor(near.length / 2)] || 1;
+  };
+}
+
+(async function init() {
+  const [base, extra, evo, prg, enc, stageEnc, enemyData, equipData, shopData] = await Promise.all([get("assets/data/digimon.json"), get("assets/data/extra_species.json"), get("assets/data/evolutions.json"), get("assets/data/progression.json"), get("assets/data/field_encounters.json"), get("assets/data/stage_encounters.json"), get("assets/data/enemies.json"), get("assets/data/equipment.json"), get("assets/data/merchant_shops.json")]);
+  prog = prg;
+  const mk = buildGym(prg.gym);
+  gymBest = mk("best"); gymTyp = mk("typ");
+  incomeAt = buildIncome(prg.battle_rewards, enc.screens);
+  growthXp = base.digimon.slice(0, 8).map((m) => m.growth_xp);
+  const gr = buildGrowth(prg.level_up, base.digimon.slice(0, 8));
+  passiveAt = gr.passive; storedAt = gr.stored;
+  enemyAt = buildEnemyPower(stageEnc, enc.screens, enemyData.enemies);
+  pace = buildPace(prg.level_up, prg.battle_rewards, enc.screens);
+  const cum = [0, 0];                                         // cumulative bits earned by level, at the reference pace
+  for (let l = 2; l <= 99; l++) cum[l] = cum[l - 1] + (pace.battles(8, l) - pace.battles(8, l - 1)) * incomeAt(l);
+  gearAt = buildGear(equipData.equipment, shopData.merchants, (L) => cum[Math.min(99, Math.max(1, Math.round(L)))] ?? 0);
+  const partnerIds = new Set((extra.starters ?? []).map((p) => p.id));
+  const sp = new Map(base.digimon.map((d) => [d.id, d]));
+  for (const d of extra.digimon) if (!partnerIds.has(d.id)) sp.set(d.id, d);
+  const forms = [...sp.values()].filter((m) => m.id >= 56 && extra.meta[m.name]);
+  const byTier = {};
+  for (const m of forms) (byTier[extra.meta[m.name].tier] ??= []).push(m);
+  const rank = new Map();                                // percentile of a form's power within its tier
+  for (const list of Object.values(byTier)) {
+    const tot = (m) => m.str + m.def + m.spt + m.wis + m.spd;
+    list.sort((a, b) => tot(a) - tot(b)).forEach((m, i) => rank.set(m.id, list.length > 1 ? i / (list.length - 1) : 0));
+  }
+  for (const [t, list] of Object.entries(byTier)) {
+    const v = list.map((m) => m.str + m.def + m.spt + m.wis + m.spd).sort((a, b) => a - b);
+    tierBonus[+t] = v[Math.floor(v.length / 2)];
+  }
+  for (let slot = 0; slot < 8; slot++) {
+    const recs = [...(evo.lines[slot]?.records ?? []).slice(0, 44), ...(extra.tree[String(slot)] ?? [])];
+    const byTo = new Map(recs.map((r) => [r.to, r]));
+    const depthMemo = new Map();
+    const depth = (id, seen = new Set()) => {
+      if (depthMemo.has(id)) return depthMemo.get(id);
+      const r = byTo.get(id); if (!r || seen.has(id)) return 0;
+      seen.add(id);
+      const q = [r.req0, r.req1].filter(Boolean);
+      const d = q.length ? 1 + Math.max(...q.map((x) => depth(x, seen))) : 0;
+      depthMemo.set(id, d); return d;
+    };
+    for (const r of extra.tree[String(slot)] ?? []) {
+      const m = sp.get(r.to); if (!m) continue;
+      const meta = extra.meta[m.name], res = m.resistances ?? {};
+      const el = ELEMS.reduce((best, e) => (res[e] > (res[best] ?? -1) ? e : best), ELEMS[0]);
+      const prereq = [[r.req0, r.req0Level], [r.req1, r.req1Level]].filter(([id]) => id).map(([id, lv]) => (sp.get(id)?.name ?? "#" + id) + " Lv" + lv).join(" + ") || "-";
+      F.push({ id: m.id, name: m.name, slot, line: LINES[slot], tier: meta.tier, el, total: m.str + m.def + m.spt + m.wis + m.spd, pct: rank.get(m.id) ?? 0, depth: depth(r.to), prereq });
+    }
+  }
+  const pr = $("params");
+  const slider = (id, label, min, max, step, fmt) => `<label><span>${label}: <b id="${id}_v"></b></span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" /></label>`;
+  pr.innerHTML = [
+    slider("t1", "Intended level, tier 1", 1, 99, 1), slider("t2", "Intended level, tier 2", 1, 99, 1), slider("t3", "Intended level, tier 3", 1, 99, 1),
+    slider("t4", "Intended level, tier 4", 1, 99, 1), slider("t5", "Intended level, tier 5", 1, 99, 1),
+    slider("a1", "Earliest any build learns a tier 1 form (Lv, simulation)", 1, 99, 1), slider("a2", "…tier 2", 1, 99, 1), slider("a3", "…tier 3", 1, 99, 1),
+    slider("a4", "…tier 4", 1, 99, 1), slider("a5", "…tier 5", 1, 99, 1),
+    slider("spread", "Level spread inside a tier (strong forms later)", 0, 20, 1),
+    slider("share", "Gate = this % of a typical build's points at the intended level", 30, 150, 5),
+    slider("typFocus", "Gate build: % of training points on the one element (100 = a focused specialist)", 10, 100, 5),
+    slider("silverLv", "Level the gym's element drills open (Silver ID)", 1, 30, 1),
+    slider("gear", "Gear bonus assumed in the power check (all stats; early shops about 276, post-game 407)", 0, 600, 10),
+    `<label><span>Gear in the power check</span><select id="gearMode"><option value="shops">what each line can wear and afford (shop timeline)</option><option value="slider">the flat bonus below</option></select></label>`,
+    slider("spend", "Share of all bits spent on gear (%)", 10, 100, 5),
+    slider("maxRatio", "Flag a tier when its power is above this % of the median enemy", 80, 200, 5),
+    slider("seed", "Pack starting bonus (element points)", 0, 150, 5),
+    slider("bonusTp", "Extra training points (TrainChips etc.)", 0, 200, 5),
+    slider("margin", "Flag a form reachable this many levels early", 0, 20, 1),
+    slider("minBattles", "Flag a chip route cheaper than this many battles' income", 10, 600, 10),
+    slider("level", "Level to inspect", 1, 99, 1),
+    slider("focus", "How much of the training points go into the one element (%)", 10, 100, 5),
+    `<label><span>Intended level set by</span><select id="paceMode"><option value="level">the same level on every line</option><option value="battles">the same number of battles (pace-adjusted)</option></select></label>`,
+    `<label><span>Element chips are available</span><select id="chipsMode"><option value="post">only after the story (measured)</option><option value="start">from the start (worst case)</option></select></label>`,
+    `<label>Pack element <select id="packElem">${ELEMS.map((e) => `<option>${e}</option>`).join("")}</select></label>`,
+  ].join("");
+  $("line").innerHTML = '<option value="">all 8 lines</option>' + LINES.map((n, i) => `<option value="${i}">${n}</option>`).join("");
+  $("elem").innerHTML = '<option value="">any</option>' + ELEMS.map((e) => `<option>${e}</option>`).join("");
+  const sync = () => {
+    P.arrive = [0, +$("a1").value, +$("a2").value, +$("a3").value, +$("a4").value, +$("a5").value];
+    P.tierLv = [0, +$("t1").value, +$("t2").value, +$("t3").value, +$("t4").value, +$("t5").value];
+    for (const k of ["spread", "share", "seed", "bonusTp", "margin", "minBattles", "level", "focus", "typFocus", "silverLv", "gear", "maxRatio", "spend"]) P[k] = +$(k).value;
+    P.packElem = $("packElem").value; P.paceMode = $("paceMode").value; P.chipsMode = $("chipsMode").value; P.gearMode = $("gearMode").value;
+    for (const id of ["a1", "a2", "a3", "a4", "a5", "t1", "t2", "t3", "t4", "t5", "spread", "share", "seed", "bonusTp", "margin", "minBattles", "level", "focus", "typFocus", "silverLv", "gear", "maxRatio", "spend"]) $(id + "_v").textContent = $(id).value;
+    render();
+  };
+  const init0 = { a1: 4, a2: 7, a3: 15, a4: 32, a5: 35, t1: 14, t2: 20, t3: 28, t4: 40, t5: 50, spread: 4, share: 100, seed: 40, bonusTp: 0, margin: 4, minBattles: 150, level: 30, focus: 100, typFocus: 100, silverLv: 10, gear: 276, maxRatio: 125, spend: 60 };
+  for (const [k, v] of Object.entries(init0)) $(k).value = v;
+  pr.addEventListener("input", sync);
+  for (const id of ["line", "tier", "elem", "show", "q"]) $(id).addEventListener("input", render);
+  const COLS = [["name", "Form", "l"], ["line", "Line", "l"], ["tier", "Tier"], ["el", "Element", "l"], ["total", "Stat total"], ["want", "Intended Lv"], ["toLevel", "Battles to get there"], ["gate", "Gate (trained points; the build adds the line base)"], ["passive", "Passive by then"],
+    ["earlyN", "Earliest Lv, focused (normal drills)"], ["earlyPack", "…with pack"], ["early", "Earliest Lv, Platinum drills"], ["gold", "Chips: gold"], ["battles", "…battles' income"], ["prereq", "Existing prerequisite", "l"], ["flag", "Flag", "l"]];
+  $("tbl").tHead.innerHTML = "<tr>" + COLS.map(([k, t, c]) => `<th data-k="${k}" class="${c ?? ""}">${t}</th>`).join("") + "</tr>";
+  $("tbl").tHead.addEventListener("click", (e) => { const k = e.target.dataset?.k; if (!k) return; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); });
+  sync();
+})().catch((e) => document.body.insertAdjacentHTML("beforeend", `<p class="bad">Could not load the data (${e.message}). Serve the web folder, e.g. http://localhost:8770/aspect-planner.html</p>`));
+
+function derive() {
+  for (const f of F) {
+    const nominal = Math.min(99, Math.round(P.tierLv[f.tier] + f.pct * P.spread));
+    const ref = pace.battles(8, nominal);                            // battles the reference pace (growth_xp 8) needs
+    f.want = P.paceMode === "battles" ? Math.max(2, pace.levelAt(growthXp[f.slot], ref)) : nominal;
+    f.toLevel = Math.round(pace.battles(growthXp[f.slot], f.want));
+    // the gate: what a typical build (normal drills, a share of the training points on this one element) holds at the intended level
+    f.passive = Math.round(passiveAt(f.slot, f.el, f.want));
+    const typical = f.want >= P.silverLv ? gymTyp(Math.round(tpAt(f.want) * P.typFocus / 100), 0) : 0;
+    f.gate = Math.max(20, Math.min(999, Math.round(((f.passive + typical) * P.share / 100) / 10) * 10));
+    // the audit: the earliest level an all-in build with the best drills (and the pack seed) reaches the gate
+    const reach = (fn, seed) => { for (let L = 1; L <= 99; L++) { const gym = L >= P.silverLv ? fn(tpAt(L), seed) * (P.focus / 100) : seed; if (gym + passiveAt(f.slot, f.el, L) >= f.gate) return L; } return 100; };
+    f.early = reach(gymBest, 0);                                   // Platinum-class drills, all training points on this element
+    f.earlyN = reach(gymTyp, 0);                                   // normal drills, all training points on this element (a focused player)
+    f.earlyPack = f.el === P.packElem ? reach(gymTyp, P.seed) : f.earlyN;
+    const gpp = CHIP[f.el][1] / CHIP_AVG;                          // gold per element point from chips
+    f.gold = Math.round(Math.max(0, f.gate - f.passive - (f.el === P.packElem ? P.seed : 0)) * gpp);
+    f.battles = Math.round(f.gold / incomeAt(f.want));
+    const flags = [];
+    if (f.earlyPack < f.want - P.margin) flags.push("focused build early");
+    if (P.chipsMode === "start" && f.battles < P.minBattles) flags.push("chips cheap");
+    f.flag = flags.join(", ");
+  }
+}
+
+function render() {
+  if (!F.length) return;
+  derive();
+  const flagged = F.filter((f) => f.flag);
+  const gym = F.filter((f) => f.flag.includes("focused")).length, chips = F.filter((f) => f.flag.includes("chips")).length;
+  const checkpoints = [14, 20, 28, 40, 50];
+  $("paceTbl").innerHTML = `<thead><tr><th class="l">Line</th><th>growth_xp</th>${checkpoints.map((l) => `<th>battles to Lv ${l}</th>`).join("")}<th>TP per 100 battles near Lv 30</th></tr></thead><tbody>` +
+    LINES.map((n, i) => `<tr><td class="l">${n}</td><td>${growthXp[i]}</td>${checkpoints.map((l) => `<td>${Math.round(pace.battles(growthXp[i], l))}</td>`).join("")}<td>${(100 / Math.max(0.01, pace.battles(growthXp[i], 31) - pace.battles(growthXp[i], 30)) * P.tpPerLevel).toFixed(0)}</td></tr>`).join("") + "</tbody>";
+  const med = (a) => { const v = [...a].sort((x, y) => x - y); return v[Math.floor(v.length / 2)] ?? 0; };
+  $("leadTbl").innerHTML = `<thead><tr><th class="l">Tier</th><th>Intended Lv (median)</th><th>Typical gate</th><th>Focused build arrives</th><th>…lead</th><th>Platinum drills arrive</th><th>…lead</th></tr></thead><tbody>` +
+    [1, 2, 3, 4, 5].map((t) => { const fs = F.filter((f) => f.tier === t); const w = med(fs.map((f) => f.want)), n = med(fs.map((f) => f.earlyN)), b = med(fs.map((f) => f.early));
+      return `<tr><td class="l">${t}</td><td>${w}</td><td>${med(fs.map((f) => f.gate))}</td><td>Lv ${n}</td><td class="${w - n > P.margin ? "bad" : "good"}">${w - n} levels</td><td>Lv ${b}</td><td class="warn">${w - b} levels</td></tr>`; }).join("") + "</tbody>";
+  const powerRows = [1, 2, 3, 4, 5].map((t) => {
+    const L = P.tierLv[t], en = enemyAt(L);
+    const cells = LINES.map((_, i) => { const gear = P.gearMode === "slider" ? P.gear : gearAt(i, L, P.spend / 100), pw = storedAt(i, L) + tierBonus[t] + gear, r = pw / en * 100; return { r, pw }; });
+    return { t, L, en, cells };
+  });
+  let powerFlags = 0;
+  $("powerTbl").innerHTML = `<thead><tr><th class="l">Tier</th><th>Intended Lv</th><th>Form bonus</th><th>Enemy median</th>${LINES.map((n) => `<th>${n}</th>`).join("")}</tr></thead><tbody>` +
+    powerRows.map((row) => `<tr><td class="l">${row.t}</td><td>${row.L}</td><td>+${tierBonus[row.t]}</td><td>${Math.round(row.en)}</td>${row.cells.map((c) => { const bad = c.r > P.maxRatio; if (bad) powerFlags++; return `<td class="${bad ? "bad" : c.r < 90 ? "warn" : "good"}">${Math.round(c.pw)} (${Math.round(c.r)}%)</td>`; }).join("")}</tr>`).join("") + "</tbody>";
+  $("arriveTbl").innerHTML = `<thead><tr><th class="l">Tier</th><th>Earliest Lv</th><th>Form bonus</th><th>Enemy median</th>${LINES.map((n) => `<th>${n}</th>`).join("")}</tr></thead><tbody>` +
+    [1, 2, 3, 4, 5].map((t) => { const L = P.arrive[t], en = enemyAt(L);
+      return `<tr><td class="l">${t}</td><td>${L}</td><td>+${tierBonus[t]}</td><td>${Math.round(en)}</td>${LINES.map((_, i) => { const gear = P.gearMode === "slider" ? P.gear : gearAt(i, L, P.spend / 100), pw = storedAt(i, L) + tierBonus[t] + gear, r = pw / en * 100;
+        if (r > P.maxRatio) powerFlags++; return `<td class="${r > P.maxRatio ? "bad" : r < 90 ? "warn" : "good"}">${Math.round(pw)} (${Math.round(r)}%)</td>`; }).join("")}</tr>`; }).join("") + "</tbody>";
+  $("cards").innerHTML = [
+    ["" + F.length, "form × line routes"], [flagged.length, "flagged in total", flagged.length ? "bad" : "good"], [gym, "reachable too early by a focused build", gym ? "bad" : "good"],
+    [P.chipsMode === "start" ? chips : "n/a", P.chipsMode === "start" ? "chips make it too cheap" : "chips: post-game only", P.chipsMode === "start" && chips ? "bad" : "good"],
+    [powerFlags, "tier × line cells above the power limit", powerFlags ? "bad" : "good"],
+    ["~" + Math.round(incomeAt(P.level)) + " bits", "median battle income at level " + P.level],
+  ].map(([n, t, c]) => `<div class="card"><div class="n ${c ?? ""}">${n}</div><div class="t">${t}</div></div>`).join("");
+
+  // what a one-element build has reached at each level, and how many forms that opens
+  const pts = (L) => (L >= P.silverLv ? gymBest(tpAt(L), P.seed) * (P.focus / 100) : P.seed) + passiveAt(0, P.packElem, L);
+  const maxCount = F.length;
+  let bars = "";
+  const tierCnt = [0, 0, 0, 0, 0, 0];
+  for (let L = 5; L <= 95; L += 5) {
+    const open = F.filter((f) => pts(L) >= f.gate && f.el === P.packElem).length;
+    bars += `<div style="height:${Math.max(2, 70 * open / Math.max(1, F.filter((f) => f.el === P.packElem).length))}px" title="level ${L}: ${open} forms"><span>${L}</span></div>`;
+  }
+  $("bars").innerHTML = bars;
+  for (const f of F) if (f.el === P.packElem && pts(P.level) >= f.gate) tierCnt[f.tier]++;
+  const totals = [0, 0, 0, 0, 0, 0]; for (const f of F) if (f.el === P.packElem) totals[f.tier]++;
+  $("tierAtLevel").innerHTML = `At level <b>${P.level}</b> a all-in <b>${P.packElem}</b> build (${Math.round(pts(P.level))} points) meets the ${P.packElem} gate of: ` +
+    [1, 2, 3, 4, 5].map((t) => `tier ${t}: <b class="${t >= 4 && tierCnt[t] ? "bad" : ""}">${tierCnt[t]}</b>/${totals[t]}`).join(" · ") + ` (counted across all 8 lines).`;
+
+  const line = $("line").value, tier = $("tier").value, el = $("elem").value, q = $("q").value.trim().toLowerCase(), show = $("show").value;
+  let list = F.filter((f) => (line === "" || f.slot === +line) && (!tier || f.tier === +tier) && (!el || f.el === el) && (!q || f.name.toLowerCase().includes(q)) && (show !== "flag" || f.flag));
+  list.sort((a, b) => { const x = a[sortKey], y = b[sortKey]; return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir || b.total - a.total; });
+  $("tbl").tBodies[0].innerHTML = list.slice(0, 600).map((f) => `<tr><td class="l">${f.name}</td><td class="l">${f.line}</td><td>${f.tier}</td><td class="l">${f.el}</td><td>${f.total}</td>
+    <td>${f.want}</td><td>${f.toLevel}</td><td>${f.gate}</td><td>${f.passive}</td><td>${f.earlyN > 99 ? "never" : f.earlyN}</td><td class="${f.earlyPack < f.want - P.margin ? "bad" : ""}">${f.earlyPack > 99 ? "never" : f.earlyPack}</td><td class="warn">${f.early > 99 ? "never" : f.early}</td>
+    <td>${f.gold.toLocaleString()}</td><td class="${f.battles < P.minBattles ? "bad" : ""}">${f.battles}</td><td class="l">${f.prereq}</td><td class="l bad">${f.flag}</td></tr>`).join("");
+  for (const th of $("tbl").tHead.rows[0].cells) th.classList.toggle("sorted", th.dataset.k === sortKey);
+  $("foot").textContent = `${list.length} rows${list.length > 600 ? " (first 600 shown, filter to see the rest)" : ""}. ` +
+    "Model: training points = 5 per level (+ extra) from the Silver level on; the gate comes from the normal drill (growth class 3) and the passive level-up growth of this line; the audit uses ultra/super drills and the best growth class; chips = 5.5 points on average at the shop price, post-game only unless switched; income = median bits of battles whose enemies are within 3 levels. Every number is a slider.";
+}
+</script>
+</body>
+</html>

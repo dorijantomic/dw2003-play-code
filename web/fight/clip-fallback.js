@@ -73,7 +73,8 @@ function physicalFromBasic(basic, donor) {
       ops.push({ op: 3, words: [0, EFFECT_CURRENT, ...o.words.slice(2)] });
     }
   }
-  return { ...donor, ops, synthesized: true };
+  // the ops are the model's OWN basic attack, so its camera operands are authored for the model's own side
+  return { ...donor, ops, synthesized: true, camAuthored: "own" };
 }
 
 /**
@@ -104,5 +105,7 @@ export function resolveClipScript(model, clip, { element = 1 } = {}) {
     }
     return { ...o, words };
   });
-  return { ...donor, ops, synthesized: true };
+  // built from a donor's script: its op5 camera operands stay as the donor authored them, for the side the donor stands on
+  // (the ops themselves are turned around above when this model is an enemy), so the camera must not be turned again
+  return { ...donor, ops, synthesized: true, camAuthored: "donor" };
 }
