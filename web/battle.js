@@ -2088,13 +2088,16 @@ export function battleRestorePlanFor(b, side, record, techniqueId, options = {})
  *     index, `:13939` the player's), so this arm does not walk the party. A source with no
  *     MP answers "No effect!" through **kind 2** with 0x10 in word 1 (`:13946` jumps to
  *     `:13989`, whose delay slot loads 0x2f and whose tail asks kind 2 at `:14022`).
+ *     The fixed side is the CASTER's here, so a player cast drains the enemy (`mpSource`/
+ *     `mpDest` in `battleScriptedPlanFor`).
  *   * `.L0x80090734` — **400** (Gilead Plant): HP restored on the enemy's active fighter
  *     (`:14006 sh $v0, 0x8($s0)`, capped at `+0x06` at `:14010`-`:14014`) and its charge
- *     byte set to the literal 32 (`:14015`-`:14016`). The heal's amount comes from
+ *     byte set to the literal 32 (`:14015`-`:14016). The heal's amount comes from
  *     **record 400's own power**: the branch that reaches this arm leaves `$a1` at 400
  *     (`:13710 li $a1, 0x190`, the `beq`'s delay slot) and the getter indexes the record
  *     by `$a1`, so the amount is `400's power * 64 + wisdom` — the shipped table's 8 and
- *     not some other record's.
+ *     not some other record's. The fixed side is the caster's own, so a player cast heals
+ *     the player and charges it.
  *
  * WHEN THE CHARGE IS SPENT — read out of the assembly, not out of the technique's wording.
  * `FIGHTSTG_F0x8008f714` computes an action's damage in its **state 0** (`:13000 jalr
@@ -2108,8 +2111,9 @@ export function battleRestorePlanFor(b, side, record, techniqueId, options = {})
  * categories, and `clearActionAffinity` calls it on the two no-damage gates.
  *
  * The clear runs HERE, ahead of every arm, which is what the original does and what makes
- * Gilead Plant interesting: its write lands on the ENEMY record, so the charge the acting
- * fighter threw away is the enemy's, not its own.
+ * Gilead Plant interesting: its write lands on the caster's own record (the fixed side
+ * `0x800a446c`, which a player cast flips to the player), so the charge the acting fighter
+ * threw away is set again by the arm itself — the clear happens first and the write wins.
  *
  * `null` means "this technique is not a category-5 member", so a caller can use it as the
  * gate the way `battleRestorePlanFor` is used for category 4.
@@ -2148,6 +2152,14 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
     : (options.rollStatusLanded ?? rollLanded);
   const playerRec = b?.player ?? null;
   const enemyRec = b?.enemy ?? null;
+  // The MP-drain arm and the heal arm name their two ACTIVE records by SIDE, not by role:
+  // MP moves off `0x800a4468`'s fighter (:13939) onto `0x800a446c`'s (:13938), and the
+  // heal writes the `0x800a446c` one (:14006). For an enemy caster that pair is
+  // (opponent -> caster); the engine flips the fixed side when the PLAYER casts
+  // (`damageTermCategory5Side`), so the pair stays (opponent -> caster) whichever side
+  // acts, and these two locals follow it.
+  const mpSource = acting < 1 ? enemyRec : playerRec;
+  const mpDest = acting < 1 ? playerRec : enemyRec;
   const plan = category5Plan(record, id, {
     side: acting,
     name: options.name ?? null,
@@ -2158,19 +2170,20 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
     // The raw 0x80042b58..0x80042b65 encounter bytes the factory stores on `b`. The
     // stat-down gate reads 0x80042b62..0x80042b64, i.e. indexes 10..12 of that run.
     gateBytes: encounterGateBytes(b),
-    sourceMp: playerRec?.mp ?? 0,
-    sourceMaxMp: playerRec?.maxMp ?? 0,
-    destMp: enemyRec?.mp ?? 0,
-    destMaxMp: enemyRec?.maxMp ?? 0,
-    targetHp: enemyRec?.hp ?? 0,
-    targetMaxHp: enemyRec?.maxHp ?? 0,
+    sourceMp: mpSource?.mp ?? 0,
+    sourceMaxMp: mpSource?.maxMp ?? 0,
+    destMp: mpDest?.mp ?? 0,
+    destMaxMp: mpDest?.maxMp ?? 0,
+    targetHp: mpDest?.hp ?? 0,
+    targetMaxHp: mpDest?.maxHp ?? 0,
     healWisdom: actingFighterWisdom(b, acting),
     playerActiveAttackModifier: playerActiveAttackModifier(b),
     affinityBefore: targetRec?.affinity ?? 0,
   });
   if (!plan) return null;
   applyCategory5Plan(b, plan, {
-    activeSlot, playerRec, enemyRec, targetRec, targets: battleRestoreTargets(b, targetSide),
+    activeSlot, playerRec, mpSource, mpDest, targetRec,
+    targets: battleRestoreTargets(b, targetSide),
     recordMagnitude: record.crit | 0,
   });
   return {
@@ -2296,6 +2309,22 @@ function statValue(rec, stat) {
   return [values.str, values.def, values.spd][stat] | 0;
 }
 
+/**
+ * One combatant's EFFECTIVE SPD — the block's `+0x0a` halfword, never the stored one.
+ *
+ * The delay routine `F0x8009bda4` builds both sides' blocks through `F0x8009ec94` and
+ * takes the delay off `lh $v0, 0xa($a3)` / `lh $v1, 0xa($s0)`
+ * (`pro/fightstg.s:26308-26309`), and the escape roll `F0x800a1608` reads the same
+ * field from the two blocks it builds itself (`:31974-31975` player side,
+ * `:32001-32004` enemy side). The live form, the three stat modifiers and the
+ * persistent penalty only reach SPD through that builder, so a raw halfword diverges
+ * from the disc on a form change, a buff/debuff, or an earlier battle's penalty.
+ * A missing record answers 0, which is what the raw sites passed.
+ */
+function effectiveSpd(rec) {
+  return rec ? effStats(rec).spd | 0 : 0;
+}
+
 /** One record's own modifier for that stat — the walker's `statMods`, absent is 0. */
 function statModifier(rec, stat) {
   return [rec?.statMods?.str ?? 0, rec?.statMods?.def ?? 0, rec?.statMods?.spd ?? 0][stat] | 0;
@@ -2334,7 +2363,7 @@ export function battleStatusEventAdvance(b) {
   // numerator is that side's own effective SPD (`lh $v0, 0xa($a3)` `:26284`), with the
   // other side only feeding the `isqrt` seed (`:26238`). So this is not per-acted-side.
   const expiries = advanceStatusEvents(
-    pool, statusEventActionDelay(b.player?.spd | 0, b.enemy?.spd | 0));
+    pool, statusEventActionDelay(effectiveSpd(b.player), effectiveSpd(b.enemy)));
   for (const expiry of expiries) {
     if (expiry.kind === "stat" || expiry.kind === "lock") {
       const records = battleRestoreTargets(b, (expiry.side | 0) < 1 ? 0 : 1);
@@ -2405,7 +2434,7 @@ function poisonDefenceFieldsOf(c) {
  * writes what is `category5Plan`'s decision, not this function's.
  */
 function applyCategory5Plan(b, plan, ctx) {
-  const { playerRec, enemyRec, targetRec, targets } = ctx;
+  const { playerRec, targetRec, targets } = ctx;
   // Each change names ITS OWN slot: the party arm writes every living record of the side
   // (`.L0x800903f4`'s walk, `:13857 addiu $s1, 0x1` / `:13858 slti $v0, $s1, 0x3`), so a
   // single-slot target would put the partner's number on the leader.
@@ -2415,19 +2444,23 @@ function applyCategory5Plan(b, plan, ctx) {
   if (plan.effect === "affinity" || plan.effect === "healCharge") {
     if (targetRec && plan.affinity !== null) targetRec.affinity = plan.affinity;
   }
-  if (plan.effect === "mpDrain" && playerRec && enemyRec) {
+  // The MP transfer follows the two SIDES the arm names, not the two roles: `mpSource`
+  // and `mpDest` are (opponent, caster) whichever side acted, so a player cast drains the
+  // enemy instead of draining itself into the enemy.
+  if (plan.effect === "mpDrain" && ctx.mpSource && ctx.mpDest) {
     const moved = plan.mpMoved | 0;
     if (moved > 0) {
-      playerRec.mp = Math.max(0, (playerRec.mp | 0) - moved);
-      enemyRec.mp = Math.min(enemyRec.maxMp | 0, (enemyRec.mp | 0) + moved);
+      ctx.mpSource.mp = Math.max(0, (ctx.mpSource.mp | 0) - moved);
+      ctx.mpDest.mp = Math.min(ctx.mpDest.maxMp | 0, (ctx.mpDest.mp | 0) + moved);
     }
   }
-  if (plan.effect === "healCharge" && enemyRec) {
-    // `sh $v0, 0x8($s0)` :14033 adds the getter's amount to the enemy's record `+0x08`,
+  if (plan.effect === "healCharge" && targetRec) {
+    // `sh $v0, 0x8($s0)` :14006 adds the getter's amount to the healed record's `+0x08`,
     // and the `beqz`'s DELAY slot :14045 puts `+0x06` (the maximum) back when the sum
-    // overshot it — so the cap is the enemy's own maximum HP.
-    const before = enemyRec.hp | 0;
-    enemyRec.hp = Math.min(enemyRec.maxHp | 0, before + (plan.healAmount | 0));
+    // overshot it — so the cap is that record's own maximum HP. `targetRec` is the side
+    // `damageTermCategory5Side` picked: the caster's own active fighter.
+    const before = targetRec.hp | 0;
+    targetRec.hp = Math.min(targetRec.maxHp | 0, before + (plan.healAmount | 0));
   }
   // THE TWO LOCKS ARE TIMED EVENTS, not flags. `FIGHTSTG_F0x8009cd1c`
   // (`pro/fightstg.s:27049`) enqueues code 0x10 / 0x11 on the PLAYER's active slot and
@@ -3373,6 +3406,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return {
       name: eStats.digimon_id,
       resistances: eStats.resistances ?? {},
+      // The effective block's +0x25 family byte. The enemy branch of F0x8009EC94
+      // copies the resolved species record's byte +0x30 (pro/fightstg.s:0x8009f5f4,
+      // engine/dw3/equipment.ts:883), and that record field is this entry's
+      // `digimon_type` — the same 1..11 classification a player form carries in
+      // `family`. Without it `effStats` answers the fallback 1, so a family-targeted
+      // technique (skill +0x9 = elem2 >= 2) loses its x1.5 stage and its +0x3C
+      // crit arm whenever the DEFENDER is an enemy.
+      family: eStats.digimon_type,
     };
   }
 
@@ -3710,6 +3751,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // `effStats` adds them on top of the base fold above.
       statMods: { str: 0, def: 0, spd: 0 },
       ailments: {},
+      // Combatant record +0x04: the enemy action turns this SLOT has started. The code-3
+      // "enemy action turn" handler bumps it by one before spawning the turn script
+      // (`wfightmn.s:4144-4148`, `lhu`/`addiu 1`/`sh` in the delay slot), so cond 18
+      // tests the current turn's own number. Nothing resets it during a battle.
+      turnCounter: 0,
     };
   }
 
@@ -4000,7 +4046,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       _turnSeq: 0,
       _frozenGateTurn: -1,
       _frozenGateLost: false,
-      timeline: initialActorTimeline(initialPlayer.spd, enemyObj.spd),
+      timeline: initialActorTimeline(effectiveSpd(initialPlayer), effectiveSpd(enemyObj)),
       // The 99-slot, 28-byte-stride status-event pool at 0x800a3868. It holds EVERY timed
       // battle effect — the stat changes, the two locks, the poison tick and the three
       // ailment recoveries — and `statusEventQueueAdvance` is its clock. Both records are
@@ -4495,7 +4541,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // A new turn on the shared timeline, so the command phase's Frozen gate rolls again
     // (F0x800a7418 step 1 runs once per player turn, `wfightmn.s:1494-1540`).
     b._turnSeq = (b._turnSeq ?? 0) + 1;
-    const step = scheduleNextActor(b.timeline, acted, b.player.spd, b.enemy.spd);
+    const step = scheduleNextActor(b.timeline, acted, effectiveSpd(b.player), effectiveSpd(b.enemy));
     // THE STATUS-EVENT QUEUE IS THE BATTLE CLOCK. `FIGHTSTG_F0x8009ba4c`
     // (`pro/fightstg.s:25779`) has no frame tick: every action-resolution epilogue asks
     // `[0x800a437c](side, 0)` for the next delay and re-enqueues the turn event with it
@@ -5879,7 +5925,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     b.partyIndex = step.index;
     b.enemy = nextEnemy;
-    b.timeline = initialActorTimeline(b.player.spd, nextEnemy.spd);
+    b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(nextEnemy));
     // A fresh timeline is a fresh turn for the command phase's Frozen gate.
     b._turnSeq = (b._turnSeq ?? 0) + 1;
     const nextName = nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? "Enemy";
@@ -5919,7 +5965,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         next.battleKind = beat.kind;
         b.enemy = next;
         b.partyIndex = beat.member;
-        b.timeline = initialActorTimeline(b.player.spd, next.spd);
+        b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(next));
         // A fresh timeline is a fresh turn for the command phase's Frozen gate.
         b._turnSeq = (b._turnSeq ?? 0) + 1;
         const nextName = next.eStats?.digimon_id ?? next.profile?.name ?? "Enemy";
@@ -6311,10 +6357,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // *Power accessories (opcode 16): basic attacks consume the effective
       // +0x2b element and +0x2c magnitude in the shared damage stage.
       if (skill) skill = { ...skill, basic_attack: true };
-      // F0x8009e0cc .L0x8009e238-.L0x8009e26c: the three-hit diversion needs the
-      // plain-attack shape (this path), the record's clip byte outside {0xb,0xc},
-      // AND Multi Crest (effective +0x37). The resolver carries all three.
-      const attempts = basicAttackHitCount(b.player.multiAttack, skill?.clip);
+      // F0x8009e0cc .L0x8009e238-.L0x8009e3a4: the record's own dispatch byte (+0x0A)
+      // picks the count — 9 takes the multi-hit applier on the record's +0x11 hits,
+      // below 2 the Multi Crest three-hit diversion (clip outside {0xb,0xc}), anything
+      // else one. The enemy's action runs the same function below.
+      const attempts = basicAttackHitCount(b.player.multiAttack, skill);
       let total = 0, landed = 0;
       if (attempts > 1) {
         // F0x8009d4b8: the damage value is computed once (accuracy #1 first, then
@@ -6354,7 +6401,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           // persistent halfwords the inn later rests away.
           applyPostHitDispatch(b, fightTechDB?.[String(basicTechId)] ?? null);
           message += inflicted.text;
-          extra += weapon.text + stolen.text + triggerCounter(b.player, b.enemy, total, pname);
+          extra += weapon.text + stolen.text + triggerCounter(b.player, b.enemy, total, pname)
+            + triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
           message += extra;
           const ailPage = ailmentBoxPage(enemyName, inflicted.ail ?? weapon.ail);
           // The one machine that picks this line (FIGHTSTG_F0x8008cb70, ported by
@@ -6536,7 +6584,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           applyPostHitDispatch(b, restoreRecord); if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._enemyFled = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c) — here the target is the enemy
           message += after.text;
           extra += after.text + weapon.text + stolen.text
-                      + triggerCounter(b.player, b.enemy, total, pname);
+                      + triggerCounter(b.player, b.enemy, total, pname)
+                      + triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
           if (usedCounter) message += ` ${pname} braces to counter!`;
           const ailPage = ailmentBoxPage(enemyName, after.ail ?? weapon.ail);
           // The one machine that picks this line (FIGHTSTG_F0x8008cb70, ported by
@@ -6697,8 +6746,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // 0..2 are condition-tested in order and the first passing row wins; the FOURTH row
   // is taken unconditionally when none passes — the loop exits on `slti $s1, 0x3` and
   // `sll $v0, $s1, 0x2` reads row 3 without ever evaluating its condition
-  // (fightstg.s:6050-6056). Conditions 0-8, 9, 10-13 are wired; 14-18 still depend on
-  // unread fight-workspace record fields and are skipped rather than guessed.
+  // (fightstg.s:6050-6056). Conditions 0-8, 9, 10-13 are wired, and 14-18 read the
+  // acting record's own live halfwords — +0x0e affinity, +0x10/+0x12/+0x14 the three stat
+  // modifiers, +0x04 the per-slot action-turn counter the turn handler bumps above.
   function pickEnemyMove(en) {
     const moves = en.eStats?.ai_moves;
     if (!moves || !moves.length) return { action: 1 };
@@ -6728,6 +6778,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const b  = battle;
     const en = b.enemy;
     const name = en.eStats?.digimon_id ?? en.profile?.name ?? "Enemy";
+    // Combatant record +0x04, once per action turn and BEFORE any gate: the code-3
+    // "enemy action turn" handler bumps the acting slot's counter and then spawns the
+    // turn script (`wfightmn.s:4140-4148`), so a turn the ailment gate skips still counts
+    // and cond 18 sees turn 1 on the first turn (`check_move_cond.s:413-421`).
+    en.turnCounter = (en.turnCounter ?? 0) + 1;
     // Layer key 0x1009 shows the speaking side; this line is the enemy's
     // (talk-system speaker id 0x10).
     renderer3d?.setFaceCamSpeaker?.(0x10);
@@ -6752,7 +6807,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the enemy escape roll F0x800a1608. Binder (the player's +0x3d) halves the base;
     // Sleep refuses the flee, Frozen halves it.
     if (move.action === 4) {
-      const fled = enemyFleeProc(b.player.spd, en.spd, b.player.binderCrest, RAND_U16, battleAilmentByte(en));
+      const fled = enemyFleeProc(effectiveSpd(b.player), effectiveSpd(en), b.player.binderCrest, RAND_U16, battleAilmentByte(en));
       // The action-code -1 path puts up 0x5E "Trying to flee." BEFORE the roll
       // (fightstg.s file `0x6123`-`0x6137` = .L0x800889f4-.L0x80088a30: queue the
       // RUN_AWAY event for side 0x10, then the 0x5E page), and the runAway arm prints
@@ -6772,8 +6827,20 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     // FIGHTSTG_F0x80089148 maps action 1/2/3 to attack/move_1/move_2. The old
     // profile.techs lookup could never work because enemy profiles intentionally contain no
-    // player-form tech list, so every enemy silently used Fight. Actions 4..8 are distinct
-    // special task paths and deliberately fall back until those effects are decoded.
+    // player-form tech list, so every enemy silently used Fight.
+    // Actions 5..8 are the slot switch: F0x80089148 returns -2..-5 (`fightstg.s:6314-6320`)
+    // and FIGHTSTG_F0x80088394 finds no candidate slot in a one-enemy fight — -2 fails on
+    // slot 0 already holding the actor, -3/-4 on the empty slots' +0x8 halfword, -5 on a
+    // zero candidate count (`fightstg.s:5771-5824`). Every one resolves to -1, and that
+    // failure arm puts up kind-2 esmfight 0x8E "Switch failed!" and enters the routine's
+    // terminal state (`fightstg.s:6159-6188`): the turn is SPENT and the enemy does
+    // nothing. A solo fight can only pay for trying.
+    if ((move.action | 0) >= 5 && (move.action | 0) <= 8) {
+      sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.SWITCH_FAILED], name },
+        `${name}: Switch failed!`);
+      return;
+    }
+
     const requestedSkillId = enemyActionSkillId(move.action || 1, en.eStats ?? {});
     const requestedSkill = requestedSkillId ? skillDB[requestedSkillId] : null;
     const usesTech = (move.action === 2 || move.action === 3) && !!requestedSkill;
@@ -6801,7 +6868,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
 
     const usedCounter = setCounterStance(skill, en);  // f7=10: enemy gains a counter stance
-    const hits = skill?.hits ?? 1;
+    // The record's own dispatch byte decides the count, exactly as on the player's
+    // Fight: +0x0A == 9 -> the record's +0x11 hits, +0x0A < 2 -> one (the enemy side
+    // carries no Multi Crest +0x37 byte, so that diversion cannot fire), else one.
+    const hits = basicAttackHitCount(!!en.multiAttack, skill);
     // The SAME rule the player's side runs, on the enemy's side: a category-4 record is a
     // heal or a cure and never enters the resolver, because the original's applier rolls
     // for accuracy only on categories 2 and 3 (`pro/fightstg.s:28463 lbu $v1, 0x4($s4)` /
@@ -6959,6 +7029,62 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const skill = basic ? { ...basic, attack_category: "physical" } : null;
     const counterSkill = skill ? { ...skill, basic_attack: true } : null;
     const r = resolveAttack(defender, attacker, counterSkill, RAND_U16, b.field);
+    if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
+    attacker.hp = Math.max(0, attacker.hp - r.dmg);
+    return ` ${defenderName} countered for ${r.dmg} damage!`;
+  }
+
+  /**
+   * The FAR-SIDE counter row — F0x8008ee84's `+0x42/+0x43/+0x44` arm.
+   *
+   * The damage machine spawns the reaction object for the side OPPOSITE the attacker
+   * (`fightstg.s:10589-10594`) and hands it the blow's damage word; the object's first
+   * step aborts when that word is zero (`fightstg.s:12419-12423`), so a blow that dealt
+   * nothing never reaches the row. For an enemy defender the row is the FIFTH four-byte
+   * move row of its 0x46-byte stats record (`+0x42` action, `+0x43` comparator, `+0x44`
+   * value): the comparator is tested for zero directly (`:12512-12514`) and otherwise
+   * through check_move_cond, and the action through F0x80089148 (`:12522-12523`) — 1 =
+   * the record's own attack (`+0x08`), 2/3 = move_1/move_2 (`+0x0a`/`+0x0c`), 4..8/0 =
+   * no counter. The `sw` at `:12528` stores those negative codes anyway, but that is the
+   * branch's delay slot, not a rule; the port maps them to "no counter".
+   *
+   * The counter is a FULL attack by the defender through the ordinary resolver, not the
+   * halved strike-back the walker's own counter stance uses. The disc runs it once per
+   * damage application, which is the caller's `total` (all hits of one action summed).
+   *
+   * A new partner (species id 191+, no 0x1CF enemy row) resolves no `eStats`, so it has
+   * no row and never counters — never the 0x58-byte player profile's bytes at +0x42..+0x44,
+   * which are growth fields (`phase2-rtarget.md` 2.2).
+   */
+  function triggerEnemyCounterRow(b, attacker, defender, damage, attackerName, defenderName) {
+    if (damage <= 0 || defender.hp <= 0) return "";
+    const row = defender.eStats?.counter;
+    if (!row || !(row.comparator | 0)) return "";
+    // The same operands `pickEnemyMove` supplies: the counter's condition runs through
+    // the one check_move_cond port. The walker fights one enemy at a time, so the slot
+    // scan sees only the defender — the multi-slot quirk (the disc reads the row of the
+    // enemy whose TURN it is) cannot differ here.
+    const context = {
+      partyProfileId: battle.player?.profile?.id ?? null,
+      partyAilmentByte: battleAilmentByte(battle.player),
+      fieldElementId: battle.field ? elementId(battle.field.element) : 0,
+      battleId: battle.screenId ?? null,
+      encounterGateByte: battle.encounterGateBytes?.[1] ?? null,
+      enemySlots: [{ speciesId: Number(defender.profile?.id) || 0, hp: defender.hp }],
+      activeEnemyIndex: 0,
+    };
+    if (enemyMoveCondition(row.comparator, row.value ?? 0, defender, RAND_U16,
+      attacker, context) !== true) return "";
+    const action = row.action | 0;
+    const skillId = enemyActionSkillId(action, defender.eStats ?? {});
+    const base = skillId ? skillDB[skillId] : null;
+    if (!base) return "";
+    // Action 1 is the species' own attack, the plain-attack shape the enemy turn uses;
+    // 2/3 are its two technique slots as they stand.
+    const skill = action === 1
+      ? { ...base, attack_category: "physical", basic_attack: true }
+      : base;
+    const r = resolveAttack(defender, attacker, skill, RAND_U16, b.field);
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
     attacker.hp = Math.max(0, attacker.hp - r.dmg);
     return ` ${defenderName} countered for ${r.dmg} damage!`;
@@ -7853,7 +7979,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // is still queued -- the original's own `find` (`pro/wfightmn.s:27062`).
       if (!statusEventLockHeld(b.statusEvents, 0, 0, activeSlotOf(b, 0)) &&
           fleeChance({ selfLevel: b.player.level | 0, otherLevel: b.enemy.level | 0,
-            selfSpd: b.player.spd | 0, otherSpd: b.enemy.spd | 0,
+            selfSpd: effectiveSpd(b.player), otherSpd: effectiveSpd(b.enemy),
             escapeBonus: b.player.escapeBonus | 0, selfAilment: battleAilmentByte(b.player),
             escapeBlocked: (b.encounterGateBytes?.[13] ?? 0) !== 0 }, RAND_U16)) {
         b.state = ST.RESULT_MSG;
@@ -9218,7 +9344,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       myTechs: (rec, blastOn = false) => mpKitTechs(rec, blastOn),
       /** One attack, rolled by the game's own resolver. Returns { hit, dmg, landed, attempts }. */
       attack: (att, def, skill) => {
-        const n = skill?.basic_attack ? basicAttackHitCount(att.multiAttack, skill?.clip) : Math.max(1, skill?.hits ?? 1);
+        const n = skill?.basic_attack ? basicAttackHitCount(att.multiAttack, skill) : Math.max(1, skill?.hits ?? 1);
         const r = n > 1 ? resolveMultiHit(att, def, skill, n, RAND_U16, null) : resolveAttack(att, def, skill, RAND_U16, null);
         return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n };
       },

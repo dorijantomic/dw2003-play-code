@@ -87,6 +87,11 @@ export interface Skill {
    *  gate (F0x8009e0cc .L0x8009e24c and F0x8009f6dc .L0x8009f88c) skips the 3-hit
    *  diversion and the 0.4x stage when this byte is 0x0b or 0x0c. */
   clip?: number;
+  /** Raw record byte +0x11 (`f14`), the multi-hit applier's hit count. Read only
+   *  when the record's own +0x0A opcode is 9: F0x8009d4b8 `lbu $s2, 0x11($v1)`
+   *  (fightstg.s:27605) sits in the `+0xa >= 2` branch, so every plain record keeps
+   *  the applier's `li $s2, 0x3` initializer instead. */
+  hits?: number;
   magical?: boolean;        // routes elemental damage through FIGHTSTG's magical curve
   target_family?: number;   // raw skill +0x9, compared with defender effective +0x25
   damage_scalar?: number;    // raw skill +0x8, used by the magical crit roll
@@ -180,6 +185,26 @@ export interface EnemyMoveContext {
 }
 
 /**
+ * The acting enemy record's own runtime fields, the operands conditions 14-18 read.
+ *
+ * They are the combatant record's LIVE halfwords (`0x800a44d0 + 0x20*slot`), not the
+ * species stats row: +0x04 is written by the enemy-turn handler, +0x0E by the
+ * affinity arm and +0x10/+0x12/+0x14 by the three category-5 stat arms. A caller
+ * that does not carry one leaves it undefined and the predicate answers null.
+ */
+export interface EnemyMoveSelf {
+  mp: number;
+  hp?: number;
+  maxHp?: number;
+  /** u16 record +0x04 — enemy action turns this slot has started (wfightmn.s:4144-4148). */
+  turnCounter?: number | null;
+  /** s16 record +0x0e — affinity (the effective block's +0x26); 0 = unmodified. */
+  affinity?: number | null;
+  /** s16 record +0x10 / +0x12 / +0x14 — the three signed stat modifiers. */
+  statMods?: { str?: number | null; def?: number | null; spd?: number | null } | null;
+}
+
+/**
  * Decoded enemy move predicates whose inputs exist in the walker combatant model.
  * Returns null when the original predicate depends on an unmodelled fight-workspace
  * field; callers must then skip that move instead of inventing a condition.
@@ -192,15 +217,16 @@ export interface EnemyMoveContext {
  *   10 = another enemy slot is alive (cmp 0) or that species is alive (cmp != 0),
  *   11 = the active elemental field id equals value,
  *   12 = the battle screen id equals value,
- *   13 = encounter config byte 1 equals value.
+ *   13 = encounter config byte 1 equals value,
+ *   14 = self record +0x0e (affinity) != 0,
+ *   15/16/17 = self record +0x10/+0x12/+0x14 (STR/DEF/SPD modifier) < 0,
+ *   18 = self record +0x04 (enemy action turns started) % value == 0.
  * Out-of-range conditions (>= 0x13) return TRUE (`.Lexit_true`).
- * Still unmodelled (null): 14-18 (self +0x04/+0x0e..+0x14), whose operand identities
- * are unread; see docs/research/battle/enemy-ai-move-conditions.md.
  */
 export function enemyMoveCondition(
   condition: number,
   value: number,
-  self: { mp: number; hp?: number; maxHp?: number },
+  self: EnemyMoveSelf,
   rng: () => number,
   other?: { hp: number; maxHp: number },
   context?: EnemyMoveContext,
@@ -281,15 +307,31 @@ export function enemyMoveCondition(
       if (gate == null) return null;
       return (gate & 0xff) === cmp;
     }
-    // .L24-.L28: the operand identities of 14-18 (self +0x04, +0x0e, +0x10, +0x12,
-    // +0x14) are unread — every available dump reads 0 — so they stay unsupported
-    // rather than guessed (named gap; docs/research/battle/enemy-ai-move-conditions.md).
     case 14:
+      // .L24: `lh $v0, 0xe($a1)` / `beqz .Lexit` — a nonzero affinity passes. The
+      // category-5 affinity arm is its only writer (see `EnemyMoveSelf.affinity`).
+      if (self.affinity == null) return null;
+      return (Math.trunc(self.affinity) | 0) !== 0;
     case 15:
     case 16:
-    case 17:
-    case 18:
-      return null;
+    case 17: {
+      // .L25/.L26/.L27: `lh $v0, 0x10/0x12/0x14($a1)` / `bgez .Lexit` — a NEGATIVE
+      // modifier (a live debuff) passes. +0x10 STR, +0x12 DEF, +0x14 SPD.
+      const mods = self.statMods;
+      if (mods == null) return null;
+      const mod = cond === 15 ? mods.str : cond === 16 ? mods.def : mods.spd;
+      if (mod == null) return null;
+      return ((Math.trunc(mod) << 16) >> 16) < 0;
+    }
+    case 18: {
+      // .L28: `lh $v1, 0x4($a1)` (this enemy slot's action-turn count) / `div` by the
+      // signed value / `mfhi` — remainder 0 passes. The bump happens at the START of
+      // the turn (wfightmn.s:4144-4148), so turn 1 tests 1 and a `value 3` row passes
+      // on turns 3, 6, 9. `value 0` divides by zero on the disc: the port says never.
+      if (self.turnCounter == null) return null;
+      if (cmp === 0) return false;
+      return (Math.trunc(self.turnCounter) % cmp) === 0;
+    }
     default: return null;
   }
 }
@@ -337,7 +379,7 @@ export interface EnemyMoveRow {
  */
 export function pickEnemyAiMove(
   moves: ReadonlyArray<EnemyMoveRow | null | undefined> | null | undefined,
-  self: { mp: number; hp?: number; maxHp?: number },
+  self: EnemyMoveSelf,
   rng: () => number,
   other?: { hp: number; maxHp: number },
   context?: EnemyMoveContext,
@@ -374,7 +416,9 @@ export function magicalBase(atk: EffStats, def: EffStats, power: number): number
  *  skill bank's effect name when a caller carries no raw byte; only two tests matter to
  *  the formulas — `>= 2` (a technique, not a plain attack) and `== 0x0B`
  *  (TECH_EFFECT_CRITICAL, named "precision") — so every other name maps to a plain 2. */
-function effectByteOf(skill: Skill | null | undefined): number {
+function effectByteOf(
+  skill: { effect_id?: number; effect?: string } | null | undefined,
+): number {
   if (typeof skill?.effect_id === "number") return skill.effect_id;
   const name = skill?.effect;
   if (!name || name === "none") return 0;
@@ -526,14 +570,16 @@ export function resolveDamage(
   // < 2, the browser basic_attack path) whose attacker carries the effective
   // +0x37 gate (Multi Crest — the same gate that diverts the resolver to the
   // 3-hit applier, fightstg.s:28502 -> 28580) the running damage is scaled by
-  // trunc(2/5): the 0x66666667 magic applied to s0<<2 then >>2. The gate's THIRD
-  // term is the record's own clip byte +0x10 (`.L0x8009f88c lbu $v0, 0x10($s1)` /
-  // `:29954 addiu $v0, -0xb` / `:29956 sltiu $v0, 0x2` / `:29958 bnez`), the same
-  // test the resolver runs before diverting — see `multiCrestPlainAttack`.
+  // trunc(2/5): the 0x66666667 magic applied to s0<<2 then >>2. The gate's first
+  // term is the record's own +0x0a opcode below 2 — the same `lbu 0xa / sltiu 0x2`
+  // the resolver runs before diverting (`:29950`-`:29954` here, `:28491`-`:28494`
+  // there) — and its THIRD term is the record's own clip byte +0x10
+  // (`.L0x8009f88c lbu $v0, 0x10($s1)` / `:29954 addiu $v0, -0xb` /
+  // `:29956 sltiu $v0, 0x2` / `:29958 bnez`). See `multiCrestPlainAttack`.
   // The tail runs ONCE for the whole action (the applier's loop calls only the
   // accuracy method, fightstg.s:27628/:27631), so the 0.4x scale is applied to
-  // the one value all three hits share, not once per hit.
-  if (skill.basic_attack && multiCrestPlainAttack(!!atk.multiAttack, skill.clip)) {
+  // the one value every hit shares, not once per hit.
+  if (skill.basic_attack && multiCrestPlainAttack(!!atk.multiAttack, skill)) {
     s0 = Math.trunc((s0 * 2) / 5);
   }
   const critical = skill.magical
@@ -831,7 +877,9 @@ export function statusPowerAfterResistance(
  * F0x8009f6dc `.L0x8009f868`-`.L0x8009f89c`, the SAME three-term conjunction twice:
  *
  *   1. the record's effect opcode `skill+0xa` is below 2 (the plain-attack shape,
- *      `sltiu $v0, $v1, 0x2`),
+ *      `lbu $v1, 0xa($s4)` / `sltiu $v0, $v1, 0x2` / `beqz` at
+ *      fightstg.s:28491-28494) — a technique record (>= 2) never diverts, whatever
+ *      its clip byte says,
  *   2. the record's clip byte `skill+0x10` is outside {0x0b, 0x0c}
  *      (`lbu $v0, 0x10($s4)` / `addiu $v0, -0xb` / `sltiu $v0, 0x2` / `bnez`),
  *   3. the acting side's effective `+0x37` is nonzero — Multi Crest
@@ -842,18 +890,42 @@ export function statusPowerAfterResistance(
  * neither: it is one hit at full damage. `clip` undefined means the caller carries
  * no record byte, and then only terms 3 is testable, so the gate falls back to it.
  */
-export function multiCrestPlainAttack(multiAttack: boolean, clip: number | undefined): boolean {
+export function multiCrestPlainAttack(
+  multiAttack: boolean,
+  skill: { effect_id?: number; effect?: string; clip?: number } | null | undefined,
+): boolean {
   if (!multiAttack) return false;
+  if (effectByteOf(skill) >= 2) return false;
+  const clip = skill?.clip;
   if (clip == null) return true;
   return clip !== 0x0b && clip !== 0x0c;
 }
 
-/** Multi Crest gate (effective record +0x37) AND the record's clip byte: the
- *  plain attack is three hits at 40% each, otherwise one. F0x8009d4b8's `$s2` is
- *  left at its `li $s2, 0x3` initializer (`:27583`) for every record whose `skill+0xa`
- *  is below 2; only the `lbu $s2, 0x11($v1)` delay slot at `:27586` reads `skill+0x11`. */
-export function basicAttackHitCount(multiAttack: boolean, clip?: number): number {
-  return multiCrestPlainAttack(multiAttack, clip) ? 3 : 1;
+/**
+ * The one hit-count dispatch, shared by the player's Fight and the enemy's action —
+ * F0x8009e0cc `.L0x8009e238`-`.L0x8009e3a4` around the applier F0x8009d4b8. The
+ * record's own effect opcode `skill+0xa` picks the arm:
+ *
+ *   +0xa < 2   the plain attack: the Multi Crest diversion above gives 3 hits at
+ *              0.4x, otherwise one. The applier's `$s2` keeps its `li $s2, 0x3`
+ *              initializer (`:27583`); the `lbu $s2, 0x11($v1)` that would overwrite
+ *              it sits in the `>= 2` branch only (`:27605`-`:27608`).
+ *   +0xa == 9  the multi-hit applier: the record's own +0x11 byte is the count
+ *              (`li $v0, 0x9` / `beq $v1, $v0, .L0x8009e39c` at `:28542` ->
+ *              `jal FIGHTSTG_F0x8009d4b8` at `:28580`; the count is read at `:27605`).
+ *              Suijinmon, Persiamon and Datamon carry dispatch 9 / f14 4 on their
+ *              own basic Fight; Machinedramon and MarineDevimon dispatch 9 / f14 2.
+ *   anything else  one hit — the applier is bypassed (`j .L0x8009e3ac`, the post-hit
+ *              dispatcher FIGHTSTG_F0x8009df78, at `:28544`).
+ */
+export function basicAttackHitCount(
+  multiAttack: boolean,
+  skill: { effect_id?: number; effect?: string; hits?: number; clip?: number } | null | undefined,
+): number {
+  const dispatch = effectByteOf(skill);
+  if (dispatch < 2) return multiCrestPlainAttack(multiAttack, skill) ? 3 : 1;
+  if (dispatch === 9) return Math.max(1, Math.trunc(skill?.hits ?? 1));
+  return 1;
 }
 
 /**

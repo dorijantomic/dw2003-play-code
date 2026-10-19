@@ -1057,6 +1057,14 @@ export interface DamageTermCategory5Arm extends DamageTermArm {
   effect: DamageTermCategory5Effect;
   /** Which side the write lands on. */
   target: DamageTermCategory5Target;
+  /**
+   * The side the arm's instruction stream names OUTRIGHT, for the three arms that do:
+   * 391 stages its status on `0x800a4468` (`FIGHTSTG_F0x8009cff4` :27256), and 392 and
+   * 400 read `0x800a446c` for the record they write (:13938, :13993). No arm tests who
+   * is acting. See {@link damageTermCategory5Side} for what the walker does with a
+   * side-0 caster.
+   */
+  fixedSide?: 0 | 1;
   /** The `esmfight` word the landing page prints, when it prints one. */
   word?: number;
   /** The page kind the arm asks for when its roll or its gate says "nothing happened". */
@@ -1178,7 +1186,7 @@ export const DAMAGE_TERM_ARMS_CATEGORY5: readonly DamageTermCategory5Arm[] = Obj
   },
   {
     arm: 0x80090610, ids: [391], kind: 1,
-    effect: "statusOnly", target: "playerActive", blankKind: 1, eventCode: 0x16,
+    effect: "statusOnly", target: "playerActive", fixedSide: 0, blankKind: 1, eventCode: 0x16,
     reads: "NO page at all when the roll lands: the arm runs " +
       "`FIGHTSTG_F0x8009cff4`, which stages status event 0x16 on the player's active " +
       "fighter (`li $v0, 0x16` fightstg.s:27251), writes 3 into the panel's own `+0xc` " +
@@ -1191,7 +1199,7 @@ export const DAMAGE_TERM_ARMS_CATEGORY5: readonly DamageTermCategory5Arm[] = Obj
   },
   {
     arm: 0x80090654, ids: [392], kind: 18,
-    effect: "mpDrain", target: "enemy", word: 0x8f, blankKind: 1,
+    effect: "mpDrain", target: "enemy", fixedSide: 1, word: 0x8f, blankKind: 1,
     reads: '"<n> MP absorbed!" — esmfight[0x8f], through kind 18 (`li $a1, 0x12` ' +
       ":13998 in the `j`'s delay slot) with word 2 = 1 (:13995). It moves MP OFF the " +
       "PLAYER's active fighter (`lh $a2, 0xc($t0)` :13944) ONTO the enemy's " +
@@ -1205,7 +1213,7 @@ export const DAMAGE_TERM_ARMS_CATEGORY5: readonly DamageTermCategory5Arm[] = Obj
   },
   {
     arm: 0x80090734, ids: [400], kind: 2,
-    effect: "healCharge", target: "enemy", word: 0x46,
+    effect: "healCharge", target: "enemy", fixedSide: 1, word: 0x46,
     reads: '"Generating!" — esmfight[0x46] (`li $v0, 0x46` :14017). It adds the ' +
       "heal getter's amount to the ENEMY's active record `+0x08` (`sh $v0, 0x8($s0)` " +
       ":14006) and caps it at `+0x06` (:14010-:14014), then writes the literal 0x20 " +
@@ -1232,11 +1240,26 @@ export function damageTermCategory5Arm(techniqueId: number): DamageTermCategory5
  * XORs the side with 1 (`xor $s2, $a0` :13738, `$a0 = 1` from :13731) and so lands on the
  * OTHER side — which is what a debuff does. The party arm has no such branch: its three
  * rows are all `+1`, and it reads the side straight (`srl $v0, 0x4` :13815).
+ *
+ * THE THREE FIXED-SIDE ARMS (391, 392, 400) ARE NOT ROLE-TARGETED AT ALL. Their streams
+ * name a side outright — 391 writes its status event's word 3 as `lw $v1, 0x4468($v0)`
+ * (`FIGHTSTG_F0x8009cff4` :27256), and 392/400 read `0x800a4468`/`0x800a446c` for the two
+ * records they move MP between or heal (:13938-:13939, :13993) — with no test on who is
+ * acting. For the enemy caster that fixed side IS the opponent, which is why the disc can
+ * write it that way: the shipped table gives 391 to Persiamon's row and 392/400 to no
+ * player row at all. The walker's extra rows can put 391 in a player's hands (its `techs`
+ * list carries `[390, 391, ...]`), and the literal disc answer there is a self-write: the
+ * status would be staged on the caster. That unreachable-on-retail behaviour is not what
+ * the arm means, so {@link DamageTermCategory5Arm.fixedSide} names the side and this
+ * function flips it for a side-0 caster: a fixed side of 1 is the caster's own side and
+ * 0 the opponent, exactly as when an enemy casts. Documented as a walker repair, not as
+ * disc emulation.
  */
 export function damageTermCategory5Side(
   arm: DamageTermCategory5Arm | null, actingSide: number, row?: DamageTermStatRow | null,
 ): number {
   const acting = (Math.trunc(Number(actingSide)) | 0) < 1 ? 0 : 1;
+  if (arm?.fixedSide !== undefined) return acting < 1 ? (arm.fixedSide ^ 1) : arm.fixedSide;
   if (arm?.target === "acting" && row && row.direction < 0) return acting < 1 ? 1 : 0;
   switch (arm?.target) {
     case "acting": return acting;

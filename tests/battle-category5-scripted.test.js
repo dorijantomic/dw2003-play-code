@@ -584,9 +584,11 @@ test("ARM 0x80090654: MP moves off the player's active fighter onto the enemy's"
     { sourceMp: 60, sourceMaxMp: 60, destMp: 99, destMaxMp: 100 }), 3);
 });
 
-test("ARM 0x80090734: Gilead Plant heals the ENEMY and charges it", () => {
-  // The record base is 0x800a4460 + 0x70 = 0x800a44d0 (:14017 / :14019) — the enemy array,
-  // whichever side cast it — and the heal adds to record `+0x08` with the cap from `+0x06`
+test("ARM 0x80090734: Gilead Plant heals and charges its caster's side", () => {
+  // The record base is 0x800a4460 + 0x70 = 0x800a44d0 (:14017 / :14019) — side 1's
+  // array, which is the ENEMY's for the only caster the disc gives this record, and the
+  // player's own once the walker lets a side-0 caster use it (the fixed side is flipped,
+  // `damageTermCategory5Side`). The heal adds to record `+0x08` with the cap from `+0x06`
   // in the `beqz`'s delay slot (:14033 / :14045).
   const b = battle();
   b.enemy.maxHp = 9000;
@@ -612,29 +614,32 @@ test("ARM 0x80090734: Gilead Plant heals the ENEMY and charges it", () => {
   assert.deepEqual(plan.page.payload, [0x46, 0x10]);
   assert.equal(ESMFIGHT[0x46], "Generating!");
 
-  // The cap is the enemy's own maximum HP.
+  // The cap is the healed record's own maximum HP.
   const b2 = battle();
   b2.enemy.hp = 480;
   battleScriptedPlanFor(b2, 1, record(400), 400, { name: "Raidenmon" });
   assert.equal(b2.enemy.hp, b2.enemy.maxHp);
 
-  // Cast by the player it still lands on the enemy, and the caster's OWN charge is the one
-  // the state-1 sub-state-0 clear empties (:13092). The wisdom term is now the PLAYER's,
-  // because the getter's `$a0` is the acting side's byte (:14021).
+  // Cast by the PLAYER the fixed side flips to the player: the heal and the charge land
+  // on the caster, which is the same operand the enemy's cast gets. The wisdom term is
+  // the PLAYER's, because the getter's `$a0` is the acting side's byte (:14021).
   const b3 = battle();
+  b3.player.maxHp = 9000;
+  b3.player.hp = 100;
   b3.player.affinity = 80;
   const fromPlayer = battleScriptedPlanFor(b3, 0, record(400), 400, { name: "Marsmon" });
-  assert.equal(fromPlayer.side, 1);
+  assert.equal(fromPlayer.side, 0);
   assert.equal(fromPlayer.healAmount, damageTermHealAmount(TECH_TABLE["400"].power, 40));
   assert.equal(fromPlayer.healAmount, 512 + 40);
-  assert.equal(b3.enemy.affinity, 0x20);
-  assert.equal(b3.player.affinity, 0);
+  assert.equal(b3.player.hp, 100 + fromPlayer.healAmount);
+  assert.equal(b3.enemy.hp, 500, "the enemy is not touched");
+  assert.equal(b3.player.affinity, 0x20, "the charge lands on the record the arm writes");
+  assert.equal(b3.enemy.affinity, 0);
   assert.equal(fromPlayer.affinityBefore, 0,
-    "the write reads the ENEMY record, which this clear never touched");
-  // A SECOND cast by the player does read a nonzero enemy record, because the clear runs
-  // on the acting side (:13092) and this arm writes the other one.
+    "the state-1 clear runs first on the acting side, which is now the arm's own record");
+  // A second cast reads the same cleared record, so the reading is stable.
   const again = battleScriptedPlanFor(b3, 0, record(400), 400, { name: "Marsmon" });
-  assert.equal(again.affinityBefore, 0x20);
+  assert.equal(again.affinityBefore, 0);
   // And the constant the delay slot names IS the record the arm belongs to.
   assert.equal(DAMAGE_TERM_HEAL_POWER_ID, 400);
   assert.equal(TECH_TABLE[String(DAMAGE_TERM_HEAL_POWER_ID)], TECH_TABLE["400"],
@@ -721,19 +726,26 @@ test("the modifier arithmetic is the routine's own, clamps included", () => {
 test("which side each arm writes to, from the table and nothing else", () => {
   const sideOf = (id, acting) =>
     damageTermCategory5Side(damageTermCategory5Arm(id), acting, damageTermStatRow(id));
-  // The Chi arms and an up row keep the acting side; a down row XORs it; Gilead Plant
-  // hard-codes the enemy; the two lock arms hard-code the player's active fighter.
+  // The Chi arms and an up row keep the acting side; a down row XORs it; the two lock
+  // arms hard-code the player's active fighter.
   assert.equal(sideOf(209, 0), 0);
   assert.equal(sideOf(209, 1), 1);
   assert.equal(sideOf(198, 1), 1);
   assert.equal(sideOf(205, 0), 1);
   assert.equal(sideOf(205, 1), 0);
-  assert.equal(sideOf(400, 0), 1, "Gilead Plant's base is the enemy array (:14019)");
-  assert.equal(sideOf(400, 1), 1);
   assert.equal(sideOf(211, 1), 0, "the lock reads 0x800a4468, the player's index (:27051)");
   assert.equal(sideOf(212, 1), 0);
+  // THE FIXED-SIDE ARMS. The disc's stream names 0x800a4468 (391) or 0x800a446c (392/400)
+  // outright, so for an enemy caster the status lands on the player and the steal/heal on
+  // the enemy itself. A PLAYER cast flips it, because a fixed side of 1 then means the
+  // caster — the technique keeps aiming at the opponent and never at the fighter that
+  // cast it (the walker's extra rows put 391 in a player's hands).
   assert.equal(sideOf(391, 1), 0);
-  assert.equal(sideOf(392, 0), 1, "the MP drain reads the enemy's active index (:13938)");
+  assert.equal(sideOf(391, 0), 1);
+  assert.equal(sideOf(392, 1), 1, "the MP drain reads the enemy's active index (:13938)");
+  assert.equal(sideOf(392, 0), 0);
+  assert.equal(sideOf(400, 1), 1, "Gilead Plant's base is the enemy array (:14019)");
+  assert.equal(sideOf(400, 0), 0);
 });
 
 test("the per-action clear still runs once for every category-5 arm", () => {

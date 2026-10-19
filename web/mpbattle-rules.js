@@ -240,7 +240,7 @@ export class Arena {
     /** Resolve one attack of `skill` from att to def with the game's own rolls, and everything that rides on a hit. */
     #strike(att, attName, def, defName, skill, spread = false) {
         const lines = [];
-        const hits = skill.basic_attack ? basicAttackHitCount(att.multiAttack, skill.clip) : Math.max(1, skill.hits ?? 1);
+        const hits = skill.basic_attack ? basicAttackHitCount(att.multiAttack, skill) : Math.max(1, skill.hits ?? 1);
         const r = hits > 1 ? resolveMultiHit(att, def, skill, hits, this.rng, this.field) : resolveAttack(att, def, skill, this.rng, this.field);
         const landed = !!r.hit;
         let dmg = landed ? Math.max(0, r.dmg | 0) : 0;

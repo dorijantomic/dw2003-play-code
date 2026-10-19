@@ -23,7 +23,7 @@
 //   0x800a01ac  regenTick                  R = rand%5 + 4, cap 9999
 //   0x800a19d8  frozenBlockRoll            the 0x20 floor
 //   0x800a1d3c  techniqueMpCost            enemy list price; +20% min +1 for loaned
-//   0x8009d4b8  basicAttackHitCount        3 hits unless the clip byte is 0x0b/0x0c
+//   0x8009d4b8  basicAttackHitCount        +0x0a dispatch: 9 -> +0x11 hits, <2 -> 3 only with Multi Crest
 //   0x800a89148 enemyActionSkillId         1/2/3 -> attack/A/B, else null
 //   0x8009bda4  statusEventDelay           the timeline delay clamp
 
@@ -374,11 +374,13 @@ test("0x800a1d3c techniqueMpCost: the enemy list price and the loaned premium", 
     assert.equal(techniqueMpCost(3, 0, { mpCostDown: 5 }), 1);
 });
 
-test("0x8009d4b8 basicAttackHitCount: 3 hits unless the clip byte is 0x0b or 0x0c", () => {
-    assert.equal(basicAttackHitCount(true, 0x0a), 3);
-    assert.equal(basicAttackHitCount(true, 0x0b), 1);
-    assert.equal(basicAttackHitCount(true, 0x0c), 1);
-    assert.equal(basicAttackHitCount(false, 0x0a), 1);
+test("0x8009d4b8 basicAttackHitCount: +0x0a below 2 diverts to 3, clip 0x0b/0x0c refuses", () => {
+    assert.equal(basicAttackHitCount(true, { effect_id: 1, clip: 0x0a }), 3);
+    assert.equal(basicAttackHitCount(true, { effect_id: 1, clip: 0x0b }), 1);
+    assert.equal(basicAttackHitCount(true, { effect_id: 1, clip: 0x0c }), 1);
+    assert.equal(basicAttackHitCount(false, { effect_id: 1, clip: 0x0a }), 1);
+    // The diversion needs the plain-attack shape: a technique record never takes it.
+    assert.equal(basicAttackHitCount(true, { effect_id: 2, clip: 0x0a }), 1);
 });
 
 test("0x80089148 enemyActionSkillId: 1/2/3 -> Fight / Tech A / Tech B, else null", () => {
