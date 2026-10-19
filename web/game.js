@@ -22,6 +22,7 @@ import {
 import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
+
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
@@ -561,17 +562,22 @@ installChat({
         && !battle.isActive() && fade.dir === 0,
     releaseKeys: () => state.keys.clear(),
     onSend: (text) => (isOnline() ? sendChat(text) : chatSay(text)),   // in a room the line goes to everyone and shows over every head
+    bubbleOpen: () => chatBox.isOpen(),
+    dismiss: () => { chatBox.pressConfirm(); chatShownAt = performance.now() / 1000; chatPresses++; },
 });
 // The bubble itself is a second instance of the game's own conversation box, so it has the real
 // balloon chrome, tail and font, but the game never sees it open: nothing is blocked while it shows.
 const chatBox = createDialogueTranslated(sfx);
 const chatActor = { x: 0, y: 0, actorId: 0 };
-let chatShownAt = 0;
+let chatShownAt = 0, chatHold = 10, chatPages = 1, chatPresses = 0;
 function chatSay(text) {
     chatBox.close();
     chatShownAt = performance.now() / 1000;
+    chatPresses = 0;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
-    chatBox.open({ pack: buildChatPack(text, String(state.playerName || "")), index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
+    const pack = buildChatPack(text, String(state.playerName || ""));
+    chatPages = pack.pages;
+    chatBox.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 // Multiplayer speech: every speaker gets their own instance of the same game balloon, over their own character.
@@ -600,9 +606,18 @@ function chatTick(dt) {
     mpBalloonTick(dt);
     if (!chatBox.isOpen()) return;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
+    // The balloon re-reads its speaker's position from the game's own memory record every tick, so
+    // write the player's position there and the bubble follows when they walk.
+    const cs = chatBox._session;
+    if (cs && cs.controller) {
+        const rec = cs.mem.read32(cs.controller + 0x50) >>> 0;
+        if (rec) { cs.mem.write32(rec + 0x58, chatActor.x >>> 0); cs.mem.write32(rec + 0x5c, chatActor.y >>> 0); }
+    }
     chatBox.update(dt, null);
     // close it by itself a few seconds after the text has shown (the box wants a confirm press)
-    if (performance.now() / 1000 - chatShownAt > 4.5 && Math.floor(performance.now() / 300) % 2) chatBox.pressConfirm();
+    if (performance.now() / 1000 - chatShownAt > (chatPresses < chatPages - 1 ? 4.5 : 10) && Math.floor(performance.now() / 300) % 2) {
+        chatBox.pressConfirm(); chatShownAt = performance.now() / 1000; chatPresses++;
+    }
 }
 const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
 const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
@@ -8707,7 +8722,7 @@ function update(dt) {
             state.ambushTiles?.[m.id],
             storyGridCellAt(state.x, state.y),
         );
-        if (ambush && storyFlags.get(ambush.gateFlag) === 0 && !battle.isActive()) {
+        if (ambush && !NO_ENCOUNTERS && storyFlags.get(ambush.gateFlag) === 0 && !battle.isActive()) {   // ?noEncounters=1 also silences the ambush patches
             storyFlags.set(ambush.gateFlag, true);
             startAmbush(m.id, ambush);
         }
