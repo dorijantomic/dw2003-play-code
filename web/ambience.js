@@ -28,9 +28,9 @@ export const FX_GROUPS = [
     ["Terrain", [["sway", "Swaying trees"], ["grass", "Grass"], ["grasspush", "Grass parts around feet"], ["water", "Water"], ["reflect", "Water reflections"], ["mirror", "Characters reflect in water"], ["wetlook", "Wet / dusty look on characters"], ["seam", "Seam fixes"]]],
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
-    ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["butterflies", "Butterflies"], ["birds", "Birds"], ["dragonflies", "Dragonflies"], ["fish", "Jumping fish"], ["critters", "Critters"], ["wildlife", "Frogs, gulls, bats, lizards"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
+    ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
-    ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, birds, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
+    ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
 ];
 export const FX_DEFS = FX_GROUPS.flatMap(([, list]) => list);
 window.__fxKeys = FX_DEFS.map(([k]) => k);
@@ -45,6 +45,8 @@ for (const k of EXPERIMENTAL) fx[k] = false;
 fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
+// Animals were removed: no switch, and an old saved "on" can never bring them back.
+for (const k of ["butterflies", "birds", "dragonflies", "fish", "critters", "wildlife"]) fx[k] = false;
 const stored = { ...fx };   // what the panel last saved; URL flags below never reach it
 
 // game.js and the labs read these flags; the panel owns them now.
@@ -303,7 +305,7 @@ function soundTick(p, L) {
         water: (isWaterStage(S.map?.id) || p.coast ? 0.7 : 0) * (1 - 0.5 * bad),
         forest: (p.grassShare >= 0.05 || p.swamp ? 0.7 : 0.2) * calm,
         city: /City|Street|Bridge/.test(S.map?.name || "") ? 0.8 : 0,
-        birds: p.birds && !p.night ? calm * 0.9 : 0,
+        birds: 0,
     });
     setMusic(window.__bgm?.el, fx.musicfx, clamp01(rain * 0.7 + storm + sandL * 0.8), clamp01(rain * 0.35 + storm * 0.85 + sandL * 0.6));
 }
@@ -670,6 +672,14 @@ function applyPreset(name) {
     syncLegacyFlags(); save(); refreshPanel();
 }
 window.__applyPreset = applyPreset;
+// Showcase scenes (the top-bar "Showcase" menu): everything that suits the map is on, the time of
+// day and weather are pinned, and the map itself still decides which effects can show.
+export function applyScene(sc) {
+    for (const [k] of FX_DEFS) fx[k] = k !== "villagers";
+    fx.todMode = sc.tod; fx.weatherMode = sc.mode; fx.quality = "high";
+    window.__weatherForce = undefined;
+    syncLegacyFlags(); save(); refreshPanel();
+}
 const PROFILE_KEY = "dw.fx.profiles";
 function snapshot() {
     const o = {};
