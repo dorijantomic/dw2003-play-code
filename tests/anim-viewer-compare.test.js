@@ -159,13 +159,13 @@ test("vectors print as one cell, at a precision that suits their size", () => {
 const HAVE = (await exists(join(DW2, "index.json"))) && (await exists(join(DW2, "dw2-bonemaps.json")));
 test("every bake's DW2 twin is found by code and carries the clip letter", { skip: !HAVE && "no ~/dw2-models mount" }, async () => {
   const idx = DW2VIEW.buildDw2Index(JSON.parse(await readFile(join(DW2, "index.json"), "utf8")));
-  const bakes = JSON.parse(await readFile(join(DW2, "converted", "bakes", "index.json"), "utf8")).bakes.filter((b) => /-dw2[A-Z]$/.test(b.id)); // authored (-gen*) motions are not DW2 bakes
+  const bakes = JSON.parse(await readFile(join(DW2, "converted", "bakes", "index.json"), "utf8")).bakes.filter((b) => /-dw2[A-Z]\d*$/.test(b.id)); // authored (-gen*) motions are not DW2 bakes
   assert.ok(bakes.length >= 5);
   for (const b of bakes) {
     const code = C.dw2CodeForFolder(b.folder);
     const entry = C.findDw2Entry(idx.models, code);
     assert.ok(entry, `${b.id}: no DW2 model with code ${code}`);
-    const letter = b.id.replace(/^.*-dw2/, "");
+    const letter = b.id.replace(/^.*-dw2/, "").replace(/\d+$/, "");   // m009mera-dw2F2 = a later bake of clip F
     assert.notEqual(C.clipIndexForLetter(entry.anims, letter), -1, `${b.id}: ${entry.path} has no clip ${letter}`);
     assert.equal(entry.anims.length, entry.durs.length);
   }
@@ -174,7 +174,7 @@ test("every bake's DW2 twin is found by code and carries the clip letter", { ski
 test("both role maps name real bones, and the DW2 side's measurement matches the converter's", { skip: !HAVE && "no ~/dw2-models mount" }, async () => {
   const maps = JSON.parse(await readFile(join(DW2, "dw2-bonemaps.json"), "utf8")).models;
   const idx = DW2VIEW.buildDw2Index(JSON.parse(await readFile(join(DW2, "index.json"), "utf8")));
-  const bakes = JSON.parse(await readFile(join(DW2, "converted", "bakes", "index.json"), "utf8")).bakes;
+  const bakes = JSON.parse(await readFile(join(DW2, "converted", "bakes", "index.json"), "utf8")).bakes.filter((b) => /-dw2[A-Z]\d*$/.test(b.id)); // authored (-gen*) motions have no DW2 twin
   const seen = new Set();
   for (const b of bakes) {
     if (seen.has(b.folder)) continue;

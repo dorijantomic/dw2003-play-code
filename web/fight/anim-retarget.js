@@ -1135,7 +1135,7 @@ function k23Cloud(model, pose) {
   }
   return { parts, mx: cnt ? sx / cnt : 0, mz: cnt ? sz / cnt : 0, H: Math.max(1, floor - top), floor };
 }
-export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "auto", restS = 0, restT = null, matchMax = K23.matchMax } = {}) {
+export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "auto", restS = 0, restT = null, matchMax = K23.matchMax, transport = false, delta = false } = {}) {
   const src = source?.actions?.[clip];
   if (!src || !src.ops?.length) return null;
   const table = src.ops.find((o) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
@@ -1277,6 +1277,17 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     const { axis, ang } = k16axisOf(k16mul(k16tr(Wrest), Wtarget));
     return k16mul(Wrest, k16axisAngle(axis, ang * w));
   };
+  // `transport`: turn each aimed bone from where it pointed the PREVIOUS frame (a minimal step) instead of from its rest
+  // direction. The shortest turn from rest has an ill-conditioned axis when a limb goes from hanging to raised (it swings
+  // sideways and rolls, shoulders merge, arms cross); small steps of a planar path add no roll. Off by default.
+  const tstate = new Map();
+  const aimR = (key, u, dv) => {
+    if (!transport) return k16fromTo(u, dv);
+    const st = tstate.get(key) || { d: u, R: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
+    const R = k16mul(k16fromTo(st.d, dv), st.R);
+    tstate.set(key, { d: dv, R });
+    return R;
+  };
   for (let s = lo; s <= hi; s++) {
     const f = s + offset;
     const sp = k16Pose(source, s);
@@ -1298,14 +1309,18 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
           const u = [tr.P[ci][0] - tr.P[i][0], tr.P[ci][1] - tr.P[i][1], tr.P[ci][2] - tr.P[i][2]];
           // the bone matrices live in the renderer's frame (the true world frame is F * W, F = diag(-1,1,-1)), so a
           // turn R in true world is F R F in the matrix
-          if (k16norm(dv) > 1e-6 && k16norm(u) > 1e-6) Wtarget = k16mul(K23_F, k16mul(k16fromTo(u, dv), k16mul(K23_F, tr.W[i])));
+          // `delta`: copy the donor's CHANGE from its own rest direction and apply it to this body's rest orientation, instead
+          // of forcing this limb along the donor's ABSOLUTE direction (a hunched donor would crouch a straight-standing body)
+          const dr = k16mv(Q, [sr.P[cj][0] - sr.P[j][0], sr.P[cj][1] - sr.P[j][1], sr.P[cj][2] - sr.P[j][2]]);
+          if (k16norm(dv) > 1e-6 && k16norm(u) > 1e-6 && (!delta || k16norm(dr) > 1e-6)) Wtarget = k16mul(K23_F, k16mul(aimR(`l${i}`, delta ? dr : u, dv), k16mul(K23_F, tr.W[i])));
         }
         if (!Wtarget && cLocT[i] && cLocS[j]) {
           // an END part (a foot, a wing tip, a fan): it has no next bone to aim along, so it is aimed along the
           // direction from its attachment point to the middle of its own mass (a foot: toward the toes; a fan:
           // toward the feathers), which is again a property of the shape and not of the bone's local axes
           const u = k16mv(K23_F, k16mv(tr.W[i], cLocT[i])), dv = k16mv(Q, k16mv(K23_F, k16mv(sp.W[j], cLocS[j])));
-          if (k16norm(dv) > 1e-6 && k16norm(u) > 1e-6) Wtarget = k16mul(K23_F, k16mul(k16fromTo(u, dv), k16mul(K23_F, tr.W[i])));
+          const dr = k16mv(Q, k16mv(K23_F, k16mv(sr.W[j], cLocS[j])));
+          if (k16norm(dv) > 1e-6 && k16norm(u) > 1e-6 && (!delta || k16norm(dr) > 1e-6)) Wtarget = k16mul(K23_F, k16mul(aimR(`e${i}`, delta ? dr : u, dv), k16mul(K23_F, tr.W[i])));
         }
         if (!Wtarget) {
           // a part whose mass is centred on its own origin (a body, a hub): the donor's own turn from its rest

@@ -24,7 +24,7 @@
 export const BAKE_ROOT = "dw2-models/converted/bakes";
 
 // A bake folder: the DW3 folder, a dash, `dw2`, the DW2 clip letter (Kokatorimon F/G/H, Meramon I/K).
-const BAKE_FOLDER = /^(m\d{3}[a-z0-9]*)-(?:dw2|gen)([A-Z])$/;
+const BAKE_FOLDER = /^(m\d{3}[a-z0-9]*)-(?:dw2|gen)([A-Z])\d*$/;
 
 /** The 5 bakes K21d wrote (BRIEF15's inputs) — the picker's fallback when no manifest is served. */
 export const K21D_BAKES = ["m009mera-dw2I", "m009mera-dw2K", "m050coca-dw2F", "m050coca-dw2G", "m050coca-dw2H"];
