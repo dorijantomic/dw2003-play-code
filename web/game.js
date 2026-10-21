@@ -1787,6 +1787,22 @@ window.__encounter = {
 // Debug-only: drive the ordinary field->battle handoff (the step counter's own
 // function) from a verifier without walking the counter down.
 window.__fieldToBattle = () => triggerRandomEncounter(currentMap().id, state.x, state.y);
+// Testing aid: the "Force encounter" button (or F9) fires the game's own random encounter from the field.
+{
+    const fire = () => window.__fieldToBattle();
+    const btn = document.getElementById("force-enc");
+    btn?.addEventListener("click", () => { btn.blur(); fire(); });
+    addEventListener("keydown", (e) => { if (e.code === "F9") { e.preventDefault(); fire(); } });
+}
+// ?encounter=1 (Playtest Lab, "force an encounter"): once the field is up, fire the game's own random
+// encounter, retrying until its guards (cutscene, fade, textbox) let it through and a battle is running.
+if (new URLSearchParams(location.search).get("encounter") === "1") {
+    let tries = 0;
+    const force = setInterval(() => {
+        if (battle.isActive() || ++tries > 120) { clearInterval(force); return; }
+        if (state.manifest) window.__fieldToBattle();
+    }, 500);
+}
 // Debug-only: read the A28 checkerboard wipe's live state for a capture.
 window.__wipe28 = () =>
     state.wipe28

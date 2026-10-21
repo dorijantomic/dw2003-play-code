@@ -18,8 +18,9 @@ import { FightCoordinator } from "./fight/fight-coordinator.js";
 import { setMoveSpeed } from "./fight/action-vm.js";
 import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
 import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP, setItemUseEffects, itemUseEffect,
-         setThrowItemEffects, throwItemEffect } from "./fight/fight-tables.js";
-import { setFallbackDonor } from "./fight/clip-fallback.js";
+         setThrowItemEffects, throwItemEffect, setSkillTable } from "./fight/fight-tables.js";
+import { setFallbackDonor, prepareModelDonors } from "./fight/clip-fallback.js";
+import { isGiant } from "./fight/anim-donor-map.js";
 import { authoredSide, mirrorCameraWords, mirrorPresetShot } from "./fight/side-mirror.js";
 import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
@@ -222,7 +223,12 @@ function interpChannel(channel, frame) {
 // value&0x8000 entry sets +0x94=1, frac=value&0x7fff /4096, from=aux). Without it, motions
 // SNAP between disjoint phases (e.g. attack frame 765→1325). Channels are lerped at the sample
 // level (a close approximation of the GTE matrix blend).
-function buildBoneWorldMatrices(model, frame, blend = null) {
+// `hide` (optional, A15) = bone indices whose mesh the caller draws FORCED OFF (scale 0) even if the
+// pack's own ch3 would show it. The disc hides prop meshes exactly this way (ch3 = 0), so a built action
+// that reuses a body authored for another clip can keep a part the model's idle never shows (the thrown
+// axe carried beside the held one) hidden without changing the pose. Set or array of indices.
+function buildBoneWorldMatrices(model, frame, blend = null, hide = null) {
+    const hidden = hide == null ? null : (typeof hide.has === "function" ? hide : new Set(hide));
     const n = model.num_bones;
     const worldRot = new Array(n);
     const worldTrans = new Array(n);
@@ -295,11 +301,15 @@ function buildBoneWorldMatrices(model, frame, blend = null) {
         // Apply ch3 scale if present (4096=1.0; defaults to identity when absent).
         // Applied to final matrix columns only — does not propagate to worldRot.
         if (bone.anim.ch3) {
-            const c3 = sampleCh(bone.anim.ch3);
+            const c3 = hidden && hidden.has(i) ? [0, 0, 0] : sampleCh(bone.anim.ch3);
             const sx = c3[0] / 4096, sy = c3[1] / 4096, sz = c3[2] / 4096;
             worlds[i][0] *= sx; worlds[i][1] *= sx; worlds[i][2] *= sx;
             worlds[i][4] *= sy; worlds[i][5] *= sy; worlds[i][6] *= sy;
             worlds[i][8] *= sz; worlds[i][9] *= sz; worlds[i][10] *= sz;
+        } else if (hidden && hidden.has(i)) {
+            worlds[i][0] = 0; worlds[i][1] = 0; worlds[i][2] = 0;
+            worlds[i][4] = 0; worlds[i][5] = 0; worlds[i][6] = 0;
+            worlds[i][8] = 0; worlds[i][9] = 0; worlds[i][10] = 0;
         }
     }
 
@@ -351,6 +361,10 @@ async function loadSkeletalModel(folder) {
       anim.slotMap = slotMapRaw ? slotMapRaw.bones : null;
 
       anim.bridgeVertCapacity = anim.bones.length * 2;
+      // The clips this model lacks are built from the A2 donor plan (fight/clip-fallback.js): attach the
+      // donor clips now, while the model is being loaded, so resolveClipScript stays synchronous. A twin's
+      // timeline tables are merged into `anim.timeline` in memory here (disc data, never written to disk).
+      await prepareModelDonors(anim);
       return anim;
     });
   _skelCache.set(folder, p);
@@ -1241,6 +1255,167 @@ export function modelRestSize(model) {
   return model._restSize;
 }
 
+// ── The GIANT near-camera fit (A5) ────────────────────────────────────────────
+// A giant the disc never stages on the NEAR side — an enemy-only species (0x48 record) or a new
+// partner's form played by us — has no near camera of its own, so playerNearCamera lends it the
+// twelve shots of the partner closest to it in size (fitNearCamera). Those shots are the
+// original's framing of ITS OWN fighter: their attack shots sit ~8k units behind the near slot
+// and 3k up, which frames the 11-12k body of the biggest partner (and every giant that borrows
+// one) as legs and torso — the player cannot see the attack the model performs (anim-a4.md
+// "Camera", anim-sheets/a4-m441raiz-sheet.png). This refits a cropping shot so the WHOLE body,
+// with the opposing fighter still in frame, is inside the 4:3 view:
+//
+//   • AIM at the body's own centre instead of the reference's aim point, which is what puts the
+//     head back in frame — the old shot aims up past the body and cuts the body in half;
+//   • LIFT the eye toward the body's top (a camera level with a 12k body sees far less of its
+//     vertical span than one at its knee, and it does not leave the arena art);
+//   • PULL BACK along the reference's own azimuth about our slot (≤ 1.5×, the last resort:
+//     the disc's stage mesh is authored for the shots it ships, and a camera further out sees
+//     the edge of the arena — the A5 first pass showed its ledge);
+//   • WIDEN the lens (H down to GIANT_H_MIN) only when the closer framing cannot hold the body.
+// A shot that already frames the body is returned EXACTLY as it was (this is a no-op for a small
+// model — the fit is the identity — and the caller only runs it for the giant band, so Kunemon
+// and every other small partner keep today's shots byte for byte). A model with its own twelve
+// near shots (a partner authored for the near side, e.g. Gallantmon) returns its own record
+// before reaching any of this, so the disc's own cameras are never touched.
+export const GIANT_FRAME_FILL = 0.86;   // the share of the half-frame the body may reach
+export const GIANT_H_MIN = 150;         // projection distance floor: fovY 2 atan(120/150) = 77.3°
+export const GIANT_PULL_MAX = 4;        // pull-back cap along the reference azimuth (arena-sized)
+export const GIANT_LIFT_STEPS = 8;      // eye-height steps tried between the reference and the top
+export const GIANT_FIT_ASPECT = 4 / 3;  // the game's own 320x240 frame (a wider canvas sees more)
+const PS1_UP = [0, -1, 0];              // PS1 Y is DOWN
+
+/** One Digimon's rest-pose body as a box standing in `slot`, PS1 units: the fit's subject. The
+ *  extractor only measures height and width from the front, so the depth is half the width —
+ *  the near face is what a camera beside the fighter sees first. */
+export function bodyBoxCorners(rest, slot) {
+  const h = rest?.h > 0 ? rest.h : 0, w = rest?.w > 0 ? rest.w : 0;
+  const out = [];
+  for (const x of [-0.5 * w, 0.5 * w])
+    for (const y of [-h, 0])
+      for (const z of [-0.25 * w, 0.25 * w]) out.push([slot.x + x, slot.y + y, slot.z + z]);
+  return out;
+}
+
+/** Project one PS1 point through one PS1 shot into normalized device coordinates (|x|,|y| <= 1 is
+ *  on screen), or null when the point is behind the eye. The projection is the one render()
+ *  builds: fovY = 2 atan(120/H) (fovYFromH) and the horizontal from the frame aspect. */
+export function shotPointNdc(shot, p, aspect = GIANT_FIT_ASPECT) {
+  if (!shot?.eye || !shot?.target || !(shot.H > 0)) return null;
+  const fwd = normalize(sub3(shot.target, shot.eye));
+  const back = [-fwd[0], -fwd[1], -fwd[2]];           // camera space looks down −z
+  const right = normalize(cross3(PS1_UP, back));
+  const up = cross3(back, right);
+  const d = sub3(p, shot.eye);
+  const depth = -dot3(d, back);
+  if (!(depth > 1)) return null;
+  const tanY = 120 / shot.H;
+  const tanX = tanY * aspect;
+  return { x: dot3(d, right) / (depth * tanX), y: dot3(d, up) / (depth * tanY), depth };
+}
+
+/** The NDC bounds of a body box (plus the opposing fighter's centre, when that shot has it in
+ *  front of the eye) through ONE shot. `behind` counts body corners the eye cannot see. */
+export function shotBodyBounds(shot, slot, rest, target = null, aspect = GIANT_FIT_ASPECT) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  let behind = 0, maxDepth = 0;
+  for (const p of bodyBoxCorners(rest, slot)) {
+    const n = shotPointNdc(shot, p, aspect);
+    if (!n) { behind++; continue; }
+    if (n.x < x0) x0 = n.x; if (n.x > x1) x1 = n.x;
+    if (n.y < y0) y0 = n.y; if (n.y > y1) y1 = n.y;
+    if (n.depth > maxDepth) maxDepth = n.depth;
+  }
+  if (target) {
+    const n = shotPointNdc(shot, target, aspect);
+    if (n) {
+      if (n.x < x0) x0 = n.x; if (n.x > x1) x1 = n.x;
+      if (n.y < y0) y0 = n.y; if (n.y > y1) y1 = n.y;
+      if (n.depth > maxDepth) maxDepth = n.depth;
+    }
+  }
+  return { x0, x1, y0, y1, behind, maxDepth,
+    fill: Math.max(Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1)) };
+}
+
+/**
+ * One near shot refitted so a giant's whole body fits: the reference's eye height is lifted toward
+ * the body's top, its azimuth is kept (pulled back along that azimuth only when the lens floor is
+ * reached), and the lens is widened as little as will fit. Returns the reference shot UNCHANGED
+ * (`changed: false`) when it already frames the body, which is the identity every small model
+ * takes. `target` is a CONSTRAINT (the opposing fighter must stay on screen), never the aim.
+ */
+export function giantShotFor(refShot, slot, rest, target = null, opts = {}) {
+  const fill = opts.fill ?? GIANT_FRAME_FILL;
+  const hMin = opts.hMin ?? GIANT_H_MIN;
+  const pullMax = opts.pullMax ?? GIANT_PULL_MAX;
+  const steps = opts.liftSteps ?? GIANT_LIFT_STEPS;
+  const aspect = opts.aspect ?? GIANT_FIT_ASPECT;
+  const h = rest?.h > 0 ? rest.h : 0;
+  const bodyC = [slot.x, slot.y - 0.5 * h, slot.z];
+  // The opposing fighter constrains a shot that already HAS it on screen (some near shots look
+  // back at us from the enemy's side, and a shot that deliberately leaves it out must stay a shot
+  // of our fighter); it is never the aim.
+  const tn = target ? shotPointNdc(refShot, target, aspect) : null;
+  const keep = tn && Math.abs(tn.x) <= 2 && Math.abs(tn.y) <= 2 ? target : null;
+  // Already framed by the reference shot exactly as it stands? Then it is the identity.
+  const asIs = shotBodyBounds(refShot, slot, rest, keep, aspect);
+  if (!asIs.behind && asIs.fill <= fill) {
+    return { eye: refShot.eye, target: refShot.target, H: refShot.H, lift: 0, pull: 1, changed: false };
+  }
+  const fits = (eye, H) => {
+    const b = shotBodyBounds({ eye, target: bodyC, H }, slot, rest, keep, aspect);
+    return !b.behind && b.fill <= fill;
+  };
+  const dx = refShot.eye[0] - slot.x, dz = refShot.eye[2] - slot.z;
+  const topY = slot.y - h;
+  const hFloor = Math.min(hMin, refShot.H);
+  for (let step = 0; step <= steps; step++) {
+    const lift = step / steps;
+    const eyeY = refShot.eye[1] + (topY - refShot.eye[1]) * lift;
+    for (let pull = 1; pull <= pullMax + 1e-9; pull += 0.1) {
+      const eye = [slot.x + dx * pull, eyeY, slot.z + dz * pull];
+      for (let H = refShot.H; H >= hFloor; H -= 4) {
+        if (fits(eye, H)) {
+          // Reaching the search at all means the reference shot did not frame the body as it
+          // stood, so the aim (the body's centre) is a change even when pull and lens are not.
+          return { eye, target: bodyC, H, lift, pull, changed: true };
+        }
+      }
+    }
+  }
+  // Nothing fits inside the caps: the widest, highest, furthest-back framing this rule allows.
+  return {
+    eye: [slot.x + dx * pullMax, topY, slot.z + dz * pullMax],
+    target: bodyC, H: hMin, lift: 1, pull: pullMax, changed: true,
+  };
+}
+
+/** A fitted near-shot table (fitNearCamera) refitted for a giant: per shot, `giantShotFor`. Returns
+ *  the same `cam` object and `changed: false` when every shot already framed the body, so a model
+ *  the reference framing holds is untouched. */
+export function fitGiantNearCamera(cam, slot, rest, target = null, opts = {}) {
+  if (!cam?.eye?.length) return { cam, shots: [], changed: false };
+  const shots = [];
+  let changed = false;
+  for (let i = 0; i < cam.eye.length; i++) {
+    const eye = cam.eye[i], look = cam.look?.[i], H = cam.view?.[i];
+    if (!eye || !look || !(H > 0)) { shots.push(null); continue; }
+    const fit = giantShotFor({ eye, target: look, H }, slot, rest, target, opts);
+    shots.push(fit);
+    if (fit.changed) changed = true;
+  }
+  if (!changed) return { cam, shots, changed: false };
+  return {
+    cam: {
+      eye: cam.eye.map((e, i) => shots[i]?.changed ? shots[i].eye : e),
+      look: cam.look.map((p, i) => shots[i]?.changed ? shots[i].target : p),
+      view: cam.view.map((v, i) => shots[i]?.changed ? shots[i].H : v),
+    },
+    shots, changed: true,
+  };
+}
+
 /**
  * The contact-marker sound substitution, read out of fightstg F0x8008c454 (the op10
  * handler, .L0x8008c4a0 / .L0x8008c4d4):
@@ -1723,6 +1898,11 @@ export function createBattle3D(canvas, sfx = null) {
   let screenOverlay = null; // op7 full-screen monochrome primitive (DNA result clip 12)
   fetch("assets/data/fight_tech_table.json")
     .then(r => (r.ok ? r.json() : null)).then(setTechTable).catch(() => {});
+  // WHO a technique is aimed at (A9): the skills table's `type` column — heal/support are
+  // self/ally casts (22 of 426 records), everything else is aimed at the opponent. Loaded here
+  // because the renderer builds the presentation and must know which shape to play.
+  fetch("assets/data/digimon.json")
+    .then(r => (r.ok ? r.json() : null)).then(setSkillTable).catch(() => {});
   // The donor for clips a model lacks (enemy-only species): a player species with the whole set. Greymon's pack.
   fetch("assets/battle/models/m005grey/anim.json")
     .then(r => (r.ok ? r.json() : null)).then(j => setFallbackDonor(j?.actions)).catch(() => {});
@@ -1870,13 +2050,27 @@ export function createBattle3D(canvas, sfx = null) {
   // rest-pose sizes in assets/battle/camera_ref_sizes.json), so a big model borrows a big partner's framing and a
   // small one a small partner's, and the fit scale stays near 1.
   let camRefSizes = null, camRefLoading = false;
-  let fittedNearCam = null;   // { folder, cam }
+  let fittedNearCam = null;   // { folder, cam, face, giant }
+  // True while our near shots were dollyed back for a giant (fitGiantNearCamera changed one).
+  // The renderer's far plane follows it: the disc's arena shots sit close and hold the enemy
+  // just inside the 8k render far plane, while a giant's fitted shot is 2-3× further back (the
+  // whole arena, enemy included, is further away), so the shot would otherwise be clipped.
+  let giantNearCam = false;
+  // Dev/test switch for before/after captures: OFF reproduces the page's pre-A5 framing exactly
+  // (the refit is simply not run), ON is the shipped behaviour.
+  let giantCamFit = true;
+  function setGiantCameraFit(on) {
+    giantCamFit = !!on;
+    fittedNearCam = null;         // drop the cached decision so the next call re-runs with the flag
+    giantNearCam = false;
+    return giantCamFit;
+  }
   function playerNearCamera() {
     const key = modelKeyFromFolder(playerFolder);
     const rec = key != null ? placementTable[key] : null;
     if (!rec) return null;
-    if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
-    if (fittedNearCam?.folder === playerFolder) return fittedNearCam.cam;
+    if ((rec.camera?.eye?.length | 0) >= 12) { giantNearCam = false; return rec.camera; }
+    if (fittedNearCam?.folder === playerFolder) { giantNearCam = fittedNearCam.giant; return fittedNearCam.cam; }
     if (!camRefSizes && !camRefLoading) {
       camRefLoading = true;
       fetch("assets/battle/camera_ref_sizes.json").then((r) => (r.ok ? r.json() : null)).then((j) => { camRefSizes = j?.sizes ?? null; }, () => {});
@@ -1890,7 +2084,21 @@ export function createBattle3D(canvas, sfx = null) {
     if (!refRec?.camera || !own || !ref) return nearCameraFor(placementTable, key);
     const k = Math.min(3, Math.max(0.5, own / ref));
     const refSlot = arenaSlot(refRec, "player"), ownSlot = arenaSlot(rec, "player");
-    const cam = fitNearCamera(refRec.camera, refSlot, ownSlot, k);
+    let cam = fitNearCamera(refRec.camera, refSlot, ownSlot, k);
+    // A GIANT on our side (ANIM_GIANTS — the enemy-authored bodies that plant their feet) is
+    // framed by the reference partner's own close near shots, which crop a body this size to its
+    // legs and torso; dolly each shot back until the whole body (and the target, when the shot
+    // has it in front) is inside the frame. Small models are outside the band and keep today's
+    // shots; a shot that already fits is kept exactly (fitGiantNearCamera's identity).
+    let giant = false;
+    let giantShots = null;
+    if (giantCamFit && isGiant(playerFolder)) {
+      const eSlot = enemyAnim8r?.homeSlot;
+      const eRest = enemyModel ? modelRestSize(enemyModel) : null;
+      const target = eSlot ? [eSlot.x, eSlot.y - 0.5 * (eRest?.h ?? 0), eSlot.z] : null;
+      const f = fitGiantNearCamera(cam, ownSlot, ownRest, target);
+      cam = f.cam; giant = f.changed; giantShots = f.shots;
+    }
     // The face close-up the same way, but scaled by HEIGHT alone, so it lands on the head
     // the way the reference's lands on the reference's. A 0x48 record's own face-box read runs past the
     // record (see faceBoxShot) and frames nothing.
@@ -1902,7 +2110,8 @@ export function createBattle3D(canvas, sfx = null) {
         ownSlot.z + (p[2] - refSlot.z) * kh];
       face[side] = s ? { ...s, eye: fit(s.eye), target: fit(s.target) } : null;
     }
-    fittedNearCam = { folder: playerFolder, cam, face };
+    fittedNearCam = { folder: playerFolder, cam, face, giant, shots: giantShots };
+    giantNearCam = giant;
     return cam;
   }
 
@@ -2154,7 +2363,20 @@ export function createBattle3D(canvas, sfx = null) {
   //   "behind" = over-the-shoulder, looking past our digimon toward the enemy (intro/attack)
   //   "orbit"  = slow sweep around our digimon while we idle / pick a command
   //   "defeat" = the loss effect's own shot: our Digimon's canned near shot 11, orbiting
-  let camMode      = "director"; // "director" | "behind" | "orbit" | "game" | "tag" | "defeat"
+  let camMode      = "director"; // "director" | "behind" | "orbit" | "game" | "tag" | "defeat" | "free"
+  // ── FREE CAMERA (web/anim-viewer.html) ────────────────────────────────────────────────────────
+  // The animation viewer draws the SAME scene through a camera it owns: an eye/look it computes
+  // from its own orbit state (web/anim-viewer-camera.js). While this is set, `camMode` is "free"
+  // and render() takes the view from here AFTER the camera record is resolved — so an action's
+  // op5 cut, the idle director and the battle fit can never move the user's view. Null in every
+  // battle page. See `setFreeCameraView` in the returned object.
+  let freeCamView = null;
+  // ISOLATED MODE: no arena, no sky, no backdrop, no battle UI (the page draws its own HUD) — a
+  // neutral background plus a ground grid under the focused fighter. Off everywhere but the viewer.
+  let isolatedMode = false;
+  let isolatedSide = "player";
+  let viewerGridTex = null, viewerGridBufs = null;
+
   let camAz        = 0;          // current azimuth offset from straight-behind (rad)
   let orbitClock   = 0;          // drives the idle sweep
   // The defeat effect's own clock. F0x8008c93c adds the raw `[0x8004df9c]()` delta,
@@ -2452,7 +2674,7 @@ export function createBattle3D(canvas, sfx = null) {
     // pair, `[60,0,preset]` then its `[60,0,0]` restore) is truncated mid-glide when the action
     // VM ends first.
     const valid = (m === "behind" || m === "orbit" || m === "game" || m === "director"
-        || m === "tag" || m === "defeat" || m === "opening");
+        || m === "tag" || m === "defeat" || m === "opening" || m === "free");
     // The disc's own camera edges, so the walker needs no state-list freeze:
     //   * the command menu opens -> a FRESH director is built (the phase's row-children arm);
     //   * the confirm is pressed -> the director's state-3 tick cuts the plain arena shot and
@@ -3035,7 +3257,7 @@ export function createBattle3D(canvas, sfx = null) {
       const yaw = f.side === "player" ? -(((a.rotation?.()[1] || 0) - (a.rotationBase || 0)) * Math.PI * 2 / 4096) : Math.PI;
       const sample = a.isActive ? a.renderSample(alpha) : null;
       if (sample) f.frame = sample.frame;
-      const bwm = buildBoneWorldMatrices(f.model, f.frame, sample ? sample.blend : null);
+      const bwm = buildBoneWorldMatrices(f.model, f.frame, sample ? sample.blend : null, a.currentHiddenParts?.());
       f.pos = pos;
       f.aabb = _updateSkeletalVBOGL(gl, f.model, f.bufs, bwm, pos, MODEL_SCALE, false, yaw);
     }
@@ -3080,6 +3302,55 @@ export function createBattle3D(canvas, sfx = null) {
     const eye = [nc[0] - dir[0] * back + side[0] * lateral, tall * 1.5 + W * 0.14, nc[1] - dir[1] * back + side[1] * lateral];
     const look = [(nc[0] + fc[0]) / 2, tall * 0.3, (nc[1] + fc[1]) / 2];
     return { eye, look, fov: Math.PI / 3.6 };
+  }
+
+  // ── viewer ground grid (isolated mode) ────────────────────────────────────────────────────────
+  // A world-space grid under the focused fighter, drawn through the SAME camera as the model. One
+  // unit quad (xz) scaled per frame by the fighter's own height, so a tiny model and a giant get
+  // the same cell count at a sensible size. The axis lines are painted into the texture (world X
+  // amber, world Z blue); the page also draws a corner gizmo from the same camera basis.
+  function ensureViewerGrid() {
+    if (viewerGridTex && viewerGridBufs) return;
+    const N = 1024, cells = 16, px = N / cells;
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = N;
+    const c = cv.getContext("2d");
+    c.fillStyle = "#22252d"; c.fillRect(0, 0, N, N);
+    c.strokeStyle = "#3b4150"; c.lineWidth = 2;
+    for (let i = 0; i <= cells; i++) {
+      const p = Math.round(i * px) + 0.5;
+      c.beginPath(); c.moveTo(p, 0); c.lineTo(p, N); c.stroke();
+      c.beginPath(); c.moveTo(0, p); c.lineTo(N, p); c.stroke();
+    }
+    c.lineWidth = 5;
+    c.strokeStyle = "#8a6a3a";                     // the grid's X axis line
+    c.beginPath(); c.moveTo(N / 2, 0); c.lineTo(N / 2, N); c.stroke();
+    c.strokeStyle = "#3a6a8a";                     // the grid's Z axis line
+    c.beginPath(); c.moveTo(0, N / 2); c.lineTo(N, N / 2); c.stroke();
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    viewerGridTex = tex;
+    viewerGridBufs = makeQuadBuffers(gl, [
+      [-0.5, 0, -0.5], [0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5],
+    ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  }
+  function drawViewerGrid(pv) {
+    const box = isolatedSide === "enemy" ? eAABBLast : pAABB;
+    if (!box) return;
+    ensureViewerGrid();
+    const cx = (box.min[0] + box.max[0]) / 2;
+    const cz = (box.min[2] + box.max[2]) / 2;
+    const h = Math.max(200, box.max[1] - box.min[1]);
+    const size = Math.max(1200, h * 14);
+    const mvp = mat4Mul(pv, mat4Mul(mat4Translate(cx, box.min[1], cz), mat4Scale(size, 1, size)));
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    drawQuad(gl, texP, mvp, viewerGridBufs, viewerGridTex, 1, [1, 1, 1, 0.95]);
   }
 
   function render(dt) {
@@ -3268,12 +3539,14 @@ export function createBattle3D(canvas, sfx = null) {
     pAABB = null;
     let eAABB = null;
     if (playerVisible && playerModel && playerSkelBufs) {
-      const bwm = buildBoneWorldMatrices(playerModel, playerFrame, playerBlend);
+      const bwm = buildBoneWorldMatrices(playerModel, playerFrame, playerBlend,
+        usePlayerA ? playerAnim8r?.currentHiddenParts?.() : null);
       pBwm = bwm;
       pAABB = _updateSkeletalVBOGL(gl, playerModel, playerSkelBufs, bwm, playerPos, MODEL_SCALE, false, playerYaw);
     }
     if (enemyModel && enemySkelBufs) {
-      const bwm = buildBoneWorldMatrices(enemyModel, enemyFrame, enemyBlend);
+      const bwm = buildBoneWorldMatrices(enemyModel, enemyFrame, enemyBlend,
+        useEnemyA ? enemyAnim8r?.currentHiddenParts?.() : null);
       eBwm = bwm;
       eAABB = _updateSkeletalVBOGL(gl, enemyModel, enemySkelBufs, bwm, enemyPos, MODEL_SCALE, false, enemyYaw);
       eAABBLast = eAABB;
@@ -3429,7 +3702,7 @@ export function createBattle3D(canvas, sfx = null) {
     // gating this cut on `camScriptOwned` left the retire shot on screen for the whole loss
     // beat and the defeat shot was never seen. The loss camera takes the one live record,
     // exactly as `setCameraMode`'s own note says the victory / loss / tag cameras do.
-    if (!camScriptOwned || camMode === "defeat") {
+    if (camMode !== "free" && (!camScriptOwned || camMode === "defeat")) {
       // The opening flourish installed its own record in the "opening" arm above — a cut or a
       // glide — and once it self-destructs the record holds the plain arena re-cut it left. The
       // battle's generic behind/over-the-shoulder shot must not overwrite it.
@@ -3456,7 +3729,18 @@ export function createBattle3D(canvas, sfx = null) {
       }
     }
     const shot = camRec.sample();
-    if (shot) {
+    // The viewer's FREE camera wins over the record: its eye/look are already render space (the
+    // page hands them in through setFreeCameraView), so no ps1ToRender and no record. This is the
+    // whole isolation: op5 cuts still update the record (the info panel reports them), but the
+    // frame is drawn through this view, so the script can never move the user's camera.
+    const freeView = camMode === "free" ? freeCamView?.() : null;
+    if (freeView) {
+      eye = freeView.eye;
+      look = freeView.look;
+      up = freeView.up || UP;
+      rollDeg = 0;
+      fovRad = freeView.fovDeg * Math.PI / 180;
+    } else if (shot) {
       const s = MODEL_SCALE;
       eye  = ps1ToRender(shot.eye, s);
       look = ps1ToRender(shot.target, s);
@@ -3499,7 +3783,11 @@ export function createBattle3D(canvas, sfx = null) {
     const liveRec = camRec.get();
     const explicitShot = liveRec?.kind === "move"
       || (liveRec?.kind === "cut" && liveRec.issuer !== "battle");
-    const farPlane = explicitShot ? 60000 : 8000;
+    // A giant's fitted near shot is dollyed back 2-3× so its whole body fits (fitGiantNearCamera),
+    // which puts the enemy — and the far edge of the arena floor — past the tight 8k far plane the
+    // disc's close arena shots are tuned to. Widen it for those shots only, as the explicit op5
+    // shots already do.
+    const farPlane = explicitShot || giantNearCam || camMode === "free" ? 60000 : 8000;
     const proj = mat4Perspective(fovRad, W/H, 1, farPlane);
     // Blast phase 1 is a camera PUSH-IN on the fighter (captured f24-f180) and
     // phase 8 returns it (f800-f880). Dolly the eye toward the player along its
@@ -3577,7 +3865,10 @@ export function createBattle3D(canvas, sfx = null) {
     // The arena view's background colour, when the ported effect-tint feed has set one
     // (view+0x12C); otherwise each branch keeps its own default (black void / sky).
     const bgTint = arenaTint;
-    if (dnaVoidActive) {
+    if (isolatedMode) {
+      // Viewer: a neutral studio background, no sky texture / arena / backdrop.
+      drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, [0.085, 0.095, 0.115, 1]);
+    } else if (dnaVoidActive) {
       drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, bgTint || [0, 0, 0, 1]);
     } else if (dfActive) {
       drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, bgTint || [0, 0, 0, 1]);   // black void (full screen)
@@ -3674,9 +3965,11 @@ export function createBattle3D(canvas, sfx = null) {
     gl.depthMask(true);
 
     // Arena floor (skipped during the special: the backdrop is a full-screen 2D scene; and skipped
-    // when the disc's own per-area arena is loaded, which supplies its own ground).
-    if (!dfActive && !dnaVoidActive && !arenaActive)
+    // when the disc's own per-area arena is loaded, which supplies its own ground — and skipped in
+    // the viewer's isolated mode, where the neutral grid below is the ground).
+    if (!dfActive && !dnaVoidActive && !arenaActive && !isolatedMode)
       drawQuad(gl, texP, pv, floorBufs, arenaTexture || whiteTex, 1, [0.8,0.8,0.85,1]);
+    if (isolatedMode) drawViewerGrid(pv);
 
     // ── Digimon rendering (skeletal if loaded, billboard fallback) ──
     // Blast transformation: past the captured swap frame the fighter is the
@@ -4224,6 +4517,32 @@ export function createBattle3D(canvas, sfx = null) {
     get dataFieldActive() { return dataFieldIsActive(); },
     setCameraMode,
     getCameraMode,
+    // ── the animation viewer's own camera / staging (web/anim-viewer.html) ──────────────────────
+    // `fn` returns {eye, look, up?, fovDeg, ortho?} in RENDER space, or null. Pass null to hand the
+    // camera back to the battle record (the viewer's "use the battle's camera" toggle).
+    setFreeCameraView(fn) { freeCamView = typeof fn === "function" ? fn : null; return !!freeCamView; },
+    /** The fighter's last rendered bounding box in render space: {min,max,center,size} or null. */
+    getFighterBounds(side) {
+      const b = side === "enemy" ? eAABBLast : pAABB;
+      if (!b) return null;
+      const center = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+      return {
+        min: b.min.slice(), max: b.max.slice(), center,
+        size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]],
+      };
+    },
+    /** Isolated studio mode: neutral background + ground grid, no arena/sky/backdrop. */
+    setIsolated(on, side = null) {
+      isolatedMode = !!on;
+      if (side) isolatedSide = side;
+      return isolatedMode;
+    },
+    /** The scene's ground height (feet of the focused fighter), render space. */
+    getGroundY(side) {
+      const b = side === "enemy" ? eAABBLast : pAABB;
+      return b ? b.min[1] : 0;
+    },
+    setGiantCameraFit,
     setSlowMotion,
     getAnimationReadout,
     setGameCamParam,
@@ -4271,6 +4590,15 @@ export function createBattle3D(canvas, sfx = null) {
         // The disc's own reaction camera for each fighter — its clip-10 op5 (see `_reactionCamFor`).
         // Null when the model authors none, which is the original's "no impact camera" case.
         playerFolder, enemyFolder,
+        // Our near camera's giant fit (fitGiantNearCamera): whether it changed anything and the
+        // per-shot dolly-back it applied — the number a probe reads to prove the framing moved.
+        nearCamera: { giant: giantNearCam,
+          fit: fittedNearCam?.folder === playerFolder
+            ? { giant: fittedNearCam.giant,
+                shots: (fittedNearCam.shots ?? []).map((s) => s
+                  ? { changed: s.changed, lift: +s.lift.toFixed(3), pull: +s.pull.toFixed(2), H: s.H }
+                  : null) }
+            : null },
         playerReactionCam: _reactionCamFor("player"),
         enemyReactionCam: _reactionCamFor("enemy"),
         camRecord: camRec.get() ? { kind: camRec.get().kind, issuer: camRec.get().issuer ?? null,

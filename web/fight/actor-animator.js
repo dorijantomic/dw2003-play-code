@@ -19,14 +19,14 @@
 // currentFrame() is sane before tick 1 (and clips with neither op2 nor op4 fall back to idle).
 import { TimelinePlayer, PlaylistPlayer } from "./timeline-player.js";
 import { ActionVM } from "./action-vm.js";
-import { techToClip, techRecord, techEffectType, ITEM_USE_CLIP, itemUseEffect, throwItemEffect } from "./fight-tables.js";
+import { techToClip, techRecord, techEffectType, techTargetClass, techName, ITEM_USE_CLIP, itemUseEffect, itemTargetClass, throwItemEffect, skillRow } from "./fight-tables.js";
 import { resolveClipScript, scriptTableSeq } from "./clip-fallback.js";
 import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // The animation-slot system the original runs is ported in
 // engine/dw3/battle-actor-animation.ts: the op2 movement arms of FIGHTSTG_F0x8008b7f4
 // (`animSlotMoveDelta`) and the live=home write of mode 7 / the placement FIGHTSTG_F0x80087f38
 // (`resetAnimSlotLiveToHome`). This file consumes those instead of hand-writing them.
-import { animSlotMoveDelta, resetAnimSlotLiveToHome } from "../vendor/engine.js";
+import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from "../vendor/engine.js";
 
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
 // Real motion advances ~1–4 frames/tick (the vsync delta); phase cuts jump by hundreds. 16 cleanly
@@ -52,11 +52,91 @@ export function clipTableSeq(model, clip) {
   return seq;
 }
 
+// ── A15: idle-hidden mesh parts ─────────────────────────────────────────────────────────────────────
+// A pack can carry a mesh its IDLE never shows: the game hides it with a ch3 scale of 0. Boltmon carries
+// the AXE HE THROWS as a second mesh (same verts/faces as the one in his hand) and the pack's ch3 shows
+// it only inside the throw clip's own frame window - and past the end of its key list on some packs.
+// A BUILT action borrows another clip's body (spellFromBasic replays the basic attack; bodyFromTable
+// replays an authored table), so that window can pop the part into view beside the held one: the
+// operator's "a second axe appears". For a synthesized action the renderer is told to keep those parts
+// off, using the SAME scale-0 mechanism the disc itself uses, unless the model's OWN action for that
+// clip number draws the part (then it is the author's choice). Authored clips keep what the disc drew.
+const _idleHiddenCache = new WeakMap();
+
+/** Linear read of a ch3 scale channel ([x,y,z,frame] keys, 4096 = 1.0) at `frame`. */
+function interpCh(ch, frame) {
+  if (!Array.isArray(ch) || !ch.length) return [4096, 4096, 4096];
+  let prev = null;
+  for (const k of ch) {
+    const f = k[3] | 0;
+    if (f === 30000) break;
+    if (f <= frame) { prev = k; continue; }
+    if (!prev) return [k[0], k[1], k[2]];
+    const span = (f - (prev[3] | 0)) || 1;
+    const t = (frame - (prev[3] | 0)) / span;
+    return [prev[0] + (k[0] - prev[0]) * t, prev[1] + (k[1] - prev[1]) * t, prev[2] + (k[2] - prev[2]) * t];
+  }
+  return prev ? [prev[0], prev[1], prev[2]] : [4096, 4096, 4096];
+}
+
+/** Mesh parts (bone indices) the model's own IDLE never shows: ch3 scale < 0.05 at every idle frame. */
+export function idleHiddenParts(model) {
+  if (!model || !model.bones) return [];
+  if (_idleHiddenCache.has(model)) return _idleHiddenCache.get(model);
+  const tab = model.timeline?.[0]?.table ?? [];
+  const frames = tab.filter((e) => (e.value | 0) < 0x8000).map((e) => e.value | 0);
+  const at = frames.length ? frames : [0];
+  const out = [];
+  for (let b = 0; b < model.bones.length; b++) {
+    const bone = model.bones[b];
+    if (!bone?.anim?.ch3 || !(bone.faces || []).length) continue;
+    let hi = 0;
+    for (const f of at) {
+      const s = interpCh(bone.anim.ch3, f);
+      hi = Math.max(hi, Math.abs(s[0]), Math.abs(s[1]), Math.abs(s[2]));
+    }
+    if (hi / 4096 < 0.05) out.push(b);
+  }
+  _idleHiddenCache.set(model, out);
+  return out;
+}
+
+/** Does the model's OWN action for `clip` draw `bone` (ch3 scale >= 0.05 anywhere in its tables)? */
+function ownClipShowsPart(model, clip, bone) {
+  const act = model?.actions?.[clip];
+  const ops = act?.ops;
+  if (!Array.isArray(ops)) return false;
+  const ch3 = model.bones?.[bone]?.anim?.ch3;
+  if (!ch3) return false;
+  const tables = new Set();
+  for (const o of ops) if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tables.add(o.words[2] | 0);
+  for (const t of tables) {
+    const tab = model.timeline?.[t]?.table;
+    if (!Array.isArray(tab)) continue;
+    for (const e of tab) {
+      const v = e.value | 0;
+      if (v & 0x8000) continue;
+      const s = interpCh(ch3, v);
+      if (Math.max(Math.abs(s[0]), Math.abs(s[1]), Math.abs(s[2])) / 4096 >= 0.05) return true;
+    }
+  }
+  return false;
+}
+
+/** The idle-hidden parts a synthesized `clip` must not draw, or null when there are none to hide. */
+export function hiddenPartsFor(model, clip) {
+  const hid = idleHiddenParts(model);
+  if (!hid.length) return null;
+  const out = hid.filter((b) => !ownClipShowsPart(model, clip, b));
+  return out.length ? out : null;
+}
+
 export class ActorAnimator {
   constructor(model) {
     this.model = model;
     this.vm = null;                          // active ActionVM, or null while idle
     this._clip = 0;                          // clip index of the active action (drives its motion table)
+    this._hidden = null;                     // A15: idle-hidden parts forced off during a BUILT action
     this.frame = model?.clips?.[0]?.start_frame ?? 0;
     this.blend = null;                       // active pose blend ({from,t}) this tick, or null
     this._dbgLoop = null;                    // fight-action-lab: table list to re-loop, or null
@@ -232,6 +312,7 @@ export class ActorAnimator {
     this._heldPose = false;
     this._holdFinalPose = false;
     this._handoffFrom = null;
+    this._hidden = null;
     this._timelineCycleComplete = false;
     this.idle = (table && table.length) ? new TimelinePlayer(table) : this._idlePlayer();
   }
@@ -252,6 +333,7 @@ export class ActorAnimator {
     this._heldPose = false;
     this._holdFinalPose = false;
     this._timelineCycleComplete = false;
+    if (this._handoffFrom == null) this._hidden = null;   // A15: keep the built part hidden through the ease
     this.idle = this._idlePlayer();
   }
 
@@ -264,9 +346,13 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip, hooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1 } = {}) {
-    // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js)
-    const script = (clip != null) ? resolveClipScript(this.model, clip, { element }) : null;
+  setAction(clip, hooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+    // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js);
+    // a heal/support technique or an item use (target "self") gets the calm self-cast build instead of an attack body
+    const script = (clip != null) ? resolveClipScript(this.model, clip, { element, target, hits, planted, tech }) : null;
+    // A15: a BUILT action may replay a body authored for another clip, whose ch3 window can show a part
+    // the idle keeps hidden (the duplicate axe). Hold that part off for the action (and the idle handoff).
+    this._hidden = script?.synthesized ? hiddenPartsFor(this.model, clip) : null;
     // a donor-built script keeps its camera operands as the donor authored them (see clip-fallback.js)
     this._camFromDonor = script?.camAuthored === "donor";
     if (script && Array.isArray(script.ops) && script.ops.length) {
@@ -310,6 +396,7 @@ export class ActorAnimator {
   setScript(script, hooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
     if (!script || !Array.isArray(script.ops) || !script.ops.length) return false;
     this._clip = -1;
+    this._hidden = null;
     const h2 = {
       ...hooks,
       onMove: (rec) => { this._onMove(rec); hooks.onMove?.(rec); },
@@ -359,7 +446,25 @@ export class ActorAnimator {
   // the fixed 0x2e effect).
   setAnimByTech(techId, hooks = {}) {
     const rec = techRecord(techId);
-    return this.setAction(techToClip(techId), hooks, { currentEffect: techEffectType(rec), element: rec?.elem1 ?? 1 });
+    // The technique's own hit count: the record's +0x0A dispatch byte over the SKILLS row, which is the
+    // row that carries `hits` (digimon.json "skills"). Feeding the extracted table row alone read its
+    // numeric `effect` column as "dispatch 2" and answered 1 for every dispatch-9 technique (Triple Fire,
+    // Hammer Rush...), so every built volley fired one contact instead of three (A12).
+    const sk = skillRow(techId);
+    const hits = (sk || rec)
+      ? basicAttackHitCount(false, { effect_id: rec?.dispatch ?? 2, hits: sk?.hits ?? rec?.hits ?? 1 })
+      : null;
+    return this.setAction(techToClip(techId), hooks, {
+      currentEffect: techEffectType(rec), element: rec?.elem1 ?? 1, target: techTargetClass(techId),
+      // the technique's own hit count (the one dispatch rule the damage applier uses), so a built cast
+      // fires exactly as many contacts as the record's hits
+      hits,
+      // a magical technique is a cast whatever clip the record names: its body never lunges (C5)
+      planted: rec?.attack_category === "magical",
+      // K13: the technique's NAME keys the anatomy's shots rule - how many projectiles leave and from
+      // which emitter bones (a three-mouthed body fires three fireballs for Triple Fire)
+      tech: techName(techId),
+    });
   }
 
   // The item's use clip AND its effect type: the item machine's default arm plays clip 10 and
@@ -369,7 +474,7 @@ export class ActorAnimator {
   // the original leaves the fresh actor's field alone.
   setAnimByItem(itemId, hooks = {}) {
     const rec = itemUseEffect(itemId);
-    return this.setAction(ITEM_USE_CLIP, hooks, { currentEffect: rec?.effect ?? null });
+    return this.setAction(ITEM_USE_CLIP, hooks, { currentEffect: rec?.effect ?? null, target: itemTargetClass(itemId) });
   }
 
   // "Active" = something authored is driving the frame (a running VM, or the idle table while
@@ -417,7 +522,7 @@ export class ActorAnimator {
     // idle frame, so the pose morphs from the attack's end pose into the walking idle.
       if (this._handoffFrom != null) {
         this._handoffT += speed / HANDOFF_TICKS;
-        if (this._handoffT >= 1) { this._handoffFrom = null; }
+        if (this._handoffT >= 1) { this._handoffFrom = null; this._hidden = null; }
         else this.blend = { from: this._handoffFrom, t: this._handoffT };
       }
     }
@@ -432,6 +537,10 @@ export class ActorAnimator {
   }
 
   currentFrame() { return this.frame; }
+
+  // A15: the mesh parts this action must not draw (idle-hidden parts of the model, held off while a
+  // synthesized action replays another clip's body). null = draw everything the pack's ch3 says.
+  currentHiddenParts() { return this._hidden; }
 
   // The pose blend ({from,t}) for this tick, or null — consumed by buildBoneWorldMatrices so
   // timeline blend segments morph the pose smoothly instead of snapping. See timeline-player.js.

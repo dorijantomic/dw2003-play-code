@@ -48,6 +48,7 @@ import { createWfightNative } from "./wfightmn-native.js";
 import { createWfightTranslated } from "./wfight-translated.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
+import { contactDamager } from "./fight/contact-damage.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
 import {
@@ -4440,6 +4441,32 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   /**
+   * The per-contact damage of a multi-contact action (A12) — the arithmetic lives in
+   * web/fight/contact-damage.js so the contract is testable without a battle.
+   *
+   * A built combo/volley presents several `op10 98` contacts before its single `op10 99`
+   * strike (clip 8 = 2x98+1x99, clip 13 = 2x98+1x99, a 4-hit basic = 3x98+1x99 — the disc's
+   * own authored shapes). Each contact is one of the technique's hits, so the damage comes
+   * off the victim hit by hit: an intermediate contact takes ONE hit's value (the
+   * resolver's `dmgPerHit`, the value the original computes once for the whole action),
+   * and the final strike takes the remainder, so the sum over the contacts is exactly the
+   * resolved total — never the total per contact, never a lost remainder. The page,
+   * the ailment/weapon/steal/dispatch machinery and the hit gauge stay on the FINAL
+   * commit, which is also where the defender's outcome clip (2 survive / 3 death /
+   * 4 evade) is dispatched — an intermediate flinch (clip 1) can never end the fight,
+   * and the intermediates are capped so the victim is still standing for the strike
+   * that carries the death reaction.
+   */
+  function armContactDamage(target, total, dmgPerHit, attempts) {
+    return contactDamager({
+      total, perHit: dmgPerHit, hits: attempts, hp: target.hp,
+      pay: (amount) => { target.hp = Math.max(0, target.hp - amount); },
+    });
+  }
+  /** Wire a damager to a renderer's contact callback: intermediate contacts pay a hit, the strike commits. */
+  const contactOnHit = (contact, commit) => (rec) => { if (contact.onHit(rec)) commit(); };
+
+  /**
    * A counter is an attack of its own: the defender swings back at the attacker AFTER the blow that provoked it has
    * played out. It used to subtract the HP and print the line the instant the blow landed, so the damage appeared on
    * the attacker with no swing at all. Now the outcome is decided where the blow lands (so the page can say it), and
@@ -6411,26 +6438,28 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // below 2 the Multi Crest three-hit diversion (clip outside {0xb,0xc}), anything
       // else one. The enemy's action runs the same function below.
       const attempts = basicAttackHitCount(b.player.multiAttack, skill);
-      let total = 0, landed = 0;
+      let total = 0, landed = 0, perHit = 0;
       if (attempts > 1) {
         // F0x8009d4b8: the damage value is computed once (accuracy #1 first, then
         // the leaf with its single critical roll) and each further attempt re-rolls
         // only accuracy on that same value. Re-rolling damage here was the
         // browser's divergence (BATTLE-Q004-ROLLTABLE-001).
         const r = resolveMultiHit(b.player, b.enemy, skill, attempts, RAND_U16, b.field);
-        total = r.dmg; landed = r.landed;
+        total = r.dmg; landed = r.landed; perHit = r.dmgPerHit;
       } else {
         const r = resolveAttack(b.player, b.enemy, skill, RAND_U16, b.field);
-        if (r.hit) { total += r.dmg; landed++; }
+        if (r.hit) { total += r.dmg; landed++; perHit = r.dmg; }
       }
       const hit = landed > 0;
       if (hit) {
         total = finalizePlayerDamage(b, total); const lethal = total >= b.enemy.hp;
+        // the damage comes off contact by contact (A12); the final strike pays the remainder
+        const contact = armContactDamage(b.enemy, total, perHit, landed);
         let committed = false;
         const commitImpact = () => {
           if (committed) return;
           committed = true;
-          b.enemy.hp = Math.max(0, b.enemy.hp - total);
+          b.enemy.hp = Math.max(0, b.enemy.hp - contact.remaining());
           if (total > 0) recordFinaleTechnique(b, basicTechId);   // the finale's latch (F0x800aa06c), before the wrapper
           if (total > 0) noteFinalBossPhaseDamage(b);   // the final boss's 3rd landed blow switches boss04 on
           let message = `${enemyName} took ${total} damage!`;
@@ -6490,7 +6519,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         armPendingImpact(b, commitImpact);
         const started = renderer3d?.playerAttack(b.player.profile.tech_basic, {
           lethal,
-          onHit: (rec) => { if (rec.type === 99) commitImpact(); },
+          onHit: contactOnHit(contact, commitImpact),
         });
         if (!started) commitImpact();
       } else {
@@ -6588,28 +6617,30 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // `:28470 j .L0x8009e3c8` for every other category).
       // F0x8009d4b8: multi-hit applier re-rolls only accuracy on one computed
       // damage value. Miss only if all whiff.
-      let total = 0, healTotal = 0, anyHit = false;
+      let total = 0, healTotal = 0, anyHit = false, perHit = 0, landedHits = 1;
       if (restoreRecord?.dispatch === DAMAGE_TERM_REPEAT_WORD) {
         // FIGHTSTG_F0x8009ddd8: the dispatch-byte-0x1f arm. Two hit slots, each with its
         // own accuracy roll and its own damage leaf, summed by the record machine. The
         // one disc technique that reaches it is 406 Back Storm.
         const r = resolveRepeatDispatch(b.player, b.enemy, skill, 0, b.field);
-        total = r.total; anyHit = r.landed > 0;
+        total = r.total; anyHit = r.landed > 0; perHit = total; landedHits = Math.max(1, r.landed | 0);
       } else if (hits > 1) {
         const r = resolveMultiHit(b.player, b.enemy, skill, hits, RAND_U16, b.field);
-        total = r.dmg; healTotal = r.heal; anyHit = r.hit;
+        total = r.dmg; healTotal = r.heal; anyHit = r.hit; perHit = r.dmgPerHit; landedHits = Math.max(1, r.landed | 0);
       } else {
         const r = resolveAttack(b.player, b.enemy, skill, RAND_U16, b.field);
-        if (r.hit) { total += r.dmg; healTotal += r.heal; anyHit = true; }
+        if (r.hit) { total += r.dmg; healTotal += r.heal; anyHit = true; perHit = r.dmg; landedHits = 1; }
       }
       const elemTag = (skill.element && skill.element !== "normal") ? ` [${skill.element}]` : "";
       if (anyHit) {
         total = finalizePlayerDamage(b, total); const lethal = total >= b.enemy.hp;
+        // the damage comes off contact by contact (A12); the final strike pays the remainder
+        const contact = armContactDamage(b.enemy, total, perHit, landedHits);
         let committed = false;
         const commitImpact = () => {
           if (committed) return;
           committed = true;
-          b.enemy.hp = Math.max(0, b.enemy.hp - total);
+          b.enemy.hp = Math.max(0, b.enemy.hp - contact.remaining());
           if (total > 0) recordFinaleTechnique(b, actionTechId);   // the finale's latch (F0x800aa06c), before the wrapper
           if (total > 0) noteFinalBossPhaseDamage(b);
           let message = `${enemyName} took ${total} damage!`;
@@ -6668,7 +6699,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         armPendingImpact(b, commitImpact);
         const started = renderer3d?.playerAttack(skill.id ?? b.player.profile.tech_basic, {
           lethal,
-          onHit: (rec) => { if (rec.type === 99) commitImpact(); },
+          onHit: contactOnHit(contact, commitImpact),
         });
         if (!started) commitImpact();
       } else {
@@ -6957,19 +6988,19 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
     // F0x8009d4b8: the multi-hit applier re-rolls only accuracy on one computed
     // damage value. Miss only if all whiff.
-    let total = 0, healTotal = 0, anyHit = false;
+    let total = 0, healTotal = 0, anyHit = false, perHit = 0, landedHits = 1;
     if (restoreRecord?.dispatch === DAMAGE_TERM_REPEAT_WORD) {
       // FIGHTSTG_F0x8009ddd8 on the enemy's side too: the one disc record with dispatch
       // byte 0x1f is 406 Back Storm, which is Raijinmon's `move_2` in enemies.json. Two
       // hit slots, each rolled and computed independently, summed by the record machine.
       const r = resolveRepeatDispatch(en, b.player, skill, 1, b.field);
-      total = r.total; anyHit = r.landed > 0;
+      total = r.total; anyHit = r.landed > 0; perHit = total; landedHits = Math.max(1, r.landed | 0);
     } else if (hits > 1) {
       const r = resolveMultiHit(en, b.player, skill, hits, RAND_U16, b.field);
-      total = r.dmg; healTotal = r.heal; anyHit = r.hit;
+      total = r.dmg; healTotal = r.heal; anyHit = r.hit; perHit = r.dmgPerHit; landedHits = Math.max(1, r.landed | 0);
     } else {
       const r = resolveAttack(en, b.player, skill, RAND_U16, b.field);
-      if (r.hit) { total += r.dmg; healTotal += r.heal; anyHit = true; }
+      if (r.hit) { total += r.dmg; healTotal += r.heal; anyHit = true; perHit = r.dmg; landedHits = 1; }
     }
     const elemTag = (skill?.element && skill.element !== "normal") ? ` [${skill.element}]` : "";
     const skillName = skill?.name && skill.name !== "Fight" ? skill.name : null;
@@ -6983,11 +7014,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (!skillName) sayOriginal(b, attackSpec(b, name), `${name} attacks!`);
     if (anyHit) {
       const lethal = total >= b.player.hp;
+      // the enemy's blow comes off contact by contact too (A12)
+      const contact = armContactDamage(b.player, total, perHit, landedHits);
       let committed = false;
       const commitImpact = () => {
         if (committed) return;
         committed = true;
-        b.player.hp = Math.max(0, b.player.hp - total);
+        b.player.hp = Math.max(0, b.player.hp - contact.remaining());
         // The disc's hit-gain gate (wfightmn 0x4330 = 0x800aa110): no gain on a lethal hit, nor while Blast is up.
         const hitGain = hitGaugeGain(total, b.player.maxHp, b.player.hp, { blastActive: !!b.blast?.active, accessories: b.player.gaugeAccessories });
         if (hitGain !== null) {   // the writer ran; `null` means it short-circuited on a KO or a Blast [BLAST-C002]
@@ -7054,7 +7087,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       armPendingImpact(b, commitImpact);
       const started = renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, {
         lethal,
-        onHit: (rec) => { if (rec.type === 99) commitImpact(); },
+        onHit: contactOnHit(contact, commitImpact),
       });
       if (!started) commitImpact();
     } else {

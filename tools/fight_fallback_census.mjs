@@ -11,13 +11,22 @@ import url from "url";
 const HERE = path.dirname(url.fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, "..", "web");
 const { ActorAnimator } = await import(url.pathToFileURL(path.join(WEB, "fight/actor-animator.js")));
-const { setFallbackDonor } = await import(url.pathToFileURL(path.join(WEB, "fight/clip-fallback.js")));
+const { setFallbackDonor, setDonorLoader, prepareModelDonors } = await import(url.pathToFileURL(path.join(WEB, "fight/clip-fallback.js")));
 
 const MODELS = path.join(WEB, "assets/battle/models");
 const manifest = JSON.parse(fs.readFileSync(path.join(WEB, "assets/battle/effects/manifest.json"), "utf8"));
 const KNOWN = new Set(Object.keys(manifest.types).map(Number));
 const donor = JSON.parse(fs.readFileSync(path.join(MODELS, "m005grey/anim.json"), "utf8"));
 setFallbackDonor(donor.actions);
+// the A2 donor plan's per-gap donors live on disk here; the browser fetches the same files (clip-fallback.js)
+const donorCache = new Map();
+setDonorLoader((folder) => {
+  if (!donorCache.has(folder)) {
+    const file = path.join(MODELS, folder, "anim.json");
+    donorCache.set(folder, fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null);
+  }
+  return Promise.resolve(donorCache.get(folder));
+});
 
 const CLIPS = [6, 8, 9, 10, 11, 13, 15, 16];
 const has = (m, c) => !!m.actions?.[c]?.ops?.length && !m.actions[c].ops.every((o) => o.op === 0 || o.op === 255);
@@ -27,6 +36,7 @@ for (const folder of fs.readdirSync(MODELS).sort()) {
   const file = path.join(MODELS, folder, "anim.json");
   if (!fs.existsSync(file)) continue;
   const model = JSON.parse(fs.readFileSync(file, "utf8"));
+  await prepareModelDonors(model);
   for (const clip of CLIPS) {
     if (has(model, clip) || !has(donor, clip)) continue;
     filled++;

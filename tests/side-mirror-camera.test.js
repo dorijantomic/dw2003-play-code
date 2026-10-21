@@ -42,11 +42,12 @@ test("Meramon is an enemy-authored script, and a clip of it opens on preset 1 (t
   assert.ok(presets.includes(1), "the authored cut is preset 1");
 });
 
-// A script built from a DONOR keeps the camera the donor authored for our side; a script built from the model OWN basic
-// attack keeps the model own (enemy-authored) camera. Only the second is turned around (battle3d _camHookFor).
+// A script built from a DONOR or the model's own body drops the authored camera CUT: an op5 preset names a
+// SLOT, so a cut written for the donor frames the wrong fighter once the script is mirrored (A10/A11 C8).
+// A built script is therefore always marked "own" and carries no op5; only an owner's own clip keeps its cut.
 import { setFallbackDonor, resolveClipScript } from "../web/fight/clip-fallback.js";
 
-test("a donor-built script is marked, so its camera is not turned a second time", () => {
+test("a built script drops the authored cut and is marked own, so the camera is not turned twice", () => {
   const donor = [];
   donor[9] = { ops: [{ op: 5, words: [0, 0, 3] }, { op: 255, words: [] }] };      // a spell: a camera preset, then end
   donor[6] = { ops: [{ op: 255, words: [] }] };
@@ -55,11 +56,11 @@ test("a donor-built script is marked, so its camera is not turned a second time"
   model.actions[5] = { ops: [{ op: 2, words: [0, 0, 2] }, { op: 5, words: [0, 0, 1] }, { op: 255, words: [] }] };   // its own basic attack
   model.timeline = { 2: { table: [1] } };
   const spell = resolveClipScript(model, 9, { element: 2 });
-  assert.equal(spell.camAuthored, "donor");
-  assert.deepEqual(spell.ops.find((o) => o.op === 5).words, [0, 0, 3], "the donor camera operands are untouched");
+  assert.equal(spell.camAuthored, "own", "a built spell carries no donor cut");
+  assert.equal(spell.ops.find((o) => o.op === 5), undefined, "the donor's preset is dropped");
   const combo = resolveClipScript(model, 6, { element: 1 });
-  assert.equal(combo.camAuthored, "own", "a combo is the model own basic attack plus the effect");
-  assert.deepEqual(combo.ops.find((o) => o.op === 5).words, [0, 0, 1]);
+  assert.equal(combo.camAuthored, "own", "a combo is the model's own basic attack plus the effect");
+  assert.equal(combo.ops.find((o) => o.op === 5), undefined, "and its own cut is dropped too");
   assert.equal(resolveClipScript(model, 5), model.actions[5], "its own clip is returned as it is");
   setFallbackDonor(null);
 });
