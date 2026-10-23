@@ -203,7 +203,7 @@
       <label><input type="checkbox" id="loop" checked> loop</label>
       <label>speed <input id="speed" type="range" min="0.1" max="2" step="0.1" value="1"><span id="speedOut">1.0×</span></label>
       <label id="dw2ClipWrap" class="hidden">clip <select id="dw2Clip"></select></label>
-      <label id="lblBake" title="A DW3 body playing a Digimon World 2 motion: a K21d bake (dev-only source, never in the repo)">baked <select id="bakeSel"><option value="">— own motion —</option></select></label>
+      <label id="lblBake" title="A DW3 body playing a Digimon World 2 motion: a K21d bake (dev-only source, never in the repo)">baked <select id="bakeSel"><option value="">— own motion —</option></select></label><button id="bakePrev" title="previous baked DW2 motion of this Digimon">◀</button><button id="bakeNext" title="next baked DW2 motion of this Digimon">▶</button>
       <button id="abBtn" class="hidden" title="A/B: the baked DW2 motion vs this body's own DW3 clip, same frame and camera">A/B</button>
       <button id="cmpBtn" class="hidden" title="Compare: the DW2 original of this clip beside this body playing the baked motion, in sync, with a per-role table">Compare</button>
       <label id="lblCmpGhost" class="hidden" title="Outline where each model was at frame 0, and the floor grid those outlines stand on"><input type="checkbox" id="cmpGhost" checked> frame-0 ghost</label>
@@ -702,6 +702,7 @@ async function loadEntry(folder, { user = false, bake = null, generic = null, dw
   if (tick) seek(tick);      // A/B keeps the frame you were looking at
   refreshGenericPanel();
   refreshDw2Panel();
+  renderBakePicker();
 }
 
 // ── K21f: DW3 body + DW2 motion bakes ───────────────────────────────────────────────────────────
@@ -791,21 +792,57 @@ function bakeSelectValue(id) {
   $("abBtn").classList.toggle("hidden", state.src === "dw2" || !state.bake);
   $("cmpBtn").classList.toggle("hidden", state.src === "dw2" || !state.bake);
 }
+/** The picker: this Digimon's baked DW2 motions first (clip + version), then every other Digimon's (the old long list). Rebuilt whenever the body changes. */
+let bakeRegAll = null;
+const BAKE_ORDER = ["F", "G", "H", "I", "K", "C0", "C1", "C2", "J", "B"];
+const bakeTag = (id) => String(id).replace(/^.*-(?:dw2|gen)/, "");
+const bakeVer = (id) => (/\d([a-z])$/.exec(id)?.[1] ?? "");
+function bakeOldLabel(r) {
+  const name = (byFolder.get(r.folder)?.name) || r.folder;
+  return `${name} · DW2-${r.letter || "?"}${r.clip != null ? ` → clip ${r.clip}` : ""}${r.table != null ? ` (table ${r.table})` : ""}`;
+}
+function bakeThisLabel(r) {
+  if (!r.label) return `DW2 clip ${r.letter || "?"} · ${bakeTag(r.id)}`;
+  const note = /\[[^\]]+\]/.exec(r.label)?.[0] ?? "";
+  const core = r.label.replace(/^AUTO [^:]+:\s*/, "").replace(/,? on the DW3 body \(not reviewed\)/, "").replace(/\s*\[[^\]]+\]/, "");
+  return `${core} · ${bakeTag(r.id)} ${note}`.trim();
+}
+function renderBakePicker() {
+  const s = $("bakeSel"); if (!s || !bakeRegAll) return;
+  const keep = state.bake?.id ?? s.value, cur = state.bake?.folder || curFolder();
+  const ord = (r) => { const i = BAKE_ORDER.indexOf(r.letter); return i < 0 ? 99 : i; };
+  const mine = bakeRegAll.rows.filter((r) => r.folder === cur).sort((x, y) => ord(x) - ord(y) || bakeVer(y.id).localeCompare(bakeVer(x.id)) || String(x.id).localeCompare(String(y.id)));
+  const others = bakeRegAll.rows.filter((r) => r.folder !== cur);
+  s.replaceChildren(el("option", { value: "", textContent: "— own motion —" }));
+  if (mine.length) {
+    const g = el("optgroup", { label: `${(byFolder.get(cur)?.name) || cur}: ${mine.length} baked DW2 motions (newest version first)` });
+    for (const r of mine) g.append(el("option", { value: r.id, textContent: bakeThisLabel(r), title: r.id }));
+    s.append(g);
+  }
+  const g2 = el("optgroup", { label: `all other Digimon (${others.length})` });
+  for (const r of others) g2.append(el("option", { value: r.id, textContent: bakeOldLabel(r), title: r.id }));
+  s.append(g2);
+  s.value = keep && [...s.options].some((o) => o.value === keep) ? keep : "";
+  const prev = $("bakePrev"), next = $("bakeNext"); if (prev) prev.disabled = next.disabled = !mine.length;
+  s.title = bakeRegAll.manifest ? `${mine.length} baked DW2 motions for this Digimon; ${bakeRegAll.rows.length} in all` : `no manifest at ${BAKE.bakeIndexUrl(bakeRegAll.root)} — listing K21d's 5 bakes`;
+}
 /** Fill the picker from the manifest (or K21d's 5 bakes when no manifest is served). */
 async function fillBakePicker() {
   const s = $("bakeSel");
   if (!s) return null;
   const reg = await bakeRegistry();
-  s.replaceChildren(el("option", { value: "", textContent: "— own motion —" }));
-  for (const r of reg.rows) {
-    const name = (byFolder.get(r.folder)?.name) || r.folder;
-    const label = `${name} · DW2-${r.letter || "?"}${r.clip != null ? ` → clip ${r.clip}` : ""}${r.table != null ? ` (table ${r.table})` : ""}`;
-    s.append(el("option", { value: r.id, textContent: label, title: r.id }));
-  }
-  if (!reg.manifest) s.title = `no manifest at ${BAKE.bakeIndexUrl(reg.root)} — listing K21d's 5 bakes`;
+  bakeRegAll = reg;
+  renderBakePicker();
   return reg;
 }
-
+/** ◀ ▶: step through this Digimon's baked motions (own motion -> first -> ... -> last -> own motion). */
+function stepBake(dir) {
+  const s = $("bakeSel"); if (!s) return;
+  const ids = ["", ...[...s.querySelectorAll("optgroup")][0]?.label?.includes("baked DW2 motions") ? [...s.querySelectorAll("optgroup")[0].querySelectorAll("option")].map((o) => o.value) : []];
+  if (ids.length < 2) { toast("this Digimon has no baked DW2 motion"); return; }
+  const i = Math.max(0, ids.indexOf(s.value)), j = (i + dir + ids.length) % ids.length;
+  s.value = ids[j]; s.dispatchEvent(new Event("change"));
+}
 
 // ── generic motions ─────────────────────────────────────────────────────────────────────────────
 // Pick any generic motion for the Digimon on screen: the generator (web/fight/generic-motion.js, or the
@@ -1762,6 +1799,8 @@ $("bakeSel").onchange = async () => {
   bakeSelectValue(row ? row.id : "");
   writeUrl();
 };
+$("bakePrev").onclick = () => stepBake(-1);
+$("bakeNext").onclick = () => stepBake(1);
 $("abBtn").onclick = () => { if (cmp.on) leaveCompare(); flipAB(); writeUrl(); };
 $("cmpBtn").onclick = async () => {
   if (cmp.on) { leaveCompare(); return; }

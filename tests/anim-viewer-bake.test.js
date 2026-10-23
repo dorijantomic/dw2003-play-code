@@ -31,6 +31,12 @@ test("a bake folder is <body>-dw2<letter> and nothing else", () => {
   assert.equal(isBakeFolder("dw2bake:m050coca"), false, "the renderer's folder is the bake id itself");
   assert.equal(isBakeFolder("m050coca-dw2FF"), false);
   assert.equal(isBakeFolder("m050coca-dw2"), false);
+  // a rebuild tag (one lowercase letter after the digits) keeps the id a bake: genX1b, genX1c (a new id so the browser cache cannot hide a rebuild)
+  assert.equal(isBakeFolder("m040andr-genX1c"), true);
+  assert.equal(isBakeFolder("m040andr-genX1b"), true);
+  assert.equal(bakeRealFolder("m040andr-genX1c"), "m040andr");
+  assert.equal(isBakeFolder("m040andr-genX1cc"), false);
+  assert.equal(isBakeFolder("m040andr-genX1C"), false);
   assert.equal(bakeRealFolder("m050coca-dw2F"), "m050coca");
   assert.equal(bakeLetter("m050coca-dw2F"), "F");
   assert.equal(bakeRealFolder("nope"), null);
