@@ -215,6 +215,11 @@
       "name": "Cipher",
       "look": "armoured security unit in dark plating with a blue chest gem, red visor and gold headphones",
       "voice": "terse and precise, talks like a system message with Query and Status lines, quietly curious about people and learning jokes"
+    },
+    "1006": {
+      "name": "Unimon",
+      "look": "a winged white horse Digimon with a horn and a red-gold helmet, lying hurt beside a hole in the park",
+      "voice": "proud and tired, slow words, warms up once helped; calls the player little one"
     }
   },
   "_threads": {

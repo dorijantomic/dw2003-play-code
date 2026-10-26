@@ -46,6 +46,19 @@
           "dir": "down-left"
         }
       ]
+    },
+    {
+      "npc_id": 1006,
+      "name": "Unimon",
+      "sheet": "data/authored/quests/art/unimon_blank.png",
+      "residents": [
+        {
+          "map": "s330",
+          "x": 664,
+          "y": 556,
+          "dir": "down"
+        }
+      ]
     }
   ]
 }

@@ -22,11 +22,16 @@ import {
 import { createEditor } from "./editor.js";
 import { renderGrass, GRASS_VIEW } from "./grass3d.js"; // EXPERIMENT: 3D grass
 import { renderWater, WATER_VIEW } from "./water3d.js"; // EXPERIMENT: 3D water
+import {
+    installMount, mountTick, mountPress, mountRiding, mountHidesFollowers, mountSpeedFactor,
+    mountRiderLift, mountRiderShiftX, mountRiderCutRow, mountPlayerLatch, mountDrawable, mountForceDismount, moveWithSubSteps,
+    mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
+} from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
-import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount } from "./quests.js";
+import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount, questDone } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
@@ -281,7 +286,7 @@ import {
     loadFieldcom,
     fieldcomReady,
     drawFieldcomIcon,
-    drawFieldShadow,
+    drawFieldShadow, drawGroundShadow,
     drawIndicatorBubble,
     drawStoryBubble,
     drawSparkleActor,
@@ -555,6 +560,33 @@ installQuests({
     },
 });
 if (/[?&]questlab=1\b/.test(location.search)) import("./quest-lab.js");   // test panel for the extra quests
+
+// EXPERIMENT (mounts): the game-side hooks the ride needs. The mount layer itself is web/mount.js; it is OFF
+// unless F2 -> Extras -> Mount is on AND a quest unlocked a mount (the quest layer's own done state, never a
+// story flag). `canStand` is this file's own foot-box test, so a dismount spot is the game's walkable ground.
+installMount({
+    groundShadow: (c, x, y, w, h, alpha) => drawGroundShadow(c, x, y, w, h, alpha),
+    state: () => state,
+    enabled: () => window.__fx?.mount === true,
+    questDone: (id) => questDone(id),
+    canStand: (x, y) => {
+        const grid = state.collision[currentMap()?.id];
+        return !!grid && !boxStuck(grid, x, y)
+            && x >= 12 && y >= 8 && x <= currentMap().width - 12 && y <= currentMap().height - 8;
+    },
+    resetFollowers: () => resetFollowers(),
+    placeFollowers: (spots) => placeFollowersAt(spots),
+    sfx: (id) => sfx.play(id),
+    fieldReady: () => !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+        && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry
+        && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm
+        && !state._questScene,
+    // anything that takes the field away sends the player off first (the map change and the ladder call
+    // mountForceDismount themselves; this catches the rest: a fight, a scene, a menu, a fade, a save load)
+    mustDismount: () => battle.isActive() || cutscene.isActive() || state.menuOpen || fade.dir !== 0
+        || state.wipe28 || state.diveDemo || textbox.isOpen() || choice.isOpen() || !!state.climb
+        || !!state.fishing || !!state.slope || !!state.submarimon || !!state.diveForm,
+});
 // Type-to-chat: T opens a line box, Enter shows it as a speech bubble over the player.
 installChat({
     stage: document.getElementById("stage"),
@@ -1571,6 +1603,29 @@ function resetFollowers() {
     state.stopTime = 0;
 }
 
+// EXPERIMENT (mounts): the party steps back into the world next to the mount, at the spots web/mount.js found
+// (walkable ground, nearest first) — never a snap across the map. The trail is re-seeded at the player so the
+// followers blend back into the conga line as the player walks off.
+function placeFollowersAt(spots) {
+    for (let i = 0; i < followers.length; i++) {
+        const s = spots?.[i];
+        if (!s) continue;
+        followers[i].x = s.x;
+        followers[i].y = s.y;
+        followers[i].parked = false;
+        followers[i].gathering = false;
+        followers[i].animTime = 0;
+        followers[i].stopping = false;
+        followers[i].stopTime = 0;
+    }
+    partnerHistory.splice(
+        0,
+        partnerHistory.length,
+        ...seedFollowerHistory({ x: state.x, y: state.y, dir: state.dir }),
+    );
+    fieldTickAccumulator = 0;
+}
+
 // After a party gather (story `SETANIM 813 823`) the followers' rings are all zero
 // records: at script END, 0x80084ecc state 3 reinstalls the follower hook 0x8008eae8
 // through resetHook 0x8008f004, but each follower keeps reading parked records until
@@ -2073,7 +2128,8 @@ function sceneCast(sc) {
     if (!sc) return [];
     // The shared rule lives in engine/dw3/npc-manager.ts `stageCast`; this adds the
     // script-spawned (ephemeral) actors the scene conjures onto scene.npcs.
-    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get);
+    // EXPERIMENT (mounts): a mount's quest character is off the map while F2 -> Extras -> Mount is off
+    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get).filter((n) => !mountActorHidden(n));
     const eph = sc.npcs.filter((n) => n._ephemeral);
     if (!eph.length) return built;
     const extra = eph.filter((e) => !built.includes(e));
@@ -3465,6 +3521,8 @@ document.addEventListener("visibilitychange", () => {
 
 async function startGame(mapId = null) {
     state.playerName ||= "Junior";
+    // EXPERIMENT (mounts): a save load (or a fresh start) begins on foot.
+    mountForceDismount();
     const saved = mapId
         ? null
         : decodeFieldLocation(localStorage.getItem(FIELD_LOCATION_KEY), knownStageIds);
@@ -3653,6 +3711,8 @@ function startPadHandoff() {
 }
 
 function startLadderClimb(scene) {
+    // EXPERIMENT (mounts): you cannot climb a ladder from the saddle — step off first.
+    mountForceDismount();
     // Which rail, which end and which side all come from the step record now. The
     // old private reading (a 22px radius over scene.ladders plus its own read of the
     // grid byte's facing group) is gone: it could arm a ladder the tile does not
@@ -3754,6 +3814,8 @@ const AMBUSH_LATCH_FLAG = 0x0f;
 // roll replaced by a fixed screen — same 1v1 rule as a wild walk-up encounter
 // (every one of the fourteen resolves to a single Digimon).
 function startAmbush(mapId, tile) {
+    // EXPERIMENT (mounts): a fight always starts on foot (the field hands over to the battle screen).
+    mountForceDismount();
     startFieldBattle(() => battle.startScreen(
         tile.screenId,
         (res) => presentVictory(res),
@@ -4349,6 +4411,8 @@ async function mpCoopRandom(mapId, x, y) {
 }
 
 function triggerRandomEncounter(mapId, x, y) {
+    // EXPERIMENT (mounts): a wild fight always starts on foot.
+    mountForceDismount();
     if (
         fieldPartySize(state.party) === 0 ||
         battle.isActive() ||
@@ -4768,6 +4832,9 @@ function grantNewPartners() {
 window.__grantNewPartners = grantNewPartners;
 
 function setMap(i, spawn = null) {
+    // EXPERIMENT (mounts): a map change always puts the player back on their own feet (no riding across a
+    // doorway, no mount left standing on the old map).
+    mountForceDismount();
     state.mapIdx =
         (i + state.manifest.maps.length) % state.manifest.maps.length;
     // The ambush-tile latch is PER VISIT. Its only mechanical job is to stop the
@@ -6950,6 +7017,12 @@ function dispatchInput(k, e, raw = "") {
         toggleGameFullscreen(document, document.getElementById("stage"));
         return;
     }
+    // EXPERIMENT (mounts): "r" rides / steps off, and only when F2 -> Extras -> Mount is on and a quest
+    // unlocked a mount (mountPress answers false otherwise, so the press falls through to everything else).
+    if (raw === "r" && !state.nameEntry && !e.ctrlKey && !e.metaKey && !e.altKey && mountPress(state)) {
+        e.preventDefault?.();
+        return;
+    }
     // Held pad state, for every screen and not only the field. Screens that own
     // the press (the open DRI, language select, shop, ...) return early below,
     // so a trailing add never ran while they held the key and their held-repeat
@@ -8145,6 +8218,14 @@ function update(dt) {
         return;
     }
 
+    // EXPERIMENT (mounts): the climb on / step off plays out on the field before anything else reads input
+    // (19 and 13 frames, the disc's own mount-onto-the-rail and step-off clip lengths). While RIDING this
+    // returns false: the player keeps the controls, faster, and the mount follows them.
+    if (mountTick(dt, state, { mapId: currentMap().id })) {
+        state.moving = false;
+        return;
+    }
+
     // Fishing. The op-7 scene controller raises the scene lock for the whole
     // cast (the replay saw leader mode 1 -> 0x48 and scene lock 0 -> 1 on the
     // frame of the press), so the D-pad is dead until the cast resolves — the
@@ -8579,6 +8660,12 @@ function update(dt) {
                     moveMag,
                     terrainCodeAt(grid, state.x, state.y),
                 );
+            // EXPERIMENT (mounts): riding multiplies the STEP, not the collision test. The step is split into
+            // sub-steps of the ordinary magnitude, so at 3x the foot box still meets every 16 px cell it crosses
+            // and no wall is tunnelled (tests/mount.test.js walks a 1-cell wall at every speed).
+            const mountStep = mountSpeedFactor();
+            const stepDx = delta.x * mountStep;
+            const stepDy = delta.y * mountStep;
             const moved = boxStuck(grid, state.x, state.y)
                 // A foot box already overlapping a blocked cell (a save written
                 // while the push trap existed, an editor-placed spawn) must never
@@ -8586,15 +8673,24 @@ function update(dt) {
                 // skipped, so the player can always walk back out — the same
                 // exemption the pre-push step model carried. With the push
                 // clamped below, nothing new can get in.
-                ? { x: state.x + delta.x, y: state.y + delta.y }
-                : moveWithCollision(
-                    grid,
-                    state.x,
-                    state.y,
-                    delta.x,
-                    delta.y,
-                    { w: 12, h: 8 },
-                );
+                ? { x: state.x + stepDx, y: state.y + stepDy }
+                : mountStep === 1
+                    ? moveWithCollision(
+                        grid,
+                        state.x,
+                        state.y,
+                        stepDx,
+                        stepDy,
+                        { w: 12, h: 8 },
+                    )
+                    : moveWithSubSteps(
+                        (x, y, dx, dy) => moveWithCollision(grid, x, y, dx, dy, { w: 12, h: 8 }),
+                        state.x,
+                        state.y,
+                        stepDx,
+                        stepDy,
+                        Math.hypot(delta.x, delta.y),
+                    );
             // The form's height on THIS tick. The buoyancy handler runs ahead of
             // the dispatcher and F0x8008de0c reads actor+0x64 at probe time, so
             // the height is read after the motion step above. Only Submarimon
@@ -8749,6 +8845,9 @@ function update(dt) {
         // controller-bit test in the stage-select overlay (stagslct file 0x2880).
         const encEligible =
             fieldPartySize(state.party) > 0 &&
+            // EXPERIMENT (mounts): no random encounters while riding — a mount is a way to cross a map, not a
+            // fight magnet.
+            !mountRiding() &&
             !m.id.startsWith("s78") &&
             !m.id.startsWith("s79") &&
             // Submarimon rolls only while THRUSTING: the thrust state 0x4b calls
@@ -9583,8 +9682,10 @@ function render() {
                 : state._inCutscene
                   ? (state._animTime ?? 0)
                   : state.animTime;
+            // EXPERIMENT (mounts): the rider stands still on the mount's back; the mount does the walking
+            const riderStill = mountRiding();
             const playerFrameIdx =
-                state.moving || state._cutTarget
+                (state.moving || state._cutTarget) && !riderStill
                     ? walkFrameIndex(timingForDir(c.frameDurations, state.dir), playerAnimTime)
                     : 0;
             // THE PLAYER'S CLIP → PACK RULE, once.
@@ -9606,10 +9707,13 @@ function render() {
             const fp = state.fishing;
             const tkr = treeKickHoldsInput(state.treeKick?.run) ? state.treeKick.run : null;
             const slp = state.slope;
+            // EXPERIMENT (mounts): the climb-on / step-off clip (p002plyl 28 / 31), the same pack the ladder uses.
+            const mnt = mountPlayerLatch();
             // The clip this frame's mode has latched, and the facing/direction it
             // plays it in — the two things a mode contributes. Null means the
             // ordinary field path, which keeps the character's own sprite.
-            const latched = cl ? { clip: cl.clip, dir: cl.dirStr ?? "up-right" }
+            const latched = mnt ? { clip: mnt.clip, dir: mnt.dir }
+                : cl ? { clip: cl.clip, dir: cl.dirStr ?? "up-right" }
                 : fp ? { clip: fp.pose.clip, dir: fp.dir }
                     : tkr ? { clip: tkr.pose.clip, dir: fieldDirectionFromIndex(tkr.facing) }
                         : slp ? { clip: slp.clip, dir: fieldDirectionFromIndex(slp.facing) }
@@ -9632,7 +9736,11 @@ function render() {
             // sub floats above it. state.x/state.y are untouched — collision,
             // exits and triggers all keep reading the ground position.
             const subLift = submarimonLiftPixels(state.submarimon);
-            const drawY = state.y - subLift;
+            // EXPERIMENT (mounts): riding lifts the rider onto the mount's back; the SHADOW keeps using the same
+            // lifted row (it is the mount's shadow that lies under him now, drawn by web/mount3d.js).
+            const drawY = state.y - subLift - mountRiderLift();
+            // EXPERIMENT (mounts, saddle split): the rider's billboard moves across onto the measured saddle point
+            const drawX = state.x + mountRiderShiftX();
             // The climb offset `entity+0x90`, fed to the shadow so it stays on
             // the ladder's FOOT while the billboard (drawn at `drawY`, already
             // offset-subtracted) climbs away from it. The modules hold +0x90 in
@@ -9644,7 +9752,8 @@ function render() {
                 && (cl.phase === "mount" || cl.phase === "dismount" || cl.phase === "climb")
                 && !window.__noClimbShadowOffset
                 ? Math.round(cl.progress * 256) : 0;
-            drawActorShadow(
+            // EXPERIMENT (mounts): on the mount the rider casts no shadow of its own; the mount's lies on the ground
+            if (!mountHidesRiderShadow()) drawActorShadow(
                 state.x, drawY, PLAYER_ENTITY_KIND, latched ? latched.clip : playerClip,
                 state.submarimon?.heightFixed ?? 0,
                 climbGroundOffsetFixed,
@@ -9656,7 +9765,8 @@ function render() {
                 // is in, which restarts with each clip — the disc latches the
                 // next SETANIM the frame the phase turns over, so the frame clock
                 // restarts with it.
-                const poseT = cl ? cl.animT
+                const poseT = mnt ? mnt.animT
+                    : cl ? cl.animT
                     : tkr ? tkr.pose.ticks * FIELD_TICK_SECONDS
                         : fp ? fp.poseT
                             : slp.frame * FIELD_TICK_SECONDS;
@@ -9665,7 +9775,7 @@ function render() {
                 if (meta && state.npcImgs[pack]) {
                     const info = drawEntitySprite(
                         meta, state.npcImgs[pack], state.clipImgs[pack],
-                        state.x, drawY, latched.dir, latched.clip, poseT, 0, false, 0,
+                        drawX, drawY, latched.dir, latched.clip, poseT, 0, false, 0,
                     );
                     debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: meta.id, info });
                     return;
@@ -9701,15 +9811,26 @@ function render() {
                 debugInfos.push({ x: state.x, y: state.y, label: df.name, sprite: df.sprite, info });
                 return;
             }
+            // EXPERIMENT (mounts, saddle split): the rider is hidden below the saddle row the mount editor set
+            const cutRow = mountRiderCutRow();
+            if (cutRow != null) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(-1e4, -1e4, 3e4, Math.round(cutRow - lastCam.y) + 1e4);
+                ctx.clip();
+            }
             const info = drawEntitySprite(
-                c, sheet, state.clipImgs[c.id], state.x, drawY,
+                c, sheet, state.clipImgs[c.id], drawX, drawY,
                 state.dir, playerClip,
                 playerAnimTime, playerFrameIdx,
-                state.moving || !!state._cutTarget, state._idleTime,
+                (state.moving || !!state._cutTarget) && !riderStill, state._idleTime,
                 state.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
             );
+            if (cutRow != null) ctx.restore();
             debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: c.id, info });
     }
+    // EXPERIMENT (mounts): the mount is submitted FIRST, so on equal keys the player (submitted next) draws on top.
+    mountDrawable(ctx, drawables, camX, camY, performance.now() / 1000);
     drawables.push({ y: state.y, player: true, draw: drawPlayerActor });
     // EXPERIMENT (multiplayer): the other players in this stage, drawn as the player character at their own position, in the same depth order.
     if (sheet) {
@@ -9762,6 +9883,7 @@ function render() {
     function partyFollowerDraws() {
         const out = [];
         if (state._questScene) return out;   // a quest scene: your partners step out of sight, so nothing walks through them
+        if (mountHidesFollowers()) return out;   // EXPERIMENT (mounts): nobody trails you on a mount
         const drawCount = activeFollowerCount();
         for (let i = 0; i < drawCount; i++) {
             const f = followers[i];
@@ -9833,6 +9955,11 @@ function render() {
             // scripted arrivals belong. `_inCutscene` is set by the first opcode
             // that names the actor and cleared when the scene ends.
             if (npc.cutsceneOnly && !npc._inCutscene) continue;
+            // EXPERIMENT (mounts): a mount's quest character is drawn from its 3D model, not its (blank) sheet
+            if (mountActorDef(npc.npc_id)) {
+                drawables.push({ y: npc.y, draw: () => mountActorDraw(ctx, npc, camX, camY, performance.now() / 1000) });
+                continue;
+            }
             const npcMeta =
                 state.manifest.npcs.find((n) => n.id === npc.sprite) ??
                 state.manifest.characters.find((c) => c.id === npc.sprite);

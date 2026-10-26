@@ -47,6 +47,13 @@ Already untracked before this sweep (same principle, see `.gitignore`):
 `content/**` (engine content converted by the `engine_bundle` stage),
 `third_party/**` (SF2 banks the `music` stage builds from the tree's VABs).
 
+Optional Digimon World 2 extras (the Unimon mount): `web/dw2models/**` is never tracked. Each player builds it from
+their own Digimon World 2 disc on their own machine (launcher page `/__dw2003/extras.html`, or
+`tools/dw2/dw2_addon.py`). The disc's models are read by `tools/dw2/dw2_disc.py` (ours) and turned into glTF by
+jype's [dw2_model_converter](https://gitlab.com/jype/dw2_model_converter) (MIT; it builds on work by SydMontague
+and RemyRM). The release workflow builds the converter from source at a pinned commit and ships it with its LICENSE
+in `runtime/bin`; it contains no game data. `tools/dw2/needed.json` lists the models the game loads.
+
 ## 2. Game-derived files kept tracked (unavoidable, with reason)
 
 These carry content decoded from the original game and are still tracked.

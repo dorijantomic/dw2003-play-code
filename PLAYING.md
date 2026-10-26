@@ -16,6 +16,11 @@ warning because the downloads are not code-signed; the README's
 [Seeing a security warning?](README.md#seeing-a-security-warning) section shows
 the two clicks that get past it.
 
+Optional: features that use Digimon World 2 models (riding Unimon) need your own Digimon World 2 disc (PlayStation,
+`.bin`/`.iso`). Open `/__dw2003/extras.html` in the running game (the setup page links it) and drop the disc there;
+it is converted on your computer in a few seconds. From source: `python3 tools/dw2/dw2_addon.py --disc <DW2 .bin>
+--converter <dw2_model_converter> --out web/dw2models`.
+
 The rest of this page is the from-source route.
 
 ## Quick Start (from source)
@@ -103,6 +108,10 @@ This recreation is built on the Digimon World 2003 matching decompilation by
 **Marko (markisha64)** — his years of reverse-engineering work are the
 foundation of everything here, and the game data comes from the repository he
 created. Thank you, Marko. Without you, none of this would exist.
+
+The optional Digimon World 2 extras use **jype**'s
+[dw2_model_converter](https://gitlab.com/jype/dw2_model_converter) (MIT), which builds on work by **SydMontague**
+and **RemyRM**. Thank you.
 
 ## Legal
 

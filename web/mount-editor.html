@@ -1,0 +1,260 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mount rider editor</title>
+<style>
+  :root { --bg:#14161f; --panel:#1e2130; --ink:#e8ecf5; --dim:#9aa3b8; --line:#3a4058; --hi:#ffcc33; --cut:#ff5a5a; --seat:#4fd1ff; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px system-ui,sans-serif; padding:16px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  .wrap { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+  .stage { background:#2b3a2b; border:1px solid var(--line); border-radius:6px; padding:6px; max-width:100%; }
+  canvas#view { display:block; image-rendering:pixelated; width:560px; height:520px; max-width:100%; height:auto; aspect-ratio:112/104; cursor:grab; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px; min-width:280px; max-width:420px; flex:1; }
+  .panel h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:14px 0 6px; }
+  .panel h2:first-child { margin-top:0; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:6px; }
+  select, button, input { background:#151826; color:var(--ink); border:1px solid var(--line); border-radius:4px; padding:5px 8px; font:inherit; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--hi); }
+  button.on { background:var(--hi); color:#111; border-color:var(--hi); }
+  input[type=number] { width:64px; }
+  .compass { display:grid; grid-template-columns:repeat(3, 72px); gap:4px; }
+  .compass button { padding:6px 0; font-size:12px; }
+  .compass .mid { visibility:hidden; }
+  .nums { font:12px ui-monospace,monospace; color:var(--dim); white-space:pre; line-height:1.5; }
+  .nums b { color:var(--ink); font-weight:600; }
+  .help { color:var(--dim); font-size:12px; line-height:1.5; margin-top:10px; }
+  .msg { color:var(--hi); font-size:12px; min-height:16px; }
+  .key { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin-right:4px; }
+</style>
+<h1>Mount rider editor</h1>
+<div class="wrap">
+  <div class="stage"><canvas id="view" width="112" height="104"></canvas></div>
+  <div class="panel">
+    <h2>Mount</h2>
+    <div class="row"><select id="mount"></select> <button id="gallop">Gallop</button></div>
+    <h2>Facing</h2>
+    <div class="compass" id="compass"></div>
+    <h2>Rider in this facing</h2>
+    <div class="row">Layer
+      <button data-layer="auto">Auto (depth)</button><button data-layer="front">In front</button><button data-layer="behind">Behind</button>
+    </div>
+    <div class="row">Move x <input id="dx" type="number" step="1"> y <input id="dy" type="number" step="1"></div>
+    <div class="row">Legs hidden below saddle + <input id="cut" type="number" step="1"> px <label><input id="nocut" type="checkbox"> no cut</label></div>
+    <div class="row"><button id="reset">Reset this facing</button><button id="copyMirror">Copy to mirror facing</button></div>
+    <h2>Save</h2>
+    <div class="row"><button id="save">Save</button><button id="clearLocal">Forget unsaved changes</button></div>
+    <div class="msg" id="msg"></div>
+    <h2>Numbers (this facing)</h2>
+    <div class="nums" id="nums"></div>
+    <div class="help">
+      <span class="key" style="background:var(--seat)"></span>saddle point (from the bones) &nbsp;
+      <span class="key" style="background:var(--cut)"></span>legs-hidden line<br>
+      Drag the rider to move him. Drag near the red line to move the line.<br>
+      Arrow keys move the rider 1 px. Shift + up/down moves the line.<br>
+      Save keeps the settings for the game (F2 -> Extras -> "Rider sits in the saddle") and downloads
+      <b>mount-seats.json</b> with the settings and the measured numbers.
+    </div>
+  </div>
+</div>
+<script type="module">
+import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit } from "./mount3d.js";
+import { MOUNTS, SEAT_DIRS, SEAT_STORE, seatDefault, loadSeats, seatSettings, seatLayout } from "./mount.js";
+import { clipFrame, FIELD_IDLE_CLIP } from "./vendor/engine.js";
+
+const W = MOUNT_VIEW.w, H = MOUNT_VIEW.h, GX = W / 2, GY = H - 8;      // the ground point in the cell
+const MIRROR = { "down": "down", "up": "up", "left": "right", "right": "left", "down-left": "down-right",
+  "down-right": "down-left", "up-left": "up-right", "up-right": "up-left" };
+const $ = (id) => document.getElementById(id);
+const view = $("view"), vc = view.getContext("2d");
+const off = (w = W, h = H) => { const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d", { willReadFrequently: true }); return c; };
+const riderC = off(), tmpC = off();
+
+// ── state ───────────────────────────────────────────────────────────────────────────────────────
+const ED = { def: MOUNTS[0], asset: null, dir: "down", gallop: false, phase: 0, t: 0, rider: null, work: {}, last: null };
+const readLocal = () => { try { return JSON.parse(localStorage.getItem(SEAT_STORE) || "{}") || {}; } catch { return {}; } };
+const writeLocal = (o) => { try { localStorage.setItem(SEAT_STORE, JSON.stringify(o)); return true; } catch { return false; } };
+const cfg = () => (ED.work[ED.def.id] ??= {})[ED.dir] ??= seatSettings(ED.def.id, ED.dir);
+const say = (t) => { $("msg").textContent = t; };
+
+// ── the rider sprite: the same pack and idle clip the field draws while riding (game.js drawClipFrame) ──────
+async function loadRider() {
+  const man = await (await fetch("assets/manifest.json")).json();
+  const c = man.characters.find((x) => x.id === "p001play") ?? man.characters[0];
+  const img = new Image();
+  img.src = c.clipSheet;
+  await img.decode();
+  ED.rider = { meta: c, img };
+}
+function drawRider(ctx, x, feetY) {
+  const { meta, img } = ED.rider;
+  const r = clipFrame(meta.clips, FIELD_IDLE_CLIP, ED.dir, 0);
+  if (!r) return null;
+  const fw = meta.clipFrameW, fh = meta.clipFrameH, top = feetY - fh + (r.bottom ?? 0);
+  if (!r.mirror) ctx.drawImage(img, r.col * fw, 0, fw, fh, Math.round(x - fw / 2), top, fw, fh);
+  else { ctx.save(); ctx.translate(Math.round(x), 0); ctx.scale(-1, 1); ctx.drawImage(img, r.col * fw, 0, fw, fh, -fw / 2, top, fw, fh); ctx.restore(); }
+  return r;
+}
+const alphaOf = (c) => c.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+
+// ── one frame: render, place, measure ───────────────────────────────────────────────────────────────
+function frame() {
+  if (!ED.asset || !ED.rider) return;
+  const full = renderMount(ED.asset, {
+    x: GX, y: GY, dir: ED.dir, phase: ED.phase, moving: ED.gallop, size: ED.def.size ?? 68,
+    timeSec: ED.t, walk: ED.def.walk ?? null, seat: ED.def.seat,
+  });
+  const split = mountSplit();
+  if (!full || !split) { say("the mount did not render (WebGL?)"); return; }
+  const c = cfg(), L = seatLayout(ED.def, split, c);
+  // the rider alone, uncut (for the numbers), then the picture in the game's order
+  const rc = riderC.getContext("2d"); rc.clearRect(0, 0, W, H);
+  const fr = drawRider(rc, L.riderX, L.feetY);
+  vc.clearRect(0, 0, W, H);
+  const fullCopy = tmpC.getContext("2d"); fullCopy.clearRect(0, 0, W, H); fullCopy.drawImage(full, 0, 0);
+  if (L.layer === "front") vc.drawImage(tmpC, 0, 0);
+  else if (L.layer === "auto") vc.drawImage(split.back, 0, 0);
+  vc.save();
+  if (L.cutY != null) { vc.beginPath(); vc.rect(0, 0, W, L.cutY); vc.clip(); }
+  vc.drawImage(riderC, 0, 0);
+  vc.restore();
+  if (L.layer === "behind") vc.drawImage(tmpC, 0, 0);
+  else if (L.layer === "auto") vc.drawImage(split.front, 0, 0);
+  // marks: the saddle point and the cut line
+  vc.fillStyle = "#4fd1ff"; vc.fillRect(Math.round(split.seatX), Math.round(split.seatY), 1, 1);
+  if (L.cutY != null) { vc.fillStyle = "rgba(255,90,90,0.8)"; for (let x = 0; x < W; x += 3) vc.fillRect(x, L.cutY, 2, 1); }
+  // numbers: how much of the rider shows, from the masks (rider, cut, what is drawn over him)
+  const R = alphaOf(riderC);
+  const over = L.layer === "auto" ? alphaOf(split.front) : L.layer === "behind" ? alphaOf(tmpC) : null;
+  let n = 0, y0 = H, y1 = -1, x0 = W, x1 = -1;
+  for (let p = 0; p < W * H; p++) if (R[p * 4 + 3] > 0) { n++; const x = p % W, y = (p / W) | 0; y0 = Math.min(y0, y); y1 = Math.max(y1, y); x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+  const upRow = y0 + 0.6 * (y1 - y0 + 1);
+  let vis = 0, cutN = 0, coverN = 0, up = 0, upVis = 0;
+  for (let p = 0; p < W * H; p++) {
+    if (!(R[p * 4 + 3] > 0)) continue;
+    const y = (p / W) | 0, isUp = y < upRow;
+    const cut = L.cutY != null && y >= L.cutY, covered = !cut && over && over[p * 4 + 3] > 0;
+    if (isUp) up++;
+    if (cut) cutN++; else if (covered) coverN++; else { vis++; if (isUp) upVis++; }
+  }
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+  ED.last = {
+    seat: [+split.seatX.toFixed(2), +split.seatY.toFixed(2)],
+    rider: { x: L.riderX, feetY: L.feetY, box: [x0, y0, x1, y1], frame: fr ? { col: fr.col, mirror: !!fr.mirror } : null },
+    cutY: L.cutY, layer: L.layer,
+    shown: pct(vis, n), hiddenByCut: pct(cutN, n), coveredByMount: pct(coverN, n), upperShown: pct(upVis, up), pixels: n,
+  };
+  const m = ED.last;
+  $("nums").innerHTML =
+    `facing        <b>${ED.dir}</b>${ED.gallop ? "  (gallop)" : ""}\n` +
+    `saddle point  x <b>${m.seat[0].toFixed(1)}</b>  y <b>${m.seat[1].toFixed(1)}</b>  (cell px)\n` +
+    `rider feet    x <b>${m.rider.x}</b>  y <b>${m.rider.feetY}</b>   move ${c.dx}, ${c.dy}\n` +
+    `rider box     ${x0},${y0} .. ${x1},${y1}\n` +
+    `shown         <b>${m.shown}%</b>   upper 60%: <b>${m.upperShown}%</b>\n` +
+    `hidden by cut ${m.hiddenByCut}%   covered by mount ${m.coveredByMount}%`;
+  syncInputs();
+}
+
+// ── controls ────────────────────────────────────────────────────────────────────────────────────
+function syncInputs() {
+  const c = cfg();
+  if (document.activeElement !== $("dx")) $("dx").value = c.dx;
+  if (document.activeElement !== $("dy")) $("dy").value = c.dy;
+  if (document.activeElement !== $("cut")) $("cut").value = c.cut ?? 0;
+  $("cut").disabled = c.cut == null;
+  $("nocut").checked = c.cut == null;
+  for (const b of document.querySelectorAll("[data-layer]")) b.classList.toggle("on", b.dataset.layer === c.layer);
+  for (const b of document.querySelectorAll("[data-dir]")) b.classList.toggle("on", b.dataset.dir === ED.dir);
+  $("gallop").classList.toggle("on", ED.gallop);
+}
+function changed() { writeLocal({ ...readLocal(), [ED.def.id]: ED.work[ED.def.id] }); say("changed (not saved to file yet)"); frame(); }
+
+const GRID = ["up-left", "up", "up-right", "left", null, "right", "down-left", "down", "down-right"];
+for (const d of GRID) {
+  const b = document.createElement("button");
+  if (!d) b.className = "mid"; else { b.textContent = d; b.dataset.dir = d; b.onclick = () => { ED.dir = d; frame(); }; }
+  $("compass").append(b);
+}
+for (const b of document.querySelectorAll("[data-layer]")) b.onclick = () => { cfg().layer = b.dataset.layer; changed(); };
+$("dx").oninput = () => { cfg().dx = Math.round(+$("dx").value || 0); changed(); };
+$("dy").oninput = () => { cfg().dy = Math.round(+$("dy").value || 0); changed(); };
+$("cut").oninput = () => { cfg().cut = Math.round(+$("cut").value || 0); changed(); };
+$("nocut").onchange = () => { cfg().cut = $("nocut").checked ? null : 0; changed(); };
+$("gallop").onclick = () => { ED.gallop = !ED.gallop; frame(); };
+$("reset").onclick = () => { ED.work[ED.def.id][ED.dir] = seatDefault(); changed(); };
+$("copyMirror").onclick = () => {
+  const m = MIRROR[ED.dir], c = cfg();
+  ED.work[ED.def.id][m] = { ...c, dx: m === ED.dir ? c.dx : -c.dx };
+  changed(); say(`copied to ${m} (x mirrored)`);
+};
+$("clearLocal").onclick = async () => {
+  const o = readLocal(); delete o[ED.def.id]; writeLocal(o);
+  await loadSeats(); ED.work = {}; frame(); say("back to the saved file");
+};
+
+// drag: near the cut line moves the line, anywhere else moves the rider
+let drag = null;
+const cellAt = (e) => { const r = view.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H]; };
+view.onpointerdown = (e) => {
+  const [x, y] = cellAt(e), c = cfg(), m = ED.last;
+  const onCut = m && m.cutY != null && Math.abs(y - m.cutY) <= 2;
+  drag = { x, y, onCut, dx: c.dx, dy: c.dy, cut: c.cut };
+  view.setPointerCapture(e.pointerId);
+};
+view.onpointermove = (e) => {
+  if (!drag) return;
+  const [x, y] = cellAt(e), c = cfg();
+  if (drag.onCut) c.cut = Math.round(drag.cut + (y - drag.y));
+  else { c.dx = Math.round(drag.dx + (x - drag.x)); c.dy = Math.round(drag.dy + (y - drag.y)); }
+  frame();
+};
+view.onpointerup = () => { if (drag) { drag = null; changed(); } };
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  const c = cfg(), k = e.key;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) return;
+  e.preventDefault();
+  if (e.shiftKey && c.cut != null && (k === "ArrowUp" || k === "ArrowDown")) c.cut += k === "ArrowUp" ? -1 : 1;
+  else if (k === "ArrowLeft") c.dx--; else if (k === "ArrowRight") c.dx++; else if (k === "ArrowUp") c.dy--; else c.dy++;
+  changed();
+});
+
+// save: settings to the game (localStorage) + a file with the settings AND every facing's measured numbers
+$("save").onclick = () => {
+  const keep = ED.dir, measured = {}, seats = {};
+  for (const id of Object.keys(ED.work)) seats[id] = { ...ED.work[id] };
+  const mine = (seats[ED.def.id] ??= {});
+  for (const d of SEAT_DIRS) { ED.dir = d; mine[d] = { ...cfg() }; const g = ED.gallop; ED.gallop = false; frame(); measured[d] = ED.last; ED.gallop = g; }
+  ED.dir = keep; frame();
+  writeLocal({ ...readLocal(), ...seats });
+  const out = {
+    about: "web/mount-editor.html: rider settings per mount and facing (dx, dy, cut, layer) + what they measured (cell px, stand pose)",
+    saved: new Date().toISOString(), cell: { w: W, h: H, ground: [GX, GY] }, seat: { [ED.def.id]: ED.def.seat },
+    seats, measured: { [ED.def.id]: measured },
+  };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
+  a.download = "mount-seats.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  say("saved: the game uses it now; mount-seats.json downloaded");
+};
+
+// ── start ───────────────────────────────────────────────────────────────────────────────────────
+for (const m of MOUNTS) $("mount").append(new Option(m.name, m.id));
+$("mount").onchange = async () => { ED.def = MOUNTS.find((m) => m.id === $("mount").value); await loadAsset(); frame(); };
+async function loadAsset() {
+  ED.asset = await loadMountAsset(ED.def.id, ED.def.model);
+  if (!ED.asset) say(`${ED.def.model} is missing (local-only model file)`);
+}
+await Promise.all([loadSeats(), loadRider(), loadAsset()]);
+frame();
+let prev = performance.now();
+(function tick(now) {
+  const dt = Math.min(0.1, (now - prev) / 1000); prev = now;
+  if (ED.gallop) { ED.phase = (ED.phase + dt / (ED.def.walk?.cycle ?? 0.9)) % 1; ED.t += dt; frame(); }
+  requestAnimationFrame(tick);
+})(prev);
+window.__mountEditor = { state: () => ({ dir: ED.dir, cfg: { ...cfg() }, last: ED.last, loaded: !!ED.asset && !!ED.rider }),
+  setDir: (d) => { ED.dir = d; frame(); return ED.last; }, set: (o) => { Object.assign(cfg(), o); frame(); return ED.last; } };
+</script>

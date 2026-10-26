@@ -29,7 +29,7 @@ export const FX_GROUPS = [
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
-    ["Extras", [["quests", "Quests (F3 or the Quests button)"]]],
+    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
 ];
@@ -41,7 +41,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto" };
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat"];     // off until you switch them on by hand; "All on" and the presets leave them alone
 for (const k of EXPERIMENTAL) fx[k] = false;
 fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
@@ -802,7 +802,8 @@ export function installFxPanel(stageEl) {
     panel = document.createElement("div");
     panel.id = "fx-panel"; panel.hidden = true;
     panel.innerHTML = `<h3>EFFECTS</h3>` + FX_GROUPS.map(([name, list]) =>
-        `<h4>${name}</h4>` + list.map(([k, label]) => `<label><input type="checkbox" data-fx="${k}"> ${label}</label>`).join("")).join("") +
+        `<h4>${name}</h4>` + list.map(([k, label]) => `<label><input type="checkbox" data-fx="${k}"> ${label}</label>`).join("") +
+        (name === "Extras" ? `<div class="hint" id="fx-dw2" hidden></div>` : "")).join("") +
         `<h4>Mood</h4>
          <label>Preset <select data-preset><option value="">choose...</option><option value="cinematic">Cinematic</option><option value="clear">Clear day</option><option value="cozyrain">Cozy rain</option><option value="storm">Storm</option><option value="night">Night</option></select></label>
          <div class="row"><button data-act="save:1">Save 1</button><button data-act="save:2">Save 2</button><button data-act="save:3">Save 3</button></div>
@@ -819,6 +820,13 @@ export function installFxPanel(stageEl) {
     toastEl = document.createElement("div"); toastEl.id = "fx-toast";
     recDot = document.createElement("div"); recDot.id = "fx-rec";
     stageEl.append(gear, panel, toastEl, recDot);
+    // the DW2 extras (Mount) need the player's own Digimon World 2 disc: say so, with the launcher's extras page
+    fetch("/__dw2003/status").then((r) => r.ok ? r.json() : null).then((st) => {
+        const el = panel.querySelector("#fx-dw2");
+        if (!el || !st || !st.dw2 || st.dw2.state === "done") return;
+        el.innerHTML = `Mount needs your own Digimon World 2 disc: <a href="/__dw2003/extras.html" target="_blank" style="color:#f5a524">add it here</a>.`;
+        el.hidden = false;
+    }).catch(() => { });
     const toggle = () => { panel.hidden = !panel.hidden; if (!panel.hidden) lastMarked = null; gear.classList.toggle("open", !panel.hidden); gear.blur(); };
     gear.addEventListener("click", toggle);
     panel.addEventListener("input", (e) => {

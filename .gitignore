@@ -76,3 +76,7 @@ data/authored/quests/art/ref/
 
 # model renders (disc-derived reference pictures)
 captures/
+
+# DW2 models the mount layer renders live (web/mount3d.js). Built on the player's machine from their own DW2 disc
+# (launcher /__dw2003/extras.html, tools/dw2/dw2_addon.py): disc-derived, local only, never committed.
+web/dw2models/

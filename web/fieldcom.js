@@ -323,6 +323,16 @@ export function drawSparkleActor(ctx, x, y, tick, flareFrames, program = 3) {
 // the texture's natural size, with no globalAlpha and no composite mode.
 // Geometry comes from the engine (engine/systems/field-shadow.ts); this module
 // owns nothing but the texture and the blit.
+/** The same drop-shadow image, centred on a ground point at any size (a mount's footprint). */
+export function drawGroundShadow(ctx, cx, cy, w, h, alpha = 1) {
+    if (!shadowImg || alpha <= 0) return false;
+    const was = ctx.globalAlpha;
+    ctx.globalAlpha = was * alpha;
+    ctx.drawImage(shadowImg, Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(w), Math.round(h));
+    ctx.globalAlpha = was;
+    return true;
+}
+
 export function drawFieldShadow(ctx, input) {
     if (!shadowImg) return false;
     const r = fieldShadowRect(input);

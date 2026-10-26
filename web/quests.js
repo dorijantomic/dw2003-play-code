@@ -611,6 +611,8 @@ export function questsCreditChallenge(screens) {
 
 /** How many extra quests this player has finished (shared on the multiplayer player card). */
 export function questsDoneCount() { return Object.keys(st?.done ?? {}).length; }
+/** Is that quest handed in? (Read-only: the mount layer unlocks a mount from it.) */
+export function questDone(id) { return !!st?.done?.[id]; }
 
 /** What the QUESTS page lists: ready, open and new quests, each with the three lines shown under the list. */
 export function questsPausePage() {

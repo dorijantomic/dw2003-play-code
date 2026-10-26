@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digimon World 2003 — Extras</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #182033; --ink: #e8ecf5; --muted: #9aa6bf;
+    --accent: #f5a524; --accent-ink: #1a1203; --line: #2a3550; --bad: #ff6b6b; --good: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 32px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 28px 16px; text-align: center;
+          transition: border-color .15s, background .15s; cursor: pointer; margin-top: 12px; }
+  .drop.over { border-color: var(--accent); background: #f5a5240f; }
+  .drop strong { display: block; font-size: 17px; margin-bottom: 6px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px;
+           background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .hint { color: var(--muted); font-size: 14px; }
+  .hint li { margin: 4px 0; }
+  .bar { height: 12px; background: #0b0f18; border-radius: 6px; overflow: hidden; margin: 16px 0 8px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .err { color: var(--bad); white-space: pre-wrap; margin: 12px 0; }
+  .done { color: var(--good); font-weight: 600; }
+  .state { margin: 8px 0; }
+  pre { background: #0b0f18; border-radius: 8px; padding: 12px; font-size: 12px; max-height: 220px;
+        overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .hidden { display: none; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Extras</h1>
+  <p class="sub">Optional content built from other games you own. <a href="/">Back to the game</a></p>
+
+  <section class="card" id="dw2">
+    <h2>Digimon World 2 extras</h2>
+    <p class="hint">Adds the features that use Digimon World 2 models: riding Unimon (F2 → Extras → Mount).</p>
+    <div class="state" id="dw2-state"></div>
+
+    <div id="dw2-pick" class="hidden">
+      <div id="dw2-drop" class="drop" tabindex="0">
+        <strong>Drop your Digimon World 2 disc image here</strong>
+        <button id="dw2-choose" type="button">Choose disc file…</button>
+        <input id="dw2-file" type="file" accept=".bin,.iso,.img" class="hidden">
+      </div>
+      <ul class="hint">
+        <li>You need your own copy of <b>Digimon World 2</b> (PlayStation) as a <b>.bin</b> or <b>.iso</b> file.
+          Checked with the USA release (SLUS-01193).</li>
+        <li>Have a <b>.cue</b> file? Pick the <b>.bin</b> file next to it.</li>
+        <li>The models are read and converted on this computer, in a few seconds. Nothing is downloaded.</li>
+      </ul>
+    </div>
+
+    <div id="dw2-work" class="hidden">
+      <div class="bar"><div id="dw2-bar"></div></div>
+      <div class="hint" id="dw2-step"></div>
+    </div>
+    <div id="dw2-err" class="err hidden"></div>
+    <div class="actions">
+      <button id="dw2-retry" type="button" class="hidden">Try again</button>
+      <button id="dw2-forget" type="button" class="ghost hidden">Remove the Digimon World 2 extras</button>
+    </div>
+    <details><summary class="hint">Show details</summary><pre id="dw2-log"></pre></details>
+  </section>
+
+  <footer>
+    The Digimon World 2 models are converted with jype's
+    <a href="https://gitlab.com/jype/dw2_model_converter" target="_blank" rel="noopener">dw2_model_converter</a>
+    (MIT; based on work by SydMontague and RemyRM). Digimon World 2 © Bandai.
+  </footer>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let uploading = false, timer = null;
+
+function upload(file) {
+  if (!file) return;
+  uploading = true;
+  $("dw2-err").classList.add("hidden");
+  $("dw2-pick").classList.add("hidden");
+  $("dw2-work").classList.remove("hidden");
+  $("dw2-step").textContent = `Copying ${file.name}…`;
+  const xhr = new XMLHttpRequest();
+  xhr.open("PUT", "/__dw2003/dw2disc");
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) $("dw2-bar").style.width = (100 * e.loaded / e.total) + "%"; };
+  xhr.onloadend = () => {
+    uploading = false;
+    let res = {};
+    try { res = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status !== 200) {
+      $("dw2-err").textContent = res.error || `Something went wrong (HTTP ${xhr.status}).`;
+      $("dw2-err").classList.remove("hidden");
+    }
+    poll();
+  };
+  xhr.send(file);
+}
+
+$("dw2-choose").onclick = (e) => { e.stopPropagation(); $("dw2-file").click(); };
+$("dw2-drop").onclick = () => $("dw2-file").click();
+$("dw2-file").onchange = () => upload($("dw2-file").files[0]);
+for (const ev of ["dragenter", "dragover"]) $("dw2-drop").addEventListener(ev, (e) => { e.preventDefault(); $("dw2-drop").classList.add("over"); });
+for (const ev of ["dragleave", "drop"]) $("dw2-drop").addEventListener(ev, (e) => { e.preventDefault(); $("dw2-drop").classList.remove("over"); });
+$("dw2-drop").addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => e.preventDefault());
+$("dw2-retry").onclick = () => fetch("/__dw2003/dw2-retry", { method: "POST" }).then(poll);
+$("dw2-forget").onclick = () => fetch("/__dw2003/dw2-forget", { method: "POST" }).then(poll);
+
+async function poll() {
+  clearTimeout(timer);
+  if (uploading) return;
+  let s;
+  try { s = (await (await fetch("/__dw2003/status")).json()).dw2; }
+  catch { timer = setTimeout(poll, 3000); return; }
+  if (!s) { $("dw2-state").textContent = "This launcher does not know the extras yet."; return; }
+  const st = s.state;
+  $("dw2-log").textContent = (s.log || []).join("\n");
+  $("dw2-pick").classList.toggle("hidden", !(st === "none" || st === "failed") || !s.available);
+  $("dw2-work").classList.toggle("hidden", !(st === "building" || st === "receiving"));
+  $("dw2-retry").classList.toggle("hidden", !(st === "failed" && s.has_disc));
+  $("dw2-forget").classList.toggle("hidden", !(st === "done" || s.has_disc) || st === "building");
+  $("dw2-err").classList.toggle("hidden", st !== "failed");
+  if (st === "failed") $("dw2-err").textContent = s.error;
+  if (!s.available) $("dw2-state").textContent = "This install has no DW2 model converter, so these extras cannot be built.";
+  else if (st === "done") $("dw2-state").innerHTML = `<span class="done">Installed</span> · ${s.models.length} models. Switch features on in the game: F2 → Extras.`;
+  else if (st === "building") { $("dw2-state").textContent = "Building…"; $("dw2-step").textContent = (s.log || []).slice(-1)[0] || ""; $("dw2-bar").style.width = "60%"; }
+  else if (st === "receiving") $("dw2-state").textContent = "Copying your disc…";
+  else $("dw2-state").textContent = "Not installed.";
+  if (st === "building" || st === "receiving") timer = setTimeout(poll, 1000);
+}
+poll();
+</script>
+</body>
+</html>

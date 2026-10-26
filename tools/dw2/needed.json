@@ -1,0 +1,7 @@
+{
+  "about": "DW2 models the game uses, built on the player's machine from their own Digimon World 2 disc by tools/dw2/dw2_addon.py. Name = the converter's output stem (<stem>.gltf). tests/dw2-addon.test.js checks every web/mount.js model is listed.",
+  "models": {
+    "328QUNI": "Unimon field model: the mount (web/mount.js MOUNTS unimon.model)",
+    "033UNIM": "Unimon battle model: the hurt quest character (web/mount.js MOUNTS unimon.actor.hurt.model)"
+  }
+}

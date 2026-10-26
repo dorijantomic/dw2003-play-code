@@ -99,6 +99,7 @@ def find_tools() -> dict:
         t["fluidsynth"] = bin_dir / f"fluidsynth{EXE}"
         node_dir = RUNTIME / "node" if os.name == "nt" else RUNTIME / "node/bin"
         t["path"] = [str(bin_dir), str(node_dir)]
+        t["dw2conv"] = bin_dir / f"dw2_model_converter{EXE}"
     else:
         cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "dw2003-play"
         t["extractors"] = Path(os.environ.get("BYOD_DDW3_TOOLS") or cache / "ddw3-tools")
@@ -111,6 +112,8 @@ def find_tools() -> dict:
         fs = os.environ.get("FLUIDSYNTH") or shutil.which("fluidsynth")
         t["fluidsynth"] = Path(fs) if fs else None
         t["path"] = []
+        dc = os.environ.get("DW2_MODEL_CONVERTER") or shutil.which("dw2_model_converter")
+        t["dw2conv"] = Path(dc) if dc else cache / f"dw2_model_converter{EXE}"
     return t
 
 
@@ -183,6 +186,9 @@ class Build:
         self.log_lines: list[str] = []
         self.started = 0.0
         self.thread = None
+        # the optional Digimon World 2 extras (tools/dw2/dw2_addon.py): their own small state, never blocks the game
+        self.dw2_disc = data / "disc" / "dw2.bin"
+        self.dw2 = {"state": "none", "error": "", "log": []}   # none | receiving | building | done | failed
         saved = self._load()
         if saved.get("built") == version() and self._outputs_ok():
             self.state = "done"
@@ -223,7 +229,52 @@ class Build:
                     "progress": round(done, 1), "error": self.error,
                     "elapsed": int(time.time() - self.started) if self.started else 0,
                     "log": self.log_lines[-60:], "version": version(),
-                    "has_disc": self.disc.is_file()}
+                    "has_disc": self.disc.is_file(), "dw2": self.dw2_status()}
+
+    # the Digimon World 2 extras ------------------------------------------------------
+    def _dw2_mod(self):
+        sys.path.insert(0, str(APP_SRC / "tools" / "dw2"))
+        try:
+            import dw2_addon  # noqa: E402  (stdlib-only)
+            return dw2_addon
+        finally:
+            sys.path.pop(0)
+
+    def dw2_status(self) -> dict:
+        conv = self.tools.get("dw2conv")
+        d = {"state": self.dw2["state"], "error": self.dw2["error"], "log": self.dw2["log"][-30:],
+             "available": bool(conv and Path(conv).is_file()), "has_disc": self.dw2_disc.is_file(), "models": []}
+        if d["state"] in ("none", "done"):
+            try:
+                stamp = self._dw2_mod().status(self.app / "web" / "dw2models")
+            except Exception:
+                stamp = None
+            d["state"] = "done" if stamp else "none"
+            d["models"] = (stamp or {}).get("models", [])
+        return d
+
+    def dw2_start(self):
+        """Build the DW2 extras from the saved DW2 disc, in its own thread (the game keeps running)."""
+        if self.dw2["state"] in ("building", "receiving") or not self.dw2_disc.is_file():
+            return
+        self.dw2.update(state="building", error="", log=[])
+        threading.Thread(target=self._dw2_run, daemon=True).start()
+
+    def _dw2_run(self):
+        def say(line):
+            self.dw2["log"].append(line)
+            self.log(f"[dw2] {line}")
+        try:
+            say("credit: jype's dw2_model_converter (MIT) turns the disc's models into glTF")
+            self._dw2_mod().build(self.dw2_disc, Path(self.tools["dw2conv"]), self.app / "web" / "dw2models",
+                                  self.data / "_dw2work", log=say)
+            self.dw2.update(state="done")
+        except SystemExit as e:
+            self.dw2.update(state="failed", error=str(e.code))
+            say(f"ERROR: {e.code}")
+        except Exception as e:
+            self.dw2.update(state="failed", error=f"{type(e).__name__}: {e}")
+            say(traceback.format_exc())
 
     def log(self, line: str):
         line = line.rstrip()
@@ -266,6 +317,9 @@ class Build:
             self._save(built=version(), disc=str(self.disc))
             self._set(state="done", step="", step_frac=1.0)
             self.log("Build complete.")
+            # a (re)build gives a fresh app copy: bring the DW2 extras back when a DW2 disc was given
+            if self.dw2_disc.is_file() and self.dw2_status()["state"] != "done":
+                self.dw2_start()
         except Exception as e:  # surface every failure on the page
             msg = str(e) if isinstance(e, BuildError) else f"{type(e).__name__}: {e}"
             if not isinstance(e, BuildError):
@@ -621,7 +675,55 @@ def make_handler(build: Build):
                     self.wfile.write(chunk)
                     left -= len(chunk)
 
+        def _put_dw2(self):
+            """The player's own Digimon World 2 disc: saved, checked, then the extras are built from it."""
+            n = int(self.headers.get("Content-Length") or 0)
+            if n < 100_000_000:
+                self.rfile.read(n)
+                return self._json({"error": "That file is too small to be a PS1 disc image (expected about "
+                                   "400-700 MB). If you have a .cue file, choose the .bin file next to it."}, 400)
+            if not build.dw2_status()["available"]:
+                self.rfile.read(n)
+                return self._json({"error": "This install has no DW2 model converter."}, 400)
+            if build.dw2["state"] in ("building", "receiving"):
+                self.rfile.read(n)
+                return self._json({"error": "the Digimon World 2 extras are already being built"}, 409)
+            dest = build.dw2_disc
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if shutil.disk_usage(dest.parent).free < n + 500_000_000:
+                self.rfile.read(n)
+                return self._json({"error": "Not enough free disk space for the Digimon World 2 disc."}, 507)
+            part = dest.with_suffix(".part")
+            build.dw2.update(state="receiving", error="")
+            try:
+                with open(part, "wb") as out:
+                    left = n
+                    while left > 0:
+                        chunk = self.rfile.read(min(left, 1 << 20))
+                        if not chunk:
+                            raise OSError("the upload stopped early")
+                        out.write(chunk)
+                        left -= len(chunk)
+                sys.path.insert(0, str(APP_SRC / "tools" / "dw2"))
+                try:
+                    import dw2_disc  # noqa: E402  (stdlib-only)
+                    err = dw2_disc.check(part)
+                finally:
+                    sys.path.pop(0)
+            except OSError as e:
+                err = f"could not receive the file: {e}"
+            if err:
+                part.unlink(missing_ok=True)
+                build.dw2.update(state="none", error="")
+                return self._json({"error": err}, 400)
+            os.replace(part, dest)
+            build.dw2.update(state="none")
+            build.dw2_start()
+            return self._json({"ok": True})
+
         def do_PUT(self):
+            if urllib.parse.urlparse(self.path).path == "/__dw2003/dw2disc":
+                return self._put_dw2()
             if urllib.parse.urlparse(self.path).path != "/__dw2003/disc":
                 return self.send_error(404)
             if build.state == "building":
@@ -670,6 +772,17 @@ def make_handler(build: Build):
             path = urllib.parse.urlparse(self.path).path
             if path == "/__dw2003/retry" and build.disc.is_file():
                 build.start()
+                return self._json({"ok": True})
+            if path == "/__dw2003/dw2-retry":
+                if build.dw2["state"] not in ("building", "receiving"):
+                    build.dw2.update(state="none")
+                    build.dw2_start()
+                return self._json({"ok": True})
+            if path == "/__dw2003/dw2-forget":
+                if build.dw2["state"] not in ("building", "receiving"):
+                    build.dw2_disc.unlink(missing_ok=True)
+                    shutil.rmtree(build.app / "web" / "dw2models", ignore_errors=True)
+                    build.dw2.update(state="none", error="", log=[])
                 return self._json({"ok": True})
             if path == "/__dw2003/forget-disc":
                 if build.state != "building":

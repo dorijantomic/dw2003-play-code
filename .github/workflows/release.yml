@@ -22,6 +22,8 @@ env:
   RUST_NIGHTLY: nightly-2026-06-09
   BINUTILS_VERSION: "2.45"
   FLUIDSYNTH_VERSION: "2.6.1"
+  # jype's dw2_model_converter (MIT): the optional Digimon World 2 extras, built from the player's own DW2 disc
+  DW2CONV_REF: 9bf52cdf622e703d8c56f79c61fc30101f6cbfc0
 
 jobs:
   bundle:
@@ -134,10 +136,32 @@ jobs:
           cp "$(find fs -name fluidsynth.exe | head -1)" stage/fluidsynth/
           cp $(find fs -name '*.dll') stage/fluidsynth/
 
+      # --- dw2_model_converter (optional DW2 extras; launcher/setup/extras.html) ---------
+      - uses: actions/cache@v4
+        id: cache-dw2conv
+        with:
+          path: stage/dw2conv
+          key: dw2conv-${{ matrix.target }}-${{ env.DW2CONV_REF }}-v1
+
+      - name: Build dw2_model_converter
+        if: steps.cache-dw2conv.outputs.cache-hit != 'true'
+        run: |
+          git clone https://gitlab.com/jype/dw2_model_converter.git dw2conv-src
+          git -C dw2conv-src checkout "$DW2CONV_REF"
+          git -C dw2conv-src submodule update --init --depth 1
+          # no runtime DLL/so beyond the OS: static C++ runtime on Linux, static MSVC runtime on Windows
+          cmake -S dw2conv-src -B dw2conv-build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
+            ${{ runner.os == 'Linux' && '-DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"' || '' }}
+          cmake --build dw2conv-build --config Release -j4
+          mkdir -p stage/dw2conv
+          cp "$(find dw2conv-build -name 'dw2_model_converter' -type f -o -name 'dw2_model_converter.exe' -type f | head -1)" stage/dw2conv/
+          cp dw2conv-src/LICENSE stage/dw2conv/dw2_model_converter-LICENSE.txt
+
       # --- the bundle ------------------------------------------------------------------
       - name: Assemble bundle
         run: |
-          cp stage/extractors/* stage/binutils/* stage/fluidsynth/* stage/bin/
+          cp stage/extractors/* stage/binutils/* stage/fluidsynth/* stage/dw2conv/* stage/bin/
           python packaging/build_bundle.py --bin stage/bin --out dist/DW2003 \
             --version "${{ steps.ver.outputs.version }}" --cache "$RUNNER_TEMP/bundle-cache"
 
