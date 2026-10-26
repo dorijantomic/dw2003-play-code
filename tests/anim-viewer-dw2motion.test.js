@@ -18,7 +18,7 @@ const motion = (letter, { table = 7, used = true, frames = 4, gaps = [9] } = {})
 const file = (over = {}) => ({
   v: 2, folder: "m050coca", name: "Kokatorimon",
   ownedSlots: [0, 1, 2, 3, 4, 5], gapSlots: [6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17],
-  motions: { F: motion("F"), G: motion("G", { table: 8, used: false }), H: motion("H", { table: 9, used: false }), I: motion("I", { table: 10, gaps: [6, 7, 8, 11, 14] }) },
+  motions: { F: motion("F", { gaps: [6, 7, 8, 9, 11, 14] }), G: motion("G", { table: 8, used: false }), H: motion("H", { table: 9, used: false }), I: motion("I", { table: 10, gaps: [10] }) },   // DW2 plays every technique as F/G/H; I is the victory pose (item use, slot 10)
   ...over,
 });
 
@@ -43,7 +43,7 @@ test("slot rows: filled / refused / owned / none, with the gate's failing keys",
   assert.deepEqual(nine.letters.map((x) => x.letter), ["F"], "only F passed the gate; G/H were refused");
   const six = by.get(6);
   assert.equal(six.status, "filled");
-  assert.deepEqual(six.letters.map((x) => x.letter), ["I"]);
+  assert.deepEqual(six.letters.map((x) => x.letter), ["F"]);
   assert.equal(by.get(12).status, "none", "clip 12 is the presentation actor's");
   assert.equal(by.get(13).status, "refused");
   assert.ok(by.get(13).refused[0].keys.includes("step"), "the refused step bar is named");
@@ -58,9 +58,9 @@ test("a slot the file does not list as a gap is never filled, even if a motion c
 test("counts: filled / gaps / refused / owned", () => {
   const c = D.dw2Counts(file());
   assert.equal(c.owned, 6);
-  assert.equal(c.filled, 6, "I fills 6,7,8,11,14 and F fills 9");
-  assert.equal(c.refused, 5, "the remaining gap slots (10, 13, 15, 16, 17) were refused");
-  assert.deepEqual(c.slots, [6, 7, 8, 9, 11, 14]);
+  assert.equal(c.filled, 7, "F fills 6,7,8,9,11,14 and I fills 10");
+  assert.equal(c.refused, 4, "the remaining gap slots (13, 15, 16, 17) were refused");
+  assert.deepEqual(c.slots, [6, 7, 8, 9, 10, 11, 14]);
 });
 
 test("the clone: a free table, the keys appended before the sentinel, the playlist registered", () => {

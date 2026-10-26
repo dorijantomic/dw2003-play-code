@@ -3014,8 +3014,16 @@ export function createBattle3D(canvas, sfx = null) {
     };
   }
   function setEnemyAnim(anim)  { enemyAnim = anim;  _applyNamed(enemyAnim8r, anim, _fxHooks("enemy")); }
+  // The victory gesture: the model's own table 44, else (DW2 motion on, ?dw2motion=1) the DW2 victory clip I merged by
+  // dw2-motion.js (DW2 plays I only when a battle is won: ~/dw3-knowledge/dw2-clips.md). model.dw2Motion exists only when it is on.
+  function victoryTable(model) {
+    const own = model?.timeline?.[44]?.table;
+    if (own?.length) return own;
+    const m = model?.dw2Motion?.I;
+    return m ? model.timeline?.[m.table]?.table ?? null : null;
+  }
   function playPlayerVictory() {
-    const table = playerModel?.timeline?.[44]?.table;
+    const table = victoryTable(playerModel);
     if (!playerAnim8r || !table || !table.length) return false;
     playerAnim = "win";
     playerAnim8r.playTimelineTable(table);
@@ -3194,7 +3202,7 @@ export function createBattle3D(canvas, sfx = null) {
   function setFighterHurt(id, low) { const f = extras.get(id); if (f?.anim8r) f.anim8r.baseTable = low ? 1 : 0; }
   function fighterVictory(id) {
     const f = extras.get(id);
-    const table = f?.model?.timeline?.[44]?.table;
+    const table = victoryTable(f?.model);
     if (!f?.anim8r || !table || !table.length) return false;
     f.anim8r.playTimelineTable(table);
     return true;

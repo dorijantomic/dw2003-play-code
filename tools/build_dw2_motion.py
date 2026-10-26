@@ -59,29 +59,29 @@ HOME = os.path.expanduser("~")
 # by the DW2 skill's cast type — F/G/H are played by cast types 0/1/2, 156C.h/anim.c).
 DW2_CLIP_MAP = {
     0: {"kind": "idle", "letters": ["A"], "why": "every DW2 fighter spawns on anim_A (fighter.c:261)"},
-    1: {"kind": "flinch", "letters": ["C0"], "why": "DW2 hit reacts 0x14/0x15/0x16 = C0/C1/C2 (Stg30_HitReactUpdate); C0 = hop 1, the intermediate flinch (op1 mode 5)"},
-    2: {"kind": "survive", "letters": ["C2"], "why": "DW3 clip 2 = survive, tables [4,5,6,11] hit->floor->get up; DW2 C2 = the knockdown reaction"},
-    3: {"kind": "death", "letters": ["K"], "why": "DW2 K = death/knockdown; DW3 clip 3 = killed, tables [4,5,6,10]"},
-    4: {"kind": "evade", "letters": ["C1"], "why": "the other hit reaction (hop 2) against DW3 clip 4, the miss/evade reaction"},
-    5: {"kind": "attack", "letters": ["I"], "why": "DW2 I = the long melee/physical attack clip (fighter.c, state-2 case 2); DW3 clip 5 = the basic attack (tech table: basics 1..52 -> 5)"},
-    6: {"kind": "attack", "letters": ["I"], "why": "DW3 clip 6 = the combo (tables [20-24]); the DW2 donor has one melee clip, I"},
-    7: {"kind": "attack", "letters": ["I"], "why": "DW3 clip 7 = the two-beat pair; DW2 I"},
-    8: {"kind": "attack", "letters": ["I"], "why": "DW3 clip 8 = the 3-beat combo (2x98+1x99 in every authored pack); DW2 I"},
+    1: {"kind": "flinch", "letters": ["C0"], "why": "DW2 C0 = hop 1, the first part of every hit reaction (Stg30_HitReactUpdate case 0)"},
+    2: {"kind": "survive", "letters": ["C2J"], "why": "DW2 hit and survive = C0 -> C1 -> C2 -> J (get up); C2J is that chain joined (export_game.mjs)"},
+    3: {"kind": "death", "letters": ["C2K"], "why": "DW2 hit and die = C0 -> C1 -> C2 -> K (death); C2K is that chain joined (export_game.mjs)"},
+    4: {"kind": "evade", "letters": ["B"], "why": "DW2 B = the guard: hit while defending (turnType 5 -> op 10 -> fighter state 3). DW2 has no miss reaction"},
+    5: {"kind": "attack", "letters": ["F", "G", "H"], "why": "DW2 plays EVERY technique, physical too, as F/G/H by the skill's cast type (fighter.c state 1); I is the victory pose"},
+    6: {"kind": "attack", "letters": ["F", "G", "H"], "why": "DW3 clip 6 = the combo; DW2 techniques are F/G/H by cast type"},
+    7: {"kind": "attack", "letters": ["F", "G", "H"], "why": "DW3 clip 7 = the two-beat pair; DW2 techniques are F/G/H by cast type"},
+    8: {"kind": "attack", "letters": ["F", "G", "H"], "why": "DW3 clip 8 = the 3-beat combo; DW2 techniques are F/G/H by cast type"},
     9: {"kind": "cast", "letters": ["F", "G", "H"], "why": "DW3 clip 9 = the spell (tech groups: attack/magical, 45 rows); the DW2 cast clip is chosen by the skill's cast type (0/1/2 -> F/G/H)"},
-    10: {"kind": "self", "letters": ["A"], "why": "DW3 clip 10 = the item/self cast; DW2 has no item pose, so its calmest stream (the idle) is the donor"},
-    11: {"kind": "signature", "letters": ["I", "F", "G", "H"], "why": "DW3 clip 11 = the signature (techs 53..104 -> 11); a physical one takes the melee clip I, a magical one the cast family by cast type"},
+    10: {"kind": "self", "letters": ["I"], "why": "DW3 clip 10 = item use, the same gesture as victory (table 44); DW2 items have no Digimon clip (the tamer uses them), so the DW2 victory pose I"},
+    11: {"kind": "signature", "letters": ["F", "G", "H"], "why": "DW3 clip 11 = the signature; DW2 techniques are F/G/H by cast type"},
     12: {"kind": "none", "letters": [], "why": "clip 12 is supplied by the battle presentation actor, not by the model"},
     13: {"kind": "cast", "letters": ["F", "G", "H"], "why": "DW3 clip 13 = the volley (8 rows, 3 hits, magical); a cast, so the cast family"},
-    14: {"kind": "attack", "letters": ["I"], "why": "DW3 clip 14 = the thrown-item arm (items 85/90); DW2 has no throw, its melee clip is the body"},
+    14: {"kind": "attack", "letters": ["F", "G", "H"], "why": "DW3 clip 14 = the thrown-item arm; DW2 has no throw, a technique body F/G/H"},
     15: {"kind": "cast", "letters": ["F", "G", "H"], "why": "DW3 clip 15 = the field move (7 rows, authors no contact); a cast, so the cast family"},
     16: {"kind": "cast", "letters": ["F", "G", "H"], "why": "DW3 clip 16 = a spell variant (4 rows); a cast, so the cast family"},
     17: {"kind": "reaction", "letters": ["C1"], "why": "DW3 clip 17 = the other thrown-item reaction arm; DW2's second hit reaction"},
 }
 
 # the letters worth baking once per species: every motion any slot above can name
-LETTERS = ["A", "C0", "C1", "C2", "K", "I", "F", "G", "H"]
-LETTER_KIND = {"A": "idle", "C0": "flinch", "C1": "evade", "C2": "survive", "K": "death",
-               "I": "attack", "F": "cast", "G": "cast", "H": "cast"}
+LETTERS = ["C0", "C1", "B", "C2J", "C2K", "I", "F", "G", "H"]   # = export_game.mjs MERGE (frame ranges rise in this order)
+LETTER_KIND = {"C0": "flinch", "C1": "reaction", "B": "evade", "C2J": "survive", "C2K": "death",
+               "I": "victory", "F": "cast", "G": "cast", "H": "cast"}
 OFFSET0 = 6000
 OFFSET_STEP = 500
 TABLE0 = 128
@@ -253,7 +253,7 @@ def write_clip_map(path):
 //
 // This file carries NO disc data: it is the ROLE of each DW3 clip slot (the engine's own slot
 // semantics, from web/fight/fight-tables.js and the action-VM playlist) and the DW2 engine's clip
-// letters (K21a section 2: letter A..K = animation file 0..10, digit = slot, so motion id =
+// letters (DW2 clips read from the decomp: ~/dw3-knowledge/dw2-clips.md; letter A..K = animation file 0..10, digit = slot, so motion id =
 // letter*10+digit; anchored on the hit reacts 0x14/0x15/0x16 = C0/C1/C2, the cast types 0/1/2 =
 // 0x32/0x3C/0x46 = F/G/H, and the city walkers' 0x1E/0x1F/0x20 = D0/D1/D2).
 //
@@ -275,7 +275,6 @@ export function dw2LetterForSlot(slot, { castType = 0, magical = false } = {}) {
   const row = DW2_CLIP_MAP[slot];
   if (!row || !row.letters.length) return null;
   if (row.letters.length === 1) return row.letters[0];
-  if (slot === 11 && !magical) return row.letters[0];
   const i = Math.max(0, Math.min(2, castType | 0));
   return DW2_CAST_LETTERS[i] ?? row.letters[0];
 }

@@ -139,7 +139,7 @@ export function applyMotion(model, letter, motion) {
   }
   model.timeline[table] = { table: motion.playlist.map((e) => ({ ...e })) };
   if (!model.dw2Motion) model.dw2Motion = {};
-  model.dw2Motion[letter] = { table, kind: motion.kind, lo: motion.lo, hi: motion.hi, letter };
+  model.dw2Motion[letter] = { table, kind: motion.kind, lo: motion.lo, hi: motion.hi, letter, hit: Number.isInteger(motion.hit) ? motion.hit : null };   // hit: playlist entry of the strike pose (v2 files from export_game.mjs)
   return { table, letter, kind: motion.kind };
 }
 

@@ -63,6 +63,7 @@ test("every clip slot the technique/item machines name has a mapping row", () =>
     assert.ok(row, `slot ${slot} has no row`);
     assert.ok(Array.isArray(row.letters), `slot ${slot} has no letters`);
     assert.ok(row.letters.length > 0, `slot ${slot} maps to no DW2 motion`);
+    if (slot === 0) continue;   // the idle is never a gap: every model owns slot 0, so A is not exported
     for (const L of row.letters) assert.ok(DW2_MOTION_LETTERS.includes(L), `${L} is not baked`);
   }
   assert.equal(DW2_CLIP_MAP[12].letters.length, 0, "clip 12 is the presentation actor's, not the model's");
@@ -74,10 +75,15 @@ test("the cast family is chosen by the technique's cast type; the signature by i
   assert.equal(dw2LetterForSlot(9, { castType: 1 }), "G");
   assert.equal(dw2LetterForSlot(9, { castType: 2 }), "H");
   assert.equal(dw2LetterForSlot(13, { castType: 2 }), "H");
-  assert.equal(dw2LetterForSlot(5), "I");
-  assert.equal(dw2LetterForSlot(3), "K");
-  assert.equal(dw2LetterForSlot(11, { magical: false }), "I");
+  // DW2 plays EVERY technique as F/G/H by cast type; I is its victory pose (~/dw3-knowledge/dw2-clips.md)
+  assert.equal(dw2LetterForSlot(5), "F");
+  assert.equal(dw2LetterForSlot(5, { castType: 2 }), "H");
+  assert.equal(dw2LetterForSlot(11, { magical: false, castType: 1 }), "G");
   assert.equal(dw2LetterForSlot(11, { magical: true, castType: 1 }), "G");
+  assert.equal(dw2LetterForSlot(2), "C2J", "hit and survive = C0,C1,C2,J");
+  assert.equal(dw2LetterForSlot(3), "C2K", "hit and die = C0,C1,C2,K");
+  assert.equal(dw2LetterForSlot(4), "B", "the guard");
+  assert.equal(dw2LetterForSlot(10), "I", "item use = the victory gesture");
   assert.equal(dw2LetterForSlot(12), null);
 });
 
@@ -86,7 +92,7 @@ test("merging a generated motion appends keys and never disturbs the model's own
   const m = model();
   const ownCh2 = JSON.parse(JSON.stringify(m.bones[1].anim.ch2));
   const ownCh1 = JSON.parse(JSON.stringify(m.bones[0].anim.ch1));
-  DW2.applyDw2Motion(m, generated("A", 128, "idle"));
+  DW2.applyDw2Motion(m, generated("C0", 128, "flinch"));
   // the model's own keys are still there, in order, followed by the appended ones and ONE terminator
   assert.deepEqual(m.bones[1].anim.ch2.slice(0, ownCh2.length - 1), ownCh2.slice(0, -1));
   const tail = m.bones[1].anim.ch2.slice(ownCh2.length - 1);
@@ -96,10 +102,10 @@ test("merging a generated motion appends keys and never disturbs the model's own
   assert.equal(m.bones[0].anim.ch1.at(-1)[3], 30000);
   // the playlist table is registered at the motion's table index and points into the appended range
   assert.deepEqual(m.timeline[128].table.map((e) => e.value), [6000, 6003, 6005]);
-  assert.deepEqual(m.dw2Motion.A, { table: 128, kind: "idle", lo: 6000, hi: 6005, letter: "A" });
+  assert.deepEqual(m.dw2Motion.C0, { table: 128, kind: "flinch", lo: 6000, hi: 6005, letter: "C0", hit: null });
   // a refused motion carries no keys and must not be merged
   const m2 = model();
-  DW2.applyDw2Motion(m2, { motions: { A: { ...generated().motions.A, used: false } } });
+  DW2.applyDw2Motion(m2, { motions: { C0: { ...generated("C0").motions.C0, used: false } } });
   assert.equal(m2.dw2Motion, undefined);
 });
 
@@ -125,7 +131,7 @@ test("the swap is OFF by default: a registered file changes nothing", () => {
 test("a clip the model OWNS is never replaced, even with the swap on", () => {
   // the operator's rule: DW2 motion fills a gap, it does not restyle an authored clip
   const m = model();
-  DW2.applyDw2Motion(m, generated("I", 129, "attack"));
+  DW2.applyDw2Motion(m, generated("F", 129, "cast"));
   DW2.setDw2MotionEnabled(true);
   try {
     const base = { ops: [{ op: 2, words: [0, 0, 2] }, { op: 11, words: [20] }, { op: 255, words: [] }] };
@@ -134,7 +140,7 @@ test("a clip the model OWNS is never replaced, even with the swap on", () => {
     assert.deepEqual(CF.resolveClipScript(m, 5, { tech: 1 }), m.actions[5]);
     // a gap slot (6 has no own script on this model) takes it
     const gap = CF.withDw2Body(m, base, 6);
-    assert.equal(gap.dw2Motion?.letter, "I");
+    assert.equal(gap.dw2Motion?.letter, "F");
     assert.equal(gap.ops.find((o) => o.op === 2).words[2], 129);
   } finally {
     DW2.setDw2MotionEnabled(false);
@@ -145,12 +151,12 @@ test("the swap is a URL scope: ?dw2motion=1 turns it on, and only for the slots 
   assert.equal(DW2.dw2MotionFlagFromUrl("?dw2motion=1"), true);
   assert.equal(DW2.dw2MotionFlagFromUrl("?foo=1"), false);
   const m = model();
-  DW2.applyDw2Motion(m, generated("I", 129, "attack"));
+  DW2.applyDw2Motion(m, generated("F", 129, "cast"));
   DW2.setDw2MotionEnabled(true);
   try {
-    assert.equal(DW2.dw2MotionFor(m, 5)?.letter, "I");
+    assert.equal(DW2.dw2MotionFor(m, 5)?.letter, "F");
     assert.equal(DW2.dw2MotionFor(m, 3), null, "a slot the file has no motion for stays as it was");
-    assert.equal(DW2.dw2SlotCount(m), 6, "the slots that resolve to I: 5,6,7,8,11-physical,14");
+    assert.equal(DW2.dw2SlotCount(m), 10, "the slots whose letters include F: 5,6,7,8,9,11,13,14,15,16");
   } finally {
     DW2.setDw2MotionEnabled(false);
   }
@@ -158,7 +164,7 @@ test("the swap is a URL scope: ?dw2motion=1 turns it on, and only for the slots 
 
 test("on, only the BODY changes: hit count, reactions, spark and camera are today's", () => {
   const m = model();
-  DW2.applyDw2Motion(m, generated("I", 129, "attack"));
+  DW2.applyDw2Motion(m, generated("F", 129, "cast"));
   const base = {
     ops: [
       { op: 3, words: [1, 9999] }, { op: 2, words: [0, 0, 2] }, { op: 11, words: [30] },
@@ -177,7 +183,7 @@ test("on, only the BODY changes: hit count, reactions, spark and camera are toda
     assert.equal(binds(sw.ops)[0].words[2], 129, "and it is the baked DW2 table");
     const count = (ops, op) => ops.filter((o) => o.op === op).length;
     for (const op of [10, 1, 3, 11, 6]) assert.equal(count(sw.ops, op), count(base.ops, op), `op${op} records kept`);
-    assert.equal(sw.dw2Motion.letter, "I");
+    assert.equal(sw.dw2Motion.letter, "F");
     // the return-to-base and the terminator survive
     assert.ok(sw.ops.some((o) => o.op === 2 && (o.words[2] | 0) === 1));
     assert.equal(sw.ops.at(-1).op, 255);
@@ -188,9 +194,10 @@ test("on, only the BODY changes: hit count, reactions, spark and camera are toda
 
 test("a reaction body gets the whole motion; an attack body keeps the disc's timing", () => {
   const m = model();
-  const g = generated("K", 130, "death");
-  g.motions.K.frames = 46;
-  g.motions.K.hi = 6045;
+  const g = generated("C2K", 130, "death");
+  g.motions.C2K.frames = 46;
+  g.motions.C2K.hi = 6045;
+  g.motions.C2K.playlist = Array.from({ length: 46 }, (_, i) => ({ value: 6000 + i }));   // the pad counts table ENTRIES (playback is per entry)
   DW2.applyDw2Motion(m, g);
   const base = { ops: [{ op: 2, words: [0, 0, 2] }, { op: 11, words: [10] }, { op: 2, words: [0, 0, 1] }, { op: 255, words: [] }] };
   DW2.setDw2MotionEnabled(true);

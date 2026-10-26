@@ -1017,19 +1017,50 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1 } = {}
   }
   if (!placed) ops.unshift({ op: 2, words: [0, 0, bodyTable] });
   const strikeKinds = new Set(["attack", "cast", "signature", "throw"]);
+  // STRIKE ON THE POSE (2026-10-26): the base's first shot/strike came on the base's own beat, not when this body reaches its strike
+  // pose (Andromon's shot at 19% of the motion, pose at 70%). When the motion file names its strike entry (`hit`, one entry per
+  // tick), the op11 waits between the body bind and the first op6 launch / op10 98-99 strike are made to add up to it: a wait is
+  // added in front of the strike, or the waits before it are shortened. Every later op keeps its distance to the first strike.
+  if (strikeKinds.has(dw2.kind) && Number.isInteger(dw2.hit)) {
+    const bind = ops.findIndex((o) => o.op === 2 && (o.words?.[2] | 0) === bodyTable);
+    const isStrike = (o) => (o.op === 6 && (o.words?.[0] | 0) === 0) || (o.op === 10 && [98, 99].includes(o.words?.[0] | 0));
+    const first = ops.findIndex((o, i) => i > bind && isStrike(o));
+    if (bind >= 0 && first > bind) {
+      // the strike waits for the BODY: drop the fixed waits and the whole-table waits ([0,s,0], [5,s,0] with no ramp armed)
+      // between the bind and the first strike, and put one "until the playhead reaches the strike pose" wait in front of it
+      // (action-vm.js op11 untilEntry). A lunge armed in between ([5,s,k]) and its own wait stay. Melee scripts waited for the
+      // whole table before the lunge, so the hit came after the motion ended (Frigimon slot 6, 2026-10-26).
+      let ramp = false;
+      const keep = [];
+      for (let i = bind + 1; i < first; i++) {
+        const o = ops[i], w0 = o.words?.[0] | 0, w2 = o.words?.[2] | 0;
+        if (o.op === 2 && w0 === 5 && w2 !== 0) ramp = true;
+        if (o.op === 11) continue;
+        if (o.op === 2 && w0 === 0 && w2 === 0) continue;
+        if (o.op === 2 && w0 === 5 && w2 === 0 && !ramp) continue;
+        keep.push(o);
+      }
+      ops.splice(bind + 1, first - bind - 1, ...keep, { op: 11, words: [0], untilEntry: dw2.hit });
+    }
+  }
   if (!strikeKinds.has(dw2.kind)) {
     // play the whole motion before the base returns: count the frames the script waits for after
     // the body bind and add the difference in one wait, just before the return / terminator
+    // A done-wait ([0,s,0]) after the bind already holds the script until the table ends: no pad then (it added 393 still
+    // ticks after Tyrannomon's victory body, 2026-10-26). The length is the bound table's ENTRIES (the export speeds the playlist up).
     let waited = 0;
     let seen = false;
+    let doneWait = false;
     for (const o of ops) {
       if (o.op === 2 && (o.words?.[2] | 0) === bodyTable) { seen = true; continue; }
       if (!seen) continue;
       if (o.op === 11) waited += (o.words?.[0] | 0);
+      if (o.op === 2 && (o.words?.[0] | 0) === 0 && (o.words?.[2] | 0) === 0) { doneWait = true; break; }
       if (o.op === 2 && (o.words?.[2] | 0) === 1) break;
     }
-    const frames = Math.max(0, dw2.hi - dw2.lo + 1);
-    const pad = frames - waited;
+    const entries = model?.timeline?.[bodyTable]?.table?.length;
+    const frames = Number.isInteger(entries) ? entries : Math.max(0, dw2.hi - dw2.lo + 1);
+    const pad = doneWait ? 0 : frames - waited;
     if (pad > 2) {
       const at = ops.findIndex((o) => seen && o.op === 2 && (o.words?.[2] | 0) === 1);
       const term = ops.findIndex((o) => o.op === 0 || o.op === 255);

@@ -167,6 +167,10 @@ export class ActionVM {
         case "op10": this._drivePort("op10", rec); break;    // effect / strike (ported)
         case "op5": this._drivePort("op5", rec); break;      // camera (ported; reuses the look-at)
         case "op11": {                                       // wait N → the ported op11 yield
+          if (Number.isInteger(rec.untilEntry)) {           // DW2 motion only (clip-fallback withDw2Body): hold until the body's strike pose
+            if (this.player && !this.player.ended && (this.player.playhead | 0) < rec.untilEntry) { this.ip--; return; }
+            break;
+          }
           if (!this._driveWait(rec, delta)) { this.ip--; return; }
           break;
         }
