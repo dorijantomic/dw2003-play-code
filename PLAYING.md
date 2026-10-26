@@ -21,6 +21,10 @@ Optional: features that use Digimon World 2 models (riding Unimon) need your own
 it is converted on your computer in a few seconds. From source: `python3 tools/dw2/dw2_addon.py --disc <DW2 .bin>
 --converter <dw2_model_converter> --out web/dw2models`.
 
+With both discs (the Digimon World 2003 game built first), the same step also gives the Digimon that are in both games
+their Digimon World 2 battle animations, made on your computer (this takes a while; the game keeps running). From
+source, add `--motion --battle web/assets/battle`. The animations play when DW2 motion is switched on (`?dw2motion=1`).
+
 The rest of this page is the from-source route.
 
 ## Quick Start (from source)

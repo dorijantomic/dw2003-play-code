@@ -46,7 +46,8 @@
 
   <section class="card" id="dw2">
     <h2>Digimon World 2 extras</h2>
-    <p class="hint">Adds the features that use Digimon World 2 models: riding Unimon (F2 → Extras → Mount).</p>
+    <p class="hint">Adds the features that use Digimon World 2 models: riding Unimon (F2 → Extras → Mount), and the Digimon World 2
+      battle animations for the Digimon that are in both games (needs your Digimon World 3 disc built first, so both discs).</p>
     <div class="state" id="dw2-state"></div>
 
     <div id="dw2-pick" class="hidden">
@@ -60,6 +61,7 @@
           Checked with the USA release (SLUS-01193).</li>
         <li>Have a <b>.cue</b> file? Pick the <b>.bin</b> file next to it.</li>
         <li>The models are read and converted on this computer, in a few seconds. Nothing is downloaded.</li>
+        <li>The battle animations are then made on this computer too. That takes a while; you can keep playing.</li>
       </ul>
     </div>
 
@@ -78,7 +80,7 @@
   <footer>
     The Digimon World 2 models are converted with jype's
     <a href="https://gitlab.com/jype/dw2_model_converter" target="_blank" rel="noopener">dw2_model_converter</a>
-    (MIT; based on work by SydMontague and RemyRM). Digimon World 2 © Bandai.
+    (MIT; based on work by SydMontague and RemyRM). The battle animations are re-posed on this computer by this project's own converter. Digimon World 2 © Bandai.
   </footer>
 </main>
 <script>
@@ -135,7 +137,7 @@ async function poll() {
   $("dw2-err").classList.toggle("hidden", st !== "failed");
   if (st === "failed") $("dw2-err").textContent = s.error;
   if (!s.available) $("dw2-state").textContent = "This install has no DW2 model converter, so these extras cannot be built.";
-  else if (st === "done") $("dw2-state").innerHTML = `<span class="done">Installed</span> · ${s.models.length} models. Switch features on in the game: F2 → Extras.`;
+  else if (st === "done") $("dw2-state").innerHTML = `<span class="done">Installed</span> · ${s.models.length} models${s.motion ? ` · battle animations for ${s.motion.species} Digimon` : ""}. Switch features on in the game: F2 → Extras.`;
   else if (st === "building") { $("dw2-state").textContent = "Building…"; $("dw2-step").textContent = (s.log || []).slice(-1)[0] || ""; $("dw2-bar").style.width = "60%"; }
   else if (st === "receiving") $("dw2-state").textContent = "Copying your disc…";
   else $("dw2-state").textContent = "Not installed.";

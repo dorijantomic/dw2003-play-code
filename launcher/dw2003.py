@@ -251,6 +251,10 @@ class Build:
                 stamp = None
             d["state"] = "done" if stamp else "none"
             d["models"] = (stamp or {}).get("models", [])
+        try:   # the DW2 animations for the DW3 Digimon (step 4 of the add-on, needs both discs)
+            d["motion"] = self._dw2_mod().motion_status(self.app / "web" / "assets" / "battle")
+        except Exception:
+            d["motion"] = None
         return d
 
     def dw2_start(self):
@@ -266,8 +270,13 @@ class Build:
             self.log(f"[dw2] {line}")
         try:
             say("credit: jype's dw2_model_converter (MIT) turns the disc's models into glTF")
+            # with the DW3 game built (both discs), also the DW2 animations for the DW3 Digimon
+            battle = self.app / "web" / "assets" / "battle"
+            node = shutil.which("node", path=os.pathsep.join(self.tools["path"] + [os.environ.get("PATH", "")]))
             self._dw2_mod().build(self.dw2_disc, Path(self.tools["dw2conv"]), self.app / "web" / "dw2models",
-                                  self.data / "_dw2work", log=say)
+                                  self.data / "_dw2work", log=say,
+                                  motion_battle=battle if (battle / "models").is_dir() else None,
+                                  cache=self.data / "_dw2cache", node=node)
             self.dw2.update(state="done")
         except SystemExit as e:
             self.dw2.update(state="failed", error=str(e.code))
@@ -782,6 +791,8 @@ def make_handler(build: Build):
                 if build.dw2["state"] not in ("building", "receiving"):
                     build.dw2_disc.unlink(missing_ok=True)
                     shutil.rmtree(build.app / "web" / "dw2models", ignore_errors=True)
+                    shutil.rmtree(build.app / "web" / "assets" / "battle" / "dw2motion", ignore_errors=True)
+                    shutil.rmtree(build.data / "_dw2cache", ignore_errors=True)
                     build.dw2.update(state="none", error="", log=[])
                 return self._json({"ok": True})
             if path == "/__dw2003/forget-disc":
