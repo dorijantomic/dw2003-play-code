@@ -1,0 +1,132 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Effect sheet preview</title>
+<style>
+  :root { --bg:#14161f; --panel:#1e2130; --ink:#e8ecf5; --dim:#9aa3b8; --line:#3a4058; --hi:#ffcc33; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px system-ui,sans-serif; padding:16px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+  select, button, input { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:5px 9px; font:inherit; }
+  button.on { border-color:var(--hi); color:var(--hi); }
+  #stage { background:#4a6a3a; border:1px solid var(--line); border-radius:8px; image-rendering:pixelated; display:block; max-width:100%; }
+  #strip { display:flex; gap:4px; overflow-x:auto; padding:6px 0; }
+  #strip canvas { background:#2a2e40; border:2px solid transparent; border-radius:4px; image-rendering:pixelated; cursor:pointer; flex:none; }
+  #strip canvas.cur { border-color:var(--hi); }
+  .info { color:var(--dim); font-variant-numeric:tabular-nums; }
+  label { color:var(--dim); }
+</style>
+<h1>Effect sheet preview</h1>
+<div class="row">
+  <label>Sheet <select id="sheet"></select></label>
+  <label>Clip <select id="clip"></select></label>
+  <button id="play">Pause</button>
+  <button id="prev">&larr; Frame</button>
+  <button id="next">Frame &rarr;</button>
+  <label>Speed (blanks per frame) <input id="hold" type="number" min="1" max="60" style="width:60px"></label>
+  <label>Zoom <input id="zoom" type="number" min="1" max="6" value="3" style="width:50px"></label>
+</div>
+<div class="row">
+  <button id="walk">Walk across</button>
+  <button id="ground" class="on">Ground line</button>
+  <button id="onion">Previous frame ghost</button>
+  <button id="bg">Background</button>
+  <span class="info" id="info"></span>
+</div>
+<canvas id="stage" width="900" height="260"></canvas>
+<div class="info">Every frame of the clip, in the order the game plays it (click one to stop on it):</div>
+<div id="strip"></div>
+<script>
+// Plays an effect sheet (web/extra_fx/<name>.png + .json) exactly the way web/quest-fx.js does: cell = frame * frame width
+// from the left of one row, `hold` field blanks (60 a second) per frame, looping clips wrap. ?sheet=<name>&clip=<clip>
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+const KNOWN = ["giant_metal_g", "giant_master_px", "big_claw", "big_horn", "print_claw", "print_horn", "log", "crate", "shard", "frame"];
+const st = { img: null, def: null, clip: null, idx: 0, ticks: 0, playing: true, walk: false, x: 0, ground: true, onion: false, bg: 0 };
+const BGS = ["#4a6a3a", "#2a2e40", "#c8c0a8", "#ff00ff"];
+
+for (const n of new Set([q.get("sheet"), ...KNOWN].filter(Boolean))) $("sheet").add(new Option(n, n));
+$("sheet").value = q.get("sheet") || KNOWN[0];
+
+async function load(name) {
+  const bust = "?t=" + Date.now();
+  const def = await (await fetch(`extra_fx/${name}.json${bust}`)).json();
+  const img = new Image(); img.src = `extra_fx/${name}.png${bust}`; await img.decode();
+  st.img = img; st.def = def;
+  $("clip").innerHTML = "";
+  for (const c of Object.keys(def.clips)) $("clip").add(new Option(`${c} (${def.clips[c].frames.length} frames)`, c));
+  const want = q.get("clip");
+  $("clip").value = def.clips[want] ? want : def.default && def.clips[def.default] ? def.default : Object.keys(def.clips)[0];
+  setClip($("clip").value);
+}
+function setClip(c) {
+  st.clip = c; st.idx = 0; st.ticks = 0; st.x = 0;
+  $("hold").value = st.def.clips[c].hold ?? 6;
+  buildStrip();
+}
+const frames = () => st.def.clips[st.clip].frames;
+const cols = () => Math.floor(st.img.naturalWidth / st.def.frame[0]);
+function drawCell(g, cell, dx, dy, z, alpha = 1) {
+  const [fw, fh] = st.def.frame;
+  g.globalAlpha = alpha;
+  g.drawImage(st.img, cell * fw, 0, fw, fh, dx, dy, fw * z, fh * z);
+  g.globalAlpha = 1;
+}
+function buildStrip() {
+  const [fw, fh] = st.def.frame, strip = $("strip");
+  strip.innerHTML = "";
+  frames().forEach((cell, i) => {
+    const c = document.createElement("canvas"); c.width = fw; c.height = fh;
+    c.style.width = fw * 1.5 + "px"; c.style.height = fh * 1.5 + "px";
+    const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+    drawCell(g, cell, 0, 0, 1);
+    g.fillStyle = "#ffcc33"; g.font = "bold 12px system-ui"; g.fillText(`${i + 1}  (cell ${cell})`, 4, 14);
+    if (cell >= cols()) { g.fillStyle = "#ff5555"; g.fillText("CELL PAST THE SHEET", 4, 30); }
+    c.onclick = () => { st.playing = false; st.idx = i; st.ticks = 0; $("play").textContent = "Play"; };
+    strip.appendChild(c);
+  });
+}
+function draw() {
+  const cv = $("stage"), g = cv.getContext("2d"), z = Math.max(1, Number($("zoom").value) || 3);
+  const [fw, fh] = st.def.frame, ax = st.def.anchor?.[0] ?? 0.5, ay = st.def.anchor?.[1] ?? 1;
+  cv.height = Math.max(260, fh * z + 40);
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = BGS[st.bg]; g.fillRect(0, 0, cv.width, cv.height);
+  const groundY = cv.height - 20;
+  const span = cv.width + fw * z;
+  const left = /left/.test(st.clip);
+  const cx = st.walk ? (left ? cv.width + fw * z / 2 - (st.x % span) : -fw * z / 2 + (st.x % span)) : cv.width / 2;
+  const dx = Math.round(cx - fw * z * ax), dy = Math.round(groundY - fh * z * ay);
+  if (st.onion && frames().length > 1) drawCell(g, frames()[(st.idx - 1 + frames().length) % frames().length], dx, dy, z, 0.3);
+  drawCell(g, frames()[st.idx], dx, dy, z);
+  if (st.ground) { g.strokeStyle = "#ffcc33"; g.beginPath(); g.moveTo(0, groundY + 0.5); g.lineTo(cv.width, groundY + 0.5); g.stroke(); }
+  $("info").textContent = `frame ${st.idx + 1} of ${frames().length}  (cell ${frames()[st.idx]} of ${cols()} in the sheet)  cell size ${fw}x${fh}`;
+  [...$("strip").children].forEach((c, i) => c.classList.toggle("cur", i === st.idx));
+}
+let last = performance.now(), acc = 0;
+function tick(now) {
+  acc += Math.min(200, now - last); last = now;
+  while (acc >= 1000 / 60) {          // one field blank
+    acc -= 1000 / 60;
+    if (!st.def || !st.playing) continue;
+    if (st.walk) st.x += 2 * (Number($("zoom").value) || 3) / 1;
+    const hold = Math.max(1, Number($("hold").value) || 6);
+    if (++st.ticks >= hold) { st.ticks = 0; st.idx = (st.idx + 1) % frames().length; }
+  }
+  if (st.def) draw();
+  requestAnimationFrame(tick);
+}
+$("sheet").onchange = () => load($("sheet").value);
+$("clip").onchange = () => setClip($("clip").value);
+$("play").onclick = () => { st.playing = !st.playing; $("play").textContent = st.playing ? "Pause" : "Play"; };
+const step = (d) => { st.playing = false; $("play").textContent = "Play"; st.idx = (st.idx + d + frames().length) % frames().length; st.ticks = 0; };
+$("prev").onclick = () => step(-1);
+$("next").onclick = () => step(1);
+$("walk").onclick = () => { st.walk = !st.walk; st.x = 0; $("walk").classList.toggle("on", st.walk); };
+$("ground").onclick = () => { st.ground = !st.ground; $("ground").classList.toggle("on", st.ground); };
+$("onion").onclick = () => { st.onion = !st.onion; $("onion").classList.toggle("on", st.onion); };
+$("bg").onclick = () => { st.bg = (st.bg + 1) % BGS.length; };
+$("zoom").oninput = buildStrip;
+addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); if (e.key === " ") { e.preventDefault(); $("play").click(); } });
+load($("sheet").value).then(() => requestAnimationFrame(tick));
+</script>

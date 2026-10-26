@@ -14,6 +14,7 @@ Usage: python3 tools/check_quests.py        (exit status 1 if anything is wrong)
 import collections
 import json
 import os
+import subprocess
 import sys
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
@@ -102,6 +103,56 @@ for q in quests:
     for it in q.get("reward", {}).get("items", []):
         if it["name"] not in item_names:
             errors.append(f"{qid}: reward item '{it['name']}' is not in the in-game item table")
+# ---- props: our own art a quest's state leaves on a map (web/quest-props.js, docs/quests-fx-brief.md section 6)
+variants = load(os.path.join(WEB, "map-variants.json")) if os.path.exists(os.path.join(WEB, "map-variants.json")) else {}
+fx_dir = os.path.join(WEB, "extra_fx")
+prop_sheets = {}
+
+
+def prop_sheet(name):
+    """web/extra_fx/<name>.{png,json} or None: both files must exist and the json must parse."""
+    if name not in prop_sheets:
+        png, meta = os.path.join(fx_dir, f"{name}.png"), os.path.join(fx_dir, f"{name}.json")
+        prop_sheets[name] = load(meta) if os.path.exists(png) and os.path.exists(meta) else None
+    return prop_sheets[name]
+
+
+for q in quests:
+    qid = q["id"]
+    for i, p in enumerate(q.get("props") or []):
+        where = f"props[{i}]"
+        if not isinstance(p, dict):
+            errors.append(f"{qid}: {where} is not an object")
+            continue
+        m = p.get("map")
+        if not isinstance(m, str) or (m not in maps and variants.get(m) not in maps):
+            errors.append(f"{qid}: {where} names unknown map {m!r}")
+        else:
+            info = map_info.get(m) or map_info.get(variants.get(m) or "") or {}
+            at = p.get("at")
+            if not (isinstance(at, list) and len(at) == 2 and all(isinstance(v, int) for v in at)):
+                errors.append(f"{qid}: {where}.at must be two whole world pixels [x, y]")
+            elif not (0 <= at[0] <= info.get("width", 0) and 0 <= at[1] <= info.get("height", 0)):
+                errors.append(f"{qid}: {where}.at ({at[0]},{at[1]}) is outside {m} ({info.get('width')}x{info.get('height')})")
+        name = p.get("sheet")
+        meta = prop_sheet(name) if isinstance(name, str) and name else None
+        if not isinstance(name, str) or not name:
+            errors.append(f"{qid}: {where} needs a sheet name")
+        elif meta is None:
+            errors.append(f"{qid}: {where} sheet '{name}' is not web/extra_fx/{name}.png + .json")
+        else:
+            frame = meta.get("frame")
+            if not (isinstance(frame, list) and len(frame) == 2 and all(isinstance(v, (int, float)) and v > 0 for v in frame)):
+                errors.append(f"{qid}: {where} sheet '{name}' has no sane frame size")
+            clips = meta.get("clips") or {}
+            if p.get("clip") is not None and p["clip"] not in clips:
+                errors.append(f"{qid}: {where} clip '{p['clip']}' is not in sheet '{name}' ({sorted(clips)})")
+        if p.get("after") not in (None, "done", "accepted"):
+            errors.append(f"{qid}: {where}.after is {p.get('after')!r}; use \"done\" or \"accepted\"")
+        if p.get("layer") not in (None, "entity", "behind", "front"):
+            errors.append(f"{qid}: {where}.layer is {p.get('layer')!r}; use \"entity\", \"behind\" or \"front\"")
+        if "solid" in p and not isinstance(p["solid"], bool):
+            errors.append(f"{qid}: {where}.solid must be true or false")
 # ---- characters (NPCs) and unlock rules
 import glob
 scene_npcs = {}                      # (stage id, npc_id) -> set of (x, y) with a real position (0,0 = scripted/cutscene only)
@@ -202,7 +253,26 @@ for q in quests:
     if fl is not None and fl not in known_flags:
         errors.append(f"{q['id']}: requires flag {fl}, which is not one of the decoded story-beat flags {sorted(known_flags)}")
 
-print(f"{len(quests)} quest(s) checked against {len(enemies)} enemies, {len(maps)} maps, {len(item_names)} item names")
+# ---- walkable ground: a scene never walks a character onto, or through, a wall
+# The geometry lives in web/quest-walk.js (the module the game itself routes scripted walks with) and the check in
+# tools/check_quest_walks.mjs, so the build and the runtime agree on what walkable means. A step whose place depends on
+# where the PLAYER stands cannot be resolved without the game running: those are counted as skipped there, not failed.
+walk_note = ""
+try:
+    walk = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_quest_walks.mjs"), "--json"],
+                          capture_output=True, text=True, timeout=600)
+    data = json.loads(walk.stdout or "{}")
+    problems = data.get("problems") or []
+    hard = [p for p in problems if p.get("severity") == "fail"]
+    for p in hard:
+        where = f"{p['where']} step {p['step']}" if p.get("step") else p["where"]
+        errors.append(f"{p['quest']}: {where} ({p['kind']}) on {p['map']} at ({p['x']},{p['y']}): {p['what']}")
+    walk_note = (f"; walks: {data.get('checked', 0)} place(s) checked, {data.get('skipped', 0)} skipped "
+                 f"(they depend on where the player stands), {len(problems) - len(hard)} note(s)")
+except (OSError, ValueError, subprocess.SubprocessError) as e:
+    walk_note = f"; walks: NOT CHECKED ({e})"
+
+print(f"{len(quests)} quest(s) checked against {len(enemies)} enemies, {len(maps)} maps, {len(item_names)} item names{walk_note}")
 for e in errors:
     print("  PROBLEM:", e)
 print("OK" if not errors else f"{len(errors)} problem(s)")

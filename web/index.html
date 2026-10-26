@@ -25,11 +25,17 @@
   #hint { margin-left: auto; font-size: 11px; color: #707090; }
   #stage { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
   #stage:fullscreen { width: 100vw; height: 100vh; background: #000; }
+  /* Window fill (F once): the stage covers the browser window without browser fullscreen. */
+  html.window-fill header { display: none; }
+  html.window-fill #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; }
+  html.window-fill #stage #title-screen { background: #000; }
+  html.window-fill #stage canvas:not(.battle-fs),
   #stage:fullscreen canvas:not(.battle-fs) {
     width: 100%; height: auto; max-width: 100%; max-height: 100%;
     border: none; border-radius: 0;
   }
   @media (min-aspect-ratio: 10/7) {
+    html.window-fill #stage canvas:not(.battle-fs),
     #stage:fullscreen canvas:not(.battle-fs) { width: auto; height: 100%; }
   }
   canvas {
@@ -143,6 +149,12 @@
     pointer-events: none; display: none;
   }
   #hud.visible { display: block; }
+  #force-enc {
+    position: absolute; top: 8px; right: 8px; z-index: 5; display: none;
+    background: rgba(125, 47, 58, 0.9); color: #fff; border: 1px solid #b45566; border-radius: 6px;
+    padding: 6px 10px; font: 12px monospace; cursor: pointer;
+  }
+  #hud.visible ~ #force-enc { display: block; }
   #hud-map { color: #ffd34d; letter-spacing: 1px; }
   #hud-partner { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
   #hud-icon { image-rendering: pixelated; width: 32px; height: 32px; }
@@ -215,6 +227,7 @@
       <span id="hud-partner-name"></span>
     </div>
   </div>
+  <button id="force-enc" title="Start the game's own random encounter now (F9)">Force encounter (F9)</button>
   <!-- The native title screen. `#title-canvas` renders the decoded STDWTITL
        composition (background, logo, wordmark, the 3 and its glow, and the
        Press Start Button / Start / Continue menu) through web/titlescreen.js.

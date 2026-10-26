@@ -207,7 +207,7 @@ QUESTS = [
 
     quest("p_res_signal_walk", "Signal strength", 44, PARK,
           text="A Researcher is measuring the signal along the forest edge. Visit the Wire Forest entrance and the west forest and tell him what you notice.",
-          goal=[go(WIRE), go(FOREST)], pay=pay(480, ("Energy Disk", 1)), after="p_res_samples", lvl=4, short="Signal walk",
+          goal=[go(WIRE), go(FOREST)], pay=pay(480, ("Energy Disk", 1)), after="p_res_samples", seen=[FOREST], lvl=6, short="Signal walk",
           offer=["The signal gets strange at the edge of the Wire Forest. I need someone to walk it and tell me what they notice.",
                  "Not numbers. Feelings. Does the air feel different? Do your teeth buzz? These are scientific questions.",
                  "Start at the entrance and walk to the west forest. Report back."],
@@ -289,7 +289,7 @@ QUESTS = [
 
     quest("p_lookout_tuskmon", "Something large in the surf", 283, CAPE,
           text="The Lookout Boy keeps reporting a large grey shape near Plug Cape. Beat a Coelamon and a Tuskmon and see if the shape is gone.",
-          goal=[kill("Coelamon", 2, [CAPE]), kill("Tuskmon", 1, [CAPE])], pay=pay(650, ("Power Charge", 2)), after="p_lookout_ship", lvl=10, short="Surf shape",
+          goal=[kill("Coelamon", 2, [CAPE]), kill("Tuskmon", 1, [CAPE])], pay=pay(650, ("Power Charge", 2)), after="p_lookout_ship", lvl=12, short="Surf shape",
           offer=["Report! A large grey shape in the surf. It moves slowly. It blows water. I think it is thinking about me.",
                  "A couple of Coelamon and a Tuskmon have been hanging around. I think one of them is the shape.",
                  "I cannot fight. I can only report. Please. For the cape."],

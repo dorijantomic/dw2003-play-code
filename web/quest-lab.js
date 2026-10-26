@@ -4,10 +4,12 @@
 //   Go     makes the quest startable (its prerequisites done, no story needed), puts its characters on the map, and stands you
 //          in front of the one who gives it. Press Enter to talk and the scene plays.
 //   Goals  meets all of its objectives at once, so you can see the turn-in scene and the reward.
-// "Reset quests" clears the quest layer's own progress. Nothing here touches the story or the normal save.
+// "Hide" folds the panel into a small tab. "Reset quests" clears the quest layer's own progress. Nothing here touches the story or the normal save.
 const $ = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 
 const css = `
+#questlab[hidden],#questlab-tab[hidden]{display:none}
+#questlab-tab{position:fixed;top:8px;right:8px;z-index:99999;font:12px system-ui,sans-serif;padding:3px 8px}
 #questlab{position:fixed;top:8px;right:8px;z-index:99999;width:300px;max-height:92vh;overflow:auto;background:#0d1b2acc;color:#e8f1fa;
   font:12px/1.35 system-ui,sans-serif;border:1px solid #5aa0d0;border-radius:6px;padding:8px}
 #questlab h4{margin:0 0 6px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
@@ -81,12 +83,18 @@ function build() {
     const total = window.__quests.defs.filter((d) => d.offer || d.objectives.some((o) => o.type === "talk")).length;
     count.textContent = `${Math.min(shown, 40)} shown of ${shown} matching, ${total} quests with a giver`;
   };
+  const hide = $("button", { textContent: "Hide" });
   const head = $("h4", {}, "Quest lab",
-    $("button", { textContent: "Reset quests", onclick: () => { window.__quests.lab.reset(); say("Quest progress cleared."); refresh(); } }));
+    $("span", {}, $("button", { textContent: "Reset quests", onclick: () => { window.__quests.lab.reset(); say("Quest progress cleared."); refresh(); } }), " ", hide));
   box.append(head, msg, search, count, list);
   document.body.append(box);
   // keys typed into the game must not be taken by the panel
   box.addEventListener("keydown", (e) => e.stopPropagation());
+  // "Hide" folds the panel into a small "Quest lab" tab; clicking the tab brings it back
+  const tab = $("button", { id: "questlab-tab", textContent: "Quest lab", hidden: true,
+    onclick: () => { box.hidden = false; tab.hidden = true; } });
+  hide.onclick = () => { box.hidden = true; tab.hidden = false; };
+  document.body.append(tab);
   refresh();
   setInterval(() => { if (document.activeElement !== search) refresh(); }, 4000);
   const pending = sessionStorage.getItem("questlabGo");

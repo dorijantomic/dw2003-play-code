@@ -1,0 +1,42 @@
+{
+  "name": "crate",
+  "frame": [
+    24,
+    24
+  ],
+  "anchor": [
+    0.5,
+    1.0
+  ],
+  "clips": {
+    "fall": {
+      "frames": [
+        0,
+        1
+      ],
+      "hold": 3,
+      "loop": true
+    },
+    "hit": {
+      "frames": [
+        2
+      ],
+      "hold": 5
+    },
+    "settle": {
+      "frames": [
+        3,
+        4,
+        5
+      ],
+      "hold": 6
+    },
+    "idle": {
+      "frames": [
+        3
+      ],
+      "hold": 30
+    }
+  },
+  "default": "idle"
+}

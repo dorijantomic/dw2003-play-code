@@ -282,10 +282,10 @@ QUESTS = [
                 "Here, take something. I have too much of everything except patience."]),
 
     quest("w_oldwoman_rumour_name", "The rumour gets a name", 58, CAVE2,
-          text="The Old Woman wants the sound named. Ask the Old Man in the Bai Hu cave, then quiet a Garbagemon in the sewers.",
+          text="The Old Woman wants the sound named. Ask the Old Man in the Bai Hu cave, then quiet two Sukamon in the sewers.",
           goal=[talk(57, CAVE2, ["A desert that hums? I have heard it. It hums the way a lid hums when something inside wants out.",
                                   "Go and look in the sewers before you agree with me. I am often right and it has made me lazy."]),
-                kill("Garbagemon", 2, [SEWERS])],
+                kill("Sukamon", 2, [SEWERS])],
           pay=pay(1000, ("Sober Disk", 2)), lvl=26, after="w_oldwoman_noise", ordered=True, short="Gets a name",
           offer=["I have the sound but not the name, and an unnamed thing follows you home.",
                  "The Old Man in the Bai Hu cave knows old noises. Ask him. Then check the sewers, he always sends people to the sewers.",
@@ -293,7 +293,7 @@ QUESTS = [
           ask="Name the sound?", options=("I will", "Not now"),
           remind=["The Old Man first, in the Bai Hu cave. Then the sewers. He is never wrong about noises.",
                   "A thing with a name is only half as frightening."],
-          done=["Garbagemon in the sewers and a humming lid in the desert. They are the same sound, dear.",
+          done=["Two Sukamon in the sewers and a humming lid in the desert. They are the same sound, dear.",
                 "The world repeats itself when nobody is listening. Thank you for listening."]),
 
     quest("w_oldwoman_repeats", "The desert that repeats", 58, CITY,

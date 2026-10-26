@@ -264,7 +264,7 @@ QUESTS = [
 
     quest("a_oldman_legend_forest", "The forest that hums", 57, DESK,
           text="The Old Man says there is a forest that hums at the edge of the world. Walk the Wire Forest entrance and the west forest beyond it.",
-          goal=[go(WIRE), go("s350")], pay=pay(500, ("Life Disk", 1)), after="a_oldman_riddle_cape", lvl=4, short="Humming forest",
+          goal=[go(WIRE), go("s350")], pay=pay(500, ("Life Disk", 1)), after="a_oldman_riddle_cape", seen=["s350"], lvl=6, short="Humming forest",
           offer=["There is a forest at the edge of the world that hums. I heard it once, long ago, and have been trying to hear it again.",
                  "Walk the Wire Forest. Start at the entrance. Keep going until it hums. I will not tell you where.",
                  "I am old. I can only listen to your report. But I do love a good report."],

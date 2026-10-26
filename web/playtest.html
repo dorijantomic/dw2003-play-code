@@ -54,6 +54,7 @@ what techniques every form can use (including which are lent to the others), gea
   <label>Bits <input type="number" id="bits" /></label>
 </div><div class="row" style="margin-top:8px">
   <label class="inline"><input type="checkbox" id="noEnc" /> no random encounters (walk freely)</label>
+  <label class="inline"><input type="checkbox" id="forceEnc" /> force an encounter as soon as the map loads</label>
   <label class="inline"><input type="checkbox" id="aspectData" /> use the aspect routes (element gates) for the extra forms</label>
   <label class="inline"><input type="checkbox" id="ownAll" /> own all eight partners (Digimon Lab)</label>
   <label class="inline"><input type="checkbox" id="cleanStory" /> start from a clean story state (clears flags)</label>
@@ -280,7 +281,7 @@ function renderWorld() {
   const maps = D.maps.filter((m) => !q || (m.id + " " + m.name).toLowerCase().includes(q) || m.id === B.map);
   $("map").innerHTML = maps.map((m) => opt(m.id, `${m.id}  ${m.name}${m.lv ? `  (enemies ~Lv ${m.lv})` : ""}`, m.id === B.map)).join("");
   $("name").value = B.name; $("bits").value = B.bits; $("chapter").value = B.chapter;
-  for (const k of ["noEnc", "aspectData", "ownAll", "cleanStory"]) $(k).checked = !!B[k];
+  for (const k of ["noEnc", "forceEnc", "aspectData", "ownAll", "cleanStory"]) $(k).checked = !!B[k];
 }
 function renderTabs() {
   $("tabs").innerHTML = B.members.map((m, i) => `<button class="${i === cur ? "on" : "alt"}" data-t="${i}">${i + 1}. ${STARTERS[m.slot].name} Lv ${m.level}${i === 0 ? " (lead)" : ""}</button>`).join("") +
@@ -349,7 +350,7 @@ const readBuilds = () => { try { return JSON.parse(store.getItem(BUILDS) ?? "{}"
 // ---------------------------------------------------------------------------------------------------------------------
 function pullWorld() {
   B.name = $("name").value; B.map = $("map").value || B.map; B.chapter = $("chapter").value; B.bits = +$("bits").value || 0;
-  for (const k of ["noEnc", "aspectData", "ownAll", "cleanStory"]) B[k] = $(k).checked;
+  for (const k of ["noEnc", "forceEnc", "aspectData", "ownAll", "cleanStory"]) B[k] = $(k).checked;
 }
 document.addEventListener("input", (e) => {
   const t = e.target, m = B?.members[cur];
@@ -440,7 +441,7 @@ function apply(play) {
   if (B.cleanStory) for (const k of ["flags", "engineFlags", "progressOrdinal", "engineEvents"]) store.removeItem(k);
   if (B.chapter) set("chapterOverride", String(B.chapter)); else store.removeItem("chapterOverride");
   msg("Applied. Your own save is backed up.", "good");
-  if (play) location.href = `index.html?skipTitle=1&map=${encodeURIComponent(B.map)}${B.noEnc ? "&noEncounters=1" : ""}${B.aspectData ? "&aspect=1" : ""}`;
+  if (play) location.href = `index.html?skipTitle=1&map=${encodeURIComponent(B.map)}${B.noEnc ? "&noEncounters=1" : ""}${B.forceEnc ? "&encounter=1" : ""}${B.aspectData ? "&aspect=1" : ""}`;
 }
 function restore() {
   const saved = store?.getItem(BACKUP); if (!saved) return msg("Nothing to put back: no test was started from this page.", "warn");

@@ -13,7 +13,7 @@
 //              of everything (weather falls over the party), fading in when a
 //              map loads. Density scales with the map's own grass share.
 import { classSource, variantBase } from "./mapclass.js";
-import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel } from "./scenery.js";
+import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel, todPhaseNow, cueBolt } from "./scenery.js";
 import { syncVillagers, removeVillagers } from "./crowd.js";
 import { setSound, thunder, footstep, setAmbience, setMusic } from "./fxaudio.js";
 import { resetScenery3, drawScenery3 } from "./scenery3.js";
@@ -212,6 +212,8 @@ function profileOf(map, mapImg) {
     return p;
 }
 window.__ambienceProfile = (id) => { const p = profiles.get(id); return p && { ...p, cls: undefined }; };
+/** Testing aid: does the scene override draw this effect right now (the map's profile AND the player's own switch)? */
+window.__ambienceSceneAllows = (kind) => sceneAllows(String(kind));
 
 // ------------------------------------------------------------------ helpers
 function rng(seed) {
@@ -277,12 +279,13 @@ const S = {
     onThunder: (ms) => thunder(fx.sound, ms, (Math.random() * 2 - 1) * 0.85),
     onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps, type, vol); },
 };
-function fillS(map, p, L, now, dt, fade, camX, camY, img) {
+function fillS(map, p, L, now, dt, fade, camX, camY, img, fxo = fx) {
     S.img = img ?? S.img;
     S.feet = window.__feet || [];
     S.moving = !!(S.feet[0] && S.feet[0].moving); S.dir = S.feet[0]?.dir ?? "down";
     S.map = map; S.p = p; S.L = L; S.now = now; S.t = now / 1000; S.dt = dt; S.fade = fade;
     S.camX = camX; S.camY = camY; S.Q = QUALITY[fx.quality] ?? 1;
+    S.fx = fxo;
     return S;
 }
 
@@ -293,13 +296,13 @@ function silenceAll() {
     setAmbience(false, {});
     setMusic(window.__bgm?.el, false, 0, 0);
 }
-function soundTick(p, L) {
-    if (!p.open) { silenceAll(); return; }
-    const rain = fx.rain ? L.rain : 0, storm = fx.snow ? L.blizzard : 0, sandL = fx.sand ? L.sand : 0;
+function soundTick(p, L, fxo = fx) {
+    if (!p.open && !sceneFx) { silenceAll(); return; }
+    const rain = fxo.rain ? L.rain : 0, storm = fxo.snow ? L.blizzard : 0, sandL = fxo.sand ? L.sand : 0;
     const bad = Math.max(rain, storm, sandL);
     setSound(fx.sound, {
-        rain, sand: sandL, night: p.night && fx.fireflies ? 1 : 0,
-        wind: clamp01(0.10 + storm * 0.9 + sandL * 0.55 + rain * 0.3 + (fx.snow ? L.snow * 0.15 : 0)),
+        rain, sand: sandL, night: p.night && fxo.fireflies ? 1 : 0,
+        wind: clamp01(0.10 + storm * 0.9 + sandL * 0.55 + rain * 0.3 + (fxo.snow ? L.snow * 0.15 : 0)),
     });
     const calm = 1 - clamp01(bad * 1.4);
     setAmbience(fx.ambience, {
@@ -411,6 +414,19 @@ function leavesOn(p, bucket) {
 // How strongly each effect is blowing right now, 0..1, for this map.
 function levels(p, now) {
     const L = { rain: 0, snow: 0, blizzard: 0, sand: 0, leaves: 0 };
+    // A quest scene's own atmosphere (see the block below): exactly what it asked for, however this map is profiled.
+    const sc = sceneFx;
+    if (sc) {
+        const k = sc.strength * sc.wRamp;
+        const w = sc.weather;
+        if (w === "rain" && sceneAllows("rain")) L.rain = k;
+        else if (w === "storm" && sceneAllows("rain")) L.rain = Math.max(0.75, k);
+        else if (w === "snow" && sceneAllows("snow")) L.snow = k;
+        else if (w === "blizzard" && sceneAllows("snow")) { L.blizzard = k; L.snow = k * 0.35; }
+        else if (w === "sand" && sceneAllows("sand")) L.sand = k;
+        else if (w === "leaves" && sceneAllows("leaves")) L.leaves = k;
+        return L;
+    }
     const add = (k, w) => { if (k in L) L[k] += w; };
     const force = window.__weatherForce;
     if (typeof force === "string") {
@@ -435,6 +451,168 @@ function levels(p, now) {
     return L;
 }
 
+// ------------------------------------------------------- quest scenes: atmosphere on any map
+// The `weather` / `time` / `lightning` scene steps (web/quest-scenes.js) ask for an effect this map does not have, or for a
+// time of day. This is a LAYER over the ordinary ambience: the same drawing code runs, with the map's profile read as if
+// it had the effect. It writes none of the player's settings -- an effect shows even where the map would not have it, but
+// one the player switched OFF in the F2 panel stays off unless the step asked with "force": true.
+//
+// Everything is exactly as it was when the scene ends, is skipped, fights, warps or the map changes:
+// clearAmbienceScene() restores window.__todForce (whatever the panel had pinned) and the map's own profile.
+export const TOD_PHASES = { day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
+let sceneFx = null;          // { weather, strength, force, wRamp, wFrames, wPending, time, tRamp, tFrames, tPending, phase0, target, savedTod, waiters }
+let sceneRev = 0;            // bumped when the override changes shape: the particle sets rebuild from the new profile
+let lastSceneRev = -1;
+let flashUntil = 0;          // a cued lightning flash keeps the ambience layer drawing for its 0.6 s
+
+/** True when a scene effect must draw although the map's own profile would not have it. */
+const sceneAllows = (kind) => !!sceneFx && (sceneFx.force || fx[kind] !== false);
+const sceneEase = (k) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
+
+/** The map's profile as this frame must read it. The same object when no scene override is on. */
+function sceneProfile(p) {
+    const sc = sceneFx;
+    if (!sc) return p;
+    const q = { ...p };
+    const w = sc.weather;
+    if (w === "clear") {
+        q.rainy = q.snowy = q.sandy = q.leaves = q.fireflies = q.fog = false;
+    } else if (w) {
+        const k = sc.strength * sc.wRamp;
+        if (w === "fog") { q.fog = sceneAllows("fog"); q.fogK = Math.max(0.05, k); }
+        if (w === "rain" || w === "storm") q.rainy = sceneAllows("rain");
+        if (w === "snow" || w === "blizzard") q.snowy = sceneAllows("snow");
+        if (w === "sand") q.sandy = sceneAllows("sand");
+        if (w === "leaves") q.leaves = sceneAllows("leaves");
+        if (w === "fireflies") q.fireflies = sceneAllows("fireflies");
+    }
+    if (sc.time) {
+        q.tod = sceneAllows("tod");       // the tint draws even indoors
+        q.night = sc.time === "night" && q.tod;
+        q.clouds = q.open && !q.night;
+    }
+    return q;
+}
+
+/** The panel switches as this frame must honour them: a forced scene effect ignores its own switch, nothing else moves. */
+function sceneFxFlags() {
+    const sc = sceneFx;
+    if (!sc?.force) return fx;
+    const o = { ...fx };
+    const w = sc.weather;
+    if (w === "fog") o.fog = true;
+    if (w === "rain" || w === "storm") o.rain = true;
+    if (w === "storm") o.lightning = true;
+    if (w === "snow" || w === "blizzard") o.snow = true;
+    if (w === "sand") o.sand = true;
+    if (w === "leaves") o.leaves = true;
+    if (w === "fireflies") o.fireflies = true;
+    if (sc.time) o.tod = true;
+    return o;
+}
+
+/**
+ * One scene atmosphere step: `{ weather?, strength?, time?, force?, frames? }`, merged over what the scene already set, so a
+ * scene can pin the night and then add fog without losing the night. Resolves when the fade-in is over (never rejects);
+ * a later step of the same kind replaces the fade and resolves the earlier wait at once.
+ */
+export function setAmbienceScene(spec) {
+    if (!spec || typeof spec !== "object") return Promise.resolve(0);
+    if (!sceneFx) {
+        sceneFx = {
+            weather: null, strength: 0.75, force: false,
+            wRamp: 1, wFrames: 0, wPending: false,
+            time: null, tRamp: 1, tFrames: 0, tPending: false,
+            phase0: todPhaseNow(), target: null, savedTod: window.__todForce, waiters: [],
+        };
+    }
+    const sc = sceneFx;
+    const frames = Math.max(0, Math.round(Number(spec.frames) || 0));
+    if ("weather" in spec) {
+        sc.weather = spec.weather == null ? null : String(spec.weather);
+        if (spec.strength != null) sc.strength = clamp01(Number(spec.strength));
+        sc.wFrames = frames;
+        sc.wRamp = frames > 0 ? 0 : 1;
+        sc.wPending = frames > 0;
+        sceneRev += 1;
+    }
+    if ("time" in spec) {
+        sc.time = spec.time == null ? null : String(spec.time);
+        sc.tFrames = frames;
+        sc.tRamp = frames > 0 ? 0 : 1;
+        sc.tPending = frames > 0;
+        if (sc.time) {
+            sc.phase0 = todPhaseNow();                     // from wherever the day is now: the day passes
+            sc.target = TOD_PHASES[sc.time] ?? null;
+        } else {
+            sc.target = null;
+            window.__todForce = sc.savedTod;               // hand the day back to the panel
+        }
+        sceneRev += 1;
+    }
+    if (spec.force === true) sc.force = true;
+    if (!sc.wPending && !sc.tPending) return Promise.resolve(1);
+    return new Promise((resolve) => { sc.waiters.push(resolve); });
+}
+
+/** Advance the scene override's fades (game.js calls this once a frame). */
+export function tickAmbienceScene(dt) {
+    const sc = sceneFx;
+    if (!sc) return;
+    const frames = Math.max(0, Number(dt) || 0) * 60;
+    if (sc.wPending) {
+        sc.wRamp = Math.min(1, sc.wRamp + frames / Math.max(1, sc.wFrames));
+        if (sc.wRamp >= 1) sc.wPending = false;
+    }
+    if (sc.tPending) {
+        sc.tRamp = Math.min(1, sc.tRamp + frames / Math.max(1, sc.tFrames));
+        if (sc.tRamp >= 1) sc.tPending = false;
+    }
+    if (sc.time && sc.target != null) {
+        window.__todForce = sc.phase0 + (sc.target - sc.phase0) * sceneEase(sc.tRamp);
+    }
+    if (!sc.wPending && !sc.tPending) {
+        const waiting = sc.waiters.splice(0);
+        for (const resolve of waiting) resolve(1);
+    }
+}
+
+/**
+ * Put the map and the player's panel back exactly as they were: the profile, the day-cycle pin, and the particle sets.
+ * Called when the scene ends, is skipped, fights, warps, and on every stage entry (a map change must never carry fog).
+ */
+export function clearAmbienceScene() {
+    if (!sceneFx) return;
+    const sc = sceneFx;
+    sceneFx = null;
+    flashUntil = 0;
+    window.__todForce = sc.savedTod;
+    sceneRev += 1;
+    const waiting = sc.waiters.splice(0);
+    for (const resolve of waiting) resolve(0);
+}
+
+/** What the scene override is doing, for the lab and a verifier. */
+export const ambienceSceneState = () => (sceneFx ? {
+    weather: sceneFx.weather, strength: sceneFx.strength, weatherRamp: Math.round(sceneFx.wRamp * 100) / 100,
+    time: sceneFx.time, timeRamp: Math.round(sceneFx.tRamp * 100) / 100, force: sceneFx.force,
+    todForce: typeof window.__todForce === "number" ? Math.round(window.__todForce * 1000) / 1000 : null,
+} : null);
+
+/** One cue of lightning on the map's own bolt art, with the thunder the sky uses (only when weather sound is on). */
+export function ambienceLightning(count = 1, force = false) {
+    if (!(force || fx.lightning)) return Promise.resolve(0);
+    const n = Math.max(1, Math.min(6, Math.round(Number(count) || 1)));
+    flashUntil = performance.now() + (n - 1) * 420 + 700;
+    for (let i = 0; i < n; i++) {
+        setTimeout(() => {
+            cueBolt();
+            if (fx.sound) thunder(true, 320 + Math.random() * 900, (Math.random() * 2 - 1) * 0.6);
+        }, i * 420);
+    }
+    return new Promise((resolve) => setTimeout(resolve, (n - 1) * 420 + 300));
+}
+
 // ------------------------------------------------------------------- frame
 // Returns a draw(ctx) closure for this frame (or null when nothing applies).
 export function ambienceFor(map, mapImg, camX, camY) {
@@ -450,28 +628,33 @@ export function ambienceFor(map, mapImg, camX, camY) {
     p.indoorLit = !p.open && hasLights(map.id) && p.indoorK > 0.02;
     p.lamps = p.baseLamps || (fx.indoor && p.indoorLit);
     if (panel && lastMarked !== map.id) markApplicable(map, p);
+    // A quest scene's atmosphere reads the map's profile as if it had the effects the scene asked for (a copy, so the
+    // cached profile and the panel's own marks never change), and honours the same panel switches unless forced.
+    const ps = sceneProfile(p);
+    const fxo = sceneFxFlags();
     const now = performance.now();
     const L = levels(p, now);
     bodyFxTick(map, p, L, now);
-    const wantRain = fx.rain && L.rain > 0.01;
-    const wantSnow = fx.snow && (L.snow > 0.01 || L.blizzard > 0.01);
-    const wantSand = fx.sand && L.sand > 0.01;
-    const wantLeaves = fx.leaves && L.leaves > 0.01;
-    const wantFlies = fx.fireflies && p.fireflies;
-    soundTick(p, L);
-    const sceneryOn = (fx.tod && p.tod) || (fx.fog && p.fog) || (fx.shafts && p.shafts) || (fx.heat && p.heat)
-        || (fx.pollen && p.pollen) || (fx.butterflies && p.butterflies) || (fx.birds && p.birds)
-        || (fx.sparkle && p.snowy) || (fx.lightning && fx.rain && p.rainy)
-        || (fx.clouds && p.clouds) || (fx.indoor && p.indoorLit) || (fx.lamps && p.lamps) || (fx.gusts && p.open) || (fx.breath && p.snowy)
-        || (p.open && (fx.nightlight || fx.windows || fx.screenfx || fx.wildlife || fx.rainwater))
-        || (fx.frost && p.snowy) || (fx.devils && p.devils) || ((fx.dragonflies || fx.fish || fx.critters) && p.open);
+    const wantRain = fxo.rain && L.rain > 0.01;
+    const wantSnow = fxo.snow && (L.snow > 0.01 || L.blizzard > 0.01);
+    const wantSand = fxo.sand && L.sand > 0.01;
+    const wantLeaves = fxo.leaves && L.leaves > 0.01;
+    const wantFlies = fxo.fireflies && ps.fireflies;
+    soundTick(p, L, fxo);
+    const sceneryOn = (fxo.tod && ps.tod) || (fxo.fog && ps.fog) || (fxo.shafts && ps.shafts) || (fxo.heat && ps.heat)
+        || (fxo.pollen && ps.pollen) || (fxo.butterflies && ps.butterflies) || (fxo.birds && ps.birds)
+        || (fxo.sparkle && ps.snowy) || (fxo.lightning && fxo.rain && ps.rainy)
+        || (fxo.clouds && ps.clouds) || (fxo.indoor && ps.indoorLit) || (fxo.lamps && ps.lamps) || (fxo.gusts && ps.open) || (fxo.breath && ps.snowy)
+        || (ps.open && (fxo.nightlight || fxo.windows || fxo.screenfx || fxo.wildlife || fxo.rainwater))
+        || (fxo.frost && ps.snowy) || (fxo.devils && ps.devils) || ((fxo.dragonflies || fxo.fish || fxo.critters) && ps.open)
+        || !!sceneFx || now < flashUntil;
     if (!(wantRain || wantSnow || wantSand || wantLeaves || wantFlies || sceneryOn)) return null;
-    if (curId !== map.id) resetFor(map, p);
+    if (curId !== map.id || lastSceneRev !== sceneRev) { resetFor(map, ps); lastSceneRev = sceneRev; }
     const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0);
     lastT = now;
     const fade = smooth((now - curSince) / 1500);
     const Q = QUALITY[fx.quality] ?? 1;
-    fillS(map, p, L, now, dt, fade, camX, camY, mapImg);
+    fillS(map, ps, L, now, dt, fade, camX, camY, mapImg, fxo);
     const rain = wantRain ? L.rain * fade : 0;
     const t = now / 1000;
     const gl = gustLevel(S);                  // a passing gust boosts every wind-driven effect
@@ -646,13 +829,13 @@ export function groundFxFor(map, mapImg, camX, camY) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p || !p.open) return null;
-    if (!(fx.steps || fx.footsteps || (fx.puddles && (p.rainy || p.snowy)))) return null;
+    if (!(fx.steps || fx.footsteps || (fx.puddles && (p.rainy || p.snowy || sceneFx)))) return null;
     if (curId !== map.id) resetFor(map, p);
     const now = performance.now();
     const dt = Math.min(0.05, lastG ? (now - lastG) / 1000 : 0);
     lastG = now;
     const fade = smooth((now - curSince) / 1500);
-    fillS(map, p, levels(p, now), now, dt, fade, camX, camY, mapImg);
+    fillS(map, sceneProfile(p), levels(p, now), now, dt, fade, camX, camY, mapImg, sceneFxFlags());
     return (ctx) => groundScenery(ctx, S);
 }
 

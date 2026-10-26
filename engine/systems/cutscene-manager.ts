@@ -100,6 +100,12 @@ export interface CutsceneOpts {
    *  the packed word the C resolves to (engine/systems/emote-sounds.ts); `stop` marks
    *  the `C >= 0x384` branch ids that key a voice off by handle instead of starting one. */
   emoteSound?: (id: number, stop: boolean) => void;
+  /** Quest scenes' own event opcode (`SCENEEVENT <index>`): the step list in web/quest-scenes.js is data, so any
+   *  event it needs that the wstag vocabulary has no opcode for (our own effect art, a screen fade, a mid-scene
+   *  battle, the player's own Y drive, a warp) arrives here. The host performs it and calls `resume` when it is
+   *  done; the scene waits meanwhile. A host that is finished at once may call `resume` immediately, and a host
+   *  with no handler lets the opcode fall through — a scene never blocks on an event the host cannot run. */
+  sceneEvent?: (index: number, resume: () => void) => void;
   movementTerrainCode?: (entity: CutEntity) => number;
 }
 
@@ -111,6 +117,9 @@ export interface CutsceneHooks {
 export interface Cutscene {
   isActive(): boolean;
   start(opcodes: string[], esdmgStrings: (string | null)[] | null, onDone?: (() => void) | null, hooks?: CutsceneHooks | null): void;
+  /** End the scene now, without running the rest of its opcodes: a host event that cannot finish (a lost battle,
+   *  whose own route leaves the field) calls this. The done callback runs as for END, so the host still cleans up. */
+  abort(): void;
   step(dt: number): boolean;
   handoff: { screenId: number; x: number; y: number; dir: number } | null;
   speakingActor: number | null;
@@ -199,6 +208,7 @@ export function createCutscene(
     playerActorId: 1,
     clock: () => _clock,
     isActive: () => _active,
+    abort: () => { if (_active) _finish(); },
     entity: (actorId: number) => _lookup(actorId, false),
     walking: () => _walkedTicksThisStep,
     playerWalking: () => _playerWalkedTicksThisStep,
@@ -443,6 +453,18 @@ export function createCutscene(
       if (name === "HANDOFF") {
         cs.handoff = { screenId: a0 ?? 0, x: a1 ?? 0, y: a2 ?? 0, dir: args[3] ?? 0 };
         _finish();
+        return;
+      }
+
+      // A quest scene's own event (web/quest-scenes.js): the host does it and calls resume. The wait is the same
+      // "hook" state a SAY's after-say hook uses, so a host that resumes synchronously (an event that is already
+      // done, or one it cannot run at all) just lets the next opcode go on the following frame.
+      if (name === "SCENEEVENT") {
+        const fn = opts.sceneEvent;
+        if (!fn) { _pc++; continue; }
+        _waitMode = "hook";
+        _pc++;
+        fn(a0 ?? 0, () => { if (_waitMode === "hook") _waitMode = null; });
         return;
       }
 

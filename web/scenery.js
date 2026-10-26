@@ -38,6 +38,10 @@ function todColor(phase) {
     }
     return [255, 255, 255];
 }
+/** Where the day cycle is right now, 0..1 (window.__todForce pins it; the panel's Time setting writes that). */
+export const todPhaseNow = () => (typeof window.__todForce === "number" ? window.__todForce : (performance.now() / 1000 / TOD_SECONDS) % 1);
+/** One lightning flash on cue (a quest scene's `lightning` step): the same bolt the storm's own timer draws. */
+export function cueBolt(now = performance.now()) { bolt = { t0: now }; }
 
 // --------------------------------------------------------------- per-map state
 let sc = null;               // state of the map being shown
@@ -146,7 +150,7 @@ export function drawScenery(ctx, S) {
     // time of day: a multiply tint (warm at golden hour, cool and darker at dusk)
     if (fx.indoor && p.indoorLit) drawIndoorMood(ctx, S);
     if (fx.tod && p.tod) {
-        const phase = typeof window.__todForce === "number" ? window.__todForce : ((now / 1000) / TOD_SECONDS) % 1;
+        const phase = todPhaseNow();
         const [r, g, b] = todColor(phase);
         todLight = (r + g + b) / 765;
         if (r + g + b < 760) {
@@ -206,9 +210,10 @@ export function drawScenery(ctx, S) {
         ctx.globalCompositeOperation = "source-over";
     }
 
-    // fog and morning mist: big soft blobs drifting on the wind
+    // fog and morning mist: big soft blobs drifting on the wind ("fogK" is a quest scene's strength on a map that is not
+    // foggy; absent on every other map, so the ordinary look is unchanged)
     if (fx.fog && p.fog) {
-        const dens = (0.55 + 0.45 * Math.sin(t / 31 + (p.seed % 7))) * fade * (0.5 + 0.5 * Q);
+        const dens = (0.55 + 0.45 * Math.sin(t / 31 + (p.seed % 7))) * fade * (0.5 + 0.5 * Q) * (p.fogK ?? 1);
         const col = p.night ? "150,172,218" : "208,224,214";
         for (const b of sc.fog) {
             b.x += b.vx * dt; b.y += b.vy * dt;
@@ -483,7 +488,7 @@ export function darkness(p, fx, now) {
     if (p.night) return 1;
     if (fx.indoor && p.indoorLit) return 0.7 * p.indoorK;   // indoor mood: the lights count as lit in the dim
     if (fx.tod && p.tod) {
-        const phase = typeof window.__todForce === "number" ? window.__todForce : ((now / 1000) / TOD_SECONDS) % 1;
+        const phase = todPhaseNow();
         const [r, g, b] = todColor(phase);
         return clamp01((1 - (r + g + b) / 765) * 2.6);
     }

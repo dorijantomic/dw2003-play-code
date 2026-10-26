@@ -1,64 +1,64 @@
 {
-  "_comment": "The characters the extra quests add (npc_id 1000 and up; below that are the game's own). tools/make_quest_sprites.py draws each from `look`, or takes a finished 120x384 `sheet`, and writes web/extra_npcs.json. `residents` say where they stand: map id and the pixel position of their feet (checked walkable). Their words and voices live in characters.json.",
-  "characters": [
+ "_comment": "The characters the extra quests add (npc_id 1000 and up; below that are the game's own). tools/make_quest_sprites.py draws each from `look`, or takes a finished 120x384 `sheet`, and writes web/extra_npcs.json. `residents` say where they stand: map id and the pixel position of their feet (checked walkable). Their words and voices live in characters.json.",
+ "characters": [
+  {
+   "npc_id": 1004,
+   "name": "Ren",
+   "views": "data/authored/quests/art/ren.png",
+   "height": 35,
+   "residents": [
     {
-      "npc_id": 1004,
-      "name": "Ren",
-      "views": "data/authored/quests/art/ren.png",
-      "height": 35,
-      "residents": [
-        {
-          "map": "s340",
-          "x": 440,
-          "y": 392,
-          "dir": "down"
-        },
-        {
-          "map": "s395",
-          "x": 896,
-          "y": 576,
-          "dir": "down"
-        },
-        {
-          "map": "s485",
-          "x": 952,
-          "y": 440,
-          "dir": "down"
-        },
-        {
-          "map": "s640",
-          "x": 576,
-          "y": 512,
-          "dir": "down"
-        }
-      ]
+     "map": "s340",
+     "x": 440,
+     "y": 392,
+     "dir": "down"
     },
     {
-      "npc_id": 1005,
-      "name": "Cipher",
-      "sheet_picture": "data/authored/quests/art/cyber.png",
-      "height": 35,
-      "residents": [
-        {
-          "map": "s205",
-          "x": 896,
-          "y": 296,
-          "dir": "down-left"
-        }
-      ]
+     "map": "s395",
+     "x": 896,
+     "y": 576,
+     "dir": "down"
     },
     {
-      "npc_id": 1006,
-      "name": "Unimon",
-      "sheet": "data/authored/quests/art/unimon_blank.png",
-      "residents": [
-        {
-          "map": "s330",
-          "x": 664,
-          "y": 556,
-          "dir": "down"
-        }
-      ]
+     "map": "s485",
+     "x": 952,
+     "y": 440,
+     "dir": "down"
+    },
+    {
+     "map": "s640",
+     "x": 576,
+     "y": 512,
+     "dir": "down"
     }
-  ]
+   ]
+  },
+  {
+   "npc_id": 1005,
+   "name": "Cipher",
+   "sheet_picture": "data/authored/quests/art/cyber.png",
+   "height": 35,
+   "residents": [
+    {
+     "map": "s205",
+     "x": 896,
+     "y": 296,
+     "dir": "down-left"
+    }
+   ]
+  },
+  {
+   "npc_id": 1006,
+   "name": "Unimon",
+   "sheet": "data/authored/quests/art/unimon_blank.png",
+   "residents": [
+    {
+     "map": "s330",
+     "x": 664,
+     "y": 556,
+     "dir": "down"
+    }
+   ]
+  }
+ ]
 }

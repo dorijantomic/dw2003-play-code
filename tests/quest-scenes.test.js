@@ -96,3 +96,91 @@ test("every scene in quests.json compiles", () => {
   }
   assert.ok(scenes >= 8, `expected the new scenes, found ${scenes}`);
 });
+
+// ------------------------------------------------------------------ the scene events: our own art, screen, fight, warp
+import { questFxSpawn, questFxClear, questFxDrawables, questFxState, defineQuestFxSheet } from "../web/quest-fx.js";
+
+test("pan is the game's own camera op: FN6B to a point, FN6A back to a character", () => {
+  const { opcodes, errors } = compileScene([
+    { pan: [640, 320] },
+    { pan: [640, 320], snap: true },
+    { pan: "player" },
+    { pan: 27 },
+  ], { playerId: 2, pos });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(opcodes, ["FN6A 1 2", "FN6B 0 640 320", "FN6B 1 640 320", "FN6A 0 2", "FN6A 0 27", "END"]);
+});
+
+test("every effect step compiles to one SCENEEVENT and its own event spec", () => {
+  const steps = [
+    { fx: "crate", at: [1056, 120], clip: "fall", fall: { floor: 424, step: 0.7 } },
+    { fxplay: "crate", clip: "settle" },
+    { fxmove: "crate", slide: { to: [1100, 200], frames: 20 } },
+    { fxwait: "crate" },
+    { fxremove: "crate", fade: 12 },
+    { fx: "shard", at: { near: "player", dx: 20, dy: -30 }, layer: "front", clip: "appear" },
+  ];
+  const { opcodes, events, errors } = compileScene(steps, { playerId: 2, pos });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(opcodes.slice(1, -1), [0, 1, 2, 3, 4, 5].map((n) => `SCENEEVENT ${n}`));
+  assert.deepEqual(events[0], { kind: "fx", name: "crate", sheet: "crate", x: 1056, y: 120, clip: "fall", fall: { floor: 424, step: 0.7 } });
+  assert.deepEqual(events[1], { kind: "fxplay", name: "crate", clip: "settle" });
+  assert.deepEqual(events[2], { kind: "fxmove", name: "crate", slide: { to: [1100, 200], frames: 20 } });
+  assert.deepEqual(events[3], { kind: "fxwait", name: "crate" });
+  assert.deepEqual(events[4], { kind: "fxremove", name: "crate", fade: 12 });
+  assert.deepEqual(events[5], { kind: "fx", name: "shard", sheet: "shard", x: 120, y: 170, clip: "appear", layer: "front" },
+    "a relative place resolves against where the character stands when the scene starts");
+});
+
+test("drop, rise, fade, battle and warp become their events, a warp keeping its map and spot", () => {
+  const { events, errors } = compileScene([
+    { drop: 100, step: 0.4 },
+    { rise: 60 },
+    { fade: "out", frames: 18 },
+    { battle: 12 },
+    { warp: { map: "s320", at: [576, 448], dir: 2 } },
+    { warp: "s330", at: [100, 200] },
+  ], { playerId: 2, pos });
+  assert.deepEqual(errors, []);
+  assert.deepEqual(events[0], { kind: "drop", pixels: 100, step: 0.4 });
+  assert.deepEqual(events[1], { kind: "rise", pixels: -60, step: 0.25 });
+  assert.deepEqual(events[2], { kind: "fade", to: "out", frames: 18 });
+  assert.deepEqual(events[3], { kind: "battle", screen: 12 });
+  assert.deepEqual(events[4], { kind: "warp", to: "s320", at: [576, 448], dir: 2 });
+  assert.deepEqual(events[5], { kind: "warp", to: "s330", at: [100, 200] });
+});
+
+test("a malformed event is reported, never half-run", () => {
+  assert.ok(validateScene([{ fx: "crate" }]).length, "an effect needs a place");
+  assert.ok(validateScene([{ fx: "crate", at: [1, 2], fall: {} }]).length, "a fall needs a floor");
+  assert.ok(validateScene([{ fx: "crate", at: [1, 2], fall: { floor: 9 }, slide: { to: [1, 2] } }]).length, "one motion only");
+  assert.ok(validateScene([{ fx: "crate", at: [1, 2], layer: "somewhere" }]).length, "a layer is entity, behind or front");
+  assert.ok(validateScene([{ fxplay: "crate" }]).length);
+  assert.ok(validateScene([{ fxmove: "crate" }]).length);
+  assert.ok(validateScene([{ fxwait: null }]).length);
+  assert.ok(validateScene([{ pan: {} }]).length);
+  assert.ok(validateScene([{ drop: 0 }]).length);
+  assert.ok(validateScene([{ fade: "sideways" }]).length);
+  assert.ok(validateScene([{ battle: 0 }]).length);
+  assert.ok(validateScene([{ warp: "s330" }]).length, "a warp needs a spot on the new map");
+  assert.ok(validateScene([{ warp: {} }]).length);
+});
+
+test("castOf names the characters an effect or a pan is placed relative to", () => {
+  assert.deepEqual(castOf([{ fx: "crate", at: { near: 58, dx: 10 } }, { pan: 27 }, { pan: "player" }]).sort((a, b) => a - b), [27, 58]);
+});
+
+test("an event a scene cannot run is skipped, and no effect art is left behind", () => {
+  const { events } = compileScene([{ fx: "nothing", at: [0, 0] }, { fxwait: "nothing" }], { playerId: 2, pos });
+  assert.equal(events.length, 2);
+  // no sheet registered under that name: nothing is placed, so nothing can be left on the map
+  assert.equal(questFxSpawn(events[0]), null);
+  assert.deepEqual(questFxState(), []);
+  assert.deepEqual(questFxDrawables(0, 0), []);
+  // and a sheet that WAS placed is cleared by the same call every scene exit runs
+  defineQuestFxSheet("demo", { frame: [8, 8], clips: { idle: { frames: [0], hold: 4 } } }, { naturalWidth: 8 });
+  assert.ok(questFxSpawn({ name: "demo", sheet: "demo", x: 5, y: 6 }));
+  assert.equal(questFxDrawables(0, 0).length, 1);
+  questFxClear();
+  assert.deepEqual(questFxDrawables(0, 0), [], "cleanup on skip: the draw list is empty again");
+});

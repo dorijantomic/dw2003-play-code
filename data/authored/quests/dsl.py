@@ -117,6 +117,215 @@ def scene(npc, lines, ask=None, options=("I will do it", "Not now"), walk=True):
     return s + _home(npc)
 
 
+# ------------------------------------------------------------------ scene events (web/quest-scenes.js)
+# The steps below need something the walking-and-talking vocabulary does not have: our own effect art, the screen, a
+# fight, the player's own height, or another map. They are data like every other step; the game performs them
+# (web/quest-fx.js), and a step it cannot run is skipped, never waited on. See docs/quests-fx-brief.md for the art.
+
+def fx(name, at=None, sheet=None, clip=None, layer=None, near=None, dx=0, dy=0, fall=None, slide=None, rise=None, scale=None):
+    """Place one of our own effect sheets (web/extra_fx/<sheet>.png) on the map.
+
+    at     a world point [x, y], or near=<npc or "player"> with dx/dy to stand it relative to a character
+    layer  "entity" (default: sorted with the people), "behind" (over the map, behind every person) or "front"
+    scale  drawn that many times its cell (a giant is 3-4x a person's height); 1 = the sheet's own pixels
+    fall   {"floor": y, "step": 0.75, "bounce": True} -- gravity with -v/3 bounces, settling on the floor
+    slide  {"to": [x, y], "frames": 30}   rise  {"pixels": 60, "frames": 30}
+    """
+    step = {"fx": name}
+    if sheet:
+        step["sheet"] = sheet
+    if scale is not None:
+        step["scale"] = float(scale)
+    if at is not None:
+        step["at"] = [int(at[0]), int(at[1])]
+    elif near is not None:
+        step["at"] = {"near": near, "dx": dx, "dy": dy}
+    if clip:
+        step["clip"] = clip
+    if layer:
+        step["layer"] = layer
+    for key, value in (("fall", fall), ("slide", slide), ("rise", rise)):
+        if value:
+            step[key] = value
+    return step
+
+
+def fx_play(name, clip, loop=None):
+    """Switch a placed effect's clip (its sheet names the clips)."""
+    step = {"fxplay": name, "clip": clip}
+    if loop is not None:
+        step["loop"] = bool(loop)
+    return step
+
+
+def fx_move(name, fall=None, slide=None, rise=None):
+    """Start a motion on an effect that is already placed."""
+    step = {"fxmove": name}
+    for key, value in (("fall", fall), ("slide", slide), ("rise", rise)):
+        if value:
+            step[key] = value
+    return step
+
+
+def fx_wait(name):
+    """Wait until that effect has arrived (or is gone): the scene goes on when it lands or fades out."""
+    return {"fxwait": name}
+
+
+def fx_remove(name, fade=None):
+    """Take the effect off the map, optionally fading it out over that many frames."""
+    step = {"fxremove": name}
+    if fade is not None:
+        step["fade"] = int(fade)
+    return step
+
+
+def pan(to, snap=False):
+    """Point the camera: pan([x, y]) to a place, pan("player") or pan(npc) to follow someone again."""
+    step = {"pan": to if isinstance(to, str) else ([int(to[0]), int(to[1])] if isinstance(to, (list, tuple)) else to)}
+    if snap:
+        step["snap"] = True
+    return step
+
+
+def drop(pixels, step_by=None):
+    """Let the player fall that many pixels (the s680 floor collapse: the room scrolls, the camera follows)."""
+    s = {"drop": int(pixels)}
+    if step_by is not None:
+        s["step"] = float(step_by)
+    return s
+
+
+def rise(pixels, step_by=None):
+    """Lift the player that many pixels (a lift, a platform coming up)."""
+    s = {"rise": int(pixels)}
+    if step_by is not None:
+        s["step"] = float(step_by)
+    return s
+
+
+def fade(to="out", frames=None):
+    """The screen to black ("out"), back to the field ("in"), or at once ("black" / "clear")."""
+    s = {"fade": to}
+    if frames is not None:
+        s["frames"] = int(frames)
+    return s
+
+
+def battle(screen):
+    """Start that fight screen mid-scene; the scene goes on after a win (a loss sends the game to the title)."""
+    return {"battle": int(screen)}
+
+
+def warp(place, at, direction=0):
+    """Move the player to another place and spot (the game's HANDOFF route). The scene ends at a warp: it is the last step."""
+    return {"warp": {"map": canon(place), "at": [int(at[0]), int(at[1])], "dir": int(direction) % 8}}
+
+
+# ------------------------------------------------------------------ props (web/quest-props.js)
+def prop(place, sheet, at, clip=None, layer=None, after="done", solid=None):
+    """Our own effect-sheet art left on a map because of the quest's state: the world the quest changed stays changed.
+
+    place  the map (a night/story variant of a place counts as the place itself)
+    sheet  web/extra_fx/<sheet>.png + .json -- ours, never game art
+    at     world pixels of the prop's feet (the sheet's own anchor decides where that lands in the cell)
+    clip   the clip to hold (the sheet's "default" when not named)
+    layer  "entity" (default: sorted with the people), "behind" or "front"
+    after  "done" (the default: once the quest is handed in) or "accepted" (from the moment it is taken)
+    solid  True adds a small box at its feet the player bumps into, exactly like a standing character; default off
+    """
+    p = {"map": canon(place), "sheet": str(sheet), "at": [int(at[0]), int(at[1])]}
+    if clip:
+        p["clip"] = str(clip)
+    if layer:
+        p["layer"] = str(layer)
+    if after and after != "done":
+        p["after"] = str(after)
+    if solid:
+        p["solid"] = True
+    return p
+
+
+_PROP_AFTER = ("done", "accepted")
+_PROP_LAYER = ("entity", "behind", "front")
+
+
+def _lint_prop(qid, index, p):
+    """A prop names a real map, a sheet that exists in web/extra_fx, and a state that can hold. Bad data stops the build."""
+    where = f"{qid}: props[{index}]"
+    if not isinstance(p, dict):
+        problem(f"{where} must be a dict from prop(...)")
+        return
+    m = p.get("map")
+    if not isinstance(m, str) or not os.path.exists(os.path.join(A, "scenes", f"{m}.json")):
+        problem(f"{where} names map {m!r}, which has no scene file")
+    sheet = p.get("sheet")
+    if not isinstance(sheet, str) or not sheet:
+        problem(f"{where} needs a sheet name")
+    elif not os.path.exists(os.path.join(WEB, "extra_fx", f"{sheet}.png")):
+        problem(f"{where}: web/extra_fx/{sheet}.png does not exist (tools/make_quest_fx.py draws the placeholders)")
+    at = p.get("at")
+    if not (isinstance(at, (list, tuple)) and len(at) == 2 and all(isinstance(v, int) for v in at)):
+        problem(f"{where}.at must be two whole world pixels [x, y]")
+    if p.get("after") is not None and p["after"] not in _PROP_AFTER:
+        problem(f"{where}.after is {p['after']!r}; use \"done\" or \"accepted\"")
+    if p.get("layer") is not None and p["layer"] not in _PROP_LAYER:
+        problem(f"{where}.layer is {p['layer']!r}; use \"entity\", \"behind\" or \"front\"")
+    if p.get("solid") not in (None, True, False):
+        problem(f"{where}.solid is {p['solid']!r}; use True or leave it out")
+
+
+def shake(amp, frames=None, decay=None, every=None, times=None):
+    """Shake the field by up to `amp` px (the text box and menus stay put).
+
+    frames  how long one shake lasts (60 = a second); decay=False keeps the amplitude instead of dying out
+    every/times  a row of thuds, one every `every` frames (a giant's footsteps); the scene waits for the last one
+    """
+    s = {"shake": int(amp)}
+    if frames is not None:
+        s["frames"] = int(frames)
+    if decay is False:
+        s["decay"] = False
+    if times is not None:
+        s["times"] = int(times)
+    if every is not None:
+        s["every"] = int(every)
+    return s
+
+
+def weather(kind, strength=None, frames=None, force=False):
+    """Any Effects-panel weather on ANY map: "fog", "rain", "storm" (rain + lightning), "snow", "blizzard", "sand",
+    "leaves", "fireflies" or "clear". It fades in over `frames`. The player's own panel switch is respected unless
+    force=True. Lasts until the scene ends (or another weather step)."""
+    s = {"weather": kind}
+    if strength is not None:
+        s["strength"] = float(strength)
+    if frames is not None:
+        s["frames"] = int(frames)
+    if force:
+        s["force"] = True
+    return s
+
+
+def tod(kind, frames=None, force=False):
+    """The time of day, indoors too: "day", "golden", "dusk" or "night". The day slides there over `frames`, then
+    stays for the rest of the scene. Respects the panel's Time switch unless force=True."""
+    s = {"time": kind}
+    if frames is not None:
+        s["frames"] = int(frames)
+    if force:
+        s["force"] = True
+    return s
+
+
+def lightning(n=1, force=False):
+    """One flash on cue (or `n` of them); thunder follows when weather sound is on."""
+    s = {"lightning": int(n)}
+    if force:
+        s["force"] = True
+    return s
+
+
 # ------------------------------------------------------------------ goals
 def kill(species, n, maps):
     sp = [species] if isinstance(species, str) else list(species)
@@ -207,7 +416,7 @@ def _short(title):
 # ------------------------------------------------------------------ the quest
 def quest(id, title, who, place, text, goal, pay, offer, remind, done, ask="Take the job?", options=("I will do it", "Not now"),
           lvl=None, after=None, short=None, flag=None, seen=None, ordered=False, plain=False,
-          verdict=None):
+          verdict=None, props=None):
     """One quest handed out by character `who` standing in `place` (a map id; its night/story variants are found automatically).
 
     offer  the lines the giver says; the last one is the question
@@ -281,4 +490,8 @@ def quest(id, title, who, place, text, goal, pay, offer, remind, done, ask="Take
         ds = scene(who, done, walk=False)
         if ds:
             q["doneScene"] = ds
+    if props:                                        # the world the quest leaves changed (web/quest-props.js)
+        q["props"] = list(props)
+        for i, p in enumerate(q["props"]):
+            _lint_prop(id, i, p)
     return q

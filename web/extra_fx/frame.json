@@ -1,0 +1,28 @@
+{
+  "name": "frame",
+  "frame": [
+    24,
+    32
+  ],
+  "anchor": [
+    0.5,
+    1.0
+  ],
+  "clips": {
+    "idle": {
+      "frames": [
+        0
+      ],
+      "hold": 30
+    },
+    "glint": {
+      "frames": [
+        1,
+        0
+      ],
+      "hold": 14,
+      "loop": true
+    }
+  },
+  "default": "idle"
+}

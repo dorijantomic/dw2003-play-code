@@ -1,0 +1,20 @@
+{
+  "name": "log",
+  "frame": [
+    64,
+    32
+  ],
+  "anchor": [
+    0.5,
+    1.0
+  ],
+  "clips": {
+    "idle": {
+      "frames": [
+        0
+      ],
+      "hold": 30
+    }
+  },
+  "default": "idle"
+}

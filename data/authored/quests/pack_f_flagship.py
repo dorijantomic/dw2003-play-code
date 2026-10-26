@@ -46,7 +46,7 @@ QUESTS = [
                                     "Before I answer him, I need proof the cards are still worth it. Win two duels. If a stranger can do it, so can I."],
                      label="Take the message to Nick"),
                 duel(2)],
-          ordered=True, lvl=38, seen=[BRIDGE2], short="Two Bridges",
+          ordered=True, lvl=40, seen=[BRIDGE2], short="Two Bridges",
           pay=pay(500),
           offer=["Nick. The Black Hat. You know him? Of course you do.",
                  "We stood on this bridge every day. Then the second server opened and he was on the other side. Same bridge. Different world.",

@@ -28,10 +28,24 @@ import {
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 
-import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor } from "./ambience.js";
+import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
-import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount, questDone } from "./quests.js";
+import { questWalkLegs, questStandFree, standInSpot } from "./quest-walk.js";   // walkable ground for scripted walks
+import {
+    loadQuestFxSheets, questFxSpawn, questFxPlay, questFxMove, questFxRemove, questFxWait, questFxClear,
+    questFxTick, questFxDrawables, questFxDrawOver, questFxDrawFade, questFxFade, questFxFading, questFxGet,
+    questFxDrivePlayer, installQuestFxPlayerDrive, installQuestFxCanvas, questFxState,
+    questFxFadeAlpha, questFxDriveState, questFxShake, questFxShakeOffset, questFxShakeState,
+} from "./quest-fx.js";
+import { createQuestChase } from "./quest-chase.js";
+import { questPropsTick, questPropSolidAt } from "./quest-props.js";   // props: art a quest's state leaves on the map
+// The `ghost` scene step (a character drawn faded and tinted) and the camera rule for `drop`/`rise`.
+import {
+    questGhostSet, questGhostActor, questGhostImage, questGhostClear, questGhostState, questGhostMap,
+    installQuestGhostCamera, installQuestGhostGate, questSceneCameraToPlayer,
+} from "./quest-ghost.js";
+import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount, questDone, questPropsOn, questsEnabled, questNeededNpcs } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
@@ -303,7 +317,7 @@ import { loadPointSprites, preloadPointSpriteStage, retainPointSpriteStages, dra
 import { loadNativeStages, enterNativeStage, tickNativeStage, fireNativeEffect, advanceFieldBlanks, resetFieldBlanks } from "./native-stage.js";
 import { beginDrawOrderLog, takeDrawOrderLog, actorDrawsUnderMap, ENTITY_BUCKET, sortDrawables } from "./draw-order.js";
 import { loadFallingObjects, fireStageObject, fireNativeStageObject, paceStageObjects, stageObjectDraws, streetScreenQuads, clearStageObjects, annotatorActive, annotatorMarkers, setAnnotatorRandom, setStageObjectSound, setStageObjectOrdinal, stageObjectState, stageAmbienceDiagnostics, STAGE_AMBIENCE_EXECUTION } from "./stage-objects.js";
-import { fieldCharPendingPixels, resetFieldChar, fieldCharState } from "./vendor/engine.js";
+import { fieldCharPendingPixels, fieldCharAddY, resetFieldChar, fieldCharState } from "./vendor/engine.js";
 import { fieldCameraFollow } from "./vendor/engine.js";
 import { preloadPartnerPictures } from "./partner-pictures.js";
 import { packedIsMusicStart, packedKey } from "./packed-sound.js";
@@ -350,7 +364,8 @@ import { createBattle, paidParticipants } from "./battle.js";
 import { createFightReport, buildFightReportPages } from "./fightreport.js";
 import { createFightReportNative } from "./fightreport-native.js";
 import { createFightReportTranslated } from "./fightreport-translated.js";
-import { toggleGameFullscreen } from "./fullscreen.js";
+import { toggleGameFullscreen, cycleGameScreen, restoreWindowFill } from "./fullscreen.js";
+restoreWindowFill(document);
 import { ephemeralActorRecord } from "./cutscene-actors.js";
 import { createDebugPanel } from "./debugPanel.js";
 import { createStagslctMenu } from "./stagslct.js";
@@ -587,6 +602,7 @@ installMount({
         || state.wipe28 || state.diveDemo || textbox.isOpen() || choice.isOpen() || !!state.climb
         || !!state.fishing || !!state.slope || !!state.submarimon || !!state.diveForm,
 });
+
 // Type-to-chat: T opens a line box, Enter shows it as a speech bubble over the player.
 installChat({
     stage: document.getElementById("stage"),
@@ -620,7 +636,11 @@ function mpBalloonSay(id, name, text) {
     if (!b) { b = { box: createDialogueTranslated(sfx), actor: { x: 0, y: 0, actorId: 0 }, at: 0 }; mpBalloons.set(id, b); }
     b.box.close();
     b.at = performance.now() / 1000;
-    b.box.open({ pack: buildChatPack(text, String(name || "")), index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: b.actor }, null,
+    const at = id === myId() ? state : multiplayerGhosts(currentMap().id).find((g) => g.id === id);
+    if (at) { b.actor.x = Math.round(at.x); b.actor.y = Math.round(at.y); }   // open over the speaker, not at the map corner
+    const pack = buildChatPack(text, String(name || ""));
+    b.pages = pack.pages; b.presses = 0;
+    b.box.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: b.actor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 function mpBalloonTick(dt) {
@@ -630,8 +650,17 @@ function mpBalloonTick(dt) {
         const at = id === myId() ? state : ghosts.get(id);
         if (!at || !isOnline() || !b.box.isOpen()) { b.box.close(); mpBalloons.delete(id); continue; }   // left the stage, or finished
         b.actor.x = Math.round(at.x); b.actor.y = Math.round(at.y);
+        // the balloon reads its speaker from the game memory record (as chatTick does): keep it on them
+        const cs = b.box._session;
+        if (cs && cs.controller) {
+            const rec = cs.mem.read32(cs.controller + 0x50) >>> 0;
+            if (rec) { cs.mem.write32(rec + 0x58, b.actor.x >>> 0); cs.mem.write32(rec + 0x5c, b.actor.y >>> 0); }
+        }
         b.box.update(dt, null);
-        if (performance.now() / 1000 - b.at > 4.5 && Math.floor(performance.now() / 300) % 2) b.box.pressConfirm();
+        // same timing as the solo bubble: 4.5 s per page, the last page stays 10 s
+        if (performance.now() / 1000 - b.at > (b.presses < b.pages - 1 ? 4.5 : 10) && Math.floor(performance.now() / 300) % 2) {
+            b.box.pressConfirm(); b.at = performance.now() / 1000; b.presses++;
+        }
     }
 }
 function chatTick(dt) {
@@ -718,6 +747,21 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 installAssetCanvasDrawing();
 ctx.imageSmoothingEnabled = false;
+// Extra quests: the scene effects draw through this context (web/quest-fx.js), and a `drop` drives the field character
+// through the engine's own +0x54 writer, so the room scrolls exactly as it does in s680's floor collapse.
+installQuestFxCanvas(ctx);
+installQuestFxPlayerDrive(fieldCharAddY);
+// Extra quests: a `drop`/`rise` is watched from the player. The host action is the field camera's own "follow the
+// player" state -- release any fixed FN6B pan point and clear the eased cutscene camera (web/quest-ghost.js).
+installQuestGhostCamera(() => {
+    cutscene.camera = null;
+    viewCam.x = state.x;
+    viewCam.y = state.y;
+    viewCam.active = false;
+});
+// ... and with F2 -> Extras -> Quests off, no actor is drawn as a ghost (a step running at that moment comes off the next
+// frame drawn), exactly as the effect art and the scene sky are the quest layer's to clear.
+installQuestGhostGate(() => window.__fx?.quests !== false);
 const fieldCanvasResolution = createCanvasResolutionController(canvas, ctx, {
     logicalWidth: VIEW_W,
     logicalHeight: VIEW_H,
@@ -1665,6 +1709,9 @@ window.__teleport = (x, y) => {
     state.y = y;
 };
 window.__state = state;
+// The `ghost` step's live actors, on the state itself: `_questGhosts` is a Map of actor -> { alpha, tint } (empty when
+// nothing is ghosted). A verifier reads its keys; web/quest-ghost.js empties it in place on every scene exit.
+state._questGhosts = questGhostMap();
 bindCardShopInventory(state).catch((error) => console.error("Card pack inventory data failed", error));
 
 // The language index the original keeps at D0x8005CCA8, and the one the pad
@@ -1842,6 +1889,22 @@ window.__encounter = {
 // Debug-only: drive the ordinary field->battle handoff (the step counter's own
 // function) from a verifier without walking the counter down.
 window.__fieldToBattle = () => triggerRandomEncounter(currentMap().id, state.x, state.y);
+// Testing aid: the "Force encounter" button (or F9) fires the game's own random encounter from the field.
+{
+    const fire = () => window.__fieldToBattle();
+    const btn = document.getElementById("force-enc");
+    btn?.addEventListener("click", () => { btn.blur(); fire(); });
+    addEventListener("keydown", (e) => { if (e.code === "F9") { e.preventDefault(); fire(); } });
+}
+// ?encounter=1 (Playtest Lab, "force an encounter"): once the field is up, fire the game's own random
+// encounter, retrying until its guards (cutscene, fade, textbox) let it through and a battle is running.
+if (new URLSearchParams(location.search).get("encounter") === "1") {
+    let tries = 0;
+    const force = setInterval(() => {
+        if (battle.isActive() || ++tries > 120) { clearInterval(force); return; }
+        if (state.manifest) window.__fieldToBattle();
+    }, 500);
+}
 // Debug-only: read the A28 checkerboard wipe's live state for a capture.
 window.__wipe28 = () =>
     state.wipe28
@@ -2130,10 +2193,47 @@ function sceneCast(sc) {
     // script-spawned (ephemeral) actors the scene conjures onto scene.npcs.
     // EXPERIMENT (mounts): a mount's quest character is off the map while F2 -> Extras -> Mount is off
     const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get).filter((n) => !mountActorHidden(n));
+    const stand = questStandIns(sc, built);
     const eph = sc.npcs.filter((n) => n._ephemeral);
-    if (!eph.length) return built;
+    if (!eph.length) return stand.length ? built.concat(stand) : built;
     const extra = eph.filter((e) => !built.includes(e));
-    return extra.length ? built.concat(extra) : built;
+    return extra.length || stand.length ? built.concat(extra, stand) : built;
+}
+
+// Optional quests (web/quests.js) can ask for one of the game's own characters on a map where the story has them away at
+// the player's point in the story (their spawn flags say no). Then a copy of them stands at one of their own posts on this
+// map, preferring a post nobody else is standing on, so the quest can go on. Only the current map, only while needed; the
+// copies are kept on the scene so they keep their facing and state between frames. Quests off: none.
+function questStandIns(sc, built) {
+    const m = currentMap();
+    if (!m || state.scenes[m.id] !== sc) return [];
+    const need = questNeededNpcs(m.id);
+    if (!need.length) { sc._standIns = null; return []; }
+    sc._standIns ??= new Map();
+    const grid = state.collision[m.id];
+    const out = [];
+    for (const npcId of need) {
+        if (built.some((n) => n.npc_id === npcId)) continue;
+        let s = sc._standIns.get(npcId);
+        if (!s) {
+            const posts = sc.npcs.filter((n) => n.npc_id === npcId && !n._ephemeral && !n._quest);
+            if (!posts.length) continue;
+            // The post itself is used as it stands (the game's own NPCs stand on counters and door cells). Only when
+            // someone else is standing there is the copy nudged aside, and then it must land on walkable ground and clear
+            // of everyone (web/quest-walk.js standInSpot tries a few nudges around the post, else keeps the post).
+            const taken = (x, y) => built.some((n) => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20);
+            const clear = (x, y) => !taken(x, y) && (!grid || questStandFree(grid, x, y));
+            const post = posts.find((p) => !taken(p.x, p.y)) ?? posts[0];
+            s = { ...post, id: "qstand_" + npcId, spawn_flags: [], _questStandIn: true };
+            if (taken(post.x, post.y)) {
+                const spot = standInSpot(post, clear);
+                s.x = spot.x; s.y = spot.y;
+            }
+            sc._standIns.set(npcId, s);
+        }
+        out.push(s);
+    }
+    return out;
 }
 
 const getNpcResolver = (actorId) => {
@@ -2240,6 +2340,10 @@ const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResolver, {
         }
         sfx?.playPacked?.(id, { overlap: true });
     },
+    // The extra quests' own scene events (web/quest-scenes.js `SCENEEVENT <n>`): our effect art, the screen fade, a
+    // mid-scene fight, the player's Y drive and a warp. The table is the current quest scene's; the host performs the
+    // event and resumes the scene when it is really done (see runQuestSceneEvent).
+    sceneEvent: (index, resume) => runQuestSceneEvent(questSceneEvents[index], resume),
     spawnActor: (actorId) => {
         const scene = state.scenes[currentMap().id];
         if (!scene) return null;
@@ -2318,29 +2422,50 @@ function questSpeak(npcId, name, text) {
  * follows exactly as in a story scene; only the words come from the quest. Resolves { answer } when it ends (answer = the
  * index picked in an "ask" step, else null), or at once with null if the scene cannot run here: the characters it needs
  * are not on this map, or the game is busy).
+ *
+ * The scripted events a scene can carry (our own effect art, a screen fade, a mid-scene fight, the player's Y drive, a
+ * warp) are not wstag opcodes: compileScene hands them over as data, the VM reports them through `opts.sceneEvent`, and
+ * runQuestSceneEvent does them. Nothing an event places may outlive the scene -- the finish path clears it, and so does a
+ * skip, a warp, a battle and every stage entry.
  */
-function playQuestScene(steps) {
+let questSceneEvents = [];          // the current quest scene's host events, indexed by the VM's SCENEEVENT operand
+// The running chase (the `chase` step, web/quest-chase.js): { machine, npc, fx, resolve, settled }. The scene's answer is set
+// through the same channel an "ask" uses, so on 1 the quest branches exactly as it would on a "no" answer.
+let questChase = null;
+let questSceneAnswerSet = null;
+// Was the quest layer on last frame? The F2 -> Extras -> Quests switch going OFF mid-scene clears the layer's own art,
+// sky and chase at once (update(), below). Declared here so the very first frame has a value to compare against.
+let questsWereOn = null;
+
+async function playQuestScene(steps) {
+    const mapId = currentMap()?.id;
+    const scene = state.scenes[mapId];
+    if (!scene || cutscene.isActive() || textbox.isOpen() || battle.isActive()) {
+        console.warn(`[quest scene] game busy: scene=${!!scene} cutscene=${cutscene.isActive()} textbox=${textbox.isOpen()} battle=${battle.isActive()}`);
+        questSceneFxReset();
+        return null;
+    }
+    const here = (id) => id === "player" || sceneCast(scene).some((n) => n.npc_id === Number(id) && !n.cutsceneOnly) || !!state.npcSprites?.[Number(id)];
+    const need = castOf(steps).filter((id) => !here(id));
+    if (need.length) { console.warn(`[quest scene] ${need.join(", ")} not on ${mapId}; skipped`); questSceneFxReset(); return null; }
+    const playerId = state.playerCharOne ? 1 : 2;
+    const pos = (id) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
+    const grid = state.collision[mapId];
+    // walkable ground by the player's own foot-box test, and clear of every character the scene is not moving
+    const cast = new Set(castOf(steps));
+    const others = sceneCast(scene).filter((n) => !cast.has(n.npc_id) && !n._ephemeral && (n.x || n.y));
+    const free = grid ? (x, y) => !rectBlocked(grid, x - 6, y - 8, x + 6, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30) : null;
+    // a scripted walk steps straight at its target with no collision test (the VM's own walk driver), so the compiler asks
+    // this for the legs to walk instead when the straight line crosses a wall (web/quest-walk.js over the same grid)
+    const walk = grid ? (ax, ay, bx, by) => questWalkLegs(grid, ax, ay, bx, by) : null;
+    const { opcodes, speech, events, errors } = compileScene(steps, { playerId, pos, free, walk });
+    if (errors.length) { console.warn("[quest scene]", errors.join("; ")); questSceneFxReset(); return null; }
+    // our own effect sheets, before the first frame that could use one; a missing sheet only makes its step skip
+    const sheets = events.filter((e) => e?.kind === "fx").map((e) => e.sheet).filter(Boolean);
+    if (sheets.length) { try { await loadQuestFxSheets(sheets); } catch { /* a sheet that will not load is skipped */ } }
     return new Promise((resolve) => {
-        const mapId = currentMap()?.id;
-        const scene = state.scenes[mapId];
-        if (!scene || cutscene.isActive() || textbox.isOpen() || battle.isActive()) {
-            console.warn(`[quest scene] game busy: scene=${!!scene} cutscene=${cutscene.isActive()} textbox=${textbox.isOpen()} battle=${battle.isActive()}`);
-            return resolve(null);
-        }
-        const here = (id) => id === "player" || sceneCast(scene).some((n) => n.npc_id === Number(id) && !n.cutsceneOnly) || !!state.npcSprites?.[Number(id)];
-        const need = castOf(steps).filter((id) => !here(id));
-        if (need.length) { console.warn(`[quest scene] ${need.join(", ")} not on ${mapId}; skipped`); return resolve(null); }
-        const playerId = state.playerCharOne ? 1 : 2;
-        const pos = (id) => (id === playerId ? { x: state.x, y: state.y } : (() => { const n = sceneCast(scene).find((c) => c.npc_id === id); return n ? { x: n.x, y: n.y } : null; })());
-        const grid = state.collision[mapId];
-        // walkable ground by the player's own foot-box test, and clear of every character the scene is not moving
-        const cast = new Set(castOf(steps));
-        const others = sceneCast(scene).filter((n) => !cast.has(n.npc_id) && !n._ephemeral && (n.x || n.y));
-        const free = grid ? (x, y) => !rectBlocked(grid, x - 6, y - 8, x + 6, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30) : null;
-        const { opcodes, speech, errors } = compileScene(steps, { playerId, pos, free });
-        if (errors.length) { console.warn("[quest scene]", errors.join("; ")); return resolve(null); }
         for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
-        const hooks = { afterSay: {} };
+        const hooks = { afterSay: {}, sceneEvent: (index, resume) => runQuestSceneEvent(questSceneEvents[index], resume) };
         let answer = null;
         for (const [n, s] of Object.entries(speech)) {
             hooks.afterSay[n] = s.ask
@@ -2349,8 +2474,13 @@ function playQuestScene(steps) {
         }
         cutsceneEsdmgRef = null;
         state._questScene = true;
+        questSceneEvents = events;
+        questSceneAnswerSet = (v) => { answer = v; };
         cutscene.start(opcodes, null, () => {
             state._questScene = false;
+            questSceneEvents = [];
+            questSceneAnswerSet = null;
+            questSceneFxReset();       // no effect art or a scene's sky may stay on the map once the scene is over
             for (const npc of scene.npcs) {
                 if (npc._origX !== undefined) { npc.x = npc._origX; npc.y = npc._origY; }
                 delete npc._origX; delete npc._origY; delete npc._inCutscene; delete npc.activeClip; delete npc._cutTarget;
@@ -2359,12 +2489,212 @@ function playQuestScene(steps) {
             delete state._inCutscene; delete state._cutTarget; delete state.activeClip;
             state._animTime = 0;
             resetFollowers();
-            resolve({ answer });
+            // A scene that ended on a lost fight (the title screen) is not a scene the quest finished: the quest layer
+            // reads `failed` and neither accepts nor pays out on it.
+            const failed = !!state._questSceneFailed;
+            delete state._questSceneFailed;
+            resolve({ answer, failed });
         }, hooks);
     });
 }
 
+/**
+ * Do one of a quest scene's own events (web/quest-scenes.js, the `SCENEEVENT <n>` opcodes): the steps that need something
+ * the wstag vocabulary has no opcode for. Each either completes at once and lets the scene go on, or calls `resume` when it
+ * is really done. An event that cannot run here (no such sheet, no such map) is skipped, never waited on: a scene must not
+ * block on art or a place the game does not have. Reused mechanisms only: the field's y-sorted draw list and its own
+ * sprite scale for effects, the s680 +0x54 drive for the player, the story's battle handoff for a fight, and HANDOFF's
+ * routing plus the ordinary stage transition for a warp.
+ */
+function runQuestSceneEvent(ev, resume) {
+    const done = typeof resume === "function" ? resume : () => {};
+    if (!ev || typeof ev !== "object") return done();
+    switch (ev.kind) {
+        case "fx":
+            if (!questFxSpawn(ev)) console.warn(`[quest scene] effect sheet "${ev.sheet}" not loaded; the step is skipped`);
+            return done();
+        case "fxplay": questFxPlay(ev); return done();
+        case "fxmove": questFxMove(ev); return done();
+        case "fxremove": questFxRemove(ev); return done();
+        case "fxwait": questFxWait(ev.name).then(() => done()); return;
+        case "drop":
+        case "rise":
+            // The camera belongs on the player while they fall: an earlier `pan` to a point is released before the first
+            // pixel moves, so the room scrolls with the player (web/quest-ghost.js, the camera half of this task).
+            questSceneCameraToPlayer();
+            questFxDrivePlayer(ev.pixels, ev.step).then(() => done());
+            return;
+        case "ghost":
+            // A memory replay: that actor draws faded and tinted from now on (the renderer asks web/quest-ghost.js per
+            // actor); "off" puts them back, and questFxClear puts every one of them back on any exit.
+            questGhostSet(ev);
+            return done();
+        case "fade": questFxFade(ev.to, ev.frames).then(() => done()); return;
+        case "shake": questFxShake(ev).then(() => done()); return;
+        case "weather": setAmbienceScene(ev).then(() => done()); return;
+        case "time": setAmbienceScene(ev).then(() => done()); return;
+        case "lightning": ambienceLightning(ev.count, ev.force).then(() => done()); return;
+        case "sfx":                                        // a sound cue by name; never blocks the scene
+            try { sfx.play(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, e?.message ?? e); }
+            return done();
+        case "chase": return startQuestChase(ev, done);
+        case "battle": {
+            // The story's own scripted-fight route: the screen's party behind the field's battle handoff. A WIN (or a
+            // flee, as in the story's fights) and the scene goes on; a LOSS takes the game to the title, so the scene
+            // ends there -- it must never run its remaining steps over the title screen.
+            questSceneFxReset();
+            const mapId = currentMap().id;
+            let settled = false;
+            const goOn = () => { if (!settled) { settled = true; done(); } };
+            startFieldBattle(() => Promise.resolve(battle.startScreen(Number(ev.screen), (res) => {
+                presentVictory(res);
+                goOn();
+            }, goOn, () => {
+                settled = true;
+                state._questSceneFailed = true;   // the quest layer must not pay out a scene that ended on the title
+                gameOverToTitle();
+                cutscene.abort();
+            }, { mapId, lead: false })).then((ok) => {
+                // startScreen returns false when it cannot put the screen up (no such screen, no party): the scene goes on
+                // rather than waiting forever for a fight that never started.
+                if (ok === false) {
+                    console.warn(`[quest scene] battle screen ${ev.screen} did not start; the step is skipped`);
+                    goOn();
+                }
+            }).catch(() => goOn()));
+            return;
+        }
+        case "warp": {
+            // HANDOFF's own route: a screen id goes through the game's screen table, a map id is used as given; then the
+            // ordinary stage transition (fade, setMap). The scene ends at the warp, exactly as HANDOFF ends a story scene.
+            questSceneFxReset();
+            const from = currentMap().id;
+            let to = ev.to;
+            if (typeof to === "number") {
+                const routed = screenRouter.route(to, from);
+                to = routed?.kind === "warp" ? routed.to : null;
+            }
+            const idx = to != null && state.manifest.maps.some((m) => m.id === String(to))
+                ? state.manifest.maps.findIndex((m) => m.id === String(to))
+                : -1;
+            if (idx < 0) { console.warn(`[quest scene] no map for warp ${JSON.stringify(ev.to)}; skipped`); return done(); }
+            startTransition({
+                to: String(to),
+                spawnX: ev.at?.[0] ?? null,
+                spawnY: ev.at?.[1] ?? null,
+                dir: DIR8_CS[(ev.dir ?? 0) & 7],
+                scripted: true,
+            });
+            if (cutscene.isActive()) cutscene.abort(); else done();
+            return;
+        }
+        default:
+            return done();
+    }
+}
+
+/**
+ * Start the `chase` step (web/quest-chase.js): the target -- an NPC on this map, or one of our own effects -- runs the
+ * path at `speed` while the PLAYER keeps the controls and must stay within `lose` px of it. It is the one scene step that
+ * hands the field back to the player: `state._questChase` lets the ordinary field update (movement, collision, the party
+ * following) through the cutscene's input gate while the VM waits on this event, and the camera is already on the player
+ * (compileScene emits FN6A before it). The result becomes the scene's answer, exactly as an "ask" step's does.
+ */
+function startQuestChase(ev, done) {
+    const scene = state.scenes[currentMap()?.id];
+    const fxTarget = typeof ev.target === "string";
+    const npc = fxTarget ? null : scene ? sceneCast(scene).find((n) => n.npc_id === Number(ev.target)) : null;
+    const fx = fxTarget ? questFxGet(ev.target) : null;
+    if (!npc && !fx) {
+        console.warn(`[quest scene] chase target ${JSON.stringify(ev.target)} is not here; the step is skipped`);
+        return done();
+    }
+    const machine = createQuestChase(ev, { x: npc ? npc.x : fx.x, y: npc ? npc.y : fx.y });
+    if (questChase) clearQuestChase();                 // defensive: one chase at a time
+    questChase = { machine, npc, fx, resolve: done, settled: false };
+    state._questChase = true;
+    state._questChaseTarget = ev.target;
+    if (machine.state.over) endQuestChase(machine.state.result);   // an empty path is not a chase: the step is skipped
+}
+
+/** One frame of a running chase: move the target, judge the gap, and let it blink when it is about to be lost. */
+function tickQuestChase(dt) {
+    const c = questChase;
+    if (!c) return;
+    const s = c.machine.tick(state.x, state.y, dt);
+    if (c.npc) {
+        c.npc.x = s.x; c.npc.y = s.y; c.npc.dir = s.dir;
+        c.npc._chasing = s.moving;
+        c.npc._chaseWarn = s.warn;
+        if (s.moving) c.npc._animTime = (c.npc._animTime ?? 0) + Math.min(dt, 0.25);
+    } else if (c.fx) {
+        c.fx.x = s.x; c.fx.y = s.y;
+        if (c.fx.layer === "entity") c.fx.ysort = s.y;
+    }
+    if (s.over) endQuestChase(s.result);
+}
+
+/** The chase is decided: the result is the scene's answer, and a loss ends the rest of the scene right here. */
+function endQuestChase(result) {
+    const c = questChase;
+    if (!c || c.settled) return;
+    c.settled = true;
+    questChase = null;
+    state._questChase = false;
+    state._questChaseTarget = null;
+    if (c.npc) { c.npc._chasing = false; c.npc._chaseWarn = false; }
+    // What the run came to, kept where a test (or the quest lab) can read it after the step has been cleaned up.
+    state._questChaseLast = {
+        result,
+        target: c.npc ? c.npc.npc_id : (c.fx ? c.fx.name : null),
+        distance: Math.round(c.machine.state.distance),
+        seconds: Math.round(c.machine.state.elapsed * 10) / 10,
+    };
+    if (questSceneAnswerSet) questSceneAnswerSet(result);      // the scene's answer, exactly like an "ask"
+    if (result === 1 && cutscene.isActive()) { cutscene.abort(); return; }   // the words after a failed chase never play
+    c.resolve();
+}
+
+/** Nothing of a chase may outlive the scene (any exit): the target goes back to its idle pose. */
+function clearQuestChase() {
+    const c = questChase;
+    const pending = !!c && !c.settled;                 // still running, so the scene is blocked on it
+    if (c) {
+        c.settled = true;
+        if (c.npc) { c.npc._chasing = false; c.npc._chaseWarn = false; }
+    }
+    questChase = null;
+    state._questChase = false;
+    state._questChaseTarget = null;
+    if (!pending) return;
+    // Clearing a chase that was still running (F2 -> Quests switched off mid-run, a save loaded, a stage entry that ended
+    // the VM) must not leave the cutscene waiting on an answer it can never get: an interrupted run counts as lost, so the
+    // step it sits in stays open, and the scene ends so its own finish path can do the rest.
+    if (questSceneAnswerSet) questSceneAnswerSet(1);
+    if (cutscene.isActive()) cutscene.abort();
+}
+
+/**
+ * Everything a quest scene may have put on the map, back to nothing: our effect art and a scene's weather / time of day.
+ * Called whenever a scene ends, is skipped, fights or warps, and on every stage entry -- so a map change can never inherit
+ * another map's sky. (Other quest-scene features hook their own cleanup into questFxClear.)
+ */
+function questSceneFxReset() {
+    questFxClear();
+    clearAmbienceScene();
+    clearQuestChase();
+}
+
 window.__playQuestScene = playQuestScene;   // testing aid (tools/verify_quest_scene.mjs)
+window.__questFx = {
+    state: questFxState, clear: questFxClear, fade: questFxFadeAlpha, drive: questFxDriveState,
+    shake: () => ({ offset: questFxShakeOffset(), batch: questFxShakeState() }),
+    ghost: questGhostState,
+    sky: ambienceSceneState,
+};   // testing aid (tools/verify_quest_fx.mjs, tools/verify_quest_fx2.mjs)
+// The running `chase` step's own numbers (web/quest-chase.js), or null when none is running: the target's position, the
+// gap to the player, whether it is about to be lost, and the answer it will settle on. Testing aid only.
+window.__questChase = () => (questChase ? { target: state._questChaseTarget, ...questChase.machine.state } : null);
 
 function getDialogue(ref) {
     return parseEntry(
@@ -4033,6 +4363,9 @@ function treeStage(mapId = currentMap().id) {
  * see. The player is never in the list.
  */
 function fieldPointOccupied(m, px, py) {
+    // A quest prop marked "solid" (the world a finished quest left changed) blocks like a standing actor -- it answers the
+    // same occupancy query, so the disc's own pushback does the rest (web/quest-props.js).
+    if (questPropSolidAt(m.id, px, py)) return true;
     const scene = state.scenes[m.id];
     const npcs = scene?.npcs
         ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get)
@@ -4835,6 +5168,10 @@ function setMap(i, spawn = null) {
     // EXPERIMENT (mounts): a map change always puts the player back on their own feet (no riding across a
     // doorway, no mount left standing on the old map).
     mountForceDismount();
+    // Every map change lands here (the stage transition, a debug jump, a story HANDOFF): nothing a quest scene placed on the
+    // map it is leaving may be drawn on the next one, and a scene's own sky goes back to the new map's (or none). The same
+    // clear runs on stage entry (checkStageCutscene) -- this one also covers the paths that set the map directly.
+    questSceneFxReset();
     state.mapIdx =
         (i + state.manifest.maps.length) % state.manifest.maps.length;
     // The ambush-tile latch is PER VISIT. Its only mechanical job is to stop the
@@ -6618,6 +6955,10 @@ function checkStageCutscene(mapId) {
     // A returning visit must not inherit last visit's falling rocks: the stage's
     // own actor list is rebuilt from the script's SETANIMs on this entry.
     clearStageObjects(mapId);
+    // ... nor a quest scene's effect art: a warp, a load and an ordinary walk into a stage all arrive here, and nothing
+    // an effect placed may be drawn on a map it does not belong to (web/quest-fx.js). A scene's own weather and time of
+    // day go back to the map's at the same moment (web/ambience.js scene override).
+    questSceneFxReset();
     // The original's field character is destroyed with its stage and the next
     // constructor re-reads the map origin into +0x50/+0x54 (fieldstg file
     // 0xe744-0xe760), so the accumulated displacement starts again at zero here.
@@ -7010,11 +7351,11 @@ function paintWipeSeams(ctx, level, regions) {
 // those are keyboard-only by construction. `raw` is the untranslated lowercased
 // key ("" for a pad press) and is what the dev-tool shortcuts read.
 function dispatchInput(k, e, raw = "") {
-    // F toggles the whole game stage in and out of browser fullscreen. The
-    // custom name-entry grid owns letter keys while it is active.
+    // F cycles the game stage: normal -> fill the window -> browser fullscreen.
+    // The custom name-entry grid owns letter keys while it is active.
     if (k === "f" && !state.nameEntry) {
-        e.preventDefault();
-        toggleGameFullscreen(document, document.getElementById("stage"));
+        e.preventDefault?.();
+        cycleGameScreen(document, document.getElementById("stage"));
         return;
     }
     // EXPERIMENT (mounts): "r" rides / steps off, and only when F2 -> Extras -> Mount is on and a quest
@@ -7834,6 +8175,21 @@ function update(dt) {
     sweepCollectionSave();
     textbox.update(dt);
     cutscene.step(dt);
+    questFxTick(dt);            // extra quests: the scene effects' own clock (web/quest-fx.js)
+    // A running chase (the `chase` step, web/quest-chase.js): the target walks its path while the player is in control.
+    // A frozen field (a box, a menu, a fight, a fade) freezes the chase too, so nothing can lose it while it is not visible.
+    // A chase whose scene has gone (a warp, a stage entry, the title screen) is not a chase any more: it may not keep the
+    // field's controls or a target's walk pose after the scene that started it has ended, whatever path ended it.
+    if (questChase && !cutscene.isActive()) clearQuestChase();
+    if (questChase && fade.dir === 0 && !textbox.isOpen() && !dialogueBox.isOpen() && !choice.isOpen() && !battle.isActive() && !state.menuOpen)
+        tickQuestChase(dt);
+    questPropsTick(currentMap()?.id, questPropsOn(currentMap()?.id));   // props: art a quest's state leaves on the map (web/quest-props.js)
+    tickAmbienceScene(dt);      // extra quests: a scene's weather/time-of-day fades (web/ambience.js)
+    // F2 -> Extras -> Quests switched OFF while a scene is playing: the quest layer's own art, sky and chase go at once
+    // (they are its feature; with the layer off the game must look like it did before quests). The conversation already on
+    // screen finishes -- its lines are the quest's own -- and nothing in the save changes.
+    if (questsWereOn && !questsEnabled()) questSceneFxReset();
+    questsWereOn = questsEnabled();
     // The s260 auction's arrival gate. Armed by checkStageCutscene; polled here
     // each frame until it fires or finds nothing, so a lot that could not start
     // while the field was busy still fires the moment the field is free (the
@@ -8191,7 +8547,8 @@ function update(dt) {
     if (
         textbox.isOpen() ||
         choice.isOpen() ||
-        cutscene.isActive() ||
+        // A chase (the `chase` step) is the one scene that hands the field back: the player walks it themselves.
+        (cutscene.isActive() && !state._questChase) ||
         fade.dir !== 0 ||
         state.wipe28 ||
         state.diveDemo ||
@@ -8748,7 +9105,8 @@ function update(dt) {
 
             // Native party actors copy the player's exact 9/18/27-tick-old
             // {x,y,facing} record. They do not steer, interpolate or catch up.
-            if (followCount > 0 && !cutscene.isActive()) {
+            // A chase hands the field to the player, so the party trails them here too.
+            if (followCount > 0 && (!cutscene.isActive() || state._questChase)) {
                 pushFollowerHistory(partnerHistory, {
                     x: state.x,
                     y: state.y,
@@ -8818,7 +9176,7 @@ function update(dt) {
             state.ambushTiles?.[m.id],
             storyGridCellAt(state.x, state.y),
         );
-        if (ambush && !NO_ENCOUNTERS && storyFlags.get(ambush.gateFlag) === 0 && !battle.isActive()) {   // ?noEncounters=1 also silences the ambush patches
+        if (ambush && !NO_ENCOUNTERS && !state._questChase && storyFlags.get(ambush.gateFlag) === 0 && !battle.isActive()) {   // ?noEncounters=1 also silences the ambush patches; a chase never rolls one
             storyFlags.set(ambush.gateFlag, true);
             startAmbush(m.id, ambush);
         }
@@ -8846,8 +9204,10 @@ function update(dt) {
         const encEligible =
             fieldPartySize(state.party) > 0 &&
             // EXPERIMENT (mounts): no random encounters while riding — a mount is a way to cross a map, not a
-            // fight magnet.
+            // fight magnet (the same rule as a chase, which also never rolls one).
             !mountRiding() &&
+            // A chase is a scripted moment: nothing may interrupt it with a random fight (the card's own rule).
+            !state._questChase &&
             !m.id.startsWith("s78") &&
             !m.id.startsWith("s79") &&
             // Submarimon rolls only while THRUSTING: the thrust state 0x4b calls
@@ -9023,7 +9383,10 @@ function drawSprite(meta, sheet, x, y, dir, frameIdx) {
         frameIdx,
         dir,
     });
-    ctx.drawImage(
+    // The frame itself: web/quest-ghost.js stands between this and ctx.drawImage so a `ghost`ed actor's frame can be
+    // tinted; with no ghost on the field it is the plain call.
+    questGhostImage(
+        ctx,
         sheet,
         frameIdx * meta.frameW,
         row * meta.frameH,
@@ -9031,8 +9394,6 @@ function drawSprite(meta, sheet, x, y, dir, frameIdx) {
         meta.frameH,
         Math.round(x - lastCam.x - meta.frameW / 2),
         cellRow,
-        meta.frameW,
-        meta.frameH,
     );
 }
 
@@ -9106,10 +9467,10 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0) {
         screenX: Math.round(x - lastCam.x), cellH: meta.clipFrameH, path: "clip", col,
     });
     if (!mirror) {
-        ctx.drawImage(
+        questGhostImage(
+            ctx,
             clipImg, sx, 0, meta.clipFrameW, meta.clipFrameH,
             Math.round(x - lastCam.x - meta.clipFrameW / 2), drawY,
-            meta.clipFrameW, meta.clipFrameH,
         );
         return;
     }
@@ -9117,10 +9478,10 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0) {
     ctx.save();
     ctx.translate(screenX, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(
+    questGhostImage(
+        ctx,
         clipImg, sx, 0, meta.clipFrameW, meta.clipFrameH,
         -meta.clipFrameW / 2, drawY,
-        meta.clipFrameW, meta.clipFrameH,
     );
     ctx.restore();
 }
@@ -9453,6 +9814,9 @@ function render() {
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.save();
     ctx.scale(ZOOM, ZOOM);
+    // Extra quests: a scene's `shake` step moves the FIELD only -- the text box, the menus and the quest mark are drawn
+    // after this transform is restored, so they stay put while the map, the people and the weather rumble.
+    { const sh = questFxShakeOffset(); if (sh.x || sh.y) ctx.translate(sh.x, sh.y); }
     // Point-sprite props that draw BEHIND the ground map-tile layer go down
     // first, so the map art covers them — ordering-table buckets 8 and above
     // against the ground's 7 (see effects.js and docs/research/field/map-tile-
@@ -9510,7 +9874,7 @@ function render() {
     // No ground split: the leader at an under-map bucket goes down before the
     // flattened map, which is this stage's ground band.
     if (playerUnderMap && !groundCover) {
-        drawPlayerActor();
+        questGhostActor(ctx, "player", drawPlayerActor);
         // The party copies the LEADER's draw-layer value every field tick
         // (follower hook F0x8008EAE8: `arg0->unk78 = leader->unk78`), so when
         // the leader goes behind the ground the whole party goes with him in
@@ -9564,7 +9928,7 @@ function render() {
     // down HERE — after layer 2 and the 8/10 props, before the ground — the disc's
     // own OT[11] -> OT[8] -> OT[7] order.
     if (playerUnderMap && groundCover) {
-        drawPlayerActor();
+        questGhostActor(ctx, "player", drawPlayerActor);
         drawPartyFollowers();
     }
     // The ground layer, at OT[7] — in front of everything the under-map band drew.
@@ -9829,9 +10193,10 @@ function render() {
             if (cutRow != null) ctx.restore();
             debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: c.id, info });
     }
+    // A `ghost`ed player (a memory replay) is drawn faint: web/quest-ghost.js sets the alpha around the whole draw.
     // EXPERIMENT (mounts): the mount is submitted FIRST, so on equal keys the player (submitted next) draws on top.
     mountDrawable(ctx, drawables, camX, camY, performance.now() / 1000);
-    drawables.push({ y: state.y, player: true, draw: drawPlayerActor });
+    drawables.push({ y: state.y, player: true, draw: () => questGhostActor(ctx, "player", drawPlayerActor) });
     // EXPERIMENT (multiplayer): the other players in this stage, drawn as the player character at their own position, in the same depth order.
     if (sheet) {
         for (const g of multiplayerGhosts(m.id)) {
@@ -9898,7 +10263,9 @@ function render() {
     function drawPartyFollower({ i, f, pc, ps }) {
         if (window.__hideParty) return; // debug A/B switch, see drawPlayerActor
         const pdir = f.dir;
-        const pStopping = !cutscene.isActive() && f.stopping;
+        // A chase hands the field to the player: the party runs with them there, exactly as in ordinary walking.
+        const fieldBusy = cutscene.isActive() && !state._questChase;
+        const pStopping = !fieldBusy && f.stopping;
         const pAnimTime = pStopping ? f.stopTime : f.animTime;
         const pfidx =
             pAnimTime > 0
@@ -9915,8 +10282,8 @@ function render() {
             pc, ps, state.clipImgs[pc.id], f.x, f.y,
             pdir, pClip,
             pAnimTime, pfidx,
-            f.gathering || (!cutscene.isActive() && state.moving), f._idleTime,
-            f.gathering || (!cutscene.isActive() && state.moving) ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
+            f.gathering || (!fieldBusy && state.moving), f._idleTime,
+            f.gathering || (!fieldBusy && state.moving) ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
         );
         debugInfos.push({ x: f.x, y: f.y, label: pc.name ?? `party${i}`, sprite: pc.id, info });
     }
@@ -9968,14 +10335,20 @@ function render() {
             if (npcMeta && npcSheet) {
                 const npcDir = npc.dir ?? "down";
                 const npcAnimTime = npc._animTime ?? 0;
-                const npcMoving = !!(npc.path || npc._cutTarget);
+                // A chase target walks its own path (`_chasing`), so it plays the walk clip like any moving actor.
+                const npcMoving = !!(npc.path || npc._cutTarget || npc._chasing);
+                // About to lose a chase: the target blinks, so a chase going wrong looks different from one being kept.
+                const npcBlink = !!(npc._chaseWarn && Math.floor((npcAnimTime + npc._idleTime) * 8) % 2 === 0);
                 const npcFrameIdx = npcMoving
                     ? walkFrameIndex(timingForDir(npcMeta.frameDurations ?? {}, npcDir), npcAnimTime)
                     : 0;
                 feetNow.push({ id: "n" + npc.id, x: npc.x, y: npc.y, moving: npcMoving, dir: npcDir });
                 drawables.push({
                     y: npc.y,
-                    draw: () => {
+                    // A `ghost`ed NPC (a memory replay) draws faint and tinted: web/quest-ghost.js is asked per actor,
+                    // around the character's own draw (shadow and sprite alike).
+                    draw: () => questGhostActor(ctx, npc.npc_id, () => {
+                        if (npcBlink) return;            // the chase warning: a blink, never a different sprite
                         // NPC = constructor kind npc_id (spawn record +0x8).
                         drawActorShadow(npc.x, npc.y, npc.npc_id, npc.activeClip);
                         const info = drawEntitySprite(
@@ -9999,11 +10372,15 @@ function render() {
                             info,
                             npc_id: npc.npc_id,
                         });
-                    },
+                    }),
                 });
             }
         }
     }
+
+    // Extra quests: the effect art a scene placed (web/quest-fx.js). It joins the SAME list, so the disc's one ordering
+    // rule sorts it against the people rather than after them -- an effect can stand behind a character or in front.
+    for (const d of questFxDrawables(camX, camY)) drawables.push(d);
 
     // The disc's own draw order, in one shared place: ascending key, larger key
     // in front, and equal keys with the EARLIER arrival on top (the queue's
@@ -10019,6 +10396,8 @@ function render() {
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
+    // Extra quests: effects told to sit over every person (the `fx` step's "layer": "front").
+    questFxDrawOver(ctx, camX, camY);
     for (const g of multiplayerGhosts(m.id)) drawGhostLabel(ctx, g, Math.round(g.x - camX), Math.round(balloonAnchorY(g.y - camY)));
     { const me = multiplayerSelf(); if (me) drawGhostLabel(ctx, me, Math.round(state.x - camX), Math.round(balloonAnchorY(state.y - camY))); }
     multiplayerTick(m.id, state);   // EXPERIMENT: sends where I am and glides the other players
@@ -10322,6 +10701,9 @@ function render() {
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
     }
+    // Extra quests: a scene's own screen fade (the `fade` step). It is a plain black cover, not the game's stage-change
+    // wipe, so it cannot make the map the quest is still standing on think the player arrived.
+    if (questFxFading()) questFxDrawFade(ctx, VIEW_W, VIEW_H);
     // The A28 checkerboard handoff draws over the field while it runs, whatever
     // the A27 fade's alpha is.
     if (state.wipe28) drawCheckerboardWipe(ctx);

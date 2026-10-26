@@ -68,6 +68,8 @@ function loadState() {
 function saveState() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* private window: progress lasts for the session */ } }
 
 const enabled = () => !fx || fx.quests !== false;
+/** Is the quest layer on? (F2 -> Extras -> Quests; the scene layer and the props follow the same switch.) */
+export const questsEnabled = enabled;
 const atGiver = (d) => !d.acceptAt || (lastMap != null && d.acceptAt.some((m) => sameMapId(m, lastMap)));
 function sameMapId(a, b) { return canon(a) === canon(b); }
 const canon = (id) => variants[id] ?? id;
@@ -77,6 +79,13 @@ const mapLabel = (id) => (mapNames[id] ?? mapNames[canon(id)] ?? id).replace(/^.
 function validate(d) {
     if (!d || typeof d.id !== "string" || !Array.isArray(d.objectives) || !d.objectives.length) return "needs an id and objectives";
     for (const o of d.objectives) { const t = OBJECTIVES[o.type]; if (!t || !t.valid(o)) return `bad objective ${JSON.stringify(o)}`; }
+    // props: our own art a quest leaves on a map once it is accepted or done (docs/quests-fx-brief.md section 6,
+    // web/quest-props.js). Only the shape is the quest layer's business; the checker owns the maps and the sheets.
+    for (const p of d.props ?? []) {
+        if (!p || typeof p.map !== "string" || typeof p.sheet !== "string") return `bad prop ${JSON.stringify(p)}`;
+        if (!Array.isArray(p.at) || p.at.length !== 2 || !p.at.every(Number.isFinite)) return `bad prop place ${JSON.stringify(p)}`;
+        if (p.after != null && p.after !== "done" && p.after !== "accepted") return `prop after is "done" or "accepted"`;
+    }
     for (const sc of [d.offer?.scene, d.acceptScene, d.doneScene, d.turnIn?.scene, ...d.objectives.map((o) => o.scene)]) {
         if (!sc) continue;
         const bad = validateScene(sc);
@@ -348,16 +357,26 @@ const ask = (prompt, options) => (api?.ask ? api.ask(prompt, options) : Promise.
 // Returns { ran, answer }: whether the scene ran, and the choice made inside it (null when it had none).
 async function perform(scene, name, lines, npcId) {
     const r = scene && api?.scene ? await api.scene(scene) : null;
-    if (r) return { ran: true, answer: r.answer };
+    // `failed`: the scene ended on a lost fight (the title screen), so the quest step it was is not done and nothing it
+    // would have paid out may be paid (web/game.js playQuestScene).
+    if (r) return { ran: true, answer: r.answer, failed: !!r.failed };
     if (lines?.length) await say(name, lines, npcId);
-    return { ran: false, answer: null };
+    return { ran: false, answer: null, failed: false };
 }
 async function busy(fn) { dialogBusy = true; try { await fn(); } finally { dialogBusy = false; } }
 const atNpc = (ref, npcId, mapId) => ref && ref.npc === npcId && ref.maps.some((m) => sameMap(m, mapId));
 const talksDone = (d, a, upTo) => d.objectives.slice(0, upTo).every((_, j) => (a.p[j] || 0) >= targetOf(d, j));
+// A scene that carries a `chase` step answers 1 when the player lost the target (web/quest-scenes.js). A lost chase never
+// fails a quest, so it must not complete the step it sits in either: the step stays open and the player can talk again and
+// retake it. No quest had a chase before this rule, so nothing that shipped changes.
+const chaseLost = (o, r) => r?.answer === 1 && Array.isArray(o?.scene) && o.scene.some((s) => s && typeof s === "object" && "chase" in s);
 
 /** Returns true when a quest took this conversation (the game then skips the character's normal line). */
 const chatted = new Set();   // characters whose ordinary words you have already heard this session
+// The quest lab's own focus (lab.prepare): a test panel picks ONE quest to try, but several quests can share a giver (the
+// demo packs all put Cipher on the Bridge), and the offer loop would otherwise always hand out the first one in file order.
+// A real player never sets this; with it set, only that quest may be offered, and only at its own giver.
+let labFocus = null;
 export function questTalk(npcId, mapId, hasChat = false) {
     if (!enabled() || dialogBusy || logOpen || !mapId) return false;
     syncCounts();                                            // what the player carries and their level right now
@@ -370,7 +389,10 @@ export function questTalk(npcId, mapId, hasChat = false) {
             if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !atNpc(o, npcId, mapId)) continue;
             if (d.ordered && !talksDone(d, a, i)) continue;
             busy(async () => {
-                await perform(o.scene, o.name ?? "", o.lines, npcId);
+                const r = await perform(o.scene, o.name ?? "", o.lines, npcId);
+                // Lost the chase this step is built around: the words after it never played, and the step waits for another go.
+                if (chaseLost(o, r)) { if (o.retryLines?.length) await say(o.name ?? "", o.retryLines, npcId); return; }
+                if (r.failed) return;                            // ended on the title screen: the step stays open
                 const was = isReady(id);
                 a.p[i] = 1; saveState();
                 if (!was && isReady(id)) toast(`Quest ready: ${d.title}${turnInRef(d) ? "" : "  (F3)"}`);
@@ -384,6 +406,7 @@ export function questTalk(npcId, mapId, hasChat = false) {
         if (!d || !isReady(id) || !atNpc(ref, npcId, mapId)) continue;
         busy(async () => {
             const r = await perform(d.doneScene ?? ref.doneScene, ref.name, ref.doneLines ?? ["Well done. Here is your reward."], npcId);
+            if (r.failed) return;                                    // the hand-in scene was lost as a fight: pay nothing
             let pick = null;
             if (d.verdict) pick = r.answer ?? await ask(d.verdict.ask, d.verdict.options);
             claim(id, true, pick);
@@ -396,9 +419,11 @@ export function questTalk(npcId, mapId, hasChat = false) {
     if (hasChat && !chatted.has(npcId)) { chatted.add(npcId); return false; }
     // 3. an offer
     for (const d of allDefs()) {
+        if (labFocus && d.id !== labFocus) continue;      // the lab asked for one quest in particular
         if (statusOf(d) !== "available" || !d.offer || declined.has(d.id) || !atNpc(d.offer, npcId, mapId)) continue;
         busy(async () => {
             const r = await perform(d.offer.scene, d.offer.name, d.offer.lines, npcId);
+            if (r.failed) return;                                    // the offer scene ended on the title screen: no quest
             const pick = r.answer ?? await ask(d.offer.ask ?? "Take the job?", ["I will do it", "Not now"]);
             if (pick === 0) {
                 accept(d.id, true);
@@ -577,6 +602,28 @@ export async function openLog() {
     } finally { logOpen = false; }
 }
 
+/**
+ * The game's own characters a running quest needs on this map right now: the next "talk" step (in order when the quest is
+ * ordered) and the person to report to once it is ready. game.js uses it to put a stand-in at the character's usual post
+ * when the story has them away from this map at the player's point in the story (the quest would otherwise be stuck).
+ */
+export function questNeededNpcs(mapId) {
+    if (!enabled() || !mapId) return [];
+    const out = new Set();
+    for (const id of Object.keys(st.active)) {
+        const d = defOf(id), a = st.active[id];
+        if (!d) continue;
+        d.objectives.forEach((o, i) => {
+            if (o.type !== "talk" || (a.p[i] || 0) >= 1 || !o.maps?.some((m) => sameMap(m, mapId))) return;
+            if (d.ordered && !talksDone(d, a, i)) return;
+            out.add(o.npc);
+        });
+        const ref = turnInRef(d);
+        if (ref && isReady(id) && ref.maps?.some((m) => sameMap(m, mapId))) out.add(ref.npc);
+    }
+    return [...out];
+}
+
 /** What mark a character wears for the extra quests: "turnin" (a finished job to hand in: red "!"), "offer" (a job to give: red "?") or null. */
 export function questNpcMark(npcId, mapId) {
     if (!enabled() || dialogBusy || logOpen || !mapId) return null;
@@ -587,6 +634,33 @@ export function questNpcMark(npcId, mapId) {
         if (s === "available" && d.offer && !declined.has(d.id) && atNpc(d.offer, npcId, mapId)) mark = "offer";
     }
     return mark;
+}
+
+/**
+ * Our own art a quest has left on a map (the quest data's "props", docs/quests-fx-brief.md section 6, drawn and kept by
+ * web/quest-props.js): a little thing that stays in the world because of what the player did. "after": "done" (the
+ * default) holds once the quest is handed in, "accepted" from the moment it is taken. Read every frame by game.js, which
+ * hands the list to web/quest-props.js; off with the Quests switch, like the rest of this layer.
+ */
+export function questPropsOn(mapId) {
+    if (!enabled() || !mapId) return [];
+    const out = [];
+    for (const d of allDefs()) {
+        const list = d.props;
+        if (!Array.isArray(list)) continue;
+        list.forEach((p, i) => {
+            if (!p || !p.sheet || !sameMap(p.map, mapId)) return;
+            const after = p.after === "accepted" ? "accepted" : "done";
+            const holds = after === "accepted" ? !!(st.active[d.id] || st.done[d.id]) : !!st.done[d.id];
+            if (!holds) return;
+            out.push({
+                key: `${d.id}#${i}`, sheet: p.sheet,
+                x: p.at?.[0] ?? 0, y: p.at?.[1] ?? 0,
+                clip: p.clip, layer: p.layer, solid: p.solid === true,
+            });
+        });
+    }
+    return out;
 }
 
 /** Text for the game's own character set (the pause page): its fonts have no slash, brackets or stars. */
@@ -683,8 +757,10 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         // test panel hooks (web/quest-lab.js, ?questlab=1): bend the quest state so a quest can be tried at once.
         // They only touch the quest layer's own store, never the story.
         lab: {
-            /** Make a quest startable: its prerequisites done, and it is neither active nor done. */
+            /** Make a quest startable: its prerequisites done, and it is neither active nor done. This is also the lab's
+             *  focus: while it holds, only this quest may be offered at its giver (several demos share one character). */
             prepare(id) {
+                labFocus = id;
                 const seen = new Set();
                 const markDone = (q) => {
                     const d = defOf(q);
@@ -709,7 +785,9 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
                 saveState(); toast(`Goals met: ${d.title}`);
                 return true;
             },
-            reset() { st = freshState(); declined.clear(); saveState(); },
+            reset() { st = freshState(); declined.clear(); labFocus = null; saveState(); },
+            /** Focus one quest for the next offer (null clears it); prepare() does this on its own. */
+            focus(id) { labFocus = id ?? null; },
         },
     };
 }

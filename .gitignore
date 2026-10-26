@@ -77,6 +77,15 @@ data/authored/quests/art/ref/
 # model renders (disc-derived reference pictures)
 captures/
 
-# DW2 models the mount layer renders live (web/mount3d.js). Built on the player's machine from their own DW2 disc
-# (launcher /__dw2003/extras.html, tools/dw2/dw2_addon.py): disc-derived, local only, never committed.
+# The giant sheets rendered from the game's own battle models (tools/giant-fx.sh -> tools/make_giant_fx.py):
+# disc-derived, generated locally, never committed. The quests' own giant art is tools/make_giant_art.py.
+web/extra_fx/giant_metal.png
+web/extra_fx/giant_metal.json
+web/extra_fx/giant_trike.png
+web/extra_fx/giant_trike.json
+web/extra_fx/giant_master_px.png
+web/extra_fx/giant_master_px.json
+
+# DW2 models the mount layer renders live (web/mount3d.js). Copied from ~/dw2-models by hand, disc-derived,
+# local only: the mount hides itself when the file is not there, and nothing here is ever committed.
 web/dw2models/

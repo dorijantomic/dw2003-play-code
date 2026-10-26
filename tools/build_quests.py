@@ -3,6 +3,8 @@
 
     python3 tools/build_quests.py            writes web/quests.json and prints what it holds
     python3 tools/build_quests.py --check    builds in memory and fails if web/quests.json is out of date
+    python3 tools/build_quests.py --with-drafts   local testing only: also put every draft (not in shipped.txt) in
+                                             web/quests.json so the quest lab can play it; run without it before committing
 
 Do not edit web/quests.json by hand. Quest ids are append-only: progress is stored by id.
 """
@@ -47,6 +49,8 @@ def main():
         return 1
     shipped = {l.strip() for l in open(os.path.join(SRC, "shipped.txt"), encoding="utf-8") if l.strip() and not l.startswith("#")}
     drafts = [q["id"] for q in quests if where[q["id"]] != "legacy" and q["id"] not in shipped]
+    if "--with-drafts" in sys.argv:
+        drafts = []
     quests = [q for q in quests if q["id"] not in set(drafts)]
     for q in quests:                      # a shipped quest never waits on a draft
         u = q.get("unlock") or {}
@@ -57,6 +61,12 @@ def main():
             del r["done"]
             if not r:
                 del q["requires"]
+    # props (our own art a quest's state leaves on a map, web/quest-props.js): they travel with the quest data as they
+    # were authored, with the one default filled in so the runtime and the JSON always agree on what "after" means.
+    for q in quests:
+        for p in q.get("props") or []:
+            if isinstance(p, dict):
+                p.setdefault("after", "done")
     text = json.dumps({"_comment": COMMENT, "quests": quests}, indent=2, ensure_ascii=False)
     if "--check" in sys.argv:
         ok = os.path.exists(OUT) and open(OUT, encoding="utf-8").read() == text
