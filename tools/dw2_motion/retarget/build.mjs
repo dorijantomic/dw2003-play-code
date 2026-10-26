@@ -39,10 +39,15 @@ for (const d of ["ap", "maps", "scenes", "out", "tails"]) fs.mkdirSync(path.join
 for (const [k, t] of Object.entries(TAILS)) fs.writeFileSync(path.join(WORK, "tails", `${k}.tail`), t);
 fs.mkdirSync(OUT, { recursive: true });
 
-const node = (script, a) => new Promise((resolve, reject) => {
+// at most JOBS tool processes at once, over ALL species and clips (one slow species no longer holds a core per clip in turn)
+let running = 0;
+const waiting = [];
+const slot = () => (running < JOBS ? (running++, Promise.resolve()) : new Promise((r) => waiting.push(r)));
+const free = () => { const r = waiting.shift(); if (r) r(); else running--; };
+const node = (script, a) => slot().then(() => new Promise((resolve, reject) => {
   cp.execFile(process.execPath, [path.join(HERE, script), ...a], { cwd: WORK, encoding: "utf8", timeout: 300000, maxBuffer: 64 << 20 },
     (e, stdout, stderr) => (e ? reject(new Error(`${script}: ${(stderr || e.message).split("\n").slice(0, 2).join(" | ")}`)) : resolve(stdout)));
-});
+}).finally(free));
 
 // ── one species: every clip converted ────────────────────────────────────────────────────────
 async function convertSpecies(s) {
@@ -51,8 +56,7 @@ async function convertSpecies(s) {
   const ratio = rigs[s.folder].size.h / ((hi - lo) || 1), tpp = Math.max(2, Math.min(5, Math.round(2 * Math.sqrt(Math.max(1, ratio)))));
   const ap = path.join(WORK, "ap", `${s.folder}.ap.json`);
   fs.writeFileSync(ap, JSON.stringify({ dw2: { id: s.dw2 }, ours: { folder: s.folder }, flipDw2: s.flipDw2, pairs: s.pairs }));
-  const rows = [];
-  for (const letter of CLIPS) {
+  return Promise.all(CLIPS.map(async (letter) => {   // the clips are independent: they queue for the JOBS process slots
     const sp = SPEC[letter], clipIdx = dw2.clips.findIndex((c) => c.name === letter);
     const row = { folder: s.folder, name: s.name, dw2: s.dw2, letter, slot: sp.slot, ticksPerPose: tpp };
     try {
@@ -65,9 +69,8 @@ async function convertSpecies(s) {
       row.dir = path.join(WORK, out);
       row.ok = true;
     } catch (e) { row.ok = false; row.error = String(e.message).slice(0, 200); }
-    rows.push(row);
-  }
-  return rows;
+    return row;
+  }));
 }
 
 // ── one species: the converted clips joined into the file the game loads ────────────────────
@@ -155,12 +158,9 @@ function exportSpecies(s, batch) {
   return { folder, name: s.name, letters: Object.keys(motions), notes };
 }
 
-// ── all species, JOBS at a time ──────────────────────────────────────────────────────────────
+// ── all species at once; the process slots (JOBS) limit the work ─────────────────────────────
 const t0 = Date.now(), done = [], failed = [];
-let next = 0;
-async function worker() {
-  while (next < species.length) {
-    const s = species[next++];
+await Promise.all(species.map(async (s) => {
     try {
       if (!fs.existsSync(modelPath(s.folder))) throw new Error("no DW3 model (DW3 disc not extracted?)");
       if (!fs.existsSync(dw2Path(s.dw2))) throw new Error(`no DW2 model dw2_${s.dw2} (DW2 disc not converted?)`);
@@ -172,9 +172,7 @@ async function worker() {
       failed.push({ folder: s.folder, error: String(e.message).slice(0, 200) });
       console.log(`[${done.length + failed.length}/${species.length}] FAILED ${s.folder}: ${String(e.message).slice(0, 160)}`);
     }
-  }
-}
-await Promise.all(Array.from({ length: Math.min(JOBS, species.length) }, worker));
+}));
 fs.copyFileSync(path.join(DATA, "cast-types.json"), path.join(OUT, "cast-types.json"));
 const folders = fs.readdirSync(OUT).filter((f) => /^m\d{3}\w+\.json$/.test(f)).map((f) => f.slice(0, -5)).sort();
 fs.writeFileSync(path.join(OUT, "index.json"), JSON.stringify({ v: 1, source: "tools/dw2_motion/retarget/build.mjs", note: "which bodies have a DW2 motion file", folders }));

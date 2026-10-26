@@ -22,7 +22,16 @@ export const DEG = Math.PI / 180;
 export const ARENA_HALF = LP.ARENA_HALF;
 
 // ── tiny row-major 3×3 helpers (same convention as MOTION_KIT) ──────────────────────────────
-export const mul = K.k16mul, tr = K.k16tr, mv = K.k16mv;
+// mul/tr: K.k16mul/k16tr written out for 3x3 (the converter's hot path). Same sums in the same order (0 + a0b0 + a1b1 + a2b2, as
+// k16mul's reduce), so the results are bit-identical; checked against a full build.
+export const mul = (A, B) => {
+  const a = A[0], b = A[1], c = A[2], x = B[0], y = B[1], z = B[2];
+  return [[0 + a[0] * x[0] + a[1] * y[0] + a[2] * z[0], 0 + a[0] * x[1] + a[1] * y[1] + a[2] * z[1], 0 + a[0] * x[2] + a[1] * y[2] + a[2] * z[2]],
+    [0 + b[0] * x[0] + b[1] * y[0] + b[2] * z[0], 0 + b[0] * x[1] + b[1] * y[1] + b[2] * z[1], 0 + b[0] * x[2] + b[1] * y[2] + b[2] * z[2]],
+    [0 + c[0] * x[0] + c[1] * y[0] + c[2] * z[0], 0 + c[0] * x[1] + c[1] * y[1] + c[2] * z[1], 0 + c[0] * x[2] + c[1] * y[2] + c[2] * z[2]]];
+};
+export const tr = (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]];
+export const mv = K.k16mv;
 export const I3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 const F = [[-1, 0, 0], [0, 1, 0], [0, 0, -1]];
 export const FLIP = F;
