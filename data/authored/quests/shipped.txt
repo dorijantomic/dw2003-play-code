@@ -13,11 +13,6 @@ p_school_three_questions
 w_oldwoman_herself
 w_oldwoman_rumour_name
 f_digimon_surprise
-f_ren_1_beach
-f_ren_2_prairie
-f_ren_3_bay
-f_ren_4_desert
-f_cipher_standing_orders
 c1_boy_sleepless
 c1_riggs_gear
 c1_boy_lot

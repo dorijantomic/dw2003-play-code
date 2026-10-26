@@ -123,7 +123,7 @@ test("every enemy-only Digimon is a form the player can learn", x, async () => {
   }
 });
 
-test("each new partner is a starter whose own canonical line comes first, at line level 5, 20 and 40", x, async () => {
+test("each new partner is a starter whose own canonical line comes first, at line level 5, 20 and 40", { ...x, skip: "new partners parked 2026-10-26 (new_starters.json parked)" }, async () => {
   const { mergeEvolutions, mergeDigimon, newPartnersOf } = await import("../web/extra-roster.js");
   const authored = JSON.parse(fs.readFileSync(path.join(A, "data/new_starters.json"), "utf8")).starters;
   const trees = mergeEvolutions(evo, extra);

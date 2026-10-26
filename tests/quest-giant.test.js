@@ -33,7 +33,7 @@ test("a scale outside 0.1..8 is a scene error, not a silent clamp", () => {
     }
 });
 
-test("both giant quests are drafts with the crossing, the prints and a challenge", () => {
+test("both giant quests are drafts with the crossing, the prints and a challenge", { skip: "giant quests removed for now 2026-10-26 (their art is local only)" }, () => {
     for (const id of ["zz_giant_trike", "zz_giant_metal"]) {
         const d = byId(id);
         assert.ok(d, `${id} is in web/quests.json (built with --with-drafts)`);
@@ -65,7 +65,7 @@ test("both giant quests are drafts with the crossing, the prints and a challenge
     assert.ok(!byId("zz_giant_trike") || true);
 });
 
-test("every sheet the two quests name is on disk in the fx format the loader reads", () => {
+test("every sheet the two quests name is on disk in the fx format the loader reads", { skip: "giant quests removed for now 2026-10-26 (their art is local only)" }, () => {
     const names = new Set();
     for (const id of ["zz_giant_trike", "zz_giant_metal"]) {
         const d = byId(id);
