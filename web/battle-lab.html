@@ -22,6 +22,7 @@
 <body>
 <div id="side">
   <h3>Battle Lab</h3>
+  <div class="row"><a href="anim-viewer.html">→ Animation Viewer</a> &nbsp; <a href="playtest.html">Playtest</a></div>
   <div class="row">our side: <select id="pModel"></select></div>
   <div class="row">enemy&nbsp;&nbsp;: <select id="eModel"></select></div>
   <div class="row">tech: <select id="techSel"></select></div>
@@ -73,6 +74,7 @@ const sfx = createSfxPlayer();
 window.addEventListener("pointerdown", () => sfx.unlock(), { once: true });
 const r = createBattle3D(off, sfx);
 window.__r = r;   // debug handle for headless probes (Battle Lab is a dev tool)
+window.__off = off;   // the GL render target, so a probe can copy a frame without the lab's rAF loop
 window.__sfx = sfx;
 if (!r) document.getElementById("status").textContent = "WebGL unavailable";
 

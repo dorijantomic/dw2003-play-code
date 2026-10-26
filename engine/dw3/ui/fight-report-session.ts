@@ -129,6 +129,30 @@ export const REPORT_TEXT_BANKS = [0x55, 0x4e, 0x6a, 0xa2] as const;
 /** The six equip halfwords of a roster record (head, body, right, left, acc0, acc1). */
 const RECORD_EQUIPMENT = ROSTER_EQUIP_OFFSETS_LIST;
 
+/**
+ * One newly learned form per partner per report.
+ *
+ * The report's record holds 44 ledger cells and is seeded with a PAGE of the partner's real
+ * ledger (roster-form-state.ts seedRosterForms). A partner owning more than a page is normal
+ * here — the extra roster adds species the disc's 44-row table never had — and when that page is
+ * full addForm has nowhere to write the grant (F0x80017924 returns 0 on a full ledger), while the
+ * row re-enters state 41 after every learned message: the same grant would be announced again and
+ * again inside one report. The walker itself grants ONE form per battle (battle.js
+ * nextUnlockedEvolution) and this screen replays that outcome, so the report must grant at most
+ * one form per partner as well. The routine below stays byte-faithful to F0x8008634C; the rule
+ * that the record is only a page lives here, at the report's own boundary.
+ */
+export function unlockOncePerReport(unlock: (slot: number) => number): (slot: number) => number {
+  const granted = new Set<number>();
+  return (slot) => {
+    const at = slot | 0;
+    if (granted.has(at)) return 0;
+    const form = unlock(at) | 0;
+    if (form !== 0) granted.add(at);
+    return form;
+  };
+}
+
 export interface FightReportResources {
   /** The overlay's data tail from 0x80086A88 (routine slots zeroed). */
   tables: Uint8Array;
@@ -540,7 +564,7 @@ export class FightReportSession {
       rowFoldStart: this.foldStart,
       rowFoldTick: (window) => windowFoldTick(mem, window),
       levelUpApply: (slot, gain) => reportAddExperience(mem, slot, gain, rewards),
-      digivolutionUnlock: (slot) => reportUnlockForm(mem, slot, rewards),
+      digivolutionUnlock: unlockOncePerReport((slot) => reportUnlockForm(mem, slot, rewards)),
       dvLadder: (slot, form, gain) => reportDvLadder(mem, slot, form, gain, rewards),
       learnTech: (slot, form) => reportLearnTechnique(mem, slot, form, rewards),
       makeLoadable: (slot, form) => reportMakeLoadable(mem, slot, form, rewards),

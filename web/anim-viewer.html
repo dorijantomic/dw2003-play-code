@@ -1,0 +1,2842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DW2003 Animation Viewer</title>
+<style>
+  :root { --bg:#0b0d12; --panel:#12151c; --panel2:#171b24; --line:#252b38; --text:#cfd8ea; --dim:#7b869b; --accent:#58b7ff; --accent2:#ffb454; --bad:#ff6b6b; --ok:#59d18a; }
+  * { box-sizing: border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; overflow:hidden; }
+  button, select, input { background:var(--panel2); color:var(--text); border:1px solid var(--line); border-radius:4px; font:12px ui-monospace,monospace; padding:4px 8px; }
+  button { cursor:pointer; }
+  button:hover { border-color:#3a465c; background:#1d2230; }
+  button.on { border-color:var(--accent); color:var(--accent); }
+  button:disabled { opacity:.45; cursor:default; }
+  a { color:var(--accent); text-decoration:none; }
+  #top { display:flex; align-items:center; gap:10px; height:44px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  #top b { color:#fff; letter-spacing:.5px; }
+  #srcSwitch { display:flex; gap:2px; }
+  #srcSwitch button { padding:3px 9px; }
+  #srcSwitch button.on { border-color:var(--accent2); color:var(--accent2); background:#1d2230; }
+  #search { width:280px; }
+  #count { color:var(--dim); min-width:90px; }
+  #top .spacer { flex:1; }
+  #layout { display:flex; height:calc(100vh - 44px); }
+  #listPane { width:300px; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; }
+  #filters { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:8px; border-bottom:1px solid var(--line); }
+  #filters select { width:100%; font-size:11px; padding:3px 4px; }
+  #species { list-style:none; margin:0; padding:4px; overflow-y:auto; flex:1; }
+  #species li { padding:4px 8px; border-radius:4px; cursor:pointer; display:flex; justify-content:space-between; gap:6px; }
+  #species li small { color:var(--dim); font-size:10px; }
+  #species li:hover { background:var(--panel2); }
+  #species li.sel { background:#1b2a3d; color:#fff; }
+  #species li .tag { color:var(--accent2); font-size:9px; border:1px solid #4a3b22; border-radius:3px; padding:0 3px; }
+  #stage { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #viewport { position:relative; flex:1; min-height:200px; background:#000; overflow:hidden; }
+  #cv { display:block; width:100%; height:100%; object-fit:contain; }
+  #hud { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #title { position:absolute; left:12px; top:10px; color:#fff; font-size:15px; letter-spacing:.5px; text-shadow:0 1px 4px #000; }
+  #title small { color:var(--dim); font-size:11px; letter-spacing:0; }
+  #badges { position:absolute; left:12px; top:36px; display:flex; gap:4px; flex-wrap:wrap; max-width:70%; }
+  .badge { font-size:10px; padding:1px 5px; border-radius:3px; border:1px solid var(--line); background:#0f131a; color:var(--dim); }
+  .badge.good { color:var(--ok); border-color:#244a34; }
+  .badge.warn { color:var(--accent2); border-color:#4a3b22; }
+  .badge.bad { color:var(--bad); border-color:#4a2424; }
+  #scriptCamOut { position:absolute; right:12px; top:10px; text-align:right; color:var(--dim); font-size:11px; white-space:pre; text-shadow:0 1px 3px #000; }
+  #hints { position:absolute; left:12px; bottom:8px; color:#5b6578; font-size:10px; }
+  #timelineBox { padding:6px 10px 2px; background:var(--panel); border-top:1px solid var(--line); }
+  #marks { position:relative; height:20px; margin-top:-22px; pointer-events:none; }
+  .mark { position:absolute; top:0; width:2px; height:14px; background:#555; }
+  .mark.contact { background:var(--accent2); height:18px; }
+  .mark.camera { background:#b07bff; }
+  .mark.fx { background:#59d18a; }
+  .mark.proj { background:#00d0d0; }
+  .mark span { position:absolute; top:15px; left:2px; font-size:9px; color:var(--dim); white-space:nowrap; }
+  #scrub { width:100%; margin:0; accent-color:var(--accent); }
+  #tickLabel { float:right; color:var(--dim); font-size:11px; }
+  #playbar { display:flex; align-items:center; gap:6px; padding:6px 10px; background:var(--panel); border-top:1px solid var(--line); flex-wrap:wrap; }
+  #playbar label { color:var(--dim); display:flex; align-items:center; gap:4px; }
+  #speed { width:110px; }
+  #tabs { display:flex; gap:2px; padding:6px 10px 0; background:var(--panel); border-top:1px solid var(--line); }
+  #tabs button { border-radius:5px 5px 0 0; border-bottom:none; }
+  #tabs button.on { background:var(--panel2); color:var(--accent); border-color:var(--line); }
+  .tab { padding:10px 12px; overflow-y:auto; background:var(--panel2); border-top:1px solid var(--line); height:230px; }
+  .tab.hidden { display:none; }
+  .groupTitle { color:var(--accent); margin:8px 0 4px; font-size:11px; letter-spacing:.5px; }
+  .actList { display:flex; flex-wrap:wrap; gap:4px; }
+  .act { text-align:left; }
+  .act small { color:var(--dim); }
+  .act.sel { border-color:var(--accent); color:#fff; background:#1b2a3d; }
+  .kv { display:grid; grid-template-columns:150px 1fr; gap:2px 10px; }
+  .kv div:nth-child(odd) { color:var(--dim); }
+  .kv .bad { color:var(--bad); }
+  .kv .ok { color:var(--ok); }
+  .camGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:6px; max-width:760px; }
+  .camGrid label { justify-content:space-between; }
+  .rowline { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:4px 0; }
+  #gallery { position:fixed; inset:44px 0 0 0; background:var(--bg); z-index:20; overflow-y:auto; padding:14px; }
+  #galleryHead { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  #galleryGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; cursor:pointer; }
+  .tile:hover { border-color:var(--accent); }
+  .tile canvas { display:block; width:100%; height:auto; background:#0a0c10; }
+  .tile div { padding:4px 6px; display:flex; justify-content:space-between; }
+  .tile div small { color:var(--dim); }
+  .hidden { display:none !important; }
+  /* K21h: the side-by-side compare — DW2's original beside our body with the baked DW2 motion */
+  #cmp { position:absolute; inset:0; display:flex; gap:2px; background:#05070a; }
+  .cmpPane { position:relative; flex:1 1 0; min-width:0; overflow:hidden; background:#0a0f16; }
+  .cmpPane + .cmpPane { border-left:1px solid #2a3242; }
+  .cmpPane canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  .cmpPane .ovl { pointer-events:none; }
+  .cmpPane .cap { position:absolute; left:8px; top:5px; right:8px; font-size:10px; color:#9aa6bb; text-shadow:0 1px 3px #000; pointer-events:none; }
+  .cmpPane .cap b { color:#fff; }
+  .cmpPane .cap small { color:#6f7a8d; }
+  #cmpSummary { position:absolute; left:50%; bottom:6px; transform:translateX(-50%); padding:2px 10px; border-radius:10px;
+    background:#0f131aee; border:1px solid var(--line); color:var(--accent2); font-size:11px; white-space:nowrap; z-index:3; pointer-events:none; }
+  #cmpSummary.ok { color:var(--ok); border-color:#244a34; }
+  #cmpTableWrap { background:var(--panel); border-top:1px solid var(--line); padding:4px 10px 6px; max-height:170px; overflow:auto; }
+  #cmpTable { border-collapse:collapse; width:100%; font-size:11px; }
+  #cmpTable th, #cmpTable td { text-align:right; padding:1px 8px; white-space:nowrap; }
+  #cmpTable th:first-child, #cmpTable td:first-child { text-align:left; }
+  #cmpTable th { color:var(--dim); font-weight:400; border-bottom:1px solid var(--line); }
+  #cmpTable td.bad { color:var(--bad); }
+  #cmpTable td.ok { color:var(--ok); }
+  #cmpTable td.dim { color:var(--dim); }
+  #cmpTable tr.legend td { color:var(--dim); text-align:left; border-bottom:none; padding-top:3px; }
+  /* generic motions tester */
+  .act.na { opacity:.38; cursor:not-allowed; }
+  .gv.works { color:var(--ok); } .gv.broken { color:var(--bad); } .gv.unsure { color:var(--accent2); }
+  .dim { color:var(--dim); }
+  .gvStub { color:var(--accent2); } .gvReal { color:var(--ok); }
+  .rateBtn.works.sel { border-color:var(--ok); color:var(--ok); } .rateBtn.broken.sel { border-color:var(--bad); color:var(--bad); } .rateBtn.unsure.sel { border-color:var(--accent2); color:var(--accent2); }
+  #gmNote { background:#0f131a; color:var(--text); border:1px solid var(--line); border-radius:3px; padding:3px 6px; }
+  #gmMatrix { border-collapse:collapse; font-size:11px; }
+  #gmMatrix th, #gmMatrix td { padding:1px 8px; white-space:nowrap; text-align:center; border-bottom:1px solid var(--line); }
+  #gmMatrix th:first-child, #gmMatrix td:first-child { text-align:left; }
+  #gmMatrix th { color:var(--dim); font-weight:400; }
+  .matrixWrap { overflow-x:auto; margin:6px 0; }
+  #species li .tag.rated { color:var(--ok); border-color:#244a34; }
+  #species li .tag.rated.hasBad { color:var(--bad); border-color:#4a2424; }
+  /* K25: DW2 motion */
+  #species li .tag.dw2 { color:var(--accent2); border-color:#3a3350; }
+  .dw2Letter { font-size:10px; padding:1px 4px; margin-left:2px; border:1px solid var(--line); background:#0f131a; color:var(--text); border-radius:3px; cursor:pointer; }
+  .dw2Letter.sel { border-color:var(--accent); color:var(--accent); }
+  .dw2Btn { display:inline-flex; align-items:center; gap:2px; }
+  .dw2Btn.static small { color:var(--bad); }
+  .dw2RefusedRow { text-decoration:underline dotted; cursor:help; }
+  #toast { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:#1b2a3d; color:#fff; padding:6px 12px; border-radius:5px; border:1px solid var(--accent); opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div id="top">
+  <b>DW2003 · ANIMATION VIEWER</b>
+  <span id="srcSwitch" title="DW3 = the disc's own models (battle3d); DW2 = Digimon World 2's converted glTF models (dev-only source)">
+    <button id="srcDw3" class="on">DW3</button><button id="srcDw2">DW2</button>
+  </span>
+  <input id="search" type="search" placeholder="Search Digimon by name or folder…" autocomplete="off">
+  <span id="count"></span>
+  <span class="spacer"></span>
+  <label id="lblIsolated" title="Only the selected Digimon on a neutral grid (no arena)"><input type="checkbox" id="isolated" checked> isolated</label>
+  <label id="lblSolver" title="Let the goal-driven cast solver (K19) build this technique's motion instead of borrowing a donor's"><input type="checkbox" id="solver"> solver</label>
+  <label title="The viewer owns the camera; script op5 cuts cannot move it"><input type="checkbox" id="freeCam" checked> free camera</label>
+  <button id="galleryBtn">Gallery</button>
+  <a href="battle-lab.html">Battle Lab</a>
+  <a href="playtest.html">Playtest</a>
+</div>
+
+<div id="layout">
+  <aside id="listPane">
+    <div id="filters">
+      <select id="fOwnership" title="ownership"><option value="">all ownership</option></select>
+      <select id="fFamily" title="family"><option value="">all families</option></select>
+      <select id="fTier" title="tier"><option value="">all tiers</option></select>
+      <select id="fElement" title="element"><option value="">all elements</option></select>
+      <select id="fGaps" title="gaps"><option value="">all models</option><option value="yes">has gaps (fallback)</option><option value="no">fully authored</option></select>
+      <select id="fDw2" title="a Digimon World 2 motion was retargeted onto this body (K25)"><option value="">all models</option><option value="yes">has DW2 motion</option></select>
+      <select id="fStage" class="hidden" title="stage"><option value="">all stages</option></select>
+      <button id="clearFilters">clear</button>
+    </div>
+    <ul id="species"></ul>
+  </aside>
+
+  <main id="stage">
+    <div id="viewport">
+      <canvas id="cv" width="1120" height="840"></canvas>
+      <canvas id="hud"></canvas>
+      <!-- K21h: the compare panes. Two full-size buffers, each shown `object-fit:cover` in its half,
+           so both panes share one projection and one crop (identical camera, identical scale). -->
+      <div id="cmp" class="hidden">
+        <div class="cmpPane" id="cmpPaneL">
+          <canvas id="cmpLImg" width="1120" height="840"></canvas>
+          <canvas id="cmpLOvl" class="ovl" width="1120" height="840"></canvas>
+          <span class="cap" id="cmpCapL">DW2 original</span>
+        </div>
+        <div class="cmpPane" id="cmpPaneR">
+          <canvas id="cmpRImg" width="1120" height="840"></canvas>
+          <canvas id="cmpROvl" class="ovl" width="1120" height="840"></canvas>
+          <span class="cap" id="cmpCapR">our body · baked motion</span>
+        </div>
+        <div id="cmpSummary">—</div>
+      </div>
+      <div id="title">—</div>
+      <div id="badges"></div>
+      <div id="scriptCamOut">script camera: —</div>
+      <div id="hints">LMB orbit · RMB / shift+LMB pan · wheel zoom to cursor · dbl-click re-pivot · F frame · Home reset · 1-7 views · WASD/QE fly</div>
+    </div>
+
+    <div id="cmpTableWrap" class="hidden">
+      <table id="cmpTable"></table>
+    </div>
+
+    <div id="timelineBox">
+      <input id="scrub" type="range" min="0" max="0" value="0" step="1">
+      <div id="marks"></div>
+      <span id="tickLabel">tick 0 / 0</span>
+    </div>
+
+    <div id="playbar">
+      <button id="play" title="play / pause (Space)">▶ play</button>
+      <button id="restart" title="restart">⟲</button>
+      <label><input type="checkbox" id="loop" checked> loop</label>
+      <label>speed <input id="speed" type="range" min="0.1" max="2" step="0.1" value="1"><span id="speedOut">1.0×</span></label>
+      <label id="dw2ClipWrap" class="hidden">clip <select id="dw2Clip"></select></label>
+      <label id="lblBake" title="A DW3 body playing a Digimon World 2 motion: a K21d bake (dev-only source, never in the repo)">baked <select id="bakeSel"><option value="">— own motion —</option></select></label><button id="bakePrev" title="previous baked DW2 motion of this Digimon">◀</button><button id="bakeNext" title="next baked DW2 motion of this Digimon">▶</button>
+      <button id="abBtn" class="hidden" title="A/B: the baked DW2 motion vs this body's own DW3 clip, same frame and camera">A/B</button>
+      <button id="cmpBtn" class="hidden" title="Compare: the DW2 original of this clip beside this body playing the baked motion, in sync, with a per-role table">Compare</button>
+      <label id="lblCmpGhost" class="hidden" title="Outline where each model was at frame 0, and the floor grid those outlines stand on"><input type="checkbox" id="cmpGhost" checked> frame-0 ghost</label>
+      <label id="lblCmpUnlink" class="hidden" title="Give each pane its own orbit; off = one camera drags both (same angle, each framed to its own model)"><input type="checkbox" id="cmpUnlink"> unlinked cameras</label>
+      <label id="lblSide">side <select id="side"><option value="near">near (player side)</option><option value="far">far (enemy side)</option></select></label>
+      <label id="lblDefender">defender <select id="defender"></select></label>
+      <label id="lblShowDefender"><input type="checkbox" id="showDefender"> show defender</label>
+      <label id="lblOutcome">outcome <select id="outcome"><option value="hit">hit</option><option value="lethal">lethal</option><option value="miss">miss</option></select></label>
+      <button id="shot" title="save the current frame as PNG">screenshot</button>
+      <button id="share" title="copy a link to this exact view">copy link</button>
+    </div>
+
+    <div id="tabs">
+      <button data-tab="actions" class="on">Actions</button>
+      <button data-tab="camera">Camera</button>
+      <button data-tab="info">Info</button>
+      <button data-tab="ratings">Ratings</button>
+    </div>
+
+    <div id="tabActions" class="tab">
+      <div class="rowline" id="dw3ActionsNote" style="color:var(--dim)">The techniques THIS Digimon owns (from its own table rows), the item-use motion, the reaction clips the coordinator selects, and the idle.</div>
+      <div id="dw2Box"></div>
+      <div id="genericBox"></div>
+      <div id="actionList"></div>
+    </div>
+
+    <div id="tabCamera" class="tab hidden">
+      <div class="rowline">
+        <span style="color:var(--dim)">presets:</span>
+        <button data-preset="front">front</button><button data-preset="back">back</button>
+        <button data-preset="left">left</button><button data-preset="right">right</button>
+        <button data-preset="top">top</button><button data-preset="bottom">bottom</button>
+        <button data-preset="threeQuarter">3/4</button>
+        <button id="battleCam">battle camera</button>
+        <button id="frameAll">frame all (F)</button>
+        <button id="frameAttack">frame attack</button>
+      </div>
+      <div class="rowline">
+        <label>fov <input id="fov" type="range" min="15" max="100" step="1" value="45"><span id="fovOut">45°</span></label>
+        <label><input type="checkbox" id="ortho"> orthographic</label>
+        <label><input type="checkbox" id="lock"> lock to Digimon</label>
+        <label><input type="checkbox" id="fullPitch"> allow full ±90° pitch</label>
+        <label><input type="checkbox" id="autoOrbit"> auto-orbit</label>
+        <label>° /s <input id="autoSpeed" type="range" min="5" max="120" step="5" value="25"><span id="autoOut">25</span></label>
+      </div>
+      <div class="rowline">
+        <label><input type="checkbox" id="fly"> fly mode (WASD/QE)</label>
+        <label><input type="checkbox" id="bbox"> bounding box</label>
+        <label><input type="checkbox" id="ruler"> ruler</label>
+        <span id="camOut" style="color:var(--dim)"></span>
+      </div>
+    </div>
+
+    <div id="tabRatings" class="tab hidden"><div id="ratingsBox"></div></div>
+
+    <div id="tabInfo" class="tab hidden">
+      <div id="info"></div>
+    </div>
+  </main>
+</div>
+
+<div id="gallery" class="hidden">
+  <div id="galleryHead">
+    <b>GALLERY</b>
+    <span style="color:var(--dim)">normal attack (or the chosen action) of each Digimon in the current search, on a loop</span>
+    <input id="gallerySearch" type="search" placeholder="filter…">
+    <span id="galleryCount" style="color:var(--dim)"></span>
+    <span class="spacer" style="flex:1"></span>
+    <button id="galleryClose">close</button>
+  </div>
+  <div id="galleryGrid"></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { createBattle3D, buildBoneWorldMatrices } from "./battle3d.js";
+import { drawEffects } from "./fight/effect-player.js";
+import { techRecord, techTargetClass, itemTargetClass, setTechTable, setSkillTable } from "./fight/fight-tables.js";
+import { resolveClipScript } from "./fight/clip-fallback.js";
+import { ActionVM } from "./fight/action-vm.js";
+import { TimelinePlayer } from "./fight/timeline-player.js";
+import { donorRow, ANIM_DONOR_GAPS } from "./fight/anim-donor-map.js";
+import { applyOp5 } from "./fight/battle-camera.js";
+import { basicAttackHitCount } from "./vendor/engine.js";
+import { createFreeCamera, DEG } from "./anim-viewer-camera.js";
+import * as DW2 from "./anim-viewer-dw2.js";
+import * as BAKE from "./anim-viewer-bake.js";
+import * as GEN from "./anim-viewer-generic.js";
+// K25: the DW2 motion module is loaded DEFENSIVELY. If it (or one of its dependencies) fails to load,
+// the viewer still opens and every Digimon is still selectable — the DW2 section just says so.
+// A hard import here would take the whole page down with it.
+const DW2M_STUB = {
+  slotLabel: (s) => `clip ${s}`,
+  dw2FileUrl: () => "",
+  ratingId: (s) => `dw2:${s}`,
+  createDw2Store: () => ({ set() {}, get: () => null, has: () => false, size: () => 0, resolve: () => null }),
+  installDw2Fetch: () => null,
+  dw2Rows: () => [], dw2Counts: () => ({ owned: 0, gaps: 0, filled: 0, refused: 0, slots: [] }),
+  dw2Actions: () => [], defaultLetter: () => null,
+  buildClone: () => ({ model: null, tables: {}, failed: {}, filled: [] }),
+  dw2Folder: (f) => `${f}-dw2m`,
+  renderDw2Panel: (box) => { box.replaceChildren(); box.textContent = "DW2 motion unavailable: web/anim-viewer-dw2motion.js did not load (see the console). Everything else on this page works."; },
+};
+let DW2M = DW2M_STUB;
+try { DW2M = await import("./anim-viewer-dw2motion.js"); } catch (err) { console.warn("DW2 motion viewer unavailable:", err); }
+import { bodyPlan as anatomyPlan, ANATOMY } from "./fight/digimon-anatomy.js";
+import * as CMP from "./anim-viewer-compare.js";
+import { poseFromChannels } from "./fight/firing-axis.js";
+import { boneMap } from "./fight/digimon-bonemap.js";
+import * as V from "./anim-viewer-data.js";
+import { createSfxPlayer } from "./audio.js";
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  for (const k of kids) n.append(k);
+  return n;
+};
+const TICK_SEC = 1 / 60;          // battle3d's STEP_HZ
+const TICK_SPEED = 2;             // GLOBAL_SPEED: table entries per logic tick (battle visual tempo)
+const toast = (m) => { const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 1600); };
+
+// ── renderer ────────────────────────────────────────────────────────────────────────────────────
+const cv = $("cv"), hud = $("hud");
+const ctx = cv.getContext("2d");
+const off = new OffscreenCanvas(cv.width, cv.height);
+const sfx = createSfxPlayer();
+addEventListener("pointerdown", () => sfx.unlock(), { once: true });
+// K21f: a bake is presented to battle3d as a model folder of its own (`m050coca-dw2F`) and its three
+// asset URLs are rewritten to the bake file / the real body's texture. Installed before anything
+// fetches, and a no-op for every other URL (see anim-viewer-bake.js).
+BAKE.installBakeFetch();
+// Generic motions: a baked clone is served from memory under a folder of its own (anim-viewer-generic.js).
+const genStore = GEN.createGenericStore();
+GEN.installGenericFetch(genStore);
+// K25: a DW3 body + its DW2 motions is the same trick (anim-viewer-dw2motion.js).
+const dw2Store = DW2M.createDw2Store();
+DW2M.installDw2Fetch(dw2Store);
+const ratings = GEN.createRatingStore();
+const r = createBattle3D(off, sfx);
+window.__r = r;
+window.__off = off;
+if (!r) { $("title").textContent = "WebGL unavailable"; throw new Error("no webgl"); }
+
+// ── data ────────────────────────────────────────────────────────────────────────────────────────
+const asset = (p) => fetch(p).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+const [dj, extra, canon, modelMap, folders, gate, contract, techTable] = await Promise.all([
+  asset("assets/data/digimon.json"),
+  asset("assets/data/extra_species.json"),
+  asset("assets/data/extra_species_canon.json"),
+  asset("assets/battle/model_map.json"),
+  asset("assets/battle/models/index.json"),
+  asset("anim-gate.json"),
+  asset("anim-contract-index.json"),
+  asset("assets/data/fight_tech_table.json"),
+]);
+setSkillTable(dj.skills);
+setTechTable(techTable);
+const skills = new Map((dj.skills || []).map((s) => [s.id | 0, s]));
+const index = V.buildModelIndex({ digimon: dj, extraSpecies: extra, extraCanon: canon, modelMap, folders, gaps: ANIM_DONOR_GAPS });
+for (const e of index) e.elements = V.elementsOf(e, skills);
+const byFolder = new Map(index.filter((e) => e.folder).map((e) => [e.folder, e]));
+
+// ── state ──────────────────────────────────────────────────────────────────────────────────────
+const state = {
+  entry: null, folder: null, defender: "m051kuwa", side: "near", outcome: "hit",
+  showDefender: false, isolated: true, freeCam: true, battleCamMode: "game",
+  solver: false,
+  // which game's models are listed: "dw3" (the disc, through battle3d) or "dw2" (K21b, glTF)
+  src: "dw3", pendingSrc: null, dw2Path: null, pendingDw2Clip: null, pendingDw2Time: null,
+  // K21f: the DW3 body + DW2 motion bake on screen (a row of the bake manifest), its table, and the
+  // pending values a deep link asked for
+  bake: null, bakeTable: null, pendingBake: null, pendingBakeTable: null,
+  // K21h: the pair view (?compare=<bake id>) and the tick a link asked for
+  pendingCompare: null, pendingCompareTick: null,
+  // generic motions: the chosen motion id (kept across Digimon), the baked one on screen, the deep link's id
+  genericId: null, generic: null, genericAction: null, pendingGeneric: null, genericFull: true, genericBusy: "",
+  // K25: DW2 motion — the file for the selected Digimon, the clone on screen, the slot on view, the deep link
+  dw2Data: null, dw2Status: null, dw2m: null, dw2Slot: null, dw2Letter: null, dw2Busy: "", pendingDw2Fill: null,
+  dw2Probing: false, dw2Probed: false,
+  action: null, actions: [], clip: null, techId: null,
+  playing: false, loop: true, speed: 1, tick: 0, maxTick: 0, marks: [], script: null, resolved: null,
+  lib: {}, acc: 0, layoutGen: 0, layoutKey: "", over: null, scriptCam: null,
+  camState: { attackMin: [Infinity, Infinity, Infinity], attackMax: [-Infinity, -Infinity, -Infinity] },
+};
+const cam = createFreeCamera({ fovDeg: 45 });
+window.__viewer = {
+  r, cam, state, V, loadEntry, selectAction, play, pause, seek, step: stepTick,
+  index,
+  frameAll, frameAttack, setFreeCam: (v) => { state.freeCam = v; $("freeCam").checked = v; },
+  getActions: () => state.actions,
+  // ── deterministic hooks for tools/verify_anim_viewer.mjs ──────────────────────────────────
+  /** Play the current action to its end with the SAME logic tick the renderer uses; no per-tick draw. */
+  runToEnd(cap = 1500) {
+    const launched = launch();
+    let n = 0;
+    for (; n < cap; n++) { if (!r.coordinator.active) break; r.coordinator.tick(TICK_SPEED); }
+    state.tick = Math.min(state.maxTick, n);
+    r.render(0); composite();
+    return { launched, ticks: n, ended: !r.coordinator.active, active: !!r.coordinator.active };
+  },
+  /** The attacker's world bone matrices (the pose), flattened for arithmetic in the test. */
+  pose(side = null) {
+    const a = side === "enemy" ? r.enemyAnimator : side === "player" ? r.playerAnimator : attacker();
+    if (!a?.model) return [];
+    const w = buildBoneWorldMatrices(a.model, a.currentFrame(), a.currentBlend(), a.currentHiddenParts?.());
+    const out = [];
+    for (const m of w.mats) out.push(m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10], m[12], m[13], m[14]);
+    for (const t of w.worldTrans) out.push(t[0], t[1], t[2]);
+    return out;
+  },
+  eye() { return cam.eye(); },
+  groundY() { return r.getGroundY?.(attackerSide()) ?? 0; },
+  setActionByIndex(i) { return selectAction(state.actions[i]); },
+  setSolver: (on) => setSolver(on),
+  // K21f: the DW3 body + DW2 motion bakes
+  bake: {
+    rows: async () => (await bakeRegistry()).rows,
+    load: (id, opts) => loadBake(id, opts),
+    flip: () => flipAB(),
+    info: () => state.bake,
+    table: () => state.bakeTable,
+    shim: () => globalThis.fetch?.hits || [],
+  },
+  // generic motions tester
+  generic: {
+    select: (id, folder) => selectGeneric(id, folder),
+    flip: () => flipGenericAB(),
+    rate: (verdict, note) => rateGeneric(verdict, note),
+    ratings, state: () => state.generic, motions: () => genMotions,
+    source: () => generator?.source || null, store: genStore, exportText: () => JSON.stringify(ratings.exportObject(), null, 2),
+    plan: () => (state.genericAction ? genericPlan(attackerModel(), state.genericAction) : null),
+    setFull: (on) => setGenericFull(on),
+  },
+  // K25: the DW2 motion tester (deterministic hooks for the headless probe).
+  // NOT `dw2` — that name is the DW2 glTF source's embedding surface further down this file.
+  dw2m: {
+    open: (folder, slot, opts) => openDw2(folder, slot, opts),
+    play: (slot, letter) => playDw2Slot(slot, letter),
+    flip: () => flipDw2AB(),
+    rate: (verdict, note) => rateDw2(verdict, note),
+    ratings, store: dw2Store,
+    state: () => state.dw2m, data: () => state.dw2Data,
+    rows: () => (state.dw2Data ? DW2M.dw2Rows(state.dw2Data) : []),
+    have: () => [...dw2Set],
+    probed: () => state.dw2Probed,
+    shim: () => globalThis.fetch?.hits || [],
+  },
+  press(key) { /* not needed */ },
+};
+
+// ── model list / filters ───────────────────────────────────────────────────────────────────────
+function fillFilters() {
+  const own = $("fOwnership");
+  for (const [key, label] of Object.entries(V.OWNERSHIP_LABELS)) {
+    const n = index.filter((e) => e.ownership === key).length;
+    if (n) own.append(el("option", { value: key, textContent: `${label} (${n})` }));
+  }
+  const fams = [...new Set(index.map((e) => e.family).filter((v) => v != null))].sort((a, b) => a - b);
+  for (const f of fams) $("fFamily").append(el("option", { value: String(f), textContent: `family ${f}` }));
+  const tiers = [...new Set(index.map((e) => e.tier).filter((v) => v != null))].sort((a, b) => a - b);
+  for (const t of tiers) $("fTier").append(el("option", { value: String(t), textContent: `tier ${t}` }));
+  const els = [...new Set(index.flatMap((e) => e.elements))].sort();
+  for (const e of els) $("fElement").append(el("option", { value: e, textContent: e }));
+  for (const e of index.filter((x) => x.folder).sort((a, b) => a.name.localeCompare(b.name))) {
+    $("defender").append(el("option", { value: e.folder, textContent: `${e.name} (${e.folder})` }));
+  }
+  $("defender").value = state.defender;
+}
+fillFilters();
+
+function currentFilters() {
+  return {
+    query: $("search").value, family: $("fFamily").value, tier: $("fTier").value,
+    element: $("fElement").value, ownership: $("fOwnership").value, gaps: $("fGaps").value,
+  };
+}
+
+const curFolder = () => state.generic?.folder ?? state.entry?.realFolder ?? state.folder;
+let ratingCounts = new Map();
+function renderList() {
+  ratingCounts = ratings.byFolder();
+  if (state.src === "dw2") return renderDw2List();
+  let list = V.filterModels(index, currentFilters()).filter((e) => e.folder || e.ownership !== "variant");
+  // K25: "has DW2 motion" — the folders whose generated file the probe found
+  if ($("fDw2")?.value === "yes") list = list.filter((e) => e.folder && dw2Set.has(e.folder));
+  const ul = $("species");
+  ul.replaceChildren();
+  for (const e of list) {
+    const rc = ratingCounts.get(e.folder);
+    const li = el("li", { className: curFolder() === e.folder ? "sel" : "" },
+      el("span", {}, e.name, el("small", {}, ` ${e.folder || "—"}`)),
+      el("span", {},
+        rc ? el("span", { className: "tag rated" + (rc.broken ? " hasBad" : ""), title: `generic motions rated here: ${rc.works} works / ${rc.broken} broken / ${rc.unsure} unsure`, textContent: `\u2713${rc.works} \u2717${rc.broken} ?${rc.unsure}` }) : "",
+        e.folder && dw2Set.has(e.folder) ? el("span", { className: "tag dw2", title: "a Digimon World 2 motion was retargeted onto this body — click the Digimon, then a DW2 clip in the Actions tab", textContent: "DW2" }) : "",
+        e.gaps.length ? el("span", { className: "tag", title: `clips built by the fallback: ${e.gaps.join(", ")}`, textContent: "gap" }) : ""));
+    li.onclick = () => (state.dw2m && e.folder ? openDw2(e.folder, state.dw2Slot) : state.genericId && e.folder ? selectGeneric(state.genericId, e.folder) : loadEntry(e.folder, { user: true }));
+    ul.append(li);
+  }
+  $("count").textContent = `${list.length} / ${index.length}`;
+}
+
+// ── layout: which model stands where ───────────────────────────────────────────────────────────
+const waitFor = (fn, ms = 6000) => new Promise((res, rej) => {
+  const t0 = performance.now();
+  const tick = () => { if (fn()) return res(true); if (performance.now() - t0 > ms) return rej(new Error("timeout")); setTimeout(tick, 30); };
+  tick();
+});
+
+async function ensureLayout({ frame = false } = {}) {
+  const gen = ++state.layoutGen;
+  const key = `${state.folder}|${state.defender}|${state.side}`;
+  const near = state.side === "near" ? state.folder : state.defender;
+  const far = state.side === "near" ? state.defender : state.folder;
+  r.setPlayerVisible(true);
+  r.setEnemyVisible(state.showDefender);
+  r.setIsolated(state.isolated, state.side === "near" ? "player" : "enemy");
+  if (key !== state.layoutKey) {
+    await r.setPlayerDigimon(near);
+    if (gen !== state.layoutGen) return false;
+    r.setEnemyDigimon(far);
+    await waitFor(() => r.playerAnimator && (!far || r.enemyAnimator));
+    if (gen !== state.layoutGen) return false;
+    state.layoutKey = key;
+    // let one frame fill the AABBs, so framing is derived from the model that is actually loaded
+    r.render(0);
+    if (frame) frameAll();
+  }
+  r.setPlayerVisible(true);
+  r.setEnemyVisible(state.showDefender);
+  r.setIsolated(state.isolated, state.side === "near" ? "player" : "enemy");
+  return true;
+}
+
+const attackerSide = () => (state.side === "near" ? "player" : "enemy");
+const defenderSide = () => (state.side === "near" ? "enemy" : "player");
+const attacker = () => (state.side === "near" ? r.playerAnimator : r.enemyAnimator);
+const attackerModel = () => attacker()?.model || null;
+
+// ── script resolution + a dry run for the tick timeline ───────────────────────────────────────
+function techOptionsFor(techId) {
+  const rec = techRecord(techId);
+  const sk = skills.get(techId | 0) || null;
+  return {
+    element: rec?.elem1 ?? 1,
+    target: techTargetClass(techId),
+    hits: basicAttackHitCount(false, { effect_id: rec?.dispatch ?? 2, hits: sk?.hits ?? rec?.hits ?? 1 }),
+    planted: rec?.attack_category === "magical",
+    // the technique's own name: the K19 solver's scope is (model, technique), so the resolution needs it
+    tech: sk?.name ?? null,
+  };
+}
+
+function resolveFor(action, model) {
+  if (!model) return { script: null, opts: {} };
+  // K21f: a baked motion is played as its own timeline table (op2 [0,0,table]) on the same ActionVM
+  if (action.kind === "bake" || action.kind === "dw2") return { script: BAKE.bakeScript(action.table), opts: {} };
+  if (action.kind === "generic") return { script: BAKE.bakeScript(null), opts: {} };
+  if (action.kind === "tech") { const opts = techOptionsFor(action.techId); return { script: resolveClipScript(model, action.clip, opts), opts }; }
+  if (action.kind === "item") return { script: resolveClipScript(model, 10, { target: itemTargetClass(action.itemId) }), opts: {} };
+  return { script: resolveClipScript(model, action.clip, {}), opts: {} };
+}
+
+// ── the K19 solver switch ────────────────────────────────────────────────────────────────────────────
+// OFF by default: the engine only takes over the (model, technique) pairs its scope enables (K19's slice),
+// so with the switch off every model plays exactly the build it played before. ON enables the solver for
+// the K19 SLICE (below); `?solver=all` opens it for everything its own gate accepts, which is an
+// experimenter's switch, not the slice.
+// The three (model, technique) pairs K19 was proven on, chosen by rule (BRIEF6): one per emitter class
+// among the models whose spells today fall back to the planted own-body build — prop arm m228piem (the
+// user's example, per-emitter x2), hand m384koet (the smallest passable hand body), mouth m050coca (the
+// largest mouth-only body). Knightmon (the user's prop-arm example) is NOT here: its 5-bone arm does not
+// solve yet (see the K19 report, known gaps).
+// This list is HARNESS data (the viewer's default scope), not engine logic: anim-solver.js has no names.
+const K19_SLICE = [
+  { folder: "m228piem", tech: "Darkness Chaos" },   // prop arm, per-emitter x2 (the user's example)
+  { folder: "m094icem", tech: "Snowstorm" },       // hand, per-emitter x2
+  { folder: "m050coca", tech: "Air Blast" },        // mouth, single
+];
+let solverMod = null;
+async function setSolver(on, { resolve = true, all = false } = {}) {
+  state.solver = !!on;
+  state.solverAll = state.solver && all;
+  $("solver").checked = state.solver;
+  if (!solverMod) solverMod = await import("./fight/anim-solver.js");
+  solverMod.setSolverScope(state.solver ? (all ? "all" : K19_SLICE) : null);
+  if (resolve && state.action) await selectAction(state.action);
+  writeUrl();
+  return solverMod.solverScope();
+}
+
+/** Run the SAME ActionVM the actor will run, one tick at a time, and record the tick of every op. */
+function dryRun(model, action, script) {
+  if (!model || !script) return { maxTick: 1, marks: [] };
+  const playerFor = (i) => {
+    const t = model.timeline?.[i]?.table;
+    if (t && t.length) return new TimelinePlayer(t);
+    const t0 = model.timeline?.[0]?.table;
+    return i !== 0 && t0 && t0.length ? new TimelinePlayer(t0) : null;
+  };
+  const vm = new ActionVM(script, { timelineForTable: playerFor, baseTable: () => 0 });
+  const marks = [];
+  const label = (op) => {
+    const w = op.words || [];
+    if (op.op === 10 && (w[0] | 0) === 98) return { kind: "contact", text: "contact 98" };
+    if (op.op === 10 && (w[0] | 0) === 99) return { kind: "contact", text: "STRIKE 99" };
+    if (op.op === 6) return { kind: "proj", text: `projectile ${w[0] ?? ""}` };
+    if (op.op === 3) return { kind: "fx", text: `effect ${w[1] ?? w[0] ?? ""}` };
+    if (op.op === 5) { const cs = applyOp5({}, { words: w }); return { kind: "camera", text: `camera ${cs.op5?.preset != null ? "preset " + cs.op5.preset : "op5"}` }; }
+    if (op.op === 2 && (w[0] | 0) === 0 && (w[2] | 0) > 0) return { kind: "table", text: `table ${w[2]}` };
+    return null;
+  };
+  let tick = 0, lastIp = 0;
+  const CAP = 2000;
+  while (!vm.ended && tick < CAP) {
+    lastIp = vm.ip;
+    vm.step(TICK_SPEED);
+    if (vm.ip > lastIp && vm.ip <= script.ops.length) {
+      for (let i = lastIp; i < vm.ip; i++) {
+        const m = label(script.ops[i]);
+        if (m) marks.push({ tick, index: i, ...m });
+      }
+    }
+    tick++;
+  }
+  return { maxTick: Math.max(1, tick), marks };
+}
+
+// ── action selection / preparation ─────────────────────────────────────────────────────────────
+function buildActionList() {
+  if (state.src === "dw2") return buildDw2ClipList();
+  const box = $("actionList");
+  box.replaceChildren();
+  const groups = V.groupActions(state.actions);
+  for (const g of groups) {
+    box.append(el("div", { className: "groupTitle", textContent: g.label }));
+    const row = el("div", { className: "actList" });
+    for (const a of g.actions) {
+      const isSel = state.action && a.kind === state.action.kind && a.clip === state.action.clip && a.techId === state.action.techId
+        && (a.kind !== "dw2" || (a.slot === state.action.slot && a.letter === state.action.letter));
+      const label = a.kind === "tech"
+        ? el("span", {}, `${a.name} `, el("small", {}, `clip ${a.clip} · ${a.hits} hit${a.hits > 1 ? "s" : ""} · ${a.element || "?"}`))
+        : el("span", {}, a.name, el("small", {}, a.kind === "bake" ? ` table ${a.table}` : a.kind === "dw2" ? ` DW2-${a.letter}` : ` clip ${a.clip}`));
+      const b = el("button", { className: "act" + (isSel ? " sel" : ""), title: a.kind === "tech" ? `technique ${a.techId}` : a.name }, label);
+      b.onclick = () => selectAction(a);
+      row.append(b);
+    }
+    box.append(row);
+  }
+}
+
+async function loadEntry(folder, { user = false, bake = null, generic = null, dw2 = null, frame = true, tick = 0 } = {}) {
+  const base = byFolder.get(folder) || { name: folder, folder, techs: [], gaps: [], elements: [], ownership: "variant" };
+  // A bake keeps the species entry (name, techniques) but stands in the renderer under its own model
+  // folder, so its cache entry and the disc model's can coexist (K21f).
+  // A generic motion does the same: the baked clone stands in under `<folder>-gm-<motion>` (anim-viewer-generic.js)
+  // ...and so does the DW2 clone, under `<folder>-dw2m` (anim-viewer-dw2motion.js, K25).
+  const entry = bake ? { ...base, folder: bake.id, realFolder: bake.folder }
+    : generic ? { ...base, folder: generic.vf, realFolder: folder }
+    : dw2 ? { ...base, folder: dw2.vf, realFolder: folder }
+    : base;
+  state.entry = entry;
+  state.folder = bake ? bake.id : generic ? generic.vf : dw2 ? dw2.vf : folder;
+  state.generic = generic;
+  state.genericAction = generic ? { kind: "generic", clip: null, table: generic.table, motion: generic.id, name: generic.name, group: { key: "generic", label: "Generic motion" } } : null;
+  state.bake = bake;
+  state.bakeTable = bake?.table ?? null;
+  state.dw2m = dw2;
+  state.actions = [
+    ...(bake ? BAKE.bakeActions(bake) : []),
+    ...(dw2 ? dw2ActionList(dw2, state.dw2Data) : []),
+    ...V.actionsFor(generic ? base : entry, skills),
+  ];
+  const titleSmall = bake
+    ? `  ${bake.id} · DW3 body ${bake.folder} + ${/-gen[A-Z]$/.test(bake.id) ? "new" : "DW2-" + bake.letter} motion${bake.table != null ? ` (table ${bake.table})` : ""}`
+    : generic ? `  ${folder} · generic motion: ${generic.name}`
+    : dw2 ? `  ${folder} · ${V.OWNERSHIP_LABELS[entry.ownership]}${dw2.counts ? ` · DW2 motion fills ${dw2.counts.filled} clip${dw2.counts.filled === 1 ? "" : "s"}` : ""}`
+    : `  ${folder} · ${V.OWNERSHIP_LABELS[entry.ownership]}${entry.family != null ? " · family " + entry.family : ""}${entry.tier != null ? " · tier " + entry.tier : ""}`;
+  $("title").replaceChildren(el("span", { textContent: entry.name }), el("small", {}, titleSmall));
+  renderBadges();
+  renderList();
+  const ok = await ensureLayout({ frame });
+  if (!ok) return;
+  // keep the URL's action when we arrived by link, else the bake's own motion, else the normal attack
+  const fromUrl = state.pendingAction;
+  state.pendingAction = null;
+  let action = generic ? state.genericAction : fromUrl && state.actions.find((a) => actionMatches(a, fromUrl));
+  if (!action && bake) action = state.actions.find((a) => a.kind === "bake") || state.actions.find((a) => a.kind === "own");
+  if (!action) action = state.actions.find((a) => a.kind === "tech" && a.clip === 5) || state.actions.find((a) => a.kind === "tech") || state.actions.find((a) => a.kind === "reaction");
+  if (user) { /* keep the current action if the new model owns it */ }
+  buildActionList();
+  if (action) selectAction(action, { keepCamera: true });
+  else { state.action = null; updateInfo(); }
+  if (tick) seek(tick);      // A/B keeps the frame you were looking at
+  refreshGenericPanel();
+  refreshDw2Panel();
+  renderBakePicker();
+}
+
+// ── K21f: DW3 body + DW2 motion bakes ───────────────────────────────────────────────────────────
+// A bake is a complete DW3-shaped model (K21d's retarget) whose ONE extra timeline table carries a
+// DW2 motion. The viewer shows it as the model folder `<body>-dw2<letter>`; anim-viewer-bake.js
+// rewrites the three asset URLs to the bake file and the body's own texture, so everything below is
+// the ordinary DW3 path.
+let bakeReg = null;
+function bakeRoot() {
+  const q = new URLSearchParams(location.search).get("dw2root");
+  return `${(q || "dw2-models").replace(/\/+$/, "")}/converted/bakes`;
+}
+async function bakeRegistry() {
+  if (bakeReg) return bakeReg;
+  const root = bakeRoot();
+  const res = await fetch(BAKE.bakeIndexUrl(root)).catch(() => null);
+  const manifest = res && res.ok ? await res.json().catch(() => null) : null;
+  const rows = BAKE.bakeRows(manifest);
+  if (!rows.length) for (const id of BAKE.K21D_BAKES) rows.push(BAKE.bakeStubRow(id));
+  bakeReg = { root, manifest: !!rows.length && rows.some((r) => !r.stub), rows, byId: new Map(rows.map((r) => [r.id, r])) };
+  return bakeReg;
+}
+
+/** No manifest? Read the bake and the disc model and find the one table the retarget wrote. */
+async function deriveBakeRow(id) {
+  const real = BAKE.bakeRealFolder(id);
+  const [bake, target] = await Promise.all([
+    fetch(BAKE.bakeUrl(id, bakeRoot())).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch(`assets/battle/models/${real}/anim.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+  ]);
+  if (!bake) return null;
+  const row = { ...BAKE.bakeStubRow(id), derived: true, bones: bake.num_bones, totalFrames: bake.total_frames };
+  const tb = bake.timeline || [], tt = target?.timeline || [];
+  for (let i = 0; i < tb.length; i++) {
+    if (JSON.stringify(tb[i]) === JSON.stringify(tt[i])) continue;
+    const frames = (tb[i]?.table || []).map((e) => e.value).filter((v) => v !== 0xFFFF);
+    if (!frames.length) continue;
+    row.table = i;
+    row.frames = frames.length;
+    break;
+  }
+  if (row.table != null) {
+    // the DW3 clip the retarget aimed at, from K21d's pairs: the body's own clip whose start frame the
+    // baked window replaces is not knowable from the bake alone, so report the manifest-less case as such
+    row.clip = null;
+  }
+  return row;
+}
+
+async function loadBake(id, { table = null, tick = 0, clip = null } = {}) {
+  const reg = await bakeRegistry();
+  let row = reg.byId.get(id) || null;
+  if (!row) row = await deriveBakeRow(id);
+  if (!row) { toast(`no bake at ${BAKE.bakeUrl(id, bakeRoot())}`); return null; }
+  const avail = await fetch(BAKE.bakeUrl(id, reg.root)).then((r) => r.ok).catch(() => false);
+  if (!avail) { toast(`no bake at ${BAKE.bakeUrl(id, reg.root)}`); return null; }
+  row = { ...row, table: table ?? row.table ?? null, clip: clip ?? row.clip ?? null };
+  state.pendingBake = row.id;
+  state.genericId = null;
+  await loadEntry(row.folder, { bake: row, frame: false, tick });
+  bakeSelectValue(row.id);
+  return state.bake;
+}
+
+/** The other half of the A/B pair (the DW2 motion's table vs the body's own clip). */
+function abPartner() {
+  if (!state.bake) return null;
+  const pair = state.actions.filter((a) => a.kind === "bake" || a.kind === "own");
+  if (pair.length < 2) return null;
+  return state.action?.kind === "bake" ? pair.find((a) => a.kind === "own") : pair.find((a) => a.kind === "bake");
+}
+function flipAB() {
+  const a = abPartner();
+  if (!a) { toast("this bake has no A/B pair"); return false; }
+  const t = state.tick;
+  pause();
+  selectAction(a);
+  seek(t);
+  return true;
+}
+
+/** Keep the picker in step with what is loaded (no re-entrant change event). */
+function bakeSelectValue(id) {
+  const s = $("bakeSel");
+  if (!s) return;
+  s.value = id && [...s.options].some((o) => o.value === id) ? id : "";
+  $("abBtn").classList.toggle("hidden", state.src === "dw2" || !state.bake);
+  $("cmpBtn").classList.toggle("hidden", state.src === "dw2" || !state.bake);
+}
+/** The picker: this Digimon's baked DW2 motions first (clip + version), then every other Digimon's (the old long list). Rebuilt whenever the body changes. */
+let bakeRegAll = null;
+const BAKE_ORDER = ["F", "G", "H", "I", "K", "C0", "C1", "C2", "J", "B"];
+const bakeTag = (id) => String(id).replace(/^.*-(?:dw2|gen)/, "");
+const bakeVer = (id) => (/\d([a-z])$/.exec(id)?.[1] ?? "");
+function bakeOldLabel(r) {
+  const name = (byFolder.get(r.folder)?.name) || r.folder;
+  return `${name} · DW2-${r.letter || "?"}${r.clip != null ? ` → clip ${r.clip}` : ""}${r.table != null ? ` (table ${r.table})` : ""}`;
+}
+function bakeThisLabel(r) {
+  if (!r.label) return `DW2 clip ${r.letter || "?"} · ${bakeTag(r.id)}`;
+  const note = /\[[^\]]+\]/.exec(r.label)?.[0] ?? "";
+  const core = r.label.replace(/^AUTO [^:]+:\s*/, "").replace(/,? on the DW3 body \(not reviewed\)/, "").replace(/\s*\[[^\]]+\]/, "");
+  return `${core} · ${bakeTag(r.id)} ${note}`.trim();
+}
+function renderBakePicker() {
+  const s = $("bakeSel"); if (!s || !bakeRegAll) return;
+  const keep = state.bake?.id ?? s.value, cur = state.bake?.folder || curFolder();
+  const ord = (r) => { const i = BAKE_ORDER.indexOf(r.letter); return i < 0 ? 99 : i; };
+  const mine = bakeRegAll.rows.filter((r) => r.folder === cur).sort((x, y) => ord(x) - ord(y) || bakeVer(y.id).localeCompare(bakeVer(x.id)) || String(x.id).localeCompare(String(y.id)));
+  const others = bakeRegAll.rows.filter((r) => r.folder !== cur);
+  s.replaceChildren(el("option", { value: "", textContent: "— own motion —" }));
+  if (mine.length) {
+    const g = el("optgroup", { label: `${(byFolder.get(cur)?.name) || cur}: ${mine.length} baked DW2 motions (newest version first)` });
+    for (const r of mine) g.append(el("option", { value: r.id, textContent: bakeThisLabel(r), title: r.id }));
+    s.append(g);
+  }
+  const g2 = el("optgroup", { label: `all other Digimon (${others.length})` });
+  for (const r of others) g2.append(el("option", { value: r.id, textContent: bakeOldLabel(r), title: r.id }));
+  s.append(g2);
+  s.value = keep && [...s.options].some((o) => o.value === keep) ? keep : "";
+  const prev = $("bakePrev"), next = $("bakeNext"); if (prev) prev.disabled = next.disabled = !mine.length;
+  s.title = bakeRegAll.manifest ? `${mine.length} baked DW2 motions for this Digimon; ${bakeRegAll.rows.length} in all` : `no manifest at ${BAKE.bakeIndexUrl(bakeRegAll.root)} — listing K21d's 5 bakes`;
+}
+/** Fill the picker from the manifest (or K21d's 5 bakes when no manifest is served). */
+async function fillBakePicker() {
+  const s = $("bakeSel");
+  if (!s) return null;
+  const reg = await bakeRegistry();
+  bakeRegAll = reg;
+  renderBakePicker();
+  return reg;
+}
+/** ◀ ▶: step through this Digimon's baked motions (own motion -> first -> ... -> last -> own motion). */
+function stepBake(dir) {
+  const s = $("bakeSel"); if (!s) return;
+  const ids = ["", ...[...s.querySelectorAll("optgroup")][0]?.label?.includes("baked DW2 motions") ? [...s.querySelectorAll("optgroup")[0].querySelectorAll("option")].map((o) => o.value) : []];
+  if (ids.length < 2) { toast("this Digimon has no baked DW2 motion"); return; }
+  const i = Math.max(0, ids.indexOf(s.value)), j = (i + dir + ids.length) % ids.length;
+  s.value = ids[j]; s.dispatchEvent(new Event("change"));
+}
+
+// ── generic motions ─────────────────────────────────────────────────────────────────────────────
+// Pick any generic motion for the Digimon on screen: the generator (web/fight/generic-motion.js, or the
+// labelled stub while that file does not exist) bakes it in the browser into a clone of the body's own
+// anim.json, the clone is served to battle3d from memory as a model folder of its own, and the viewer's
+// ordinary DW3 path plays it (idle -> motion -> idle as one playlist). The chosen motion survives a
+// change of Digimon: clicking another species re-bakes it for that body.
+let generator = null, genMotions = [], panelTok = 0, genTok = 0;
+const rawModels = new Map();
+async function getGenerator() {
+  if (!generator) {
+    generator = await GEN.loadGenerator();
+    generator.api.setStubBodyPlanResolver?.(anatomyPlan);
+  }
+  return generator;
+}
+async function rawModel(folder) {
+  if (!folder) return null;
+  if (rawModels.has(folder)) return rawModels.get(folder);
+  const m = await asset(`assets/battle/models/${folder}/anim.json`);
+  if (m) {
+    if (!m.folder) m.folder = folder;
+    rawModels.set(folder, m);
+    while (rawModels.size > 12) rawModels.delete(rawModels.keys().next().value);
+  }
+  return m;
+}
+const planOfFolder = (f) => anatomyPlan(f) || "unknown";
+const speciesName = (f) => byFolder.get(f)?.name || f;
+/** idle -> motion -> idle for one generic action, measured once per (action, preview mode). */
+function genericPlan(model, a) {
+  if (a._plan && a._plan.full === state.genericFull && a._plan.model === model) return a._plan;
+  const p = GEN.previewPlan(model, a.table, { full: state.genericFull });
+  a._plan = { ...p, full: state.genericFull, model };
+  return a._plan;
+}
+function genericView() {
+  const f = curFolder();
+  return {
+    digimon: { name: speciesName(f), folder: f, plan: planOfFolder(f) },
+    source: generator, motions: genMotions, selected: state.generic?.id || null,
+    rating: (id) => ratings.get(id, f),
+    current: state.generic ? { report: state.generic.report, ticks: state.maxTick, frames: state.generic.ticks } : null,
+    full: state.genericFull, busy: state.genericBusy,
+    onSelect: (id, m) => (m.applicable ? selectGeneric(id) : (toast(`${m.name}: ${m.reason || "not applicable to this body"}`), undefined)),
+    onRate: (verdict, note) => rateGeneric(verdict, note),
+    onClear: () => { const g = state.generic; if (g && ratings.clear(g.id, g.folder)) afterRating(); },
+    onNote: (note) => { const g = state.generic; if (g && ratings.setNote(g.id, g.folder, note)) { toast("note saved"); renderRatings(); } },   // no panel re-render: that would eat the click that blurred the field
+    onAB: () => flipGenericAB(),
+    onFull: (on) => setGenericFull(on),
+  };
+}
+function renderGeneric() {
+  if (state.src === "dw2") return;
+  GEN.renderGenericPanel($("genericBox"), genericView());
+}
+async function refreshGenericPanel() {
+  if (state.src === "dw2") return;
+  const tok = ++panelTok;
+  let list = [];
+  try {
+    const gen = await getGenerator();
+    const model = await rawModel(curFolder());
+    const meta = new Map(gen.api.GENERIC_MOTIONS.map((m) => [m.id, m]));
+    list = (model ? gen.api.listGenericMotions(model) : gen.api.GENERIC_MOTIONS.map((m) => ({ id: m.id, name: m.name, applicable: false, reason: "model not loaded" })))
+      .map((m) => ({ ...m, description: meta.get(m.id)?.description || "" }));
+  } catch (err) { toast(`generic motions unavailable: ${err?.message || err}`); }
+  if (tok !== panelTok) return;
+  genMotions = list;
+  renderGeneric();
+  renderRatings();
+}
+function afterRating() { renderGeneric(); renderRatings(); renderList(); }
+function rateGeneric(verdict, note) {
+  const g = state.generic;
+  if (!g) { toast("nothing baked to rate"); return null; }
+  const e = ratings.set(g.id, g.folder, { verdict, note, name: speciesName(g.folder), bodyPlan: g.plan });
+  if (!ratings.persisted) toast("rated, but this browser blocks storage: it will be lost on reload");
+  afterRating();
+  return e;
+}
+function setGenericFull(on) {
+  state.genericFull = !!on;
+  try { localStorage.setItem(GEN.PREVIEW_KEY, on ? "1" : "0"); } catch { /* no storage: per-page only */ }
+  if (state.generic && state.genericAction && state.action?.kind === "generic") { selectAction(state.genericAction); play(); }
+}
+/** Bake `id` for `folder` (default: the Digimon on screen) and play it. Resolves true when it plays. */
+async function selectGeneric(id, folder = curFolder()) {
+  if (state.src === "dw2" || !folder) return false;
+  if (cmp.on) leaveCompare();
+  const tok = ++genTok;
+  state.genericId = id;
+  state.pendingAction = null;
+  state.genericBusy = "baking…";
+  renderGeneric();
+  const fail = async (why) => {
+    state.genericBusy = why;
+    toast(why);
+    state.generic = null;
+    await loadEntry(folder);           // the Digimon still switches; the motion id stays for the next one
+    state.genericBusy = why;
+    renderGeneric();
+    return false;
+  };
+  try {
+    const gen = await getGenerator();
+    const motion = gen.api.GENERIC_MOTIONS.find((m) => m.id === id);
+    if (!motion) { state.genericId = null; return await fail(`unknown generic motion "${id}"`); }
+    const raw = await rawModel(folder);
+    if (tok !== genTok) return false;
+    if (!raw) return await fail(`no model for ${folder}`);
+    let baked;
+    try { baked = gen.api.bakeGenericMotion(raw, id); } catch (err) { baked = { ok: false, reason: `generator threw: ${err?.message || err}` }; }
+    if (tok !== genTok) return false;
+    if (!baked?.ok) return await fail(`${motion.name} on ${speciesName(folder)}: ${baked?.reason || "refused"}`);
+    const vf = GEN.genericFolder(folder, id);
+    // a generator may place its table past the end of the timeline, leaving holes that JSON turns into null
+    for (let i = 0; i < baked.model.timeline.length; i++) if (!baked.model.timeline[i]) baked.model.timeline[i] = { table: [] };
+    genStore.set(vf, { model: baked.model, real: folder });
+    const switched = curFolder() !== folder;
+    state.generic = { id, vf, folder, name: motion.name, table: baked.table, ticks: baked.ticks, report: baked.report, plan: planOfFolder(folder) };
+    state.genericBusy = "";
+    await loadEntry(folder, { generic: state.generic, frame: switched || !state.entry });
+    if (tok !== genTok) return false;
+    play();
+    renderGeneric();
+    writeUrl();
+    return true;
+  } catch (err) {
+    state.genericBusy = `failed: ${err?.message || err}`;
+    renderGeneric();
+    return false;
+  }
+}
+function flipGenericAB() {
+  if (!state.generic) { toast("pick a generic motion first"); return false; }
+  const t = state.tick;
+  const to = state.action?.kind === "generic" ? state.actions.find((a) => a.kind === "idle") : state.genericAction;
+  if (!to) return false;
+  pause();
+  selectAction(to);
+  seek(Math.min(t, state.maxTick));
+  writeUrl();
+  return true;
+}
+function exportRatings() {
+  const text = JSON.stringify(ratings.exportObject(), null, 2);
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = el("a", { href: url, download: `generic-motion-ratings-${new Date().toISOString().slice(0, 10)}.json` });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    toast(`exported ${ratings.size()} rating${ratings.size() === 1 ? "" : "s"}`);
+  } catch (err) { toast(`export failed: ${err?.message || err}`); }
+  return text;
+}
+async function importRatings(file) {
+  try {
+    const res = ratings.importObject(await file.text());
+    toast(`imported: ${res.added} new, ${res.updated} updated, ${res.kept} kept, ${res.skipped} skipped`);
+    afterRating();
+    return res;
+  } catch (err) { toast(`import failed: ${err?.message || err}`); return null; }
+}
+function renderRatings() {
+  const box = $("ratingsBox");
+  if (!box || !generator) return;
+  // columns: the body plans that have a rating (all of them while nothing is rated yet)
+  const every = new Set(Object.values(ANATOMY).map((a) => a.plan).filter(Boolean));
+  const rated = new Set(ratings.all().map((r) => r.bodyPlan));
+  GEN.renderRatingsPanel(box, {
+    motions: [...generator.api.GENERIC_MOTIONS, ...dw2RatingRows()], plans: [...(rated.size ? rated : every)].sort(), unrated: rated.size ? [...every].filter((p) => !rated.has(p)).sort() : [], matrix: ratings.matrix(), total: ratings.size(), persisted: ratings.persisted,
+    onExport: exportRatings,
+    onCopy: async () => { const t = JSON.stringify(ratings.exportObject(), null, 2); try { await navigator.clipboard.writeText(t); toast("ratings JSON copied"); } catch { toast("copy blocked by the browser: use Export"); } },
+    onImport: importRatings,
+  });
+}
+
+// ── K25: DW2 motion for every Digimon that has it ──────────────────────────────────────────────
+// The batch build's generated files (web/assets/battle/dw2motion/<folder>.json) are read here, merged
+// into a COPY of the body's own anim.json (a free table per motion — anim-viewer-dw2motion.js), and
+// served to battle3d as the model folder `<folder>-dw2m`. Everything else is the ordinary DW3 path.
+const dw2Files = new Map();          // folder -> generated file | null
+const dw2Set = new Set();            // the folders that have a file (the list marker + filter)
+let dw2Indexed = false;              // true once assets/battle/dw2motion/index.json was read
+let dw2Tok = 0, dw2PanelTok = 0;
+/**
+ * Which bodies have a generated file, from ONE request: the build's own index
+ * (web/assets/battle/dw2motion/index.json, a list of folders). This used to probe each of the 249
+ * model folders — 243 of them 404s — which saturated a single-threaded dev server badly enough to
+ * abort the page's own module loads. With the index a Digimon that has no DW2 file costs NO request.
+ */
+async function loadDw2Index() {
+  if (dw2Indexed) return dw2Set.size;
+  const idx = await asset(DW2M.dw2FileUrl("index"));
+  if (Array.isArray(idx?.folders)) { for (const f of idx.folders) if (typeof f === "string") dw2Set.add(f); dw2Indexed = true; }
+  state.dw2Probed = dw2Indexed;
+  return dw2Set.size;
+}
+async function dw2File(folder, { fresh = false } = {}) {
+  if (!folder || !DW2M.dw2FileUrl("x")) return null;
+  if (!fresh && dw2Files.has(folder)) return dw2Files.get(folder);
+  if (!dw2Indexed) await loadDw2Index();
+  if (dw2Indexed && !dw2Set.has(folder)) { dw2Files.set(folder, null); return null; }   // known-absent: no request
+  const data = await asset(DW2M.dw2FileUrl(folder));
+  dw2Files.set(folder, data || null);
+  if (data) dw2Set.add(folder);
+  while (dw2Files.size > 40) dw2Files.delete(dw2Files.keys().next().value);
+  return data || null;
+}
+/** The generated file for the Digimon on screen (null: no DW2 twin). */
+const dw2FolderNow = () => state.dw2m?.folder ?? curFolder();
+const dw2Name = (slot) => `DW2 ${DW2M.slotLabel(slot)}`;
+/** One action per filled slot for the Actions list (the panel adds the per-letter sub-buttons). */
+function dw2ActionList(dw2m, data) {
+  if (!dw2m || !data) return [];
+  const out = [];
+  for (const slot of dw2m.counts?.slots || []) {
+    const a = DW2M.dw2Actions(data, { folder: dw2m.folder, slot, tables: dw2m.tables })[0];
+    if (a) out.push(a);
+  }
+  return out;
+}
+function dw2View() {
+  const f = dw2FolderNow();
+  const data = state.dw2Data;
+  return {
+    digimon: { name: speciesName(f), folder: f, plan: planOfFolder(f) },
+    status: state.dw2Status || (data ? "ready" : "none"),
+    data, rows: data ? DW2M.dw2Rows(data) : [], counts: data ? DW2M.dw2Counts(data) : null,
+    busy: state.dw2Busy,
+    played: state.dw2m && state.dw2Slot != null ? { slot: state.dw2Slot, letter: state.dw2Letter } : null,
+    report: state.dw2m ? dw2Report() : "",
+    rating: (slot) => ratings.get(DW2M.ratingId(slot), f),
+    // A slot click must WORK from a cold panel: the first click loads this body's DW2 clone and plays
+    // it (that was the "buttons do nothing" bug: the table only exists once the clone is loaded).
+    onPlay: (slot, letter) => (state.dw2m?.folder === f ? playDw2Slot(slot, letter) : openDw2(f, slot, { letter })),
+    onAB: () => flipDw2AB(),
+    onRate: (verdict, note) => rateDw2(verdict, note),
+    onClear: () => clearDw2(),
+    onNote: (note) => noteDw2(note),
+  };
+}
+function renderDw2() {
+  if (state.src === "dw2") return;
+  DW2M.renderDw2Panel($("dw2Box"), dw2View());
+}
+/** Read the selected Digimon's DW2 file and show the panel (no baking: that happens on click). */
+async function refreshDw2Panel() {
+  if (state.src === "dw2") return;
+  const tok = ++dw2PanelTok;
+  const folder = dw2FolderNow();
+  if (!folder) return;
+  state.dw2Status = "loading";
+  renderDw2();
+  const data = await dw2File(folder);
+  if (tok !== dw2PanelTok) return;
+  state.dw2Data = data;
+  state.dw2Status = data ? "ready" : "none";
+  if (!data && state.dw2m) state.dw2m = null;
+  renderDw2();
+  renderRatings();
+}
+/** What the panel says about the clip on screen right now. */
+function dw2Report() {
+  const d = state.dw2m;
+  if (!d || state.dw2Slot == null) return "";
+  const row = DW2M.dw2Rows(state.dw2Data || {}).find((r) => r.slot === state.dw2Slot);
+  const fill = row?.letters?.find((x) => x.letter === state.dw2Letter) || row?.letters?.[0];
+  if (!fill) return "";
+  const playing = state.action?.kind === "dw2";
+  return `${playing ? "playing" : "showing"} DW2 ${state.dw2Letter || fill.letter} · clip ${state.dw2Slot} ${DW2M.slotLabel(state.dw2Slot)} `
+    + `· table ${d.tables[fill.letter] ?? fill.table} · ${fill.frames} frames · ${state.maxTick} ticks`
+    + (playing ? "" : " · A/B flips to today's clip at the same tick");
+}
+/**
+ * Load `folder` with its DW2 motions available and play one slot. Resolves true when a DW2 clip plays.
+ * `slot` defaults to the first filled slot; `letter` to that slot's first letter.
+ */
+async function openDw2(folder, slot = null, { letter = null, frame = null, tick = 0 } = {}) {
+  if (state.src === "dw2" || !folder) return false;
+  if (cmp.on) leaveCompare();
+  const tok = ++dw2Tok;
+  state.dw2Busy = "reading the DW2 file…";
+  state.dw2Status = "loading";
+  renderDw2();
+  const data = await dw2File(folder);
+  if (tok !== dw2Tok) return false;
+  if (!data) {
+    state.dw2Data = null; state.dw2Status = "none"; state.dw2m = null; state.dw2Busy = "";
+    await loadEntry(folder, { frame: frame ?? !state.entry });
+    toast(`no DW2 twin for ${speciesName(folder)}`);
+    return false;
+  }
+  const counts = DW2M.dw2Counts(data);
+  state.dw2Data = data;
+  state.dw2Status = "ready";
+  if (!counts.filled) {
+    state.dw2m = null; state.dw2Busy = "";
+    await loadEntry(folder, { frame: frame ?? !state.entry });
+    toast(`${speciesName(folder)}: every DW2 motion was refused by the gate — nothing to play`);
+    renderDw2();
+    return false;
+  }
+  const raw = await rawModel(folder);
+  if (tok !== dw2Tok) return false;
+  if (!raw) { state.dw2Busy = `no model for ${folder}`; renderDw2(); return false; }
+  const clone = DW2M.buildClone(raw, data);
+  const vf = DW2M.dw2Folder(folder);
+  clone.model.folder = vf;
+  dw2Store.set(vf, { model: clone.model, real: folder });
+  const switched = state.dw2m?.folder !== folder;
+  const wantSlot = slot ?? state.dw2Slot ?? counts.slots[0];
+  const wantRow = DW2M.dw2Rows(data).find((r) => r.slot === wantSlot && r.status === "filled");
+  state.dw2Letter = letter || wantRow?.letters?.[0]?.letter || null;
+  state.dw2m = { folder, vf, tables: clone.tables, failed: clone.failed, counts, slots: counts.slots };
+  state.dw2Slot = null;
+  state.dw2Busy = "";
+  await loadEntry(folder, { dw2: state.dw2m, frame: frame ?? (switched || !state.entry), tick });
+  if (tok !== dw2Tok) return false;
+  return playDw2Slot(wantRow ? wantRow.slot : counts.slots[0], state.dw2Letter);
+}
+/** Play one filled slot's DW2 motion through the viewer's own raw-table path (the K21f bake path). */
+function playDw2Slot(slot, letter = null) {
+  const d = state.dw2m;
+  if (!d || !state.dw2Data) return false;
+  const a = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot, letter, tables: d.tables }).find((x) => x.kind === "dw2");
+  if (!a) { toast(`slot ${slot}: no DW2 motion to play on this body`); return false; }
+  state.dw2Slot = slot;
+  state.dw2Letter = a.letter;
+  selectAction(a);
+  play();
+  renderDw2();
+  writeUrl();
+  return true;
+}
+/** A/B: the DW2 motion and what this slot plays today, at the same tick and camera. */
+function flipDw2AB() {
+  const d = state.dw2m;
+  if (!d || state.dw2Slot == null) { toast("pick a DW2 clip first"); return false; }
+  const pair = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot: state.dw2Slot, letter: state.dw2Letter, tables: d.tables });
+  const to = state.action?.kind === "dw2" ? pair.find((a) => a.kind === "own") : pair.find((a) => a.kind === "dw2");
+  if (!to) return false;
+  const t = state.tick;
+  pause();
+  selectAction(to);
+  seek(Math.min(t, state.maxTick));
+  renderDw2();
+  writeUrl();
+  return true;
+}
+function rateDw2(verdict, note) {
+  const d = state.dw2m;
+  if (!d || state.dw2Slot == null) { toast("play a DW2 clip first"); return null; }
+  const e = ratings.set(DW2M.ratingId(state.dw2Slot), d.folder, {
+    verdict, note, kind: "dw2", name: dw2Name(state.dw2Slot), bodyPlan: planOfFolder(d.folder),
+  });
+  if (!ratings.persisted) toast("rated, but this browser blocks storage: it will be lost on reload");
+  afterDw2Rating();
+  return e;
+}
+function clearDw2() {
+  const d = state.dw2m;
+  if (!d || state.dw2Slot == null) return false;
+  const had = ratings.clear(DW2M.ratingId(state.dw2Slot), d.folder);
+  if (had) afterDw2Rating();
+  return had;
+}
+function noteDw2(note) {
+  const d = state.dw2m;
+  if (!d || state.dw2Slot == null) return null;
+  const e = ratings.setNote(DW2M.ratingId(state.dw2Slot), d.folder, note);
+  if (e) { toast("note saved"); renderRatings(); }
+  return e;
+}
+function afterDw2Rating() { renderDw2(); renderRatings(); }
+/** The DW2 rows the Ratings tab lists beside the generic motions (all 17 motion slots). */
+function dw2RatingRows() {
+  const out = [];
+  for (let slot = 0; slot <= 17; slot++) {
+    if (slot === 12) continue;
+    out.push({ id: DW2M.ratingId(slot), name: dw2Name(slot), description: `DW2 motion filling clip ${slot} (${DW2M.slotLabel(slot)}) on any Digimon that has one` });
+  }
+  return out;
+}
+
+function actionMatches(a, x) {
+  if (!x) return false;
+  if (x.techId != null) return a.kind === "tech" && a.techId === x.techId;
+  if (x.itemId != null) return a.kind === "item";
+  return a.clip === x.clip && (x.kind ? a.kind === x.kind : true);
+}
+function renderBadges() {
+  if (state.src === "dw2") return renderBadgesDw2();
+  const e = state.entry; const box = $("badges");
+  box.replaceChildren();
+  if (!e) return;
+  const add = (text, cls = "") => box.append(el("span", { className: "badge " + cls, textContent: text }));
+  const b = state.bake;
+  if (cmp.on) {
+    add("COMPARE", "good");
+    add(`DW2 original ${cmp.entry?.code || "?"} ${cmp.model?.anims?.[cmp.gltfClip]?.name || ""}`);
+    add(`↔ ${cmp.id} (this body, baked)`, "good");
+    add(`${CMP.agreementText(cmp.summary)}`, cmp.summary?.total && cmp.summary.agree === cmp.summary.total ? "good" : "bad");
+    return;
+  }
+  if (state.generic) { add(`GENERIC: ${state.generic.name}`, "warn"); add(state.generic.folder); add(state.generic.plan); if (generator?.source !== "real") add("STUB generator", "bad"); return; }
+  if (state.dw2m) {
+    add(`DW2 motion · ${state.dw2m.vf}`, "good");
+    add(`${state.dw2m.counts?.filled ?? 0} clip${state.dw2m.counts?.filled === 1 ? "" : "s"} filled from DW2`);
+    if (state.action?.kind === "dw2") add(`playing DW2-${state.action.letter} · clip ${state.action.slot}`);
+    else add("today's clip (A/B)", "warn");
+    return;
+  }
+  add(b ? b.id : e.folder || "no model");
+  if (b) {
+    add(/-gen[A-Z]$/.test(b.id) ? `new motion (not from DW2) on the DW3 body` : `DW2-${b.letter} on the DW3 body`, "good");
+    if (b.table != null) add(`table ${b.table}${b.frames ? ` · ${b.frames} frames` : ""}`);
+    if (b.gate) add(`castGate ${b.gate.used ? "USED" : "REFUSE " + (b.gate.reasons || []).join(",")}`, b.gate.used ? "good" : "warn");
+  } else if (e.gaps?.length) add(`fallback clips: ${e.gaps.join(", ")}`, "warn"); else add("fully authored", "good");
+  if (e.elements?.length) add(e.elements.join(" / "));
+}
+
+async function selectAction(action, { keepCamera = true } = {}) {
+  state.action = action;
+  state.clip = action.clip;
+  state.techId = action.kind === "tech" ? action.techId : null;
+  if (action.kind === "dw2") { state.dw2Slot = action.slot; state.dw2Letter = action.letter; }
+  buildActionList();
+  const model = attackerModel();
+  const { script, opts } = resolveFor(action, model);
+  state.script = script;
+  state.resolved = opts;
+  // K21f: a bake is a raw timeline table, not a scripted action — its length is the table's own
+  const dry = action.kind === "idle" ? { maxTick: 240, marks: [] }
+    : (action.kind === "bake" || action.kind === "dw2") ? { maxTick: bakeTicks(model, action.table), marks: [] }
+    : action.kind === "generic" ? { maxTick: genericPlan(model, action).ticks, marks: [] }
+    : dryRun(model, action, script);
+  state.maxTick = dry.maxTick;
+  state.marks = dry.marks;
+  // The SEQUENCE is longer than the attacker's own script: its op1 records start the defender's
+  // reaction (clip 2 survive / 3 death / 4 evade), which runs for its own duration. Measure the
+  // whole thing with the same coordinator the battle uses, so the scrubber covers what plays.
+  if (action.kind !== "idle" && action.kind !== "bake" && action.kind !== "dw2" && action.kind !== "generic") state.maxTick = Math.max(state.maxTick, measureSequence());
+  state.tick = 0;
+  state.over = null;
+  $("scrub").max = String(state.maxTick);
+  $("scrub").value = "0";
+  drawMarks();
+  launch();
+  renderNow();
+  updateInfo();
+  writeUrl();
+  $("play").disabled = false;
+}
+
+// ── playback ───────────────────────────────────────────────────────────────────────────────────
+function hooksFor() {
+  return {
+    onHit: (rec) => { (state.lib.rec ||= []).push(rec); if (rec.type === 99) state.over = state.over || "strike"; },
+    onEffect: (rec) => { (state.lib.fx ||= []).push(rec); },
+    onCamera: (rec) => {
+      const cs = applyOp5({}, rec);
+      if (!cs.op5) return;
+      state.scriptCam = cs.op5.preset != null ? `preset ${cs.op5.preset}` : cs.op5.eye ? "explicit transform" : "shot";
+      $("scriptCamOut").textContent = `script camera: ${state.scriptCam}`;
+    },
+  };
+}
+
+function launch() {
+  const a = state.action, model = attackerModel();
+  if (!a || !model) return false;
+  state.lib = { rec: [], fx: [] };
+  state.scriptCam = null;
+  $("scriptCamOut").textContent = "script camera: —";
+  state.camState = { attackMin: [Infinity, Infinity, Infinity], attackMax: [-Infinity, -Infinity, -Infinity] };
+  const hooks = hooksFor();
+  const lethal = state.outcome === "lethal", miss = state.outcome === "miss";
+  r.setPlayerVisible(true);
+  r.setEnemyVisible(state.showDefender);
+  if (a.kind === "tech") {
+    return state.side === "near" ? r.playerAttack(a.techId, { lethal, miss, ...hooks })
+                                 : r.enemyAttack(a.techId, { lethal, miss, ...hooks });
+  }
+  if (a.kind === "bake" || a.kind === "dw2") {
+    // K21f: play the baked table through the animator's own raw-table path (the motion browser's
+    // primitive). The ActionVM is the wrong vehicle here: a script with no op4 is "settled" at its
+    // terminator by design (see action-vm's _motionSettled), so op2+op255 would end on the first tick.
+    const tab = attackerModel()?.timeline?.[a.table]?.table;
+    if (!tab || !tab.length) return false;
+    attacker()?.playTimelineTable(tab);
+    return true;
+  }
+  if (a.kind === "generic") {
+    // idle -> motion -> idle (or the motion alone) as one playlist of raw tables on the animator's idle slot
+    const plan = genericPlan(attackerModel(), a);
+    if (!plan.tables[0]?.length) return false;
+    attacker()?.debugPlayPlaylist(plan.tables, { loop: false });
+    return true;
+  }
+  if (a.kind === "reaction" || a.kind === "own") return attacker()?.setAction(a.clip, hooks, { holdFinalPose: a.clip === 3 }) || false;
+  if (a.kind === "item") return state.side === "near" ? r.playPlayerItemUse(a.itemId, hooks)
+                                                       : attacker()?.setAnimByItem(a.itemId, hooks) || false;
+  attacker()?.setIdle();
+  return true;
+}
+
+function actionEnded() {
+  // K21f: a baked table runs in the idle slot (no VM), so its own sampler's end is the answer
+  if (state.action?.kind === "bake" || state.action?.kind === "dw2") return !!bakePlayer()?.ended;
+  if (state.action?.kind === "generic") return state.tick >= state.maxTick;
+  return !r.coordinator.active;
+}
+
+/** The animator's raw-table playhead, which is where a bake plays (K21f). */
+function bakePlayer() { return attacker()?.idle || null; }
+/** Logic ticks a baked table lasts: one timeline entry per TICK_SPEED per tick (K21f). */
+function bakeTicks(model, table) {
+  const n = (model?.timeline?.[table]?.table || []).filter((e) => e && e.value !== 0xFFFF).length;
+  return Math.max(1, Math.ceil(n / TICK_SPEED));
+}
+
+/** Launch once and step to the end of the whole sequence (attacker + defender reaction). */
+function measureSequence(cap = 1500) {
+  if (!launch()) return 1;
+  let n = 0;
+  for (; n < cap; n++) { if (!r.coordinator.active) break; r.coordinator.tick(TICK_SPEED); }
+  return Math.max(1, n);
+}
+
+/** One logic tick through the renderer (so effects, skins, camera records all advance together). */
+function stepTick() {
+  if (!state.action) return false;
+  r.render(TICK_SEC);
+  state.tick = Math.min(state.maxTick, state.tick + 1);
+  trackAttackBounds();
+  if (actionEnded() && state.tick >= 2) return false;
+  return true;
+}
+
+function play() {
+  if (cmp.on) {
+    if (!state.action) return;
+    if (state.tick >= cmp.maxTick) cmpSeek(0);
+    state.playing = true;
+    $("play").textContent = "⏸ pause";
+    return;
+  }
+  if (state.src === "dw2") {
+    if (dw2.clip < 0) return;
+    if (dw2.time >= (dw2.model?.anims[dw2.clip]?.dur || 0)) dw2.time = 0;
+    dw2.playing = true;
+    state.playing = true;
+    $("play").textContent = "⏸ pause";
+    return;
+  }
+  if (!state.action) return;
+  if (state.tick >= state.maxTick || actionEnded()) seek(0);
+  state.playing = true;
+  $("play").textContent = "⏸ pause";
+}
+function pause() {
+  if (state.src === "dw2") { dw2.playing = false; state.playing = false; $("play").textContent = "▶ play"; return; }
+  state.playing = false; $("play").textContent = "▶ play";
+}
+
+function seek(n) {
+  if (cmp.on) return cmpSeek(n);
+  if (state.src === "dw2") return dw2SeekTick(n);
+  const target = Math.max(0, Math.min(state.maxTick, n | 0));
+  launch();
+  for (let i = 0; i < target; i++) r.coordinator.tick(TICK_SPEED);
+  state.tick = target;
+  r.render(0);
+  trackAttackBounds();
+  composite();
+  $("scrub").value = String(target);
+  $("tickLabel").textContent = `tick ${target} / ${state.maxTick}`;
+}
+
+function trackAttackBounds() {
+  for (const side of [attackerSide(), defenderSide()]) {
+    const b = r.getFighterBounds?.(side);
+    if (!b) continue;
+    for (let i = 0; i < 3; i++) {
+      state.camState.attackMin[i] = Math.min(state.camState.attackMin[i], b.min[i]);
+      state.camState.attackMax[i] = Math.max(state.camState.attackMax[i], b.max[i]);
+    }
+  }
+}
+
+// ── camera ────────────────────────────────────────────────────────────────────────────────────
+const keys = { w: false, a: false, s: false, d: false, q: false, e: false };
+let lastPointer = null, drag = null;
+
+function lockedPoint() {
+  if (!$("lock").checked) return null;
+  const b = r.getFighterBounds?.(attackerSide());
+  return b ? b.center : null;
+}
+
+function updateCamera(dt) {
+  if (cmp.on) {
+    // both panes are live: the right one is battle3d's free camera (cam), the left one is the DW2
+    // reader's (camB). Linked = one angle; each pane is framed at its own model's scale, so the two
+    // bodies read the same size on screen even though the games' units differ by ~2x.
+    r.setCameraMode("free");
+    r.setFreeCameraView(() => cam.view());
+    const b = r.getFighterBounds?.("player");
+    if (b) {
+      const radius = Math.max(1, Math.hypot(b.size[0], b.size[1], b.size[2]) * 0.5);
+      cam.minDist = radius * 0.08;
+      cam.maxDist = radius * 400;
+    }
+    cam.lockPoint = lockedPoint();
+    cam.flyMode = $("fly").checked;
+    if (cam.flyMode) cam.fly(keys, dt);
+    cam.update(dt);
+    if ($("cmpUnlink").checked) {
+      camB.flyMode = false;
+      camB.update(dt);
+    } else syncCamB();
+    $("camOut").textContent = `compare · yaw ${cam.azimuthDeg().toFixed(1)}° · pitch ${cam.pitchDeg().toFixed(1)}° · dist ${cam.dist.toFixed(0)}`
+      + (cmp.baseA && cmp.baseB ? ` (DW2 ${camB.dist.toFixed(0)})` : "") + ($("cmpUnlink").checked ? " · unlinked" : " · linked");
+    return;
+  }
+  if (state.src === "dw2") {
+    if (dw2.bounds) {
+      const radius = Math.max(1, Math.hypot(...dw2.bounds.size) * 0.5);
+      cam.minDist = radius * 0.02;
+      cam.maxDist = radius * 200;
+    }
+    cam.lockPoint = null;
+    cam.flyMode = $("fly").checked;
+    if (cam.flyMode) cam.fly(keys, dt);
+    cam.update(dt);
+    $("camOut").textContent = `yaw ${cam.azimuthDeg().toFixed(1)}° · pitch ${cam.pitchDeg().toFixed(1)}° · dist ${cam.dist.toFixed(0)} · pivot ${cam.pivot.map((v) => v.toFixed(0)).join(",")}`;
+    return;
+  }
+  if (state.freeCam) {
+    r.setCameraMode("free");
+    r.setFreeCameraView(() => cam.view());
+    cam.lockPoint = lockedPoint();
+    // The viewer's own size limits come from the model on screen: a speck can come closer than a
+    // giant, and neither can be dollied so far the pivot plane clips.
+    const b = r.getFighterBounds?.(attackerSide());
+    if (b) {
+      const radius = Math.max(1, Math.hypot(b.size[0], b.size[1], b.size[2]) * 0.5);
+      cam.minDist = radius * 0.08;
+      cam.maxDist = radius * 400;
+    }
+    cam.flyMode = $("fly").checked;
+    if (cam.flyMode) cam.fly(keys, dt);
+    cam.update(dt);
+  } else {
+    r.setFreeCameraView(null);
+    r.setCameraMode(state.battleCamMode === "battle" ? "game" : state.battleCamMode, { scriptOwnsCamera: r.coordinator.active });
+    cam.update(0);
+  }
+  $("camOut").textContent = state.freeCam
+    ? `yaw ${cam.azimuthDeg().toFixed(1)}° · pitch ${cam.pitchDeg().toFixed(1)}° · dist ${cam.dist.toFixed(0)} · pivot ${cam.pivot.map((v) => v.toFixed(0)).join(",")}`
+    : `battle camera: ${r.getCameraMode?.() ?? "—"}`;
+}
+
+function frameAll() {
+  if (state.src === "dw2") {
+    const b = dw2BoundsNow();
+    if (b) cam.frameBounds(b, cv.width / cv.height, { immediate: false });
+    else toast("model still loading");
+    return;
+  }
+  const b = r.getFighterBounds?.(attackerSide()) || r.getFighterBounds?.(defenderSide());
+  if (b) cam.frameBounds(b, cv.width / cv.height, { immediate: false });
+  else toast("model still loading");
+}
+function frameAttack() {
+  const { attackMin: mn, attackMax: mx } = state.camState;
+  const boxes = [];
+  if (mn.every(Number.isFinite)) boxes.push({ min: mn, max: mx });
+  // The far end of an enemy-targeted attack is the defender's own slot, which is where the
+  // projectile/effect travels to (the op3 sprites are screen-space, so this is the world anchor
+  // the disc's staging gives them). Self casts have no far end.
+  const enemyTargeted = state.action?.kind !== "tech" || techTargetClass(state.action.techId) === "enemy";
+  if (enemyTargeted) {
+    const d = r.getFighterBounds?.(defenderSide());
+    if (d) boxes.push(d);
+  }
+  if (!boxes.length) return frameAll();
+  cam.frameUnion(boxes, cv.width / cv.height);
+}
+function resetView() {
+  const b = currentBounds();
+  cam.reset(b, cv.width / cv.height);
+  $("autoOrbit").checked = false;
+  cam.autoOrbitSpeed = 0;
+  if (!$("freeCam").checked) { $("freeCam").checked = true; state.freeCam = true; }
+}
+function setPreset(name) { cam.setPreset(name); if (name === "top" || name === "bottom") { /* clamp default already */ } }
+
+// ── HUD (gizmo, bbox, ruler) ─────────────────────────────────────────────────────────────────
+function drawHud() {
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const W = hud.clientWidth, H = hud.clientHeight;
+  if (hud.width !== Math.round(W * dpr) || hud.height !== Math.round(H * dpr)) { hud.width = Math.round(W * dpr); hud.height = Math.round(H * dpr); }
+  const c = hud.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, W, H);
+  if (!state.freeCam) return;
+  const aspect = W / Math.max(1, H);
+  const toScreen = (p) => { const n = cam.project(p, aspect); return n ? [(n[0] * 0.5 + 0.5) * W, (1 - (n[1] * 0.5 + 0.5)) * H] : null; };
+  // bounding box
+  if ($("bbox").checked) {
+    const b = currentBounds();
+    if (b) {
+      const corners = [];
+      for (let i = 0; i < 8; i++) corners.push([i & 1 ? b.max[0] : b.min[0], i & 2 ? b.max[1] : b.min[1], i & 4 ? b.max[2] : b.min[2]]);
+      const edges = [[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+      c.strokeStyle = "rgba(88,183,255,.75)"; c.lineWidth = 1;
+      for (const [i, j] of edges) {
+        const a = toScreen(corners[i]), d = toScreen(corners[j]);
+        if (!a || !d) continue;
+        c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(d[0], d[1]); c.stroke();
+      }
+    }
+  }
+  // ruler: the model's height in render units (which are PS1 units × MODEL_SCALE)
+  if ($("ruler").checked) {
+    const b = currentBounds();
+    if (b) {
+      const x = W - 70;
+      const p0 = toScreen([b.center[0], b.min[1], b.center[2]]), p1 = toScreen([b.center[0], b.max[1], b.center[2]]);
+      if (p0 && p1) {
+        c.strokeStyle = "#ffb454"; c.lineWidth = 1.5;
+        c.beginPath(); c.moveTo(x, p0[1]); c.lineTo(x, p1[1]);
+        c.moveTo(x - 5, p0[1]); c.lineTo(x + 5, p0[1]); c.moveTo(x - 5, p1[1]); c.lineTo(x + 5, p1[1]); c.stroke();
+        c.fillStyle = "#ffb454"; c.font = "11px ui-monospace,monospace";
+        c.fillText(`${Math.round(b.max[1] - b.min[1])} u`, x + 8, (p0[1] + p1[1]) / 2);
+      }
+    }
+  }
+  // axes gizmo (bottom-right): world X/Y/Z through the camera basis, drawn in 2D
+  const gx = W - 44, gy = H - 44, L = 26;
+  const { right, up, forward } = cam.basis();
+  const axes = [
+    { v: [1, 0, 0], col: "#e06666", l: "X" },
+    { v: [0, 1, 0], col: "#59d18a", l: "Y" },
+    { v: [0, 0, 1], col: "#58b7ff", l: "Z" },
+  ];
+  for (const a of axes) {
+    const sx = a.v[0] * right[0] + a.v[1] * right[1] + a.v[2] * right[2];
+    const sy = a.v[0] * up[0] + a.v[1] * up[1] + a.v[2] * up[2];
+    c.strokeStyle = a.col; c.fillStyle = a.col; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + sx * L, gy - sy * L); c.stroke();
+    c.font = "9px ui-monospace,monospace"; c.fillText(a.l, gx + sx * (L + 5) - 3, gy - sy * (L + 5) + 3);
+  }
+}
+
+// ── marks / info / URL ───────────────────────────────────────────────────────────────────────
+const MARK_COLORS = { contact: "#ffb454", camera: "#b07bff", fx: "#59d18a", proj: "#00d0d0", table: "#3a465c" };
+function drawMarks() {
+  const box = $("marks"); box.replaceChildren();
+  for (const m of state.marks) {
+    if (m.kind === "table") continue;
+    const d = el("div", { className: "mark " + (m.kind === "contact" ? "contact" : m.kind === "camera" ? "camera" : m.kind === "fx" ? "fx" : "proj") });
+    d.style.left = `${(m.tick / Math.max(1, state.maxTick)) * 100}%`;
+    d.title = `${m.text} @ tick ${m.tick}`;
+    d.onclick = () => { pause(); seek(m.tick); };
+    d.style.pointerEvents = "auto";
+    box.append(d);
+  }
+  box.style.pointerEvents = "none";
+}
+
+function updateInfo() {
+  if (state.src === "dw2") return updateDw2Info();
+  const e = state.entry, a = state.action, b = state.bake;
+  // the DW3 tables this page reads (gate, contract, donor rows) are keyed by the DISC folder
+  const folder = b ? b.folder : state.generic ? state.generic.folder : state.dw2m ? state.dw2m.folder : state.folder;
+  const out = $("info");
+  out.replaceChildren();
+  const kv = el("div", { className: "kv" });
+  const row = (k, v, cls = "") => { kv.append(el("div", { textContent: k }), el("div", { className: cls, textContent: v == null || v === "" ? "—" : String(v) })); };
+  if (b) for (const [k, v, cls] of BAKE.bakeInfoRows(b)) row(k, v, cls);
+  if (state.generic) {
+    const g = state.generic, rt = ratings.get(g.id, g.folder);
+    row("generic motion", `${g.name} (${g.id}) on ${g.folder} \u00b7 table ${g.table} \u00b7 ${g.ticks} ticks \u00b7 generator: ${generator?.source}`, generator?.source === "real" ? "ok" : "bad");
+    row("rating", rt ? `${rt.verdict}${rt.note ? " \u2014 " + rt.note : ""}` : "not rated");
+  }
+  if (state.dw2m) {
+    const d = state.dw2m, rt = state.dw2Slot != null ? ratings.get(DW2M.ratingId(state.dw2Slot), d.folder) : null;
+    row("DW2 motion", `${d.vf} on ${d.folder} · ${d.counts?.filled ?? 0} clip${d.counts?.filled === 1 ? "" : "s"} filled from DW2 (gate-passed) · ${d.counts?.refused ?? 0} refused · ${d.counts?.owned ?? 0} owned by the body`, "ok");
+    row("DW2 tables", Object.entries(d.tables || {}).map(([L, t]) => `${L}:${t}`).join(" ") || "—");
+    if (state.dw2Slot != null) row("DW2 clip", `clip ${state.dw2Slot} ${DW2M.slotLabel(state.dw2Slot)} · ${state.action?.kind === "dw2" ? "the DW2 motion is playing" : "today's clip is playing (A/B)"}`);
+    row("rating", rt ? `${rt.verdict}${rt.note ? " — " + rt.note : ""}` : "not rated");
+  }
+  if (cmp.on) {
+    row("compare", `${cmp.entry?.code || "?"} ${cmp.model?.anims?.[cmp.gltfClip]?.name || ""} (DW2 original) ↔ ${cmp.id} (this body, baked) — one tick, one camera`, "ok");
+    for (const [k, v] of CMP.conversionRows(cmp.scale)) row(k, v);
+    row("roles (DW2 / our bone)", CMP.roleBonesRow(cmp.bones2, cmp.bones3, cmp.torsoNote));
+    row("frames", `DW2 ${cmp.entry?.code || "?"} ${cmp.model?.anims?.[cmp.gltfClip]?.name || ""} · ${cmp.dw2Frames} frames @30 Hz — bake table ${state.bakeTable} · ${cmp.table.length} frames · a tick advances both by ${TICK_SPEED} frames`);
+    row("placement", "each pane keeps its own renderer's placement (the DW3 pane is battle3d's staged body, the DW2 pane is the file's own frame); the camera angle, the floor and the units are shared — the numbers are model-space joints, not screen pixels");
+    row("agreement", `${CMP.agreementText(cmp.summary)} over ${cmp.maxTick} ticks (a role counts when any tick agrees)`, cmp.summary?.total && cmp.summary.agree === cmp.summary.total ? "ok" : "bad");
+    const live = el("div", { textContent: `${CMP.agreementText(cmp.summary)} · tick ${state.tick} / ${cmp.maxTick}` });
+    kv.append(el("div", { textContent: "live" }), live);
+    cmp.infoNote = live;
+  }
+  row("Digimon", e ? `${e.name} (${folder || "no model"})` : "—");
+  row("species id", e?.id ?? "—");
+  row("ownership", e ? V.OWNERSHIP_LABELS[e.ownership] : "—");
+  row("family / tier", e ? `${e.family ?? "—"} / ${e.tier ?? "—"}` : "—");
+  row("action", a ? `${a.group?.label || a.kind}: ${a.name}` : "—");
+  if (a?.kind === "tech") {
+    const rec = techRecord(a.techId);
+    row("technique", `${a.techId} · clip ${a.clip} · ${a.hits} hit${a.hits > 1 ? "s" : ""} · ${a.element || "?"} · ${a.type} → ${techTargetClass(a.techId)}`);
+    row("record", rec ? `motion ${rec.motion} · effect ${rec.effect} · category ${rec.category} · elem ${rec.elem1}/${rec.elem2}` : "no tech record");
+  } else row("clip", a?.clip ?? "—");
+  const desc = V.describeScript(state.script, { folder, clip: state.clip, donorRow: donorRow(folder, state.clip), castBake: attackerModel()?.castBakes?.[state.clip] });
+  row("script", desc.text, desc.kind === "authored" ? "ok" : desc.kind === "none" ? "bad" : "");
+  if (state.script?.solver) {
+    const sv = state.script.solver, rep = sv.report || {};
+    const gate = rep.gate ? Object.entries(rep.gate).map(([k, v]) => `${k} ${v ? "ok" : "FAIL"}`).join(" · ") : "";
+    row("solver", `${sv.cls}/${sv.mode} · table ${sv.table} · release ${sv.release} · aim ${rep.worstAim == null ? "—" : Number(rep.worstAim).toFixed(1) + "°"} · ${gate}`, rep.pass === false ? "bad" : "ok");
+  }
+  const dr = donorRow(folder, state.clip);
+  if (dr) row("donor row", `${dr.m} · donor ${dr.d} · own tables ${(dr.t || []).join(",") || "—"}`);
+  const gateRow = V.gateFor(gate, folder, state.clip);
+  if (gateRow) {
+    if (gateRow.err) row("A10 gate", `no bake: ${gateRow.err}`, "bad");
+    else row("A10 gate", `${gateRow.used ? "USED" : "FALLBACK"} · coverage ${gateRow.covered} · reasons ${gateRow.reasons?.join(",") || "none"} · ankle ${gateRow.ankle} · energy ${gateRow.energy}`, gateRow.used ? "ok" : "bad");
+  }
+  const cr = V.contractFor(contract, folder, state.clip, state.side);
+  if (cr) {
+    const failed = Object.entries(cr.fail || {});
+    const text = `${cr.cases} case${cr.cases === 1 ? "" : "s"} on this side` + (failed.length ? ` · failing ${failed.map(([k, n]) => `${k}×${n}`).join(" ")}` : " · all invariants pass");
+    const names = failed.map(([k]) => `${k}: ${contract.invariantNames?.[k] || ""}`).join("; ");
+    row("A10 contract", text + (names ? ` (${names})` : ""), failed.length ? "bad" : "ok");
+    row("builds", Object.entries(cr.builds || {}).map(([k, n]) => `${k}:${n}`).join(" ") || "—");
+  }
+  row("tick", `${TICK_SEC.toFixed(4)} s · ${TICK_SPEED} table frames per tick · ${state.maxTick} ticks for the whole sequence`);
+  row("script camera", state.scriptCam || "—");
+  out.append(kv);
+}
+
+let urlTimer = null;
+function writeUrl() {
+  clearTimeout(urlTimer);
+  urlTimer = setTimeout(() => {
+    const q = new URLSearchParams();
+    if (state.src === "dw2") {
+      // the deep link the K21b report documents: ?src=dw2&model=<path>&clip=<n>&t=<seconds>
+      q.set("src", "dw2");
+      if (dw2.entry) q.set("model", dw2.entry.path);
+      if (dw2.clip >= 0) q.set("clip", String(dw2.clip));
+      q.set("t", dw2.time.toFixed(3));
+      const h = new URLSearchParams(Object.entries(cam.state()).map(([k, v]) => [k, String(v)])).toString();
+      history.replaceState(null, "", `${location.pathname}?${q.toString()}#${h}`);
+      return;
+    }
+    if (cmp.on) {
+      // K21h deep link: ?compare=<bake id>[&t=<tick>] — the pair, at the tick you are looking at
+      q.set("compare", cmp.id);
+      if (state.tick) q.set("t", String(state.tick));
+      const cs = cam.state();
+      const hash = new URLSearchParams(Object.entries(cs).map(([k, v]) => [k, String(v)])).toString();
+      history.replaceState(null, "", `${location.pathname}?${q.toString()}#${hash}`);
+      return;
+    }
+    if (state.dw2m) {
+      // K25 deep link: ?dw2fill=<slot>&model=<folder>[&letter=F][&ab=own]
+      q.set("dw2fill", String(state.dw2Slot ?? state.dw2m.counts?.slots?.[0] ?? ""));
+      q.set("model", state.dw2m.folder);
+      if (state.dw2Letter) q.set("letter", state.dw2Letter);
+      if (state.action?.kind === "own") q.set("ab", "own");
+    } else if (state.generic) {
+      // generic motions deep link: ?generic=<motion id>&model=<folder>
+      q.set("generic", state.generic.id);
+      q.set("model", state.generic.folder);
+    } else if (state.bake) {
+      // K21f deep link: ?bake=<body>-dw2<letter>&table=<n>[&ab=own&clip=<n>]
+      q.set("bake", state.bake.id);
+      if (state.bakeTable != null) q.set("table", String(state.bakeTable));
+      if (state.action?.kind === "own") q.set("ab", "own");
+    } else if (state.folder) q.set("model", state.folder);
+    if (state.clip != null && !state.generic) q.set("clip", String(state.clip));
+    if (state.techId != null && !state.generic) q.set("tech", String(state.techId));
+    q.set("side", state.side);
+    if (state.defender && state.defender !== "m051kuwa") q.set("defender", state.defender);
+    if (state.outcome !== "hit") q.set("outcome", state.outcome);
+    if (state.solver) q.set("solver", state.solverAll ? "all" : "1");
+    const cs = cam.state();
+    const hash = new URLSearchParams(Object.entries(cs).map(([k, v]) => [k, String(v)])).toString();
+    history.replaceState(null, "", `${location.pathname}?${q.toString()}#${hash}`);
+  }, 120);
+}
+
+function readUrl() {
+  const q = new URLSearchParams(location.search);
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (q.get("src") === "dw2") {
+    state.pendingSrc = "dw2";
+    state.dw2Path = q.get("model") || null;
+    const clip = q.get("clip");
+    if (clip != null && clip !== "") state.pendingDw2Clip = /^\d+$/.test(clip) ? +clip : clip;
+    if (q.get("t") != null && q.get("t") !== "") state.pendingDw2Time = Math.max(0, +q.get("t") || 0);
+  } else if (q.get("src") === "dw3") state.pendingSrc = "dw3";
+  if (q.get("generic")) state.pendingGeneric = q.get("generic");
+  // K25: ?dw2fill=<slot>&model=<folder>[&letter=F][&ab=own] — a DW2 motion on that Digimon, playing
+  const dw2fill = q.get("dw2fill");
+  if (dw2fill != null && /^\d+$/.test(dw2fill)) {
+    state.pendingDw2Fill = { slot: +dw2fill, letter: q.get("letter") || null, ab: q.get("ab") === "own" };
+  }
+  const model = q.get("model");
+  if (model && state.pendingSrc !== "dw2") state.folder = model;
+  // K21f: ?bake=<body>-dw2<letter>[&table=<n>][&ab=own] — a DW3 body playing a baked DW2 motion
+  const bake = q.get("bake");
+  if (bake) {
+    state.pendingBake = bake;
+    const t = q.get("table");
+    if (t != null && /^\d+$/.test(t)) state.pendingBakeTable = +t;
+  }
+  // K21h: ?compare=<bake id>[&t=<tick>] — the same pair, side by side at one tick
+  const compare = q.get("compare");
+  if (compare) {
+    state.pendingCompare = compare;
+    const t = q.get("t");
+    if (t != null && /^\d+$/.test(t)) state.pendingCompareTick = +t;
+  }
+  if (q.get("side") === "far") state.side = "far";
+  const def = q.get("defender");
+  if (def && byFolder.has(def)) state.defender = def;
+  if (q.get("outcome")) state.outcome = q.get("outcome");
+  if (q.get("solver") === "all") { state.solver = true; state.solverAll = true; }
+  else if (q.get("solver") === "1" || q.get("solver") === "on") state.solver = true;
+  const tech = q.get("tech"), clip = q.get("clip");
+  if (tech) state.pendingAction = { techId: +tech };
+  else if (clip != null) state.pendingAction = { clip: +clip, kind: q.get("kind") || (q.get("ab") === "own" ? "own" : null) };
+  if ([...hash.keys()].length) cam.setState(Object.fromEntries(hash));
+}
+
+// ── UI wiring ────────────────────────────────────────────────────────────────────────────────
+$("search").oninput = () => { renderList(); if (galleryOpen) renderGallery(); };
+for (const id of ["fFamily", "fTier", "fElement", "fOwnership", "fGaps", "fDw2"]) $(id).onchange = renderList;
+$("clearFilters").onclick = () => { for (const id of ["fFamily", "fTier", "fElement", "fOwnership", "fGaps", "fDw2", "fStage"]) $(id).value = ""; $("search").value = ""; renderList(); };
+$("srcDw3").onclick = () => setSource("dw3");
+$("srcDw2").onclick = () => setSource("dw2");
+$("fStage").onchange = () => renderDw2List();
+$("dw2Clip").onchange = () => setDw2Clip(+$("dw2Clip").value);
+$("bakeSel").onchange = async () => {
+  if (cmp.on) leaveCompare();
+  const id = $("bakeSel").value;
+  if (!id) { const real = state.bake?.folder || curFolder(); bakeSelectValue(""); await loadEntry(real); writeUrl(); return; }
+  const row = await loadBake(id);
+  bakeSelectValue(row ? row.id : "");
+  writeUrl();
+};
+$("bakePrev").onclick = () => stepBake(-1);
+$("bakeNext").onclick = () => stepBake(1);
+$("abBtn").onclick = () => { if (cmp.on) leaveCompare(); flipAB(); writeUrl(); };
+$("cmpBtn").onclick = async () => {
+  if (cmp.on) { leaveCompare(); return; }
+  const id = state.bake?.id || $("bakeSel").value;
+  if (!id) { toast("pick a bake first"); return; }
+  await enterCompare(id);
+};
+$("cmpGhost").onchange = () => { if (cmp.on) cmpDraw(); };
+$("side").value = state.side;
+$("side").onchange = async () => { state.side = $("side").value; await ensureLayout({ frame: false }); if (state.action) selectAction(state.action); writeUrl(); };
+$("defender").onchange = async () => { state.defender = $("defender").value; await ensureLayout({ frame: false }); if (state.action) selectAction(state.action); writeUrl(); };
+$("showDefender").onchange = () => { state.showDefender = $("showDefender").checked; r.setEnemyVisible(state.side === "near" ? state.showDefender : true); r.setPlayerVisible(state.side === "near" ? true : state.showDefender); };
+$("outcome").value = state.outcome;
+$("outcome").onchange = () => { state.outcome = $("outcome").value; if (state.action) selectAction(state.action); writeUrl(); };
+$("isolated").onchange = () => { state.isolated = $("isolated").checked; r.setIsolated(state.isolated, state.side === "near" ? "player" : "enemy"); };
+$("solver").onchange = () => { setSolver($("solver").checked); };
+$("freeCam").onchange = () => { state.freeCam = $("freeCam").checked; if (!state.freeCam) { $("battleCam").classList.add("on"); state.battleCamMode = "game"; } else $("battleCam").classList.remove("on"); };
+$("battleCam").onclick = () => {
+  state.freeCam = !state.freeCam; $("freeCam").checked = state.freeCam;
+  state.battleCamMode = "game";
+  $("battleCam").classList.toggle("on", !state.freeCam);
+  if (state.freeCam) cam.reset(r.getFighterBounds?.(attackerSide()), cv.width / cv.height);
+};
+$("play").onclick = () => (state.playing ? pause() : play());
+$("restart").onclick = () => { pause(); seek(0); };
+$("loop").onchange = () => { state.loop = $("loop").checked; };
+$("speed").oninput = () => { state.speed = +$("speed").value; $("speedOut").textContent = state.speed.toFixed(1) + "×"; };
+$("scrub").oninput = () => { pause(); seek(+$("scrub").value); };
+$("shot").onclick = () => {
+  const a = document.createElement("a");
+  if (cmp.on) {
+    a.download = `compare-${cmp.id}-t${state.tick}.png`;
+    a.href = cmpShot().toDataURL("image/png");
+    a.click();
+    return;
+  }
+  const name = state.src === "dw2" ? `${(dw2.entry?.code || "dw2")}-clip${dw2.clip}-t${dw2.time.toFixed(2)}` : `${state.folder}-clip${state.clip}-t${state.tick}`;
+  a.download = `${name}.png`; a.href = cv.toDataURL("image/png"); a.click();
+};
+$("share").onclick = async () => { try { await navigator.clipboard.writeText(location.href); toast("link copied"); } catch { toast(location.href); } };
+for (const b of document.querySelectorAll("[data-preset]")) b.onclick = () => setPreset(b.dataset.preset);
+for (const b of document.querySelectorAll("#tabs button")) b.onclick = () => {
+  for (const x of document.querySelectorAll("#tabs button")) x.classList.toggle("on", x === b);
+  for (const t of ["actions", "camera", "info", "ratings"]) $("tab" + t[0].toUpperCase() + t.slice(1)).classList.toggle("hidden", t !== b.dataset.tab);
+  if (b.dataset.tab === "ratings") renderRatings();
+};
+$("fov").oninput = () => { cam.fovDeg = +$("fov").value; $("fovOut").textContent = cam.fovDeg + "°"; writeUrl(); };
+$("ortho").onchange = () => { cam.ortho = $("ortho").checked; writeUrl(); };
+$("fullPitch").onchange = () => { cam.allowFullPitch = $("fullPitch").checked; };
+$("autoOrbit").onchange = () => { cam.autoOrbitSpeed = $("autoOrbit").checked ? +$("autoSpeed").value : 0; };
+$("autoSpeed").oninput = () => { $("autoOut").textContent = $("autoSpeed").value; if ($("autoOrbit").checked) cam.autoOrbitSpeed = +$("autoSpeed").value; };
+$("frameAll").onclick = frameAll;
+$("frameAttack").onclick = frameAttack;
+$("fly").onchange = () => { cam.flyMode = $("fly").checked; };
+
+// mouse
+cv.addEventListener("contextmenu", (e) => e.preventDefault());
+cv.addEventListener("pointerdown", (e) => {
+  cv.setPointerCapture(e.pointerId);
+  drag = { x: e.clientX, y: e.clientY, button: e.button, shift: e.shiftKey, mode: (e.button === 0 && !e.shiftKey) ? "orbit" : "pan" };
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (!state.freeCam) return;
+  if (drag.mode === "orbit") cam.orbitPixels(dx, dy);
+  else cam.panPixels(dx, dy, cv.clientHeight);
+  writeUrl();
+});
+addEventListener("pointerup", () => { drag = null; });
+cv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  if (!state.freeCam) return;
+  const rect = cv.getBoundingClientRect();
+  const ndc = [((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2];
+  cam.zoomBy(Math.exp(e.deltaY * 0.0012), ndc, cv.width / cv.height);
+  writeUrl();
+}, { passive: false });
+cv.addEventListener("dblclick", (e) => {
+  if (!state.freeCam) return;
+  const rect = cv.getBoundingClientRect();
+  const ndc = [((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2];
+  const b = currentBounds();
+  cam.pivotAt(ndc, cv.width / cv.height, b, state.src === "dw2" ? 0 : r.getGroundY?.(attackerSide()));
+  writeUrl();
+});
+const KEYMAP = { KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", KeyQ: "q", KeyE: "e" };
+// K21h: the compare panes orbit/pan/zoom. Linked (default) = whichever pane you drag, both follow;
+// unlinked = the left pane drives the DW2 camera, the right ours.
+let cmpDrag = null;
+for (const [paneId, which] of [["cmpPaneL", "B"], ["cmpPaneR", "A"]]) {
+  const node = $(paneId);
+  node.addEventListener("contextmenu", (e) => e.preventDefault());
+  node.addEventListener("pointerdown", (e) => {
+    if (!cmp.on) return;
+    node.setPointerCapture(e.pointerId);
+    cmpDrag = { which, x: e.clientX, y: e.clientY, mode: (e.button === 0 && !e.shiftKey) ? "orbit" : "pan" };
+  });
+  node.addEventListener("pointermove", (e) => {
+    if (!cmp.on || !cmpDrag) return;
+    const dx = e.clientX - cmpDrag.x, dy = e.clientY - cmpDrag.y;
+    cmpDrag.x = e.clientX; cmpDrag.y = e.clientY;
+    const camera = cmpDrag.which === "B" && $("cmpUnlink").checked ? camB : cam;
+    if (cmpDrag.mode === "orbit") camera.orbitPixels(dx, dy);
+    else camera.panPixels(dx, dy, cv.clientHeight);
+    writeUrl();
+  });
+  node.addEventListener("pointerup", () => { cmpDrag = null; });
+  node.addEventListener("pointercancel", () => { cmpDrag = null; });
+  node.addEventListener("wheel", (e) => {
+    if (!cmp.on) return;
+    e.preventDefault();
+    const camera = which === "B" && $("cmpUnlink").checked ? camB : cam;
+    camera.zoomBy(Math.exp(e.deltaY * 0.0012), [0, 0], cv.width / cv.height);
+    writeUrl();
+  }, { passive: false });
+}
+addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; return; }
+  if (e.code === "Space") { e.preventDefault(); state.playing ? pause() : play(); }
+  else if (e.code === "KeyF") frameAll();
+  else if (e.code === "Home") resetView();
+  else if (e.code === "KeyB") { $("bbox").checked = !$("bbox").checked; }
+  else if (/^Digit[1-7]$/.test(e.code)) setPreset(["front", "back", "left", "right", "top", "bottom", "threeQuarter"][+e.code.slice(5) - 1]);
+});
+addEventListener("keyup", (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+
+// ── DW2 source (K21b) ──────────────────────────────────────────────────────────────────────────
+// The DW3 half of this page is the disc's own data drawn by battle3d. The DW2 half is Digimon World
+// 2's models as the community converter wrote them (glTF 2.0, one file per character, embedded
+// texture, RIGID mesh-per-bone rigs), parsed by web/anim-viewer-dw2.js and drawn by its own small
+// WebGL pass into a second canvas that is composited into this one. Everything around it — the free
+// camera with its orbit/pan/zoom/presets/framing, the HUD, the screenshot, the scrubber, speed, loop —
+// is the SAME code, because it is the same canvas.
+//
+// The files are dev-only and live outside the repo: `web/dw2-models` is a git-excluded symlink to
+// ~/dw2-models, served by whatever static server serves this page. No DW2 data is in the repo.
+const dw2 = {
+  index: null, root: DW2.DW2_DEFAULT_ROOT, entry: null, model: null, clip: 0,
+  time: 0, playing: false, renderer: null, pose: null, bounds: null, offset: [0, 0, 0],
+  loadToken: 0, error: null, loading: false,
+};
+
+async function initDw2Index() {
+  if (dw2.index) return dw2.index;
+  const q = new URLSearchParams(location.search);
+  dw2.root = (q.get("dw2root") || DW2.DW2_DEFAULT_ROOT).replace(/\/+$/, "");
+  const res = await fetch(`${dw2.root}/index.json`).catch(() => null);
+  if (!res || !res.ok) throw new Error(`no DW2 index at ${dw2.root}/index.json — start the dev server from web/ and keep the (git-excluded) web/dw2-models symlink in place`);
+  dw2.index = DW2.buildDw2Index(await res.json());
+  const sel = $("fStage");
+  sel.replaceChildren(el("option", { value: "", textContent: `all stages (${dw2.index.count})` }));
+  for (const [stage, n] of Object.entries(dw2.index.stages).sort((a, b) => b[1] - a[1])) {
+    sel.append(el("option", { value: stage, textContent: `${stage} (${n})` }));
+  }
+  return dw2.index;
+}
+
+const dw2UrlOf = (entry) => `${dw2.root}/${dw2.index.root}/${String(entry.path).split("/").map(encodeURIComponent).join("/")}`;
+
+function renderDw2List() {
+  const ul = $("species");
+  ul.replaceChildren();
+  if (dw2.error) {
+    ul.append(el("li", { className: "sel", textContent: `DW2 source unavailable: ${dw2.error}` }));
+    $("count").textContent = "—";
+    return;
+  }
+  const list = DW2.filterDw2(dw2.index?.models || [], { query: $("search").value, stage: $("fStage").value });
+  for (const e of list) {
+    const li = el("li", { className: dw2.entry?.path === e.path ? "sel" : "" },
+      el("span", {}, e.name, el("small", {}, ` ${e.code || ""} · ${e.anims.length} clip${e.anims.length === 1 ? "" : "s"}`)),
+      e.stage !== "Digimon" ? el("span", { className: "tag", textContent: e.stage }) : "");
+    li.onclick = () => loadDw2(e, { user: true });
+    ul.append(li);
+  }
+  $("count").textContent = `${list.length} / ${dw2.index?.count ?? 0}`;
+}
+
+function renderBadgesDw2() {
+  const box = $("badges");
+  box.replaceChildren();
+  const add = (text, cls = "") => box.append(el("span", { className: "badge " + cls, textContent: text }));
+  add("DW2");
+  if (dw2.error) { add("no source", "bad"); return; }
+  if (!dw2.entry) return;
+  add(dw2.entry.stage);
+  if (dw2.model) {
+    const st = dw2.model.stats;
+    add(`${st.clips} clip${st.clips === 1 ? "" : "s"}`, st.clips ? "good" : "warn");
+    add(`rigid rig · ${st.joints || "?"} joints`);
+    if (!st.clips) add("no animations: bind pose", "warn");
+  } else if (dw2.loading) add("loading…", "warn");
+}
+
+/** Read the current clip at the current time, with the fixed ground offset applied. */
+function dw2PoseAt(clip = dw2.clip, time = dw2.time) {
+  if (!dw2.model) return null;
+  return DW2.offsetPose(dw2.model, DW2.samplePose(dw2.model, clip, time), dw2.offset);
+}
+
+function dw2BoundsNow() {
+  const pose = dw2PoseAt();
+  return pose ? DW2.poseBounds(dw2.model, pose) : null;
+}
+
+function drawDw2() {
+  if (!dw2.model || !dw2.renderer) return 0;
+  const pose = dw2PoseAt();
+  if (!pose) return 0;
+  dw2.pose = pose;
+  dw2.bounds = DW2.poseBounds(dw2.model, pose);
+  return dw2.renderer.draw(dw2.model, pose, cam.viewProjection(cv.width / cv.height), { bg: "#0b0d12" });
+}
+
+function fillDw2ClipSelect() {
+  const sel = $("dw2Clip");
+  const opts = [el("option", { value: "-1", textContent: "bind pose" })];
+  for (const c of dw2.model ? DW2.clipList(dw2.model) : []) {
+    opts.push(el("option", { value: String(c.index), textContent: `${c.name} · ${c.dur.toFixed(2)} s` }));
+  }
+  sel.replaceChildren(...opts);
+  sel.value = String(dw2.clip);
+  sel.disabled = !dw2.model;
+}
+
+function buildDw2ClipList() {
+  const box = $("actionList");
+  box.replaceChildren();
+  fillDw2ClipSelect();
+  if (!dw2.model) {
+    box.append(el("div", { className: "rowline", style: "color:var(--dim)", textContent: dw2.loading ? "loading…" : "select a DW2 model on the left" }));
+    return;
+  }
+  box.append(el("div", { className: "rowline", style: "color:var(--dim)", textContent: "The clips in this file, in its own order (the converter names them anim_A … anim_K). Durations are the keys' last time, measured from the file." }));
+  const row = el("div", { className: "actList" });
+  const bind = el("button", { className: "act" + (dw2.clip < 0 ? " sel" : ""), title: "the file's own bind pose (no clip)" },
+    el("span", {}, "Bind pose ", el("small", {}, "no clip")));
+  bind.onclick = () => setDw2Clip(-1);
+  row.append(bind);
+  for (const c of DW2.clipList(dw2.model)) {
+    const b = el("button", { className: "act" + (dw2.clip === c.index ? " sel" : ""), title: `clip ${c.index} · ${c.channels} channels` },
+      el("span", {}, c.name, el("small", {}, ` ${c.dur.toFixed(2)} s`)));
+    b.onclick = () => setDw2Clip(c.index);
+    row.append(b);
+  }
+  box.append(row);
+  if (!DW2.clipList(dw2.model).length) {
+    box.append(el("div", { className: "rowline", style: "color:var(--accent2)", textContent: "this file carries no animation clips: the bind pose is what there is to see" }));
+  }
+}
+
+function setDw2Clip(i) {
+  const clip = i >= 0 ? dw2.model?.anims[i] : null;
+  dw2.clip = clip ? i : -1;
+  dw2.time = 0;
+  const dur = clip ? clip.dur : 0;
+  state.maxTick = Math.max(1, Math.round(dur * 60));
+  state.tick = 0;
+  $("scrub").max = String(state.maxTick);
+  $("scrub").value = "0";
+  $("dw2Clip").value = String(dw2.clip);
+  if (!clip) pause();
+  buildDw2ClipList();
+  drawDw2();
+  composite();
+  updateInfo();
+  writeUrl();
+}
+
+async function loadDw2(entry, { user = false, frame = true } = {}) {
+  const token = ++dw2.loadToken;
+  dw2.entry = entry;
+  dw2.model = null;
+  dw2.loading = true;
+  dw2.error = null;
+  state.dw2Path = entry.path;
+  $("title").replaceChildren(el("span", { textContent: entry.name }), el("small", {}, `  ${entry.path} · Digimon World 2`));
+  renderBadgesDw2();
+  renderDw2List();
+  buildDw2ClipList();
+  try {
+    if (!dw2.renderer) {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      dw2.renderer = DW2.createDw2Renderer(c);
+    }
+    const model = await dw2.renderer.loadModel(dw2UrlOf(entry));
+    if (token !== dw2.loadToken) return false;
+    dw2.model = model;
+    dw2.loading = false;
+    // stand the model on the ground once, from the BIND pose: the offset is fixed afterwards so the
+    // feet do not slide while a clip plays
+    const bind = DW2.samplePose(model, -1, 0);
+    const b = DW2.poseBounds(model, bind);
+    dw2.offset = [-b.center[0], -b.min[1], -b.center[2]];
+    const clips = DW2.clipList(model);
+    const wanted = state.pendingDw2Clip != null ? clips.find((c) => c.index === state.pendingDw2Clip) || clips.find((c) => c.name === state.pendingDw2Clip) : null;
+    state.pendingDw2Clip = null;
+    setDw2Clip((wanted || clips[0])?.index ?? -1);
+    if (state.pendingDw2Time != null) {
+      const t = state.pendingDw2Time;
+      state.pendingDw2Time = null;
+      dw2SeekTick(Math.round(t * 60));
+    }
+    if (frame) {
+      const bb = dw2BoundsNow();
+      if (bb) cam.frameBounds(bb, cv.width / cv.height, { immediate: true });
+    }
+    renderBadgesDw2();
+    buildDw2ClipList();
+    drawDw2();
+    composite();
+    updateInfo();
+    writeUrl();
+    if (dw2.clip >= 0) play();       // a model source that shows motion on arrival
+    return true;
+  } catch (err) {
+    if (token !== dw2.loadToken) return false;
+    dw2.loading = false;
+    dw2.error = String(err?.message || err);
+    renderBadgesDw2();
+    buildDw2ClipList();
+    updateInfo();
+    toast(`DW2: ${dw2.error}`);
+    return false;
+  }
+}
+
+function dw2Advance(dt) {
+  const clip = dw2.clip >= 0 ? dw2.model?.anims[dw2.clip] : null;
+  if (!clip) return;
+  dw2.time += dt * state.speed;
+  if (clip.dur > 0 && dw2.time >= clip.dur) {
+    if (state.loop) dw2.time %= clip.dur;
+    else { dw2.time = clip.dur; pause(); }
+  }
+  state.tick = Math.min(state.maxTick, Math.round(dw2.time * 60));
+}
+
+function dw2SeekTick(n) {
+  const clip = dw2.clip >= 0 ? dw2.model?.anims[dw2.clip] : null;
+  const dur = clip?.dur || 0;
+  state.tick = Math.max(0, Math.min(state.maxTick, n | 0));
+  dw2.time = dur > 0 ? dur * (state.tick / Math.max(1, state.maxTick)) : 0;
+  drawDw2();
+  composite();
+}
+
+function dw2PlayingText() {
+  const clip = dw2.clip >= 0 ? dw2.model?.anims[dw2.clip] : null;
+  return clip ? `${clip.name} · ${dw2.time.toFixed(2)} / ${clip.dur.toFixed(2)} s · ${clip.channels.length} channels` : "bind pose";
+}
+
+function updateDw2Info() {
+  const out = $("info");
+  out.replaceChildren();
+  const kv = el("div", { className: "kv" });
+  const row = (k, v, cls = "") => { kv.append(el("div", { textContent: k }), el("div", { className: cls, textContent: v == null || v === "" ? "—" : String(v) })); };
+  row("model", dw2.entry ? `${dw2.entry.name} (${dw2.entry.path})` : "—");
+  row("source", dw2.entry ? dw2UrlOf(dw2.entry) : `${dw2.root}/index.json`);
+  row("stage / code", dw2.entry ? `${dw2.entry.stage} / ${dw2.entry.code || "—"}` : "—");
+  if (dw2.error) row("error", dw2.error, "bad");
+  if (dw2.model) {
+    const st = dw2.model.stats;
+    row("rig", `rigid: ${st.meshes} meshes parented to ${st.joints || "?"} bones, ${st.hasSkinAttrs ? "WITH" : "no"} skin weights, ${st.hasIndices ? "indexed" : "non-indexed"} triangles`);
+    row("geometry", `${st.tris} triangles · ${st.verts} vertices · ${st.draws} draw calls`);
+    row("materials / texture", `${st.materials} material${st.materials === 1 ? "" : "s"} · ${st.textured} textured prims · image ${st.textureSizes || "—"}`);
+    row("clips", `${st.clips}: ${DW2.clipList(dw2.model).map((c) => `${c.name} ${c.dur.toFixed(2)}s`).join(", ") || "none"}`);
+    row("playing", dw2PlayingText());
+    dw2.infoPlaying = kv.lastElementChild;      // kept live while the clip plays (composite updates it)
+    row("converter", dw2.model.gen);
+  }
+  row("note", "DW2 files are dev-only local data (never in the repo): the viewer reads them from the git-excluded web/dw2-models symlink.");
+  out.append(kv);
+}
+
+/** The bounds the HUD, framing and re-pivot use, from whichever source is on screen. */
+const currentBounds = () => (state.src === "dw2" ? dw2.bounds : r.getFighterBounds?.(attackerSide()));
+
+async function setSource(src) {
+  if (src !== "dw3" && src !== "dw2") return;
+  if (src === state.src) return;
+  if (cmp.on) leaveCompare();          // K21h: the pair view is a DW3-mode state
+  const wasDw3 = state.src === "dw3";
+  state.src = src;
+  const dw2On = src === "dw2";
+  $("srcDw3").classList.toggle("on", !dw2On);
+  $("srcDw2").classList.toggle("on", dw2On);
+  for (const id of ["fFamily", "fTier", "fElement", "fOwnership", "fGaps"]) $(id).classList.toggle("hidden", dw2On);
+  $("fStage").classList.toggle("hidden", !dw2On);
+  for (const id of ["lblIsolated", "lblSolver", "lblSide", "lblDefender", "lblShowDefender", "lblOutcome", "lblBake"]) $(id).classList.toggle("hidden", dw2On);
+  $("abBtn").classList.toggle("hidden", dw2On || !state.bake);
+  $("dw2ClipWrap").classList.toggle("hidden", !dw2On);
+  $("dw3ActionsNote").classList.toggle("hidden", dw2On);
+  $("genericBox").classList.toggle("hidden", dw2On);
+  $("galleryBtn").classList.toggle("hidden", dw2On);
+  $("battleCam").classList.toggle("hidden", dw2On);
+  $("frameAttack").classList.toggle("hidden", dw2On);
+  if (dw2On) {
+    pause();
+    state.action = null;
+    state.freeCam = true;
+    $("freeCam").checked = true;
+    $("freeCam").disabled = true;
+    try {
+      await initDw2Index();
+    } catch (err) {
+      dw2.error = String(err?.message || err);
+      renderDw2List();
+      renderBadgesDw2();
+      $("title").textContent = "DW2 source unavailable";
+      updateInfo();
+      return;
+    }
+    $("fStage").value = $("fStage").value || "Digimon";
+    renderDw2List();
+    const byPath = state.dw2Path && dw2.index.models.find((m) => m.path === state.dw2Path);
+    const first = byPath || dw2.index.models.find((m) => /007AIRD/.test(m.path)) || dw2.index.models.find((m) => m.stage === "Digimon") || dw2.index.models[0];
+    await loadDw2(first, { frame: true });
+  } else {
+    dw2.playing = false;
+    state.playing = false;
+    $("play").textContent = "▶ play";
+    $("freeCam").disabled = false;
+    renderList();
+    if (wasDw3) return;
+    const folder = state.folder && byFolder.has(state.folder) ? state.folder
+      : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder);
+    state.layoutKey = "";
+    r.setFreeCameraView(() => cam.view());
+    await loadEntry(folder);
+    $("scrub").max = String(state.maxTick);
+  }
+}
+
+
+/** The embedding surface for tools/probes (same shape as the DW3 hooks above). */
+window.__viewer.dw2 = {
+  state: dw2,
+  source: (s) => setSource(s),
+  index: () => dw2.index,
+  load: (key) => {
+    const e = dw2.index?.models.find((m) => m.path === key || m.code === key || m.name === key);
+    return e ? loadDw2(e, { user: true }) : Promise.resolve(false);
+  },
+  setClip: setDw2Clip, seek: dw2SeekTick, play, pause, advance: dw2Advance,
+  bounds: () => dw2.bounds, pose: () => dw2.pose, model: () => dw2.model,
+  url: () => (dw2.entry ? dw2UrlOf(dw2.entry) : null),
+  info: () => ({
+    src: state.src, path: dw2.entry?.path || null, clip: dw2.clip, time: dw2.time,
+    playing: dw2.playing, error: dw2.error, loading: dw2.loading,
+    stats: dw2.model?.stats || null, bounds: dw2.bounds, maxTick: state.maxTick, tick: state.tick,
+  }),
+};
+
+// ── K21h: compare — the DW2 original beside our body with the baked DW2 motion ─────────────────
+// Left pane: Digimon World 2's own file, posed by the K21b reader. Right pane: the DW3 body with
+// K21d's retarget of the SAME clip, posed by battle3d's ordinary animator. One tick, one scrubber,
+// one play/pause/speed/loop, one camera angle. The table under the panes is the measured comparison:
+// anim-viewer-compare.js owns the frame change, the unit scale and the verdict rules, and this block
+// owns nothing but the wiring between the two renderers and that table.
+const cmp = {
+  on: false, id: null, row: null, entry: null, model: null, gltfClip: -1, renderer: null,
+  offset: [0, 0, 0], pose: null, bones2: {}, bones3: {}, torsoNote: null, roles: [], cells: null,
+  scale: 1, dw2Frames: 1, maxTick: 1, table: [], ref2: null, ref3: null,
+  boxA0: null, boxB0: null, summary: null, error: null, ratio: 1, baseA: null, baseB: null,
+  epsilon: 1, infoNote: null,
+};
+const camB = createFreeCamera({ fovDeg: 45 });
+
+/** The DW2 side's pose at one of its clip frames, with the fixed ground offset applied. */
+const cmpPose2 = (frame) => DW2.offsetPose(cmp.model, DW2.samplePose(cmp.model, cmp.gltfClip, Math.max(0, frame) / 30), cmp.offset);
+const cmpFrame2 = (tick) => CMP.frameAtTick(tick, TICK_SPEED, cmp.dw2Frames - 1);
+const cmpFrame3 = (tick) => CMP.frameAtTick(tick, TICK_SPEED, Math.max(0, cmp.table.length - 1));
+
+/** Raw (glTF-frame) world positions of the roles on the DW2 side; the conversion happens in compareRow. */
+function cmpPositions2(pose) {
+  const joints = cmp.model?.json?.skins?.[0]?.joints || [];
+  const out = {};
+  for (const r of cmp.roles) {
+    if (r.dw2 == null) continue;
+    const n = joints[r.dw2];
+    if (n == null) continue;
+    out[r.role] = [pose.world[n * 16 + 12], pose.world[n * 16 + 13], pose.world[n * 16 + 14]];
+  }
+  return out;
+}
+/** The same roles on our body, from the pose the renderer itself poses (firing-axis poseFromChannels). */
+function cmpPositions3(frame) {
+  const model = attackerModel();
+  if (!model) return {};
+  const p = poseFromChannels(model, Math.max(0, frame | 0));
+  const out = {};
+  for (const r of cmp.roles) if (r.dw3 != null && p.pos[r.dw3]) out[r.role] = p.pos[r.dw3].slice();
+  return out;
+}
+
+/** The table's rows at one tick: displacement from frame 0 on both sides, compared. */
+function cmpRowsAt(tick) {
+  const p2 = cmpPositions2(cmpPose2(cmpFrame2(tick)));
+  const p3 = cmpPositions3(cmp.table[cmpFrame3(tick)] ?? 0);
+  return cmp.roles.map((r) => {
+    const d2 = cmp.ref2?.[r.role] && p2[r.role] ? CMP.displacement(cmp.ref2[r.role], p2[r.role]) : null;
+    const d3 = cmp.ref3?.[r.role] && p3[r.role] ? CMP.displacement(cmp.ref3[r.role], p3[r.role]) : null;
+    return { ...r, cmp: CMP.compareRow(d2 ? CMP.toBodyUnits(d2, cmp.scale) : null, d3, { epsilon: cmp.epsilon }) };
+  });
+}
+
+function cmpVerdict(v) {
+  if (v.ok) return v.moving2 || v.moving3 ? "agree" : "both still";
+  if (!v.moving2 && !v.moving3) return "both still";
+  if (!v.moving2 || !v.moving3) return "one side still";
+  return !v.dirOk ? "direction ✗" : "size ✗";
+}
+
+function cmpLegend() {
+  return "Δ = that joint's displacement from the clip's frame 0, both columns in the DW3 body's units: DW2 side frame-changed (x right, y down, z forward) and × sizeRatio. "
+    + "red = the direction disagrees (cos < 0.5) or the size differs by more than 2×; a role that moves on one side and stands still on the other counts as a size mismatch. "
+    + "bones are DW2 joint / our bone."
+    + (cmp.torsoNote ? ` Torso: ${cmp.torsoNote}.` : "");
+}
+
+function cmpBuildTable() {
+  const t = $("cmpTable");
+  t.replaceChildren();
+  const th = (s) => el("th", { textContent: s });
+  t.append(el("thead", {}, el("tr", {},
+    th("role"), th("DW2 bone"), th("our bone"),
+    th("DW2 Δ x / y / z"), th("|DW2|"), th("our Δ x / y / z"), th("|our|"), th("cos"), th("size"), th("verdict"))));
+  const body = el("tbody");
+  cmp.cells = new Map();
+  for (const r of cmp.roles) {
+    const c = {};
+    const tr = el("tr", {}, el("td", { textContent: r.label }));
+    for (const k of ["bone2", "bone3", "d2", "l2", "d3", "l3", "cos", "size", "verdict"]) {
+      c[k] = el("td", { className: "dim", textContent: k.startsWith("bone") ? "—" : "" });
+      tr.append(c[k]);
+    }
+    c.bone2.textContent = r.dw2 == null ? "—" : `j${r.dw2}`;
+    c.bone3.textContent = r.dw3 == null ? "—" : `j${r.dw3}`;
+    body.append(tr);
+    cmp.cells.set(r.role, c);
+  }
+  t.append(body);
+  t.append(el("tfoot", {}, el("tr", { className: "legend" }, el("td", { colSpan: 10, textContent: cmpLegend() }))));
+}
+
+function cmpUpdateTable(rows) {
+  if (!cmp.cells) cmpBuildTable();
+  const n = (x) => (x >= 10 ? String(Math.round(x)) : x.toFixed(1));
+  for (const r of rows) {
+    const c = cmp.cells.get(r.role);
+    if (!c) continue;
+    const v = r.cmp;
+    const cls = v.ok ? "ok" : "bad";
+    c.d2.textContent = CMP.fmtVec(v.dw2);
+    c.l2.textContent = r.dw2 == null ? "—" : n(v.len2);
+    c.d3.textContent = CMP.fmtVec(v.dw3);
+    c.l3.textContent = r.dw3 == null ? "—" : n(v.len3);
+    c.cos.textContent = v.cos == null ? "—" : v.cos.toFixed(2);
+    c.size.textContent = v.moving2 || v.moving3 ? (Number.isFinite(v.ratio) ? `${v.ratio.toFixed(2)}×` : "∞") : "—";
+    c.verdict.textContent = cmpVerdict(v);
+    for (const k of ["d2", "l2", "d3", "l3", "cos", "size", "verdict"]) c[k].className = cls;
+  }
+}
+
+/** The floor grid + the frame-0 ghost + the current footprint, in the pane's own world. */
+function drawCmpPane(side, camera, box0, boxNow, W, H) {
+  const c = $("cmp" + side + "Ovl").getContext("2d");
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, W, H);
+  if (!box0) return;
+  const aspect = W / H;
+  const scr = (p) => { const q = camera.project(p, aspect); return q ? [(q[0] * 0.5 + 0.5) * W, (1 - (q[1] * 0.5 + 0.5)) * H] : null; };
+  const line = (a, b, style, width = 1) => {
+    const p = scr(a), q = scr(b);
+    if (!p || !q) return;
+    c.strokeStyle = style; c.lineWidth = width;
+    c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke();
+  };
+  const gy = box0.min[1];                                  // each side's own floor (the model's frame-0 feet)
+  const cx = box0.center[0], cz = box0.center[2];
+  const span = Math.max(box0.size[0], box0.size[2], 1) * 1.6;
+  const steps = 4;
+  for (let i = -steps; i <= steps; i++) {
+    const d = (span * i) / steps;
+    const major = i === 0;
+    line([cx - span, gy, cz + d], [cx + span, gy, cz + d], major ? "#3c4a63" : "#1e2634", major ? 1.5 : 1);
+    line([cx + d, gy, cz - span], [cx + d, gy, cz + span], major ? "#3c4a63" : "#1e2634", major ? 1.5 : 1);
+  }
+  const footprint = (b, style, width) => {
+    if (!b) return;
+    const y = b.min[1];
+    const k = [[b.min[0], y, b.min[2]], [b.max[0], y, b.min[2]], [b.max[0], y, b.max[2]], [b.min[0], y, b.max[2]]];
+    for (let i = 0; i < 4; i++) line(k[i], k[(i + 1) % 4], style, width);
+  };
+  if ($("cmpGhost").checked) footprint(box0, "rgba(255,180,84,.55)", 1.5);   // frame 0, where it started
+  footprint(boxNow, "#58b7ff", 1.5);                                         // now
+  if (boxNow) line([boxNow.center[0], boxNow.min[1], boxNow.center[2]], [boxNow.center[0], boxNow.max[1], boxNow.center[2]], "rgba(88,183,255,.5)", 1);
+}
+
+/** Draw both panes at the shared tick, then the table + the one-line summary. */
+function cmpDraw() {
+  if (!cmp.on || !cmp.model || !cmp.renderer) return;
+  const W = cv.width, H = cv.height;
+  r.render(0);
+  const pose = cmpPose2(cmpFrame2(state.tick));
+  cmp.pose = pose;
+  const boxB = DW2.poseBounds(cmp.model, pose);
+  cmp.renderer.draw(cmp.model, pose, camB.viewProjection(W / H), { bg: "#0a0f16" });
+  $("cmpRImg").getContext("2d").drawImage(off, 0, 0);
+  drawCmpPane("L", camB, cmp.boxB0, boxB, W, H);
+  drawCmpPane("R", cam, cmp.boxA0, r.getFighterBounds?.("player") || null, W, H);
+  cmpUpdateTable(cmpRowsAt(state.tick));
+  const sum = cmp.summary;
+  const text = `${CMP.agreementText(sum)} · tick ${state.tick} / ${cmp.maxTick}`;
+  const node = $("cmpSummary");
+  node.textContent = text;
+  node.classList.toggle("ok", !!(sum && sum.total && sum.agree === sum.total));
+  $("scrub").value = String(state.tick);
+  $("tickLabel").textContent = `tick ${state.tick} / ${cmp.maxTick} · bake frame ${cmp.table[cmpFrame3(state.tick)] ?? "—"} · DW2 frame ${cmpFrame2(state.tick)} / ${cmp.dw2Frames - 1}`;
+  if (cmp.infoNote?.isConnected) cmp.infoNote.textContent = text;
+}
+
+/** Seek: relaunch the bake and run the SHARED tick counter forward on both sides. */
+function cmpSeek(n) {
+  if (!cmp.on) return;
+  const t = Math.max(0, Math.min(cmp.maxTick, n | 0));
+  launch();
+  for (let i = 0; i < t; i++) r.coordinator.tick(TICK_SPEED);
+  state.tick = t;
+  r.render(0);
+  cmpDraw();
+  writeUrl();
+}
+
+/** The linked camera: one angle, each pane at its own model's scale. */
+function syncCamB() {
+  if (!cmp.baseA || !cmp.baseB) return;
+  const s = cam.state(), a = cmp.baseA, b = cmp.baseB, k = cmp.ratio || 1;
+  camB.minDist = 0.001; camB.maxDist = 1e9;
+  camB.setState({
+    yaw: s.yaw, pitch: s.pitch, fov: s.fov, ortho: s.ortho, dist: s.dist * k,
+    px: b.px + (s.px - a.px) * k, py: b.py + (s.py - a.py) * k, pz: b.pz + (s.pz - a.pz) * k,
+  });
+}
+
+// ── loading the pair ────────────────────────────────────────────────────────────────────────────
+async function cmpLoad(id) {
+  pause();
+  let row = (await bakeRegistry()).byId.get(id) || null;
+  if (!row) row = await deriveBakeRow(id);
+  if (!row) { toast(`no bake at ${BAKE.bakeUrl(id, bakeRoot())}`); return null; }
+  await loadBake(row.id, { tick: 0 });
+  if (!state.bake || state.bake.id !== row.id) return null;
+  // the renderer's own animator must have the bake mounted before its timeline is read (a race here
+  // reads the previous model's channel keys and every number below would be nonsense)
+  await waitFor(() => attacker()?.model?.folder === row.id, 8000).catch(() => false);
+  row = { ...state.bake, sizeRatio: state.bake.sizeRatio ?? row.sizeRatio ?? null };
+  try { await initDw2Index(); } catch (err) { cmp.error = String(err?.message || err); toast(`DW2 source: ${cmp.error}`); return null; }
+  const code = CMP.dw2CodeForFolder(row.folder);
+  const entry = CMP.findDw2Entry(dw2.index.models, code);
+  if (!entry) { toast(`no DW2 model with code ${code} for ${row.folder}`); return null; }
+  if (!cmp.renderer) {
+    const c = document.createElement("canvas");
+    c.width = cv.width; c.height = cv.height;
+    try { cmp.renderer = DW2.createDw2Renderer(c); } catch (err) { toast(`DW2 renderer: ${err?.message || err}`); return null; }
+    $("cmpLImg").replaceWith(c);
+    c.id = "cmpLImg";
+    c.classList.remove("ovl");
+    $("cmpPaneL").insertBefore(c, $("cmpLOvl"));
+  }
+  // the same file already mounted (a re-entry) does not need parsing again
+  const sameFile = cmp.model && cmp.entry?.path === entry.path;
+  if (sameFile) cmp.entry = entry;
+  else {
+    try { cmp.model = await cmp.renderer.loadModel(dw2UrlOf(entry)); }
+    catch (err) { toast(`DW2 model: ${err?.message || err}`); return null; }
+    cmp.entry = entry;
+  }
+  cmp.gltfClip = CMP.clipIndexForLetter(cmp.model.anims, row.letter);
+  if (cmp.gltfClip < 0) { toast(`${entry.code} carries no clip ${row.letter}`); return null; }
+  const bind = DW2.samplePose(cmp.model, -1, 0);
+  const bb = DW2.poseBounds(cmp.model, bind);
+  cmp.offset = [-bb.center[0], -bb.min[1], -bb.center[2]];
+  cmp.dw2Frames = CMP.clipFrames(cmp.model.anims[cmp.gltfClip].dur);
+  // roles: our body's from K12's map, the DW2 file's from the geometry-derived map (+ the whole-body rule)
+  const maps = await fetch(`${dw2.root}/dw2-bonemaps.json`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  const r2 = CMP.dw2RoleBones(maps?.models?.[`dw2_${row.folder}`] || null, CMP.partVolumes(cmp.model, bind));
+  cmp.bones2 = r2.bones;
+  cmp.torsoNote = r2.torsoNote;
+  cmp.bones3 = CMP.roleBones(boneMap(row.folder));
+  cmp.roles = CMP.roleRows(cmp.bones2, cmp.bones3);
+  cmp.scale = Number.isFinite(+row.sizeRatio) && +row.sizeRatio > 0 ? +row.sizeRatio : 1;
+  // the baked table's frames, in tick order (the tick -> frame map both sides share)
+  const tab = attackerModel()?.timeline?.[state.bakeTable]?.table || [];
+  cmp.table = tab.map((e) => (e ? e.value : null)).filter((v) => v != null && v !== 0xFFFF);
+  cmp.id = row.id;
+  cmp.row = row;
+  const bakeTicks = cmp.table.length ? CMP.ticksForFrames(cmp.table.length, TICK_SPEED) : 0;
+  cmp.maxTick = Math.max(1, bakeTicks, CMP.ticksForFrames(cmp.dw2Frames, TICK_SPEED));
+  state.maxTick = cmp.maxTick;
+  $("scrub").max = String(cmp.maxTick);
+  // frame 0: the reference both columns measure from, the ghost boxes and the camera framing
+  state.tick = 0;
+  launch();
+  r.render(0);
+  cmp.boxA0 = r.getFighterBounds?.("player") || null;
+  const pose0 = cmpPose2(0);
+  cmp.boxB0 = DW2.poseBounds(cmp.model, pose0);
+  cmp.ref2 = cmpPositions2(pose0);
+  cmp.ref3 = cmpPositions3(cmp.table[0] ?? 0);
+  const bodyH = cmp.boxA0 ? cmp.boxA0.size[1] : 1000;
+  cmp.epsilon = Math.max(0.5, bodyH * 0.005);
+  const aspect = cv.width / cv.height;
+  if (cmp.boxA0) cam.frameBounds(cmp.boxA0, aspect, { immediate: true });
+  camB.minDist = 0.001; camB.maxDist = 1e9;
+  camB.frameBounds(cmp.boxB0, aspect, { immediate: true });
+  cmp.baseA = cam.state();
+  cmp.baseB = camB.state();
+  cmp.sizeA = cmp.boxA0 ? Math.hypot(...cmp.boxA0.size) : 1;
+  cmp.sizeB = Math.hypot(...cmp.boxB0.size);
+  cmp.ratio = cmp.sizeA > 0 ? cmp.sizeB / cmp.sizeA : 1;
+  // the whole clip, for the one-line number at the top
+  const frames = [];
+  for (let t = 0; t < cmp.maxTick; t++) frames.push(cmpRowsAt(t));
+  cmp.summary = CMP.maxAgreement(frames);
+  cmpBuildTable();
+  $("cmpCapL").replaceChildren(el("b", { textContent: `DW2 original · ${entry.code}` }), el("small", {}, ` ${cmp.model.anims[cmp.gltfClip].name} · ${cmp.dw2Frames} frames · ${cmp.model.anims[cmp.gltfClip].dur.toFixed(2)} s`));
+  $("cmpCapR").replaceChildren(el("b", { textContent: `our body ${row.folder} · DW2-${row.letter} baked` }), el("small", {}, ` table ${state.bakeTable} · clip ${row.clip ?? "?"} · ${cmp.table.length} frames`));
+  return row;
+}
+
+async function enterCompare(id, { tick = null } = {}) {
+  if (!id) return false;
+  if (state.src === "dw2") await setSource("dw3");
+  const row = await cmpLoad(id);
+  if (!row) return false;
+  cmp.on = true;
+  $("cmp").classList.remove("hidden");
+  $("cv").classList.add("hidden");
+  $("hud").classList.add("hidden");
+  $("cmpTableWrap").classList.remove("hidden");
+  for (const k of ["lblCmpGhost", "lblCmpUnlink"]) $(k).classList.remove("hidden");
+  $("cmpBtn").textContent = "exit compare";
+  $("cmpBtn").classList.add("on");
+  state.freeCam = true;
+  $("freeCam").checked = true;
+  r.setFreeCameraView(() => cam.view());
+  cmpSeek(tick != null ? tick : 0);
+  renderBadges();
+  updateInfo();
+  writeUrl();
+  play();
+  return true;
+}
+
+function leaveCompare() {
+  if (!cmp.on) return;
+  pause();
+  cmp.on = false;
+  $("cmp").classList.add("hidden");
+  $("cv").classList.remove("hidden");
+  $("hud").classList.remove("hidden");
+  $("cmpTableWrap").classList.add("hidden");
+  for (const k of ["lblCmpGhost", "lblCmpUnlink"]) $(k).classList.add("hidden");
+  $("cmpSummary").textContent = "—";
+  $("cmpBtn").textContent = "Compare";
+  $("cmpBtn").classList.remove("on");
+  renderBadges();
+  if (state.action) { selectAction(state.action, { keepCamera: true }); }
+  updateInfo();
+  writeUrl();
+}
+
+/** The page's screenshot in compare mode: the two full frames side by side. */
+function cmpShot() {
+  const W = cv.width, H = cv.height, out = document.createElement("canvas");
+  out.width = W; out.height = Math.round(H / 2);
+  const c = out.getContext("2d");
+  c.drawImage(cmp.renderer.canvas, 0, 0, W, H, 0, 0, W / 2, H / 2);
+  c.drawImage(off, 0, 0, W, H, W / 2, 0, W / 2, H / 2);
+  return out;
+}
+
+/** The embedding surface for tools/probes: one call per check, no DOM queries needed. */
+window.__viewer.compare = {
+  on: () => cmp.on,
+  id: () => cmp.id,
+  enter: (id, opts) => enterCompare(id, opts),
+  leave: () => leaveCompare(),
+  seek: cmpSeek,
+  rows: () => cmpRowsAt(state.tick),
+  summary: () => cmp.summary,
+  roles: () => cmp.roles,
+  bones: () => ({ dw2: cmp.bones2, dw3: cmp.bones3, torsoNote: cmp.torsoNote }),
+  tick: () => state.tick,
+  maxTick: () => cmp.maxTick,
+  frames: () => ({ dw2: cmp.dw2Frames, table: cmp.table.length, bakeFrame: cmp.table[cmpFrame3(state.tick)] ?? null, dw2Frame: cmpFrame2(state.tick) }),
+  // the raw role positions both sides are measured from (DW2 in its own glTF frame, ours in ours)
+  poseNow: () => ({
+    dw2: cmpPositions2(cmpPose2(cmpFrame2(state.tick))),
+    dw3: cmpPositions3(cmp.table[cmpFrame3(state.tick)] ?? 0),
+    ref2: cmp.ref2, ref3: cmp.ref3,
+  }),
+  panes: () => {
+    const lit = (canvas) => {
+      const c2 = canvas.getContext("2d");
+      let n = 0;
+      if (!c2) {
+        // a WebGL canvas: read it back through a scratch 2D canvas
+        const t = document.createElement("canvas"); t.width = canvas.width; t.height = canvas.height;
+        const tctx = t.getContext("2d"); tctx.drawImage(canvas, 0, 0);
+        const d = tctx.getImageData(0, 0, t.width, t.height).data;
+        for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+        return n;
+      }
+      const d = c2.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 60) n++;
+      return n;
+    };
+    const L = $("cmpLImg"), R = $("cmpRImg");
+    return { left: { w: L.width, h: L.height, lit: lit(L) }, right: { w: R.width, h: R.height, lit: lit(R) } };
+  },
+  model: () => ({ dw2: cmp.entry?.path || null, clip: cmp.model?.anims?.[cmp.gltfClip]?.name || null, scale: cmp.scale, error: cmp.error }),
+};
+
+// ── render loop ──────────────────────────────────────────────────────────────────────────────
+function composite() {
+  if (state.src === "dw2") {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (dw2.renderer) ctx.drawImage(dw2.renderer.canvas, 0, 0);
+    drawHud();
+    $("scrub").value = String(state.tick);
+    const clip = dw2.clip >= 0 ? dw2.model?.anims[dw2.clip] : null;
+    $("tickLabel").textContent = clip ? `t ${dw2.time.toFixed(2)} / ${clip.dur.toFixed(2)} s` : "bind pose";
+    if (dw2.infoPlaying?.isConnected) dw2.infoPlaying.textContent = dw2PlayingText();
+    return;
+  }
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0);
+  const fx = r.getEffectDraw?.();
+  if (fx) drawEffects(ctx, fx.list, fx.manifest, fx.images, fx.view);
+  drawHud();
+  $("scrub").value = String(state.tick);
+  $("tickLabel").textContent = `tick ${state.tick} / ${state.maxTick}`;
+}
+/** Draw the current state without advancing the simulation. */
+function renderNow() { r.render(0); composite(); }
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now;
+  updateCamera(dt);
+  if (cmp.on) {
+    // K21h: ONE tick counter for both panes. A tick is one logic tick of the bake (coordinator.tick
+    // advances its idle TimelinePlayer, exactly as the scrubber path does) and 1/60 s of the DW2 clip
+    // — the two motions are keyed on the same 30 Hz frame grid, so tick x TICK_SPEED is that frame.
+    if (state.playing && state.action) {
+      state.acc += dt * state.speed;
+      let steps = 0;
+      while (state.acc >= TICK_SEC && steps < 8) {
+        state.acc -= TICK_SEC;
+        steps++;
+        r.coordinator.tick(TICK_SPEED);
+        state.tick++;
+        if (state.tick >= cmp.maxTick) {
+          if (state.loop) { launch(); state.tick = 0; }
+          else { state.tick = cmp.maxTick; state.playing = false; $("play").textContent = "▶ play"; break; }
+        }
+      }
+    }
+    cmpDraw();
+    requestAnimationFrame(frame);
+    return;
+  }
+  if (state.src === "dw2") {
+    if (state.playing && dw2.playing) dw2Advance(dt);
+    drawDw2();
+    composite();
+    requestAnimationFrame(frame);
+    return;
+  }
+  if (state.playing && state.action) {
+    state.acc += dt * state.speed;
+    let steps = 0;
+    while (state.acc >= TICK_SEC && steps < 8) {
+      state.acc -= TICK_SEC;
+      const alive = stepTick();
+      steps++;
+      if (!alive) {
+        if (state.loop && state.action.kind !== "idle" && state.maxTick > 2) { state.acc = 0; launch(); state.tick = 0; }
+        else {
+          state.playing = false; state.tick = state.maxTick; $("play").textContent = "▶ play";
+          r.render(0); break;
+        }
+      }
+    }
+    if (!steps) r.render(0);
+  } else {
+    r.render(0);
+  }
+  composite();
+  requestAnimationFrame(frame);
+}
+
+// ── gallery ──────────────────────────────────────────────────────────────────────────────────
+let galleryOpen = false, galleryTiles = [], galleryTurn = 0, galleryTimer = null;
+function galleryList() {
+  const q = $("gallerySearch").value;
+  return V.filterModels(index, { ...currentFilters(), query: q }).filter((e) => e.folder).slice(0, 12);
+}
+function renderGallery() {
+  const list = galleryList();
+  const grid = $("galleryGrid");
+  grid.replaceChildren();
+  galleryTiles = [];
+  $("galleryCount").textContent = `${list.length} shown`;
+  for (const e of list) {
+    const c = el("canvas", { width: 420, height: 315 });
+    const tile = el("div", { className: "tile" }, c, el("div", {}, el("span", { textContent: e.name }), el("small", { textContent: e.folder })));
+    tile.onclick = () => { closeGallery(); loadEntry(e.folder, { user: true }); };
+    grid.append(tile);
+    galleryTiles.push({ entry: e, canvas: c, ctx: c.getContext("2d"), tick: 0, max: 0, ready: false });
+  }
+}
+async function galleryStep() {
+  if (!galleryOpen || !galleryTiles.length) return;
+  const t = galleryTiles[galleryTurn % galleryTiles.length];
+  galleryTurn++;
+  try {
+    r.setIsolated(true, "player");
+    r.setPlayerVisible(true);
+    r.setEnemyVisible(false);
+    await r.setPlayerDigimon(t.entry.folder);
+    await waitFor(() => r.playerAnimator?.model?.folder === t.entry.folder, 4000);
+    r.setFreeCameraView(() => cam.view());
+    r.setCameraMode("free");
+    r.render(0);
+    const b = r.getFighterBounds("player");
+    if (b) { cam.frameBounds(b, 4 / 3, { immediate: true }); cam.setPreset("threeQuarter", { immediate: true }); cam.update(0); }
+    const actions = V.actionsFor(t.entry, skills);
+    const a = actions.find((x) => x.kind === "tech" && x.clip === 5) || actions.find((x) => x.kind === "tech") || actions[0];
+    if (!a) return;
+    if (t.tick === 0 || t.max === 0) {
+      const { script } = resolveFor(a, r.playerAnimator.model);
+      const dry = dryRun(r.playerAnimator.model, a, script);
+      t.max = Math.max(20, Math.min(240, dry.maxTick));
+      launchForGallery(a);
+      t.tick = 0;
+    }
+    for (let i = 0; i < 4; i++) { r.render(TICK_SEC); t.tick++; if (t.tick >= t.max) { t.tick = 0; launchForGallery(a); } }
+    t.ctx.drawImage(off, 0, 0, t.canvas.width, t.canvas.height);
+  } catch (err) { /* a model that fails to load must not stop the gallery */ }
+}
+function launchForGallery(a) {
+  const hooks = {};
+  r.setPlayerVisible(true); r.setEnemyVisible(false);
+  if (a.kind === "tech") r.playerAttack(a.techId, hooks);
+  else if (a.kind === "reaction") r.playerAnimator?.setAction(a.clip, hooks);
+  else if (a.kind === "item") r.playPlayerItemUse(a.itemId, hooks);
+  else r.playerAnimator?.setIdle();
+}
+function openGallery() {
+  galleryOpen = true; $("gallery").classList.remove("hidden");
+  renderGallery();
+  clearInterval(galleryTimer);
+  galleryTimer = setInterval(galleryStep, 220);
+}
+function closeGallery() {
+  galleryOpen = false; $("gallery").classList.add("hidden");
+  clearInterval(galleryTimer);
+  // hand the renderer back to the viewer's own model
+  state.layoutKey = "";
+  ensureLayout({ frame: true }).then(() => state.action && selectAction(state.action));
+}
+$("galleryBtn").onclick = openGallery;
+$("galleryClose").onclick = closeGallery;
+$("gallerySearch").oninput = renderGallery;
+
+// ── boot ─────────────────────────────────────────────────────────────────────────────────────
+readUrl();
+$("solver").checked = state.solver;
+if (state.solver) await setSolver(true, { resolve: false, all: !!state.solverAll });   // scope before the first resolve
+$("side").value = state.side;
+$("defender").value = state.defender;
+$("outcome").value = state.outcome;
+$("speedOut").textContent = "1.0×";
+$("fov").value = String(cam.fovDeg);
+$("fovOut").textContent = cam.fovDeg + "°";
+await fillBakePicker();
+try { state.genericFull = localStorage.getItem(GEN.PREVIEW_KEY) !== "0"; } catch { /* no storage */ }
+await getGenerator().catch(() => null);
+// K25: which bodies have a DW2 file — ONE request for the build's index, never one per model folder
+state.dw2Probed = false;
+await loadDw2Index().catch(() => null);
+renderList();
+requestAnimationFrame(frame);
+if (state.pendingSrc === "dw2") {
+  await setSource("dw2");       // ?src=dw2&model=…&clip=…&t=…
+} else if (state.pendingCompare) {
+  // K21h: ?compare=<bake id>[&t=<tick>] — DW2's original beside our body, in sync
+  const id = state.pendingCompare, tick = state.pendingCompareTick;
+  state.pendingCompare = null; state.pendingCompareTick = null;
+  const ok = await enterCompare(id, { tick });
+  if (!ok) {
+    toast(`compare: ${id} did not load`);
+    loadEntry(state.folder && byFolder.has(state.folder) ? state.folder : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder));
+  }
+} else if (state.pendingDw2Fill) {
+  // K25: ?dw2fill=<slot>&model=<folder>[&letter=F][&ab=own] — click-free entry into the DW2 motion
+  const want = state.pendingDw2Fill;
+  state.pendingDw2Fill = null;
+  const folder = state.folder && byFolder.has(state.folder) ? state.folder
+    : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder);
+  const ok = await openDw2(folder, want.slot, { letter: want.letter });
+  if (!ok) loadEntry(folder);
+  else if (want.ab) flipDw2AB();
+} else if (state.pendingGeneric) {
+  // ?generic=<motion id>&model=<folder> — that motion on that Digimon, playing
+  const id = state.pendingGeneric; state.pendingGeneric = null;
+  const folder = state.folder && byFolder.has(state.folder) ? state.folder
+    : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder);
+  await selectGeneric(id, folder);
+} else if (state.pendingBake) {
+  const row = await loadBake(state.pendingBake, { table: state.pendingBakeTable });
+  if (!row) state.pendingAction = null;     // the toast already said why; fall through to a normal model
+  if (!row) loadEntry(state.folder && byFolder.has(state.folder) ? state.folder : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder));
+} else {
+  const first = state.folder && byFolder.has(state.folder) ? state.folder
+    : (byFolder.has("m441raiz") ? "m441raiz" : index.find((e) => e.folder)?.folder);
+  loadEntry(first);
+}
+</script>
+</body>
+</html>

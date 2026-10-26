@@ -156,6 +156,21 @@ export function setReportOwnedForms(slot: number, owned: ReadonlyMap<number, num
     grantedThisReport[slot | 0] = false;
 }
 
+/**
+ * A form's form level as the report must see it: from its ledger CELL when the cell is one of
+ * the 44 the record holds, else from the full ledger the walker handed in (`setReportOwnedForms`).
+ * -1 means the slot does not own the form.
+ *
+ * The record's ledger is a page of the real ledger (44 cells; a partner can own every species),
+ * so a cell test alone would call an owned form "new" whenever its entry sits on another page —
+ * the screen would then announce a form the player already has, once per win, forever.
+ */
+function reportOwnedLevel(mem: RewardMemory, slot: number, walkerId: number, buf: number): number {
+    const value = gameFormId(mem as never, walkerId);
+    if (value > 0 && formEntryCopy(mem, slot, value, buf) !== -1) return s8(mem.read8(buf + 2));
+    return ownedOutsideCells[slot | 0]?.get(walkerId) ?? -1;
+}
+
 /** The extra records' pass of F0x8008634C: same rules as the disc's loop, over walker ids. */
 function reportUnlockExtraForm(mem: RewardMemory, slot: number, host: RewardHost): number {
     const rows = extraEvolutionRows[slot | 0];
@@ -211,15 +226,16 @@ export function reportUnlockForm(mem: RewardMemory, slot: number, host: RewardHo
     const group = mem.read32(REWARD_EVOLUTION_GROUPS + slot * 4) >>> 0;
     const formOf = (row: number): number => mem.read16(REWARD_SPECIES_BASE + Math.imul(mem.read32(row) - 1, REWARD_SPECIES_STRIDE));
     for (let row = group; row < group + 0x2c0; row += 0x10) {
+        // "Already acquired" is the partner's real ledger, cells or not (reportOwnedLevel).
+        const target = mem.read32(row) >>> 0;
+        if (target > 0 && reportOwnedLevel(mem, slot, target, buf) !== -1) continue;
         let form = formOf(row);
-        if (formEntryCopy(mem, slot, form, buf) >= 0) continue; // already acquired
         if (form <= 0) continue;
         for (let k = 0; k < 2; k++) {
             const prerequisite = s16(mem.read16(row + 4 + k * 4));
             if (prerequisite === 0) continue;
-            const prerequisiteForm = mem.read16(REWARD_SPECIES_BASE + Math.imul(prerequisite - 1, REWARD_SPECIES_STRIDE));
-            const index = formEntryCopy(mem, slot, prerequisiteForm, buf);
-            if (index === -1 || s8(mem.read8(buf + 2)) < s16(mem.read16(row + 6 + k * 4))) form = -1;
+            const level = reportOwnedLevel(mem, slot, prerequisite, buf);
+            if (level === -1 || level < s16(mem.read16(row + 6 + k * 4))) form = -1;
         }
         if (form <= 0) continue;
         const kind = s16(mem.read16(row + 0xc));
@@ -238,11 +254,9 @@ export function reportUnlockForm(mem: RewardMemory, slot: number, host: RewardHo
             if (s16(mem.read16(equipped + i * 2)) < 3) {
                 mem.write16(equipped + i * 2, form & 0xffff);
                 setEquippedForms(mem, slot, equipped);
-                grantedThisReport[slot | 0] = true;
                 return form;
             }
         }
-        grantedThisReport[slot | 0] = true;
         return form;
     }
     return reportUnlockExtraForm(mem, slot, host);

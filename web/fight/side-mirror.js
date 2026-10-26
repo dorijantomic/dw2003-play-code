@@ -13,10 +13,16 @@ const HALF_TURN = 2048;                                                    // PS
 const wrap = (a) => (((a + HALF_TURN) % 4096) + 4096) % 4096;
 
 const cache = new WeakMap();
-/** "player" when the model's scripts aim down +z, "enemy" when down -z (null for a model without action scripts). */
+/** "player" when the model's scripts aim down +z, "enemy" when down -z. */
 export function authoredSide(model) {
   const actions = model?.actions;
-  if (!Array.isArray(actions)) return null;
+  // A model with NO action scripts of its own — the new partner species, whose anim.json carries only timeline
+  // tables — plays nothing but donor scripts and clip-fallback builds, and clip-fallback lays those out in the
+  // player convention (+z toward the far side, see its victimAnchor()). Saying "player" here is what lets the
+  // animator turn such a built script around when the fighter stands on the far side; without it the strike
+  // effect stayed at +5120 and landed 320 units from the ATTACKER's own slot instead of on the defender
+  // (measured on m468agnm, clip 5, far side, tools/verify_attack_reaction.mjs).
+  if (!Array.isArray(actions)) return "player";
   if (cache.has(actions)) return cache.get(actions);
   // A projectile's root yaw is the cleanest sign: 2048 (half a turn) in 223 of the 224 player-side records and 0 in all
   // 121 enemy-side ones. Hit-spark z is the fallback, and a model with neither is told apart by carrying the full set

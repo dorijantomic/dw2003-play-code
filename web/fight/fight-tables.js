@@ -103,3 +103,44 @@ export function isThrowItem(itemId) {
   const id = itemId | 0;
   return id >= THROW_ITEM_BAND[0] && id <= THROW_ITEM_BAND[1];
 }
+
+// ── WHO A TECHNIQUE IS AIMED AT (A9) ────────────────────────────────────────────
+// The disc's own skill table says what a technique does: digimon.json "skills".type is
+// "attack", "heal" or "support" for every one of its 426 records, and it agrees with the
+// technique record's category byte on every row (type heal/support ⇔ category 4/5; the 404
+// attack records are category 2/3). The 22 heal/support records are the SELF/ALLY casts:
+// 184..210 and 400 (clip 10) plus 100 (clip 11). Every other record — including the three
+// "attack" records that happen to share clip 10 with the item path (211, 392, 400 aside) —
+// is aimed at the OPPONENT. Nothing here is per-species: the class is a column of the
+// skills table, and the builder/checker both read it from there.
+//
+// The item machine's DEFAULT arm (every item id but the throw band) plays clip 10 with the
+// used item's record effect written to actor+0x6c (fightstg.s .L0x8008d8c0): an item heals,
+// cures or charges its USER, so the default arm is a SELF presentation. The throw band
+// 77..90 is a typed attack arm (clips 14/15/17, motion/effect of the thrown item) and stays
+// aimed at the opponent.
+let SKILL_TYPES = null;                    // Map skill id -> "attack" | "heal" | "support"
+let SKILL_ROWS = null;                     // Map skill id -> the whole skills row (hits, name, clip)
+export function setSkillTable(json) {
+  const rows = Array.isArray(json) ? json : (json?.skills ?? null);
+  SKILL_TYPES = Array.isArray(rows)
+    ? new Map(rows.map((s) => [s.id | 0, String(s.type || "attack")]))
+    : null;
+  SKILL_ROWS = Array.isArray(rows) ? new Map(rows.map((s) => [s.id | 0, s])) : null;
+}
+export function skillType(techId) { return SKILL_TYPES?.get(techId | 0) ?? null; }
+/** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
+export function skillRow(techId) { return SKILL_ROWS?.get(techId | 0) ?? null; }
+/**
+ * The technique's in-game NAME ("Triple Fire"), which is the key the anatomy's per-technique tables use
+ * (shots rules, firing limb). K13: a built script needs the name to know how many projectiles leave and
+ * from which emitter, so the animator passes it down from the same skills row it already reads for hits.
+ */
+export function techName(techId) { return skillRow(techId)?.name ?? null; }
+/** "self" when the technique is a heal/support cast (or an unknown record is absent -> "enemy"). */
+export function techTargetClass(techId) {
+  const t = skillType(techId);
+  return (t === "heal" || t === "support") ? "self" : "enemy";
+}
+/** The item machine's target: the default clip-10 arm is self-use, the throw band is an attack. */
+export function itemTargetClass(itemId) { return isThrowItem(itemId) ? "enemy" : "self"; }
