@@ -183,4 +183,14 @@ if (-not $Succeeded) {
     throw "HD asset build failed. Update the AMD/Nvidia graphics driver and try again."
 }
 
+# Cut the HD field maps into tiles (web/map-tiles.js draws only the tiles on screen). CPU only,
+# incremental: maps already tiled from the same picture are skipped. Without tiles the game still
+# loads each map whole, so a failure here is a warning, not a failed build.
+Write-Host "Cutting the HD maps into tiles..."
+$Jobs = [Math]::Max(1, [Math]::Min(6, [Environment]::ProcessorCount - 2))
+& $VenvPython (Join-Path $PSScriptRoot "tile_hd_maps.py") --web (Join-Path $RepoRoot "web") --jobs $Jobs | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Tiling the HD maps failed; the game will load them whole (slower)."
+}
+
 Write-Host "HD asset pack is ready. Start the game and choose HD Remaster."

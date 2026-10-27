@@ -29,6 +29,7 @@ import {
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
+import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
 import { questWalkLegs, questStandFree, standInSpot } from "./quest-walk.js";   // walkable ground for scripted walks
@@ -61,6 +62,7 @@ import { createBgmPlayer, createSfxPlayer, createExclusiveRegister } from "./aud
 import { sceneBgmTrack } from "./ordinal-scene-variant.js";
 import {
     ASSET_MODE_HD,
+    assetImageScale,
     assetMode,
     assignAssetImage,
     hideAssetModeChooser,
@@ -70,6 +72,7 @@ import {
     loadAssetImage as loadImage,
     showAssetModeChooser,
 } from "./assets.js";
+import { installPixelFilter } from "./gpu-pixel-filter.js";
 import { createCanvasResolutionController } from "./canvas-resolution.js";
 import { createTextbox, autoBalloonMode } from "./textbox.js";
 import { createChoice } from "./choice.js";
@@ -424,6 +427,18 @@ const PACKED_MUSIC = {
 const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 installFxPanel(document.getElementById("stage"));
+// HD Remaster field maps (always on in HD):
+// - a tiled HD map is drawn from assets-hd/map-tiles (map-tiles.js, only the tiles on screen are
+//   loaded); the stage itself holds the NATIVE picture (ready at once, used for the layer split, the
+//   terrain effects, and shown until the visible tiles are in). Neighbouring stages load only their
+//   native picture. A map with no tiles (pack built before tools/tile_hd_maps.py) loads whole.
+// - grass / water / seam fix / swaying trees / ground effects read the native picture instead of the
+//   4x one (their map coordinates are native pixels; an HD picture is 4x as wide).
+const HD_MAPS = assetMode() === ASSET_MODE_HD;
+if (HD_MAPS) loadTileIndex();
+// F2 Pixel filter (default off): EPX / MMPX / xBR. Authentic: the whole finished frame; HD Remaster:
+// each native image (sprites, effects, menus) before it is drawn (gpu-pixel-filter.js)
+installPixelFilter(document.getElementById("stage"), document.getElementById("game"), () => assetMode() === ASSET_MODE_HD);
 installPost2d(document.getElementById("stage"), document.getElementById("game"));
 installMultiplayer({ stageEl: document.getElementById("stage"), defaultName: () => state.playerName || "Tamer" });
 // EXPERIMENT (multiplayer): the many-vs-many fight screen and what it needs from the game.
@@ -1426,6 +1441,8 @@ const state = {
     clipImgs: {},
     mapImgs: {},
     mapFgImgs: {}, // stageId -> Image ("_fg" walk-behind overlay; see map_overlays.json)
+    mapTiles: {},      // stageId -> {base, fg} TiledMap|null (HD Remaster, map-tiles.js)
+    mapNativeImgs: {}, // stageId -> {base, fg} native Images for the terrain effects (HD map with no tiles)
     // The map's own tile layers, kept SEPARATE for the ~28 stages that also draw
     // a thing between them (a prop at bucket 8/10, or a party whose step program
     // put its leader behind the ground). The disc emits each map-tile layer into
@@ -4909,7 +4926,51 @@ async function loadCollisionForStage(id) {
     return promise;
 }
 
+// HD maps (see HD_MAPS): "assets/maps/s540.png" -> "s540".
+function mapPictureName(url) {
+    const m = String(url).match(/assets\/maps\/([^/?#]+)\.png/);
+    return m ? m[1] : null;
+}
+function loadNativeImage(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`failed to load ${url}`));
+        img.src = url;
+    });
+}
+// The picture a stage holds: the native one when its HD copy is drawn from tiles, else the asset mode's.
+function loadMapPicture(url) {
+    return HD_MAPS && tiledMap(mapPictureName(url)) ? loadNativeImage(url) : loadImage(url);
+}
+// HD full picture (no tiles): the terrain effects get a native copy (state.mapNativeImgs).
+function keepNativeCopy(id, part, url, img) {
+    if (!HD_MAPS || assetImageScale(img) <= 1) return;
+    loadNativeImage(url).then((n) => {
+        if (retainedStageIds.has(id)) (state.mapNativeImgs[id] ??= {})[part] = n;
+    }).catch(() => {});
+}
+// The picture the terrain effects read: native in HD (null while its copy loads).
+function effectsMapImg(id, part = "base") {
+    const img = part === "fg" ? state.mapFgImgs[id] : state.mapImgs[id];
+    if (!HD_MAPS || !(img instanceof Image) || assetImageScale(img) <= 1) return img;
+    return state.mapNativeImgs[id]?.[part] ?? null;
+}
+
+// Draw a map picture at (ox, oy). With its HD tiles only the tiles in view are drawn;
+// the native picture goes down underneath until a frame has had every visible tile in.
+const tilesComplete = new Map();   // "<tiled map>:<kind>" -> last frame drew every visible tile
+function drawMapPicture(img, tm, kind, ox, oy) {
+    if (!tm) { ctx.drawImage(img, ox, oy); return; }
+    const key = `${tm.name}:${kind}`;
+    if (!tilesComplete.get(key)) ctx.drawImage(img, ox, oy);
+    const M = 16;                   // map pixels of slack for the quest shake translate
+    tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M, -oy - M, VIEW_W / ZOOM + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
+}
+
 function ensureMapImg(id) {
+    // HD: which maps are tiled decides what to load, so wait for the tile index once.
+    if (HD_MAPS && !tileIndexReady()) return loadTileIndex().then(() => ensureMapImg(id));
     // The fg check sits before the early return: the overlay index can finish
     // loading after the map image did, and render() re-calls ensureMapImg.
     const mapMeta = state.manifest.maps.find((x) => x.id === id);
@@ -4918,6 +4979,12 @@ function ensureMapImg(id) {
         : (mapMeta?.assetSource && state.mapOverlays?.[mapMeta.assetSource]
             ? mapMeta.assetSource
             : null);
+    if (HD_MAPS) {
+        state.mapTiles[id] = {
+            base: tiledMap(mapPictureName(mapMeta.image)),
+            fg: overlayId ? tiledMap(`${overlayId}_fg`) : null,
+        };
+    }
     const loads = [];
     // Request the ground-cover image only for a stage the build actually gave
     // one. tools/build_map_ground_over_props.py emits every stage with a prop
@@ -4977,6 +5044,8 @@ function ensureMapImg(id) {
         if (retainedStageIds.has(id)) {
             state.mapGroundImgs[id] = ground;
             state.mapLayer2Imgs[id] = layer2;
+            // HD: the tiles split at the same native mask, scaled up per tile.
+            state.mapTiles[id]?.base?.setSplitMask(mask);
         }
     };
     if (!state.mapGroundImgs[id]) {
@@ -4987,8 +5056,10 @@ function ensureMapImg(id) {
     }
     if (overlayId && !state.mapFgImgs[id]) {
         state.mapFgImgs[id] = "loading";
-        loads.push(loadImage(`assets/maps/${overlayId}_fg.png`).then((img) => {
+        const fgUrl = `assets/maps/${overlayId}_fg.png`;
+        loads.push(loadMapPicture(fgUrl).then((img) => {
             if (retainedStageIds.has(id)) state.mapFgImgs[id] = img;
+            keepNativeCopy(id, "fg", fgUrl, img);
         }).catch((error) => {
             if (retainedStageIds.has(id)) state.mapFgImgs[id] = "failed";
             console.warn("[assets] foreground overlay load failed", id, error);
@@ -5003,8 +5074,9 @@ function ensureMapImg(id) {
     if (mapLoadPromises.has(id)) return mapLoadPromises.get(id);
     state.mapImgs[id] = "loading";
     const promise = Promise.all([
-        loadImage(mapMeta.image).then((img) => {
+        loadMapPicture(mapMeta.image).then((img) => {
             if (retainedStageIds.has(id)) state.mapImgs[id] = img;
+            keepNativeCopy(id, "base", mapMeta.image, img);
             buildGroundCover();
             return img;
         }),
@@ -5073,9 +5145,15 @@ function activateStageNeighborhood(id) {
             delete state.mapFgImgs[loadedId];
             delete state.mapGroundImgs[loadedId];
             delete state.mapLayer2Imgs[loadedId];
+            delete state.mapTiles[loadedId];
+            delete state.mapNativeImgs[loadedId];
             delete state.collision[loadedId];
             readyStageIds.delete(loadedId);
         }
+    }
+    if (HD_MAPS) {
+        retainTiledMaps([...keep].flatMap((k) =>
+            [state.mapTiles[k]?.base?.name, state.mapTiles[k]?.fg?.name].filter(Boolean)));
     }
     const keepSprites = stageSpriteIds(keep, state.scenes);
     for (const id of persistentSpriteIds()) keepSprites.add(id);
@@ -9757,6 +9835,10 @@ function render() {
     }
     const m = currentMap();
     const mapImg = state.mapImgs[m.id];
+    // HD maps: the picture the terrain effects read, and the HD tiles drawn over the native picture.
+    const fxMapImg = effectsMapImg(m.id);
+    const tiles = HD_MAPS ? state.mapTiles[m.id] : null;
+    if (HD_MAPS) tickTiles();
     const c = currentChar();
     const sheet = state.charImgs[c.id] ?? state.npcImgs[c.id];
     // The one ordering list for the field frame, and the debug overlay list.
@@ -9865,8 +9947,8 @@ function render() {
     if (!window.__hideProps) drawStageOverlayShapes(ctx, m.id, camX, camY);
     // Map layer 2, at OT[11] — the farthest layer.
     if (layer2Split) {
-        ctx.drawImage(
-            layer2Img,
+        drawMapPicture(
+            layer2Img, tiles?.base, "layer2",
             m.fixedViewportBackground ? 0 : -camX,
             m.fixedViewportBackground ? 0 : -camY,
         );
@@ -9886,8 +9968,8 @@ function render() {
         // after the under-map band); the flattened map would put its baked ground
         // in front of layer 2, which the layer split has already replaced.
         if (!layer2Split) {
-            ctx.drawImage(
-                mapImg,
+            drawMapPicture(
+                mapImg, tiles?.base, null,
                 m.fixedViewportBackground ? 0 : -camX,
                 m.fixedViewportBackground ? 0 : -camY,
             );
@@ -9933,20 +10015,20 @@ function render() {
     }
     // The ground layer, at OT[7] — in front of everything the under-map band drew.
     if (groundCover) {
-        ctx.drawImage(
-            groundImg,
+        drawMapPicture(
+            groundImg, tiles?.base, "ground",
             m.fixedViewportBackground ? 0 : -camX,
             m.fixedViewportBackground ? 0 : -camY,
         );
     }
     // EXPERIMENT (seam fixes): filler pixels for pin-holes and hairline cracks in the
     // map picture, drawn over the ground. Off with the Effects panel / __noSeamFix.
-    if (!window.__noSeamFix && !window.__hideProps && !m.fixedViewportBackground && mapImg instanceof Image) {
-        const sp = seamPatchFor(m.id, mapImg);
+    if (!window.__noSeamFix && !window.__hideProps && !m.fixedViewportBackground && fxMapImg instanceof Image) {
+        const sp = seamPatchFor(m.id, fxMapImg);
         if (sp) ctx.drawImage(sp.canvas, -camX, -camY);
     }
     // EXPERIMENT (swaying trees): hide the painted canopies; the swaying copy is drawn with the foreground layer
-    if (!m.fixedViewportBackground && mapImg instanceof Image && swayFor(m, mapImg)) drawTreePatch(ctx, m.id, state.mapFgImgs[m.id], mapImg, camX, camY);
+    if (!m.fixedViewportBackground && fxMapImg instanceof Image && swayFor(m, fxMapImg)) drawTreePatch(ctx, m.id, effectsMapImg(m.id, "fg"), fxMapImg, camX, camY);
     // Build y-sorted drawable list
     //
     // `playerAnimTime` feeds gesture-clip timing (drawEntitySprite's `animTime` for
@@ -9970,11 +10052,11 @@ function render() {
     // EXPERIMENT (3D water): shaded water surface over the map's water pixels,
     // drawn straight onto the ground (before every entity). ?nowater3d turns it off.
     if (!NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
-        const wc = renderWater(m.id, mapImg, camX, camY, performance.now() / 1000);
+        const wc = renderWater(m.id, fxMapImg, camX, camY, performance.now() / 1000);
         if (wc) ctx.drawImage(wc, 0, 0, WATER_VIEW.w, WATER_VIEW.h);
     }
     if (!NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
-        const gc = renderGrass(m.id, mapImg, camX, camY, performance.now() / 1000);
+        const gc = renderGrass(m.id, fxMapImg, camX, camY, performance.now() / 1000);
         if (gc) {
             const STRIP = 8, PXS = GRASS_VIEW.px;
             for (let sy = 0; sy < GRASS_VIEW.h; sy += STRIP) {
@@ -9989,7 +10071,7 @@ function render() {
     // EXPERIMENT (ambience ground layer): puddles, footprints, dust and wading ripples,
     // above the ground and under every sprite.
     if (!window.__hideProps && !m.fixedViewportBackground) {
-        const gfx = groundFxFor(m, mapImg, camX, camY);
+        const gfx = groundFxFor(m, fxMapImg, camX, camY);
         if (gfx) drawables.push({ y: -1e12, draw: () => gfx(ctx) });
     }
     const fgImg = state.mapFgImgs[m.id];
@@ -9998,8 +10080,8 @@ function render() {
             y: Infinity,
             draw: () => {
                 // EXPERIMENT (swaying trees): the canopies move; everything else in the layer stays put
-                const sw = swayFor(m, mapImg);
-                if (!(sw && drawSwayingForeground(ctx, m.id, fgImg, mapImg, camX, camY, performance.now(), sw.gust))) ctx.drawImage(fgImg, -camX, -camY);
+                const sw = swayFor(m, fxMapImg);
+                if (!(sw && drawSwayingForeground(ctx, m.id, effectsMapImg(m.id, "fg"), fxMapImg, camX, camY, performance.now(), sw.gust))) drawMapPicture(fgImg, tiles?.fg, null, -camX, -camY);
             },
         });
     }
@@ -10404,7 +10486,7 @@ function render() {
     questsTick(m.id, state.x, state.y);   // EXPERIMENT: lets the optional quest layer notice a new stage and where you are
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {
-        const amb = ambienceFor(m, mapImg, camX, camY);
+        const amb = ambienceFor(m, fxMapImg, camX, camY);
         if (amb) amb(ctx);
     } else ambienceSilence();
     if (state.debugAnim) drawAnimDebug(debugInfos);

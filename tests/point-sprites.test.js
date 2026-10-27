@@ -112,9 +112,10 @@ test("the map's layers are emitted into their own buckets around the under-map b
   // OT[11] before the props, the ground at OT[7] after them — so a bucket-8/10
   // prop is sandwiched between the two layers, exactly as on the console.
   const src = readFileSync("web/game.js", "utf8");
-  const layer2 = src.indexOf("ctx.drawImage(\n            layer2Img,");
+  // drawMapPicture = ctx.drawImage, or the HD tiles (HD Remaster) (same place in the order).
+  const layer2 = src.indexOf("drawMapPicture(\n            layer2Img,");
   const under = src.indexOf("drawEffectsUnderMap(ctx, m.id");
-  const ground = src.indexOf("ctx.drawImage(\n            groundImg,");
+  const ground = src.indexOf("drawMapPicture(\n            groundImg,");
   const over = src.indexOf("drawEffects(ctx, m.id, camX, camY, drawables");
   for (const [name, i] of [["layer-2 layer draw", layer2], ["under-map pass", under],
                            ["ground layer draw", ground], ["over-map pass", over]]) {
@@ -125,7 +126,7 @@ test("the map's layers are emitted into their own buckets around the under-map b
   assert.ok(ground < over, "the rest of the props come after the ground layer");
   // The flattened map is only drawn when the stage ships no layer split; a split
   // stage is drawn as its two layers above, not the flattened base map.
-  assert.match(src, /if \(!layer2Split\) \{\n\s*ctx\.drawImage\(\n\s*mapImg,/,
+  assert.match(src, /if \(!layer2Split\) \{\n\s*drawMapPicture\(\n\s*mapImg,/,
     "the flattened base map is skipped for a split stage");
   // The native objects both passes read must be ticked before the first of them.
   const tickNative = src.indexOf("tickNativeStage(m.id, fieldBlanks)");
