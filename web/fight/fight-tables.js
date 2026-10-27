@@ -121,14 +121,28 @@ export function isThrowItem(itemId) {
 // aimed at the opponent.
 let SKILL_TYPES = null;                    // Map skill id -> "attack" | "heal" | "support"
 let SKILL_ROWS = null;                     // Map skill id -> the whole skills row (hits, name, clip)
+let SKILL_BY_NAME = null;                  // Map skill name -> the rows that carry it
 export function setSkillTable(json) {
   const rows = Array.isArray(json) ? json : (json?.skills ?? null);
   SKILL_TYPES = Array.isArray(rows)
     ? new Map(rows.map((s) => [s.id | 0, String(s.type || "attack")]))
     : null;
   SKILL_ROWS = Array.isArray(rows) ? new Map(rows.map((s) => [s.id | 0, s])) : null;
+  // OWN CLIPS (web/fight/own-clips.js): the animator hands the technique's NAME down (techName), so a
+  // builder that needs the row's category has to find it by name. One name can carry several rows
+  // ("Fight" is 242 of them) and they do agree on category for a given clip, so the lookup keeps the
+  // whole list and lets the caller narrow it by clip.
+  SKILL_BY_NAME = Array.isArray(rows) ? new Map() : null;
+  for (const s of rows) {
+    const n = String(s.name ?? "");
+    if (!n) continue;
+    if (!SKILL_BY_NAME.has(n)) SKILL_BY_NAME.set(n, []);
+    SKILL_BY_NAME.get(n).push(s);
+  }
 }
 export function skillType(techId) { return SKILL_TYPES?.get(techId | 0) ?? null; }
+/** Every skills row that carries this NAME (the technique name the animator passes down), or []. */
+export function skillRowsForName(name) { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
 /** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
 export function skillRow(techId) { return SKILL_ROWS?.get(techId | 0) ?? null; }
 /**

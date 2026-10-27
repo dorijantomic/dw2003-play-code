@@ -22,14 +22,16 @@
 // does (strip the 30000 terminator, append, re-terminate), so nothing of the model's own motion is
 // lost and no geometry is duplicated: only joint ANGLES travel.
 import { DW2_CLIP_MAP, dw2LetterForSlot, DW2_MOTION_LETTERS } from "./dw2-clip-map.js";
+import { battleSetting } from "./battle-settings.js";
+import { ensureDw2Picks } from "./dw2-picks.js";
 
-let enabled = false;
+let override = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
 let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
 let castTypesPromise = null;
 
-export function setDw2MotionEnabled(v) { enabled = !!v; }
-export function dw2MotionEnabled() { return enabled; }
-/** Read the scope out of a query string: `?dw2motion=1` turns the swap on. */
+export function setDw2MotionEnabled(v) { override = v == null ? null : !!v; }
+export function dw2MotionEnabled() { return override == null ? battleSetting("dw2motion") : override; }
+/** Read the developer override out of a query string: `?dw2motion=1` turns the swap on for the session. */
 export function dw2MotionFlagFromUrl(search = "") {
   try {
     const q = new URLSearchParams(search || "");
@@ -38,11 +40,11 @@ export function dw2MotionFlagFromUrl(search = "") {
   } catch { return false; }
 }
 if (typeof window !== "undefined" && window?.location?.search) {
-  if (dw2MotionFlagFromUrl(window.location.search)) enabled = true;
+  if (dw2MotionFlagFromUrl(window.location.search)) override = true;
 }
 // ...and the Node tools (contract/identity harnesses) turn it on with DW2MOTION=1, the same way
 // K16_MODE switches the retarget's A/B path.
-if (typeof process !== "undefined" && process?.env?.DW2MOTION === "1") enabled = true;
+if (typeof process !== "undefined" && process?.env?.DW2MOTION === "1") override = true;
 
 // ── loading (browser fetch; Node tools read the same file from disk; tests register JSON directly) ─
 const dataCache = new Map();          // folder -> generated file | null
@@ -171,8 +173,9 @@ export function applyDw2Motion(model, data) {
  * leaves the model exactly as it was.
  */
 export async function prepareDw2Motion(model) {
-  if (!enabled || !model?.folder || model.__dw2Applied) return model;
+  if (!dw2MotionEnabled() || !model?.folder || model.__dw2Applied) return model;
   await ensureCastTypes();
+  await ensureDw2Picks();             // the hand-picked clips (dw2-picks.js), read by resolveClipScript
   let data = dataCache.get(model.folder);
   if (data === undefined) {
     data = await Promise.resolve(loader ? loader(model.folder) : null).catch(() => null);
@@ -188,7 +191,7 @@ export async function prepareDw2Motion(model) {
  * signature slot takes the melee clip for a physical technique).
  */
 export function dw2MotionFor(model, clip, { tech = null, magical = false } = {}) {
-  if (!enabled || !model?.dw2Motion || clip == null) return null;
+  if (!dw2MotionEnabled() || !model?.dw2Motion || clip == null) return null;
   const row = DW2_CLIP_MAP[clip];
   if (!row) return null;
   const castType = castTypeFor(tech) ?? 0;

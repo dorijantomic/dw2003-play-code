@@ -63,7 +63,14 @@ import { solveCast, solverEnabledFor } from "./anim-solver.js";
 // K22c: a generated DW2 motion on this body (web/fight/dw2-motion.js). OFF by default; every call
 // below is a no-op until a scope turns it on, so the build is byte-identical without it.
 import { prepareDw2Motion, dw2MotionFor, dw2MotionEnabled } from "./dw2-motion.js";
+// The hand-picked clips (web/dw2-motion-picks.json, written by the animation viewer): with DW2 motion
+// on, a listed clip overrides the automatic rule ("dw2" even over an own clip, "dw3" never DW2).
+import { dw2Pick } from "./dw2-picks.js";
 import { skillRow } from "./fight-tables.js";
+// OWN CLIPS FIRST (the operator's rule, 2026-10-26): a missing technique slot takes the model's OWN
+// clip of the matching kind before anything else. OFF by default (?ownclips=1 / setOwnClipsEnabled);
+// every call below is a no-op until a scope turns it on, so the build is byte-identical without it.
+import { ownClipPlan, ownClipsBlockDw2, classifyOwnScript } from "./own-clips.js";
 
 const donorAnims = new Map();   // folder -> anim.json | null (a miss is cached too)
 
@@ -943,6 +950,137 @@ function buildEnemyScript(model, clip, row, gap, element, hits, planted, turn, l
   return bodyFromTable(model, body[0], gap.script, { turn, element, clip, hits, launch });
 }
 
+// ── OWN CLIPS FIRST (off by default; web/fight/own-clips.js) ────────────────────────────────────
+// A technique slot the model has no script for, played with the model's OWN attack clip of the
+// matching kind: its body tables, its waits, its travel arms and its own strike beats. The
+// technique contributes what the own body cannot carry - its projectile sprite, its effect on the
+// victim, and its own contact count placed on the body's strike moments.
+const strikeBeat = (model) => [{ op: 10, words: [CONTACT_TYPE, 0] }, strikeFx(model, SPARK_TYPE), { op: 1, words: [5] }];
+const finalBeat = (model) => [
+  { op: 10, words: [STRIKE_TYPE, 0] }, strikeFx(model, SPARK_TYPE), strikeFx(model, EFFECT_CURRENT), { op: 1, words: [0] },
+];
+
+/**
+ * HOW the contacts are placed (the multi-hit answer). The body's own op10 records are its strike
+ * beats: op10 98/99 are real contacts (measured in the engine's op10 handler, vendor/engine.js:22652),
+ * every other type is an effect/sound marker the disc's authors put on the beat (type 10 = sht_step,
+ * 33 = comcd111, 23 = comcat106 - web/assets/sfx/op10_map.json). Vegiemon's own basic is
+ * `10,10,10,10,99,10,10,10,10`: ONE damage strike, ten sound markers.
+ *
+ * So the technique's LAST contact goes where the body's own damage strike is, and its intermediate
+ * contacts go on the body's other strike beats, evenly spread over them and never in the tick-0 prefix
+ * before the motion starts. When the body has fewer beats than the technique needs, the remaining
+ * beats are put into the last wait before the strike (that wait is split, so the authored timing
+ * around it survives) - the same shape withHits builds, but anchored on the body's own moments rather
+ * than on a fixed 10-tick spacing from the strike.
+ */
+function withOwnClip(model, clip, plan, { element = 1, hits = null } = {}) {
+  const src = model?.actions?.[plan.slot];
+  if (!hasOps(src)) return null;
+  const contacts = clipContacts(clip, hits);
+  const sprite = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? null;
+  const ops = [];
+  const markers = [];        // { at, type, contact } in OUTPUT order
+  let firstBeat = -1;        // the first output op that consumes time
+  let shippedShot = false;
+  for (const o of src.ops) {
+    const w = o.words || [];
+    if (o.op === 10) {
+      const type = w[0] | 0;
+      const contact = type === CONTACT_TYPE || type === STRIKE_TYPE;
+      markers.push({ at: ops.length, type, contact });
+      if (contact) continue;                       // the technique's own contact count decides
+      ops.push(cloneOp(o));                        // an effect/sound marker stays on its beat
+      continue;
+    }
+    if (o.op === 1) continue;                      // reactions come with the contacts
+    if (o.op === 6 && (w[0] | 0) === 0) {          // the body's own shot: its beat, its emitter point
+      const shot = cloneOp(o);
+      if (sprite != null) shot.words[1] = sprite;  // the technique's projectile
+      ops.push(shot);
+      shippedShot = true;
+      continue;
+    }
+    if (o.op === 11) { if (firstBeat < 0) firstBeat = ops.length; ops.push(cloneOp(o)); continue; }
+    if (o.op === 2) {
+      const mode = w[0] | 0, sub = w[2] | 0;
+      if ((mode === 0 && sub === 0) || (mode === 5 && sub === 0)) { if (firstBeat < 0) firstBeat = ops.length; }
+    }
+    ops.push(cloneOp(o));
+  }
+  // where the technique's last contact lands: the body's own damage strike, else its last beat, else
+  // just before the tail (return-to-base + terminator)
+  const contactMarks = markers.filter((m) => m.contact);
+  const finalMark = contactMarks.length ? contactMarks[contactMarks.length - 1] : (markers[markers.length - 1] ?? null);
+  let finalAt = finalMark ? finalMark.at : -1;
+  if (finalAt < 0) {
+    let term = ops.findIndex((o) => o.op === 0 || o.op === 255);
+    if (term < 0) term = ops.length;
+    while (term > 0 && ops[term - 1].op === 2 && (ops[term - 1].words?.[2] | 0) === 1) term--;
+    finalAt = term;
+  }
+  const need = Math.max(0, contacts - 1);
+  const pre = markers.filter((m) => m !== finalMark && m.at <= finalAt);
+  // the beats after the motion has started are the ones a contact may land on: a marker in the tick-0
+  // prefix fires before the body has moved (a wind-up spark), so it is the last resort, not the first
+  const late = firstBeat >= 0 ? pre.filter((m) => m.at >= firstBeat) : [];
+  const pool = late.length ? late : pre;
+  const chosen = [];
+  if (need > 0 && pool.length) {
+    if (need <= pool.length) {
+      for (let i = 0; i < need; i++) {
+        const k = need === 1 ? pool.length - 1 : Math.round((i * (pool.length - 1)) / (need - 1));
+        if (!chosen.includes(pool[k])) chosen.push(pool[k]);
+      }
+    } else chosen.push(...pool);
+  }
+  const inserts = chosen.map((m) => ({ at: m.at, ops: strikeBeat(model), order: 1 }));
+  inserts.push({ at: finalAt, ops: finalBeat(model), order: 0 });
+  const extra = need - chosen.length;
+  if (extra > 0) {
+    // the remaining beats go INTO the last wait before the strike: that wait is split into `extra + 1`
+    // parts, so a contact sits between them and the strike still lands on the body's own tick
+    let wi = -1;
+    for (let i = finalAt - 1; i >= 0; i--) if (ops[i].op === 11) { wi = i; break; }
+    if (wi >= 0) {
+      const total = ops[wi].words?.[0] | 0;
+      const part = Math.max(1, Math.floor(total / (extra + 1)));
+      ops[wi] = { op: 11, words: [Math.max(1, total - part * extra)] };
+      const list = [];
+      for (let i = 0; i < extra; i++) list.push(...strikeBeat(model), { op: 11, words: [part] });
+      inserts.push({ at: wi + 1, ops: list, order: 0 });
+    } else {
+      const list = [];
+      for (let i = 0; i < extra; i++) list.push({ op: 11, words: [20] }, ...strikeBeat(model));
+      inserts.push({ at: finalAt, ops: list, order: 1 });
+    }
+  }
+  inserts.sort((a, b) => (b.at - a.at) || (a.order - b.order));
+  for (const ins of inserts) ops.splice(Math.max(0, Math.min(ins.at, ops.length)), 0, ...ins.ops);
+  // a body with no shot of its own but a technique that fires: the anatomy's plan places it at the
+  // strike (the same rule the donor builds use; the own body has no emitter point to inherit)
+  if (!shippedShot && plan.moveKind === "shoot") {
+    const tables = scriptTableSeq(src);
+    const at = ops.findIndex((o) => o.op === 10 && (o.words?.[0] | 0) === STRIKE_TYPE);
+    const recs = projectileOps(model, null, tables[0] ?? null, element, { tech: plan.tech ?? null, volley: (clip | 0) === 13, tables });
+    if (recs.length) ops.splice(at < 0 ? ops.length : at, 0, ...recs);
+  }
+  const built = builtPresentation(model, {
+    ...src, ops, synthesized: true, camAuthored: "own", buildKind: "ownclip",
+    ownClip: { slot: plan.slot, kind: plan.kind, moveKind: plan.moveKind ?? plan.kind, why: plan.why, contacts, hits },
+  });
+  // a body that steps out and never steps back would leave the fighter standing in melee range: the
+  // disc's own move-home arm (op2 mode 7, the one its own scripts use) puts the slot back
+  const cls = classifyOwnScript(model, src);
+  const travelsOut = cls.ramp4 > 0 || cls.leap3 > 0 || cls.dash8 > 0;
+  if (travelsOut && !cls.returnsHome) {
+    let term = built.ops.findIndex((o) => o.op === 0 || o.op === 255);
+    if (term < 0) term = built.ops.length;
+    built.ops.splice(term, 0, { op: 2, words: [7, 0, 0] });
+  }
+  return built;
+}
+
 function donorPayload(model, clip, row) {
   const prepared = model.donorClips?.[clip];
   if (prepared) return prepared;
@@ -964,8 +1102,26 @@ function donorPayload(model, clip, row) {
  * never an attack body and never the Greymon last resort.
  */
 export function resolveClipScript(model, clip, opts = {}) {
+  // THE HAND PICKS (dw2-picks.js): only with DW2 motion on. "dw2" plays the DW2 motion even where the
+  // body owns this clip (falls through to the rule when the body has no DW2 motion for it); "dw3"
+  // keeps every DW2 body away from this clip.
+  const pick = dw2MotionEnabled() ? dw2Pick(model?.folder, clip) : null;
+  if (pick === "dw2") {
+    const base = resolveClipScriptBase(model, clip, opts);
+    const picked = base ? withDw2Body(model, base, clip, { ...opts, force: true }) : base;
+    if (picked && picked !== base) return picked;
+  }
+  // OWN CLIPS FIRST: a technique slot the model has no script for takes the model's OWN clip of the
+  // matching kind (own-clips.js). Off by default -> ownClipPlan returns null and nothing below changes.
+  const plan = ownClipPlan(model, clip, opts);
+  if (plan) {
+    const own = withOwnClip(model, clip, plan, opts);
+    if (own) return own;
+  }
   const base = resolveClipScriptBase(model, clip, opts);
-  if (!base || !dw2MotionEnabled()) return base;
+  if (!base || !dw2MotionEnabled() || pick === "dw3") return base;
+  // a body that throws a part of itself keeps its own motion: a DW2 body does not carry the mesh
+  if (ownClipsBlockDw2(model, clip, opts)) return base;
   return withDw2Body(model, base, clip, opts);
 }
 
@@ -984,11 +1140,13 @@ export function resolveClipScript(model, clip, opts = {}) {
  * the whole DW2 motion plays: a reaction has no strike to be late for, and a death that stops
  * three frames in reads as a freeze. Nothing else is touched.
  */
-export function withDw2Body(model, base, clip, { tech = null, element = 1 } = {}) {
+export function withDw2Body(model, base, clip, { tech = null, element = 1, force = false } = {}) {
   // THE USER RULE: DW2 motion only FILLS a slot the DW3 model does not own. A slot with an own action
   // script is authored data and is returned untouched — no DW2 body ever replaces a clip the model
   // already plays (its own attack, death, idle, reactions all stay exactly as the disc wrote them).
-  if (hasOps(model?.actions?.[clip])) return base;
+  // `force` = the user hand-picked DW2 for this clip (dw2-motion-picks.json): the own clip's ops stay,
+  // only its body binds take the DW2 table, exactly as for a donor build.
+  if (!force && hasOps(model?.actions?.[clip])) return base;
   const magical = skillRow(tech)?.attack_category === "magical";
   const dw2 = dw2MotionFor(model, clip, { tech, magical });
   if (!dw2 || !base?.ops?.length) return base;
@@ -1082,7 +1240,7 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1 } = {}
   return { ...base, ops: finalOps, dw2Motion: { letter: dw2.letter, table: bodyTable, kind: dw2.kind, slot: dw2.slot } };
 }
 
-function resolveClipScriptBase(model, clip, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+export function resolveClipScriptBase(model, clip, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
   const own = model?.actions?.[clip];
   if (hasOps(own) && (target !== "self" || scriptIsSelfCast(own))) return own;
   if (clip == null || !model) return null;

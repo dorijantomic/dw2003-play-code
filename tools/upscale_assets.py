@@ -35,9 +35,11 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fnmatch
+import functools
 import gc
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -67,6 +69,16 @@ DEFAULT_EXCLUDED_DIRS = frozenset({"ref"})
 # than art.  web/battle3d.js stopped reading them and builds the arena floor
 # procedurally, so an AI pass only turns the noise into swirls and burns GPU time.
 DEAD_ASSET_PATTERNS = ("battle/arena/*",)
+# Developer-only rasters: no game path requests them through the HD loader (web/assets.js), so an HD
+# copy is never shown.  thumbs/ is the stage-wiring tool's preview set (web/wire.js loads it with a
+# plain <img>); an arena's whole-page floor.png/wall.png and every *_void.png are battle3d.js debug
+# views (arenaDebug.legacy / voidRaw).  The game draws only {page}_c{col}_r{row}.png.
+DEV_ONLY_PATTERNS = (
+    "thumbs/*",
+    "battle/arenas/*/floor.png",
+    "battle/arenas/*/wall.png",
+    "battle/arenas/*/*_void.png",
+)
 # An anime-restoration model has nothing to reconstruct in a 32x32 portrait cell:
 # it merges limbs, moves eyes, and on a shared sheet it bleeds one cell into its
 # neighbour, which native crop rectangles then show.  Cells at or below this edge
@@ -78,7 +90,7 @@ MAX_NEAREST_PORTRAIT_CELL = 64
 MAX_HD_DIMENSION = 32_767
 SCALE = 4
 DEFAULT_TILE = 512
-DEFAULT_OVERLAP = 64
+DEFAULT_OVERLAP = 32
 
 
 @dataclass(frozen=True)
@@ -168,6 +180,100 @@ def portrait_cell_max_edge(src: Path, atlas: bool) -> int | None:
     return max(edges) if edges else None
 
 
+# Overworld AI (default on since 2026-10-27; --no-overworld-ai turns it off): field character sheets and the stage prop sheets go through
+# the map model one FRAME at a time instead of staying exact pixels.  Frames on these sheets touch
+# (15,875 of 15,881 prop rects lie within 2 px of another), so a whole-sheet pass would bleed one
+# frame into the next; each frame is inferred alone with its own edges reflected as context.
+OVERWORLD_AI = True
+CELL_MODELS = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
+
+
+def _stage_sheet(rel: Path) -> tuple[str, bool] | None:
+    """effects/s200.png -> ("s200", False); effects/s200_semi.png -> ("s200", True)."""
+    match = re.fullmatch(r"effects/(s\d+)(_semi)?\.png", rel.as_posix())
+    return (match.group(1), bool(match.group(2))) if match else None
+
+
+@functools.lru_cache(maxsize=4)
+def _read_json(path: str):
+    return json.loads(Path(path).read_text())
+
+
+def cell_regions(src: Path, rel: Path) -> list[tuple[int, int, int, int]]:
+    """The frames of a field sheet: prop rects from data/point_sprites.json, or the frame grid that
+    manifest.json gives a character sheet.  Empty when the sheet has no known frames."""
+    from PIL import Image
+
+    root = src.parents[len(rel.parts) - 1]
+    with Image.open(src) as image:
+        width, height = image.size
+    boxes: set[tuple[int, int, int, int]] = set()
+    stage = _stage_sheet(rel)
+    if stage:
+        sprites = _read_json(str(root / "data/point_sprites.json")).get(stage[0], {}).get("sprites", {})
+        for layers in sprites.values():
+            for layer in layers:
+                x0, y0 = max(0, int(layer["x"])), max(0, int(layer["y"]))
+                x1 = min(width, int(layer["x"]) + int(layer["w"]))
+                y1 = min(height, int(layer["y"]) + int(layer["h"]))
+                if x1 > x0 and y1 > y0:
+                    boxes.add((x0, y0, x1, y1))
+    elif rel.parts and rel.parts[0] == "sprites":
+        manifest = _read_json(str(root / "manifest.json"))
+        wanted = "assets/" + rel.as_posix()
+        for entry in manifest.get("characters", []) + manifest.get("npcs", []):
+            for sheet, fw_key, fh_key in (("sheet", "frameW", "frameH"), ("clipSheet", "clipFrameW", "clipFrameH")):
+                if entry.get(sheet) == wanted and entry.get(fw_key) and entry.get(fh_key):
+                    fw, fh = int(entry[fw_key]), int(entry[fh_key])
+                    boxes |= {
+                        (x, y, min(width, x + fw), min(height, y + fh))
+                        for y in range(0, height, fh) for x in range(0, width, fw)
+                    }
+    return sorted(boxes, key=lambda box: (box[1], box[0], box[3], box[2]))
+
+
+def upscale_cells(src: Path, rel: Path, image, recipe: dict, **model_args):
+    """Nearest-scale the sheet, then replace each frame with its own AI upscale.
+
+    A stage prop sheet's plain and blended (_semi) halves never share a texel, so both are inferred
+    from their union (same colours on both sides of the split) and each keeps only its own alpha."""
+    import numpy as np
+    from PIL import Image
+
+    own = image.convert("RGBA")
+    colour = own
+    stage = _stage_sheet(rel)
+    if stage:
+        other = src.with_name(f"{stage[0]}.png" if stage[1] else f"{stage[0]}_semi.png")
+        if other.is_file():
+            with Image.open(other) as companion:
+                companion = companion.convert("RGBA")
+            if companion.size == own.size:
+                merged = np.asarray(own).copy()
+                extra = np.asarray(companion)
+                take = (merged[..., 3] == 0) & (extra[..., 3] > 0)
+                merged[take] = extra[take]
+                colour = Image.fromarray(merged, "RGBA")
+    base, alpha_mode = nearest_upscale(own)
+    inference = {"method": "ai", "models": recipe["models"]}
+    used = set()
+    for box in cell_regions(src, rel):
+        own_alpha = own.crop(box).getchannel("A")
+        if own_alpha.getextrema()[1] == 0:
+            continue                                   # nothing of this sheet in this frame
+        high, scale, _alpha, model_used = upscale_with_models(colour.crop(box), inference, **model_args)
+        if scale != SCALE:
+            raise ValueError(f"frame model returned scale {scale}")
+        high = high.convert("RGBA")
+        # exact 4x transparency, also for sheets with half-transparent texels (alpha 127): the game's
+        # pixel outline stays where it was and the AI only redraws the colours inside it
+        high.putalpha(own_alpha.resize(high.size, Image.Resampling.NEAREST))
+        base.paste(high, (box[0] * SCALE, box[1] * SCALE))
+        used.add(model_used)
+    model_used = "+".join(sorted(used)) if used else "nearest"
+    return base, SCALE, alpha_mode, f"{model_used}-frames"
+
+
 def asset_class(rel: Path, src: Path | None = None) -> str:
     """Conservatively classify a runtime raster from its canonical build path."""
     path = rel.as_posix().lower()
@@ -180,10 +286,16 @@ def asset_class(rel: Path, src: Path | None = None) -> str:
         return _portrait_class(source, "portrait", atlas=False)
     if root == "ui" and name == "ststat_sheet.png":
         return _portrait_class(source, "portrait-atlas", atlas=True)
+    if OVERWORLD_AI and root == "sprites":
+        return "sprite-frames"
+    if OVERWORLD_AI and _stage_sheet(rel):
+        return "prop-frames"
     if root in {"sprites", "effects", "cards"}:
         return "tiny-sprite"
     if path.startswith("battle/effects/"):
         return "tiny-sprite"
+    if path.startswith("battle/arenas/"):
+        return "arena-palette"
     if path.startswith("battle/textures/") or path.startswith("battle/backdrops/"):
         return "medium-prerendered"
     if root == "ui" or name in {"title_logo.png"}:
@@ -208,6 +320,8 @@ def processing_recipe(
     kind = asset_class(rel, src)
     if kind in {"tiny-sprite", "ui-text", "portrait-tiny"}:
         return {"assetClass": kind, "method": "nearest", "models": []}
+    if kind in {"sprite-frames", "prop-frames"}:
+        return {"assetClass": kind, "method": "ai-frames", "models": list(CELL_MODELS)}
     if kind == "map":
         models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
     elif kind in {"portrait", "portrait-atlas"}:
@@ -215,7 +329,14 @@ def processing_recipe(
     else:
         models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
     method = "portrait-atlas" if kind == "portrait-atlas" else "ai"
-    return {"assetClass": kind, "method": method, "models": models}
+    recipe = {"assetClass": kind, "method": method, "models": models}
+    if kind == "arena-palette":
+        # One arena page is decoded once per palette, and regions drawn with OTHER palettes touch the
+        # ones this file is drawn for (42 of 43 multi-palette pages, 0 texels apart).  Those foreign
+        # texels hold wrong colours; the model would smear them across the drawn edges.  Only the
+        # texels this palette draws are kept; the rest are filled from them before inference.
+        recipe["fill"] = "arena-clut-mask"
+    return recipe
 
 
 def processing_matches(
@@ -310,7 +431,9 @@ def discover_assets(
     for path in sorted(src_dir.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in RASTER_SUFFIXES:
             continue
-        resolved = path.resolve()
+        # src_dir is already resolved, so rglob yields real paths; resolving each file again costs a
+        # filesystem round trip per file (minutes over the Windows -> WSL share).
+        resolved = path
         if out_dir != src_dir and out_dir in resolved.parents:
             continue
         rel = resolved.relative_to(src_dir)
@@ -321,7 +444,7 @@ def discover_assets(
         if is_reference and not include_reference:
             default_excluded.append(rel)
             continue
-        if _matches(rel, DEAD_ASSET_PATTERNS):
+        if _matches(rel, DEAD_ASSET_PATTERNS) or _matches(rel, DEV_ONLY_PATTERNS):
             dead.append(rel)
             continue
         if includes and not _matches(rel, includes):
@@ -591,8 +714,73 @@ def _pad_to_multiple(rgb, multiple: int):
     return np.pad(rgb, ((0, add_h), (0, add_w), (0, 0)), mode=mode)
 
 
-def upscale_image(model, image, *, tile: int, overlap: int, dilate: int):
-    """Return tiled SR with reflective context, cropped halos, and separate alpha."""
+def arena_palette_mask(src: Path, margin: int = 2):
+    """Texels of an arena palette page that the game draws WITH this palette, or None.
+
+    `battle/arenas/<pack>/<page>_c<col>_r<row>.png` is one atlas page decoded with one palette; the
+    pack's geometry.json lists every triangle with its page, palette (clut) and UVs (0..1 of the
+    page).  Texel centres inside those triangles are drawn; `margin` texels around them are kept too
+    (bilinear sampling and the 4x texture read one texel past an edge)."""
+    import re
+
+    import numpy as np
+
+    match = re.fullmatch(r"(floor|wall)_c(\d+)_r(\d+)\.png", src.name)
+    geometry = src.parent / "geometry.json"
+    if not match or not geometry.is_file():
+        return None
+    page, col, row = match.group(1), int(match.group(2)), int(match.group(3))
+    from PIL import Image
+
+    with Image.open(src) as image:
+        width, height = image.size
+    groups = json.loads(geometry.read_text()).get("groups", [])
+    mask = np.zeros((height, width), dtype=bool)
+    ys, xs = np.mgrid[0:height, 0:width]
+    cx, cy = xs + 0.5, ys + 0.5
+    for group in groups:
+        clut = group.get("clut") or [0, 255]
+        if (group.get("page") or "wall") != page or [int(clut[0]), int(clut[1])] != [col, row]:
+            continue
+        uv = group.get("uv") or []
+        for t in range(0, len(uv) - 5, 6):
+            ax, ay = uv[t] * width, uv[t + 1] * height
+            bx, by = uv[t + 2] * width, uv[t + 3] * height
+            qx, qy = uv[t + 4] * width, uv[t + 5] * height
+            x0, x1 = int(max(0, min(ax, bx, qx) - 1)), int(min(width, max(ax, bx, qx) + 2))
+            y0, y1 = int(max(0, min(ay, by, qy) - 1)), int(min(height, max(ay, by, qy) + 2))
+            if x0 >= x1 or y0 >= y1:
+                continue
+            px, py = cx[y0:y1, x0:x1], cy[y0:y1, x0:x1]
+            e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+            e1 = (qx - bx) * (py - by) - (qy - by) * (px - bx)
+            e2 = (ax - qx) * (py - qy) - (ay - qy) * (px - qx)
+            inside = ((e0 >= 0) & (e1 >= 0) & (e2 >= 0)) | ((e0 <= 0) & (e1 <= 0) & (e2 <= 0))
+            mask[y0:y1, x0:x1] |= inside
+            # a triangle thinner than a texel (the disc has flat ones that stretch one texel row)
+            # still marks every texel its edges run through
+            for (sx, sy), (tx, ty) in (((ax, ay), (bx, by)), ((bx, by), (qx, qy)), ((qx, qy), (ax, ay))):
+                steps = int(max(abs(tx - sx), abs(ty - sy)) * 2) + 1
+                for k in range(steps + 1):
+                    ex, ey = sx + (tx - sx) * k / steps, sy + (ty - sy) * k / steps
+                    mask[min(height - 1, max(0, int(ey))), min(width - 1, max(0, int(ex)))] = True
+    if not mask.any():
+        return None
+    for _ in range(margin):
+        grown = mask.copy()
+        grown[1:, :] |= mask[:-1, :]
+        grown[:-1, :] |= mask[1:, :]
+        grown[:, 1:] |= mask[:, :-1]
+        grown[:, :-1] |= mask[:, 1:]
+        mask = grown
+    return mask
+
+
+def upscale_image(model, image, *, tile: int, overlap: int, dilate: int, fill_mask=None):
+    """Return tiled SR with reflective context, cropped halos, and separate alpha.
+
+    `fill_mask` (bool array, source size) marks the only texels whose colours are real; every other
+    texel is replaced by its nearest real neighbour colour before inference (alpha is unchanged)."""
     import numpy as np
     from PIL import Image
 
@@ -603,7 +791,17 @@ def upscale_image(model, image, *, tile: int, overlap: int, dilate: int):
     scale = None
     pixels = np.asarray(source, dtype=np.float32) / 255.0
     rgb_source = pixels[..., :3]
-    if has_alpha:
+    # Only this rectangle is inferred.  With a fill mask it is the bounding box of the masked texels;
+    # nothing outside it is drawn, so that part keeps the filled colours at 4x nearest.
+    rx0, ry0, rx1, ry1 = 0, 0, width, height
+    if fill_mask is not None:
+        known = fill_mask & (pixels[..., 3] > 0.0) if has_alpha else fill_mask
+        if known.any():
+            rgb_source = dilate_fill(rgb_source, known, width + height)
+            rows, cols = np.nonzero(fill_mask)
+            rx0, rx1 = max(0, int(cols.min()) - 1), min(width, int(cols.max()) + 2)
+            ry0, ry1 = max(0, int(rows.min()) - 1), min(height, int(rows.max()) + 2)
+    elif has_alpha:
         rgb_source = dilate_fill(rgb_source, pixels[..., 3] > 0.0, dilate)
     pad_mode = "reflect" if width > 1 and height > 1 else "edge"
     padded = np.pad(
@@ -616,10 +814,10 @@ def upscale_image(model, image, *, tile: int, overlap: int, dilate: int):
     if has_alpha:
         alpha_filter, alpha_kind = alpha_resampling(source.getchannel("A"))
 
-    for y0 in range(0, height, tile):
-        y1 = min(y0 + tile, height)
-        for x0 in range(0, width, tile):
-            x1 = min(x0 + tile, width)
+    for y0 in range(ry0, ry1, tile):
+        y1 = min(y0 + tile, ry1)
+        for x0 in range(rx0, rx1, tile):
+            x1 = min(x0 + tile, rx1)
             patch_h = y1 - y0 + overlap * 2
             patch_w = x1 - x0 + overlap * 2
             rgb = padded[y0 : y1 + overlap * 2, x0 : x1 + overlap * 2]
@@ -635,6 +833,15 @@ def upscale_image(model, image, *, tile: int, overlap: int, dilate: int):
             if scale is None:
                 scale = patch_scale_x
                 output = Image.new(source.mode, (width * scale, height * scale))
+                if (rx0, ry0, rx1, ry1) != (0, 0, width, height):
+                    filled = Image.fromarray(
+                        (np.clip(rgb_source, 0, 1) * 255).round().astype(np.uint8), "RGB"
+                    ).resize((width * scale, height * scale), Image.Resampling.NEAREST)
+                    if has_alpha:
+                        filled = filled.convert("RGBA")
+                        filled.putalpha(source.getchannel("A").resize(
+                            (width * scale, height * scale), alpha_filter))
+                    output.paste(filled, (0, 0))
             elif scale != patch_scale_x:
                 raise ValueError("model scale changed between tiles")
 
@@ -738,6 +945,7 @@ def upscale_with_models(
     overlap: int,
     dilate: int,
     tile_limits: dict[str, int] | None = None,
+    fill_mask=None,
 ):
     """Run a model chain, adapting tile size without globally disabling on OOM."""
     if recipe["method"] == "nearest":
@@ -770,6 +978,7 @@ def upscale_with_models(
                         tile=attempt_tile,
                         overlap=overlap,
                         dilate=dilate,
+                        **({"fill_mask": fill_mask} if fill_mask is not None else {}),
                     )
                     if tile_limits is not None:
                         tile_limits[key] = attempt_tile
@@ -1159,11 +1368,17 @@ def _parser() -> argparse.ArgumentParser:
         help=f"reflective context in source pixels (default: {DEFAULT_OVERLAP})",
     )
     parser.add_argument("--dilate", type=int, default=16, help="transparent-edge fill passes")
+    parser.add_argument(
+        "--overworld-ai", action=argparse.BooleanOptionalAction, default=True,
+        help="AI-upscale field character sheets and stage prop sheets frame by frame (default: on)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    global OVERWORLD_AI
+    OVERWORLD_AI = bool(args.overworld_ai)
     if args.tile < 16 or args.overlap < 0 or args.dilate < 0:
         _parser().error("--tile must be >= 16; --overlap and --dilate must be >= 0")
     if args.src_dir.resolve() == args.out_dir.resolve():
@@ -1220,7 +1435,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  excluded refs/test {len(excluded):>5} (use --include-reference)")
     dead_paths = [rel.as_posix() for rel in dead]
     if dead:
-        print(f"  excluded dead assets {len(dead):>3} ({', '.join(DEAD_ASSET_PATTERNS)})")
+        print(f"  excluded dead/dev-only {len(dead):>3} ({', '.join(DEAD_ASSET_PATTERNS + DEV_ONLY_PATTERNS)})")
     if args.dry_run:
         return 0
     if not assets:
@@ -1271,6 +1486,20 @@ def main(argv: list[str] | None = None) -> int:
             continue
         recipe = processing_recipe(asset.rel, src=asset.src)
         old_record = old_records.get(asset.rel.as_posix())
+        if recipe["method"] == "nearest":
+            # Exact pixels: a 4x nearest copy shows the same pixels as the native file (the game
+            # draws native art unsmoothed) at 16x the download, so the pack only records it and the
+            # game keeps the native file.  A copy left by an older build is removed.
+            if dst.is_file():
+                dst.unlink()
+            record = record_for(
+                asset.rel, size, SCALE, src=asset.src,
+                modelUsed="nearest", backend="native", alphaMode="native", native=True,
+            )
+            records.append(record)
+            old_records[record["path"]] = record
+            skipped += 1
+            continue
         if (
             not args.force
             and output_is_current(asset.src, dst)
@@ -1328,18 +1557,7 @@ def main(argv: list[str] | None = None) -> int:
         if done % 16 == 0:
             checkpoint_manifest()
 
-    nearest_pending = [
-        entry
-        for entry in pending
-        if processing_recipe(entry[1].rel, src=entry[1].src)["method"] == "nearest"
-    ]
-    ai_pending = [entry for entry in pending if entry not in nearest_pending]
-    for index, asset, dst in nearest_pending:
-        with Image.open(asset.src) as source:
-            size = [source.width, source.height]
-            high, alpha_mode = nearest_upscale(source)
-        save_atomic(high, dst)
-        report(index, asset, size, high.size, "nearest", alpha_mode, "cpu")
+    ai_pending = list(pending)
 
     if backend == "ncnn":
         # The compatibility backend cannot target decoded sub-regions. Keep the
@@ -1348,7 +1566,7 @@ def main(argv: list[str] | None = None) -> int:
             entry
             for entry in ai_pending
             if processing_recipe(entry[1].rel, src=entry[1].src)["method"]
-            == "portrait-atlas"
+            in ("portrait-atlas", "ai-frames")
         ]
         ai_pending = [entry for entry in ai_pending if entry not in ncnn_atlases]
         for index, asset, dst in ncnn_atlases:
@@ -1373,10 +1591,49 @@ def main(argv: list[str] | None = None) -> int:
                     "realesrgan-anime-x4", alpha_mode, "ncnn-vulkan",
                 )
     else:
+        import hashlib
+        import shutil
+        from concurrent.futures import ThreadPoolExecutor
+
         models: dict[str, LoadedModel] = {}
         unavailable: dict[str, str] = {}
         tile_limits: dict[str, int] = {}
-        for index, asset, dst in ai_pending:
+        # PNG encoding is ~1/3 of the GPU time per image and Pillow's encoder releases the GIL, so
+        # it runs on a worker while the GPU does the next image (at most 3 images waiting).
+        saver = ThreadPoolExecutor(max_workers=2)
+        in_flight: list = []
+
+        def drain(limit: int) -> None:
+            while len(in_flight) > limit:
+                future, done_args = in_flight.pop(0)
+                future.result()
+                report(*done_args)
+
+        # Identical sources (same pixels, same recipe) are inferred once and the result copied.
+        first_of: dict[tuple, tuple] = {}
+        copies: list[tuple] = []
+        unique: list[tuple] = []
+        for entry in ai_pending:
+            with Image.open(entry[1].src) as source:
+                key = (
+                    hashlib.sha1(
+                        source.mode.encode() + repr(source.size).encode() + source.tobytes()
+                    ).hexdigest(),
+                    json.dumps(processing_recipe(entry[1].rel, src=entry[1].src), sort_keys=True),
+                    # a palette mask depends on the page's geometry, not only on its pixels
+                    entry[1].src.parent.as_posix() if "battle/arenas/" in entry[1].rel.as_posix() else "",
+                    entry[1].rel.as_posix()
+                    if processing_recipe(entry[1].rel, src=entry[1].src)["method"] == "ai-frames" else "",
+                )
+            if key in first_of:
+                copies.append((entry, first_of[key]))
+            else:
+                first_of[key] = entry
+                unique.append(entry)
+        if copies:
+            print(f"{len(copies)} identical sources will be copied, not inferred", flush=True)
+        results: dict[Path, tuple] = {}
+        for index, asset, dst in unique:
             recipe = processing_recipe(asset.rel, src=asset.src)
             with Image.open(asset.src) as source:
                 size = [source.width, source.height]
@@ -1391,7 +1648,13 @@ def main(argv: list[str] | None = None) -> int:
                     "overlap": args.overlap,
                     "dilate": args.dilate,
                 }
-                if recipe["method"] == "portrait-atlas":
+                if recipe.get("fill") == "arena-clut-mask":
+                    model_args["fill_mask"] = arena_palette_mask(asset.src)
+                if recipe["method"] == "ai-frames":
+                    high, scale, alpha_mode, model_used = upscale_cells(
+                        asset.src, asset.rel, source, recipe, **model_args
+                    )
+                elif recipe["method"] == "portrait-atlas":
                     high, scale, alpha_mode, model_used = upscale_portrait_atlas(
                         asset.src, source, recipe, **model_args
                     )
@@ -1401,8 +1664,20 @@ def main(argv: list[str] | None = None) -> int:
                     )
             if scale != SCALE:
                 raise ValueError(f"{model_used} returned scale {scale}; expected {SCALE}")
-            save_atomic(high, dst)
-            report(index, asset, size, high.size, model_used, alpha_mode, args.device)
+            results[asset.src] = (size, high.size, model_used, alpha_mode)
+            in_flight.append((
+                saver.submit(save_atomic, high, dst),
+                (index, asset, size, high.size, model_used, alpha_mode, args.device),
+            ))
+            del high
+            drain(3)
+        drain(0)
+        saver.shutdown()
+        for (index, asset, dst), (_i, first, first_dst) in copies:
+            size, high_size, model_used, alpha_mode = results[first.src]
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(first_dst, dst)
+            report(index, asset, size, high_size, model_used, alpha_mode, args.device)
 
     print(
         progress_line(

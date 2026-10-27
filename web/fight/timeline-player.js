@@ -65,6 +65,37 @@ export class TimelinePlayer {
     if (this._s.frozen) this.ended = true;
   }
 
+  /** The run of entries that show the SAME frame, starting at the current playhead entry.
+   *  `{ frame, run, next }` — run = how many entries name `frame` from here, next = the frame the
+   *  run changes to. null when there is nothing to spread: a single entry, a loop marker or an end
+   *  marker in the way. Smooth mode (web/fight/smooth-anim.js) uses it to keep the pose moving
+   *  across a held playlist frame instead of standing still and then jumping. */
+  lookaheadHold(maxRun = 96) {
+    const t = this.table, n = this.table.length, p = this._s.playhead;
+    if (!t || p < 0 || p >= n) return null;
+    const frameOf = (e) => {
+      if (!e) return null;
+      const v = e.value | 0;
+      if (v === 0xffff) return null;
+      return (v & 0x8000) ? (e.loop_target | 0) : v;
+    };
+    const f0 = frameOf(t[p]);
+    if (f0 == null) return null;
+    let run = 1;
+    while (p + run < n && run < maxRun) {
+      const v = t[p + run].value | 0;
+      if (v === 0x8000 || v === 0xffff) return null;
+      if (frameOf(t[p + run]) !== f0) break;
+      run++;
+    }
+    if (p + run >= n) return null;
+    const vn = t[p + run].value | 0;
+    if (vn === 0x8000 || vn === 0xffff) return null;
+    const nf = frameOf(t[p + run]);
+    if (nf == null || nf === f0) return null;
+    return { frame: f0, run, next: nf };
+  }
+
   currentFrame() { return this.frame; }
 }
 
@@ -109,6 +140,9 @@ export class PlaylistPlayer {
   }
 
   currentFrame() { return this.frame; }
+
+  /** Smooth mode: the current sub-table's held-frame lookahead (see TimelinePlayer.lookaheadHold). */
+  lookaheadHold(maxRun = 96) { return this.cur?.lookaheadHold?.(maxRun) ?? null; }
 }
 
 export { SAMPLE_BIT, LOOP_MARKER, END_MARKER };

@@ -89,3 +89,4 @@ web/extra_fx/giant_master_px.json
 # DW2 models the mount layer renders live (web/mount3d.js). Copied from ~/dw2-models by hand, disc-derived,
 # local only: the mount hides itself when the file is not there, and nothing here is ever committed.
 web/dw2models/
+web/assets-lab/

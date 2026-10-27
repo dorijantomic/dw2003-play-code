@@ -730,7 +730,47 @@ def make_handler(build: Build):
             build.dw2_start()
             return self._json({"ok": True})
 
+        def _put_dw2_picks(self):
+            # The animation viewer's Save (Actions -> DW2 motion -> Your picks): the hand-picked DW2/DW3
+            # clips go to web/dw2-motion-picks.json, a committed file that ships with the game
+            # (web/fight/dw2-picks.js reads it). Only this computer may write it.
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send_error(403)
+            n = int(self.headers.get("Content-Length") or 0)
+            if n <= 0 or n > 1_000_000:
+                return self._json({"error": "bad size"}, 400)
+            try:
+                raw = json.loads(self.rfile.read(n).decode("utf-8")).get("picks")
+                if not isinstance(raw, dict):
+                    raise ValueError("no picks")
+                picks = {}
+                for folder, slots in raw.items():
+                    if not re.fullmatch(r"[A-Za-z0-9_]+", str(folder)) or not isinstance(slots, dict):
+                        raise ValueError(f"bad folder {folder!r}")
+                    row = {}
+                    for slot, v in slots.items():
+                        if not re.fullmatch(r"\d{1,2}", str(slot)) or v not in ("dw2", "dw3"):
+                            raise ValueError(f"bad pick {folder} {slot} {v!r}")
+                        row[str(int(slot))] = v
+                    if row:
+                        picks[folder] = dict(sorted(row.items(), key=lambda kv: int(kv[0])))
+            except (ValueError, AttributeError, UnicodeDecodeError) as e:
+                return self._json({"error": f"not saved: {e}"}, 400)
+            dest = build.app / "web" / "dw2-motion-picks.json"
+            try:
+                old = json.loads(dest.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                old = {}
+            out = {"v": 1, "note": old.get("note", "Hand-picked DW2/DW3 clips, saved by the animation viewer."),
+                   "picks": dict(sorted(picks.items()))}
+            part = dest.with_suffix(".part")
+            part.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
+            os.replace(part, dest)
+            return self._json({"ok": True, "species": len(picks), "clips": sum(len(r) for r in picks.values())})
+
         def do_PUT(self):
+            if urllib.parse.urlparse(self.path).path == "/__dw2003/dw2-picks":
+                return self._put_dw2_picks()
             if urllib.parse.urlparse(self.path).path == "/__dw2003/dw2disc":
                 return self._put_dw2()
             if urllib.parse.urlparse(self.path).path != "/__dw2003/disc":

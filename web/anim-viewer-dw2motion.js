@@ -143,6 +143,32 @@ export function tableFor(tables, slot, letter, data) {
   return hit ? tables?.[hit.letter] ?? null : null;
 }
 
+// ── the hand picks (web/dw2-motion-picks.json; the game reads it through web/fight/dw2-picks.js) ──
+/** Every gate-passed DW2 motion for `slot`, owned slot or not (a hand pick may override ownership). */
+export function pickLetters(data, slot) {
+  const row = DW2_CLIP_MAP[slot];
+  if (!row || !row.letters.length) return [];
+  const out = [];
+  for (const letter of row.letters) {
+    const m = data?.motions?.[letter];
+    if (!m || !m.used) continue;
+    out.push({ letter, table: m.table | 0, frames: m.frames | 0, kind: m.kind || row.kind, gate: m.gate || null, static: motionIsStatic(m) });
+  }
+  return out;
+}
+/** One row per slot a pick can change: it has a DW2 motion. `rule` = what the automatic rule plays there. */
+export function pickRows(data) {
+  const out = [];
+  for (let slot = 0; slot <= 17; slot++) {
+    if (slot === 12) continue;
+    const letters = pickLetters(data, slot);
+    if (!letters.length) continue;
+    const owned = !!data?.ownedSlots?.includes(slot);
+    out.push({ slot, label: slotLabel(slot), owned, letters, rule: fillersFor(data, slot).length ? "dw2" : "dw3" });
+  }
+  return out;
+}
+
 // ── the clone (the body's own anim.json + the DW2 keys in a free table) ─────────────────────────
 const TERM = 30000;
 const empty = (t) => ({ table: t || [] });
@@ -302,8 +328,10 @@ export async function probeFolders(folders, onFound, { root = DW2_ROOT, concurre
 
 // ── actions + deep link ────────────────────────────────────────────────────────────────────────
 /** The A/B pair for one filled slot: the DW2 motion, and what that slot plays today. */
-export function dw2Actions(data, { folder = null, slot, letter = null, tables = null } = {}) {
-  const fill = fillersFor(data, slot).find((f) => !letter || f.letter === letter);
+export function dw2Actions(data, { folder = null, slot, letter = null, tables = null, any = false } = {}) {
+  // any: also an owned slot's DW2 motion (the hand-pick rows play those)
+  const list = fillersFor(data, slot);
+  const fill = (list.length || !any ? list : pickLetters(data, slot)).find((f) => !letter || f.letter === letter);
   if (!fill) return [];
   const out = [];
   const table = tables?.[fill.letter] ?? fill.table;
@@ -341,6 +369,97 @@ const h = (tag, props = {}, ...kids) => {
 const VERDICT_MARK = { works: "✓", broken: "✗", unsure: "?" };
 const VERDICTS = ["works", "broken", "unsure"];
 
+const PICK_WORD = { dw2: "DW2", dw3: "DW3" };
+/** What the game plays for a row: the pick when there is one, else the automatic rule. */
+const resultOf = (row, pick) => pick || row.rule;
+/**
+ * "Your picks": a table, one row per clip that has a DW2 motion.
+ *   Clip | In the game (what battle plays; "unsaved" when it differs from the saved file) | Your choice
+ *   (Auto / DW2 / DW3, the chosen one filled) | Preview (play DW3 / DW2, the one on screen filled).
+ * v.picks: { rows, get(slot), saved(slot), set(slot, value|null), dirty, msg, onSave(), dw2On,
+ *            playing: {slot, which:"dw2"|"dw3", letter}|null }
+ * v.onPlay(slot, letter) plays DW2, v.onPlayOwn(slot) plays what DW3 plays there.
+ */
+function renderPicks(box, v) {
+  const p = v.picks;
+  const wrap = h("div", { id: "dw2Picks", className: "dw2Picks" });
+  const changed = p.rows.filter((r) => (p.get(r.slot) || null) !== (p.saved(r.slot) || null)).length;
+  const nPicks = p.rows.filter((r) => p.get(r.slot)).length;
+
+  // header: what this table means + the save state, always visible
+  const head = h("div", { className: "pkHead" });
+  head.append(h("span", { className: "pkTitle", textContent: "Which animation does the game play?" }));
+  const save = h("button", { type: "button", id: "dw2PicksSave",
+    className: "pkSave " + (changed ? "dirty" : "clean"),
+    textContent: changed ? `Save ${changed} change${changed === 1 ? "" : "s"}` : "All saved ✓",
+    title: "write web/dw2-motion-picks.json (it ships with the game)" });
+  save.disabled = !changed;
+  save.onclick = () => p.onSave();
+  head.append(save);
+  if (p.msg) head.append(h("span", { id: "dw2PicksMsg", className: "pkMsg" + (/NOT saved/.test(p.msg) ? " bad" : ""), textContent: p.msg }));
+  wrap.append(head);
+  wrap.append(h("div", { className: "pkLegend" },
+    h("span", { className: "pkChip dw3", textContent: "DW3" }), " Digimon World 3 (its own or the old fallback)   ",
+    h("span", { className: "pkChip dw2", textContent: "DW2" }), " Digimon World 2 motion   ·   ",
+    h("b", { textContent: "Auto" }), " = the automatic rule   ·   ",
+    `${nPicks} hand pick${nPicks === 1 ? "" : "s"} on this Digimon   ·   your game here: DW2 motion is `,
+    h("b", { className: p.dw2On ? "pkOn" : "pkOff", textContent: p.dw2On ? "ON" : "OFF" }),
+    p.dw2On ? "" : " (F2 → Battle; off = everything plays DW3)"));
+
+  if (!p.rows.length) { wrap.append(h("div", { className: "rowline dim" }, "no clip of this Digimon has a DW2 motion.")); box.append(wrap); return; }
+
+  const table = h("table", { className: "pkTable" });
+  const hr = h("tr", {});
+  for (const t of ["Clip", "In the game", "Your choice", "Preview"]) hr.append(h("th", { textContent: t }));
+  table.append(hr);
+  for (const r of p.rows) {
+    const cur = p.get(r.slot) || null;
+    const was = p.saved(r.slot) || null;
+    const now = resultOf(r, cur);
+    const before = resultOf(r, was);
+    const unsaved = cur !== was;
+    const tr = h("tr", { className: "pkRow" + (unsaved ? " unsaved" : "") + (p.playing?.slot === r.slot ? " onscreen" : "") });
+    tr.dataset.slot = String(r.slot);
+
+    tr.append(h("td", {}, h("b", { textContent: r.label }), h("div", { className: "dim", textContent: `clip ${r.slot} · ${r.owned ? "has its own DW3 clip" : "no own DW3 clip"}` })));
+
+    const inGame = h("td", {}, h("span", { className: `pkChip big ${now}`, textContent: PICK_WORD[now] }));
+    inGame.append(h("div", { className: "dim", textContent: cur ? "your pick" : "automatic rule" }));
+    if (unsaved) inGame.append(h("div", { className: "pkUnsaved", textContent: before !== now ? `unsaved · saved file plays ${PICK_WORD[before]}` : "unsaved" }));
+    tr.append(inGame);
+
+    const seg = h("div", { className: "pkSeg" });
+    for (const val of [null, "dw2", "dw3"]) {
+      const label = val ? PICK_WORD[val] : `Auto (${PICK_WORD[r.rule]})`;
+      const b = h("button", { type: "button", className: `pkOpt ${val || "auto"}` + (cur === val ? " sel" : ""), textContent: (cur === val ? "● " : "○ ") + label,
+        title: val ? `always play ${PICK_WORD[val]} for this clip` : `follow the automatic rule (${PICK_WORD[r.rule]} here)` });
+      b.dataset.pick = val || "rule";
+      b.onclick = () => p.set(r.slot, val);
+      seg.append(b);
+    }
+    tr.append(h("td", {}, seg));
+
+    const prev = h("td", { className: "pkPrev" });
+    const ownOn = p.playing?.slot === r.slot && p.playing.which === "dw3";
+    const own = h("button", { type: "button", className: "pkPlay dw3" + (ownOn ? " sel" : ""), textContent: ownOn ? "▶ DW3 (showing)" : "▶ DW3", title: "show what DW3 plays for this clip" });
+    own.onclick = () => v.onPlayOwn(r.slot);
+    prev.append(own);
+    for (const f of r.letters) {
+      const on = p.playing?.slot === r.slot && p.playing.which === "dw2" && p.playing.letter === f.letter;
+      const name = r.letters.length > 1 ? `DW2 ${f.letter}` : "DW2";
+      const b = h("button", { type: "button", className: "pkPlay dw2" + (on ? " sel" : ""), textContent: on ? `▶ ${name} (showing)` : `▶ ${name}`,
+        title: r.letters.length > 1 ? `show the DW2 ${f.letter} motion (in battle the technique decides F, G or H)` : "show the DW2 motion" });
+      b.dataset.letter = f.letter;
+      b.onclick = () => v.onPlay(r.slot, f.letter);
+      prev.append(b);
+    }
+    tr.append(prev);
+    table.append(tr);
+  }
+  wrap.append(table);
+  box.append(wrap);
+}
+
 /**
  * The "DW2 motion" section of the Actions tab.
  * v: { digimon:{name,folder,plan}, status:"loading"|"none"|"ready", data, rows, counts, busy,
@@ -350,6 +469,13 @@ const VERDICTS = ["works", "broken", "unsure"];
 export function renderDw2Panel(box, v) {
   box.replaceChildren();
   const name = v.digimon?.name || "?";
+  // SIMPLE MODE (the viewer's default): the picks table and nothing else
+  if (v.simple) {
+    if (v.status === "loading") { box.append(h("div", { className: "rowline dim", id: "dw2Loading" }, `reading ${name}'s DW2 file…`)); return; }
+    if (v.status === "none" || !v.data || !v.picks) { box.append(h("div", { className: "rowline dim", id: "dw2None" }, `${name} has no Digimon World 2 motion: the game always plays DW3.`)); return; }
+    renderPicks(box, v);
+    return;
+  }
   const title = h("div", { className: "groupTitle" }, `DW2 motion · ${name}`, v.digimon?.plan ? h("span", { className: "dim" }, ` (${v.digimon.plan})`) : "");
   box.append(title);
   if (v.status === "loading") { box.append(h("div", { className: "rowline dim", id: "dw2Loading" }, "reading this Digimon's DW2 file…")); return; }
@@ -362,6 +488,8 @@ export function renderDw2Panel(box, v) {
   box.append(h("div", { className: "rowline dim", id: "dw2Counts" },
     `${c.filled} of ${c.gaps} gap clip${c.gaps === 1 ? "" : "s"} filled by a DW2 motion · ${c.refused} refused by the gate · ${c.owned} clip${c.owned === 1 ? "" : "s"} this body plays itself`
     + (statics.size ? ` · ${statics.size} of them hold one pose (the baked keys never move: that species' file is defective, not the viewer)` : "")));
+
+  if (v.picks) renderPicks(box, v);
 
   // ── filled: clickable, one button per (slot), sub-buttons per cast letter
   const filledRow = h("div", { className: "actList", id: "dw2Fill" });

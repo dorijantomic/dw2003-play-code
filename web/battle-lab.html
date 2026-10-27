@@ -44,6 +44,11 @@
     </select>
     <label><input id="autoloop" type="checkbox"> auto-repeat attack</label>
   </div>
+  <div class="row">
+    <label><input id="optSmooth" type="checkbox"> smooth anim</label>
+    <label><input id="optOwn" type="checkbox"> own clips</label>
+    <label><input id="optDw2" type="checkbox"> DW2 motion</label>
+  </div>
   <h3>Tech record</h3>
   <div id="rec">—</div>
   <h3>op10 SFX test</h3>
@@ -62,6 +67,18 @@ import { drawEffects } from "./fight/effect-player.js";
 import { techRecord } from "./fight/fight-tables.js";
 import { createSfxPlayer } from "./audio.js";
 import { autoFilterable, injectFilterStyles } from "./lab-filter.js";
+import { smoothAnimEnabled, setSmoothAnim } from "./fight/smooth-anim.js";
+import { ownClipsEnabled, setOwnClipsEnabled } from "./fight/own-clips.js";
+import { dw2MotionEnabled, setDw2MotionEnabled } from "./fight/dw2-motion.js";
+
+// Lab switches for the F2 -> Battle settings (start from the setting or ?smooth=1 / ?ownclips=1 / ?dw2motion=1;
+// a tick here applies to this lab session only and never changes the saved setting).
+for (const [id, get, set] of [["optSmooth", smoothAnimEnabled, setSmoothAnim],
+  ["optOwn", ownClipsEnabled, setOwnClipsEnabled], ["optDw2", dw2MotionEnabled, setDw2MotionEnabled]]) {
+  const el = document.getElementById(id);
+  el.checked = !!get();
+  el.addEventListener("change", () => set(el.checked));
+}
 
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");

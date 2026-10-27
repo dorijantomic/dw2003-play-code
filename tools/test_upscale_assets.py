@@ -263,6 +263,13 @@ class PixelPreservationTests(unittest.TestCase):
     def test_asset_classes_have_deterministic_model_chains(self):
         self.assertEqual(
             up.processing_recipe(Path("sprites/p002plyk.png")),
+            {"assetClass": "sprite-frames", "method": "ai-frames", "models": list(up.CELL_MODELS)},
+        )
+        self.assertEqual(
+            up.processing_recipe(Path("effects/s200_semi.png"))["method"], "ai-frames"
+        )
+        self.assertEqual(
+            up.processing_recipe(Path("battle/effects/arch01.png")),
             {"assetClass": "tiny-sprite", "method": "nearest", "models": []},
         )
         self.assertEqual(
@@ -320,7 +327,7 @@ class PixelPreservationTests(unittest.TestCase):
         self.assertTrue(up.processing_matches(vulkan, map_recipe, "ncnn"))
         self.assertFalse(up.processing_matches(vulkan, map_recipe, "torch"))
 
-        sprite_recipe = up.processing_recipe(Path("sprites/p002play.png"))
+        sprite_recipe = up.processing_recipe(Path("battle/effects/arch01.png"))
         nearest = {
             "processing": sprite_recipe,
             "backend": "cpu",
@@ -570,6 +577,66 @@ class DeadAssetTests(unittest.TestCase):
             self.assertEqual([a.rel.as_posix() for a in assets], ["sprites/keep.png"])
             self.assertEqual([d.as_posix() for d in dead], ["battle/arena/f000com1.png"])
             self.assertEqual(excluded, [])
+
+
+
+class CompletenessAndSpeedTests(unittest.TestCase):
+    def test_developer_only_rasters_are_not_built(self):
+        """thumbs/ and the arena debug pages are never requested through web/assets.js."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            src, out = root / "assets", root / "assets-hd"
+            for rel in ("thumbs/s001.png", "battle/arenas/meft1001/floor.png",
+                        "battle/arenas/meft1001/floor_c0_r255_void.png",
+                        "battle/arenas/meft1001/floor_c0_r255.png", "maps/s001.png"):
+                path = src / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGBA", (8, 8)).save(path)
+            assets, _excluded, dead = up.discover_assets(src, out)
+            self.assertEqual(sorted(a.rel.as_posix() for a in assets),
+                             ["battle/arenas/meft1001/floor_c0_r255.png", "maps/s001.png"])
+            self.assertEqual(len(dead), 3)
+
+    def test_arena_palette_pages_use_ai_with_a_palette_mask(self):
+        recipe = up.processing_recipe(Path("battle/arenas/meft1001/floor_c32_r255.png"))
+        self.assertEqual(recipe["method"], "ai")
+        self.assertEqual(recipe["fill"], "arena-clut-mask")
+
+    def test_arena_mask_keeps_only_this_palettes_triangles(self):
+        with tempfile.TemporaryDirectory() as raw:
+            pack = Path(raw) / "meft1001"
+            pack.mkdir()
+            Image.new("RGBA", (16, 16)).save(pack / "floor_c32_r255.png")
+            tri = lambda x0, y0, x1, y1: [x0, y0, x1, y0, x0, y1]
+            (pack / "geometry.json").write_text(json.dumps({"groups": [
+                {"page": "floor", "clut": [32, 255], "uv": tri(0, 0, 0.25, 0.25)},
+                {"page": "floor", "clut": [0, 255], "uv": tri(0.5, 0.5, 1, 1)},
+                # a flat strip: one texel row, zero area
+                {"page": "floor", "clut": [32, 255], "uv": [0.0, 0.75, 0.5, 0.75, 0.25, 0.75]},
+            ]}))
+            mask = up.arena_palette_mask(pack / "floor_c32_r255.png", margin=0)
+            self.assertTrue(mask[1, 1])
+            self.assertFalse(mask[12, 12])          # the other palette's region
+            self.assertTrue(mask[12, 4])            # the flat strip's row
+
+    @unittest.skipIf(np is None, "numpy unavailable")
+    def test_fill_mask_replaces_foreign_texels_before_inference(self):
+        seen = {}
+
+        def fake_sr(_model, rgb):
+            seen["rgb"] = rgb.copy()
+            return np.repeat(np.repeat(rgb, 4, axis=0), 4, axis=1)
+
+        image = Image.new("RGB", (8, 8), (255, 0, 0))
+        for x in range(4):
+            for y in range(8):
+                image.putpixel((x, y), (0, 0, 255))
+        mask = np.zeros((8, 8), dtype=bool)
+        mask[:, :4] = True
+        with mock.patch.object(up, "sr_rgb", fake_sr):
+            up.upscale_image(object(), image, tile=64, overlap=2, dilate=1, fill_mask=mask)
+        core = seen["rgb"][2:-2, 2:-2]
+        self.assertTrue((core[..., 0] == 0).all())  # no red from the unmasked half reaches the model
 
 
 if __name__ == "__main__":

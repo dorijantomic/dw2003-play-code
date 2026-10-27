@@ -11,6 +11,7 @@
 //
 // Tune live from the console: __hd2d = { blur, focus, bloom, thr, sat, con, vig }.
 import { fx } from "./ambience.js";
+import { pixelFilteredFrame } from "./gpu-pixel-filter.js";
 
 const DEFAULTS = { blur: 3.2, focus: 0.24, bloom: 0.38, thr: 0.52, sat: 1.1, con: 1.05, vig: 0.22 };
 
@@ -101,7 +102,7 @@ export function installPost2d(stageEl, gameCanvas) {
         t.blur *= k; t.bloom *= k; t.vig *= k; t.sat = 1 + (t.sat - 1) * k; t.con = 1 + (t.con - 1) * k;
         gl.viewport(0, 0, ov.width, ov.height);
         gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCanvas);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pixelFilteredFrame() ?? gameCanvas);   // the F2 pixel filter's frame when it is on
         gl.generateMipmap(gl.TEXTURE_2D);
         gl.uniform1i(loc.uTex, 0); gl.uniform2f(loc.uSize, ov.width, ov.height);
         gl.uniform1f(loc.uBlur, t.blur); gl.uniform1f(loc.uFocus, t.focus); gl.uniform1f(loc.uBloom, t.bloom);

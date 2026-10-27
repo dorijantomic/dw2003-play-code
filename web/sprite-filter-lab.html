@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprite Filter Lab</title>
+<style>
+  :root { --bg:#14161b; --panel:#1d2027; --text:#d8dde6; --muted:#7f8896; --line:#2c313b; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px system-ui, sans-serif; }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  header h1 { font-size:15px; margin:0 8px 0 0; }
+  label { color:var(--muted); }
+  input, select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 6px; }
+  input[type=number] { width:58px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px; padding:16px; }
+  .cell { background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .cell h2 { font-size:12px; margin:0; padding:6px 8px; border-bottom:1px solid var(--line); }
+  .cell h2 small { color:var(--muted); font-weight:normal; }
+  .view { overflow:auto; max-height:70vh; }
+  .view.checker { background:repeating-conic-gradient(#3a3f4a 0% 25%, #2a2e36 0% 50%) 0 0/16px 16px; }
+  .view.dark { background:#000; }
+  .view.light { background:#cfd6e0; }
+  .view.green { background:#3b7a3b; }
+  canvas { display:block; image-rendering:pixelated; }
+  .smooth canvas { image-rendering:auto; }
+  #note { color:var(--muted); padding:0 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sprite Filter Lab</h1>
+  <label>sheet <input id="sheet" list="sheets" value="sprites/p006agum.png" size="28"></label>
+  <datalist id="sheets"></datalist>
+  <label>crop x <input id="cx" type="number" value="0"></label>
+  <label>y <input id="cy" type="number" value="0"></label>
+  <label>w <input id="cw" type="number" value="0" title="0 = whole sheet"></label>
+  <label>h <input id="ch" type="number" value="0" title="0 = whole sheet"></label>
+  <label>show at <select id="zoom">
+    <option value="1">1x of the 4x result</option>
+    <option value="0.5">0.5x</option>
+    <option value="0.75" selected>0.75x</option>
+    <option value="1.5">1.5x</option>
+    <option value="2">2x</option>
+  </select></label>
+  <label>background <select id="bgsel">
+    <option value="checker">checker</option><option value="dark">black</option>
+    <option value="light">light</option><option value="green">grass</option>
+  </select></label>
+  <label><input id="a4k" type="checkbox"> Anime4K (slow: builds big GPU models)</label>
+  <button id="go">Apply</button>
+</header>
+<p id="note"></p>
+<div id="grid"></div>
+
+<script type="module">
+import { nearest4, epx4, mmpx4, xbr, ensureXbr } from "./sprite-filters.js";
+import { pixelFilterNow } from "./gpu-pixel-filter.js";
+import { anime4k } from "./anime4k-lab.js";
+await ensureXbr().catch((e) => console.warn("xBR not loaded", e));
+
+// Every filter produces a 4x image from the same native crop; the page shows them side by side.
+// The game can use the same filters on the overworld sprites: F2 -> Settings -> Sprite filter.
+const SHEETS = "p001play p002play p002plyd p002plyf p002plyk p002plyl p003pken p004kogu p005koet p006agum p007vmon p008giru p009rena p010pata p011mino p012mint p013taku p014takt p015lumo p016rdmd p027smth p038wiza p040piko p047leom p074jiji p075baba p105kngo p115knig p150lisa p151nick p152keit p170goma p174piyo".split(" ");
+document.getElementById("sheets").innerHTML =
+  SHEETS.map((s) => `<option value="sprites/${s}.png">`).join("") +
+  `<option value="effects/s200.png"><option value="battle/effects/arch01.png"><option value="maps/s245.png"><option value="ui/stdglabo_portraits_sheet.png">`;
+
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+for (const k of ["sheet", "cx", "cy", "cw", "ch"]) if (q.has(k)) $(k).value = q.get(k);
+
+
+const FILTERS = [
+  ["Original pixels (what HD shows today)", "exact 4x", nearest4],
+  ["Plain smooth (bilinear)", "browser smoothing, for reference", null],
+  ["EPX / Scale2x, twice", "classic rule-based, keeps palette", epx4],
+  ["MMPX, twice", "2021 pixel-art filter, keeps palette", mmpx4],
+  ["xBR 4x, no new colours", "Hyllian xBR, palette kept", (s) => xbr(s, false)],
+  ["xBR 4x, blended", "Hyllian xBR, smooth edges", (s) => xbr(s, true)],
+];
+
+function panel(title, sub, imageData, smooth, scale) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.innerHTML = `<h2>${title} <small>${sub}</small></h2>`;
+  const view = document.createElement("div");
+  view.className = `view ${$("bgsel").value}${smooth ? " smooth" : ""}`;
+  const cv = document.createElement("canvas");
+  cv.width = imageData.width; cv.height = imageData.height;
+  cv.getContext("2d").putImageData(imageData, 0, 0);
+  cv.style.width = `${imageData.width * scale}px`;
+  cv.style.height = `${imageData.height * scale}px`;
+  view.appendChild(cv);
+  cell.appendChild(view);
+  $("grid").appendChild(cell);
+  return cell;
+}
+
+async function aiPanels(sheet, scale) {
+  // Optional: AI results made offline for this sheet, assets-lab/sprite-ai/<sheet path>/<model>.png
+  const base = `assets-lab/sprite-ai/${sheet.replace(/\.png$/, "")}`;
+  let list = [];
+  try { const r = await fetch(`${base}/index.json`, { cache: "no-store" }); if (r.ok) list = await r.json(); } catch {}
+  for (const item of list) {
+    const img = new Image();
+    img.src = `${base}/${item.file}`;
+    try { await img.decode(); } catch { continue; }
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+    const x = +$("cx").value * 4, y = +$("cy").value * 4;
+    const w = (+$("cw").value || img.width / 4) * 4, h = (+$("ch").value || img.height / 4) * 4;
+    panel(`AI: ${item.title}`, item.sub || "made offline on the GPU", g.getImageData(x, y, w, h), false, scale);
+  }
+}
+
+async function run() {
+  $("grid").innerHTML = "";
+  const sheet = $("sheet").value.trim();
+  const img = new Image();
+  img.src = `assets/${sheet}`;
+  try { await img.decode(); } catch { $("note").textContent = `could not load assets/${sheet}`; return; }
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const x = +$("cx").value, y = +$("cy").value;
+  const w = +$("cw").value || img.width - x, h = +$("ch").value || img.height - y;
+  const src = g.getImageData(x, y, w, h);
+  const scale = +$("zoom").value;
+  $("note").textContent = `${sheet}: ${img.width}x${img.height}, crop ${w}x${h} at ${x},${y}. Every panel is a 4x image (${w * 4}x${h * 4}).`;
+  const cpu = {};
+  for (const [title, sub, fn] of FILTERS) {
+    if (!fn) {
+      const big = nearest4(src);                          // same size as the rest; drawn smooth from native
+      const cv = document.createElement("canvas"); cv.width = big.width; cv.height = big.height;
+      const tmp = document.createElement("canvas"); tmp.width = w; tmp.height = h;
+      tmp.getContext("2d").putImageData(src, 0, 0);
+      const gg = cv.getContext("2d"); gg.imageSmoothingEnabled = true; gg.drawImage(tmp, 0, 0, big.width, big.height);
+      panel(title, sub, gg.getImageData(0, 0, big.width, big.height), false, scale);
+      continue;
+    }
+    const t = performance.now();
+    const out = fn(src);
+    cpu[title] = out;
+    const cell = panel(title, sub, out, false, scale);
+    cell.querySelector("small").textContent += ` · ${(performance.now() - t).toFixed(0)} ms`;
+  }
+  // The game's GPU shader (gpu-pixel-filter.js) on the same crop, counted against the CPU result above:
+  // "0 px differ" proves the shader is the same filter.
+  const tmp = document.createElement("canvas"); tmp.width = w; tmp.height = h;
+  tmp.getContext("2d").putImageData(src, 0, 0);
+  for (const [name, title] of [["epx", "EPX / Scale2x, twice"], ["mmpx", "MMPX, twice"], ["xbr", "xBR 4x, no new colours"], ["xbrblend", "xBR 4x, blended"]]) {
+    if (!cpu[title]) continue;
+    const t = performance.now();
+    const out = pixelFilterNow(tmp, name);
+    const ms = performance.now() - t;
+    if (!out) { panel(`${title}, GPU`, "WebGL2 not available here", nearest4(src), false, scale); continue; }
+    const data = out.getContext("2d").getImageData(0, 0, out.width, out.height);
+    const ref = cpu[title].data;
+    let differ = 0;
+    for (let i = 0; i < ref.length; i += 4)
+      if (ref[i + 3] !== data.data[i + 3] || (ref[i + 3] && (ref[i] !== data.data[i] || ref[i + 1] !== data.data[i + 1] || ref[i + 2] !== data.data[i + 2]))) differ++;
+    panel(`${title}, GPU (what the game uses)`, `${differ} px differ from CPU · ${ms.toFixed(1)} ms`, data, false, scale);
+  }
+  // Anime4K (WebGPU, anime4k-webgpu 1.0.0, MIT): the live AI upscaler.  "warm" = a second run with the
+  // shaders already built, which is what each game frame would cost.
+  for (const [title, steps] of [
+    ["Anime4K CNN M, twice", ["CNNx2M", "CNNx2M"]],
+    ["Anime4K CNN UL, twice", ["CNNx2UL", "CNNx2UL"]],
+    ["Anime4K GAN x4 UUL", ["GANx4UUL"]],
+  ]) {
+    if (!$("a4k").checked) break;
+    try {
+      const r = await anime4k(tmp, steps);
+      panel(title, `live AI · ${r.ms.toFixed(1)} ms warm, ${r.msCold.toFixed(0)} ms first`, r.image, false, scale);
+    } catch (e) {
+      panel(title, `not run: ${e.message}`, nearest4(src), false, scale);
+    }
+  }
+  // The baked HD pack (fateplus-lite-x4), when this sheet has a file in it
+  try {
+    const hd = new Image();
+    hd.src = `assets-hd/${sheet}`;
+    await hd.decode();
+    const c2 = document.createElement("canvas"); c2.width = hd.width; c2.height = hd.height;
+    const g2 = c2.getContext("2d"); g2.drawImage(hd, 0, 0);
+    panel("HD pack (baked offline)", "fateplus-lite-x4", g2.getImageData(x * 4, y * 4, w * 4, h * 4), false, scale);
+  } catch {}
+  await aiPanels(sheet, scale);
+}
+$("go").onclick = run;
+for (const id of ["zoom", "bgsel", "a4k"]) $(id).onchange = run;
+run();
+</script>
+</body>
+</html>

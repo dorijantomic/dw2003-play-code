@@ -19,6 +19,8 @@ import { setSound, thunder, footstep, setAmbience, setMusic } from "./fxaudio.js
 import { resetScenery3, drawScenery3 } from "./scenery3.js";
 import { resetScenery2, drawScenery2, gustLevel, hasLights } from "./scenery2.js";
 import { isWaterAt, isWaterStage, waterPixelTest } from "./water3d.js";
+import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
+import { SPRITE_FILTERS } from "./sprite-filters.js";
 
 const VIEW_W = 320;
 const VIEW_H = 240;
@@ -32,6 +34,10 @@ export const FX_GROUPS = [
     ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
+    // Battle rules the player switches on by hand (all OFF by default; see MANUAL below). One group,
+    // shared: own clips (each Digimon plays its own attack for a technique it has no clip for), the
+    // Digimon World 2 motion for empty clips, and the smoother pose playback.
+    ["Battle", [["ownclips", "Own clips for techniques (each Digimon uses its own attack)"], ["dw2motion", "Digimon World 2 motion for techniques a Digimon has no clip for"], ["smoothanim", "Smooth battle animation (more in-between frames)"]]],
 ];
 export const FX_DEFS = FX_GROUPS.flatMap(([, list]) => list);
 window.__fxKeys = FX_DEFS.map(([k]) => k);
@@ -39,10 +45,12 @@ const QUALITY = { low: 0.4, medium: 0.7, high: 1 };
 // "Time" setting: pins the time-of-day phase (0 = daylight, 0.77 = deepest dusk); auto = the slow cycle
 const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
 const STORE_KEY = "dw.fx.v1";
-export const fx = { weatherMode: "auto", quality: "high", todMode: "auto" };
+export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
 const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat"];     // off until you switch them on by hand; "All on" and the presets leave them alone
-for (const k of EXPERIMENTAL) fx[k] = false;
+const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
+const MANUAL = [...EXPERIMENTAL, ...BATTLE];
+for (const k of MANUAL) fx[k] = false;
 fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
@@ -851,7 +859,7 @@ const PRESETS = {
 function applyPreset(name) {
     const d = PRESETS[name];
     if (!d) return;
-    for (const [k] of FX_DEFS) fx[k] = !EXPERIMENTAL.includes(k) && (d.all ? true : d.on.includes(k));
+    for (const [k] of FX_DEFS) fx[k] = !MANUAL.includes(k) && (d.all ? true : d.on.includes(k));
     fx.todMode = d.tod; fx.weatherMode = d.mode;
     syncLegacyFlags(); save(); refreshPanel();
 }
@@ -951,6 +959,7 @@ function refreshPanel() {
     const w = panel.querySelector("[data-mode]"); if (w) w.value = fx.weatherMode;
     const q = panel.querySelector("[data-quality]"); if (q) q.value = fx.quality;
     const td = panel.querySelector("[data-tod]"); if (td) td.value = fx.todMode;
+    const sf = panel.querySelector("[data-spritefilter]"); if (sf) sf.value = fx.spriteFilter;
     for (const k of ["lightGain", "hd2dStrength"]) {
         const r = panel.querySelector(`[data-slider="${k}"]`), v = panel.querySelector(`[data-val="${k}"]`);
         if (r) r.value = fx[k]; if (v) v.textContent = (+fx[k]).toFixed(2);
@@ -997,6 +1006,7 @@ export function installFxPanel(stageEl) {
          <label>Time <select data-tod><option value="auto">auto cycle</option><option value="day">day</option><option value="golden">golden hour</option><option value="dusk">dusk</option><option value="night">night</option></select></label>
          <label>Light strength <input type="range" min="0" max="2" step="0.05" data-slider="lightGain"> <span data-val="lightGain"></span></label>
          <label>HD-2D strength <input type="range" min="0" max="2" step="0.05" data-slider="hd2dStrength"> <span data-val="hd2dStrength"></span></label>
+         <label>Pixel filter (GPU) <select data-spritefilter>${Object.entries(SPRITE_FILTERS).filter(([k]) => k === "off" || GPU_FILTER_NAMES.includes(k)).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
          <label>Quality <select data-quality><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></label>
          <div class="row"><button data-all="1">All on</button><button data-all="0">All off</button></div>
          <div class="hint">F2 opens this. Choices are remembered.</div>`;
@@ -1025,6 +1035,7 @@ export function installFxPanel(stageEl) {
         else if ("mode" in t.dataset) setFx("weatherMode", t.value);
         else if ("quality" in t.dataset) setFx("quality", t.value);
         else if ("tod" in t.dataset) setFx("todMode", t.value);
+        else if ("spritefilter" in t.dataset) setFx("spriteFilter", t.value);
         else if ("preset" in t.dataset) { if (t.value) applyPreset(t.value); t.value = ""; }
         t.blur();
     });
@@ -1040,7 +1051,7 @@ export function installFxPanel(stageEl) {
         }
         const b = e.target.closest("[data-all]");
         if (!b) return;
-        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1" && !EXPERIMENTAL.includes(k);
+        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1" && !MANUAL.includes(k);
         syncLegacyFlags(); save(); refreshPanel();
         b.blur();
     });

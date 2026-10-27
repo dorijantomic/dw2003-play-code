@@ -27,13 +27,21 @@ import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // (`animSlotMoveDelta`) and the live=home write of mode 7 / the placement FIGHTSTG_F0x80087f38
 // (`resetAnimSlotLiveToHome`). This file consumes those instead of hand-writing them.
 import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from "../vendor/engine.js";
+import { smoothAnimEnabled } from "./smooth-anim.js";
 
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
 // Real motion advances ~1–4 frames/tick (the vsync delta); phase cuts jump by hundreds. 16 cleanly
 // separates the two so a phase boundary or loop-back snaps instead of sweeping through dead frames.
 const SNAP_THRESH = 16;
-// Ticks over which the action->idle pose ease plays (~0.17s @60Hz). Long enough to read as fluid,
-// short enough not to feel laggy returning to idle after an attack.
+// ── smooth mode (F2 → Battle → "Smooth battle animation"; web/fight/smooth-anim.js) ──────────────
+// Two things the player can see are pure stepping rather than animation, and both have a measured
+// source: a run of playlist entries that all name the SAME frame (a held pose, then a jump) and a
+// cut to another frame/table with no blend entry authored behind it (the 140 cuts in SCAN.md).
+// Smooth mode spreads the hold across its ticks and crossfades the cut. Neither touches a tick that
+// already carries an authored blend entry — the disc's own easing always wins.
+const SMOOTH_SNAP_THRESH = 64;   // forward frame steps this size are drawn as a sweep, not a snap
+const SMOOTH_CUT_TICKS = 4;      // ~0.07 s at 60 Hz: long enough to read as motion, short enough to keep the hit
+const SMOOTH_HOLD_MAX_STEP = 32; // a held frame never spreads over a bigger pose jump than this
 const HANDOFF_TICKS = 10;
 
 // The ordered list of timeline tables a clip plays, read straight from its action script's op2
@@ -146,6 +154,9 @@ export class ActorAnimator {
     this._prevFrame = this.frame;
     this._prevBlend = null;
     this._snap = true;                       // first frame shows the current state, no interpolation
+    // Smooth mode state: a hard-cut crossfade ({from,k}) and a held-frame spread ({frame,next,run,k}).
+    this._cut = null;
+    this._hold = null;
     // Action->idle handoff ease: when a VM ends, the idle table leads with plain frames (no ease-in),
     // so resuming idle would snap the pose. We synthesize a blend from the action's last frame into
     // idle over HANDOFF_TICKS. _handoffFrom = that frame (null = inactive); _handoffT ramps 0->1.
@@ -531,9 +542,48 @@ export class ActorAnimator {
     // anything else snaps (the blend object, not the scalar, carries eased phase transitions).
     this._prevFrame = pf;
     this._prevBlend = pb;
-    const d = this.frame - pf;
-    this._snap = !(d >= 0 && d <= SNAP_THRESH);
+    let d = this.frame - pf;
+    const smooth = smoothAnimEnabled();
+    if (smooth) d = this._smoothTick(pf, d);
+    const thresh = smooth ? SMOOTH_SNAP_THRESH : SNAP_THRESH;
+    this._snap = !(d >= 0 && d <= thresh);
     return this.frame;
+  }
+
+  // ── smooth mode: held frames + hard cuts (see the constants above) ────────────────────────────
+  // Returns the (possibly fractional) frame delta this tick produced, for the snap test. An authored
+  // blend entry — this.blend set by the player/idle/handoff — is never touched: the disc already has
+  // an ease there, and the mode's whole point is to add dobbing where the disc has none.
+  _smoothTick(pf, d) {
+    if (this.blend) { this._hold = null; this._cut = null; return d; }
+    // 1. A held pose: a run of entries naming the same frame. Spread the move to the next distinct
+    //    frame evenly across the run, so the pose never stands still and then jumps.
+    const player = this.vm?.player ?? this.idle;
+    if (this._hold) {
+      const h = this._hold;
+      h.k += 1;
+      const f = Math.min(1, h.k / h.run);
+      this.frame = h.frame + (h.next - h.frame) * f;
+      if (f >= 1) this._hold = null;
+    } else {
+      const la = player?.lookaheadHold?.() ?? null;
+      const step = la ? Math.abs(la.next - la.frame) : 0;
+      if (la && la.run >= 2 && la.frame === this.frame && step > 1 && step <= SMOOTH_HOLD_MAX_STEP) {
+        this._hold = { frame: la.frame, next: la.next, run: la.run, k: 1 };
+        this.frame = la.frame + (la.next - la.frame) * (1 / la.run);
+      }
+    }
+    d = this.frame - pf;
+    // 2. A hard cut with nothing authored: crossfade the pose that was on screen into the new one.
+    if (this._cut) {
+      this._cut.k += 1;
+      if (this._cut.k > SMOOTH_CUT_TICKS) this._cut = null;
+      else this.blend = { from: this._cut.from, t: this._cut.k / SMOOTH_CUT_TICKS, cut: true };
+    } else if (d !== 0 && !(d >= 0 && d <= SMOOTH_SNAP_THRESH) && pf != null) {
+      this._cut = { from: pf, k: 1 };
+      this.blend = { from: pf, t: 1 / SMOOTH_CUT_TICKS, cut: true };
+    }
+    return d;
   }
 
   currentFrame() { return this.frame; }
@@ -559,7 +609,10 @@ export class ActorAnimator {
     if (cb) {                                 // blend in progress: frame is constant, ease blend.t
       const pb = this._prevBlend;
       const t = (pb && pb.from === cb.from) ? pb.t + (cb.t - pb.t) * a : cb.t;
-      return { frame: cf, blend: { from: cb.from, t } };
+      // A synthetic cut crossfade uses a MOVING frame (the action keeps running underneath), so it
+      // interpolates the frame as well; an authored blend entry pins the frame, as before.
+      const f = cb.cut ? this._prevFrame + (cf - this._prevFrame) * a : cf;
+      return { frame: f, blend: { from: cb.from, t, cut: cb.cut } };
     }
     return { frame: this._prevFrame + (cf - this._prevFrame) * a, blend: null };
   }

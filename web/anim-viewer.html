@@ -126,6 +126,42 @@
   .dw2Btn { display:inline-flex; align-items:center; gap:2px; }
   .dw2Btn.static small { color:var(--bad); }
   .dw2RefusedRow { text-decoration:underline dotted; cursor:help; }
+  /* Your picks (anim-viewer-dw2motion.js renderPicks) */
+  .dw2Picks { border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin:6px 0 10px; background:var(--panel2); }
+  .pkHead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .pkTitle { color:var(--accent); font-size:13px; font-weight:bold; }
+  .pkSave { padding:4px 12px; border-radius:4px; font-weight:bold; }
+  .pkSave.dirty { background:var(--accent2); color:#1a1205; border:1px solid var(--accent2); }
+  .pkSave.clean { background:transparent; color:var(--ok); border:1px solid #2c5a3e; cursor:default; }
+  .pkMsg { color:var(--ok); } .pkMsg.bad { color:var(--bad); }
+  .pkLegend { color:var(--dim); margin:6px 0; line-height:1.9; }
+  .pkOn { color:var(--ok); } .pkOff { color:var(--bad); }
+  .pkChip { display:inline-block; padding:0 6px; border-radius:3px; font-weight:bold; font-size:11px; }
+  .pkChip.big { font-size:13px; padding:2px 10px; }
+  .pkChip.dw2 { background:#3a2a10; color:var(--accent2); border:1px solid var(--accent2); }
+  .pkChip.dw3 { background:#10263a; color:var(--accent); border:1px solid var(--accent); }
+  .pkTable { border-collapse:collapse; width:100%; }
+  .pkTable th { text-align:left; color:var(--dim); font-weight:normal; border-bottom:1px solid var(--line); padding:3px 6px; }
+  .pkTable td { padding:5px 6px; border-bottom:1px solid #1c212c; vertical-align:middle; }
+  .pkRow.unsaved { background:#2a2110; }
+  .pkRow.onscreen td:first-child { box-shadow:inset 3px 0 0 var(--ok); }
+  .pkUnsaved { color:var(--accent2); font-size:10px; }
+  .pkSeg { display:inline-flex; border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+  .pkOpt { border:none; border-right:1px solid var(--line); background:#0f131a; color:var(--dim); padding:4px 9px; border-radius:0; }
+  .pkOpt:last-child { border-right:none; }
+  .pkOpt:hover { color:#fff; }
+  .pkOpt.sel.auto { background:#2a3040; color:#fff; }
+  .pkOpt.sel.dw2 { background:var(--accent2); color:#1a1205; font-weight:bold; }
+  .pkOpt.sel.dw3 { background:var(--accent); color:#06121d; font-weight:bold; }
+  .pkPlay { margin-right:4px; padding:3px 8px; border-radius:4px; background:#0f131a; border:1px solid var(--line); color:var(--text); }
+  .pkPlay.dw2:hover, .pkPlay.dw2.sel { border-color:var(--accent2); color:var(--accent2); }
+  .pkPlay.dw3:hover, .pkPlay.dw3.sel { border-color:var(--accent); color:var(--accent); }
+  .pkPlay.sel { background:#1b2a3d; font-weight:bold; }
+  /* SIMPLE MODE (default): only the picks table + play controls; "dev tools" in the top bar shows the rest */
+  body.simple .devOnly { display:none !important; }
+  .otherClips > summary { cursor:pointer; color:var(--dim); margin:6px 0; }
+  .otherClips > summary:hover { color:#fff; }
+  #lblDevTools { color:var(--dim); }
   #toast { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:#1b2a3d; color:#fff; padding:6px 12px; border-radius:5px; border:1px solid var(--accent); opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
   #toast.show { opacity:1; }
 </style>
@@ -133,31 +169,32 @@
 <body>
 <div id="top">
   <b>DW2003 · ANIMATION VIEWER</b>
-  <span id="srcSwitch" title="DW3 = the disc's own models (battle3d); DW2 = Digimon World 2's converted glTF models (dev-only source)">
+  <span id="srcSwitch" class="devOnly" title="DW3 = the disc's own models (battle3d); DW2 = Digimon World 2's converted glTF models (dev-only source)">
     <button id="srcDw3" class="on">DW3</button><button id="srcDw2">DW2</button>
   </span>
   <input id="search" type="search" placeholder="Search Digimon by name or folder…" autocomplete="off">
-  <span id="count"></span>
+  <span id="count" class="devOnly"></span>
   <span class="spacer"></span>
-  <label id="lblIsolated" title="Only the selected Digimon on a neutral grid (no arena)"><input type="checkbox" id="isolated" checked> isolated</label>
-  <label id="lblSolver" title="Let the goal-driven cast solver (K19) build this technique's motion instead of borrowing a donor's"><input type="checkbox" id="solver"> solver</label>
-  <label title="The viewer owns the camera; script op5 cuts cannot move it"><input type="checkbox" id="freeCam" checked> free camera</label>
-  <button id="galleryBtn">Gallery</button>
-  <a href="battle-lab.html">Battle Lab</a>
-  <a href="playtest.html">Playtest</a>
+  <label id="lblIsolated" class="devOnly" title="Only the selected Digimon on a neutral grid (no arena)"><input type="checkbox" id="isolated" checked> isolated</label>
+  <label id="lblSolver" class="devOnly" title="Let the goal-driven cast solver (K19) build this technique's motion instead of borrowing a donor's"><input type="checkbox" id="solver"> solver</label>
+  <label class="devOnly" title="The viewer owns the camera; script op5 cuts cannot move it"><input type="checkbox" id="freeCam" checked> free camera</label>
+  <button id="galleryBtn" class="devOnly">Gallery</button>
+  <a class="devOnly" href="battle-lab.html">Battle Lab</a>
+  <a class="devOnly" href="playtest.html">Playtest</a>
+  <label id="lblDevTools" title="show the developer tools (bakes, compare, generic motions, ratings, filters...)"><input type="checkbox" id="devTools"> dev tools</label>
 </div>
 
 <div id="layout">
   <aside id="listPane">
     <div id="filters">
-      <select id="fOwnership" title="ownership"><option value="">all ownership</option></select>
-      <select id="fFamily" title="family"><option value="">all families</option></select>
-      <select id="fTier" title="tier"><option value="">all tiers</option></select>
-      <select id="fElement" title="element"><option value="">all elements</option></select>
-      <select id="fGaps" title="gaps"><option value="">all models</option><option value="yes">has gaps (fallback)</option><option value="no">fully authored</option></select>
+      <select id="fOwnership" class="devOnly" title="ownership"><option value="">all ownership</option></select>
+      <select id="fFamily" class="devOnly" title="family"><option value="">all families</option></select>
+      <select id="fTier" class="devOnly" title="tier"><option value="">all tiers</option></select>
+      <select id="fElement" class="devOnly" title="element"><option value="">all elements</option></select>
+      <select id="fGaps" class="devOnly" title="gaps"><option value="">all models</option><option value="yes">has gaps (fallback)</option><option value="no">fully authored</option></select>
       <select id="fDw2" title="a Digimon World 2 motion was retargeted onto this body (K25)"><option value="">all models</option><option value="yes">has DW2 motion</option></select>
-      <select id="fStage" class="hidden" title="stage"><option value="">all stages</option></select>
-      <button id="clearFilters">clear</button>
+      <select id="fStage" class="devOnly hidden" title="stage"><option value="">all stages</option></select>
+      <button id="clearFilters" class="devOnly">clear</button>
     </div>
     <ul id="species"></ul>
   </aside>
@@ -202,32 +239,34 @@
       <button id="restart" title="restart">⟲</button>
       <label><input type="checkbox" id="loop" checked> loop</label>
       <label>speed <input id="speed" type="range" min="0.1" max="2" step="0.1" value="1"><span id="speedOut">1.0×</span></label>
-      <label id="dw2ClipWrap" class="hidden">clip <select id="dw2Clip"></select></label>
-      <label id="lblBake" title="A DW3 body playing a Digimon World 2 motion: a K21d bake (dev-only source, never in the repo)">baked <select id="bakeSel"><option value="">— own motion —</option></select></label><button id="bakePrev" title="previous baked DW2 motion of this Digimon">◀</button><button id="bakeNext" title="next baked DW2 motion of this Digimon">▶</button>
-      <button id="abBtn" class="hidden" title="A/B: the baked DW2 motion vs this body's own DW3 clip, same frame and camera">A/B</button>
-      <button id="cmpBtn" class="hidden" title="Compare: the DW2 original of this clip beside this body playing the baked motion, in sync, with a per-role table">Compare</button>
-      <label id="lblCmpGhost" class="hidden" title="Outline where each model was at frame 0, and the floor grid those outlines stand on"><input type="checkbox" id="cmpGhost" checked> frame-0 ghost</label>
-      <label id="lblCmpUnlink" class="hidden" title="Give each pane its own orbit; off = one camera drags both (same angle, each framed to its own model)"><input type="checkbox" id="cmpUnlink"> unlinked cameras</label>
-      <label id="lblSide">side <select id="side"><option value="near">near (player side)</option><option value="far">far (enemy side)</option></select></label>
-      <label id="lblDefender">defender <select id="defender"></select></label>
-      <label id="lblShowDefender"><input type="checkbox" id="showDefender"> show defender</label>
-      <label id="lblOutcome">outcome <select id="outcome"><option value="hit">hit</option><option value="lethal">lethal</option><option value="miss">miss</option></select></label>
-      <button id="shot" title="save the current frame as PNG">screenshot</button>
-      <button id="share" title="copy a link to this exact view">copy link</button>
+      <label id="dw2ClipWrap" class="devOnly hidden">clip <select id="dw2Clip"></select></label>
+      <label id="lblBake" class="devOnly" title="A DW3 body playing a Digimon World 2 motion: a K21d bake (dev-only source, never in the repo)">baked <select id="bakeSel"><option value="">— own motion —</option></select></label><button id="bakePrev" class="devOnly" title="previous baked DW2 motion of this Digimon">◀</button><button id="bakeNext" class="devOnly" title="next baked DW2 motion of this Digimon">▶</button>
+      <button id="abBtn" class="devOnly hidden" title="A/B: the baked DW2 motion vs this body's own DW3 clip, same frame and camera">A/B</button>
+      <button id="cmpBtn" class="devOnly hidden" title="Compare: the DW2 original of this clip beside this body playing the baked motion, in sync, with a per-role table">Compare</button>
+      <label id="lblCmpGhost" class="devOnly hidden" title="Outline where each model was at frame 0, and the floor grid those outlines stand on"><input type="checkbox" id="cmpGhost" checked> frame-0 ghost</label>
+      <label id="lblCmpUnlink" class="devOnly hidden" title="Give each pane its own orbit; off = one camera drags both (same angle, each framed to its own model)"><input type="checkbox" id="cmpUnlink"> unlinked cameras</label>
+      <label id="lblSide" class="devOnly">side <select id="side"><option value="near">near (player side)</option><option value="far">far (enemy side)</option></select></label>
+      <label id="lblDefender" class="devOnly">defender <select id="defender"></select></label>
+      <label id="lblShowDefender" class="devOnly"><input type="checkbox" id="showDefender"> show defender</label>
+      <label id="lblOutcome" class="devOnly">outcome <select id="outcome"><option value="hit">hit</option><option value="lethal">lethal</option><option value="miss">miss</option></select></label>
+      <button id="shot" class="devOnly" title="save the current frame as PNG">screenshot</button>
+      <button id="share" class="devOnly" title="copy a link to this exact view">copy link</button>
     </div>
 
     <div id="tabs">
       <button data-tab="actions" class="on">Actions</button>
       <button data-tab="camera">Camera</button>
-      <button data-tab="info">Info</button>
-      <button data-tab="ratings">Ratings</button>
+      <button data-tab="info" class="devOnly">Info</button>
+      <button data-tab="ratings" class="devOnly">Ratings</button>
     </div>
 
     <div id="tabActions" class="tab">
-      <div class="rowline" id="dw3ActionsNote" style="color:var(--dim)">The techniques THIS Digimon owns (from its own table rows), the item-use motion, the reaction clips the coordinator selects, and the idle.</div>
+      <div class="devOnly rowline" id="dw3ActionsNote" style="color:var(--dim)">The techniques THIS Digimon owns (from its own table rows), the item-use motion, the reaction clips the coordinator selects, and the idle.</div>
       <div id="dw2Box"></div>
-      <div id="genericBox"></div>
+      <div id="genericBox" class="devOnly"></div>
+      <details id="otherClips" class="otherClips"><summary>Other clips of this Digimon (techniques by name, items, reactions)</summary>
       <div id="actionList"></div>
+      </details>
     </div>
 
     <div id="tabCamera" class="tab hidden">
@@ -284,6 +323,8 @@ import { createBattle3D, buildBoneWorldMatrices } from "./battle3d.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { techRecord, techTargetClass, itemTargetClass, setTechTable, setSkillTable } from "./fight/fight-tables.js";
 import { resolveClipScript } from "./fight/clip-fallback.js";
+import { DW2_PICKS_URL, cleanPicks } from "./fight/dw2-picks.js";
+import { battleSetting } from "./fight/battle-settings.js";
 import { ActionVM } from "./fight/action-vm.js";
 import { TimelinePlayer } from "./fight/timeline-player.js";
 import { donorRow, ANIM_DONOR_GAPS } from "./fight/anim-donor-map.js";
@@ -345,6 +386,24 @@ GEN.installGenericFetch(genStore);
 const dw2Store = DW2M.createDw2Store();
 DW2M.installDw2Fetch(dw2Store);
 const ratings = GEN.createRatingStore();
+const picks = { all: {}, saved: {}, dirty: false, msg: "" };   // the hand picks (see loadPicks)
+// SIMPLE MODE is the default: body.simple hides every .devOnly control; "dev tools" brings them back.
+const devMode = { on: false };
+try { devMode.on = localStorage.getItem("animviewer.devtools") === "1"; } catch { /* no store: simple */ }
+function applyDevMode() {
+  document.body.classList.toggle("simple", !devMode.on);
+  const box = document.getElementById("devTools");
+  if (box) box.checked = devMode.on;
+  const other = document.getElementById("otherClips");
+  if (other && devMode.on) other.open = true;
+}
+applyDevMode();
+document.getElementById("devTools")?.addEventListener("change", (e) => {
+  devMode.on = !!e.target.checked;
+  try { localStorage.setItem("animviewer.devtools", devMode.on ? "1" : "0"); } catch { /* not remembered */ }
+  applyDevMode();
+  renderDw2();
+});
 const r = createBattle3D(off, sfx);
 window.__r = r;
 window.__off = off;
@@ -364,6 +423,7 @@ const [dj, extra, canon, modelMap, folders, gate, contract, techTable] = await P
 ]);
 setSkillTable(dj.skills);
 setTechTable(techTable);
+await loadPicks();
 const skills = new Map((dj.skills || []).map((s) => [s.id | 0, s]));
 const index = V.buildModelIndex({ digimon: dj, extraSpecies: extra, extraCanon: canon, modelMap, folders, gaps: ANIM_DONOR_GAPS });
 for (const e of index) e.elements = V.elementsOf(e, skills);
@@ -1084,7 +1144,64 @@ function dw2View() {
     onRate: (verdict, note) => rateDw2(verdict, note),
     onClear: () => clearDw2(),
     onNote: (note) => noteDw2(note),
+    onPlayOwn: (slot) => playOwnSlot(f, slot),
+    simple: !devMode.on,
+    picks: data && DW2M.pickRows ? {
+      rows: DW2M.pickRows(data),
+      get: (slot) => picks.all[f]?.[String(slot)] ?? null,
+      saved: (slot) => picks.saved[f]?.[String(slot)] ?? null,
+      set: (slot, val) => setPick(f, slot, val),
+      dirty: picks.dirty, msg: picks.msg,
+      dw2On: battleSetting("dw2motion"),
+      playing: state.action?.kind === "dw2" ? { slot: state.dw2Slot, which: "dw2", letter: state.dw2Letter }
+        : state.action?.kind === "own" && state.dw2m ? { slot: state.action.clip, which: "dw3" } : null,
+      onSave: () => savePicks(),
+    } : null,
   };
+}
+// ── the hand picks: web/dw2-motion-picks.json (the game reads it, web/fight/dw2-picks.js) ──────────
+// Edited here in memory; Save writes the file through the launcher (PUT /__dw2003/dw2-picks).
+async function loadPicks() {
+  try {
+    const r = await fetch(DW2_PICKS_URL, { cache: "no-store" });
+    picks.all = cleanPicks(r.ok ? (await r.json())?.picks : null);
+  } catch { picks.all = {}; }
+  picks.saved = JSON.parse(JSON.stringify(picks.all));
+}
+function setPick(folder, slot, val) {
+  const row = { ...(picks.all[folder] || {}) };
+  if (val) row[String(slot)] = val; else delete row[String(slot)];
+  if (Object.keys(row).length) picks.all[folder] = row; else delete picks.all[folder];
+  picks.dirty = true;
+  picks.msg = "";
+  renderDw2();
+}
+async function savePicks() {
+  picks.msg = "saving…";
+  renderDw2();
+  try {
+    const r = await fetch("/__dw2003/dw2-picks", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ picks: picks.all }) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j?.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+    picks.dirty = false;
+    picks.saved = JSON.parse(JSON.stringify(picks.all));
+    picks.msg = `saved: ${j.clips} pick${j.clips === 1 ? "" : "s"} over ${j.species} Digimon (web/dw2-motion-picks.json)`;
+  } catch (err) {
+    picks.msg = `NOT saved (${err.message}). Open the viewer through the game launcher: http://localhost:8770/anim-viewer.html`;
+  }
+  renderDw2();
+}
+/** Play what DW3 plays for `slot` (today's build), from the same DW2 clone so A/B stays possible. */
+async function playOwnSlot(folder, slot) {
+  if (state.dw2m?.folder !== folder && !(await openDw2(folder, slot))) return false;
+  const own = DW2M.dw2Actions(state.dw2Data, { folder, slot, tables: state.dw2m.tables, any: true }).find((a) => a.kind === "own");
+  if (!own) return false;
+  state.dw2Slot = slot;
+  selectAction(own);
+  play();
+  renderDw2();
+  writeUrl();
+  return true;
 }
 function renderDw2() {
   if (state.src === "dw2") return;
@@ -1110,7 +1227,8 @@ async function refreshDw2Panel() {
 function dw2Report() {
   const d = state.dw2m;
   if (!d || state.dw2Slot == null) return "";
-  const row = DW2M.dw2Rows(state.dw2Data || {}).find((r) => r.slot === state.dw2Slot);
+  const row = DW2M.dw2Rows(state.dw2Data || {}).find((r) => r.slot === state.dw2Slot && r.letters.length)
+    || (DW2M.pickRows ? DW2M.pickRows(state.dw2Data || {}) : []).find((r) => r.slot === state.dw2Slot);
   const fill = row?.letters?.find((x) => x.letter === state.dw2Letter) || row?.letters?.[0];
   if (!fill) return "";
   const playing = state.action?.kind === "dw2";
@@ -1140,7 +1258,8 @@ async function openDw2(folder, slot = null, { letter = null, frame = null, tick 
   const counts = DW2M.dw2Counts(data);
   state.dw2Data = data;
   state.dw2Status = "ready";
-  if (!counts.filled) {
+  const pickable = DW2M.pickRows ? DW2M.pickRows(data) : [];
+  if (!counts.filled && !pickable.length) {
     state.dw2m = null; state.dw2Busy = "";
     await loadEntry(folder, { frame: frame ?? !state.entry });
     toast(`${speciesName(folder)}: every DW2 motion was refused by the gate — nothing to play`);
@@ -1155,21 +1274,22 @@ async function openDw2(folder, slot = null, { letter = null, frame = null, tick 
   clone.model.folder = vf;
   dw2Store.set(vf, { model: clone.model, real: folder });
   const switched = state.dw2m?.folder !== folder;
-  const wantSlot = slot ?? state.dw2Slot ?? counts.slots[0];
-  const wantRow = DW2M.dw2Rows(data).find((r) => r.slot === wantSlot && r.status === "filled");
+  const wantSlot = slot ?? state.dw2Slot ?? counts.slots[0] ?? pickable[0]?.slot;
+  const wantRow = DW2M.dw2Rows(data).find((r) => r.slot === wantSlot && r.status === "filled")
+    || pickable.find((r) => r.slot === wantSlot);
   state.dw2Letter = letter || wantRow?.letters?.[0]?.letter || null;
   state.dw2m = { folder, vf, tables: clone.tables, failed: clone.failed, counts, slots: counts.slots };
   state.dw2Slot = null;
   state.dw2Busy = "";
   await loadEntry(folder, { dw2: state.dw2m, frame: frame ?? (switched || !state.entry), tick });
   if (tok !== dw2Tok) return false;
-  return playDw2Slot(wantRow ? wantRow.slot : counts.slots[0], state.dw2Letter);
+  return playDw2Slot(wantRow ? wantRow.slot : (counts.slots[0] ?? pickable[0]?.slot), state.dw2Letter);
 }
 /** Play one filled slot's DW2 motion through the viewer's own raw-table path (the K21f bake path). */
 function playDw2Slot(slot, letter = null) {
   const d = state.dw2m;
   if (!d || !state.dw2Data) return false;
-  const a = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot, letter, tables: d.tables }).find((x) => x.kind === "dw2");
+  const a = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot, letter, tables: d.tables, any: true }).find((x) => x.kind === "dw2");
   if (!a) { toast(`slot ${slot}: no DW2 motion to play on this body`); return false; }
   state.dw2Slot = slot;
   state.dw2Letter = a.letter;
@@ -1183,7 +1303,7 @@ function playDw2Slot(slot, letter = null) {
 function flipDw2AB() {
   const d = state.dw2m;
   if (!d || state.dw2Slot == null) { toast("pick a DW2 clip first"); return false; }
-  const pair = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot: state.dw2Slot, letter: state.dw2Letter, tables: d.tables });
+  const pair = DW2M.dw2Actions(state.dw2Data, { folder: d.folder, slot: state.dw2Slot, letter: state.dw2Letter, tables: d.tables, any: true });
   const to = state.action?.kind === "dw2" ? pair.find((a) => a.kind === "own") : pair.find((a) => a.kind === "dw2");
   if (!to) return false;
   const t = state.tick;

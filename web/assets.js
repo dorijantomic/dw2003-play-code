@@ -12,6 +12,7 @@ export const HD_SCALE = 4;
 
 const imageScales = new WeakMap();
 const PATCHED = Symbol.for("ddw3.assetDrawPatched");
+import { pixelFiltered } from "./gpu-pixel-filter.js";
 
 function storage() {
   return typeof localStorage === "undefined" ? null : localStorage;
@@ -39,11 +40,46 @@ export function hdAssetUrl(url) {
   return match ? `assets-hd/${match[1]}` : text;
 }
 
+// The HD pack's own list (assets-hd/manifest.json): the paths that HAVE a 4x file.  Exact-pixel
+// art (sprites, UI, effect sheets) is recorded `native: true` with no file, and an image the pack
+// never built is absent; for both the game loads the native file directly instead of asking for
+// a 4x copy that 404s first.  Until the list has arrived (or with no list at all) every request
+// still tries HD first and falls back, as before.
+let hdFiles = null;                 // Set of asset-relative paths with a 4x file; null = not known yet
+let hdFilesPromise = null;
+export function loadHdIndex() {
+  if (!hdFilesPromise) {
+    hdFilesPromise = (typeof fetch === "function"
+      ? fetch("assets-hd/manifest.json", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)
+      : Promise.resolve(null))
+      .then((manifest) => {
+        hdFiles = manifest && Array.isArray(manifest.assets)
+          ? new Set(manifest.assets
+            .filter((r) => r && typeof r.path === "string" && !r.native)
+            .map((r) => r.path))
+          : new Set();
+        return hdFiles;
+      });
+  }
+  return hdFilesPromise;
+}
+/** Test hook: replace the pack list (null = unknown, try every HD path). */
+export function setHdIndex(paths) { hdFiles = paths == null ? null : new Set(paths); hdFilesPromise = Promise.resolve(hdFiles); }
+
+function hdFileListed(url) {
+  if (hdFiles === null) return true;
+  const match = String(url).match(/^(?:\.\/)?assets\/([^?#]+)/);
+  return !!match && hdFiles.has(match[1]);
+}
+
 export function assetRequest(url, mode = assetMode()) {
-  return mode === ASSET_MODE_HD
+  return mode === ASSET_MODE_HD && hdFileListed(url)
     ? { primary: hdAssetUrl(url), fallback: String(url), scale: HD_SCALE }
     : { primary: String(url), fallback: null, scale: 1 };
 }
+if (assetMode() === ASSET_MODE_HD) loadHdIndex();
 
 function tagLoadedImage(img, scale) {
   imageScales.set(img, scale);
@@ -78,7 +114,8 @@ export function assignAssetImage(img, url) {
   return img;
 }
 
-export function loadAssetImage(url) {
+export async function loadAssetImage(url) {
+  if (assetMode() === ASSET_MODE_HD) await loadHdIndex();
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -138,6 +175,19 @@ export function installAssetCanvasDrawing() {
   Object.defineProperty(proto, PATCHED, { value: true });
   proto.drawImage = function drawDensityAware(image, ...args) {
     const scale = assetImageScale(image);
+    // F2 -> Settings -> Pixel filter in HD Remaster (gpu-pixel-filter.js, default off): a native image
+    // drawn onto the game canvas comes from its 4x filtered copy, frame rectangles scaled like an HD file.
+    const filtered = scale <= 1 ? pixelFiltered(image, this.canvas) : null;
+    if (filtered) {
+      const smoothing = this.imageSmoothingEnabled;
+      this.imageSmoothingEnabled = true;
+      try {
+        return nativeDrawImage.call(this, filtered, ...scaledDrawArguments(
+          4, { naturalWidth: filtered.width, naturalHeight: filtered.height }, args));
+      } finally {
+        this.imageSmoothingEnabled = smoothing;
+      }
+    }
     if (scale <= 1) return nativeDrawImage.call(this, image, ...args);
     const smoothing = this.imageSmoothingEnabled;
     this.imageSmoothingEnabled = true;
@@ -153,6 +203,7 @@ export function installAssetCanvasDrawing() {
 
 /** Fetch an HD raster for WebGL, falling back to its authentic counterpart. */
 export async function fetchAsset(url) {
+  if (assetMode() === ASSET_MODE_HD) await loadHdIndex();
   const request = assetRequest(url);
   if (request.fallback) {
     try {

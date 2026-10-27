@@ -8,7 +8,7 @@ param(
     [switch] $AllowCompatibilityFallback,
     [int] $GpuIndex = -1,
     [int] $Tile = 512,
-    [int] $Overlap = 64,
+    [int] $Overlap = 32,
     [int] $NcnnBatch = 64,
     [string[]] $Include = @(),
     [string[]] $Exclude = @()
