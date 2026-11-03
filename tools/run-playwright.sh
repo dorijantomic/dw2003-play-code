@@ -24,4 +24,11 @@ else
   echo "         to a dir containing libnspr4.so/libnss3.so (extracted without sudo)." >&2
 fi
 
+# GPU: the Windows host's AMD card is reachable from WSL through /dev/dxg, but Mesa only
+# uses it when the gallium d3d12 driver is named — left alone it picks llvmpipe (software)
+# even with the render node readable. VERIFY_GPU=0 keeps the old software-only behaviour.
+if [ "${VERIFY_GPU:-1}" != "0" ] && [ -e /dev/dxg ]; then
+  export GALLIUM_DRIVER=d3d12
+fi
+
 exec node "$@"

@@ -1,0 +1,1 @@
+{"style_medium": "anime game texture", "artistic_style": "cel-shaded, clean", "edit_instruction": "Render the image as a clean anime game texture with crisp cel shading."}

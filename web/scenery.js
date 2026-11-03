@@ -8,7 +8,8 @@
 // strip of world it uncovers is already populated (see the wrap helpers in S).
 // ambience.js decides which maps get which effect and calls into here.
 
-const VIEW_W = 320;
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 
 // ------------------------------------------------------------------ helpers
@@ -28,7 +29,7 @@ const TOD = [
     [0.64, [255, 150, 86]], [0.77, [150, 132, 196]], [0.89, [255, 196, 148]], [1.00, [255, 255, 255]],
 ];
 const TOD_SECONDS = 240;
-function todColor(phase) {
+export function todColor(phase) {
     for (let i = 1; i < TOD.length; i++) {
         if (phase <= TOD[i][0]) {
             const [p0, c0] = TOD[i - 1], [p1, c1] = TOD[i];

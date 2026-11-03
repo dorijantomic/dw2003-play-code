@@ -286,17 +286,34 @@ function pump() {
   if (queue.length) requestAnimationFrame(pump); else pumping = false;
 }
 
+// HD Remaster battle menus (F2 -> Screen -> "Sharp battle menus", ON by default, 2026-10-27: the user picked xBR blended
+// in sprite-filter-lab.html over the AI sample): the battle's menu, letter and result-screen sheets are drawn from their
+// xBR-blended 4x copy even when the Pixel filter is off. Same shader and cache as the Pixel filter.
+const BATTLE_UI_SHEET = /\/assets\/ui\/(pgfgc00|cmfont|stfrpt)_sheet\.png(\?|$)/;
+function battleUiFilter(image) {
+  try { if (window.__fx?.uisharp === false) return null; } catch { return null; }
+  return BATTLE_UI_SHEET.test(image.src || "") ? "xbrblend" : null;
+}
+/** Another on-screen canvas the native images are filtered for (the many-vs-many fight's menu canvas). */
+export function registerPixelScreen(canvas) { if (canvas) screens.add(canvas); }
+export const pixelFilterStats = new Map();     // sheet src -> filtered draws (headless checks)
+
 /** assets.js's drawImage wrapper: the 4x filtered canvas for a native <img> drawn onto the game canvas
  * in HD Remaster mode, or null (draw it as it is). The first draw queues it and draws native. */
 export function pixelFiltered(image, target) {
   if (!screens.has(target) || !imageMode()) return null;
-  const name = pixelFilterName();
-  if (!GPU_FILTER_NAMES.includes(name)) return null;
   if (typeof HTMLImageElement === "undefined" || !(image instanceof HTMLImageElement)) return null;
+  let name = pixelFilterName();
+  if (!GPU_FILTER_NAMES.includes(name)) name = battleUiFilter(image);
+  if (!name) return null;
   if (!image.complete || !image.naturalWidth) return null;
   let per = cache.get(image);
   if (!per) cache.set(image, per = new Map());
-  if (per.has(name)) return per.get(name);
+  if (per.has(name)) {
+    const out = per.get(name);
+    if (out) pixelFilterStats.set(image.src, (pixelFilterStats.get(image.src) | 0) + 1);
+    return out;
+  }
   per.set(name, null);
   queue.push([image, name]);
   if (!pumping) { pumping = true; requestAnimationFrame(pump); }

@@ -45,8 +45,10 @@ export function canvasEventToLogical(
   const contentHeight = canvas.clientHeight || rect.height || logicalHeight;
   const x = event.clientX - rect.left - (canvas.clientLeft || 0);
   const y = event.clientY - rect.top - (canvas.clientTop || 0);
+  // Wide overworld (web/field-view.js): the canvas is the box plus padX logical px each side.
+  const padX = Number(canvas.dataset?.fieldPad) || 0;
   return {
-    x: x * logicalWidth / contentWidth,
+    x: x * (logicalWidth + 2 * padX) / contentWidth - padX,
     y: y * logicalHeight / contentHeight,
   };
 }
@@ -100,37 +102,66 @@ export function createCanvasResolutionController(
   view.addEventListener?.("resize", markDirty);
   canvas.ownerDocument?.addEventListener?.("fullscreenchange", markDirty);
 
-  function beginFrame(hd) {
+  let lastPad = 0;
+
+  // `wide` (HD Remaster wide overworld, web/field-view.js): { padX, stageHeight } -- padX logical
+  // pixels of field on EACH side of the logical box. The logical canvas is then
+  // (logicalWidth + 2 padX) x logicalHeight, sized from the STAGE height (the canvas's own CSS size
+  // follows its backing shape, so reading it would only repeat last frame's shape), and the
+  // transform puts the box's (0,0) padX in from the left edge.
+  function beginFrame(hd, wide = null) {
+    const padX = hd && wide?.padX > 0 ? wide.padX : 0;
+    const fullWidth = logicalWidth + 2 * padX;
     if (
       dirty
       || hd !== lastHd
+      || padX !== lastPad
       || canvas.width !== current.width
       || canvas.height !== current.height
     ) {
-      const target = computeCanvasBacking({
-        hd,
-        cssWidth: canvas.clientWidth,
-        cssHeight: canvas.clientHeight,
-        devicePixelRatio: view.devicePixelRatio,
-        logicalWidth,
-        logicalHeight,
-        maxDimension,
-      });
+      let target;
+      if (padX > 0) {
+        const dpr = Math.max(1, Number(view.devicePixelRatio) || 1);
+        let height = Math.max(logicalHeight, Math.round((wide.stageHeight || logicalHeight) * dpr));
+        let width = Math.round(height * fullWidth / logicalHeight);
+        const reduction = Math.min(1, maxDimension / Math.max(width, height));
+        if (reduction < 1) {
+          height = Math.max(logicalHeight, Math.round(height * reduction));
+          width = Math.round(height * fullWidth / logicalHeight);
+        }
+        target = { width, height };
+      } else {
+        target = computeCanvasBacking({
+          hd,
+          cssWidth: canvas.clientWidth,
+          cssHeight: canvas.clientHeight,
+          devicePixelRatio: view.devicePixelRatio,
+          logicalWidth,
+          logicalHeight,
+          maxDimension,
+        });
+        // Coming back from the wide view: the canvas's CSS box still has the wide shape (it follows
+        // the backing), so take the height and give the backing the box's own shape again.
+        if (hd && lastPad > 0) target.width = Math.round(target.height * logicalWidth / logicalHeight);
+      }
       if (canvas.width !== target.width) canvas.width = target.width;
       if (canvas.height !== target.height) canvas.height = target.height;
       current = {
         ...target,
-        scaleX: target.width / logicalWidth,
+        scaleX: target.width / fullWidth,
         scaleY: target.height / logicalHeight,
+        padX,
         hd,
       };
       lastHd = hd;
+      lastPad = padX;
       dirty = false;
+      if (canvas.dataset) canvas.dataset.fieldPad = String(padX);
     }
 
     // Canvas width/height changes reset all 2D state, and battle also uses this
     // shared context, so establish the field transform at every field frame.
-    ctx.setTransform(current.scaleX, 0, 0, current.scaleY, 0, 0);
+    ctx.setTransform(current.scaleX, 0, 0, current.scaleY, (current.padX || 0) * current.scaleX, 0);
     // Native fallbacks and authentic pixel atlases stay nearest-neighbour.
     // web/assets.js temporarily enables smoothing only for density-tagged HD
     // sources, so one missing HD file cannot blur or bleed an entire UI.

@@ -28,7 +28,7 @@ import { TexturePatchAnimator } from "./fight/texture-patch-animator.js";
 import { mat4Identity, mat4Mul, mat4Translate, mat4Scale, mat4RotPSX,
          projLayerWorlds, clipFrameAt, meshAbrMode } from "./fight/proj-layers.js";
 import { meshPrimitiveStates } from "./fight/display-list.js";
-import { fetchAsset, loadAssetImage } from "./assets.js";
+import { fetchAsset, loadAssetImage, assetMode } from "./assets.js";
 // The slow-motion clock (engine/dw3/battle-slow-motion.ts, F0x8009e428 / F0x8009e510):
 // the ordinary route now steps through the PORT, not a hand-written copy of it.
 // The actor teardown (engine/dw3/battle-actor-lifecycle.ts, FIGHTSTG_F0x8008606c): the
@@ -48,10 +48,22 @@ const VERT_SRC = `
 attribute vec3 aPos;
 attribute vec2 aUV;
 uniform mat4 uMVP;
+uniform mat4 uSkyM;       // battle atmosphere, arena draw only: model -> world (zero elsewhere)
 varying vec2 vUV;
+varying float vDepth;
+varying vec3 vWorld;
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+attribute vec3 aNormal;
+varying vec3 vNrm;
+// SCENE-LIGHT-END
 void main() {
   gl_Position = uMVP * vec4(aPos, 1.0);
   vUV = aUV;
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  vNrm = aNormal;
+// SCENE-LIGHT-END
+  vDepth = gl_Position.w * 0.001;   // view depth in thousands (battle atmosphere fog)
+  vWorld = (uSkyM * vec4(aPos, 1.0)).xyz * 0.001;
 }`;
 
 const FRAG_SRC = `
@@ -59,14 +71,120 @@ precision mediump float;
 uniform sampler2D uTex;
 uniform float uAlpha;
 uniform vec4 uTint;
+// battle atmosphere (F2, off by default); all zero = the game's own colours
+uniform vec3 uGradeSub;   // colour *= 1 - uGradeSub
+uniform vec3 uFogCol;
+uniform vec3 uFogP;       // fog start, 1 / (end - start), most fog; depths in thousands
+uniform vec4 uSky;        // horizon height (thousands), stars, moon, time (s); arena draw only
+uniform vec3 uEye;        // camera, thousands
+uniform vec3 uMoonDir;
+uniform vec2 uWater;      // waves on, ground height band (thousands)
 varying vec2 vUV;
+varying float vDepth;
+varying vec3 vWorld;
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+uniform float uSLOn;      // 0 = off (the default: nothing below runs)
+uniform vec3 uSLDir, uSLCol, uSLAmb;   // light direction (render space), lit and shade multipliers (sRGB)
+varying vec3 vNrm;
+// SCENE-LIGHT-END
+// TOON-BEGIN (F2 "Toon shading", off by default; strip these blocks = the code before toon)
+uniform float uToon;      // 0 = off (the default: nothing below runs); 1 = flat cel bands on the Digimon
+uniform vec3 uToonDir;    // light direction (render space)
+// TOON-END
+// SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
+uniform vec2 uSoftA;      // x: 0 = off (the default: nothing below runs), 1 = cut-out edge from a blurred alpha; y: tap spacing in UV
+// SOFTA-END
+float hash3(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 void main() {
   vec4 c = texture2D(uTex, vUV) * uTint;
   c.a *= uAlpha;
+// SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
+  if (uSoftA.x > 0.5) {   // the 4 px alpha staircase of the HD sheet: 3x3 taps of the alpha, kept where the mean >= 0.5
+    float sa = 0.0;
+    for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) sa += texture2D(uTex, vUV + vec2(float(i), float(j)) * uSoftA.y).a;
+    if (sa < 4.5 || uTint.a * uAlpha < 0.05) discard;
+    c.a = uTint.a * uAlpha;
+  } else
+// SOFTA-END
   if (c.a < 0.05) discard;
+  vec3 raw = c.rgb;
+  float mx = max(raw.r, max(raw.g, raw.b)), mn = min(raw.r, min(raw.g, raw.b));
+  float sat = mx > 0.0 ? (mx - mn) / mx : 0.0;
+  // water: a water-coloured texel on the floor of an arena that has water (tools/measure_arena_sky_water.py)
+  bool water = uWater.x > 0.0 && abs(vWorld.y) < uWater.y && sat > 0.25 && mx > 0.2 && raw.b >= raw.r + 0.08 && raw.b >= raw.g * 0.85;
+  if (water) {
+    vec2 q = vWorld.xz * 3.0;
+    float t = uSky.w;
+    vec2 wob = vec2(sin(q.y * 2.1 + t * 1.3) + sin(q.x * 1.3 - t * 0.9), cos(q.x * 1.7 + t * 1.1) + sin(q.y * 0.9 + t * 1.6)) * 0.0025;
+    vec4 w2 = texture2D(uTex, vUV + wob) * uTint;
+    if (w2.a > 0.05) c.rgb = w2.rgb;
+    float wave = sin(q.x * 2.3 + q.y * 1.1 + t * 1.7) * sin(q.y * 2.9 - q.x * 0.7 + t * 1.2);
+    c.rgb *= 0.92 + 0.12 * wave;
+    float glint = pow(max(0.0, wave), 12.0) * uWater.x;
+    c.rgb += vec3(glint * 0.55);
+  }
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  if (uSLOn > 0.5) {
+    float nl = length(vNrm);
+    float k = nl > 1e-6 ? smoothstep(-0.15, 0.25, dot(vNrm / nl, uSLDir)) : 0.5;
+    c.rgb *= mix(uSLAmb, uSLCol, k);
+  }
+// SCENE-LIGHT-END
+// TOON-BEGIN (F2 "Toon shading", off by default; strip these blocks = the code before toon)
+  if (uToon > 0.5) {      // 3 hard grey bands (never tinted): the lit band keeps the texture's own colour, whites stay white
+    float tl = length(vNrm);
+    float td = tl > 1e-6 ? dot(vNrm / tl, uToonDir) : 1.0;
+    c.rgb *= td > 0.15 ? 1.0 : (td > -0.35 ? 0.80 : 0.64);
+  }
+// TOON-END
+  c.rgb *= vec3(1.0) - uGradeSub;
+  // night sky: stars and the moon on blue sky texels above the horizon, so nearer rock covers them
+  if (uSky.y + uSky.z > 0.0 && vWorld.y > uSky.x && sat > 0.15 && mx > 0.3 && raw.b > raw.r + 0.06 && raw.b >= raw.g) {
+    vec3 d = normalize(vWorld - uEye);
+    vec3 cell = floor(d * 420.0);
+    float h = hash3(cell);
+    if (h > 0.985) {
+      vec3 ctr = (cell + 0.5) / 420.0;
+      float r = length(d - ctr) * 420.0;
+      float tw = 0.65 + 0.35 * sin(uSky.w * (2.0 + h * 5.0) + h * 40.0);
+      c.rgb += vec3(smoothstep(0.45, 0.0, r) * (h - 0.985) / 0.015 * tw * uSky.y);
+    }
+    float m = dot(d, uMoonDir);
+    float disc = smoothstep(0.99955, 0.99975, m);
+    float halo = pow(max(0.0, (m - 0.985) / 0.015), 3.0) * 0.35;
+    c.rgb = mix(c.rgb, vec3(0.95, 0.94, 0.86), disc * uSky.z);
+    c.rgb += vec3(0.55, 0.6, 0.75) * halo * uSky.z;
+  }
+  c.rgb = mix(c.rgb, uFogCol, clamp((vDepth - uFogP.x) * uFogP.y, 0.0, 1.0) * uFogP.z);
   gl_FragColor = c;
 }`;
 
+// TOON-BEGIN (F2 "Toon outlines", off by default; strip these blocks = the code before toon)
+// Inverted hull: the fighter's own skinned corners (same VBO the model draws from, so the same bones and animation),
+// pushed out along smooth welded normals by uPush * view depth = a constant number of pixels on screen; drawn with the
+// faces toward the camera culled, so only the rim around the silhouette shows. Solid near-black #141414.
+const TOON_HULL_VERT_SRC = `
+attribute vec3 aPos;
+attribute vec2 aUV;
+attribute vec3 aNormal;
+uniform mat4 uMVP;
+uniform float uPush;      // render units per unit of view depth (= outline px * 2 / (viewport height * proj[5]))
+varying vec2 vUV;
+void main() {
+  vec4 c = uMVP * vec4(aPos, 1.0);
+  gl_Position = uMVP * vec4(aPos + aNormal * (uPush * c.w), 1.0);
+  vUV = aUV;
+}`;
+const TOON_HULL_FRAG_SRC = `
+precision mediump float;
+uniform sampler2D uTex;
+uniform vec3 uCol;
+varying vec2 vUV;
+void main() {
+  if (texture2D(uTex, vUV).a < 0.05) discard;   // cut-out texels have no outline, as they have no body
+  gl_FragColor = vec4(uCol, 1.0);
+}`;
+// TOON-END
 const VERT_COL_SRC = `
 attribute vec3 aPos;
 attribute vec4 aColor;
@@ -828,6 +946,9 @@ function _updateSkeletalVBOGL(gl, model, buffers, bwm, worldPos, scale, flipX, y
   }
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.vbo);
   gl.bufferData(gl.ARRAY_BUFFER, posData, gl.DYNAMIC_DRAW);
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  buffers.lastPos = posData;
+// SCENE-LIGHT-END
 
   if (!isFinite(minX)) return null;
   return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
@@ -854,6 +975,12 @@ function _updateSkeletalVBOGL(gl, model, buffers, bwm, worldPos, scale, flipX, y
 // reaction script's own op10[99] impact sprite. Nothing modulates the body colour, so this
 // is one untinted colour and it is the only one the fighter path has.
 export const FIGHTER_TINT = [1, 1, 1, 1];
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+// Sign that turns cross(p1 - p0, p2 - p0) of a fighter triangle (render space) into its OUTWARD normal. MEASURED by
+// tools/verify_built_light.mjs (getSceneLight(): signed volume of each bone piece; with +1 it was negative on 47 of 51
+// pieces of m373rena + m051kuwa, so these triangles wind clockwise seen from outside).
+const SCENE_LIGHT_WINDING = -1;
+// SCENE-LIGHT-END
 
 // `wire` draws the SAME index buffer as connected lines instead of filled
 // triangles, which is how the Blast transformation shows the incoming form
@@ -879,9 +1006,20 @@ function drawSkeletalMesh(gl, prog, mvp, buffers, tex, tint, alpha = 1.0, wire =
   gl.enableVertexAttribArray(prog.aUV);
   gl.vertexAttribPointer(prog.aUV, 2, gl.FLOAT, false, 0, 0);
 
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  const nAt = prog.aNormal ?? -1;
+  if (nAt >= 0 && buffers.nbo && buffers.litOn) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.nbo);
+    gl.enableVertexAttribArray(nAt);
+    gl.vertexAttribPointer(nAt, 3, gl.FLOAT, false, 0, 0);
+  } else if (nAt >= 0) gl.disableVertexAttribArray(nAt);
+// SCENE-LIGHT-END
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.ibo);
   gl.drawElements(wire ? gl.LINE_STRIP : gl.TRIANGLES,
     buffers.indexCount, gl.UNSIGNED_SHORT, 0);
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  if (nAt >= 0) gl.disableVertexAttribArray(nAt);
+// SCENE-LIGHT-END
 }
 
 // ─── GL helpers ───────────────────────────────────────────────────────────────
@@ -941,12 +1079,24 @@ function loadTexture(gl, url, onLoad) {
       const hd = new URL(r.url, location.href).pathname.includes("/assets-hd/");
       return r.blob().then(blob => ({ blob, hd }));
     })
-    .then(({ blob, hd }) => createImageBitmap(blob).then(bitmap => ({ bitmap, hd })))
+    // HD sheets are filtered (LINEAR + mipmaps), so a see-through texel's colour reaches the opaque texels beside it.
+    // The default bitmap is premultiplied and the upload wipes that colour to black: measured on meft1001's sky sheet,
+    // 968080 alpha-0 texels 0,0,0 instead of the file's 78,126,195, and HD clouds got a black outline (user 2026-10-29;
+    // tools/probe_texture_premultiply.mjs). Original sheets are NEAREST-sampled and keep the default decode.
+    .then(({ blob, hd }) => createImageBitmap(blob, hd ? { premultiplyAlpha: "none" } : undefined).then(bitmap => ({ bitmap, hd })))
     .then(({ bitmap, hd }) => {
       const bw = bitmap.width, bh = bitmap.height;
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      // HD arena sheets (1024 px) are seen far smaller than that on the walls: without mipmaps every screen pixel picks
+      // one texel of many and the wall shimmers and looks pixelated as the camera moves (user 2026-10-28, Dark Dungeon).
+      const pow2 = (n) => (n & (n - 1)) === 0, mip = hd && /\/battle\/arenas\//.test(url) && pow2(bw) && pow2(bh);
+      if (mip) {
+        gl.generateMipmap(gl.TEXTURE_2D);
+        const af = gl.getExtension("EXT_texture_filter_anisotropic");
+        if (af) gl.texParameterf(gl.TEXTURE_2D, af.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(af.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mip ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, hd ? gl.LINEAR : gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
       // WRAP_T = REPEAT: seam-unwrapped V coords (export_fight_anim.py) go
@@ -1581,6 +1731,10 @@ export const GIANT_H_MIN = 150;         // projection distance floor: fovY 2 ata
 export const GIANT_PULL_MAX = 4;        // pull-back cap along the reference azimuth (arena-sized)
 export const GIANT_LIFT_STEPS = 8;      // eye-height steps tried between the reference and the top
 export const GIANT_FIT_ASPECT = 4 / 3;  // the game's own 320x240 frame (a wider canvas sees more)
+// F2 -> Screen -> "Battle camera a little further out" (HD Remaster only): how far the eye steps back
+// along its view ray, and the camera modes it applies to (see the projection in render()).
+export const BATTLE_WIDE_DOLLY = 1.25;
+const BATTLE_WIDE_MODES = new Set(["director", "behind"]);
 const PS1_UP = [0, -1, 0];              // PS1 Y is DOWN
 
 /** One Digimon's rest-pose body as a box standing in `slot`, PS1 units: the fit's subject. The
@@ -1734,8 +1888,11 @@ export function resolveContactSoundType(type, contactType, evaded) {
   return evaded ? CONTACT_EVADE_TYPE : contactType;
 }
 
-export function createBattle3D(canvas, sfx = null) {
-  const gl = canvas.getContext("webgl", { alpha: false, antialias: true });
+export function createBattle3D(canvas, sfx = null, opts = {}) {
+  // opts.alpha (Arena Viewer "built" look only): a see-through canvas, so a three.js world drawn on another canvas
+  // shows under the fighters. Every other caller keeps the opaque canvas.
+  const gl = canvas.getContext("webgl", opts.alpha
+    ? { alpha: true, premultipliedAlpha: false, antialias: true } : { alpha: false, antialias: true });
   if (!gl) return null;
 
   // Programs
@@ -1748,6 +1905,23 @@ export function createBattle3D(canvas, sfx = null) {
     uTex:  gl.getUniformLocation(texProg, "uTex"),
     uAlpha:gl.getUniformLocation(texProg, "uAlpha"),
     uTint: gl.getUniformLocation(texProg, "uTint"),
+    uGradeSub: gl.getUniformLocation(texProg, "uGradeSub"),
+    uFogCol: gl.getUniformLocation(texProg, "uFogCol"),
+    uFogP: gl.getUniformLocation(texProg, "uFogP"),
+    uSkyM: gl.getUniformLocation(texProg, "uSkyM"),
+    uSky: gl.getUniformLocation(texProg, "uSky"),
+    uEye: gl.getUniformLocation(texProg, "uEye"),
+    uMoonDir: gl.getUniformLocation(texProg, "uMoonDir"),
+    uWater: gl.getUniformLocation(texProg, "uWater"),
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+    aNormal: gl.getAttribLocation(texProg, "aNormal"),
+    uSLOn: gl.getUniformLocation(texProg, "uSLOn"), uSLDir: gl.getUniformLocation(texProg, "uSLDir"),
+    uSLCol: gl.getUniformLocation(texProg, "uSLCol"), uSLAmb: gl.getUniformLocation(texProg, "uSLAmb"),
+// SCENE-LIGHT-END
+// TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
+    uToon: gl.getUniformLocation(texProg, "uToon"), uToonDir: gl.getUniformLocation(texProg, "uToonDir"),
+// TOON-END
+    uSoftA: gl.getUniformLocation(texProg, "uSoftA"),
   };
 
   // World up axis. Eye/look are computed per-frame by the cinematic camera (see render()).
@@ -2069,9 +2243,19 @@ export function createBattle3D(canvas, sfx = null) {
 
   function _arenaGroupBuf(g) {   // same shape as _bdGroupBuf (static spinDeg == 0)
     const b = _bdGroupBuf(g);
+    // HD sheets are LINEAR-sampled. The pack's UVs are whole texel numbers (all 166002 of them, every pack): the
+    // original's NEAREST read at u = 128.0 is texel 128, but a LINEAR read there is half texel 127, the NEXT picture
+    // on the sheet, so every piece got a border (meft1015 lamps, user 2026-10-29). Half a texel in = texel centres,
+    // what NEAREST reads. Authentic keeps the pack's UVs.
+    if (assetMode() === "hd" && Array.isArray(g.uv)) {
+      const half = 0.5 / TEXTURE_PAGE_TEXELS;
+      gl.bindBuffer(gl.ARRAY_BUFFER, b.ubo);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(g.uv.map((t) => t + half)), gl.STATIC_DRAW);
+    }
     b.clut = Array.isArray(g.clut) ? g.clut : null;   // the layer's palette group (col,row)
     b.degenerate = !!g.degenerate;     // blank CLUT slot: the original only culls these away
     b.pos = g.pos;                     // kept for the per-frame back-face cull (arenaCullIndices)
+    b.uv = g.uv;                       // kept for the battle atmosphere moon pick (_atmosMoonPick)
     b.cullRef = g.cullRef || null;     // triangle -> the triangle whose projected sign governs it
     return b;
   }
@@ -2672,6 +2856,200 @@ export function createBattle3D(canvas, sfx = null) {
   // ISOLATED MODE: no arena, no sky, no backdrop, no battle UI (the page draws its own HUD) — a
   // neutral background plus a ground grid under the focused fighter. Off everywhere but the viewer.
   let isolatedMode = false;
+  // Arena Viewer "built" look: the disc arena and its sky are not drawn and the frame clears see-through, so only the
+  // fighters land on this canvas (web/arena-built.js draws the arena under it, with this frame's camera).
+  let builtArena = false;
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+  // Sun / moon light on the Digimon, set only by the Arena Viewer's built look (web/built/shared.js modelLight()):
+  // { dir: [x,y,z] render space toward the light, colour: lit multiplier, ambient: shade multiplier } (sRGB).
+  // null (the default) = the uniform stays 0 and the shader does exactly what it always did. Normals: per corner,
+  // the area-weighted face normals of every corner made from the same bone vertex, from this frame's skinned positions.
+  let sceneLight = null;
+  function _litNormals(model, bufs) {
+    const pos = bufs?.lastPos; if (!model || !pos) return;
+    const n = bufs.totalVerts;
+    if (!bufs.weld || bufs.weldFor !== model) {      // corner -> one id per (bone, vertex), built once per model
+      const weld = new Int32Array(n), ids = new Map();
+      for (let b = 0; b < model.bones.length; b++) {
+        const faces = model.bones[b].faces || [], off = bufs.boneOffsets[b];
+        for (let f = 0; f < faces.length; f++) for (let c = 0; c < 3; c++) {
+          const key = b * 65536 + faces[f][c];
+          let id = ids.get(key); if (id === undefined) { id = ids.size; ids.set(key, id); }
+          weld[off + f * 3 + c] = id;
+        }
+      }
+      bufs.weld = weld; bufs.weldN = ids.size; bufs.weldFor = model; bufs.weldBuilds = (bufs.weldBuilds || 0) + 1;
+      bufs.acc = new Float32Array(ids.size * 3); bufs.nrm = new Float32Array(n * 3);
+    }
+    const { weld, acc, nrm } = bufs; acc.fill(0);
+    for (let t = 0; t + 2 < n; t += 3) {
+      const a = t * 3, b = a + 3, c = a + 6;
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      const nx = (uy * vz - uz * vy) * SCENE_LIGHT_WINDING, ny = (uz * vx - ux * vz) * SCENE_LIGHT_WINDING, nz = (ux * vy - uy * vx) * SCENE_LIGHT_WINDING;
+      for (let k = 0; k < 3; k++) { const w = weld[t + k] * 3; acc[w] += nx; acc[w + 1] += ny; acc[w + 2] += nz; }
+    }
+    for (let i = 0; i < n; i++) {
+      const w = weld[i] * 3, x = acc[w], y = acc[w + 1], z = acc[w + 2], l = Math.sqrt(x * x + y * y + z * z) || 1;
+      nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+    }
+    if (!bufs.nbo) bufs.nbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufs.nbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.DYNAMIC_DRAW);
+  }
+  function _sceneLightDraw(on) {          // before the fighters (on) and right after them (off)
+    gl.useProgram(texP.program);
+    const L = on ? sceneLight : null;
+    gl.uniform1f(texP.uSLOn, L ? 1 : 0);
+    for (const bufs of [playerSkelBufs, enemySkelBufs]) if (bufs) bufs.litOn = !!L;
+    if (!L) return;
+    gl.uniform3fv(texP.uSLDir, L.dir); gl.uniform3fv(texP.uSLCol, L.colour); gl.uniform3fv(texP.uSLAmb, L.ambient);
+    _litNormals(playerModel, playerSkelBufs);
+    _litNormals(enemyModel, enemySkelBufs);
+  }
+// SCENE-LIGHT-END
+// TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
+  // On when the game's F2 setting is on (window.__fx.toonoutline / .toonshade) or the Arena Viewer ticked it (setToon).
+  const toonSet = { outline: false, shade: false };
+  const TOON_COL = [20 / 255, 20 / 255, 20 / 255];   // #141414
+  const TOON_PX_1080 = 2.0;                          // outline width in px at a 1080 px tall frame (scaled with the frame)
+  let toonProg = null, toonLog = { frames: 0, hulls: 0, welds: 0, err: null };
+  function _toonState() {
+    const o = !!(window.__fx?.toonoutline || toonSet.outline), s = !!(window.__fx?.toonshade || toonSet.shade);
+    return o || s ? { outline: o, shade: s } : null;
+  }
+  // Built once per model from that frame's skinned corners: weld = one id per position (quantised to 0.5 render units),
+  // so corners of different faces / bone pieces at one point share ONE averaged normal (no hull cracks at hard edges).
+  // sign = per bone piece +1 / -1 from its signed volume, so a piece wound the other way still gets outward normals,
+  // and the hull index buffer flips that piece's triangles so the culling below treats it like the rest.
+  function _toonWeld(model, bufs) {
+    const pos = bufs.lastPos, n = bufs.totalVerts;
+    const sign = new Float32Array(n / 3), hull = new Uint16Array(n);
+    for (let b = 0; b < model.bones.length; b++) {
+      const t0 = bufs.boneOffsets[b], nt = (model.bones[b].faces || []).length;
+      let qx = 0, qy = 0, qz = 0;
+      for (let i = t0 * 3; i < (t0 + nt * 3) * 3; i += 3) { qx += pos[i]; qy += pos[i + 1]; qz += pos[i + 2]; }
+      const nc = Math.max(1, nt * 3); qx /= nc; qy /= nc; qz /= nc;
+      let v = 0;
+      for (let f = 0; f < nt; f++) {
+        const a = (t0 + f * 3) * 3;
+        const x0 = pos[a] - qx, y0 = pos[a + 1] - qy, z0 = pos[a + 2] - qz, x1 = pos[a + 3] - qx, y1 = pos[a + 4] - qy, z1 = pos[a + 5] - qz, x2 = pos[a + 6] - qx, y2 = pos[a + 7] - qy, z2 = pos[a + 8] - qz;
+        v += x0 * (y1 * z2 - z1 * y2) - y0 * (x1 * z2 - z1 * x2) + z0 * (x1 * y2 - y1 * x2);
+      }
+      const s = v * SCENE_LIGHT_WINDING < 0 ? -1 : 1;
+      for (let f = 0; f < nt; f++) {
+        const t = t0 + f * 3; sign[t / 3] = s;
+        hull[t] = t; hull[t + 1] = s < 0 ? t + 2 : t + 1; hull[t + 2] = s < 0 ? t + 1 : t + 2;
+      }
+    }
+    const weld = new Int32Array(n), ids = new Map();
+    for (let i = 0; i < n; i++) {
+      const key = Math.round(pos[i * 3] * 2) + "," + Math.round(pos[i * 3 + 1] * 2) + "," + Math.round(pos[i * 3 + 2] * 2);
+      let id = ids.get(key); if (id === undefined) { id = ids.size; ids.set(key, id); }
+      weld[i] = id;
+    }
+    if (!bufs.toonIbo) bufs.toonIbo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufs.toonIbo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, hull, gl.STATIC_DRAW);
+    Object.assign(bufs, { toonFor: model, toonN: n, toonSign: sign, toonWeldIds: weld, toonAcc: new Float32Array(ids.size * 3),
+      toonNrm: new Float32Array(n * 3), toonWeldN: ids.size });
+    toonLog.welds++;
+  }
+  // This frame's smooth outward normals (area-weighted face normals summed per weld id) into bufs.nbo.
+  function _toonNormals(model, bufs) {
+    if (!model || !bufs?.lastPos || !bufs.totalVerts) return false;
+    if (bufs.toonFor !== model || bufs.toonN !== bufs.totalVerts) _toonWeld(model, bufs);
+    const pos = bufs.lastPos, n = bufs.totalVerts, { toonSign: sign, toonWeldIds: weld, toonAcc: acc, toonNrm: nrm } = bufs;
+    acc.fill(0);
+    for (let t = 0; t + 2 < n; t += 3) {
+      const a = t * 3, b = a + 3, c = a + 6, s = sign[t / 3] * SCENE_LIGHT_WINDING;
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      const nx = (uy * vz - uz * vy) * s, ny = (uz * vx - ux * vz) * s, nz = (ux * vy - uy * vx) * s;
+      for (let k = 0; k < 3; k++) { const w = weld[t + k] * 3; acc[w] += nx; acc[w + 1] += ny; acc[w + 2] += nz; }
+    }
+    for (let i = 0; i < n; i++) {
+      const w = weld[i] * 3, x = acc[w], y = acc[w + 1], z = acc[w + 2], l = Math.sqrt(x * x + y * y + z * z) || 1;
+      nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+    }
+    if (!bufs.nbo) bufs.nbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufs.nbo);
+    gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.DYNAMIC_DRAW);
+    return true;
+  }
+  function _toonBodies() {
+    const out = [];
+    if (!(blastState && blastState.showNewModel) && playerVisible && playerModel && playerSkelBufs) out.push([playerModel, playerSkelBufs, playerTex]);
+    if (enemyVisible && enemyModel && enemySkelBufs) out.push([enemyModel, enemySkelBufs, enemyTex]);
+    for (const f of extras.values()) if (f.visible && f.model && f.bufs) out.push([f.model, f.bufs, f.tex]);
+    return out;
+  }
+  // Before the fighters: normals for every body; Toon shading binds them (litOn) and sets the band uniforms.
+  function _toonBegin(st, eye, look) {
+    const bodies = _toonBodies();
+    for (const [m, b] of bodies) { b.toonOk = _toonNormals(m, b); if (st.shade && b.toonOk) b.litOn = true; }
+    if (!st.shade) return;
+    let d;
+    if (sceneLight) d = sceneLight.dir;
+    else {     // key light from above the camera: toward the camera plus up
+      let vx = eye[0] - look[0], vy = eye[1] - look[1], vz = eye[2] - look[2];
+      const vl = Math.hypot(vx, vy, vz) || 1; vx /= vl; vy /= vl; vz /= vl;
+      d = [vx, vy + 1, vz];
+    }
+    const dl = Math.hypot(d[0], d[1], d[2]) || 1;
+    gl.useProgram(texP.program);
+    gl.uniform1f(texP.uToon, 1);
+    gl.uniform3fv(texP.uToonDir, [d[0] / dl, d[1] / dl, d[2] / dl]);
+    gl.uniform1f(texP.uSLOn, 0);           // no tinted scene light on the Digimon while toon shading is on
+  }
+  // After the fighters (and the 2 vs 2 extras): the hulls, then everything back to the game's own state.
+  function _toonEnd(st, pv, proj, H) {
+    const bodies = _toonBodies();
+    if (st.outline) {
+      try {
+        if (!toonProg) {
+          const p = gl.createProgram();
+          gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, TOON_HULL_VERT_SRC));
+          gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, TOON_HULL_FRAG_SRC));
+          // the same attribute slots as the main program, so its enabled arrays stay as it left them
+          if (texP.aPos >= 0) gl.bindAttribLocation(p, texP.aPos, "aPos");
+          if (texP.aUV >= 0) gl.bindAttribLocation(p, texP.aUV, "aUV");
+          if (texP.aNormal >= 0) gl.bindAttribLocation(p, texP.aNormal, "aNormal");
+          gl.linkProgram(p);
+          if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error("Link: " + gl.getProgramInfoLog(p));
+          toonProg = { program: p, aPos: gl.getAttribLocation(p, "aPos"), aUV: gl.getAttribLocation(p, "aUV"), aNormal: gl.getAttribLocation(p, "aNormal"),
+            uMVP: gl.getUniformLocation(p, "uMVP"), uPush: gl.getUniformLocation(p, "uPush"), uTex: gl.getUniformLocation(p, "uTex"), uCol: gl.getUniformLocation(p, "uCol") };
+        }
+        const px = Math.max(1, TOON_PX_1080 * H / 1080);
+        gl.useProgram(toonProg.program);
+        gl.uniformMatrix4fv(toonProg.uMVP, false, pv);
+        gl.uniform1f(toonProg.uPush, px * 2 / (H * proj[5]));
+        gl.uniform3fv(toonProg.uCol, TOON_COL);
+        gl.uniform1i(toonProg.uTex, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.enable(gl.CULL_FACE); gl.frontFace(gl.CCW); gl.cullFace(gl.BACK);   // outward faces wind clockwise (SCENE_LIGHT_WINDING): cull the ones toward the camera
+        gl.depthMask(false);
+        for (const [, b, tex] of bodies) {
+          if (!b.toonOk || !b.vbo || !b.nbo || !b.toonIbo) continue;
+          gl.bindTexture(gl.TEXTURE_2D, tex || whiteTex);
+          gl.bindBuffer(gl.ARRAY_BUFFER, b.vbo); gl.enableVertexAttribArray(toonProg.aPos); gl.vertexAttribPointer(toonProg.aPos, 3, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, b.ubo); gl.enableVertexAttribArray(toonProg.aUV); gl.vertexAttribPointer(toonProg.aUV, 2, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ARRAY_BUFFER, b.nbo); gl.enableVertexAttribArray(toonProg.aNormal); gl.vertexAttribPointer(toonProg.aNormal, 3, gl.FLOAT, false, 0, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.toonIbo);
+          gl.drawElements(gl.TRIANGLES, b.totalVerts, gl.UNSIGNED_SHORT, 0);
+          gl.disableVertexAttribArray(toonProg.aNormal);
+          toonLog.hulls++;
+        }
+      } catch (e) { toonLog.err = String(e?.message || e); toonSet.outline = false; }
+      gl.depthMask(true);
+      gl.disable(gl.CULL_FACE);
+    }
+    for (const [, b] of bodies) b.litOn = false;
+    gl.useProgram(texP.program);
+    gl.uniform1f(texP.uToon, 0);
+    toonLog.frames++;
+  }
+// TOON-END
   let isolatedSide = "player";
   let viewerGridTex = null, viewerGridBufs = null;
 
@@ -3458,9 +3836,112 @@ export function createBattle3D(canvas, sfx = null) {
   coordinator.extraActors = () => { const out = []; for (const f of extras.values()) if (f.anim8r) out.push(f.anim8r); return out; };
   const laneOf = (f) => f.dx + f.lat;
 
+  // Many-vs-many line-up (multiCam only). The caller's dx only gives the ORDER along a side; the spacing comes from each
+  // model's own measured width (widest x extent over its first 1.5 s of idle, PS1 units) plus a gap, so two big
+  // Digimon never overlap. Each side stands in a slant (echelon): the lanes step back away from the opponent, so the
+  // line reads as a diagonal instead of a flat row. The arena (and a special's backdrop) is drawn larger by the
+  // same rule that keeps each fighter's share of the arena what it is in the original one-on-one fight:
+  // scale = widest side's line-up width / one fighter's slot (its width + the gap), between 1 and MULTI_ARENA_MAX.
+  const MULTI_LANE_MIN = 1900, MULTI_GAP_MIN = 300, MULTI_GAP_FRAC = 0.35, MULTI_ECHELON = 0.45, MULTI_ARENA_MAX = 4, MULTI_MEASURE_S = 1.5;
+  let arenaScale = 1;
+  function _layoutExtras() {
+    if (!multiCam) { arenaScale = 1; for (const f of extras.values()) { f.dxT = f.dx0; f.dz = 0; } return; }
+    let scale = 1;
+    for (const side of ["player", "enemy"]) {                  // each side by its own widths, gap and slant
+      const list = [...extras.values()].filter((f) => f.side === side).sort((a, b) => a.dx0 - b.dx0);
+      const maxW = Math.max(0, ...list.map((f) => f.restW || 0));
+      if (!list.length || !(maxW > 0)) continue;               // nothing measured yet: keep the caller's lanes
+      const gap = Math.max(MULTI_GAP_MIN, maxW * MULTI_GAP_FRAC);
+      const w = list.map((f) => f.restW || maxW);
+      // centre to centre: half of each width + the gap, never less than the old fixed lane (1900)
+      const step = (i) => Math.max(MULTI_LANE_MIN, w[i] / 2 + w[i + 1] / 2 + gap);
+      let c = 0; const cx = [0];
+      for (let i = 0; i + 1 < list.length; i++) cx.push(c += step(i));
+      const span = c + w[0] / 2 + w[list.length - 1] / 2;
+      scale = Math.max(scale, span / (maxW + gap));
+      const away = Math.sign(arenaSlot(null, side).z) || 1;  // PS1 z: further from the opponent
+      list.forEach((f, i) => {
+        f.dxT = cx[i] - c / 2;
+        f.dz = away * (i - (list.length - 1) / 2) * MULTI_ECHELON * Math.max(MULTI_LANE_MIN, maxW + gap);
+      });
+    }
+    // the smart camera (F2 -> Screen) turns away from the rock itself, and does better with the arena at full size
+    // (tools/verify_smart_cam.mjs: meft1009 near rock on the fighters 5% at the lowered scale, 0% at full)
+    arenaScale = window.__fx?.smartcam ? Math.min(MULTI_ARENA_MAX, scale) : _arenaScaleClear(Math.min(MULTI_ARENA_MAX, scale));
+  }
+  // A larger arena must not bring its rock or walls between the camera and the fighters: measured over every arena
+  // pack (tools/measure_mp_arena_cover.mjs, 2026-10-27), two of 29 did at the line-up's scale (meft1017: 0% -> 62% of
+  // the screen, meft1029: 0% -> 35%). So the scale is lowered, in steps toward 1, until the screen share covered by
+  // arena geometry that rises above the fighters' feet and is nearer than the nearest fighter is no more than at
+  // the original size (+1%). Worked out once per arena and wanted scale, from the multi shot's own camera.
+  const rockCoverCache = new Map();
+  function _rockCover(groups, s, cam, fs, aspect) {
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2], 0, fwd[0]]);
+    const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    const t = Math.tan(cam.fovDeg * Math.PI / 360);
+    let near = Infinity, feet = Infinity;
+    for (const f of fs) {
+      const c = [(f.aabb.min[0] + f.aabb.max[0]) / 2, (f.aabb.min[1] + f.aabb.max[1]) / 2, (f.aabb.min[2] + f.aabb.max[2]) / 2];
+      near = Math.min(near, dot(sub(c, cam.eye), fwd)); feet = Math.min(feet, f.aabb.min[1]);
+    }
+    const GW = 100, GH = 36, hit = new Uint8Array(GW * GH), k = MODEL_SCALE * s;
+    const xs = [0, 0, 0], ys = [0, 0, 0];
+    for (const g of groups) {
+      const pos = g.pos; if (!pos) continue;
+      tri: for (let i = 0; i + 8 < pos.length; i += 9) {
+        let top = -Infinity, anyNear = false;
+        for (let v = 0; v < 3; v++) {
+          const p = [pos[i + v * 3] * k, -pos[i + v * 3 + 1] * k, -pos[i + v * 3 + 2] * k];
+          top = Math.max(top, p[1]);
+          const d = sub(p, cam.eye), z = dot(d, fwd);
+          if (z <= 1) continue tri;
+          if (z < near * 0.9) anyNear = true;
+          xs[v] = (dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW; ys[v] = (0.5 - dot(d, up) / (z * t) * 0.5) * GH;
+        }
+        if (!anyNear || top < feet + 40) continue;
+        const area = (xs[1] - xs[0]) * (ys[2] - ys[0]) - (xs[2] - xs[0]) * (ys[1] - ys[0]);
+        if (!area) continue;
+        const x0 = Math.max(0, Math.floor(Math.min(...xs))), x1 = Math.min(GW - 1, Math.ceil(Math.max(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(GH - 1, Math.ceil(Math.max(...ys)));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const px = x + 0.5, py = y + 0.5;
+          const a = ((xs[1] - px) * (ys[2] - py) - (xs[2] - px) * (ys[1] - py)) / area;
+          const b = ((xs[2] - px) * (ys[0] - py) - (xs[0] - px) * (ys[2] - py)) / area;
+          if (a >= 0 && b >= 0 && a + b <= 1) hit[y * GW + x] = 1;
+        }
+      }
+    }
+    let n = 0; for (const h of hit) n += h;
+    return n / (GW * GH);
+  }
+  function _arenaScaleClear(want, pk = activeArena) {
+    if (!(want > 1)) return 1;
+    const groups = pk?.groups, fs = [...extras.values()].filter((f) => f.aabb);
+    if (!groups?.length || !lastCamInfo || !fs.length) return arenaScale;   // not ready: keep what is drawn now
+    const key = `${pk.name}|${want.toFixed(2)}`;
+    if (rockCoverCache.has(key)) return rockCoverCache.get(key);
+    const aspect = canvas.width / Math.max(1, canvas.height);
+    const base = _rockCover(groups, 1, lastCamInfo, fs, aspect);
+    let s = want;
+    for (let i = 0; i < 10 && s > 1; i++, s = Math.max(1, want - (want - 1) * i / 9)) {
+      if (_rockCover(groups, s, lastCamInfo, fs, aspect) <= base + 0.01) break;
+    }
+    rockCoverCache.set(key, s);
+    return s;
+  }
+  /** (checks) the scale this arena pack would get for the current line-up and camera; null while it loads. */
+  function probeArenaScale(name, want) { const pk = loadArenaPack(name); return pk?.groups ? _arenaScaleClear(want, pk) : null; }
+  function getMultiLayout() {
+    return { arenaScale, arena: activeArena?.name ?? null, fighters: [...extras.values()].map((f) => ({ id: f.id, side: f.side, dx: f.dx, dxT: f.dxT, dz: f.dz, restW: f.restW, aabb: f.aabb ? { min: [...f.aabb.min], max: [...f.aabb.max] } : null })) };
+  }
+
   function addFighter(id, side, folder, dx = 0) {
+    const old = extras.get(id);
     removeFighter(id);
-    const f = { id, side, folder, dx, lat: 0, latT: 0, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
+    const f = { id, side, folder, dx: old ? old.dx : dx, dx0: dx, dxT: old ? old.dxT : dx, dz: old ? old.dz : 0, latz: 0, latzT: 0, restW: 0, born: null,
+      lat: 0, latT: 0, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
       visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null };
     extras.set(id, f);
     f.tex = loadTexture(gl, `assets/battle/textures/${folder}.png`);
@@ -3489,7 +3970,7 @@ export function createBattle3D(canvas, sfx = null) {
     releaseActorResources([f.tex, f.bufs, f.model]);
   }
   function clearFighters(side = null) { for (const f of [...extras.values()]) if (!side || f.side === side) removeFighter(f.id); }
-  function setFighterLane(id, dx) { const f = extras.get(id); if (f) f.dx = dx; }
+  function setFighterLane(id, dx) { const f = extras.get(id); if (f) { f.dx0 = dx; if (!multiCam) f.dx = f.dxT = dx; } }
   function setFighterVisible(id, v) { const f = extras.get(id); if (f) f.visible = !!v; }
   function setMultiCamera(on) { multiCam = !!on; }
   function fightersReady() { for (const f of extras.values()) if (!f.anim8r) return false; return true; }
@@ -3538,16 +4019,17 @@ export function createBattle3D(canvas, sfx = null) {
     contactEvade[A.side] = miss;
     armDataField(techId);                      // a special's element backdrop, same as in a one-on-one fight
     A.latT = D.dx - A.dx;                      // run along the lane that leads to the target, and come back afterwards
-    const aLane = A.dx + A.latT, dLane = D.dx;
+    A.latzT = D.dz - A.dz;                     // (and the target's step of the slanted line-up)
+    const aLane = A.dx + A.latT, dLane = D.dx, aDz = A.dz + A.latzT, dDz = D.dz;
     // an effect whose z is on the defender's side of the arena is at the defender; otherwise it is at the attacker
     const atDefender = (z, defSide) => (defSide === "enemy" ? z > 0 : z < 0);
-    const shiftFx = (h, laneNear, laneFar, defSide) => ({
+    const shiftFx = (h, laneNear, laneFar, defSide, zNear, zFar) => ({
       ...h,
-      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + (atDefender(rec.z | 0, defSide) ? laneFar : laneNear) }),
+      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + (atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + (atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
       setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + laneNear, ...l.from.slice(1)] } : l),
     });
-    const attHooks = shiftFx(_fxHooks(A.side, _impactContact({ ...hooks, onMotion: dataFieldMotion })), aLane, dLane, D.side);
-    const defHooks = shiftFx(_fxHooks(D.side), dLane, dLane, D.side);
+    const attHooks = shiftFx(_fxHooks(A.side, _impactContact({ ...hooks, onMotion: dataFieldMotion })), aLane, dLane, D.side, aDz, dDz);
+    const defHooks = shiftFx(_fxHooks(D.side), dLane, dLane, D.side, dDz, dDz);
     return coordinator.attack(A.anim8r, D.anim8r, techId, attHooks, { lethal, miss, defenderHooks: defHooks });
   }
 
@@ -3558,7 +4040,7 @@ export function createBattle3D(canvas, sfx = null) {
       const a = f.anim8r;
       const home = a.homeSlot || arenaSlot(null, f.side);
       const mv = a.moveDelta();
-      const pos = ps1ToRender([home.x + mv[0] + f.dx + f.lat, home.y + mv[1], home.z + mv[2]], ARENA);
+      const pos = ps1ToRender([home.x + mv[0] + f.dx + f.lat, home.y + mv[1], home.z + mv[2] + (f.dz || 0) + f.latz], ARENA);
       pos[1] += Math.sin(animTime * 3 + f.phase) * 2;
       const yaw = f.side === "player" ? -(((a.rotation?.()[1] || 0) - (a.rotationBase || 0)) * Math.PI * 2 / 4096) : Math.PI;
       const sample = a.isActive ? a.renderSample(alpha) : null;
@@ -3566,6 +4048,9 @@ export function createBattle3D(canvas, sfx = null) {
       const bwm = buildBoneWorldMatrices(f.model, f.frame, sample ? sample.blend : null, a.currentHiddenParts?.());
       f.pos = pos;
       f.aabb = _updateSkeletalVBOGL(gl, f.model, f.bufs, bwm, pos, MODEL_SCALE, false, yaw);
+      if (f.born == null) f.born = animTime;
+      if (f.aabb && animTime - f.born < MULTI_MEASURE_S && !coordinator.active)       // its own width, while it idles
+      { f.restW = Math.max(f.restW, (f.aabb.max[0] - f.aabb.min[0]) / ARENA); f.restH = Math.max(f.restH || 0, f.aabb.max[1] - f.aabb.min[1]); }
     }
   }
   function _drawExtras(pv) {
@@ -3595,7 +4080,14 @@ export function createBattle3D(canvas, sfx = null) {
     const avg = (list) => list.length ? [list.reduce((s, f) => s + f.pos[0], 0) / list.length, list.reduce((s, f) => s + f.pos[2], 0) / list.length] : null;
     const nc = avg(near) ?? avg(far), fc = avg(far) ?? avg(near);
     let minX = Infinity, maxX = -Infinity, tall = 60;
-    for (const f of fs) { minX = Math.min(minX, f.aabb.min[0]); maxX = Math.max(maxX, f.aabb.max[0]); tall = Math.max(tall, f.aabb.max[1] - f.aabb.min[1]); }
+    // framed by each fighter's RESTING size (restW / restH, measured while it idles), not this frame's pose box: the box
+    // breathes with the idle animation and the whole shot (ground, sky, moon) bobbed with it (2v2 idle: eye height
+    // wobbled 16 units in 10 s). A fighter not measured yet uses its live box.
+    for (const f of fs) {
+      const hw = f.restW ? f.restW * MODEL_SCALE / 2 : null;   // restW is stored / ARENA (= MODEL_SCALE)
+      minX = Math.min(minX, hw != null ? f.pos[0] - hw : f.aabb.min[0]); maxX = Math.max(maxX, hw != null ? f.pos[0] + hw : f.aabb.max[0]);
+      tall = Math.max(tall, f.restH || f.aabb.max[1] - f.aabb.min[1]);
+    }
     let dir = [fc[0] - nc[0], fc[1] - nc[1]];
     const dl = Math.hypot(dir[0], dir[1]);
     dir = dl > 1 ? [dir[0] / dl, dir[1] / dl] : [0, 1];
@@ -3609,6 +4101,677 @@ export function createBattle3D(canvas, sfx = null) {
     const look = [(nc[0] + fc[0]) / 2, tall * 0.3, (nc[1] + fc[1]) / 2];
     return { eye, look, fov: Math.PI / 3.6 };
   }
+
+  // F2 -> Screen -> "Smart 2 vs 2 camera" (off by default; the many-vs-many fight only). The wide shot above is a fixed
+  // rule that does not know the arena, so a rock face can fill the screen between it and the Digimon. The Digimon are
+  // always painted OVER the arena (it is a background layer, its depth is cleared), so rock never hides them: what goes
+  // wrong is rock that stands in front of them painted across the shot and behind their bodies. This tries camera spots
+  // around the same look point (turned left/right, higher, nearer/further) and scores each by what the arena draw would
+  // paint, measured from the arena's own triangles on a 100 x 36 screen grid: only the faces the arena draw keeps
+  // (front-facing by the same NCLIP rule as arenaCullIndices, a quad by its first triangle), only faces that rise above
+  // the fighters' feet and are nearer than the nearest fighter. Numbers: the share of the screen that near rock covers,
+  // the share of the fighters' screen boxes it covers, and the fighters' box corners off screen. A small cost for
+  // moving away from the original shot keeps it when nothing is in the way. Chosen while nobody is acting (no jumps
+  // mid-attack), at most once a second, and eased toward the pick.
+  const SMART_YAW = [0, -15, 15, -30, 30, -45, 45, -60, 60, -75, 75, -90, 90], SMART_H = [1, 1.35, 1.75, 0.8], SMART_D = [1, 1.2, 0.85, 1.45];
+  let smartPick = null, smartAt = -1e9, smartKey = "", smartLastClock = 0, smartInfo = null;
+  const smartCur = { yaw: 0, h: 1, d: 1 };
+  function _smartApply(base, p) {
+    const v = [base.eye[0] - base.look[0], base.eye[1] - base.look[1], base.eye[2] - base.look[2]];
+    const a = p.yaw * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return { eye: [base.look[0] + (v[0] * c - v[2] * s) * p.d, base.look[1] + v[1] * p.h * p.d, base.look[2] + (v[0] * s + v[2] * c) * p.d], look: base.look, fov: base.fov };
+  }
+  // one camera spot's numbers (all 0..1)
+  function _smartScore(groups, scale, cam, fs, aspect) {
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2], 0, fwd[0]]);
+    const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
+    const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * scale;
+    const scr = (p) => { const d = sub(p, cam.eye), z = dot(d, fwd); return z > 1 ? [(dot(d, right) / (z * t * aspect) * 0.5 + 0.5) * GW, (0.5 - dot(d, up) / (z * t) * 0.5) * GH, z] : null; };
+    let near = Infinity, feet = Infinity, off = 0, corners = 0;
+    const boxes = new Uint8Array(GW * GH);
+    for (const f of fs) {
+      const b = f.aabb;
+      near = Math.min(near, dot(sub([(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2], cam.eye), fwd));
+      feet = Math.min(feet, b.min[1]);
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const x of [b.min[0], b.max[0]]) for (const y of [b.min[1], b.max[1]]) for (const z of [b.min[2], b.max[2]]) {
+        const q = scr([x, y, z]); corners++;
+        if (!q) { off++; continue; }
+        if (q[0] < 0.025 * GW || q[0] > 0.975 * GW || q[1] < 0.025 * GH || q[1] > 0.975 * GH) off++;
+        x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]);
+      }
+      for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(GH - 1, Math.ceil(y1) - 1); y++)
+        for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(GW - 1, Math.ceil(x1) - 1); x++) boxes[y * GW + x] = 1;
+    }
+    const hit = new Uint8Array(GW * GH), xs = [0, 0, 0], ys = [0, 0, 0];
+    for (const g of groups) {
+      const pos = g.pos, ref = g.cullRef; if (!pos) continue;
+      const front = new Map();
+      const proj3 = (tri) => { const out = []; for (let v = 0; v < 3; v++) { const q = scr([pos[tri * 9 + v * 3] * k, -pos[tri * 9 + v * 3 + 1] * k, -pos[tri * 9 + v * 3 + 2] * k]); if (!q) return null; out.push(q); } return out; };
+      tri: for (let ti = 0, nt = (pos.length / 9) | 0; ti < nt; ti++) {
+        const rt = ref ? ref[ti] : ti;
+        let fr = front.get(rt);
+        if (fr === undefined) {
+          const q = proj3(rt);       // NCLIP in screen space, Y down: drawn when > 0 (arenaCullIndices)
+          fr = !!q && (q[0][0] * (q[1][1] - q[2][1]) + q[1][0] * (q[2][1] - q[0][1]) + q[2][0] * (q[0][1] - q[1][1])) > 0;
+          front.set(rt, fr);
+        }
+        if (!fr) continue;
+        let top = -Infinity, anyNear = false;
+        for (let v = 0; v < 3; v++) {
+          const p = [pos[ti * 9 + v * 3] * k, -pos[ti * 9 + v * 3 + 1] * k, -pos[ti * 9 + v * 3 + 2] * k];
+          top = Math.max(top, p[1]);
+          const q = scr(p); if (!q) continue tri;
+          if (q[2] < near * 0.9) anyNear = true;
+          xs[v] = q[0]; ys[v] = q[1];
+        }
+        if (!anyNear || top < feet + 40) continue;
+        const area = (xs[1] - xs[0]) * (ys[2] - ys[0]) - (xs[2] - xs[0]) * (ys[1] - ys[0]);
+        if (!area) continue;
+        const x0 = Math.max(0, Math.floor(Math.min(...xs))), x1 = Math.min(GW - 1, Math.ceil(Math.max(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(GH - 1, Math.ceil(Math.max(...ys)));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const px = x + 0.5, py = y + 0.5;
+          const a = ((xs[1] - px) * (ys[2] - py) - (xs[2] - px) * (ys[1] - py)) / area;
+          const b = ((xs[2] - px) * (ys[0] - py) - (xs[0] - px) * (ys[2] - py)) / area;
+          if (a >= 0 && b >= 0 && a + b <= 1) hit[y * GW + x] = 1;
+        }
+      }
+    }
+    let n = 0, nb = 0, nbh = 0;
+    for (let i = 0; i < hit.length; i++) { n += hit[i]; if (boxes[i]) { nb++; nbh += hit[i]; } }
+    return { cover: n / hit.length, onFighters: nb ? nbh / nb : 0, offscreen: off / Math.max(1, corners) };
+  }
+  function _smartTotal(m, p) {
+    return 8 * m.onFighters + 4 * m.cover + 6 * m.offscreen
+      + 0.004 * Math.abs(p.yaw) + 0.5 * Math.abs(Math.log(p.h)) + 0.6 * Math.abs(Math.log(p.d));
+  }
+  // all candidate spots in order; the original shot first
+  const SMART_CANDS = []; for (const yaw of SMART_YAW) for (const h of SMART_H) for (const d of SMART_D) SMART_CANDS.push({ yaw, h, d });
+  let smartJob = null;
+  // scores `n` more candidates of a job; returns true when the job is finished
+  function _smartStep(job, n) {
+    const t0 = performance.now();
+    for (; n > 0 && job.i < SMART_CANDS.length; n--, job.i++) {
+      const p = SMART_CANDS[job.i], m = _smartScore(job.groups, job.scale, _smartApply(job.base, p), job.fs, job.aspect), s = _smartTotal(m, p);
+      if (!job.def) job.def = { p, m, s };
+      if (!job.best || s < job.best.s) job.best = { p, m, s };
+    }
+    job.ms += performance.now() - t0;
+    return job.i >= SMART_CANDS.length;
+  }
+  function _smartJob(base, fs, pk = activeArena, scale = arenaScale) {
+    const groups = pk?.groups; if (!groups?.length) return null;
+    return { base, fs, groups, scale, aspect: canvas.width / Math.max(1, canvas.height), name: pk.name, i: 0, ms: 0, def: null, best: null };
+  }
+  const _smartResult = (job) => ({ arena: job.name, arenaScale: job.scale, ms: job.ms, original: job.def, pick: job.best });
+  function _smartCameraShot() {
+    const base = _multiCameraShot(); if (!base) return null;
+    const fs = [...extras.values()].filter((f) => f.model && f.visible && f.aabb);
+    const key = `${activeArena?.name}|${arenaScale.toFixed(2)}|` + fs.map((f) => `${Math.round(f.pos[0] / 150)},${Math.round(f.pos[2] / 150)}`).join(";");
+    // a new pick is worked out over several frames (12 spots a frame, a few ms), only while nobody is acting
+    if (!smartJob && !coordinator.active && activeArena?.groups && (orbitClock - smartAt > 1 || !smartPick) && key !== smartKey) {
+      smartJob = _smartJob(base, fs); smartKey = key;
+    }
+    if (smartJob && _smartStep(smartJob, 12)) {
+      smartInfo = _smartResult(smartJob); smartPick = smartJob.best.p; smartAt = orbitClock; smartJob = null;
+    }
+    const dt = Math.min(0.25, Math.max(0, orbitClock - smartLastClock)); smartLastClock = orbitClock;
+    const p = smartPick || { yaw: 0, h: 1, d: 1 }, k = 1 - Math.exp(-dt * 2.5);
+    smartCur.yaw += (p.yaw - smartCur.yaw) * k; smartCur.h += (p.h - smartCur.h) * k; smartCur.d += (p.d - smartCur.d) * k;
+    return _smartApply(base, smartCur);
+  }
+  /** (checks) the smart camera's numbers: the last pick in the live fight, or a fresh pick for arena pack `name`
+   *  at `scale` (default: the scale that pack would get) with the current fighters; null while the pack loads. */
+  function probeSmartCam(name, want = arenaScale, scale = null) {
+    if (!name) return smartInfo;
+    const pk = loadArenaPack(name); if (!pk?.groups) return null;
+    const base = _multiCameraShot(), fs = [...extras.values()].filter((f) => f.model && f.visible && f.aabb);
+    if (!base || !fs.length) return null;
+    const job = _smartJob(base, fs, pk, scale ?? _arenaScaleClear(want, pk));
+    _smartStep(job, SMART_CANDS.length);
+    return _smartResult(job);
+  }
+
+
+  // F2 -> Atmosphere -> "Battle sky & weather" (off by default). The fight follows the place it started from: the
+  // overworld's time of day (its own multiply colour, scenery.js todColor) or the game's own night map, and that map's
+  // weather (rain, snow / blizzard, sand, foggy places) as the ambience layer last measured it (window.__battleAtmos,
+  // set by ambience.js; absent in the labs, so they never change). Night and storms grade the arena and the Digimon in
+  // the shader (uGradeSub), distance fog by view depth (uFogCol/uFogP); snow, rain and sand fall as 3D particles in a box
+  // in front of the camera, behind the Digimon where they are further away. Storms flash. Technique effects are drawn
+  // after the uniforms are reset, so they keep the game's own colours.
+  const ATM_HAZE_DAY = [0.72, 0.80, 0.92], ATM_HAZE_NIGHT = [0.07, 0.09, 0.18];
+  const ATM_SNOW = [0.86, 0.89, 0.95], ATM_RAIN = [0.40, 0.45, 0.52], ATM_SAND = [0.78, 0.62, 0.42];
+  let atmFlash = 0, atmNextBolt = 0, atmThunderAt = 0, atmLastT = 0, atmParts = null, atmColBuf = null, atmColProg = null;
+  function _atmosFrame(eye, look) {
+    if (!window.__fx?.battleatmos) return null;
+    const a = window.__battleAtmos?.();
+    if (!a) return null;
+    const L = a.L || {};
+    const rain = Math.min(1, L.rain || 0), snow = Math.min(1, (L.snow || 0) + (L.blizzard || 0)), sand = Math.min(1, L.sand || 0);
+    const tint = a.tod && a.rgb ? a.rgb.map((v) => v / 255) : a.nightMap ? [0.55, 0.55, 0.8] : [1, 1, 1];
+    const mult = tint.map((v) => v * (1 - 0.2 * rain));
+    const night = Math.max(0, Math.min(1, (1 - (mult[0] + mult[1] + mult[2]) / 3) * 2.2));
+    const haze = ATM_HAZE_DAY.map((v, i) => v + (ATM_HAZE_NIGHT[i] - v) * night);
+    const wsum = snow + rain + sand, dim = 1 - night * 0.75;
+    const fogCol = wsum > 0
+      ? haze.map((v, i) => { const w = (ATM_SNOW[i] * snow + ATM_RAIN[i] * rain + ATM_SAND[i] * sand) / wsum * dim; const k = Math.min(1, wsum); return v + (w - v) * k; })
+      : haze;
+    const fogMax = Math.min(0.85, 0.18 + 0.45 * snow + 0.35 * rain + 0.55 * sand + (a.foggy ? 0.35 : 0));
+    const camDist = Math.hypot(eye[0] - look[0], eye[1] - look[1], eye[2] - look[2]) || 1;
+    const start = camDist * 1.15 / 1000, end = camDist * 5 / 1000;
+    // a storm's lightning: a short white flash, the thunder a moment later
+    const now = performance.now() / 1000;
+    const dt = Math.min(0.05, atmLastT ? now - atmLastT : 0); atmLastT = now;
+    if (rain > 0.5) {
+      if (!atmNextBolt) atmNextBolt = now + 4 + Math.random() * 8;
+      if (now > atmNextBolt) { atmFlash = 1; atmThunderAt = now + 0.4 + Math.random() * 0.8; atmNextBolt = now + 6 + Math.random() * 10; }
+    }
+    if (atmThunderAt && now > atmThunderAt) { atmThunderAt = 0; try { a.thunder?.(); } catch { } }
+    atmFlash = Math.max(0, atmFlash - dt * 5);
+    const flash = atmFlash > 0 ? 0.9 * atmFlash * (0.6 + 0.4 * Math.sin(now * 90)) : 0;
+    return { rain, snow, sand, night, dt, camDist,
+      gradeSub: mult.map((v) => 1 - v - flash), fogCol, fogP: [start, 1 / Math.max(1e-3, end - start), fogMax] };
+  }
+  // Arenas whose floor water gets waves: measured (tools/measure_arena_sky_water.py, water-coloured share of the floor)
+  // AND named so by the maps that use them (manifest byStage). meft1027 Suzaku / Zhu Que UG Lake 97%, meft1002 Shell
+  // Beach / the capes 6% (the sea strip). Left out: meft1011 Seabed 78% (a sea floor under water, no surface),
+  // meft1009 / 1012 / 1020 (blue-grey stone and metal, 14-28%), meft1023 / 1029 (no map known to use them yet).
+  const ARENA_WATER = new Set(["meft1027", "meft1002"]);
+  const ATM_HORIZON = 600, ATM_GROUND = 300;      // pack units, as the measuring tool
+  let atmMoon = null;                              // { arena, dir }: set once per fight, so the moon stays put in the world
+  function _atmosArena(atm, world, eye, look, fov, aspect, scale) {
+    gl.useProgram(texP.program);
+    if (!atm) {
+      gl.uniformMatrix4fv(texP.uSkyM, false, new Float32Array(16));
+      gl.uniform4fv(texP.uSky, [0, 0, 0, 0]); gl.uniform2fv(texP.uWater, [0, 0]);
+      return;
+    }
+    // the moon: a direction picked once per arena, from the arena itself (_atmosMoonPick), after the shot has settled
+    const panP = _panoActive(), arenaName = activeArena?.name + (panP ? "|" + panP.id : "");   // a panorama changes where sky is
+    if (atmMoon?.arena !== arenaName) { atmMoon = { arena: arenaName, dir: null, since: performance.now(), pending: false }; }
+    if (!atmMoon.dir && !atmMoon.pending && atm.night > 0.3 && performance.now() - atmMoon.since > 1500) {
+      atmMoon.pending = true;
+      const want = atmMoon;
+      _atmosMoonPick(activeArena, eye.slice(), look.slice(), fov, aspect, scale, panP).then((r) => { if (atmMoon === want) { want.dir = r?.dir || null; want.pick = r; } });
+    }
+    const k = MODEL_SCALE * scale / 1000, nightK = Math.max(0, Math.min(1, (atm.night - 0.35) / 0.4));
+    gl.uniformMatrix4fv(texP.uSkyM, false, world);
+    gl.uniform3fv(texP.uEye, eye.map((v) => v / 1000));
+    gl.uniform3fv(texP.uMoonDir, atmMoon.dir || [0, 1, 0]);
+    const clear = 1 - Math.min(1, atm.rain + atm.snow + atm.sand);   // nothing shows through a storm
+    gl.uniform4fv(texP.uSky, [ATM_HORIZON * k, nightK * clear, atmMoon.dir ? nightK * clear : 0, performance.now() / 1000 % 3600]);
+    gl.uniform2fv(texP.uWater, _atmosWaterU(atm, scale));
+  }
+  function _atmosWaterU(atm, scale) { return [ARENA_WATER.has(activeArena?.name) ? 1 - 0.6 * atm.night : 0, ATM_GROUND * MODEL_SCALE * scale / 1000]; }
+  // Where the moon can be seen: directions over the upper part of this shot (9 x 7 screen points); a ray from the eye
+  // along each one (and 4 more at the moon's own edge) must first hit an arena triangle above the horizon whose texel is
+  // sky-blue by the shader's own rule. Of those, the one nearest a little right of centre, two thirds up. None: no moon.
+  async function _atmosMoonPick(pk, eye, look, fov, aspect, scale, pan = null) {
+    const groups = pk?.groups; if (!groups?.length) return null;
+    const pages = new Map();
+    for (const g of groups) {
+      const col = g.clut ? g.clut[0] : 0, row = g.clut ? g.clut[1] : 255, key = `${g.page || "wall"}_c${col}_r${row}`;
+      if (!pages.has(key)) pages.set(key, await loadTexturePixels(`assets/battle/arenas/${pk.name}/${key}.png`));
+      g._px = pages.get(key);
+    }
+    const k = MODEL_SCALE * scale, horizon = ATM_HORIZON * k;
+    const hitSky = (d) => {
+      let best = null;
+      for (const g of pan ? [] : groups) {      // a panorama replaces the arena: only the painted sky counts
+        const pos = g.pos, uv = g.uv; if (!pos || !uv || !g._px) continue;
+        for (let t = 0, nt = (pos.length / 9) | 0; t < nt; t++) {
+          const b = t * 9;
+          const p0 = [pos[b] * k, -pos[b + 1] * k, -pos[b + 2] * k], p1 = [pos[b + 3] * k, -pos[b + 4] * k, -pos[b + 5] * k], p2 = [pos[b + 6] * k, -pos[b + 7] * k, -pos[b + 8] * k];
+          const e1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]], e2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+          const q = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+          const det = e1[0] * q[0] + e1[1] * q[1] + e1[2] * q[2]; if (Math.abs(det) < 1e-9) continue;
+          const tv = [eye[0] - p0[0], eye[1] - p0[1], eye[2] - p0[2]], u = (tv[0] * q[0] + tv[1] * q[1] + tv[2] * q[2]) / det; if (u < 0 || u > 1) continue;
+          const r = [tv[1] * e1[2] - tv[2] * e1[1], tv[2] * e1[0] - tv[0] * e1[2], tv[0] * e1[1] - tv[1] * e1[0]];
+          const v = (d[0] * r[0] + d[1] * r[1] + d[2] * r[2]) / det; if (v < 0 || u + v > 1) continue;
+          const dist = (e2[0] * r[0] + e2[1] * r[1] + e2[2] * r[2]) / det; if (dist <= 0 || (best && dist >= best.dist)) continue;
+          const w = 1 - u - v, ub = (t * 6);
+          best = { dist, g, y: eye[1] + d[1] * dist, u: w * uv[ub] + u * uv[ub + 2] + v * uv[ub + 4], v: w * uv[ub + 1] + u * uv[ub + 3] + v * uv[ub + 5] };
+        }
+      }
+      let tx;
+      if (best) { if (best.y <= horizon) return false; tx = { px: best.g._px, u: best.u, v: best.v }; }
+      else if (pan) tx = _panoTexel(pan, eye, d);
+      if (!tx) return false;
+      const px = tx.px, x = Math.min(px.width - 1, Math.max(0, Math.floor(tx.u * px.width))), y = Math.min(px.height - 1, Math.max(0, Math.floor(tx.v * px.height)));
+      const i = (y * px.width + x) * 4, R = px.data[i] / 255, G = px.data[i + 1] / 255, B = px.data[i + 2] / 255;
+      const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+      return px.data[i + 3] >= 13 && mx > 0.3 && (mx - mn) / mx > 0.15 && B > R + 0.06 && B >= G;
+    };
+    const f = [look[0] - eye[0], look[1] - eye[1], look[2] - eye[2]], fl = Math.hypot(...f), fw = f.map((v) => v / fl);
+    const rt = [-fw[2], 0, fw[0]], rl = Math.hypot(rt[0], rt[2]) || 1; rt[0] /= rl; rt[2] /= rl;
+    const up = [rt[1] * fw[2] - rt[2] * fw[1], rt[2] * fw[0] - rt[0] * fw[2], rt[0] * fw[1] - rt[1] * fw[0]];
+    const tv = Math.tan(fov / 2), th = tv * aspect;
+    const dirAt = (sx, sy) => { const d = fw.map((v, i) => v + rt[i] * sx * th + up[i] * sy * tv), l = Math.hypot(...d); return d.map((v) => v / l); };
+    const cands = [];
+    for (let ix = -4; ix <= 4; ix++) for (let iy = 1; iy <= 7; iy++) cands.push([ix * 0.2, iy * 0.12]);
+    cands.sort((a, b) => (Math.abs(a[0] - 0.35) + Math.abs(a[1] - 0.6)) - (Math.abs(b[0] - 0.35) + Math.abs(b[1] - 0.6)));
+    const edge = 0.03;                                   // the halo's reach (rad), so the whole moon sits on sky
+    for (const [sx, sy] of cands) {
+      const d = dirAt(sx, sy);
+      const ok = hitSky(d) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, b]) => {
+        const e = d.map((v, i) => v + (rt[i] * a + up[i] * b) * edge), l = Math.hypot(...e); return hitSky(e.map((v) => v / l));
+      });
+      if (ok) return { dir: d, screen: [sx, sy] };
+    }
+    return { dir: null, tried: cands.length };
+  }
+  function _atmosUniforms(atm) {
+    gl.useProgram(texP.program);
+    gl.uniform3fv(texP.uGradeSub, atm ? atm.gradeSub : [0, 0, 0]);
+    gl.uniform3fv(texP.uFogCol, atm ? atm.fogCol : [0, 0, 0]);
+    gl.uniform3fv(texP.uFogP, atm ? atm.fogP : [0, 0, 0]);
+  }
+  // snow / rain / sand: particles in a box in front of the camera, wrapped so the box is always full
+  function _drawWeather(pv, atm, eye, look) {
+    const want = Math.round(900 * atm.snow + 800 * atm.rain + 700 * atm.sand);
+    if (!want) return;
+    if (!atmColProg) {
+      const p = createProgram(gl, VERT_COL_SRC, FRAG_COL_SRC);
+      atmColProg = { program: p, aPos: gl.getAttribLocation(p, "aPos"), aColor: gl.getAttribLocation(p, "aColor"), uMVP: gl.getUniformLocation(p, "uMVP") };
+      atmColBuf = gl.createBuffer();
+    }
+    const D = atm.camDist, box = [D * 1.6, D * 0.9, D * 1.6];
+    const fwd = [look[0] - eye[0], look[1] - eye[1], look[2] - eye[2]].map((v) => v / D);
+    const c = [eye[0] + fwd[0] * D * 0.75, look[1] + D * 0.2, eye[2] + fwd[2] * D * 0.75];
+    if (!atmParts || atmParts.length !== want) {
+      atmParts = [];
+      for (let i = 0; i < want; i++) {
+        const kind = i < 900 * atm.snow ? 0 : i < 900 * atm.snow + 800 * atm.rain ? 1 : 2;
+        atmParts.push({ kind, p: [Math.random(), Math.random(), Math.random()], ph: Math.random() * 6.28, s: 0.6 + Math.random() * 0.8 });
+      }
+    }
+    const t = performance.now() / 1000, dt = atm.dt;
+    const right = [-fwd[2], 0, fwd[0]], rl = Math.hypot(right[0], right[2]) || 1; right[0] /= rl; right[2] /= rl;
+    const v = new Float32Array(atmParts.length * 6 * 7);
+    let o = 0;
+    const put = (x, y, z, col) => { v[o++] = x; v[o++] = y; v[o++] = z; v[o++] = col[0]; v[o++] = col[1]; v[o++] = col[2]; v[o++] = col[3]; };
+    const dark = 1 - atm.night * 0.6;
+    for (const q of atmParts) {
+      // fall speed / wind as a share of the box per second
+      const fall = q.kind === 0 ? 0.12 * q.s : q.kind === 1 ? 1.6 * q.s : 0.05;
+      const side = q.kind === 0 ? 0.03 * Math.sin(t * 0.8 + q.ph) : q.kind === 1 ? 0.08 : 0.9 * q.s;
+      q.p[1] = (q.p[1] - fall * dt + 1) % 1; q.p[0] = (q.p[0] + side * dt + 1) % 1;
+      if (q.kind === 2) q.p[1] = (q.p[1] + 0.02 * Math.sin(t * 2 + q.ph) * dt + 1) % 1;
+      const x = c[0] + (q.p[0] - 0.5) * box[0], y = c[1] + (q.p[1] - 0.5) * box[1], z = c[2] + (q.p[2] - 0.5) * box[2];
+      let w, h, col;
+      if (q.kind === 0) { w = h = D * 0.0045 * q.s; col = [dark, dark, dark * 1.02, 0.85]; }
+      else if (q.kind === 1) { w = D * 0.0012; h = D * 0.05 * q.s; col = [0.75 * dark, 0.8 * dark, 0.9 * dark, 0.35]; }
+      else { w = D * 0.012 * q.s; h = D * 0.0015; col = [0.85 * dark, 0.7 * dark, 0.5 * dark, 0.4]; }
+      // a quad facing the camera: `right` across, world up along (rain slants a little with the wind)
+      const rx = right[0] * w, rz = right[2] * w, ux = q.kind === 1 ? right[0] * h * 0.08 : 0, uz = q.kind === 1 ? right[2] * h * 0.08 : 0;
+      put(x - rx, y, z - rz, col); put(x + rx, y, z + rz, col); put(x + rx + ux, y + h, z + rz + uz, col);
+      put(x - rx, y, z - rz, col); put(x + rx + ux, y + h, z + rz + uz, col); put(x - rx + ux, y + h, z - rz + uz, col);
+    }
+    gl.useProgram(atmColProg.program);
+    gl.uniformMatrix4fv(atmColProg.uMVP, false, pv);
+    gl.bindBuffer(gl.ARRAY_BUFFER, atmColBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, v, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(atmColProg.aPos);
+    gl.vertexAttribPointer(atmColProg.aPos, 3, gl.FLOAT, false, 28, 0);
+    gl.enableVertexAttribArray(atmColProg.aColor);
+    gl.vertexAttribPointer(atmColProg.aColor, 4, gl.FLOAT, false, 28, 12);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.drawArrays(gl.TRIANGLES, 0, o / 7);
+    gl.depthMask(true);
+    gl.disableVertexAttribArray(atmColProg.aColor);
+  }
+  /** (checks) this frame's battle atmosphere numbers, or null when off / not available. */
+  function getAtmosphere() { return lastAtm && { ...lastAtm, particles: atmParts ? atmParts.length : 0, moonDir: atmMoon?.dir, moonPick: atmMoon?.pick, water: ARENA_WATER.has(activeArena?.name), arena: activeArena?.name }; }
+  let lastAtm = null;
+
+  // F2 -> Screen -> "Painted 360 battle backdrops" (off by default; HD Remaster only). The fight's whole place is
+  // painted: the disc arena is not drawn at all.
+  //  * far: an equirectangular picture of the map the fight started from (assets-hd/battle/panoramas/s<map>.png,
+  //    git-ignored, painted by hand, 4x by tools/upscale_assets.py) on a sphere that moves with the camera, so the
+  //    picture is never bent (a picture has no depth: laying its lower half on the floor smeared every cliff and wave
+  //    into streaks). u = 0.5 looks along -Z (toward the enemy side), horizon at v = 0.5.
+  //  * near: a real flat ground at the Digimon's feet (y = 0, +-4 measured) with its own tiling texture
+  //    (s<map>_ground.png, 512 px, PANO_TILE units a tile), fading out between PANO_FADE[0] and [1] from the arena centre
+  //    so the picture shows beyond it. Measured in the s340 fights: fighters ~2000 out, the camera up to 4260 out.
+  const PANO_IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  const PANO_R = 50000, PANO_GR = 9000, PANO_FADE = [4500, 9000], PANO_TILE = 800;
+  let pano = null;                                 // { id, tex, px, ground, missing }
+  let panoDome = null, panoDisk = null, panoGroundProg = null;
+  const panoLog = { id: null, loaded: false, missing: false, ground: false, drawn: 0 };
+  function _panoTex(px, repeat) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, px.width, px.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(px.data.buffer, px.data.byteOffset, px.data.length));
+    if (repeat) gl.generateMipmap(gl.TEXTURE_2D);   // 512 x 512: a power of two, so it may repeat and mipmap
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, repeat ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    return tex;
+  }
+  function _panoActive() {
+    if (!window.__fx?.battlepano || assetMode() !== "hd" || arenaStageReq?.mapId == null) return null;
+    // The map's own painting (s<map>.png) if there is one, else the painting of the arena it fights in (meft10xx.png),
+    // shared by every map that uses that arena. key = map + arena; id = the file actually used.
+    const mapId = "s" + String(arenaStageReq.mapId).replace(/^s/, ""), key = mapId + "|" + (activeArena?.name ?? "");
+    if (pano?.key !== key) {
+      const me = pano = { key, id: mapId, tex: null, px: null, ground: null, mesh: null, missing: false };
+      const tries = [mapId, activeArena?.name].filter(Boolean);
+      const load = (id) => {
+        loadTexturePixels(`assets-hd/battle/panoramas/${id}.png`).then((px) => {
+          if (pano !== me) return;
+          if (!px || px.width > gl.getParameter(gl.MAX_TEXTURE_SIZE)) { if (tries.length) load(tries.shift()); else me.missing = true; return; }
+          me.id = id; me.px = px; me.tex = _panoTex(px, false);
+          fetch(`assets-hd/battle/panoramas/${id}_paint.json`).then((r) => (r.ok ? r.json() : null)).then((meta) => {
+            if (pano !== me || !meta) return;
+            loadTexturePixels(`assets-hd/battle/panoramas/${id}_floor.png`).then((f) => {
+              if (pano === me && f && f.width <= gl.getParameter(gl.MAX_TEXTURE_SIZE)) { me.paint = { meta, floor: _panoTex(f, (f.width & (f.width - 1)) === 0 && f.width === f.height) }; me.mesh = null; }
+            });
+          }).catch(() => {});
+          loadTexturePixels(`assets-hd/battle/panoramas/${id}_ground.png`).then((g) => {
+            const pow2 = (n) => n > 0 && (n & (n - 1)) === 0;
+            if (pano === me && g && pow2(g.width) && pow2(g.height)) me.ground = _panoTex(g, true);
+          });
+          const base = `assets-hd/battle/panoramas/${id}_depth`;
+          Promise.all([fetch(base + ".json").then((r) => (r.ok ? r.json() : null)), fetch(base + ".bin").then((r) => (r.ok ? r.arrayBuffer() : null))])
+            .then(([meta, buf]) => { if (pano === me && !me.paint && meta && buf && buf.byteLength === meta.cols * meta.rows * 4) me.mesh = _panoMeshBuild(meta, new Float32Array(buf)); })
+            .catch(() => {});
+        });
+      };
+      load(tries.shift());
+    }
+    return pano.tex ? pano : null;
+  }
+  // The painted ARENA (<id>_paint.json + <id>_floor.png, tools/capture_arena_360.mjs + capture_arena_floor.mjs, each
+  // repainted by Gemini): the game's own arena triangles, same cull, same size, but coloured from the paintings. Floor
+  // triangles (level, below meta.floorCap, inside the floor square) take the straight-down floor picture by (x, z): top
+  // = -Z, right = +X. Every other triangle takes the 360 by its direction from the capture eye meta.eye (render units),
+  // u 0.5 = -Z, horizon at v 0.5. Why: one 360 from the middle gave the floor near the camera (10 m out) only 12 px per
+  // 100 units before Gemini cut it 4x; the user saw it smeared.
+  let panoPaintProg = null;
+  function _paintFloorMask(g) {
+    if (g.paintFloor) return g.paintFloor;
+    const P = g.pos, nt = (P.length / 9) | 0, m = new Uint8Array(nt), k = MODEL_SCALE, cap = pano.paint.meta.floorCap, half = pano.paint.meta.floorHalf;
+    for (let t = 0; t < nt; t++) {
+      const v = [0, 1, 2].map((i) => [P[t * 9 + i * 3] * k, -P[t * 9 + i * 3 + 1] * k, -P[t * 9 + i * 3 + 2] * k]);
+      const e1 = [v[1][0] - v[0][0], v[1][1] - v[0][1], v[1][2] - v[0][2]], e2 = [v[2][0] - v[0][0], v[2][1] - v[0][1], v[2][2] - v[0][2]];
+      const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], nl = Math.hypot(...n) || 1;
+      const cx = (v[0][0] + v[1][0] + v[2][0]) / 3, cz = (v[0][2] + v[1][2] + v[2][2]) / 3;
+      m[t] = Math.abs(n[1] / nl) > 0.9 && v.every((q) => q[1] < cap) && Math.abs(cx) < half && Math.abs(cz) < half ? 1 : 0;
+    }
+    return (g.paintFloor = m);
+  }
+  function _drawArenaPaint(p, mvp, world, atm) {
+    if (!panoPaintProg) {
+      const pr = createProgram(gl, `
+attribute vec3 aPos;
+uniform mat4 uMVP;
+uniform mat4 uWorld;
+varying vec3 vW;
+void main() { gl_Position = uMVP * vec4(aPos, 1.0); vW = (uWorld * vec4(aPos, 1.0)).xyz; }`, `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform sampler2D uPano;
+uniform sampler2D uFloor;
+uniform vec3 uEye;
+uniform float uHalf;
+uniform float uMode;
+uniform vec3 uGradeSub;
+varying vec3 vW;
+void main() {
+  vec4 c;
+  if (uMode > 0.5) c = texture2D(uFloor, (vW.xz / uHalf + 1.0) * 0.5);
+  else {
+    vec3 d = normalize(vW - uEye);
+    c = texture2D(uPano, vec2(0.5 + atan(d.x, -d.z) / 6.2831853, 0.5 - asin(clamp(d.y, -1.0, 1.0)) / 3.1415927));
+  }
+  c.rgb *= vec3(1.0) - uGradeSub;
+  gl_FragColor = vec4(c.rgb, 1.0);
+}`);
+      panoPaintProg = { program: pr, aPos: gl.getAttribLocation(pr, "aPos"), uMVP: gl.getUniformLocation(pr, "uMVP"), uWorld: gl.getUniformLocation(pr, "uWorld"),
+        uPano: gl.getUniformLocation(pr, "uPano"), uFloor: gl.getUniformLocation(pr, "uFloor"), uEye: gl.getUniformLocation(pr, "uEye"),
+        uHalf: gl.getUniformLocation(pr, "uHalf"), uMode: gl.getUniformLocation(pr, "uMode"), uGradeSub: gl.getUniformLocation(pr, "uGradeSub") };
+    }
+    const g0 = panoPaintProg, meta = p.paint.meta;
+    gl.useProgram(g0.program);
+    gl.uniformMatrix4fv(g0.uMVP, false, mvp); gl.uniformMatrix4fv(g0.uWorld, false, world);
+    gl.uniform3fv(g0.uEye, meta.eye); gl.uniform1f(g0.uHalf, meta.floorHalf);
+    gl.uniform3fv(g0.uGradeSub, atm ? atm.gradeSub : [0, 0, 0]);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, p.tex); gl.uniform1i(g0.uPano, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, p.paint.floor); gl.uniform1i(g0.uFloor, 1);
+    gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+    let floorTris = 0, otherTris = 0;
+    for (const g of activeArena.groups) {
+      if (!g.count) continue;
+      const idx = arenaCullIndices(mvp, g); if (!idx) continue;
+      const fm = _paintFloorMask(g), fl = [], ot = [];
+      for (let i = 0; i < idx.length; i += 3) (fm[idx[i] / 3] ? fl : ot).push(idx[i], idx[i + 1], idx[i + 2]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.vbo); gl.enableVertexAttribArray(g0.aPos); gl.vertexAttribPointer(g0.aPos, 3, gl.FLOAT, false, 0, 0);
+      if (!g.paintIbo) g.paintIbo = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.paintIbo);
+      for (const [list, mode] of [[fl, 1], [ot, 0]]) {
+        if (!list.length) continue;
+        gl.uniform1f(g0.uMode, mode);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(list), gl.DYNAMIC_DRAW);
+        gl.drawElements(gl.TRIANGLES, list.length, gl.UNSIGNED_SHORT, 0);
+      }
+      floorTris += fl.length / 3; otherTris += ot.length / 3;
+    }
+    gl.activeTexture(gl.TEXTURE0);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    panoLog.paint = { floorTris, otherTris };
+  }
+  function _panoBufs(pos, uv, idx) {
+    const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
+    const ubo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ubo); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uv), gl.STATIC_DRAW);
+    const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+    return { vbo, ubo, ibo, indexCount: idx.length };
+  }
+  // unit sphere, 64 x 32
+  function _panoDomeBufs() {
+    if (panoDome) return panoDome;
+    const SA = 64, SL = 32, pos = [], uv = [], idx = [];
+    for (let j = 0; j <= SL; j++) {
+      const lat = Math.PI / 2 - j * Math.PI / SL;
+      for (let i = 0; i <= SA; i++) {
+        const az = -Math.PI + i * 2 * Math.PI / SA;
+        pos.push(Math.sin(az) * Math.cos(lat), Math.sin(lat), -Math.cos(az) * Math.cos(lat));
+        uv.push(0.5 + az / (2 * Math.PI), 0.5 - lat / Math.PI);
+      }
+    }
+    for (let j = 0; j < SL; j++) for (let i = 0; i < SA; i++) { const a = j * (SA + 1) + i, b = a + SA + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    return (panoDome = _panoBufs(pos, uv, idx));
+  }
+  // flat disk at y = 0 around the arena centre, 24 rings x 64 (uv unused: the ground shader tiles by world x, z)
+  function _panoDiskBufs() {
+    if (panoDisk) return panoDisk;
+    const SA = 64, SR = 24, pos = [], uv = [], idx = [];
+    for (let j = 0; j <= SR; j++) {
+      const r = PANO_GR * (j / SR);
+      for (let i = 0; i <= SA; i++) { const a = i * 2 * Math.PI / SA; pos.push(Math.cos(a) * r, 0, Math.sin(a) * r); uv.push(0, 0); }
+    }
+    for (let j = 0; j < SR; j++) for (let i = 0; i < SA; i++) { const a = j * (SA + 1) + i, b = a + SA + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+    return (panoDisk = _panoBufs(pos, uv, idx));
+  }
+  function _panoGround(bdPV, tex, atm) {
+    if (!panoGroundProg) {
+      const p = createProgram(gl, `
+attribute vec3 aPos;
+uniform mat4 uMVP;
+varying vec2 vXZ;
+varying float vDepth;
+void main() { gl_Position = uMVP * vec4(aPos, 1.0); vXZ = aPos.xz; vDepth = gl_Position.w * 0.001; }`, `
+precision mediump float;
+uniform sampler2D uTex;
+uniform vec3 uP;          // tile size, fade start, fade end
+uniform vec3 uGradeSub;
+uniform vec3 uFogCol;
+uniform vec3 uFogP;
+varying vec2 vXZ;
+varying float vDepth;
+void main() {
+  vec4 c = texture2D(uTex, vXZ / uP.x);
+  c.a = 1.0 - smoothstep(uP.y, uP.z, length(vXZ));
+  c.rgb *= vec3(1.0) - uGradeSub;
+  c.rgb = mix(c.rgb, uFogCol, clamp((vDepth - uFogP.x) * uFogP.y, 0.0, 1.0) * uFogP.z);
+  gl_FragColor = c;
+}`);
+      panoGroundProg = { program: p, aPos: gl.getAttribLocation(p, "aPos"), uMVP: gl.getUniformLocation(p, "uMVP"), uTex: gl.getUniformLocation(p, "uTex"),
+        uP: gl.getUniformLocation(p, "uP"), uGradeSub: gl.getUniformLocation(p, "uGradeSub"), uFogCol: gl.getUniformLocation(p, "uFogCol"), uFogP: gl.getUniformLocation(p, "uFogP") };
+    }
+    const g = panoGroundProg, b = _panoDiskBufs();
+    gl.useProgram(g.program);
+    gl.uniformMatrix4fv(g.uMVP, false, bdPV);
+    gl.uniform3fv(g.uP, [PANO_TILE, PANO_FADE[0], PANO_FADE[1]]);
+    gl.uniform3fv(g.uGradeSub, atm ? atm.gradeSub : [0, 0, 0]);
+    gl.uniform3fv(g.uFogCol, atm ? atm.fogCol : [0, 0, 0]);
+    gl.uniform3fv(g.uFogP, atm ? atm.fogP : [0, 0, 0]);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(g.uTex, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.vbo); gl.enableVertexAttribArray(g.aPos); gl.vertexAttribPointer(g.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.ibo);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.drawElements(gl.TRIANGLES, b.indexCount, gl.UNSIGNED_SHORT, 0);
+  }
+  // the picture's texel along unit direction d (the dome is centred on the eye); sky only
+  function _panoTexel(p, eye, d) {
+    if (d[1] <= 0) return null;
+    return { px: p.px, u: 0.5 + Math.atan2(d[0], -d[2]) / (2 * Math.PI), v: 0.5 - Math.asin(Math.min(1, d[1])) / Math.PI };
+  }
+  // The painted place in 3D: s<map>_depth.bin / .json (tools/pano_depth.py + pano_depth_export.py: an AI depth model on 13
+  // ordinary views of the picture) gives every corner of a 256 x 128 grid its distance from the painted viewpoint, NaN
+  // for sky. Size: PANO_UNIT_M render units per depth metre, so the Digimon (465-660 units tall, measured) are about
+  // person-sized in the place (the first try sized the place by the 1v1 camera height, 90 units a metre: the user saw it
+  // "way too small", Digimon as 7 m giants). The viewpoint sits cameraHeightM (the depth tool's measure) above the arena
+  // centre. The ground where the Digimon fight is made exactly level: a point lower than PANO_FLAT_M metres goes to y 0
+  // inside PANO_FLAT_R[0], blending out by [1] (measured on s340: the depth ground is within +-0.5 m of level 4-20 m out,
+  // +0.6 m right under the viewpoint). A quad is torn
+  // out (the far dome shows through) where it is a "rubber sheet" across a depth jump: corners differ > 1.3x in distance,
+  // it is not level ground (normal.y < 0.8) and it faces the viewpoint edge-on (|cos| < 0.15).
+  // Far wall: everything further than PANO_FAR_M (and the sky, which has no depth) lies on one smooth wall at that
+  // distance, as in the picture, so the whole place is ONE fixed 3D object (the camera-following dome is not drawn with
+  // it: both at once showed the picture twice). Why: the mesh is a 1.4-degree grid, and a cell on a tree's edge had one
+  // corner on the tree and one on the sky, so leaves were stretched into jagged streaks; the depth model also blurs thin
+  // fronds. Measured on s340: trees against the sky 62-98 m (far trees >= 55 m); the beach half within 7 m, 90% within
+  // 35 m; fighters within 5.4 m of the centre, the camera within 10.7 m. 40 m keeps the beach and near cliffs in 3D.
+  const PANO_UNIT_M = 400, PANO_FLAT_M = 1.0, PANO_FLAT_R = [5000, 7000], PANO_FAR_M = 40;
+  function _panoMeshBuild(meta, vals) {
+    const C = meta.cols, R = meta.rows, k = PANO_UNIT_M, EYE = meta.cameraHeightM * k, FLAT_Y = PANO_FLAT_M * k;
+    const pos = new Float32Array(C * R * 3), uv = new Float32Array(C * R * 2), dist = new Float32Array(C * R), skyF = new Uint8Array(C * R);
+    for (let j = 0; j < R; j++) {
+      const lat = Math.PI / 2 - j * Math.PI / (R - 1), cl = Math.cos(lat), sl = Math.sin(lat);
+      for (let i = 0; i < C; i++) {
+        const n = j * C + i, az = -Math.PI + i * 2 * Math.PI / (C - 1), sky = !(vals[n] > 0), v = Math.min(sky ? Infinity : vals[n], PANO_FAR_M) * k;
+        dist[n] = v; skyF[n] = sky ? 1 : 0;
+        uv[n * 2] = i / (C - 1); uv[n * 2 + 1] = j / (R - 1);
+        if (!(v > 0)) { pos[n * 3] = pos[n * 3 + 1] = pos[n * 3 + 2] = NaN; continue; }
+        let x = Math.sin(az) * cl * v, y = EYE + sl * v, z = -Math.cos(az) * cl * v;
+        const rh = Math.hypot(x, z);
+        if (!sky && y < FLAT_Y && rh < PANO_FLAT_R[1]) y *= rh <= PANO_FLAT_R[0] ? 0 : 1 - (PANO_FLAT_R[1] - rh) / (PANO_FLAT_R[1] - PANO_FLAT_R[0]);
+        pos[n * 3] = x; pos[n * 3 + 1] = y; pos[n * 3 + 2] = z;
+      }
+    }
+    const idx = []; let torn = 0;
+    const P = (n) => [pos[n * 3], pos[n * 3 + 1], pos[n * 3 + 2]];
+    for (let j = 0; j < R - 1; j++) for (let i = 0; i < C - 1; i++) {
+      const q = [j * C + i, j * C + i + 1, (j + 1) * C + i, (j + 1) * C + i + 1];
+      if (q.some((n) => !(dist[n] > 0))) continue;
+      const ds = q.map((n) => dist[n]);
+      if (!q.some((n) => skyF[n]) && Math.max(...ds) / Math.min(...ds) > 1.3) {   // the sky's edge is never torn: nothing is behind it
+        const a = P(q[0]), b = P(q[3]), c = P(q[1]), d = P(q[2]);
+        const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - c[0], d[1] - c[1], d[2] - c[2]];
+        const nn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], nl = Math.hypot(...nn) || 1;
+        const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - EYE, (a[2] + b[2]) / 2], ml = Math.hypot(...m) || 1;
+        const cosv = Math.abs(nn[0] * m[0] + nn[1] * m[1] + nn[2] * m[2]) / (nl * ml);
+        if (Math.abs(nn[1] / nl) < 0.8 && cosv < 0.15) { torn++; continue; }
+      }
+      idx.push(q[0], q[2], q[1], q[1], q[2], q[3]);
+    }
+    for (let n = 0; n < pos.length; n++) if (Number.isNaN(pos[n])) pos[n] = 0;   // unused corners (sky)
+    const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+    const ubo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ubo); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
+    const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+    return { vbo, ubo, ibo, indexCount: idx.length, pos, idx, torn, scale: k };
+  }
+  /** (checks) height of the painted place's mesh straight under (x, z), render space; null = no mesh or nothing under. */
+  function probePanoGround(x, z) {
+    const m = pano?.mesh; if (!m) return null;
+    let best = null; const p = m.pos, I = m.idx;
+    for (let t = 0; t < I.length; t += 3) {
+      const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+      const d = (p[b + 2] - p[c + 2]) * (p[a] - p[c]) + (p[c] - p[b]) * (p[a + 2] - p[c + 2]); if (Math.abs(d) < 1e-9) continue;
+      const w0 = ((p[b + 2] - p[c + 2]) * (x - p[c]) + (p[c] - p[b]) * (z - p[c + 2])) / d;
+      const w1 = ((p[c + 2] - p[a + 2]) * (x - p[c]) + (p[a] - p[c]) * (z - p[c + 2])) / d, w2 = 1 - w0 - w1;
+      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      const y = w0 * p[a + 1] + w1 * p[b + 1] + w2 * p[c + 1];
+      if (best == null || y < best) best = y;          // the lowest surface under the point is the ground
+    }
+    return best;
+  }
+  function _drawPano(p, bdPV, eye, atm) {
+    const M = new Float32Array([PANO_R, 0, 0, 0, 0, PANO_R, 0, 0, 0, 0, PANO_R, 0, eye[0], eye[1], eye[2], 1]);
+    const depth = gl.isEnabled(gl.DEPTH_TEST);
+    gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.BLEND);
+    if (atm) { gl.useProgram(texP.program); gl.uniformMatrix4fv(texP.uSkyM, false, M); gl.uniform2fv(texP.uWater, [0, 0]); }
+    if (!p.mesh) drawSkeletalMesh(gl, texP, mat4Mul(bdPV, M), _panoDomeBufs(), p.tex, [1, 1, 1, 1]);
+    if (p.mesh) {               // the place in 3D: it sorts itself by depth (cleared after the arena branch, like the arena)
+      gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+      if (atm) gl.uniformMatrix4fv(texP.uSkyM, false, PANO_IDENT);
+      drawSkeletalMesh(gl, texP, bdPV, p.mesh, p.tex, [1, 1, 1, 1]);
+      gl.disable(gl.DEPTH_TEST);
+    } else if (p.ground) _panoGround(bdPV, p.ground, atm);
+    if (depth) gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    panoLog.ground = !!p.ground; panoLog.mesh = p.mesh ? { tris: p.mesh.indexCount / 3, torn: p.mesh.torn, scale: +p.mesh.scale.toFixed(2) } : null;
+    panoLog.drawn++;
+  }
+  /** (checks) the panorama's state: map id, loaded / missing, ground on, frames drawn, and its numbers. */
+  // Tool only (tools/capture_arena_360.mjs): the disc arena alone, no fighters, seen from `eye` toward `look`, through a
+  // square 90-degree view into an offscreen buffer; returns the RGBA rows bottom-up as base64. Six of these make a 360.
+  let _capFbo = null;
+  // opts.ortho = half-size of a square straight view (no perspective) for the top-down floor; opts.far = how deep it
+  // reaches from the eye (with ortho, everything above the eye is left out: walls cut at that height).
+  function captureArenaFace(eye, look, up, size = 1024, opts = {}) {
+    if (!activeArena?.groups?.length) return null;
+    if (!_capFbo || _capFbo.size !== size) {
+      const fb = gl.createFramebuffer(), tx = gl.createTexture(), rb = gl.createRenderbuffer();
+      gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, size, size);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, rb);
+      _capFbo = { fb, size };
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, _capFbo.fb);
+    gl.viewport(0, 0, size, size);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, arenaBg || [0, 0, 0, 1]);
+    let proj = mat4Perspective(Math.PI / 2, 1, 1, 60000);
+    if (opts.ortho) { const L = opts.ortho, n = 0, f = opts.far || 60000; proj = new Float32Array(16);
+      proj[0] = 1 / L; proj[5] = 1 / L; proj[10] = -2 / (f - n); proj[14] = -(f + n) / (f - n); proj[15] = 1; }
+    const mvp = mat4Mul(mat4Mul(proj, mat4LookAt(eye, look, up)), ps1ToRenderMatrix(MODEL_SCALE));
+    gl.depthMask(true); gl.disable(gl.BLEND);
+    for (const g of activeArena.groups) { if (g.count) drawProjLayerIndexed(gl, texP, mvp, g, arenaTextureFor(activeArena, g), arenaCullIndices(mvp, g)); }
+    const px = new Uint8Array(size * size * 4);
+    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.enable(gl.BLEND); gl.viewport(0, 0, canvas.width, canvas.height);
+    let b = ""; for (let i = 0; i < px.length; i += 0x8000) b += String.fromCharCode.apply(null, px.subarray(i, i + 0x8000));
+    return { size, arena: activeArena.name, rgba: btoa(b) };
+  }
+
+  function getPanorama() { return { ...panoLog, on: !!window.__fx?.battlepano, hd: assetMode() === "hd", dome: { r: PANO_R, groundR: PANO_GR, fade: PANO_FADE, tile: PANO_TILE } }; }
 
   // ── viewer ground grid (isolated mode) ────────────────────────────────────────────────────────
   // A world-space grid under the focused fighter, drawn through the SAME camera as the model. One
@@ -3664,7 +4827,8 @@ export function createBattle3D(canvas, sfx = null) {
 
     const W = canvas.width, H = canvas.height;
     gl.viewport(0, 0, W, H);
-    gl.clearColor(0.04, 0.04, 0.08, 1);   // #0a0a14 = the sky gradient's bottom stop
+    if (builtArena) gl.clearColor(0, 0, 0, 0);
+    else gl.clearColor(0.04, 0.04, 0.08, 1);   // #0a0a14 = the sky gradient's bottom stop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.enable(gl.DEPTH_TEST);
@@ -3753,9 +4917,12 @@ export function createBattle3D(canvas, sfx = null) {
       // glide to ~0.5 s and read as a fast zoom rather than the original's slow one.
       camRec.tick(CAMERA_FRAME_DELTA);
       coordinator.tick(speed);
+      _layoutExtras();
       for (const f of extras.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
         f.lat += (f.latT - f.lat) * Math.min(1, 0.12 * speed);
-        if (f.latT !== 0 && !(f.anim8r?.vm && !f.anim8r.vm.ended)) f.latT = 0;
+        f.latz += (f.latzT - f.latz) * Math.min(1, 0.12 * speed);
+        f.dx += (f.dxT - f.dx) * Math.min(1, 0.12 * speed);         // to its measured place in the line-up
+        if (f.latT !== 0 && !(f.anim8r?.vm && !f.anim8r.vm.ended)) { f.latT = 0; f.latzT = 0; }
       }
       // Eyes and looping body textures. `speed` is the same per-tick frame delta the
       // original's blink timer counts down by (D0x800a4464), so the blink keeps the
@@ -4077,7 +5244,7 @@ export function createBattle3D(canvas, sfx = null) {
     }
 
     if (multiCam && extras.size) {   // (multiplayer) the wide shot of everybody owns the camera
-      const c = _multiCameraShot();
+      const c = window.__fx?.smartcam ? _smartCameraShot() : _multiCameraShot();
       if (c) { eye = c.eye; look = c.look; up = UP; rollDeg = 0; fovRad = c.fov; } else if (!shot) return;
     }
 
@@ -4093,7 +5260,18 @@ export function createBattle3D(canvas, sfx = null) {
     // which puts the enemy — and the far edge of the arena floor — past the tight 8k far plane the
     // disc's close arena shots are tuned to. Widen it for those shots only, as the explicit op5
     // shots already do.
-    const farPlane = explicitShot || giantNearCam || camMode === "free" ? 60000 : 8000;
+    // F2 -> Screen -> "Battle camera a little further out" (HD Remaster only, off by default): the idle /
+    // command camera, the acting phases' held arena shot and the multiplayer wide shot step back along
+    // their own view ray. A technique's own camera (an explicit op5 shot) is left exactly as the disc has it.
+    const battleWide = !explicitShot && !freeView
+      && (BATTLE_WIDE_MODES.has(camMode) || (multiCam && extras.size > 0))
+      && document.documentElement.dataset.assetMode === "hd" && !!window.__fx?.battlewide;
+    if (battleWide) {
+      eye = [ look[0] + (eye[0] - look[0]) * BATTLE_WIDE_DOLLY,
+              look[1] + (eye[1] - look[1]) * BATTLE_WIDE_DOLLY,
+              look[2] + (eye[2] - look[2]) * BATTLE_WIDE_DOLLY ];
+    }
+    const farPlane = explicitShot || giantNearCam || camMode === "free" || battleWide ? 60000 : 8000;
     const proj = mat4Perspective(fovRad, W/H, 1, farPlane);
     // Blast phase 1 is a camera PUSH-IN on the fighter (captured f24-f180) and
     // phase 8 returns it (f800-f880). Dolly the eye toward the player along its
@@ -4138,6 +5316,9 @@ export function createBattle3D(canvas, sfx = null) {
     if (extras.size) _projectExtras(pv, W, H);
     lastCamInfo = {
       eye, look, fovDeg: fovRad * 180 / Math.PI,
+      // The camera the frame is really drawn with (after the wide-shot step, blast dolly and screen roll), render space.
+      render: { eye: camEye.slice(), look: camLook.slice(), up: camUp.slice(), fovRad, aspect: W / H,
+                arenaScale: multiCam ? arenaScale : 1 },
       // PS1 convention, matching the record's own frame.
       up: renderToPs1(up, 1), roll: rollDeg,
       // fovRad is the VERTICAL fov (fovYFromH), so the projection distance comes back through
@@ -4164,6 +5345,11 @@ export function createBattle3D(canvas, sfx = null) {
     const arenaActive = !dfActive && !dnaVoidActive
       && !!(activeArena && activeArena.groups && activeArena.groups.length);
 
+    // battle atmosphere (F2 -> Atmosphere, off by default): only over the ordinary per-area arena
+    const atm = arenaActive && !isolatedMode ? _atmosFrame(camEye, camLook) : null;
+    lastAtm = atm;
+    _atmosUniforms(atm);
+
     // Sky background (draw first, no depth write). During a special the per-element backdrop
     // replaces the arena environment: black void + the MEFT10<sigEffect> wall+floor meshes drawn
     // ADDITIVELY (abr=1) through this frame's camera — the same 3D scene the real game renders.
@@ -4182,7 +5368,7 @@ export function createBattle3D(canvas, sfx = null) {
       // spans ±20479×MODEL_SCALE (≈±7168 world) and its far edge exceeds the scene's 8000 far plane
       // at wide shots → far triangles clipped to black holes. A 60000 far plane keeps it all in.
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
-      const world = ps1ToRenderMatrix(MODEL_SCALE);   // fight-model → world, the one mapping
+      const world = ps1ToRenderMatrix(MODEL_SCALE * (multiCam ? arenaScale : 1));   // fight-model → world (larger for many fighters)
       // Spin phase: each group lerps 0→spinDeg over BD_ROT_MS from when the backdrop appeared, then
       // holds (the real ctrl reaches its target at frame 121 then sentinel-holds).
       const spinT = Math.min(1, Math.max(0, (performance.now() - dataFieldOnAt) / BD_ROT_MS));
@@ -4215,10 +5401,16 @@ export function createBattle3D(canvas, sfx = null) {
       // original shows. `arenaLegacy` keeps the pre-decode alpha/one-palette render for captures.
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, arenaBg || bgTint || [0, 0, 0, 1]);   // the arena view's sky colour
+      if (!builtArena) drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, arenaBg || bgTint || [0, 0, 0, 1]);   // the arena view's sky colour
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
-      const world = ps1ToRenderMatrix(MODEL_SCALE);
+      const world = ps1ToRenderMatrix(MODEL_SCALE * (multiCam ? arenaScale : 1));   // larger for many fighters (_layoutExtras)
       const mvp = mat4Mul(bdPV, world);
+      _atmosArena(atm, world, camEye, camLook, fovRad, W / H, multiCam ? arenaScale : 1);
+      const panoP = isolatedMode ? null : _panoActive();
+      panoLog.id = pano?.id ?? null; panoLog.loaded = !!panoP; panoLog.missing = !!pano?.missing;
+      if (panoP) _drawPano(panoP, bdPV, camEye, atm);   // F2 painted place (HD Remaster): replaces the whole disc arena
+      if (panoP) { const bx = [pAABB, eAABBLast, ...[...extras.values()].map((f) => f.aabb)].filter(Boolean);
+        panoLog.eye = camEye.slice(); panoLog.feet = bx.map((b) => +b.min[1].toFixed(1)); panoLog.heights = bx.map((b) => +(b.max[1] - b.min[1]).toFixed(1)); panoLog.xz = bx.map((b) => [Math.round((b.min[0] + b.max[0]) / 2), Math.round((b.min[2] + b.max[2]) / 2)]); }
       arenaCullLog.kept = 0; arenaCullLog.total = 0; arenaCullLog.groups = [];
       if (arenaDebug.opaque) gl.disable(gl.BLEND);         // OPAQUE: the decoded arena blend (cmd 0x2C)
       else { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
@@ -4235,7 +5427,8 @@ export function createBattle3D(canvas, sfx = null) {
       // the emit order. Decoded + measured 2026-10-07,
       // .dw3-research/arena-construction-2026-10-07/worker-e.md.
       if (arenaDebug.depthWrite) gl.depthMask(true);
-      for (const g of activeArena.groups) {
+      if (panoP?.paint) _drawArenaPaint(panoP, mvp, world, atm);
+      for (const g of panoP || builtArena ? [] : activeArena.groups) {
         if (!g.count) continue;
         const tex = arenaTextureFor(activeArena, g);
         const idx = arenaDebug.cull ? arenaCullIndices(mvp, g) : null;
@@ -4245,6 +5438,7 @@ export function createBattle3D(canvas, sfx = null) {
       }
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      if (atm) _atmosArena(null);
       // THE ARENA IS A BACKGROUND LAYER — its own pass must not reject the entities drawn after
       // it. The arena writes depth above so its (page,CLUT) groups depth-sort like the original's
       // ordering table (the flat-blue-patch fix), but the Digimon and the effects are drawn AFTER
@@ -4284,6 +5478,17 @@ export function createBattle3D(canvas, sfx = null) {
     // wireframe materializing (f312-f360) neither is drawn — the capture has the
     // old model whited out and the flames covering that gap, and those are
     // painted by web/blast-presentation.js over this frame.
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+    if (sceneLight) _sceneLightDraw(true);
+// SCENE-LIGHT-END
+// TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
+    const toonSt = _toonState();
+    if (toonSt) _toonBegin(toonSt, camEye, camLook);
+// TOON-END
+// SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
+    const softA = !!window.__fx?.softalpha;
+    if (softA) { gl.useProgram(texP.program); gl.uniform2f(texP.uSoftA, 1, 2 / 1024); }
+// SOFTA-END
     if (blastState && blastState.showNewModel && playerModel && playerSkelBufs) {
       if (blastState.solidAlpha > 0) {
         drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, FIGHTER_TINT,
@@ -4311,13 +5516,23 @@ export function createBattle3D(canvas, sfx = null) {
       drawDigimonBillboard(gl, texP, pv, enemyPos, DIGI_W, DIGI_H,
         enemyTex || whiteTex, 1, FIGHTER_TINT, false);
     }
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+    if (sceneLight) _sceneLightDraw(false);
+// SCENE-LIGHT-END
 
     if (extras.size) _drawExtras(pv);
+// SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
+    if (softA) { gl.useProgram(texP.program); gl.uniform2f(texP.uSoftA, 0, 0); }
+// SOFTA-END
+// TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
+    if (toonSt) _toonEnd(toonSt, pv, proj, H);
+// TOON-END
 
     // Floor shadow ellipses. The Blast vortex has no floor to cast onto — the
     // capture is a black void from f180 — so both shadows drop with it.
     if (playerVisible && !blastVoid) drawShadow(gl, texP, pv, playerPos, 20, 8);
     if (enemyVisible && !blastVoid)  drawShadow(gl, texP, pv, enemyPos,  20, 8);
+    if (atm) { _drawWeather(pv, atm, camEye, camLook); _atmosUniforms(null); }   // effects keep the game's own colours
 
     // ── op6 flight meshes: root at the muzzle, per-layer ctrl-track TRS animation ──
     // The original builds a layer array of count+1 blocks (FIGHTSTG_F0x80084560): index 0 is
@@ -4605,6 +5820,7 @@ export function createBattle3D(canvas, sfx = null) {
     // fight started on and the encounter id it rolled; the arena table (from the stage's own
     // battle-trigger records) resolves the id. Returns the loaded arena pack or null.
     setArenaStage,
+    getMultiLayout, probeArenaScale, probeSmartCam, getAtmosphere, getPanorama, probePanoGround, captureArenaFace,
     // Debug/before-after only: fall back to the pre-decode arena render — one palette per atlas
     // page (floor.png/wall.png) composited with alpha — so a capture can show the palette+blend
     // change side by side. Production always uses the decoded per-CLUT palette + opaque blend.
@@ -4837,6 +6053,54 @@ export function createBattle3D(canvas, sfx = null) {
         size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]],
       };
     },
+    /** Arena Viewer "built" look: no disc arena or sky, see-through clear (needs createBattle3D(.., {alpha: true})). */
+    setBuiltArena(on) { builtArena = !!on; return builtArena; },
+// TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
+    /** Arena Viewer: { outline, shade } booleans (the game uses F2 window.__fx.toonoutline / .toonshade instead). */
+    setToon(o) { toonSet.outline = !!o?.outline; toonSet.shade = !!o?.shade; return { ...toonSet }; },
+    /** For checks: what is on now, and counters (frames drawn with toon, hull draws, weld builds, last error). */
+    getToon() { return { set: { ...toonSet }, on: _toonState(), ...toonLog }; },
+// TOON-END
+// SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
+    /** Arena Viewer built look only: light the Digimon like the built world ({dir, colour, ambient}, see
+     *  _sceneLightDraw); null turns it off again. Never called by the game or the model viewer. */
+    setSceneLight(L) {
+      sceneLight = L && L.dir && L.colour && L.ambient
+        ? { dir: Array.from(L.dir).slice(0, 3), colour: Array.from(L.colour).slice(0, 3), ambient: Array.from(L.ambient).slice(0, 3) } : null;
+      return sceneLight;
+    },
+    /** For checks: the light now, and per side the share of faces whose normal points away from the mesh centre. */
+    getSceneLight() {
+      const out = { light: sceneLight, winding: SCENE_LIGHT_WINDING };
+      for (const [side, bufs] of [["player", playerSkelBufs], ["enemy", enemySkelBufs]]) {
+        const p = bufs?.lastPos; if (!p) continue;
+        // signed volume (divergence theorem): > 0 when the normals point out of the closed surface, whatever its shape;
+        // per bone piece too (each piece about its own centre), so a mixed winding would show
+        const model = bufs === playerSkelBufs ? playerModel : enemyModel;
+        const vol = (a0, a1) => {
+          let qx = 0, qy = 0, qz = 0; const nv = (a1 - a0) / 3; if (nv < 3) return 0;
+          for (let i = a0; i < a1; i += 3) { qx += p[i]; qy += p[i + 1]; qz += p[i + 2]; }
+          qx /= nv; qy /= nv; qz /= nv;
+          let v = 0;
+          for (let a = a0; a + 8 < a1; a += 9) {
+            const x0 = p[a] - qx, y0 = p[a + 1] - qy, z0 = p[a + 2] - qz, x1 = p[a + 3] - qx, y1 = p[a + 4] - qy, z1 = p[a + 5] - qz, x2 = p[a + 6] - qx, y2 = p[a + 7] - qy, z2 = p[a + 8] - qz;
+            v += (x0 * (y1 * z2 - z1 * y2) - y0 * (x1 * z2 - z1 * x2) + z0 * (x1 * y2 - y1 * x2)) / 6;
+          }
+          return v * SCENE_LIGHT_WINDING;
+        };
+        let pos = 0, neg = 0, nPos = 0, nNeg = 0;
+        for (let b = 0; b < (model?.bones.length || 0); b++) {
+          const a0 = bufs.boneOffsets[b] * 3, a1 = a0 + (model.bones[b].faces || []).length * 9, v = vol(a0, a1);
+          if (v > 0) { pos += v; nPos++; } else if (v < 0) { neg -= v; nNeg++; }
+        }
+        out[side] = { faces: p.length / 9, volume: vol(0, p.length), bonesOut: nPos, bonesIn: nNeg, outShare: pos + neg > 0 ? pos / (pos + neg) : 0,
+                      lit: !!bufs.litOn, normals: !!bufs.nbo, weldBuilds: bufs.weldBuilds || 0 };
+      }
+      return out;
+    },
+// SCENE-LIGHT-END
+    /** This frame's fighter view-projection (column-major 4x4, render space), for checks. */
+    getViewProjection() { return _fxView ? Array.from(_fxView.pv) : null; },
     /** Isolated studio mode: neutral background + ground grid, no arena/sky/backdrop. */
     setIsolated(on, side = null) {
       isolatedMode = !!on;

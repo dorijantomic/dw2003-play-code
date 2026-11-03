@@ -74,6 +74,7 @@ import {
 } from "./assets.js";
 import { installPixelFilter } from "./gpu-pixel-filter.js";
 import { createCanvasResolutionController } from "./canvas-resolution.js";
+import { setFieldViewPad, widePadFor, wideBoxCameraX, fieldFrameRule, scriptIsStaged, easeLevel, FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 import { createTextbox, autoBalloonMode } from "./textbox.js";
 import { createChoice } from "./choice.js";
 import { createInn } from "./inn.js";
@@ -447,7 +448,8 @@ installMpBattle({
     getKit: () => battle.mpKit(),
     sfx, bgm, mapId: () => currentMap()?.id ?? null, languageByte: () => state.languageByte,
     openReport: (b, onClose) => openNativeReport(b, onClose),
-    myId: () => myId(), myName: () => myName(),
+    myId: () => myId() ?? 1, myName: () => myName() || state.playerName || "Tamer",
+    practice: (o) => mpbPractice(o),
     nameOf: (id) => peerOf(id)?.name ?? myName(),
     send: (ids, d) => sendMpb(ids, d),
     releaseKeys: () => state.keys.clear(),
@@ -2377,6 +2379,30 @@ const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResolver, {
     },
 });
 window.__cutscene = cutscene;
+// HD Remaster wide overworld (web/field-view.js, F2 -> Screen -> Wide overworld, off by default).
+// camK: 1 = the wide camera clamp, 0 = the disc's own; sides: 1 = the extra map at the sides shows,
+// 0 = covered. staged: the running scene moves an actor or the camera, so it plays in the original framing.
+const wideField = { camK: 0, sides: 0, staged: false, t: 0, padL: 0 };
+window.__wideField = wideField;
+{
+    const startScene = cutscene.start;
+    cutscene.start = (opcodes, ...rest) => {
+        wideField.staged = scriptIsStaged(opcodes);
+        return startScene(opcodes, ...rest);
+    };
+}
+// A screen that owns the whole picture: the field stays where it is under it, and the wide sides are covered.
+function fieldFullScreenUiOpen() {
+    return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
+        || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
+        || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
+        || state.endScreen || state.titleScreen || stagslctMenu.open
+        || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
+}
+function fieldStageFilled() {
+    return !!(document.fullscreenElement || document.documentElement.classList.contains("window-fill"));
+}
+let questPaths = {};         // the named routes a quest scene walks ({ walk, path }, web/quest-paths.json, drawn in quest-editor.html)
 let extraResidents = [];   // where the extra quests' own characters stand (see extra_npcs.json)
 
 /**
@@ -2475,7 +2501,7 @@ async function playQuestScene(steps) {
     // a scripted walk steps straight at its target with no collision test (the VM's own walk driver), so the compiler asks
     // this for the legs to walk instead when the straight line crosses a wall (web/quest-walk.js over the same grid)
     const walk = grid ? (ax, ay, bx, by) => questWalkLegs(grid, ax, ay, bx, by) : null;
-    const { opcodes, speech, events, errors } = compileScene(steps, { playerId, pos, free, walk });
+    const { opcodes, speech, events, errors } = compileScene(steps, { playerId, pos, free, walk, paths: questPaths });
     if (errors.length) { console.warn("[quest scene]", errors.join("; ")); questSceneFxReset(); return null; }
     // our own effect sheets, before the first frame that could use one; a missing sheet only makes its step skip
     const sheets = events.filter((e) => e?.kind === "fx").map((e) => e.sheet).filter(Boolean);
@@ -2803,6 +2829,13 @@ async function init() {
         }
     } catch {
         /* no extra characters */
+    }
+    // Named walking routes for quest scenes (optional; without the file a { walk, path } step just fails its scene check).
+    try {
+        const qp = await fetch("quest-paths.json");
+        if (qp.ok) questPaths = (await qp.json()).paths ?? {};
+    } catch {
+        /* no named paths */
     }
     // The new partners' field sprites (web/extra_partners.json): they join the character table the
     // starters walk from, so a new partner leading the party is a character like any starter.
@@ -4739,6 +4772,28 @@ function mpbLaunch({ foes, withId, label, screenId, challenge, opts }) {
     });
     return true;
 }
+// PRACTICE (F2 -> Extras -> "Practice 2 vs 2", a test, off by default): the many-vs-many fight on one computer, me and a
+// computer-played partner against two wild Digimon. The partner is a copy of my own party in another order (my second Digimon
+// leads it when I have one); it is not saved and gets nothing. Everything else is the real co-op fight (web/mpbattle.js).
+const PRACTICE_BOT_ID = -1;
+function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, opts } = {}) {
+    if (!mpIdle() || fieldPartySize(state.party) === 0 || !foes?.length) return false;
+    const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
+    startFieldBattle(async () => {
+        const kit = await battle.mpKit();
+        const recs = kit.party().map((m) => m.rec);
+        const order = recs.length > 1 ? [...recs.slice(1), recs[0]] : recs;
+        const bots = [{ id: PRACTICE_BOT_ID, name: "Partner", party: order }];
+        mpbHost({ foes, ids: [myId() ?? 1], label, screenId, challenge: null, done, bots }).then((ok) => { if (!ok) done({ fled: true }); });
+    });
+    return true;
+}
+async function mpPracticeRandom(mapId, x, y) {
+    const a = await battle.rollEncounter(mapId, x, y);
+    if (!a) return;
+    const b = await battle.rollEncounter(mapId, x, y);
+    mpbPractice({ foes: [a.party[0], (b ?? a).party[0]], label: "Practice 2 vs 2", screenId: a.screen ?? null });
+}
 mpOn((type, d) => {
     if (type === "mpb") {
         if (d.d?.k === "setup" && mpIdle() && fieldPartySize(state.party) > 0) startFieldBattle(() => mpbMessage(d.from, d.d));   // the same hand-off for a friend's fight
@@ -4775,6 +4830,7 @@ function triggerRandomEncounter(mapId, x, y) {
     )
         return;
     if (coopReady()) { mpCoopRandom(mapId, x, y); return; }   // teamed up: two wild Digimon, and your partner can join
+    if (window.__fx?.practice2v2) { mpPracticeRandom(mapId, x, y); return; }   // F2 -> Extras -> Practice 2 vs 2 (test, off by default)
     startFieldBattle(() =>
         battle.startRandom(mapId, x, y, (res) => presentVictory(res), null, gameOverToTitle));
 }
@@ -4965,7 +5021,8 @@ function drawMapPicture(img, tm, kind, ox, oy) {
     const key = `${tm.name}:${kind}`;
     if (!tilesComplete.get(key)) ctx.drawImage(img, ox, oy);
     const M = 16;                   // map pixels of slack for the quest shake translate
-    tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M, -oy - M, VIEW_W / ZOOM + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
+    // The view is the 320 box plus FIELD_VIEW_PAD each side with the wide overworld (web/field-view.js).
+    tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M - FIELD_VIEW_PAD, -oy - M, FIELD_VIEW_W + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
 }
 
 function ensureMapImg(id) {
@@ -7242,6 +7299,20 @@ function runStageHandoff(exit) {
     fade.pending = exit;
 }
 
+// Wide overworld (web/field-view.js): black over the two side strips, as much as the frame rule says
+// they are covered (1 - wideField.sides). Box coordinates; the strips are padL wide outside the box.
+function drawWideSideCovers(ctx) {
+    const padL = wideField.padL;
+    const a = 1 - wideField.sides;
+    if (!(padL > 0) || a <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, a);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(-padL, 0, padL, VIEW_H);
+    ctx.fillRect(VIEW_W, 0, padL, VIEW_H);
+    ctx.restore();
+}
+
 // The legacy hand-drawn stage wipe, kept for ?legacyWipe=1. The decoded one is
 // below it.
 const LEGACY_WIPE_TILE = 128; // 64x64 at 320x240, doubled for the 640x480 view
@@ -7366,13 +7437,15 @@ function paintWipeCoverAround(ctx, level, clear) {
     const cw = clear.w * ZOOM, ch = clear.h * ZOOM;
     // Four bands around the window, which is what the original's frame draws:
     // the cover is everywhere the field does not show through.
+    // With the wide overworld the field goes on padL past both box edges; the cover does too.
+    const L = -wideField.padL, R = VIEW_W + wideField.padL;
     const outside = [
-        [0, 0, VIEW_W, cy],
-        [0, cy + ch, VIEW_W, VIEW_H - (cy + ch)],
-        [0, cy, cx, ch],
-        [cx + cw, cy, VIEW_W - (cx + cw), ch],
+        [L, 0, R - L, cy],
+        [L, cy + ch, R - L, VIEW_H - (cy + ch)],
+        [L, cy, cx - L, ch],
+        [cx + cw, cy, R - (cx + cw), ch],
     ];
-    subtractLayer(ctx, 0, 0, VIEW_W, VIEW_H, (layer) => {
+    subtractLayer(ctx, L, 0, R - L, VIEW_H, (layer) => {
         layer.fillStyle = dimFillStyle(coverLevel(level));
         for (const [x, y, w, h] of outside)
             if (w > 0 && h > 0) layer.fillRect(x, y, w, h);
@@ -7411,8 +7484,9 @@ function paintWipeSeams(ctx, level, regions) {
     ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = `rgb(${r},${g},${b})`;
     const t = ZOOM * WIPE_TILE;
-    for (let x = 0; x <= VIEW_W; x += t) ctx.fillRect(x, 0, 1, VIEW_H);
-    for (let y = 0; y <= VIEW_H; y += t) ctx.fillRect(0, y, VIEW_W, 1);
+    const L = -Math.ceil(wideField.padL / t) * t, R = VIEW_W + wideField.padL;
+    for (let x = L; x <= R; x += t) ctx.fillRect(x, 0, 1, VIEW_H);
+    for (let y = 0; y <= VIEW_H; y += t) ctx.fillRect(L, y, R - L, 1);
     ctx.restore();
 }
 
@@ -9830,8 +9904,15 @@ function render() {
         // Battle owns the shared canvas at device resolution and establishes
         // its own transforms. The field underneath is fully covered.
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        wideField.padL = 0;
     } else {
-        fieldFrame = fieldCanvasResolution.beginFrame(assetMode() === ASSET_MODE_HD);
+        const hd = assetMode() === ASSET_MODE_HD;
+        const stageEl = canvas.parentElement;
+        const pad = hd && window.__fx?.widefield && fieldStageFilled() && stageEl
+            ? widePadFor(stageEl.clientWidth, stageEl.clientHeight) : 0;
+        setFieldViewPad(pad);
+        wideField.padL = FIELD_VIEW_PAD * ZOOM;
+        fieldFrame = fieldCanvasResolution.beginFrame(hd, pad ? { padX: wideField.padL, stageHeight: stageEl.clientHeight } : null);
     }
     const m = currentMap();
     const mapImg = state.mapImgs[m.id];
@@ -9877,6 +9958,27 @@ function render() {
     const follow = fieldCameraFollow(camCenterX, camCenterY, m.width, m.height);
     let camX = nativeCenter ? camCenterX - nativeCenter[0] : follow.x;
     let camY = nativeCenter ? camCenterY - nativeCenter[1] : follow.y;
+    // Wide overworld: the wide view is centred on the target the way the original centres its 320
+    // view, clamped inside the map, and the 320 box is its middle (web/field-view.js). Where the wider
+    // view could show what the original never showed, the camera eases back to the disc's own clamp
+    // and the sides are covered (fieldFrameRule). Toward the original the ease is fast (6 frames).
+    if (!battle.isActive()) {
+        const now = performance.now();
+        const dtw = wideField.t ? Math.min(0.1, (now - wideField.t) / 1000) : 0;
+        wideField.t = now;
+        const rule = fieldFrameRule({
+            pad: FIELD_VIEW_PAD, mapW: m.width,
+            fixedViewport: !!m.fixedViewportBackground,
+            stagedScene: (cutscene.isActive() && wideField.staged) || !!state.diveDemo,
+            nativeCentre: !!nativeCenter, labCamera: labCam.active,
+            fullScreenUi: fieldFullScreenUiOpen(),
+        });
+        const camTarget = rule.wideCamera ? 1 : 0, sideTarget = rule.showSides ? 1 : 0;
+        wideField.camK = easeLevel(wideField.camK, camTarget, dtw, camTarget < wideField.camK ? 10 : 4);
+        wideField.sides = easeLevel(wideField.sides, sideTarget, dtw, sideTarget < wideField.sides ? 10 : 4);
+        const wideX = wideField.camK > 0 ? wideBoxCameraX(camCenterX, m.width, FIELD_VIEW_PAD) : null;
+        if (wideX != null) camX += (wideX - camX) * wideField.camK;
+    }
     // Draw on the pixel grid. The player moves in fractions of a pixel (a walk
     // step is 0x4cc/0x100 = 1.195 px), so an unsnapped camera leaves the map at
     // a fractional destination and the canvas then samples it UNEVENLY: measured
@@ -9893,7 +9995,7 @@ function render() {
     lastCam.y = camY;
 
     ctx.fillStyle = window.__clearColour ?? "#000"; // see __cam/__mapInfo above
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(-wideField.padL, 0, VIEW_W + 2 * wideField.padL, VIEW_H);
     ctx.save();
     ctx.scale(ZOOM, ZOOM);
     // Extra quests: a scene's `shake` step moves the FIELD only -- the text box, the menus and the quest mark are drawn
@@ -9909,7 +10011,7 @@ function render() {
     // and its ported actors, so both step the same blanks.
     const fieldBlanks = advanceFieldBlanks();
     tickNativeStage(m.id, fieldBlanks);
-    paceStageObjects(m.id, fieldBlanks, camX, camY);
+    paceStageObjects(m.id, fieldBlanks, camX, camY, FIELD_VIEW_PAD);
     // The leader's own ordering bucket decides which side of the ground it lands
     // on. A type-5 field actor draws into the bucket named by its draw-layer word
     // (+0x78 -> the 0x1002 slot +0x138, F0x8008F52C), and a stage's own step
@@ -10005,7 +10107,7 @@ function render() {
     // This pass also ticks the frame, so drawEffects below must follow it.
     // The view size is the cull window the disc's F0x80089038 tests records
     // against (the 0x1002 layer's screen rect, 320x240 at ZOOM 1).
-    if (!window.__hideProps) drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM);
+    if (!window.__hideProps) drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD);
     // The under-map band (the party, whose leader's step-op 5 bucket is 8) goes
     // down HERE — after layer 2 and the 8/10 props, before the ground — the disc's
     // own OT[11] -> OT[8] -> OT[7] order.
@@ -10052,18 +10154,18 @@ function render() {
     // EXPERIMENT (3D water): shaded water surface over the map's water pixels,
     // drawn straight onto the ground (before every entity). ?nowater3d turns it off.
     if (!NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
-        const wc = renderWater(m.id, fxMapImg, camX, camY, performance.now() / 1000);
-        if (wc) ctx.drawImage(wc, 0, 0, WATER_VIEW.w, WATER_VIEW.h);
+        const wc = renderWater(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
+        if (wc) ctx.drawImage(wc, -FIELD_VIEW_PAD, 0, WATER_VIEW.w, WATER_VIEW.h);
     }
     if (!NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
-        const gc = renderGrass(m.id, fxMapImg, camX, camY, performance.now() / 1000);
+        const gc = renderGrass(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
         if (gc) {
             const STRIP = 8, PXS = GRASS_VIEW.px;
             for (let sy = 0; sy < GRASS_VIEW.h; sy += STRIP) {
                 drawables.push({
                     y: camY + sy + STRIP,
                     draw: () => ctx.drawImage(gc, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
-                                              0, sy, GRASS_VIEW.w, STRIP),
+                                              -FIELD_VIEW_PAD, sy, GRASS_VIEW.w, STRIP),
                 });
             }
         }
@@ -10071,8 +10173,9 @@ function render() {
     // EXPERIMENT (ambience ground layer): puddles, footprints, dust and wading ripples,
     // above the ground and under every sprite.
     if (!window.__hideProps && !m.fixedViewportBackground) {
-        const gfx = groundFxFor(m, fxMapImg, camX, camY);
-        if (gfx) drawables.push({ y: -1e12, draw: () => gfx(ctx) });
+        const gfx = groundFxFor(m, fxMapImg, camX - FIELD_VIEW_PAD, camY);
+        const gpad = FIELD_VIEW_PAD;
+        if (gfx) drawables.push({ y: -1e12, draw: () => { ctx.save(); ctx.translate(-gpad, 0); gfx(ctx); ctx.restore(); } });
     }
     const fgImg = state.mapFgImgs[m.id];
     if (fgImg instanceof Image) {
@@ -10090,7 +10193,7 @@ function render() {
     // the map, under all entities); y-sorted props join `drawables` at their
     // decoded baseline so the player walks behind them.
     // (tickNativeStage already ran above, before the under-map effects pass.)
-    if (!window.__hideProps) drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM);
+    if (!window.__hideProps) drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD);
     // Debug-only: record what each producer submits to the one ordering list, so
     // a verifier can read the band chosen (window.__drawComposites).
     if (window.__logDrawOrder) beginDrawOrderLog();
@@ -10486,8 +10589,8 @@ function render() {
     questsTick(m.id, state.x, state.y);   // EXPERIMENT: lets the optional quest layer notice a new stage and where you are
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {
-        const amb = ambienceFor(m, fxMapImg, camX, camY);
-        if (amb) amb(ctx);
+        const amb = ambienceFor(m, fxMapImg, camX - FIELD_VIEW_PAD, camY);
+        if (amb) { ctx.save(); ctx.translate(-FIELD_VIEW_PAD, 0); amb(ctx); ctx.restore(); }
     } else ambienceSilence();
     if (state.debugAnim) drawAnimDebug(debugInfos);
     window.__lastAnimDebug = debugInfos;
@@ -10716,6 +10819,7 @@ function render() {
     editor.drawOverlay(ctx);
     if (editor.enabled) sceneEd.drawOverlay(ctx);
     ctx.restore();
+    drawWideSideCovers(ctx);
 
     // Over the field, under everything the player can interact with.
     placeCard.draw(ctx, VIEW_W, VIEW_H);
@@ -10785,7 +10889,11 @@ function render() {
     }
     // Extra quests: a scene's own screen fade (the `fade` step). It is a plain black cover, not the game's stage-change
     // wipe, so it cannot make the map the quest is still standing on think the player arrived.
-    if (questFxFading()) questFxDrawFade(ctx, VIEW_W, VIEW_H);
+    if (questFxFading()) {
+        ctx.save(); ctx.translate(-wideField.padL, 0);
+        questFxDrawFade(ctx, VIEW_W + 2 * wideField.padL, VIEW_H);
+        ctx.restore();
+    }
     // The A28 checkerboard handoff draws over the field while it runs, whatever
     // the A27 fade's alpha is.
     if (state.wipe28) drawCheckerboardWipe(ctx);

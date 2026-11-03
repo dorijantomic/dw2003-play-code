@@ -15,11 +15,12 @@
 // Screen y (down) of a world point = z*sin(PITCH) - y*cos(PITCH), which is what
 // the OrthographicCamera below produces, so a blade planted at (px, py) lands
 // exactly on that map pixel and a blade h tall rises h*cos(PITCH) pixels.
-import * as THREE from "./lib3d/three.module.min.js";
+import * as THREE from "./lib3d/three.module.js";
 import { waterPixelTest } from "./water3d.js";
 import { classSource } from "./mapclass.js";
 
-const VIEW_W = 320;          // map pixels visible (game draws at ZOOM 2)
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 const PX = 2;                // device pixels per map pixel (matches ZOOM)
 const PITCH = (50 * Math.PI) / 180; // view direction below the horizon
@@ -282,6 +283,7 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
     if (NO_GRASS_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
+    if (renderer.domElement.width !== VIEW_W * PX) renderer.setSize(VIEW_W * PX, VIEW_H * PX, false);
     let st = stages.get(stageId);
     if (st === undefined) {
         const cls = classSource(stageId, mapImg);
@@ -330,4 +332,4 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
     return renderer.domElement;
 }
 
-export const GRASS_VIEW = { w: VIEW_W, h: VIEW_H, px: PX };
+export const GRASS_VIEW = { get w() { return VIEW_W; }, h: VIEW_H, px: PX };

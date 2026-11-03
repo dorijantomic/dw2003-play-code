@@ -13,7 +13,7 @@
 //              of everything (weather falls over the party), fading in when a
 //              map loads. Density scales with the map's own grass share.
 import { classSource, variantBase } from "./mapclass.js";
-import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel, todPhaseNow, cueBolt } from "./scenery.js";
+import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel, todPhaseNow, todColor, cueBolt } from "./scenery.js";
 import { syncVillagers, removeVillagers } from "./crowd.js";
 import { setSound, thunder, footstep, setAmbience, setMusic } from "./fxaudio.js";
 import { resetScenery3, drawScenery3 } from "./scenery3.js";
@@ -22,21 +22,24 @@ import { isWaterAt, isWaterStage, waterPixelTest } from "./water3d.js";
 import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
 import { SPRITE_FILTERS } from "./sprite-filters.js";
 
-const VIEW_W = 320;
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 
 // ---------------------------------------------------------------- settings
 export const FX_GROUPS = [
     ["Terrain", [["sway", "Swaying trees"], ["grass", "Grass"], ["grasspush", "Grass parts around feet"], ["water", "Water"], ["reflect", "Water reflections"], ["mirror", "Characters reflect in water"], ["wetlook", "Wet / dusty look on characters"], ["seam", "Seam fixes"]]],
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
-    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
+    ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["battleatmos", "Battle sky & weather: night, fog, snow, rain follow where you are (new)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
-    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"]]],
+    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
     // Battle rules the player switches on by hand (all OFF by default; see MANUAL below). One group,
     // shared: own clips (each Digimon plays its own attack for a technique it has no clip for), the
     // Digimon World 2 motion for empty clips, and the smoother pose playback.
+    // HD Remaster screen shape (web/field-view.js). Off by default; Authentic never uses them.
+    ["Screen", [["widefield", "Wide overworld: fill a wide screen (HD Remaster, window fill / fullscreen)"], ["battlewide", "Battle camera a little further out (HD Remaster)"], ["uisharp", "Sharp battle menus (xBR, HD Remaster)"], ["smartcam", "Smart 2 vs 2 camera: moves so rocks do not hide the Digimon"], ["battlepano", "Painted 360 battle backdrops (HD Remaster, test: Shell Beach)"], ["toonoutline", "Toon outlines: black outlines around the Digimon in battle"], ["toonshade", "Toon shading: flat cel light on the Digimon in battle"], ["softalpha", "Smooth cut-out edges: no blocky steps on crests and tails of the Digimon in battle (HD Remaster)"]]],
     ["Battle", [["ownclips", "Own clips for techniques (each Digimon uses its own attack)"], ["dw2motion", "Digimon World 2 motion for techniques a Digimon has no clip for"], ["smoothanim", "Smooth battle animation (more in-between frames)"]]],
 ];
 export const FX_DEFS = FX_GROUPS.flatMap(([, list]) => list);
@@ -47,7 +50,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha"];     // off until you switch them on by hand; "All on" and the presets leave them alone
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
@@ -234,14 +237,25 @@ const smooth = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
 // World-anchored particles: each keeps a map-pixel position and is drawn wrapped
 // onto a torus slightly larger than the view (M px margin), so the camera moving
 // never drags them along and the newly uncovered strip is already populated.
-const M = 40, DW = VIEW_W + 2 * M, DH = VIEW_H + 2 * M;
+const M = 40, DH = VIEW_H + 2 * M;
+let DW = VIEW_W + 2 * M;
 const wrapX = (x, cam) => (((x - cam + M) % DW) + DW) % DW - M;
 const wrapY = (y, cam) => (((y - cam + M) % DH) + DH) % DH - M;
-const MB = 200, DWB = VIEW_W + 2 * MB, DHB = VIEW_H + 2 * MB;       // big soft shapes (dust)
+const MB = 200, DHB = VIEW_H + 2 * MB;
+let DWB = VIEW_W + 2 * MB;       // big soft shapes (dust)
 const wrapXB = (x, cam) => (((x - cam + MB) % DWB) + DWB) % DWB - MB;
 const wrapYB = (y, cam) => (((y - cam + MB) % DHB) + DHB) % DHB - MB;
 
 const wrapRange = (v, period, margin) => (((v + margin) % period) + period) % period - margin;
+// The particle tori follow the view width; true when it changed (the particles are then laid out again).
+function syncViewDims() {
+    if (DW === VIEW_W + 2 * M) return false;
+    DW = VIEW_W + 2 * M; DWB = VIEW_W + 2 * MB;
+    S.DW = DW; S.DWB = DWB;
+    return true;
+}
+// Particle counts are set for the 320 view; a wider view gets the same density.
+const wideCount = (n, big = false) => Math.round(n * (big ? DWB / (320 + 2 * MB) : DW / (320 + 2 * M)));
 
 // pixels of the current map's classification picture, read once per map visit
 let pixCache = null;
@@ -348,21 +362,21 @@ function resetFor(map, p) {
     resetScenery2(map, p, S);
     resetScenery3(map, p);
     const r = rng(p.seed ^ 0x9e3779b9);
-    drops = Array.from({ length: 170 }, () => ({
+    drops = Array.from({ length: wideCount(170) }, () => ({
         gx: r() * DW, gy: r() * DH, h: r() * 180, v: 230 + r() * 150, l: 7 + r() * 7, a: 0.45 + r() * 0.4,
     }));
     splashes = [];
-    grit = Array.from({ length: 260 }, () => ({
+    grit = Array.from({ length: wideCount(260) }, () => ({
         x: r() * DW, y: r() * DH, v: 240 + r() * 200, l: 8 + r() * 14, a: 0.45 + r() * 0.4,
     }));
-    dust = Array.from({ length: 9 }, () => ({
+    dust = Array.from({ length: wideCount(9, true) }, () => ({
         x: r() * DWB, y: r() * DHB, rad: 70 + r() * 100, v: 30 + r() * 40, a: 0.22 + r() * 0.18,
     }));
-    storm = Array.from({ length: 260 }, () => ({ x: r() * DW, y: r() * DH, v: 40 + r() * 50, a: 0.3 + r() * 0.4 }));
-    flakes = Array.from({ length: 230 }, () => ({
+    storm = Array.from({ length: wideCount(260) }, () => ({ x: r() * DW, y: r() * DH, v: 40 + r() * 50, a: 0.3 + r() * 0.4 }));
+    flakes = Array.from({ length: wideCount(230) }, () => ({
         x: r() * DW, y: r() * DH, v: 16 + r() * 30, s: 0.7 + r() * 1.3, ph: r() * 6.28, sw: 6 + r() * 14,
     }));
-    const nLeaves = Math.round(24 + 50 * Math.min(1, p.grassShare / 0.3));
+    const nLeaves = wideCount(Math.round(24 + 50 * Math.min(1, p.grassShare / 0.3)));
     leaves = Array.from({ length: nLeaves }, () => ({
         x: r() * DW, y: r() * DH, v: 12 + r() * 14, d: 14 + r() * 22, ph: r() * 6.28,
         rot: r() * 6.28, spin: (r() - 0.5) * 4, hue: r(), kx: 0, ky: 0,
@@ -623,6 +637,14 @@ export function ambienceLightning(count = 1, force = false) {
 
 // ------------------------------------------------------------------- frame
 // Returns a draw(ctx) closure for this frame (or null when nothing applies).
+// What a fight started here should look like (battle3d.js, F2 -> Atmosphere -> "Battle sky & weather"): the last
+// overworld map's weather as measured above, and the time of day live.
+let lastAtmos = null;
+window.__battleAtmos = () => {
+    if (!lastAtmos) return null;
+    const phase = todPhaseNow();
+    return { ...lastAtmos, phase, rgb: todColor(phase), thunder: () => thunder(fx.sound, 900, (Math.random() * 2 - 1) * 0.6) };
+};
 export function ambienceFor(map, mapImg, camX, camY) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
@@ -642,6 +664,8 @@ export function ambienceFor(map, mapImg, camX, camY) {
     const fxo = sceneFxFlags();
     const now = performance.now();
     const L = levels(p, now);
+    lastAtmos = { mapId: map.id, tod: !!(fxo.tod && ps.tod), nightMap: !!p.night, foggy: !!(fxo.fog && ps.fog),
+        L: { rain: fxo.rain ? L.rain : 0, snow: fxo.snow ? L.snow : 0, blizzard: fxo.snow ? L.blizzard : 0, sand: fxo.sand ? L.sand : 0 } };
     bodyFxTick(map, p, L, now);
     const wantRain = fxo.rain && L.rain > 0.01;
     const wantSnow = fxo.snow && (L.snow > 0.01 || L.blizzard > 0.01);
@@ -657,6 +681,7 @@ export function ambienceFor(map, mapImg, camX, camY) {
         || (fxo.frost && ps.snowy) || (fxo.devils && ps.devils) || ((fxo.dragonflies || fxo.fish || fxo.critters) && ps.open)
         || !!sceneFx || now < flashUntil;
     if (!(wantRain || wantSnow || wantSand || wantLeaves || wantFlies || sceneryOn)) return null;
+    if (syncViewDims()) curId = null;
     if (curId !== map.id || lastSceneRev !== sceneRev) { resetFor(map, ps); lastSceneRev = sceneRev; }
     const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0);
     lastT = now;
@@ -838,6 +863,7 @@ export function groundFxFor(map, mapImg, camX, camY) {
     const p = profileOf(map, mapImg);
     if (!p || !p.open) return null;
     if (!(fx.steps || fx.footsteps || (fx.puddles && (p.rainy || p.snowy || sceneFx)))) return null;
+    if (syncViewDims()) curId = null;
     if (curId !== map.id) resetFor(map, p);
     const now = performance.now();
     const dt = Math.min(0.05, lastG ? (now - lastG) / 1000 : 0);

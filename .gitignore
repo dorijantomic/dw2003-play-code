@@ -90,3 +90,13 @@ web/extra_fx/giant_master_px.json
 # local only: the mount hides itself when the file is not there, and nothing here is ever committed.
 web/dw2models/
 web/assets-lab/
+
+# Local debugging pages and tools: for our own work, not for other people (2026-11-03).
+web/arena-viewer.html
+web/biome-gallery.html
+web/quest-editor.html
+tools/_probe_*
+# Downloaded third-party 3D models: licences not checked yet, local only.
+web/biome/assets/
+# Local agent notes with private paths.
+/CLAUDE.md

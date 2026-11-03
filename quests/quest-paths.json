@@ -1,0 +1,4 @@
+{
+ "_comment": "Named walking routes for quest scenes. A scene step { \"walk\": 27, \"path\": \"name\" } walks the points in order, each leg routed round walls like any quest walk (web/quest-scenes.js). Drawn in web/quest-editor.html; every point is walkable ground (web/quest-walk.js). Mirrored to quests/ and web/quest-paths.json on save.",
+ "paths": {}
+}

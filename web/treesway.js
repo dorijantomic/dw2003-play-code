@@ -16,6 +16,7 @@ const MIN_AREA = 450;        // smaller blobs are not trees
 const GREEN_SHARE = 0.5;     // share of a blob's pixels that must be foliage green
 const CELL_W = 24, CELL_H = 2;
 const BLOCK = 4;             // resolution of the ground fill under a removed canopy
+import { FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 
 const stages = new Map();    // stageId -> built data | null (nothing to sway)
 
@@ -138,9 +139,10 @@ export function drawSwayingForeground(ctx, stageId, fgImg, baseImg, camX, camY, 
     if (!(fgImg instanceof Image) || !(baseImg instanceof Image)) return false;
     const b = get(stageId, fgImg, baseImg);
     if (!b) return false;
-    const t = now / 1000, VIEW_W = 320, VIEW_H = 240;
+    // The view is the 320 box plus FIELD_VIEW_PAD each side with F2 -> Screen -> Wide overworld (web/field-view.js).
+    const t = now / 1000, VIEW_W = FIELD_VIEW_W, VIEW_H = 240, left = camX - FIELD_VIEW_PAD;
     ctx.drawImage(b.restCv, -camX, -camY);
-    const cx0 = Math.max(0, Math.floor(camX / CELL_W)), cx1 = Math.min(b.cols - 1, Math.floor((camX + VIEW_W) / CELL_W) + 1);
+    const cx0 = Math.max(0, Math.floor(left / CELL_W)), cx1 = Math.min(b.cols - 1, Math.floor((left + VIEW_W) / CELL_W) + 1);
     const ry0 = Math.max(0, Math.floor(camY / CELL_H)), ry1 = Math.min(b.rows - 1, Math.floor((camY + VIEW_H) / CELL_H) + 1);
     const amp = (0.7 + 0.5 * Math.sin(t * 0.21)) * calm;
     for (let r = ry0; r <= ry1; r++) {

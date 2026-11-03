@@ -7,7 +7,7 @@
 //   --probe: one picture per 45 degrees, to check the model's front.
 // The loop: a battle model's idle (its stance) is the first stretch of its animation, ending where the root
 // bone comes back to its frame-0 pose. LOOP=start:end overrides it. ZOOM, PITCH and FRONT tune the camera.
-import { chromium } from "playwright";
+import { launch } from "./verify-launch.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { baseUrl } from "./verify-base-url.mjs";
 
@@ -18,12 +18,13 @@ const front = Number(process.env.FRONT ?? 0);        // camera angle that sees t
 const pitch = Number(process.env.PITCH ?? 0.3);     // radians above the horizon (field camera)
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader"] });
-const page = await browser.newPage({ viewport: { width: 900, height: 900 } });
+const browser = await launch();
+const page = await browser.newPage({ viewport: { width: Number(process.env.SIZE ?? 900), height: Number(process.env.SIZE ?? 900) } });
 page.on("pageerror", (e) => console.log("pageerror", e.message));
 await page.goto(`${baseUrl(8770)}/model-viewer.html?model=${model}`);
 await page.waitForFunction(() => window._model && window._mv, null, { timeout: 60000 });
 await page.waitForTimeout(800);
+console.log("renderer:", await page.evaluate(() => { const g = document.createElement("canvas").getContext("webgl"); const e = g.getExtension("WEBGL_debug_renderer_info"); return g.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : g.RENDERER); }));
 const loop = process.env.LOOP ? process.env.LOOP.split(":").map(Number) : await page.evaluate(() => {
   const ch = window._model.bones?.[0]?.anim?.ch1 ?? [];
   const same = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];

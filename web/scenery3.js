@@ -7,7 +7,8 @@
 import { darkness } from "./scenery.js";
 import { lampPoints, windowRects } from "./scenery2.js";
 
-const VIEW_W = 320;
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -58,7 +59,7 @@ function drawNightLight(ctx, S) {
     const { fx, p, now, fade, camX, camY, t } = S;
     const dark = darkness(p, fx, now);
     if (dark < 0.06) return;
-    if (!nl) { nl = document.createElement("canvas"); nl.width = VIEW_W; nl.height = VIEW_H; nlx = nl.getContext("2d"); }
+    if (!nl || nl.width !== VIEW_W) { nl = document.createElement("canvas"); nl.width = VIEW_W; nl.height = VIEW_H; nlx = nl.getContext("2d"); }
     nlx.globalCompositeOperation = "source-over";
     nlx.clearRect(0, 0, VIEW_W, VIEW_H);
     nlx.fillStyle = `rgba(5,9,28,${(0.5 * dark * fade).toFixed(3)})`;

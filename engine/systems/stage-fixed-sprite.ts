@@ -208,9 +208,12 @@ export function stepFixedSpriteRun(
  */
 export function fixedSpriteVisible(
     camX: number, camY: number, x: number, y: number, w: number, h: number,
+    pad = 0,
 ): boolean {
-    if (x + w < camX) return false;
-    if (camX + FIXED_SPRITE_CANVAS_W < x) return false;
+    // `pad`: the HD Remaster wide overworld's extra map pixels on each side of the 320 box
+    // (web/field-view.js); 0 is the original box.
+    if (x + w < camX - pad) return false;
+    if (camX + FIXED_SPRITE_CANVAS_W + pad < x) return false;
     if (y + h < camY) return false;
     return !(camY + FIXED_SPRITE_SCREEN_H < y);
 }
@@ -254,6 +257,7 @@ export function tickFixedSprite(
     delta: number,
     camX = 0,
     camY = 0,
+    pad = 0,
 ): FixedSpriteDraw[] {
     const jobs: FixedSpriteDraw[] = [];
     const draws = member.drawStates ?? [member.fullState ?? 1];
@@ -267,7 +271,7 @@ export function tickFixedSprite(
             obj.loopIndex = loop.index;
             obj.loopTimer = loop.timer;
             if (obj.frontClip !== 0
-                && fixedSpriteVisible(camX, camY, obj.x, obj.y, 0x20, 0x20)) {
+                && fixedSpriteVisible(camX, camY, obj.x, obj.y, 0x20, 0x20, pad)) {
                 jobs.push({
                     id: obj.id, clip: obj.frontClip, ctr: obj.ctr, x: obj.x, y: obj.y,
                     layer: FIXED_SPRITE_FRONT_LAYER, sortY: obj.y,
@@ -302,14 +306,14 @@ export function tickFixedSprite(
         }
         if (obj.ended) obj.state = 3;
 
-        if (obj.frontClip !== 0 && fixedSpriteVisible(camX, camY, obj.x, obj.y, 0x20, 0x20)) {
+        if (obj.frontClip !== 0 && fixedSpriteVisible(camX, camY, obj.x, obj.y, 0x20, 0x20, pad)) {
             jobs.push({
                 id: obj.id, clip: obj.frontClip, ctr: obj.ctr, x: obj.x, y: obj.y,
                 layer: FIXED_SPRITE_FRONT_LAYER, sortY: obj.y,
             });
         }
         if (obj.burstClip !== 0
-            && fixedSpriteVisible(camX, camY, obj.x, obj.y + FIXED_SPRITE_BACK_Y, 0x20, 0x40)) {
+            && fixedSpriteVisible(camX, camY, obj.x, obj.y + FIXED_SPRITE_BACK_Y, 0x20, 0x40, pad)) {
             jobs.push({
                 id: obj.id, clip: obj.burstClip, ctr: 0,
                 x: obj.x, y: obj.y + FIXED_SPRITE_BACK_Y,

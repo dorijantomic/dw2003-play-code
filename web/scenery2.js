@@ -5,7 +5,8 @@
 // drags it along. ambience.js decides which maps get which effect.
 import { darkness, setReveal } from "./scenery.js";
 
-const VIEW_W = 320;
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -121,7 +122,7 @@ setReveal({
         const dark = darkness(S.p, S.fx, S.now);
         if (dark < 0.04) return;
         const gain = typeof window.__lightGain === "number" ? window.__lightGain : 1, a = clamp01(0.85 * gain * dark * S.fade);
-        if (!rvMask) { rvMask = document.createElement("canvas"); rvMask.width = VIEW_W; rvMask.height = VIEW_H; }
+        if (!rvMask || rvMask.width !== VIEW_W) { rvMask = document.createElement("canvas"); rvMask.width = VIEW_W; rvMask.height = VIEW_H; }
         if (!rvTmp || rvTmp.width !== snap.width || rvTmp.height !== snap.height) { rvTmp = document.createElement("canvas"); rvTmp.width = snap.width; rvTmp.height = snap.height; }
         const mx = rvMask.getContext("2d");
         mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = "source-over"; mx.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -534,7 +535,7 @@ export function drawScenery2(ctx, S) {
 
     // frost creeping in from the screen edges in a blizzard
     if (fx.frost && p.snowy && L.blizzard > 0.05) {
-        if (!frost) frost = makeFrost();
+        if (!frost || frost.width !== VIEW_W) frost = makeFrost();
         ctx.globalAlpha = clamp01(L.blizzard) * 0.95 * fade;
         ctx.drawImage(frost, 0, 0);
     }

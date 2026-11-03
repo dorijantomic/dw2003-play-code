@@ -143,6 +143,7 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 /**
  * @param steps      the scene's steps (see above)
  * @param opts.playerId  the script id the player answers to in this scene (cutscene.playerActorId: 1 or 2)
+ * @param opts.paths     name -> [[x, y], ...] (or { points }), or a function of the name: the routes a { walk, path } step plays
  * @param opts.pos       (actorId) -> { x, y } | null, the current place of a character (for "face" and for safe defaults)
  * @returns { opcodes, speech, errors }  speech[n] = { who, name, text } for the SAY opcode numbered n
  */
@@ -196,10 +197,38 @@ export function compileScene(steps, opts = {}) {
     // A host event: one opcode the VM hands to the game (`SCENEEVENT <index>`) and the spec that says what to do
     const event = (spec) => { events.push(spec); opcodes.push(`SCENEEVENT ${events.length - 1}`); };
     opcodes.push(`FN6A 1 ${playerId}`);                       // the camera starts on the player, as in the story scenes
+    // One walk to a point: a clear line is one WALKTO, a blocked one is routed into legs (see the walk step below)
+    const emitWalk = (who, to, f) => {
+        const from = walkStart(idOf(who));
+        const legs = from && opts.walk ? opts.walk(from.x, from.y, num(to[0]), num(to[1])) : null;
+        const routed = legs && legs.length && (legs.length > 1 || legs[0][0] !== num(to[0]) || legs[0][1] !== num(to[1]));
+        if (routed) {
+            legs.forEach((leg, k) => {
+                const last = k === legs.length - 1;
+                opcodes.push(`WALKTO ${idOf(who)} ${num(leg[0])} ${num(leg[1])}${last && f != null ? " " + f : ""}`);
+                if (!last) opcodes.push(`WAITIDLE ${idOf(who)}`);
+            });
+        } else {
+            opcodes.push(`WALKTO ${idOf(who)} ${num(to[0])} ${num(to[1])}${f == null ? "" : " " + f}`);
+        }
+        walkAt.set(Number(idOf(who)), { x: num(to[0]), y: num(to[1]) });
+    };
     steps.forEach((s, i) => {
         const bad = (why) => errors.push(`step ${i + 1}: ${why}`);
         if (s == null || typeof s !== "object") return bad("not an object");
-        if ("walk" in s) {
+        if ("walk" in s && s.path != null && s.to == null) {
+            // A named path (quests/quest-paths.json, drawn in web/quest-editor.html): its points are walked in order, each
+            // one a walk exactly like { walk, to: [x, y] } (so each is routed round walls), waited out before the next.
+            const rec = typeof opts.paths === "function" ? opts.paths(s.path) : opts.paths?.[s.path];
+            const pts = Array.isArray(rec) ? rec : rec?.points;
+            if (!Array.isArray(pts) || !pts.length || !pts.every((p) => Array.isArray(p) && p.length === 2)) return bad(`walk: no path named ${JSON.stringify(s.path)}`);
+            const f = facing(s.face);
+            pts.forEach((p, k) => {
+                const last = k === pts.length - 1;
+                emitWalk(s.walk, p, last ? f : null);
+                if (!last) opcodes.push(`WAITIDLE ${idOf(s.walk)}`);
+            });
+        } else if ("walk" in s) {
             let to = s.to;
             if (to === "origin") {                                // back to where they stood when the scene began
                 const p = opts.pos?.(idOf(s.walk));
@@ -227,19 +256,7 @@ export function compileScene(steps, opts = {}) {
             // (opts.walk, web/quest-walk.js over the map's collision grid): a clear line stays one WALKTO exactly as
             // before, a blocked one becomes a few legs. The VM holds one target per actor, so every leg but the last is
             // waited out; only walks that actually cross something pay that cost.
-            const from = walkStart(idOf(s.walk));
-            const legs = from && opts.walk ? opts.walk(from.x, from.y, num(to[0]), num(to[1])) : null;
-            const routed = legs && legs.length && (legs.length > 1 || legs[0][0] !== num(to[0]) || legs[0][1] !== num(to[1]));
-            if (routed) {
-                legs.forEach((leg, k) => {
-                    const last = k === legs.length - 1;
-                    opcodes.push(`WALKTO ${idOf(s.walk)} ${num(leg[0])} ${num(leg[1])}${last && f != null ? " " + f : ""}`);
-                    if (!last) opcodes.push(`WAITIDLE ${idOf(s.walk)}`);
-                });
-            } else {
-                opcodes.push(`WALKTO ${idOf(s.walk)} ${num(to[0])} ${num(to[1])}${f == null ? "" : " " + f}`);
-            }
-            walkAt.set(Number(idOf(s.walk)), { x: num(to[0]), y: num(to[1]) });
+            emitWalk(s.walk, to, f);
         } else if ("together" in s) {
             const w = opts.pos?.(idOf(s.together)), p = opts.pos?.(playerId);
             if (!w || !p) return bad(`together: nobody ${s.together} to walk with`);
@@ -482,6 +499,6 @@ export function castOf(steps) {
 
 /** Static check of a scene (no game needed): returns a list of problems, empty when it is well formed. */
 export function validateScene(steps) {
-    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }) });
+    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }), paths: () => [[0, 0]] });
     return errors;
 }

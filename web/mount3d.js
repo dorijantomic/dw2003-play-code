@@ -11,7 +11,7 @@
 // mount reads as a pixel sprite standing in a 320x240 field rather than a smooth 3D model.
 //
 // Nothing here reads game state: mount.js owns the riding rules.
-import * as THREE from "./lib3d/three.module.min.js";
+import * as THREE from "./lib3d/three.module.js";
 
 export const MOUNT_VIEW = { w: 112, h: 104 };      // game pixels of the sprite cell
 const PITCH = (50 * Math.PI) / 180;                // the field's own isometric pitch (web/grass3d.js)

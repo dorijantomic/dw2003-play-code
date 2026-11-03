@@ -9,10 +9,11 @@
 //      a shoreline foam line ride on top.
 //   3. game.js draws the result right after the map, before the y-sorted
 //      entities, so the party and props stand on top of the water.
-import * as THREE from "./lib3d/three.module.min.js";
+import * as THREE from "./lib3d/three.module.js";
 import { classSource } from "./mapclass.js";
 
-const VIEW_W = 320;
+// The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
+import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 const PX = 2;
 const PITCH = (50 * Math.PI) / 180; // must match grass3d.js
@@ -238,6 +239,7 @@ export function renderWater(stageId, mapImg, camX, camY, timeSec) {
     if (!WATER_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
+    if (renderer.domElement.width !== VIEW_W * PX) renderer.setSize(VIEW_W * PX, VIEW_H * PX, false);
     let st = stages.get(stageId);
     if (st === undefined) {
         const cls = classSource(stageId, mapImg);
@@ -257,7 +259,7 @@ export function renderWater(stageId, mapImg, camX, camY, timeSec) {
     return renderer.domElement;
 }
 
-export const WATER_VIEW = { w: VIEW_W, h: VIEW_H, px: PX };
+export const WATER_VIEW = { get w() { return VIEW_W; }, h: VIEW_H, px: PX };
 
 // Is this map pixel water (so wading can ripple)? False until the stage has been drawn once.
 export function isWaterAt(stageId, x, y) {

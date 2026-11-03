@@ -825,9 +825,10 @@ function prepareEffects(stageId, view = null) {
 /** The cull rect for a draw call's camera: the visible map-pixel window, the
  *  walker's stand-in for the 0x1002 layer's screen rect (ctx+0x128).  No view
  *  dimensions (a caller without a camera) -> null, and nothing is culled. */
-function viewRect(camX, camY, viewW, viewH) {
+function viewRect(camX, camY, viewW, viewH, pad = 0) {
+    // `pad`: the HD Remaster wide overworld's extra map pixels on each side (web/field-view.js).
     return viewW > 0 && viewH > 0
-        ? { x: camX, y: camY, w: viewW, h: viewH }
+        ? { x: camX - pad, y: camY, w: viewW + 2 * pad, h: viewH }
         : null;
 }
 
@@ -835,8 +836,8 @@ function viewRect(camX, camY, viewW, viewH) {
 // buckets 8 and above. Call this immediately BEFORE the base map is drawn; the
 // map art then covers them, which is what the console does. It also ticks the
 // frame, so drawEffects must follow it on the same frame.
-export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH) {
-    const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH));
+export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH, pad = 0) {
+    const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
     preparedFrame = f;
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw) => {
@@ -850,10 +851,10 @@ export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH) {
 // them. Coordinates are map-space; ctx is already camera-translated by the
 // caller passing camX/camY. Records at UNDER_MAP_BUCKET and above were already
 // painted by drawEffectsUnderMap and are skipped here.
-export function drawEffects(ctx, stageId, camX, camY, drawables, viewW, viewH) {
+export function drawEffects(ctx, stageId, camX, camY, drawables, viewW, viewH, pad = 0) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
-        : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH));
+        : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
     preparedFrame = null; // one frame's preparation is good for one frame
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw, py, pysort) => {

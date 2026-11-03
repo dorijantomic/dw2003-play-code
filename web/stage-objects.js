@@ -349,7 +349,7 @@ export function streetScreensActive(stageId) {
 }
 
 /** Per-frame: advance every live actor. Call once, before the draw passes. */
-export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0) {
+export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0, pad = 0) {
     // The street cars, the street screens and the pad halos count the same blanks as the rocks.
     tickStreetVehicles(stageId, delta);
     if (streetScreensActive(stageId)) tickStreetScreens(stageId, delta);
@@ -383,7 +383,7 @@ export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0) {
     if (members && sprites?.length) {
         for (const o of sprites) {
             const m = fixedSpriteFor(members, o.id);
-            if (m) o.jobs = tickFixedSprite(o, m, delta, camX, camY);
+            if (m) o.jobs = tickFixedSprite(o, m, delta, camX, camY, pad);
         }
     }
     // The display ensembles write into the same chain the renderer reads, so
@@ -418,8 +418,8 @@ export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0) {
  * returned for this frame (the render loop reads it once and hands the same
  * list to the native stage runtime). Returns the number of blanks run.
  */
-export function paceStageObjects(stageId, deltas, camX = 0, camY = 0) {
-    for (const delta of deltas) tickStageObjects(stageId, delta, camX, camY);
+export function paceStageObjects(stageId, deltas, camX = 0, camY = 0, pad = 0) {
+    for (const delta of deltas) tickStageObjects(stageId, delta, camX, camY, pad);
     return deltas.length;
 }
 

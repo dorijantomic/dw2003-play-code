@@ -1,5 +1,8 @@
 # Notes for agents working in this repo
 
+- **GPU ONLY, NEVER CPU (user, absolute, 2026-11-03).** Every render/filming/headless Chromium uses the AMD GPU: WSL sees it via /dev/dxg, `tools/run-playwright.sh` sets GALLIUM_DRIVER=d3d12, launch Chromium via `tools/verify-launch.mjs` (HARDWARE args) and print the WebGL renderer string. SwiftShader / llvmpipe / `--use-angle=swiftshader` = forbidden: stop and report.
+
+
 Short pointers to knowledge that is easy to lose. Read the linked file before touching the area.
 
 ## Extra quests and new characters (a layer on top of the game, never part of the story)

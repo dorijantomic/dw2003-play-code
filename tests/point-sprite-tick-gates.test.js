@@ -224,8 +224,8 @@ test("web/effects.js routes the tick and the draw through the engine's gates", (
   assert.ok(src.includes("const gates = pointModeGatesFor(stageId);"),
     "the gate rows are looked up per prepared frame, so a retained runtime "
     + "still follows a flag set while the player was away");
-  // and the game hands the camera window to both passes
+  // and the game hands the camera window to both passes (plus the wide overworld pad, web/field-view.js)
   const game = readFileSync(resolve(ROOT, "web/game.js"), "utf8");
-  assert.ok(game.includes("drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM)"));
-  assert.ok(game.includes("drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM)"));
+  assert.ok(game.includes("drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD)"));
+  assert.ok(game.includes("drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD)"));
 });

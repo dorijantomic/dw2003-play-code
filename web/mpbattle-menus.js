@@ -104,7 +104,11 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         },
         draw(ctx, cw, ch) {
             ctx.save();
-            ctx.scale(cw / NATIVE_W, ch / NATIVE_H);
+            // one even scale, the 320 x 240 box centred: the one-on-one battle's own rule (battle.js), so a wide window
+            // does not stretch the menus sideways
+            const k = Math.min(cw / NATIVE_W, ch / NATIVE_H);
+            ctx.translate((cw - NATIVE_W * k) / 2, (ch - NATIVE_H * k) / 2);
+            ctx.scale(k, k);
             if (mode) {
                 const w = widgets[mode];
                 if (w.active()) {

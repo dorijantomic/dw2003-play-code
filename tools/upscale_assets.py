@@ -185,6 +185,12 @@ def portrait_cell_max_edge(src: Path, atlas: bool) -> int | None:
 # (15,875 of 15,881 prop rects lie within 2 px of another), so a whole-sheet pass would bleed one
 # frame into the next; each frame is inferred alone with its own edges reflected as context.
 OVERWORLD_AI = True
+# UI AI (--ui-ai, OFF by default, 2026-10-27; a test until the user has seen the samples): a ui/ screen-pack sheet whose
+# <name>.json lists its pieces (clip id -> layers x/y/w/h) is AI-upscaled ONE PIECE AT A TIME, like the overworld sheets.
+# The pieces touch (a panel is edge slices and strips tiled side by side), so a whole-sheet pass would bleed. A piece
+# that lies inside a bigger listed piece is done as part of the bigger one.
+UI_AI = False
+UI_AI_SHEETS = ("ui/pgfgc00_sheet.png",)   # the battle menus first (command list, TECH/ITEM/DV/TAG, message window, HUD)
 CELL_MODELS = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
 
 
@@ -197,6 +203,14 @@ def _stage_sheet(rel: Path) -> tuple[str, bool] | None:
 @functools.lru_cache(maxsize=4)
 def _read_json(path: str):
     return json.loads(Path(path).read_text())
+
+
+def _ui_piece_sheet(root: Path, rel: Path) -> Path | None:
+    """ui/x_sheet.png -> ui/x_sheet.json when --ui-ai is on and the sheet is one of UI_AI_SHEETS."""
+    if not UI_AI or rel.as_posix() not in UI_AI_SHEETS:
+        return None
+    pieces = root / rel.with_suffix(".json")
+    return pieces if pieces.is_file() else None
 
 
 def cell_regions(src: Path, rel: Path) -> list[tuple[int, int, int, int]]:
@@ -218,6 +232,16 @@ def cell_regions(src: Path, rel: Path) -> list[tuple[int, int, int, int]]:
                 y1 = min(height, int(layer["y"]) + int(layer["h"]))
                 if x1 > x0 and y1 > y0:
                     boxes.add((x0, y0, x1, y1))
+    elif _ui_piece_sheet(root, rel):
+        clips = _read_json(str(_ui_piece_sheet(root, rel)))
+        for clip in clips.values():
+            for layer in (clip.get("layers") or []) if isinstance(clip, dict) else []:
+                x0, y0 = max(0, int(layer["x"])), max(0, int(layer["y"]))
+                x1 = min(width, int(layer["x"]) + int(layer["w"]))
+                y1 = min(height, int(layer["y"]) + int(layer["h"]))
+                if x1 > x0 and y1 > y0:
+                    boxes.add((x0, y0, x1, y1))
+        boxes = {b for b in boxes if not any(o != b and o[0] <= b[0] and o[1] <= b[1] and o[2] >= b[2] and o[3] >= b[3] for o in boxes)}
     elif rel.parts and rel.parts[0] == "sprites":
         manifest = _read_json(str(root / "manifest.json"))
         wanted = "assets/" + rel.as_posix()
@@ -286,6 +310,8 @@ def asset_class(rel: Path, src: Path | None = None) -> str:
         return _portrait_class(source, "portrait", atlas=False)
     if root == "ui" and name == "ststat_sheet.png":
         return _portrait_class(source, "portrait-atlas", atlas=True)
+    if UI_AI and rel.as_posix() in UI_AI_SHEETS:
+        return "ui-frames"
     if OVERWORLD_AI and root == "sprites":
         return "sprite-frames"
     if OVERWORLD_AI and _stage_sheet(rel):
@@ -320,7 +346,7 @@ def processing_recipe(
     kind = asset_class(rel, src)
     if kind in {"tiny-sprite", "ui-text", "portrait-tiny"}:
         return {"assetClass": kind, "method": "nearest", "models": []}
-    if kind in {"sprite-frames", "prop-frames"}:
+    if kind in {"sprite-frames", "prop-frames", "ui-frames"}:
         return {"assetClass": kind, "method": "ai-frames", "models": list(CELL_MODELS)}
     if kind == "map":
         models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
@@ -1369,6 +1395,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dilate", type=int, default=16, help="transparent-edge fill passes")
     parser.add_argument(
+        "--ui-ai", action="store_true",
+        help="AI-upscale the battle menu sheet one piece at a time (UI_AI_SHEETS; off by default, a test)",
+    )
+    parser.add_argument(
         "--overworld-ai", action=argparse.BooleanOptionalAction, default=True,
         help="AI-upscale field character sheets and stage prop sheets frame by frame (default: on)",
     )
@@ -1377,8 +1407,9 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    global OVERWORLD_AI
+    global OVERWORLD_AI, UI_AI
     OVERWORLD_AI = bool(args.overworld_ai)
+    UI_AI = bool(args.ui_ai)
     if args.tile < 16 or args.overlap < 0 or args.dilate < 0:
         _parser().error("--tile must be >= 16; --overlap and --dilate must be >= 0")
     if args.src_dir.resolve() == args.out_dir.resolve():
