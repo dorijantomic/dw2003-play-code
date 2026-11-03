@@ -975,6 +975,31 @@ function _updateSkeletalVBOGL(gl, model, buffers, bwm, worldPos, scale, flipX, y
 // reaction script's own op10[99] impact sprite. Nothing modulates the body colour, so this
 // is one untinted colour and it is the only one the fighter path has.
 export const FIGHTER_TINT = [1, 1, 1, 1];
+
+// NEW content (F2 -> Extras -> "Fusion bosses", off by default): a per-side fighter tint.
+// The original has ONE untinted colour for every fighter (FIGHTER_TINT above), so this is
+// ours; web/fusion.js's boss record carries the rgba, and web/battle.js sets it when the
+// two halves fuse (Kimeramon's body wearing Millenniummon's dark palette). With the
+// switch off nothing calls setFighterTint and every side keeps FIGHTER_TINT.
+const FIGHTER_TINTS = { player: FIGHTER_TINT, enemy: FIGHTER_TINT, extra: FIGHTER_TINT };
+
+/** The tint a side draws with: the game's own FIGHTER_TINT unless a fusion set one. */
+export function fighterTint(side) {
+  return FIGHTER_TINTS[side] ?? FIGHTER_TINT;
+}
+
+/**
+ * Set one side's fighter tint. `rgba` is four 0..1 numbers; `null` (or anything that is
+ * not a colour) puts the game's own FIGHTER_TINT back. Returns the tint now in force.
+ */
+export function setFighterTint(side, rgba) {
+  const key = side === "enemy" ? "enemy" : side === "extra" ? "extra" : "player";
+  const colour = Array.isArray(rgba) && rgba.length >= 3
+    ? [rgba[0], rgba[1], rgba[2], rgba[3] ?? 1].map(Number)
+    : null;
+  FIGHTER_TINTS[key] = colour && colour.every(Number.isFinite) ? colour : FIGHTER_TINT;
+  return FIGHTER_TINTS[key];
+}
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
 // Sign that turns cross(p1 - p0, p2 - p0) of a fighter triangle (render space) into its OUTWARD normal. MEASURED by
 // tools/verify_built_light.mjs (getSceneLight(): signed volume of each bone piece; with +1 it was negative on 47 of 51
@@ -3528,6 +3553,14 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
   let enemyVisible = true;
   function setEnemyVisible(visible) { enemyVisible = !!visible; }
 
+  // NEW content (F2 -> Extras -> "Fusion bosses"): the fusion's white-out. It is the
+  // original's own full-screen monochrome primitive (op7, FIGHTSTG_F0x80092e18/0x800930c0
+  // -- the DNA clip's white-out), started at full white on type 1 so it ramps back down and
+  // clears itself; a type-0 overlay would hold the screen white forever.
+  function whiteOut(frames = 20) {
+    screenOverlay = { type: 1, duration: Math.max(1, frames | 0), t: 0 };
+  }
+
   function setEnemyDigimon(folder) {
     if (folder === enemyFolder) return;
     enemyFolder = folder;
@@ -4056,7 +4089,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
   function _drawExtras(pv) {
     for (const f of extras.values()) {
       if (!f.visible || !f.model || !f.bufs) continue;
-      drawSkeletalMesh(gl, texP, pv, f.bufs, f.tex || whiteTex, FIGHTER_TINT);
+      drawSkeletalMesh(gl, texP, pv, f.bufs, f.tex || whiteTex, fighterTint(f.side === "enemy" ? "enemy" : "player"));
       drawShadow(gl, texP, pv, f.pos, 20, 8);
     }
   }
@@ -5491,7 +5524,7 @@ void main() {
 // SOFTA-END
     if (blastState && blastState.showNewModel && playerModel && playerSkelBufs) {
       if (blastState.solidAlpha > 0) {
-        drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, FIGHTER_TINT,
+        drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, fighterTint("player"),
           blastState.solidAlpha);
       }
       if (blastState.wireframeAlpha > 0) {
@@ -5502,19 +5535,19 @@ void main() {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       }
     } else if (playerVisible && playerModel && playerSkelBufs) {
-      drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, FIGHTER_TINT);
+      drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, fighterTint("player"));
     } else if (playerVisible) {
       // The billboard quad's normal is render +Z, which under the one mapping is the PS1
       // screen's own toward-the-viewer, so the page reads the same way the console draws it.
       // The player's old flipX=true was a compensation for the mirrored world and goes with it.
       drawDigimonBillboard(gl, texP, pv, playerPos, DIGI_W, DIGI_H,
-        playerTex || whiteTex, 1, FIGHTER_TINT, false);
+        playerTex || whiteTex, 1, fighterTint("player"), false);
     }
     if (enemyVisible && enemyModel && enemySkelBufs) {
-      drawSkeletalMesh(gl, texP, pv, enemySkelBufs, enemyTex || whiteTex, FIGHTER_TINT);
+      drawSkeletalMesh(gl, texP, pv, enemySkelBufs, enemyTex || whiteTex, fighterTint("enemy"));
     } else if (enemyVisible) {
       drawDigimonBillboard(gl, texP, pv, enemyPos, DIGI_W, DIGI_H,
-        enemyTex || whiteTex, 1, FIGHTER_TINT, false);
+        enemyTex || whiteTex, 1, fighterTint("enemy"), false);
     }
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
     if (sceneLight) _sceneLightDraw(false);
@@ -5741,7 +5774,7 @@ void main() {
           } else if (item.what === "floor") {
             drawQuad(gl, texP, mvp, floorBufs, arenaTexture || whiteTex, 1, [0.8,0.8,0.85,1]);
           } else {
-            drawSkeletalMesh(gl, texP, mvp, boxBufs, playerTex || whiteTex, FIGHTER_TINT);
+            drawSkeletalMesh(gl, texP, mvp, boxBufs, playerTex || whiteTex, fighterTint("player"));
           }
         }
         gl.disable(gl.SCISSOR_TEST);
@@ -5808,6 +5841,11 @@ void main() {
     preloadDigimon,
     setPlayerVisible,
     setEnemyVisible,
+    // NEW content (F2 -> Extras -> "Fusion bosses"): the fusion's white-out and its
+    // per-side tint (web/fusion.js's boss record). Both are inert until battle.js calls
+    // them, which it only does with the switch on.
+    whiteOut,
+    setFighterTint,
     setFighterBaseIdle,
     dnaOrbIgnite, dnaOrbsPath, dnaOrbsClear,
     dnaPresentationStart, dnaFusionStart, dnaPresentationStop,

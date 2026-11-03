@@ -1,0 +1,17 @@
+{
+  "_comment": "Fusion bosses (NEW content, not part of the shipped game). Authored intent only: every species, screen and move named here is a real row of the game's own tables, checked by tools/build_fusion_bosses.py, which writes web/fusion_bosses.json. Edit this file, not that one.",
+  "bosses": [
+    {
+      "id": "millenniummon",
+      "halves": ["Kimeramon", "Machinedramon"],
+      "body": "Kimeramon",
+      "displayName": "Millenniummon",
+      "level": 50,
+      "hpFromScreens": [121, 139],
+      "statScaleFromScreen": { "screen": 139, "delta": 2 },
+      "moves": [325, 166, 9001],
+      "tint": [0.62, 0.42, 0.85, 1],
+      "transform": "whiteout"
+    }
+  ]
+}

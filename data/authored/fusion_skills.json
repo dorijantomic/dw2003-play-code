@@ -1,0 +1,19 @@
+{
+  "_comment": "Authored techniques for the fusion bosses (NEW content, not part of the shipped game). Each row is built on a real technique row (base) and only changes what it names; tools/build_fusion_bosses.py checks every field against web/assets/data/digimon.json and fight_tech_table.json and writes web/fusion_bosses.json. Edit this file, not that one.",
+  "skills": [
+    {
+      "id": 9001,
+      "base": 167,
+      "name": "Time Unlimited",
+      "desc": "Traps the foe in a black orb where time has stopped.",
+      "power": 750,
+      "mp": 180,
+      "element": "dark",
+      "category": "magical",
+      "clip": 9,
+      "effect_id": 5,
+      "effect_power": 96,
+      "effect_from": 307
+    }
+  ]
+}
