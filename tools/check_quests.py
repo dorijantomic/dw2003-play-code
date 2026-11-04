@@ -239,6 +239,17 @@ for q in quests:
     r = q.get("reward", {})
     if r.get("bits", 0) > 20000:
         errors.append(f"{qid}: reward of {r['bits']} bits is not sane")
+    # a verdict's pay is a reward too: one per option, real items, sane money (the game pays the base reward and the
+    # chosen option together, so a bad item here would silently give nothing)
+    v = q.get("verdict") or {}
+    if len(v.get("pay") or []) != len(v.get("options") or []):
+        errors.append(f"{qid}: verdict needs one pay per option")
+    for p in v.get("pay") or []:
+        for it in p.get("items", []):
+            if it["name"] not in item_names:
+                errors.append(f"{qid}: verdict item '{it['name']}' is not in the in-game item table")
+        if not (0 <= p.get("bits", 0) <= 20000):
+            errors.append(f"{qid}: verdict reward of {p.get('bits')} bits is not sane")
 
 known_flags = {r["flag"] for r in load(os.path.join(A, "data/chapter_progression.json"))["ladder"]}
 for q in quests:

@@ -286,9 +286,10 @@ export function compileScene(steps, opts = {}) {
             opcodes.push(`WALKTO ${idOf(s.face)} ${Math.round(p.x)} ${Math.round(p.y)} ${facing(s.dir) ?? 0}`);
         } else if ("put" in s) {
             if (!Array.isArray(s.at) || s.at.length !== 2) return bad("put needs at: [x, y]");
-            putAt.set(Number(idOf(s.put)), [num(s.at[0]), num(s.at[1])]);
-            walkAt.set(Number(idOf(s.put)), { x: num(s.at[0]), y: num(s.at[1]) });
-            opcodes.push(`SETPOS ${idOf(s.put)} ${num(s.at[0])} ${num(s.at[1])}`);
+            const at = { x: num(s.at[0]), y: num(s.at[1]) };      // a point: face/{near}/origin read .x/.y from it
+            putAt.set(Number(idOf(s.put)), at);
+            walkAt.set(Number(idOf(s.put)), at);
+            opcodes.push(`SETPOS ${idOf(s.put)} ${at.x} ${at.y}`);
         } else if ("look" in s) {
             opcodes.push(`FN6A ${s.snap ? 1 : 0} ${idOf(s.look)}`);
         } else if ("say" in s) {
