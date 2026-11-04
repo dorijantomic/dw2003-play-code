@@ -39,6 +39,7 @@ import { loadPack, drawClip, drawClipAtPaletteRow } from "./screenpack.js";
 import { digivolveDemoOn, setDigivolveDemo } from "./blast-presentation.js";
 import { createStatusBackdrop } from "./status-backdrop.js";
 import { drawItemIcon } from "./itemicons.js";
+import { weaponEffectLine } from "./weapon-lab.js";   // F2 -> Extras -> Weapon effects (off by default)
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
 // is string 11, the 6th entry, gated by the card-game unlock. UNKNOWN U-04:
@@ -2695,6 +2696,15 @@ function _drawEquip(ctx, state, m, p, t, fold) {
       const eq = EQUIPMENT_BY_ID[sel.id];
       const wieldName = wieldNameFor(eq, E.wield_names);
       if (wieldName) drawText(ctx, wieldName, d2.x, d2.y, GREY);
+      // F2 -> Extras -> "Weapon effects" (off by default): a signature weapon's
+      // decoded on-hit effect as a third footer line. The footer plate (ststat
+      // clip 32) is 38 px tall from y 194; line 2 sits at 0xD5, so the 8x9 face
+      // at 0xD5 + 9 = 0xDE ends at 231, still inside the plate's 232 bottom.
+      // With the switch off the footer keeps the original's two lines exactly.
+      if (window.__fx?.weaponlab) {
+        const effectLine = weaponEffectLine(sel.id);
+        if (effectLine) drawText(ctx, effectLine, d2.x, d2.y + 9, { ...GREY, kind: 2 });
+      }
     }
   }
 }
