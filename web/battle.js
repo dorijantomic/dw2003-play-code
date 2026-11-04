@@ -31,7 +31,7 @@
 
 import { asButton } from "./input.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
-import { createBattle3D, resolveModelFolder } from "./battle3d.js";
+import { createBattle3D, resolveModelFolder, setFighterTint } from "./battle3d.js";
 import { createBattleCommandNative } from "./battlecmd-native.js";
 import { createBattleCommandTranslated, battleAilmentByte } from "./battlecmd-translated.js";
 import { createBattleTechTranslated } from "./battletech-translated.js";
@@ -46,6 +46,12 @@ import {
 import { battleMsgBank, battleMsgBankSync, battleMsgPaint, battleMsgText, translatedBattleMsgEnabled } from "./battlemsg-translated.js";
 import { createWfightNative } from "./wfightmn-native.js";
 import { createWfightTranslated } from "./wfight-translated.js";
+// NEW content (F2 -> Extras -> "Fusion bosses", off by default): two real species blending
+// into one fighter. Pure rules in web/fusion.js; the authored boss + its new technique are
+// built into web/fusion_bosses.json by tools/build_fusion_bosses.py.
+import {
+  enemyDisplayName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, partyEntriesFor,
+} from "./fusion.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
@@ -2742,17 +2748,20 @@ function enemyStatRecordFor(name) {
   const i = enemyStatIndexForName(name);
   return i >= 0 ? enemyStatRecords[i] : null;
 }
-function battleHudPlateLabelsFor(b) {
+export function battleHudPlateLabelsFor(b) {
   const activePlayerIndex = b.activePlayerIndex ?? 0;
   const activeEnemyIndex = b.enemySlot ?? 0;
   const playerName = String(b.playerRoster?.[activePlayerIndex]?.name ?? b.player?.profile?.name ?? "");
   const enemyKey = String(b.enemy?.eStats?.enemy_id ?? b.enemy?.profile?.name ?? "");
-  const enemyName = String(b.enemy?.eStats?.digimon_id ?? b.enemy?.profile?.name ?? "");
+  // NEW content (F2 -> Extras -> "Fusion bosses"): a record with an authored display name
+  // (the fused body is still Kimeramon) short-circuits the original's name line, so the
+  // plate says Millenniummon instead of the species it is drawn as.
+  const enemyName = enemyDisplayName(b.enemy);
   // The original's numeric enemy id is the word at 0x80042b1c + slot*0xc + 0x18, which
   // FIGHTSTG_F0x8009b8d0 scans the record table for; the record it finds carries the
   // name line at +0x06, so the plate's enemy name comes out of the original's own table
   // rather than the walker's species string.
-  const enemyRow = enemyStatRecordFor(enemyKey);
+  const enemyRow = b.enemy?.displayName != null ? null : enemyStatRecordFor(enemyKey);
   const enemyNameId = enemyRow?.nameId ?? null;
   const enemyId = enemyRow?.id ?? 0;
   const key = `${activePlayerIndex}|${activeEnemyIndex}|${playerName}|${enemyName}|${enemyNameId}`;
@@ -3268,7 +3277,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   async function loadData() {
-    if (digimonDB) return;
+    if (digimonDB) { await loadFusionData(); return; }
     const [dj, sej, fej, zgj, emj, evj, bmj, prj, ftj, dcj, cbj, esj, jgj] = await Promise.all([
       fetch("assets/data/digimon.json").then(r => r.json()),
       fetch("assets/data/stage_encounters.json").then(r => r.json()),
@@ -3336,6 +3345,26 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // form appears are four reads of disc data (dnaPairing + dnaActionRecord over the
     // profile and technique tables, and the model's own clip-12 director script).
     evolutionTrees = evj;
+    await loadFusionData();
+  }
+
+  // NEW content (F2 -> Extras -> "Fusion bosses", off by default): the authored fusion
+  // bosses and their new technique, built into web/fusion_bosses.json by
+  // tools/build_fusion_bosses.py. With the switch off nothing is fetched, so the skill map
+  // and every party entry are exactly today's. The switch is read when data loads, so
+  // ticking it takes effect on the next battle that loads data.
+  let fusionDataTried = false;
+  let fusionBossesDB = null;
+  async function loadFusionData() {
+    if (fusionDataTried || !fusionEnabled()) return;
+    fusionDataTried = true;
+    try {
+      const r = await fetch("fusion_bosses.json", { cache: "no-store" });
+      if (!r.ok) return;
+      const fj = await r.json();
+      fusionBossesDB = fj?.bosses ?? null;
+      skillDB = mergeFusionSkills(skillDB, fj?.skills, true);
+    } catch { fusionBossesDB = null; }
   }
 
   // Roll a random encounter for (mapId, player x,y) against the authentic field tables.
@@ -3705,7 +3734,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // REAL per-encounter hp/mp). Reused for every member of a sequential boss party. Returns
   // null when the species can't be resolved.
   function buildEnemyRecord({
-    enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, enemyStatScale = 16,
+    enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, enemyStatScale = 16, displayName = null,
   }) {
     // Resolve enemy: prefer sdigiedt entry by name, fall back to profile by numeric id
     const eStats = typeof enemyId === "string" ? enemiesDB[enemyId] : null;
@@ -3730,6 +3759,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return {
       profile: enemyProf,
       eStats,                                 // raw sdigiedt entry (null for legacy numeric enemies)
+      // The authored name the plate and the pages show instead of the body species
+      // (NEW content, web/fusion.js: the fused body is drawn and stored as Kimeramon).
+      displayName: displayName ?? null,
       fightSkill: eStats ? skillDB[eStats.attack] : null,
       level: enemyLevel,
       hp: eHp, maxHp: eHp,
@@ -3944,6 +3976,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
   async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, party, screenId, mapId, onWin, onFlee, onLose }) {
     await loadData();
+    // NEW content (F2 -> Extras -> "Fusion bosses"): every battle opens with the game's own
+    // untinted colour on both sides; the fusion tints the enemy when it happens.
+    setFighterTint("player", null);
+    setFighterTint("enemy", null);
     // The decoded message banks, so the panel can put the game's own words on the line
     // from the very first message rather than the walker's English: bank 0x7f for the
     // lines themselves, and bank 0x6a for the item name kind 14's second slot holds.
@@ -4180,10 +4216,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // handler resolves when the movie is over (or immediately when none is due).
     if (fieldMovieHandoff) await fieldMovieHandoff({ screenId, mapId });
     // Fight every member sequentially (boss gauntlet); random encounters are 1-member parties.
-    const entries = party.map(e => ({
+    // NEW content (F2 -> Extras -> "Fusion bosses"): partyEntriesFor carries an authored
+    // entry's `displayName` and `fuseInto` through this mapping and leaves an ordinary
+    // entry byte-identical; with the switch off it drops both, so no fight can smuggle a
+    // fusion in.
+    const fusionOn = fusionEnabled();
+    const entries = partyEntriesFor(party, fusionOn).map(e => ({
       // (multiplayer duels: a player's own Digimon form may not be in the enemy table, so those entries carry its numeric id)
       enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name, enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp,
       enemyStatScale: e.stat_scale ?? 16,
+      ...(fusionOn && e.displayName != null ? { displayName: e.displayName } : {}),
+      ...(fusionOn && e.fuseInto != null ? { fuseInto: e.fuseInto } : {}),
     }));
     await start({ party: entries, screenId, mapId, onWin, onFlee, onLose });
     return true;
@@ -5973,6 +6016,18 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       return;
     }
 
+    // NEW content (F2 -> Extras -> "Fusion bosses"): the last body of an authored fusion
+    // party fuses instead of the battle ending. Only the last member may carry `fuseInto`
+    // and only with the switch on (web/fusion.js). Not a second heal: the fused record's HP
+    // is the authored 2424, never the player's maximum.
+    const fusion = fusionOnDefeat({
+      party: b.party, partyIndex: b.partyIndex, fxOn: fusionEnabled(), bosses: fusionBossesDB,
+    });
+    if (fusion.fuse) {
+      fuseIntoBoss(b, fusion.boss);
+      return;
+    }
+
     const step = gauntletNext(b.party, b.partyIndex);
     const nextEnemy = step.done ? null : buildEnemyRecord(step.entry);
     if (!nextEnemy) {
@@ -6004,11 +6059,74 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(nextEnemy));
     // A fresh timeline is a fresh turn for the command phase's Frozen gate.
     b._turnSeq = (b._turnSeq ?? 0) + 1;
-    const nextName = nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? "Enemy";
-    swapEnemyModel(nextName);
+    const nextName = enemyDisplayName(nextEnemy);
+    // The model follows the body species, never an authored display name (Millenniummon has
+    // no model folder of its own; its body is Kimeramon).
+    swapEnemyModel(nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? nextName);
     sayOriginal(b, {
       kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName],
     }, `${nextName} steps forward!`);
+    b.menuSel = 0;
+    b._nextState = ST.PLAYER_MENU;
+    b.state = ST.RESULT_MSG;
+    b.timer = 0;
+  }
+
+  /**
+   * NEW content (F2 -> Extras -> "Fusion bosses"): the two halves fuse.
+   *
+   * The battle's own precedent is the Galacticmon finale's body swap (runFinaleBeat): a new
+   * record, a model swap, result pages, and the fight goes on. Here the record is built by
+   * web/fusion.js from the halves' real enemy rows and the authored boss spec
+   * (web/fusion_bosses.json): the body species is the one stored and drawn, `displayName`
+   * is what the plate and the pages say, and the fused HP is the authored 2424 — never a
+   * full heal of the player's side, and never the fallen body's own pool.
+   */
+  function fuseIntoBoss(b, boss) {
+    const en = b?.enemy;
+    const bodyRow = enemiesDB?.[boss?.body] ?? null;
+    if (!en || !bodyRow) return;
+    const halves = (boss.halves ?? []).map((name) => enemiesDB?.[name] ?? null).filter(Boolean);
+    const fused = fusedRecord({
+      halves, body: boss.body, level: boss.level, hp: boss.hp,
+      statScale: boss.statScale, moves: boss.moves,
+    });
+    // The body's own row with the fused attack, the two techniques and the AI rows on top;
+    // its resistances, status bytes and drop stay the body's, because the fused fighter IS
+    // that body.
+    const eStats = { ...bodyRow };
+    eStats.attack = fused.attack;
+    eStats.move_1 = fused.move_1;
+    eStats.move_2 = fused.move_2;
+    eStats.ai_moves = fused.ai_moves;
+    en.eStats = eStats;
+    en.profile = enemyToProfile(eStats);
+    en.fightSkill = skillDB?.[eStats.attack] ?? en.fightSkill;
+    en.displayName = boss.displayName ?? null;
+    en.level = fused.level;
+    en.hp = fused.hp; en.maxHp = fused.maxHp;
+    en.mp = fused.mp; en.maxMp = fused.maxMp;
+    en.str = fused.stats.str;
+    en.def = fused.stats.def;
+    en.spt = fused.stats.spt;
+    en.wis = fused.stats.wis;
+    en.spd = fused.stats.spd;
+    en.powerScale = fused.statScale;
+    en.statusImmunities = b.statusImmunities;
+    en.turnCounter = 0;
+    // The record keeps its status-event pool and side/slot bytes: it is the same object.
+    b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(en));
+    b._turnSeq = (b._turnSeq ?? 0) + 1;
+    // One body only: once the fused fighter falls there is nothing left to fuse.
+    if (b.party?.[b.partyIndex]) b.party[b.partyIndex].fuseInto = null;
+    if (boss.transform === "whiteout") renderer3d?.whiteOut?.(20);
+    setFighterTint("enemy", boss.tint ?? null);
+    swapEnemyModel(boss.body);
+    const name = enemyDisplayName(en);
+    setResultPages(b, [
+      `${(boss.halves ?? []).join(" and ")} fuse!`,
+      `${name} appears!`,
+    ]);
     b.menuSel = 0;
     b._nextState = ST.PLAYER_MENU;
     b.state = ST.RESULT_MSG;
@@ -6857,7 +6975,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   function applyEnemyAction() {
     const b  = battle;
     const en = b.enemy;
-    const name = en.eStats?.digimon_id ?? en.profile?.name ?? "Enemy";
+    // NEW content (F2 -> Extras -> "Fusion bosses"): a fused body shows its authored name
+    // on every page it speaks, not the species it is drawn as.
+    const name = enemyDisplayName(en);
     // Combatant record +0x04, once per action turn and BEFORE any gate: the code-3
     // "enemy action turn" handler bumps the acting slot's counter and then spawns the
     // turn script (`wfightmn.s:4140-4148`), so a turn the ailment gate skips still counts
