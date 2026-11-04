@@ -115,3 +115,17 @@ test("a taller body never ends up less framed than a shorter one", () => {
     assert.ok(b.fill <= GIANT_FRAME_FILL + eps, `shot ${i}: ${b.fill.toFixed(2)}`);
   }
 });
+
+test("a small partner scaled 2.5x is framed whole by the same fit", async () => {
+  const { scaledRest } = await import("../web/battle3d.js");
+  // Giant mode part 1: a Kunemon-sized body (rest h 1000, w 480) drawn at 2.5x.
+  const rest = scaledRest({ h: 1000, w: 480 }, 2.5);
+  assert.deepEqual(rest, { h: 2500, w: 1200 });
+  const r = fitGiantNearCamera(CAM, SLOT, rest, ENEMY);
+  assert.equal(r.changed, true);
+  for (let i = 0; i < CAM.eye.length; i++) {
+    const b = shotBodyBounds(shotAt(r.cam, i), SLOT, rest, null);
+    assert.equal(b.behind, 0, `shot ${i}: a body corner is behind the eye`);
+    assert.ok(b.fill <= GIANT_FRAME_FILL + eps, `shot ${i}: body fills ${b.fill.toFixed(2)} of the frame`);
+  }
+});

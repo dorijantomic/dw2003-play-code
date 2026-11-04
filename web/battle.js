@@ -31,7 +31,7 @@
 
 import { asButton } from "./input.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
-import { createBattle3D, resolveModelFolder } from "./battle3d.js";
+import { createBattle3D, resolveModelFolder, clampFighterScale } from "./battle3d.js";
 import { createBattleCommandNative } from "./battlecmd-native.js";
 import { createBattleCommandTranslated, battleAilmentByte } from "./battlecmd-translated.js";
 import { createBattleTechTranslated } from "./battletech-translated.js";
@@ -872,6 +872,35 @@ export function gauntletNext(party, index) {
   if (!party || next >= party.length) return { done: true };
   return { done: false, index: next, entry: party[next] };
 }
+
+// ── Giant mode part 1 (F2 -> Extras -> "Giant mode", off by default) ─────────
+// A boss-party entry may carry `size`: a multiplier on the fighter's shipped body size. The
+// field is read ONLY when the toggle is on; with it off the entries come back with no `size`
+// key at all and the renderer is never called, so every battle draws exactly as before.
+export function partyEntriesWithSize(entries, fxOn, k = 1) {
+  const mul = Number.isFinite(k) && k > 0 ? k : 1;
+  return (entries || []).map((entry) => {
+    const { size, ...rest } = entry;
+    return fxOn ? { ...rest, size: clampFighterScale((Number(size) || 1) * mul) } : rest;
+  });
+}
+
+/**
+ * Hand the giant-mode sizes to the renderer. OFF: nothing is called, so both sides keep the
+ * shipped MODEL_SCALE. ON: our side takes `playerK` (part 2's slider; 1 until it exists) and
+ * the enemy takes the current party entry's `size` (1 when it carries none).
+ */
+export function applyGiantScales(renderer, entry, fxOn, playerK = 1) {
+  if (!renderer || typeof renderer.setFighterScale !== "function") return false;
+  if (!fxOn) return false;
+  renderer.setFighterScale("player", clampFighterScale(playerK));
+  renderer.setFighterScale("enemy", clampFighterScale(entry?.size ?? 1));
+  return true;
+}
+
+// The F2 toggle's live value (ambience.js owns `window.__fx`). Read when a battle starts or a
+// gauntlet member steps in, so switching it takes effect on the next fight.
+function giantModeOn() { return !!window.__fx?.giantmode; }
 
 /**
  * The battle's LIVE kind word (0x800a4536): the finale's phase once it has advanced,
@@ -3252,6 +3281,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (renderer3d) {
         if (pFolder) renderer3d.setPlayerDigimon(pFolder);
         if (eFolder) renderer3d.setEnemyDigimon(eFolder);
+        // Giant mode part 1: the opening member's own size. The toggle gates the read; off, the
+        // renderer is not called at all and both sides stay at the shipped size.
+        applyGiantScales(renderer3d, b?.party?.[b?.partyIndex ?? 0], giantModeOn());
         // The disc opens a fight on a canned shot the ENEMY's record names, framing our
         // Digimon (FIGHTSTG_F0x800880f0 sub-state 0 -> F0x8009257c). It yields as soon as
         // an action's own camera runs.
@@ -4180,11 +4212,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // handler resolves when the movie is over (or immediately when none is due).
     if (fieldMovieHandoff) await fieldMovieHandoff({ screenId, mapId });
     // Fight every member sequentially (boss gauntlet); random encounters are 1-member parties.
-    const entries = party.map(e => ({
+    // Giant mode part 1: an entry may carry `size`, but it is only kept when the F2 toggle is
+    // on (off: no entry has a `size` key and the renderer is never told anything).
+    const entries = partyEntriesWithSize(party.map(e => ({
       // (multiplayer duels: a player's own Digimon form may not be in the enemy table, so those entries carry its numeric id)
       enemyId: (typeof e.name === "string" && !enemiesDB?.[e.name] && Number.isFinite(e.digimonId)) ? e.digimonId : e.name, enemyLevel: e.level, enemyHp: e.hp, enemyMp: e.mp,
       enemyStatScale: e.stat_scale ?? 16,
-    }));
+      size: e.size,
+    })), giantModeOn(), 1);
     await start({ party: entries, screenId, mapId, onWin, onFlee, onLose });
     return true;
   }
@@ -6006,6 +6041,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b._turnSeq = (b._turnSeq ?? 0) + 1;
     const nextName = nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? "Enemy";
     swapEnemyModel(nextName);
+    // Giant mode part 1: the next boss-party member may be a different size than the last.
+    applyGiantScales(renderer3d, b.party?.[b.partyIndex], giantModeOn());
     sayOriginal(b, {
       kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName],
     }, `${nextName} steps forward!`);
@@ -6046,6 +6083,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b._turnSeq = (b._turnSeq ?? 0) + 1;
         const nextName = next.eStats?.digimon_id ?? next.profile?.name ?? "Enemy";
         swapEnemyModel(nextName);
+        // Giant mode part 1: a scripted phase change may swap in a different-sized body too.
+        applyGiantScales(renderer3d, entry, giantModeOn());
       }
     } else if (b.enemy) {
       b.enemy.battleKind = beat.kind;
