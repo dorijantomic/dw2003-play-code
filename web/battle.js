@@ -52,6 +52,10 @@ import { createWfightTranslated } from "./wfight-translated.js";
 import {
   enemyDisplayName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, partyEntriesFor,
 } from "./fusion.js";
+// Both halves' loot (same F2 key, off by default): the fused body rolls the OTHER
+// halves' real drops — never the body's own row a second time. Pure rules in
+// web/fusion-loot.js.
+import { rollFusionDrops } from "./fusion-loot.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
@@ -6132,8 +6136,25 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // battle's own reward record once, at the win (winRewards) — never per enemy.
   function defeatCurrentEnemy() {
     const b = battle;
-    const drop = rollDrop(b.enemy.eStats);
-    if (drop) b._loot.drops.push(drop);
+    // NEW content (F2 -> Extras -> "Fusion bosses"): a fused body carries the OTHER
+    // halves' real loot. The body's own row was already rolled when that half fell —
+    // this function ran for it before fuseIntoBoss swapped the record — so skipping the
+    // body here is what stops Kimeramon's DevilChip being paid twice. `bossId` is
+    // written only by fuseIntoBoss, which is only reachable with the switch on, so with
+    // the fusion layer off the ordinary path below is exactly today's.
+    const fusionBoss = b.enemy?.bossId ? fusionBossesDB?.[b.enemy.bossId] ?? null : null;
+    if (fusionBoss) {
+      // The stream follows the disc-accurate switch exactly as rollDrop's two lines do:
+      // the disc's RAND_U16 word when it is on, Math.random() when it is off. One live
+      // draw per owed row; every item that lands joins the loot list the report banks.
+      const disc = !!window.__fx?.discrolls;
+      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, enemiesDB, disc ? RAND_U16 : Math.random, disc)) {
+        b._loot.drops.push(item);
+      }
+    } else {
+      const drop = rollDrop(b.enemy.eStats);
+      if (drop) b._loot.drops.push(drop);
+    }
 
     // The Galacticmon finale's scripted sequence replaces the gauntlet swap for the
     // tail's fall (claim wfightmn-finale-kinds-2026-10-10): the disc's kind word walks
