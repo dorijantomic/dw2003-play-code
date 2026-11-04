@@ -331,8 +331,10 @@ export function questsTick(mapId, x, y) {
         }
     }
     if (!enabled() || !mapId) return;
-    // Walk-in triggers (web/quest-triggers.js): enter-only, so the two places are passed on. The first tick on a map has
-    // no previous place here, and a warp does not count as walking into a patch.
+    // Quest triggers (web/quest-triggers.js): walk-in rectangles are enter-only, so the two places are passed on; the
+    // first tick on a map has no previous place here, which is exactly the arrival rows' condition ("on": "enter" — a
+    // scene that fires because the player walked into a place, once per load, after the game's own arrival chain). A
+    // warp still does not count as walking into a patch.
     triggerRunner?.tick(mapId, prevMap === mapId ? prevX : null, prevMap === mapId ? prevY : null, lastX, lastY);
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), a = st.active[id];
@@ -756,9 +758,9 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
         }
         triggerDefs = Array.isArray(q.triggers) ? q.triggers : [];
     } catch (e) { console.warn("[quests] could not load quests.json:", e); }
-    // Walk-in triggers (web/quest-triggers.js): authored rectangles that start a scene when the player steps into them.
-    // The original field VM's own shape (op-8 start_event on the type-7 trigger grid). Off unless F2 -> Extras -> Quest
-    // triggers is ticked (and the Quests layer itself is on); a scene runs only when the game is idle.
+    // Quest triggers (web/quest-triggers.js): authored rectangles that start a scene when the player steps into them,
+    // and `on: "enter"` rows that start one because the map was loaded (the disc's own gate-object shape). Off unless
+    // F2 -> Extras -> Quest triggers is ticked (and the Quests layer itself is on); a scene runs only when the game is idle.
     triggerRunner = installTriggers(triggerDefs, {
         enabled: () => enabled() && fx.questtriggers === true,
         statusOf: (id) => { const d = defOf(id); return d ? statusOf(d) : null; },
