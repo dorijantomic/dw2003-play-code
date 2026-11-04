@@ -68,10 +68,12 @@ run('bubble player', lambda: dsl.bubble('player'))
 run('placecard 21 characters', lambda: dsl.placecard('__LONG__', 'Central Park'))
 run('placecard tab', lambda: dsl.placecard('Central' + chr(9) + 'Sector', 'Central Park'))
 run('placecard number', lambda: dsl.placecard(5, 'Central Park'))
+run('placecard newline area', lambda: dsl.placecard('Central' + chr(10), 'Central Park'))
+run('placecard newline place', lambda: dsl.placecard('Central Sector', 'Central Park' + chr(10)))
 print(json.dumps(rows))
 `.trim().replace("__LONG__", "x".repeat(21));
   const rows = dsl(rowsCode);
-  const needles = ["wink", "hold 0", "601", "player", "x".repeat(21), "\\t", "placecard area 5"];
+  const needles = ["wink", "hold 0", "601", "player", "x".repeat(21), "\\t", "placecard area 5", "Central\\n", "Central Park\\n"];
   assert.equal(rows.length, needles.length, "every bad case ran");
   rows.forEach((row, i) => {
     console.log(`${row.label}: dsl.PROBLEMS ${row.before} -> ${row.after}`);
@@ -80,7 +82,7 @@ print(json.dumps(rows))
     assert.equal(row.problems.length, 1);
     assert.ok(row.problems[0].includes(needles[i]), `${JSON.stringify(row.problems[0])} names ${needles[i]}`);
   });
-  assert.deepEqual(rows.map((r) => r.before), [0, 1, 2, 3, 4, 5, 6], "the problems are reported one per bad value");
+  assert.deepEqual(rows.map((r) => r.before), [0, 1, 2, 3, 4, 5, 6, 7, 8], "the problems are reported one per bad value");
 });
 
 test("the dicts the helpers write are exactly what the scene compiler takes", () => {
@@ -92,6 +94,34 @@ test("the dicts the helpers write are exactly what the scene compiler takes", ()
   assert.deepEqual(pc.errors, []);
   assert.equal(pc.opcodes.filter((op) => op.startsWith("SCENEEVENT")).length, 1, `one host event, got ${JSON.stringify(pc.opcodes)}`);
   assert.deepEqual(pc.events, [{ kind: "placecard", area: "Central Sector", place: "Central Park" }]);
+});
+
+test("a trailing newline is refused, exactly the name the game's own compiler refuses", () => {
+  // Python's `$` also matches just before a trailing newline; the compiler's JS `/^[\x20-\x7e]+$/` does not. A pack
+  // must not sail past the helper and then have its scene step refused at runtime, so both sides agree on this name.
+  const [areaNewline, placeNewline] = dsl(
+    "print(json.dumps([dsl.placecard('Central'+chr(10),'Central Park'), dsl.placecard('Central Sector','Central Park'+chr(10))]))",
+  );
+  for (const step of [areaNewline, placeNewline]) {
+    const compiled = compileScene([step], { fx: { questplacecard: true } });
+    assert.equal(compiled.errors.length, 1, `the compiler refuses ${JSON.stringify(step)}: ${JSON.stringify(compiled.errors)}`);
+  }
+  const problems = dsl(
+    "dsl.placecard('Central'+chr(10),'Central Park'); dsl.placecard('Central Sector','Central Park'+chr(10)); print(json.dumps(dsl.PROBLEMS))",
+  );
+  assert.equal(problems.length, 2, "the helper names both bad names, so the build fails before the game drops the step");
+  assert.ok(problems[0].includes("Central\\n"), problems[0]);
+  assert.ok(problems[1].includes("Central Park\\n"), problems[1]);
+});
+
+test("20 characters is the longest name the card takes, and it still compiles", () => {
+  const [step, accepted, after21] = dsl(
+    "print(json.dumps([dsl.placecard('x'*20, 'y'*20), len(dsl.PROBLEMS), (dsl.placecard('x'*21, 'y'), len(dsl.PROBLEMS))[1]]))",
+  );
+  assert.equal(accepted, 0, "a name of exactly 20 characters is taken");
+  assert.equal(after21, 1, "21 characters is one too many");
+  const compiled = compileScene([step], { fx: { questplacecard: true } });
+  assert.deepEqual(compiled.errors, []);
 });
 
 test("the helpers are in dsl.py, and the older helpers are only added to, never moved", () => {

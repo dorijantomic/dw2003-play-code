@@ -133,7 +133,9 @@ def anim(who, clip, face=None):
 
 # ------------------------------------------------------------------ the two newest steps (web/quest-scenes.js)
 _BUBBLE_KINDS = ("exclaim", "puffs", "close")
-_NAMES_OK = re.compile(r"^[\x20-\x7e]{1,20}$")
+# fullmatch, never match: Python's `$` also matches just before a trailing newline, and the game's own compiler
+# (web/quest-scenes.js `/^[\x20-\x7e]+$/`, JS end-of-string) refuses that name -- the helper must refuse it too.
+_NAMES_OK = re.compile(r"[\x20-\x7e]{1,20}")
 
 
 def bubble(who, kind="exclaim", hold=None):
@@ -162,7 +164,7 @@ def placecard(area, place):
     place  its second bar, also 1 to 20 ("Central Park"); 20 is the longest name the disc's own table holds
     """
     for what, name in (("area", area), ("place", place)):
-        if not isinstance(name, str) or not _NAMES_OK.match(name):
+        if not isinstance(name, str) or not _NAMES_OK.fullmatch(name):
             problem(f"placecard {what} {name!r} is not 1 to 20 printable characters")
     return {"placecard": {"area": area, "place": place}}
 
