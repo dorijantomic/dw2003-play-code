@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursor almanac — every cursor the game uses, at its real rate</title>
+<style>
+  :root { color-scheme: dark; font: 14.5px/1.5 "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #e8edf7; background: #0a1020; }
+  header { padding: 22px clamp(16px, 3vw, 40px) 14px; border-bottom: 1px solid #22334b; background: #0f1a2e; }
+  .eyebrow { color: #8fb5e5; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); line-height: 1.16; }
+  header p { margin: 0; max-width: 980px; color: #b8c7dc; }
+  .clockbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 14px;
+              font-family: ui-monospace, monospace; color: #ffd34d; font-size: 13px; }
+  .clockbar #secs { color: #8fa9c8; }
+  .clockbar button { margin-left: auto; background: #2a2a40; color: #e8e8f0; border: 1px solid #45456a;
+                     border-radius: 5px; padding: 3px 12px; font: inherit; cursor: pointer; }
+  main { padding: 20px clamp(16px, 3vw, 40px) 50px; max-width: 1400px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(470px, 1fr)); gap: 16px; }
+  .card { border: 1px solid #22334b; border-radius: 12px; background: #0d1727; padding: 14px 16px 12px; }
+  .card .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+  .card h2 { margin: 0; font-size: 16px; color: #ffd34d; letter-spacing: .03em; }
+  .card .rate { color: #8fa9c8; font-size: 12px; font-family: ui-monospace, monospace; }
+  canvas { display: block; width: 100%; max-width: 460px; height: auto; margin: 10px auto 6px;
+           border-radius: 8px; background: #070c16; border: 1px solid #18253a; }
+  .now { text-align: center; color: #b8c7dc; font-size: 12.5px; font-family: ui-monospace, monospace; }
+  .now b { color: #ffd34d; font-weight: 600; }
+  .where { margin-top: 10px; border-top: 1px solid #18253a; padding-top: 8px; display: grid; gap: 4px; }
+  .where div { display: grid; grid-template-columns: 46px 1fr; gap: 8px; align-items: baseline; }
+  .where .tag { color: #7f95b2; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .where code { color: #9ab3d3; font-size: 11.5px; overflow-wrap: anywhere; }
+  .footer { margin-top: 26px; padding-top: 12px; border-top: 1px solid #1d2a40; color: #7f95b2; font-size: 12.5px; max-width: 980px; }
+  .footer code { color: #9ab3d3; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">digimon world 3 · the menu cursors</div>
+  <h1>Four cursors, four clocks</h1>
+  <p>
+    Every menu cursor the disc draws, running at the rate the original code advances it. One tick is one
+    vsync: PAL runs 50 a second, so a 6-vsync step is 120 ms and the pause cursor's rest is 0.64 s. All four
+    rows share one clock, so you can watch them drift against each other. Nothing here is a redrawn
+    approximation of the timing — the numbers come from the same tables the game's own port reads.
+  </p>
+  <div class="clockbar">
+    <span id="vsync">vsync 0</span>
+    <span id="secs">0.00 s</span>
+    <button id="pause" type="button">Pause</button>
+  </div>
+</header>
+<main>
+  <div class="grid" id="rows"></div>
+  <p class="footer">
+    The pause row draws the walker's real cursor glyphs (<code>web/uifont.js</code>), the same five strings the
+    pause menu swaps through. The other three rows draw the cursor's shape by hand, because the album and lab
+    art is not part of the cursor table; their colours and clocks are the decoded ones.
+  </p>
+</main>
+<script type="module">
+import { CURSORS, frameOf } from "./cursor-almanac.js";
+import { drawText } from "./uifont.js";
+
+const PAL_HZ = 50;
+const W = 440;
+const H = 150;
+
+const RATE = {
+  glyph: (row) =>
+    `rest ${row.rest} vsyncs · step ${row.step} · cycle ${row.cycle} (${(row.cycle / PAL_HZ).toFixed(2)} s)`,
+  clut: (row) =>
+    row.clutSteps
+      ? `${row.clutSteps} CLUT steps · ${row.period} ticks each (${(row.period / PAL_HZ).toFixed(2)} s)`
+      : `${row.rows} palette rows · ${row.period} vsyncs each (${(row.period / PAL_HZ).toFixed(2)} s)`,
+  blink: (row) => `${row.frames}-frame counter · ${row.period} vsyncs (${(row.period / PAL_HZ).toFixed(2)} s)`,
+};
+
+const NOW = {
+  glyph: (row, f) => `frame <b>${f}</b>/${row.glyphs.length} · ${row.glyphs[f]}`,
+  clut: (row, f) =>
+    row.clutSteps ? `CLUT step <b>${f + 1}</b>/${row.clutSteps}` : `palette row <b>${f}</b>/${row.rows}`,
+  blink: (row, f) => `blink frame <b>${f}</b>/${row.frames}`,
+};
+
+const SIX_COLOURS = ["#ffd34d", "#ffb454", "#ff8f6b", "#e06c9f", "#b07cff", "#6fb3ff"];
+const LAB_COLOURS = ["#ffd34d", "#8fe08f", "#6fb3ff", "#c77dff"];
+
+/** Split "code...; docs/..." into its two halves for the card. */
+function sourceHalves(source) {
+  const at = source.indexOf("; docs/");
+  if (at < 0) return [source, ""];
+  return [source.slice(0, at), source.slice(at + 2)];
+}
+
+/** The whole cycle as one bar: a segment per decoded phase, a playhead at `tick`. */
+function drawStrip(ctx, x, y, w, total, parts, tick) {
+  const k = ((tick % total) + total) % total;
+  let cx = x;
+  for (const part of parts) {
+    const width = (w * part.ticks) / total;
+    ctx.fillStyle = part.colour;
+    ctx.fillRect(cx, y, Math.max(1, width - 1), 7);
+    cx += width;
+  }
+  const px = x + (w * k) / total;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(px - 1, y - 2, 2, 11);
+}
+
+function pauseParts(row) {
+  return [
+    { ticks: row.rest, colour: "#3d4a63" },
+    ...Array.from({ length: row.glyphs.length - 1 }, (_, i) => ({ ticks: row.step, colour: SIX_COLOURS[i] })),
+  ];
+}
+
+function drawPause(ctx, row, tick) {
+  const f = frameOf(row, tick);
+  const rows = ["ITEMS", "SORT", "MAP", "STATUS"];
+  for (let i = 0; i < rows.length; i++) {
+    const y = 16 + i * 24;
+    if (i === 0) { ctx.fillStyle = "#131f33"; ctx.fillRect(46, y - 4, 130, 20); }
+    drawText(ctx, rows[i], 62, y, { scale: 1 });
+  }
+  // The game's own cursor glyph strings, enlarged so the pulse reads at a glance.
+  drawText(ctx, row.glyphs[f], 22, 12, { scale: 2 });
+  drawStrip(ctx, 24, 128, 392, row.cycle, pauseParts(row), tick);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawAlbum(ctx, row, tick) {
+  const f = frameOf(row, tick);
+  const cols = 6, cellW = 44, cellH = 34, x0 = 78, y0 = 12;
+  const selected = 8; // col 2, row 1
+  for (let i = 0; i < cols * 3; i++) {
+    const col = i % cols, line = Math.floor(i / cols);
+    const x = x0 + col * cellW, y = y0 + line * cellH;
+    ctx.fillStyle = "#1b2740";
+    roundRect(ctx, x, y, cellW - 6, cellH - 6, 3);
+    ctx.fill();
+    ctx.strokeStyle = "#2b3d5c";
+    ctx.stroke();
+    if (i === selected) {
+      ctx.fillStyle = "#223350";
+      ctx.fill();
+    }
+  }
+  // Clip 7's colour, walking its six-step table every 17 ticks.
+  const sx = x0 + (selected % cols) * cellW, sy = y0 + Math.floor(selected / cols) * cellH;
+  ctx.strokeStyle = SIX_COLOURS[f];
+  ctx.lineWidth = 2;
+  roundRect(ctx, sx - 1, sy - 1, cellW - 4, cellH - 4, 3);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  // L1/R1 page arrows blink on the same 17-tick phase.
+  const blink = Math.floor(tick / row.period) % 2;
+  ctx.globalAlpha = blink ? 1 : 0.2;
+  ctx.fillStyle = SIX_COLOURS[f];
+  for (const [dir, x] of [[1, 26], [-1, 414]]) {
+    ctx.beginPath();
+    ctx.moveTo(x + dir * 10, 58);
+    ctx.lineTo(x, 48);
+    ctx.lineTo(x, 68);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  drawStrip(ctx, 24, 128, 392, row.period * row.clutSteps,
+    SIX_COLOURS.map((colour, i) => ({ ticks: row.period, colour: i === f ? "#ffffff" : colour })), tick);
+}
+
+function drawLab(ctx, row, tick) {
+  const f = frameOf(row, tick);
+  const colour = LAB_COLOURS[f];
+  const node = (col, line) => [70 + col * 90, 34 + line * 30];
+  ctx.strokeStyle = "#243552";
+  for (let line = 0; line < 3; line++) {
+    ctx.beginPath();
+    ctx.moveTo(...node(0, line));
+    ctx.lineTo(...node(3, line));
+    ctx.stroke();
+  }
+  for (let line = 0; line < 3; line++) {
+    for (let col = 0; col < 4; col++) {
+      const [x, y] = node(col, line);
+      ctx.fillStyle = col === 1 && line === 1 ? colour : "#33466a";
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // The chart cursor and both pagers share the same 4-row palette cycle.
+  const [cx, cy] = node(1, 1);
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 2;
+  roundRect(ctx, cx - 13, cy - 12, 26, 24, 5);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.fillStyle = colour;
+  for (const [dir, x] of [[1, 26], [-1, 414]]) {
+    ctx.beginPath();
+    ctx.moveTo(x + dir * 10, 64);
+    ctx.lineTo(x, 52);
+    ctx.lineTo(x, 76);
+    ctx.closePath();
+    ctx.fill();
+  }
+  drawStrip(ctx, 24, 128, 392, row.period * row.rows,
+    LAB_COLOURS.map((c, i) => ({ ticks: row.period, colour: i === f ? "#ffffff" : c })), tick);
+}
+
+function drawMap(ctx, row, tick) {
+  const f = frameOf(row, tick);
+  const zones = [[84, 46], [150, 70], [222, 40], [286, 78], [352, 52], [396, 96]];
+  ctx.strokeStyle = "#243552";
+  ctx.beginPath();
+  zones.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  for (const [x, y] of zones) {
+    ctx.fillStyle = "#33466a";
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // The current zone's marker, on the 4-frame counter.
+  const [mx, my] = zones[2];
+  const alpha = [1, 0.66, 0.33, 0.66][f];
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#ffd34d";
+  ctx.beginPath();
+  ctx.moveTo(mx, my - 9);
+  ctx.lineTo(mx + 8, my);
+  ctx.lineTo(mx, my + 9);
+  ctx.lineTo(mx - 8, my);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  drawStrip(ctx, 24, 128, 392, row.period * row.frames,
+    Array.from({ length: row.frames }, (_, i) => ({ ticks: row.period, colour: i === f ? "#ffffff" : "#3d4a63" })), tick);
+}
+
+const DRAW = { "Pause menu": drawPause, "Card album": drawAlbum, "Digimon Lab": drawLab, "World map": drawMap };
+
+const views = [];
+const grid = document.getElementById("rows");
+for (const row of CURSORS) {
+  const card = document.createElement("section");
+  card.className = "card";
+
+  const head = document.createElement("div");
+  head.className = "head";
+  const title = document.createElement("h2");
+  title.textContent = row.screen;
+  const rate = document.createElement("span");
+  rate.className = "rate";
+  rate.textContent = RATE[row.kind](row);
+  head.append(title, rate);
+
+  const canvas = document.createElement("canvas");
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const now = document.createElement("div");
+  now.className = "now";
+
+  const where = document.createElement("div");
+  where.className = "where";
+  const [code, doc] = sourceHalves(row.source);
+  for (const [tag, text] of [["code", code], ["doc", doc]]) {
+    const line = document.createElement("div");
+    const label = document.createElement("span");
+    label.className = "tag";
+    label.textContent = tag;
+    const body = document.createElement("code");
+    body.textContent = text;
+    line.append(label, body);
+    where.append(line);
+  }
+
+  card.append(head, canvas, now, where);
+  grid.append(card);
+  views.push({ row, ctx, now, draw: DRAW[row.screen] });
+}
+
+const vsyncEl = document.getElementById("vsync");
+const secsEl = document.getElementById("secs");
+const pauseBtn = document.getElementById("pause");
+let started = performance.now();
+let paused = false;
+let pausedTick = 0;
+let pausedAt = 0;
+
+const tickNow = (now) => (paused ? pausedTick : Math.floor((now - started) / (1000 / PAL_HZ)));
+
+function render(now) {
+  const tick = tickNow(now);
+  vsyncEl.textContent = `vsync ${tick}`;
+  secsEl.textContent = `${(tick / PAL_HZ).toFixed(2)} s`;
+  for (const view of views) {
+    view.ctx.clearRect(0, 0, W, H);
+    view.draw(view.ctx, view.row, tick);
+    view.now.innerHTML = NOW[view.row.kind](view.row, frameOf(view.row, tick));
+  }
+  requestAnimationFrame(render);
+}
+
+pauseBtn.addEventListener("click", () => {
+  const now = performance.now();
+  if (!paused) {
+    pausedTick = tickNow(now);
+    pausedAt = now;
+    paused = true;
+    pauseBtn.textContent = "Play";
+  } else {
+    started += now - pausedAt;
+    paused = false;
+    pauseBtn.textContent = "Pause";
+  }
+});
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
