@@ -131,6 +131,44 @@ def anim(who, clip, face=None):
     return step
 
 
+# ------------------------------------------------------------------ the two newest steps (web/quest-scenes.js)
+_BUBBLE_KINDS = ("exclaim", "puffs", "close")
+# fullmatch, never match: Python's `$` also matches just before a trailing newline, and the game's own compiler
+# (web/quest-scenes.js `/^[\x20-\x7e]+$/`, JS end-of-string) refuses that name -- the helper must refuse it too.
+_NAMES_OK = re.compile(r"[\x20-\x7e]{1,20}")
+
+
+def bubble(who, kind="exclaim", hold=None):
+    """The story's own reaction bubble pops over that character, and shuts again (web/quest-scenes.js `bubble`).
+
+    who   an npc id: a bubble rides on a person, so "player" is not one
+    kind  "exclaim" (the red "!"), "puffs" (the silent smoke puffs) or "close" (shut a bubble, with no wait)
+    hold  how long it stays up, in frames 1..600 (the step's own default is 48); "close" never waits
+    """
+    if not isinstance(who, int) or isinstance(who, bool):
+        problem(f"bubble who {who!r} is not an npc id (a whole number: the bubble rides on a character, never the player)")
+    if kind not in _BUBBLE_KINDS:
+        problem(f"bubble kind {kind!r} is not one of exclaim, puffs, close")
+    if hold is not None and kind != "close" and (not isinstance(hold, int) or isinstance(hold, bool) or not 1 <= hold <= 600):
+        problem(f"bubble hold {hold!r} is not a whole number of frames 1 to 600")
+    step = {"bubble": kind, "who": who}
+    if hold is not None:
+        step["hold"] = hold
+    return step
+
+
+def placecard(area, place):
+    """The field's own blue location card, typed with two names the quest writes (web/quest-scenes.js `placecard`).
+
+    area   the card's first bar, 1 to 20 printable characters ("Central Sector")
+    place  its second bar, also 1 to 20 ("Central Park"); 20 is the longest name the disc's own table holds
+    """
+    for what, name in (("area", area), ("place", place)):
+        if not isinstance(name, str) or not _NAMES_OK.fullmatch(name):
+            problem(f"placecard {what} {name!r} is not 1 to 20 printable characters")
+    return {"placecard": {"area": area, "place": place}}
+
+
 # ------------------------------------------------------------------ scene events (web/quest-scenes.js)
 # The steps below need something the walking-and-talking vocabulary does not have: our own effect art, the screen, a
 # fight, the player's own height, or another map. They are data like every other step; the game performs them
