@@ -72,6 +72,23 @@ export function createPlaceCard() {
         return true;
     };
 
+    /**
+     * Start the card with two names the caller writes, instead of the stage entry table: the quest layer's
+     * `placecard` scene step (web/quest-scenes.js) names its own place. Same card, same bars, same typewriter,
+     * same hold and slit — only the two strings differ. Returns false, and shows nothing, for an empty name.
+     * The data must be loaded first (await loadPlaceCard()), exactly as for begin(mapId).
+     */
+    card.beginText = (area, place) => {
+        if (!data || typeof area !== "string" || typeof place !== "string" || !area.trim() || !place.trim()) {
+            card._st = null;
+            return false;
+        }
+        card._st = createLocationCard(data.bars, area, place);
+        card._acc = 0;
+        card._held = false;
+        return true;
+    };
+
     card.cancel = () => {
         card._st = null;
     };

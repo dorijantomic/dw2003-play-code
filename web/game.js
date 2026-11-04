@@ -2593,6 +2593,13 @@ function runQuestSceneEvent(ev, resume) {
         case "sfx":                                        // a sound cue by name; never blocks the scene
             try { sfx.play(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, e?.message ?? e); }
             return done();
+        case "placecard":
+            // The quest's own place card: the field's blue stage-entry card, typed with two names the quest wrote
+            // (web/placecard.js beginText). It closes by itself, so the scene goes straight on without waiting.
+            loadPlaceCard().then(() => {
+                if (!placeCard.beginText(ev.area, ev.place)) console.warn(`[quest scene] place card ${JSON.stringify(ev.area)} / ${JSON.stringify(ev.place)} did not start`);
+            }).catch((e) => console.warn(`[quest scene] the place card data did not load: ${e?.message ?? e}`));
+            return done();
         case "chase": return startQuestChase(ev, done);
         case "battle": {
             // The story's own scripted-fight route: the screen's party behind the field's battle handoff. A WIN (or a

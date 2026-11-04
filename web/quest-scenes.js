@@ -33,6 +33,13 @@
 //                                                 scenes use draws it: no art of ours, no new draw code.
 //                                                 Behind F2 -> Extras -> Quest emotes (off by default): with the switch off
 //                                                 the step is refused here at compile time instead of half-playing.
+//   { "placecard": { "area": "Kusanagi City", "place": "Street Corner" } }
+//                                                 the game's own blue location card, typed with two names the quest writes
+//                                                 (the same bars, one character every six frames, the same hold and slit a
+//                                                 stage entry uses; engine/systems/location-card.ts). Both names are 1 to
+//                                                 20 printable characters — 20 is the longest name the disc's own table
+//                                                 holds ("Wire Forest Entrance"). Behind F2 -> Extras -> Quest place
+//                                                 cards (off by default). The card closes by itself, so the scene goes on.
 //   { "put": 27, "at": [x, y] }                    place a character (an NPC that is not on this map is spawned, if its
 //                                                  sprite is known, so a visitor can walk in from the edge)
 //   { "say": 27, "name": "Leomon", "text": "..." } speak, in the game's own conversation box. say: "player" for the
@@ -212,6 +219,9 @@ export function compileScene(steps, opts = {}) {
     };
     // A host event: one opcode the VM hands to the game (`SCENEEVENT <index>`) and the spec that says what to do
     const event = (spec) => { events.push(spec); opcodes.push(`SCENEEVENT ${events.length - 1}`); };
+    // The F2 switches. The game passes its settings object in as opts.fx (window.__fx); a plain node compile has no
+    // window, so a gated step needs an explicit opts.fx.<switch> to be let in.
+    const settings = opts.fx ?? (typeof window !== "undefined" ? window.__fx : null);
     opcodes.push(`FN6A 1 ${playerId}`);                       // the camera starts on the player, as in the story scenes
     // One walk to a point: a clear line is one WALKTO, a blocked one is routed into legs (see the walk step below)
     const emitWalk = (who, to, f) => {
@@ -327,9 +337,7 @@ export function compileScene(steps, opts = {}) {
             // puffs) and 806 closes (cutscene-manager _configureBubble; wstag-script-decode.md shows the story's own
             // `SETANIM 803 (805,57)` / WAIT / `SETANIM 803 (806,57)`). A quest takes the first slot, so no art and no draw
             // code here: the cutscene bubble actor the story scenes use pops it.
-            // F2 -> Extras -> Quest emotes gates the step (off by default). The game passes its settings object in as
-            // opts.fx (window.__fx); a plain node compile has no window, so only an explicit opts.fx.questemotes lets it in.
-            const settings = opts.fx ?? (typeof window !== "undefined" ? window.__fx : null);
+            // F2 -> Extras -> Quest emotes gates the step (off by default); `settings` above is opts.fx / window.__fx.
             if (settings?.questemotes !== true) return bad("bubble needs F2 -> Extras -> Quest emotes switched on");
             const BUBBLES = { exclaim: 805, puffs: 807, close: 806 };
             if (!Object.hasOwn(BUBBLES, s.bubble)) return bad(`bubble ${JSON.stringify(s.bubble)} is not one of exclaim, puffs, close`);
@@ -342,6 +350,20 @@ export function compileScene(steps, opts = {}) {
             opcodes.push(`SETANIM ${slot} ${cmd} ${idOf(s.who)}`);
             // an open bubble is shut again by itself: the story's balloon stays up until its close command
             if (cmd !== 806) opcodes.push(`WAIT ${s.hold == null ? 48 : Number(s.hold)}`, `SETANIM ${slot} 806 ${idOf(s.who)}`);
+        } else if ("placecard" in s) {
+            // The game's own blue location card with two names the quest writes: web/placecard.js beginText over
+            // engine/systems/location-card.ts, so the bars, the typewriter (one character every six frames), the hold
+            // and the slit close are the field's own and only the strings are the quest's. F2 -> Extras -> Quest place
+            // cards gates the step (off by default): refused here at compile time, never half-played.
+            if (settings?.questplacecard !== true) return bad("placecard needs F2 -> Extras -> Quest place cards switched on");
+            const pc = s.placecard;
+            if (!pc || typeof pc !== "object" || Array.isArray(pc)) return bad("placecard needs { area, place }: two names");
+            // Both names print on the card's own bars: 1 to 20 printable characters (20 is the longest name the
+            // disc's own table holds, "Wire Forest Entrance"), never a control character the card's font cannot draw.
+            const name = (v) => typeof v === "string" && /^[\x20-\x7e]+$/.test(v) && v.length <= 20;
+            if (!name(pc.area)) return bad(`placecard area ${JSON.stringify(pc.area)} is not 1 to 20 printable characters`);
+            if (!name(pc.place)) return bad(`placecard place ${JSON.stringify(pc.place)} is not 1 to 20 printable characters`);
+            event({ kind: "placecard", area: pc.area, place: pc.place });
         } else if ("face" in s) {
             // turning on the spot is a walk to where the character already stands: it arrives on the first tick and sets the facing
             const p = opts.pos?.(idOf(s.face));
@@ -568,7 +590,7 @@ export function castOf(steps) {
 /** Static check of a scene (no game needed): returns a list of problems, empty when it is well formed. */
 export function validateScene(steps) {
     // The F2 switches are a player setting, not a matter of the scene's shape: validate every step as if it were on, so a
-    // quest author still sees a malformed bubble step instead of only "turn Quest emotes on".
-    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }), paths: () => [[0, 0]], fx: { questemotes: true } });
+    // quest author still sees a malformed gated step instead of only "turn the switch on".
+    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }), paths: () => [[0, 0]], fx: { questemotes: true, questplacecard: true } });
     return errors;
 }
