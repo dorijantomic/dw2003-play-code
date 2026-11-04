@@ -72,6 +72,9 @@ import { mergeTechRecord, dropPasses } from "./tech-record.js";
 import { battleDelta, battleSpeedOn } from "./battle-speed.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
+// F2 -> Battle -> "Enemy tells" (the every-Nth countdown) and "Pattern breaker" (those
+// rows one turn early), both off by default: pure rules in web/enemy-tells.js.
+import { nearestTell, tellText } from "./enemy-tells.js";
 import {
   physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, drainHeal, RAND_U16,
   hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc, runAwayLine,
@@ -7137,6 +7140,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       enemySlots: [{ speciesId: Number(en.profile?.id) || 0, hp: en.hp }],
       activeEnemyIndex: 0,
     };
+    // F2 -> Battle -> "Pattern breaker" (new, off by default; web/enemy-tells.js): the
+    // every-Nth rows (comparator 18) test one turn further on, so each such special
+    // fires a turn early. Only the counter moves — hp/mp/affinity/statMods pass through,
+    // so conditions 2-17 read exactly what they read before; with the switch off `en`
+    // stays the enemy record itself, so the picks and the RNG draws are unchanged.
+    if (window.__fx?.aishift) en = { ...en, turnCounter: (en.turnCounter ?? 0) + 1 };
     const picked = pickEnemyAiMove(moves, en, RAND_U16, battle.player, context);
     if (picked) return picked;
     // Only when the extracted row set has no fourth row at all (the disc's record always
@@ -8940,6 +8949,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // "Renamon" here while the presentation actor is Stingmon.
       nativeText(b.playerRoster?.[b.activePlayerIndex]?.name ?? b.player.profile?.name ?? "Partner",
         player.nameX, player.nameY, { kind: 1 });
+    }
+    // F2 -> Battle -> "Enemy tells" (new, off by default; web/enemy-tells.js): one line
+    // under the enemy plate counting down to its nearest every-Nth row (comparator 18),
+    // read from the same ai_moves rows and the live +0x04 counter the AI selection uses.
+    if (window.__fx?.enemytells) {
+      const tell = nearestTell(b.enemy.eStats?.ai_moves, b.enemy.turnCounter ?? 0);
+      if (tell) nativeText(tellText(tell), enemy.nameX, enemy.y + enemy.h + 2, { kind: 1 });
     }
     if (USE_TRANSLATED_HUD) {
       // F0x800935cc / F0x80093628: two number elements at (0x10b, 0x1a) and

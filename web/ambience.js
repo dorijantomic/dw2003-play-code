@@ -41,7 +41,7 @@ export const FX_GROUPS = [
     // Digimon World 2 motion for empty clips, and the smoother pose playback.
     // HD Remaster screen shape (web/field-view.js). Off by default; Authentic never uses them.
     ["Screen", [["widefield", "Wide overworld: fill a wide screen (HD Remaster, window fill / fullscreen)"], ["battlewide", "Battle camera a little further out (HD Remaster)"], ["uisharp", "Sharp battle menus (xBR, HD Remaster)"], ["smartcam", "Smart 2 vs 2 camera: moves so rocks do not hide the Digimon"], ["battlepano", "Painted 360 battle backdrops (HD Remaster, test: Shell Beach)"], ["toonoutline", "Toon outlines: black outlines around the Digimon in battle"], ["toonshade", "Toon shading: flat cel light on the Digimon in battle"], ["softalpha", "Smooth cut-out edges: no blocky steps on crests and tails of the Digimon in battle (HD Remaster)"]]],
-    ["Battle", [["ownclips", "Own clips for techniques (each Digimon uses its own attack)"], ["dw2motion", "Digimon World 2 motion for techniques a Digimon has no clip for"], ["smoothanim", "Smooth battle animation (more in-between frames)"]]],
+    ["Battle", [["ownclips", "Own clips for techniques (each Digimon uses its own attack)"], ["dw2motion", "Digimon World 2 motion for techniques a Digimon has no clip for"], ["smoothanim", "Smooth battle animation (more in-between frames)"], ["enemytells", "Enemy tells: every-Nth countdown (new)"], ["aishift", "Pattern breaker: every-Nth rows one turn early (new)"]]],
 ];
 export const FX_DEFS = FX_GROUPS.flatMap(([, list]) => list);
 window.__fxKeys = FX_DEFS.map(([k]) => k);
@@ -51,7 +51,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "movetheatre", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "discrolls", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "movetheatre", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "discrolls", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift"];     // off until you switch them on by hand; "All on" and the presets leave them alone
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
