@@ -4829,7 +4829,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * the phase changes. `web/boss-phase.js` owns the arithmetic; this function only writes
    * the battle: the four AI rows (row 3 unconditional, so the last move always has a
    * fallback), the battlefield element at the field items' power 64, the fighter tint,
-   * the battle track and the page.
+   * the battle track, the body size and the page.
    *
    * The enemy record carries the cursor (`bossPhase`, -1 before the first line), so a
    * fired phase never fires again and a single hit that crosses two thresholds fires
@@ -4857,6 +4857,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (effects.music && window.__fx?.bossmusic === true) {
       b._battleTrack = effects.music;
       bgm?.play(b._battleTrack);
+    }
+    // NEW content (F2 -> Extras -> "The boss grows", off by default): the phase can change
+    // the boss's SIZE, not only its moves, tint and field. The body takes the phase's own
+    // multiplier (Millenniummon grows to 1.6 at 60% — web/battle3d.js GIANT_FIT_K, where
+    // the camera opens its giant fit) and the party entry keeps it, so a later KO/gauntlet
+    // reapply (applyGiantScales reads `entry.size`) draws the boss grown again. The
+    // renderer call is optional: a headless battle has none.
+    if (effects.size && window.__fx?.bossgrows === true) {
+      renderer3d?.setFighterScale?.("enemy", clampFighterScale(effects.size));
+      if (b.party?.[b.partyIndex]) b.party[b.partyIndex].size = clampFighterScale(effects.size);
     }
     return effects.page ? [{ text: effects.page, spec: null }] : [];
   }

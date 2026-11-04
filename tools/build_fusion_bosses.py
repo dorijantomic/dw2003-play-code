@@ -172,7 +172,9 @@ def resolve_phases(bid, phases, moves):
       * `tint` is four numbers 0..1, the same shape the boss's own tint has;
       * `page` is the authored line the phase puts up (non-empty);
       * `music` is one of the banks the game's own battle_music.json names (computed by
-        `battle_banks()`), so the fight's track can turn at the phase's HP line.
+        `battle_banks()`), so the fight's track can turn at the phase's HP line;
+      * `size` is a body multiplier 0.5..8 with at most one decimal, never smaller than
+        an earlier phase's size (a boss only grows), so a phase can draw the boss bigger.
     """
     if phases is None:
         return []
@@ -182,6 +184,7 @@ def resolve_phases(bid, phases, moves):
         raise BuildError(f"boss {bid}: at most {MAX_PHASES} phases, got {len(phases)}")
     out = []
     previous = None
+    previous_size = None
     banks = None
     for n, phase in enumerate(phases):
         if not isinstance(phase, dict):
@@ -219,7 +222,19 @@ def resolve_phases(bid, phases, moves):
             if not isinstance(music, str) or music not in banks:
                 raise BuildError(f"boss {bid} phase {n}: music {music!r} is not one of the "
                                  f"game's battle banks {sorted(banks)}")
+        size = phase.get("size")
+        if size is not None:
+            if (not isinstance(size, (int, float)) or isinstance(size, bool)
+                    or not 0.5 <= size <= 8 or abs(size * 10 - round(size * 10)) > 1e-9):
+                raise BuildError(f"boss {bid} phase {n}: size {size!r} must be a number 0.5..8 "
+                                 f"with at most one decimal")
+            if previous_size is not None and size < previous_size:
+                raise BuildError(f"boss {bid} phase {n}: size {size!r} is smaller than the previous "
+                                 f"phase's {previous_size!r} (a boss only grows)")
+            previous_size = size
         resolved = {"at": float(at), "moves": list(phase_moves)}
+        if size is not None:
+            resolved["size"] = float(size)
         if field is not None:
             resolved["field"] = field
         if tint is not None:

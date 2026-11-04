@@ -27,6 +27,10 @@
 //     builder computes the legal set from it). The battle plays it once at the phase's
 //     HP line — the same write + play the Galacticmon finale runs for boss04, behind
 //     F2 -> Extras -> "A phase changes the battle music" (`bossmusic`, off by default).
+//   * a phase may also name a body size, a multiplier 0.5..8 with at most one decimal
+//     (the builder enforces it and that a boss never shrinks). The battle draws the
+//     enemy at it, behind F2 -> Extras -> "The boss grows" (`bossgrows`, off by default);
+//     the renderer's own band is 0.1..16 (web/battle3d.js clampFighterScale).
 import { FIELD_POWER } from "./field-war.js";
 
 /**
@@ -87,11 +91,13 @@ export function phaseRows(phase, bossMoves) {
 /**
  * What a phase does to the battlefield itself: the field it names (or null), the field
  * power the seven field items write (64), the fighter tint (or null), the one page it
- * puts up (or null) and the battle bank it turns the music to (or null).
+ * puts up (or null), the battle bank it turns the music to (or null) and the body size
+ * the boss wears from then on (or null).
  *
  * The battle applies only what is named: no field means no field write, no tint means
- * the fused fighter keeps the boss's own tint, no page means no box page, and no music
- * means the screen's own track keeps playing.
+ * the fused fighter keeps the boss's own tint, no page means no box page, no music
+ * means the screen's own track keeps playing, and no size means the body keeps the size
+ * the renderer drew it at.
  */
 export function phaseEffects(phase) {
   return {
@@ -100,5 +106,6 @@ export function phaseEffects(phase) {
     tint: phase?.tint ?? null,
     page: phase?.page ?? null,
     music: phase?.music ?? null,
+    size: phase?.size ?? null,
   };
 }
