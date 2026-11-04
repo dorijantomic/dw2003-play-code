@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counter redirects — who the confirm press really reaches</title>
+<style>
+  :root { --ink:#ffd34d; --dim:#8a8ab0; --line:#1a2540; --good:#8fe08f; --warn:#e0a080; --bg:#0a0e1a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#e8e8f0; font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+  header { padding:20px clamp(14px,3vw,34px) 12px; border-bottom:1px solid #333; background:#0d1424; }
+  .eyebrow { color:var(--dim); font-size:11px; letter-spacing:1.5px; text-transform:uppercase; }
+  h1 { margin:4px 0 8px; font-size:22px; letter-spacing:1px; color:var(--ink); }
+  header p { margin:0; max-width:1000px; color:#b8c7dc; font-size:12.5px; }
+  header p + p { margin-top:6px; }
+  code { color:#9ab3d3; }
+  .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px clamp(14px,3vw,34px); border-bottom:1px solid #111a2e; }
+  .bar button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:5px; padding:5px 12px; font:inherit; cursor:pointer; }
+  .bar button:hover:not(:disabled) { border-color:var(--ink); }
+  .bar button:disabled { opacity:.5; cursor:default; }
+  #progress { color:var(--dim); font-size:12px; min-width:190px; }
+  #status { color:var(--good); font-size:12px; }
+  main { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr); gap:20px; padding:14px clamp(14px,3vw,34px) 40px; align-items:start; }
+  @media (max-width:1000px) { main { grid-template-columns:1fr; } }
+  #pairs { display:grid; gap:8px; }
+  .pair { border:1px solid var(--line); border-radius:6px; background:#0d1424; padding:7px 11px; }
+  .pair h3 { margin:0 0 4px; font-size:13px; color:var(--ink); font-weight:600; letter-spacing:.5px; }
+  .pair h3 span { color:var(--dim); }
+  .pair h3 small { color:var(--dim); font-weight:400; font-size:11px; margin-left:8px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { display:grid; gap:1px; border:1px solid #2a3a6a; border-radius:5px; background:#111a2e; padding:3px 7px; font-size:11.5px; }
+  .chip b { color:#ffe08a; font-weight:600; }
+  .chip .map { color:#5a6a8a; font-size:10.5px; }
+  .chip .mk { color:var(--warn); }
+  .chip .tg { color:var(--good); }
+  .chip .tg em { color:#9ab3d3; font-style:normal; }
+  .chip.none { color:var(--dim); border-style:dashed; }
+  aside { border:1px solid var(--line); border-radius:6px; background:#0d1424; padding:10px 13px; position:sticky; top:10px; }
+  aside h2 { margin:0 0 8px; font-size:12px; color:var(--ink); letter-spacing:1px; }
+  #lookup { display:flex; gap:6px; }
+  #lookup input { flex:1 1 auto; min-width:0; background:#111a2e; color:#e8e8f0; border:1px solid #45456a; border-radius:5px; padding:5px 8px; font:inherit; }
+  #lookup button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:5px; padding:5px 11px; font:inherit; cursor:pointer; }
+  #answer { margin-top:9px; font-size:12.5px; line-height:1.6; }
+  #answer .hit { color:var(--good); }
+  #answer .hit b { color:#ffe08a; }
+  #answer .miss { color:var(--dim); }
+  #answer .miss b { color:var(--warn); }
+  #answer .note { color:var(--dim); font-size:11.5px; margin:5px 0 0; }
+  .note { color:var(--dim); font-size:11.5px; line-height:1.6; }
+  footer { padding:0 clamp(14px,3vw,34px) 34px; color:#7f95b2; font-size:11.5px; max-width:1000px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">digimon world 3 · the confirm press</div>
+  <h1>Counter redirects</h1>
+  <p>
+    Fifteen npc ids are not people. They are spriteless position markers standing where a counter clerk, a
+    guard or a checkpoint looks reachable from — and the field confirm handler quietly swaps the marker id
+    for the character behind it (<code>F0x8008E2CC</code>, table at <code id="ram">the redirect table</code>) before
+    the talk arms run. That is why two records share one tile, and why the Explorer shows a marker with no
+    sprite next to a clerk with one.
+  </p>
+  <p>
+    Each row below is one pair: the rooms where both ids stand in the same cast, the marker's spot (it has
+    no sprite) and the clerk's spot and sprite. The lookup box answers the one question the Explorer cannot:
+    press here, who do I reach?
+  </p>
+</header>
+
+<div class="bar">
+  <button type="button" id="load">Load all 294 scenes</button>
+  <span id="progress">nothing loaded yet</span>
+  <span id="status"></span>
+</div>
+
+<main>
+  <section id="pairs"></section>
+  <aside>
+    <h2>PRESS HERE, WHO DO I REACH?</h2>
+    <form id="lookup">
+      <input id="id" inputmode="numeric" autocomplete="off" placeholder="npc id, e.g. 112" aria-label="npc id">
+      <button type="submit">Look up</button>
+    </form>
+    <div id="answer"><p class="note">Type an npc id. A marker answers from the table itself, before any room is loaded.</p></div>
+  </aside>
+</main>
+
+<footer>
+  Read-only: the pairs come from the engine's own table (engine/dw3/npc-confirm-redirects.ts, and
+  F0x8008E2CC in pro/fieldstg.s 0xb674-0xb73c is the handler that reads it); the spots come from the
+  shipped scene files. Nothing on this page writes anywhere.
+</footer>
+
+<script type="module">
+import {
+  redirectRows,
+  redirectReport,
+  redirectFor,
+  scanScenes,
+  reportMaps,
+  NPC_CONFIRM_REDIRECT_TABLE_RAM,
+} from "./redirect-view.js";
+import { confirmRedirectPairs } from "./vendor/engine.js";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const spot = (p) => `(${p.x}, ${p.y})`;
+
+const pairs = confirmRedirectPairs();
+const rows = redirectRows(pairs);
+let scenes = new Map();
+let report = [];
+const mapNames = new Map();
+const roomName = (id) => mapNames.get(id) || id;
+
+// The one number on the page that is not a coordinate: the engine's own address.
+$("ram").textContent = "0x" + NPC_CONFIRM_REDIRECT_TABLE_RAM.toString(16).toUpperCase();
+
+function roomChips(from, to) {
+  const row = report.find((r) => r.from === from && r.to === to);
+  if (!row || !row.maps.length) {
+    return `<span class="chip none">${report.length ? "no room carries this pair" : "load the scenes to find its rooms"}</span>`;
+  }
+  return row.maps.map((m) => `<span class="chip">` +
+    `<b>${esc(roomName(m.map))}</b><span class="map">${esc(m.map)}</span>` +
+    `<span class="mk">marker ${spot(m.marker)} · no sprite</span>` +
+    `<span class="tg">you reach ${to} at ${spot(m.target)} <em>${esc(m.target.sprite)}</em></span>` +
+    `</span>`).join("");
+}
+
+function paintPairs() {
+  $("pairs").innerHTML = rows.map(({ from, to }) => {
+    const row = report.find((r) => r.from === from && r.to === to);
+    const where = row ? ` <small>${row.maps.length} ${row.maps.length === 1 ? "room" : "rooms"}</small>` : "";
+    return `<article class="pair"><h3>${from} <span>→</span> ${to}${where}</h3><div class="chips">${roomChips(from, to)}</div></article>`;
+  }).join("");
+}
+
+async function loadScenes() {
+  const button = $("load"), line = $("progress"), status = $("status");
+  button.disabled = true;
+  let manifest = null;
+  try {
+    const res = await fetch("assets/manifest.json");
+    if (res.ok) manifest = await res.json();
+  } catch { /* no manifest: the rooms are still fetched by number */ }
+  const order = (manifest && Array.isArray(manifest.maps) ? manifest.maps : []).map((m) => m.id);
+  for (const m of (manifest && Array.isArray(manifest.maps) ? manifest.maps : [])) mapNames.set(m.id, m.name);
+  let done = 0;
+  for (const id of order) {
+    line.textContent = `loading ${done + 1} / ${order.length} · ${id}`;
+    try {
+      const res = await fetch(`assets/scenes/${id}.json`);
+      if (res.ok) scenes.set(id, await res.json());
+    } catch { /* a room that does not load is simply not shown */ }
+    done++;
+    if (done % 20 === 0) await new Promise((r) => setTimeout(r, 0));
+  }
+  report = redirectReport(pairs, scenes);
+  const counts = scanScenes(scenes);
+  const carrying = reportMaps(report);
+  line.textContent = `${done} / ${order.length} scenes loaded`;
+  status.textContent =
+    `${counts.maps} rooms · ${counts.ids} npc ids · ` +
+    `${report.filter((r) => r.maps.length).length} of ${rows.length} pairs stand in a room · ` +
+    `${carrying.length} rooms carry at least one`;
+  button.disabled = false;
+  paintPairs();
+}
+
+function answer(raw) {
+  const text = String(raw ?? "").trim();
+  const id = Number(text);
+  const box = $("answer");
+  if (!text || !Number.isInteger(id)) {
+    box.innerHTML = `<p class="miss">Type an npc id — a whole number such as <b>112</b>.</p>`;
+    return;
+  }
+  const hit = redirectFor(id);
+  if (!hit) {
+    box.innerHTML = `<p class="miss"><b>${id}</b> is not a marker — the press reaches whoever you face, unchanged.</p>`;
+    return;
+  }
+  const row = report.find((r) => r.from === hit.from && r.to === hit.to);
+  const first = row && row.maps[0];
+  const where = first
+    ? ` — a step away at <b>${esc(first.target.sprite)}</b> ${spot(first.target)} on ${esc(roomName(first.map))}`
+    : "";
+  const rooms = row && row.maps.length
+    ? `<p class="note">The pair stands in ${row.maps.length} ${row.maps.length === 1 ? "room" : "rooms"}: ${row.maps.map((m) => esc(m.map)).join(", ")}. The marker is at ${spot(first.marker)} and has no sprite of its own.</p>`
+    : `<p class="note">Load the scenes to see the clerk's sprite, their spot and every room the pair stands in.</p>`;
+  box.innerHTML = `<p class="hit"><b>${hit.from}</b> is a position marker: press here, you reach <b>${hit.to}</b>${where}.</p>${rooms}`;
+}
+
+$("load").addEventListener("click", loadScenes);
+$("lookup").addEventListener("submit", (e) => {
+  e.preventDefault();
+  answer($("id").value);
+});
+$("id").addEventListener("input", () => {
+  if ($("id").value.trim()) answer($("id").value);
+});
+
+paintPairs();
+</script>
+</body>
+</html>
