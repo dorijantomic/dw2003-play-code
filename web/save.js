@@ -1,4 +1,5 @@
 import { residentStorage } from "./vendor/engine.js";
+import { checkSlot } from "./slot-check.js";
 // web/save.js — the MEMORY CARD save/load screen (STGMCARD overlay).
 //
 // Identity (decoded 2026-08-05, docs/research/ui/stgmcard-decoded-2026-08-05.md):
@@ -153,16 +154,81 @@ export function writeSlot(i, { record, image = null, data = null, playSeconds = 
 export function restoreSlotData(i, profiles = null) {
   const slot = readSlot(i);
   if (!slot) return false;
+  // With the switch on, the entry is checked once more before restoreStorage
+  // clears a single live key: a damaged file must never reach the store.
+  if (saveVerifyOn()) {
+    const check = checkSlot(slot);
+    if (!check.ok) { refuseSlot(i, check, store.getItem(SLOT_KEY(i))); return false; }
+  }
   restoreStorage(slot.residentImageVersion === 1 && profiles
     ? residentStorage(slot.image, profiles, slot.data) : slot.data);
   return true;
 }
 
-export function readSlot(i) {
+// ── Card verify (F2 -> Extras -> "Card verify", off by default) ─────────────
+// A slot is checked for shape and honest numbers before it is trusted
+// (web/slot-check.js). A damaged entry reads as no file — the card's own dash
+// row — and its raw text is kept under the Save Doctor's quarantine key so a
+// later look can still see what the browser held.
+const QUARANTINE_KEY = "dw.quarantine.v1";
+
+function saveVerifyOn() {
+  return typeof window !== "undefined" && window.__fx?.saveverify === true;
+}
+
+// The last refused check, so a load's caller can record the disc's code.
+let lastRefusal = null;
+/** {slot, ok, code, empty, why} of the last refused entry, or null. */
+export function lastSlotRefusal() { return lastRefusal; }
+
+// The last parsed+checked entry per slot. The slot chooser reads all three
+// slots on every drawn frame; with the switch on, a 0x26C4 image is a 9,924-value
+// scan, so a hit on the same raw text skips both the parse and the check.
+const checkedRaw = new Map();    // slot -> {raw, entry, check}  (entry null = refused)
+
+function refuseSlot(i, check, raw) {
+  lastRefusal = { slot: i, ...check };
+  if (typeof raw !== "string") return;
   try {
-    const raw = store.getItem(SLOT_KEY(i));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+    let kept = {};
+    try { kept = JSON.parse(store.getItem(QUARANTINE_KEY) ?? "{}"); } catch { kept = {}; }
+    if (kept === null || typeof kept !== "object" || Array.isArray(kept)) kept = {};
+    if (kept[SLOT_KEY(i)] === raw) return;      // this raw text is already kept
+    kept[SLOT_KEY(i)] = raw;
+    store.setItem(QUARANTINE_KEY, JSON.stringify(kept));
+  } catch { /* storage blocked or full: the refusal itself still stands */ }
+}
+
+export function readSlot(i) {
+  let raw = null;
+  try {
+    raw = store.getItem(SLOT_KEY(i));
+    if (raw === null || raw === undefined || raw === "") return null;
+    // Switch off: exactly today's read.
+    if (!saveVerifyOn()) return JSON.parse(raw);
+    const prior = checkedRaw.get(i);
+    if (prior && prior.raw === raw) {
+      if (!prior.entry) lastRefusal = { slot: i, ...prior.check };
+      return prior.entry;
+    }
+    const entry = JSON.parse(raw);
+    const check = checkSlot(entry);
+    if (!check.ok) {
+      refuseSlot(i, check, raw);
+      checkedRaw.set(i, { raw, entry: null, check });
+      return null;
+    }
+    checkedRaw.set(i, { raw, entry, check });   // an empty file (check.empty) is today's read
+    return entry;
+  } catch {
+    if (saveVerifyOn()) {
+      const check = { ok: false, code: 8, empty: false, why: "entry is not JSON" };
+      if (typeof raw === "string") refuseSlot(i, check, raw);
+      else lastRefusal = { slot: i, ...check };
+      checkedRaw.set(i, { raw, entry: null, check });
+    }
+    return null;
+  }
 }
 
 /**

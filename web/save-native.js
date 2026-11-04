@@ -31,7 +31,7 @@ import {
 } from "./native-screen-host.js";
 import { seedNativeScreenParty } from "./native-screen.js";
 import { createWalkerMemcard, slotForFile } from "./memcard.js";
-import { buildRecord, readSlot, restoreSlotData, writeSlot } from "./save.js";
+import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 
 const MODULE_ID = "pro/stgmcard";
 const SAVE = 0x80048d34;
@@ -200,7 +200,14 @@ export function createSaveNative(sfx = null) {
         if (r._loadedSlot === null) return;
         const slot = r._loadedSlot;
         r._loadedSlot = null;
-        restoreSlotData(slot);
+        if (!restoreSlotData(slot)) {
+            // Card verify refused the file: no key was restored, so the page is
+            // not reloaded and the slot is not stamped. The disc's own code is
+            // recorded for the diagnostics.
+            const refusal = lastSlotRefusal();
+            r._lastDiagnostic = `load refused: MEMORY CARD code ${refusal?.code ?? 5} (${refusal?.why ?? "file not found"})`;
+            return;
+        }
         if (typeof localStorage !== "undefined") localStorage.setItem("mcardLastSlot", String(slot));
         if (typeof location !== "undefined") {
             // The page reloads into the loaded slot: the boot skips the language and
