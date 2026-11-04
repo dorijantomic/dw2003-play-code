@@ -15,15 +15,18 @@
 //   {t:"mpb", to:[ids], d:{...}}    a many-vs-many fight message (turns, actions, results) passed to those players (see #mpb)
 //   {t:"coop", op, to, ...}         team-up and shared fights between two players (see #coop)
 //   {t:"duel", op, to, hp, won}     a friendly duel: ask / yes / no / cancel / result, passed to player `to` (see #direct)
+//   {t:"lg", op, ...}               a Server Champ night among the room's tamers (see #lg)
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
 // and receives:
-//   {t:"welcome", id, room, roster:[{id,name,map,card}]}
+//   {t:"welcome", id, room, host, roster:[{id,name,map,card}]}
 //   {t:"join", id, name} / {t:"leave", id}
 //   {t:"pos", id, map, x, y, dir, mv} / {t:"gone", id} (that player left my stage) / {t:"emote", id, e}
 //   {t:"at", id, map}               that player is now in this stage (everyone is told, so the list can say where)
 //   {t:"chat", id, text, map} / {t:"feed", id, kind, text} / {t:"card", id, card}
 //   {t:"trade", op, ...}
 //   {t:"err", reason}   reasons: no_room, full, exists, busy, bad
+import { newLeague, nextPairing, report, forfeit, matchScore, packLeague } from "../web/mp-league.js";
+
 export const MAX_PEERS = 50;         // a room of friends; positions only go to the same stage, so this stays cheap
 export const MAX_ROOMS = 200;        // per relay, so a flood of "create" cannot fill its memory
 export const MAX_MESSAGE = 8000;     // bytes; a position update is about 80, a player card up to ~2000, a fighter record ~2500
@@ -95,7 +98,7 @@ export class Hub {
                 for (let i = 0; i < 20 && (!code || this.rooms.has(code)); i++) code = makeCode(this.rand);
             }
             if (this.rooms.has(code)) return { error: "exists" };
-            this.rooms.set(code, { peers: new Map() });
+            this.rooms.set(code, { peers: new Map(), host: null, league: null, pair: null });
         } else {
             code = cleanCode(room);
             if (!code) return { error: "bad" };
@@ -109,7 +112,9 @@ export class Hub {
         };
         const roster = [...r.peers.values()].map((p) => ({ id: p.id, name: p.name, map: p.map, card: p.card }));
         r.peers.set(peer.id, peer);
-        this.#to(peer, { t: "welcome", id: peer.id, room: code, roster });
+        if (r.host == null) r.host = peer.id;               // whoever made the room runs its Server Champ nights
+        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster });
+        if (r.league) this.#to(peer, { t: "lg", op: "state", host: r.host, ev: null, pair: r.pair, lg: packLeague(r.league) });   // join mid-night: see the bracket
         for (const o of r.peers.values()) if (o !== peer) this.#to(o, { t: "join", id: peer.id, name: peer.name });
         return {
             session: {
@@ -132,7 +137,21 @@ export class Hub {
         if (!r || !r.peers.delete(peer.id)) return;
         this.#endTrade(r, peer, "left");
         for (const o of r.peers.values()) this.#to(o, { t: "leave", id: peer.id });
-        if (!r.peers.size) this.rooms.delete(code);
+        if (!r.peers.size) { this.rooms.delete(code); return; }   // the room and its Server Champ night are gone
+        if (r.host === peer.id) {
+            // only the host can run a night, so theirs ends here; the next tamer can open a new one
+            const had = r.league != null;
+            r.league = null; r.pair = null; r.host = [...r.peers.keys()][0];
+            if (had) this.#league(r, { k: "closed" });
+            for (const o of r.peers.values()) this.#to(o, { t: "host", id: r.host });
+        } else if (r.league && r.league.ids.includes(peer.id) && !r.league.dropped.includes(peer.id)) {
+            // a tamer who disconnects mid-night counts as a loss for that fight and leaves the night (no re-entry)
+            const res = forfeit(r.league, peer.id);
+            if (res.ok) {
+                r.pair = nextPairing(r.league);
+                this.#league(r, { k: "drop", id: peer.id, w: res.to ?? undefined });
+            }
+        }
     }
 
     #message(code, peer, raw) {
@@ -156,6 +175,7 @@ export class Hub {
         if (m.t === "duel") return this.#direct(r, peer, m, "duel", DUEL_OPS);
         if (m.t === "coop") return this.#coop(r, peer, m);
         if (m.t === "mpb") return this.#mpb(r, peer, m);
+        if (m.t === "lg") return this.#lg(r, peer, m);
         if (m.t === "emote" && Number.isInteger(m.e) && m.e >= 0 && m.e <= 7) {
             for (const o of r.peers.values()) if (o !== peer && o.map && o.map === peer.map) this.#to(o, { t: "emote", id: peer.id, e: m.e });
         }
@@ -258,6 +278,57 @@ export class Hub {
             out.i = m.i; out.hp = m.hp;
         }
         this.#to(to, out);
+    }
+
+    // ---- #lg
+    // A Server Champ night: 2..8 tamers of this room, one bracket, best of three fights (web/mp-league.js holds
+    // the rules). The room keeps the bracket for the evening and drops it when it closes or its host leaves.
+    // The host alone opens it, calls a fight (`next`) and reports one (`win`); a tamer may only drop themselves.
+    //   client -> relay: open{ids,bestOf?} | next | win{winner,games} | drop
+    //   relay -> everyone: {t:"lg", op:"state", host, ev, pair, lg}   (lg = null when the night is over)
+    //   relay -> one peer: {t:"lg", op:"no", why}                      (a refused request)
+    #league(r, ev) {
+        const msg = { t: "lg", op: "state", host: r.host, ev, pair: r.pair, lg: packLeague(r.league) };
+        for (const o of r.peers.values()) this.#to(o, msg);
+    }
+
+    #lg(r, peer, m) {
+        const no = (why) => this.#to(peer, { t: "lg", op: "no", why });
+        if (!m || typeof m.op !== "string") return;
+        if (m.op === "drop") {                                   // anyone may leave the night, but only themselves
+            if (!r.league) return no("no_league");
+            const res = forfeit(r.league, peer.id);
+            if (res.refused) return no(res.refused);
+            r.pair = nextPairing(r.league);
+            return this.#league(r, { k: "drop", id: peer.id, w: res.to ?? undefined });
+        }
+        if (peer.id !== r.host) return;                          // everything else is the host's alone
+        if (m.op === "open") {
+            if (r.league && r.league.phase !== "done") return no("open");   // one night at a time; a won one makes way for the next
+            const ids = Array.isArray(m.ids) ? m.ids : [];
+            if (ids.length < 2 || ids.length > 8 || new Set(ids).size !== ids.length
+                || !ids.every((id) => Number.isInteger(id) && r.peers.has(id))) return no("ids");
+            r.league = newLeague({ ids, bestOf: m.bestOf === 1 ? 1 : 3 });
+            r.pair = null;
+            return this.#league(r, { k: "open" });
+        }
+        if (!r.league) return no("no_league");
+        if (m.op === "next") {
+            if (r.league.phase === "done") return no("done");
+            r.pair = nextPairing(r.league);
+            if (!r.pair) return this.#league(r, { k: "round", r: r.league.r });
+            return this.#league(r, { k: "pair", a: r.pair.a, b: r.pair.b, r: r.pair.r, m: r.pair.m, game: r.pair.game });
+        }
+        if (m.op === "win") {
+            const res = report(r.league, m.winner, m.games);
+            if (res.refused) return no(res.refused);
+            r.pair = nextPairing(r.league);
+            if (!res.ended) return this.#league(r, { k: "game", a: res.a, b: res.b, n: res.games.length, w: m.winner });
+            const won = r.league.champ === res.winner;
+            // the score is written from the winner's side, whoever of the two won (web/mp-league.js matchScore)
+            const g = matchScore({ a: res.a, b: res.b, w: res.winner, g: res.games });
+            return this.#league(r, { k: "win", w: res.winner, l: res.a === res.winner ? res.b : res.a, g, c: won ? 1 : undefined });
+        }
     }
 
     // ---- #trade
