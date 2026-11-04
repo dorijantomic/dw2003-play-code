@@ -5,6 +5,9 @@
 //          in front of the one who gives it. Press Enter to talk and the scene plays.
 //   Goals  meets all of its objectives at once, so you can see the turn-in scene and the reward.
 // "Hide" folds the panel into a small tab. "Reset quests" clears the quest layer's own progress. Nothing here touches the story or the normal save.
+// "Ways" reads one job's every ending out of its data (web/quest-endings.js): the same page tools/quest_endings.mjs prints.
+import { endingsBlock } from "./quest-endings.js";
+
 const $ = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
 
 const css = `
@@ -78,7 +81,8 @@ function build() {
         $("div", { className: "t" }, d.title),
         $("div", { className: "s" }, `${d.giver ?? ""} · ${window.__quests.status(d.id)}${d.offer?.scene || d.objectives.some((o) => o.scene) ? " · scene" : ""}`),
         $("button", { textContent: "Go", onclick: () => { go(d, say); setTimeout(refresh, 300); } }),
-        $("button", { textContent: "Goals", onclick: () => { say(window.__quests.lab.finishGoals(d.id) ? "Goals met. Talk to the giver." : "Nothing to finish."); refresh(); } })));
+        $("button", { textContent: "Goals", onclick: () => { say(window.__quests.lab.finishGoals(d.id) ? "Goals met. Talk to the giver." : "Nothing to finish."); refresh(); } }),
+        $("button", { textContent: "Ways", onclick: () => { msg.style.whiteSpace = "pre-wrap"; say(endingsBlock(d)); } })));
     }
     const total = window.__quests.defs.filter((d) => d.offer || d.objectives.some((o) => o.type === "talk")).length;
     count.textContent = `${Math.min(shown, 40)} shown of ${shown} matching, ${total} quests with a giver`;
