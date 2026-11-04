@@ -15,6 +15,11 @@
 //   multiplayerTick(mapId, state)   called every frame: remembers where I am and moves the others smoothly
 //   multiplayerGhosts(mapId)        the other players standing in this stage, for game.js to draw
 //   multiplayerSelf()               me, as a ghost-like record (name tag, speech bubble, emote) when online
+//
+// With F2 -> Extras -> "Chat: keep every line I type" on, my own lines leave through a small queue
+// (web/chat-queue.js) that spaces them 650 ms apart, a little over the relay's own 600 ms drop, so a line
+// typed in a hurry reaches the room instead of vanishing. The relay is not touched: it still drops at 600.
+import { createChatQueue } from "./chat-queue.js";
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
@@ -23,6 +28,7 @@ const BEAT_MS = 2000;           // standing still, still say "I am here" now and
 const STALE_MS = 9000;          // a player silent this long is hidden (their connection probably dropped)
 const SNAP = 140;               // farther away than this (a map change, a warp): jump instead of gliding
 const SAY_MS = 6500;            // how long a speech bubble stays over a head
+const CHAT_GAP_MS = 650;        // F2 "Chat: keep every line I type": over the relay's 600 ms drop, so a line waits instead
 export const EMOTES = ["♥", "!", "?", "...", "♪", ":)", "GG", "zZ"];   // 0..7
 
 const mp = {
@@ -37,7 +43,7 @@ const mp = {
 
 // ------------------------------------------------------------ events for the social dock
 const listeners = new Set();
-/** fn(type, data): "status" | "roster" | "chat" {id,name,text,self} | "feed" {id,name,kind,text} | "sys" {text} | "trade" {...} */
+/** fn(type, data): "status" | "roster" | "chat" {id,name,text,self,mark} | "chatstate" {mark} | "feed" {id,name,kind,text} | "sys" {text} | "trade" {...} */
 export const mpOn = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 const emit = (type, data = {}) => { for (const f of [...listeners]) { try { f(type, data); } catch (e) { console.warn("[multiplayer]", e); } } };
 
@@ -48,6 +54,8 @@ export const myName = () => mp.name;
 export const amHost = () => mp.status === "online" && mp.hostId != null && mp.hostId === mp.id;
 /** The F2 switch: F2 -> Extras -> "Server Champ league", off by default. Off = nothing leaves this game. */
 export const serverChampOn = () => typeof window !== "undefined" && window.__fx?.serverchamp === true;
+/** The F2 switch: F2 -> Extras -> "Chat: keep every line I type", off by default. Off = a line leaves at once, as before. */
+export const chatQueueOn = () => typeof window !== "undefined" && window.__fx?.chatqueue === true;
 /** Everyone in the room except me: [{ id, name, map, card }] */
 export const peerList = () => [...mp.peers].map(([id, p]) => ({ id, name: p.name, map: p.map, card: p.card }));
 export const peerOf = (id) => mp.peers.get(id) ?? null;
@@ -148,6 +156,7 @@ export function connect(want) {
     ws.onclose = () => {
         if (mp.ws !== ws) return;                  // I closed it myself
         mp.ws = null; mp.peers.clear(); emit("roster");
+        resetChatQueue();                          // a dropped connection does not keep half-sent lines waiting forever
         if (mp.want && gotWelcome && mp.retry < 5) {
             const wait = 1500 * 2 ** mp.retry++;
             setStatus("connecting", "Connection lost. Reconnecting...");
@@ -183,6 +192,7 @@ export function disconnect(quiet = false) {
     const ws = mp.ws; mp.ws = null; mp.want = quiet ? mp.want : null;
     if (ws) try { ws.close(); } catch { /* already closed */ }
     mp.peers.clear(); mp.room = null; mp.id = null; mp.hostId = null;
+    resetChatQueue();                             // lines still waiting die with the connection, and say so
     if (!quiet) setStatus("off");
 }
 
@@ -190,18 +200,47 @@ function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 
 export const sendRaw = (o) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
 const sayTime = (text) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
 
+// ------------------------------------------------------------ the chat queue (F2 -> Extras -> Chat)
+// One queue per connection. The relay drops a line that arrives under CHAT_GAP (600 ms, server/room-core.mjs);
+// this waits 650 ms between my lines, so the room keeps every one. With the switch off no queue is made.
+let chatQ = null;
+function chatQueue() {
+    if (!chatQ) chatQ = createChatQueue({
+        gap: CHAT_GAP_MS,
+        send: (text, meta) => {
+            const ok = sendRaw({ t: "chat", text });
+            if (meta && (meta.queued || !ok)) { meta.queued = false; meta.dropped = !ok; emit("chatstate", { mark: meta }); }
+            return ok;
+        },
+    });
+    return chatQ;
+}
+/** How many of my lines are still waiting for their turn (0 with the switch off). */
+export const chatPending = () => (chatQ ? chatQ.pending() : 0);
+/** A closed connection drops what still waited; each of those rows is told it did not leave (never silent). */
+function resetChatQueue() {
+    if (!chatQ) return;
+    for (const meta of chatQ.reset()) { meta.queued = false; meta.dropped = true; emit("chatstate", { mark: meta }); }
+}
+
 export function sendEmote(i) {
     sendRaw({ t: "emote", e: i });
     mp.me.emote = EMOTES[i] ?? ""; mp.me.emoteUntil = performance.now() + 2500;
 }
 
-/** Say something: it goes to everyone's chat log, and shows over my head here and over my character for players in my stage. */
+/** Say something: it goes to everyone's chat log, and shows over my head here and over my character for players in my stage.
+ *  Returns "sent" | "queued" | false. With F2 -> Extras -> "Chat: keep every line I type" on, a line typed inside the
+ *  relay's gap waits its turn (its local row shows "..."), so the room hears every line instead of the last one. */
 export function sendChat(text) {
     text = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 100);
     if (!text) return false;
     mp.me.say = text; mp.me.sayUntil = performance.now() + sayTime(text);
-    emit("chat", { id: mp.id, name: mp.name, text, self: true });
-    return sendRaw({ t: "chat", text });
+    const mark = { queued: false, dropped: false };           // the dock keeps a hold of this on the row it prints now
+    emit("chat", { id: mp.id, name: mp.name, text, self: true, mark });
+    if (!chatQueueOn()) return sendRaw({ t: "chat", text }) ? "sent" : false;
+    const r = chatQueue().push(text, mark);
+    if (r === "queued") { mark.queued = true; emit("chatstate", { mark }); }
+    return r;
 }
 export function sendFeed(kind, text) { return sendRaw({ t: "feed", kind, text }); }
 export function sendCard(card) { return sendRaw({ t: "card", card }); }
@@ -222,6 +261,7 @@ export function multiplayerTick(mapId, st) {
     mp.me.map = mapId; mp.me.x = Math.round(st.x); mp.me.y = Math.round(st.y); mp.me.dir = st.dir;
     mp.me.mv = st.moving || st._cutTarget ? 1 : 0;
     if (mp.status !== "online") return;
+    if (chatQ) chatQ.flush();                     // a waiting line leaves when its gap is up (F2 -> Extras -> Chat)
     // glide the others toward their latest position, and run their walk animation while they are moving
     for (const p of mp.peers.values()) {
         if (p.x == null) continue;

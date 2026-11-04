@@ -8,7 +8,7 @@
 // Trade swaps items and BIT between two players; both press Confirm on the same offer and each game moves its own items.
 //
 // Nothing here writes a story flag. Names and chat from other players are only ever put on the page as text.
-import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn } from "./multiplayer.js";
+import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 
 const MAX_LOG = 300;
@@ -54,6 +54,8 @@ function drawLog() {
         if (e.k === "chat") {
             const n = h("b", "", e.name); n.style.color = nameColor(e.name);
             row.append(n, ": ", e.text);
+            if (e.mark?.queued) row.append(h("span", "wait", " ..."));           // typed, still waiting its turn
+            else if (e.mark?.dropped) row.append(h("span", "wait", " (not sent)"));   // it never left this game
         } else if (e.k === "feed") {
             const [icon, col] = KIND[e.kind] ?? KIND.info;
             const i = h("span", "", icon + " "); i.style.color = col;
@@ -628,6 +630,7 @@ export function installSocial({ stageEl, api: a }) {
       #mp-dock .log, #mp-dock .players { height:170px; overflow-y:auto; padding:4px 6px; }
       #mp-dock .log[hidden], #mp-dock .players[hidden] { display:none; }
       #mp-dock .ln { word-break:break-word; } #mp-dock .tm { color:#8e95c9; font:10px monospace; margin-right:5px; }
+      #mp-dock .ln .wait { color:#ffb15a; font-style:italic; }
       #mp-dock .ln.sys { color:#aab; font-style:italic; } #mp-dock .ln.feed { color:#e8ecff; }
       #mp-dock .say { display:flex; gap:4px; padding:4px 0 0; }
       #mp-dock .say input { flex:1; background:rgba(8,10,30,.55); color:#fff; border:1px solid rgba(120,130,220,.45); border-radius:4px; padding:4px 7px; font:inherit; text-shadow:none; }
@@ -685,7 +688,13 @@ export function installSocial({ stageEl, api: a }) {
     const submit = () => {
         const text = input.value.replace(/\s+/g, " ").trim();
         input.value = "";
-        if (text) sendChat(text);
+        if (text) {
+            const r = sendChat(text);
+            if (r === "queued") {
+                const n = chatPending();
+                note(n === 1 ? "One line waiting..." : `${n} lines waiting...`);
+            } else if (r === false && chatQueueOn()) note("That line was not sent - you are not in a room.");
+        }
         input.blur(); api.releaseKeys();
     };
     // typing here must not walk the character or press game buttons
@@ -700,7 +709,8 @@ export function installSocial({ stageEl, api: a }) {
     for (const w of [inspect, tradeBox]) w.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (w === inspect) closeInspect(); else cancelTrade(); } });
 
     mpOn((type, d) => {
-        if (type === "chat") add({ k: "chat", name: d.name, text: d.text, self: d.self });
+        if (type === "chat") add({ k: "chat", name: d.name, text: d.text, self: d.self, mark: d.mark });
+        else if (type === "chatstate") drawLog();          // a waiting line left (or did not): repaint its "..." mark
         else if (type === "feed") add({ k: "feed", kind: d.kind, name: d.name, text: d.text });
         else if (type === "sys") note(d.text);
         else if (type === "roster") {
