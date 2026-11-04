@@ -208,6 +208,21 @@ The clip stays latched on that character until another `anim` step or the end of
 clip is drawn and the pose comes back when they stop. Every scene exit clears it. Author it with
 `anim(who, clip, face=None)` in `dsl.py`.
 
+## Place card
+
+`{"placecard": {"area": "Kusanagi City", "place": "Street Corner"}}` — the game's own blue location card, the one that
+names the place you walk into, with two names the quest writes. It is the field's stage-entry card
+(`engine/systems/location-card.ts`, drawn by `web/placecard.js beginText`): the same ten bars, the same typewriter (one
+character every six frames), the same one-second hold and the same slit close. Only the two strings are the quest's. The
+card closes by itself, so the scene goes straight on after it.
+
+Both names are 1 to 20 printable characters — 20 is the longest name the disc's own table holds ("Wire Forest
+Entrance"). The compiler refuses anything else (a 21st character, a tab or control character, a name that is not a
+string) as one error naming the value, so a scene never silently shows half a name.
+
+Behind F2 → Extras → Quest place cards (off by default). With the switch off the step is refused at compile time. No
+art and no data of ours: the card's own bars and font draw it.
+
 ## Walkable ground: where a scene may put a character
 
 The cutscene VM's own walk driver steps straight toward a target with **no collision test**: a `WALKTO` whose line
@@ -243,9 +258,9 @@ nudged when someone else is standing there — then to walkable ground clear of 
 ## Checking it
 
 - `node --test tests/quest-scenes.test.js tests/quest-fx.test.js tests/quest-sky.test.js tests/quest-chase.test.js
-  tests/quest-ghost.test.js tests/quest-props.test.js tests/quest-edge.test.js` — every step compiles and validates, the
-  effect list itself (fall, bounce, settle, clips, fade, remove, the player drive, cleanup), the sky override, the chase
-  machine, the ghost table, the prop layer, and the edge cases.
+  tests/quest-ghost.test.js tests/quest-props.test.js tests/quest-edge.test.js tests/quest-placecard.test.js` — every step
+  compiles and validates, the effect list itself (fall, bounce, settle, clips, fade, remove, the player drive, cleanup), the
+  sky override, the chase machine, the ghost table, the prop layer, the quest's own place card, and the edge cases.
 - In the browser: `python3 tools/build_quests.py --with-drafts`, then `web/quest-lab.html` and play the drafts:
   - `zz_fx_all` ("Cipher's full sweep") plays EVERY step in one scene: shake thuds, fog, night, lightning, a ghost, a
     crate that falls/settles/slides/fades, a real fight, a chase, a drop, a rise, a fade, a warp — and leaves a board

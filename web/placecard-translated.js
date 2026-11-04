@@ -15,6 +15,10 @@
 import { ui } from "./vendor/engine.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
+// A quest's own two names (the `placecard` scene step, web/quest-scenes.js) are not in the disc's name banks, so that
+// card is the plain-string one in web/placecard.js: the same bars, the same typewriter, hold and slit, drawn from
+// strings we hold. This instance hands it the screen while it plays, so game.js talks to one card either way.
+import { createPlaceCard as createTextPlaceCard } from "./placecard.js";
 
 /** The framebuffer the card's coordinates are authored in. */
 const NATIVE_W = 320;
@@ -51,6 +55,8 @@ export function placeCardScene(mapId) {
 }
 
 export function createPlaceCardTranslated() {
+    // The quest layer's own card (beginText below): the plain-string renderer, handed the screen while it plays.
+    const textCard = createTextPlaceCard();
     const card = {
         _session: null,
         _clock: null,
@@ -74,7 +80,7 @@ export function createPlaceCardTranslated() {
         if (Number.isInteger(language) && language >= 0 && language <= 6) card._language = language;
     };
 
-    card.isActive = () => !!card._session?.isActive() && !card._failed;
+    card.isActive = () => textCard.isActive() || (!!card._session?.isActive() && !card._failed);
 
     /** The field's busy flag: raised on begin, cleared by the card's last callback. */
     card.isBusy = () => !!card._session?.busy();
@@ -86,6 +92,7 @@ export function createPlaceCardTranslated() {
     card.begin = (mapId) => {
         const scene = placeCardScene(mapId);
         card._session?.dispose();
+        textCard.cancel();                     // an arrival is not a scene's card: the arrival takes the screen
         if (!data || scene == null) return false;
         try {
             card._session ??= new ui.PlaceCardSession(data);
@@ -104,7 +111,18 @@ export function createPlaceCardTranslated() {
     };
 
     card.cancel = () => {
+        textCard.cancel();
         card._session?.dispose();
+    };
+
+    /**
+     * A quest's own two names (the `placecard` scene step): the plain-string card (web/placecard.js) plays them with
+     * the field card's own bars, typewriter, hold and slit. The data must be loaded (await loadPlaceCard()) first.
+     * Returns false, and shows nothing, for an empty name.
+     */
+    card.beginText = (area, place) => {
+        card._session?.dispose();
+        return textCard.beginText(area, place);
     };
 
     /**
@@ -115,8 +133,9 @@ export function createPlaceCardTranslated() {
         card._held = !!on;
     };
 
-    /** Advance by `dt` seconds: one card callback per display tick due. */
+    /** Advance by `dt` seconds: one card callback per display tick due, plus a scene's own card (beginText). */
     card.step = (dt) => {
+        textCard.step(dt);                     // quest text runs its own clock and closes without the field's release
         const session = card._session;
         if (!session?.isActive() || card._failed) return;
         try {
@@ -132,7 +151,10 @@ export function createPlaceCardTranslated() {
 
     card.draw = (ctx, viewW, viewH) => {
         const session = card._session;
-        if (!session?.isActive() || card._failed) return;
+        if (!session?.isActive() || card._failed) {
+            textCard.draw(ctx, viewW, viewH);  // a scene's own two names (beginText), while it plays
+            return;
+        }
         const s = viewW / NATIVE_W;
         const slit = session.slit();
         ctx.save();
@@ -154,6 +176,7 @@ export function createPlaceCardTranslated() {
 
     /** Live state, for tests and the UI lab (the fields web/placecard.js's verifier reads). */
     card.state = () => {
+        if (textCard.isActive()) return textCard.state();     // a scene's own card (beginText) is what is on screen
         const st = card._session?.state();
         if (!st) return null;
         const name = (n) => ({ revealed: n?.revealed ?? 0, total: n?.total ?? 0, ended: !!n?.ended });
