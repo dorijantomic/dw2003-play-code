@@ -30,7 +30,7 @@ import {
   setCodexData,
   setBattlefieldsData,
   codexLoad,
-  tickCodex,
+  tickCodex, openCodex,
   codexOpen,
   codexTab,
   codexRows,
@@ -173,7 +173,7 @@ test("opening the book reads items.json; the DROPS tab lists 78 items and Crimso
   assert.ok(fetched.includes("assets/data/items.json"), "items.json rides the book's own load");
   assert.equal(fetched.length, 8, "one read each, no second switch");
 
-  tickCodex(true);
+  openCodex();
   assert.equal(codexTab(), "partners", "the book still opens on the partner pages");
   for (let i = 0; i < 8 && codexTab() !== "drops"; i++) codexPress("r1");
   assert.equal(codexTab(), "drops", "the seventh tab of the same book");

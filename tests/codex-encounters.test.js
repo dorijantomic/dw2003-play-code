@@ -32,7 +32,7 @@ import {
   codexPageIndex,
   codexPageRows,
   codexCursor,
-  tickCodex,
+  tickCodex, openCodex,
   codexPress,
   codexDraw,
 } from "../web/codex.js";
@@ -203,7 +203,7 @@ test("with the toggle off there is no tab, no index and the pad falls through un
 test("R1 twice reaches ENCOUNTERS; a search lists the real stages, zones, slots and party", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  tickCodex(true);
+  openCodex();
   assert.equal(codexTab(), "partners");
   codexPress("r1");
   assert.equal(codexTab(), "wild");

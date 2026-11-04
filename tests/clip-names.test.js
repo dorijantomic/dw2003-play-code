@@ -34,7 +34,7 @@ import {
   codexRows,
   codexTab,
   setCodexData,
-  tickCodex,
+  tickCodex, openCodex,
 } from "../web/codex.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -233,7 +233,7 @@ test("the Clips tab rides the codex switch: off draws nothing, on shows all 62 n
   assert.equal(offCtx.calls.length, 0, "with the switch off the canvas gets no call");
 
   setCodexData(disc, evolutions); // no enemy/finder tables: those two tabs are skipped
-  tickCodex(true);
+  openCodex();
   for (let i = 0; i < 5 && codexTab() !== "clips"; i++) codexPress("r1");
   assert.equal(codexTab(), "clips", "the fifth tab is reachable from the pad");
   assert.equal(codexRows().length, 62);

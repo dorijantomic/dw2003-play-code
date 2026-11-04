@@ -29,7 +29,7 @@ import {
   codexPageRows,
   codexRows,
   codexCursor,
-  tickCodex,
+  tickCodex, openCodex,
   codexPress,
   codexDraw,
 } from "../web/codex.js";
@@ -178,7 +178,7 @@ test("with the toggle off there is no page and the pad falls through untouched",
 test("R1 turns to the wild tab and L1 back, each tab keeping its own rows and pages", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  tickCodex(true);
+  openCodex();
   assert.equal(codexTab(), "partners", "the book opens on the partner pages");
   assert.equal(codexRows().length, 55, "the disc's partner profiles");
   assert.equal(codexPageCount(), 3, "55 partner rows over pages of 24");
@@ -218,7 +218,7 @@ test("R1 turns to the wild tab and L1 back, each tab keeping its own rows and pa
 test("the wild page draws real numbers and the four AI rows in plain words, the fourth named as the fallback", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   const ctx = fakeCtx();
   assert.equal(codexDraw(ctx, 0), true);
@@ -244,7 +244,7 @@ test("the wild page draws real numbers and the four AI rows in plain words, the 
 test("Cardmon's own page shows no drop, and the plain-words AI line names the technique the row fires", async () => {
   codexReset();
   setCodexData(digimon, evolutions, enemyFile, models);
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   const cardmonRow = codexRows().findIndex((r) => r.name === "Cardmon");
   assert.equal(cardmonRow, 182, "the eight Cardmon records sit late in the table");
@@ -269,7 +269,7 @@ test("Cardmon's own page shows no drop, and the plain-words AI line names the te
 test("Airdramon's page names its own special technique next to its id", async () => {
   codexReset();
   setCodexData(digimon, evolutions, enemyFile, models);
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   const at = codexRows().findIndex((r) => r.name === "Airdramon");
   assert.equal(at, 18, "Airdramon is the 19th wild record");

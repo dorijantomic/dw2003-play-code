@@ -21,7 +21,7 @@ import {
   plannerLoad,
   plannerReset,
   setPlannerData,
-  tickPlanner,
+  tickPlanner, openPlanner,
   plannerPress,
   plannerDraw,
   plannerOpen,
@@ -241,14 +241,17 @@ test("with the switch off the page is closed, swallows no press and draws nothin
   assert.equal(ctx.calls.length, 0, "no canvas call at all");
 });
 
-test("the page opens on the toggle's rising edge and lists the partner's next forms", async () => {
+test("the toggle never opens the page, the button does, and it lists the partner's next forms", async () => {
   plannerReset();
   await plannerLoad(fakeFetch);
   const members = [
     { slot: 0, name: "Kotemon", live: liveFor({ levels: { 14: 30 }, level: 5, stats: { spd: 280 } }) },
     { slot: 7, name: "Patamon", live: emptyLive() },
   ];
-  assert.equal(tickPlanner(true, () => ({ members })), true);
+  assert.equal(tickPlanner(true, () => ({ members })), false, "the switch on opens nothing");
+  assert.equal(plannerOpen(), false);
+  openPlanner();
+  assert.equal(tickPlanner(true, () => ({ members })), true, "the F2 button opened it; the tick keeps it fed");
   assert.equal(plannerOpen(), true);
   assert.equal(plannerSelection().name, "Kotemon");
   assert.equal(plannerRowsNow().length, 43, "Growlmon is already learned, so its own record leaves the list");
@@ -282,7 +285,10 @@ test("the page opens on the toggle's rising edge and lists the partner's next fo
   tickPlanner(true, () => ({ members }));
   assert.equal(plannerOpen(), false, "Cross does not reopen while the switch stays on");
   tickPlanner(false, () => ({ members }));
-  assert.equal(tickPlanner(true, () => ({ members })), true, "off and on again reopens it");
+  assert.equal(tickPlanner(true, () => ({ members })), false, "off and on again does not reopen it");
+  openPlanner();
+  assert.equal(tickPlanner(false, () => ({ members })), false, "the switch off closes it");
+  openPlanner();
   plannerPress("start");
   assert.equal(plannerOpen(), false);
   tickPlanner(false, () => ({ members }));
@@ -293,6 +299,7 @@ test("the page reads the partner's live ledger: a learned form leaves the list",
   setPlannerData(evolutions, digimon, [
     { slot: 0, name: "Kotemon", live: liveFor({ levels: { 9: 1 } }) },
   ]);
+  openPlanner();
   tickPlanner(true, null);
   assert.equal(plannerOpen(), true);
   assert.equal(plannerRowsNow().length, 43);

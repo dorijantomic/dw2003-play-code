@@ -15,7 +15,7 @@ import {
   cutContentOpen,
   cutContentPage,
   cutContentPages,
-  tickCutContent,
+  tickCutContent, openCutContent,
   wrapText,
   cutContentLines,
 } from "../web/cut-content.js";
@@ -191,7 +191,7 @@ test("the panel wraps its text and every page carries its title, body and eviden
 test("the page owns the pad: Cross or Start closes it, Left and Right page through all seven", () => {
   tickCutContent(false);
   assert.equal(cutContentOpen(), false);
-  tickCutContent(true);
+  openCutContent();
   assert.equal(cutContentOpen(), true);
   assert.equal(cutContentPage(), 0);
 
@@ -207,25 +207,27 @@ test("the page owns the pad: Cross or Start closes it, Left and Right page throu
   assert.equal(cutContentOpen(), false);
   assert.equal(cutContentPress("up"), false, "with the page closed the field gets the press again");
 
-  tickCutContent(true);
+  openCutContent();
   cutContentPress("start");
   assert.equal(cutContentOpen(), false, "Start closes it too");
   tickCutContent(false);
 });
 
-test("the page opens on the rising edge only and never reopens after Cross while the flag stays on", () => {
+test("the switch never opens the page; the button does; Cross closes; the switch off closes", () => {
   tickCutContent(false);
   assert.equal(cutContentOpen(), false);
   tickCutContent(true);
-  assert.equal(cutContentOpen(), true, "off -> on opens it");
+  assert.equal(cutContentOpen(), false, "switch on at load: not open");
+  openCutContent();
+  assert.equal(cutContentOpen(), true, "the F2 button opens it");
   cutContentPress("cross");
-  assert.equal(cutContentOpen(), false);
+  assert.equal(cutContentOpen(), false, "Escape (cross) closes it");
   tickCutContent(true);
-  assert.equal(cutContentOpen(), false, "still on: it does not reopen every frame");
+  assert.equal(cutContentOpen(), false, "still on: it does not reopen");
   tickCutContent(false);
-  assert.equal(cutContentOpen(), false);
   tickCutContent(true);
-  assert.equal(cutContentOpen(), true, "a new off -> on edge opens it again");
+  assert.equal(cutContentOpen(), false, "a new off -> on edge does not open it");
+  openCutContent();
   tickCutContent(false);
   assert.equal(cutContentOpen(), false, "switching the setting off closes it");
 });

@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   BLAST_BRACKETS, blastCards, blastCardCount, blastCardIndex, blastDraw, blastLoad, blastOpen,
-  blastPress, blastReset, tierForLevel, tickBlastLadder,
+  blastPress, blastReset, tierForLevel, tickBlastLadder, openBlastLadder,
 } from "../web/blast-ladder.js";
 import { levelTier } from "../engine/dw3/battle-formulas.ts";
 
@@ -106,7 +106,7 @@ test("tierForLevel is the event-0x12 ladder and agrees with the engine for every
 test("a card shows the five brackets and says Blast is automatic, temporary and leaves the ledger alone", async () => {
   blastReset();
   await blastLoad(async () => ({ json: async () => digimon }));
-  tickBlastLadder(true);
+  openBlastLadder();
   const text = drawn();
   assert.match(text, /Kotemon/, "the card names the starter");
   for (const name of ["Dinohumon", "Kyukimon", "GuardiAngemon", "GranKuwagamon", "MaloMyotismon"])
@@ -131,13 +131,14 @@ test("with the F2 switch off there is no page and no press is taken", () => {
   assert.equal(blastPress("right"), false);
 });
 
-test("the switch's rising edge opens it on the first card; Left/Right walk the eight; Cross closes", async () => {
+test("the F2 button opens it on the first card; Left/Right walk the eight; Cross closes", async () => {
   blastReset();
   await blastLoad(async () => ({ json: async () => digimon }));
   assert.equal(blastCardCount(), 8);
   let opened = false;
   for (let frame = 0; frame < 3; frame++) opened = tickBlastLadder(true);
-  assert.equal(opened, true, "the switch on opens the page");
+  assert.equal(opened, false, "the switch on opens nothing");
+  assert.equal(openBlastLadder(), true, "the F2 button opens the page");
   assert.equal(blastCardIndex(), 0, "it opens on the first starter");
   assert.equal(blastPress("right"), true);
   assert.equal(blastCardIndex(), 1);
@@ -151,7 +152,10 @@ test("the switch's rising edge opens it on the first card; Left/Right walk the e
   assert.equal(blastOpen(), false, "and it closes");
   assert.equal(blastPress("cross"), false, "the next press falls through");
   assert.equal(tickBlastLadder(false), false, "the switch going off keeps it closed");
-  assert.equal(tickBlastLadder(true), true, "and switching it back on reopens it");
+  assert.equal(tickBlastLadder(true), false, "and switching it back on does not reopen it");
+  openBlastLadder();
+  assert.equal(tickBlastLadder(false), false, "the switch off closes an open page");
+  assert.equal(blastOpen(), false);
 });
 
 test("blastLoad reads the shipped table through the page's own fetch", async () => {
@@ -164,7 +168,7 @@ test("blastLoad reads the shipped table through the page's own fetch", async () 
   assert.equal(ok, true);
   assert.deepEqual(urls, ["assets/data/digimon.json"]);
   const cards = blastCards(digimon);
-  tickBlastLadder(true);
+  openBlastLadder();
   assert.equal(blastCardIndex(), 0);
   assert.match(drawn(), new RegExp(cards[0].starter), "the loaded card draws");
 });

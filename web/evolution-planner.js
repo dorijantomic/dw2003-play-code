@@ -294,23 +294,25 @@ export function setPlannerData(evolutions, digimon, members = null) {
   return S.profiles.length;
 }
 
+/** Open the page on the first partner (the F2 button "Open the next forms planner"). Fetches data on first open. */
+export function openPlanner() {
+  S.open = true;
+  S.index = 0;
+  S.cursor = 0;
+  if (!S.evolutions && !S.loading) plannerLoad();
+  return S.open;
+}
+
 /**
- * Follow F2 -> Extras -> "Next forms planner (new)". Opens once on the switch's rising
- * edge and closes when it turns off; Cross/Start closes it while the switch stays on,
- * and cycling the switch off and on opens it again. `snapshot` is game.js's live party
+ * Follow F2 -> Extras -> "Next forms planner (new)". The switch only ENABLES the page: it never
+ * opens it (not on page load, not on ticking the switch); openPlanner does, from the F2 button.
+ * Cross/Start closes it; switching the switch off closes it. `snapshot` is game.js's live party
  * reader: () => ({ members: [{ slot, name, live }] }). With the switch off nothing is
  * fetched and the snapshot is never called.
  */
 export function tickPlanner(enabled, snapshot = null) {
   const on = enabled === true;
-  if (on && !S.wasOn) {
-    S.open = true;
-    S.index = 0;
-    S.cursor = 0;
-    if (!S.evolutions && !S.loading) plannerLoad();
-  } else if (!on && S.wasOn) {
-    S.open = false;
-  }
+  if (!on && S.open) S.open = false;
   S.wasOn = on;
   if (S.open) {
     if (typeof snapshot === "function") {

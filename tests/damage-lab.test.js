@@ -173,7 +173,7 @@ import {
   damageLabPress,
   damageLabDraw,
   damageLabSetRng,
-  tickDamageLab,
+  tickDamageLab, openDamageLab,
 } from "../web/damage-lab.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
@@ -243,22 +243,26 @@ test("with the switch off there is no page, no press and no canvas call", () => 
   assert.equal(ctx.calls.length, 0, "no canvas call at all");
 });
 
-test("the page opens on the switch's rising edge and the switch off closes it", async () => {
+test("the switch never opens the page; the button does; cross closes; the switch off closes", async () => {
   damageLabReset();
   await damageLabLoad(fakeFetch);
   damageLabSetRng(() => 127);
-  assert.equal(tickDamageLab(true), true);
+  assert.equal(tickDamageLab(true), false, "the switch on opens nothing");
+  assert.equal(damageLabOpen(), false);
+  assert.equal(openDamageLab(), true, "the F2 button opens it");
   assert.equal(damageLabOpen(), true);
   // the pad moves the pickers and the page swallows every press while it is up
   assert.equal(damageLabPress("down"), true);
   assert.equal(damageLabPress("right"), true);
   assert.equal(damageLabPress("up"), true);
-  // switching the switch off closes it; switching it on again reopens on the edge
+  // switching the switch off closes it; switching it on again does NOT reopen it
   tickDamageLab(false);
   assert.equal(damageLabOpen(), false);
   tickDamageLab(true);
+  assert.equal(damageLabOpen(), false, "the switch only enables; it never opens");
+  openDamageLab();
   assert.equal(damageLabOpen(), true);
-  // Cross closes and a switch that stays on does not reopen it
+  // Escape arrives as the pad name cross: it closes, and a switch that stays on does not reopen it
   damageLabPress("cross");
   assert.equal(damageLabOpen(), false);
   tickDamageLab(true);
@@ -269,7 +273,7 @@ test("the page draws every stage and the total for the chosen fight", async () =
   damageLabReset();
   await damageLabLoad(fakeFetch);
   damageLabSetRng(() => 127);
-  tickDamageLab(true);
+  openDamageLab();
   const ctx = fakeCtx();
   assert.equal(damageLabDraw(ctx), true);
   const text = drawnText(ctx);
@@ -286,7 +290,7 @@ test("the page draws every stage and the total for the chosen fight", async () =
 test("the crit pick makes the crit stage land or miss", async () => {
   damageLabReset();
   await damageLabLoad(fakeFetch);
-  tickDamageLab(true);
+  openDamageLab();
   // CRIT is the fifth option row; moving it right from "roll" picks "lands"
   for (let i = 0; i < 4; i++) damageLabPress("down");
   damageLabPress("right"); // lands
@@ -368,7 +372,7 @@ test("a heal, stat or field record gets a sentence, not invented damage", async 
   damageLabReset();
   await damageLabLoad(fakeFetch);
   damageLabSetRng(() => 127);
-  tickDamageLab(true);
+  openDamageLab();
   // the TECHNIQUE picker: walk to a category-6 record (213 Fire Field) with R1 jumps
   for (let i = 0; i < 2; i++) damageLabPress("down");      // the technique row
   for (let i = 0; i < 21; i++) damageLabPress("r1");        // 1 -> 211 (ten at a time)
@@ -395,7 +399,7 @@ test("the F2 Extras row and EXPERIMENTAL list are off by default", () => {
 
 test("web/game.js gates the page on window.__fx?.damagelab and hooks it like the Codex", () => {
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(game, /import \{ tickDamageLab, damageLabPress, damageLabDraw, damageLabOpen \} from "\.\/damage-lab\.js"/);
+  assert.match(game, /import \{ tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabOpen \} from "\.\/damage-lab\.js"/);
   assert.match(game, /tickDamageLab\(window\.__fx\?\.damagelab === true\)/, "the page follows the switch");
   assert.match(game, /if \(damageLabOpen\(\)\) return;/, "the field is frozen while it is up");
   assert.match(game, /if \(damageLabPress\(k\)\)/, "the pad goes to the page");

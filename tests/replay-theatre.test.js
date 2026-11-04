@@ -21,7 +21,7 @@ import {
   replayRows,
   replayOnMap,
   elsewhereNotice,
-  tickReplay,
+  tickReplay, openReplay,
   replayOpen,
   replayPress,
   replayTake,
@@ -239,24 +239,32 @@ test("with the switch off tickReplay opens nothing, and a closed page swallows n
   assert.equal(ctx.calls.length, 0);
 });
 
-test("the page opens on the rising edge, alone, and Start closes it", () => {
+test("the switch never opens the page, the button does, and Start closes it", () => {
   replayReset();
   assert.equal(tickReplay(false, () => view), false);
-  assert.equal(tickReplay(true, () => view), true, "the rising edge opens the page");
+  assert.equal(tickReplay(true, () => view), false, "the switch on opens nothing");
+  assert.equal(replayOpen(), false);
+  assert.equal(openReplay(view), true, "the F2 button opens the page");
   assert.equal(replayView().place, view.place);
   assert.equal(replayView().here.length, 2);
   // a second frame with the switch still on does not reopen a page the player closed
   assert.equal(replayPress("start"), true, "the page owns the press");
   assert.equal(replayOpen(), false);
-  assert.equal(tickReplay(true, () => view), false, "still on, not a new edge");
-  // switching it off and on again is a new edge
+  assert.equal(tickReplay(true, () => view), false, "still on, not reopened");
+  // switching it off and on again does not open it either; the switch off closes an open page
   assert.equal(tickReplay(false, () => view), false);
-  assert.equal(tickReplay(true, () => view), true);
+  assert.equal(tickReplay(true, () => view), false);
+  openReplay(view);
+  assert.equal(tickReplay(false, () => view), false, "the switch off closes it");
+  assert.equal(replayOpen(), false);
+  openReplay(view);
+  assert.equal(replayPress("cross"), true, "Escape arrives as cross and closes it");
+  assert.equal(replayOpen(), false);
 });
 
 test("Up/Down walk the room's rows and Cross hands the chosen row to the game", () => {
   replayReset();
-  tickReplay(true, () => view);
+  openReplay(view);
   assert.equal(replayView().cursor, 0);
   replayPress("down");
   assert.equal(replayView().cursor, 1);
@@ -274,13 +282,13 @@ test("Up/Down walk the room's rows and Cross hands the chosen row to the game", 
 
 test("Cross on a room with no scene of its own chooses nothing, and the elsewhere list is greyed", () => {
   replayReset();
-  tickReplay(true, () => ({ place: "Asuka City — Underground Path", here: [], elsewhere: view.elsewhere }));
+  openReplay({ place: "Asuka City — Underground Path", here: [], elsewhere: view.elsewhere });
   assert.equal(replayPress("cross"), true);
   assert.equal(replayTake(), null, "nothing to play here");
   assert.equal(replayOpen(), false);
   // the page still draws the greyed rows and the walk-there line
   replayReset();
-  tickReplay(true, () => ({ place: "Asuka City — Underground Path", here: [], elsewhere: view.elsewhere }));
+  openReplay({ place: "Asuka City — Underground Path", here: [], elsewhere: view.elsewhere });
   const ctx = fakeCtx();
   assert.equal(replayDraw(ctx, 640, 480), true);
   const text = drawnText(ctx);
@@ -292,7 +300,7 @@ test("Cross on a room with no scene of its own chooses nothing, and the elsewher
 
 test("the open page draws the room's rows with their SAY lines", () => {
   replayReset();
-  tickReplay(true, () => view);
+  openReplay(view);
   const ctx = fakeCtx();
   assert.equal(replayDraw(ctx, 640, 480), true);
   const text = drawnText(ctx);

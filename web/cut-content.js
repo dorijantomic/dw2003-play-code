@@ -145,14 +145,13 @@ export function closeCutContent() {
 }
 
 /**
- * Follow the F2 -> Extras -> Cut-content gallery setting. Opens once when it turns on (the rising
- * edge), closes when it turns off. Closing the page with Cross while the setting stays on does not
- * reopen it; switching the setting off and on again does.
+ * Follow the F2 -> Extras -> Cut-content gallery setting. The switch only ENABLES the page: it never
+ * opens it (not on page load, not on ticking the switch). The F2 button "Open the cut-content gallery"
+ * opens it (openCutContent); Cross closes it; switching the setting off closes it.
  */
 export function tickCutContent(enabled) {
   const on = enabled === true;
-  if (on && !S.wasOn) openCutContent();
-  else if (!on && S.wasOn) closeCutContent();
+  if (!on && S.open) closeCutContent();
   S.wasOn = on;
   return S.open;
 }

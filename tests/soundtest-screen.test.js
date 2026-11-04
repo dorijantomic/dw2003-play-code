@@ -106,7 +106,9 @@ test("the screen ships behind F2 -> Extras -> Sound test and is off by default",
 
     const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
     assert.match(game, /window\.__fx\?\.soundtest/, "the screen opens on the toggle");
-    assert.match(game, /if \(soundTestOn && !soundTestWasOn\) soundTest\.show\(\)/, "and only on its rising edge");
+    assert.doesNotMatch(game, /soundTestWasOn/, "the switch has no rising edge that opens it");
+    assert.match(game, /case "soundtest": if \(!fx\.soundtest\) return false; soundTest\.show\(\)/, "only the F2 button opens it");
+    assert.match(game, /if \(!soundTestOn && soundTest\.open\) soundTest\.hide\(\)/, "the switch off closes it");
     assert.match(game, /if \(soundTest\.open\) \{\s*e\.preventDefault\(\);\s*soundTest\.handleKey\(k\);/, "the open screen owns the press");
     const gate = game.match(/function fieldFullScreenUiOpen\(\) \{\s*return !!\(([^;]*?)\);\s*\}/s);
     assert.ok(gate, "the full-screen gate is one boolean expression");

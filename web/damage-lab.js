@@ -525,18 +525,21 @@ export function damageLabPress(button) {
   return true;
 }
 
-/** Follow F2 -> Extras -> "Damage Lab (new)": open on the rising edge, close when it
- *  goes off. Off means no page, no data fetch and no key handling. */
+/** Open the page (the F2 button "Open the Damage Lab"). Fetches data on first open. */
+export function openDamageLab() {
+  S.open = true;
+  S.sel = 0;
+  if (!S.forms.length && !S.loading) damageLabLoad();
+  else recompute();
+  return S.open;
+}
+
+/** Follow F2 -> Extras -> "Damage Lab (new)": the switch only ENABLES the page, it never opens
+ *  it (openDamageLab does, from the F2 button); it closes when the switch goes off. Off means
+ *  no page, no data fetch and no key handling. */
 export function tickDamageLab(enabled) {
   const on = enabled === true;
-  if (on && !S.wasOn) {
-    S.open = true;
-    S.sel = 0;
-    if (!S.forms.length && !S.loading) damageLabLoad();
-    else recompute();
-  } else if (!on && S.wasOn) {
-    S.open = false;
-  }
+  if (!on && S.open) S.open = false;
   S.wasOn = on;
   return S.open;
 }

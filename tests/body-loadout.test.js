@@ -51,7 +51,7 @@ import {
   codexDraw,
   setCodexData,
   setLoadoutData,
-  tickCodex,
+  tickCodex, openCodex,
 } from "../web/codex.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -349,7 +349,7 @@ test("with the codex switch off there is no fourth tab, no body and no canvas ca
 
 test("R1 three times reaches LOADOUT; opening a body fetches exactly its own anim.json", async () => {
   installBook();
-  tickCodex(true);
+  openCodex();
   assert.equal(codexTab(), "partners");
   codexPress("r1");
   codexPress("r1");
@@ -387,7 +387,7 @@ test("R1 three times reaches LOADOUT; opening a body fetches exactly its own ani
 test("the LOADOUT page names each clip's tables, waits, mesh, effects, sounds and strike", async () => {
   installBook();
   setLoadoutData({ index: ["m009mera"], techTable, sounds });
-  tickCodex(true);
+  openCodex();
   codexPress("r1"); codexPress("r1"); codexPress("r1");
   await codexLoadoutBody(async () => anim("m009mera"));
   const ctx = fakeCtx();
@@ -419,7 +419,7 @@ test("the LOADOUT page names each clip's tables, waits, mesh, effects, sounds an
 test("a clip with no strike prints 'no strike marker' and no invented shot", async () => {
   installBook();
   setLoadoutData({ index: ["m014monz"], techTable, sounds });
-  tickCodex(true);
+  openCodex();
   codexPress("r1"); codexPress("r1"); codexPress("r1");
   await codexLoadoutBody(async () => anim("m014monz"));
   const ctx = fakeCtx();

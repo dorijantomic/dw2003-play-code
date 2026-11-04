@@ -161,21 +161,23 @@ export function blastLoad(fetchJson = globalThis.fetch) {
   return S.loading;
 }
 
+/** Open the card on the first starter (the F2 button "Open the blast ladder"). Fetches data on first open. */
+export function openBlastLadder() {
+  S.open = true;
+  S.index = 0;
+  if (!S.cards.length && !S.loading) blastLoad();
+  return S.open;
+}
+
 /**
- * Follow F2 -> Extras -> "Blast ladder (new)". It opens once when the switch
- * turns on (the rising edge) and closes when it turns off; closing with Cross
- * while the switch stays on does not reopen it. With the switch off nothing is
+ * Follow F2 -> Extras -> "Blast ladder (new)". The switch only ENABLES the card: it never opens
+ * it (not on page load, not on ticking the switch); openBlastLadder does, from the F2 button.
+ * Cross closes it; switching the switch off closes it. With the switch off nothing is
  * fetched and nothing exists.
  */
 export function tickBlastLadder(on) {
   const enabled = on === true;
-  if (enabled && !S.wasOn) {
-    S.open = true;
-    S.index = 0;
-    if (!S.cards.length && !S.loading) blastLoad();
-  } else if (!enabled && S.wasOn) {
-    S.open = false;
-  }
+  if (!enabled && S.open) S.open = false;
   S.wasOn = enabled;
   return S.open;
 }

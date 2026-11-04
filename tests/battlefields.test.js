@@ -33,7 +33,7 @@ import {
   setCodexData,
   setBattlefieldsData,
   codexLoadBattlefields,
-  tickCodex,
+  tickCodex, openCodex,
   codexOpen,
   codexTab,
   codexPageCount,
@@ -228,7 +228,7 @@ test("first landing on the tab fetches the two battle manifests, the technique t
   const fetchJson = fakeFetch(fetched);
   setBattlefieldsData({ fetchJson });
   setCodexData(digimon, read("web/assets/data/evolutions.json"));   // partner rows only: no book-wide load
-  tickCodex(true);
+  openCodex();
   assert.equal(codexTab(), "partners");
 
   codexPress("r1");                       // LOADOUT (always reachable)
@@ -285,7 +285,7 @@ test("when the book already read the map names the tab reuses them (no second 92
     "assets/battle/backdrops/manifest.json",
     "assets/data/fight_tech_table.json",
   ], "only the two battle manifests and the technique table: the map list was already in memory");
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   codexPress("r1");
   codexPress("r1");
@@ -298,7 +298,7 @@ test("Square walks the tab's four sections; the element world names the moves th
   const fetchJson = fakeFetch([]);
   setBattlefieldsData({ fetchJson });
   setCodexData(digimon, read("web/assets/data/evolutions.json"));
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   codexPress("r1");
   codexPress("r1");
@@ -341,7 +341,7 @@ test("without the technique table the page says so instead of inventing move cou
   // The two battle manifests and the map names are here; the technique table and the
   // skill names are not.
   setBattlefieldsData({ arenas, backdrops, maps: manifest });
-  tickCodex(true);
+  openCodex();
   codexPress("r1");
   codexPress("r1");
   codexPress("r1");

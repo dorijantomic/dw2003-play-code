@@ -142,7 +142,6 @@ export function elsewhereNotice(row) {
 const S = {
   open: false,
   wasOn: false,    // the F2 flag last frame: the page opens on its rising edge only
-  pending: false,  // a rising edge seen while the field was busy (a cutscene, a fight)
   place: "",
   here: [],        // the room's own rows (Up/Down/Cross work on these)
   elsewhere: [],   // reached scenes in other rooms (greyed, never selectable)
@@ -164,7 +163,6 @@ export function replayView() {
 export function replayReset() {
   S.open = false;
   S.wasOn = false;
-  S.pending = false;
   S.place = "";
   S.here = [];
   S.elsewhere = [];
@@ -189,25 +187,15 @@ export function closeReplay() {
 }
 
 /**
- * Follow the F2 -> Extras -> "Replay theatre (new)" switch. The page opens once on its rising edge
- * (a frame with the field busy defers that edge until the field is free, so a story cutscene is
- * never replaced by a replay). Switching the switch off closes it; closing the page with Start or
- * Cross while the switch stays on does not reopen it — switch it off and on again for a new edge.
- * `rowsNow` is only called when the page actually opens, so with the switch off nothing is built.
+ * Follow the F2 -> Extras -> "Replay theatre (new)" switch. The switch only ENABLES the page: it never
+ * opens it (not on page load, not on ticking the switch). The F2 button "Open the replay theatre" opens
+ * it (openReplay, with the field free, so a story cutscene or a fight is never replaced by a replay).
+ * Switching the switch off closes it; Start or Cross close it too. `rowsNow` and `free` are kept so the
+ * call shape is unchanged; nothing is built here.
  */
 export function tickReplay(enabled, rowsNow, free = true) {
   const on = enabled === true;
-  if (!on) {
-    S.pending = false;
-    if (S.open) closeReplay();
-  } else {
-    if (!S.wasOn) S.pending = true;
-    if (S.pending && free === true && !S.open) {
-      S.pending = false;
-      const view = typeof rowsNow === "function" ? rowsNow() : rowsNow;
-      openReplay(view ?? {});
-    }
-  }
+  if (!on && S.open) closeReplay();
   S.wasOn = on;
   return S.open;
 }

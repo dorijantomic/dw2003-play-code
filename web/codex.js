@@ -943,24 +943,27 @@ export function codexRows() {
   return tabRows();
 }
 
+/** Open the book on its first tab (the F2 button "Open the Digimon Codex"). Fetches data on first open. */
+export function openCodex() {
+  S.open = true;
+  S.tab = "partners";
+  S.page = 0;
+  S.cursor = 0;
+  S.encQuery = "";
+  S.encEntries = encounterEntries(S.enc);
+  if (!S.rows.length && !S.loading) codexLoad();
+  syncFinderKeys();
+  return S.open;
+}
+
 /**
- * Follow F2 -> Extras -> "Digimon Codex (new)". It opens once when the switch turns on (the
- * rising edge) and closes when it turns off; closing with Cross while the switch stays on does
- * not reopen it, switching the switch off and on again does. With it off no data is fetched.
+ * Follow F2 -> Extras -> "Digimon Codex (new)". The switch only ENABLES the book: it never opens
+ * it (not on page load, not on ticking the switch); openCodex does, from the F2 button. Cross closes
+ * it; switching the switch off closes it. With it off no data is fetched.
  */
 export function tickCodex(enabled) {
   const on = enabled === true;
-  if (on && !S.wasOn) {
-    S.open = true;
-    S.tab = "partners";
-    S.page = 0;
-    S.cursor = 0;
-    S.encQuery = "";
-    S.encEntries = encounterEntries(S.enc);
-    if (!S.rows.length && !S.loading) codexLoad();
-  } else if (!on && S.wasOn) {
-    S.open = false;
-  }
+  if (!on && S.open) S.open = false;
   S.wasOn = on;
   syncFinderKeys();
   return S.open;

@@ -20,7 +20,7 @@ import {
   codexPageIndex,
   codexCursor,
   codexPageRows,
-  tickCodex,
+  tickCodex, openCodex,
   codexPress,
   codexDraw,
 } from "../web/codex.js";
@@ -161,10 +161,12 @@ test("with the toggle off tickCodex opens nothing and codexDraw draws nothing", 
   assert.equal(ctx.calls.length, 0, "no canvas call at all");
 });
 
-test("the page opens on the toggle's rising edge and pages/cursors/close from the pad", async () => {
+test("the toggle never opens the page, the button does, and it pages/cursors/close from the pad", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  assert.equal(tickCodex(true), true);
+  assert.equal(tickCodex(true), false, "the switch on opens nothing");
+  assert.equal(codexOpen(), false);
+  openCodex();
   assert.equal(codexOpen(), true);
   // first page, first row
   assert.equal(codexPress("down"), true);
@@ -179,7 +181,11 @@ test("the page opens on the toggle's rising edge and pages/cursors/close from th
   tickCodex(true);
   assert.equal(codexOpen(), false, "Cross does not reopen while the switch stays on");
   tickCodex(false);
-  assert.equal(tickCodex(true), true);
+  assert.equal(tickCodex(true), false, "off and on again does not reopen it either");
+  openCodex();
+  assert.equal(codexOpen(), true);
+  assert.equal(tickCodex(false), false, "the switch off closes an open book");
+  openCodex();
   codexPress("start");
   assert.equal(codexOpen(), false);
   tickCodex(false);
@@ -188,7 +194,7 @@ test("the page opens on the toggle's rising edge and pages/cursors/close from th
 test("an open book draws Kotemon's real numbers on its page", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  tickCodex(true);
+  openCodex();
   const ctx = fakeCtx();
   assert.equal(codexDraw(ctx, 0), true);
   const text = drawnText(ctx);
@@ -207,7 +213,7 @@ test("an open book draws Kotemon's real numbers on its page", async () => {
 test("the debug hook publishes the current page (source), and the page/cursor getters answer it", async () => {
   codexReset();
   await codexLoad(fakeFetch);
-  tickCodex(true);
+  openCodex();
   assert.equal(codexPageIndex(), 0);
   codexPress("down");
   codexPress("down");

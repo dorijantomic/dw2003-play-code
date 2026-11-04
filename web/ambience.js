@@ -1050,6 +1050,12 @@ function refreshPanel() {
     const sf = panel.querySelector("[data-spritefilter]"); if (sf) sf.value = fx.spriteFilter;
     // The soundtrack room's button row exists only while its F2 switch is on;
     // with the switch off the page has no link anywhere in the game.
+    // The in-game screens (cut-content, codex, blast ladder, planner, damage lab, replay theatre,
+    // sound test): the switch only ENABLES them. Their button row shows while the switch is on, and
+    // pressing it is the only way they open (never on page load, never on ticking the switch).
+    for (const n of ["cutcontent", "codex", "blastladder", "planner", "damagelab", "replay", "soundtest"]) {
+        const row = panel.querySelector("#fx-open-" + n); if (row) row.hidden = !fx[n];
+    }
     const snd = panel.querySelector("#fx-soundtrack"); if (snd) snd.hidden = !fx.soundtrack;
     // The cinema's button row exists only while its F2 switch is on; with the
     // switch off the page has no link anywhere in the game.
@@ -1133,6 +1139,13 @@ export function installFxPanel(stageEl) {
         `<h4>${name}</h4>` + list.map(([k, label]) => `<label><input type="checkbox" data-fx="${k}"> ${label}</label>`).join("") +
         (name === "Extras" ? `<div class="hint" id="fx-dw2" hidden></div>
          <div class="hint" id="fx-movetheatre" hidden><button type="button" data-act="movetheatre">Open Move Theatre</button></div>
+         <div class="row" id="fx-open-cutcontent" hidden><button type="button" data-act="extra:cutcontent">Open the cut-content gallery</button></div>
+         <div class="row" id="fx-open-codex" hidden><button type="button" data-act="extra:codex">Open the Digimon Codex</button></div>
+         <div class="row" id="fx-open-blastladder" hidden><button type="button" data-act="extra:blastladder">Open the blast ladder</button></div>
+         <div class="row" id="fx-open-planner" hidden><button type="button" data-act="extra:planner">Open the next forms planner</button></div>
+         <div class="row" id="fx-open-damagelab" hidden><button type="button" data-act="extra:damagelab">Open the Damage Lab</button></div>
+         <div class="row" id="fx-open-replay" hidden><button type="button" data-act="extra:replay">Open the replay theatre</button></div>
+         <div class="row" id="fx-open-soundtest" hidden><button type="button" data-act="extra:soundtest">Open the sound test</button></div>
          <div class="row" id="fx-soundtrack" hidden><button type="button" data-act="soundtrack">Open the soundtrack room</button></div>
          <div class="row" id="fx-cinema" hidden><button type="button" data-act="cinema">Open the cinema</button></div>
          <div class="row" id="fx-cursorbook" hidden><button type="button" data-act="cursorbook">Open the cursor almanac</button></div>
@@ -1201,6 +1214,10 @@ export function installFxPanel(stageEl) {
             else if (kind === "shot") screenshot();
             else if (kind === "rec") toggleRecord();
             else if (kind === "movetheatre") window.open("move-theatre.html", "_blank");
+            else if (kind === "extra") {
+                // open an in-game screen (window.__openExtra, web/game.js); the panel steps aside so it is seen
+                if (fx[arg] && window.__openExtra?.(arg)) { panel.hidden = true; gear.classList.remove("open"); }
+            }
             else if (kind === "soundtrack") { if (fx.soundtrack) window.open("soundtrack.html", "_blank", "noopener"); }
             else if (kind === "cinema") { if (fx.cinema) window.open("cinema.html", "_blank", "noopener"); }
             else if (kind === "cursorbook") { if (fx.cursorbook) window.open("cursor-almanac.html", "_blank", "noopener"); }

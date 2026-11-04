@@ -27,12 +27,12 @@ import {
     mountRiderLift, mountRiderShiftX, mountRiderCutRow, mountPlayerLatch, mountDrawable, mountForceDismount, moveWithSubSteps,
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
-import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
-import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
-import { tickBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
-import { tickPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
-import { tickDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> Damage Lab (new; off by default)
-import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
+import { tickCutContent, openCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
+import { tickCodex, openCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
+import { tickBlastLadder, openBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
+import { tickPlanner, openPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
+import { tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> Damage Lab (new; off by default)
+import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, openReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
@@ -1362,7 +1362,6 @@ const soundTest = createSoundTest({
     sfx,
     music: { play: (track) => bgm.play(track), stop: () => bgm.play(null) },
 });
-let soundTestWasOn = false;   // the F2 switch's rising edge opens the screen
 const cntyselMenu = createCntyselMenu(sfx);   // SYSTEM07 cursor / SYSTEM08 confirm
 // Fully translated language screen; the adapter retains its historical name.
 // `?legacyCntysel=1` keeps the earlier authored screen for comparison.
@@ -8502,14 +8501,12 @@ function frame(t) {
     }
     const dt = Math.min((t - lastT) / 1000, 0.1);
     lastT = t;
-    // F2 -> Extras -> Sound test (dev): the screen opens on the switch's rising
-    // edge. Cross/Start closes it and it stays closed until the switch is
-    // cycled off and on. With the switch off it can never be open, so the game
+    // F2 -> Extras -> Sound test (dev): the switch only ENABLES the screen; it opens from the F2
+    // button "Open the sound test" (window.__openExtra("soundtest")). Cross/Start closes it, and
+    // switching the switch off closes it. With the switch off it can never be open, so the game
     // below behaves exactly as before.
     const soundTestOn = !!window.__fx?.soundtest;
-    if (soundTestOn && !soundTestWasOn) soundTest.show();
     if (!soundTestOn && soundTest.open) soundTest.hide();
-    soundTestWasOn = soundTestOn;
     if (soundTest.open) soundTest.tick(state.keys);
     // Game-speed hack: window.__gameSpeed fast-forwards EVERYTHING (cutscenes, WAITs, auto
     // walks, fades, animations) by sub-stepping the sim that many times. Set __gameSpeed=4
@@ -8536,6 +8533,28 @@ function syncSubThrustSound(thrusting) {
     if (thrusting) sfx.playSustained("sub_move");
     else sfx.stopSustained("sub_move");
 }
+
+/**
+ * The F2 panel's "Open ..." buttons call this. The F2 switches only ENABLE these screens; none opens
+ * by itself on page load or when the switch is ticked. Returns true when the screen is now open;
+ * false when its switch is off, the game has not started, or the field is busy (a fight, a scene).
+ * Escape (the "cross" press) closes every one of them.
+ */
+window.__openExtra = (name) => {
+    const fx = window.__fx || {};
+    if (!state.started || state.titleScreen || state.endScreen) return false;
+    if (!replayFieldFree()) return false;
+    switch (name) {
+        case "cutcontent": if (fx.cutcontent !== true) return false; openCutContent(); return true;
+        case "codex": if (fx.codex !== true) return false; openCodex(); return true;
+        case "blastladder": if (fx.blastladder !== true) return false; openBlastLadder(); return true;
+        case "planner": if (fx.planner !== true) return false; openPlanner(); return tickPlanner(true, plannerPartyMembers);
+        case "damagelab": if (fx.damagelab !== true) return false; openDamageLab(); return true;
+        case "replay": if (fx.replay !== true) return false; openReplay(replayRowsNow() ?? {}); return true;
+        case "soundtest": if (!fx.soundtest) return false; soundTest.show(); return true;
+        default: return false;
+    }
+};
 
 function update(dt) {
     // EXPERIMENT (cut-content gallery): F2 -> Extras -> Cut-content gallery opens a read-only text page on the
