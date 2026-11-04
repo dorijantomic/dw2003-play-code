@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Language desk — the seven rows the pad cannot all reach</title>
+<style>
+  :root { color-scheme: dark; font: 14.5px/1.5 "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #e8edf7; background: #0a1020; }
+  a { color: #9ac7ff; }
+  header { padding: 22px clamp(16px, 3vw, 40px) 16px; border-bottom: 1px solid #22334b; background: #0f1a2e; }
+  .eyebrow { color: #8fb5e5; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); line-height: 1.16; }
+  header p { margin: 0; max-width: 900px; color: #b8c7dc; }
+  main { padding: 20px clamp(16px, 3vw, 40px) 60px; max-width: 1180px; }
+  h2 { margin: 30px 0 10px; font-size: 16px; color: #ffd34d; letter-spacing: .06em; text-transform: uppercase; }
+  h3 { margin: 0 0 4px; font-size: 14.5px; }
+  p { color: #b8c7dc; margin: 8px 0; }
+  .callout { margin: 18px 0 0; padding: 14px 16px; border: 1px solid #7a5c12; border-left: 4px solid #ffd34d;
+             border-radius: 8px; background: #211b0c; }
+  .callout strong { color: #ffd34d; }
+  .callout p { color: #e2d6b4; margin: 6px 0 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 4px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #1d2a40; vertical-align: top; }
+  th { color: #8fa9c8; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; }
+  tbody tr:hover { background: #101c30; }
+  td.num, th.num { font-family: ui-monospace, monospace; white-space: nowrap; }
+  .reach { color: #8fe08f; font-weight: 600; }
+  .noreach { color: #ffb27a; font-weight: 600; }
+  .side { color: #c8a4ff; }
+  .src { color: #6f86a3; font-size: 11.5px; font-family: ui-monospace, monospace; }
+  #rows tr.is-side { background: #14101f; }
+  #rows tr.is-side:hover { background: #1a1428; }
+  .branch { border: 1px solid #22334b; border-radius: 10px; background: #0d1727; padding: 13px 15px; margin: 10px 0; }
+  .branch .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+  .branch .tag { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+                 color: #071629; background: #8fc8ff; border-radius: 5px; padding: 2px 7px; }
+  .branch .what { font-weight: 700; color: #f1f5ff; }
+  .branch .detail { margin: 6px 0 0; color: #b8c7dc; }
+  .branch .detail.none { color: #9fb3cc; }
+  .branch .detail.none b { color: #ffd34d; }
+  .branch .ref { margin: 7px 0 0; }
+  .branch .ref code { color: #6f86a3; font-size: 11.5px; }
+  .count { color: #8fa9c8; font-size: 12px; margin-left: 6px; }
+  .footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid #1d2a40; color: #7f95b2; font-size: 12.5px; }
+  .footer code { color: #9ab3d3; }
+  ul { margin: 8px 0; padding-left: 20px; color: #b8c7dc; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">digimon world 3 · boot language screen (cnty_sel)</div>
+  <h1>Seven rows, and the pad reaches five</h1>
+  <p>
+    The language screen runs before the title. It draws seven rows, one per language, and its cursor table
+    writes one language byte per row. Up and Down walk the main list; rows 5 and 6 sit in a side pane that this
+    build never opens. This desk lays out what each row would change — the title menu's clip trio, the END card,
+    the naming keyboard's pages and the name plate — against English, the build every number here comes from.
+  </p>
+  <div class="callout">
+    <strong>The USA row changes nothing decoded.</strong>
+    <p>
+      It picks the <code>country/usa</code> pack, but no decoded screen lays out differently: the title trio is
+      8, 9, 10, the END card is clip 0, the naming keyboard has one page and the plate is the eight-box clip 55.
+      That is the headline of this page, not a flaw.
+    </p>
+  </div>
+</header>
+<main>
+  <h2>The seven rows</h2>
+  <p>
+    The cursor table is seven bytes: <code id="cursorBytes">02 03 05 04 06 01 00</code>. Rows 0–4 are the PAL EFIGS
+    in alphabetical order — English, French, German, Italian, Spanish. Rows 5 (USA, right side) and 6 (JPN, left side)
+    never light up, because the side pane's mode word (+0x14) is written 0 once and never 1. The Japanese title path
+    is reachable today only with <code>?skipLanguage=1&amp;language=0</code>.
+  </p>
+  <table aria-label="The seven language rows">
+    <thead>
+      <tr>
+        <th class="num">Row</th>
+        <th class="num">Writes</th>
+        <th>Language</th>
+        <th class="num">Pack</th>
+        <th>Reachable</th>
+        <th>Side pane</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <h2>What each row changes</h2>
+  <p>
+    A row's branches are the decoded layouts that differ from English. English is the reference and branches from
+    nothing; USA is the row that changes nothing decoded; the four other PAL languages each get their own title
+    words and their own END card; Japanese gets exactly three things.
+  </p>
+  <div id="branches"></div>
+
+  <h2>The tables the screens read</h2>
+  <p>
+    None of this is chosen by the country-select code itself: each screen reads the same language byte the row
+    wrote and picks its own table. The name plate is the odd one out — it reads the field length, not the language.
+  </p>
+  <table aria-label="Title menu per-language clip trios">
+    <thead><tr><th>Language</th><th class="num">Title clips (prompt, upper, lower)</th><th>Same as English?</th></tr></thead>
+    <tbody id="titles"></tbody>
+  </table>
+  <table aria-label="END card per language">
+    <thead><tr><th>Language</th><th class="num">END clip</th><th>Reads</th></tr></thead>
+    <tbody id="ends"></tbody>
+  </table>
+  <table aria-label="Naming keyboard pages and name plates">
+    <thead><tr><th>Screen</th><th>What decides it</th><th class="num">Value</th></tr></thead>
+    <tbody>
+      <tr><td>Naming keyboard pages</td><td>language index</td><td class="num">JPN 3 pages; every other language 1</td></tr>
+      <tr><td>Name plate (ten boxes)</td><td>field length 10 — the ten-character folder name</td><td class="num">clip 53</td></tr>
+      <tr><td>Name plate (five boxes)</td><td>field length 5 — Japanese names</td><td class="num">clip 52</td></tr>
+      <tr><td>Name plate (eight boxes)</td><td>field length 8 — everybody else</td><td class="num">clip 55</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Every number on this page is decoded from the original game, not guessed. Sources:
+    <code>ddw3-walker/docs/research/ui/cnty_sel-full-decode-2026-08-05.md</code> (the seven-row cursor table and the
+    dead side pane), <code>ddw3-walker/docs/research/ui/stdwtitl-title-menu-2026-08-14.md</code> (title clips, and the
+    Japanese build's different opening), <code>ddw3-walker/docs/research/ui/end-screen-decoded-2026-08-14.md</code>
+    (the END card per language), <code>ddw3-walker/docs/research/ui/card-folder-screens-layout.md</code> (the naming
+    keyboard's pages and the name plates). Pad button names follow
+    <code>engine/systems/input-map.ts</code>.
+  </div>
+</main>
+<script type="module">
+import {
+  ROWS,
+  CURSOR_BYTES,
+  TITLE_CLIPS,
+  END_CLIPS,
+  END_WORDS,
+  NAMEDT_PAGES,
+  branchesFor,
+} from "./language-desk.js";
+
+const el = (tag, text, cls) => {
+  const n = document.createElement(tag);
+  if (text !== undefined) n.textContent = text;
+  if (cls) n.className = cls;
+  return n;
+};
+
+document.getElementById("cursorBytes").textContent = CURSOR_BYTES;
+
+// --- the seven rows ---------------------------------------------------------
+const rowsBody = document.getElementById("rows");
+for (const r of ROWS) {
+  const tr = el("tr", undefined, r.reachable ? "" : "is-side");
+  tr.append(
+    el("td", String(r.row), "num"),
+    el("td", String(r.language), "num"),
+    el("td", `${r.name} (${r.code})`),
+    el("td", r.code.toLowerCase(), "num"),
+    el("td", r.reachable ? "yes — main list" : "no — side pane only", r.reachable ? "reach" : "noreach"),
+    el("td", r.side ? r.side : "—", r.side ? "side" : ""),
+    el("td", r.source, "src"),
+  );
+  rowsBody.append(tr);
+}
+
+// --- one branch card per language ------------------------------------------
+const branchBox = document.getElementById("branches");
+for (const r of ROWS) {
+  const branches = branchesFor(r.language);
+  const card = el("div", undefined, "branch");
+  const head = el("div", undefined, "head");
+  head.append(el("span", `Row ${r.row}`, "tag"), el("span", `${r.name} (${r.code})`, "what"));
+  if (branches.length) head.append(el("span", `${branches.length} branch${branches.length === 1 ? "" : "es"}`, "count"));
+  card.append(head);
+
+  if (branches.length === 0) {
+    const note = el("p", undefined, "detail none");
+    if (r.language === 1) {
+      note.append(
+        el("b", "Changes nothing decoded. "),
+        document.createTextNode(
+          "Same title trio (8, 9, 10), same END card (clip 0, END), same one-page keyboard, same eight-box plate. " +
+          "It picks the country/usa pack and nothing on screen lays out differently.",
+        ),
+      );
+    } else if (r.language === 2) {
+      note.append(
+        el("b", "The reference build. "),
+        document.createTextNode("Every number on this desk is English's own; there is nothing to differ from."),
+      );
+    } else {
+      note.textContent = "No decoded layout branch differs from English.";
+    }
+    card.append(note);
+  } else {
+    for (const b of branches) {
+      const line = el("p", undefined, "detail");
+      line.append(el("b", `${b.what}. `), document.createTextNode(b.detail));
+      const ref = el("p", undefined, "ref");
+      ref.append(el("code", b.source));
+      card.append(line, ref);
+    }
+  }
+  branchBox.append(card);
+}
+
+// --- the three tables the screens read -------------------------------------
+const titlesBody = document.getElementById("titles");
+for (const r of ROWS) {
+  const trio = TITLE_CLIPS[r.language];
+  const same = trio.join(",") === TITLE_CLIPS[2].join(",");
+  const tr = el("tr");
+  tr.append(
+    el("td", `${r.name} (${r.code})`),
+    el("td", trio.join(", "), "num"),
+    el("td", same ? "yes" : "no — its own trio"),
+  );
+  titlesBody.append(tr);
+}
+
+const endsBody = document.getElementById("ends");
+for (const r of ROWS) {
+  const tr = el("tr");
+  tr.append(
+    el("td", `${r.name} (${r.code})`),
+    el("td", String(END_CLIPS[r.language]), "num"),
+    el("td", END_WORDS[r.language]),
+  );
+  endsBody.append(tr);
+}
+
+// the keyboard pages are a per-language number too; show it in one place
+const pages = ROWS.map((r) => `${r.code} ${NAMEDT_PAGES[r.language]}`).join(" · ");
+const note = document.createElement("p");
+note.className = "src";
+note.textContent = `Naming keyboard pages, by language: ${pages}`;
+endsBody.after(note);
+</script>
+</body>
+</html>
