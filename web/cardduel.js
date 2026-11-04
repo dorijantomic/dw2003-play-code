@@ -4474,8 +4474,10 @@ export function createCardDuel(sfx = null, bgm = null) {
     // slot's +0x734/+0x736, the displayed pair. `unkE82` is the strip's own
     // visible flag, so a Program card gets no strip at all.
     //
-    // The five-entry table at 0x800A5C20 reads 68, 111, 154, 197, 240 — which
-    // is DYNAMIC_STAT_MEGAS exactly, decoded independently from D0x80083960.
+    // The five-entry table at 0x800A5C20 reads 68, 111, 154, 197, 240 in the
+    // disc's ZERO-based duel numbering (duel+0x50 stores cardId-1; CARD-DUEL-VERIFIED.md
+    // sec 33.2). This browser numbers cards from one, so DYNAMIC_STAT_MEGAS is that
+    // table plus one: 69, 112, 155, 198, 241, the five cards that print a rule.
     // Those five carry printed stats that mean nothing because their real ones
     // are computed from the board, and the browser declines to quote them.
     //

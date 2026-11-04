@@ -64,10 +64,9 @@ import { FIELD_CYCLE, fieldName, nextField } from "./field-war.js";
 // breathes twice. Pure rules in web/boss-phase.js; the phases themselves are authored in
 // data/authored/fusion_bosses.json and built into web/fusion_bosses.json.
 import { phaseFor, phaseRows, phaseEffects } from "./boss-phase.js";
-// F2 -> Extras -> "Disc-accurate hit & drop rolls" (off by default): the technique record's own
+// Disc-accurate hit & drop rolls (always on, no F2 switch): the technique record's own
 // +0x06 accuracy byte (`elemCtx`) on the skill merge, and the disc's own enemy drop draw
-// (`RAND_U16() % 1024 < drop_rate + 1`, wfightmn 0x1f84). Pure rules in web/tech-record.js;
-// with the switch off the merge adds no base_acc and the drop keeps its Math.random() line.
+// (`RAND_U16() % 1024 < drop_rate + 1`, wfightmn 0x1f84). Pure rules in web/tech-record.js.
 import { mergeTechRecord, dropPasses } from "./tech-record.js";
 import { battleDelta, battleSpeedOn } from "./battle-speed.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
@@ -3371,11 +3370,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // opcode (`dispatch` in the extracted table) and +0x0C its effect power (`crit`).
     // `effect`/`effect_p2` name only the subset with a decoded effect name; the raw
     // bytes cover all 443 rows, so a technique the name table misses still gets its
-    // true crit/accuracy branch. With F2 -> Extras -> "Disc-accurate hit & drop rolls"
-    // on, the merge also carries +0x06 (`elemCtx`) as `base_acc`; off it adds nothing.
+    // true crit/accuracy branch. The merge also carries +0x06 (`elemCtx`) as `base_acc`
+    // (the disc's own accuracy byte; always on, pinned by tests/disc-rolls.test.js).
     skillDB     = Object.fromEntries(dj.skills.map(s => {
       const rec = ftj?.[String(s.id)];
-      return [s.id, mergeTechRecord(s, rec, { useDiscAcc: !!window.__fx?.discrolls })];
+      return [s.id, mergeTechRecord(s, rec, { useDiscAcc: true })];
     }));
     stageEncDB  = sej;
     fieldEncDB  = fej;
@@ -6167,11 +6166,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the fusion layer off the ordinary path below is exactly today's.
     const fusionBoss = b.enemy?.bossId ? fusionBossesDB?.[b.enemy.bossId] ?? null : null;
     if (fusionBoss) {
-      // The stream follows the disc-accurate switch exactly as rollDrop's two lines do:
-      // the disc's RAND_U16 word when it is on, Math.random() when it is off. One live
-      // draw per owed row; every item that lands joins the loot list the report banks.
-      const disc = !!window.__fx?.discrolls;
-      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, enemiesDB, disc ? RAND_U16 : Math.random, disc)) {
+      // The stream is the disc's RAND_U16 word, exactly as rollDrop's line does.
+      // One live draw per owed row; every item that lands joins the loot list the report banks.
+      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, enemiesDB, RAND_U16, true)) {
         b._loot.drops.push(item);
       }
     } else {
@@ -7505,11 +7502,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // Roll enemy item drop. Returns item name string or null.
   function rollDrop(eStats) {
     if (!eStats || !eStats.drop_item || eStats.drop_item === "Null") return null;
-    // F2 -> Extras -> "Disc-accurate hit & drop rolls" (off by default): wfightmn 0x1f84's own
-    // draw, `RAND_U16() % 1024 < drop_rate + 1`, on the shared stream. Off: today's line below.
-    if (window.__fx?.discrolls) return dropPasses(eStats.drop_rate, RAND_U16) ? eStats.drop_item : null;
-    if (Math.random() * 255 < eStats.drop_rate) return eStats.drop_item;
-    return null;
+    // wfightmn 0x1f84's own draw, `RAND_U16() % 1024 < drop_rate + 1`, on the shared stream
+    // (exp-levelup-rewards-decoded-2026-07-10.md line 44). Always on.
+    return dropPasses(eStats.drop_rate, RAND_U16) ? eStats.drop_item : null;
   }
 
   // Resolve a digimon profile by its DiscId. The evolution trees name their forms by

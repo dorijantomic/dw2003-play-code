@@ -85,7 +85,14 @@ export const DUEL_SLOT = {
     sumAp: 0x734,
     sumHp: 0x736,
 } as const;
-/** The five-card dynamic-stat Mega id list (overlay table D0x800A5C20). */
+/**
+ * The five-card dynamic-stat Mega id list (overlay table D0x800A5C20). RAW disc
+ * values: the disc's duel numbers are ZERO-based (duel+0x50 holds cardId-1), and
+ * this port reads that raw array, so these stay 68..240. The browser's one-based
+ * catalogue ids for the same cards are 69, 112, 155, 198, 241
+ * (engine/systems/card-battle.ts DYNAMIC_STAT_MEGAS). Pinned against the
+ * executable image by tests/duel-counter-service-oracle.test.js.
+ */
 export const DUEL_DYNAMIC_STAT_MEGAS: readonly number[] = [68, 111, 154, 197, 240];
 
 /**

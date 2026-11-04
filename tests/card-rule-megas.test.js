@@ -180,3 +180,10 @@ test("applyDynamicStatMegas reads DYNAMIC_STAT_MEGAS", () => {
   const body = source.slice(at, source.indexOf("\n}\n", at) + 3);
   assert.match(body, /DYNAMIC_STAT_MEGAS\.indexOf\(slot\.id\)/);
 });
+
+test("the browser ids are the disc raw zero-based table (0x800A5C20) plus one", async () => {
+  const { DUEL_DYNAMIC_STAT_MEGAS } = await import("../engine/dw3/ui/duel-counter-service.ts");
+  assert.deepEqual([...DUEL_DYNAMIC_STAT_MEGAS], [68, 111, 154, 197, 240], "raw disc halfwords");
+  assert.deepEqual([...DYNAMIC_STAT_MEGAS], DUEL_DYNAMIC_STAT_MEGAS.map((n) => n + 1),
+    "duel numbers are zero-based (duel+0x50 = cardId-1); the browser ones are one-based");
+});

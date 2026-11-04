@@ -1,7 +1,7 @@
-// tests/disc-rolls.test.js — Disc-accurate hit & drop rolls (F2 -> Extras -> "Disc-accurate
-// hit & drop rolls", off by default).
+// tests/disc-rolls.test.js — Disc-accurate hit & drop rolls (ALWAYS ON, no F2 switch: the
+// fix makes the normal game behave like the original disc).
 //
-// TWO fidelity fixes under one switch:
+// TWO fidelity fixes:
 //   1. every technique's hit roll uses the record's own +0x06 accuracy byte
 //      (`fight_tech_table.json` `elemCtx`) instead of the engine's `acc ?? 100`. The shipped
 //      443-row table carries only four values: 80 x2, 100 x68, 110 x304, 127 x69 — so the
@@ -10,8 +10,8 @@
 //      (wfightmn 0x1f84; docs/research/battle/exp-levelup-rewards-decoded-2026-07-10.md:44)
 //      on the shared stream, instead of `Math.random() * 255 < drop_rate`.
 //
-// With the switch OFF the merge adds no `base_acc` (engine default 100, exactly today) and
-// `rollDrop` keeps the `Math.random()` line, byte for byte. Pure numbers only: no browser.
+// The pure helper keeps its `useDiscAcc: false` option (no `base_acc`, engine default 100) for
+// the unit tests below; the game itself always passes true. Pure numbers only: no browser.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -161,22 +161,20 @@ test("tools/hit_table.mjs --json is all 443 techniques, skill 1 first at 110/128
   }
 });
 
-test("source gates: battle.js wires the merge and the drop; the old drop line survives", () => {
+test("source gates: battle.js always uses the disc's merge and drop roll (no F2 key)", () => {
   const battle = readFileSync(join(ROOT, "web/battle.js"), "utf8");
-  assert.match(battle, /mergeTechRecord\(/, "the skill merge calls the pure helper");
+  assert.match(battle, /mergeTechRecord\(s, rec, \{ useDiscAcc: true \}\)/, "the skill merge always carries the record's accuracy byte");
   assert.match(battle, /dropPasses\(eStats\.drop_rate, RAND_U16\)/, "the drop draw is the disc's roll");
-  assert.match(battle, /Math\.random\(\) \* 255 < eStats\.drop_rate/,
-    "the off path keeps today's Math.random() drop line");
   const block = battle.match(/function rollDrop\(eStats\) \{[\s\S]*?\n  \}/);
   assert.ok(block, "rollDrop is still a function of eStats");
-  assert.match(block[0], /window\.__fx\?\.discrolls/, "the new roll is behind the F2 key");
-  assert.match(block[0], /Math\.random\(\) \* 255 < eStats\.drop_rate/, "off path inside rollDrop");
+  assert.doesNotMatch(block[0], /__fx/, "no switch inside rollDrop");
+  assert.doesNotMatch(block[0], /Math\.random/, "the old Math.random drop line is gone");
+  assert.match(battle, /rollFusionDrops\([^\n]*RAND_U16, true\)/, "fusion halves' loot rolls the same disc way");
+  assert.doesNotMatch(battle, /discrolls/, "the key is gone from battle.js");
 });
 
-test("the toggle pair is in ambience.js, OFF by default", () => {
+test("the F2 row for discrolls is gone from ambience.js", () => {
   const amb = readFileSync(join(ROOT, "web/ambience.js"), "utf8");
-  assert.match(amb, /\["discrolls", "Disc-accurate hit & drop rolls \(new\)"\]/);
-  assert.match(amb, /const EXPERIMENTAL = \[[^\]]*"discrolls"/);
-  // EXPERIMENTAL keys are switched off by the MANUAL loop; nothing else turns it on.
-  assert.match(amb, /const MANUAL = \[\.\.\.EXPERIMENTAL, \.\.\.BATTLE\];\nfor \(const k of MANUAL\) fx\[k\] = false;/);
+  assert.doesNotMatch(amb, /discrolls/);
+  assert.doesNotMatch(amb, /Disc-accurate hit & drop rolls/);
 });

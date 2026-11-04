@@ -129,7 +129,7 @@ test("source gate: the fused branch sits on bossId, pays the other halves, and n
     "the branch sits on bossId + the authored boss table");
   assert.match(block, /rollFusionDrops\(fusionBoss\.halves, fusionBoss\.body, enemiesDB/,
     "the fused body rolls the OTHER halves' drops");
-  assert.match(block, /disc \? RAND_U16 : Math\.random, disc\)/, "the stream follows the disc-accurate switch");
+  assert.match(block, /enemiesDB, RAND_U16, true\)/, "the stream is the disc roll, always on");
   // The ordinary path is byte-for-byte today's, and it is what the fused body skips.
   assert.match(block, /const drop = rollDrop\(b\.enemy\.eStats\);/);
   assert.match(block, /if \(drop\) b\._loot\.drops\.push\(drop\);/);

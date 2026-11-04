@@ -12,8 +12,8 @@
 // MetalPowerS (rate 32), and each distinct item only once, at the highest rate any
 // other half carries it. The body's own item was already paid; it is never paid twice.
 //
-// The chance text follows the live roll the "Disc-accurate hit & drop rolls" switch
-// (`discrolls`, off by default) selects — the same pair web/battle.js's rollDrop uses:
+// The chance text follows the live roll, the same pair web/battle.js's rollDrop uses
+// (the game always rolls the disc way; `disc` false stays for pure-function tests):
 //   off -> Math.random() * 255 < rate        -> rate / 255
 //   on  -> dropPasses: draw % 1024 < rate + 1 -> (rate + 1) / 1024
 import { dropPasses } from "./tech-record.js";
