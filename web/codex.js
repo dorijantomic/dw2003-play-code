@@ -61,6 +61,15 @@
 // own selectors (SCENE-Q002) is still needs_evidence. The rows are a typed fact table; no
 // anim.json is fetched for this tab.
 //
+// The Battlefields tab (the sixth) is web/battlefields.js read aloud: one row per fighting
+// stage (202 of them) with its own map name, its `_default` arena and the per-battle-screen
+// overrides; the 92 maps that carry no ordinary arena; the 29 arenas with their pack,
+// background colour and CLUT count; and the 17 backdrop packs — the 16 element worlds plus
+// the data fallback — with the 52 techniques that summon one. Every number there is measured
+// from the arena and backdrop manifests the battle itself loads, the technique table and the
+// manifest's map names; the tab's own load happens the first time it is landed on, so a
+// player who never opens it pays nothing. Square jumps between the four sections.
+//
 // OFF unless F2 -> Extras -> "Digimon Codex (new)" is switched on (web/ambience.js).
 // It opens on that switch's rising edge, owns the pad while it is up (L1/R1 tab,
 // Left/Right page, Up/Down row, Cross/Start close; the ENCOUNTERS tab also takes
@@ -70,6 +79,7 @@
 
 import { loadoutReport } from "./fight/body-loadout.js";
 import { CLIP_ID_CAVEAT, CLIP_NAMES_62 } from "./fight/clip-names.js";
+import { arenaRows, backdropFacts, backdropRows, battlefieldRows } from "./battlefields.js";
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
 const PER_PAGE = 24;              // rows on one book page
@@ -79,8 +89,8 @@ const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const STATUS_LABELS = { poison: "Poison", paralyze: "Paralyze", confuse: "Confuse", sleep: "Sleep", ko: "KO" };
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
-const TAB_NAMES = ["partners", "wild", "encounters", "loadout", "clips"];
-const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT", clips: "CLIPS" };
+const TAB_NAMES = ["partners", "wild", "encounters", "loadout", "clips", "battlefields"];
+const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT", clips: "CLIPS", battlefields: "BATTLEFIELDS" };
 
 const pick = (source, keys) =>
   Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
@@ -420,6 +430,12 @@ const S = {
   loadoutFetch: null,   // the fetch the tab was installed with (tests); null = globalThis.fetch
   techTable: null,      // fight_tech_table.json: technique id -> clip/elem1/elem2/effect
   sounds: null,         // sfx/op10_map.json: op10 cue id -> the disc's sound name
+  bfRows: [],           // Battlefields: 202 stages, 92 no-arena maps, 29 arenas, 17 worlds
+  bfFacts: null,        // Battlefields: the corpus numbers the page prints
+  bfArenaById: new Map(), // Battlefields: arena id -> its pack/bg/clut row
+  bfLoading: null,      // Battlefields: the tab's own load, once
+  bfFetch: null,        // the fetch the Battlefields tab was installed with (tests); null = globalThis.fetch
+  maps: [],             // assets/manifest.json's map list (the finder and Battlefields share it)
   body: null,           // {folder, anim, error} the body on screen
   bodyPending: new Map(), // folder -> the in-flight anim.json read
   bodyCache: new Map(), // folder -> {folder, anim, error} for every body opened this session
@@ -452,6 +468,12 @@ export function codexReset() {
   S.loadoutFetch = null;
   S.techTable = null;
   S.sounds = null;
+  S.bfRows = [];
+  S.bfFacts = null;
+  S.bfArenaById = new Map();
+  S.bfLoading = null;
+  S.bfFetch = null;
+  S.maps = [];
   S.body = null;
   S.bodyPending = new Map();
   S.bodyCache = new Map();
@@ -489,6 +511,7 @@ export function setCodexData(digimon, evolutions, enemies = null, models = null,
   S.wildPages = codexPages(S.wild, PER_PAGE);
   const enc = encounters && typeof encounters === "object" ? encounters : {};
   S.enc = encounterIndex(enc.stages ?? null, enc.screens ?? null, enc.maps ?? null);
+  S.maps = mapList(enc.maps);      // the Battlefields tab reuses the same map list
   S.encQuery = "";
   S.encEntries = encounterEntries(S.enc);
 
@@ -545,6 +568,69 @@ export function codexLoad(fetchJson = globalThis.fetch) {
     }
   })();
   return S.loading;
+}
+
+// ------------------------------------------------------------ the Battlefields tab
+
+/**
+ * Install the Battlefields tab's tables (the browser's load and the node test both land
+ * here). `arenas` is battle/arenas/manifest.json, `backdrops` battle/backdrops/manifest.json,
+ * `techTable` fight_tech_table.json and `maps` the manifest's map list (or the manifest
+ * itself); `skills` resolves technique names (digimon.json's list, the book's own skill map,
+ * or anything web/battlefields.js accepts). Every one is optional, so a caller can install
+ * only what it has. `fetchJson` pins the fetch the tab uses (tests).
+ */
+export function setBattlefieldsData({ arenas = null, backdrops = null, techTable = null, skills = undefined, maps = undefined, fetchJson = undefined } = {}) {
+  const mapSource = maps !== undefined ? maps : S.maps;
+  const skillSource = skills !== undefined ? skills : S.skills;
+  S.maps = mapList(mapSource);
+  S.bfRows = battlefieldRows({ arenas, backdrops, techTable, skills: skillSource, maps: mapSource });
+  S.bfFacts = backdropFacts({ backdrops, techTable });
+  S.bfArenaById = new Map(arenaRows({ arenas }).map((row) => [row.id, row]));
+  if (fetchJson !== undefined) S.bfFetch = typeof fetchJson === "function" ? fetchJson : null;
+  if (S.tab === "battlefields" && S.bfRows.length) {
+    const pages = Math.max(1, Math.ceil(S.bfRows.length / PER_PAGE));
+    S.page = Math.max(0, Math.min(S.page, pages - 1));
+    S.cursor = Math.max(0, Math.min(S.cursor, codexPageRows().length - 1));
+  }
+  return S.bfRows;
+}
+
+/**
+ * Fetch the Battlefields tab's tables once: the arena manifest, the backdrop manifest, the
+ * technique table and the map names. The book-wide load already fetches assets/manifest.json
+ * and the Loadout tab may already hold the technique table, so those two are reused when
+ * they are here rather than read twice (the manifest is 928 KB). Cached per book load;
+ * `fetchJson` is injectable for tests. A failed read is null, never invented data.
+ */
+export function codexLoadBattlefields(fetchJson = undefined) {
+  if (S.bfLoading) return S.bfLoading;
+  const fetcher = fetchJson ?? S.bfFetch ?? globalThis.fetch;
+  if (typeof fetcher !== "function") return Promise.resolve(false);
+  const read = (url) => Promise.resolve(fetcher(url)).then(asJson).catch(() => null);
+  S.bfLoading = (async () => {
+    try {
+      const [arenas, backdrops, techTable, maps] = await Promise.all([
+        read("assets/battle/arenas/manifest.json"),
+        read("assets/battle/backdrops/manifest.json"),
+        S.techTable ? Promise.resolve(S.techTable) : read("assets/data/fight_tech_table.json"),
+        S.maps.length ? Promise.resolve(S.maps) : read("assets/manifest.json"),
+      ]);
+      if (arenas == null && backdrops == null) {
+        S.error = "the battle manifests did not load";
+        return false;
+      }
+      setBattlefieldsData({ arenas, backdrops, techTable, maps });
+      S.error = null;
+      return true;
+    } catch (err) {
+      S.error = String(err?.message ?? err);
+      return false;
+    } finally {
+      S.bfLoading = null;
+    }
+  })();
+  return S.bfLoading;
 }
 
 // ---------------------------------------------------------------- the Loadout tab
@@ -678,7 +764,7 @@ export function codexOpen() {
   return S.open;
 }
 
-/** Which part of the book is up: "partners", "wild", "encounters", "loadout" or "clips". */
+/** Which part of the book is up: "partners", "wild", "encounters", "loadout", "clips" or "battlefields". */
 export function codexTab() {
   return S.tab;
 }
@@ -689,6 +775,7 @@ function tabPages() {
   if (S.tab === "encounters") return codexPages(S.encEntries, PER_PAGE);
   if (S.tab === "clips") return CLIP_PAGES;
   if (S.tab === "loadout") return codexPages(S.loadoutRows, PER_PAGE);
+  if (S.tab === "battlefields") return codexPages(S.bfRows, PER_PAGE);
   return S.pages;
 }
 /** The rows of the tab that is up (the finder's entries hold one species each). */
@@ -697,6 +784,7 @@ function tabRows() {
   if (S.tab === "encounters") return S.encEntries;
   if (S.tab === "clips") return CLIP_NAMES_62;
   if (S.tab === "loadout") return S.loadoutRows;
+  if (S.tab === "battlefields") return S.bfRows;
   return S.rows;
 }
 
@@ -749,6 +837,8 @@ function tabHasContent(tab) {
   // The Loadout tab is always reachable: its list is one small index.json, fetched the
   // first time the tab lands, so skipping it while empty would make it unreachable.
   if (tab === "loadout") return true;
+  // The Battlefields tab likewise: its four tables are fetched the first time it lands.
+  if (tab === "battlefields") return true;
   return S.rows.length > 0;
 }
 
@@ -756,9 +846,9 @@ function tabHasContent(tab) {
 function switchTab(delta) {
   let i = TAB_NAMES.indexOf(S.tab);
   if (i < 0) i = 0;
-  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT -> CLIPS and L1 walks the same ring
-  // backwards. A tab with no rows (e.g. the finder before its tables have loaded) is
-  // skipped, so the pad never lands on a blank page.
+  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT -> CLIPS -> BATTLEFIELDS and L1 walks
+  // the same ring backwards. A tab with no rows (e.g. the finder before its tables have
+  // loaded) is skipped, so the pad never lands on a blank page.
   for (let step = 0; step < TAB_NAMES.length; step++) {
     i = (i + delta + TAB_NAMES.length) % TAB_NAMES.length;
     if (tabHasContent(TAB_NAMES[i])) break;
@@ -769,6 +859,9 @@ function switchTab(delta) {
   if (S.tab === "loadout") {
     if (!S.loadoutRows.length) codexLoadLoadout(S.loadoutFetch ?? undefined);
     else codexLoadoutBody(S.loadoutFetch ?? undefined);
+  }
+  if (S.tab === "battlefields" && !S.bfRows.length) {
+    codexLoadBattlefields(S.bfFetch ?? undefined);
   }
 }
 
@@ -858,12 +951,35 @@ export function codexType(text) {
   return true;
 }
 
+/** The absolute row index the cursor is on (page * PER_PAGE + cursor). */
+function cursorIndex() {
+  return S.page * PER_PAGE + S.cursor;
+}
+
+/**
+ * Jump to the next section of the Battlefields tab (stage rows -> the maps with no ordinary
+ * arena -> the arenas -> the backdrop packs -> back to the stages). The sections are the
+ * places the row kind changes.
+ */
+function nextBattlefieldSection() {
+  if (!S.bfRows.length) return;
+  const starts = [];
+  for (let i = 0; i < S.bfRows.length; i++) {
+    if (i === 0 || S.bfRows[i].kind !== S.bfRows[i - 1].kind) starts.push(i);
+  }
+  const at = cursorIndex();
+  const next = starts.find((start) => start > at) ?? starts[0];
+  S.page = Math.floor(next / PER_PAGE);
+  S.cursor = next % PER_PAGE;
+}
+
 /**
  * The pad while the book is up: L1/R1 turn between PARTNERS, WILD and ENCOUNTERS,
  * Left/Right turn a page (wrapping), Up/Down move the row cursor (walking over a page
  * edge), Cross/Start close it, every other press is swallowed. On the ENCOUNTERS tab a
  * single character or Backspace edits the name filter instead and Triangle goes back to
- * WILD. Returns false when the book is closed, so the press falls through exactly as before.
+ * WILD. On BATTLEFIELDS, Square jumps to the next of its four sections. Returns false
+ * when the book is closed, so the press falls through exactly as before.
  */
 export function codexPress(button) {
   if (!S.open) return false;
@@ -877,6 +993,7 @@ export function codexPress(button) {
   else if (button === "right") setPage(S.page + 1);
   else if (button === "up") moveCursor(-1);
   else if (button === "down") moveCursor(1);
+  else if (button === "square" && S.tab === "battlefields") nextBattlefieldSection();
   else if (button === "triangle" && S.tab === "encounters") switchTab(-1);
   else if (button === "cross" || button === "start") S.open = false;
   return true;
@@ -1262,6 +1379,217 @@ function drawEncounters(ctx, W, H) {
   return true;
 }
 
+/**
+ * The BATTLEFIELDS tab: the stages' arenas on the left, the open row on the right. The list
+ * is one directory in four sections (Square jumps between them): the 202 fighting stages,
+ * the 92 maps with no ordinary arena, the 29 arenas, then the 17 backdrop packs. Every
+ * number is read from the tab's own rows, which web/battlefields.js measured from the
+ * manifests — nothing on this page is a guess.
+ */
+function drawBattlefields(ctx, W, H) {
+  const x = Math.round(W * 0.03);
+  const y = Math.round(H * 0.02);
+  const w = W - 2 * x;
+  const h = H - 2 * y;
+  const left = x + 14;
+  const pages = tabPages();
+  const pageRows = pages[S.page] ?? [];
+  const counts = { stage: 0, map: 0, arena: 0, world: 0 };
+  for (const row of S.bfRows) if (row.kind in counts) counts[row.kind] += 1;
+  const facts = S.bfFacts ?? { packs: 0, elementPacks: 0, specialTechs: 0, ordinaryTechs: 0, listedTechs: 0, zeroListed: 0 };
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,12,0.96)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9a54a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+
+  // header
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText("DIGIMON CODEX", left, y + 12);
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText("BATTLEFIELDS — each place's arena, and the element worlds", left + 172, y + 17);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`${Math.min(S.page + 1, Math.max(pages.length, 1))} / ${pages.length}`, x + w - 16, y + 16);
+  ctx.textAlign = "left";
+  drawTabs(ctx, left, y + 31, x + w - 16);
+
+  const top = y + 58;
+  const bottom = y + h - 30;
+  const listX = left;
+  const listW = Math.round(w * 0.36);
+
+  // the section the cursor is in, and the corpus numbers
+  const cursorRow = pageRows[Math.max(0, Math.min(S.cursor, pageRows.length - 1))] ?? null;
+  const crumbs = {
+    stage: `STAGES — where each place fights (${counts.stage})`,
+    map: `MAPS — no ordinary arena (${counts.map})`,
+    arena: `ARENAS — the 29 ordinary battle arenas (${counts.arena})`,
+    world: `WORLDS — ${facts.elementPacks} element packs + the data fallback (${counts.world})`,
+  };
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(cursorRow ? crumbs[cursorRow.kind] : "Battlefields", listX, top);
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#5f6b80";
+  ctx.textAlign = "right";
+  ctx.fillText("Square: next section", x + w - 16, top + 1);
+  ctx.textAlign = "left";
+
+  const listTop = top + 18;
+  const listBottom = bottom - 18;
+  if (!S.bfRows.length) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+    ctx.fillText(S.error ? `The battle tables did not load: ${S.error}` : "Opening the battle tables…", listX, listTop + 4);
+  } else {
+    const rowH = Math.floor((listBottom - listTop) / Math.max(pageRows.length, 1));
+    const lh = Math.max(11, Math.min(14, rowH));
+    const width = 38;   // the list column is about 38 characters wide at 10px
+    ctx.font = "10px monospace";
+    let ry = listTop;
+    for (let i = 0; i < pageRows.length; i++) {
+      const row = pageRows[i];
+      const hit = i === S.cursor;
+      if (hit) {
+        ctx.fillStyle = "rgba(201,165,74,0.22)";
+        ctx.fillRect(listX - 2, ry - 2, listW - 4, lh);
+      }
+      let tag;
+      if (row.kind === "stage") tag = `${row.stage} \u2192${row.defaultArena} ${row.name ?? "unnamed map"}`;
+      else if (row.kind === "map") tag = `${row.stage} ${row.name ?? "unnamed map"}`;
+      else if (row.kind === "arena") tag = `arena ${row.id} ${row.pack ?? "no pack"} \u00b7 ${row.clutTextures} tex`;
+      else tag = `${row.element ?? "unknown"} ${row.sig} ${row.pack ?? "no pack"} \u00b7 ${row.techs.length} move${row.techs.length === 1 ? "" : "s"}`;
+      if (tag.length > width) tag = `${tag.slice(0, width - 1)}\u2026`;
+      const colour = hit ? "#ffe9a8"
+        : row.kind === "map" ? "#7a869c"
+          : row.kind === "arena" ? "#9fd0ff"
+            : row.kind === "world" ? "#9ad0a8" : "#c8d2e2";
+      ctx.fillStyle = colour;
+      ctx.fillText(`${hit ? ">" : " "} ${tag}`, listX, ry);
+      ry += lh;
+    }
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#5f6b80";
+    ctx.fillText(`${S.bfRows.length} rows \u00b7 ${counts.stage} stages \u00b7 ${counts.map} maps without one`, listX, bottom - 2);
+  }
+
+  // the open row (right)
+  const dx = listX + listW + 14;
+  const dw = x + w - 16 - dx;
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.strokeRect(dx - 8, listTop, dw, listBottom - listTop);
+  if (cursorRow) drawBattlefieldDetail(ctx, cursorRow, dx + 2, listTop + 8, dw - 12);
+
+  // controls, in the book's own margin
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7a90b0";
+  ctx.textAlign = "left";
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: row    Square: next section    Cross / Start: close", left, bottom + 8);
+  ctx.restore();
+  return true;
+}
+
+/** One Battlefields row's detail column: a stage's arena, an arena's own data, a world's moves. */
+function drawBattlefieldDetail(ctx, row, tx, top, width) {
+  const cols = Math.max(30, Math.floor(width / 6));
+  const facts = S.bfFacts;
+  const techsKnown = (facts?.techs ?? 0) > 0;   // false when the technique table did not load
+  let ty = top;
+  ctx.textAlign = "left";
+  ctx.font = "bold 13px monospace";
+  ctx.fillStyle = "#ffd34d";
+  const title = row.kind === "stage" ? `${row.stage} — ${row.name ?? "unnamed map"}`
+    : row.kind === "map" ? `${row.stage} — ${row.name ?? "unnamed map"}`
+      : row.kind === "arena" ? `Arena ${row.id} — ${row.pack ?? "no pack"}`
+        : `${row.element === "data" ? "Data" : String(row.element ?? "unknown").replace(/^./, (c) => c.toUpperCase())} — ${row.pack ?? "no pack"} (sig ${row.sig})`;
+  for (const line of wrapText(title, cols)) {
+    ctx.fillText(line, tx, ty);
+    ty += 16;
+  }
+  ty += 4;
+
+  const line = (text, colour = "#c8d2e2") => {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = colour;
+    for (const part of wrapText(text, cols)) {
+      ctx.fillText(part, tx, ty);
+      ty += 12;
+    }
+  };
+  const heading = (text) => {
+    ty += 4;
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#6fd0a8";
+    ctx.fillText(text, tx, ty);
+    ty += 13;
+  };
+
+  if (row.kind === "stage") {
+    const arena = S.bfArenaById.get(row.defaultArena) ?? null;
+    heading("WHERE IT FIGHTS");
+    if (arena) line(`Default arena ${row.defaultArena} \u00b7 ${arena.pack} \u00b7 rgb ${arena.bg.join(",")} \u00b7 ${arena.clutTextures} CLUT`);
+    else line(`Default arena ${row.defaultArena} \u00b7 no pack record (not one of the 29 ordinary arenas)`);
+    const screens = Object.entries(row.screens ?? {});
+    if (screens.length) {
+      line(`Per-screen overrides (${screens.length}): ${screens.map(([screen, id]) => `${screen}\u2192${id}`).join(" \u00b7 ")}`);
+    } else {
+      line("No per-screen override: every battle screen uses the default arena.");
+    }
+    heading("THE ELEMENT WORLDS");
+    if (techsKnown) line(`${facts.elementPacks} element packs + the data fallback; ${facts.specialTechs} of the ${facts.techs} techniques summon one, the other ${facts.ordinaryTechs} fight in the ordinary arena.`);
+    else line(`${facts?.elementPacks ?? 0} element packs + the data fallback; the technique table did not load, so the moves are not listed.`);
+    line(`${facts?.zeroListed ?? 0} of the ${facts?.listedTechs ?? 0} rows in the backdrop table point at sig 0 (the ordinary arena).`);
+  } else if (row.kind === "map") {
+    heading("NO ORDINARY ARENA");
+    line("This map has no entry in the battle arena table, so it is listed as no ordinary arena.");
+    line(`${S.bfRows.filter((r) => r.kind === "map").length} of the 294 maps have no ordinary arena in the arena table.`);
+  } else if (row.kind === "arena") {
+    heading("THE ARENA ITSELF");
+    line(`Pack: ${row.pack ?? "none"}`);
+    line(`Background: ${row.bg.length ? row.bg.join(", ") : "none"} (RGB)`);
+    line(`CLUT textures: ${row.clutTextures}`);
+    const stages = S.bfRows.filter((r) => r.kind === "stage" && r.defaultArena === row.id).length;
+    let screenUses = 0;
+    for (const r of S.bfRows) {
+      if (r.kind !== "stage") continue;
+      for (const id of Object.values(r.screens ?? {})) if (id === row.id) screenUses += 1;
+    }
+    line(`Default arena of ${stages} stage${stages === 1 ? "" : "s"}; a screen override on ${screenUses} screen${screenUses === 1 ? "" : "s"}.`);
+  } else {
+    heading(row.fallback ? "THE DATA FALLBACK" : "WHICH MOVES SUMMON IT");
+    if (row.fallback) {
+      line("The pack the battle draws when a special's technique carries no element world (sig 0); the fight itself stays in the ordinary arena.");
+      if (techsKnown) line(`${facts.ordinaryTechs} of the ${facts.techs} techniques are like this.`);
+      else line("The technique table did not load, so how many techniques land here is unknown.");
+    } else {
+      line(`Element: ${row.element ?? "unknown"} \u00b7 pack ${row.pack ?? "none"} \u00b7 sound ${row.sound}${row.sound < 0 ? " (none)" : ""}`);
+      if (techsKnown) line(`Summoned by ${row.techs.length} of the ${facts.techs} techniques:`);
+      else line("The technique table did not load, so its moves are not listed.");
+      for (const tech of row.techs) line(`#${tech.id} ${tech.name ?? "unnamed technique"}`, "#9ad0a8");
+    }
+    ty += 2;
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#8a93a8";
+    const tail = techsKnown
+      ? `${facts.specialTechs} of the ${facts.techs} techniques summon an element world; the other ${facts.ordinaryTechs} fight in the ordinary arena (${facts.zeroListed} of the ${facts.listedTechs} rows in the backdrop table point at sig 0).`
+      : `The technique table did not load, so the move counts are unknown (${facts?.zeroListed ?? 0} of the ${facts?.listedTechs ?? 0} rows in the backdrop table point at sig 0).`;
+    for (const part of wrapText(tail, cols)) {
+      ctx.fillText(part, tx, ty);
+      ty += 11;
+    }
+  }
+}
+
 /** The species whose model_map folder is `folder` — the join the move rows come from. */
 function loadoutSpecies(folder) {
   const out = [];
@@ -1611,6 +1939,7 @@ function drawClips(ctx, W, H) {
 export function codexDraw(ctx, page = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (S.tab === "encounters") return drawEncounters(ctx, W, H);
+  if (S.tab === "battlefields") return drawBattlefields(ctx, W, H);
   if (S.tab === "clips") return drawClips(ctx, W, H);
   if (S.tab === "loadout") return drawLoadout(ctx, W, H);
   const tabName = S.tab;
@@ -1735,6 +2064,8 @@ if (typeof window !== "undefined") {
     query: () => S.encQuery,
     type: (text) => codexType(text),
     loadout: () => S.loadoutRows,
+    battlefields: () => S.bfRows,
+    battlefieldFacts: () => S.bfFacts,
     clips: () => CLIP_NAMES_62,
     body: () => S.body,
     loadBody: () => codexLoadoutBody(),
