@@ -82,42 +82,57 @@ test("g_bridge_golden reads 2 offer + 3 ask + 3 verdict rows, each verdict pays 
   for (const row of rows) assert.ok(row.lines.length && row.lines[0].trim(), `every row has a first line (${row.kind})`);
 });
 
-test("the real data's totals are the measured ones: 236/224/199/399/33/68/232/467/2/1/12", () => {
-  const expected = { quests: 236, offers: 224, askSteps: 199, askRows: 399, verdicts: 33, verdictRows: 68, choicePoints: 232, optionRows: 467, chases: 2, battles: 1, closingless: 12 };
-  assert.deepEqual(endingsTable(quests), expected, "computed from the data, compared once to the measured numbers");
-  assert.deepEqual(endingsTable(quests), measuredTable(quests), "and to a second, independent walk over quests.json");
-  // the table is computed, not a constant: one quest's own numbers follow from its own data
+test("the real data's totals follow the file itself, so a quest merged later cannot pin them stale", () => {
+  const table = endingsTable(quests);
+  assert.deepEqual(table, measuredTable(quests), "the module and a second, independent walk over quests.json agree");
+  // every total follows from the file and from the rules, not from a count measured on one day
+  assert.equal(table.quests, quests.length, "one quest per definition in the file");
+  assert.equal(table.offers, quests.filter((q) => q.offer).length, "one offer per def that has one");
+  assert.equal(table.choicePoints, table.askSteps + table.verdicts, "every ask step and every verdict is one choice point");
+  assert.equal(table.optionRows, table.askRows + table.verdictRows, "every option of either is one spoken row");
+  assert.ok(table.offers > 0 && table.askSteps > 0 && table.verdicts > 0, "the file still has offers, questions and hand-ins");
+  // the frozen golden fixture keeps its exact numbers
   const one = endingsTable([quests.find((q) => q.id === "g_bridge_golden")]);
   assert.deepEqual(one, { quests: 1, offers: 1, askSteps: 2, askRows: 5, verdicts: 1, verdictRows: 3, choicePoints: 3, optionRows: 8, chases: 0, battles: 0, closingless: 0 });
 });
 
-test("every quest yields rows; the 12 with no giver say so, and name where they are taken from", () => {
+test("every quest yields rows; a job with no giver says so, and each job's closing row follows its own words", () => {
   for (const q of quests) assert.ok(endingsOf(q).length >= 1, `${q.id} yields at least one row`);
+
+  // no giver: a def with no offer gets exactly one note and no offer rows; a def with one gets its two offer rows
   const noOffer = quests.filter((q) => !q.offer);
-  assert.equal(noOffer.length, 12);
   for (const q of noOffer) {
     const rows = endingsOf(q);
     assert.equal(rows.filter((r) => r.kind === "offer").length, 0, `${q.id} has no offer rows`);
     assert.equal(rows.filter((r) => /no giver/.test(r.note)).length, 1, `${q.id} has exactly one no-giver note`);
   }
+  for (const q of quests.filter((q) => q.offer)) {
+    const rows = endingsOf(q);
+    assert.equal(rows.filter((r) => /no giver/.test(r.note)).length, 0, `${q.id} has a giver`);
+    assert.equal(rows.filter((r) => r.kind === "offer").length, 2, `${q.id} has the accept and decline rows`);
+  }
   const east = endingsOf(quests.find((q) => q.id === "east_station_greens")).find((r) => /no giver/.test(r.note));
   for (const map of ["s410", "s411", "s955"]) assert.match(east.note, new RegExp(map), "east_station_greens names its acceptAt place");
 
-  // the same 12 have no closing words, and each carries the warning row
+  // closing: the warning row is there for every def with neither doneScene nor doneLines, and only for those
   const noClosing = quests.filter(closingless);
-  assert.equal(noClosing.length, 12);
-  assert.deepEqual(noClosing.map((q) => q.id), noOffer.map((q) => q.id));
   for (const q of noClosing) {
     const row = endingsOf(q).find((r) => r.kind === "closing");
     assert.ok(row, `${q.id} has the closing warning`);
     assert.match(row.note, /no closing words; the hand-in ends on the toast/);
   }
+  for (const q of quests.filter((x) => !closingless(x))) {
+    assert.equal(endingsOf(q).filter((r) => r.kind === "closing").length, 0, `${q.id} has its closing words, so no warning`);
+  }
+  assert.equal(endingsTable(quests).closingless, noClosing.length, "the table counts the same defs the walk finds");
 });
 
 test("offers with no scene say asked at runtime; chase and battle rows are kept up / lost and win-or-flee / loss", () => {
   const noScene = quests.filter((q) => q.offer && !q.offer.scene);
-  assert.equal(noScene.length, 26);
   for (const q of noScene) for (const r of endingsOf(q).filter((x) => x.kind === "offer")) assert.match(r.note, /asked at runtime/);
+  for (const q of quests.filter((x) => x.offer?.scene)) {
+    for (const r of endingsOf(q).filter((x) => x.kind === "offer")) assert.doesNotMatch(r.note, /asked at runtime/, `${q.id} asks in its own offer scene`);
+  }
 
   const chase = endingsOf(quests.find((q) => q.id === "zz_chase_demo")).filter((r) => r.kind === "chase");
   assert.equal(chase.length, 2);
@@ -194,7 +209,7 @@ test("the page block shows the exact question, the pays and the closing warning,
 test("the CLI prints every job and exits 0 on the current data; --quest, --shipped, --json and --markdown work", () => {
   const all = spawnSync(process.execPath, [TOOL, "--all"], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   assert.equal(all.status, 0, all.stderr);
-  assert.equal((all.stdout.match(/^## /gm) ?? []).length, 236, "one block per quest");
+  assert.equal((all.stdout.match(/^## /gm) ?? []).length, quests.length, "one block per quest in the file");
   assert.match(all.stdout, /no giver: east_station_greens/);
 
   const one = spawnSync(process.execPath, [TOOL, "--quest", "g_bridge_golden"], { cwd: ROOT, encoding: "utf8" });
@@ -211,7 +226,7 @@ test("the CLI prints every job and exits 0 on the current data; --quest, --shipp
   assert.equal(json.status, 0, json.stderr);
   const data = JSON.parse(json.stdout);
   assert.deepEqual(data.totals, endingsTable(quests));
-  assert.equal(data.quests.length, 236);
+  assert.equal(data.quests.length, quests.length, "one JSON entry per quest in the file");
   assert.ok(Array.isArray(data.quests[0].rows));
 
   const md = spawnSync(process.execPath, [TOOL, "--quest", "g_bridge_golden", "--markdown"], { cwd: ROOT, encoding: "utf8" });
