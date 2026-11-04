@@ -29,6 +29,7 @@ import {
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
+import { tickBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 
@@ -2415,7 +2416,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7606,6 +7607,14 @@ function dispatchInput(k, e, raw = "") {
         return;
     }
 
+    // EXPERIMENT (Blast ladder): the same rule for the ladder page — Left/Right walk the eight starters, Cross/Start
+    // close, every other press swallowed. Closed, it answers false and the press falls through exactly as before.
+    if (blastPress(k)) {
+        state.keys.delete(k);
+        e.preventDefault();
+        return;
+    }
+
     // Backquote/tilde key: toggle the partner debug editor (dev tool — level/EXP/stats/items).
     // Match the PHYSICAL key via e.code — on many layouts `~` is a dead key so e.key never
     // arrives as "`". Backslash is a no-dead-key fallback.
@@ -8389,6 +8398,11 @@ function update(dt) {
     // the book never exists and this costs one comparison.
     tickCodex(window.__fx?.codex === true);
     if (codexOpen()) return;
+    // EXPERIMENT (Blast ladder): F2 -> Extras -> "Blast ladder (new)" opens the five-form card on the setting's rising
+    // edge. While it is up the field is frozen and dispatchInput gives it every press; with the setting off the page
+    // never exists and this costs one comparison.
+    tickBlastLadder(window.__fx?.blastladder === true);
+    if (blastOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -10986,6 +11000,8 @@ function render() {
     cutContentDraw(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (Digimon Codex): the partner book sits over everything too; it draws only while open.
     codexDraw(ctx, null, VIEW_W, VIEW_H);
+    // EXPERIMENT (Blast ladder): the starter card, over everything, drawn only while its page is open.
+    blastDraw(ctx, null, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
