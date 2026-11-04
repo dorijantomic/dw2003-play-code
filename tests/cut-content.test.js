@@ -1,4 +1,4 @@
-// The Cut-Content Gallery (web/cut-content.js): six honest exhibits about content the
+// The Cut-Content Gallery (web/cut-content.js): seven honest exhibits about content the
 // disc never lets a player see, each with the evidence path that proves it. The page is
 // text only and opens from F2 -> Extras -> Cut-content gallery (off by default).
 //
@@ -20,9 +20,9 @@ import {
   cutContentLines,
 } from "../web/cut-content.js";
 
-test("the gallery has exactly six exhibits, each with a title, a body and an evidence path", () => {
-  assert.equal(CUT_CONTENT.length, 6);
-  assert.equal(cutContentPages(), 6);
+test("the gallery has exactly seven exhibits, each with a title, a body and an evidence path", () => {
+  assert.equal(CUT_CONTENT.length, 7);
+  assert.equal(cutContentPages(), 7);
   for (const e of CUT_CONTENT) {
     assert.equal(typeof e.title, "string");
     assert.ok(e.title.trim().length > 0, "every exhibit has a title");
@@ -40,9 +40,9 @@ test("every evidence path is a real file under docs/ or web/assets/data/", () =>
   }
 });
 
-test("the six titles name the Arena, the Digivolve Demo, shop 30 and the Master Room", () => {
+test("the seven titles name the Arena, the Digivolve Demo, shop 30, the Master Room and no motion", () => {
   const titles = CUT_CONTENT.map((e) => e.title).join("\n");
-  for (const name of ["Arena", "Digivolve", "shop 30", "Master Room"]) {
+  for (const name of ["Arena", "Digivolve", "shop 30", "Master Room", "no motion"]) {
     assert.ok(titles.includes(name), `a title names ${name}`);
   }
 });
@@ -109,18 +109,86 @@ test("the stage-select paragraph's shop numbers are the shipped table's own", ()
   assert.doesNotMatch(body, /values 0-29 plus 30/);
 });
 
+test("the seventh exhibit is the bodies that cannot move, and the census note is its evidence", () => {
+  const exhibit = CUT_CONTENT[6];
+  assert.match(exhibit.title, /no motion/);
+  assert.equal(exhibit.evidence, "docs/fight3d-animation-census.md");
+  assert.ok(existsSync(exhibit.evidence), "the census note exists");
+
+  // the counts the page states, and the still body it names
+  for (const token of ["249", "23", "111", "13", "m466rgn2"]) {
+    assert.ok(exhibit.body.includes(token), `the exhibit body carries ${token}`);
+  }
+  // every inert body is named, with what plays instead
+  for (const folder of ["m468agnm", "m469garm", "m470agry"]) {
+    assert.ok(exhibit.body.includes(folder), `the exhibit names ${folder}`);
+  }
+  assert.match(exhibit.body, /donor/i);
+  // and it says plainly that these shipped - they are not a cut-content claim
+  assert.match(exhibit.body, /shipped/i);
+  assert.match(exhibit.body, /not cut content/i);
+});
+
+test("the census note's numbers match a fresh count of the shipped animation data", () => {
+  const root = "web/assets/battle/models";
+  const folders = JSON.parse(readFileSync(`${root}/index.json`, "utf8"));
+  assert.equal(folders.length, 249);
+
+  const present = new Map();
+  const authors = new Array(62).fill(0);
+  let still = null;
+  for (const folder of folders) {
+    const anim = JSON.parse(readFileSync(`${root}/${folder}/anim.json`, "utf8"));
+    const n = anim.clips.filter((c) => c.present).length;
+    present.set(n, (present.get(n) || 0) + 1);
+    assert.equal(anim.timeline.length, 62, `${folder} carries 62 timeline tables`);
+    anim.timeline.forEach((t, i) => {
+      if (t.table.length > 0) authors[i] += 1;
+    });
+    if (folder === "m466rgn2") still = anim;
+  }
+  assert.equal(present.get(18), 23, "23 packs carry all 18 action clips");
+  assert.equal(present.get(6), 111, "111 packs carry exactly 6");
+  assert.equal(present.get(0), 3, "three packs carry no clip array");
+  const never = authors.flatMap((n, i) => (n === 0 ? [i] : []));
+  assert.equal(never.length, 13, "13 of the 62 timeline tables are authored by no pack");
+
+  // m466rgn2: total_frames 0, every real keyframe at frame 0 (30000 is the end marker),
+  // yet 12 non-empty tables - every table plays a still
+  assert.equal(still.total_frames, 0);
+  const frames = still.bones
+    .flatMap((b) => Object.values(b.anim).flat())
+    .map((rec) => rec[rec.length - 1]);
+  assert.deepEqual([...new Set(frames)].sort((a, b) => a - b), [0, 30000]);
+  assert.equal(still.timeline.filter((t) => t.table.length > 0).length, 12);
+
+  const doc = readFileSync("docs/fight3d-animation-census.md", "utf8");
+  for (const line of [
+    `${folders.length} battle model packs`,
+    `${present.get(18)} packs carry all 18 action clips`,
+    `${present.get(6)} packs carry exactly 6`,
+    `${never.length} of the 62 timeline tables`,
+    "m466rgn2: total_frames 0",
+  ]) {
+    assert.ok(doc.includes(line), `the census note says "${line}"`);
+  }
+  for (const folder of ["m468agnm", "m469garm", "m470agry"]) {
+    assert.ok(doc.includes(folder), `the census note names ${folder}`);
+  }
+});
+
 test("the panel wraps its text and every page carries its title, body and evidence", () => {
   const lines = cutContentLines(0);
   assert.equal(lines.title, CUT_CONTENT[0].title);
   assert.equal(lines.evidence, `Evidence: ${CUT_CONTENT[0].evidence}`);
   assert.equal(lines.body.join(" "), CUT_CONTENT[0].body);
   assert.equal(lines.page, 1);
-  assert.equal(lines.pages, 6);
+  assert.equal(lines.pages, 7);
   assert.deepEqual(wrapText("one two three four", 8), ["one two", "three", "four"]);
   assert.deepEqual(wrapText("", 8), []);
 });
 
-test("the page owns the pad: Cross or Start closes it, Left and Right page through all six", () => {
+test("the page owns the pad: Cross or Start closes it, Left and Right page through all seven", () => {
   tickCutContent(false);
   assert.equal(cutContentOpen(), false);
   tickCutContent(true);
@@ -132,7 +200,7 @@ test("the page owns the pad: Cross or Start closes it, Left and Right page throu
   assert.equal(cutContentPress("left"), true);
   assert.equal(cutContentPage(), 0);
   assert.equal(cutContentPress("left"), true);
-  assert.equal(cutContentPage(), 5, "Left from the first page wraps to the last");
+  assert.equal(cutContentPage(), 6, "Left from the first page wraps to the last");
   assert.equal(cutContentPress("up"), true, "every press is consumed while the page is up");
 
   assert.equal(cutContentPress("cross"), true);

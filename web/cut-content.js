@@ -1,13 +1,14 @@
 // web/cut-content.js — the Cut-Content Gallery: a read-only text page that says plainly what the
 // disc never lets a player see, and which leads were falsified so nobody rebuilds a myth.
 //
-// Six exhibits, one per page. Every fact is read from the repo's own evidence record
+// Seven exhibits, one per page. Every fact is read from the repo's own evidence record
 // (docs/research/evidence/ledger.json) or from the generated data the page cites, and every
 // exhibit carries its evidence path so the claim can be re-checked. The prose decodes behind the
 // claims live in the walker's research tree (docs/research/UNFINISHED-CONTENT-NOT-ADDED-TO-THE-
 // ACTUAL-GAME.md, docs/research/ui/stagslct-full-decode-2026-08-05.md §"Two dead branches",
 // docs/research/field/repeat-examine-search-points-2026-07-26.md); the ledger entry is what the
-// repo can check without that tree.
+// repo can check without that tree. The seventh exhibit counts the shipped animation packs from
+// web/assets/battle/models and records the census in docs/fight3d-animation-census.md.
 //
 // Nothing here is a to-do item: the game cancels the arena in dialogue, and the walker recreates
 // the game that shipped. The page is OFF unless F2 -> Extras -> Cut-content gallery is switched on
@@ -16,7 +17,7 @@
 // The module is DOM-free at the top level so node tests can import it; the drawing takes a canvas
 // context and the two view sizes.
 
-/** The six exhibits. `body` is one short paragraph; `evidence` is a real path in this repo. */
+/** The seven exhibits. `body` is one short paragraph; `evidence` is a real path in this repo. */
 export const CUT_CONTENT = [
   {
     title: "The Arena ladder the game cancels in dialogue",
@@ -87,6 +88,20 @@ export const CUT_CONTENT = [
       "Bulbmon level 95, Armageddemon level 99. Nine identical stubs are not nine rounds; they are the shape of a ladder that was " +
       "scaffolded and never filled in.",
     evidence: "web/assets/data/field_encounters.json",
+  },
+  {
+    title: "Bodies that cannot move: shipped bodies with no motion",
+    body:
+      "The disc's 249 battle model packs all ship, and some of them cannot animate. 23 packs author all 18 action " +
+      "clips; 111 author exactly 6 (idle, the four reactions and the basic attack). Three carry no clip array at all: " +
+      "m468agnm, m469garm and m470agry, the three newest DNA fused forms (fusedModel 468, 469, 470). They have 0 clips, " +
+      "0 action scripts and only 3, 3 and 5 non-empty timeline tables; their fights play through donor rows, clips 5, " +
+      "9 and 10 keyed to table 56 or 58 in web/fight/anim-donor-map.js. m466rgn2 has total_frames 0: every real " +
+      "keyframe sits at frame 0 (36 keys plus 36 end markers at 30000), so its 12 non-empty timeline tables all play a " +
+      "still. And 13 of the 62 timeline tables - 7, 8, 9, 41, 42, 43, 46, 47, 48, 49, 59, 60, 61 - are authored by " +
+      "no pack at all. These are shipped, not cut content: the bodies render and the fights run; they have no motion " +
+      "to play.",
+    evidence: "docs/fight3d-animation-census.md",
   },
 ];
 
