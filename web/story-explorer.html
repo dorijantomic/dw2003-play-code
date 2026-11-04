@@ -64,6 +64,8 @@
   #beats { max-height: 210px; overflow-y: auto; font-size: 11px; }
   #beats div { padding: 2px 0; border-bottom: 1px solid #171c2b; cursor: pointer; }
   #beats div:hover { color: #cfe0ff; }
+  #hidden { max-height: 260px; overflow-y: auto; }
+  #hidden li .meta { color: #e6a9a9; }
   details summary { cursor: pointer; color: #9fb0d0; }
   #error { color: #e6a9a9; }
 </style>
@@ -80,9 +82,13 @@
   <aside id="left">
     <h2>Stage</h2>
     <select id="stage" style="width:100%"></select>
+    <h2>Stage census</h2>
+    <div id="census" class="hint">loading…</div>
     <h2>People in this stage</h2>
     <input id="filter" type="text" placeholder="filter by npc id, sprite or record" style="width:100%" />
     <ul class="list" id="people"></ul>
+    <h2>Hidden by the gate</h2>
+    <ul class="list" id="hidden"></ul>
   </aside>
   <section id="middle">
     <h2 id="versionsTitle">Versions of this person</h2>
