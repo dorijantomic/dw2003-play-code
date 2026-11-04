@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Move Theatre — DW2003</title>
+<style>
+  body { background:#0d0d16; color:#cfd8ea; font:13px monospace; margin:0; display:flex; min-height:100vh; }
+  #side { width:380px; padding:10px; box-sizing:border-box; background:#12121e; }
+  #main { flex:1; display:flex; flex-direction:column; align-items:center; padding:10px; }
+  canvas { background:#000; border:1px solid #333; max-width:100%; }
+  select, input, button { background:#22223a; color:#dfe; border:1px solid #445; font:12px monospace; padding:3px 6px; margin:2px 0; }
+  select { max-width:250px; }
+  button.big { padding:6px 14px; font-weight:bold; }
+  .row { margin:8px 0; }
+  h3 { margin:10px 0 4px; color:#8cf; }
+  #rec { font-size:11px; color:#adc; white-space:pre-wrap; background:#0a0a12; padding:5px; }
+  #status { font-size:12px; color:#9ab; min-height:18px; }
+  #note { font-size:11px; color:#e9a; }
+  label { user-select:none; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h3>Move Theatre</h3>
+  <div class="row" style="color:#9ab">Every signature move, on demand: pick a Digimon, pick one of
+    its own techniques, and watch the real battle view play it — its clip, its effects, its
+    backdrop and its sound.</div>
+  <div class="row">Digimon: <select id="species"></select></div>
+  <div class="row">technique: <select id="techSel"></select></div>
+  <div class="row">
+    <button class="big" id="play">▶ Play move</button>
+    <label><input id="loop" type="checkbox"> loop</label>
+  </div>
+  <div class="row">camera: <select id="cam"></select></div>
+  <div class="row" id="note"></div>
+  <h3>Technique record</h3>
+  <div id="rec">—</div>
+  <h3>Status</h3>
+  <div id="status"></div>
+</div>
+<div id="main">
+  <canvas id="cv" width="960" height="672"></canvas>
+</div>
+<script type="module">
+import { createBattle3D } from "./battle3d.js";
+import { drawEffects } from "./fight/effect-player.js";
+import { createSfxPlayer } from "./audio.js";
+import { theatrePlan, theatreCameraModes } from "./theatre-plan.js";
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const off = new OffscreenCanvas(cv.width, cv.height);
+// The real battle's own SFX player, so the contact sound fires on the strike. Web Audio
+// needs a user gesture, so unlock on the first click (same as the Battle Lab).
+const sfx = createSfxPlayer();
+window.addEventListener("pointerdown", () => sfx.unlock(), { once: true });
+const r = createBattle3D(off, sfx);
+window.__r = r;   // debug handle for headless probes
+window.__off = off;
+if (!r) {
+  document.getElementById("status").textContent = "WebGL unavailable";
+  throw new Error("Move Theatre needs WebGL");
+}
+
+// Everything the page decides comes from the tables the game already ships; it fetches
+// nothing of its own.
+const [digimon, modelMap, models, techTable] = await Promise.all([
+  fetch("assets/data/digimon.json").then(x => x.json()),
+  fetch("assets/battle/model_map.json").then(x => x.json()),
+  fetch("assets/battle/models/index.json").then(x => x.json()),
+  fetch("assets/data/fight_tech_table.json").then(x => x.json()),
+]);
+const data = { digimon, modelMap, models, techTable };
+const $ = (id) => document.getElementById(id);
+
+const skillRow = (id) => digimon.skills.find((s) => s.id === id) ?? null;
+const skillName = (id) => skillRow(id)?.name ?? "";
+const skillElem = (id) => skillRow(id)?.element ?? "";
+
+// The camera select offers the disc's own battle views (web/theatre-plan.js).
+const CAMERA_LABELS = {
+  director: "director (real idle)",
+  game: "game (real PS1 fixed)",
+  behind: "behind (debug)",
+  orbit: "orbit (debug)",
+};
+let camMode = "director";
+for (const m of theatreCameraModes()) {
+  const o = document.createElement("option");
+  o.value = m;
+  o.textContent = CAMERA_LABELS[m] ?? m;
+  $("cam").appendChild(o);
+}
+$("cam").value = camMode;
+$("cam").onchange = () => { camMode = $("cam").value; r.setCameraMode(camMode); };
+r.setCameraMode(camMode);
+
+// The move needs a target: Kuwagamon, the first story fight's opponent (the Battle Lab's
+// default foe for the same reason). Its model is warmed once, so Play is offered only when
+// both fighters can stand in the arena.
+r.setEnemyDigimon("m051kuwa");
+const targetReady = r.preloadDigimon("m051kuwa");
+
+let plan = null;          // theatrePlan for the picked species
+let currentAttack = null; // tech id to replay for the loop
+let loadToken = 0;
+
+function showRecord(id) {
+  const rec = techTable[String(id)];
+  if (!rec) { $("rec").textContent = `tech ${id}: no record`; return; }
+  const s = skillRow(id);
+  $("rec").textContent =
+    `tech ${id} ${s ? s.name : ""}${s ? ` (${s.element})` : ""}\n` +
+    `mp ${rec.mp}  power ${rec.power}  category ${rec.category}\n` +
+    `clip ${rec.clip}  motion ${rec.motion}  effect ${rec.effect}`;
+}
+
+function pickSpecies() {
+  const name = $("species").value;
+  plan = theatrePlan(data, name);
+  const sel = $("techSel");
+  sel.innerHTML = "";
+  for (const id of plan.techs) {
+    const o = document.createElement("option");
+    o.value = String(id);
+    o.textContent = `${id} ${skillName(id)} (${skillElem(id)})`;
+    sel.appendChild(o);
+  }
+  if (plan.techs.length) showRecord(plan.techs[0]);
+  else $("rec").textContent = `${name} has no basic or signature technique in the tables.`;
+  $("note").textContent = plan.model ? "" : `No battle model for ${name}.`;
+  $("play").disabled = true;
+  const token = ++loadToken;
+  if (!plan.model) { $("status").textContent = "no model"; return; }
+  $("status").textContent = "loading model…";
+  Promise.all([r.setPlayerDigimon(plan.model), targetReady]).then(([player, target]) => {
+    if (token !== loadToken) return;    // a newer pick won
+    const ready = !!player && !!target && plan.techs.length > 0;
+    $("play").disabled = !ready;
+    $("status").textContent = ready ? "ready" : "models failed to load";
+  });
+}
+
+for (const d of digimon.digimon) {
+  const p = theatrePlan(data, d.name);
+  const o = document.createElement("option");
+  o.value = d.name;
+  o.textContent = p.model ? d.name : `${d.name} (no model)`;
+  $("species").appendChild(o);
+}
+const first = digimon.digimon.find((d) => d.name === "Agumon" && theatrePlan(data, d.name).model)
+  ?? digimon.digimon.find((d) => theatrePlan(data, d.name).model)
+  ?? digimon.digimon[0];
+$("species").value = first.name;
+$("species").onchange = pickSpecies;
+$("techSel").onchange = () => showRecord(Number($("techSel").value) || 0);
+pickSpecies();
+
+function play() {
+  const id = Number($("techSel").value) || 0;
+  if (!plan?.model || !id) return;
+  showRecord(id);
+  currentAttack = id;
+  const started = r.playerAttack(id, {});
+  $("status").textContent = started
+    ? `playing ${id} ${skillName(id)}`
+    : "could not play (model still loading?)";
+}
+$("play").onclick = play;
+
+// Draw the battle frame the same way the lab does: the renderer draws into the offscreen
+// buffer, the visible canvas copies it, and the op3 sprite bursts are composited on top.
+let last = performance.now();
+let wasActive = false;
+let replayTimer = null;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  // A script's own op5 camera shots own the record while an action plays; the lab's frame
+  // loop answers that from the coordinator, so the theatre does too.
+  r.setCameraMode(camMode, { scriptOwnsCamera: r.coordinator.active });
+  r.render(dt);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0);
+  const fx = r.getEffectDraw?.();
+  if (fx) drawEffects(ctx, fx.list, fx.manifest, fx.images, fx.view);
+  const active = r.coordinator.active;
+  if (wasActive && !active) {
+    $("status").textContent = `done: ${currentAttack} ${skillName(currentAttack)}`;
+    if ($("loop").checked && currentAttack) {
+      clearTimeout(replayTimer);
+      replayTimer = setTimeout(play, 400);
+    }
+  }
+  wasActive = active;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
