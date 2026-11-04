@@ -2623,6 +2623,14 @@ function runQuestSceneEvent(ev, resume) {
             // actor); "off" puts them back, and questFxClear puts every one of them back on any exit.
             questGhostSet(ev);
             return done();
+        case "bucket":
+            // The PLAYER's draw-layer word for the rest of the scene (the `bucket` step): 8 draws them behind the map
+            // band, so the ground covers them as they walk (the Protocol Ruins tunnel), and 4 back in front. The value
+            // is kept as `_questBucket` because stepSetupBucketTick applies it every frame: a tile's own op-5 record
+            // would otherwise take the player back out. questSceneFxReset restores 4 and drops the override on exit.
+            state._questBucket = ev.value;
+            state.playerDrawBucket = ev.value;
+            return done();
         case "fade": questFxFade(ev.to, ev.frames).then(() => done()); return;
         case "shake": questFxShake(ev).then(() => done()); return;
         case "weather": setAmbienceScene(ev).then(() => done()); return;
@@ -2784,6 +2792,10 @@ function questSceneFxReset() {
     questFxClear();
     clearAmbienceScene();
     clearQuestChase();
+    // The player's own draw layer goes back to the entity bucket (4) on every exit, and the scene's override with it:
+    // a scene that put the player behind the map band must never leave them there (web/quest-scenes.js `bucket`).
+    delete state._questBucket;
+    state.playerDrawBucket = ENTITY_BUCKET;
 }
 
 window.__playQuestScene = playQuestScene;   // testing aid (tools/verify_quest_scene.mjs)
@@ -7277,8 +7289,16 @@ function stepSetupBucketTick() {
         stepSetupBucketMap = id;
         state.playerDrawBucket = ENTITY_BUCKET;
     }
+    // A quest scene's own `bucket` step pins the word for the rest of the scene (web/quest-scenes.js). It wins over the
+    // tile under the player's feet: on a live op-5 cell the setup arm would write 4 again and pull the player back out
+    // from behind the map band. Only the scene's exit clears it (questSceneFxReset restores ENTITY_BUCKET).
+    if (state._questBucket != null) {
+        state.playerDrawBucket = state._questBucket;
+        return state.playerDrawBucket;
+    }
     const eff = stepSetup()?.effect;
     if (eff && eff.actor78 != null) state.playerDrawBucket = eff.actor78 & 0xff;
+    return state.playerDrawBucket;
 }
 
 function startTransition(exit) {
