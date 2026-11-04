@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Soundtrack Room — the disc's own music</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#f0c040; font-family:monospace; }
+  #top { padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; background:#0a0e1a; border-bottom:1px solid #333; z-index:2; }
+  button { background:#2a3a6a; color:#f0c040; border:1px solid #f0c040; padding:5px 10px; cursor:pointer; font-family:monospace; font-size:13px; }
+  button:hover { background:#3a4a8a; }
+  #count { color:#9ab; font-size:12px; }
+  #now { color:#8fe08f; font-size:12px; }
+  #hint { padding:8px 14px; color:#9ab; font-size:12px; line-height:1.5; }
+  #hint b { color:#f0c040; }
+  #list { padding:0 0 30px; outline:none; }
+  h2 { margin:18px 14px 4px; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:#8a8ab0; border-bottom:1px solid #222; padding-bottom:3px; }
+  h2 span { color:#f0c040; }
+  .track { display:flex; gap:10px; align-items:baseline; padding:5px 14px; border-bottom:1px solid #111a2e; cursor:pointer; }
+  .track:hover { background:#111a2e; }
+  .track.sel { background:#1a2540; box-shadow:inset 3px 0 0 #f0c040; }
+  .track.playing .name { color:#8fe08f; }
+  .track.playing .playhint { color:#8fe08f; }
+  .kind { flex:0 0 58px; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .kind.field { color:#8fc4e0; }
+  .kind.battle { color:#e08f8f; }
+  .kind.jingle { color:#c4a0e0; }
+  .name { flex:0 0 120px; color:#f0c040; }
+  .label { flex:1 1 auto; color:#9ab; font-size:12px; }
+  .playhint { flex:0 0 14px; color:#4a5a7a; }
+</style>
+</head>
+<body>
+<div id="top">
+  <button id="stop">■ Stop / mute</button>
+  <span id="count">loading…</span>
+  <span id="now"></span>
+</div>
+<div id="hint">
+  The disc's whole soundtrack, grouped the way you hear it in the game. <b>Field themes</b> name the
+  places whose stage entry plays them; <b>battle themes</b> name the stages whose encounter screens
+  trigger them; <b>jingles and one-shots</b> are the rest. Click a row to hear it — field and battle
+  themes loop, jingles ring once. Arrow keys scroll, Enter plays.
+</div>
+<div id="list" tabindex="0"></div>
+<script type="module">
+import { soundtrackRows, playMode } from "./soundtrack.js";
+import { createBgmPlayer } from "./audio.js";
+
+const $ = (id) => document.getElementById(id);
+const load = (url) => fetch(url).then((r) => r.json());
+const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const [stems, mapArchives, battleMusic, manifest] = await Promise.all([
+  load("assets/music/index.json"),
+  load("assets/data/map_sound_archives.json"),
+  load("assets/data/battle_music.json"),
+  load("assets/manifest.json"),
+]);
+const rows = soundtrackRows({ stems, mapArchives, maps: manifest.maps || manifest, battleMusic });
+
+const KIND_TITLE = {
+  field: "Field themes — the places that play them",
+  battle: "Battle themes — the stages whose encounter screens trigger them",
+  jingle: "Jingles & one-shots — they ring once",
+};
+const countOf = (kind) => rows.filter((r) => r.kind === kind).length;
+$("count").textContent = `${rows.length} tracks — ${countOf("field")} field · ${countOf("battle")} battle · ${countOf("jingle")} jingles`;
+
+const player = createBgmPlayer();
+const listEl = $("list");
+const nowEl = $("now");
+const stopBtn = $("stop");
+const elements = [];   // { el, row } in the one list's own order
+let cursor = -1;
+let flash = null;
+
+function select(index) {
+  if (index < 0 || index >= elements.length) return;
+  if (cursor >= 0) elements[cursor].el.classList.remove("sel");
+  cursor = index;
+  const el = elements[cursor].el;
+  el.classList.add("sel");
+  el.scrollIntoView({ block: "nearest" });
+}
+
+function clearPlaying() {
+  clearTimeout(flash);
+  for (const { el } of elements) el.classList.remove("playing");
+}
+
+function play(row, el) {
+  clearPlaying();
+  if (player.muted) {          // clicking a row is the gesture that unmutes the room
+    player.toggleMute();
+    stopBtn.textContent = "■ Stop / mute";
+  }
+  el.classList.add("playing");
+  if (playMode(row.kind) === "loop") {
+    player.play(row.track);
+    nowEl.textContent = `▶ ${row.track} — loops`;
+  } else {
+    player.playJingle(row.track);
+    nowEl.textContent = `▶ ${row.track} — rings once`;
+    flash = setTimeout(() => el.classList.remove("playing"), 4000);
+  }
+}
+
+for (const kind of ["field", "battle", "jingle"]) {
+  const heading = document.createElement("h2");
+  heading.innerHTML = `${KIND_TITLE[kind]} <span>(${countOf(kind)})</span>`;
+  listEl.append(heading);
+  for (const row of rows.filter((r) => r.kind === kind)) {
+    const el = document.createElement("div");
+    el.className = "track";
+    el.dataset.track = row.track;
+    el.dataset.kind = row.kind;
+    el.innerHTML =
+      `<span class="kind ${row.kind}">${row.kind}</span>` +
+      `<span class="name">${escapeHtml(row.track)}</span>` +
+      `<span class="label">${escapeHtml(row.label)}</span>` +
+      `<span class="playhint">▶</span>`;
+    el.addEventListener("click", () => {
+      const index = elements.findIndex((t) => t.el === el);
+      select(index);
+      play(row, el);
+    });
+    elements.push({ el, row });
+    listEl.append(el);
+  }
+}
+
+stopBtn.addEventListener("click", () => {
+  player.play(null);              // stop the held field or battle theme
+  clearPlaying();
+  if (!player.muted) {
+    player.el.removeAttribute("src");  // unmuting must not resume a stopped theme
+    player.toggleMute();               // silence the room, one-shots included
+    stopBtn.textContent = "Unmute";
+    nowEl.textContent = "muted — no track starts";
+  } else {
+    player.toggleMute();
+    stopBtn.textContent = "■ Stop / mute";
+    nowEl.textContent = "";
+  }
+});
+
+addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    select(cursor < 0 ? 0 : cursor + (e.key === "ArrowDown" ? 1 : -1));
+  } else if (e.key === "Home") {
+    e.preventDefault();
+    select(0);
+  } else if (e.key === "End") {
+    e.preventDefault();
+    select(elements.length - 1);
+  } else if ((e.key === "Enter" || e.key === " ") && cursor >= 0) {
+    e.preventDefault();
+    const { row, el } = elements[cursor];
+    play(row, el);
+  }
+});
+listEl.focus();
+</script>
+</body>
+</html>
