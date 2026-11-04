@@ -20,7 +20,7 @@
 // (web/chat-queue.js) that spaces them 650 ms apart, a little over the relay's own 600 ms drop, so a line
 // typed in a hurry reaches the room instead of vanishing. The relay is not touched: it still drops at 600.
 import { createChatQueue } from "./chat-queue.js";
-import { drawIndicatorBubble, BALLOON_ANCHOR_LIFT } from "./fieldcom.js";
+import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
 
 const PORT = 20031;             // the relay's port on the host's computer
@@ -313,12 +313,13 @@ export function drawGhostLabel(ctx, g, sx, headY) {
     ctx.fillStyle = "#fff"; ctx.fillText(g.name, Math.round(sx), y);
     if (g.emote) {
         // F2 -> Extras -> "The game's own reaction bubbles": "!" and "..." wear the disc's own balloon
-        // (FIELDCOM balloon 0x35 + the program row the game puts over an NPC), at the game's own anchor
-        // lift. headY is already that lift above the ground, so the anchor the balloon rides from is
-        // headY + BALLOON_ANCHOR_LIFT. The other six emotes have no mark on the disc and keep the glyph.
+        // (FIELDCOM balloon 0x35 + the program row the game puts over an NPC). headY is already the
+        // game's own balloon anchor — game.js passes balloonAnchorY(ground), the ground minus the
+        // 0x1b lift — so the balloon is drawn at headY itself, the same point every other bubble in
+        // the game hangs from. The other six emotes have no mark on the disc and keep the glyph.
         const kind = window.__fx?.mpbubbles ? bubbleFor(g.emoteIx) : null;
         if (kind != null) {
-            drawIndicatorBubble(ctx, Math.round(sx), headY + BALLOON_ANCHOR_LIFT, kind, bubbleTick(performance.now()));
+            drawIndicatorBubble(ctx, Math.round(sx), headY, kind, bubbleTick(performance.now()));
         } else {
             ctx.font = "bold 12px monospace";
             ctx.fillStyle = "#000"; ctx.fillText(g.emote, Math.round(sx) + 1, y - 13);

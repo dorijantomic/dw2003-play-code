@@ -12,10 +12,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EMOTE_BUBBLE, bubbleFor, bubbleTick } from "../web/mp-emotes.js";
-import { drawIndicatorBubble, KIND } from "../web/fieldcom.js";
+import { drawIndicatorBubble, KIND, BALLOON_ANCHOR_LIFT } from "../web/fieldcom.js";
 import { EMOTES, drawGhostLabel } from "../web/multiplayer.js";
 
 const MP_SRC = readFileSync(new URL("../web/multiplayer.js", import.meta.url), "utf8");
+const GAME_SRC = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
 const FC_SRC = readFileSync(new URL("../web/fieldcom.js", import.meta.url), "utf8");
 const AMB_SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
 const MANIFEST = JSON.parse(
@@ -85,10 +86,28 @@ test("the balloon draw is gated by the F2 switch and the glyph stays the else br
   const call = fn.indexOf("drawIndicatorBubble(");
   assert.ok(call > gate, "the balloon is drawn only after the switch says yes");
   assert.match(fn, /bubbleFor\(g\.emoteIx\)/, "the raw emote index selects the glyph row");
-  assert.match(fn, /drawIndicatorBubble\(\s*ctx,\s*Math\.round\(sx\),\s*headY \+ BALLOON_ANCHOR_LIFT,/,
-    "the game's own anchor lift is used");
+  // headY is ALREADY the game's balloon anchor (game.js passes balloonAnchorY(...), the ground
+  // minus 0x1b), so the balloon is drawn at headY itself. Adding BALLOON_ANCHOR_LIFT a second
+  // time drops it 27 px down the canvas, onto the body and feet instead of over the head.
+  assert.match(fn, /drawIndicatorBubble\(\s*ctx,\s*Math\.round\(sx\),\s*headY,/,
+    "the balloon draws at headY, the game's own anchor");
+  assert.doesNotMatch(fn, /BALLOON_ANCHOR_LIFT/, "no second anchor lift in the draw");
   assert.match(fn, /\}\s*else\s*\{[\s\S]*?fillText\(g\.emote/, "the other six emotes keep the typed glyph");
   assert.equal(EMOTES.length, 8);
+});
+
+test("headY is already the game's balloon anchor, so the balloon cannot slip 27 px down", () => {
+  // game.js draws the name tag and the balloon from the one point balloonAnchorY() gives:
+  // ground - BALLOON_ANCHOR_LIFT (0x1b = 27), the same anchor every other bubble in the game
+  // hangs from. These pins keep drawGhostLabel's headY meaning that, not the bare ground.
+  assert.match(GAME_SRC, /drawGhostLabel\(ctx, g, [^\n]*balloonAnchorY\(g\.y - camY\)\)/,
+    "a friend's headY is balloonAnchorY(g.y - camY)");
+  assert.match(GAME_SRC, /drawGhostLabel\(ctx, me, [^\n]*balloonAnchorY\(state\.y - camY\)\)/,
+    "my own headY is balloonAnchorY(state.y - camY)");
+  assert.equal(BALLOON_ANCHOR_LIFT, 0x1b, "the lift headY already carries");
+  // ...and multiplayer.js does not import it any more, so no caller can add it back by habit.
+  assert.doesNotMatch(MP_SRC, /import \{[^}]*BALLOON_ANCHOR_LIFT[^}]*\} from "\.\/fieldcom\.js"/,
+    "web/multiplayer.js no longer imports the anchor lift");
 });
 
 test("the switch is in F2 -> Extras and starts off", () => {
