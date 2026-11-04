@@ -25,7 +25,7 @@
 //   {t:"chat", id, text, map} / {t:"feed", id, kind, text} / {t:"card", id, card}
 //   {t:"trade", op, ...}
 //   {t:"err", reason}   reasons: no_room, full, exists, busy, bad
-import { newLeague, nextPairing, report, forfeit, packLeague } from "../web/mp-league.js";
+import { newLeague, nextPairing, report, forfeit, matchScore, packLeague } from "../web/mp-league.js";
 
 export const MAX_PEERS = 50;         // a room of friends; positions only go to the same stage, so this stays cheap
 export const MAX_ROOMS = 200;        // per relay, so a flood of "create" cannot fill its memory
@@ -325,8 +325,9 @@ export class Hub {
             r.pair = nextPairing(r.league);
             if (!res.ended) return this.#league(r, { k: "game", a: res.a, b: res.b, n: res.games.length, w: m.winner });
             const won = r.league.champ === res.winner;
-            const wa = res.games.filter((g) => g === res.a).length;
-            return this.#league(r, { k: "win", w: res.winner, l: res.a === res.winner ? res.b : res.a, g: `${wa}-${res.games.length - wa}`, c: won ? 1 : undefined });
+            // the score is written from the winner's side, whoever of the two won (web/mp-league.js matchScore)
+            const g = matchScore({ a: res.a, b: res.b, w: res.winner, g: res.games });
+            return this.#league(r, { k: "win", w: res.winner, l: res.a === res.winner ? res.b : res.a, g, c: won ? 1 : undefined });
         }
     }
 

@@ -10,7 +10,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { newLeague, nextPairing, report, forfeit, standings, champ, packLeague, unpackLeague } from "../web/mp-league.js";
+import { newLeague, nextPairing, report, forfeit, standings, champ, matchScore, packLeague, unpackLeague } from "../web/mp-league.js";
 import { Hub } from "../server/room-core.mjs";
 
 const src = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -137,6 +137,15 @@ test("best of three: 2-0 and 2-1 end the fight, 1-1 goes on, a refused game chan
         assert.equal(report(lg, A, [A, 99]).refused, "not_in_match");
         assert.equal(report(lg, A, []).refused, "no_games");
     }
+});
+
+test("a finished fight's score is written from the winner's side: 2-1 and 2-0 read the same whoever won", () => {
+    const m = (a, b, w, g) => ({ a, b, w, g });
+    assert.equal(matchScore(m(1, 2, 1, [1, 2, 1])), "2-1", "the first tamer of the pairing won 2-1");
+    assert.equal(matchScore(m(1, 2, 2, [1, 2, 2])), "2-1", "the second tamer won 2-1: no 1-2");
+    assert.equal(matchScore(m(1, 2, 1, [1, 1])), "2-0", "the first tamer won 2-0");
+    assert.equal(matchScore(m(1, 2, 2, [2, 2])), "2-0", "the second tamer won 2-0");
+    assert.equal(matchScore({ a: 1, b: 2 }), "", "a fight still to be played has no score");
 });
 
 // ------------------------------------------------------------ dropping out
@@ -353,6 +362,34 @@ test("Hub: the next night starts once one is won, with no champion on the board"
     assert.deepEqual(night(host).rounds.flat().length, 1, "a fresh bracket");
 });
 
+test("Hub: a result names the winner first and scores from their side, the second tamer of the pairing too", () => {
+    const { host, all, ids: who } = room(2);
+    send(host, { t: "lg", op: "open", ids: who });
+    send(host, { t: "lg", op: "next" });
+    const pair = state(host).pair;
+    assert.deepEqual([pair.a, pair.b], who, "the first tamer of the draw is the first one of the pairing");
+    // the SECOND tamer wins 2-1: every dock prints "<winner> beat <loser> 2-1"
+    send(host, { t: "lg", op: "win", winner: pair.b, games: [pair.a, pair.b, pair.b] });
+    for (const x of all) {
+        const ev = state(x).ev;
+        assert.equal(ev.k, "win");
+        assert.deepEqual([ev.w, ev.l], [pair.b, pair.a], "the winner is named first, the loser second");
+        assert.equal(ev.g, "2-1", "the winner's games come first, the loser's second (never 1-2)");
+    }
+    // the next night the second tamer wins 2-0: still from their side
+    send(host, { t: "lg", op: "open", ids: who });
+    send(host, { t: "lg", op: "next" });
+    const again = state(host).pair;
+    send(host, { t: "lg", op: "win", winner: again.b, games: [again.b, again.b] });
+    assert.equal(state(host).ev.g, "2-0");
+    // and the first tamer winning reads the same way round
+    send(host, { t: "lg", op: "open", ids: who });
+    send(host, { t: "lg", op: "next" });
+    const third = state(host).pair;
+    send(host, { t: "lg", op: "win", winner: third.a, games: [third.a, third.b, third.a] });
+    assert.deepEqual([state(host).ev.w, state(host).ev.l, state(host).ev.g], [third.a, third.b, "2-1"]);
+});
+
 // ------------------------------------------------------------ the champion's card, and the switch
 
 test("a champion card is a normal player card plus one flag, and stays under the relay's 2000-byte cap", () => {
@@ -384,6 +421,27 @@ test("F2 -> Extras -> Server Champ league: off by default, and off means no butt
     assert.match(socialSrc, /if \(serverChampOn\(\)\) el\.players\.append\(leagueStrip\(\)\)/, "the strip is gated");
     // a card that carries champ draws as a normal card: the flag is only read behind the switch
     assert.match(socialSrc, /const isChamp = \(p\) => serverChampOn\(\) && \(p\.id === champId\(\) \|\| p\.card\?\.champ === true\)/, "the champ colour is gated");
+});
+
+test("the dock prints the winner's name and the winner's score, in the feed and in the bracket strip", () => {
+    // the feed's result line: winner first, loser second, the score the relay computed
+    const feed = socialSrc.match(/else if \(ev\.k === "win"\)[^\n]*/)?.[0] ?? "";
+    assert.match(feed, /lgName\(ev\.w\)\} beat \$\{lgName\(ev\.l\)\} \$\{ev\.g\}/, "the feed says who won, then the score");
+    // the strip's finished match: no bracket-order score any more
+    const fn = socialSrc.match(/function matchText\(m\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    assert.match(fn, /matchScore\(m\)/, "the strip scores a finished fight from the winner's side");
+    assert.ok(!/leagueScore\(m, m\.a\)\}-\$\{leagueScore\(m, m\.b\)/.test(fn), "no bracket-order score in the strip");
+});
+
+test("a room bigger than a night still starts one, and the strip appears when the switch is turned on", () => {
+    const between = (a, b) => socialSrc.slice(socialSrc.indexOf(a), socialSrc.indexOf(b));
+    const start = between("function startLeague()", "function reportGame");
+    assert.match(start, /all\.slice\(0, MAX_TAMERS\)/, "the start keeps a night to the 8 tamers the relay allows");
+    assert.match(start, /note\(/, "and tells the host who is in it when the room is bigger");
+    assert.ok(!/sendLeague\(\{ op: "open", ids: \[myId\(\), \.\.\.peerList\(\)/.test(start), "no 9-tamer open the relay would refuse");
+    const poll = between("function pollSelf()", "// ------------------------------------------------------------ install");
+    assert.match(poll, /if \(on !== champOn\)/, "the dock notices the switch flipping");
+    assert.match(poll, /drawPlayers\(\)/, "and redraws the PLAYERS tab: the strip appears at once");
 });
 
 test("one night travels packed and comes back the same, small enough for the relay's 600-byte cap", () => {

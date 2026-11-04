@@ -9,13 +9,13 @@
 //
 // Nothing here writes a story flag. Names and chat from other players are only ever put on the page as text.
 import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn } from "./multiplayer.js";
-import { unpackLeague } from "./mp-league.js";
+import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 
 const MAX_LOG = 300;
 const S = { tab: "all", log: [], collapsed: false, unread: 0 };
 let api = null, dock = null, el = {}, trade = null, duel = null, inspectId = null, goArm = null;
 let prevParty = null, lastCardJson = "";
-let league = null, leaguePair = null, leagueGames = [], leagueKey = "";   // the Server Champ night (web/mp-league.js)
+let league = null, leaguePair = null, leagueGames = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
 
 // ------------------------------------------------------------ small helpers
 const h = (tag, cls, ...kids) => {
@@ -136,7 +136,7 @@ function closeInspect() { inspectId = null; if (el.inspect) el.inspect.hidden = 
 function drawInspect() {
     if (inspectId == null || !el.inspect) return;
     const self = inspectId === myId();
-    const p = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : peerOf(inspectId);
+    const p = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
     if (!p) { closeInspect(); return; }
     const c = p.card;
     const box = el.inspect; box.hidden = false; box.replaceChildren();
@@ -461,7 +461,7 @@ function onCoop(m) {
 const LEAGUE_NO = {
     no_league: "No Server Champ night is open.",
     open: "A Server Champ night is already open.",
-    ids: "Pick 2 to 8 tamers who are in the room.",
+    ids: "A Server Champ night needs 2 to 8 tamers who are in the room.",
     done: "This night is won - wait for the next one.",
     dropped: "That tamer already left the night.",
     no_fight: "No fight is on the table right now.",
@@ -486,7 +486,7 @@ function matchText(m) {
     if (m.dead) return "no tamer left";
     if (m.w == null) return `${lgName(m.a)} vs ${lgName(m.b)}`;
     const lost = m.a === m.w ? m.b : m.a;
-    return `${lgName(m.w)} beat ${lgName(lost)} ${m.wo ? "w.o." : `${leagueScore(m, m.a)}-${leagueScore(m, m.b)}`}`;
+    return `${lgName(m.w)} beat ${lgName(lost)} ${m.wo ? "w.o." : matchScore(m)}`;
 }
 
 function leagueStrip() {
@@ -520,8 +520,11 @@ function leagueStrip() {
 }
 
 function startLeague() {
-    const ids = [myId(), ...peerList().map((p) => p.id)];
-    if (ids.length < 2) { note("You need at least one more tamer in the room."); return; }
+    const all = [myId(), ...peerList().map((p) => p.id)];
+    if (all.length < 2) { note("You need at least one more tamer in the room."); return; }
+    // a night holds 8 tamers; in a bigger room the first 7 others in join order are the night, and the host is told
+    const ids = all.slice(0, MAX_TAMERS);
+    if (ids.length < all.length) note(`A Server Champ night holds ${MAX_TAMERS} tamers. This one has you and the next ${ids.length - 1} in the room.`);
     sendLeague({ op: "open", ids });
 }
 
@@ -573,7 +576,12 @@ export function socialQuestDone(title) { if (isOnline() && api) post("quest", `f
 
 function pollSelf() {
     if (!api) return;
-    if (!serverChampOn() && league) { clearLeague(); drawPlayers(); }
+    const on = serverChampOn();
+    if (on !== champOn) {                                    // the switch flipped: the bracket strip appears or goes
+        champOn = on;
+        if (!on) clearLeague();
+        drawPlayers();
+    }
     // tuck the box away during battles and cutscenes, so it never covers them
     if (dock) dock.style.display = isOnline() && !api.busy() ? "" : "none";
     if (!isOnline()) { prevParty = null; lastCardJson = ""; return; }

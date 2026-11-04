@@ -16,7 +16,8 @@
 //   newLeague({ ids, bestOf = 3 })   a night drawn: the first round with its byes, the numbers of the bracket
 //   nextPairing(lg)                  the fight to call now; null between rounds (ask again for the next round)
 //                                    and null when the night is won
-//   report(lg, winner, games)        the host reports one fight's games so far, e.g. [a, b, a]: who won each
+//   report(lg, winner, games)         the host reports one fight's games so far, e.g. [a, b, a]: who won each
+//   matchScore(match)                 a finished fight as it is written: the winner's games first ("2-1", never "1-2")
 //   forfeit(lg, id)                  that tamer leaves the night; the opponent goes through, no re-entry
 //   standings(lg)                    every tamer, best first (the champion at the top)
 //   champ(lg)                        the winner's id, null until the final is won
@@ -153,6 +154,18 @@ export function report(lg, winner, games) {
     if (ended) m.w = winner;
     settle(lg);
     return { ok: true, ended, a: m.a, b: m.b, winner: ended ? m.w : null, games: m.g.slice(), r: lg.r, m: index };
+}
+
+/**
+ * A finished fight as it is written: the winner's games first, then the loser's ("2-1", never a bracket-order
+ * "1-2"). The relay puts this in its result message and the dock prints it after the winner's name; both read it
+ * here so the two can never disagree again.
+ */
+export function matchScore(m) {
+    if (!m || m.w == null) return "";
+    const games = Array.isArray(m.g) ? m.g : [];
+    const lost = m.a === m.w ? m.b : m.a;
+    return `${games.filter((g) => g === m.w).length}-${games.filter((g) => g === lost).length}`;
 }
 
 /** A tamer leaves the night: their open fight goes to the opponent, and no later pairing calls them again. */
