@@ -20,6 +20,8 @@
 // (web/chat-queue.js) that spaces them 650 ms apart, a little over the relay's own 600 ms drop, so a line
 // typed in a hurry reaches the room instead of vanishing. The relay is not touched: it still drops at 600.
 import { createChatQueue } from "./chat-queue.js";
+import { drawIndicatorBubble, BALLOON_ANCHOR_LIFT } from "./fieldcom.js";
+import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
@@ -34,8 +36,8 @@ export const EMOTES = ["♥", "!", "?", "...", "♪", ":)", "GG", "zZ"];   // 0.
 const mp = {
     ws: null, status: "off", room: null, id: null, name: "", hostId: null,
     addresses: [], hosting: false, host: "",   // the host's own addresses, to show to friends
-    peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteUntil, say, sayUntil, card }
-    me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteUntil: 0 },
+    peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteIx, emoteUntil, say, sayUntil, card }
+    me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteIx: null, emoteUntil: 0 },
     sent: { map: null, x: 0, y: 0, dir: "", mv: 0, at: 0 },
     retry: 0, retryTimer: 0, want: null, beat: 0,
     ui: null, lastTick: 0,
@@ -128,7 +130,7 @@ export function connect(want) {
             if (jump || p.x == null) { p.x = m.x; p.y = m.y; }
             if (moved) emit("roster");
         } else if (m.t === "emote") {
-            const p = mp.peers.get(m.id); if (p) { p.emote = EMOTES[m.e] ?? ""; p.emoteUntil = performance.now() + 2500; }
+            const p = mp.peers.get(m.id); if (p) { p.emote = EMOTES[m.e] ?? ""; p.emoteIx = m.e; p.emoteUntil = performance.now() + 2500; }
         } else if (m.t === "chat") {
             const p = mp.peers.get(m.id); if (!p) return;
             p.say = m.text; p.sayUntil = performance.now() + sayTime(m.text);
@@ -196,7 +198,7 @@ export function disconnect(quiet = false) {
     if (!quiet) setStatus("off");
 }
 
-function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false }; }
+function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false }; }
 export const sendRaw = (o) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
 const sayTime = (text) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
 
@@ -225,7 +227,7 @@ function resetChatQueue() {
 
 export function sendEmote(i) {
     sendRaw({ t: "emote", e: i });
-    mp.me.emote = EMOTES[i] ?? ""; mp.me.emoteUntil = performance.now() + 2500;
+    mp.me.emote = EMOTES[i] ?? ""; mp.me.emoteIx = i; mp.me.emoteUntil = performance.now() + 2500;
 }
 
 /** Say something: it goes to everyone's chat log, and shows over my head here and over my character for players in my stage.
@@ -281,14 +283,15 @@ function sendPresence() {
     }
 }
 
-/** The other players standing in this stage: [{ id, name, x, y, dir, moving, animTime, emote, say }] */
+/** The other players standing in this stage: [{ id, name, x, y, dir, moving, animTime, emote, emoteIx, say }] */
 export function multiplayerGhosts(mapId) {
     if (mp.status !== "online") return [];
     const now = performance.now(), out = [];
     for (const [id, p] of mp.peers) {
         if (p.map !== mapId || p.hidden || p.x == null || now - p.seen > STALE_MS) continue;
+        const on = now < p.emoteUntil;
         out.push({ id, name: p.name, x: p.x, y: p.y, dir: p.dir, moving: p.moving, animTime: p.animTime,
-            emote: now < p.emoteUntil ? p.emote : "", say: now < p.sayUntil ? p.say : "" });
+            emote: on ? p.emote : "", emoteIx: on ? p.emoteIx : null, say: now < p.sayUntil ? p.say : "" });
     }
     return out;
 }
@@ -297,7 +300,8 @@ export function multiplayerGhosts(mapId) {
 export function multiplayerSelf() {
     if (mp.status !== "online") return null;
     const now = performance.now(), m = mp.me;
-    return { id: mp.id, name: mp.name, emote: now < m.emoteUntil ? m.emote : "", say: now < m.sayUntil ? m.say : "" };
+    return { id: mp.id, name: mp.name, emote: now < m.emoteUntil ? m.emote : "",
+        emoteIx: now < m.emoteUntil ? m.emoteIx : null, say: now < m.sayUntil ? m.say : "" };
 }
 
 /** Name tag, emote and speech bubble over a player; (sx, headY) is the point just above the head on the canvas (the game's balloon anchor). */
@@ -308,9 +312,18 @@ export function drawGhostLabel(ctx, g, sx, headY) {
     ctx.fillStyle = "rgba(0,0,32,0.72)"; ctx.fillRect(Math.round(sx - w / 2), y - 9, w, 11);
     ctx.fillStyle = "#fff"; ctx.fillText(g.name, Math.round(sx), y);
     if (g.emote) {
-        ctx.font = "bold 12px monospace";
-        ctx.fillStyle = "#000"; ctx.fillText(g.emote, Math.round(sx) + 1, y - 13);
-        ctx.fillStyle = "#ffd34d"; ctx.fillText(g.emote, Math.round(sx), y - 14);
+        // F2 -> Extras -> "The game's own reaction bubbles": "!" and "..." wear the disc's own balloon
+        // (FIELDCOM balloon 0x35 + the program row the game puts over an NPC), at the game's own anchor
+        // lift. headY is already that lift above the ground, so the anchor the balloon rides from is
+        // headY + BALLOON_ANCHOR_LIFT. The other six emotes have no mark on the disc and keep the glyph.
+        const kind = window.__fx?.mpbubbles ? bubbleFor(g.emoteIx) : null;
+        if (kind != null) {
+            drawIndicatorBubble(ctx, Math.round(sx), headY + BALLOON_ANCHOR_LIFT, kind, bubbleTick(performance.now()));
+        } else {
+            ctx.font = "bold 12px monospace";
+            ctx.fillStyle = "#000"; ctx.fillText(g.emote, Math.round(sx) + 1, y - 13);
+            ctx.fillStyle = "#ffd34d"; ctx.fillText(g.emote, Math.round(sx), y - 14);
+        }
     }
     // speech is drawn by the game itself: its own balloon, one per speaker (see mpBalloon in game.js)
     ctx.restore();
