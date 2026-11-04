@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DDW3 NPC Dialogue-State Explorer</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b0c14; color: #cdd3e0;
+               font: 12px/1.5 system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { flex: none; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+           padding: 10px 14px; background: #10131f; border-bottom: 1px solid #232838; }
+  header h1 { font-size: 15px; margin: 0; }
+  header .sub { color: #7d879c; font-size: 11px; max-width: 760px; }
+  header .badge { margin-left: auto; font-size: 11px; color: #8fd3a8; }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside { background: #10131f; border-right: 1px solid #232838; overflow-y: auto; padding: 10px 12px; }
+  #left { width: 300px; flex: none; }
+  #right { width: 340px; flex: none; border-right: 0; border-left: 1px solid #232838; }
+  #middle { flex: 1; min-width: 0; overflow-y: auto; padding: 10px 14px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; margin: 14px 0 6px;
+       color: #6b7488; }
+  h2:first-child { margin-top: 0; }
+  select, input[type=text], input[type=number] {
+    background: #0c1627; color: #dfe; border: 1px solid #33405c; border-radius: 5px;
+    padding: 4px 6px; font: inherit; max-width: 100%; }
+  button { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346; border-radius: 5px;
+           padding: 4px 8px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #3d6bff; }
+  .muted { color: #7d879c; }
+  .mono { font-family: ui-monospace, monospace; }
+  .hint { color: #7d879c; font-size: 11px; }
+  .row { margin: 5px 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row > label { color: #9fb0d0; min-width: 108px; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { padding: 5px 6px; border-radius: 5px; cursor: pointer;
+               border: 1px solid transparent; }
+  ul.list li:hover { background: #141a2a; }
+  ul.list li[aria-selected="true"] { background: #17233c; border-color: #2d54c8; }
+  ul.list li .meta { color: #6b7488; font-size: 11px; }
+  .pill { display: inline-block; font-size: 10px; padding: 0 6px; border-radius: 8px;
+          background: #1b2b45; border: 1px solid #38516f; color: #c6d8f4; vertical-align: middle; }
+  .pill.good { background: #173b2f; border-color: #2f7d5f; color: #a9e6c9; }
+  .pill.warn { background: #3b3417; border-color: #7d6a2f; color: #e6dca9; }
+  .pill.bad { background: #3b1d1d; border-color: #7d3434; color: #e6a9a9; }
+  .card { border: 1px solid #232838; border-radius: 7px; background: #0e1220;
+          padding: 8px 10px; margin: 8px 0; }
+  .card[data-selected="true"] { border-color: #2d54c8; }
+  .card h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+  .ver { font-family: ui-monospace, monospace; color: #9fc4ff; }
+  .gate { margin: 3px 0 0; }
+  .cond { display: inline; }
+  .cond + .cond::before { content: " and "; color: #6b7488; }
+  .cond.unknown { color: #e6dca9; }
+  .cond.unknown::after { content: " (unknown)"; font-size: 10px; color: #9b8f5a; }
+  .line { white-space: pre-wrap; color: #b8c4da; background: #0a0d16; border-left: 2px solid #2c3346;
+          border-radius: 0 5px 5px 0; padding: 5px 8px; margin: 5px 0 0;
+          font-family: ui-monospace, monospace; font-size: 11.5px; max-height: 130px; overflow: auto; }
+  .state[data-live="true"] { border-color: #2f7d5f; background: #0d1a16; }
+  .state .head { display: flex; gap: 8px; align-items: baseline; }
+  .state .num { font-family: ui-monospace, monospace; color: #8fd3a8; }
+  .legend { font-size: 11px; color: #7d879c; border-top: 1px solid #232838; margin-top: 10px; padding-top: 8px; }
+  #beats { max-height: 210px; overflow-y: auto; font-size: 11px; }
+  #beats div { padding: 2px 0; border-bottom: 1px solid #171c2b; cursor: pointer; }
+  #beats div:hover { color: #cfe0ff; }
+  details summary { cursor: pointer; color: #9fb0d0; }
+  #error { color: #e6a9a9; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NPC Dialogue-State Explorer</h1>
+  <span class="sub">Every version the disc authors for a person: its spawn gate and each
+    dialogue state's gate in plain words, and which state your save is talking to.
+    Read-only — it changes no game file and writes nothing.</span>
+  <span class="badge" id="ready">loading…</span>
+</header>
+<main>
+  <aside id="left">
+    <h2>Stage</h2>
+    <select id="stage" style="width:100%"></select>
+    <h2>People in this stage</h2>
+    <input id="filter" type="text" placeholder="filter by npc id, sprite or record" style="width:100%" />
+    <ul class="list" id="people"></ul>
+  </aside>
+  <section id="middle">
+    <h2 id="versionsTitle">Versions of this person</h2>
+    <div id="versions" class="muted">Pick a person on the left.</div>
+    <h2 id="statesTitle">Dialogue states</h2>
+    <div id="states" class="muted">Pick a version above.</div>
+  </section>
+  <aside id="right">
+    <h2>Your save's flags</h2>
+    <div id="saveInfo" class="hint">reading localStorage…</div>
+    <button id="reload" style="margin-top:6px">Reload save</button>
+    <h2>Manual values</h2>
+    <div class="row"><label for="beat">Story beat</label>
+      <input id="beat" type="number" min="0" step="1" style="width:82px" placeholder="unknown" /></div>
+    <div class="row"><label for="charisma">Party Charisma</label>
+      <input id="charisma" type="number" min="0" step="1" style="width:82px" placeholder="unknown" /></div>
+    <div class="row"><label for="routeKey">Route key</label>
+      <input id="routeKey" type="number" min="1" step="1" style="width:82px" placeholder="unknown" /></div>
+    <div class="row"><label for="routeCompanion">Route companion</label>
+      <input id="routeCompanion" type="number" min="1" step="1" style="width:82px" placeholder="unknown" /></div>
+    <div class="hint">The beat, the party Charisma and the route pair are not stored as
+      flags; leave one blank and every gate that needs it reads <b>unknown</b>.</div>
+    <h2>Beats on the disc</h2>
+    <div id="beats" class="muted">loading…</div>
+    <p class="legend">A dialogue state is live when its whole gate passes. An
+      <span class="cond unknown" style="display:inline"></span> gate passes like an unmodelled
+      flag does in the game, so the live mark is a best reading, not a promise.</p>
+  </aside>
+</main>
+<script type="module" src="story-explorer.js"></script>
+</body>
+</html>
