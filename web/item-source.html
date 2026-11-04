@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Item Source Book — where every item comes from</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#f0c040; font-family:monospace; }
+  #top { padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; position:sticky; top:0; background:#0a0e1a; border-bottom:1px solid #333; z-index:2; }
+  input { background:#111a2e; color:#f0c040; border:1px solid #2a3a6a; padding:6px 9px; font-family:monospace; font-size:14px; width:260px; }
+  input:focus { outline:1px solid #f0c040; }
+  #count { color:#9ab; font-size:12px; }
+  #hint { padding:8px 14px; color:#9ab; font-size:12px; line-height:1.5; }
+  #hint b { color:#f0c040; }
+  #book { display:flex; gap:14px; align-items:flex-start; padding:0 14px 30px; }
+  #list { flex:0 1 420px; max-height:calc(100vh - 130px); overflow-y:auto; outline:none; border-right:1px solid #1a2540; }
+  #detail { flex:1 1 auto; max-height:calc(100vh - 130px); overflow-y:auto; padding-left:4px; }
+  .item { display:flex; gap:10px; align-items:baseline; padding:4px 8px; border-bottom:1px solid #111a2e; cursor:pointer; }
+  .item:hover { background:#111a2e; }
+  .item.sel { background:#1a2540; box-shadow:inset 3px 0 0 #f0c040; }
+  .item .id { flex:0 0 36px; color:#5a6a8a; font-size:11px; text-align:right; }
+  .item .name { flex:1 1 auto; color:#f0c040; }
+  .item .cat { flex:0 0 74px; color:#8a8ab0; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .item .num { flex:0 0 26px; text-align:right; font-size:11px; color:#8fe08f; }
+  .item .num.none { color:#a05a5a; }
+  h2 { margin:0 0 6px; font-size:15px; color:#f0c040; }
+  h2 span { color:#8a8ab0; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .price { color:#8fe08f; font-size:13px; margin-bottom:10px; }
+  .nothing { color:#e0a080; font-size:13px; line-height:1.6; margin:6px 0 12px; }
+  h3 { margin:14px 0 4px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#8a8ab0; border-bottom:1px solid #222; padding-bottom:3px; }
+  h3 b { color:#f0c040; }
+  .src { padding:3px 0 3px 10px; color:#c8d0e0; font-size:12px; line-height:1.5; }
+  .src.unopened { color:#e0b080; }
+  .empty { color:#8a8ab0; font-size:13px; padding:8px 0; }
+</style>
+</head>
+<body>
+<div id="top">
+  <input id="q" type="search" placeholder="type an item name or id" autocomplete="off" spellcheck="false">
+  <span id="count">loading…</span>
+</div>
+<div id="hint">
+  Every one of the disc's 402 items and every place the game hands it over: the shops that stock it
+  (with the stage the merchant stands on), the people who give it, the cutscenes and the stages' own
+  code that grant it, and the enemies that drop it with their roll. When nothing in the retail game
+  gives it, the book says so. <b>Type to filter, arrow keys scroll, Enter shows a row.</b>
+</div>
+<div id="book">
+  <div id="list" tabindex="0"></div>
+  <div id="detail"></div>
+</div>
+<script type="module" src="./item-source-page.js"></script>
+</body>
+</html>
