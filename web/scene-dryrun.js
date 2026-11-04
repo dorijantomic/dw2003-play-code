@@ -27,7 +27,7 @@
 //     ok, ended, seconds, frames,
 //     says: [{ n, at, who, name, text, ask, options, actor, mode }],
 //     answers: [{ say, answer, at }],
-//     events: [{ index, step, at, kind, ...the compiled spec }],
+//     events: [{ ...the compiled spec, index, step, at }],   // `at` is always the clock; a warp's point is x/y
 //     walks: [{ actor, from, to, arrived, seconds, at, x, y }],
 //     camera: [{ at, kind: "follow" | "point", actor, x, y, mode }],
 //     handoffs: [{ step, at, map, to, x, y, dir, then }],
@@ -87,7 +87,7 @@ function entityOf(record) {
     return { x: 0, y: 0, dir: "down" };
 }
 
-/** Every scene slot in web/quests.json, in file order: {quest, questId, slot, map, steps}. 469 of them today. */
+/** Every scene slot in web/quests.json, in file order: {quest, questId, slot, map, steps}. The count follows the data. */
 export function questScenes(questsJson) {
     const quests = Array.isArray(questsJson) ? questsJson : questsJson?.quests ?? [];
     const out = [];
@@ -233,7 +233,14 @@ export function dryRun(steps, opts = {}) {
         const spec = compiled.events[index];
         if (!spec) return resume();
         const at = vm.clock();
-        const record = { index, step: stepOfEvent(index), at, ...spec };
+        // The clock time is written after the spread: a warp's own spec carries `at` (its destination point), and that
+        // must not turn the record's `at` into a coordinate pair — the timeline reads it as a time. The destination is
+        // kept as x/y for the report.
+        const record = { ...spec, index, step: stepOfEvent(index), at };
+        if (spec.kind === "warp" && Array.isArray(spec.at)) {
+            record.x = spec.at[0];
+            record.y = spec.at[1];
+        }
         events.push(record);
         const held = holdEvent.some((h) => (typeof h === "number" ? h === index : h === spec.kind));
         if (held) return;                      // the host never finishes: the VM waits in hook mode (the stall finder sees it)

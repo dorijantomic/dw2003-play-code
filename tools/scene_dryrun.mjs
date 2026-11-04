@@ -137,7 +137,7 @@ function eventLine(ev) {
         case "time": return `time of day moves to ${ev.time} over ${ev.frames} frames`;
         case "lightning": return `${ev.count} lightning flash${ev.count === 1 ? "" : "es"}`;
         case "battle": return `battle screen ${ev.screen} (a win, as the field's scripted fights)`;
-        case "warp": return `warp to ${ev.to} at ${at(ev.at)} — the scene ends there${ev.then ? ", then the follow-up scene plays" : ""}`;
+        case "warp": return `warp to ${ev.to} at ${at([ev.x, ev.y])} — the scene ends there${ev.then ? ", then the follow-up scene plays" : ""}`;
         case "chase": return `chase npc ${ev.target} along ${ev.path?.length ?? 0} points (the player must keep up)`;
         case "ghost": return ev.off ? `npc ${ev.npc} back to normal` : `npc ${ev.npc} drawn faded (alpha ${ev.alpha})`;
         case "drop":
@@ -145,6 +145,18 @@ function eventLine(ev) {
         case "sfx": return `sound "${ev.name}"`;
         default: return `${ev.kind} event`;
     }
+}
+
+/**
+ * Why the steps after the last played one never run, worded from what the run actually recorded: a warp that handed
+ * off, a stall, or the clock cap — never "after the warp" for a scene that has no warp.
+ */
+function tailLine(run) {
+    const steps = `steps ${run.unreachableTail.join(", ")}`;
+    if (run.handoffs.length) return `${steps} never play after the warp`;
+    if (run.stalls.length) return `${steps} never play: the scene stalled before them`;
+    if (run.timeout) return `${steps} never play: the clock hit its cap first`;
+    return `${steps} never play`;
 }
 
 function printReport(run, { quest, slot, mapId }) {
@@ -172,7 +184,7 @@ function printReport(run, { quest, slot, mapId }) {
     console.log(`${name} ${slot}${where} — ${run.seconds.toFixed(1)} s, ${plural(run.frames, "frame")}, ${plural(run.says.length, "line")}, ${plural(run.walks.length, "walk")}, ${plural(run.events.length, "event")}, ${run.stalls.length ? plural(run.stalls.length, "stall") : "no stalls"}`);
     for (const line of lines) console.log(`  ${at(line.at).padStart(7)}  ${line.text}`);
     console.log(`  ${at(run.seconds).padStart(7)}  ${run.ended ? "END" : run.timeout ? "CAP (the scene never ended)" : "STOPPED"}`);
-    if (run.unreachableTail.length) console.log(`  steps ${run.unreachableTail.join(", ")} never play after the warp`);
+    if (run.unreachableTail.length) console.log(`  ${tailLine(run)}`);
     for (const c of run.conditionalTail) console.log(`  steps ${c.after.join(", ")} play only if the player keeps up (chase at step ${c.at})`);
     if (run.pendingFollowUp) console.log(`  follow-up scene ${JSON.stringify(run.pendingFollowUp.scene)} plays on arrival at ${run.pendingFollowUp.map}`);
     for (const e of run.errors) console.log(`  scene error: ${e}`);

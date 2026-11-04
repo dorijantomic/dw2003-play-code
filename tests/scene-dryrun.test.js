@@ -201,10 +201,15 @@ test("a scene using every host event kind plays them all and ends without a stal
     assert.equal(run.handoffs.length, 1);
 });
 
-test("every shipped scene (469 slots) plays through the VM: the census never fails the test", () => {
-    const quests = load("web/quests.json");
+test("every shipped scene plays through the VM: the census never fails the test", () => {
+    // The sweep follows whatever quests file it is pointed at (web/quests.json by default), never a pinned count: quest
+    // data is append-only, so a hard number here breaks on every quest card and on every merge that lands one. Set
+    // DRYRUN_QUESTS to a scratch copy — `git show integration/all:web/quests.json > /tmp/quests.json` — to sweep the
+    // merge target's data without touching web/quests.json.
+    const questsFile = process.env.DRYRUN_QUESTS ?? "web/quests.json";
+    const quests = JSON.parse(readFileSync(resolve(ROOT, questsFile), "utf8"));
     const slots = questScenes(quests);
-    assert.equal(slots.length, 469, "the sweep covers every scene slot in web/quests.json");
+    assert.ok(slots.length > 0, `the sweep found scene slots in ${questsFile}`);
 
     const extra = load("web/extra_npcs.json");
     const paths = load("web/quest-paths.json").paths ?? {};
@@ -239,9 +244,10 @@ test("every shipped scene (469 slots) plays through the VM: the census never fai
         if (run.seconds > census.longest.seconds) census.longest = { slot: `${slot.questId} ${slot.slot}`, seconds: run.seconds };
     }
     console.log(`[dry run census] ${JSON.stringify(census)}`);
-    assert.equal(census.total, 469, "every slot was measured");
+    assert.ok(census.total > 0, "the sweep measured the slots it was given");
     // A census, not a gate: the shipped data may hold a scene the dry run cannot finish, and that is a finding for the
-    // author, not a broken tool. The fixtures above are the gate.
+    // author, not a broken tool. The fixtures above are the gate. The count is reported, never pinned: quest data is
+    // append-only, so a fixed number would fail on the next quest card (or on the merge target's newer file).
     assert.ok(census.longest.seconds <= 120, "nothing ran past the 120 s cap");
 });
 
@@ -287,6 +293,29 @@ test("the CLI on a deliberately stalled fixture exits 1 and names the stall", ()
         assert.equal(error.status, 1);
         assert.match(String(error.stdout), /STALL/);
         assert.match(String(error.stdout), /hook/);
+        // The fixture has no warp: a tail left by a stall must not be blamed on one (the tool cannot lie about its cause).
+        assert.doesNotMatch(String(error.stdout), /after the warp/);
+        assert.match(String(error.stdout), /steps 2 never play: the scene stalled before them/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test("the CLI blames a dead tail on the warp only when a warp was recorded", () => {
+    const dir = mkdtempSync(join(tmpdir(), "scene-dryrun-"));
+    try {
+        const file = join(dir, "warped.json");
+        writeFileSync(file, JSON.stringify([
+            { wait: 10 },
+            { warp: { map: "s320", at: [576, 448], dir: 0 } },
+            { wait: 60 },
+        ]));
+        const out = execFileSync(process.execPath, ["tools/scene_dryrun.mjs", "--scene", file, "--map", "s330"], {
+            cwd: ROOT, encoding: "utf8", timeout: 60_000,
+        });
+        assert.match(out, /warp to s320 at \(576, 448\)/);
+        assert.match(out, /steps 3 never play after the warp/);
+        assert.doesNotMatch(out, /STALL/);
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
