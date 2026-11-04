@@ -4825,11 +4825,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    *
    * The phase data is the boss record's own `phases` (data/authored/fusion_bosses.json,
    * built into web/fusion_bosses.json): `at` is the share of max HP, `moves` are the
-   * boss's own technique ids in action order, and `field`/`tint`/`page` are what the
-   * phase changes. `web/boss-phase.js` owns the arithmetic; this function only writes
+   * boss's own technique ids in action order, and `field`/`tint`/`music`/`page` are what
+   * the phase changes. `web/boss-phase.js` owns the arithmetic; this function only writes
    * the battle: the four AI rows (row 3 unconditional, so the last move always has a
-   * fallback), the battlefield element at the field items' power 64, the fighter tint
-   * and the page.
+   * fallback), the battlefield element at the field items' power 64, the fighter tint,
+   * the battle track and the page.
    *
    * The enemy record carries the cursor (`bossPhase`, -1 before the first line), so a
    * fired phase never fires again and a single hit that crosses two thresholds fires
@@ -4848,6 +4848,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const effects = phaseEffects(phase);
     if (effects.element) b.field = { element: effects.element, power: effects.power };
     if (effects.tint) setFighterTint("enemy", effects.tint);
+    // NEW content (F2 -> Extras -> "A phase changes the battle music", off by default):
+    // the phase may name one of the game's own battle banks (battle_music.json carries
+    // them all; the builder refuses anything else). These are the finale's own two lines
+    // (`noteFinalBossPhaseDamage`: `_battleTrack = "boss04"` then `bgm?.play`) reached at
+    // the phase's HP line instead of the third landed blow. With the switch off no bank
+    // is read here and the screen's own track keeps playing.
+    if (effects.music && window.__fx?.bossmusic === true) {
+      b._battleTrack = effects.music;
+      bgm?.play(b._battleTrack);
+    }
     return effects.page ? [{ text: effects.page, spec: null }] : [];
   }
 

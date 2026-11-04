@@ -23,6 +23,10 @@
 //   * a field phase writes the same `{ element, power 64 }` the seven field items and
 //     the seven field techniques write (web/field-war.js FIELD_POWER; fightstg
 //     item handler 0x8008e4e0 stores elem and 0x40).
+//   * a phase may also name one of the game's own battle banks (battle_music.json; the
+//     builder computes the legal set from it). The battle plays it once at the phase's
+//     HP line — the same write + play the Galacticmon finale runs for boss04, behind
+//     F2 -> Extras -> "A phase changes the battle music" (`bossmusic`, off by default).
 import { FIELD_POWER } from "./field-war.js";
 
 /**
@@ -82,11 +86,12 @@ export function phaseRows(phase, bossMoves) {
 
 /**
  * What a phase does to the battlefield itself: the field it names (or null), the field
- * power the seven field items write (64), the fighter tint (or null) and the one page it
- * puts up (or null).
+ * power the seven field items write (64), the fighter tint (or null), the one page it
+ * puts up (or null) and the battle bank it turns the music to (or null).
  *
  * The battle applies only what is named: no field means no field write, no tint means
- * the fused fighter keeps the boss's own tint, no page means no box page.
+ * the fused fighter keeps the boss's own tint, no page means no box page, and no music
+ * means the screen's own track keeps playing.
  */
 export function phaseEffects(phase) {
   return {
@@ -94,5 +99,6 @@ export function phaseEffects(phase) {
     power: FIELD_POWER,
     tint: phase?.tint ?? null,
     page: phase?.page ?? null,
+    music: phase?.music ?? null,
   };
 }
