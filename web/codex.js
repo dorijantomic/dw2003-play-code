@@ -53,6 +53,14 @@
 // 39.9 MB, so the tab builds its list from index.json and fetches ONE body's anim.json
 // when a row is opened (plus the small technique and sound tables once).
 //
+// The Clips tab (the fifth) is the glossary the game never printed: the developers' own 62
+// battle animation names from their hidden scene-test tool (web/fight/clip-names.js), one
+// row per animation with its engine clip id, its timeline table, a plain-English gloss and
+// how many of the 249 model packs author that table. Its header states the caveat: the tool
+// passes its list position + 1 as the engine animation id, and the join against fightstg's
+// own selectors (SCENE-Q002) is still needs_evidence. The rows are a typed fact table; no
+// anim.json is fetched for this tab.
+//
 // OFF unless F2 -> Extras -> "Digimon Codex (new)" is switched on (web/ambience.js).
 // It opens on that switch's rising edge, owns the pad while it is up (L1/R1 tab,
 // Left/Right page, Up/Down row, Cross/Start close; the ENCOUNTERS tab also takes
@@ -61,6 +69,7 @@
 // DOM-free at the top level so node tests import it; drawing takes a canvas context.
 
 import { loadoutReport } from "./fight/body-loadout.js";
+import { CLIP_ID_CAVEAT, CLIP_NAMES_62 } from "./fight/clip-names.js";
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
 const PER_PAGE = 24;              // rows on one book page
@@ -70,8 +79,8 @@ const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const STATUS_LABELS = { poison: "Poison", paralyze: "Paralyze", confuse: "Confuse", sleep: "Sleep", ko: "KO" };
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
-const TAB_NAMES = ["partners", "wild", "encounters", "loadout"];
-const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT" };
+const TAB_NAMES = ["partners", "wild", "encounters", "loadout", "clips"];
+const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT", clips: "CLIPS" };
 
 const pick = (source, keys) =>
   Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
@@ -136,6 +145,9 @@ export function codexPages(rows, perPage = PER_PAGE) {
   for (let i = 0; i < rows.length; i += size) pages.push(rows.slice(i, i + size));
   return pages;
 }
+
+// The Clips tab's pages: the 62 animation rows are a fixed fact table, so they are cut once.
+const CLIP_PAGES = codexPages(CLIP_NAMES_62, PER_PAGE);
 
 // ---------------------------------------------------------------- wild pages
 
@@ -666,7 +678,7 @@ export function codexOpen() {
   return S.open;
 }
 
-/** Which part of the book is up: "partners", "wild", "encounters" or "loadout". */
+/** Which part of the book is up: "partners", "wild", "encounters", "loadout" or "clips". */
 export function codexTab() {
   return S.tab;
 }
@@ -675,6 +687,7 @@ export function codexTab() {
 function tabPages() {
   if (S.tab === "wild") return S.wildPages;
   if (S.tab === "encounters") return codexPages(S.encEntries, PER_PAGE);
+  if (S.tab === "clips") return CLIP_PAGES;
   if (S.tab === "loadout") return codexPages(S.loadoutRows, PER_PAGE);
   return S.pages;
 }
@@ -682,6 +695,7 @@ function tabPages() {
 function tabRows() {
   if (S.tab === "wild") return S.wild;
   if (S.tab === "encounters") return S.encEntries;
+  if (S.tab === "clips") return CLIP_NAMES_62;
   if (S.tab === "loadout") return S.loadoutRows;
   return S.rows;
 }
@@ -730,6 +744,8 @@ export function tickCodex(enabled) {
 function tabHasContent(tab) {
   if (tab === "encounters") return S.encEntries.length > 0;
   if (tab === "wild") return S.wild.length > 0;
+  // The Clips tab is the typed 62-row glossary: always there, no fetch.
+  if (tab === "clips") return true;
   // The Loadout tab is always reachable: its list is one small index.json, fetched the
   // first time the tab lands, so skipping it while empty would make it unreachable.
   if (tab === "loadout") return true;
@@ -740,7 +756,7 @@ function tabHasContent(tab) {
 function switchTab(delta) {
   let i = TAB_NAMES.indexOf(S.tab);
   if (i < 0) i = 0;
-  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT and L1 walks the same ring
+  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT -> CLIPS and L1 walks the same ring
   // backwards. A tab with no rows (e.g. the finder before its tables have loaded) is
   // skipped, so the pad never lands on a blank page.
   for (let step = 0; step < TAB_NAMES.length; step++) {
@@ -1086,7 +1102,7 @@ function drawWildDetail(ctx, row, tx, top) {
   }
 }
 
-/** The three tab labels, the one that is up lit and underlined. */
+/** The tab labels, the one that is up lit and underlined. */
 function drawTabs(ctx, left, y, right) {
   let tx = left;
   for (const id of TAB_NAMES) {
@@ -1424,6 +1440,170 @@ function drawLoadout(ctx, W, H) {
 }
 
 /**
+ * One clip row's detail as ready-to-draw strings (pure; the draw uses it). The family line
+ * gives the group's real id range, and the packs line never rounds a zero away.
+ */
+function clipsDetailLines(row) {
+  if (!row) return null;
+  const group = CLIP_NAMES_62.filter((r) => r.family === row.family);
+  const first = group[0]?.id ?? row.id;
+  const last = group[group.length - 1]?.id ?? row.id;
+  return {
+    name: `${row.jp}  (engine id ${row.id})`,
+    en: row.en,
+    family: group.length > 1 ? `Family ${row.family} — clips ${first}..${last}` : `Family ${row.family} — this one clip`,
+    table: `Timeline table ${row.table} of the body's 62-entry timeline`,
+    packs: row.packs === 0
+      ? "0 of the 249 model packs author this table"
+      : `${row.packs} of the 249 model packs author this table`,
+  };
+}
+
+/**
+ * The CLIPS tab: the developers' own 62 animation names on the left, one row per animation
+ * with its engine id, timeline table, gloss and pack count; the open row's own facts on the
+ * right; the caveat across the top, because the id join is still needs_evidence.
+ */
+function drawClips(ctx, W, H) {
+  const x = Math.round(W * 0.03);
+  const y = Math.round(H * 0.02);
+  const w = W - 2 * x;
+  const h = H - 2 * y;
+  const left = x + 14;
+  const right = x + w - 16;
+  const pages = CLIP_PAGES;
+  const pageRows = pages[S.page] ?? [];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,12,0.96)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9a54a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText("DIGIMON CODEX", left, y + 12);
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText("CLIPS — the developers' own 62 animation names", left + 172, y + 17);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`${Math.min(S.page + 1, Math.max(pages.length, 1))} / ${pages.length}`, right, y + 16);
+  ctx.textAlign = "left";
+  drawTabs(ctx, left, y + 31, right);
+
+  // the header caveat: what the id list does and does not settle
+  const caveatCols = Math.max(32, Math.floor((right - left) / 5.4));
+  let cy = y + 58;
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#6fd0a8";
+  ctx.fillText("THE CAVEAT", left, cy);
+  cy += 12;
+  ctx.fillStyle = "#9fd0ff";
+  const sentences = CLIP_ID_CAVEAT.split("; ");
+  for (const sentence of sentences) {
+    for (const line of wrapText(sentence, caveatCols)) {
+      ctx.fillText(line, left, cy);
+      cy += 11;
+    }
+  }
+  ctx.fillStyle = "#5f6b80";
+  ctx.fillText("t = timeline table in the body's anim.json · N/249 = the model packs that author it", left, cy + 2);
+  cy += 15;
+
+  const top = cy;
+  const bottom = y + h - 30;
+  const listX = left;
+  const listW = Math.round(w * 0.36);
+  const listTop = top;
+  const listBottom = bottom - 18;
+
+  // the 62 rows (24 a page), the cursor's row lit
+  const rowH = Math.floor((listBottom - listTop) / Math.max(pageRows.length, 1));
+  const lh = Math.max(11, Math.min(14, rowH));
+  ctx.font = "10px monospace";
+  let ry = listTop;
+  for (let i = 0; i < pageRows.length; i++) {
+    const entry = pageRows[i];
+    const hit = i === S.cursor;
+    if (hit) {
+      ctx.fillStyle = "rgba(201,165,74,0.22)";
+      ctx.fillRect(listX - 2, ry - 2, listW - 4, lh);
+    }
+    ctx.fillStyle = hit ? "#ffe9a8" : entry.packs === 0 ? "#7a90b0" : "#c8d2e2";
+    ctx.fillText(`${hit ? ">" : " "} ${String(entry.id).padStart(2, "0")} ${entry.jp}  t${entry.table} ${entry.packs}/249`, listX, ry);
+    ry += lh;
+  }
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#5f6b80";
+  ctx.fillText(`62 names, ids 1..62 · ${CLIP_NAMES_62.length - CLIP_NAMES_62.filter((r) => r.packs > 0).length} tables no pack authors`, listX, bottom - 2);
+
+  // the open animation (right)
+  const dx = listX + listW + 14;
+  const dw = right - dx;
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.strokeRect(dx - 8, listTop, dw, bottom - listTop);
+  const row = pageRows[Math.max(0, Math.min(S.cursor, pageRows.length - 1))];
+  const d = clipsDetailLines(row);
+  if (d) {
+    const cols = Math.max(24, Math.floor(dw / 5.3));
+    let ty = listTop + 6;
+    ctx.font = "bold 14px monospace";
+    ctx.fillStyle = "#ffd34d";
+    for (const line of wrapText(d.name, cols)) {
+      ctx.fillText(line, dx + 2, ty);
+      ty += 16;
+    }
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#c8d2e2";
+    for (const line of wrapText(d.en, cols)) {
+      ctx.fillText(line, dx + 2, ty);
+      ty += 12;
+    }
+    ty += 6;
+    const label = (text) => {
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "#6fd0a8";
+      ctx.fillText(text, dx + 2, ty);
+      ty += 12;
+      ctx.font = "10px monospace";
+      ctx.fillStyle = "#d8e2f0";
+    };
+    label("GROUP");
+    ctx.fillText(d.family, dx + 2, ty); ty += 15;
+    label("TIMELINE");
+    ctx.fillText(d.table, dx + 2, ty); ty += 15;
+    label("AUTHORED BY");
+    ctx.fillStyle = row.packs === 0 ? "#ff9a8a" : "#d8e2f0";
+    for (const line of wrapText(d.packs, cols)) {
+      ctx.fillText(line, dx + 2, ty);
+      ty += 12;
+    }
+    ty += 6;
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#5f6b80";
+    for (const line of wrapText("The name is the tool's own label. The table and the pack count come from the shipped anim.json files.", cols)) {
+      ctx.fillText(line, dx + 2, ty);
+      ty += 11;
+    }
+  }
+
+  // controls, in the book's own margin
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7a90b0";
+  ctx.textAlign = "left";
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: name    Cross / Start: close", left, bottom + 8);
+  ctx.restore();
+  return true;
+}
+
+/**
  * Draw the book over the whole view. `page` is a page index, a page (array of rows), or null for
  * the page the pad is on. `W`/`H` are the canvas box (640x480 in the game), so the panel also
  * reads correctly in a smaller test canvas. Returns false when the book is closed.
@@ -1431,6 +1611,7 @@ function drawLoadout(ctx, W, H) {
 export function codexDraw(ctx, page = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (S.tab === "encounters") return drawEncounters(ctx, W, H);
+  if (S.tab === "clips") return drawClips(ctx, W, H);
   if (S.tab === "loadout") return drawLoadout(ctx, W, H);
   const tabName = S.tab;
   if (!tabRows().length) {
@@ -1486,7 +1667,7 @@ export function codexDraw(ctx, page = null, W = 640, H = 480) {
   ctx.fillText(`${index + 1} / ${tabPages().length}`, x + w - 16, y + 16);
   ctx.textAlign = "left";
 
-  // the three tabs, the one that is up lit and underlined
+  // the section's tab strip, the one that is up lit and underlined
   drawTabs(ctx, left, y + 31, x + w - 16);
 
   const top = y + 50;
@@ -1554,6 +1735,7 @@ if (typeof window !== "undefined") {
     query: () => S.encQuery,
     type: (text) => codexType(text),
     loadout: () => S.loadoutRows,
+    clips: () => CLIP_NAMES_62,
     body: () => S.body,
     loadBody: () => codexLoadoutBody(),
     error: () => S.error,

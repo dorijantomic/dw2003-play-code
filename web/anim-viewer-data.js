@@ -15,6 +15,8 @@
 // numeric family column the data carries (no name table ships), so the filter shows the numbers the
 // data actually has; elements are the elements of the techniques the species owns.
 
+import { clipLabel } from "./fight/clip-names.js";
+
 // The 14 technique groups of /home/dorij/scratch-research/tech-groups.md, keyed by the three data
 // columns that define them (type, clip, multi-hit), in the doc's own order, labelled in plain words.
 export const TECH_GROUPS = [
@@ -139,11 +141,6 @@ export function filterModels(list, { query = "", family = "", tier = "", element
   });
 }
 
-const CLIP_LABELS = {
-  5: "Normal attack", 6: "Combo", 8: "Combo (clip 8)", 9: "Spell", 10: "Clip 10",
-  11: "Special / Signature", 13: "Volley", 15: "Thrown special", 16: "Special (clip 16)",
-};
-
 /**
  * The actions to offer for one species, grouped like the technique table:
  *   - every technique the species OWNS (its own `techs` rows), with the group, name, hits, element
@@ -178,7 +175,7 @@ export function actionsFor(entry, skills) {
   ];
   return [
     ...out,
-    { kind: "item", itemId: 43, clip: 10, name: "Item use (clip 10, self cast)", group: { key: "item|10", label: "Item use" } },
+    { kind: "item", itemId: 43, clip: 10, name: `${clipLabel(10)} (self cast)`, group: { key: "item|10", label: "Item use" } },
     ...reactions,
     { kind: "idle", clip: 0, name: "Idle", group: { key: "idle|0", label: "Idle" } },
   ];

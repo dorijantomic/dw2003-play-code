@@ -20,6 +20,8 @@
 //   ("motion"); plain basics with effect==0 && clip==5 default to 0x1e (30).
 //   When the per-contact damage result is 3 (evade), the handler substitutes 0x38 (56).
 
+import { clipLabel } from "./fight/clip-names.js";
+
 export const EVADE_CONTACT_TYPE = 0x38; // F0x8008c454: contact result 3 -> type 56
 
 // The fightstg contact rule (F0x8008ee84 0x8008f21c..0x8008f32c), verbatim.
@@ -29,22 +31,8 @@ export function contactTypeForTech(rec) {
   return rec.motion ?? null;
 }
 
-// Known battle clip semantics (disc survey + user ground truth; fight-tables.js).
-const CLIP_LABELS = {
-  2: "Being hit (survive: flinch → floor → get up)",
-  3: "Death (hit → floor → dead)",
-  5: "Basic attack",
-  6: "Attack (1 contact)",
-  7: "Attack (2-hit combo)",
-  8: "Attack (3-hit combo)",
-  10: "Item use",
-  11: "Signature attack",
-  13: "Attack (3-hit combo)",
-};
-
-export function clipLabel(clip) {
-  return CLIP_LABELS[clip] || `Clip ${clip}`;
-}
+// Tracked back to the sound-audit page: every clip title goes through clipLabel() from
+// ./fight/clip-names.js, the one label table the research pages share.
 
 // Reverse the name->pack map: pack -> [names].
 export function namesForPack(modelMap) {
