@@ -24,6 +24,15 @@
 //                                                 SETANIM): "idle" (1) and "talk" (7) are the two clip meanings the research
 //                                                 reads (a working reading, low confidence); any other clip is the number the
 //                                                 actor's own sheet holds (1..255), never an invented name
+//   { "bubble": "exclaim", "who": 27, "hold": 48 }   the story's own reaction bubble pops over that character and shuts again
+//                                                 after `hold` frames (default 48, 1..600): "exclaim" is the red "!" (the
+//                                                 bubble's glyph row 0), "puffs" the silent smoke-puff row (row 1).
+//                                                 { "bubble": "close", "who": 27 } only shuts a bubble, with no wait.
+//                                                 These compile to the original's own bubble actor (SETANIM 803 <805|807|806>
+//                                                 <who>: slot, command, character), so the cutscene bubble actor the story
+//                                                 scenes use draws it: no art of ours, no new draw code.
+//                                                 Behind F2 -> Extras -> Quest emotes (off by default): with the switch off
+//                                                 the step is refused here at compile time instead of half-playing.
 //   { "put": 27, "at": [x, y] }                    place a character (an NPC that is not on this map is spawned, if its
 //                                                  sprite is known, so a visitor can walk in from the edge)
 //   { "say": 27, "name": "Leomon", "text": "..." } speak, in the game's own conversation box. say: "player" for the
@@ -312,6 +321,27 @@ export function compileScene(steps, opts = {}) {
                 }
             }
             opcodes.push(`SETANIM ${idOf(s.who)} ${clip} ${f}`);
+        } else if ("bubble" in s) {
+            // The story's own reaction bubble. The original's vocabulary is `SETANIM <slot> <cmd> <actor>`: slots 803..806
+            // are the resident bubble actors, cmd 805 opens glyph row 0 (the red "!"), 807 opens row 1 (the silent smoke
+            // puffs) and 806 closes (cutscene-manager _configureBubble; wstag-script-decode.md shows the story's own
+            // `SETANIM 803 (805,57)` / WAIT / `SETANIM 803 (806,57)`). A quest takes the first slot, so no art and no draw
+            // code here: the cutscene bubble actor the story scenes use pops it.
+            // F2 -> Extras -> Quest emotes gates the step (off by default). The game passes its settings object in as
+            // opts.fx (window.__fx); a plain node compile has no window, so only an explicit opts.fx.questemotes lets it in.
+            const settings = opts.fx ?? (typeof window !== "undefined" ? window.__fx : null);
+            if (settings?.questemotes !== true) return bad("bubble needs F2 -> Extras -> Quest emotes switched on");
+            const BUBBLES = { exclaim: 805, puffs: 807, close: 806 };
+            if (!Object.hasOwn(BUBBLES, s.bubble)) return bad(`bubble ${JSON.stringify(s.bubble)} is not one of exclaim, puffs, close`);
+            if (s.who == null || !Number.isFinite(Number(s.who))) return bad("bubble needs who: a character id");
+            const cmd = BUBBLES[s.bubble], slot = 803;
+            if (cmd !== 806 && s.hold != null) {
+                const hold = Number(s.hold);
+                if (!(Number.isInteger(hold) && hold >= 1 && hold <= 600)) return bad("bubble hold is a number of frames 1 to 600");
+            }
+            opcodes.push(`SETANIM ${slot} ${cmd} ${idOf(s.who)}`);
+            // an open bubble is shut again by itself: the story's balloon stays up until its close command
+            if (cmd !== 806) opcodes.push(`WAIT ${s.hold == null ? 48 : Number(s.hold)}`, `SETANIM ${slot} 806 ${idOf(s.who)}`);
         } else if ("face" in s) {
             // turning on the spot is a walk to where the character already stands: it arrives on the first tick and sets the facing
             const p = opts.pos?.(idOf(s.face));
@@ -518,6 +548,8 @@ export function castOf(steps) {
         }
         // a pose is played on a character (the step's own `who`, not its clip)
         if (s.anim != null && s.who != null && !isPlayer(s.who) && Number.isFinite(Number(s.who))) ids.add(Number(s.who));
+        // a reaction bubble rides on a character too (its `who`)
+        if (s.bubble != null && s.who != null && Number.isFinite(Number(s.who))) ids.add(Number(s.who));
         // an effect or a camera pan may be placed or aimed relative to a character ("near": 27, { "pan": 27 })
         for (const near of [s.at?.near, s.pan && typeof s.pan === "object" ? s.pan.near : null]) {
             if (near != null && !isPlayer(near) && Number.isFinite(Number(near))) ids.add(Number(near));
@@ -535,6 +567,8 @@ export function castOf(steps) {
 
 /** Static check of a scene (no game needed): returns a list of problems, empty when it is well formed. */
 export function validateScene(steps) {
-    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }), paths: () => [[0, 0]] });
+    // The F2 switches are a player setting, not a matter of the scene's shape: validate every step as if it were on, so a
+    // quest author still sees a malformed bubble step instead of only "turn Quest emotes on".
+    const { errors } = compileScene(steps, { pos: () => ({ x: 0, y: 0 }), paths: () => [[0, 0]], fx: { questemotes: true } });
     return errors;
 }
