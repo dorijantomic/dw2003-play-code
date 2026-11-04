@@ -21,6 +21,7 @@ import { on } from "./gameEvents.js";
 import { wrap } from "./dialogue-pack.js";
 import { validateScene } from "./quest-scenes.js";
 import { installTriggers } from "./quest-triggers.js";
+import { offersAt, offerLabels } from "./quest-offers.js";   // the offer loop's filters, written once (F2: pick which job)
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -425,11 +426,19 @@ export function questTalk(npcId, mapId, hasChat = false) {
     // Offers and reminders never replace what a character normally says (it may be a hint the player needs): the first
     // talk is always the ordinary chat; the quest business comes on the next one (the marker over their head says it waits).
     if (hasChat && !chatted.has(npcId)) { chatted.add(npcId); return false; }
-    // 3. an offer
-    for (const d of allDefs()) {
-        if (labFocus && d.id !== labFocus) continue;      // the lab asked for one quest in particular
-        if (statusOf(d) !== "available" || !d.offer || declined.has(d.id) || !atNpc(d.offer, npcId, mapId)) continue;
+    // 3. an offer. Every job this character could hand out here, in file order (web/quest-offers.js keeps the loop's
+    // filters in one place). One job is exactly the old behaviour. With F2 -> Extras -> "Quests: pick which job to take"
+    // on, and more than one waiting, the character asks which one; "Back" declines nothing and marks nothing, so the
+    // whole list is still waiting on the next talk.
+    const offers = offersAt(allDefs(), npcId, mapId, { statusOf, declined, labFocus, canon });
+    if (offers.length) {
         busy(async () => {
+            let d = offers[0];
+            if (offers.length > 1 && fx.questsecondjob === true) {
+                const pick = await pagedPick("Which job?", offerLabels(offers, 28));
+                if (pick < 0) return;                            // "Back": no job taken, nothing declined
+                d = offers[pick];
+            }
             const r = await perform(d.offer.scene, d.offer.name, d.offer.lines, npcId);
             if (r.failed) return;                                    // the offer scene ended on the title screen: no quest
             const pick = r.answer ?? await ask(d.offer.ask ?? "Take the job?", ["I will do it", "Not now"]);
