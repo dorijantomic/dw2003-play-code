@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build web/quests.json from its sources: data/authored/quests/legacy.json plus every pack_*.py (docs/quests-bible.md),
-and data/authored/quests/triggers.json (the walk-in quest triggers, web/quest-triggers.js).
+and data/authored/quests/triggers.json (the walk-in and arrival quest triggers, web/quest-triggers.js).
 
     python3 tools/build_quests.py            writes web/quests.json and prints what it holds
     python3 tools/build_quests.py --check    builds in memory and fails if web/quests.json is out of date
@@ -34,7 +34,12 @@ TEXT_OK = re.compile(r"^[A-Za-z0-9 .,'\-:\"!?]*$")
 
 def trigger_problems(triggers):
     """Everything wrong with the authored triggers' shape (the maps, the ground and the scenes are
-    tools/check_triggers.mjs's business: it reads the game's own collision and scene data)."""
+    tools/check_triggers.mjs's business: it reads the game's own collision and scene data).
+
+    Two shapes share the record. A walk-in row carries `rect` and fires when the player steps into it. An arrival row
+    carries `"on": "enter"` and no rect: its condition is the map load itself (the disc's gate-object shape,
+    engine/systems/scene-arrival.ts), so it needs a map, a gate and a scene but no ground. `on` may only be "enter",
+    and `on` together with `rect` is ambiguous and refused."""
     problems, ids = [], set()
     for i, t in enumerate(triggers):
         where = f"trigger {i + 1}"
@@ -51,12 +56,19 @@ def trigger_problems(triggers):
             ids.add(tid)
         if not isinstance(t.get("map"), str) or not t["map"]:
             problems.append(f"{where} needs a map")
-        rect = t.get("rect")
-        if not (isinstance(rect, list) and len(rect) == 4
-                and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in rect)):
-            problems.append(f"{where}: rect must be [x, y, width, height] in whole pixels")
-        elif rect[2] <= 0 or rect[3] <= 0:
-            problems.append(f"{where}: rect needs a positive width and height")
+        on = t.get("on")
+        if on is not None and on != "enter":
+            problems.append(f'{where}: on must be "enter" (the only value; leave it out for a walk-in rectangle)')
+        if on == "enter":
+            if t.get("rect") is not None:
+                problems.append(f'{where}: on "enter" and a rect cannot both be set (the map load is the condition)')
+        else:
+            rect = t.get("rect")
+            if not (isinstance(rect, list) and len(rect) == 4
+                    and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in rect)):
+                problems.append(f"{where}: rect must be [x, y, width, height] in whole pixels")
+            elif rect[2] <= 0 or rect[3] <= 0:
+                problems.append(f"{where}: rect needs a positive width and height")
         if "once" in t and not isinstance(t["once"], bool):
             problems.append(f"{where}: once must be true or false")
         if "draft" in t and not isinstance(t["draft"], bool):

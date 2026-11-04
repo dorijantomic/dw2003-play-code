@@ -171,6 +171,36 @@ while the player stands on the map shows or drops it on the next frame, with no 
 whole layer at once. Because a prop shares the scene effects' live list under a `prop:` name, "nothing an effect placed may
 be left after a scene" must ignore `prop:` — a prop is meant to be there.
 
+## Arrival scenes: a trigger on a map load
+
+A quest scene can also start because the player walked into a **place**, not a patch of ground — the disc's commonest
+scene shape (a place's entry gate object decides once per field load). It is the walk-in trigger's own record
+(`data/authored/quests/triggers.json`, `web/quest-triggers.js`) with one field changed: `"on": "enter"` and **no
+`rect`**.
+
+```json
+{ "id": "gt_asuka_gate", "map": "s330", "on": "enter",
+  "when": { "quest": "f_two_sides_bridge", "status": "active" }, "once": true,
+  "scene": [ { "say": 1005, "name": "Cipher", "text": "You are late." } ] }
+```
+
+- `map` is the stage id the row sits on; the condition is that this map was just loaded. The row is asked on the first
+  field tick of the load — **after the game's own arrival chain** — and at most **one arrival scene runs per field load**:
+  the first passing row in file order, or none.
+- A busy game (the arrival cutscene still running, a menu, a fade, a quest conversation or fight) does not cancel the row:
+  the load stays armed and the row is asked again on the first idle tick. A decision taken while idle is final for that
+  load; the next map change arms the new map's own rows and drops the old load's.
+- `when`, `once` and `scene` mean exactly what they mean on a walk-in row: `when.quest`/`when.status` gates on the quest
+  layer's own status, and `once: true` (the default) keeps a seen scene from replaying on the next visit.
+- **No rectangle.** `on` may only be `"enter"`, and `on` together with `rect` is refused as ambiguous — the map load and a
+  patch cannot both be the condition. Every character the scene names must stand on that map, exactly as for a walk-in
+  scene (`node tools/check_triggers.mjs`).
+- F2 → Extras → Quest triggers (off by default) is the switch; with it off nothing is tested and no scene is read.
+
+Reference: `engine/systems/scene-arrival.ts` (first passing candidate, at most one event per pass, once per field load) and
+`docs/research/scripting/field-script-engine-verified.md:1473-1512` (the 76 reset-band gate objects; the phase word is the
+one-shot latch).
+
 ## Chase
 
 `{"chase": 27, "path": [[x, y], ...], "speed": 130, "lose": 90, "frames": 600}` — the target (an NPC on this map, or one
@@ -261,6 +291,9 @@ nudged when someone else is standing there — then to walkable ground clear of 
   tests/quest-ghost.test.js tests/quest-props.test.js tests/quest-edge.test.js tests/quest-placecard.test.js` — every step
   compiles and validates, the effect list itself (fall, bounce, settle, clips, fade, remove, the player drive, cleanup), the
   sky override, the chase machine, the ghost table, the prop layer, the quest's own place card, and the edge cases.
+- `node --test tests/quest-triggers.test.js tests/quest-arrival-trigger.test.js` — the walk-in rectangles and the arrival
+  rows: the pure decisions, the runner's marks and saves, the arm that waits for an idle tick and decides once per load,
+  the source order, and the build-time checker's rules (an `on` row needs a map, gate and scene; `on` + `rect` refused).
 - In the browser: `python3 tools/build_quests.py --with-drafts`, then `web/quest-lab.html` and play the drafts:
   - `zz_fx_all` ("Cipher's full sweep") plays EVERY step in one scene: shake thuds, fog, night, lightning, a ghost, a
     crate that falls/settles/slides/fades, a real fight, a chase, a drop, a rise, a fade, a warp — and leaves a board

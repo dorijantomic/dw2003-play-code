@@ -1,17 +1,23 @@
 #!/usr/bin/env node
-// Build-time check: a walk-in quest trigger (web/quest-triggers.js) names a real map, a patch of ground the player can
-// actually walk into, a scene that compiles, and characters who stand on that map.
+// Build-time check: a walk-in or arrival quest trigger (web/quest-triggers.js) names a real map, a scene that compiles,
+// and characters who stand on that map; a walk-in row also names a patch of ground the player can actually walk into.
 //
 //   node tools/check_triggers.mjs          human lines, exit 1 when something is wrong
 //   node tools/check_triggers.mjs --json   the same as one JSON object (tests and tools read this)
 //   node tools/check_triggers.mjs --root <dir>   read another tree (the tests build a tiny one to prove the failures)
+//
+// Two shapes share one record:
+//   * walk-in (no `on`): a rectangle on a map, entered from outside;
+//   * arrival (`"on": "enter"`): NO rectangle, fires on the first field tick of a map load (the disc's gate-object shape,
+//     engine/systems/scene-arrival.ts). `on` may only be "enter", and a row that also carries a rect is refused as
+//     ambiguous — the map load and a patch cannot both be the condition.
 //
 // It reads the AUTHORED source data/authored/quests/triggers.json (which holds drafts too) and, when the built
 // web/quests.json carries a triggers list, that as well: the game only ever sees the built one, and both must be sound.
 // The geometry is web/quest-walk.js, the module the game itself measures ground with, so the checker and the field agree
 // on what standable means. What is checked, per trigger:
 //   * map    — a stage id in web/assets/manifest.json with collision data;
-//   * rect   — [x, y, width, height] in whole pixels, at least one standable cell inside it;
+//   * rect   — [x, y, width, height] in whole pixels, at least one standable cell inside it (walk-in rows only);
 //   * centre — walkable, or a standable cell within two cells of it (a patch may sit a step off the walkway);
 //   * scene  — compiles with no errors (web/quest-scenes.js validateScene);
 //   * cast   — every character the scene names stands on that map (the scene files plus web/extra_npcs.json residents);
@@ -85,6 +91,9 @@ for (const [source, list] of sources) {
         else seen.add(t.id);
         if (t.once != null && typeof t.once !== "boolean") add(source, t, 'once must be true or false');
         if (t.draft != null && typeof t.draft !== "boolean") add(source, t, 'draft must be true or false');
+        if (t.on != null && t.on !== "enter") add(source, t, `on is ${JSON.stringify(t.on)}; the only value is "enter"`);
+        if (t.on === "enter" && t.rect != null)
+            add(source, t, 'has both on "enter" and a rect: the map load and a rectangle cannot both be the condition');
         if (t.when != null) {
             if (!t.when || typeof t.when !== "object" || typeof t.when.quest !== "string" || !t.when.quest)
                 add(source, t, "when needs a quest id");
@@ -96,6 +105,11 @@ for (const [source, list] of sources) {
         if (sceneErrors.length) add(source, t, `the scene does not compile: ${sceneErrors.join("; ")}`);
         checked++;
         if (typeof t.map !== "string" || !mapIds.has(t.map)) { add(source, t, `map ${JSON.stringify(t.map)} is not in web/assets/manifest.json`); continue; }
+        // every character the scene names stands on this map, or the scene can never play there (both kinds of row)
+        for (const id of castOf(t.scene)) {
+            if (!postsOf(t.map).has(id)) add(source, t, `npc ${id} does not stand on ${t.map}`);
+        }
+        if (t.on === "enter") continue;                  // an arrival row has no rectangle: the map load is the condition
         const rect = t.rect;
         if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[2] <= 0 || rect[3] <= 0) {
             add(source, t, "rect must be [x, y, width, height] with a positive width and height");
@@ -114,10 +128,6 @@ for (const [source, list] of sources) {
         const cx = x + w / 2, cy = y + h / 2;
         if (!questStandFree(grid, cx, cy) && !questFreeCellNear(grid, cx, cy, 2))
             add(source, t, `the centre (${Math.round(cx)},${Math.round(cy)}) is not walkable and no standable cell is within 2 cells`);
-        // every character the scene names stands on this map, or the scene can never play there
-        for (const id of castOf(t.scene)) {
-            if (!postsOf(t.map).has(id)) add(source, t, `npc ${id} does not stand on ${t.map}`);
-        }
     }
 }
 
