@@ -56,6 +56,10 @@ import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
 import { FIELD_CYCLE, fieldName, nextField } from "./field-war.js";
+// NEW content (F2 -> Extras -> "Boss phases", off by default): an authored fusion boss
+// breathes twice. Pure rules in web/boss-phase.js; the phases themselves are authored in
+// data/authored/fusion_bosses.json and built into web/fusion_bosses.json.
+import { phaseFor, phaseRows, phaseEffects } from "./boss-phase.js";
 import { battleDelta, battleSpeedOn } from "./battle-speed.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
@@ -4785,9 +4789,53 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         }
       }
     }
+    // NEW content (F2 -> Extras -> "Boss phases", off by default): an authored fusion
+    // boss takes its second wind. At its own HP lines (60% then 25% for Millenniummon,
+    // web/boss-phase.js) it swaps its four AI rows for the phase's moves, sets the
+    // battlefield element once, takes a phase tint and puts up one authored page. The
+    // newest phase only: a hit that crosses two lines fires the last one, never both
+    // pages; a fired phase never fires twice (the cursor lives on the enemy record).
+    // With the switch off no phase is read and the fight is exactly today's.
+    if (acted === "player" && typeof window !== "undefined" && window.__fx?.bossphases === true &&
+        b.enemy?.bossId && b.enemy.hp > 0) {
+      const phasePages = advanceBossPhase(b);
+      if (phasePages.length) pages.push(...phasePages);
+    }
     b._timelinePages = pages;
     b._timelineMessage = pages.map((page) => page.text).join("\n");
     b._nextState = step.next === "player" ? ST.PLAYER_MENU : ST.ENEMY_ACT;
+  }
+
+  /**
+   * NEW content (F2 -> Extras -> "Boss phases"): advance an authored fusion boss to the
+   * newest HP phase it has reached, and return the one page that phase puts up.
+   *
+   * The phase data is the boss record's own `phases` (data/authored/fusion_bosses.json,
+   * built into web/fusion_bosses.json): `at` is the share of max HP, `moves` are the
+   * boss's own technique ids in action order, and `field`/`tint`/`page` are what the
+   * phase changes. `web/boss-phase.js` owns the arithmetic; this function only writes
+   * the battle: the four AI rows (row 3 unconditional, so the last move always has a
+   * fallback), the battlefield element at the field items' power 64, the fighter tint
+   * and the page.
+   *
+   * The enemy record carries the cursor (`bossPhase`, -1 before the first line), so a
+   * fired phase never fires again and a single hit that crosses two thresholds fires
+   * only the newer one. Returns [] when no new phase is due.
+   */
+  function advanceBossPhase(b) {
+    const en = b?.enemy;
+    const boss = en?.bossId ? fusionBossesDB?.[en.bossId] ?? null : null;
+    const phases = boss?.phases;
+    if (!en || !Array.isArray(phases) || !phases.length) return [];
+    const index = phaseFor(en.maxHp, en.hp, phases);
+    if (!(index > (en.bossPhase ?? -1))) return [];
+    en.bossPhase = index;
+    const phase = phases[index];
+    en.eStats.ai_moves = phaseRows(phase, boss.moves);
+    const effects = phaseEffects(phase);
+    if (effects.element) b.field = { element: effects.element, power: effects.power };
+    if (effects.tint) setFighterTint("enemy", effects.tint);
+    return effects.page ? [{ text: effects.page, spec: null }] : [];
   }
 
   /**
@@ -6194,6 +6242,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     en.powerScale = fused.statScale;
     en.statusImmunities = b.statusImmunities;
     en.turnCounter = 0;
+    // F2 -> Extras -> "Boss phases": the authored record's own id and a fresh phase
+    // cursor. The four AI rows only change once an HP line is crossed (advanceBossPhase).
+    en.bossId = boss.id ?? null;
+    en.bossPhase = -1;
     // The record keeps its status-event pool and side/slot bytes: it is the same object.
     b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(en));
     b._turnSeq = (b._turnSeq ?? 0) + 1;

@@ -48,6 +48,11 @@ APPLIERS = {
 }
 AUTHORED_SKILL_MIN = 9000      # authored technique ids live above the real table's 443 rows
 TRANSFORMS = {"whiteout"}
+# Boss phases (web/boss-phase.js): the seven elemental fields a phase may set. Ids 2..8
+# are the disc's own ELEMENT_ID (engine/dw3/battle-formulas.ts); `normal` (1) is not a
+# battlefield, so it is not a phase field.
+PHASE_FIELDS = {"fire", "water", "ice", "wind", "thunder", "machine", "dark"}
+MAX_PHASES = 3
 
 
 class BuildError(Exception):
@@ -134,6 +139,68 @@ def resolve_skill(row, real_skills, fight_tech):
     return str(sid), resolved
 
 
+def resolve_phases(bid, phases, moves):
+    """The authored HP phases of one boss, validated and resolved.
+
+    A phase is `{at, moves, page}` plus optional `field` and `tint`; `web/boss-phase.js`
+    reads exactly those. The rules keep the battle's phase machine simple and honest:
+
+      * at most three phases, and `at` strictly descending (0.6 then 0.25) so the page
+        of a phase a single hit skips never stacks on top of the newest one;
+      * `at` is a number 0.05..0.95 — a phase can never fire on the first or last blow;
+      * 1..3 `moves`, each one of the boss's OWN moves (the three technique ids the boss
+        record already names; actions 1..3, never flee or a slot switch);
+      * `field` is one of the disc's seven elemental fields (2..8, never `normal`);
+      * `tint` is four numbers 0..1, the same shape the boss's own tint has;
+      * `page` is the authored line the phase puts up (non-empty).
+    """
+    if phases is None:
+        return []
+    if not isinstance(phases, list):
+        raise BuildError(f"boss {bid}: phases must be a list")
+    if len(phases) > MAX_PHASES:
+        raise BuildError(f"boss {bid}: at most {MAX_PHASES} phases, got {len(phases)}")
+    out = []
+    previous = None
+    for n, phase in enumerate(phases):
+        if not isinstance(phase, dict):
+            raise BuildError(f"boss {bid} phase {n}: must be an object")
+        at = phase.get("at")
+        if not isinstance(at, (int, float)) or isinstance(at, bool) or not 0.05 <= at <= 0.95:
+            raise BuildError(f"boss {bid} phase {n}: at {at!r} must be a number 0.05..0.95")
+        if previous is not None and at >= previous:
+            raise BuildError(f"boss {bid} phase {n}: at {at!r} is not strictly below the previous "
+                             f"phase's {previous!r}")
+        previous = at
+        phase_moves = phase.get("moves")
+        if not isinstance(phase_moves, list) or not 1 <= len(phase_moves) <= 3:
+            raise BuildError(f"boss {bid} phase {n}: moves must name 1..3 of the boss's own moves")
+        for move in phase_moves:
+            if move not in moves:
+                raise BuildError(f"boss {bid} phase {n}: move {move!r} is not one of the boss's "
+                                 f"own moves {moves}")
+        field = phase.get("field")
+        if field is not None and field not in PHASE_FIELDS:
+            raise BuildError(f"boss {bid} phase {n}: field {field!r} is not one of "
+                             f"{sorted(PHASE_FIELDS)}")
+        tint = phase.get("tint")
+        if tint is not None and (not isinstance(tint, list) or len(tint) != 4 or not all(
+                isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
+                for v in tint)):
+            raise BuildError(f"boss {bid} phase {n}: tint must be four numbers 0..1")
+        page = phase.get("page")
+        if not isinstance(page, str) or not page.strip():
+            raise BuildError(f"boss {bid} phase {n}: needs a page (the line it puts up)")
+        resolved = {"at": float(at), "moves": list(phase_moves)}
+        if field is not None:
+            resolved["field"] = field
+        if tint is not None:
+            resolved["tint"] = [float(v) for v in tint]
+        resolved["page"] = page.strip()
+        out.append(resolved)
+    return out
+
+
 def screen_party_hp(screens, screen_id, half):
     screen = screens.get(str(screen_id))
     if not screen:
@@ -201,6 +268,7 @@ def resolve_boss(row, enemies, real_skills, authored_skills, screens):
     transform = row.get("transform")
     if transform not in TRANSFORMS:
         raise BuildError(f"boss {bid}: transform {transform!r} is not one of {sorted(TRANSFORMS)}")
+    phases = resolve_phases(bid, row.get("phases"), moves)
     return bid, {
         "id": bid,
         "halves": list(halves),
@@ -212,6 +280,7 @@ def resolve_boss(row, enemies, real_skills, authored_skills, screens):
         "moves": list(moves),
         "tint": [float(v) for v in tint],
         "transform": transform,
+        "phases": phases,
     }
 
 
