@@ -106,3 +106,125 @@ function build() {
 }
 
 const wait = setInterval(() => { if (ready()) { clearInterval(wait); build(); } }, 300);
+
+// ---- Shelf: put the quest layer in a named state, then put it back (web/quest-shelf.js). -------------------------
+// Appended block: it mounts itself into the panel above once the panel is built, so nothing above this line changes.
+// It reads and writes only the quest layer's own keys: dw.quests.v1 (the live state), dw.quests.v1.bak (the state
+// before a restore) and dw.quests.shelf.v1 (the named states). No story flag, no memory card, no game save.
+import { diffSnapshots, shelfAdd, shelfRemove, shelfRename, shelfExport, shelfImport } from "./quest-shelf.js";
+
+/** The live quest state as a plain snapshot (window.__quests.state is the quest layer's own object). */
+const shelfNow = () => JSON.parse(JSON.stringify(window.__quests.state));
+
+function shelfLoad() {
+  try {
+    const read = shelfImport(localStorage.getItem("dw.quests.shelf.v1") || "null");
+    return read.problems.length ? [] : read.shelf;
+  } catch { return []; }
+}
+
+function shelfStore(shelf) {
+  try { localStorage.setItem("dw.quests.shelf.v1", JSON.stringify(shelfExport(shelf))); } catch { /* private window */ }
+}
+
+/** One plain line per diff row: + active id, - done id, pick id: from -> to. */
+function shelfRowText(row) {
+  if (row.kind === "picks") return `pick ${row.id}: ${row.from} -> ${row.to}`;
+  return `${row.from === null ? "+" : "-"} ${row.kind} ${row.id}`;
+}
+
+function shelfMount(box) {
+  let shelf = shelfLoad();
+  const msg = $("div", { className: "msg" });
+  const say = (t) => { msg.textContent = t; };
+  const area = $("textarea", { rows: 4, placeholder: "Export puts the shelf here. Paste one here and press Import." });
+  area.style.cssText = "width:100%;box-sizing:border-box;margin:4px 0;font:11px monospace";
+  const list = $("div");
+
+  const render = () => {
+    list.textContent = "";
+    if (!shelf.length) { list.append($("div", { className: "s" }, "No states saved yet.")); return; }
+    for (const item of shelf) {
+      list.append($("div", { className: "q" },
+        $("div", { className: "t" }, item.name),
+        $("div", { className: "s" }, new Date(item.at).toLocaleString()),
+        $("button", { textContent: "Restore", onclick: () => restore(item) }),
+        $("button", { textContent: "Diff", onclick: () => diff(item) }),
+        $("button", { textContent: "Rename", onclick: () => rename(item) }),
+        $("button", { textContent: "Delete", onclick: () => drop(item) })));
+    }
+  };
+
+  const saveAs = () => {
+    const name = window.prompt("Name this quest state (for example: after the offer)", "");
+    if (name == null) return;
+    const added = shelfAdd(shelf, name, shelfNow());
+    if (added.problems.length) { say(added.problems.join("; ")); return; }
+    shelf = added.shelf; shelfStore(shelf);
+    say(`Saved "${name.trim()}".`); render();
+  };
+
+  const diff = (item) => {
+    const d = diffSnapshots(item.snap, shelfNow());
+    msg.style.whiteSpace = "pre-wrap";
+    say(d.rows.length ? d.rows.map(shelfRowText).join("\n") : `No difference from "${item.name}".`);
+  };
+
+  const rename = (item) => {
+    const to = window.prompt("New name for this state", item.name);
+    if (to == null) return;
+    const out = shelfRename(shelf, item.name, to);
+    if (out.problems.length) { say(out.problems.join("; ")); return; }
+    shelf = out.shelf; shelfStore(shelf);
+    say(`Renamed to "${to.trim()}".`); render();
+  };
+
+  const drop = (item) => {
+    if (!window.confirm(`Delete "${item.name}" from the shelf?`)) return;
+    const out = shelfRemove(shelf, item.name);
+    if (out.problems.length) { say(out.problems.join("; ")); return; }
+    shelf = out.shelf; shelfStore(shelf);
+    say(`Deleted "${item.name}".`); render();
+  };
+
+  // Restore: the state now goes to the backup key, the named state becomes the live one, then the page reloads.
+  // reload() keeps the current URL, so ?questlab=1&map=... survives.
+  const restore = (item) => {
+    if (!window.confirm(`Restore "${item.name}"? The state now goes to dw.quests.v1.bak first, then the page reloads.`)) return;
+    try {
+      localStorage.setItem("dw.quests.v1.bak", localStorage.getItem("dw.quests.v1") ?? "null");
+      localStorage.setItem("dw.quests.v1", JSON.stringify(item.snap));
+    } catch (e) { say(`Could not restore: ${e}`); return; }
+    location.reload();
+  };
+
+  const doExport = () => {
+    area.value = JSON.stringify(shelfExport(shelf), null, 2);
+    area.focus(); area.select();
+    say("The shelf is in the box; copy it out.");
+  };
+
+  const doImport = () => {
+    const read = shelfImport(area.value);
+    if (read.problems.length) { say(read.problems.join("; ")); return; }
+    shelf = read.shelf; shelfStore(shelf);
+    say(`Imported ${shelf.length} state${shelf.length === 1 ? "" : "s"}.`); render();
+  };
+
+  box.append($("div", { className: "q" },
+    $("div", { className: "t" }, "Shelf"),
+    $("div", { className: "s" }, "Name a state, jump back to it, diff two, undo. The quest layer's own store only."),
+    $("button", { textContent: "Save state as…", onclick: saveAs }),
+    $("button", { textContent: "Export", onclick: doExport }),
+    area,
+    $("button", { textContent: "Import", onclick: doImport }),
+    msg, list));
+  render();
+}
+
+const shelfWait = setInterval(() => {
+  const box = document.getElementById("questlab");
+  if (!box || !window.__quests?.state) return;
+  clearInterval(shelfWait);
+  shelfMount(box);
+}, 250);
