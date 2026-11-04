@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gym map — the nine gyms and the rank ladder each one opens</title>
+<style>
+  :root { color-scheme: dark; font: 14.5px/1.5 "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #e8edf7; background: #0a1020; }
+  header { padding: 22px clamp(16px, 3vw, 40px) 16px; border-bottom: 1px solid #22334b; background: #0f1a2e; }
+  .eyebrow { color: #8fb5e5; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); line-height: 1.16; }
+  header p { margin: 0; max-width: 960px; color: #b8c7dc; }
+  main { padding: 20px clamp(16px, 3vw, 40px) 60px; max-width: 1240px; }
+  #summary { display: inline-block; margin: 2px 0 12px; padding: 5px 12px; border: 1px solid #2a4363;
+             border-radius: 999px; background: #0d1727; color: #ffd34d; font-size: 12.5px; letter-spacing: .03em; }
+  .legend { margin: 0 0 18px; max-width: 960px; color: #9fb3cc; font-size: 12.5px; }
+  .legend b { color: #d9e6f7; }
+  .gym { margin: 18px 0; border: 1px solid #22334b; border-radius: 12px; background: #0d1727; overflow: hidden; }
+  .gym h2 { margin: 0; padding: 13px 16px 4px; font-size: 17px; color: #f1f5ff; }
+  .gym h2 .code { margin-left: 9px; padding: 1px 7px; border-radius: 5px; background: #1b2a42;
+                  color: #8fc4e0; font: 600 11.5px ui-monospace, monospace; letter-spacing: .04em; }
+  .greeter { margin: 0; padding: 0 16px; color: #c8a4ff; font: 600 12.5px ui-monospace, monospace; }
+  .order { margin: 5px 16px 10px; color: #6f86a3; font-size: 11.5px; }
+  .rung { margin: 0 16px 12px; border: 1px solid #1d2a40; border-radius: 9px; background: #101c30; }
+  .runghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 8px 12px;
+              border-bottom: 1px solid #1a2740; background: #121f36; border-radius: 9px 9px 0 0; }
+  .runghead .rungnum { color: #8fa9c8; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .runghead .gates { color: #ffd34d; font-weight: 700; }
+  .runghead .rank { color: #8fe08f; font: 600 12px ui-monospace, monospace; }
+  .runghead .count { color: #9fb3cc; font-size: 12px; }
+  .runghead .tp { margin-left: auto; color: #8fc4e0; font: 600 12px ui-monospace, monospace; }
+  .drills { display: flex; flex-wrap: wrap; gap: 5px 8px; margin: 0; padding: 10px 12px; list-style: none; }
+  .drills li { padding: 2px 9px; border: 1px solid #263a58; border-radius: 999px; background: #0b1524;
+               color: #cfdcee; font-size: 12px; }
+  .src { margin-top: 26px; color: #6f86a3; font-size: 11.5px; font-family: ui-monospace, monospace; }
+  .error { color: #ffb27a; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Reference — read only · F2 → Extras → Gym map (new)</div>
+  <h1>Gym map — the nine gyms and the rank ladder each one opens</h1>
+  <p>
+    Every training gym's greeter checks your ID cards in the order below. The first rung you
+    satisfy decides which rank menu opens, and each rank is its own drill list. Pick the gym
+    whose high rank trains the stat you are after instead of guessing which town has it.
+    This page only prints the ladder: it does not open the gym and does not read your bag.
+  </p>
+</header>
+<main>
+  <div id="summary">loading…</div>
+  <p class="legend">
+    A rung lists the cards it needs; <b>must not have</b> means that card sends you to an
+    earlier rung. One rung is checked after another, so the first fully satisfied line is
+    the menu you get. A drill's second core stat is a loss chance, while a second element
+    or max HP/MP row is another gain. TP is the training points you spend, chosen on the
+    gym screen.
+  </p>
+  <div id="gyms"></div>
+  <p class="src">
+    Sources: web/assets/data/gym_ranks.json · progression.json (gym) · item_effects.json ·
+    manifest.json (places and greeter names). The decode is
+    ddw3-walker docs/research/battle/gym-entry-and-rank-chain-2026-07-08.md.
+  </p>
+</main>
+<script type="module">
+import { loadAndRender } from "./gym-map-page.js";
+loadAndRender().catch((error) => {
+  const summary = document.getElementById("summary");
+  summary.className = "error";
+  summary.textContent = `Could not load the gym tables: ${error.message}`;
+});
+</script>
+</body>
+</html>
