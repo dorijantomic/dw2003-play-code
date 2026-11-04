@@ -25,6 +25,8 @@ import { createMenus } from "./mpbattle-menus.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { asButton } from "./input.js";
 import { registerPixelScreen } from "./gpu-pixel-filter.js";
+import { emit } from "./gameEvents.js";                 // a co-op win can reach the quest layer, as a one-on-one win does
+import { winEvent } from "./mp-credit.js";             // the same `battleWon` record, built from the fight's foes and map
 
 const TURN_MS = 45000;              // how long a player may think
 const MIN_ANIM_MS = 900;            // the shortest pause after an action
@@ -571,8 +573,9 @@ function snapshot(ph = "play") {
         P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0, pt: ar.partyPlate(p), ac: p.act })),
     };
 }
-/** The other PEOPLE in the fight (not me, not a computer-played practice partner). */
-const people = (ids) => ids.filter((id) => id !== A.myId() && !F.bots?.has(id));
+/** The other PEOPLE in the fight (not me, not a computer-played practice partner). `fight` defaults to the fight I am in;
+ *  `finish` passes the fight it has just ended (the module's own F is already null by then). */
+const people = (ids, fight = F) => ids.filter((id) => id !== A.myId() && !fight?.bots?.has(id));
 function broadcast(ph = "play") {
     const S = snapshot(ph);
     const others = people(F.ids).filter((id) => !F.H.arena.byKey("p" + id)?.fled);
@@ -735,7 +738,7 @@ async function begin(setup, isHost, hostId, done) {
     if (F) return false;
     F = {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
-        screenId: setup.screenId ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
+        screenId: setup.screenId ?? null, mapId: setup.mapId ?? A.mapId?.() ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         bots: new Set((setup.bots ?? []).map((b) => b.id)), snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
     };
     const U = F.ui = A.ui ?? (A.ui = buildUi());
@@ -765,7 +768,7 @@ async function begin(setup, isHost, hostId, done) {
             F.H.P.set(b.id, { id: b.id, pn: String(b.name).slice(0, 12), n: recs[0].profile?.name ?? "?", lv: recs[0].level | 0, rec: recs[0], party: recs });
         }
         const peers = people(F.ids);
-        if (peers.length) A.send(peers, { k: "setup", fid: F.fid, foes: F.foes, ids: F.ids, names: F.names, label: F.label, screenId: F.screenId, ch: F.challenge });
+        if (peers.length) A.send(peers, { k: "setup", fid: F.fid, foes: F.foes, ids: F.ids, names: F.names, label: F.label, screenId: F.screenId, ch: F.challenge, mapId: F.mapId });
         F.H.readyTimer = setTimeout(() => { if (F) hostBegin(); }, READY_MS);
         if (F.H.P.size >= F.ids.length) hostBegin();
     }
@@ -778,7 +781,7 @@ async function begin(setup, isHost, hostId, done) {
 export function mpbHost({ foes, ids, label, screenId, challenge, done, bots = [] }) {
     const all = [...ids, ...bots.map((b) => b.id)];
     const names = Object.fromEntries(all.map((id) => [id, bots.find((b) => b.id === id)?.name ?? A.nameOf(id)]));
-    return begin({ fid: (Date.now() % 1000000000) + Math.floor(Math.random() * 1000), foes, ids: all, names, label, screenId, ch: challenge, bots }, true, A.myId(), done);
+    return begin({ fid: (Date.now() % 1000000000) + Math.floor(Math.random() * 1000), foes, ids: all, names, label, screenId, ch: challenge, bots, mapId: A.mapId?.() }, true, A.myId(), done);
 }
 
 /** Messages of a fight from the relay. */
@@ -786,7 +789,7 @@ export function mpbMessage(from, d) {
     if (!d || typeof d !== "object") return;
     if (d.k === "setup") {
         if (F || !A.canJoin()) { A.send([from], { k: "decline", fid: d.fid }); return; }
-        begin({ fid: d.fid, foes: d.foes, ids: d.ids, names: d.names, label: d.label, screenId: d.screenId, ch: d.ch }, false, from, A.joinDone(d))
+        begin({ fid: d.fid, foes: d.foes, ids: d.ids, names: d.names, label: d.label, screenId: d.screenId, ch: d.ch, mapId: d.mapId }, false, from, A.joinDone(d))
             .then((ok) => { if (!ok) A.send([from], { k: "decline", fid: d.fid }); });
         return;
     }
@@ -833,6 +836,13 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
         const took = [...(f.took ?? [0])].filter((i) => f.party[i]);
         report = f.kit.winReport?.({ screenId: f.screenId, party: f.party, took }) ?? null;   // the disc's payout for each Digimon that fought
         reward = report?.reward ?? f.kit.applyWin({ screenId: f.screenId, participants: f.ids.length });
+        // F2 -> Extras -> Co-op wins count for quests: both tamers were there, so both of their quests tick for this win
+        // (the same event the one-on-one battle sends). Only a real second human counts — a practice 2v2 with a computer
+        // partner is no co-op win — and the fight's own map is the host's, which rode the setup packet.
+        if (window.__fx?.mpcredit && people(f.ids, f).length > 0) {
+            const ev = winEvent(f.foes, { mapId: f.mapId, screenId: f.screenId });
+            if (ev) emit("battleWon", ev);
+        }
     }
     if (!won && !fled) A.restore(f.snap);       // a lost optional fight costs nothing
     else if (!committed) for (const m of f.party) f.kit.commit(m.rec);
