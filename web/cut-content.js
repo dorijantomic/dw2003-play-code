@@ -23,7 +23,7 @@ export const CUT_CONTENT = [
     body:
       "Both Digimon Arena floors ship a five-opponent ladder - s232 Asuka screens 253-257 and s233 Amaterasu screens 258-262 - " +
       "and nothing can start a single match. Neither floor carries an event table, a step program or an NPC, and the one routine " +
-      "that starts a scripted battle takes its round number from a caller that does not exist. Nine of the ten records are a single " +
+      "that starts a scripted battle takes its record index from a caller, and no caller has been found. Nine of the ten records are a single " +
       "level-1 Kunemon; only Amaterasu's fifth, screen 262, is an authored party (Datamon, Bulbmon, Armageddemon), and that is the " +
       "one fight that ships: the World Champ finale on the s927 room at story ordinal 0x2d. A live check on 2026-08-13 stood on s233 " +
       "in the tournament state and swept the floor with confirm and cancel: nothing started. The Arena Receptionist says registration " +
@@ -51,8 +51,8 @@ export const CUT_CONTENT = [
       "launcher and force the master story ordinal to value - no shipped record sets bit 15. The Circle handler compares type against " +
       "0x300 and on a match would write value to the master story ordinal without leaving the screen - no shipped record has type " +
       "0x300. Both were checked by walking the whole table: 297 rows, 257 distinct types, 0x300 absent and no value with bit 15 set. " +
-      "The table is a launcher, not a travel menu; the same table's 31 shop records carry code 0xf00 with values 0-29 plus 30 for the " +
-      "special shop.",
+      "The table is a launcher, not a travel menu: seven of its rows are shop launches (code 0xf00) - the special shop 30, the rows " +
+      "labelled shops 0-4 and the row labelled shop 29, whose stored value is 28.",
     evidence: "docs/research/evidence/ledger.json",
   },
   {

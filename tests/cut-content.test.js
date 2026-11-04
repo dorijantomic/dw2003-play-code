@@ -82,6 +82,33 @@ test("the Kunemon and shop 30 numbers on the page are the shipped data's own", (
   assert.equal(at30[0].kind, "launch_0x1002");
 });
 
+test("the stage-select paragraph's shop numbers are the shipped table's own", () => {
+  // the table the exhibit describes: 297 rows, 257 distinct types, no 0x300 row, no value with bit 15
+  const table = JSON.parse(readFileSync("web/assets/data/stagslct_ui.json", "utf8"));
+  const rows = table.menuRows;
+  assert.equal(rows.length, 297);
+  assert.equal(new Set(rows.map((r) => r.type)).size, 257);
+  assert.ok(!rows.some((r) => r.type === "0x300"), "no shipped row has type 0x300");
+  assert.ok(!rows.some((r) => (Number(r.value) & 0x8000) !== 0), "no shipped row sets bit 15");
+
+  // exactly seven rows are shop launches (code 0xf00): the special shop 30, the rows
+  // labelled shops 0-4 and the row labelled shop 29, which stores value 28
+  const shopRows = rows.filter((r) => r.type === "0xf00");
+  assert.equal(shopRows.length, 7, "seven shop rows, not 31");
+  assert.deepEqual(shopRows.map((r) => r.value), [30, 0, 1, 2, 3, 4, 28]);
+  assert.equal(shopRows[0].value, 30, "the special shop is value 30");
+  assert.equal(shopRows[6].name_jp, "みせ２９", "the last shop row is labelled shop 29");
+
+  // the exhibit says what the table holds, and no longer claims 31 shop records / values 0-29 plus 30
+  const body = CUT_CONTENT[2].body;
+  assert.match(body, /seven of its rows are shop launches \(code 0xf00\)/);
+  for (const named of ["special shop 30", "shops 0-4", "shop 29", "stored value is 28"]) {
+    assert.ok(body.includes(named), `the paragraph names ${named}`);
+  }
+  assert.doesNotMatch(body, /31 shop records/);
+  assert.doesNotMatch(body, /values 0-29 plus 30/);
+});
+
 test("the panel wraps its text and every page carries its title, body and evidence", () => {
   const lines = cutContentLines(0);
   assert.equal(lines.title, CUT_CONTENT[0].title);
