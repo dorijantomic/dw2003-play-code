@@ -114,13 +114,14 @@
 //     F0x800a3934 its board evaluator, but where in the sequence a Program is
 //     played rather than a Digimon summoned is not traced.
 //   - the effect record's +0x03 byte, carried through as playKind.
-//   - (RESOLVED 2026-08-25.) The five dynamic-stat Megas ARE read out. All five
-//     formulas were derived from the arms of D0x80083960 and are implemented in
-//     applyDynamicStatMegas() below. The table is 5 entries plus a null word,
-//     not the 8 an earlier note claimed. What is still only RECORDED is the five
-//     card ids themselves, which live at 0x800A5C20 — past the end of the
-//     disassembly — though they are corroborated as one Digimon per colour at a
-//     regular stride of 43.
+//   - (RESOLVED 2026-08-25, RE-SCOPED 2026-11-04.) The five dynamic-stat Megas
+//     ARE read out. All five formulas were derived from the arms of D0x80083960
+//     and are implemented in applyDynamicStatMegas() below. The table is 5
+//     entries plus a null word, not the 8 an earlier note claimed. WHICH cards
+//     carry them comes from the catalogue's printed rule text — the five
+//     Digimon cards with a rule, ids 69/112/155/198/241, one per colour — not
+//     from the raw halfwords at 0x800A5C20 (68/111/154/197/240), whose values
+//     §14.5 still records as unverified. See the constant below.
 
 import { startProgram, stepVm, resolveVmChoice } from "./card-effect-vm.ts";
 import type { EffectVm, VmChoice } from "./card-effect-vm.ts";
@@ -1251,22 +1252,31 @@ export function putOnField(duel: DuelState, s: DuelSide, id: number): boolean {
 // ---------------------------------------------------------------------------
 
 /** The five cards whose AP and HP are RECOMPUTED every Summon Phase instead of
- *  being their printed stats. One per energy colour, in `ENERGY_COLOURS` order.
+ *  being their printed stats — the five Digimon cards that PRINT a stat rule.
+ *  One per energy colour, in `ENERGY_COLOURS` order:
  *
- *  READ FROM THE TABLE 2026-08-25. `0x800A5C20` holds them as sequential u16 —
- *  68, 111, 154, 197, 240, then a zero terminator — and that is an exact match
- *  for the recorded list. An earlier note here called them "recorded rather
- *  than read" because the address looked to be past the end of the
- *  disassembly; it is not. `cardgame.s` runs to `0x800A5DDC`, and the data
- *  region simply renders as `.word 0xVALUE # nop`, which the reader that
- *  reported the gap was not matching.
+ *    white 69 RosemonII       AP & HP become 20x your Digimon on the field
+ *    blue 112 MarineAngemon   +10 and 10x the cards in your hand
+ *    green 155 SaberLeomon    +10 and 20x the cards in your trash
+ *    red 198 Gryphonmon       10x the Digimon across both fields
+ *    black 241 Creepymon      +10 and 10x the cards across both trashes
  *
- *  Independently corroborated as well: all five are Digimon, exactly one per
- *  energy colour, at a regular stride of 43 in a colour-ordered catalog.
+ *  THE CATALOGUE TEXT IS THE AUTHORITY. These are the only Digimon cards with
+ *  text in the card-text bank, and the album's detail line checks exactly these
+ *  five ids, `0x45 / 0x70 / 0x9B / 0xC6 / 0xF1`
+ *  (docs/research/ui/card-album-screen-2026-08-14.md §3). Two of them print
+ *  AP 0 / HP 0 because their real numbers are only computed when they are
+ *  played. The decoded formula arms (`D0x80083960`, one arm per colour in this
+ *  same order) match those five printed rules, which is what ties each arm to
+ *  its card (CARD-DUEL-VERIFIED.md §19.3).
  *
- *  — white PrinceMamemon, blue Babamon, green MetalEtemon,
- *    red SkullMammothmon, black Piedmon. */
-export const DYNAMIC_STAT_MEGAS: readonly number[] = Object.freeze([68, 111, 154, 197, 240]);
+ *  NOT THE RAW TABLE. The halfwords at `0x800A5C20` read 68/111/154/197/240 —
+ *  one lower than these ids — and that table sits past the disassembled range;
+ *  §14.5 still records its values as UNVERIFIED, so it is not proof of which
+ *  cards the rules name. Using its values as ids would recompute five cards
+ *  that print neither a rule nor 0/0. The ordinary duel runs the native overlay
+ *  and keeps the disc's own table; this list is the engine path's correction. */
+export const DYNAMIC_STAT_MEGAS: readonly number[] = Object.freeze([69, 112, 155, 198, 241]);
 
 /**
  * Recompute the dynamic Megas' stats. `F0x800A09FC` runs `F0x800A0844` for
