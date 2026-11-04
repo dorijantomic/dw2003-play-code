@@ -32,6 +32,7 @@ import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXP
 import { tickBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
 import { tickPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
 import { tickDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> Damage Lab (new; off by default)
+import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 
@@ -1492,6 +1493,9 @@ const state = {
     ordinalByStage: {}, // {stageNum: [ordinals...]} from progress_ordinal.json (a stage may
     // be revisited at several beats, so this is the FULL list per stage)
     allOrdinals: [], // sorted set of every ladder ordinal (for the linear-step advance)
+    progressTable: null, // assets/data/progress_ordinal.json as loaded (the replay theatre's ladder;
+    // NOT state.progressOrdinal, which is the accessor over the engine's $story.ordinal)
+    replayLadder: null, // {byStage, names} built once for the replay theatre (web/replay-theatre.js)
     rosterPredTable: {}, // {key: record} from roster_predicate_table.json (bank-0x70)
     // The s260 Cargo Tower auction's lot table + scripts
     // (assets/data/auction_lots.json, tools/extract_s260_auction.py). null until
@@ -2447,7 +2451,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen() || damageLabOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -3149,6 +3153,7 @@ async function init() {
             setTalkLaunchBindings(tlb);   // null tolerated: playTalkEvent falls back to tel
             state.chapterTable = cp; // null tolerated → deriveChapter falls back to default 1
             // Populate ordinal/roster tables in place (the flag store captured these references).
+            state.progressTable = po ?? null;   // kept whole for the replay theatre's ladder
             if (po) {
                 const all = new Set();
                 for (const b of po.ladder) {
@@ -6885,6 +6890,73 @@ window.__auctionScriptRow = auctionScriptRow;
 // jump (window.__setMap) skips the fade — this is that same call, for tests.
 window.__stageEnter = (mapId) => checkStageCutscene(mapId);
 
+// ---------------------------------------------------------------------------------------------
+// EXPERIMENT (Replay theatre, web/replay-theatre.js): watch one of the disc's own story scenes again.
+//
+// The page lists the bytecode scenes of the room you are standing in whose beat you have reached (the
+// master story ordinal), plus the scenes waiting in other rooms you have reached, greyed with their
+// place name. Play hands the record to the SAME cutscene VM the story uses, with a completion that
+// does nothing — so the scene's own staging, walks, camera and lines play, while the event's flag
+// writes, step store, HANDOFF and battle never happen. Native events and the four mutating bytecode
+// events are refused by the module itself (REPLAY_DENY): their effect lives inside playStoryEvent,
+// where a no-op completion cannot stop it.
+
+/** May the theatre open right now? A running scene, fight or screen is never replaced by a replay. */
+function replayFieldFree() {
+    return !!state.started && !state.titleScreen && !state.endScreen
+        && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+        && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
+}
+
+/**
+ * The page's rows for this moment. The player-facing list is only the room you are standing in —
+ * playStoryEvent stages a scene with currentMap()'s own cast, and loading another stage would run
+ * its arrival chain — so scenes of other reached rooms come back separately, greyed.
+ */
+function replayRowsNow() {
+    const map = state.manifest ? currentMap() : null;
+    if (!map || !state.wstag || !state.progressTable) return { place: map?.name ?? "", here: [], elsewhere: [] };
+    state.replayLadder ||= replayLadder(state.progressTable, state.manifest);
+    const ordinal = Number(engine?.state.vars.get("$story.ordinal") ?? 0);
+    const rows = replayRows(map.id, state.wstag, state.replayLadder, ordinal);
+    return {
+        place: map.name,
+        here: rows.filter((r) => r.mapId === currentMap().id),
+        elsewhere: rows.filter((r) => r.elsewhere),
+    };
+}
+
+/** A page row -> the event record itself, tagged with the room the row named. */
+function playReplayRow(row) {
+    const ev = (state.wstag?.[row.mapId] ?? []).find((e) => Number(e.id) === Number(row.eventId));
+    if (!ev) return false;
+    ev.replayMap = row.mapId;   // replayScene's own room check (only the current map may play)
+    return replayScene(ev);
+}
+
+/**
+ * Play one of the disc's own scenes through the game's cutscene VM. The completion is a no-op on
+ * purpose: the story's flag writes, step store, HANDOFF and battle all live in the CALLER's
+ * completion (engine.completeEvent / doStoryHandoff), so an empty one plays the scene and changes
+ * nothing. Only a scene of the room you are standing in may be played — another stage's scene would
+ * need that stage loaded, and a load runs its arrival chain. Returns false for anything else.
+ */
+function replayScene(ev) {
+    const mapId = state.manifest ? currentMap().id : null;
+    if (replayRefused(ev) || !replayOnMap(ev.replayMap, mapId)) return false;
+    playStoryEvent(ev, () => {});
+    return true;
+}
+// Console aid: __replay.rows() is what the page would list, __replay.press("down") drives the page.
+window.__replay = {
+    open: () => replayOpen(),
+    view: () => replayView(),
+    rows: () => replayRowsNow(),
+    press: (button) => replayPress(String(button)),
+    take: () => replayTake(),
+    scene: (ev) => replayScene(ev),
+};
+
 function playStoryEvent(ev, onDone) {
     if (!ev.disasm?.length && playHelpMenuEvent(ev, onDone)) return;
     if (!ev.disasm?.length && playYesNoEvent(ev, onDone)) return;
@@ -7678,6 +7750,17 @@ function dispatchInput(k, e, raw = "") {
     if (damageLabPress(k)) {
         state.keys.delete(k);
         e.preventDefault();
+        return;
+    }
+
+    // EXPERIMENT (Replay theatre): while the page is up it owns the pad exactly like the pages above — Up/Down the
+    // room's own scenes, Cross play (the page closes and the scene starts in the field's own cutscene VM), Start
+    // close, every other press swallowed. Closed, it answers false and nothing changes.
+    if (replayPress(k)) {
+        state.keys.delete(k);
+        e.preventDefault();
+        const row = replayTake();
+        if (row) playReplayRow(row);
         return;
     }
 
@@ -8479,6 +8562,12 @@ function update(dt) {
     // page never exists and this costs one comparison.
     tickDamageLab(window.__fx?.damagelab === true);
     if (damageLabOpen()) return;
+    // EXPERIMENT (Replay theatre): F2 -> Extras -> "Replay theatre (new)" opens on the setting's rising edge, but only
+    // with the field free — a story cutscene or a fight is never replaced by a replay. While the page is up the field is
+    // frozen and dispatchInput gives it every press; with the setting off no list is built (rowsNow is not called) and
+    // this costs one comparison.
+    tickReplay(window.__fx?.replay === true, replayRowsNow, replayFieldFree());
+    if (replayOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -11082,6 +11171,8 @@ function render() {
     plannerDraw(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (Damage Lab): the stage-by-stage page sits over everything too; it draws only while the page is open.
     damageLabDraw(ctx, VIEW_W, VIEW_H);
+    // EXPERIMENT (Replay theatre): the scene list sits over everything too; it draws only while the page is open.
+    replayDraw(ctx, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
