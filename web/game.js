@@ -28,6 +28,7 @@ import {
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
+import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
@@ -2408,7 +2409,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7584,6 +7585,14 @@ function dispatchInput(k, e, raw = "") {
         return;
     }
 
+    // EXPERIMENT (Digimon Codex): while the book is up it owns the pad exactly like the gallery above — Left/Right page,
+    // Up/Down the row, Cross/Start close, every other press swallowed. Closed, it answers false and nothing changes.
+    if (codexPress(k)) {
+        state.keys.delete(k);
+        e.preventDefault();
+        return;
+    }
+
     // Backquote/tilde key: toggle the partner debug editor (dev tool — level/EXP/stats/items).
     // Match the PHYSICAL key via e.code — on many layouts `~` is a dead key so e.key never
     // arrives as "`". Backslash is a no-dead-key fallback.
@@ -8362,6 +8371,11 @@ function update(dt) {
     // and dispatchInput gives it every press; with the setting off the page never exists and this costs one call.
     tickCutContent(window.__fx?.cutcontent === true);
     if (cutContentOpen()) return;
+    // EXPERIMENT (Digimon Codex): F2 -> Extras -> "Digimon Codex (new)" opens the partner book on the setting's
+    // rising edge. While it is up the field is frozen and dispatchInput gives it every press; with the setting off
+    // the book never exists and this costs one comparison.
+    tickCodex(window.__fx?.codex === true);
+    if (codexOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -10929,6 +10943,8 @@ function render() {
     sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (cut-content gallery): the read-only page sits over everything, including the battle HUD.
     cutContentDraw(ctx, VIEW_W, VIEW_H);
+    // EXPERIMENT (Digimon Codex): the partner book sits over everything too; it draws only while open.
+    codexDraw(ctx, null, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
