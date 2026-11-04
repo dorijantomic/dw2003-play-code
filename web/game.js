@@ -31,6 +31,7 @@ import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from 
 import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
 import { tickBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
 import { tickPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
+import { tickDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> Damage Lab (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 
@@ -2446,7 +2447,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen() || damageLabOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7652,6 +7653,13 @@ function dispatchInput(k, e, raw = "") {
         e.preventDefault();
         return;
     }
+    // EXPERIMENT (Damage Lab): while the page is up it owns the pad exactly like the planner above — Up/Down the picker,
+    // Left/Right its value, Cross/Start close, every other press swallowed. Closed, it answers false and nothing changes.
+    if (damageLabPress(k)) {
+        state.keys.delete(k);
+        e.preventDefault();
+        return;
+    }
 
     // Backquote/tilde key: toggle the partner debug editor (dev tool — level/EXP/stats/items).
     // Match the PHYSICAL key via e.code — on many layouts `~` is a dead key so e.key never
@@ -8446,6 +8454,11 @@ function update(dt) {
     // field is frozen and dispatchInput gives it every press; with the setting off this costs one comparison.
     tickPlanner(window.__fx?.planner === true, plannerPartyMembers);
     if (plannerOpen()) return;
+    // EXPERIMENT (Damage Lab): F2 -> Extras -> "Damage Lab (new)" opens the stage-by-stage damage page on the setting's
+    // rising edge. While it is up the field is frozen and dispatchInput gives it every press; with the setting off the
+    // page never exists and this costs one comparison.
+    tickDamageLab(window.__fx?.damagelab === true);
+    if (damageLabOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -11047,6 +11060,8 @@ function render() {
     blastDraw(ctx, null, VIEW_W, VIEW_H);
     // EXPERIMENT (Next forms planner): the read-only page sits over everything too; it draws only while open.
     plannerDraw(ctx, VIEW_W, VIEW_H);
+    // EXPERIMENT (Damage Lab): the stage-by-stage page sits over everything too; it draws only while the page is open.
+    damageLabDraw(ctx, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
