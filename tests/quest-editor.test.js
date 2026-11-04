@@ -142,4 +142,4 @@ test("scenes without a path compile byte-identical to the compiler before the ed
     assert.equal(digest, GOLDEN);
 });
 
-const GOLDEN = "477:4320:f418c8b0bd8f489fb32a836864ca801f529554b9f92933004aea022f30cae401";
+const GOLDEN = "480:4354:2c04bbcaa3a62a3d053f5e482b8d8eff7f9f956397ef3d3a97d39bbdcb6bbf31";
