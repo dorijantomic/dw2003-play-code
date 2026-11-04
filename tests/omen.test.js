@@ -134,7 +134,9 @@ test("game.js writes state._encCounter only in the driver's own two lines", () =
   const writes = [...game.matchAll(/^[ \t]*state\._encCounter[ \t]*=[ \t]*(.*)$/gm)].map((m) => m[1]);
   assert.equal(writes.length, 2, `two driver writes, found: ${writes.join(" | ")}`);
   assert.equal(writes[0].trim(), "r.counter;");
-  assert.match(writes[1], /^resetEncounterCounter\(/);
+  // F2 -> Extras -> Encounter dial may wrap the decoded reset (dialReset(...)), but
+  // the value still comes from the decoded routine — the omen never writes it.
+  assert.match(writes[1], /^(?:dialReset\()?resetEncounterCounter\(/);
 });
 
 test("the level mirror sits in the driver block and is initialised to 0", () => {

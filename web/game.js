@@ -30,6 +30,7 @@ import {
 import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
+import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
@@ -9450,12 +9451,19 @@ function update(dt) {
                     const r = encounterStepTick(state._encCounter, level);
                     state._encCounter = r.counter;
                     if (r.expired) {
+                        // EXPERIMENT (encounter dial): the F2 setting is applied HERE, at the
+                        // call site, so the decoded routine stays the one authority. With the
+                        // switch off it reads "normal" — the decoded reset and the gated
+                        // launch, exactly as before. "none" drops only the launch; "rare" and
+                        // "lure" only scale the reset value (rare x2, lure floor(/2)), so the
+                        // 8-tick driver, the zone rate table and the slot roll are untouched.
+                        const dial = dialModeFromFx(window.__fx);
                         // Original order: the gated launch, then the reset.
-                        if (!NO_ENCOUNTERS)
+                        if (!NO_ENCOUNTERS && dialAllowsFight(dial))
                             triggerRandomEncounter(m.id, state.x, state.y);
-                        state._encCounter = resetEncounterCounter(
+                        state._encCounter = dialReset(resetEncounterCounter(
                             () => Math.floor(Math.random() * 0x10000),
-                        );
+                        ), dial);
                     }
                 }
             }
