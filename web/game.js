@@ -27,6 +27,7 @@ import {
     mountRiderLift, mountRiderShiftX, mountRiderCutRow, mountPlayerLatch, mountDrawable, mountForceDismount, moveWithSubSteps,
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
+import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
@@ -2396,7 +2397,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7555,6 +7556,15 @@ function dispatchInput(k, e, raw = "") {
     }
     if (!state.started) return;
 
+    // EXPERIMENT (cut-content gallery): while the page is up it owns the pad — Left/Right turn a page, Cross/Start
+    // close it, every other press is swallowed — so nothing reaches the field underneath. Closed, it answers false
+    // and every press falls through exactly as before.
+    if (cutContentPress(k)) {
+        state.keys.delete(k);   // the press was the page's, so a held Cross/Start cannot act on the field the moment it closes
+        e.preventDefault();
+        return;
+    }
+
     // Backquote/tilde key: toggle the partner debug editor (dev tool — level/EXP/stats/items).
     // Match the PHYSICAL key via e.code — on many layouts `~` is a dead key so e.key never
     // arrives as "`". Backslash is a no-dead-key fallback.
@@ -8319,6 +8329,11 @@ function syncSubThrustSound(thrusting) {
 }
 
 function update(dt) {
+    // EXPERIMENT (cut-content gallery): F2 -> Extras -> Cut-content gallery opens a read-only text page on the
+    // setting's rising edge. While it is up the field is frozen (nothing moves under a page the player is reading)
+    // and dispatchInput gives it every press; with the setting off the page never exists and this costs one call.
+    tickCutContent(window.__fx?.cutcontent === true);
+    if (cutContentOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -10883,6 +10898,8 @@ function render() {
     if (USE_NATIVE_CNTYSEL) cntyselNative.draw(ctx, VIEW_W, VIEW_H);
     else cntyselMenu.draw(ctx, VIEW_W, VIEW_H);
     sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);
+    // EXPERIMENT (cut-content gallery): the read-only page sits over everything, including the battle HUD.
+    cutContentDraw(ctx, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
