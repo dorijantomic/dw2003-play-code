@@ -42,3 +42,6 @@ am1_olivia_lobby
 g_bridge_golden
 g_dri_mixup
 g_card_315
+lf_pass
+lf_charm
+lf_ticket
