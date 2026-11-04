@@ -3,6 +3,8 @@
 // The NPC dialogue-state explorer: pick a stage, pick a person, and see every record
 // the disc authors for them — the spawn gate of each version in plain words, and every
 // dialogue state with its own gate, its line, and which one the saved flags make live.
+// The same page counts the stage (its records, spawn slots, invisible and cutscene-only
+// versions) and lists the records this save hides, each with the first gate it fails.
 //
 // It answers "why is this person different in my friend's save", so it reads the save
 // the game already keeps (engineFlags holds the banked story bits; flags holds the text
@@ -11,9 +13,9 @@
 // filled — the page prints that, it does not guess.
 //
 // Read-only lab page: nothing here is imported by the game, so there is no F2 toggle.
-import { gateWords, liveStateIndex } from "./gate-text.js";
+import { gateWords, liveStateIndex, stageCensus, hiddenRows } from "./gate-text.js";
 import { createFlagStore } from "./flag-store.js";
-import { flagConditionPasses } from "./vendor/engine.js";
+import { deriveChapter, flagConditionPasses } from "./vendor/engine.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -138,6 +140,7 @@ async function fetchJson(path) {
 
 let placeCard = null;
 let progressOrdinal = null;
+let chapterProgression = null;
 let scene = null;
 let groups = [];
 const dialogueCache = new Map();
@@ -249,6 +252,63 @@ function renderPeople() {
     li.append(el("div", null, label.title), el("div", "meta", label.meta));
     li.addEventListener("click", () => {
       ui.groupKey = key;
+      ui.recordId = null;
+      renderPeople();
+      renderVersions();
+      renderStates();
+    });
+    list.append(li);
+  }
+}
+
+/** The chapter the saved flags put the story in — the engine's own deriveChapter over the
+ *  disc's ladder (chapter_progression.json). The faithful spawn gate ignores it today; the
+ *  census still passes it through, because that is the engine's spawn call. */
+function currentChapter() {
+  return deriveChapter(readBit, chapterProgression ?? {});
+}
+
+/** The stage in numbers, above the people list: what the scene ships and what this save
+ *  builds. The verdicts are gate-text's stageCensus, i.e. the engine's chapterNpcs path. */
+function renderCensus() {
+  const box = $("census");
+  box.replaceChildren();
+  if (!scene) { box.textContent = "pick a stage"; return; }
+  const records = scene.npcs ?? [];
+  if (!records.length) { box.textContent = "this stage ships no NPC records"; return; }
+  const census = stageCensus(records, currentChapter(), getCond);
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  box.append(el("div", null,
+    `${count(census.records, "NPC record", "NPC records")} · ` +
+    `${count(census.slots, "spawn slot", "spawn slots")} · ` +
+    `${census.variants} ${census.variants === 1 ? "shares" : "share"} a slot`));
+  box.append(el("div", null,
+    `${census.invisible} invisible · ${census.cutsceneOnly} cutscene only · ` +
+    `${census.gated} with a spawn gate`));
+  box.append(el("div", null,
+    `${census.passing} spawn for this save · ${census.hidden} hidden by the gate`));
+}
+
+/** The records this save hides, under the people list. A row names the person, the slot,
+ *  the spot, and the first gate that fails in plain words; clicking opens that person's
+ *  versions, where the record is marked "does not spawn". */
+function renderHidden() {
+  const list = $("hidden");
+  list.replaceChildren();
+  if (!scene) { list.append(el("li", "muted", "pick a stage")); return; }
+  const records = scene.npcs ?? [];
+  if (!records.length) { list.append(el("li", "muted", "no NPC records in this stage")); return; }
+  const rows = hiddenRows(records, currentChapter(), getCond);
+  if (!rows.length) {
+    list.append(el("li", "muted", "nothing — every record of this stage spawns for this save"));
+    return;
+  }
+  for (const row of rows) {
+    const li = el("li");
+    li.append(el("div", null, `npc ${row.npc_id} · slot ${row.slot ?? "?"} · at ${row.x},${row.y}`));
+    li.append(el("div", "meta", `hidden: ${row.why}`));
+    li.addEventListener("click", () => {
+      ui.groupKey = String(row.npc_id);
       ui.recordId = null;
       renderPeople();
       renderVersions();
@@ -425,8 +485,10 @@ function renderBeats() {
 // ── wiring ─────────────────────────────────────────────────────────────────────────────────
 function onManualChange() {
   rebuildStore();
+  renderCensus();
   renderVersions();
   renderStates();
+  renderHidden();
 }
 
 function reloadSave() {
@@ -434,8 +496,10 @@ function reloadSave() {
   readBit = makeReader(save);
   rebuildStore();
   renderSavePanel();
+  renderCensus();
   renderVersions();
   renderStates();
+  renderHidden();
 }
 
 async function onStage() {
@@ -445,6 +509,8 @@ async function onStage() {
   } catch (error) {
     $("versions").className = "muted";
     $("versions").textContent = `could not read assets/scenes/${stage}.json`;
+    $("census").textContent = `could not read assets/scenes/${stage}.json`;
+    $("hidden").replaceChildren();
     return;
   }
   groups = groupRecords(scene.npcs);
@@ -453,18 +519,21 @@ async function onStage() {
   const withStates = (scene.npcs ?? []).filter((n) => n.dialogue_states?.length).length;
   $("ready").textContent =
     `${stageName(stage)} — ${(scene.npcs ?? []).length} NPC records, ${withStates} with dialogue states`;
+  renderCensus();
   renderPeople();
   renderVersions();
   renderStates();
+  renderHidden();
 }
 
 async function main() {
   rebuildStore();
   renderSavePanel();
   try {
-    [placeCard, progressOrdinal] = await Promise.all([
+    [placeCard, progressOrdinal, chapterProgression] = await Promise.all([
       fetchJson("assets/data/place_card.json"),
       fetchJson("assets/data/progress_ordinal.json"),
+      fetchJson("assets/data/chapter_progression.json"),
     ]);
   } catch (error) {
     $("ready").textContent = "could not read the data files";

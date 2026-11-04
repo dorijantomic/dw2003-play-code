@@ -13,7 +13,12 @@
 // Read-only on purpose: there is no setter here, and there is no id-to-value logic
 // either — liveStateIndex takes a caller-supplied reader, exactly like the engine's
 // pickDialogueState. The roster table is the only data file (op-0x30 beat ranges).
+//
+// stageCensus/hiddenRows are the per-stage half of the explorer. They do not re-model
+// spawn gating: the pass/fail is the engine's own chapterNpcs path, so a command bank
+// always passes and a value the save cannot answer stays permissive.
 import rosterFile from "./assets/data/roster_predicate_table.json" with { type: "json" };
+import { chapterNpcs, isStoryCommandBank } from "./vendor/engine.js";
 
 // The party-Charisma ladder D0x80048cf8 (engine/dw3/dw3-config.ts CHARISMA_THRESHOLDS).
 // Kept here as well because this module also runs in the browser, where engine/*.ts does
@@ -95,6 +100,76 @@ export function gateWords({ id, expected = 1 } = {}) {
 export function gateListWords(list) {
   if (!list || !list.length) return "always";
   return list.map(gateWords).join(" and ");
+}
+
+/**
+ * One stage in numbers. `records` is a scene's `npcs` list; `chapter` and `getCond` are
+ * the engine's own spawn-gate arguments (chapter only matters on the legacy no-getCond
+ * path). `passing` is counted with that faithful path itself —
+ * chapterNpcs([record], chapter, getCond).length === 1 — so a command bank always passes
+ * and a value the save cannot answer stays permissive; `hidden` is all the rest.
+ *
+ * `slots` is the number of distinct spawn-slot numbers the records fill; `variants` is
+ * how many records share their slot with at least one other record (every record of a
+ * slot that carries more than one is another version of that slot).
+ */
+export function stageCensus(records, chapter, getCond) {
+  const list = records ?? [];
+  const slotCount = new Map();
+  for (const record of list) {
+    if (record?.slot == null) continue;
+    slotCount.set(record.slot, (slotCount.get(record.slot) ?? 0) + 1);
+  }
+  let variants = 0;
+  for (const count of slotCount.values()) if (count > 1) variants += count;
+
+  let passing = 0;
+  for (const record of list) {
+    if (chapterNpcs([record], chapter, getCond).length === 1) passing++;
+  }
+
+  return {
+    records: list.length,
+    slots: slotCount.size,
+    variants,
+    invisible: list.filter((record) => record?.invisible).length,
+    cutsceneOnly: list.filter((record) => record?.cutsceneOnly).length,
+    gated: list.filter((record) => (record?.spawn_flags ?? []).length > 0).length,
+    passing,
+    hidden: list.length - passing,
+  };
+}
+
+/**
+ * The records the given flags hide, one row each, in scene order: who (`npc_id`), the
+ * spawn slot and spot, and `why` — the plain words of the FIRST gate entry that
+ * definitively fails, found with the rule chapterNpcs applies (a command bank and an
+ * unknown value never fail). A hidden record with no failing entry is only possible on
+ * the legacy chapter-cap path; it quotes its whole gate then.
+ */
+export function hiddenRows(records, chapter, getCond) {
+  const rows = [];
+  for (const record of records ?? []) {
+    if (chapterNpcs([record], chapter, getCond).length === 1) continue;
+    rows.push({
+      npc_id: record?.npc_id ?? record?.id ?? null,
+      slot: record?.slot ?? null,
+      x: record?.x ?? null,
+      y: record?.y ?? null,
+      why: firstFailingGate(record, getCond),
+    });
+  }
+  return rows;
+}
+
+function firstFailingGate(record, getCond) {
+  const gates = record?.spawn_flags ?? [];
+  for (const cond of gates) {
+    if (isStoryCommandBank((cond.id >>> 8) & 0xfe)) continue;
+    const value = getCond ? getCond(cond.id) : null;
+    if (value !== null && value !== cond.expected) return gateWords(cond);
+  }
+  return gateListWords(gates);
 }
 
 /**
