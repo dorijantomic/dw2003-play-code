@@ -42,6 +42,17 @@
 // the screen id, the species, and the party's level / HP / stat scale, plus the zone
 // block's own rate byte. The same party stored twice (screen 5) is kept twice.
 //
+// The Loadout tab (the fourth) is the fight's backstage: one row per model pack (249 of
+// them, from battle/models/index.json), and for the body under the cursor its OWN action
+// scripts read by web/fight/body-loadout.js — every authored clip's timeline tables, waits,
+// projectile mesh and launch offset, sprite effect types, contact cues and whether it marks
+// a strike at all — then the moves of the species that play those clips (real technique
+// names, element, mesh, the technique's own effect byte). The two odd-case lines at the
+// bottom carry the corpus numbers the Loadout test measures over every pack (one mesh
+// serving two elements; authored attack clips with no strike marker). The 249 packs are
+// 39.9 MB, so the tab builds its list from index.json and fetches ONE body's anim.json
+// when a row is opened (plus the small technique and sound tables once).
+//
 // OFF unless F2 -> Extras -> "Digimon Codex (new)" is switched on (web/ambience.js).
 // It opens on that switch's rising edge, owns the pad while it is up (L1/R1 tab,
 // Left/Right page, Up/Down row, Cross/Start close; the ENCOUNTERS tab also takes
@@ -49,15 +60,18 @@
 // the switch off nothing exists and the frame loop pays one comparison. The module is
 // DOM-free at the top level so node tests import it; drawing takes a canvas context.
 
+import { loadoutReport } from "./fight/body-loadout.js";
+
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
 const PER_PAGE = 24;              // rows on one book page
+const BODY_CACHE_LIMIT = 8;       // Loadout: how many opened anim.json files stay in memory
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const STATUS_LABELS = { poison: "Poison", paralyze: "Paralyze", confuse: "Confuse", sleep: "Sleep", ko: "KO" };
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
-const TAB_NAMES = ["partners", "wild", "encounters"];
-const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS" };
+const TAB_NAMES = ["partners", "wild", "encounters", "loadout"];
+const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT" };
 
 const pick = (source, keys) =>
   Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
@@ -389,8 +403,17 @@ const S = {
   enc: null,            // {bySpecies, rows} from stage_encounters + field_encounters
   encQuery: "",         // the encounter finder's name filter
   encEntries: [],       // one {name, rows, stages} per species matching the filter
+  loadoutRows: [],      // one {folder, names} per model pack (battle/models/index.json)
+  loadoutLoading: null, // the small tables' load (index.json + the technique/sound tables)
+  loadoutFetch: null,   // the fetch the tab was installed with (tests); null = globalThis.fetch
+  techTable: null,      // fight_tech_table.json: technique id -> clip/elem1/elem2/effect
+  sounds: null,         // sfx/op10_map.json: op10 cue id -> the disc's sound name
+  body: null,           // {folder, anim, error} the body on screen
+  bodyPending: new Map(), // folder -> the in-flight anim.json read
+  bodyCache: new Map(), // folder -> {folder, anim, error} for every body opened this session
   models: null,         // model_map.json: species -> model folder
   skills: new Map(),
+  profiles: [],         // the raw digimon.json rows (basic / signature / slots for the join)
   evolutions: null,
   lineByRoot: new Map(),   // profile id -> the line slot it roots (the eight starters)
   linesOf: new Map(),      // profile id -> the line slots whose records can reach it
@@ -412,8 +435,17 @@ export function codexReset() {
   S.enc = null;
   S.encQuery = "";
   S.encEntries = [];
+  S.loadoutRows = [];
+  S.loadoutLoading = null;
+  S.loadoutFetch = null;
+  S.techTable = null;
+  S.sounds = null;
+  S.body = null;
+  S.bodyPending = new Map();
+  S.bodyCache = new Map();
   S.models = null;
   S.skills = new Map();
+  S.profiles = [];
   S.evolutions = null;
   S.lineByRoot = new Map();
   S.linesOf = new Map();
@@ -437,6 +469,7 @@ export function setCodexData(digimon, evolutions, enemies = null, models = null,
   S.cursor = 0;
   S.tab = "partners";
   S.skills = new Map((Array.isArray(digimon) ? [] : digimon?.skills ?? []).map((s) => [s.id, s]));
+  S.profiles = Array.isArray(digimon) ? digimon.slice() : (digimon?.digimon ?? []).slice();
   S.evolutions = evolutions;
   S.models = models && typeof models === "object" ? models : null;
   const enemyList = Array.isArray(enemies) ? enemies : enemies?.enemies ?? [];
@@ -502,12 +535,138 @@ export function codexLoad(fetchJson = globalThis.fetch) {
   return S.loading;
 }
 
+// ---------------------------------------------------------------- the Loadout tab
+
+/** The reverse of model_map.json: folder -> the display names that stage it. */
+function namesByFolder() {
+  const byFolder = new Map();
+  for (const [name, folder] of Object.entries(S.models ?? {})) {
+    if (typeof folder !== "string") continue;
+    if (!byFolder.has(folder)) byFolder.set(folder, []);
+    byFolder.get(folder).push(name);
+  }
+  return byFolder;
+}
+
+/**
+ * Install the Loadout tab's small tables (the browser's load and the node test both land
+ * here). `index` is battle/models/index.json (the 249 folder names), `techTable`
+ * fight_tech_table.json and `sounds` sfx/op10_map.json; every one is optional so a caller
+ * can install only what it has. `fetchJson` pins the fetch the tab uses (tests).
+ */
+export function setLoadoutData({ index = null, techTable = null, sounds = null, fetchJson = undefined } = {}) {
+  if (index != null) {
+    const list = Array.isArray(index) ? index : Array.isArray(index?.models) ? index.models : [];
+    const folders = [...new Set(list.filter((f) => typeof f === "string"))].sort();
+    const byFolder = namesByFolder();
+    S.loadoutRows = folders.map((folder) => ({ folder, names: byFolder.get(folder) ?? [] }));
+    S.body = null;
+    S.bodyPending = new Map();
+    S.bodyCache = new Map();
+    const pages = Math.max(1, Math.ceil(S.loadoutRows.length / PER_PAGE));
+    S.page = Math.max(0, Math.min(S.page, pages - 1));
+    S.cursor = Math.max(0, Math.min(S.cursor, PER_PAGE - 1));
+  }
+  if (techTable !== null) S.techTable = techTable && typeof techTable === "object" ? techTable : null;
+  if (sounds !== null) S.sounds = sounds && typeof sounds === "object" ? sounds : null;
+  if (fetchJson !== undefined) S.loadoutFetch = typeof fetchJson === "function" ? fetchJson : null;
+  if (S.tab === "loadout" && S.loadoutRows.length) codexLoadoutBody();
+}
+
+/**
+ * Fetch the Loadout tab's small tables once: battle/models/index.json, the technique table
+ * and the op10 sound names. None of them is an anim.json — the bodies come one at a time
+ * (codexLoadoutBody). Cached per book load; `fetchJson` is injectable for tests.
+ */
+export function codexLoadLoadout(fetchJson = undefined) {
+  if (S.loadoutLoading) return S.loadoutLoading;
+  const fetcher = fetchJson ?? S.loadoutFetch ?? globalThis.fetch;
+  if (typeof fetcher !== "function") return Promise.resolve(false);
+  const read = (url) => Promise.resolve(fetcher(url)).then(asJson).catch(() => null);
+  S.loadoutLoading = (async () => {
+    try {
+      const [index, techTable, sounds] = await Promise.all([
+        read("assets/battle/models/index.json"),
+        read("assets/data/fight_tech_table.json"),
+        read("assets/sfx/op10_map.json"),
+      ]);
+      if (index == null) {
+        S.error = "battle/models/index.json did not load";
+        return false;
+      }
+      setLoadoutData({ index, techTable, sounds });
+      S.error = null;
+      return true;
+    } catch (err) {
+      S.error = String(err?.message ?? err);
+      return false;
+    } finally {
+      S.loadoutLoading = null;
+    }
+  })();
+  return S.loadoutLoading;
+}
+
+/** The body row under the cursor (only while the Loadout tab is up). */
+function loadoutRow() {
+  if (S.tab !== "loadout") return null;
+  return codexPageRows()[Math.max(0, Math.min(S.cursor, codexPageRows().length - 1))] ?? null;
+}
+
+/**
+ * Read the selected body's own anim.json — the tab's one big fetch, one body at a time.
+ * The last few bodies stay cached (a small LRU) so stepping back and forth costs nothing
+ * while 249 packs never sit in memory at once; a body that fails to load keeps its error.
+ * `fetchJson` is injectable for tests. Resolves to the anim (or null).
+ */
+export function codexLoadoutBody(fetchJson = undefined) {
+  const row = loadoutRow();
+  if (!row) return Promise.resolve(null);
+  const folder = row.folder;
+  const cached = S.bodyCache.get(folder);
+  if (cached) {
+    if (loadoutRow()?.folder === folder) S.body = cached;
+    return Promise.resolve(cached.anim ?? null);
+  }
+  if (S.bodyPending.has(folder)) return S.bodyPending.get(folder);
+  const fetcher = fetchJson ?? S.loadoutFetch ?? globalThis.fetch;
+  if (typeof fetcher !== "function") return Promise.resolve(null);
+  const pending = (async () => {
+    let entry;
+    try {
+      const anim = await asJson(fetcher(`assets/battle/models/${folder}/anim.json`));
+      entry = { folder, anim: anim ?? null, error: anim ? null : "the pack returned no JSON" };
+    } catch (err) {
+      entry = { folder, anim: null, error: String(err?.message ?? err) };
+    }
+    S.bodyPending.delete(folder);
+    S.bodyCache.set(folder, entry);
+    // keep only the last few bodies: the 249 packs are 39.9 MB, so the page must not hold
+    // them all just because a player scrolled the list
+    while (S.bodyCache.size > BODY_CACHE_LIMIT) S.bodyCache.delete(S.bodyCache.keys().next().value);
+    if (loadoutRow()?.folder === folder) S.body = entry;
+    return entry.anim;
+  })();
+  S.bodyPending.set(folder, pending);
+  return pending;
+}
+
+/** The body the page is showing ({folder, anim, error}), or null. */
+export function codexLoadoutBodyState() {
+  return S.body;
+}
+
+/** The anim.json the page has loaded for the selected body, or null. */
+export function codexLoadoutAnim() {
+  return S.body?.anim ?? null;
+}
+
 /** Is the book up? (web/game.js freezes the field and routes the pad to it while true.) */
 export function codexOpen() {
   return S.open;
 }
 
-/** Which part of the book is up: "partners", "wild" or "encounters". */
+/** Which part of the book is up: "partners", "wild", "encounters" or "loadout". */
 export function codexTab() {
   return S.tab;
 }
@@ -516,12 +675,14 @@ export function codexTab() {
 function tabPages() {
   if (S.tab === "wild") return S.wildPages;
   if (S.tab === "encounters") return codexPages(S.encEntries, PER_PAGE);
+  if (S.tab === "loadout") return codexPages(S.loadoutRows, PER_PAGE);
   return S.pages;
 }
 /** The rows of the tab that is up (the finder's entries hold one species each). */
 function tabRows() {
   if (S.tab === "wild") return S.wild;
   if (S.tab === "encounters") return S.encEntries;
+  if (S.tab === "loadout") return S.loadoutRows;
   return S.rows;
 }
 
@@ -569,6 +730,9 @@ export function tickCodex(enabled) {
 function tabHasContent(tab) {
   if (tab === "encounters") return S.encEntries.length > 0;
   if (tab === "wild") return S.wild.length > 0;
+  // The Loadout tab is always reachable: its list is one small index.json, fetched the
+  // first time the tab lands, so skipping it while empty would make it unreachable.
+  if (tab === "loadout") return true;
   return S.rows.length > 0;
 }
 
@@ -576,9 +740,9 @@ function tabHasContent(tab) {
 function switchTab(delta) {
   let i = TAB_NAMES.indexOf(S.tab);
   if (i < 0) i = 0;
-  // R1 walks PARTNERS -> WILD -> ENCOUNTERS and L1 walks the same ring backwards.
-  // A tab with no rows (e.g. the finder before its tables have loaded) is skipped,
-  // so the pad never lands on a blank page.
+  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT and L1 walks the same ring
+  // backwards. A tab with no rows (e.g. the finder before its tables have loaded) is
+  // skipped, so the pad never lands on a blank page.
   for (let step = 0; step < TAB_NAMES.length; step++) {
     i = (i + delta + TAB_NAMES.length) % TAB_NAMES.length;
     if (tabHasContent(TAB_NAMES[i])) break;
@@ -586,6 +750,10 @@ function switchTab(delta) {
   S.tab = TAB_NAMES[i];
   S.page = 0;
   S.cursor = 0;
+  if (S.tab === "loadout") {
+    if (!S.loadoutRows.length) codexLoadLoadout(S.loadoutFetch ?? undefined);
+    else codexLoadoutBody(S.loadoutFetch ?? undefined);
+  }
 }
 
 function setPage(page) {
@@ -594,6 +762,7 @@ function setPage(page) {
   S.page = ((page % n) + n) % n;
   const rows = codexPageRows();
   S.cursor = Math.max(0, Math.min(S.cursor, rows.length - 1));
+  if (S.tab === "loadout") codexLoadoutBody(S.loadoutFetch ?? undefined);
 }
 
 function moveCursor(delta) {
@@ -603,14 +772,17 @@ function moveCursor(delta) {
   if (next < 0 && S.page > 0) {
     setPage(S.page - 1);
     S.cursor = codexPageRows().length - 1;
+    if (S.tab === "loadout") codexLoadoutBody(S.loadoutFetch ?? undefined);
     return;
   }
   if (next >= rows.length && S.page < tabPages().length - 1) {
     setPage(S.page + 1);
     S.cursor = 0;
+    if (S.tab === "loadout") codexLoadoutBody(S.loadoutFetch ?? undefined);
     return;
   }
   S.cursor = Math.max(0, Math.min(rows.length - 1, next));
+  if (S.tab === "loadout") codexLoadoutBody(S.loadoutFetch ?? undefined);
 }
 
 /** The encounter finder's current name filter (lowercase; "" is every species). */
@@ -1074,6 +1246,183 @@ function drawEncounters(ctx, W, H) {
   return true;
 }
 
+/** The species whose model_map folder is `folder` — the join the move rows come from. */
+function loadoutSpecies(folder) {
+  const out = [];
+  for (const p of S.profiles) if (S.models?.[p.name] === folder) out.push(p);
+  return out;
+}
+
+/**
+ * The LOADOUT tab: every model pack on the left (one row per folder), the open body's own
+ * scripts on the right. The odd-case lines (one mesh/many elements; silent attack clips)
+ * are pinned above the box's bottom edge so they are always readable, and the clip block
+ * is cut with a "+N more lines" when a full 18-clip pack overruns the column.
+ */
+function drawLoadout(ctx, W, H) {
+  const x = Math.round(W * 0.03);
+  const y = Math.round(H * 0.02);
+  const w = W - 2 * x;
+  const h = H - 2 * y;
+  const left = x + 14;
+  const pages = tabPages();
+  const pageRows = pages[S.page] ?? [];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,12,0.96)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9a54a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText("DIGIMON CODEX", left, y + 12);
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText("LOADOUT — what each body really throws", left + 172, y + 17);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`${Math.min(S.page + 1, Math.max(pages.length, 1))} / ${pages.length}`, x + w - 16, y + 16);
+  ctx.textAlign = "left";
+  drawTabs(ctx, left, y + 31, x + w - 16);
+
+  const top = y + 58;
+  const bottom = y + h - 30;
+  const listX = left;
+  const listW = Math.round(w * 0.36);
+  const listTop = top;
+  const listBottom = bottom - 18;
+
+  if (!S.loadoutRows.length) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+    ctx.fillText(
+      S.error ? `The model index could not be read: ${S.error}` : "Loading the model index…",
+      listX,
+      listTop + 4,
+    );
+  } else {
+    const rowH = Math.floor((listBottom - listTop) / Math.max(pageRows.length, 1));
+    const lh = Math.max(11, Math.min(14, rowH));
+    ctx.font = "10px monospace";
+    let ry = listTop;
+    for (let i = 0; i < pageRows.length; i++) {
+      const entry = pageRows[i];
+      const hit = i === S.cursor;
+      if (hit) {
+        ctx.fillStyle = "rgba(201,165,74,0.22)";
+        ctx.fillRect(listX - 2, ry - 2, listW - 4, lh);
+      }
+      const who = entry.names.length ? ` ${entry.names.join("/")}` : "";
+      ctx.fillStyle = hit ? "#ffe9a8" : entry.names.length ? "#c8d2e2" : "#7a90b0";
+      ctx.fillText(`${hit ? ">" : " "} ${entry.folder}${who}`, listX, ry);
+      ry += lh;
+    }
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#5f6b80";
+    ctx.fillText(`${S.loadoutRows.length} pack ${S.loadoutRows.length === 1 ? "body" : "bodies"} · one anim.json at a time`, listX, bottom - 2);
+  }
+
+  // the open body
+  const dx = listX + listW + 14;
+  const dw = x + w - 16 - dx;
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.strokeRect(dx - 8, top, dw, bottom - top);
+  const row = pageRows[Math.max(0, Math.min(S.cursor, pageRows.length - 1))];
+  const cols = Math.max(24, Math.floor(dw / 5.3));
+  if (row) {
+    const body = S.body && S.body.folder === row.folder ? S.body : null;
+    let ty = top + 6;
+    if (!body) {
+      ctx.font = "10px monospace";
+      ctx.fillStyle = "#d8e2f0";
+      ctx.fillText(`opening ${row.folder}/anim.json…`, dx + 2, ty + 4);
+    } else if (body.error) {
+      ctx.font = "10px monospace";
+      ctx.fillStyle = "#ff9a8a";
+      for (const line of wrapText(`could not read ${row.folder}: ${body.error}`, cols)) {
+        ctx.fillText(line, dx + 2, ty);
+        ty += 12;
+      }
+    } else {
+      const report = loadoutReport({
+        folder: row.folder,
+        names: row.names,
+        species: loadoutSpecies(row.folder),
+        anim: body.anim,
+        techTable: S.techTable,
+        skills: S.skills,
+        sounds: S.sounds,
+      });
+      const oddLines = report.odd.flatMap((line) => wrapText(line, cols));
+      const oddTop = bottom - 6 - oddLines.length * 10;
+      ctx.font = "bold 13px monospace";
+      ctx.fillStyle = "#ffd34d";
+      for (const line of wrapText(report.title, cols)) {
+        ctx.fillText(line, dx + 2, ty);
+        ty += 15;
+      }
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "#8a93a8";
+      for (const line of wrapText(report.sub, cols)) {
+        ctx.fillText(line, dx + 2, ty);
+        ty += 11;
+      }
+      ty += 4;
+      ctx.fillStyle = "#6fd0a8";
+      if (ty < oddTop - 12) {
+        ctx.fillText("MOVES OF THE SPECIES THAT PLAYS THIS BODY", dx + 2, ty);
+        ty += 12;
+      }
+      ctx.fillStyle = "#d8e2f0";
+      for (const line of report.moves.flatMap((l) => wrapText(l, cols))) {
+        if (ty > oddTop - 12) break;
+        ctx.fillText(line, dx + 2, ty);
+        ty += 10;
+      }
+      ty += 3;
+      if (ty < oddTop - 12) {
+        ctx.fillStyle = "#6fd0a8";
+        ctx.fillText("PER CLIP — the body's own action script", dx + 2, ty);
+        ty += 12;
+      }
+      ctx.fillStyle = "#c8d2e2";
+      const clipLines = report.clips.flatMap((l) => wrapText(l, cols));
+      let shown = 0;
+      for (const line of clipLines) {
+        if (ty > oddTop - 20) break;         // keep one line for the "+N more" notice
+        ctx.fillText(line, dx + 2, ty);
+        ty += 10;
+        shown++;
+      }
+      if (shown < clipLines.length) {
+        ctx.fillStyle = "#5f6b80";
+        ctx.fillText(`+${clipLines.length - shown} more lines`, dx + 2, Math.min(ty, oddTop - 10));
+      }
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "#9fd0ff";
+      let oy = oddTop;
+      for (const line of oddLines) {
+        ctx.fillText(line, dx + 2, oy);
+        oy += 10;
+      }
+    }
+  }
+
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7a90b0";
+  ctx.textAlign = "left";
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: body    Cross / Start: close", left, bottom + 8);
+  ctx.restore();
+  return true;
+}
+
 /**
  * Draw the book over the whole view. `page` is a page index, a page (array of rows), or null for
  * the page the pad is on. `W`/`H` are the canvas box (640x480 in the game), so the panel also
@@ -1082,6 +1431,7 @@ function drawEncounters(ctx, W, H) {
 export function codexDraw(ctx, page = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (S.tab === "encounters") return drawEncounters(ctx, W, H);
+  if (S.tab === "loadout") return drawLoadout(ctx, W, H);
   const tabName = S.tab;
   if (!tabRows().length) {
     drawEmpty(ctx, W, H, S.error ? `The book could not be opened: ${S.error}` : "Opening the book…");
@@ -1203,6 +1553,9 @@ if (typeof window !== "undefined") {
     entry: () => codexPageRows()[S.cursor] ?? null,
     query: () => S.encQuery,
     type: (text) => codexType(text),
+    loadout: () => S.loadoutRows,
+    body: () => S.body,
+    loadBody: () => codexLoadoutBody(),
     error: () => S.error,
     reload: () => codexLoad(),
   };
