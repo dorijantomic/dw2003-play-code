@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cinema — the disc's five movies</title>
+<style>
+  body { margin:0; background:#08080f; color:#e8e8f0; font:14px/1.5 "Segoe UI",system-ui,sans-serif; }
+  #top { padding:14px 18px 6px; }
+  h1 { margin:0; font-size:19px; letter-spacing:2px; color:#ffd34d; text-transform:uppercase; }
+  #hint { margin:6px 0 0; max-width:900px; color:#9a9ab8; font-size:12.5px; }
+  #hint b { color:#e8e8f0; font-weight:600; }
+  #status { margin:6px 0 0; min-height:1.4em; color:#8fe08f; font-size:12.5px; }
+  #list { padding:6px 0 30px; outline:none; }
+  .movie { display:grid; grid-template-columns:minmax(220px,300px) 200px 1fr; gap:14px; align-items:baseline;
+           padding:9px 18px; border-bottom:1px solid #161624; cursor:pointer; }
+  .movie:hover { background:#11111c; }
+  .movie.sel { background:#181828; box-shadow:inset 3px 0 0 #ffd34d; }
+  .movie .label { color:#ffd34d; font-size:14.5px; }
+  .movie .code { color:#8fc4e0; font-family:ui-monospace,monospace; font-size:12px; }
+  .movie .frames { color:#7e7e9c; font-size:12px; }
+  #film { padding:0 0 24px; text-align:center; }
+  #film[hidden] { display:none; }
+  #screen { display:block; margin:0 auto; max-width:100%; height:auto; background:#000;
+            border:1px solid #22223a; }
+  #caption { margin:10px auto 0; max-width:900px; color:#9a9ab8; font-size:12.5px; }
+  #caption b { color:#e8e8f0; font-weight:600; }
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>Cinema</h1>
+  <p id="hint">
+    The five movies the disc ships, played through the same players the game uses for them:
+    the two <b>openings</b> (the title's attract loop), the <b>field movie</b> of story ordinal 43,
+    and the two <b>ending</b> streams. Each row lists the count the player stops at and the count the
+    stream itself carries. Click a movie (or pick one with the arrow keys and press Enter).
+    While it plays, <b>START</b> (Enter or Space) or <b>Back</b> (Esc) returns to this list.
+  </p>
+  <p id="status"></p>
+</div>
+<div id="list" tabindex="0"></div>
+<div id="film" hidden>
+  <canvas id="screen" width="960" height="672"></canvas>
+  <p id="caption"></p>
+</div>
+<script type="module">
+import { movieRow } from "./vendor/engine.js";
+import { cinemaRows, rowFor } from "./cinema.js";
+import { createTitleMoviePlayer } from "./title-movie.js";
+import { createFieldMoviePlayer } from "./field-movie.js";
+
+const $ = (id) => document.getElementById(id);
+const listEl = $("list"), filmEl = $("film"), canvas = $("screen");
+const captionEl = $("caption"), statusEl = $("status"), hintEl = $("hint");
+const ctx = canvas.getContext("2d");
+
+// The five launch codes, in the disc's own order; the rows resolve through the
+// disc's movie table (web/vendor/engine.js movieRow) into the shipped streams.
+const CODES = [0xe01, 0xe02, 0xe0a, 0xe0b, 0xe0c];
+const hex = (code) => "0x" + code.toString(16).toUpperCase();
+const adapterName = (adapter) => (adapter === "title" ? "title player" : "field player");
+
+let rows = [];
+try {
+  const manifest = await (await fetch("assets/movie/manifest.json")).json();
+  rows = cinemaRows(manifest, CODES.map(movieRow));
+} catch (error) {
+  hintEl.textContent = "The movie list could not be loaded: " + error.message;
+  throw error;
+}
+// Warm the title player's own layout file so a click starts the picture inside
+// the click's own gesture (the field player warms the manifest this page already read).
+fetch("assets/data/stdwtitl_ui.json").catch(() => {});
+
+let playing = null, lastError = null, selected = 0;
+const items = [];
+
+function onError(error) {
+  lastError = error;
+  console.error("[cinema]", error);
+}
+
+// The end stays here: the player hands back, the list returns. No return
+// selector is followed and nothing leaves the page.
+function onEnd(code) {
+  playing = null;
+  filmEl.hidden = true;
+  listEl.hidden = false;
+  captionEl.textContent = "";
+  const row = rowFor(code, rows);
+  if (lastError) {
+    statusEl.textContent = "Could not play " + (row ? row.label : "that stream") + ": " + lastError.message;
+    lastError = null;
+  } else if (row) {
+    statusEl.textContent = row.label + " finished — back on the list.";
+  }
+  listEl.focus();
+  select(selected);
+}
+
+const titleMovie = createTitleMoviePlayer(onEnd, onError);
+const fieldMovie = createFieldMoviePlayer(onEnd, onError);
+
+function select(index) {
+  if (!items.length) return;
+  selected = Math.max(0, Math.min(items.length - 1, index));
+  items.forEach((el, i) => el.classList.toggle("sel", i === selected));
+  items[selected].scrollIntoView({ block: "nearest" });
+}
+
+for (const [index, row] of rows.entries()) {
+  const el = document.createElement("div");
+  el.className = "movie";
+  el.dataset.code = hex(row.code);
+  el.dataset.adapter = row.adapter;
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = row.label;
+  const code = document.createElement("span");
+  code.className = "code";
+  code.textContent = hex(row.code) + " · " + adapterName(row.adapter);
+  const frames = document.createElement("span");
+  frames.className = "frames";
+  frames.textContent = row.streamFrames
+    ? "the player ends at " + row.rowFrames + " pictures · the stream carries " + row.streamFrames
+    : "no shipped stream";
+  el.append(label, code, frames);
+  el.addEventListener("click", () => { select(index); open(row.code); });
+  items.push(el);
+  listEl.append(el);
+}
+select(0);
+
+// One launch code, through the player that code belongs to. Both players end
+// the movie themselves (the row's picture count, or START / Back).
+async function open(code) {
+  const row = rowFor(code, rows);
+  if (!row || !row.file || playing) return;
+  const player = row.adapter === "title" ? titleMovie : fieldMovie;
+  playing = player;
+  lastError = null;
+  statusEl.textContent = "";
+  listEl.hidden = true;
+  filmEl.hidden = false;
+  captionEl.innerHTML = "<b>" + row.label + "</b> · " + hex(row.code) + " · START or Back returns to the list";
+  await player.open(code);
+  const diag = player.diagnostics ? player.diagnostics() : null;
+  if (diag && diag.blocked) {
+    captionEl.textContent = row.adapter === "title"
+      ? "The browser held the sound back — click the picture to try the sound again, or START to return to the list."
+      : "The browser held the sound back, so the stream plays muted — START or Back returns to the list.";
+  }
+}
+
+filmEl.addEventListener("click", () => {
+  if (!playing) return;
+  const diag = playing.diagnostics ? playing.diagnostics() : null;
+  // A click is a gesture that can unlock the sound again; otherwise it is the
+  // mouse's START and ends the movie.
+  if (diag && diag.blocked) { playing.retry?.(); return; }
+  playing.skip();
+});
+
+addEventListener("keydown", (e) => {
+  if (playing) {
+    // START ends the movie; Back ends it too. Both land back on the list.
+    if (e.key === "Enter" || e.key === " " || e.key === "Escape" || e.key === "Backspace") {
+      e.preventDefault();
+      playing.skip();
+    }
+    return;
+  }
+  if (e.key === "ArrowDown") { e.preventDefault(); select(selected + 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); select(selected - 1); }
+  else if (e.key === "Home") { e.preventDefault(); select(0); }
+  else if (e.key === "End") { e.preventDefault(); select(rows.length - 1); }
+  else if ((e.key === "Enter" || e.key === " ") && rows.length) { e.preventDefault(); open(rows[selected].code); }
+});
+
+// One loop draws the picture. The field player also takes the frame's time (it
+// counts the console's blanks); the title player counts the pictures itself.
+let previous = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = previous ? Math.min(0.05, (now - previous) / 1000) : 0;
+  previous = now;
+  if (!playing) return;
+  if (playing === fieldMovie) fieldMovie.update(dt);
+  if (playing) playing.draw(ctx, 960, 672);
+}
+requestAnimationFrame(frame);
+listEl.focus();
+</script>
+</body>
+</html>

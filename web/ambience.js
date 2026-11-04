@@ -32,7 +32,7 @@ export const FX_GROUPS = [
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["battleatmos", "Battle sky & weather: night, fog, snow, rain follow where you are (new)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
-    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["battlespeed", "Faster battles"], ["codex", "Digimon Codex (new)"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"]]],
+    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["battlespeed", "Faster battles"], ["codex", "Digimon Codex (new)"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["cinema", "Cinema"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
     // Battle rules the player switches on by hand (all OFF by default; see MANUAL below). One group,
@@ -50,7 +50,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "soundtest", "questtriggers"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "soundtest", "cinema", "questtriggers"];     // off until you switch them on by hand; "All on" and the presets leave them alone
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
@@ -987,6 +987,9 @@ function refreshPanel() {
     const q = panel.querySelector("[data-quality]"); if (q) q.value = fx.quality;
     const td = panel.querySelector("[data-tod]"); if (td) td.value = fx.todMode;
     const sf = panel.querySelector("[data-spritefilter]"); if (sf) sf.value = fx.spriteFilter;
+    // The cinema's button row exists only while its F2 switch is on; with the
+    // switch off the page has no link anywhere in the game.
+    const cinema = panel.querySelector("#fx-cinema"); if (cinema) cinema.hidden = !fx.cinema;
     for (const k of ["lightGain", "hd2dStrength", "battleSpeed"]) {
         const r = panel.querySelector(`[data-slider="${k}"]`), v = panel.querySelector(`[data-val="${k}"]`);
         if (r) r.value = fx[k]; if (v) v.textContent = (+fx[k]).toFixed(2);
@@ -1007,6 +1010,7 @@ export function installFxPanel(stageEl) {
         font:13px/1.75 "Segoe UI",system-ui,sans-serif; box-shadow:0 8px 30px #000; }
       #fx-panel[hidden] { display:none; }
       #fx-panel label[hidden] { display:none; }
+      #fx-panel .row[hidden] { display:none; }
       #fx-panel h3 { margin:0 0 2px; font-size:13px; color:#ffd34d; letter-spacing:1px; }
       #fx-panel h4 { margin:8px 0 0; font-size:11px; color:#8a8ab0; letter-spacing:1.5px; text-transform:uppercase; }
       #fx-panel label { display:flex; gap:8px; align-items:center; cursor:pointer; }
@@ -1026,7 +1030,7 @@ export function installFxPanel(stageEl) {
     panel.id = "fx-panel"; panel.hidden = true;
     panel.innerHTML = `<h3>EFFECTS</h3>` + FX_GROUPS.map(([name, list]) =>
         `<h4>${name}</h4>` + list.map(([k, label]) => `<label><input type="checkbox" data-fx="${k}"> ${label}</label>`).join("") +
-        (name === "Extras" ? `<div class="hint" id="fx-dw2" hidden></div>` : "")).join("") +
+        (name === "Extras" ? `<div class="hint" id="fx-dw2" hidden></div><div class="row" id="fx-cinema" hidden><button type="button" data-act="cinema">Open the cinema</button></div>` : "")).join("") +
         `<h4>Mood</h4>
          <label>Preset <select data-preset><option value="">choose...</option><option value="cinematic">Cinematic</option><option value="clear">Clear day</option><option value="cozyrain">Cozy rain</option><option value="storm">Storm</option><option value="night">Night</option></select></label>
          <div class="row"><button data-act="save:1">Save 1</button><button data-act="save:2">Save 2</button><button data-act="save:3">Save 3</button></div>
@@ -1079,6 +1083,7 @@ export function installFxPanel(stageEl) {
             else if (kind === "photo") setPhoto(!photoOn);
             else if (kind === "shot") screenshot();
             else if (kind === "rec") toggleRecord();
+            else if (kind === "cinema") { if (fx.cinema) window.open("cinema.html", "_blank", "noopener"); }
             act.blur(); return;
         }
         const b = e.target.closest("[data-all]");
