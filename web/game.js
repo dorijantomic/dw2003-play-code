@@ -374,6 +374,7 @@ restoreWindowFill(document);
 import { ephemeralActorRecord } from "./cutscene-actors.js";
 import { createDebugPanel } from "./debugPanel.js";
 import { createStagslctMenu } from "./stagslct.js";
+import { createSoundTest } from "./soundtest.js";
 import { createCntyselMenu } from "./cntysel.js";
 import { createCntyselNative } from "./cntysel-native.js";
 import { createSceneSkip } from "./sceneSkip.js";
@@ -1344,6 +1345,16 @@ const placeCard = USE_LEGACY_PLACE_CARD ? createPlaceCard() : createPlaceCardTra
 // docs/research/ui/stagslct-decoded-2026-07-11.md), so it is reachable only
 // through this walker-authored debug entry point, not a claimed original one.
 const stagslctMenu = createStagslctMenu();
+// The developers' own SOUND TEST screen (overlay soundtst, decode:
+// docs/research/audio/soundtst-full-decode-2026-08-05.md). F2 -> Extras ->
+// Sound test, off by default; with the switch off it never opens and owns no
+// input. Plays its samples through the residents' packed-sound lookup
+// (sfx.playBankSound) and the title theme through the music player.
+const soundTest = createSoundTest({
+    sfx,
+    music: { play: (track) => bgm.play(track), stop: () => bgm.play(null) },
+});
+let soundTestWasOn = false;   // the F2 switch's rising edge opens the screen
 const cntyselMenu = createCntyselMenu(sfx);   // SYSTEM07 cursor / SYSTEM08 confirm
 // Fully translated language screen; the adapter retains its historical name.
 // `?legacyCntysel=1` keeps the earlier authored screen for comparison.
@@ -2397,7 +2408,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7554,6 +7565,14 @@ function dispatchInput(k, e, raw = "") {
         saveScreen.handleKey(k, state);
         return;
     }
+    // The Sound Test dev screen owns every press while it is open (F2 ->
+    // Extras -> Sound test). It is only ever open when that switch is on, so
+    // with the switch off this branch never runs.
+    if (soundTest.open) {
+        e.preventDefault();
+        soundTest.handleKey(k);
+        return;
+    }
     if (!state.started) return;
 
     // EXPERIMENT (cut-content gallery): while the page is up it owns the pad — Left/Right turn a page, Cross/Start
@@ -8302,6 +8321,15 @@ function frame(t) {
     }
     const dt = Math.min((t - lastT) / 1000, 0.1);
     lastT = t;
+    // F2 -> Extras -> Sound test (dev): the screen opens on the switch's rising
+    // edge. Cross/Start closes it and it stays closed until the switch is
+    // cycled off and on. With the switch off it can never be open, so the game
+    // below behaves exactly as before.
+    const soundTestOn = !!window.__fx?.soundtest;
+    if (soundTestOn && !soundTestWasOn) soundTest.show();
+    if (!soundTestOn && soundTest.open) soundTest.hide();
+    soundTestWasOn = soundTestOn;
+    if (soundTest.open) soundTest.tick(state.keys);
     // Game-speed hack: window.__gameSpeed fast-forwards EVERYTHING (cutscenes, WAITs, auto
     // walks, fades, animations) by sub-stepping the sim that many times. Set __gameSpeed=4
     // in the console to blitz through auto-scenes; 1 (or unset) = normal. Sub-stepping (vs.
@@ -10895,6 +10923,7 @@ function render() {
     // Drawn last so the debug overlay sits on top of everything, including the battle HUD.
     debugPanel.drawOverlay(ctx, VIEW_W, VIEW_H, state);
     stagslctMenu.draw(ctx, VIEW_W, VIEW_H);
+    soundTest.draw(ctx, VIEW_W, VIEW_H);
     if (USE_NATIVE_CNTYSEL) cntyselNative.draw(ctx, VIEW_W, VIEW_H);
     else cntyselMenu.draw(ctx, VIEW_W, VIEW_H);
     sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);

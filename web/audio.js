@@ -915,6 +915,25 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
     if (meta) startVoice(name, meta, bank, sustain);
   };
 
+  // One sound from a NAMED bank, with the key-off left to the caller. The
+  // sound test holds Circle to hear a sound and releases it to stop (the
+  // overlay's play/stop pair D0x80055c48 / D0x80055c50), so `sustain: true`
+  // keeps the sample's own loop points alive and the caller stops it through
+  // player.stop(name). Returns the key it started ("stem", or "bank:stem" for
+  // a per-map bank), or null when this build has no sample for it -- the
+  // screen turns that null into "no sample in this build" instead of going
+  // silently mute.
+  player.playBankSound = (bank, name, { sustain = false } = {}) => {
+    const meta = bank ? areaManifest?.[bank]?.[name] : manifest?.[name];
+    if (!meta) return null;
+    const key = bank ? `${bank}:${name}` : name;
+    // The same trace sfx.play keeps, so audits that listen for a sample name
+    // still hear the screens that now play through this entry point.
+    if (globalThis.__sfxTrace) globalThis.__sfxTrace.add(String(key));
+    if (!player.muted && ctx) startVoice(name, meta, bank ?? null, sustain);
+    return key;
+  };
+
   // F0x800202d4 — stop this sound now, and clear the exclusive-track register
   // if this sound is the one holding it.
   player.stop = (name) => {
