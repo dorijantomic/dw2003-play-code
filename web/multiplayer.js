@@ -26,7 +26,7 @@ const SAY_MS = 6500;            // how long a speech bubble stays over a head
 export const EMOTES = ["♥", "!", "?", "...", "♪", ":)", "GG", "zZ"];   // 0..7
 
 const mp = {
-    ws: null, status: "off", room: null, id: null, name: "",
+    ws: null, status: "off", room: null, id: null, name: "", hostId: null,
     addresses: [], hosting: false, host: "",   // the host's own addresses, to show to friends
     peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteUntil, say, sayUntil, card }
     me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteUntil: 0 },
@@ -44,6 +44,10 @@ const emit = (type, data = {}) => { for (const f of [...listeners]) { try { f(ty
 export const isOnline = () => mp.status === "online";
 export const myId = () => mp.id;
 export const myName = () => mp.name;
+/** True when I made this room: the only one who can open a Server Champ night or call its fights. */
+export const amHost = () => mp.status === "online" && mp.hostId != null && mp.hostId === mp.id;
+/** The F2 switch: F2 -> Extras -> "Server Champ league", off by default. Off = nothing leaves this game. */
+export const serverChampOn = () => typeof window !== "undefined" && window.__fx?.serverchamp === true;
 /** Everyone in the room except me: [{ id, name, map, card }] */
 export const peerList = () => [...mp.peers].map(([id, p]) => ({ id, name: p.name, map: p.map, card: p.card }));
 export const peerOf = (id) => mp.peers.get(id) ?? null;
@@ -87,6 +91,7 @@ export function connect(want) {
         if (m.t === "welcome") {
             gotWelcome = true; mp.retry = 0;
             mp.id = m.id; mp.room = m.room; mp.want = { base, room: m.room };   // a reconnect rejoins this room
+            mp.hostId = m.host ?? null;
             mp.peers.clear();
             for (const p of m.roster) { const q = newPeer(p.name); q.map = p.map ?? null; q.card = p.card ?? null; mp.peers.set(p.id, q); }
             mp.sent.at = 0; mp.sent.map = null;                                  // announce myself straight away
@@ -134,6 +139,10 @@ export function connect(want) {
             emit("coop", m);
         } else if (m.t === "mpb") {
             emit("mpb", m);
+        } else if (m.t === "lg") {
+            emit("league", m);
+        } else if (m.t === "host") {
+            mp.hostId = m.id; emit("roster");
         }
     };
     ws.onclose = () => {
@@ -173,7 +182,7 @@ export function disconnect(quiet = false) {
     if (!quiet) mp.hosting = false;
     const ws = mp.ws; mp.ws = null; mp.want = quiet ? mp.want : null;
     if (ws) try { ws.close(); } catch { /* already closed */ }
-    mp.peers.clear(); mp.room = null; mp.id = null;
+    mp.peers.clear(); mp.room = null; mp.id = null; mp.hostId = null;
     if (!quiet) setStatus("off");
 }
 
@@ -201,6 +210,8 @@ export const sendDuel = (o) => sendRaw({ t: "duel", ...o });
 export const sendCoop = (o) => sendRaw({ t: "coop", ...o });
 /** A many-vs-many fight message to these players (web/mpbattle.js). */
 export const sendMpb = (ids, d) => sendRaw({ t: "mpb", to: ids, d });
+/** A Server Champ night message (web/mp-league.js, server/room-core.mjs): only with F2 -> Extras -> Server Champ league on. */
+export const sendLeague = (o) => serverChampOn() ? sendRaw({ t: "lg", ...o }) : false;
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */

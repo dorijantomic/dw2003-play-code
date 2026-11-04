@@ -8,12 +8,14 @@
 // Trade swaps items and BIT between two players; both press Confirm on the same offer and each game moves its own items.
 //
 // Nothing here writes a story flag. Names and chat from other players are only ever put on the page as text.
-import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop } from "./multiplayer.js";
+import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn } from "./multiplayer.js";
+import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 
 const MAX_LOG = 300;
 const S = { tab: "all", log: [], collapsed: false, unread: 0 };
 let api = null, dock = null, el = {}, trade = null, duel = null, inspectId = null, goArm = null;
 let prevParty = null, lastCardJson = "";
+let league = null, leaguePair = null, leagueGames = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
 
 // ------------------------------------------------------------ small helpers
 const h = (tag, cls, ...kids) => {
@@ -94,9 +96,10 @@ function drawPlayers() {
     sel.value = String(strength());
     sel.onchange = () => { try { localStorage.setItem(KEY_STR, sel.value); } catch { /* storage blocked */ } };
     el.players.append(h("div", "sub", "Co-op boss strength ", sel, partner != null ? `   Partner: ${peerOf(partner)?.name ?? "?"}` : ""));
+    if (serverChampOn()) el.players.append(leagueStrip());
     const rows = [{ id: myId(), name: myName(), map: here, card: api.card(), self: true }, ...peerList()];
     for (const p of rows) {
-        const nm = h("b", "nm", (p.id === partner ? "★ " : "") + p.name); nm.style.color = nameColor(p.name);
+        const nm = h("b", "nm", (p.id === partner ? "★ " : "") + p.name); nm.style.color = isChamp(p) ? "#ffd34d" : nameColor(p.name);
         const where = h("div", "sub", `${levelLine(p.card)}  ·  ${place(p.map)}${p.map && p.map === here ? "  ●" : ""}`);
         const acts = h("div", "acts", btn("Inspect", () => openInspect(p.id)));
         if (!p.self) {
@@ -114,7 +117,7 @@ function drawPlayers() {
                 acts.append(go);
             }
         }
-        el.players.append(h("div", "pl", h("div", "who", nm, p.self ? " (you)" : ""), where, acts));
+        el.players.append(h("div", "pl", h("div", "who", nm, p.self ? " (you)" : "", isChamp(p) ? h("span", "chmp", "  SERVER CHAMP") : ""), where, acts));
     }
     badge();
 }
@@ -133,13 +136,14 @@ function closeInspect() { inspectId = null; if (el.inspect) el.inspect.hidden = 
 function drawInspect() {
     if (inspectId == null || !el.inspect) return;
     const self = inspectId === myId();
-    const p = self ? { name: myName(), map: api.currentMapId(), card: api.card() } : peerOf(inspectId);
+    const p = self ? { id: myId(), name: myName(), map: api.currentMapId(), card: api.card() } : (peerOf(inspectId) ? { ...peerOf(inspectId), id: inspectId } : null);
     if (!p) { closeInspect(); return; }
     const c = p.card;
     const box = el.inspect; box.hidden = false; box.replaceChildren();
-    const title = h("div", "ttl", p.name); title.style.color = nameColor(p.name);
+    const title = h("div", "ttl", p.name); title.style.color = isChamp(p) ? "#ffd34d" : nameColor(p.name);
     box.append(h("div", "hd", title, btn("×", closeInspect, "x")));
     box.append(h("div", "sub", `${place(p.map)}${c?.chapter ? `  ·  Chapter ${c.chapter}` : ""}`));
+    if (isChamp(p)) box.append(h("div", "sub champ", "SERVER CHAMP"));
     if (!c) { box.append(h("div", "sub", "This player's card has not arrived yet.")); return; }
     box.append(h("div", "sub", `${c.bits ?? 0} BIT  ·  ${c.quests ?? 0} extra quest${c.quests === 1 ? "" : "s"} done`));
     for (const d of c.party ?? []) {
@@ -446,6 +450,121 @@ function onCoop(m) {
     }
 }
 
+// ------------------------------------------------------------ the Server Champ night
+// The game's own Online Center promises exactly this: "Server Champs can battle with others to be the next World
+// Champ", and the stated goal "to become the strongest of the over 200,000 players" (dw3-systems-reference,
+// Server Tournament / Server Champ / World Champ). The disc gives you nobody to battle; this is that evening with
+// the friends in your room. The room keeps the bracket (server/room-core.mjs, `lg`; rules in web/mp-league.js), the
+// host opens it and calls each fight, and the winner's card says SERVER CHAMP until the next night.
+// F2 -> Extras -> "Server Champ league", off by default: no button, no message, and a card that carries the mark
+// draws as a normal card.
+const LEAGUE_NO = {
+    no_league: "No Server Champ night is open.",
+    open: "A Server Champ night is already open.",
+    ids: "A Server Champ night needs 2 to 8 tamers who are in the room.",
+    done: "This night is won - wait for the next one.",
+    dropped: "That tamer already left the night.",
+    no_fight: "No fight is on the table right now.",
+    not_in_match: "That tamer is not in this fight.",
+    no_games: "Report at least one game.",
+    too_many_games: "A best-of-three fight has at most three games.",
+    already_over: "That fight was already decided.",
+    wrong_winner: "The winner does not match the games you reported.",
+};
+
+const lgName = (id) => (id === myId() ? myName() : (peerOf(id)?.name ?? `Tamer ${id}`));
+const matchOf = (pair) => (pair ? league?.rounds?.[pair.r]?.[pair.m] ?? null : null);
+const leagueScore = (m, id) => (m?.g ?? []).filter((g) => g === id).length;
+/** The room's champion from its own bracket; null until the final is won, or with the switch off. */
+const champId = () => (serverChampOn() && league ? league.champ : null);
+/** The champ colour: the room's champion, or a card that says so itself. Off = a normal card. */
+const isChamp = (p) => serverChampOn() && (p.id === champId() || p.card?.champ === true);
+
+function matchText(m) {
+    if (!m) return "?";
+    if (m.bye) return `${lgName(m.a ?? m.b)} (bye)`;
+    if (m.dead) return "no tamer left";
+    if (m.w == null) return `${lgName(m.a)} vs ${lgName(m.b)}`;
+    const lost = m.a === m.w ? m.b : m.a;
+    return `${lgName(m.w)} beat ${lgName(lost)} ${m.wo ? "w.o." : matchScore(m)}`;
+}
+
+function leagueStrip() {
+    const box = h("div", "lg");
+    box.append(h("div", "lgh", `SERVER CHAMP · best of ${league?.bestOf ?? 3}`));
+    if (!league) {
+        if (amHost()) box.append(h("div", "sub", "2 to 8 tamers, one bracket, one evening."), btn("Start a Server Champ night", startLeague));
+        else box.append(h("div", "sub", "The host can start a Server Champ night."));
+        return box;
+    }
+    league.rounds.forEach((round, r) => box.append(h("div", "sub", `Round ${r + 1}: ${round.map(matchText).join("  ·  ")}`)));
+    if (league.champ != null) box.append(h("div", "champ", `${lgName(league.champ)} is SERVER CHAMP`));
+    else if (leaguePair) {
+        const m = matchOf(leaguePair), score = leagueGames.length ? `  (${leagueScore(m, leaguePair.a)}-${leagueScore(m, leaguePair.b)})` : "";
+        box.append(h("div", "cur", `Next: ${lgName(leaguePair.a)} vs ${lgName(leaguePair.b)}, game ${leaguePair.game}${score}`));
+    } else box.append(h("div", "sub", league.phase === "break" ? "Round over - the host calls the next round." : "Waiting for the host to call the first fight."));
+    const acts = h("div", "acts");
+    if (amHost() && league.champ == null) {
+        if (!leaguePair) acts.append(btn("Next fight", () => sendLeague({ op: "next" })));
+        else acts.append(btn(`${lgName(leaguePair.a)} won game`, () => reportGame(leaguePair.a)),
+            btn(`${lgName(leaguePair.b)} won game`, () => reportGame(leaguePair.b)));
+    }
+    // the pair on the table can start today's friendly duel (each side fights a copy of the other's team)
+    if (leaguePair && !duel && !trade && (myId() === leaguePair.a || myId() === leaguePair.b)) {
+        const other = myId() === leaguePair.a ? leaguePair.b : leaguePair.a;
+        acts.append(btn(`Duel ${lgName(other)}`, () => askDuel(other)));
+    }
+    if (league.ids.includes(myId()) && !league.dropped.includes(myId())) acts.append(btn("Drop out", () => sendLeague({ op: "drop" })));
+    if (acts.childNodes.length) box.append(acts);
+    return box;
+}
+
+function startLeague() {
+    const all = [myId(), ...peerList().map((p) => p.id)];
+    if (all.length < 2) { note("You need at least one more tamer in the room."); return; }
+    // a night holds 8 tamers; in a bigger room the first 7 others in join order are the night, and the host is told
+    const ids = all.slice(0, MAX_TAMERS);
+    if (ids.length < all.length) note(`A Server Champ night holds ${MAX_TAMERS} tamers. This one has you and the next ${ids.length - 1} in the room.`);
+    sendLeague({ op: "open", ids });
+}
+
+function reportGame(id) {
+    if (!leaguePair) return;
+    leagueGames.push(id);                                     // the games of this fight, in order (best of three)
+    if (!sendLeague({ op: "win", winner: id, games: leagueGames })) { leagueGames.pop(); note("Could not send the result (not in a room, or the switch is off)."); }
+}
+
+function announceLeague(ev) {
+    if (!ev) return;
+    const feed = (text) => add({ k: "feed", kind: "info", name: "Server Champ", text });
+    if (ev.k === "closed") { note("The Server Champ night ended (the host left)."); return; }
+    if (!league) return;
+    if (ev.k === "open") feed(`night is on: ${league.ids.length} tamers, best of ${league.bestOf}. The winner is Server Champ until the next night.`);
+    else if (ev.k === "pair") feed(`round ${ev.r + 1}: ${lgName(ev.a)} vs ${lgName(ev.b)}.`);
+    else if (ev.k === "game") feed(`${lgName(ev.w)} takes game ${ev.n} of ${lgName(ev.a)} vs ${lgName(ev.b)}.`);
+    else if (ev.k === "win") feed(`${lgName(ev.w)} beat ${lgName(ev.l)} ${ev.g}.${ev.c ? ` ${lgName(ev.w)} is SERVER CHAMP!` : ""}`);
+    else if (ev.k === "drop") feed(`${lgName(ev.id)} left the night.${ev.w != null ? ` ${lgName(ev.w)} goes through.` : ""}`);
+    else if (ev.k === "round") feed(`round ${ev.r + 1} is over.`);
+}
+
+function clearLeague() { league = null; leaguePair = null; leagueGames = []; leagueKey = ""; }
+
+function onLeague(m) {
+    if (!serverChampOn()) return;
+    if (m.op === "no") {
+        note(LEAGUE_NO[m.why] ?? "The Server Champ night server said no.");
+        leagueGames = matchOf(leaguePair)?.g?.slice() ?? [];      // the server's tally is the truth after a refusal
+        return;
+    }
+    if (m.op !== "state") return;
+    league = m.lg ? unpackLeague(m.lg) : null; leaguePair = m.pair ?? null;
+    const key = leaguePair ? `${leaguePair.r}:${leaguePair.m}` : "";
+    if (key !== leagueKey) { leagueKey = key; leagueGames = matchOf(leaguePair)?.g?.slice() ?? []; }
+    announceLeague(m.ev);
+    drawPlayers();
+    drawInspect();
+}
+
 // ------------------------------------------------------------ what I am doing -> everyone's log
 function post(kind, text) {
     add({ k: "feed", kind, name: myName(), text, self: true });
@@ -457,11 +576,18 @@ export function socialQuestDone(title) { if (isOnline() && api) post("quest", `f
 
 function pollSelf() {
     if (!api) return;
+    const on = serverChampOn();
+    if (on !== champOn) {                                    // the switch flipped: the bracket strip appears or goes
+        champOn = on;
+        if (!on) clearLeague();
+        drawPlayers();
+    }
     // tuck the box away during battles and cutscenes, so it never covers them
     if (dock) dock.style.display = isOnline() && !api.busy() ? "" : "none";
     if (!isOnline()) { prevParty = null; lastCardJson = ""; return; }
     const card = api.card();
     if (!card) return;
+    if (serverChampOn() && league?.champ != null && league.champ === myId()) card.champ = true;   // my card says SERVER CHAMP until the next night
     if (duel && (duel.st === "fight")) { prevParty = null; return; }   // a duel's EXP is taken back: not news
     if (prevParty) {
         card.party.forEach((b, i) => {
@@ -508,6 +634,11 @@ export function installSocial({ stageEl, api: a }) {
       #mp-dock .say input:focus { background:rgba(8,10,30,.9); outline:1px solid #6a78ff; }
       #mp-dock button.go { background:rgba(40,60,160,.8); color:#fff; border:0; border-radius:4px; padding:3px 9px; cursor:pointer; }
       #mp-dock .pl { padding:4px 2px; border-bottom:1px solid rgba(120,130,220,.2); } #mp-dock .pl .nm { font-size:13px; }
+      #mp-dock .lg { padding:4px 2px 6px; margin-bottom:3px; border-bottom:1px solid rgba(120,130,220,.35); }
+      #mp-dock .lg .lgh { color:#cfd6ff; font:bold 10px monospace; letter-spacing:.6px; }
+      #mp-dock .lg .cur { color:#e8ecff; font-size:11px; }
+      #mp-dock .lg .champ, .mp-win .sub.champ { color:#ffd34d; font-weight:bold; }
+      #mp-dock .pl .chmp { color:#ffd34d; font:bold 9px monospace; letter-spacing:1px; }
       .mp-sub, #mp-dock .sub { color:#aab3e8; font-size:11px; }
       #mp-dock .acts, .mp-win .acts { display:flex; gap:4px; margin-top:3px; }
       #mp-dock .acts button, .mp-win button { background:rgba(50,60,150,.85); color:#fff; border:1px solid rgba(140,150,240,.5); border-radius:4px; padding:2px 8px; font:inherit; cursor:pointer; }
@@ -583,8 +714,9 @@ export function installSocial({ stageEl, api: a }) {
         else if (type === "trade") onTrade(d);
         else if (type === "duel") onDuel(d);
         else if (type === "coop") onCoop(d);
+        else if (type === "league") onLeague(d);
         else if (type === "status") {
-            if (d.status !== "online") { if (trade) endTrade(); if (duel && duel.st !== "fight") endDuel(); closeInspect(); partner = null; partyAsk = null; if (coop) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); } }
+            if (d.status !== "online") { if (trade) endTrade(); if (duel && duel.st !== "fight") endDuel(); closeInspect(); partner = null; partyAsk = null; clearLeague(); if (coop) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); } }
             dock.style.display = d.status === "online" && !api.busy() ? "" : "none";
             badge();
         }
