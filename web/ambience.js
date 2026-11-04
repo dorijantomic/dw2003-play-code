@@ -1010,6 +1010,7 @@ export function installFxPanel(stageEl) {
       #fx-panel label { display:flex; gap:8px; align-items:center; cursor:pointer; }
       #fx-panel select, #fx-panel button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:4px; padding:2px 6px; font:inherit; }
       #fx-panel .row { display:flex; gap:6px; margin-top:8px; }
+      #fx-panel .row[hidden] { display:none; }
       #fx-toast { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:50; padding:6px 14px; border-radius:8px; background:#000b; color:#fff; font:600 14px 'Segoe UI',system-ui,sans-serif; pointer-events:none; opacity:0; transition:opacity .3s; }
       #fx-rec { position:absolute; top:14px; left:14px; z-index:50; width:14px; height:14px; border-radius:7px; background:#e33; box-shadow:0 0 8px #e33; pointer-events:none; display:none; }
       #fx-panel input[type=range] { width:84px; }

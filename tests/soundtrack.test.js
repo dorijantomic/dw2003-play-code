@@ -125,6 +125,77 @@ test("field and battle themes loop; jingles ring once", () => {
     assert.equal(playMode("jingle"), "jingle");
 });
 
+// A tiny author-CSS cascade, enough for the panel's flat rule list (id/class/
+// attribute compounds and descendant selectors). The browser cannot be asked
+// here, and the bug this guards is exactly a cascade one: the panel's own
+// `#fx-panel .row { display:flex }` beats the browser's [hidden] rule, so the
+// row needs a hide rule of its own that wins.
+function authorRules(css) {
+    const rules = [];
+    const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        const decls = {};
+        for (const d of m[2].split(";")) {
+            const i = d.indexOf(":");
+            if (i > 0) decls[d.slice(0, i).trim()] = d.slice(i + 1).trim();
+        }
+        rules.push({ selectors: m[1].split(",").map((s) => s.trim().replace(/\s+/g, " ")).filter(Boolean), decls });
+    }
+    return rules;
+}
+const compoundMatches = (compound, el) => {
+    const parts = compound.match(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|[a-z][\w-]*/gi) || [];
+    return parts.every((p) => {
+        if (p[0] === "#") return el.id === p.slice(1);
+        if (p[0] === ".") return el.classes.includes(p.slice(1));
+        if (p[0] === "[") return el.attrs.includes(p.slice(1, -1).split("=")[0].trim());
+        return el.tag === p.toLowerCase();
+    });
+};
+function selectorMatches(sel, el) {
+    const parts = sel.split(" ").filter(Boolean);
+    if (!parts.length || !compoundMatches(parts[parts.length - 1], el)) return false;
+    let node = el.parent;
+    for (let i = parts.length - 2; i >= 0; i--) {
+        while (node && !compoundMatches(parts[i], node)) node = node.parent;
+        if (!node) return false;
+        node = node.parent;
+    }
+    return true;
+}
+const specificity = (sel) => [
+    (sel.match(/#[\w-]+/g) || []).length,
+    (sel.match(/\.[\w-]+|\[[^\]]+\]/g) || []).length,
+];
+const outranks = (a, b) => a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1];
+// Which display value an element gets from the panel's rules. Author rules
+// always beat the browser's own [hidden] rule (author origin > user agent).
+function displayFor(css, el) {
+    let best = null;
+    for (const rule of authorRules(css)) {
+        if (!("display" in rule.decls)) continue;
+        for (const sel of rule.selectors) {
+            if (!selectorMatches(sel, el)) continue;
+            const spec = specificity(sel);
+            if (!best || outranks(spec, best.spec) >= 0) best = { spec, value: rule.decls.display };
+        }
+    }
+    if (best) return best.value;
+    return el.attrs.includes("hidden") ? "none" : "block";
+}
+
+test("the gated row really hides while the F2 switch is off", () => {
+    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const style = ambience.match(/css\.textContent = `([\s\S]*?)`;/);
+    assert.ok(style, "the panel still injects one style block");
+    const panel = { tag: "div", id: "fx-panel", classes: [], attrs: [], parent: null };
+    const row = (hidden) => ({ tag: "div", id: "fx-soundtrack", classes: ["row"], attrs: hidden ? ["hidden"] : [], parent: panel });
+    assert.match(ambience, /id="fx-soundtrack" hidden/, "the row ships hidden");
+    assert.match(ambience, /snd\.hidden = !fx\.soundtrack/, "refreshPanel follows the switch");
+    assert.equal(displayFor(style[1], row(true)), "none", "switch off: the row is not rendered");
+    assert.equal(displayFor(style[1], row(false)), "flex", "switch on: the row still lays out as a row");
+});
+
 test("the page plays through the game's own bgm player and is only linked from the gated F2 row", () => {
     const page = readFileSync(new URL("../web/soundtrack.html", import.meta.url), "utf8");
     assert.match(page, /import\s*\{[^}]*createBgmPlayer[^}]*\}\s*from\s*"\.\/audio\.js"/, "the page plays through web/audio.js");
