@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIT ledger — where the money comes from and where it goes</title>
+<style>
+  :root { --ink:#ffd34d; --dim:#8a8ab0; --line:#1a2540; --good:#8fe08f; --warn:#e0a080; --bg:#0a0e1a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#e8e8f0; font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; }
+  header { position:sticky; top:0; z-index:2; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap;
+           padding:10px 16px; background:var(--bg); border-bottom:1px solid #333; }
+  h1 { margin:0; font-size:16px; letter-spacing:1px; color:var(--ink); }
+  #count { color:var(--dim); font-size:12px; }
+  #hint { padding:9px 16px 0; color:var(--dim); font-size:12px; line-height:1.6; max-width:1100px; }
+  #hint b { color:var(--ink); font-weight:600; }
+  main { padding:4px 16px 40px; }
+  section { margin-top:22px; }
+  h2 { font-size:13px; color:var(--ink); letter-spacing:1px; text-transform:uppercase; margin:0 0 6px; }
+  h2 span { color:var(--dim); text-transform:none; letter-spacing:0; font-weight:400; }
+  .note { color:var(--dim); font-size:11.5px; margin:0 0 8px; max-width:1000px; }
+  #cap { display:flex; gap:10px; flex-wrap:wrap; }
+  .cap { flex:0 0 auto; border:1px solid var(--line); background:#0d1424; padding:7px 11px; border-radius:6px; }
+  .cap b { color:var(--ink); font-size:15px; }
+  .cap span { color:var(--dim); display:block; font-size:11.5px; }
+  .split { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:18px; align-items:start; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:3px 8px; border-bottom:1px solid #111a2e; }
+  thead th { color:var(--dim); font-size:10px; letter-spacing:1px; text-transform:uppercase; border-bottom:1px solid #333; }
+  td.num { text-align:right; color:var(--good); white-space:nowrap; }
+  td.id { width:52px; color:#5a6a8a; font-size:11px; }
+  td.name { color:#ffe08a; }
+  .unpriced { color:var(--warn); }
+  .box { border:1px solid var(--line); border-radius:6px; background:#0d1424; max-height:420px; overflow:auto; }
+  .box h3 { position:sticky; top:0; margin:0; padding:6px 10px; background:#111a2e; color:var(--ink);
+            font-size:12px; font-weight:600; border-bottom:1px solid var(--line); }
+  .box h3 span { color:var(--dim); font-weight:400; }
+  .none { padding:10px; color:var(--dim); }
+  .stat { display:flex; gap:22px; flex-wrap:wrap; padding:8px 0 10px; }
+  .stat div { border-left:2px solid var(--line); padding-left:9px; }
+  .stat b { display:block; color:var(--ink); font-size:17px; }
+  .stat span { color:var(--dim); font-size:11px; }
+  .sellrow { display:flex; gap:8px; padding:2px 10px; border-bottom:1px solid #111a2e; font-size:12px; }
+  .sellrow .id { flex:0 0 40px; color:#5a6a8a; }
+  .sellrow .nm { flex:1 1 auto; }
+  .sellrow .pr { flex:0 0 110px; text-align:right; color:var(--good); }
+  footer { margin-top:26px; padding-top:10px; border-top:1px solid #1d2a40; color:#7f95b2; font-size:11.5px; max-width:1000px; }
+  footer code { color:#9ab3d3; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BIT LEDGER</h1>
+  <span id="count">loading…</span>
+</header>
+<div id="hint">
+  The whole economy in the disc's own numbers: the <b>9,999,999 BIT</b> ceiling, what fights pay,
+  what people hand over, what every shop charges at most, what a bed costs in every inn, and the
+  pieces no shop sells but still pays for. This page does not rank fights for experience — that is
+  the Grind planner's job — and it prints no live balance: every figure comes from the shipped tables.
+</div>
+<main>
+  <section id="cap">
+    <div class="cap"><b id="capmax">…</b><span>the wallet's ceiling</span></div>
+    <div class="cap"><b id="capnear">…</b><span>a small win into a nearly full wallet</span></div>
+    <div class="cap"><b id="capbuy">…</b><span>the dearest thing a full wallet can buy</span></div>
+  </section>
+
+  <section id="fights">
+    <h2>What fights pay <span id="fightcount"></span></h2>
+    <p class="note">The bits column of the 335-screen reward table. Five screen ids pay nothing, so the
+      spread is taken over the fights that pay; the twenty best are listed dearest first, ties by screen id.</p>
+    <div class="stat" id="fightspread"></div>
+    <div class="box" id="fightbox">
+      <h3>The twenty best fights <span>payout in BIT</span></h3>
+      <table><thead><tr><th>Screen</th><th style="text-align:right">Bits</th></tr></thead><tbody id="fightrows"></tbody></table>
+    </div>
+  </section>
+
+  <div class="split">
+    <section id="grants">
+      <h2>The money grants <span id="grantcount"></span></h2>
+      <p class="note">The bank-0x70 table: people who hand over BIT once, and the stage each one happens on.</p>
+      <div class="box">
+        <h3>People who give you money</h3>
+        <table><thead><tr><th>Stage</th><th>NPC</th><th style="text-align:right">Bits</th></tr></thead><tbody id="grantrows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="inns">
+      <h2>What a bed costs <span id="inncount"></span></h2>
+      <p class="note">All the inns, cheapest first, at each inn's own price per Digimon.</p>
+      <div class="box">
+        <h3>Inn tariffs</h3>
+        <table><thead><tr><th>Inn</th><th>Map</th><th style="text-align:right">Bits</th></tr></thead><tbody id="innrows"></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <section id="shops">
+    <h2>What shops charge <span id="shopcount"></span></h2>
+    <p class="note">Every shop, showing the dearest piece of its stock and that piece's own
+      buy price. The disc's unopened shop lists stock but no prices, so it shows no price at all.</p>
+    <div class="box">
+      <h3>Dearest stock per shop</h3>
+      <table><thead><tr><th>Shop</th><th>Dearest piece</th><th style="text-align:right">Bits</th></tr></thead><tbody id="shoprows"></tbody></table>
+    </div>
+  </section>
+
+  <section id="shelf">
+    <h2>The sell shelf <span id="shelfcount"></span></h2>
+    <p class="note">Pieces no shop ever sells — no buy price — but a shop still pays for them, dearest sale first.</p>
+    <div class="box">
+      <h3>No shop sells it, a shop pays for it</h3>
+      <table><thead><tr><th>#</th><th>Item</th><th style="text-align:right">Sells for</th></tr></thead><tbody id="shelfrows"></tbody></table>
+    </div>
+  </section>
+
+  <footer>
+    Sources: <code>web/assets/data/progression.json</code> (battle_rewards),
+    <code>web/assets/data/bank70_money_grants.json</code>,
+    <code>web/assets/data/shops.json</code>,
+    <code>web/assets/data/inn_ui.json</code> and
+    <code>web/assets/data/item_effects.json</code>. The 9,999,999 ceiling is
+    <code>engine/systems/shop-manager.ts</code>'s own <code>MONEY_CAP</code> (the disc's 0x98967F).
+  </footer>
+</main>
+<script type="module" src="./bit-ledger-page.js"></script>
+</body>
+</html>
