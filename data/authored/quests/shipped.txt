@@ -39,3 +39,4 @@ am1_barbie_oink_mode
 am1_mickey_upstairs
 am1_donald_stairs
 am1_olivia_lobby
+g_bridge_golden
