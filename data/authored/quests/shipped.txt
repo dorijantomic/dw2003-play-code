@@ -40,3 +40,4 @@ am1_mickey_upstairs
 am1_donald_stairs
 am1_olivia_lobby
 g_bridge_golden
+g_dri_mixup
