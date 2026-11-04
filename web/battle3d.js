@@ -1893,6 +1893,53 @@ export function fitGiantNearCamera(cam, slot, rest, target = null, opts = {}) {
   };
 }
 
+// ── Giant mode part 1: any fighter can be scaled ──────────────────────────────
+// The battle renderer draws each side at MODEL_SCALE × that side's own scale (1 = the shipped
+// size, the default), and the body plus its hit/camera box grow about its feet because the
+// scale is applied about the fighter's slot in _updateSkeletalVBOGL. F2 -> Extras -> "Giant
+// mode" gates the whole feature: with it off the battle never sets a scale, so both sides stay
+// at 1 and every frame is the one the game drew before.
+export const FIGHTER_SCALE_MIN = 0.1;   // 1/10 of the shipped body
+export const FIGHTER_SCALE_MAX = 16;    // 16x the shipped body
+export const GIANT_FIT_K = 1.6;         // a normal body this many times its size opens the giant fit
+export const GIANT_FIT_MIN_K = 0.7;     // a giant shrunk below this loses the fit (ordinary path)
+
+/** A fighter's size multiplier, clamped to the band the renderer can draw. */
+export function clampFighterScale(k) {
+  const n = Number(k);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.min(FIGHTER_SCALE_MAX, Math.max(FIGHTER_SCALE_MIN, n));
+}
+
+/** The per-side scale store, pure so node tests can pin it without a WebGL context. */
+export function createFighterScaleState() {
+  const scales = { player: 1, enemy: 1 };
+  const sideOf = (side) => (side === "enemy" ? "enemy" : "player");
+  return {
+    scales,
+    setFighterScale(side, k) {
+      const s = sideOf(side);
+      scales[s] = clampFighterScale(k);
+      return scales[s];
+    },
+    fighterScale(side) { return scales[sideOf(side)]; },
+  };
+}
+
+/** One Digimon's rest-pose body, grown by its own scale, for the camera fit's body box. */
+export function scaledRest(rest, k) {
+  if (!rest) return null;
+  const m = clampFighterScale(k);
+  return { h: (rest.h ?? 0) * m, w: (rest.w ?? 0) * m };
+}
+
+/** Whether our near camera needs the giant refit for this body: a giant at its own size (or
+ *  nearly — below 0.7x it is ordinary), or a normal body drawn at 1.6x or more. */
+export function usesGiantFit(folder, k = 1) {
+  const m = clampFighterScale(k);
+  return isGiant(folder) ? m >= GIANT_FIT_MIN_K : m >= GIANT_FIT_K;
+}
+
 /**
  * The contact-marker sound substitution, read out of fightstg F0x8008c454 (the op10
  * handler, .L0x8008c4a0 / .L0x8008c4d4):
@@ -1951,6 +1998,9 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
 
   // World up axis. Eye/look are computed per-frame by the cinematic camera (see render()).
   const UP = [0, 1, 0];
+  // Giant mode part 1: per-side body scale (1 = MODEL_SCALE, as shipped). Only the battle's
+  // F2-gated entry path ever sets it; until then both sides draw exactly as before.
+  const fighterScale = createFighterScaleState();
 
   // Arena dimensions (world units). Large enough to read as a ground plane across the
   // deep player→enemy axis (player ~z+220, enemy ~z-360).
@@ -2577,7 +2627,12 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     const rec = key != null ? placementTable[key] : null;
     if (!rec) return null;
     if ((rec.camera?.eye?.length | 0) >= 12) { giantNearCam = false; return rec.camera; }
-    if (fittedNearCam?.folder === playerFolder) { giantNearCam = fittedNearCam.giant; return fittedNearCam.cam; }
+    // Giant mode part 1: the fit's subject is the body as DRAWN, so the cached table is keyed
+    // by the live scale as well as by the model folder.
+    const playerScale = fighterScale.fighterScale("player");
+    if (fittedNearCam?.folder === playerFolder && fittedNearCam.scale === playerScale) {
+      giantNearCam = fittedNearCam.giant; return fittedNearCam.cam;
+    }
     if (!camRefSizes && !camRefLoading) {
       camRefLoading = true;
       fetch("assets/battle/camera_ref_sizes.json").then((r) => (r.ok ? r.json() : null)).then((j) => { camRefSizes = j?.sizes ?? null; }, () => {});
@@ -2596,14 +2651,17 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     // framed by the reference partner's own close near shots, which crop a body this size to its
     // legs and torso; dolly each shot back until the whole body (and the target, when the shot
     // has it in front) is inside the frame. Small models are outside the band and keep today's
-    // shots; a shot that already fits is kept exactly (fitGiantNearCamera's identity).
+    // shots; a shot that already fits is kept exactly (fitGiantNearCamera's identity). Giant mode
+    // part 1 widens that band: a normal body drawn at 1.6x or more needs the same refit, and a
+    // giant shrunk below 0.7x goes back to the ordinary path. Both the body box and the opposing
+    // fighter's centre are the SCALED ones, because that is what the frame holds.
     let giant = false;
     let giantShots = null;
-    if (giantCamFit && isGiant(playerFolder)) {
+    if (giantCamFit && usesGiantFit(playerFolder, playerScale)) {
       const eSlot = enemyAnim8r?.homeSlot;
-      const eRest = enemyModel ? modelRestSize(enemyModel) : null;
+      const eRest = enemyModel ? scaledRest(modelRestSize(enemyModel), fighterScale.fighterScale("enemy")) : null;
       const target = eSlot ? [eSlot.x, eSlot.y - 0.5 * (eRest?.h ?? 0), eSlot.z] : null;
-      const f = fitGiantNearCamera(cam, ownSlot, ownRest, target);
+      const f = fitGiantNearCamera(cam, ownSlot, scaledRest(ownRest, playerScale), target);
       cam = f.cam; giant = f.changed; giantShots = f.shots;
     }
     // The face close-up the same way, but scaled by HEIGHT alone, so it lands on the head
@@ -2617,7 +2675,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
         ownSlot.z + (p[2] - refSlot.z) * kh];
       face[side] = s ? { ...s, eye: fit(s.eye), target: fit(s.target) } : null;
     }
-    fittedNearCam = { folder: playerFolder, cam, face, giant, shots: giantShots };
+    fittedNearCam = { folder: playerFolder, scale: playerScale, cam, face, giant, shots: giantShots };
     giantNearCam = giant;
     return cam;
   }
@@ -5048,13 +5106,15 @@ void main() {
       const bwm = buildBoneWorldMatrices(playerModel, playerFrame, playerBlend,
         usePlayerA ? playerAnim8r?.currentHiddenParts?.() : null);
       pBwm = bwm;
-      pAABB = _updateSkeletalVBOGL(gl, playerModel, playerSkelBufs, bwm, playerPos, MODEL_SCALE, false, playerYaw);
+      pAABB = _updateSkeletalVBOGL(gl, playerModel, playerSkelBufs, bwm, playerPos,
+        MODEL_SCALE * fighterScale.fighterScale("player"), false, playerYaw);
     }
     if (enemyModel && enemySkelBufs) {
       const bwm = buildBoneWorldMatrices(enemyModel, enemyFrame, enemyBlend,
         useEnemyA ? enemyAnim8r?.currentHiddenParts?.() : null);
       eBwm = bwm;
-      eAABB = _updateSkeletalVBOGL(gl, enemyModel, enemySkelBufs, bwm, enemyPos, MODEL_SCALE, false, enemyYaw);
+      eAABB = _updateSkeletalVBOGL(gl, enemyModel, enemySkelBufs, bwm, enemyPos,
+        MODEL_SCALE * fighterScale.fighterScale("enemy"), false, enemyYaw);
       eAABBLast = eAABB;
     }
     if (extras.size) _updateExtras(alpha, ARENA);
@@ -6151,6 +6211,11 @@ void main() {
       return b ? b.min[1] : 0;
     },
     setGiantCameraFit,
+    /** Giant mode part 1: draw one side ("player" | "enemy") at k x its shipped size, clamped
+     *  0.1..16; k = 1 draws exactly as shipped. Returns the stored scale. */
+    setFighterScale: (side, k) => fighterScale.setFighterScale(side, k),
+    /** The scale that side is drawn at now (1 = MODEL_SCALE). */
+    getFighterScale: (side) => fighterScale.fighterScale(side),
     setSlowMotion,
     getAnimationReadout,
     setGameCamParam,
