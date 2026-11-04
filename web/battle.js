@@ -56,6 +56,7 @@ import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
 import { FIELD_CYCLE, fieldName, nextField } from "./field-war.js";
+import { battleDelta, battleSpeedOn } from "./battle-speed.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
 import {
@@ -5534,7 +5535,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
   }
 
+  /**
+   * The battle's whole frame: message clock, HP plate, blast cinematic and the 3D
+   * scene, all stepped by one dt. "Faster battles" (F2 -> Extras, off by default)
+   * scales that dt here -- and only here -- so a battle at x2 really is two
+   * battle-frames per frame while the field and cutscenes keep the game's own dt.
+   */
   function update(dt) {
+    if (battleSpeedOn(window.__fx)) dt = battleDelta(dt, window.__fx.battleSpeed);
     if (!battle) return;
     const b = battle;
     tickHudEase(dt);
