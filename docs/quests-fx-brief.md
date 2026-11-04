@@ -191,6 +191,23 @@ player's own foot box; keep it inside the map's open ground and end near where t
 Every ghost is cleared on every scene exit and when F2 Quests is switched off. It is a look, not a second body: a ghosted
 character still walks, talks and blocks like themselves.
 
+## Poses
+
+`{"anim": "talk", "who": 27, "face": "left"}` plays one of the character's own animation clips in place: it is the story
+scenes' own `SETANIM` opcode, so the VM latches the clip on the actor, sets the facing, and drops any walk already in
+progress. `face` takes a direction name or the game's facing index 0..7 and defaults to down. The player works as the
+actor too (`"who": "player"`).
+
+Only two clip meanings are known, and both are a working reading of the decode (**low confidence**): `idle` = 1 and
+`talk` = 7. Every other clip is written as the number the actor's own animation sheet holds (1..255), e.g.
+`{"anim": 5, "who": 27}`; what it looks like is unknown until someone plays it. There is no invented name for those: the
+compiler refuses a name it does not know, a number outside 1..255, and a facing outside 0..7, each as one error naming
+the value, so a scene never silently plays the wrong pose.
+
+The clip stays latched on that character until another `anim` step or the end of the scene; while they walk the walking
+clip is drawn and the pose comes back when they stop. Every scene exit clears it. Author it with
+`anim(who, clip, face=None)` in `dsl.py`.
+
 ## Walkable ground: where a scene may put a character
 
 The cutscene VM's own walk driver steps straight toward a target with **no collision test**: a `WALKTO` whose line

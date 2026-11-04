@@ -20,6 +20,10 @@
 //   { "wait": 30 }                                 pause, in frames (60 = one second)
 //   { "arrive": 27 }                               wait until that character has stopped walking
 //   { "face": 27, "dir": 6 }                       turn on the spot (0..7, the game's facing index)
+//   { "anim": "talk", "who": 27, "face": "left" }  play one of the actor's own animation clips on the spot (the game's own
+//                                                 SETANIM): "idle" (1) and "talk" (7) are the two clip meanings the research
+//                                                 reads (a working reading, low confidence); any other clip is the number the
+//                                                 actor's own sheet holds (1..255), never an invented name
 //   { "put": 27, "at": [x, y] }                    place a character (an NPC that is not on this map is spawned, if its
 //                                                  sprite is known, so a visitor can walk in from the edge)
 //   { "say": 27, "name": "Leomon", "text": "..." } speak, in the game's own conversation box. say: "player" for the
@@ -100,6 +104,9 @@ const isPlayer = (w) => w === "player";
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
 // the game's facing index (cutscene-manager DIR8); a scene may write the name instead
 const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right", "down-right"];
+// The only two clip meanings the research reads (field-actor-anim-engine.md; LOW confidence in the decode): 1 = idle,
+// 7 = talk. Every other clip is the number the actor's own animation sheet holds, so a name is never invented for it.
+export const ANIMS = { idle: 1, talk: 7 };
 // the facing index that looks along (vx, vy) in screen space (y grows downward)
 const lookAlong = (vx, vy) => [6, 7, 0, 1, 2, 3, 4, 5][(Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8];
 /**
@@ -279,6 +286,32 @@ export function compileScene(steps, opts = {}) {
             opcodes.push(`WAITIDLE ${idOf(s.arrive)}`);
         } else if ("wait" in s) {
             opcodes.push(`WAIT ${Math.max(1, num(s.wait, 30))}`);
+        } else if ("anim" in s) {
+            // One of the actor's own animation clips, latched the way the disc's own SETANIM latches it: the VM also stops a
+            // walk in progress and turns the actor (engine/systems/cutscene-manager.ts). Only idle and talk have a known
+            // meaning; every other clip is the number the actor's own sheet holds, so a made-up name is refused.
+            let clip;
+            if (typeof s.anim === "string") {
+                if (!Object.hasOwn(ANIMS, s.anim)) return bad(`anim ${JSON.stringify(s.anim)} is not a clip name (idle, talk); any other clip is its number 1 to 255`);
+                clip = ANIMS[s.anim];
+            } else if (Number.isInteger(s.anim) && s.anim >= 1 && s.anim <= 255) {
+                clip = s.anim;
+            } else {
+                return bad(`anim ${JSON.stringify(s.anim)} is not a clip name (idle, talk) or a clip number 1 to 255`);
+            }
+            if (s.who == null || !(isPlayer(s.who) || Number.isFinite(Number(s.who)))) return bad(`anim needs who: a character id or "player"`);
+            let f = 0;
+            if (s.face != null) {
+                if (typeof s.face === "string") {
+                    if (!DIRS.includes(s.face)) return bad(`anim face ${JSON.stringify(s.face)} is not one of ${DIRS.join(", ")}`);
+                    f = DIRS.indexOf(s.face);
+                } else if (Number.isInteger(s.face) && s.face >= 0 && s.face <= 7) {
+                    f = s.face;
+                } else {
+                    return bad(`anim face ${JSON.stringify(s.face)} is not 0 to 7`);
+                }
+            }
+            opcodes.push(`SETANIM ${idOf(s.who)} ${clip} ${f}`);
         } else if ("face" in s) {
             // turning on the spot is a walk to where the character already stands: it arrives on the first tick and sets the facing
             const p = opts.pos?.(idOf(s.face));
@@ -482,6 +515,8 @@ export function castOf(steps) {
         for (const k of ["walk", "arrive", "face", "put", "look", "say"]) {
             if (k in s && s[k] != null && !isPlayer(s[k]) && Number.isFinite(Number(s[k]))) ids.add(Number(s[k]));
         }
+        // a pose is played on a character (the step's own `who`, not its clip)
+        if (s.anim != null && s.who != null && !isPlayer(s.who) && Number.isFinite(Number(s.who))) ids.add(Number(s.who));
         // an effect or a camera pan may be placed or aimed relative to a character ("near": 27, { "pan": 27 })
         for (const near of [s.at?.near, s.pan && typeof s.pan === "object" ? s.pan.near : null]) {
             if (near != null && !isPlayer(near) && Number.isFinite(Number(near))) ids.add(Number(near));

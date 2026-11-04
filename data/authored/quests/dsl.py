@@ -117,6 +117,20 @@ def scene(npc, lines, ask=None, options=("I will do it", "Not now"), walk=True):
     return s + _home(npc)
 
 
+def anim(who, clip, face=None):
+    """Play one of the actor's own animation clips on the spot, and turn them (web/quest-scenes.js `anim`).
+
+    who   the character: an npc id, or "player"
+    clip  "idle" (1) or "talk" (7) -- the only two meanings the research reads -- or the number the actor's own
+          animation sheet holds (1..255). A walk or another anim replaces it; the clip lasts until then or the scene ends.
+    face  a direction name ("left") or the game's facing index 0..7; default 0 (down)
+    """
+    step = {"anim": clip if isinstance(clip, str) else int(clip), "who": who if isinstance(who, str) else int(who)}
+    if face is not None:
+        step["face"] = face if isinstance(face, str) else int(face)
+    return step
+
+
 # ------------------------------------------------------------------ scene events (web/quest-scenes.js)
 # The steps below need something the walking-and-talking vocabulary does not have: our own effect art, the screen, a
 # fight, the player's own height, or another map. They are data like every other step; the game performs them
