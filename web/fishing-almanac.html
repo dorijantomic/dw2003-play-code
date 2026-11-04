@@ -102,7 +102,7 @@ try {
     fetch("assets/data/fishing_spots.json").then((r) => r.json()),
     fetch("assets/data/field_encounters.json").then((r) => r.json()),
     fetch("assets/data/progression.json").then((r) => r.json()),
-    fetch("manifest.json").then((r) => r.json()),
+    fetch("assets/manifest.json").then((r) => r.json()),
   ]);
   rewards = progression.battle_rewards;
   rows = almanac(fish, encounters.screens, rewards, manifest.maps);

@@ -168,9 +168,15 @@ test("the page imports the pure module and reads the four shipped tables", () =>
     assert.match(page, /import\s*\{[^}]*\bcardmonStages\b[^}]*\}/, "the Cardmon filter comes from the module");
     assert.match(page, /import\s*\{[^}]*\bwaterIndex\b[^}]*\}/, "the species index comes from the module");
     for (const file of ["assets/data/fishing_spots.json", "assets/data/field_encounters.json",
-        "assets/data/progression.json", "manifest.json"]) {
+        "assets/data/progression.json", "assets/manifest.json"]) {
         assert.ok(page.includes(file), `the page fetches ${file}`);
     }
+    // The manifest shipped by build_assets.py sits in web/assets/; a bare
+    // "manifest.json" would be /manifest.json next to the page and 404 on a
+    // plain static server, so the assets prefix is part of the contract.
+    assert.match(page, /fetch\("assets\/manifest\.json"\)/, "the manifest is fetched from assets/");
+    assert.doesNotMatch(page, /["'`]manifest\.json["'`]/,
+        "no bare manifest.json without the assets prefix");
     assert.match(page, /id="cardmonOnly"/, "the Cardmon-only filter");
     assert.match(page, /id="species"/, "the species index");
 });
