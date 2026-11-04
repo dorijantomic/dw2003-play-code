@@ -201,11 +201,12 @@ test("R1 turns to the wild tab and L1 back, each tab keeping its own rows and pa
   assert.equal(codexTab(), "partners");
   assert.equal(codexPageIndex(), 0, "coming back to a tab starts at its first page");
   assert.equal(codexPageRows()[0].name, "Kotemon");
-  // L1 on the first tab wraps to the last one — since the Battlefields tab was added that
-  // is BATTLEFIELDS (the Clips and Loadout tabs sit before it, and the encounter finder
+  // L1 on the first tab wraps to the last one — since both tabs were added, that is DROPS
+  // (BATTLEFIELDS sits just before it, then Clips and Loadout, and the encounter finder
   // before them has no rows in this book).
   codexPress("l1");
-  assert.equal(codexTab(), "battlefields");
+  assert.equal(codexTab(), "drops");
+  assert.equal(codexPageRows()[0].item, "ArmorChip", "the drop finder is the last tab");
   assert.equal(codexPageIndex(), 0);
   // and R1 on the last tab wraps back to PARTNERS
   codexPress("r1");

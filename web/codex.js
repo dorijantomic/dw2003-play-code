@@ -70,6 +70,15 @@
 // manifest's map names; the tab's own load happens the first time it is landed on, so a
 // player who never opens it pays nothing. Square jumps between the four sections.
 //
+// The DROPS tab (the seventh) is the drop finder: one row per item the disc really drops,
+// and for the open item every enemy that drops it, the disc's own odds and every stage pool
+// each of those enemies can be met in. The doubles are read from enemies.json (`drop_item`,
+// `drop_rate`; `Null` and the eight Cardmon rows drop nothing), the pools from the same two
+// encounter tables part 3 reads, and the item's own record from items.json (`catalog` key
+// items + the 83 `items` consumables). The odds are the disc's, not a percentage: a rate byte
+// of 128 means (128 + 1) in 1024 per win, so the page prints "129 in 1024", never "12.8%".
+// The tab only reads; the browser's own drop roll in web/battle.js is not touched.
+//
 // OFF unless F2 -> Extras -> "Digimon Codex (new)" is switched on (web/ambience.js).
 // It opens on that switch's rising edge, owns the pad while it is up (L1/R1 tab,
 // Left/Right page, Up/Down row, Cross/Start close; the ENCOUNTERS tab also takes
@@ -89,8 +98,8 @@ const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const STATUS_LABELS = { poison: "Poison", paralyze: "Paralyze", confuse: "Confuse", sleep: "Sleep", ko: "KO" };
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
-const TAB_NAMES = ["partners", "wild", "encounters", "loadout", "clips", "battlefields"];
-const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT", clips: "CLIPS", battlefields: "BATTLEFIELDS" };
+const TAB_NAMES = ["partners", "wild", "encounters", "loadout", "clips", "battlefields", "drops"];
+const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS", loadout: "LOADOUT", clips: "CLIPS", battlefields: "BATTLEFIELDS", drops: "DROPS" };
 
 const pick = (source, keys) =>
   Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
@@ -412,6 +421,122 @@ export function dropText(row) {
   return name === "Null" ? "none" : name;
 }
 
+// --------------------------------------------------------------- drop finder
+
+/** Plain code-unit order, so the list is the same on every machine. */
+const nameOrder = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The disc's drop odds for one rate byte: the fight rolls `rate + 1` in 1024, so the
+ * byte 128 is 129 in 1024 per win, never "12.8%". Pure.
+ */
+export function dropOdds(rate) {
+  return { n: (Number(rate) || 0) + 1, of: 1024 };
+}
+
+/** Every stage number a species' real encounter pools can roll, ascending. Pure. */
+export function enemyStages(stageIndex, enemy) {
+  const rows = stageIndex?.bySpecies instanceof Map ? stageIndex.bySpecies.get(enemy) ?? [] : [];
+  const stages = [];
+  for (const row of rows) {
+    const stage = Number(row?.stage);
+    if (Number.isFinite(stage) && !stages.includes(stage)) stages.push(stage);
+  }
+  return stages.sort((a, b) => a - b);
+}
+
+/**
+ * Every real dropped item in an enemies.json-shaped table (`{enemies: [...]}` or the array
+ * itself), indexed by item name:
+ *
+ *   byItem: Map<item, {droppers: [{enemy, rate, odds}], stages: [stage, ...]}>
+ *
+ * The disc's one `Null` placeholder and the eight Cardmon rows are skipped, as is every
+ * enemy whose `drop_item` is the `Null` placeholder: those 92 rows name the 78 real items.
+ * A dropper's `odds` is `{n: rate + 1, of: 1024}` (the fight's own roll, not a percentage),
+ * and the entry's `stages` is the union of its droppers' real pools from `stageIndex`
+ * (part 3's encounterIndex). Nothing is invented: no pool means an empty stage list. Pure.
+ */
+export function dropIndex(enemies, stageIndex = null) {
+  const list = Array.isArray(enemies) ? enemies : Array.isArray(enemies?.enemies) ? enemies.enemies : [];
+  const byItem = new Map();
+  for (const e of list) {
+    const enemy = typeof e?.enemy_id === "string" ? e.enemy_id : "";
+    const item = typeof e?.drop_item === "string" ? e.drop_item : "Null";
+    if (!enemy || enemy === "Null" || /^Cardmon\d*$/.test(enemy)) continue;  // placeholder + Cardmon rows
+    if (item === "Null") continue;                                           // this enemy drops nothing
+    const rate = Number(e.drop_rate) || 0;
+    let entry = byItem.get(item);
+    if (!entry) {
+      entry = { droppers: [], stages: [] };
+      byItem.set(item, entry);
+    }
+    entry.droppers.push({ enemy, rate, odds: dropOdds(rate) });
+    for (const stage of enemyStages(stageIndex, enemy)) {
+      if (!entry.stages.includes(stage)) entry.stages.push(stage);
+    }
+  }
+  for (const entry of byItem.values()) entry.stages.sort((a, b) => a - b);
+  return { byItem };
+}
+
+/** The item names the index holds, alphabetically. Pure. */
+export function dropItems(index) {
+  const names = index?.byItem instanceof Map ? [...index.byItem.keys()] : [];
+  return names.sort(nameOrder);
+}
+
+/**
+ * One item's entry as the tab lists it: `{item, droppers, stages}`, or null for a name the
+ * index does not hold. The lookup ignores case and surrounding spaces. Pure.
+ */
+export function dropEntry(index, item) {
+  if (!(index?.byItem instanceof Map)) return null;
+  const wanted = String(item ?? "").trim();
+  if (!wanted) return null;
+  const name = dropItems(index).find((n) => n.toLowerCase() === wanted.toLowerCase());
+  if (!name) return null;
+  const entry = index.byItem.get(name);
+  return { item: name, droppers: entry.droppers, stages: entry.stages };
+}
+
+/**
+ * The item entries matching `query`: an exact name (ignoring case and spaces) wins outright,
+ * otherwise every name containing the text; an empty query is every item. An invented item
+ * is an empty list, never a made-up row. Pure.
+ */
+export function dropSearch(index, query = "") {
+  const names = dropItems(index);
+  const q = String(query ?? "").trim().toLowerCase();
+  if (!q) return names.map((n) => dropEntry(index, n));
+  const exact = names.filter((n) => n.toLowerCase() === q);
+  const hit = exact.length ? exact : names.filter((n) => n.toLowerCase().includes(q));
+  return hit.map((n) => dropEntry(index, n));
+}
+
+/**
+ * One item's record from items.json (`{catalog, items}` — the 402 key items and the 83
+ * consumables — or a bare array). Both lists are name sources; the richer `items` record
+ * wins when a name is in both. An unknown name is null, never a guessed record. Pure.
+ */
+export function itemByName(items, name) {
+  const wanted = String(name ?? "").trim();
+  if (!wanted) return null;
+  const list = Array.isArray(items)
+    ? items
+    : [
+      ...(Array.isArray(items?.catalog) ? items.catalog : []),
+      ...(Array.isArray(items?.items) ? items.items : []),
+    ];
+  let found = null;
+  for (const record of list) {
+    if (!record || typeof record.name !== "string") continue;
+    if (record.name === wanted) found = record;
+    else if (!found && record.name.toLowerCase() === wanted.toLowerCase()) found = record;
+  }
+  return found;
+}
+
 const S = {
   open: false,          // the book is up
   wasOn: false,         // the F2 flag last frame: the book opens on its rising edge only
@@ -425,6 +550,9 @@ const S = {
   enc: null,            // {bySpecies, rows} from stage_encounters + field_encounters
   encQuery: "",         // the encounter finder's name filter
   encEntries: [],       // one {name, rows, stages} per species matching the filter
+  items: null,          // items.json (catalog + items): the drop finder's name source
+  drop: null,           // {byItem} from enemies.json + the encounter pools
+  dropEntries: [],      // the DROPS tab's rows: one {item, droppers, stages} per dropped item
   loadoutRows: [],      // one {folder, names} per model pack (battle/models/index.json)
   loadoutLoading: null, // the small tables' load (index.json + the technique/sound tables)
   loadoutFetch: null,   // the fetch the tab was installed with (tests); null = globalThis.fetch
@@ -463,6 +591,9 @@ export function codexReset() {
   S.enc = null;
   S.encQuery = "";
   S.encEntries = [];
+  S.items = null;
+  S.drop = null;
+  S.dropEntries = [];
   S.loadoutRows = [];
   S.loadoutLoading = null;
   S.loadoutFetch = null;
@@ -493,9 +624,10 @@ export function codexReset() {
  * `enemies` is enemies.json (the whole object or its array), `models` model_map.json;
  * both are optional so a partner-only caller keeps working. `encounters` is
  * `{stages, screens, maps}` — stage_encounters.json, field_encounters.json and the
- * manifest — and is optional for the same reason: no finder tab, no index.
+ * manifest — and is optional for the same reason: no finder tab, no index. `items` is
+ * items.json (the drop finder's name source) and is optional too.
  */
-export function setCodexData(digimon, evolutions, enemies = null, models = null, encounters = null) {
+export function setCodexData(digimon, evolutions, enemies = null, models = null, encounters = null, items = null) {
   const rows = partnerRows(digimon, Array.isArray(digimon) ? [] : digimon?.skills);
   S.rows = rows;
   S.pages = codexPages(rows, PER_PAGE);
@@ -514,6 +646,9 @@ export function setCodexData(digimon, evolutions, enemies = null, models = null,
   S.maps = mapList(enc.maps);      // the Battlefields tab reuses the same map list
   S.encQuery = "";
   S.encEntries = encounterEntries(S.enc);
+  S.items = items && typeof items === "object" ? items : null;
+  S.drop = dropIndex(enemyList, S.enc);
+  S.dropEntries = dropSearch(S.drop, "");
 
   const lineByRoot = new Map();
   const linesOf = new Map();
@@ -535,16 +670,16 @@ const asJson = (value) => (typeof value?.json === "function" ? value.json() : va
 /**
  * Fetch and install the tables through the page's own fetch, so the extra roster's
  * wrapped fetch has already merged the added species and their line records. The wild
- * tables (enemies.json + model_map.json) and the finder tables (stage_encounters.json,
- * field_encounters.json and manifest.json's map names) ride the same load. Cached per
- * book load. `fetchJson` is injectable for tests.
+ * tables (enemies.json + model_map.json), the finder tables (stage_encounters.json,
+ * field_encounters.json and manifest.json's map names) and the drop finder's item names
+ * (items.json) ride the same load. Cached per book load. `fetchJson` is injectable for tests.
  */
 export function codexLoad(fetchJson = globalThis.fetch) {
   if (S.loading) return S.loading;
   if (typeof fetchJson !== "function") return Promise.resolve(false);
   S.loading = (async () => {
     try {
-      const [digimon, evolutions, enemies, models, stageEncounters, fieldEncounters, manifest] = await Promise.all([
+      const [digimon, evolutions, enemies, models, stageEncounters, fieldEncounters, manifest, items] = await Promise.all([
         Promise.resolve(fetchJson("assets/data/digimon.json")).then(asJson),
         Promise.resolve(fetchJson("assets/data/evolutions.json")).then(asJson),
         Promise.resolve(fetchJson("assets/data/enemies.json")).then(asJson),
@@ -552,12 +687,13 @@ export function codexLoad(fetchJson = globalThis.fetch) {
         Promise.resolve(fetchJson("assets/data/stage_encounters.json")).then(asJson),
         Promise.resolve(fetchJson("assets/data/field_encounters.json")).then(asJson),
         Promise.resolve(fetchJson("assets/manifest.json")).then(asJson),
+        Promise.resolve(fetchJson("assets/data/items.json")).then(asJson),
       ]);
       setCodexData(digimon, evolutions, enemies, models, {
         stages: stageEncounters,
         screens: fieldEncounters,
         maps: manifest,
-      });
+      }, items);
       S.error = null;
       return true;
     } catch (err) {
@@ -764,7 +900,7 @@ export function codexOpen() {
   return S.open;
 }
 
-/** Which part of the book is up: "partners", "wild", "encounters", "loadout", "clips" or "battlefields". */
+/** Which part of the book is up: "partners", "wild", "encounters", "loadout", "clips", "battlefields" or "drops". */
 export function codexTab() {
   return S.tab;
 }
@@ -776,6 +912,7 @@ function tabPages() {
   if (S.tab === "clips") return CLIP_PAGES;
   if (S.tab === "loadout") return codexPages(S.loadoutRows, PER_PAGE);
   if (S.tab === "battlefields") return codexPages(S.bfRows, PER_PAGE);
+  if (S.tab === "drops") return codexPages(S.dropEntries, PER_PAGE);
   return S.pages;
 }
 /** The rows of the tab that is up (the finder's entries hold one species each). */
@@ -785,6 +922,7 @@ function tabRows() {
   if (S.tab === "clips") return CLIP_NAMES_62;
   if (S.tab === "loadout") return S.loadoutRows;
   if (S.tab === "battlefields") return S.bfRows;
+  if (S.tab === "drops") return S.dropEntries;
   return S.rows;
 }
 
@@ -839,6 +977,9 @@ function tabHasContent(tab) {
   if (tab === "loadout") return true;
   // The Battlefields tab likewise: its four tables are fetched the first time it lands.
   if (tab === "battlefields") return true;
+  // The DROPS tab needs the enemies table and the encounter pools; without them there is
+  // nothing to find, so the ring skips it exactly like the other table-backed tabs.
+  if (tab === "drops") return S.dropEntries.length > 0;
   return S.rows.length > 0;
 }
 
@@ -846,8 +987,8 @@ function tabHasContent(tab) {
 function switchTab(delta) {
   let i = TAB_NAMES.indexOf(S.tab);
   if (i < 0) i = 0;
-  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT -> CLIPS -> BATTLEFIELDS and L1 walks
-  // the same ring backwards. A tab with no rows (e.g. the finder before its tables have
+  // R1 walks PARTNERS -> WILD -> ENCOUNTERS -> LOADOUT -> CLIPS -> BATTLEFIELDS -> DROPS and
+  // L1 walks the same ring backwards. A tab with no rows (e.g. the finder before its tables have
   // loaded) is skipped, so the pad never lands on a blank page.
   for (let step = 0; step < TAB_NAMES.length; step++) {
     i = (i + delta + TAB_NAMES.length) % TAB_NAMES.length;
@@ -974,12 +1115,12 @@ function nextBattlefieldSection() {
 }
 
 /**
- * The pad while the book is up: L1/R1 turn between PARTNERS, WILD and ENCOUNTERS,
- * Left/Right turn a page (wrapping), Up/Down move the row cursor (walking over a page
- * edge), Cross/Start close it, every other press is swallowed. On the ENCOUNTERS tab a
- * single character or Backspace edits the name filter instead and Triangle goes back to
- * WILD. On BATTLEFIELDS, Square jumps to the next of its four sections. Returns false
- * when the book is closed, so the press falls through exactly as before.
+ * The pad while the book is up: L1/R1 turn between the book's parts, Left/Right turn a
+ * page (wrapping), Up/Down move the row cursor (walking over a page edge), Cross/Start
+ * close it, every other press is swallowed. On the ENCOUNTERS tab a single character or
+ * Backspace edits the name filter instead and Triangle goes back to WILD. On
+ * BATTLEFIELDS, Square jumps to the next of its four sections. Returns false when the
+ * book is closed, so the press falls through exactly as before.
  */
 export function codexPress(button) {
   if (!S.open) return false;
@@ -1375,6 +1516,167 @@ function drawEncounters(ctx, W, H) {
   ctx.fillStyle = "#7a90b0";
   ctx.textAlign = "left";
   ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: species    Triangle: back    Cross / Start: close", left, bottom + 8);
+  ctx.restore();
+  return true;
+}
+
+/** The DROPS tab's right column: the item's own record, the disc's odds, and each dropper's stages. */
+function drawDropDetail(ctx, entry, tx, top, width) {
+  const cols = Math.max(30, Math.floor(width / 5.3));
+  const record = itemByName(S.items, entry.item);
+  const kind = record
+    ? `${record.category ?? record.type ?? "item"} #${record.id}`
+    : "not named in items.json";
+  const count = entry.droppers.length;
+  let ty = top + 5;
+  ctx.textAlign = "left";
+
+  ctx.font = "bold 14px monospace";
+  ctx.fillStyle = "#ffd34d";
+  for (const line of wrapText(entry.item, cols)) {
+    ctx.fillText(line, tx, ty);
+    ty += 16;
+  }
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText(`${kind} · ${count} dropper${count === 1 ? "" : "s"}`, tx, ty);
+  ty += 15;
+
+  const heading = (text) => {
+    ty += 3;
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#6fd0a8";
+    ctx.fillText(text, tx, ty);
+    ty += 12;
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+  };
+
+  heading("THE ODDS (THE DISC'S OWN)");
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#9fd0ff";
+  const odds = "The roll is (drop_rate + 1) in 1024 per win: rate 128 is 129 in 1024, not 12.8%. The fight's own roll is untouched.";
+  for (const line of wrapText(odds, cols)) {
+    ctx.fillText(line, tx, ty);
+    ty += 11;
+  }
+
+  heading("WHO DROPS IT");
+  for (const dropper of entry.droppers) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#ffe9a8";
+    ctx.fillText(`${dropper.enemy} · ${dropper.odds.n} in ${dropper.odds.of} per win`, tx, ty);
+    ty += 12;
+    const stages = enemyStages(S.enc, dropper.enemy);
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#9ad0a8";
+    const stageLine = stages.length ? `met on ${stages.join(", ")}` : "no encounter pool rolls it";
+    for (const line of wrapText(stageLine, cols)) {
+      ctx.fillText(line, tx, ty);
+      ty += 10;
+    }
+    ty += 2;
+  }
+
+  heading(`EVERY STAGE POOL (${entry.stages.length} stage${entry.stages.length === 1 ? "" : "s"})`);
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#c8d2e2";
+  for (const line of wrapText(entry.stages.length ? entry.stages.join(", ") : "none", cols)) {
+    ctx.fillText(line, tx, ty);
+    ty += 10;
+  }
+}
+
+/**
+ * The DROPS tab: every item the disc really drops on the left (one row per item, with its
+ * dropper count), the open item's own record, its disc odds and every dropper with the
+ * stages its pool can be met on, on the right. Every number is measured from enemies.json,
+ * the two encounter tables and items.json; the tab only reads and never touches a roll.
+ */
+function drawDrops(ctx, W, H) {
+  const x = Math.round(W * 0.03);
+  const y = Math.round(H * 0.02);
+  const w = W - 2 * x;
+  const h = H - 2 * y;
+  const left = x + 14;
+  const right = x + w - 16;
+  const pages = tabPages();
+  const pageRows = pages[S.page] ?? [];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,12,0.96)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9a54a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+
+  // header
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText("DIGIMON CODEX", left, y + 12);
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText("DROPS — which enemy drops what, and where", left + 172, y + 17);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`${Math.min(S.page + 1, Math.max(pages.length, 1))} / ${pages.length}`, right, y + 16);
+  ctx.textAlign = "left";
+  drawTabs(ctx, left, y + 31, right);
+
+  const top = y + 58;
+  const bottom = y + h - 30;
+  const listX = left;
+  const listW = Math.round(w * 0.36);
+  const listTop = top;
+  const listBottom = bottom - 18;
+
+  if (!S.dropEntries.length) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+    ctx.fillText(
+      S.error ? `The drop tables did not load: ${S.error}` : "The drop tables are not loaded.",
+      listX,
+      listTop + 4,
+    );
+  } else {
+    const rowH = Math.floor((listBottom - listTop) / Math.max(pageRows.length, 1));
+    const lh = Math.max(11, Math.min(14, rowH));
+    ctx.font = "10px monospace";
+    let ry = listTop;
+    for (let i = 0; i < pageRows.length; i++) {
+      const entry = pageRows[i];
+      const hit = i === S.cursor;
+      if (hit) {
+        ctx.fillStyle = "rgba(201,165,74,0.22)";
+        ctx.fillRect(listX - 2, ry - 2, listW - 4, lh);
+      }
+      ctx.fillStyle = hit ? "#ffe9a8" : "#c8d2e2";
+      ctx.fillText(`${hit ? ">" : " "} ${entry.item}  (${entry.droppers.length})`, listX, ry);
+      ry += lh;
+    }
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#5f6b80";
+    ctx.fillText(`${S.dropEntries.length} items the disc really drops`, listX, bottom - 2);
+  }
+
+  // the open item (right)
+  const dx = listX + listW + 14;
+  const dw = right - dx;
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.strokeRect(dx - 8, listTop, dw, listBottom - listTop);
+  const entry = pageRows[Math.max(0, Math.min(S.cursor, pageRows.length - 1))];
+  if (entry) drawDropDetail(ctx, entry, dx + 2, listTop, dw - 12);
+
+  // controls, in the book's own margin
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7a90b0";
+  ctx.textAlign = "left";
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: item    Cross / Start: close", left, bottom + 8);
   ctx.restore();
   return true;
 }
@@ -1940,6 +2242,7 @@ export function codexDraw(ctx, page = null, W = 640, H = 480) {
   if (!S.open) return false;
   if (S.tab === "encounters") return drawEncounters(ctx, W, H);
   if (S.tab === "battlefields") return drawBattlefields(ctx, W, H);
+  if (S.tab === "drops") return drawDrops(ctx, W, H);
   if (S.tab === "clips") return drawClips(ctx, W, H);
   if (S.tab === "loadout") return drawLoadout(ctx, W, H);
   const tabName = S.tab;
@@ -2067,6 +2370,8 @@ if (typeof window !== "undefined") {
     battlefields: () => S.bfRows,
     battlefieldFacts: () => S.bfFacts,
     clips: () => CLIP_NAMES_62,
+    drops: () => S.dropEntries,
+    dropOdds: (rate) => dropOdds(rate),
     body: () => S.body,
     loadBody: () => codexLoadoutBody(),
     error: () => S.error,
