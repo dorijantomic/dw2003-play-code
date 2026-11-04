@@ -1,5 +1,5 @@
 // web/codex.js — the Digimon Codex, part 1: the book and the partner pages;
-// part 2: the wild pages.
+// part 2: the wild pages; part 3: the encounter finder.
 //
 // A paged in-game book of every partner profile the game can hold, and every real
 // wild record on the disc. It has no table of its own: each partner row is read from
@@ -32,9 +32,20 @@
 //   the plain-words condition and action; the fourth row is the unconditional
 //   fallback — its condition byte is never tested, so it is labelled as such).
 //
+// The encounter finder (part 3) is the third tab. It has no table of its own either:
+// it reads the two the encounter driver reads (web/battle.js / engine/dw3/encounters.ts) —
+// stage_encounters.json picks a global screen id from a stage's zone pool, and
+// field_encounters.json's `screens` turns that screen id into the 1..3-enemy party —
+// plus the manifest's `maps` for each stage's own name. A row is therefore a real roll:
+// stage number, stage name, the 1-based geographic zone (each selector group is four
+// zones of eight slots; multi-group stages simply carry several groups), the slot,
+// the screen id, the species, and the party's level / HP / stat scale, plus the zone
+// block's own rate byte. The same party stored twice (screen 5) is kept twice.
+//
 // OFF unless F2 -> Extras -> "Digimon Codex (new)" is switched on (web/ambience.js).
 // It opens on that switch's rising edge, owns the pad while it is up (L1/R1 tab,
-// Left/Right page, Up/Down row, Cross/Start close) and draws over everything. With
+// Left/Right page, Up/Down row, Cross/Start close; the ENCOUNTERS tab also takes
+// single-character keys and Backspace as a name filter) and draws over everything. With
 // the switch off nothing exists and the frame loop pays one comparison. The module is
 // DOM-free at the top level so node tests import it; drawing takes a canvas context.
 
@@ -45,7 +56,8 @@ const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const ELEMENT_LABELS = { fire: "Fire", water: "Water", ice: "Ice", wind: "Wind", thunder: "Thunder", machine: "Machine", dark: "Dark" };
 const STATUS_LABELS = { poison: "Poison", paralyze: "Paralyze", confuse: "Confuse", sleep: "Sleep", ko: "KO" };
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
-const TAB_NAMES = ["partners", "wild"];
+const TAB_NAMES = ["partners", "wild", "encounters"];
+const TAB_LABELS = { partners: "PARTNERS", wild: "WILD", encounters: "ENCOUNTERS" };
 
 const pick = (source, keys) =>
   Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
@@ -238,6 +250,126 @@ export function wildSearch(rows, query) {
   return list.filter((r) => String(r?.name ?? "").toLowerCase().includes(q));
 }
 
+// ------------------------------------------------------------ encounter finder
+
+/**
+ * A `{ key: table }` object (the extracted JSON ships a header key) or the table itself.
+ * Anything else is an empty table, never a guess.
+ */
+function innerTable(value, key) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const inner = value[key];
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) return inner;
+  return value;
+}
+
+/** The manifest's map list (the whole manifest object or the array). */
+function mapList(value) {
+  if (Array.isArray(value)) return value;
+  return Array.isArray(value?.maps) ? value.maps : [];
+}
+
+/**
+ * Every real encounter roll in the two tables the driver reads, indexed by species.
+ *
+ * `stages` is stage_encounters.json (or its `stages` object) and `screens`
+ * field_encounters.json (or its `screens` map); `maps` is web/assets/manifest.json
+ * (or its `maps` array) and names each stage `s<key>`. Pure.
+ *
+ * The stage's `zones[]` is group-major / zone-minor: flat index i is zone `(i % 4) + 1`
+ * of selector group `floor(i / 4)` (engine/dw3/encounters.ts documents the four-zone
+ * selector record). A non-zero slot is a screen id; the screen's array is the 1..3-enemy
+ * party, and the party is kept entry by entry, so a party stored twice is two rows.
+ *
+ * Row = {stage, stageName, zone, slot, screen, name, level, hp, statScale, rateLevel},
+ * all 1-based where the game counts from 1 (zone, slot). `stage` is the numeric key.
+ */
+export function encounterIndex(stages, screens, maps = null) {
+  const stageTable = innerTable(stages, "stages") ?? {};
+  const screenTable = innerTable(screens, "screens") ?? {};
+  const nameById = new Map(
+    mapList(maps).filter((m) => m && typeof m.id === "string").map((m) => [m.id, m.name]),
+  );
+  const rows = [];
+  const bySpecies = new Map();
+  for (const [key, stage] of Object.entries(stageTable)) {
+    const zones = Array.isArray(stage?.zones) ? stage.zones : null;
+    const stageNo = Number(key);
+    if (!zones || !Number.isFinite(stageNo)) continue;
+    const stageName = nameById.get(`s${key}`) ?? null;
+    for (let i = 0; i < zones.length; i++) {
+      const zone = zones[i];
+      const slots = Array.isArray(zone?.slots) ? zone.slots : null;
+      if (!slots) continue;
+      const rateLevel = Number(zone.rate_level) || 0;
+      const zoneNo = (i % 4) + 1;
+      for (let j = 0; j < slots.length; j++) {
+        const screen = Number(slots[j]) || 0;
+        if (!screen) continue;                       // an empty slot rolls no encounter
+        const party = screenTable[String(screen)] ?? screenTable[screen];
+        if (!Array.isArray(party)) continue;
+        for (const member of party) {
+          if (!member || typeof member.name !== "string") continue;
+          const row = {
+            stage: stageNo,
+            stageName,
+            zone: zoneNo,
+            slot: j + 1,
+            screen,
+            name: member.name,
+            level: Number(member.level) || 0,
+            hp: Number(member.hp) || 0,
+            statScale: Number(member.stat_scale) || 0,
+            rateLevel,
+          };
+          rows.push(row);
+          const list = bySpecies.get(row.name);
+          if (list) list.push(row);
+          else bySpecies.set(row.name, [row]);
+        }
+      }
+    }
+  }
+  return { bySpecies, rows };
+}
+
+/**
+ * The species names matching `query`, alphabetically. An exact name (ignoring case and
+ * surrounding spaces) wins outright, so "Kunemon" never drags in a numbered variant;
+ * otherwise every name containing the text is returned. An empty query is every name. Pure.
+ */
+export function encounterSpecies(index, query = "") {
+  const names = index?.bySpecies instanceof Map ? [...index.bySpecies.keys()].sort() : [];
+  const q = String(query ?? "").trim().toLowerCase();
+  if (!q) return names;
+  const exact = names.filter((n) => n.toLowerCase() === q);
+  if (exact.length) return exact;
+  return names.filter((n) => n.toLowerCase().includes(q));
+}
+
+/** Every real row of the species matching `query`; an unknown or empty query is []. Pure. */
+export function encounterSearch(index, query) {
+  if (!String(query ?? "").trim()) return [];
+  const rows = [];
+  for (const name of encounterSpecies(index, query)) rows.push(...(index.bySpecies.get(name) ?? []));
+  return rows;
+}
+
+/** The tab's entries: one per species, with its rows and the stages they land on. */
+function encounterEntries(index, query = "") {
+  const out = [];
+  for (const name of encounterSpecies(index, query)) {
+    const rows = index?.bySpecies?.get(name) ?? [];
+    if (!rows.length) continue;
+    out.push({
+      name,
+      rows,
+      stages: [...new Set(rows.map((r) => r.stage))].sort((a, b) => a - b),
+    });
+  }
+  return out;
+}
+
 /** The drop as the page prints it: the disc's `Null` placeholder means no item. */
 export function dropText(row) {
   const name = row?.drop ?? "Null";
@@ -254,6 +386,9 @@ const S = {
   pages: [],
   wild: [],             // the wild rows (the Null placeholder already skipped)
   wildPages: [],
+  enc: null,            // {bySpecies, rows} from stage_encounters + field_encounters
+  encQuery: "",         // the encounter finder's name filter
+  encEntries: [],       // one {name, rows, stages} per species matching the filter
   models: null,         // model_map.json: species -> model folder
   skills: new Map(),
   evolutions: null,
@@ -274,6 +409,9 @@ export function codexReset() {
   S.pages = [];
   S.wild = [];
   S.wildPages = [];
+  S.enc = null;
+  S.encQuery = "";
+  S.encEntries = [];
   S.models = null;
   S.skills = new Map();
   S.evolutions = null;
@@ -281,14 +419,17 @@ export function codexReset() {
   S.linesOf = new Map();
   S.loading = null;
   S.error = null;
+  syncFinderKeys();
 }
 
 /**
  * Install the loaded tables (the browser load and the node test both land here).
  * `enemies` is enemies.json (the whole object or its array), `models` model_map.json;
- * both are optional so a partner-only caller keeps working.
+ * both are optional so a partner-only caller keeps working. `encounters` is
+ * `{stages, screens, maps}` — stage_encounters.json, field_encounters.json and the
+ * manifest — and is optional for the same reason: no finder tab, no index.
  */
-export function setCodexData(digimon, evolutions, enemies = null, models = null) {
+export function setCodexData(digimon, evolutions, enemies = null, models = null, encounters = null) {
   const rows = partnerRows(digimon, Array.isArray(digimon) ? [] : digimon?.skills);
   S.rows = rows;
   S.pages = codexPages(rows, PER_PAGE);
@@ -301,6 +442,10 @@ export function setCodexData(digimon, evolutions, enemies = null, models = null)
   const enemyList = Array.isArray(enemies) ? enemies : enemies?.enemies ?? [];
   S.wild = wildRows(enemyList, S.skills, S.models);
   S.wildPages = codexPages(S.wild, PER_PAGE);
+  const enc = encounters && typeof encounters === "object" ? encounters : {};
+  S.enc = encounterIndex(enc.stages ?? null, enc.screens ?? null, enc.maps ?? null);
+  S.encQuery = "";
+  S.encEntries = encounterEntries(S.enc);
 
   const lineByRoot = new Map();
   const linesOf = new Map();
@@ -322,21 +467,29 @@ const asJson = (value) => (typeof value?.json === "function" ? value.json() : va
 /**
  * Fetch and install the tables through the page's own fetch, so the extra roster's
  * wrapped fetch has already merged the added species and their line records. The wild
- * tables (enemies.json + model_map.json) ride the same load. Cached per book load.
- * `fetchJson` is injectable for tests.
+ * tables (enemies.json + model_map.json) and the finder tables (stage_encounters.json,
+ * field_encounters.json and manifest.json's map names) ride the same load. Cached per
+ * book load. `fetchJson` is injectable for tests.
  */
 export function codexLoad(fetchJson = globalThis.fetch) {
   if (S.loading) return S.loading;
   if (typeof fetchJson !== "function") return Promise.resolve(false);
   S.loading = (async () => {
     try {
-      const [digimon, evolutions, enemies, models] = await Promise.all([
+      const [digimon, evolutions, enemies, models, stageEncounters, fieldEncounters, manifest] = await Promise.all([
         Promise.resolve(fetchJson("assets/data/digimon.json")).then(asJson),
         Promise.resolve(fetchJson("assets/data/evolutions.json")).then(asJson),
         Promise.resolve(fetchJson("assets/data/enemies.json")).then(asJson),
         Promise.resolve(fetchJson("assets/battle/model_map.json")).then(asJson),
+        Promise.resolve(fetchJson("assets/data/stage_encounters.json")).then(asJson),
+        Promise.resolve(fetchJson("assets/data/field_encounters.json")).then(asJson),
+        Promise.resolve(fetchJson("assets/manifest.json")).then(asJson),
       ]);
-      setCodexData(digimon, evolutions, enemies, models);
+      setCodexData(digimon, evolutions, enemies, models, {
+        stages: stageEncounters,
+        screens: fieldEncounters,
+        maps: manifest,
+      });
       S.error = null;
       return true;
     } catch (err) {
@@ -354,18 +507,22 @@ export function codexOpen() {
   return S.open;
 }
 
-/** Which half of the book is up: "partners" or "wild". */
+/** Which part of the book is up: "partners", "wild" or "encounters". */
 export function codexTab() {
   return S.tab;
 }
 
 /** The pages of the tab that is up. */
 function tabPages() {
-  return S.tab === "wild" ? S.wildPages : S.pages;
+  if (S.tab === "wild") return S.wildPages;
+  if (S.tab === "encounters") return codexPages(S.encEntries, PER_PAGE);
+  return S.pages;
 }
-/** The rows of the tab that is up. */
+/** The rows of the tab that is up (the finder's entries hold one species each). */
 function tabRows() {
-  return S.tab === "wild" ? S.wild : S.rows;
+  if (S.tab === "wild") return S.wild;
+  if (S.tab === "encounters") return S.encEntries;
+  return S.rows;
 }
 
 /** The page on screen, 0-based; how many pages; the rows of the page; where the cursor is. */
@@ -397,17 +554,35 @@ export function tickCodex(enabled) {
     S.tab = "partners";
     S.page = 0;
     S.cursor = 0;
+    S.encQuery = "";
+    S.encEntries = encounterEntries(S.enc);
     if (!S.rows.length && !S.loading) codexLoad();
   } else if (!on && S.wasOn) {
     S.open = false;
   }
   S.wasOn = on;
+  syncFinderKeys();
   return S.open;
 }
 
-/** Turn to the next/previous half of the book, landing on its first row of its first page. */
+/** True when a tab has something to show; an empty tab is skipped while cycling. */
+function tabHasContent(tab) {
+  if (tab === "encounters") return S.encEntries.length > 0;
+  if (tab === "wild") return S.wild.length > 0;
+  return S.rows.length > 0;
+}
+
+/** Turn to the next/previous part of the book, landing on its first row of its first page. */
 function switchTab(delta) {
-  const i = (TAB_NAMES.indexOf(S.tab) + delta + TAB_NAMES.length) % TAB_NAMES.length;
+  let i = TAB_NAMES.indexOf(S.tab);
+  if (i < 0) i = 0;
+  // R1 walks PARTNERS -> WILD -> ENCOUNTERS and L1 walks the same ring backwards.
+  // A tab with no rows (e.g. the finder before its tables have loaded) is skipped,
+  // so the pad never lands on a blank page.
+  for (let step = 0; step < TAB_NAMES.length; step++) {
+    i = (i + delta + TAB_NAMES.length) % TAB_NAMES.length;
+    if (tabHasContent(TAB_NAMES[i])) break;
+  }
   S.tab = TAB_NAMES[i];
   S.page = 0;
   S.cursor = 0;
@@ -438,20 +613,83 @@ function moveCursor(delta) {
   S.cursor = Math.max(0, Math.min(rows.length - 1, next));
 }
 
+/** The encounter finder's current name filter (lowercase; "" is every species). */
+export function codexQuery() {
+  return S.encQuery;
+}
+
+// The keyboard's raw letters, captured before game.js's own key map translates them, so
+// the finder can be typed into. A letter with a pad binding (W/A/S/D, K, E, ...) would
+// otherwise arrive as a direction or a shoulder and move the page. The listener exists
+// only while the book is open on the ENCOUNTERS tab; with it off (or on any other tab)
+// the page receives exactly what it received before. Arrow keys, Enter and Escape are
+// left alone, so the pad still pages, confirms, closes and goes back.
+let finderKeyHandler = null;
+function syncFinderKeys() {
+  if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+  const want = S.open && S.tab === "encounters";
+  if (want && !finderKeyHandler) {
+    finderKeyHandler = (event) => {
+      if (!S.open || S.tab !== "encounters") return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = typeof event.key === "string" ? event.key : "";
+      const back = key === "Backspace";
+      if (!back && !(key.length === 1 && /^[a-z0-9 '-]$/i.test(key))) return;
+      codexType(back ? "backspace" : key);
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+    };
+    window.addEventListener("keydown", finderKeyHandler, true);
+  } else if (!want && finderKeyHandler) {
+    window.removeEventListener("keydown", finderKeyHandler, true);
+    finderKeyHandler = null;
+  }
+}
+
 /**
- * The pad while the book is up: L1/R1 turn between the partner and the wild half,
+ * Type into the encounter finder. `text` is one printable character (letters, digits,
+ * space, apostrophe or hyphen) or "backspace". In the browser the finder's own key
+ * listener above feeds this; node tests and the console hook call it directly. Off the
+ * finder tab (or with the book closed) nothing is edited. Returns false on a press it
+ * cannot use, so a caller can fall through.
+ */
+export function codexType(text) {
+  if (!S.open || S.tab !== "encounters") return false;
+  const key = String(text ?? "");
+  if (key === "backspace") {
+    if (!S.encQuery) return true;
+    S.encQuery = S.encQuery.slice(0, -1);
+  } else if (key.length === 1 && /^[a-z0-9 '-]$/i.test(key)) {
+    if (S.encQuery.length < 24) S.encQuery += key.toLowerCase();
+  } else {
+    return false;
+  }
+  S.encEntries = encounterEntries(S.enc, S.encQuery);
+  S.page = 0;
+  S.cursor = 0;
+  return true;
+}
+
+/**
+ * The pad while the book is up: L1/R1 turn between PARTNERS, WILD and ENCOUNTERS,
  * Left/Right turn a page (wrapping), Up/Down move the row cursor (walking over a page
- * edge), Cross/Start close it, every other press is swallowed. Returns false when the
- * book is closed, so the press falls through exactly as before.
+ * edge), Cross/Start close it, every other press is swallowed. On the ENCOUNTERS tab a
+ * single character or Backspace edits the name filter instead and Triangle goes back to
+ * WILD. Returns false when the book is closed, so the press falls through exactly as before.
  */
 export function codexPress(button) {
   if (!S.open) return false;
+  if (S.tab === "encounters" && (button === "backspace" || (typeof button === "string" && button.length === 1))) {
+    codexType(button);
+    return true;
+  }
   if (button === "l1") switchTab(-1);
   else if (button === "r1") switchTab(1);
   else if (button === "left") setPage(S.page - 1);
   else if (button === "right") setPage(S.page + 1);
   else if (button === "up") moveCursor(-1);
   else if (button === "down") moveCursor(1);
+  else if (button === "triangle" && S.tab === "encounters") switchTab(-1);
   else if (button === "cross" || button === "start") S.open = false;
   return true;
 }
@@ -676,6 +914,166 @@ function drawWildDetail(ctx, row, tx, top) {
   }
 }
 
+/** The three tab labels, the one that is up lit and underlined. */
+function drawTabs(ctx, left, y, right) {
+  let tx = left;
+  for (const id of TAB_NAMES) {
+    const label = TAB_LABELS[id];
+    ctx.font = "bold 11px monospace";
+    ctx.fillStyle = S.tab === id ? "#ffd34d" : "#5f6b80";
+    ctx.fillText(label, tx, y);
+    if (S.tab === id) {
+      ctx.fillStyle = "#ffd34d";
+      ctx.fillRect(tx, y + 11, label.length * 7, 2);
+    }
+    tx += label.length * 7 + 16;
+  }
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#5f6b80";
+  ctx.textAlign = "right";
+  ctx.fillText("L1 / R1: tab", right, y + 1);
+  ctx.textAlign = "left";
+}
+
+/** The finder's right column: the species, its stages, and its first real pools. */
+function drawEncounterDetail(ctx, entry, tx, top) {
+  let ty = top + 8;
+  ctx.textAlign = "left";
+  ctx.font = "bold 14px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText(entry.name, tx, ty);
+  ty += 18;
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText(`${entry.rows.length} pools on ${entry.stages.length} stages`, tx, ty);
+  ty += 14;
+  ctx.fillStyle = "#9ad0a8";
+  for (const line of wrapText(`Stages: ${entry.stages.join(", ")}`, 56)) {
+    ctx.fillText(line, tx, ty);
+    ty += 12;
+  }
+  ty += 4;
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#6fd0a8";
+  ctx.fillText("WHERE IT CAN BE ROLLED", tx, ty);
+  ty += 12;
+  ctx.font = "9px monospace";
+  const shown = entry.rows.slice(0, 10);
+  for (const row of shown) {
+    const line = `s${row.stage} ${row.stageName ?? "unnamed stage"} · zone ${row.zone} · slot ${row.slot}`
+      + ` · screen ${row.screen} · Lv ${row.level} · HP ${row.hp} · x${row.statScale} · rate ${row.rateLevel}`;
+    ctx.fillStyle = "#c8d2e2";
+    for (const part of wrapText(line, 58)) {
+      ctx.fillText(part, tx, ty);
+      ty += 11;
+    }
+    ty += 2;
+  }
+  if (entry.rows.length > shown.length) {
+    ctx.fillStyle = "#5f6b80";
+    ctx.fillText(`+${entry.rows.length - shown.length} more pools`, tx, ty);
+  }
+}
+
+/** The ENCOUNTERS tab: a searchable species list on the left, the chosen species' pools on the right. */
+function drawEncounters(ctx, W, H) {
+  const x = Math.round(W * 0.03);
+  const y = Math.round(H * 0.02);
+  const w = W - 2 * x;
+  const h = H - 2 * y;
+  const left = x + 14;
+  const pages = tabPages();
+  const pageRows = pages[S.page] ?? [];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4,6,12,0.96)";
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9a54a";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+
+  // header
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#ffd34d";
+  ctx.fillText("DIGIMON CODEX", left, y + 12);
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#8a93a8";
+  ctx.fillText("ENCOUNTERS — where each species can be met", left + 172, y + 17);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`${Math.min(S.page + 1, Math.max(pages.length, 1))} / ${pages.length}`, x + w - 16, y + 16);
+  ctx.textAlign = "left";
+  drawTabs(ctx, left, y + 31, x + w - 16);
+
+  const top = y + 58;
+  const bottom = y + h - 30;
+  const listX = left;
+  const listW = Math.round(w * 0.36);
+
+  // the name filter
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#9fd0ff";
+  ctx.fillText(`Search: ${S.encQuery || "(all species)"}`, listX, top);
+  ctx.font = "9px monospace";
+  ctx.fillStyle = "#5f6b80";
+  ctx.textAlign = "right";
+  ctx.fillText("letters: filter   Backspace: delete", x + w - 16, top + 1);
+  ctx.textAlign = "left";
+
+  const listTop = top + 20;
+  const listBottom = bottom - 18;
+  if (!S.enc || !S.enc.rows.length) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+    ctx.fillText("The encounter tables are not loaded.", listX, listTop + 4);
+  } else if (!pageRows.length) {
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#d8e2f0";
+    ctx.fillText(`No species matches "${S.encQuery}".`, listX, listTop + 4);
+  } else {
+    const rowH = Math.floor((listBottom - listTop) / Math.max(pageRows.length, 1));
+    const lh = Math.max(11, Math.min(14, rowH));
+    ctx.font = "10px monospace";
+    let ry = listTop;
+    for (let i = 0; i < pageRows.length; i++) {
+      const entry = pageRows[i];
+      const hit = i === S.cursor;
+      if (hit) {
+        ctx.fillStyle = "rgba(201,165,74,0.22)";
+        ctx.fillRect(listX - 2, ry - 2, listW - 4, lh);
+      }
+      const tag = `${hit ? ">" : " "} ${entry.name}  (${entry.stages.length})`;
+      ctx.fillStyle = hit ? "#ffe9a8" : "#c8d2e2";
+      ctx.fillText(tag, listX, ry);
+      ry += lh;
+    }
+    ctx.font = "9px monospace";
+    ctx.fillStyle = "#5f6b80";
+    ctx.fillText(`${S.encEntries.length} species with a pool`, listX, bottom - 2);
+  }
+
+  // the open species (right)
+  const dx = listX + listW + 14;
+  const dw = x + w - 16 - dx;
+  ctx.strokeStyle = "rgba(201,165,74,0.35)";
+  ctx.strokeRect(dx - 8, listTop, dw, bottom - listTop);
+  const entry = pageRows[Math.max(0, Math.min(S.cursor, pageRows.length - 1))];
+  if (entry) drawEncounterDetail(ctx, entry, dx + 2, listTop);
+
+  // controls, in the book's own margin
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7a90b0";
+  ctx.textAlign = "left";
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: species    Triangle: back    Cross / Start: close", left, bottom + 8);
+  ctx.restore();
+  return true;
+}
+
 /**
  * Draw the book over the whole view. `page` is a page index, a page (array of rows), or null for
  * the page the pad is on. `W`/`H` are the canvas box (640x480 in the game), so the panel also
@@ -683,6 +1081,7 @@ function drawWildDetail(ctx, row, tx, top) {
  */
 export function codexDraw(ctx, page = null, W = 640, H = 480) {
   if (!S.open) return false;
+  if (S.tab === "encounters") return drawEncounters(ctx, W, H);
   const tabName = S.tab;
   if (!tabRows().length) {
     drawEmpty(ctx, W, H, S.error ? `The book could not be opened: ${S.error}` : "Opening the book…");
@@ -737,21 +1136,8 @@ export function codexDraw(ctx, page = null, W = 640, H = 480) {
   ctx.fillText(`${index + 1} / ${tabPages().length}`, x + w - 16, y + 16);
   ctx.textAlign = "left";
 
-  // the two tabs, the one that is up lit and underlined
-  ctx.font = "bold 11px monospace";
-  ctx.fillStyle = tabName === "partners" ? "#ffd34d" : "#5f6b80";
-  ctx.fillText("PARTNERS", left, y + 31);
-  ctx.fillStyle = "#3d4658";
-  ctx.fillText("|", left + 62, y + 31);
-  ctx.fillStyle = tabName === "wild" ? "#ffd34d" : "#5f6b80";
-  ctx.fillText("WILD", left + 74, y + 31);
-  ctx.fillStyle = "#ffd34d";
-  ctx.fillRect(tabName === "partners" ? left : left + 72, y + 42, tabName === "partners" ? 53 : 30, 2);
-  ctx.font = "9px monospace";
-  ctx.fillStyle = "#5f6b80";
-  ctx.textAlign = "right";
-  ctx.fillText("L1 / R1: tab", x + w - 16, y + 32);
-  ctx.textAlign = "left";
+  // the three tabs, the one that is up lit and underlined
+  drawTabs(ctx, left, y + 31, x + w - 16);
 
   const top = y + 50;
   const bottom = y + h - 30;
@@ -794,7 +1180,7 @@ export function codexDraw(ctx, page = null, W = 640, H = 480) {
   ctx.font = "10px monospace";
   ctx.fillStyle = "#7a90b0";
   ctx.textAlign = "left";
-  ctx.fillText("L1 / R1: partner / wild    Left / Right: page    Up / Down: row    Cross / Start: close", left, bottom + 8);
+  ctx.fillText("L1 / R1: tab    Left / Right: page    Up / Down: row    Cross / Start: close", left, bottom + 8);
   ctx.restore();
   return true;
 }
@@ -811,6 +1197,12 @@ if (typeof window !== "undefined") {
     rows: () => tabRows(),
     wild: () => S.wild,
     wildSearch: (text) => wildSearch(S.wild, text),
+    encounters: () => S.enc?.rows ?? [],
+    encounterSpecies: (text) => encounterSpecies(S.enc, text),
+    encounterSearch: (text) => encounterSearch(S.enc, text),
+    entry: () => codexPageRows()[S.cursor] ?? null,
+    query: () => S.encQuery,
+    type: (text) => codexType(text),
     error: () => S.error,
     reload: () => codexLoad(),
   };
