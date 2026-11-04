@@ -49,6 +49,7 @@ import { createWfightTranslated } from "./wfight-translated.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
+import { FIELD_CYCLE, fieldName, nextField } from "./field-war.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
 import {
@@ -2916,6 +2917,18 @@ export function dvGaugeWidth(gauge) {
   return Math.trunc(normalizeDvGauge(gauge) / 25);
 }
 
+/**
+ * Is the elemental field war switched on? (F2 -> Extras -> "Elemental field war",
+ * off by default; web/ambience.js owns the switch.)
+ *
+ * With it off the game behaves exactly as before: the seven field techniques only
+ * print the disc's word (`damageTermPage`'s category-6 arm) and the field changes
+ * only when one of the seven field items sets it.
+ */
+export function fieldWarEnabled() {
+  return typeof window !== "undefined" && window.__fx?.fieldwar === true;
+}
+
 export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   let battle = null; // active battle data
   // Step F: the six-row command list runs the translated pro/fightstg list
@@ -4670,6 +4683,28 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         text: `${targetName} is hurt by poison! ${amount} damage!`,
         spec: enginePoisonTickMessageSpec(targetName, amount),
       });
+    }
+    // F2 -> Extras -> "Elemental field war": the battlefield element walks on its own,
+    // one step per FOUR player actions, through fire -> water -> ice -> wind -> thunder
+    // -> machine -> dark -> none (web/field-war.js). The page is the disc's own word for
+    // the new field (esmfight[elem1 + 0x61], the same seven words the field items and
+    // the field techniques print), so the player sees the fight change. Off by default:
+    // without the switch the field still changes only when a field item sets it.
+    if (acted === "player" && fieldWarEnabled()) {
+      b._fieldWarActions = (b._fieldWarActions ?? 0) + 1;
+      if (b._fieldWarActions % 4 === 0) {
+        b.field = nextField(b.field);
+        const word = b.field ? fieldName(b.field.element) : null;
+        if (word) {
+          pages.push({
+            text: word,
+            spec: {
+              kind: MSG_KIND.ONE_LINE,
+              payload: [0x63 + FIELD_CYCLE.indexOf(b.field.element)],
+            },
+          });
+        }
+      }
     }
     b._timelinePages = pages;
     b._timelineMessage = pages.map((page) => page.text).join("\n");
@@ -6610,6 +6645,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b.pendingAction = null;
         return false;
       }
+      // THE SEVEN FIELD TECHNIQUES (category 6, records 213..219) are the record
+      // machine's own field writer: FIGHTSTG_F0x800907cc stores the technique's
+      // element (record +0x07, elem1 = fire..dark) and its 64 power byte (record
+      // +0x0c, the same 64 the seven field items write) into the battle header's
+      // field pair (0x800a4530/+2), then prints esmfight[elem1 + 0x61]. The
+      // browser printed the word but never wrote the pair, so the field never
+      // moved. F2 -> Extras -> "Elemental field war", off by default, so the seven
+      // techniques keep printing their word and leaving the field alone.
+      if (restoreRecord?.category === 6 && fieldWarEnabled()) {
+        b.field = { element: elementNameForElem1(restoreRecord.elem1), power: restoreRecord.crit };
+      }
       // Every remaining technique on this path is an ORDINARY attack, so the resolver
       // runs: the category-4 arm above is the only one that does not, because the
       // original's applier rolls for accuracy on categories 2 and 3 alone
@@ -6985,6 +7031,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (spec) sayOriginal(b, spec, text); else sayWalker(b, text);
       renderer3d?.enemyAttack(skill.id ?? en.profile?.tech_basic, { miss: false });
       return;
+    }
+    // The category-6 field write, on the enemy's side too: F0x800907cc is the record
+    // machine's ONE field arm, reached whichever side acts, so an enemy that casts a
+    // field technique moves the battlefield element exactly as the player's does.
+    // F2 -> Extras -> "Elemental field war", off by default.
+    if (restoreRecord?.category === 6 && fieldWarEnabled()) {
+      b.field = { element: elementNameForElem1(restoreRecord.elem1), power: restoreRecord.crit };
     }
     // F0x8009d4b8: the multi-hit applier re-rolls only accuracy on one computed
     // damage value. Miss only if all whiff.
