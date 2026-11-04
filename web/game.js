@@ -35,8 +35,9 @@ import { tickDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./d
 import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
+import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
 
-import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
+import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState, fx } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
@@ -11097,6 +11098,22 @@ function render() {
     if (editor.enabled) sceneEd.drawOverlay(ctx);
     ctx.restore();
     drawWideSideCovers(ctx);
+
+    // EXPERIMENT (Angler's almanac): with the switch on, standing on a fishing spot draws
+    // one line — how many casts this visit has left. It reads the live state.fishingBudget
+    // (the cast itself is the game's own) and writes nothing.
+    if (fx.anglermap && fishingSpotHere()) {
+        const line = `Casts left this visit: ${castsLeft(state.fishingBudget ?? FISHING_BUDGET)}`;
+        ctx.save();
+        ctx.font = "10px monospace";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#000";
+        ctx.fillText(line, 9, VIEW_H - 9);
+        ctx.fillStyle = "#ffd34d";
+        ctx.fillText(line, 8, VIEW_H - 10);
+        ctx.restore();
+    }
 
     // Over the field, under everything the player can interact with.
     placeCard.draw(ctx, VIEW_W, VIEW_H);

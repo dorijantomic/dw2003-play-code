@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The angler's almanac — every fishing stage, what bites and what it pays</title>
+<style>
+  :root { color-scheme: dark; font: 14.5px/1.5 "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #e8edf7; background: #081320; }
+  header { padding: 22px clamp(16px, 3vw, 40px) 16px; border-bottom: 1px solid #1f3a4b; background: #0b1b2a; }
+  .eyebrow { color: #8fc4e0; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { margin: 4px 0 8px; font-size: clamp(22px, 3vw, 32px); line-height: 1.16; }
+  header p { margin: 0; max-width: 980px; color: #b8c7dc; }
+  header b { color: #eaf4ff; font-weight: 600; }
+  main { padding: 18px clamp(16px, 3vw, 40px) 60px; max-width: 1280px; }
+  #summary { display: inline-block; margin: 2px 0 12px; padding: 5px 12px; border: 1px solid #24506b;
+             border-radius: 999px; background: #0b1a29; color: #ffd34d; font-size: 12.5px; letter-spacing: .03em; }
+  .legend { margin: 0 0 14px; max-width: 980px; color: #9fb3cc; font-size: 12.5px; }
+  .legend b { color: #d9e6f7; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 0 0 12px;
+              padding: 10px 14px; border: 1px solid #1f3a4b; border-radius: 10px; background: #0b1a29; }
+  .controls label { display: inline-flex; gap: 7px; align-items: center; color: #d9e6f7; cursor: pointer; }
+  .controls input[type=checkbox] { accent-color: #ffd34d; }
+  #species { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #species .cap { color: #6f8aa3; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  #species button { padding: 2px 10px; border: 1px solid #2a4a63; border-radius: 999px; background: #0e2233;
+                    color: #cfdcee; font: inherit; font-size: 12px; cursor: pointer; }
+  #species button:hover { background: #14324a; }
+  #species button.sel { border-color: #ffd34d; color: #ffd34d; }
+  #species button .n { color: #7f9ab3; font-size: 11px; }
+  #shown { color: #8fa9c8; font-size: 12px; margin: 0 0 10px; min-height: 1.2em; }
+  .stage { display: grid; grid-template-columns: minmax(220px, 1.1fr) 74px minmax(230px, 1fr) minmax(230px, 1fr);
+           gap: 4px 16px; align-items: baseline; padding: 10px 14px; border-bottom: 1px solid #13283a; }
+  .stage:nth-child(odd) { background: #0a1725; }
+  .stage:hover { background: #0e2133; }
+  .stage.hide { display: none; }
+  .stage .place { color: #f1f7ff; font-weight: 600; }
+  .stage .place .code { margin-left: 8px; padding: 1px 7px; border-radius: 5px; background: #14304a;
+                        color: #8fc4e0; font: 600 11px ui-monospace, monospace; letter-spacing: .04em; }
+  .stage .spots { color: #9fb3cc; font-size: 12.5px; }
+  .catch { font-size: 12.5px; }
+  .catch .who { color: #d9e6f7; font-weight: 600; }
+  .catch.cardmon .who { color: #c8a4ff; }
+  .catch.water .who { color: #8fe0c0; }
+  .catch .meta { color: #7f9ab3; font: 11.5px ui-monospace, monospace; }
+  .catch .pays { color: #ffd34d; }
+  .catch .pays.unknown { color: #ff9f7a; }
+  .src { margin-top: 26px; color: #6f86a3; font-size: 11.5px; font-family: ui-monospace, monospace; }
+  .error { color: #ffb27a; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Reference — read only · F2 → Extras → Angler's almanac (new)</div>
+  <h1>The angler's almanac</h1>
+  <p>
+    Every fishing stage, the spots on it, and what the line can pull out. A strike does not give an
+    item: it starts a <b>battle</b>. Band one takes the stage's <b>slot 4</b> — a <b>Cardmon</b> on
+    all forty-six stages, the one whose kill can pay a booster. Band two takes <b>slot 7</b>, the
+    area's big water Digimon. A visit starts with <b>sixteen casts</b>, and stepping onto the map
+    again refills them. This page only prints the shipped tables: it changes no fishing rule, no
+    catch table and no reward.
+  </p>
+</header>
+<main>
+  <div id="summary">loading…</div>
+  <p class="legend">
+    A row is one fishing stage. <b>Spots</b> counts the standable tiles the stage's own step records
+    carry. <b>Pays</b> is the battle-reward record at that catch's screen id, straight from
+    progression.json — a screen the table does not reach prints <b>unknown</b>, never a made-up zero.
+    Tick <b>Cardmon only</b> to keep the guaranteed catch in view, or pick a water Digimon to jump to
+    the stages that hook it.
+  </p>
+  <div class="controls">
+    <label><input type="checkbox" id="cardmonOnly"> Cardmon only</label>
+    <div id="species"><span class="cap">Water species</span></div>
+  </div>
+  <p id="shown"></p>
+  <div id="stages"></div>
+  <p class="src">
+    Sources: web/assets/data/fishing_spots.json · field_encounters.json · progression.json ·
+    manifest.json. The decode is ddw3-walker docs/research/field/fishing-system-decoded-2026-07-11.md.
+  </p>
+</main>
+<script type="module">
+import { almanac, cardmonStages, waterIndex, rewardFor } from "./fishing-almanac.js";
+
+const $ = (id) => document.getElementById(id);
+const summaryEl = $("summary"), shownEl = $("shown"), listEl = $("stages");
+const speciesEl = $("species"), cardmonEl = $("cardmonOnly");
+
+const rewardText = (record) => record
+  ? `${record.dvexp} DV exp · ${record.exp} exp · ${record.bits} bits`
+  : "unknown";
+
+let rows = [], rewards = null, cardmonOnly = false, pickedSpecies = null;
+const items = [];
+
+try {
+  const [fish, encounters, progression, manifest] = await Promise.all([
+    fetch("assets/data/fishing_spots.json").then((r) => r.json()),
+    fetch("assets/data/field_encounters.json").then((r) => r.json()),
+    fetch("assets/data/progression.json").then((r) => r.json()),
+    fetch("manifest.json").then((r) => r.json()),
+  ]);
+  rewards = progression.battle_rewards;
+  rows = almanac(fish, encounters.screens, rewards, manifest.maps);
+} catch (error) {
+  summaryEl.className = "error";
+  summaryEl.textContent = `Could not load the fishing tables: ${error.message}`;
+  throw error;
+}
+
+// The summary prints what the data holds, counted here — no number is typed in.
+const cardmon = cardmonStages(rows);
+const index = waterIndex(rows);
+const spots = rows.reduce((n, row) => n + row.spots, 0);
+const catches = rows.reduce((n, row) => n + (row.cardmon.screen != null) + (row.water.screen != null), 0);
+summaryEl.textContent =
+  `${rows.length} stages · ${spots} spots · ${catches} catches · ` +
+  `${cardmon.length} Cardmon stages · ${index.length} water species`;
+
+// The species index: one button per water Digimon, with how many stages hook it.
+for (const entry of index) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.species = entry.species;
+  button.append(entry.species + " ");
+  const n = document.createElement("span");
+  n.className = "n";
+  n.textContent = `(${entry.stages.length})`;
+  button.append(n);
+  button.addEventListener("click", () => {
+    pickedSpecies = pickedSpecies === entry.species ? null : entry.species;
+    refresh();
+  });
+  speciesEl.append(button);
+}
+const allButton = document.createElement("button");
+allButton.type = "button";
+allButton.dataset.species = "";
+allButton.textContent = "all";
+allButton.addEventListener("click", () => { pickedSpecies = null; refresh(); });
+speciesEl.append(allButton);
+
+// One row per stage: the map's name, its spot count, the two catches and what
+// each catch's battle screen pays.
+for (const row of rows) {
+  const el = document.createElement("div");
+  el.className = "stage";
+  el.dataset.stage = row.stage;
+  el.dataset.water = row.water.species ?? "";
+
+  const place = document.createElement("div");
+  place.className = "place";
+  place.textContent = row.name;
+  const code = document.createElement("span");
+  code.className = "code";
+  code.textContent = row.stage;
+  place.append(code);
+
+  const spotsEl = document.createElement("div");
+  spotsEl.className = "spots";
+  spotsEl.textContent = row.spots === 1 ? "1 spot" : `${row.spots} spots`;
+
+  const catchCell = (kind, slot, catchRecord, record) => {
+    const cell = document.createElement("div");
+    cell.className = `catch ${kind}`;
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = catchRecord.species ?? "unknown";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = `slot ${slot} · screen ${catchRecord.screen ?? "unknown"}`;
+    const pays = document.createElement("div");
+    pays.className = "pays" + (record ? "" : " unknown");
+    pays.textContent = "pays " + rewardText(record);
+    cell.append(who, meta, pays);
+    return cell;
+  };
+
+  // The water cell is the row's own reward record (the area's screen); the
+  // Cardmon's record comes from the same lookup, its own screen id.
+  el.append(place, spotsEl, catchCell("cardmon", "4", row.cardmon, rewardFor(rewards, row.cardmon.screen)),
+    catchCell("water", "7", row.water, row.reward));
+  items.push(el);
+  listEl.append(el);
+}
+
+// The filters read the module's own lists, never a private copy of the rule.
+const cardmonSet = new Set(cardmonStages(rows).map((row) => row.stage));
+function refresh() {
+  let shown = 0;
+  for (const el of items) {
+    const isCardmon = cardmonSet.has(el.dataset.stage);
+    const matchesSpecies = !pickedSpecies || el.dataset.water === pickedSpecies;
+    const visible = (!cardmonOnly || isCardmon) && matchesSpecies;
+    el.classList.toggle("hide", !visible);
+    if (visible) shown++;
+  }
+  for (const button of speciesEl.querySelectorAll("button[data-species]")) {
+    button.classList.toggle("sel", button.dataset.species === (pickedSpecies ?? ""));
+  }
+  const speciesNote = pickedSpecies ? ` · ${pickedSpecies} only` : "";
+  shownEl.textContent =
+    `showing ${shown} of ${rows.length} stages${speciesNote}` +
+    (cardmonOnly ? ` · Cardmon only: ${cardmon.length} of ${rows.length} stages hook one` : "");
+}
+
+cardmonEl.addEventListener("change", () => { cardmonOnly = cardmonEl.checked; refresh(); });
+refresh();
+</script>
+</body>
+</html>
