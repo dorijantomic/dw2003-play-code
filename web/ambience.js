@@ -32,7 +32,7 @@ export const FX_GROUPS = [
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["battleatmos", "Battle sky & weather: night, fog, snow, rain follow where you are (new)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
-    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["questemotes", "Quest emotes"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["battlespeed", "Faster battles"], ["codex", "Digimon Codex (new)"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"]]],
+    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["questemotes", "Quest emotes"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["omen", "A feeling before a fight (new)"], ["battlespeed", "Faster battles"], ["codex", "Digimon Codex (new)"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
     // Battle rules the player switches on by hand (all OFF by default; see MANUAL below). One group,
@@ -50,7 +50,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "soundtest", "questtriggers", "questemotes"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "soundtest", "questtriggers", "questemotes", "omen"];     // off until you switch them on by hand; "All on" and the presets leave them alone
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
@@ -342,6 +342,25 @@ export function ambienceSilence() { silenceAll(); }
 let curId = null, curSince = 0, lastT = 0;
 let drops = [], splashes = [], flakes = [], leaves = [], flies = [], grit = [], dust = [], storm = [];
 let glow = null;
+
+// EXPERIMENT (omen, web/omen.js): "A feeling before a fight" — game.js puts the cue on
+// window.__omen (read-only here: the encounter counter is never touched) and this layer draws
+// it in view space: a dark edge shadow and a few dust specks that grow as the counter runs out.
+// `omenShown` eases the level, so stopping mid-warning fades the feeling instead of snapping it.
+let omenCue = null;          // the last cue with a real feeling, kept while it fades
+let omenShown = 0;           // eased 0..1 copy of the level
+let omenSeed = -1;           // which map's mote layout is already built
+let omenMotes = [];
+const OMEN_MOTES = 26;
+function omenMotesFor(seed) {
+    if (seed === omenSeed) return;
+    omenSeed = seed;
+    const r = rng((seed >>> 0) ^ 0x9e3779b9);
+    omenMotes = Array.from({ length: OMEN_MOTES }, () => ({
+        x: r() * VIEW_W, y: r() * VIEW_H, vx: (r() - 0.5) * 12, vy: -7 - r() * 13,
+        ph: r() * 6.2832, s: 0.7 + r() * 1.5, a: 0.35 + r() * 0.5,
+    }));
+}
 
 function glowSprite() {
     if (glow) return glow;
@@ -663,6 +682,11 @@ export function ambienceFor(map, mapImg, camX, camY) {
     // cached profile and the panel's own marks never change), and honours the same panel switches unless forced.
     const ps = sceneProfile(p);
     const fxo = sceneFxFlags();
+    // EXPERIMENT (omen): the field's warning arrives from game.js; off, it is never read.
+    const omenOn = fx.omen === true;
+    const omenOm = omenOn ? window.__omen : null;
+    if (!omenOn) { omenCue = null; omenShown = 0; }
+    const wantOmen = omenOn && !!omenOm && (omenOm.level > 0.001 || omenShown > 0.01);
     const now = performance.now();
     const L = levels(p, now);
     lastAtmos = { mapId: map.id, tod: !!(fxo.tod && ps.tod), nightMap: !!p.night, foggy: !!(fxo.fog && ps.fog),
@@ -681,7 +705,7 @@ export function ambienceFor(map, mapImg, camX, camY) {
         || (ps.open && (fxo.nightlight || fxo.windows || fxo.screenfx || fxo.wildlife || fxo.rainwater))
         || (fxo.frost && ps.snowy) || (fxo.devils && ps.devils) || ((fxo.dragonflies || fxo.fish || fxo.critters) && ps.open)
         || !!sceneFx || now < flashUntil;
-    if (!(wantRain || wantSnow || wantSand || wantLeaves || wantFlies || sceneryOn)) return null;
+    if (!(wantRain || wantSnow || wantSand || wantLeaves || wantFlies || sceneryOn || wantOmen)) return null;
     if (syncViewDims()) curId = null;
     if (curId !== map.id || lastSceneRev !== sceneRev) { resetFor(map, ps); lastSceneRev = sceneRev; }
     const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0);
@@ -818,6 +842,40 @@ export function ambienceFor(map, mapImg, camX, camY) {
                 if (sx < -10 || sx > VIEW_W + 10 || sy < -4 || sy > VIEW_H + 4) continue;
                 ctx.globalAlpha = (1 - s.age / 0.35) * 0.5 * rain;
                 ctx.beginPath(); ctx.ellipse(sx, sy, 1 + s.age * 9, 0.4 + s.age * 3.5, 0, 0, 6.2832); ctx.stroke();
+            }
+        }
+        if (wantOmen) {
+            // EXPERIMENT (omen): the last few driver runs darken the screen's rim and lift a few
+            // dust specks; it eases out when the player stops (game.js sends level 0 while quiet).
+            if (omenOm && omenOm.level > 0.001) omenCue = omenOm;
+            const target = omenOm ? omenOm.level : 0;
+            omenShown += (target - omenShown) * Math.min(1, dt * 6);
+            if (omenCue && omenCue.cues && omenShown > 0.01) {
+                const cue = omenCue.cues;
+                omenMotesFor(omenCue.seed ?? 0);
+                const k = omenShown;
+                const breath = 0.72 + 0.28 * Math.sin(t * (1.1 + 2.4 * cue.pulse) + cue.pulse * 6.2832);
+                const dark = 0.46 * k * cue.shadow * breath;
+                const g = ctx.createRadialGradient(VIEW_W * 0.5, VIEW_H * 0.5, VIEW_H * 0.30,
+                    VIEW_W * 0.5, VIEW_H * 0.5, VIEW_W * 0.62);
+                g.addColorStop(0, "rgba(8,6,14,0)");
+                g.addColorStop(0.62, `rgba(8,6,14,${(dark * 0.35).toFixed(3)})`);
+                g.addColorStop(1, `rgba(8,6,14,${dark.toFixed(3)})`);
+                ctx.globalAlpha = 1; ctx.fillStyle = g;
+                ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+                const n = Math.min(omenMotes.length, Math.round(omenMotes.length * k * cue.rustle));
+                ctx.fillStyle = "#dccca6";
+                for (let i = 0; i < n; i++) {
+                    const m = omenMotes[i];
+                    m.x += (m.vx + wind * 0.12) * dt; m.y += m.vy * dt;
+                    if (m.y < -3) m.y += VIEW_H + 6;
+                    if (m.x < -3) m.x += VIEW_W + 6; else if (m.x > VIEW_W + 3) m.x -= VIEW_W + 6;
+                    ctx.globalAlpha = 0.55 * k * cue.rustle * m.a * (0.6 + 0.4 * Math.sin(t * 2.1 + m.ph));
+                    ctx.beginPath();
+                    ctx.ellipse(m.x + Math.sin(t * 0.9 + m.ph) * 3, m.y, m.s, m.s * 0.7, 0, 0, 6.2832);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
             }
         }
         ctx.restore();

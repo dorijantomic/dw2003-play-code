@@ -29,6 +29,7 @@ import {
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
+import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
@@ -1603,6 +1604,10 @@ const state = {
     // [0x80048d64] countdown, reset to rand()%0x900 folded into 0..1279.
     _encTick: 0,
     _encCounter: resetEncounterCounter(() => Math.floor(Math.random() * 0x10000)),
+    // EXPERIMENT (omen): the rate tier the driver last used, mirrored for the field's warning
+    // (web/omen.js). Read-only: nothing outside the cue reads it, and the counter above is
+    // never written except by the driver's own two lines further down.
+    _encLevel: 0,
 };
 
 // The saved worn array is the wearer record's own multiset, so a save that
@@ -9428,9 +9433,15 @@ function update(dt) {
         // Note the beat is gated on the movement PATH, not on displacement: the
         // three F0x8008fd74 call sites pass their `moving` argument as a literal 1
         // on the walk path, so walking into a wall still ticks the driver.
+        // EXPERIMENT (omen): when the driver cannot run at all (a mount, a chase, no party)
+        // no roll is pending, so the mirrored tier reads 0 and the field's feeling fades.
+        if (!encEligible) state._encLevel = 0;
         for (let tick = 0; tick < fieldTicks.ticks; tick++) {
             if (encEligible && state._encTick % ENCOUNTER_TICK_FRAMES === 0) {
                 const level = battle.encounterRateLevel(m.id, state.x, state.y);
+                // EXPERIMENT (omen): mirror the tier the driver just used (the counter below
+                // stays the driver's own: the cue only ever reads it).
+                state._encLevel = level;
                 // 0 covers all three ways the driver (F0x80092664) bails out: the
                 // stage registers no type-4 zone map (module gate), the player is
                 // on a zone-0 cell, or the block is the level-0 sentinel only the
@@ -9472,6 +9483,21 @@ function update(dt) {
         for (let i = 0; i < activeFollowerCount(); i++) {
             tickStopClip(followers[i], followerChar(i));
         }
+    }
+
+    // EXPERIMENT (omen): "A feeling before a fight" — read the decoded counter (never write it)
+    // and put the field cue on window.__omen for web/ambience.js. Only the last 12 driver runs
+    // show anything, and only while the switch is on: off, the counter is not read, no cue is
+    // computed and web/omen.js is not called at all.
+    if (window.__fx?.omen === true) {
+        const om = currentMap();
+        const seed = [...om.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) >>> 0;
+        // Standing still drains nothing: the feeling fades until the player walks again.
+        const quiet = !(state.moving || state.submarimon);
+        const level = omenLevel(state._encCounter, state._encLevel, { enabled: true, quiet });
+        window.__omen = { level, cues: omenCues(level, seed), seed };
+    } else if (window.__omen) {
+        window.__omen = null;             // switched off mid-walk: the field clears at once
     }
 
     // WS4 position-triggered story VM (engine/systems/trigger-system.ts): the player's (x,y)
