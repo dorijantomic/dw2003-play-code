@@ -1,0 +1,20 @@
+{
+  "_comment": "Walk-in quest triggers (web/quest-triggers.js): a quest scene that starts because the player stepped into a patch of ground. rect = [x, y, width, height] in world pixels; enter-only (the previous frame was outside, this one inside); once defaults to true; when gates on the quest layer's own status (available / active / ready / done). draft: true is local testing only (tools/build_quests.py --with-drafts), like a draft quest. Check with: node tools/check_triggers.mjs",
+  "triggers": [
+    {
+      "id": "gt_bridge_cipher",
+      "map": "s205",
+      "rect": [856, 272, 48, 48],
+      "once": true,
+      "scene": [
+        { "walk": 1005, "to": { "near": "player", "gap": 40 } },
+        { "arrive": 1005 },
+        { "say": 1005, "name": "Cipher", "text": "Hold. You have stepped onto the drop zone. Query: are you hurt? Status: no." },
+        { "say": 1005, "name": "Cipher", "text": "The bridge is mine to watch until the order changes. Cross if you must. I will be here." },
+        { "walk": 1005, "to": "origin" },
+        { "arrive": 1005 }
+      ],
+      "draft": true
+    }
+  ]
+}

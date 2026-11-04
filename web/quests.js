@@ -20,6 +20,7 @@ import { fx } from "./ambience.js";
 import { on } from "./gameEvents.js";
 import { wrap } from "./dialogue-pack.js";
 import { validateScene } from "./quest-scenes.js";
+import { installTriggers } from "./quest-triggers.js";
 
 const KEY = "dw.quests.v1";
 const OBJECTIVES = {
@@ -49,17 +50,18 @@ let defs = [];
 let speciesIds = null;                                       // name -> species id, for "ownForm" (digimon.json, extras included)
 let st = loadState();
 let api = null, fieldEnc = null, challengeBusy = false;
+let triggerRunner = null;                                    // walk-in quest triggers (web/quest-triggers.js), built from quests.json
 let variants = {};
 let mapNames = {};
 let lastMap = null, lastX = 0, lastY = 0;
 let toastEl = null, toastTimer = 0;
 
-function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, gen: { n: 0, def: null } }; }
+function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, triggers: {}, gen: { n: 0, def: null } }; }
 function loadState() {
     try {
         const j = JSON.parse(localStorage.getItem(KEY) || "null");
         if (j && j.v === 1 && j.active && j.done) {      // older saves lack the newer fields
-            j.visited ??= []; j.met ??= []; j.duelWins ??= 0; j.announced ??= {}; j.seen ??= {}; j.gen ??= { n: 0, def: null };
+            j.visited ??= []; j.met ??= []; j.duelWins ??= 0; j.announced ??= {}; j.seen ??= {}; j.triggers ??= {}; j.gen ??= { n: 0, def: null };
             return j;
         }
     } catch { /* fall through to a fresh state */ }
@@ -311,6 +313,7 @@ async function scanForms() {
     }
 }
 export function questsTick(mapId, x, y) {
+    const prevX = lastX, prevY = lastY, prevMap = lastMap;   // walk-in triggers need the previous tick's place
     lastX = x ?? lastX; lastY = y ?? lastY;
     if (++metTick % 45 === 0) scanMet(mapId);
     const now = performance.now();
@@ -328,6 +331,9 @@ export function questsTick(mapId, x, y) {
         }
     }
     if (!enabled() || !mapId) return;
+    // Walk-in triggers (web/quest-triggers.js): enter-only, so the two places are passed on. The first tick on a map has
+    // no previous place here, and a warp does not count as walking into a patch.
+    triggerRunner?.tick(mapId, prevMap === mapId ? prevX : null, prevMap === mapId ? prevY : null, lastX, lastY);
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), a = st.active[id];
         if (!d) continue;
@@ -733,6 +739,7 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
     if (!stageEl || api) return;
     api = { giveItem, giveBits, startBattle, readFlag, partyLevel, partnerIds, npcsHere, speak, ask, idle, onDone, scene, ownsForm, countItem, takeItem };
     installUi(stageEl);
+    let triggerDefs = [];
     try {
         const [q, v, m] = await Promise.all([
             fetch("quests.json").then((r) => r.json()),
@@ -747,7 +754,22 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
             if (bad || seen.has(d.id)) { console.warn(`[quests] skipped "${d.id}": ${bad || "duplicate id"}`); continue; }
             seen.add(d.id); defs.push(d);
         }
+        triggerDefs = Array.isArray(q.triggers) ? q.triggers : [];
     } catch (e) { console.warn("[quests] could not load quests.json:", e); }
+    // Walk-in triggers (web/quest-triggers.js): authored rectangles that start a scene when the player steps into them.
+    // The original field VM's own shape (op-8 start_event on the type-7 trigger grid). Off unless F2 -> Extras -> Quest
+    // triggers is ticked (and the Quests layer itself is on); a scene runs only when the game is idle.
+    triggerRunner = installTriggers(triggerDefs, {
+        enabled: () => enabled() && fx.questtriggers === true,
+        statusOf: (id) => { const d = defOf(id); return d ? statusOf(d) : null; },
+        idle: () => !!(api?.idle && api.idle()),
+        get dialogBusy() { return dialogBusy; },
+        get battle() { return challengeBusy; },
+        state: () => st,
+        playScene: (scene) => (api?.scene ? api.scene(scene) : null),
+        save: saveState,
+        warn: (m) => console.warn(m),
+    });
     await loadRoam();
     ensureGenerated(); announceUnlocks();
     window.__quests = {   // debug / test hooks; nothing in the game reads these

@@ -35612,5 +35612,48 @@
         }
       ]
     }
+  ],
+  "triggers": [
+    {
+      "id": "gt_bridge_cipher",
+      "map": "s205",
+      "rect": [
+        856,
+        272,
+        48,
+        48
+      ],
+      "once": true,
+      "scene": [
+        {
+          "walk": 1005,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 1005
+        },
+        {
+          "say": 1005,
+          "name": "Cipher",
+          "text": "Hold. You have stepped onto the drop zone. Query: are you hurt? Status: no."
+        },
+        {
+          "say": 1005,
+          "name": "Cipher",
+          "text": "The bridge is mine to watch until the order changes. Cross if you must. I will be here."
+        },
+        {
+          "walk": 1005,
+          "to": "origin"
+        },
+        {
+          "arrive": 1005
+        }
+      ],
+      "draft": true
+    }
   ]
 }
