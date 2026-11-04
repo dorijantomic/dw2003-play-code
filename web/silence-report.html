@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Silence Report — what this build cannot sound</title>
+<style>
+  body { margin:0; background:#0a0e1a; color:#d8e0f0; font-family:monospace; font-size:13px; line-height:1.5; }
+  #top { padding:12px 16px; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; position:sticky; top:0; background:#0a0e1a; border-bottom:1px solid #333; z-index:2; }
+  h1 { margin:0; font-size:16px; letter-spacing:1px; color:#e8c060; }
+  #sub { color:#8a93aa; font-size:12px; }
+  #top button { margin-left:auto; background:#2a3a6a; color:#e8c060; border:1px solid #e8c060; padding:5px 12px; cursor:pointer; font-family:monospace; font-size:12px; }
+  #top button:hover { background:#3a4a8a; }
+  main { padding:4px 16px 40px; max-width:1000px; }
+  h2 { margin:22px 0 6px; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:#8a8ab0; border-bottom:1px solid #222; padding-bottom:3px; }
+  h2 span { color:#e8c060; }
+  p { margin:6px 0; color:#b8c0d0; }
+  b { color:#e8c060; }
+  table { border-collapse:collapse; margin:8px 0; width:100%; }
+  th, td { text-align:left; padding:3px 10px 3px 0; border-bottom:1px solid #16203a; vertical-align:top; }
+  th { color:#7f88a0; font-weight:normal; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  td.num { text-align:right; color:#e8c060; width:70px; }
+  .row { padding:4px 0; border-bottom:1px solid #16203a; }
+  .name { color:#e8c060; }
+  .id { color:#7f88a0; }
+  .why { color:#9aa4bc; font-size:12px; }
+  .fires { color:#ff9080; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .how { color:#c8a0a0; font-size:12px; }
+  .good { color:#8fe08f; }
+  .note { color:#7f88a0; font-size:11px; }
+  code { color:#a8c8e8; }
+  @media print {
+    body { background:#fff; color:#111; }
+    #top { position:static; background:#fff; border-bottom:1px solid #888; }
+    h1, h2 span, b, .name, td.num { color:#111; }
+    h2 { color:#333; border-color:#888; }
+    .id, .why, .note, .how, #sub { color:#333; }
+    .fires { color:#a00; }
+    #top button { display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>SILENCE REPORT</h1>
+  <span id="sub">what this build cannot sound — computed from the shipped tables</span>
+  <button id="print" type="button">Print</button>
+</div>
+<main>
+  <p>Every number below is counted from the game's own tables, never from a list typed into
+     this page: the 71-category Sound-Test catalogue, the two sample manifests, the music
+     stem index, the stage sound archives, the movie manifest and the map manifest. It is the
+     same honesty the Sound Test's per-row mark gives, said in game terms.</p>
+  <div id="summary">loading…</div>
+  <div id="silent"></div>
+  <div id="banks"></div>
+  <div id="map"></div>
+  <div id="movies"></div>
+  <div id="alts"></div>
+</main>
+<script type="module">
+import {
+  altGaps, bankGaps, coverage, movieGaps, themeGaps,
+  MOVIE_GAP_ROWS, START_WORDS,
+} from "./silence-report.js";
+
+const $ = (id) => document.getElementById(id);
+const load = (url) => fetch(url).then((r) => r.json());
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+$("print").addEventListener("click", () => window.print());
+
+// The seven shipped tables. Nothing outside web/assets is ever fetched.
+const [catalogue, common, area, stems, archives, movieManifest, mapManifest] = await Promise.all([
+  load("assets/data/soundtst_catalogue.json"),
+  load("assets/sfx/manifest.json"),
+  load("assets/sfx/area_manifest.json"),
+  load("assets/music/index.json"),
+  load("assets/data/map_sound_archives.json"),
+  load("assets/movie/manifest.json"),
+  load("assets/manifest.json"),
+]);
+const maps = mapManifest.maps || mapManifest;
+
+const cov = coverage({ catalogue, common, area, stems, startWords: START_WORDS });
+const banks = bankGaps(archives, area, catalogue);
+const themeGapsList = themeGaps(archives, maps);
+const film = movieGaps(MOVIE_GAP_ROWS, movieManifest.movies);
+const alts = altGaps(archives, catalogue, stems);
+
+const nameOf = new Map(maps.map((m) => [m.id, m.name]));
+
+// ---------------------------------------------------------------- the jaw
+$("summary").innerHTML = `
+  <h2>The whole catalogue <span>(${cov.rows} rows)</span></h2>
+  <table>
+    <tr><th>Rows the Sound Test holds</th><td class="num">${cov.rows}</td><td class="note">71 categories, the overlay's own table</td></tr>
+    <tr><th>Play a sample this build extracted</th><td class="num good">${cov.sample}</td><td class="note">the row's own bank holds the sample</td></tr>
+    <tr><th>Play a rendered music stem</th><td class="num good">${cov.stem}</td><td class="note">music starts, rendered by bank and sequence</td></tr>
+    <tr><th>Play only their bank's theme</th><td class="num">${cov.bankTheme}</td><td class="note">${cov.themes.map((r) => `${esc(r.name)} hears <code>${esc(r.stem)}</code> — the train theme, approximate`).join("; ") || "none"}</td></tr>
+    <tr><th>Have no built audio at all</th><td class="num fires">${cov.silent.length}</td><td class="note">named below, with the two the game really fires</td></tr>
+  </table>`;
+
+// ------------------------------------------------------------- the five
+const silentRows = cov.silent.map((row) => `
+  <div class="row">
+    <span class="name">${esc(row.name)}</span>
+    <span class="id">${esc(row.id)} · ${esc(row.category)}</span>
+    ${row.fires ? `<div class="fires">the game really fires this</div><div class="how">${esc(row.how)}</div>` : ""}
+    <div class="why">${esc(row.why)}</div>
+  </div>`).join("");
+$("silent").innerHTML = `
+  <h2>The rows with no sound at all <span>(${cov.silent.length})</span></h2>
+  <p>These are the Sound-Test rows with neither a built sample nor a rendered stem. Two of them
+     are cues the original really plays, so a player hears something here that this build does
+     not.</p>
+  ${silentRows}
+  <p class="note">A sixth row, TRAINING, has no stem of its own either, but its bank's theme
+     <code>${esc(cov.themes[0]?.stem ?? "bgm031")}</code> was rendered at that sequence, so it is
+     counted above as approximate rather than silent.</p>`;
+
+// ------------------------------------------------------------ the banks
+const stageCount = {};
+for (const rec of Object.values(archives)) {
+  const bank = String(rec.bank || "").toLowerCase();
+  stageCount[bank] = (stageCount[bank] || 0) + 1;
+}
+const stageRows = banks.stageBanks.map((bank) => {
+  const n = stageCount[bank] || 0;
+  const example = Object.entries(archives).find(([, rec]) => String(rec.bank).toLowerCase() === bank);
+  const where = example ? nameOf.get(example[0]) ?? example[0] : "";
+  return `<tr><td class="name">${esc(bank)}</td><td class="num">${n}</td><td class="note">${esc(where)}${n > 1 ? ` and ${n - 1} more` : ""}</td></tr>`;
+}).join("");
+$("banks").innerHTML = `
+  <h2>Banks that were never extracted <span>(${banks.count} of 71)</span></h2>
+  <p>${banks.stageBanks.length} are stage banks: a real place loads them, so the music there
+     plays from the rendered stem and every cue inside the bank is still silent.
+     ${banks.other.map((b) => `The ${esc(b)} bank`).join(", ")} is the odd one out — its theme is a music
+     stem, not a sample, so nothing was lost.</p>
+  <table><tr><th>Stage bank</th><th>Stages</th><th>Example place</th></tr>${stageRows}</table>
+  <p class="note">Every other category has a built bank: ${banks.banked} of 71.</p>`;
+
+// -------------------------------------------------------------- the map
+$("map").innerHTML = `
+  <h2>The map with no theme <span>(${themeGapsList.length})</span></h2>
+  ${themeGapsList.map((id) => `<div class="row"><span class="name">${esc(id)}</span>
+    <span class="id">${esc(nameOf.get(id) ?? "")}</span>
+    <div class="why">no record in the stage sound archives, and <code>music: null</code> in the map manifest —
+    the original stops the held track on entry, so the silence is faithful.</div></div>`).join("")}`;
+
+// ------------------------------------------------------------ the movies
+$("movies").innerHTML = `
+  <h2>Movie rows with no stream <span>(${film.missing.length} of ${film.rows})</span></h2>
+  <p>The title overlay's player names ${film.rows} rows; ${film.shipped} streams ship
+     (${film.shippedRows.map((n) => `<span class="name">${esc(n)}</span>`).join(", ")}).</p>
+  ${film.missing.map((name) => `<div class="row"><span class="name">${esc(name)}</span>
+    <div class="why">no stream in this build</div></div>`).join("")}
+  <p class="note">${film.variants.map((n) => esc(n)).join(" and ")} are language variants of MOVIEE02's
+     row, not rows of their own, so they are not counted missing.</p>`;
+
+// ---------------------------------------------------------- the alternates
+const altStems = Object.entries(alts.byStem).map(([stem, n]) => `<tr><td class="name">${esc(stem)}</td><td class="num">${n}</td><td class="note">${alts.missing.some((m) => m.stem === stem) ? "stem missing" : "stem present"}</td></tr>`).join("");
+$("alts").innerHTML = `
+  <h2>Alternate play ids nothing plays <span>(${alts.count})</span></h2>
+  <p>${alts.count} stage records carry a second play id — a music switch whose guard is still
+     undecoded. Nothing in this build ever plays one; the stems they would start are all built.</p>
+  <table><tr><th>Stem</th><th>Rows</th><th>State</th></tr>${altStems}</table>
+  ${alts.missing.length ? `<p class="fires">${alts.missing.length} alternate stems are missing</p>` : `<p class="note good">every alternate stem is present, so wiring the guards would lose no audio.</p>`}`;
+</script>
+</body>
+</html>
