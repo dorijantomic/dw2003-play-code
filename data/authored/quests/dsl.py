@@ -218,6 +218,17 @@ def rise(pixels, step_by=None):
     return s
 
 
+def bucket(n):
+    """Draw the PLAYER behind the map band or back in front of it for the rest of the scene.
+
+    n  8 = behind the map band: the ground covers the player as they walk (the Protocol Ruins tunnel's own trick)
+       4 = back in front of it (the disc's entity bucket). Only a whole number 0..15 is a bucket, and the disc itself
+           authors nothing but 4 and 8 (its step-program setup op 5 writes the player actor's +0x78 draw layer).
+    The scene holds it until it ends or another bucket step; every scene exit puts the player back at 4.
+    """
+    return {"bucket": int(n)}
+
+
 def fade(to="out", frames=None):
     """The screen to black ("out"), back to the field ("in"), or at once ("black" / "clear")."""
     s = {"fade": to}

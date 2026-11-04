@@ -79,6 +79,7 @@ The steps are documented at the top of `web/quest-scenes.js`; the DSL helpers ar
 | `lightning` | 1-6 flashes on cue (thunder follows when weather sound is on) | `lightning` |
 | `chase` | the target (an NPC id, or an effect's name) runs a path while the PLAYER keeps the controls and must stay within `lose` px | plain dict |
 | `ghost` | that character drawn faded and tinted for the rest of the scene (a memory replay); `{ghost: n, off: true}` restores them | plain dict |
+| `bucket` | the PLAYER draws behind the map band (8) or back in front (4) for the rest of the scene; the exit restores 4 | `bucket` |
 
 ```python
 fx("crate", at=[1056, 120], clip="fall", fall={"floor": 424, "step": 0.7})   # place it and let it fall
@@ -220,6 +221,21 @@ player's own foot box; keep it inside the map's open ground and end near where t
 (a memory replay, a recording, a spirit); `"player"` works as the target. `{"ghost": 27, "off": true}` puts them back.
 Every ghost is cleared on every scene exit and when F2 Quests is switched off. It is a look, not a second body: a ghosted
 character still walks, talks and blocks like themselves.
+
+## Behind the map: the player's draw bucket
+
+`{"bucket": 8}` draws the PLAYER behind the map band: the ground image is painted over them as they walk, exactly the
+Protocol Ruins tunnel's own trick. `{"bucket": 4}` puts them back in front of it, the disc's entity bucket. Those are the
+only two values the disc writes — its step-program setup op 5 authors the player actor's `+0x78` draw-layer word as 8 on
+the tunnel's entrance cells and 4 on its exits, over s261, s375, s376, s934 and s949. The scene holds the bucket until it
+ends or another bucket step says otherwise, and **every scene exit puts the player back at 4**, so a scene can never
+leave them behind the map. The step is scene data only, so it rides F2 → Extras → Quests like every scene. The DSL
+helper writes it: `bucket(8)` to go behind the map band, `bucket(4)` to come back in front.
+
+```python
+bucket(8)                     # the ground covers the player from here on
+bucket(4)                     # and back in front of it
+```
 
 ## Poses
 

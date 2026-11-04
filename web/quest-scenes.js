@@ -72,6 +72,10 @@
 //   { "drop": 180, "step": 0.25 } / { "rise": 180 }  move the PLAYER that many pixels down/up through the field
 //                                                  character's own Y (the s680 floor collapse: the room scrolls, the camera
 //                                                  follows); blocks until the whole distance is travelled
+//   { "bucket": 8 } / { "bucket": 4 }               the PLAYER's own draw layer: 8 draws them behind the map band (the ground
+//                                                  covers them as they walk -- the Protocol Ruins tunnel's trick), 4 puts
+//                                                  them back in front of it (the disc's entity bucket). The scene holds it
+//                                                  until it ends or another bucket step, and every scene exit restores 4.
 //   { "fade": "out", "frames": 30 }                the screen to black; "in" back to the field; "black"/"clear" at once
 //   { "battle": 12 }                               start that fight screen mid-scene and go on after a WIN (a flee also goes
 //                                                  on, as the story's own scripted fights do); a loss ends the scene, since the
@@ -456,6 +460,17 @@ export function compileScene(steps, opts = {}) {
             const px = Math.abs(num(down ? s.drop : s.rise, 0));
             if (!(px > 0)) return bad(`${down ? "drop" : "rise"} needs a distance in pixels`);
             event({ kind: down ? "drop" : "rise", pixels: down ? px : -px, step: Number(s.step) > 0 ? Number(s.step) : 0.25 });
+        } else if ("bucket" in s) {
+            // The player actor's draw-layer word (+0x78): 8 draws them behind the map band, the ground covers them as
+            // they walk (the Protocol Ruins tunnel); 4 puts them back in front, the disc's entity bucket. The host keeps
+            // a scene override the per-frame setup tick respects (web/game.js stepSetupBucketTick / questSceneFxReset),
+            // so a tile's own op-5 record cannot take it back and no scene leaves the player behind the map. Only a
+            // whole number 0 to 15 is a bucket: the word is a byte, and the disc itself authors nothing but 4 and 8.
+            const b = s.bucket;
+            if (!Number.isInteger(b) || b < 0 || b > 15) {
+                return bad(`bucket ${JSON.stringify(b)} is not a whole number 0 to 15 (8 = behind the map band, 4 = back in front)`);
+            }
+            event({ kind: "bucket", value: b });
         } else if ("fade" in s) {
             const mode = s.fade === true ? "out" : String(s.fade ?? "");
             if (!["out", "in", "black", "clear"].includes(mode)) return bad(`fade ${JSON.stringify(s.fade)} is not "out", "in", "black" or "clear"`);
