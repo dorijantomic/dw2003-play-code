@@ -19,7 +19,7 @@ import { ui, rosterSlotOfCharId, itemCountEntries, ROSTER_SLOT_CHARIDS } from ".
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { buildDirectoryBlock, slotForFile } from "./memcard.js";
-import { buildRecord, readSlot, restoreSlotData, writeSlot } from "./save.js";
+import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 import { fetchBytes, fetchJson, loadResidentResources, loadProfileRecords } from "./resident-data.js";
 
 /** The card art: 0x029D0000 is disc index 669 (STMCRDCS), 0x02860000 is 646 (CMFONT). */
@@ -206,8 +206,17 @@ export function createSaveTranslated(sfx = null) {
         }
         const restored = session.services.restored;
         if (restored.length) {
-            result.loadedSlot = restored[restored.length - 1];
-            restoreSlotData(result.loadedSlot, r._data.profiles);
+            const loadedSlot = restored[restored.length - 1];
+            if (!restoreSlotData(loadedSlot, r._data.profiles)) {
+                // Card verify refused the file: not one key was restored, so the
+                // page is not reloaded and the slot is not stamped as played.
+                // The disc's own code goes into the diagnostics.
+                const refusal = lastSlotRefusal();
+                result.refused = { slot: loadedSlot, code: refusal?.code ?? 5, why: refusal?.why ?? "file not found" };
+                r._lastDiagnostic = `load refused: MEMORY CARD code ${result.refused.code} (${result.refused.why})`;
+                return result;
+            }
+            result.loadedSlot = loadedSlot;
             if (typeof localStorage !== "undefined") {
                 try { localStorage.setItem("mcardLastSlot", String(result.loadedSlot)); } catch { /* storage blocked */ }
             }
