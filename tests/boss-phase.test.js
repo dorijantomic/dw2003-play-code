@@ -66,14 +66,17 @@ test("phaseRows cycles a two-move phase and refuses an unknown id", () => {
   assert.deepEqual(phaseRows(null, BOSS_MOVES), []);
 });
 
-test("phaseEffects names the field, its power, the tint and the page", () => {
+test("phaseEffects names the field, its power, the tint, the page and the bank", () => {
   assert.deepEqual(phaseEffects({ field: "dark", tint: [0, 0, 0, 1], page: "x" }),
-    { element: "dark", power: 64, tint: [0, 0, 0, 1], page: "x" },
+    { element: "dark", power: 64, tint: [0, 0, 0, 1], page: "x", music: null },
     "a field phase writes the same element + power 64 the field items write");
   assert.deepEqual(phaseEffects({ moves: [166], page: "y" }),
-    { element: null, power: 64, tint: null, page: "y" }, "no field means no field write");
+    { element: null, power: 64, tint: null, page: "y", music: null }, "no field means no field write");
   assert.deepEqual(phaseEffects(null),
-    { element: null, power: 64, tint: null, page: null });
+    { element: null, power: 64, tint: null, page: null, music: null });
+  assert.deepEqual(phaseEffects({ music: "boss04" }),
+    { element: null, power: 64, tint: null, page: null, music: "boss04" },
+    "a phase may name a battle bank (tests/boss-music.test.js owns the bank set)");
 });
 
 // ── the authored data and its builder ────────────────────────────────────────────────

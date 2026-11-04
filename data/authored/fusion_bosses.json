@@ -14,7 +14,7 @@
       "transform": "whiteout",
       "phases": [
         { "at": 0.6, "moves": [166], "page": "Millenniummon's armour splits and knits itself back together. It has only begun to fight." },
-        { "at": 0.25, "moves": [325, 166], "field": "dark", "tint": [0.35, 0.1, 0.5, 1], "page": "The battlefield goes black. Time stops where Millenniummon looks." }
+        { "at": 0.25, "moves": [325, 166], "field": "dark", "tint": [0.35, 0.1, 0.5, 1], "music": "boss04", "page": "The battlefield goes black. Time stops where Millenniummon looks." }
       ]
     }
   ]

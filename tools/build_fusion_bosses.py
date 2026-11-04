@@ -71,6 +71,23 @@ def is_int(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def battle_banks():
+    """Every battle bank the game's own battle-music table names — never a hardcoded list.
+
+    web/assets/data/battle_music.json is the decoded trigger table (128 screen keys, 310
+    records). Each record's `bank` is the track the field handoff copies into the packed
+    battle-music word (archive = (id >> 18) & 0x7f, played by wfightmn); a phase may name
+    one of those and nothing else.
+    """
+    banks = set()
+    for records in load("battle_music.json").values():
+        for row in records:
+            bank = row.get("bank")
+            if isinstance(bank, str) and bank:
+                banks.add(bank)
+    return banks
+
+
 def resolve_skill(row, real_skills, fight_tech):
     sid = row.get("id")
     if not is_int(sid) or sid < AUTHORED_SKILL_MIN:
@@ -142,8 +159,9 @@ def resolve_skill(row, real_skills, fight_tech):
 def resolve_phases(bid, phases, moves):
     """The authored HP phases of one boss, validated and resolved.
 
-    A phase is `{at, moves, page}` plus optional `field` and `tint`; `web/boss-phase.js`
-    reads exactly those. The rules keep the battle's phase machine simple and honest:
+    A phase is `{at, moves, page}` plus optional `field`, `tint` and `music`;
+    `web/boss-phase.js` reads exactly those. The rules keep the battle's phase machine
+    simple and honest:
 
       * at most three phases, and `at` strictly descending (0.6 then 0.25) so the page
         of a phase a single hit skips never stacks on top of the newest one;
@@ -152,7 +170,9 @@ def resolve_phases(bid, phases, moves):
         record already names; actions 1..3, never flee or a slot switch);
       * `field` is one of the disc's seven elemental fields (2..8, never `normal`);
       * `tint` is four numbers 0..1, the same shape the boss's own tint has;
-      * `page` is the authored line the phase puts up (non-empty).
+      * `page` is the authored line the phase puts up (non-empty);
+      * `music` is one of the banks the game's own battle_music.json names (computed by
+        `battle_banks()`), so the fight's track can turn at the phase's HP line.
     """
     if phases is None:
         return []
@@ -162,6 +182,7 @@ def resolve_phases(bid, phases, moves):
         raise BuildError(f"boss {bid}: at most {MAX_PHASES} phases, got {len(phases)}")
     out = []
     previous = None
+    banks = None
     for n, phase in enumerate(phases):
         if not isinstance(phase, dict):
             raise BuildError(f"boss {bid} phase {n}: must be an object")
@@ -191,11 +212,20 @@ def resolve_phases(bid, phases, moves):
         page = phase.get("page")
         if not isinstance(page, str) or not page.strip():
             raise BuildError(f"boss {bid} phase {n}: needs a page (the line it puts up)")
+        music = phase.get("music")
+        if music is not None:
+            if banks is None:
+                banks = battle_banks()
+            if not isinstance(music, str) or music not in banks:
+                raise BuildError(f"boss {bid} phase {n}: music {music!r} is not one of the "
+                                 f"game's battle banks {sorted(banks)}")
         resolved = {"at": float(at), "moves": list(phase_moves)}
         if field is not None:
             resolved["field"] = field
         if tint is not None:
             resolved["tint"] = [float(v) for v in tint]
+        if music is not None:
+            resolved["music"] = music
         resolved["page"] = page.strip()
         out.append(resolved)
     return out
