@@ -30,6 +30,7 @@ import {
 import { tickCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 import { tickCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
 import { tickBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
+import { tickPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 
@@ -1748,6 +1749,35 @@ window.__teleport = (x, y) => {
     state.y = y;
 };
 window.__state = state;
+// EXPERIMENT (Next forms planner): the party as the page reads it — each member's roster slot (the line the
+// disc's unlock routine scans) and its live ledger, level and stat record. Exactly the records web/battle.js
+// passes to engine/dw3/evo-trees.ts (statsRecord.formLedger, .level, .stats/.bonuses/.elemBonuses).
+function plannerPartyMembers() {
+    const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
+    return view.slice(0, 3).map((row, i) => {
+        const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
+        if (!record) return null;
+        const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
+        return {
+            slot,
+            name: row.name,
+            live: {
+                formLevels: Object.fromEntries((record.formLedger ?? []).map((entry) => [Number(entry.id), Number(entry.formLevel ?? 1)])),
+                level: Number(record.level ?? 1),
+                stats: record,
+            },
+        };
+    }).filter(Boolean);
+}
+// Console aid: __planner.rows() is the selected partner's list; __planner.press("down") drives the page.
+window.__planner = {
+    open: () => plannerOpen(),
+    rows: () => plannerRowsNow(),
+    cursor: () => plannerCursor(),
+    selection: () => plannerSelection(),
+    members: () => plannerPartyMembers(),
+    press: (button) => plannerPress(String(button)),
+};
 // The `ghost` step's live actors, on the state itself: `_questGhosts` is a Map of actor -> { alpha, tint } (empty when
 // nothing is ghosted). A verifier reads its keys; web/quest-ghost.js empties it in place on every scene exit.
 state._questGhosts = questGhostMap();
@@ -2416,7 +2446,7 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -7614,6 +7644,14 @@ function dispatchInput(k, e, raw = "") {
         e.preventDefault();
         return;
     }
+    // EXPERIMENT (Next forms planner): while the page is up it owns the pad exactly like the book above — Up/Down
+    // the form, Left/Right the partner, Cross/Start close, every other press swallowed. Closed, it answers false
+    // and nothing changes.
+    if (plannerPress(k)) {
+        state.keys.delete(k);
+        e.preventDefault();
+        return;
+    }
 
     // Backquote/tilde key: toggle the partner debug editor (dev tool — level/EXP/stats/items).
     // Match the PHYSICAL key via e.code — on many layouts `~` is a dead key so e.key never
@@ -8403,6 +8441,11 @@ function update(dt) {
     // never exists and this costs one comparison.
     tickBlastLadder(window.__fx?.blastladder === true);
     if (blastOpen()) return;
+    // EXPERIMENT (Next forms planner): F2 -> Extras -> "Next forms planner (new)" opens on the setting's rising
+    // edge. The page is read-only and lists the selected partner's line with its live gates. While it is up the
+    // field is frozen and dispatchInput gives it every press; with the setting off this costs one comparison.
+    tickPlanner(window.__fx?.planner === true, plannerPartyMembers);
+    if (plannerOpen()) return;
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
@@ -11002,6 +11045,8 @@ function render() {
     codexDraw(ctx, null, VIEW_W, VIEW_H);
     // EXPERIMENT (Blast ladder): the starter card, over everything, drawn only while its page is open.
     blastDraw(ctx, null, VIEW_W, VIEW_H);
+    // EXPERIMENT (Next forms planner): the read-only page sits over everything too; it draws only while open.
+    plannerDraw(ctx, VIEW_W, VIEW_H);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
