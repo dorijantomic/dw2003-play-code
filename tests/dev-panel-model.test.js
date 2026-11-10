@@ -11,11 +11,11 @@ const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8")
 const BLOCK = SRC.match(/export const FX_GROUPS = \[([\s\S]*?)\n\];/)[1];
 const FX_KEYS = [...BLOCK.matchAll(/\["(\w+)", "[^"]*"\]/g)].map((m) => m[1]);
 
-test("all 100 FX_DEFS keys are present exactly once", () => {
-    assert.equal(FX_KEYS.length, 100);
-    assert.equal(new Set(FX_KEYS).size, 100);
+test("all 101 FX_DEFS keys are present exactly once", () => {
+    assert.equal(FX_KEYS.length, 101);
+    assert.equal(new Set(FX_KEYS).size, 101);
     const keys = DEV_ROWS.map((r) => r.key);
-    assert.equal(keys.length, 100);
+    assert.equal(keys.length, 101);
     assert.deepEqual([...keys].sort(), [...FX_KEYS].sort());
 });
 
@@ -46,7 +46,7 @@ test("the tabs and sub-headings are the agreed ones", () => {
     assert.deepEqual(keysOf("battle", "Look"), ["battlewide", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "hd2d"]);
     assert.deepEqual(rowsOfTab("online").map((r) => r.key), ["mpbubbles", "mpcredit", "serverchamp", "chatqueue"]);
     assert.equal(rowsOfTab("info").length, 10);
-    assert.equal(rowsOfTab("test").length, 13);
+    assert.equal(rowsOfTab("test").length, 14);
     assert.equal(rowsOfTab("controls").length, 0);
 });
 
@@ -106,7 +106,7 @@ test("filter All / In / Auto / Out follows ship-list.js", () => {
     }
     let total = 0;
     for (const f of ["in", "auto", "out"]) total += DEV_ROWS.filter((r) => shipClass(r.key) === f).length;
-    assert.equal(total, 100, "every key has a ship class");
+    assert.equal(total, 101, "every key has a ship class");
     assert.deepEqual(selectRows({ tab: "online", filter: "auto" }).map((r) => r.key), ["mpbubbles", "mpcredit"]);
     assert.deepEqual(selectRows({ tab: "online", filter: "in" }), []);
     const shipOf = (k) => (k === "rain" ? "out" : "in");

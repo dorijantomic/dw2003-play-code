@@ -553,7 +553,7 @@ class PortraitCellSizeTests(unittest.TestCase):
             self.assertEqual(up.asset_class(rel, src), "portrait")
             recipe = up.processing_recipe(rel, src=src)
             self.assertEqual(recipe["method"], "ai")
-            self.assertEqual(recipe["models"][0], "apisr-x4")
+            self.assertEqual(recipe["models"][0], "fateplus-lite-x4")
 
     def test_unmeasurable_sheet_keeps_the_portrait_recipe(self):
         """Without decoded rectangles the size test cannot fire, so do not guess."""

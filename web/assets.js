@@ -47,23 +47,63 @@ export function hdAssetUrl(url) {
 // still tries HD first and falls back, as before.
 let hdFiles = null;                 // Set of asset-relative paths with a 4x file; null = not known yet
 let hdFilesPromise = null;
+let hdManifestStamp = null;         // Last-Modified of the manifest we last parsed
+
+function hdPathSet(manifest) {
+  return manifest && Array.isArray(manifest.assets)
+    ? new Set(manifest.assets
+      .filter((r) => r && typeof r.path === "string" && !r.native)
+      .map((r) => r.path))
+    : new Set();
+}
+
 export function loadHdIndex() {
   if (!hdFilesPromise) {
     hdFilesPromise = (typeof fetch === "function"
       ? fetch("assets-hd/manifest.json", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => {
+          if (!r.ok) return null;
+          hdManifestStamp = r.headers?.get?.("last-modified") ?? null;
+          return r.json();
+        })
         .catch(() => null)
       : Promise.resolve(null))
       .then((manifest) => {
-        hdFiles = manifest && Array.isArray(manifest.assets)
-          ? new Set(manifest.assets
-            .filter((r) => r && typeof r.path === "string" && !r.native)
-            .map((r) => r.path))
-          : new Set();
+        hdFiles = hdPathSet(manifest);
         return hdFiles;
       });
+    startHdIndexRefresh();
   }
   return hdFilesPromise;
+}
+
+// The HD pack can still be growing while the game runs (the launcher builds it in the background and
+// rewrites the manifest every few files).  Re-read the list once a minute; requests made after that
+// (the next map, battle or screen) get the new 4x files, images already on screen stay as they are.
+// The server answers an unchanged manifest with 304, and a changed one is only parsed when its
+// Last-Modified differs.  Browser only: a node test never starts the timer.
+export const HD_INDEX_REFRESH_MS = 60000;
+let hdRefreshTimer = null;
+export async function refreshHdIndex() {
+  if (typeof fetch !== "function") return false;
+  try {
+    const r = await fetch("assets-hd/manifest.json", { cache: "no-cache" });
+    if (!r.ok) return false;
+    const stamp = r.headers?.get?.("last-modified") ?? null;
+    if (stamp !== null && stamp === hdManifestStamp) return false;
+    const next = hdPathSet(await r.json());
+    hdManifestStamp = stamp;
+    if (hdFiles !== null && next.size === hdFiles.size && [...next].every((p) => hdFiles.has(p))) return false;
+    hdFiles = next;
+    hdFilesPromise = Promise.resolve(hdFiles);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function startHdIndexRefresh() {
+  if (hdRefreshTimer || typeof window === "undefined" || typeof setInterval !== "function") return;
+  hdRefreshTimer = setInterval(refreshHdIndex, HD_INDEX_REFRESH_MS);
 }
 /** Test hook: replace the pack list (null = unknown, try every HD path). */
 export function setHdIndex(paths) { hdFiles = paths == null ? null : new Set(paths); hdFilesPromise = Promise.resolve(hdFiles); }
@@ -283,5 +323,20 @@ export async function initializeAssetModeUi() {
   });
   close?.addEventListener("click", hideAssetModeChooser);
 
+  if (!selected && await launcherWantsHd()) {   // the player ticked HD Remaster on the setup page
+    setAssetMode(ASSET_MODE_HD);
+    location.reload();
+    return;
+  }
   if (!selected) await showAssetModeChooser();
+}
+
+/** True when the launcher reports the player's setup-page choice "HD Remaster" (it is built while they play). */
+export async function launcherWantsHd() {
+  try {
+    const r = await fetch("/__dw2003/status", { cache: "no-store" });
+    return r.ok && (await r.json())?.hd?.enabled === true;
+  } catch {
+    return false;   // not served by the launcher: show the chooser as before
+  }
 }

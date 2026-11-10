@@ -37,12 +37,19 @@
   .done { color: var(--good); font-weight: 600; }
   footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
   a { color: var(--accent); }
+  .hdbox { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; cursor: pointer; }
+  .hdbox input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--accent); }
 </style>
 </head>
 <body>
 <main>
   <h1>Digimon World 2003</h1>
   <p class="sub">Browser recreation — one-time setup</p>
+
+  <label id="hdbox" class="card hdbox">
+    <input id="hd" type="checkbox" checked>
+    <span><strong>HD Remaster</strong> (sharper 4x art, about 20 min extra on a good graphics card, runs while you play)</span>
+  </label>
 
   <section id="pick" class="card hidden">
     <div id="drop" class="drop" tabindex="0">
@@ -125,6 +132,7 @@ for (const ev of ["dragleave", "drop"]) $("drop").addEventListener(ev, (e) => { 
 $("drop").addEventListener("drop", (e) => upload(e.dataTransfer.files[0]));
 document.addEventListener("dragover", (e) => e.preventDefault());
 document.addEventListener("drop", (e) => e.preventDefault());
+$("hd").onchange = () => fetch("/__dw2003/hd", { method: "POST", body: JSON.stringify({ on: $("hd").checked }) });
 $("retry").onclick = () => fetch("/__dw2003/retry", { method: "POST" }).then(poll);
 $("other").onclick = () => fetch("/__dw2003/forget-disc", { method: "POST" }).then(() => { show("pick"); });
 
@@ -136,6 +144,7 @@ async function poll() {
   try { s = await (await fetch("/__dw2003/status")).json(); }
   catch { timer = setTimeout(poll, 3000); return; }
   $("ver").textContent = s.version ? `· ${s.version}` : "";
+  if (s.hd) $("hd").checked = s.hd.enabled;
   if (s.state === "done") { location.replace("/"); return; }
   if (s.state === "need-disc") { show("pick"); timer = setTimeout(poll, 5000); return; }
   show("work");

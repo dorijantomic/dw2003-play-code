@@ -36,6 +36,9 @@ class Stage:
     env: dict = field(default_factory=dict)     # extra env vars merged into the subprocess
     opt_in: bool = False               # heavyweight/noncanonical derivative; run via --only
     uv_python: Optional[str] = None     # interpreter constraint for uv (e.g. torch needs 3.12)
+    # Extra uv --with packages for a second run when the stage exits with NEEDS_FALLBACK_RC
+    # (the HD upscaler: ONNX Runtime first, torch only when that path is unusable).
+    uv_with_fallback: tuple = ()
 
 
 def topo_order(stages):
@@ -117,7 +120,10 @@ class StageResult:
 BASE_WITH = ("pillow", "toml", "numpy")
 
 
-def _build_argv(stage, uv):
+NEEDS_FALLBACK_RC = 75   # EX_TEMPFAIL; tools/upscale_assets.py exits with it when it needs torch
+
+
+def _build_argv(stage, uv, fallback=False):
     # A self-contained install (the packaged launcher) ships one interpreter with
     # every stage's packages preinstalled and no uv: run the stage on it directly.
     direct = os.environ.get("DW2003_PYTHON")
@@ -127,10 +133,26 @@ def _build_argv(stage, uv):
         return [uv, *stage.cmd]                       # python -c "<code>"  (tests only)
     with_flags = []
     extra = () if stage.uv_python else BASE_WITH
-    for w in dict.fromkeys((*extra, *stage.uv_with)):
+    withs = (*extra, *stage.uv_with, *(stage.uv_with_fallback if fallback else ()))
+    for w in dict.fromkeys(withs):
         with_flags += ["--with", w]
     python_flags = ["--python", stage.uv_python] if stage.uv_python else []
+    # A packaged install carries a Python of that same series: use it rather than
+    # letting uv download one.
+    own = os.environ.get("DW2003_PYTHON")
+    if own and stage.uv_python and os.path.isfile(own) and _py_series(own) == stage.uv_python:
+        python_flags = ["--python", own]
     return [uv, "run", *python_flags, *with_flags, "python", *stage.cmd]
+
+
+def _py_series(exe):
+    """'3.12' for a python executable, '' when it will not say."""
+    try:
+        out = subprocess.run([exe, "-c", "import sys;print('%d.%d' % sys.version_info[:2])"],
+                             capture_output=True, text=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out
 
 
 _SETUP_LOCK = threading.Lock()
@@ -153,6 +175,11 @@ def run_stage(stage, uv, log_dir):
     env = {**os.environ, **BASE_ENV, **stage.env}
     with open(log, "w") as fh:
         rc = subprocess.call(argv, cwd=stage.cwd, stdout=fh, stderr=subprocess.STDOUT, env=env)
+        if rc == NEEDS_FALLBACK_RC and stage.uv_with_fallback:
+            fh.write("[build_all] the light path cannot run here; installing the fallback packages and running again" + chr(10))
+            fh.flush()
+            rc = subprocess.call(_build_argv(stage, uv, fallback=True), cwd=stage.cwd, stdout=fh,
+                                 stderr=subprocess.STDOUT, env=env)
     secs = time.time() - t0
     if rc == 0:
         return StageResult(stage.name, "OK", "", secs)
@@ -1541,8 +1568,16 @@ STAGES = [
     # the parallel tree preserves paths and records source dimensions.
     # Run: .venv/bin/python3 build_all.py --only upscale_assets
     Stage("upscale_assets", ["tools/upscale_assets.py"], str(REPO),
-          uv_with=("torch", "spandrel", "spandrel-extra-arches", "gdown",
-                   "pillow", "numpy"),
+          # The light path: ONNX Runtime (GPU provider per platform, PEP 508 markers), numpy, pillow.
+          # No torch. The tool runs the prebuilt ONNX models on it.
+          uv_with=("pillow", "numpy",
+                   "onnxruntime-directml; sys_platform == 'win32'",
+                   "onnxruntime-gpu; sys_platform == 'linux' and platform_machine == 'x86_64'",
+                   "onnxruntime; sys_platform == 'darwin'"),
+          # Only when the light path is unusable (no GPU provider, model download failed, ...): the tool
+          # exits 75 and build_all runs it again with these (torch/DirectML for Windows GPUs).
+          uv_with_fallback=("torch", "spandrel", "spandrel-extra-arches", "gdown", "onnx",
+                            "torch-directml; sys_platform == 'win32'"),
           inputs=("web/assets",), outputs=("web/assets-hd/manifest.json",),
           deps=("build_assets", "fight_models", "fight_effects", "backdrops",
                 "ui_assets", "screen_packs", "fieldcom_icons", "dive_demo",
@@ -1628,7 +1663,7 @@ def main(argv=None):
         for p in authored_problems:
             print("AUTHORED INPUT PROBLEM:", p)
         return 1
-    uv = os.path.expanduser("~/.local/bin/uv")
+    uv = os.environ.get("DW2003_UV") or os.path.expanduser("~/.local/bin/uv")
     if not os.path.exists(uv):
         import shutil as _shutil_uv
         uv = _shutil_uv.which("uv") or uv

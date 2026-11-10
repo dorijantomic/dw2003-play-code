@@ -135,6 +135,12 @@ function Invoke-DirectMLBuild {
             torch-directml spandrel spandrel_extra_arches gdown | Out-Host
         if ($LASTEXITCODE -ne 0) { return $false }
     }
+    # Faster ONNX Runtime DirectML path; optional (the script falls back to torch-directml).
+    & $VenvPython -c "import onnx, onnxruntime" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        & $VenvPython -m pip install --disable-pip-version-check onnx onnxruntime-directml | Out-Host
+        if ($LASTEXITCODE -ne 0) { Write-Host "ONNX Runtime not installed; using torch-directml." }
+    }
     $Arguments = @(Get-CommonUpscalerArgs) + @(
         "--backend", "torch",
         "--device", "directml"
@@ -171,7 +177,7 @@ if ($Backend -eq "Auto" -or $Backend -eq "DirectML") {
     }
 }
 if (-not $Succeeded -and $Backend -eq "Auto" -and -not $AllowCompatibilityFallback) {
-    throw "DirectML failed. The specialist FatePlus/HAT/APISR recipe was NOT replaced. Fix DirectML or explicitly use -Backend Vulkan (RealESRGAN compatibility output)."
+    throw "DirectML failed. The specialist FatePlus/HAT recipe was NOT replaced. Fix DirectML or explicitly use -Backend Vulkan (RealESRGAN compatibility output)."
 }
 if (-not $Succeeded -and ($Backend -eq "Vulkan" -or $AllowCompatibilityFallback)) {
     if ($Backend -eq "Auto") {

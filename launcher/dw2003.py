@@ -100,6 +100,7 @@ def find_tools() -> dict:
         node_dir = RUNTIME / "node" if os.name == "nt" else RUNTIME / "node/bin"
         t["path"] = [str(bin_dir), str(node_dir)]
         t["dw2conv"] = bin_dir / f"dw2_model_converter{EXE}"
+        t["uv"] = bin_dir / f"uv{EXE}"
     else:
         cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "dw2003-play"
         t["extractors"] = Path(os.environ.get("BYOD_DDW3_TOOLS") or cache / "ddw3-tools")
@@ -114,7 +115,21 @@ def find_tools() -> dict:
         t["path"] = []
         dc = os.environ.get("DW2_MODEL_CONVERTER") or shutil.which("dw2_model_converter")
         t["dw2conv"] = Path(dc) if dc else cache / f"dw2_model_converter{EXE}"
+        t["uv"] = None
     return t
+
+
+def find_uv(t: dict | None = None) -> str | None:
+    """The uv program for the HD Remaster's package installs: the one shipped in the install
+    (runtime/bin) first, then the one on PATH, then ~/.local/bin."""
+    bundled = (t or {}).get("uv")
+    if bundled and Path(bundled).is_file():
+        return str(bundled)
+    found = shutil.which("uv")
+    if found:
+        return found
+    home = Path.home() / ".local/bin" / f"uv{EXE}"
+    return str(home) if home.is_file() else None
 
 
 def self_test() -> int:
@@ -189,6 +204,10 @@ class Build:
         # the optional Digimon World 2 extras (tools/dw2/dw2_addon.py): their own small state, never blocks the game
         self.dw2_disc = data / "disc" / "dw2.bin"
         self.dw2 = {"state": "none", "error": "", "log": []}   # none | receiving | building | done | failed
+        # the optional HD Remaster (stage upscale_assets): built in the background once the game is playable
+        self.hd = {"state": "none", "error": "", "done": 0, "total": 0}   # none | running | done | failed
+        self.hd_proc = None
+        self.hd_auto = True          # False for a build-only run (--no-serve): nothing may outlive it
         saved = self._load()
         if saved.get("built") == version() and self._outputs_ok():
             self.state = "done"
@@ -208,11 +227,18 @@ class Build:
         self.data.mkdir(parents=True, exist_ok=True)
         self.state_file.write_text(json.dumps(d, indent=1))
 
+    HD_POLL = 3   # seconds between progress reads of the background job
+
+    def hd_enabled(self) -> bool:
+        """The player's choice from the setup page; ticked unless they unticked it."""
+        return bool(self._load().get("hd", True))
+
     def _outputs_ok(self) -> bool:
         return all((self.app / f).is_file() for f in BUILD_OUTPUTS)
 
     # status for the setup page -------------------------------------------------
     def status(self) -> dict:
+        hd = self.hd_status()            # takes the lock itself: not from inside it
         with self.lock:
             done = 0.0
             for key, _label, share in self.STEPS:
@@ -229,7 +255,104 @@ class Build:
                     "progress": round(done, 1), "error": self.error,
                     "elapsed": int(time.time() - self.started) if self.started else 0,
                     "log": self.log_lines[-60:], "version": version(),
-                    "has_disc": self.disc.is_file(), "dw2": self.dw2_status()}
+                    "has_disc": self.disc.is_file(), "dw2": self.dw2_status(), "hd": hd}
+
+    # the HD Remaster (4x art) ---------------------------------------------------------
+    def hd_status(self) -> dict:
+        with self.lock:
+            hd = dict(self.hd)
+        total = hd["total"]
+        hd["enabled"] = self.hd_enabled()
+        hd["progress"] = 100.0 if hd["state"] == "done" else (
+            round(100.0 * hd["done"] / total, 1) if total else 0.0)
+        return hd
+
+    def hd_set(self, on: bool):
+        """Save the choice; start the background job now (game playable) or stop it."""
+        self._save(hd=bool(on))
+        if on:
+            self.hd_start()
+        else:
+            p = self.hd_proc
+            if p is not None and p.poll() is None:
+                p.terminate()
+            with self.lock:
+                if self.hd["state"] == "running":
+                    self.hd.update(state="none", error="")
+
+    def hd_argv(self) -> list:
+        return ["build_all.py", "--only", "upscale_assets"]
+
+    def hd_start(self):
+        """Run `build_all.py --only upscale_assets` hidden, at low priority, while the game is played.
+
+        Safe to call any time: it does nothing unless the game is built, the player wants HD and no
+        job is running. Files already upscaled are skipped by the tool, so every launch resumes."""
+        with self.lock:
+            if (self.state != "done" or not self.hd_auto or not self.hd_enabled()
+                    or self.hd["state"] == "running"):
+                return
+            if self._load().get("hd_built") == version() and (self.app / "web/assets-hd/manifest.json").is_file():
+                self.hd.update(state="done", error="")
+                return
+            self.hd.update(state="running", error="", done=0, total=0)
+        threading.Thread(target=self._hd_run, daemon=True).start()
+
+    def _hd_progress(self, log: Path):
+        try:
+            with open(log, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                fh.seek(max(0, fh.tell() - 4096))
+                tail = fh.read().decode("utf-8", "replace")
+        except OSError:
+            return
+        found = re.findall(r"^\[(\d+)/(\d+)\] ", tail, re.M)
+        if found:
+            with self.lock:
+                self.hd.update(done=int(found[-1][0]), total=int(found[-1][1]))
+
+    def _hd_run(self):
+        log = self.app / "build" / "logs" / "upscale_assets.log"
+        try:
+            uv = find_uv(self.tools)
+            if not uv:
+                raise BuildError("the HD Remaster needs the 'uv' tool, which was not found")
+            self.log("[hd] HD Remaster started in the background")
+            if os.name == "nt":   # no window, below normal priority
+                kw = {"creationflags": subprocess.CREATE_NO_WINDOW | 0x00004000}
+            else:
+                kw = {"preexec_fn": lambda: os.nice(10)}
+            p = self.hd_proc = subprocess.Popen(
+                [self.tools["python"], *self.hd_argv()], cwd=self.app, env=self._env(),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                errors="replace", **kw)
+            tail: list[str] = []
+
+            def drain():
+                for line in p.stdout:
+                    tail.append(line.rstrip())
+                    del tail[:-40]
+            t = threading.Thread(target=drain, daemon=True)
+            t.start()
+            while p.poll() is None:
+                self._hd_progress(log)
+                time.sleep(self.HD_POLL)
+            t.join(5)
+            self._hd_progress(log)
+            if self.hd["state"] != "running":      # switched off while it ran
+                return
+            if p.returncode != 0:
+                failed = [l for l in tail if ": FAILED" in l]
+                raise BuildError(f"the HD upscale stopped with exit code {p.returncode}"
+                                 + (f" ({failed[0].strip()})" if failed else "")
+                                 + f"; the full log is {log}")
+            self._save(hd_built=version())
+            self.hd.update(state="done", error="")
+            self.log("[hd] HD Remaster finished")
+        except Exception as e:   # the game keeps running on the native art
+            msg = str(e) if isinstance(e, BuildError) else f"{type(e).__name__}: {e}"
+            self.log(f"[hd] ERROR: {msg}")
+            self.hd.update(state="failed", error=msg)
 
     # the Digimon World 2 extras ------------------------------------------------------
     def _dw2_mod(self):
@@ -326,6 +449,7 @@ class Build:
             self._save(built=version(), disc=str(self.disc))
             self._set(state="done", step="", step_frac=1.0)
             self.log("Build complete.")
+            self.hd_start()
             # a (re)build gives a fresh app copy: bring the DW2 extras back when a DW2 disc was given
             if self.dw2_disc.is_file() and self.dw2_status()["state"] != "done":
                 self.dw2_start()
@@ -462,6 +586,7 @@ class Build:
             "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8",
             "DDW3_DIR": str(self.tree), "DW3_DISC": str(self.disc),
             "DW2003_PYTHON": self.tools["python"],
+            **({"DW2003_UV": u} if (u := find_uv(self.tools)) else {}),
             "BYOD_DDW3_TOOLS": str(self.tools["extractors"]),
         })
         if os.name == "nt":  # LF line endings in everything the build writes
@@ -835,6 +960,14 @@ def make_handler(build: Build):
                     shutil.rmtree(build.data / "_dw2cache", ignore_errors=True)
                     build.dw2.update(state="none", error="", log=[])
                 return self._json({"ok": True})
+            if path == "/__dw2003/hd":
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    on = bool(json.loads(self.rfile.read(n) or b"{}").get("on"))
+                except (ValueError, AttributeError):
+                    return self._json({"error": "bad request"}, 400)
+                build.hd_set(on)
+                return self._json({"ok": True, "hd": build.hd_status()})
             if path == "/__dw2003/forget-disc":
                 if build.state != "building":
                     build._set(state="need-disc", error="")
@@ -905,6 +1038,7 @@ def main(argv=None):
         shutil.rmtree(build.tree, ignore_errors=True)
     if a.disc:
         build.disc = Path(a.disc).expanduser().resolve()
+    build.hd_auto = not a.no_serve
     if a.disc and build.state != "done" or (a.rebuild and build.disc.is_file()):
         build.start()
         if a.no_serve:
@@ -913,6 +1047,7 @@ def main(argv=None):
     elif a.no_serve:
         print("nothing to do: pass --disc to build" if build.state != "done" else "already built")
         return 0 if build.state == "done" else 1
+    build.hd_start()      # an earlier build is playable now: carry on with the HD Remaster (resumes)
     return serve(build, a.port, not a.no_browser)
 
 

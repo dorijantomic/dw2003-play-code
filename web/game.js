@@ -8645,7 +8645,36 @@ function frame(t) {
     const perfT1 = perfHook ? performance.now() : 0;
     render();
     if (perfHook) perfHook(perfT1 - perfT0, performance.now() - perfT1);
+    if (window.__fx?.showfps || fpsBox) fpsTick(t);   // F2 -> Show FPS (dev); off = this one check
     requestAnimationFrame(frame);
+}
+
+// F2 -> Tools -> Show FPS (dev only). A DOM box inside #stage (so it stays visible in full screen and never touches the
+// canvas). Counts the frames that really ran render() (frame() above skips the ones the 61 fps cap drops) and shows the
+// count per second and the median gap, refreshed twice a second. Switched off: the box is removed and the buffer cleared.
+let fpsBox = null, fpsGaps = [], fpsLast = 0, fpsShown = 0;
+function fpsTick(t) {
+    if (!window.__fx?.showfps) {
+        if (fpsBox) { fpsBox.remove(); fpsBox = null; }
+        fpsGaps.length = 0; fpsLast = 0;
+        return;
+    }
+    if (!fpsBox) {
+        fpsBox = document.createElement("div");
+        fpsBox.id = "fps-box";
+        fpsBox.style.cssText = "position:absolute;top:4px;right:4px;z-index:60;padding:2px 6px;background:#000c;color:#fff;" +
+            "font:12px/1.3 monospace;pointer-events:none;white-space:nowrap";
+        (document.getElementById("stage") || document.body).appendChild(fpsBox);
+        fpsShown = t;
+    }
+    if (fpsLast) fpsGaps.push(t - fpsLast);
+    fpsLast = t;
+    if (t - fpsShown >= 500 && fpsGaps.length) {
+        const n = fpsGaps.length, sorted = fpsGaps.slice().sort((a, b) => a - b);
+        const med = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+        fpsBox.textContent = `${Math.round(n * 1000 / (t - fpsShown))} fps  ${med.toFixed(1)} ms`;
+        fpsGaps.length = 0; fpsShown = t;
+    }
 }
 
 // The Submarimon thrust LOOP (SUB_MOVE, packed id 0xa0045f4a). The native

@@ -44,7 +44,7 @@ const TOON_KEYS = Object.freeze(["toonoutline", "toonshade"]);
 /** Keys that stay on F2 only (developer pages and labs). */
 export const F2_ONLY_KEYS = Object.freeze([
     "blastladder", "planner", "itemsource", "gymmap", "itemrulebook", "anglermap", "movetheatre", "cutcontent", "stageselect",
-    "soundtest", "soundtrack", "cinema", "langdesk", "damagelab", "silence", "cursorbook", "chatqueue", "weaponlab", "bitledger",
+    "soundtest", "soundtrack", "cinema", "langdesk", "damagelab", "silence", "showfps", "cursorbook", "chatqueue", "weaponlab", "bitledger",
     "savexray", "saveverify", "replay", "redirectview", "arrivallab", "practice2v2",
 ]);
 /**

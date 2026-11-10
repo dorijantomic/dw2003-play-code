@@ -91,6 +91,15 @@ MAX_HD_DIMENSION = 32_767
 SCALE = 4
 DEFAULT_TILE = 512
 DEFAULT_OVERLAP = 32
+# Exit code that tells build_all.py "run me again with torch": the light path (ONNX Runtime only, no
+# torch installed) cannot do this job here.
+EXIT_NEEDS_TORCH = 75
+# Prebuilt ONNX models (tools/export_onnx_models.py, attached to each GitHub release by release.yml).
+# A packaged install knows its version from app/launcher/VERSION; a checkout has none and exports locally.
+ONNX_RELEASE_URL = os.environ.get(
+    "DW2003_ONNX_URL_BASE",
+    "https://github.com/dorijantomic/dw2003-play-code/releases/download/{version}",
+)
 
 
 @dataclass(frozen=True)
@@ -128,14 +137,6 @@ MODEL_SPECS = {
         "ESRGAN",
         "CC-BY-NC-SA-4.0",
     ),
-    "apisr-x4": ModelSpec(
-        "apisr-x4",
-        "4x_APISR_RRDB_GAN_generator.pth",
-        "https://github.com/Kiteretsu77/APISR/releases/download/v0.2.0/"
-        "4x_APISR_RRDB_GAN_generator.pth",
-        "RRDB",
-        "GPL-3.0; upstream model disclaimer applies",
-    ),
     "realesrgan-anime-x4": ModelSpec(
         "realesrgan-anime-x4",
         "RealESRGAN_x4plus_anime_6B.pth",
@@ -147,7 +148,6 @@ MODEL_SPECS = {
 
 DIRECTML_RECIPE_MODELS = (
     "fateplus-lite-x4",
-    "apisr-x4",
     "hat-classical-x4",
     "realesrgan-anime-x4",
 )
@@ -351,7 +351,7 @@ def processing_recipe(
     if kind == "map":
         models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
     elif kind in {"portrait", "portrait-atlas"}:
-        models = ["apisr-x4", "hat-classical-x4", "realesrgan-anime-x4"]
+        models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
     else:
         models = ["fateplus-lite-x4", "hat-classical-x4", "realesrgan-anime-x4"]
     method = "portrait-atlas" if kind == "portrait-atlas" else "ai"
@@ -454,14 +454,25 @@ def discover_assets(
     if not src_dir.is_dir():
         raise FileNotFoundError(f"asset source directory does not exist: {src_dir}")
 
-    for path in sorted(src_dir.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in RASTER_SUFFIXES:
-            continue
-        # src_dir is already resolved, so rglob yields real paths; resolving each file again costs a
-        # filesystem round trip per file (minutes over the Windows -> WSL share).
+    # One os.scandir walk: DirEntry gives is_file()/is_dir() from the directory listing (no per-file stat over
+    # the Windows -> WSL share), and the include/exclude patterns are matched on the relative name before
+    # anything else is touched.  The result is sorted exactly like the old sorted(rglob) walk.
+    found: list[Path] = []
+    stack = [src_dir]
+    while stack:
+        directory = stack.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    sub = directory / entry.name
+                    if out_dir != src_dir and sub == out_dir:
+                        continue
+                    stack.append(sub)
+                    continue
+                if os.path.splitext(entry.name)[1].lower() in RASTER_SUFFIXES and entry.is_file():
+                    found.append(directory / entry.name)
+    for path in sorted(found):
         resolved = path
-        if out_dir != src_dir and out_dir in resolved.parents:
-            continue
         rel = resolved.relative_to(src_dir)
         is_reference = (
             bool(rel.parts and rel.parts[0] in DEFAULT_EXCLUDED_DIRS)
@@ -521,10 +532,268 @@ def ensure_model(spec: ModelSpec | None = None, cache: Path = CACHE) -> Path:
 
 @dataclass
 class LoadedModel:
-    descriptor: object
+    descriptor: object          # Spandrel model; None until torch is needed (the light path has no torch)
     device: object
     spec: ModelSpec
     directml_safe_forward: bool = False
+    ort: object | None = None  # OrtRunner while ONNX Runtime on a GPU provider is in use
+    torch_loader: object | None = None   # () -> (descriptor, device); raises NeedsTorch without torch
+
+    def attach_torch(self) -> None:
+        if self.descriptor is None:
+            if self.torch_loader is None:
+                raise NeedsTorch("torch is needed and no loader is set")
+            self.descriptor, self.device = self.torch_loader()
+
+
+# ONNX Runtime fp32 on a GPU provider is the default inference path (on DirectML about 1.8x faster than
+# torch-directml, same pixels within 1 level). Each patch is reflect-padded to the next fixed square size below
+# (static shapes are fastest) and the 4x result is cropped back. Any problem falls back to the torch path.
+ORT_BUCKETS = (64, 128, 256, 384, 576)
+
+# GPU execution providers per platform, best first. The first one the installed onnxruntime build reports is
+# used; the CPU provider is never used (torch is the fallback). Packages: Windows onnxruntime-directml, Linux
+# x86_64 onnxruntime-gpu (NVIDIA CUDA; ROCm/MIGraphX need the AMD wheels onnxruntime-rocm or
+# onnxruntime-migraphx plus a system ROCm instead), macOS onnxruntime (CoreML).
+ORT_PLATFORM_PROVIDERS = {
+    "win32": ("DmlExecutionProvider",),
+    "linux": ("CUDAExecutionProvider", "ROCMExecutionProvider", "MIGraphXExecutionProvider"),
+    "darwin": ("CoreMLExecutionProvider",),
+}
+
+
+def ort_pick_provider(platform: str, available, device_id: int | None):
+    """Return ((provider, options), "") or (None, reason). Pure: no onnxruntime import."""
+    key = "linux" if platform.startswith("linux") else platform
+    wanted = ORT_PLATFORM_PROVIDERS.get(key)
+    if not wanted:
+        return None, f"no ONNX Runtime GPU provider is known for platform {platform}"
+    for name in wanted:
+        if name in available:
+            options = {} if name == "CoreMLExecutionProvider" else {"device_id": device_id or 0}
+            return (name, options), ""
+    return None, f"none of {', '.join(wanted)} in {list(available)}"
+
+
+class NeedsTorch(SystemExit):
+    """The light path (ONNX Runtime, no torch) cannot do this; build_all.py reruns with torch."""
+
+    def __init__(self, why: str):
+        print(f"NEEDS_TORCH: {why}", flush=True)
+        super().__init__(EXIT_NEEDS_TORCH)
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def installed_version() -> str | None:
+    """The release this install belongs to (app/launcher/VERSION), None in a checkout."""
+    try:
+        text = (REPO / "launcher" / "VERSION").read_text().strip()
+    except OSError:
+        return None
+    return text if re.fullmatch(r"v\d[\w.\-]*", text) and "-g" not in text else None
+
+
+def onnx_files_ok(onnx_path: Path, info_path: Path):
+    """(onnx_path, info) when the json is valid and the .onnx matches its sha256, else None."""
+    try:
+        info = json.loads(info_path.read_text())
+        if (onnx_path.is_file() and onnx_path.stat().st_size == info["bytes"]
+                and _sha256_file(onnx_path) == info["sha256"]):
+            return onnx_path, info
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def _download(url: str, dest: Path) -> None:
+    partial = dest.with_suffix(dest.suffix + ".download")
+    request = urllib.request.Request(url, headers={"User-Agent": "dw2003-upscale"})
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response, open(partial, "wb") as out:
+            while True:
+                block = response.read(1 << 20)
+                if not block:
+                    break
+                out.write(block)
+        os.replace(partial, dest)
+    finally:
+        if partial.exists():
+            partial.unlink()
+
+
+def ensure_onnx(spec: ModelSpec, cache: Path = CACHE, version: str | None = None, fetch=_download):
+    """The prebuilt dynamic-shape ONNX model and its json, as (path, info), or None.
+
+    Order: the cache (sha256 checked) -> the release this install belongs to (downloaded, sha256 checked,
+    cached) -> None (the caller exports locally when torch is there)."""
+    folder = cache / "onnx"
+    onnx_path, info_path = folder / f"{spec.key}.onnx", folder / f"{spec.key}.json"
+    got = onnx_files_ok(onnx_path, info_path)
+    if got:
+        return got
+    version = version or installed_version()
+    if not version:
+        return None
+    base = ONNX_RELEASE_URL.format(version=version)
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        print(f"downloading {spec.key}.onnx from the {version} release ...", flush=True)
+        fetch(f"{base}/{spec.key}.json", info_path)
+        fetch(f"{base}/{spec.key}.onnx", onnx_path)
+    except Exception as exc:
+        print(f"  {spec.key}: no prebuilt ONNX model ({type(exc).__name__}: {str(exc)[:200]})", flush=True)
+        return None
+    got = onnx_files_ok(onnx_path, info_path)
+    if got is None:
+        print(f"  {spec.key}: the downloaded ONNX model failed its sha256 check; discarded", flush=True)
+        for stale in (onnx_path, info_path):
+            stale.unlink(missing_ok=True)
+    return got
+
+
+def export_dynamic_onnx(weights: Path, out_dir: Path, spec: ModelSpec) -> tuple[Path, dict]:
+    """Export one model with free height/width to <out_dir>/<key>.onnx + .json (needs torch, spandrel, onnx).
+
+    Free dimensions are named h and w; ONNX Runtime pins them per session (static shapes are fastest)."""
+    import torch
+    from spandrel import ModelLoader
+
+    net = ModelLoader().load_from_file(str(weights)).model.eval().cpu()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    onnx_path = out_dir / f"{spec.key}.onnx"
+    partial = onnx_path.with_suffix(".tmp")
+    print(f"  {spec.key}: exporting ONNX -> {onnx_path.name}", flush=True)
+    with torch.no_grad():
+        torch.onnx.export(
+            net, torch.zeros(1, 3, 64, 64), str(partial), opset_version=17,
+            do_constant_folding=False, input_names=["x"], output_names=["y"],
+            dynamic_axes={"x": {2: "h", 3: "w"}, "y": {2: "h4", 3: "w4"}},
+        )
+    os.replace(partial, onnx_path)
+    info = {
+        "key": spec.key, "file": onnx_path.name, "sha256": _sha256_file(onnx_path),
+        "bytes": onnx_path.stat().st_size, "scale": SCALE, "buckets": list(ORT_BUCKETS),
+        "free_dimensions": ["h", "w"], "input": "x", "output": "y", "opset": 17,
+        "source": {
+            "filename": spec.filename, "sha256": _sha256_file(weights),
+            "url": spec.url if not spec.url.startswith("gdrive:") else "", "license": spec.license,
+        },
+    }
+    (out_dir / f"{spec.key}.json").write_text(json.dumps(info, indent=1) + chr(10))
+    return onnx_path, info
+
+
+class OrtRunner:
+    def __init__(self, ort, model: tuple[Path, dict], device_id: int | None, key: str,
+                 provider=("DmlExecutionProvider", {}), fallback: str = "torch"):
+        self.ort, self.device_id, self.key = ort, device_id, key
+        self.path, self.info = model
+        self.provider, self.fallback = provider, fallback
+        self.buckets = tuple(self.info.get("buckets") or ORT_BUCKETS)
+        self.scale = int(self.info.get("scale") or SCALE)
+        self.sessions: dict[int, object] = {}
+        self.failed: str | None = None
+        self.warned_big = False
+
+    @classmethod
+    def create(cls, spec: ModelSpec, weights, device_index: int | None,
+               device_name: str = "directml", fallback: str = "torch", platform: str | None = None,
+               cache: Path = CACHE, onnx_files=None):
+        """Return a runner, or None (with the reason printed) so the caller keeps torch.
+
+        `weights` is a Path or a callable returning one; it is only used to export an ONNX model locally when
+        no prebuilt one exists. `onnx_files` is a ready (path, info) pair (tests)."""
+        platform = platform or sys.platform
+        why = None
+        ort = None
+        provider = None
+        model = onnx_files
+        if os.environ.get("DW2003_TEST_NO_ORT"):   # test harness only: force the torch fallback
+            why = "disabled by DW2003_TEST_NO_ORT"
+        elif device_name == "cpu":
+            why = "the CPU device was requested"
+        elif platform == "win32" and device_name not in ("directml", "auto"):
+            why = "on Windows ONNX Runtime is used with --device directml"
+        elif spec.input_multiple != 1:
+            why = f"{spec.architecture} models do not export to ONNX here"
+        else:
+            try:
+                import onnxruntime as ort
+            except ImportError as exc:
+                why = f"{exc.name} is not installed"
+        if why is None:
+            try:
+                provider, why = ort_pick_provider(platform, list(ort.get_available_providers()), device_index)
+            except Exception as exc:
+                why = f"{type(exc).__name__}: {exc}"
+        if not why and model is None:
+            model = ensure_onnx(spec, cache)
+            if model is None:
+                try:   # no prebuilt model: export it here when torch is installed
+                    import importlib.util
+
+                    if not (importlib.util.find_spec("torch") and importlib.util.find_spec("spandrel")):
+                        why = "no prebuilt ONNX model and no torch to export one"
+                    else:
+                        path = weights() if callable(weights) else weights
+                        model = export_dynamic_onnx(path, cache / "onnx", spec)
+                except Exception as exc:
+                    why = f"ONNX export failed ({type(exc).__name__}: {str(exc)[:200]})"
+        if why:
+            print(f"  {spec.key}: inference on {fallback} (ONNX Runtime unused: {why})", flush=True)
+            return None
+        return cls(ort, model, device_index, spec.key, provider, fallback)
+
+    def _session(self, size: int):
+        session = self.sessions.get(size)
+        if session is None:
+            ort = self.ort
+            options = ort.SessionOptions()
+            options.enable_mem_pattern = False
+            options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            for name in self.info.get("free_dimensions", ("h", "w")):
+                options.add_free_dimension_override_by_name(name, size)
+            name, provider_options = self.provider
+            session = ort.InferenceSession(str(self.path), options, providers=[(name, provider_options)])
+            used = session.get_providers()
+            if not used or used[0] != name:
+                raise RuntimeError(f"session providers are {used}, not {name}")
+            print(f"  {self.key}: ONNX Runtime provider {used[0]} fp32, {size}x{size}", flush=True)
+            self.sessions[size] = session
+        return session
+
+    def run(self, rgb01):
+        """Scaled result (HWC float32) or None when this patch should use torch."""
+        import numpy as np
+
+        h, w = rgb01.shape[:2]
+        side = max(h, w)
+        size = next((b for b in self.buckets if b >= side), None)
+        if size is None:
+            if not self.warned_big:
+                self.warned_big = True
+                print(f"  {self.key}: patch {w}x{h} is over {self.buckets[-1]}; those patches use {self.fallback}", flush=True)
+            return None
+        mode = "reflect" if h > 1 and w > 1 else "edge"
+        padded = np.pad(rgb01, ((0, size - h), (0, size - w), (0, 0)), mode=mode) if (h, w) != (size, size) else rgb01
+        session = self._session(size)
+        x = np.ascontiguousarray(padded.transpose(2, 0, 1)[None], dtype=np.float32)
+        y = session.run(None, {"x": x})[0][0].transpose(1, 2, 0)
+        # One pass into a C-contiguous HWC array (the transposed model output made the old clip + astype two
+        # strided passes and left a strided result that every later crop and clip paid for again).
+        k = self.scale
+        out = np.empty((h * k, w * k, 3), dtype=np.float32)
+        np.clip(y[: h * k, : w * k], 0, 1, out=out)
+        return out
 
 
 _EXTRA_ARCHES_INSTALLED = False
@@ -568,6 +837,47 @@ def preferred_directml_device(names: list[str]) -> int:
     return min(scored)[1]
 
 
+def dxgi_adapter_names() -> list[str]:
+    """Display adapter names in DXGI order (the order DirectML numbers them), without torch."""
+    import ctypes
+
+    dxgi = ctypes.WinDLL("dxgi")
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("a", ctypes.c_uint32), ("b", ctypes.c_uint16), ("c", ctypes.c_uint16),
+                    ("d", ctypes.c_ubyte * 8)]
+
+    iid = GUID(0x770AAE78, 0xF26F, 0x4DBA, (ctypes.c_ubyte * 8)(0xA8, 0x29, 0x25, 0x3C, 0x83, 0xD1, 0xB3, 0x87))
+    factory = ctypes.c_void_p()
+    if dxgi.CreateDXGIFactory1(ctypes.byref(iid), ctypes.byref(factory)) != 0:
+        return []
+
+    def method(obj, index, *argtypes):
+        vtable = ctypes.cast(ctypes.cast(obj, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+        return ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, *argtypes)(vtable[index])
+
+    names = []
+    enum_adapters1 = method(factory, 12, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p))   # IDXGIFactory1
+    for index in range(16):
+        adapter = ctypes.c_void_p()
+        if enum_adapters1(factory, index, ctypes.byref(adapter)) != 0:
+            break
+        desc = ctypes.create_string_buffer(512)
+        method(adapter, 8, ctypes.c_void_p)(adapter, desc)                                  # IDXGIAdapter::GetDesc
+        names.append(ctypes.wstring_at(ctypes.addressof(desc)))
+        method(adapter, 2)(adapter)                                                         # Release
+    method(factory, 2)(factory)
+    return names
+
+
+def auto_directml_index() -> int | None:
+    """The adapter automatic mode uses (Nvidia, then AMD, never Intel); None = let DirectML choose."""
+    try:
+        return preferred_directml_device(dxgi_adapter_names())
+    except Exception:
+        return None
+
+
 def torch_device(name: str, device_index: int | None = None):
     import torch
 
@@ -597,9 +907,51 @@ def torch_device(name: str, device_index: int | None = None):
             )
         print(f"DirectML GPU [{selected}]: {names[selected]}", flush=True)
         return torch_directml.device(selected)
+    if name == "mps":
+        if not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+            raise RuntimeError("MPS was requested but no Apple GPU is available")
+        return torch.device("mps")
     if name == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # cuda, then Apple mps, then the CPU as the last resort.
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
     raise ValueError(f"unknown torch device: {name}")
+
+
+def resolve_device_name(name: str, platform: str | None = None, has_directml=None) -> str:
+    """`auto` on Windows means DirectML when torch-directml or ONNX Runtime is installed, so a player's GPU is used
+    without any flag. Everything else (and every explicit choice) is returned unchanged."""
+    if name.lower() != "auto" or (platform or sys.platform) != "win32":
+        return name
+    if has_directml is None:
+        def has_directml():
+            import importlib.util
+            return (importlib.util.find_spec("torch_directml") is not None
+                    or importlib.util.find_spec("onnxruntime") is not None)
+    try:
+        return "directml" if has_directml() else name
+    except Exception:
+        return name
+
+
+def _load_torch_part(spec: ModelSpec, device_name: str, device_index: int | None, cache: Path):
+    """(descriptor, torch device). Without torch/spandrel this ends the run with exit 75 so that
+    build_all.py installs them and runs again."""
+    try:
+        import torch  # noqa: F401
+        from spandrel import ImageModelDescriptor, ModelLoader
+    except ImportError as exc:
+        raise NeedsTorch(f"{exc.name} is not installed") from exc
+    ensure_extra_arches_installed()
+    model = ModelLoader().load_from_file(str(ensure_model(spec, cache)))
+    if not isinstance(model, ImageModelDescriptor):
+        raise TypeError(f"not an image SR model: {type(model)}")
+    device = torch_device(device_name, device_index)
+    model.to(device).eval()
+    return model, device
 
 
 def load_model(
@@ -609,54 +961,87 @@ def load_model(
     device_index: int | None = None,
     cache: Path = CACHE,
 ):
-    try:
-        import torch
-        from spandrel import ImageModelDescriptor, ModelLoader
-    except ImportError as exc:
-        sys.exit(
-            "missing ML dependencies; run through uv as shown in --help "
-            f"({exc.name} is not installed)"
-        )
-    ensure_extra_arches_installed()
+    """The light path first: prebuilt ONNX on ONNX Runtime's GPU provider, which needs no torch at all.
+    Torch is loaded only when that is unusable (then, without torch installed, exit 75)."""
+    device_name = resolve_device_name(device_name)
     spec = spec or MODEL_SPECS["realesrgan-anime-x4"]
-    model = ModelLoader().load_from_file(str(ensure_model(spec, cache)))
-    if not isinstance(model, ImageModelDescriptor):
-        raise TypeError(f"not an image SR model: {type(model)}")
-    device = torch_device(device_name, device_index)
-    model.to(device).eval()
-    return LoadedModel(
-        model,
-        device,
-        spec,
-        directml_safe_forward=device_name.lower() == "directml",
+    lowered = device_name.lower()
+    ort_index = device_index
+    if ort_index is None and sys.platform == "win32" and lowered in ("directml", "auto"):
+        ort_index = auto_directml_index()
+    label = "torch-directml" if lowered == "directml" else f"torch ({lowered})"
+    runner = OrtRunner.create(spec, lambda: ensure_model(spec, cache), ort_index, lowered, label, cache=cache)
+    loaded = LoadedModel(
+        None, None, spec, directml_safe_forward=lowered == "directml", ort=runner,
+        torch_loader=lambda: _load_torch_part(spec, device_name, device_index, cache),
     )
+    if runner is None:
+        loaded.attach_torch()
+        if getattr(loaded.device, "type", "") == "cpu" and lowered == "auto":
+            print(
+                "WARNING: no GPU found (no CUDA, no Apple MPS, no ONNX Runtime GPU provider); upscaling runs on "
+                "the CPU and will be very slow.",
+                flush=True,
+            )
+    return loaded
 
 
 def dilate_fill(rgb, mask, iterations: int):
-    """Grow opaque edge colors without wrapping across opposite image edges."""
+    """Grow opaque edge colors without wrapping across opposite image edges.
+
+    Each pass fills every unknown pixel that touches a known one with the mean of its known up, down, left and
+    right neighbours (summed in that order in float32).  Only the pixels next to the previous pass's new pixels
+    can be newly reachable, so each pass touches that frontier instead of the whole image; the result is
+    bit-identical to the full-image formulation.
+    """
     import numpy as np
 
-    rgb = rgb.astype(np.float32).copy()
-    known = mask.copy()
-    height, width = known.shape
+    rgb = np.array(rgb, dtype=np.float32, order="C")  # always a fresh C-contiguous copy
+    height, width = mask.shape
+    known = np.array(mask, dtype=bool).reshape(-1)
+    flat = rgb.reshape(-1, rgb.shape[-1])
+    frontier = np.flatnonzero(known)
     for _ in range(iterations):
-        if known.all():
+        if frontier.size == 0:
             break
-        acc = np.zeros_like(rgb)
-        count = np.zeros((height, width), dtype=np.float32)
-        for ys, yd, xs, xd in (
-            (slice(0, -1), slice(1, None), slice(None), slice(None)),
-            (slice(1, None), slice(0, -1), slice(None), slice(None)),
-            (slice(None), slice(None), slice(0, -1), slice(1, None)),
-            (slice(None), slice(None), slice(1, None), slice(0, -1)),
+        row = frontier // width
+        col = frontier - row * width
+        cand = np.concatenate((
+            frontier[row > 0] - width, frontier[row < height - 1] + width,
+            frontier[col > 0] - 1, frontier[col < width - 1] + 1,
+        ))
+        cand = cand[~known[cand]]
+        if cand.size == 0:
+            break
+        cand = np.unique(cand)
+        crow = cand // width
+        ccol = cand - crow * width
+        acc = np.zeros((cand.size, flat.shape[1]), dtype=np.float32)
+        count = np.zeros(cand.size, dtype=np.float32)
+        for valid, src in (
+            (crow > 0, cand - width),
+            (crow < height - 1, cand + width),
+            (ccol > 0, cand - 1),
+            (ccol < width - 1, cand + 1),
         ):
-            take = known[ys, xs] & ~known[yd, xd]
-            acc[yd, xd][take] += rgb[ys, xs][take]
-            count[yd, xd][take] += 1
-        new = count > 0
-        rgb[new] = acc[new] / count[new, None]
-        known |= new
+            take = valid.copy()
+            take[valid] = known[src[valid]]
+            acc[take] += flat[src[take]]
+            count[take] += 1
+        flat[cand] = acc / count[:, None]
+        known[cand] = True
+        frontier = cand
     return rgb
+
+
+def float01_to_u8(values):
+    """(clip(values, 0, 1) * 255).round().astype(uint8) in one temporary and in-place passes."""
+    import numpy as np
+
+    scaled = np.multiply(values, 255, dtype=np.float32) if values.dtype == np.float32 else values * 255
+    np.clip(scaled, 0, 255, out=scaled)
+    np.rint(scaled, out=scaled)
+    return scaled.astype(np.uint8)
 
 
 def descriptor_forward(descriptor, tensor, *, directml_safe: bool):
@@ -687,6 +1072,22 @@ def directml_compatibility_ops(torch_module, enabled: bool):
 
 
 def sr_rgb(model, rgb01):
+    runner = model.ort if isinstance(model, LoadedModel) else None
+    if runner is not None and runner.failed is None:
+        try:
+            result = runner.run(rgb01)
+            if result is not None:
+                return result
+        except Exception as exc:
+            if not is_device_memory_error(exc):
+                runner.failed = f"{type(exc).__name__}: {exc}"
+            print(
+                f"  {runner.key}: ONNX Runtime ({runner.provider[0]}) failed, using {runner.fallback} "
+                f"({type(exc).__name__}: {str(exc)[:300]})",
+                flush=True,
+            )
+    if isinstance(model, LoadedModel):
+        model.attach_torch()
     import torch
 
     descriptor = model.descriptor if isinstance(model, LoadedModel) else model
@@ -861,7 +1262,7 @@ def upscale_image(model, image, *, tile: int, overlap: int, dilate: int, fill_ma
                 output = Image.new(source.mode, (width * scale, height * scale))
                 if (rx0, ry0, rx1, ry1) != (0, 0, width, height):
                     filled = Image.fromarray(
-                        (np.clip(rgb_source, 0, 1) * 255).round().astype(np.uint8), "RGB"
+                        float01_to_u8(rgb_source), "RGB"
                     ).resize((width * scale, height * scale), Image.Resampling.NEAREST)
                     if has_alpha:
                         filled = filled.convert("RGBA")
@@ -880,7 +1281,7 @@ def upscale_image(model, image, *, tile: int, overlap: int, dilate: int, fill_ma
                 (patch_h - overlap) * scale,
             )
             core_rgb = high[crop_box[1] : crop_box[3], crop_box[0] : crop_box[2]]
-            core_u8 = (np.clip(core_rgb, 0, 1) * 255).round().astype(np.uint8)
+            core_u8 = float01_to_u8(core_rgb)
             if has_alpha:
                 alpha_core = source.getchannel("A").crop((x0, y0, x1, y1))
                 alpha_high = alpha_core.resize(
@@ -1096,7 +1497,7 @@ def prepare_ncnn_input(src: Path, staged: Path, *, dilate: int) -> tuple[list[in
         rgb = pixels[..., :3] / 255.0
         if has_alpha:
             rgb = dilate_fill(rgb, pixels[..., 3] > 0, dilate)
-        rgb_u8 = (np.clip(rgb, 0, 1) * 255).round().astype(np.uint8)
+        rgb_u8 = float01_to_u8(rgb)
         Image.fromarray(rgb_u8, "RGB").save(staged, format="PNG")
     return size, has_alpha
 
@@ -1316,9 +1717,8 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build a parallel asset-aware 4x HD tree for all runtime rasters.",
         epilog=(
-            "ML run: ~/.local/bin/uv run --python 3.12 --with torch --with "
-            "spandrel --with spandrel-extra-arches --with gdown --with pillow "
-            "--with numpy python tools/upscale_assets.py"
+            "Normally run by build_all.py --only upscale_assets (ONNX Runtime packages; torch, spandrel "
+            "and torch-directml are added only when that path cannot run, exit code 75)."
         ),
     )
     parser.add_argument("--src-dir", type=Path, default=DEFAULT_SRC)
@@ -1328,8 +1728,8 @@ def _parser() -> argparse.ArgumentParser:
         help="auto uses NCNN when --ncnn-exe or REALESRGAN_NCNN_EXE is set",
     )
     parser.add_argument(
-        "--device", choices=("auto", "directml", "cuda", "cpu"), default="auto",
-        help="torch inference device (Windows launcher defaults to directml)",
+        "--device", choices=("auto", "directml", "cuda", "mps", "cpu"), default="auto",
+        help="torch inference device (auto: DirectML on Windows when torch-directml is installed, else CUDA, Apple MPS, CPU)",
     )
     parser.add_argument(
         "--device-index", type=int,
@@ -1406,6 +1806,8 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    if argv is None and os.environ.get("DW2003_TEST_UPSCALE_ARGS"):   # test harness only (e.g. "--limit 3")
+        argv = os.environ["DW2003_TEST_UPSCALE_ARGS"].split()
     args = _parser().parse_args(argv)
     global OVERWORLD_AI, UI_AI
     OVERWORLD_AI = bool(args.overworld_ai)

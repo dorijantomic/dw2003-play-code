@@ -120,6 +120,7 @@ export const DEV_ROWS = Object.freeze([
     R("test", "Tools", "langdesk", "Language desk", "A page on the seven language rows the pad cannot all reach."),
     R("test", "Tools", "damagelab", "Damage Lab", "Pick a fighter, enemy and technique and see each step of the damage."),
     R("test", "Tools", "silence", "Silence report", "Sounds this build cannot play."),
+    R("test", "Tools", "showfps", "Show FPS", "A small box in the top-right corner: frames drawn per second and the median gap between them."),
     R("test", "Tools", "cursorbook", "Cursor almanac", "A page of the four cursors and how fast each one blinks."),
     R("test", "Tools", "weaponlab", "Weapon effects", "Adds a weapon’s hidden on-hit effect to the equipment screen."),
     R("test", "Tools", "bitledger", "BIT ledger", "The game’s money tables."),

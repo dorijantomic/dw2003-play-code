@@ -1,5 +1,5 @@
 // OPTIONS rows, pages and cursor (web/options-model.js): every row writes the same keys F2 does, defaults equal today's, and
-// every one of the 98 effect keys has a home.
+// every one of the 99 effect keys has a home.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -22,16 +22,16 @@ function defaults() {
 const memoryStore = (fx = defaults()) => ({ fx, get: (k) => fx[k], setMany: (o) => Object.assign(fx, o) });
 const FILTERS = [["off", "Off"], ["bilinear", "Smooth"], ["epx", "EPX"]];
 
-test("the 98 effect keys are read from ambience.js, and each has exactly one home", () => {
+test("the 99 effect keys are read from ambience.js, and each has exactly one home", () => {
     const keys = PAIRS.filter((k) => k !== "glossary" && k !== "options");
-    assert.equal(keys.length, 98);
+    assert.equal(keys.length, 99);
     assert.deepEqual(keys.filter((k) => !(k in OPTIONS_HOME)), [], "no key without a home");
     assert.deepEqual(Object.keys(OPTIONS_HOME).filter((k) => !PAIRS.includes(k)), [], "no home for a key that does not exist");
     const count = (h) => Object.values(OPTIONS_HOME).filter((v) => v === h).length;
-    assert.deepEqual([count("detail"), F2_ONLY_KEYS.length], [35, 25]);
+    assert.deepEqual([count("detail"), F2_ONLY_KEYS.length], [35, 26]);
     assert.equal(Object.values(OPTIONS_HOME).filter((v) => v.startsWith("extra:")).length, 5, "only the Quests row is left of the extras");
     assert.equal(Object.values(OPTIONS_HOME).filter((v) => v.startsWith("effects:")).length, 4, "the four sound keys (the other 33 EFFECTS keys are Detail keys too)");
-    assert.equal(count("f2"), 54, "25 dev keys, wide x2, hd2d, toon x2, 22 hidden extras keys, glossary, options");
+    assert.equal(count("f2"), 55, "26 dev keys, wide x2, hd2d, toon x2, 22 hidden extras keys, glossary, options");
 });
 
 test("every home that names a row names a real row, and every row is on a page", () => {

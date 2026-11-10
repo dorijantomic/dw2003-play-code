@@ -86,6 +86,25 @@ class TestRunAll(unittest.TestCase):
             ba._build_argv(stage, "uv")[:4], ["uv", "run", "--python", "3.12"]
         )
 
+    def test_fallback_packages_only_on_the_second_run(self):
+        stage = Stage(name="ml", cmd=["tool.py"], cwd=".", uv_python="3.12", uv_with=("onnxruntime",),
+                      uv_with_fallback=("torch",))
+        first = ba._build_argv(stage, "uv")
+        second = ba._build_argv(stage, "uv", fallback=True)
+        self.assertNotIn("torch", first)
+        self.assertIn("torch", second)
+        self.assertIn("onnxruntime", second)
+
+    def test_exit_75_reruns_once_with_the_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            flag = Path(d) / "flag"
+            code = "import os,sys;f=sys.argv[1];(sys.exit(0) if os.path.exists(f) else (open(f,'w').close(), sys.exit(75)))"
+            stage = Stage(name="ml", cmd=["-c", code, str(flag)], cwd=d, uv_with_fallback=("torch",))
+            res = run_stage(stage, sys.executable, Path(d) / "logs")
+            self.assertEqual(res.status, "OK")
+            plain = Stage(name="ml2", cmd=["-c", "import sys;sys.exit(75)"], cwd=d)
+            self.assertEqual(run_stage(plain, sys.executable, Path(d) / "logs").status, "FAILED")
+
 
 class TestSetupIdempotent(unittest.TestCase):
     def test_setup_noops_when_satisfied(self):

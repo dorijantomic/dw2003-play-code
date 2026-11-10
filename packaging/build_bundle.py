@@ -10,7 +10,7 @@ Node, and the tools that turn the player's disc into the game's assets:
       app/              this repository (git HEAD), plus node_modules
       runtime/python/   portable CPython with the build's packages installed
       runtime/node/     portable Node.js
-      runtime/bin/      Marko's extractors, mips objdump, fluidsynth (from --bin)
+      runtime/bin/      Marko's extractors, mips objdump, fluidsynth, uv (from --bin)
 
 The launcher (app/launcher/dw2003.py, run on runtime/python) does the rest on
 the player's machine. The OS installers (packaging/*) wrap this directory.
@@ -41,7 +41,7 @@ PY_PACKAGES = ["pillow", "numpy", "toml", "capstone", "imageio-ffmpeg", "mido",
                "soundfile", "pycparser==2.22"]
 EXE = ".exe" if os.name == "nt" else ""
 BIN_REQUIRED = ["unpack", "unmap", "unrlen", "unmap-tile", "untim", "unlang-file",
-                "ddw3-unvab-sep", "mips-elf-objdump", "fluidsynth"]
+                "ddw3-unvab-sep", "mips-elf-objdump", "fluidsynth", "uv"]
 
 
 def host() -> tuple[str, str]:

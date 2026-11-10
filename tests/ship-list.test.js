@@ -45,16 +45,16 @@ async function loadAmbience({ installed, saved, mark, search = "" }) {
 }
 
 // ---------------------------------------------------------------- the list
-test("ship list: every FX_DEFS key has exactly one entry, no extras, counts 44 / 9 / 47", async () => {
+test("ship list: every FX_DEFS key has exactly one entry, no extras, counts 44 / 9 / 48", async () => {
     const { FX_DEFS } = await loadAmbience({});
     const keys = FX_DEFS.map(([k]) => k);
-    assert.equal(keys.length, 100);
-    assert.equal(new Set(keys).size, 100, "FX_DEFS has no duplicate key");
+    assert.equal(keys.length, 101);
+    assert.equal(new Set(keys).size, 101, "FX_DEFS has no duplicate key");
     assert.deepEqual(Object.keys(SHIP).sort(), [...keys].sort(), "same keys, none missing, none extra");
     assert.equal(SHIP_IN.length, 44);
     assert.equal(SHIP_AUTO.length, 9);
-    assert.equal(SHIP_OUT.length, 47);
-    assert.equal(new Set([...SHIP_IN, ...SHIP_AUTO, ...SHIP_OUT]).size, 100, "no key sits in two classes");
+    assert.equal(SHIP_OUT.length, 48);
+    assert.equal(new Set([...SHIP_IN, ...SHIP_AUTO, ...SHIP_OUT]).size, 101, "no key sits in two classes");
     for (const k of keys) assert.ok(["in", "auto", "out"].includes(SHIP[k]), k);
 });
 
