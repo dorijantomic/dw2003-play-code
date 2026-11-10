@@ -26,6 +26,8 @@
 // with a copy of the screen, then difference that copy back onto the screen.
 // Two full-screen composites, both on the GPU, and no per-pixel JavaScript.
 
+import { noteBackdropBlend } from "./battle-layer.js";
+
 let layerCanvas = null;   // the dim shape, on black
 let minCanvas = null;     // min(screen, dim)
 
@@ -52,6 +54,7 @@ function scratch(w, h) {
  */
 export function subtractLayer(ctx, x, y, w, h, paintLayer) {
   if (w <= 0 || h <= 0) return;
+  noteBackdropBlend();   // it reads the canvas under it (web/battle-layer.js)
   if (typeof document === "undefined") { paintLayer(ctx, w, h); return; }
 
   const m = typeof ctx.getTransform === "function"

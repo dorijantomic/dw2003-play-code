@@ -9,6 +9,7 @@
 
 import { loadAssetImage } from "./assets.js";
 import { registerPausePanels } from "./panel-kit.js";
+import { noteBackdropBlend } from "./battle-layer.js";
 
 const packs = {}; // name -> { img, map, ids, patterns }
 
@@ -77,6 +78,7 @@ export function drawClip(ctx, p, id, x, y, scale = 1) {
     // clip.semi = the pack's own PS1 ABR blend mode (same mapping as
     // web/effects.js drawSprite): 0 = B/2+F/2, 1 = B+F, 2 = B-F, 3 = B+F/4.
     ctx.save();
+    if (semi >= 1 && semi <= 3) noteBackdropBlend();   // mixes with what is under it (web/battle-layer.js)
     if (semi === 1) ctx.globalCompositeOperation = "lighter";
     else if (semi === 2) ctx.globalCompositeOperation = "difference";
     else if (semi === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; }
@@ -131,6 +133,7 @@ export function drawClipWidth(ctx, p, id, x, y, width) {
   const blend = semi >= 0 && clip.stp !== false;
   if (blend) {
     ctx.save();
+    if (semi >= 1 && semi <= 3) noteBackdropBlend();
     if (semi === 1) ctx.globalCompositeOperation = "lighter";
     else if (semi === 2) ctx.globalCompositeOperation = "difference";
     else if (semi === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; }

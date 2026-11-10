@@ -23,6 +23,8 @@
 // pixelFilterNow(image, name) runs the same shader on one image (4x, no down-sampling): the lab
 // (sprite-filter-lab.html) counts the pixels where it differs from the CPU filters in sprite-filters.js.
 
+import { setFlatReader } from "./battle-layer.js";
+
 export const GPU_FILTER_NAMES = ["bilinear", "epx", "mmpx", "xbr", "xbrblend"];
 const NATIVE_W = 320, NATIVE_H = 240;
 
@@ -341,6 +343,7 @@ export function installPixelFilter(stageEl, gameCanvas, isHd = () => false) {
     requestAnimationFrame(frame);
     const name = pixelFilterName();
     const on = GPU_FILTER_NAMES.includes(name) && !failed && allowed() && !gameCanvas.hidden && gameCanvas.width > 0;
+    setFlatReader("pixel-filter", on);      // a battle's 3D layer is not in the game canvas unless the frame is flat
     if (!on) { frameCanvas = null; if (ov.style.display !== "none") ov.style.display = "none"; return; }
     if (!pipe) {
       try { pipe = createPipeline(ov); } catch (error) { console.warn("[pixel filter]", error); }

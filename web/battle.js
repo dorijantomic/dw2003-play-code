@@ -58,7 +58,10 @@ import {
 import { rollFusionDrops } from "./fusion-loot.js";
 // enemies.json drop names are compact ("ArmorChip"); the item table is keyed by display name.
 import { itemForDropName } from "./drop-item.js";
-import { drawEffects } from "./fight/effect-player.js";
+import { drawEffects, effectsBlendBackdrop } from "./fight/effect-player.js";
+import {
+  createBattleLayer, showBattleLayer, releaseBattleLayer, takeBackdropBlends, noteBackdropBlend, layerFrameOk,
+} from "./battle-layer.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
 import { FIELD_CYCLE, fieldName, nextField } from "./field-war.js";
@@ -3222,7 +3225,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
   let enemiesDB = null; // map of enemy_id string → sdigiedt entry
 
-  // 3D battle renderer (WebGL into OffscreenCanvas, blitted during draw())
+  // 3D battle renderer: WebGL into its own <canvas> stacked under the game canvas (web/battle-layer.js).
+  // An OffscreenCanvas, copied into the game canvas in draw(), is only the fallback for a page with no parent.
   let renderer3d = null;
   let offscreen3d = null;
 
@@ -3304,10 +3308,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
   async function _init3DRenderer(b) {
     try {
-      if (typeof OffscreenCanvas === "undefined") return;
-      offscreen3d = new OffscreenCanvas(canvas.width, canvas.height);
+      offscreen3d = createBattleLayer(canvas)
+        ?? (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(canvas.width, canvas.height) : null);
+      if (!offscreen3d) return;
       renderer3d  = createBattle3D(offscreen3d, sfx);
-      if (!renderer3d) { offscreen3d = null; return; }
+      if (!renderer3d) { releaseBattleLayer(); offscreen3d = null; return; }
       // The disc's own per-AREA battle arena: the field screen the fight started on and the
       // encounter id it rolled resolve to the battle descriptor's arena id (the trigger record's
       // `param`, copied to 0x80042b28 by fieldstg fn 0x800925a8), which selects the SFSTDATA
@@ -3384,6 +3389,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         sfx?.play("comcd103");
       }
     } catch (err) {
+      releaseBattleLayer();
       renderer3d = null; offscreen3d = null;
     }
   }
@@ -5137,6 +5143,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         if (battle === b) {
           persistPlayerGauge(b);
           if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack);
+          releaseBattleLayer();
           battle = null; cb?.();
         }
       }, 1400);
@@ -7849,6 +7856,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     // Teardown 3D renderer
     if (renderer3d) { renderer3d.setSlowMotion?.(0); renderer3d.destroy(); renderer3d = null; }
+    releaseBattleLayer();
     offscreen3d = null;
     exitBattleFullscreen();
 
@@ -8454,6 +8462,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b._runAwayEnd = () => {
           persistPlayerGauge(b);
           if (bgm && b._fieldTrack !== undefined) bgm.play(b._fieldTrack);
+          releaseBattleLayer();
           battle = null; cb?.();
         };
       } else {
@@ -9540,7 +9549,18 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
     // 3D scene fills the whole canvas (identity transform, full device resolution).
     if (renderer3d && offscreen3d) {
-      ctx.drawImage(offscreen3d, 0, 0, cw, ch);
+      // The 3D picture is its own canvas under this one (web/battle-layer.js): clear here so it shows
+      // through, nothing is copied. A frame whose draws mix with the pixels under them (additive and
+      // subtractive PSX sprites, the defeat fade, a screen dim) is drawn the old way, 3D copied in.
+      const fx = renderer3d.getEffectDraw?.();
+      const mixes = takeBackdropBlends() > 0;
+      const certain = (b.state === ST.LOSE && b._loseFade > 0) || (!!fx && effectsBlendBackdrop(fx.list, fx.manifest));
+      if (layerFrameOk(mixes, certain) && showBattleLayer(true)) {
+        ctx.clearRect(0, 0, cw, ch);
+      } else {
+        showBattleLayer(false);
+        ctx.drawImage(offscreen3d, 0, 0, cw, ch);
+      }
       // ORDER MATTERS during a form change: the transformation controller's
       // curtain blacks the arena out FIRST and the E000EVOL sprites play over
       // that black, so the curtain has to go UNDER the effect pass. Drawing it
@@ -9550,7 +9570,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // maps PSX screen/world coords to the offscreen's px which we scale to the canvas here.
       // The transformation's own effects (types 1000-1003/1007/1008, file
       // E000EVOL) come through this same pass.
-      const fx = renderer3d.getEffectDraw?.();
       if (fx) {
         ctx.save();
         ctx.scale(cw / offscreen3d.width, ch / offscreen3d.height);
@@ -9569,6 +9588,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         ctx.restore();
       }
     } else {
+      showBattleLayer(false);
       ctx.fillStyle = "rgba(0,0,8,0.92)";
       ctx.fillRect(0, 0, cw, ch);
     }
@@ -9646,10 +9666,26 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     ctx.restore();
   }
 
+  // True only when this frame's draw() paints or clears EVERY pixel of the shared canvas, so the field drawn under it is never
+  // seen (web/game.js render() then skips the field's pure pixel work). Mirrors draw()'s own branches and has no side effects:
+  //  - no battle, the native results screen and the hosted ending (draw() returns, the field shows): false
+  //  - the STFGTREP report: opaque black fillRect over the whole canvas: true
+  //  - 3D path: clearRect of the whole canvas (the opaque battle layer is under it) or drawImage of the opaque
+  //    (alpha:false WebGL) 3D frame over the whole canvas: true
+  //  - the 2D fallback (0.92 alpha fill, no 3D renderer): false
+  function coversField() {
+    const b = battle;
+    if (!b) return false;
+    if (b._reportNative || b._endingHosted) return false;
+    if (b.state === ST.WIN && b._victoryPhase === "report") return true;
+    return !!(renderer3d && offscreen3d);
+  }
+
   // PSX ABR 2 (B - F) with a grey F: each channel becomes max(0, c - level).
   // Canvas has no subtract mode, so: invert, add the level, invert again.
   function drawSubtractiveFade(ctx, cw, ch, amount) {
     const level = Math.round(amount * 255);
+    noteBackdropBlend();
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
@@ -9925,7 +9961,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (battle?.enemy && (battle.partyIndex | 0) === index && hp < battle.enemy.hp) battle.enemy.hp = Math.max(0, hp | 0);
   }
 
-  return { isActive, start, startRandom, startParty, startScreen, scriptedScreen, partyForScreen, triggersForStage,
+  return { isActive, coversField, start, startRandom, startParty, startScreen, scriptedScreen, partyForScreen, triggersForStage,
     rollEncounter, coopState, coopSetEnemyHp, mpKit,
     // Post-fight results hand-off (Phase 6.3): the host registers how to open
     // the native pro/stfgtrep screen, and calls finishNativeReport() when the

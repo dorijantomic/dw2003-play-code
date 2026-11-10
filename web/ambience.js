@@ -20,6 +20,7 @@ import { resetScenery3, drawScenery3 } from "./scenery3.js";
 import { resetScenery2, drawScenery2, gustLevel, hasLights } from "./scenery2.js";
 import { isWaterAt, isWaterStage, waterPixelTest } from "./water3d.js";
 import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
+import { isBattleLayer, setFlatReader } from "./battle-layer.js";
 import { SPRITE_FILTERS } from "./sprite-filters.js";
 import { dialModeFromFx } from "./encounter-dial.js";   // F2 -> Extras -> Encounter dial (repel / lure)
 import { needsPractice2v2Reset } from "./options-model.js";
@@ -1019,7 +1020,7 @@ function profileAct(kind, slot) {
 // The recording is of the canvas alone, so no window, panel or label is ever in it.
 let photoOn = false, recorder = null, recChunks = [], toastEl = null, toastTimer = 0, recDot = null;
 function gameCanvas() {
-    return [...document.querySelectorAll("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null) || null;
+    return [...document.querySelectorAll("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null && !isBattleLayer(c)) || null;
 }
 function toast(msg, ms = 2600) {
     if (!toastEl) return;
@@ -1036,7 +1037,14 @@ function download(blob, name) {
 export function screenshot() {
     const cv = gameCanvas();
     if (!cv) return false;
-    cv.toBlob((b) => { if (b) { download(b, `walkabout-${stamp()}.png`); toast("Screenshot saved"); } }, "image/png");
+    // A battle keeps its 3D picture in a canvas under this one: ask for one flat frame (3D copied in), read it after it is drawn.
+    setFlatReader("screenshot", true);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        cv.toBlob((b) => {
+            setFlatReader("screenshot", false);
+            if (b) { download(b, `walkabout-${stamp()}.png`); toast("Screenshot saved"); }
+        }, "image/png");
+    }));
     return true;
 }
 export function toggleRecord() {
@@ -1045,11 +1053,13 @@ export function toggleRecord() {
     if (!cv || !cv.captureStream || typeof MediaRecorder === "undefined") { toast("Recording is not supported here"); return false; }
     const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m));
     recChunks = [];
+    setFlatReader("record", true);      // a battle's 3D layer is not in this canvas unless the frame is flat
     recorder = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 12e6 });
     recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
         const blob = new Blob(recChunks, { type: "video/webm" });
         recorder = null; if (recDot) recDot.style.display = "none";
+        setFlatReader("record", false);
         window.__lastClip = { bytes: blob.size };
         download(blob, `walkabout-${stamp()}.webm`); toast("Clip saved");
     };

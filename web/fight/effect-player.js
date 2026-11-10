@@ -29,6 +29,7 @@
 // plain sprite descriptors; the host (battle3d/battle.js or the Effects Lab) owns images/canvas.
 
 import { loadAssetImage } from "../assets.js";
+import { noteBackdropBlend } from "../battle-layer.js";
 // The effect system's channel-record stepper (F0x800893dc) and screen/world draw
 // (F0x8008921c), ported once in engine/dw3/battle-effects.ts and proven against the
 // original words by tests/engine/unit/battle-effects-oracle.test.ts. The browser
@@ -252,6 +253,27 @@ export async function loadEffectAssets(base = "assets/battle/effects") {
   return { manifest, images };
 }
 
+/** The sheet clip a sprite descriptor draws (channel 1 selects a palette-cycled "id@shift" variant). */
+function effectClip(arch, s) {
+  return (s.clutShift ? arch?.clips?.[`${s.frame}@${s.clutShift & 0xFF}`] : null)
+    ?? arch?.clips?.[String(s.frame)];
+}
+
+/** PS1 semi-transparency modes that mix with the pixels under the sprite: 1 and 3 add, 2 subtracts. */
+const blendsBackdrop = (semi) => semi === 1 || semi === 2 || semi === 3;
+
+/**
+ * True when any sprite in the list is drawn with a mode that blends with what is under it (so the 3D
+ * picture must be in the same canvas for it; see web/battle-layer.js). Same clip lookup as drawEffects.
+ */
+export function effectsBlendBackdrop(list, manifest) {
+  for (const s of list ?? []) {
+    const clip = effectClip(manifest?.archives?.[String(s.arch)], s);
+    if (clip && blendsBackdrop(clip.semi)) return true;
+  }
+  return false;
+}
+
 /**
  * Draw one tick's sprites onto a 2D context. `view`:
  *   worldToScreen(psxOffset, side) → {x,y} canvas px (project an attacker-relative PS1 point)
@@ -266,8 +288,7 @@ export function drawEffects(ctx, list, manifest, images, view) {
     // the same directory-draw as field point-sprites/screen packs), pre-composed by the
     // extractor into one sheet rect with its authored anchor offset (ox,oy).
     // clutShift (channel 1) selects a palette-cycled variant, pre-cut as "id@shift"
-    const clip = (s.clutShift ? arch.clips?.[`${s.frame}@${s.clutShift & 0xFF}`] : null)
-      ?? arch.clips?.[String(s.frame)];
+    const clip = effectClip(arch, s);
     if (!clip || !clip.w || !clip.h) continue;
     let x, y;
     if (s.screen) {
@@ -303,6 +324,7 @@ export function drawEffects(ctx, list, manifest, images, view) {
     // 0 = B/2+F/2 (half-mix), 2 = B-F (approximated), else opaque. (Same mapping as the
     // shipped field-effect renderer web/effects.js.)
     const semi = clip.semi;
+    if (blendsBackdrop(semi)) noteBackdropBlend();
     if (semi === 1) ctx.globalCompositeOperation = "lighter";
     else if (semi === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; }
     else if (semi === 0) ctx.globalAlpha = 0.5;

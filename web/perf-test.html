@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed test (dev)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a1020; color: #e8edf7; font: 13px/1.4 "Segoe UI", system-ui, sans-serif; }
+  #bar { height: 132px; box-sizing: border-box; padding: 6px 10px; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; border-bottom: 1px solid #22334b; background: #0f1a2e; overflow: hidden; }
+  #bar label { margin-right: 12px; white-space: nowrap; }
+  #bar input[type=text] { width: 230px; background: #111a2e; color: #e8edf7; border: 1px solid #2a3a6a; border-radius: 5px; padding: 3px 6px; }
+  #bar select, #bar button { background: #1b2a4a; color: #e8edf7; border: 1px solid #3a4f8a; border-radius: 5px; padding: 3px 10px; }
+  #start { font-weight: 700; color: #ffd34d; }
+  #status { font-weight: 700; color: #ffd34d; }
+  #done { font-weight: 700; color: #8fe08f; font-size: 15px; }
+  #log { grid-column: 1 / -1; margin: 0; overflow: auto; font: 11px/1.3 ui-monospace, monospace; color: #b8c7dc; white-space: pre-wrap; }
+  #g { display: block; width: 100%; height: calc(100% - 132px); border: 0; background: #000; }
+  .dim { color: #8fa9c8; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <div>
+    <b>Speed test (dev)</b> <span class="dim">origin <span id="origin"></span></span><br>
+    <label>receiver <input id="recv" type="text"></label>
+    <label>art <select id="mode"><option value="hd">HD Remaster</option><option value="authentic">Authentic</option></select></label>
+    <label><input id="walk" type="checkbox" checked> walk left/right</label>
+    <label><input id="pin" type="checkbox" checked> pin time of day to day</label>
+    <button id="start" type="button">Start</button><br>
+    <span id="status">idle. Close every other tab and window first. Takes about 6 minutes.</span>
+    <span id="done"></span> <a id="dl" hidden>save results as a file</a><br>
+    <span class="dim" id="saved"></span>
+  </div>
+  <pre id="log"></pre>
+</div>
+<iframe id="g" title="the game" allow="autoplay"></iframe>
+<script src="perf-test.js" defer></script>
+</body>
+</html>

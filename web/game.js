@@ -8639,8 +8639,12 @@ function frame(t) {
     // in the console to blitz through auto-scenes; 1 (or unset) = normal. Sub-stepping (vs.
     // one big dt) keeps collision + cutscene stepping stable at high multipliers.
     const mult = Math.max(1, Math.floor(window.__gameSpeed || 1));
+    const perfHook = window.__perfHook;   // dev-only timing hook (web/perf-test.js); unset = exactly the lines below
+    const perfT0 = perfHook ? performance.now() : 0;
     for (let i = 0; i < mult; i++) update(dt);
+    const perfT1 = perfHook ? performance.now() : 0;
     render();
+    if (perfHook) perfHook(perfT1 - perfT0, performance.now() - perfT1);
     requestAnimationFrame(frame);
 }
 
@@ -10088,14 +10092,14 @@ function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest) {
         const a = bf.reflect(x, y);
         if (a > 0.02) {
             ctx.save();
-            ctx.globalAlpha = a; ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";
+            ctx.globalAlpha = a; if (!window.__perfNoFilter) ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
             ctx.translate(0, 2 * (y - lastCam.y + 4)); ctx.scale(1, -1);
             _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
             ctx.restore();
         }
     }
     if (bf.filter) {
-        ctx.save(); ctx.filter = bf.filter;
+        ctx.save(); if (!window.__perfNoFilter) ctx.filter = bf.filter;
         const r = _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
         ctx.restore();
         return r;
@@ -10318,8 +10322,12 @@ function drawAnimDebug(entries) {
     ctx.restore();
 }
 
+let _grassScratch = null;   // reusable 2D copy of the WebGL grass canvas (see render())
 function render() {
     billboardDraws = [];
+    // A battle frame whose battle.draw() paints or clears every pixel: the field underneath is never seen, so only its pure
+    // pixel work (3D water, 3D grass, the y-sorted draw list, front quest fx) is skipped; every tick and state update still runs.
+    const skipField = battle.isActive() && !!battle.coversField?.();
     if (battle.isActive()) {
         // Battle owns the shared canvas at device resolution and establishes
         // its own transforms. The field underneath is fully covered.
@@ -10419,6 +10427,7 @@ function render() {
 
     ctx.fillStyle = window.__clearColour ?? "#000"; // see __cam/__mapInfo above
     ctx.fillRect(-wideField.padL, 0, VIEW_W + 2 * wideField.padL, VIEW_H);
+    if (window.__perfCut === 1) {  return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 1: after camera, ticks set-up and the clear (no save open yet)
     ctx.save();
     ctx.scale(ZOOM, ZOOM);
     // Extra quests: a scene's `shake` step moves the FIELD only -- the text box, the menus and the quest mark are drawn
@@ -10435,6 +10444,7 @@ function render() {
     const fieldBlanks = advanceFieldBlanks();
     tickNativeStage(m.id, fieldBlanks);
     paceStageObjects(m.id, fieldBlanks, camX, camY, FIELD_VIEW_PAD);
+    if (window.__perfCut === 2) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 2: after the stage ticks (inside the zoom save)
     // The leader's own ordering bucket decides which side of the ground it lands
     // on. A type-5 field actor draws into the bucket named by its draw-layer word
     // (+0x78 -> the 0x1002 slot +0x138, F0x8008F52C), and a stage's own step
@@ -10471,7 +10481,7 @@ function render() {
     // that has one (tools/extract_stage_overlay_shapes.py).
     if (!window.__hideProps) drawStageOverlayShapes(ctx, m.id, camX, camY);
     // Map layer 2, at OT[11] — the farthest layer.
-    if (layer2Split) {
+    if (layer2Split && !skipField) {   // skipField: a covering battle draws every pixel; the tile cache is left as is
         drawMapPicture(
             layer2Img, tiles?.base, "layer2",
             m.fixedViewportBackground ? 0 : -camX,
@@ -10492,7 +10502,7 @@ function render() {
         // A split stage is drawn as its two layers (layer 2 above, the ground
         // after the under-map band); the flattened map would put its baked ground
         // in front of layer 2, which the layer split has already replaced.
-        if (!layer2Split) {
+        if (!layer2Split && !skipField) {
             drawMapPicture(
                 mapImg, tiles?.base, null,
                 m.fixedViewportBackground ? 0 : -camX,
@@ -10519,6 +10529,7 @@ function render() {
     // the platform and the point sprites stay in front of it.  See
     // engine/systems/point-record-actor.ts `scroll-layer`.
     if (!window.__hideProps) drawScrollLayers(ctx, m.id);
+    if (window.__perfCut === 3) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 3: after the map pictures (layer 2 / base map, scroll layers)
 
     // Props that draw BEHIND the ground go down next, then the ground itself is
     // put back in front of them. On a split stage layer 2 is already down and the
@@ -10539,7 +10550,7 @@ function render() {
         drawPartyFollowers();
     }
     // The ground layer, at OT[7] — in front of everything the under-map band drew.
-    if (groundCover) {
+    if (groundCover && !skipField) {
         drawMapPicture(
             groundImg, tiles?.base, "ground",
             m.fixedViewportBackground ? 0 : -camX,
@@ -10554,6 +10565,7 @@ function render() {
     }
     // EXPERIMENT (swaying trees): hide the painted canopies; the swaying copy is drawn with the foreground layer
     if (!m.fixedViewportBackground && fxMapImg instanceof Image && swayFor(m, fxMapImg)) drawTreePatch(ctx, m.id, effectsMapImg(m.id, "fg"), fxMapImg, camX, camY);
+    if (window.__perfCut === 4) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 4: after under-map effects, ground picture, seam patch, tree patch
     // Build y-sorted drawable list
     //
     // `playerAnimTime` feeds gesture-clip timing (drawEntitySprite's `animTime` for
@@ -10576,23 +10588,32 @@ function render() {
     // blades nearer the camera and in front of farther ones. ?nograss3d turns it off.
     // EXPERIMENT (3D water): shaded water surface over the map's water pixels,
     // drawn straight onto the ground (before every entity). ?nowater3d turns it off.
-    if (!NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
+    if (!skipField && !NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
         const wc = renderWater(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
         if (wc) ctx.drawImage(wc, -FIELD_VIEW_PAD, 0, WATER_VIEW.w, WATER_VIEW.h);
     }
-    if (!NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
+    if (window.__perfCut === 5) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 5: after 3D water
+    if (!skipField && !NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
         const gc = renderGrass(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
         if (gc) {
             const STRIP = 8, PXS = GRASS_VIEW.px;
+            // Firefox: each drawImage from a WebGL canvas holds frames back; one copy + 2D strips is as fast as no grass (measured 12.3 -> 127.5 fps).
+            if (!_grassScratch) _grassScratch = document.createElement("canvas");
+            if (_grassScratch.width !== gc.width || _grassScratch.height !== gc.height) { _grassScratch.width = gc.width; _grassScratch.height = gc.height; }
+            const sctx = _grassScratch.getContext("2d");
+            sctx.clearRect(0, 0, _grassScratch.width, _grassScratch.height);
+            sctx.drawImage(gc, 0, 0);
+            const gsrc = _grassScratch;
             for (let sy = 0; sy < GRASS_VIEW.h; sy += STRIP) {
                 drawables.push({
                     y: camY + sy + STRIP,
-                    draw: () => ctx.drawImage(gc, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
+                    draw: () => ctx.drawImage(gsrc, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
                                               -FIELD_VIEW_PAD, sy, GRASS_VIEW.w, STRIP),
                 });
             }
         }
     }
+    if (window.__perfCut === 6) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 6: after 3D grass
     // EXPERIMENT (ambience ground layer): puddles, footprints, dust and wading ripples,
     // above the ground and under every sprite.
     if (!window.__hideProps && !m.fixedViewportBackground) {
@@ -11003,6 +11024,7 @@ function render() {
     // flush calls the head-most first and each callback prepends into its
     // ordering-table bucket). `sortDrawables` (web/draw-order.js) is that rule.
     sortDrawables(drawables);
+    if (window.__perfCut === 7) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 7: after every drawable is collected and sorted, before any is drawn
     // When the leader's bucket is behind the ground it was already painted in the
     // map band above, *before* the ground image; OT[8] is reached before OT[7]
     // and before every entity bucket, so the leader is behind the ground and
@@ -11011,9 +11033,10 @@ function render() {
     // neither is left in the list. The party rides the leader's bucket every
     // frame (F0x8008EAE8), so the follower drawables are painted in that same
     // band and skipped here with the leader.
-    for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower))) d.draw();
+    for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower)) && !skipField) d.draw();
     // Extra quests: effects told to sit over every person (the `fx` step's "layer": "front").
-    questFxDrawOver(ctx, camX, camY);
+    if (!skipField) questFxDrawOver(ctx, camX, camY);
+    if (window.__perfCut === 8) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 8: after the y-sorted drawables loop and front quest fx
     for (const g of multiplayerGhosts(m.id)) drawGhostLabel(ctx, g, Math.round(g.x - camX), Math.round(balloonAnchorY(g.y - camY)));
     { const me = multiplayerSelf(); if (me) drawGhostLabel(ctx, me, Math.round(state.x - camX), Math.round(balloonAnchorY(state.y - camY))); }
     multiplayerTick(m.id, state);   // EXPERIMENT: sends where I am and glides the other players
@@ -11036,6 +11059,7 @@ function render() {
         groundImgSize: groundImg ? [groundImg.width, groundImg.height] : null,
         layer2ImgType: layer2Img ? layer2Img.constructor.name : null,
     };
+    if (window.__perfCut === 9) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 9: after ambience/weather particles and the debug records
 
     // (SAY speaker indication is the anchored speech balloon itself — the
     // textbox draws attached to the speaker with a tail; see textbox.js.)
@@ -11249,8 +11273,10 @@ function render() {
 
     editor.drawOverlay(ctx);
     if (editor.enabled) sceneEd.drawOverlay(ctx);
+    if (window.__perfCut === 10) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 10: after cutscene effects, bubbles, ladders, fishing, overlays (the whole zoomed field), restore done here
     ctx.restore();
     drawWideSideCovers(ctx);
+    if (window.__perfCut === 11) {  return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 11: after the zoom restore and the wide side covers
 
     // EXPERIMENT (Angler's almanac): with the switch on, standing on a fishing spot draws
     // one line — how many casts this visit has left. It reads the live state.fishingBudget
@@ -11344,6 +11370,7 @@ function render() {
     // GLOSSARY / OPTIONS: over everything, drawn only while a book is open.
     books.draw(ctx, VIEW_W, VIEW_H, wideField.padL, wideField.padL > 0);
 
+    if (window.__perfCut === 12) {  return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 12: after all field UI / menus / HUD, before fades
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);
     }

@@ -12,6 +12,7 @@
 // Tune live from the console: __hd2d = { blur, focus, bloom, thr, sat, con, vig }.
 import { fx } from "./ambience.js";
 import { pixelFilteredFrame } from "./gpu-pixel-filter.js";
+import { setFlatReader } from "./battle-layer.js";
 
 const DEFAULTS = { blur: 3.2, focus: 0.24, bloom: 0.38, thr: 0.52, sat: 1.1, con: 1.05, vig: 0.22 };
 
@@ -89,6 +90,7 @@ export function installPost2d(stageEl, gameCanvas) {
     function frame() {
         requestAnimationFrame(frame);
         const on = fx.hd2d && !failed && !gameCanvas.hidden && gameCanvas.width > 0;
+        setFlatReader("hd2d", !!on);        // a battle's 3D layer is not in the game canvas unless the frame is flat
         if (!on) { if (ov.style.display !== "none") ov.style.display = "none"; return; }
         if (!gl && !init()) { ov.style.display = "none"; return; }
         // sit exactly on the game canvas's content box (inside its border), whatever the page does to it

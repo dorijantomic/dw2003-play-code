@@ -92,6 +92,8 @@ const CONTROLS_HTML = (spriteFilters) => `
     <h4>All switches</h4>
     <div class="row"><button type="button" data-all="1">All on</button><button type="button" data-all="0">All off</button></div>
     <div class="hint" data-dp-total></div>
+    <h4>Speed test</h4>
+    <div class="row"><a href="perf-test.html" target="_blank" rel="noopener" style="color:#ffd34d">Open the speed test page (dev only)</a></div>
     <div class="hint">F2 or Escape closes this page. Choices are remembered.</div>`;
 
 /**

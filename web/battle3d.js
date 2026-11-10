@@ -5140,15 +5140,19 @@ void main() {
       const bwm = buildBoneWorldMatrices(playerModel, playerFrame, playerBlend,
         usePlayerA ? playerAnim8r?.currentHiddenParts?.() : null);
       pBwm = bwm;
+      const _pt = globalThis.__perfHook3d ? performance.now() : 0;   // dev-only timing hook
       pAABB = _updateSkeletalVBOGL(gl, playerModel, playerSkelBufs, bwm, playerPos,
         MODEL_SCALE * fighterScale.fighterScale("player"), false, playerYaw);
+      if (_pt) globalThis.__perfHook3d?.("fighterVBO", performance.now() - _pt, playerSkelBufs.totalVerts);
     }
     if (enemyModel && enemySkelBufs) {
       const bwm = buildBoneWorldMatrices(enemyModel, enemyFrame, enemyBlend,
         useEnemyA ? enemyAnim8r?.currentHiddenParts?.() : null);
       eBwm = bwm;
+      const _pt = globalThis.__perfHook3d ? performance.now() : 0;   // dev-only timing hook
       eAABB = _updateSkeletalVBOGL(gl, enemyModel, enemySkelBufs, bwm, enemyPos,
         MODEL_SCALE * fighterScale.fighterScale("enemy"), false, enemyYaw);
+      if (_pt) globalThis.__perfHook3d?.("fighterVBO", performance.now() - _pt, enemySkelBufs.totalVerts);
       eAABBLast = eAABB;
     }
     if (extras.size) _updateExtras(alpha, ARENA);
@@ -5555,14 +5559,18 @@ void main() {
       // .dw3-research/arena-construction-2026-10-07/worker-e.md.
       if (arenaDebug.depthWrite) gl.depthMask(true);
       if (panoP?.paint) _drawArenaPaint(panoP, mvp, world, atm);
+      const _pf3 = globalThis.__perfHook3d, _pt3 = _pf3 ? performance.now() : 0;   // dev-only timing hook (web/perf-test.js); unset = no change
+      let _ptri = 0;
       for (const g of panoP || builtArena ? [] : activeArena.groups) {
         if (!g.count) continue;
         const tex = arenaTextureFor(activeArena, g);
         const idx = arenaDebug.cull ? arenaCullIndices(mvp, g) : null;
         if (idx) arenaCullLog.groups.push({ page: g.page, clut: g.clut, kept: idx.length / 3, total: (g.count / 3) | 0 });
+        if (_pf3) _ptri += (g.count / 3) | 0;
         if (arenaDebug.cull) drawProjLayerIndexed(gl, texP, mvp, g, tex, idx);
         else drawProjLayer(gl, texP, mvp, g, tex, 1);
       }
+      if (_pf3) _pf3("arenaGroups", performance.now() - _pt3, _ptri);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       if (atm) _atmosArena(null);
