@@ -184,16 +184,18 @@ function displayFor(css, el) {
     return el.attrs.includes("hidden") ? "none" : "block";
 }
 
-test("the gated row really hides while the F2 switch is off", () => {
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-    const style = ambience.match(/css\.textContent = `([\s\S]*?)`;/);
-    assert.ok(style, "the panel still injects one style block");
+test("the gated rows really hide while the F2 switch is off", () => {
+    const dev = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const style = dev.match(/DEV_PANEL_CSS = `([\s\S]*?)`;/);
+    assert.ok(style, "the F2 page still has one style block");
+    const css = style[1].split("@media")[0];
     const panel = { tag: "div", id: "fx-panel", classes: [], attrs: [], parent: null };
-    const row = (hidden) => ({ tag: "div", id: "fx-soundtrack", classes: ["row"], attrs: hidden ? ["hidden"] : [], parent: panel });
-    assert.match(ambience, /id="fx-soundtrack" hidden/, "the row ships hidden");
-    assert.match(ambience, /snd\.hidden = !fx\.soundtrack/, "refreshPanel follows the switch");
-    assert.equal(displayFor(style[1], row(true)), "none", "switch off: the row is not rendered");
-    assert.equal(displayFor(style[1], row(false)), "flex", "switch on: the row still lays out as a row");
+    const el = (classes, attrs) => ({ tag: "div", id: "", classes, attrs, parent: panel });
+    assert.equal(displayFor(css, el(["row"], ["hidden"])), "none", "a hidden button row is not rendered");
+    assert.equal(displayFor(css, el(["row"], [])), "flex", "a shown button row still lays out as a row");
+    assert.equal(displayFor(css, el(["dr-x"], ["hidden"])), "none", "a hidden inline control (encounter dial) is not rendered");
+    assert.equal(displayFor(css, el(["ctl"], ["hidden", "data-show-when"])), "none", "a slider that follows a switch hides with it");
+    assert.match(dev, /b\.disabled = !fx\[/, "an Open button is disabled while its switch is off");
 });
 
 test("the page plays through the game's own bgm player and is only linked from the gated F2 row", () => {
@@ -209,9 +211,10 @@ test("the page plays through the game's own bgm player and is only linked from t
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"soundtrack"/, "off until the player switches it on");
 
-    const refs = ambience.split("soundtrack.html").length - 1;
+    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8");
+    const refs = devModel.split("soundtrack.html").length - 1;
     assert.equal(refs, 1, "one reference to the page, no other link into it");
-    assert.match(ambience, /if \(fx\.soundtrack\)[^;{}]*window\.open\("soundtrack\.html"/, "opened only behind the toggle's guard");
+    assert.match(devModel, /soundtrack: P\("soundtrack\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
     assert.doesNotMatch(ambience, /(get|has)\("soundtrack"\)/, "never a URL flag");
-    assert.match(ambience, /#fx-soundtrack/, "the gated button row");
 });

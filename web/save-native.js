@@ -23,12 +23,8 @@
 // The old hand-authored screen (web/save.js) stays as the development rollback
 // (?legacySave=1) until this route is accepted; nothing here falls back to it.
 
-import { maskFromButtons, rosterSlotOfCharId, itemCountEntries, writeItemArrays } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { rosterSlotOfCharId, itemCountEntries, writeItemArrays } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { seedNativeScreenParty } from "./native-screen.js";
 import { createWalkerMemcard, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
@@ -51,7 +47,6 @@ const CODE_WORD = SAVE + 0x26c4;
 const CLOCK_HM = SAVE + 0x4c;
 const CLOCK_S = SAVE + 0x50;
 const RECORDS = 0x80049494;
-const STRIDE = 0x3dc;
 const REC_NAME = 0x08;
 
 export function createSaveNative(sfx = null) {
@@ -179,18 +174,6 @@ export function createSaveNative(sfx = null) {
         }
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            preBoot,
-            seed,
-            memcard: makeCard(),
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-        });
-        if (!host) return false;
-        r._host = host;
-        return true;
-    }
-
     /**
      * A load swaps the whole persisted state under the running game, so the
      * page is reloaded to rebuild every module from it — the same rule the
@@ -219,7 +202,6 @@ export function createSaveNative(sfx = null) {
     }
 
     r.open = (gameState, mode = "save", onClose = null, opts = {}) => {
-        r._open = true;
         r._mode = mode === "load" ? "load" : "save";
         r._state = gameState ?? null;
         r._opts = opts ?? {};
@@ -227,69 +209,13 @@ export function createSaveNative(sfx = null) {
         r._loadedSlot = null;
         r._savedSlot = null;
         r._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            r._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) r._pending = true;
+        r._begin();
     };
 
     r.isOpen = () => r._open;
 
     r.handleKey = (_k, state) => {
         if (state && !r._state) r._state = state;
-    };
-
-    r.update = (dt) => {
-        if (!r._open) return;
-        if (r._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                r._lastDiagnostic = "native save-screen boot failed (manifest/overlay missing)";
-                return;
-            }
-            r._pending = false;
-        }
-        const keys = r._state?.keys;
-        r._host.setPad(keys ? maskFromButtons(keys) : 0);
-        const done = r._host.tick(dt);
-        r._lastTraps = r._host.state()?.traps ?? r._lastTraps;
-        if (done) r._finish();
-    };
-
-    r.draw = (ctx, viewW, viewH) => {
-        if (!r._open || !r._host) return;
-        r._host.draw(ctx, viewW, viewH);
-    };
-
-    r.close = () => {
-        if (r._open) r._finish();
-    };
-
-    r._finish = () => {
-        if (!r._open) return;
-        r._open = false;
-        r._pending = false;
-        const host = r._host;
-        r._host = null;
-        if (host) {
-            // The load restores the walker's own state (and reloads the page), so
-            // it owns the exit: the caller's onClose must not also start a game
-            // that the reload is about to replace.
-            const loaded = r._loadedSlot;
-            host.teardown();
-            if (loaded !== null) {
-                r._loadedSlot = loaded;
-                r._onClose = null;
-                finishLoad();
-                return;
-            }
-        }
-        const cb = r._onClose;
-        r._onClose = null;
-        cb?.();
     };
 
     /** Diagnostics for the lab and focused browser checks. */
@@ -306,5 +232,35 @@ export function createSaveNative(sfx = null) {
         lastDiagnostic: r._lastDiagnostic,
     });
 
-    return r;
+    return createNativeAdapter({
+        owner: r,
+        moduleId: MODULE_ID,
+        hostOptions: () => ({
+            preBoot,
+            seed: (api) => seed(api, r._state, r._mode, r._opts),
+            memcard: makeCard(),
+            playPackedSound: (id) => { sfx?.playPacked(id); },
+        }),
+        frame: (host, dt) => {
+            const done = host.tick(dt);
+            r._lastTraps = host.state()?.traps ?? r._lastTraps;
+            return done;
+        },
+        closed: (_allowCommit, host) => {
+            // The load restores the walker's own state (and reloads the page), so
+            // it owns the exit: the caller's onClose must not also start a game
+            // that the reload is about to replace.
+            const loaded = r._loadedSlot;
+            if (host && loaded !== null) {
+                r._loadedSlot = loaded;
+                r._onClose = null;
+                finishLoad();
+                return;
+            }
+            const cb = r._onClose;
+            r._onClose = null;
+            cb?.();
+        },
+        label: "native save-screen boot failed (manifest/overlay missing)",
+    });
 }

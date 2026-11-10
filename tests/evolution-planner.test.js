@@ -300,6 +300,7 @@ test("the page reads the partner's live ledger: a learned form leaves the list",
     { slot: 0, name: "Kotemon", live: liveFor({ levels: { 9: 1 } }) },
   ]);
   openPlanner();
+  openPlanner();
   tickPlanner(true, null);
   assert.equal(plannerOpen(), true);
   assert.equal(plannerRowsNow().length, 43);

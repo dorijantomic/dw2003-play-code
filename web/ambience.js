@@ -15,13 +15,17 @@
 import { classSource, variantBase } from "./mapclass.js";
 import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel, todPhaseNow, todColor, cueBolt } from "./scenery.js";
 import { syncVillagers, removeVillagers } from "./crowd.js";
-import { setSound, thunder, footstep, setAmbience, setMusic } from "./fxaudio.js";
+import { setSound, thunder, footstep, setAmbience, setMusic, setWeatherVolume, setMusicVolume } from "./fxaudio.js";
 import { resetScenery3, drawScenery3 } from "./scenery3.js";
 import { resetScenery2, drawScenery2, gustLevel, hasLights } from "./scenery2.js";
 import { isWaterAt, isWaterStage, waterPixelTest } from "./water3d.js";
 import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
 import { SPRITE_FILTERS } from "./sprite-filters.js";
 import { dialModeFromFx } from "./encounter-dial.js";   // F2 -> Extras -> Encounter dial (repel / lure)
+import { needsPractice2v2Reset } from "./options-model.js";
+import { createDevView, DEV_PANEL_CSS } from "./dev-panel.js";   // the F2 page (tabs, search, In / Auto / Out filter), built on first open
+import { DEV_OPEN } from "./dev-panel-model.js";
+import { SHIP, shipClass, isInstalledBuild, applyShipDefaults, finishShipLoad, UPGRADE_MARK_KEY } from "./ship-list.js";   // what players get per switch (in / auto / out)
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
@@ -33,7 +37,7 @@ export const FX_GROUPS = [
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["battleatmos", "Battle sky & weather: night, fog, snow, rain follow where you are (new)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
     ["Life", [["leaves", "Falling leaves"], ["fireflies", "Fireflies"], ["devils", "Dust devils & tumbleweeds"], ["villagers", "Ambient villagers (experimental)"]]],
-    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["questemotes", "Quest emotes"], ["questplacecard", "Quest place cards"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["bossphases", "Boss phases (new)"], ["bossmusic", "A phase changes the battle music (new)"], ["bossgrows", "The boss grows (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["omen", "A feeling before a fight (new)"], ["encounterdial", "Encounter dial (repel / lure)"], ["battlespeed", "Faster battles"], ["codex", "Digimon Codex (new)"], ["blastladder", "Blast ladder (new)"], ["planner", "Next forms planner (new)"], ["movetheatre", "Move theatre"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["soundtrack", "Soundtrack room"], ["cinema", "Cinema"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"], ["serverchamp", "Server Champ league"], ["langdesk", "Language desk (new)"], ["damagelab", "Damage Lab (new)"], ["itemsource", "Item source book (new)"], ["gymmap", "Gym map (new)"], ["silence", "Silence report (dev)"], ["itemrulebook", "Item rulebook (new)"], ["cursorbook", "Cursor almanac (new)"], ["chatqueue", "Chat: keep every line I type"], ["weaponlab", "Weapon effects (new)"], ["questsecondjob", "Quests: pick which job to take (new)"], ["bitledger", "BIT ledger (new)"], ["savexray", "Save X-ray (new)"], ["saveverify", "Card verify (new)"], ["replay", "Replay theatre (new)"], ["mpbubbles", "The game's own reaction bubbles"], ["redirectview", "Counter redirects (new)"], ["arrivallab", "Arrival lab (dev)"], ["mpcredit", "Co-op wins count for quests"], ["anglermap", "Angler's almanac"]]],
+    ["Extras", [["quests", "Quests (F3 or the Quests button)"], ["questtriggers", "Quest triggers"], ["questemotes", "Quest emotes"], ["questplacecard", "Quest place cards"], ["mount", "Mount (ride a Digimon a quest unlocks)"], ["mountseat", "Rider sits in the saddle (depth split, new)"], ["fusionbosses", "Fusion bosses: Kimeramon + Machinedramon fuse into Millenniummon (new)"], ["bossphases", "Boss phases (new)"], ["bossmusic", "A phase changes the battle music (new)"], ["bossgrows", "The boss grows (new)"], ["giantmode", "Giant mode: any fighter in a battle can be drawn at another size (new)"], ["fieldwar", "Elemental field war: field techniques set the battlefield element, and it shifts on its own every four turns (new)"], ["omen", "A feeling before a fight (new)"], ["encounterdial", "Encounter dial (repel / lure)"], ["battlespeed", "Faster battles"], ["blastladder", "Blast ladder (new)"], ["planner", "Next forms planner (new)"], ["movetheatre", "Move theatre"], ["cutcontent", "Cut-content gallery (dev)"], ["stageselect", "Stage select (dev)"], ["soundtest", "Sound test (dev)"], ["soundtrack", "Soundtrack room"], ["cinema", "Cinema"], ["practice2v2", "Practice 2 vs 2 (test): wild fights are 2 vs 2 with a computer partner"], ["serverchamp", "Server Champ league"], ["langdesk", "Language desk (new)"], ["damagelab", "Damage Lab (new)"], ["itemsource", "Item source book (new)"], ["gymmap", "Gym map (new)"], ["silence", "Silence report (dev)"], ["itemrulebook", "Item rulebook (new)"], ["cursorbook", "Cursor almanac (new)"], ["chatqueue", "Chat: keep every line I type"], ["weaponlab", "Weapon effects (new)"], ["questsecondjob", "Quests: pick which job to take (new)"], ["bitledger", "BIT ledger (new)"], ["savexray", "Save X-ray (new)"], ["saveverify", "Card verify (new)"], ["replay", "Replay theatre (new)"], ["mpbubbles", "The game's own reaction bubbles"], ["redirectview", "Counter redirects (new)"], ["arrivallab", "Arrival lab (dev)"], ["mpcredit", "Co-op wins count for quests"], ["anglermap", "Angler's almanac"], ["glossary", "Glossary book on the pause menu (new)"], ["options", "Options screen on the pause menu (new)"]]],
     ["Ground", [["steps", "Footprints, dust & ripples"], ["puddles", "Puddles & ice"]]],
     ["Sound", [["sound", "Weather sounds"], ["ambience", "Place sounds (water, city)"], ["musicfx", "Music reacts to weather"], ["footsteps", "Footstep sounds"]]],
     // Battle rules the player switches on by hand (all OFF by default; see MANUAL below). One group,
@@ -51,17 +55,32 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "fieldwar", "battlespeed", "codex", "movetheatre", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap"];     // off until you switch them on by hand; "All on" and the presets leave them alone
+const EXPERIMENTAL = ["villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "fieldwar", "battlespeed", "movetheatre", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
+applyShipDefaults(fx);       // both builds: "in" and "auto" start on, "out" starts off (web/ship-list.js)
 fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 fx.battleSpeed = 2;          // Faster battles slider (1 to 3, the x1 / x1.5 / x2 / x3 positions; web/battle-speed.js)
+fx.musicVolume = 1;         // OPTIONS music volume, 0..1; 1 = the game's own gain (web/volume-levels.js)
+fx.soundVolume = 1;         // OPTIONS sound volume, 0..1; 1 = the game's own gain
 fx.encounterDialMode = "normal";  // Encounter dial setting (only read while F2 -> Extras -> Encounter dial is on; web/encounter-dial.js)
 try { Object.assign(fx, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch { }
 // Animals were removed: no switch, and an old saved "on" can never bring them back.
 for (const k of ["butterflies", "birds", "dragonflies", "fish", "critters", "wildlife"]) fx[k] = false;
+// Old saves: the Battle ideas row used to switch practice2v2 on (every wild fight 2 vs 2). Reset it once; a dev who turns it on again on F2 keeps it.
+try {
+    if (needsPractice2v2Reset(fx, localStorage.getItem("dw.fx.p2vreset"))) { fx.practice2v2 = false; localStorage.setItem(STORE_KEY, JSON.stringify({ ...fx })); }
+    localStorage.setItem("dw.fx.p2vreset", "1");
+} catch { }
+// Installed copy (the packaged release; marker web/installed-build.js): "out" forced off, "auto" forced on, F2 does nothing,
+// and an old save with an "in" key off gets the "in" defaults once. The owner PC (a checkout) keeps every switch and its save.
+const SHIPPED = isInstalledBuild();
+try {
+    const r = finishShipLoad(fx, { installed: SHIPPED, markValue: localStorage.getItem(UPGRADE_MARK_KEY) });
+    if (r.upgraded) { localStorage.setItem(STORE_KEY, JSON.stringify({ ...fx })); localStorage.setItem(UPGRADE_MARK_KEY, "1"); }
+} catch { }
 const stored = { ...fx };   // what the panel last saved; URL flags below never reach it
 
 // game.js and the labs read these flags; the panel owns them now.
@@ -73,6 +92,14 @@ function syncLegacyFlags() {
     window.__grassPush = !!fx.grasspush;
     window.__todForce = TODMODES[fx.todMode];
     window.__lightGain = fx.lightGain;        // read by scenery2.js (lamp strength)
+    applyVolumes();
+}
+/** The OPTIONS volumes onto the players (web/game.js also applies them when it creates the players). */
+function applyVolumes() {
+    window.__bgm?.setVolume?.(fx.musicVolume);
+    window.__sfx?.setVolume?.(fx.soundVolume);
+    setWeatherVolume(fx.soundVolume);
+    setMusicVolume(fx.musicVolume);
 }
 function save(keys = null) {
     for (const k of keys || Object.keys(fx)) stored[k] = fx[k];
@@ -89,7 +116,16 @@ export function setFx(key, value) {
     save([key]);
     refreshPanel();
 }
-window.__fx = fx;
+if (SHIPPED) Object.defineProperty(window, "__fx", { get: () => fx, set() { }, configurable: true });   // nothing can swap the object
+else Object.defineProperty(window, "__fx", { value: fx, writable: true, configurable: true, enumerable: true });
+/** Set several settings at once and save once (the OPTIONS screen: a Detail level is 36 values). */
+export function setFxMany(values) {
+    Object.assign(fx, values);
+    syncLegacyFlags();
+    save(Object.keys(values));
+    refreshPanel();
+}
+window.__setFxMany = setFxMany;
 window.__isWaterAt = (x, y) => isWaterAt(S.map ? S.map.id : "", x, y);
 window.__setFx = setFx;
 // URL flags from the older experiments still win for the session.
@@ -123,16 +159,11 @@ const APPLIES = {
 };
 let lastMarked = null;
 function markApplicable(map, p) {
-    if (!panel) return;
+    if (!panel || !dev) return;
     lastMarked = map.id;
-    for (const [k] of FX_DEFS) {
-        const box = panel.querySelector(`[data-fx="${k}"]`);
-        if (!box) continue;
-        const ok = APPLIES[k] ? !!APPLIES[k](p, map) : true;
-        const lab = box.closest("label");
-        lab.classList.toggle("na", !ok);
-        lab.title = ok ? "" : "This effect does not apply on this map";
-    }
+    const na = new Set();
+    for (const [k] of FX_DEFS) if (APPLIES[k] && !APPLIES[k](p, map)) na.add(k);
+    dev.setNa(na);
 }
 
 // ----------------------------------------------------------------- profile
@@ -679,7 +710,7 @@ export function ambienceFor(map, mapImg, camX, camY) {
     p.indoorK = Math.max(0, Math.min(1, (95 - (p.room || 0)) / 20));
     p.indoorLit = !p.open && hasLights(map.id) && p.indoorK > 0.02;
     p.lamps = p.baseLamps || (fx.indoor && p.indoorLit);
-    if (panel && lastMarked !== map.id) markApplicable(map, p);
+    if (panel && !panel.hidden && lastMarked !== map.id) markApplicable(map, p);
     // A quest scene's atmosphere reads the map's profile as if it had the effects the scene asked for (a copy, so the
     // cached profile and the panel's own marks never change), and honours the same panel switches unless forced.
     const ps = sceneProfile(p);
@@ -946,7 +977,10 @@ const PRESETS = {
 function applyPreset(name) {
     const d = PRESETS[name];
     if (!d) return;
-    for (const [k] of FX_DEFS) fx[k] = !MANUAL.includes(k) && (d.all ? true : d.on.includes(k));
+    for (const [k] of FX_DEFS) {
+        if (MANUAL.includes(k) && SHIP[k] !== "out") continue;     // a preset leaves the shipped extras as they are
+        fx[k] = !MANUAL.includes(k) && (d.all ? true : d.on.includes(k));
+    }
     fx.todMode = d.tod; fx.weatherMode = d.mode;
     syncLegacyFlags(); save(); refreshPanel();
 }
@@ -1039,153 +1073,45 @@ function setPhoto(on) {
 window.__photo = { screenshot, toggleRecord, setPhoto };
 
 // ------------------------------------------------------------------- panel
-let panel = null, gear = null;
+let panel = null, gear = null, dev = null;
+// The F2 page is built on its first open and only refreshed while it is open (web/dev-panel.js).
 function refreshPanel() {
-    if (!panel) return;
-    for (const [k] of FX_DEFS) { const c = panel.querySelector(`[data-fx="${k}"]`); if (c) c.checked = !!fx[k]; }
-    const mt = panel.querySelector("#fx-movetheatre"); if (mt) mt.hidden = !fx.movetheatre;
-    const w = panel.querySelector("[data-mode]"); if (w) w.value = fx.weatherMode;
-    const q = panel.querySelector("[data-quality]"); if (q) q.value = fx.quality;
-    const td = panel.querySelector("[data-tod]"); if (td) td.value = fx.todMode;
-    const sf = panel.querySelector("[data-spritefilter]"); if (sf) sf.value = fx.spriteFilter;
-    // The soundtrack room's button row exists only while its F2 switch is on;
-    // with the switch off the page has no link anywhere in the game.
-    // The in-game screens (cut-content, codex, blast ladder, planner, damage lab, replay theatre,
-    // sound test): the switch only ENABLES them. Their button row shows while the switch is on, and
-    // pressing it is the only way they open (never on page load, never on ticking the switch).
-    for (const n of ["cutcontent", "codex", "blastladder", "planner", "damagelab", "replay", "soundtest"]) {
-        const row = panel.querySelector("#fx-open-" + n); if (row) row.hidden = !fx[n];
-    }
-    const snd = panel.querySelector("#fx-soundtrack"); if (snd) snd.hidden = !fx.soundtrack;
-    // The cinema's button row exists only while its F2 switch is on; with the
-    // switch off the page has no link anywhere in the game.
-    const cinema = panel.querySelector("#fx-cinema"); if (cinema) cinema.hidden = !fx.cinema;
-    // The cursor almanac's button row exists only while its F2 switch is on; with the
-    // switch off the page has no link anywhere in the game.
-    const cursorbook = panel.querySelector("#fx-cursorbook"); if (cursorbook) cursorbook.hidden = !fx.cursorbook;
-    // The language desk's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game (web/language-desk.html).
-    const langdesk = panel.querySelector("#fx-langdesk"); if (langdesk) langdesk.hidden = !fx.langdesk;
-    // The item source book's button row exists only while its F2 switch is on;
-    // with the switch off the page has no link anywhere in the game.
-    const itemSource = panel.querySelector("#fx-itemsource"); if (itemSource) itemSource.hidden = !fx.itemsource;
-    // The gym map's button row exists only while its F2 switch is on; with the
-    // switch off the page has no link anywhere in the game.
-    const gymmap = panel.querySelector("#fx-gymmap"); if (gymmap) gymmap.hidden = !fx.gymmap;
-    // The silence report's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game (web/silence-report.html).
-    const silence = panel.querySelector("#fx-silence"); if (silence) silence.hidden = !fx.silence;
-    // The item rulebook's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game.
-    const itemRulebook = panel.querySelector("#fx-itemrulebook"); if (itemRulebook) itemRulebook.hidden = !fx.itemrulebook;
-    // The BIT ledger's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game.
-    const bitLedger = panel.querySelector("#fx-bitledger"); if (bitLedger) bitLedger.hidden = !fx.bitledger;
-    // The save X-ray's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game and no slot is read.
-    const savexray = panel.querySelector("#fx-savexray"); if (savexray) savexray.hidden = !fx.savexray;
-    // The counter-redirect page's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game.
-    const redirectview = panel.querySelector("#fx-redirectview"); if (redirectview) redirectview.hidden = !fx.redirectview;
-    // The arrival lab's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game.
-    const arrivallab = panel.querySelector("#fx-arrivallab"); if (arrivallab) arrivallab.hidden = !fx.arrivallab;
-    // The angler's almanac's button row follows its F2 switch the same way; with the switch off
-    // the page has no link anywhere in the game.
-    const angler = panel.querySelector("#fx-angler"); if (angler) angler.hidden = !fx.anglermap;
-    // The encounter dial's select exists only while its F2 switch is on; it always
-    // shows the stored mode (a stored value that is not one of the four reads normal).
-    const dl = panel.querySelector("[data-dial]"); if (dl) dl.value = dialModeFromFx(fx);
-    const dlRow = panel.querySelector("#fx-dial"); if (dlRow) dlRow.hidden = !fx.encounterdial;
-    for (const k of ["lightGain", "hd2dStrength", "battleSpeed"]) {
-        const r = panel.querySelector(`[data-slider="${k}"]`), v = panel.querySelector(`[data-val="${k}"]`);
-        if (r) r.value = fx[k]; if (v) v.textContent = (+fx[k]).toFixed(2);
-    }
-    // A slider that belongs to one switch (battle speed -> "Faster battles") is only
-    // shown while that switch is on, so the panel never offers a speed it will not use.
-    for (const row of panel.querySelectorAll("[data-show-when]")) row.hidden = !fx[row.dataset.showWhen];
+    if (!panel || panel.hidden || !dev || !dev.isBuilt()) return;
+    dev.sync();
 }
 export function installFxPanel(stageEl) {
-    if (panel || !stageEl) return;
+    if (panel || !stageEl || SHIPPED) return;      // installed copy: no F2 panel, no gear, no F2 / F8-F10 keys
     const css = document.createElement("style");
     css.textContent = `
       #fx-gear { position:absolute; top:8px; right:8px; z-index:40; width:30px; height:30px; border-radius:15px;
         border:1px solid #565680; background:#1d1d2bcc; color:#ffd34d; cursor:pointer; font-size:16px; opacity:0; transition:opacity .2s; }
       #stage:hover #fx-gear:hover, #fx-gear:focus-visible, #fx-gear.open { opacity:.95; }
-      #fx-panel { position:absolute; top:44px; right:8px; z-index:40; width:252px; max-height:calc(100% - 60px); overflow-y:auto;
-        padding:10px 14px 12px; border:2px solid #45456a; border-radius:10px; background:#1d1d2bf2; color:#e8e8f0;
-        font:13px/1.75 "Segoe UI",system-ui,sans-serif; box-shadow:0 8px 30px #000; }
-      #fx-panel[hidden] { display:none; }
-      #fx-panel label[hidden] { display:none; }
-      #fx-panel h3 { margin:0 0 2px; font-size:13px; color:#ffd34d; letter-spacing:1px; }
-      #fx-panel h4 { margin:8px 0 0; font-size:11px; color:#8a8ab0; letter-spacing:1.5px; text-transform:uppercase; }
-      #fx-panel label { display:flex; gap:8px; align-items:center; cursor:pointer; }
-      #fx-panel select, #fx-panel button { background:#2a2a40; color:#e8e8f0; border:1px solid #45456a; border-radius:4px; padding:2px 6px; font:inherit; }
-      #fx-panel .row { display:flex; gap:6px; margin-top:8px; }
-      #fx-panel .row[hidden] { display:none; }
+      ${DEV_PANEL_CSS}
       #fx-toast { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:50; padding:6px 14px; border-radius:8px; background:#000b; color:#fff; font:600 14px 'Segoe UI',system-ui,sans-serif; pointer-events:none; opacity:0; transition:opacity .3s; }
-      #fx-rec { position:absolute; top:14px; left:14px; z-index:50; width:14px; height:14px; border-radius:7px; background:#e33; box-shadow:0 0 8px #e33; pointer-events:none; display:none; }
-      #fx-panel input[type=range] { width:84px; }
-      #fx-panel span[data-val] { min-width:28px; color:#8a8ab0; font-size:11px; }
-      #fx-panel label.na { opacity:.42; }
-      #fx-panel label.na::after { content:"(not here)"; font-size:10px; color:#8a8aa8; margin-left:auto; }
-      #fx-panel .hint { color:#707090; font-size:11px; line-height:1.4; margin-top:6px; }`;
+      #fx-rec { position:absolute; top:14px; left:14px; z-index:50; width:14px; height:14px; border-radius:7px; background:#e33; box-shadow:0 0 8px #e33; pointer-events:none; display:none; }`;
     document.head.appendChild(css);
     gear = document.createElement("button");
     gear.id = "fx-gear"; gear.type = "button"; gear.title = "Effects (F2)"; gear.textContent = "\u2699";
     panel = document.createElement("div");
     panel.id = "fx-panel"; panel.hidden = true;
-    panel.innerHTML = `<h3>EFFECTS</h3>` + FX_GROUPS.map(([name, list]) =>
-        `<h4>${name}</h4>` + list.map(([k, label]) => `<label><input type="checkbox" data-fx="${k}"> ${label}</label>`).join("") +
-        (name === "Extras" ? `<div class="hint" id="fx-dw2" hidden></div>
-         <div class="hint" id="fx-movetheatre" hidden><button type="button" data-act="movetheatre">Open Move Theatre</button></div>
-         <div class="row" id="fx-open-cutcontent" hidden><button type="button" data-act="extra:cutcontent">Open the cut-content gallery</button></div>
-         <div class="row" id="fx-open-codex" hidden><button type="button" data-act="extra:codex">Open the Digimon Codex</button></div>
-         <div class="row" id="fx-open-blastladder" hidden><button type="button" data-act="extra:blastladder">Open the blast ladder</button></div>
-         <div class="row" id="fx-open-planner" hidden><button type="button" data-act="extra:planner">Open the next forms planner</button></div>
-         <div class="row" id="fx-open-damagelab" hidden><button type="button" data-act="extra:damagelab">Open the Damage Lab</button></div>
-         <div class="row" id="fx-open-replay" hidden><button type="button" data-act="extra:replay">Open the replay theatre</button></div>
-         <div class="row" id="fx-open-soundtest" hidden><button type="button" data-act="extra:soundtest">Open the sound test</button></div>
-         <div class="row" id="fx-soundtrack" hidden><button type="button" data-act="soundtrack">Open the soundtrack room</button></div>
-         <div class="row" id="fx-cinema" hidden><button type="button" data-act="cinema">Open the cinema</button></div>
-         <div class="row" id="fx-cursorbook" hidden><button type="button" data-act="cursorbook">Open the cursor almanac</button></div>
-         <div class="row" id="fx-langdesk" hidden><button type="button" data-act="langdesk">Open the language desk</button></div>
-         <div class="row" id="fx-itemsource" hidden><button type="button" data-act="itemsource">Open the item source book</button></div>
-         <div class="row" id="fx-gymmap" hidden><button type="button" data-act="gymmap">Open the gym map</button></div>
-         <div class="row" id="fx-silence" hidden><button type="button" data-act="silence">Open the silence report</button></div>
-         <div class="row" id="fx-itemrulebook" hidden><button type="button" data-act="itemrulebook">Open the item rulebook</button></div>
-         <div class="row" id="fx-bitledger" hidden><button type="button" data-act="bitledger">Open the BIT ledger</button></div>
-         <div class="row" id="fx-savexray" hidden><button type="button" data-act="savexray">Open the save X-ray</button></div>
-         <div class="row" id="fx-redirectview" hidden><button type="button" data-act="redirectview">Open the counter redirects</button></div>
-         <div class="row" id="fx-arrivallab" hidden><button type="button" data-act="arrivallab">Open the arrival lab</button></div>
-         <div class="row" id="fx-angler" hidden><button type="button" data-act="angler">Open the angler's almanac</button></div>
-         <div class="row" id="fx-dial" hidden><select data-dial title="How often random fights come"><option value="none">none (no random fights)</option><option value="rare">rare (fewer)</option><option value="normal" selected>normal (the game's own rate)</option><option value="lure">lure (more)</option></select></div>` : "")).join("") +
-        `<h4>Mood</h4>
-         <label>Preset <select data-preset><option value="">choose...</option><option value="cinematic">Cinematic</option><option value="clear">Clear day</option><option value="cozyrain">Cozy rain</option><option value="storm">Storm</option><option value="night">Night</option></select></label>
-         <div class="row"><button data-act="save:1">Save 1</button><button data-act="save:2">Save 2</button><button data-act="save:3">Save 3</button></div>
-         <div class="row"><button data-act="load:1">Load 1</button><button data-act="load:2">Load 2</button><button data-act="load:3">Load 3</button></div>
-         <div class="row"><button data-act="photo">Photo mode F8</button><button data-act="shot">Shot F9</button><button data-act="rec">Rec F10</button></div>
-         <h4>Settings</h4>
-         <label>Weather <select data-mode><option value="auto">random</option><option value="always">always on</option><option value="storm">stormy</option><option value="clear">clear skies</option></select></label>
-         <label>Time <select data-tod><option value="auto">auto cycle</option><option value="day">day</option><option value="golden">golden hour</option><option value="dusk">dusk</option><option value="night">night</option></select></label>
-         <label>Light strength <input type="range" min="0" max="2" step="0.05" data-slider="lightGain"> <span data-val="lightGain"></span></label>
-         <label>HD-2D strength <input type="range" min="0" max="2" step="0.05" data-slider="hd2dStrength"> <span data-val="hd2dStrength"></span></label>
-         <label data-show-when="battlespeed" hidden>Faster battles speed x<input type="range" min="1" max="3" step="0.5" data-slider="battleSpeed"> <span data-val="battleSpeed"></span></label>
-         <label>Pixel filter (GPU) <select data-spritefilter>${Object.entries(SPRITE_FILTERS).filter(([k]) => k === "off" || GPU_FILTER_NAMES.includes(k)).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
-         <label>Quality <select data-quality><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></label>
-         <div class="row"><button data-all="1">All on</button><button data-all="0">All off</button></div>
-         <div class="hint">F2 opens this. Choices are remembered.</div>`;
     toastEl = document.createElement("div"); toastEl.id = "fx-toast";
     recDot = document.createElement("div"); recDot.id = "fx-rec";
     stageEl.append(gear, panel, toastEl, recDot);
-    // the DW2 extras (Mount) need the player's own Digimon World 2 disc: say so, with the launcher's extras page
-    fetch("/__dw2003/status").then((r) => r.ok ? r.json() : null).then((st) => {
-        const el = panel.querySelector("#fx-dw2");
-        if (!el || !st || !st.dw2 || st.dw2.state === "done") return;
-        el.innerHTML = `Mount needs your own Digimon World 2 disc: <a href="/__dw2003/extras.html" target="_blank" style="color:#f5a524">add it here</a>.`;
-        el.hidden = false;
-    }).catch(() => { });
-    const toggle = () => { panel.hidden = !panel.hidden; if (!panel.hidden) lastMarked = null; gear.classList.toggle("open", !panel.hidden); gear.blur(); };
+    dev = createDevView(panel, {
+        fx, shipOf: shipClass,
+        spriteFilters: Object.entries(SPRITE_FILTERS).filter(([k]) => k === "off" || GPU_FILTER_NAMES.includes(k)),
+        dialMode: () => dialModeFromFx(fx),
+        close: () => { if (!panel.hidden) toggle(); },
+        // the DW2 extras (Mount) need the player's own Digimon World 2 disc: say so, with the launcher's extras page
+        // (asked once, when the page is first opened; a closed page makes no request)
+        onFirstOpen(view) {
+            fetch("/__dw2003/status").then((r) => r.ok ? r.json() : null).then((st) => {
+                if (!st || !st.dw2 || st.dw2.state === "done") return;
+                view.setNote(`Mount needs your own Digimon World 2 disc: <a href="/__dw2003/extras.html" target="_blank">add it here</a>.`);
+            }).catch(() => { });
+        },
+    });
+    const toggle = () => { panel.hidden = !panel.hidden; if (!panel.hidden) lastMarked = null; gear.classList.toggle("open", !panel.hidden); gear.blur(); if (!panel.hidden) dev.show(); };
     gear.addEventListener("click", toggle);
     panel.addEventListener("input", (e) => {
         const t = e.target;
@@ -1205,6 +1131,14 @@ export function installFxPanel(stageEl) {
         else if ("preset" in t.dataset) { if (t.value) applyPreset(t.value); t.value = ""; }
         t.blur();
     });
+    // An Open button of the F2 page: the key's own switch must be on. Screens inside the game go through
+    // window.__openExtra (web/game.js) and the page steps aside; the others open in a new tab (web/dev-panel-model.js DEV_OPEN).
+    const openDev = (key) => {
+        const o = DEV_OPEN[key];
+        if (!o || !fx[key]) return;
+        if (o.extra) { if (window.__openExtra?.(key)) { panel.hidden = true; gear.classList.remove("open"); } }
+        else window.open(o.href, "_blank", o.noopener ? "noopener" : undefined);
+    };
     panel.addEventListener("click", (e) => {
         const act = e.target.closest("[data-act]");
         if (act) {
@@ -1213,33 +1147,21 @@ export function installFxPanel(stageEl) {
             else if (kind === "photo") setPhoto(!photoOn);
             else if (kind === "shot") screenshot();
             else if (kind === "rec") toggleRecord();
-            else if (kind === "movetheatre") window.open("move-theatre.html", "_blank");
-            else if (kind === "extra") {
-                // open an in-game screen (window.__openExtra, web/game.js); the panel steps aside so it is seen
-                if (fx[arg] && window.__openExtra?.(arg)) { panel.hidden = true; gear.classList.remove("open"); }
-            }
-            else if (kind === "soundtrack") { if (fx.soundtrack) window.open("soundtrack.html", "_blank", "noopener"); }
-            else if (kind === "cinema") { if (fx.cinema) window.open("cinema.html", "_blank", "noopener"); }
-            else if (kind === "cursorbook") { if (fx.cursorbook) window.open("cursor-almanac.html", "_blank", "noopener"); }
-            else if (kind === "langdesk") { if (fx.langdesk) window.open("language-desk.html", "_blank", "noopener"); }
-            else if (kind === "itemsource") { if (fx.itemsource) window.open("item-source.html", "_blank", "noopener"); }
-            else if (kind === "gymmap") { if (fx.gymmap) window.open("gym-map.html", "_blank", "noopener"); }
-            else if (kind === "silence") { if (fx.silence) window.open("silence-report.html", "_blank", "noopener"); }
-            else if (kind === "itemrulebook") { if (fx.itemrulebook) window.open("item-rulebook.html", "_blank", "noopener"); }
-            else if (kind === "bitledger") { if (fx.bitledger) window.open("bit-ledger.html", "_blank", "noopener"); }
-            else if (kind === "savexray") { if (fx.savexray) window.open("save-xray.html", "_blank", "noopener"); }
-            else if (kind === "redirectview") { if (fx.redirectview) window.open("redirect-lab.html", "_blank", "noopener"); }
-            else if (kind === "arrivallab") { if (fx.arrivallab) window.open("arrival-lab.html", "_blank", "noopener"); }
-            else if (kind === "angler") { if (fx.anglermap) window.open("fishing-almanac.html", "_blank", "noopener"); }
+            else if (kind === "open") openDev(arg);
             act.blur(); return;
         }
         const b = e.target.closest("[data-all]");
         if (!b) return;
-        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1" && !MANUAL.includes(k);
+        for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1";
         syncLegacyFlags(); save(); refreshPanel();
         b.blur();
     });
-    panel.addEventListener("keydown", (e) => e.stopPropagation());
+    // Typing in the page never reaches the game; F2 still closes it from inside, and Escape closes it from anywhere.
+    panel.addEventListener("keydown", (e) => { if (e.key === "F2") { e.preventDefault(); toggle(); } e.stopPropagation(); });
+    panel.addEventListener("keyup", (e) => e.stopPropagation());
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !panel.hidden) { e.preventDefault(); e.stopImmediatePropagation(); toggle(); }
+    }, true);
     window.addEventListener("keydown", (e) => {
         if (e.key === "F2") { e.preventDefault(); toggle(); }
         else if (e.key === "F8") { e.preventDefault(); setPhoto(!photoOn); }

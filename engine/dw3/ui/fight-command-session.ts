@@ -32,7 +32,6 @@
 import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
-import { clearOtag, setDrawMove, CLEAR_OTAG_HEAD } from "../psyq-video.ts";
 import { ScreenTextBanks } from "./screen-text-banks.ts";
 import { ShopDrawIntents } from "./shop-draw-intents.ts";
 import { ShopWidgetServices } from "./shop-widget-services.ts";
@@ -40,14 +39,14 @@ import { ScreenPad } from "./screen-services.ts";
 import { TranslatedTaskTree, type TranslatedTaskClass } from "./translated-task-tree.ts";
 import { textRevealTick } from "./text-window.ts";
 import { callTaskOrWidget, loadResidentResources, type CursorGlyphTable } from "./resident-text-host.ts";
-import { drawTextElement, type TextDrawerStepperHost } from "./text-drawer.ts";
+import { createFightBlitHost, createFightTextHosts, fightMenuVsync } from "./fight-menu-host.ts";
 import { frameDelta } from "../../systems/frame-clock.ts";
 import {
-  commandMenuActorConstruct, commandMenuActorTick, commandMenuStateMachine, commandMenuVsyncBlit,
+  commandMenuActorConstruct, commandMenuActorTick, commandMenuStateMachine,
   jokeMenuActorConstruct, jokeMenuActorTick,
   COMMAND_ACTOR_EXTRA, COMMAND_ACTOR_HANDLER, COMMAND_ACTOR_SIZE, COMMAND_BLIT_RECT,
   COMMAND_CONFIG, COMMAND_FLAGS_BASE, COMMAND_FLAGS_INDEX, COMMAND_JOKE_CONFIG,
-  COMMAND_JOKE_PERM, COMMAND_MENU_HANDLER, COMMAND_MENU_SIZE, COMMAND_MENU_UPDATE,
+  COMMAND_JOKE_PERM, COMMAND_MENU_HANDLER, COMMAND_MENU_SIZE,
   COMMAND_NAME_BANK, COMMAND_STRING_BASE, COMMAND_TIME_OBJECT, JOKE_ACTOR_EXTRA,
   JOKE_ACTOR_HANDLER, JOKE_ACTOR_SIZE, JOKE_LABEL_BASE, JOKE_ROWS,
   type CommandMenuBlitHost, type CommandMenuHost,
@@ -181,39 +180,12 @@ export class FightCommandSession {
       callMethod: (target, slot, args) => { callTaskOrWidget(mem, this.tree, this.widgets, target, slot, args); },
     };
 
-    const otAddress = this.widgets.arena.alloc(8, 4);
-    const packetArea = this.widgets.arena.alloc(0x4000, 4);
-    const drawScratch = this.widgets.arena.alloc(0x48, 4);
-    const drawerHost: TextDrawerStepperHost = {
-      // The browser paints the glyphs from the widgets' own fields; the drawer
-      // still runs so every per-frame side effect of the text box is kept.
-      viewForKey: () => 1,
-      bucketFor: () => otAddress,
-      packetCursor: () => packetArea,
-      flushPacketCursor: () => {},
-      rotMatrixYXZ: () => { throw new Error("Battle command: rotated text is not translated"); },
-      scaleMatrix: () => { throw new Error("Battle command: scaled text is not translated"); },
-      applyMatrixSV: () => { throw new Error("Battle command: transformed text is not translated"); },
-      alloc: this.widgets.arena.alloc,
-      free: this.widgets.arena.free,
-      stringById: (bank, id) => this.banks.stringById(mem, bank, id),
-    };
-    this.revealHost = {
-      draw: (self) => drawTextElement(mem, drawerHost, self, drawScratch),
-      playPackedSound: playSound,
-      padButtonWord: () => this.pad.pressed(),
-      logicalButtonBit: (code) => code,
-      free: (ptr) => { if (this.widgets.arena.has(ptr)) this.widgets.arena.free(ptr); },
-    };
-    this.blitHost = {
-      breakDraw: () => 0, // Platform GPU: never busy, so BreakDraw's idle arm returns 0.
-      clearOTag: (ot, count) => {
-        clearOtag(mem, ot, count, { debugDispatch: () => { throw new Error("libgpu debug output is not translated"); } });
-      },
-      setDrawMove: (packet, rect, x, y) => setDrawMove(mem, packet, rect, x, y),
-      drawSync: () => 0, // Platform GPU: the idle bit is always set.
-      continueDraw: (ot) => this.executeChain(ot),
-    };
+    // The drawer's ordering table, packet area and scratch, in the order every
+    // battle menu allocated them, plus the vsync blit's host.
+    this.revealHost = createFightTextHosts(mem, this.widgets, {
+      label: "Battle command", playSound, banks: this.banks, padWord: () => this.pad.pressed(),
+    }).revealHost;
+    this.blitHost = createFightBlitHost(mem, this.moves, "Battle command");
 
     const classes = new Map<number, TranslatedTaskClass>();
     classes.set(COMMAND_ACTOR_HANDLER, {
@@ -255,39 +227,7 @@ export class FightCommandSession {
 
   /** The resident vsync handler's hook: [0x8004DE10](arg [0x8004DE14]). */
   private vsync(): void {
-    const hook = this.mem.read32(COMMAND_TIME_OBJECT) >>> 0;
-    if (hook === 0) return;
-    if (hook !== COMMAND_MENU_UPDATE) throw new Error(`Untranslated vsync callback ${hook.toString(16)}`);
-    commandMenuVsyncBlit(this.mem, this.mem.read32(COMMAND_TIME_OBJECT + 4) >>> 0, this.blitHost);
-  }
-
-  /** Platform GPU: run the packets linked from `ot` up to the libgpu terminator. */
-  private executeChain(ot: number): void {
-    let node = ot >>> 0;
-    for (let guard = 0; guard < 64; guard++) {
-      if (node === CLEAR_OTAG_HEAD) return;
-      const tag = this.mem.read32(node) >>> 0;
-      const length = tag >>> 24;
-      for (let i = 0; i < length;) {
-        const word = this.mem.read32(node + 4 + i * 4) >>> 0;
-        const command = word >>> 24;
-        if (command === 0x01) { i += 1; continue; } // texture cache flush
-        if (command === 0x80 && i + 4 <= length) {
-          const src = this.mem.read32(node + 8 + i * 4) >>> 0;
-          const dst = this.mem.read32(node + 12 + i * 4) >>> 0;
-          const size = this.mem.read32(node + 16 + i * 4) >>> 0;
-          this.moves.push({ srcX: src & 0xffff, srcY: src >>> 16, dstX: dst & 0xffff, dstY: dst >>> 16,
-            w: size & 0xffff, h: size >>> 16 });
-          i += 4;
-          continue;
-        }
-        throw new Error(`Battle command: untranslated GPU command ${command.toString(16)}`);
-      }
-      const next = tag & 0xffffff;
-      if (next === 0xffffff) return;
-      node = (0x80000000 | next) >>> 0;
-    }
-    throw new Error("Battle command: GPU chain does not terminate");
+    fightMenuVsync(this.mem, this.blitHost);
   }
 
   finished(): boolean { return !this.tree.tasks.has(this.root); }

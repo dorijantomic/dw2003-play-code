@@ -20,6 +20,7 @@
 // Used by the inn's rest (F0x800110E0 steps 20-23) and the dive-demo transition.
 import type { NativeMemory } from "../../../native/memory.ts";
 import type { TranslatedTaskClass, TranslatedTaskTree } from "../translated-task-tree.ts";
+import { fadeStep } from "../screen-dim.ts";
 
 export const RESIDENT_FADE_CREATE = 0x8001206c;
 export const RESIDENT_FADE_HANDLER = 0x80011fb8;
@@ -92,11 +93,10 @@ export function residentFadeCreate(mem: NativeMemory, tree: TranslatedTaskTree, 
 /** F0x80011DEC(fade, direction, frames): 0 fades to black, nonzero fades back. */
 export function residentFadeStart(mem: NativeMemory, tree: TranslatedTaskTree,
                                   fade: number, direction: number, frames: number): void {
-    if (s32(frames) === 0) throw new Error("Resident fade: zero-frame duration (div by zero in the original)");
     tree.callMethod(fade, 0x28, [1]);
     mem.write32(fade + 0x10, 1);
     mem.write32(fade + 0x58, direction >>> 0);
-    const step = Math.trunc(0xff00 / s32(frames));
+    const step = fadeStep(frames);
     if (direction === 0) {
         mem.write32(fade + 0x5c, 0);
         mem.write32(fade + 0x60, step >>> 0);

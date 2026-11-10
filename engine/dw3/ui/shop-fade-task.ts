@@ -29,6 +29,7 @@
 //                            paints the dim over the frame.
 import type { NativeMemory } from "../../native/memory.ts";
 import type { TranslatedTaskClass, TranslatedTaskTree } from "./translated-task-tree.ts";
+import { fadeStep } from "./screen-dim.ts";
 
 export const SHOP_FADE_HANDLER = 0x80083510;
 export const SHOP_FADE_SIZE = 0x68;
@@ -67,8 +68,7 @@ export function startShopFade(mem: NativeMemory, tree: TranslatedTaskTree,
   tree.callMethod(fade, 0x28, [1]);
   mem.write32(fade + 0x10, 1);
   mem.write32(fade + 0x58, direction | 0);
-  // MIPS signed div: a zero divisor yields -1 for a positive dividend.
-  const step = frames === 0 ? -1 : Math.trunc(FADE_FULL / (frames | 0));
+  const step = fadeStep(frames);
   mem.write32(fade + 0x5c, (direction | 0) === 0 ? 0 : FADE_FULL);
   mem.write32(fade + 0x60, (direction | 0) === 0 ? step | 0 : -step | 0);
 }

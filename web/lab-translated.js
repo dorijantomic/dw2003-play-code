@@ -24,15 +24,17 @@
 //
 // Same public API as createDriNative: open/isOpen/handleKey/update/draw/close/diagnostics.
 import {
-    ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, syncWornFromEquipment, ui,
+    ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, rosterSlotOfCharId, syncWornFromEquipment, ui,
     extraProfileCount, extraRowFormId, EXTRA_FIRST_ID,
     isFormDigimonId,
 } from "./vendor/engine.js";
+import { ownedSlots as walkerOwnedSlots, slotStats as walkerSlotStats } from "./dri-native.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { baseStatsFor, CHARID_TO_DIGID } from "./party.js";
 import { ensureFormLedger } from "./dri-model.js";
-import { encodeGymName } from "./gym-translated.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 
 /** The lab's picture handles: the stdglabo archive (chrome and the chart's portraits) and CMFONT. */
@@ -103,22 +105,28 @@ export function createLabTranslated(sfx = null) {
         sfx?.playPacked(key);
     };
 
-    const slotOfChar = (charId) => ROSTER_SLOT_CHARIDS.indexOf(String(charId));
-    const ownedSlots = (state) => {
-        const mask = Number(state?.rosterOwned) || 0;
-        const slots = new Set();
-        for (let s = 0; s < ROSTER_SLOT_CHARIDS.length; s++) if (mask & (1 << s)) slots.add(s);
-        for (const charId of state?.party ?? []) { const s = slotOfChar(charId); if (s >= 0) slots.add(s); }
-        return [...slots].sort((a, b) => a - b);
-    };
+    // Closed by the caller, the lab still runs onClose; a session the player never finished is
+    // disposed, one that finished already tore itself down. `release` reads the summary and commits
+    // while the session is still alive, as the old `_finish` did.
+    const host = createTranslatedScreenHost(g, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_UNLESS_FINISHED, finishDispose: DISPOSE_UNLESS_FINISHED,
+        release(session) {
+            if (!session) return;
+            g._summary = {
+                finished: session.finished(), ticks: g._ticks, transition: session.transition(), party: session.partyMap(),
+                sounds: session.sounds.slice(), displayCalls: session.displayCalls.map((c) => ({ ...c })),
+            };
+            commit();
+        },
+    });
+
+    /** Roster slot of a manifest character id; -1 when it is not a partner (this
+     *  screen's own miss marker — the engine helper answers null). */
+    const slotOfChar = (charId) => rosterSlotOfCharId(String(charId)) ?? -1;
+    /** Owned slots plus the deployed party, from the DRI's single walk. */
+    const ownedSlots = (state) => walkerOwnedSlots(state, { includeParty: true });
     /** The walker's stats object for a roster slot: the deployed party's live block, or the reserve store. */
-    const slotStats = (state, slot) => {
-        const charId = ROSTER_SLOT_CHARIDS[slot];
-        const pos = (state.party ?? []).indexOf(charId);
-        if (pos === 0) return state.partnerStats ?? null;
-        if (pos > 0) return state.partyStats?.[pos] ?? null;
-        return state.reserveStats?.[charId] ?? null;
-    };
+    const slotStats = walkerSlotStats;
     const slotEquipment = (state, slot) => {
         const charId = ROSTER_SLOT_CHARIDS[slot];
         const pos = (state.party ?? []).indexOf(charId);
@@ -164,7 +172,7 @@ export function createLabTranslated(sfx = null) {
                 };
             });
             const member = {
-                slot, nameBytes: encodeGymName(state.digimonNames?.[charId] ?? db[starterId]?.name ?? charId),
+                slot, nameBytes: encodeNativeScreenText(state.digimonNames?.[charId] ?? db[starterId]?.name ?? charId),
                 exp: Number(stats.xp) || 0, level: Number(stats.level) || 0, tp: Number(stats.tp) || 0,
                 hp: Number(stats.hp) || 0, maxHp: Number(stats.maxHp) || 0, mp: Number(stats.mp) || 0, maxMp: Number(stats.maxMp) || 0,
                 core: Array.from({ length: 6 }, (_, i) => Number(stats.core?.[i]) || 0),
@@ -277,29 +285,26 @@ export function createLabTranslated(sfx = null) {
     }
 
     g.open = async (state, onClose = null, selector = 0) => {
-        g._open = true;
-        g._pending = true;
+        const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;
         g._session = null;
         g._ticks = 0;
         g._summary = null;
         g._committed = 0;
-        g._onClose = onClose;
         g._state = state ?? null;
         g._returnSelector = selector;
         g._lastDiagnostic = null;
         g._packed = {};
-        const request = ++g._request;
         const language = Number.isInteger(state?.languageByte) ? state.languageByte : 2;
         try {
             const data = await loadShared();
             const banks = await loadBanks(data.manifest, language);
-            if (request !== g._request) return;
+            if (!host.current(request)) return;
             g._data = data;
             g._banks = banks;
         } catch (error) {
-            if (request === g._request) fail(error);
+            if (host.current(request)) fail(error);
         }
     };
 
@@ -353,31 +358,10 @@ export function createLabTranslated(sfx = null) {
         ctx.restore();
     };
 
-    g.close = () => {
-        if (g._open) g._finish();
-    };
+    g.close = () => host.close();
 
-    g._finish = () => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        ++g._request;
-        const session = g._session;
-        if (session) {
-            const finished = session.finished();
-            // Read every private value while the session is alive.
-            g._summary = {
-                finished, ticks: g._ticks, transition: session.transition(), party: session.partyMap(),
-                sounds: session.sounds.slice(), displayCalls: session.displayCalls.map((c) => ({ ...c })),
-            };
-            commit();
-            if (!finished) session.dispose();
-        }
-        g._session = null;
-        const cb = g._onClose;
-        g._onClose = null;
-        cb?.();
-    };
+    // `web/native-session.js` ends a screen whose session finished by calling `_finish`.
+    g._finish = () => host.finish();
 
     /** The live text widgets (for focused checks that read what the screen says). */
     g.textWidgets = () => (g._session ? g._session.widgets.textWidgets() : []);

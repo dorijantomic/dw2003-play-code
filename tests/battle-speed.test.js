@@ -15,6 +15,7 @@ import { SPEEDS, battleDelta, battleSpeedOn } from "../web/battle-speed.js";
 
 const BATTLE_SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
 const AMBIENCE_SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const DEV_SRC = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");   // the F2 page draws the slider row
 const GAME_SRC = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
 const SPEED_SRC = readFileSync(new URL("../web/battle-speed.js", import.meta.url), "utf8");
 
@@ -76,12 +77,12 @@ test("ambience.js offers the switch in Extras, off by default, with its slider",
     assert.match(AMBIENCE_SRC, /const EXPERIMENTAL = \[[^\]]*"battlespeed"/,
         "battlespeed is experimental, so presets and All on never switch it on");
     assert.match(AMBIENCE_SRC, /fx\.battleSpeed = 2;/, "the slider's default is x2");
-    assert.match(AMBIENCE_SRC, /<input type="range" min="1" max="3" step="0.5" data-slider="battleSpeed">/,
+    assert.match(DEV_SRC, /<input type="range" min="1" max="3" step="0.5" data-slider="battleSpeed"/,
         "the 1..3, step 0.5 slider");
-    assert.match(AMBIENCE_SRC, /\["lightGain", "hd2dStrength", "battleSpeed"\]/,
+    assert.match(DEV_SRC, /\["lightGain", "hd2dStrength", "battleSpeed"\]/,
         "the panel's slider refresh loop knows the new slider");
-    assert.match(AMBIENCE_SRC, /data-show-when="battlespeed"/,
+    assert.match(DEV_SRC, /data-show-when="battlespeed"/,
         "the slider row is only shown while the switch is on");
-    assert.match(AMBIENCE_SRC, /querySelectorAll\("\[data-show-when\]"\)/,
+    assert.match(DEV_SRC, /querySelectorAll\("\[data-show-when\]"\)/,
         "refreshPanel hides/shows the slider with the switch");
 });

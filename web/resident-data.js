@@ -8,6 +8,15 @@ import { ui } from "./vendor/engine.js";
 
 const RESIDENT_LABEL = "Resident data";
 
+/**
+ * The two packs every battle screen's resident resources come from: the resident UI glyphs
+ * (CMFONT, pack directory 0x00286000, disc index 646) and the battle chrome (PGFGTC00,
+ * 0x00455000, 1109). Keyed by the directory word the original's resource calls carry, and by
+ * the disc's own pack index, because the renderer wants the first and the loader the second.
+ */
+export const RESIDENT_PACK_NAMES = { 0x02860000: "cmfont", 0x04550000: "pgfgc00" };
+export const RESIDENT_PACKS = { 646: "cmfont", 1109: "pgfgc00" };
+
 /** Fetch assets/data/<path> as bytes. `label` names the screen in the error. */
 export const fetchBytes = async (path, label) => {
     const response = await fetch(`assets/data/${path}`);

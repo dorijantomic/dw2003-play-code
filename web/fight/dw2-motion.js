@@ -24,13 +24,14 @@
 import { DW2_CLIP_MAP, dw2LetterForSlot, DW2_MOTION_LETTERS } from "./dw2-clip-map.js";
 import { battleSetting } from "./battle-settings.js";
 import { ensureDw2Picks } from "./dw2-picks.js";
+import { isInstalledBuild } from "../ship-list.js";
 
 let override = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
 let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
 let castTypesPromise = null;
 
 export function setDw2MotionEnabled(v) { override = v == null ? null : !!v; }
-export function dw2MotionEnabled() { return override == null ? battleSetting("dw2motion") : override; }
+export function dw2MotionEnabled() { if (isInstalledBuild()) return true; return override == null ? battleSetting("dw2motion") : override; }   // installed copy: auto = always on (no DW2 data = the disc motion, see prepareDw2Motion)
 /** Read the developer override out of a query string: `?dw2motion=1` turns the swap on for the session. */
 export function dw2MotionFlagFromUrl(search = "") {
   try {

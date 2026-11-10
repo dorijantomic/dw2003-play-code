@@ -28,7 +28,7 @@ import { buildEffectiveStats } from "../../effective-stats.ts";
 import { itemRecord } from "../../item-record.ts";
 import { findFormLedgerIndex, validateEquippedForm } from "../../form-ledger.ts";
 import { partyPositionToRosterSlot, persistentRosterSlot, rosterContextBase } from "../../party-context.ts";
-import { partyCardRows, ROWS_TECHNIQUES } from "./party-card-rows.ts";
+import { partyCardFoldRows, partyCardRows, partyCardWidgetGrid, ROWS_TECHNIQUES } from "./party-card-rows.ts";
 import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
 
@@ -232,21 +232,7 @@ export function techniquesCtor(mem: PauseMemory, obj: number, ui: number, host: 
     const layout = () => mem.read32(LAYOUT) | 0;
     const t0 = layout() + 0x84;
     mem.write32(ui, host.createText(layer(), 1, s16(mem.read16(t0 + 4)), s16(mem.read16(t0 + 8))));
-    for (let row = 0; row < 3; row++) {
-        const yoff = row * 0x2e;
-        const l = layout();
-        mem.write32(ui + row * 0x2c + 4, host.createText(layer(), 1, s16(mem.read16(l + 4)), s16(mem.read16(l + 8) + yoff)));
-        for (let k = 0; k < 5; k++) {
-            const e = l + 0x14 + k * 0xc;
-            mem.write32(ui + row * 0x2c + 8 + k * 4,
-                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
-        }
-        for (let k = 0; k < 5; k++) {
-            const e = l + 0x50 + k * 0xc;
-            mem.write32(ui + row * 0x2c + 0x1c + k * 4,
-                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
-        }
-    }
+    partyCardWidgetGrid(mem, ui, layer, layout, ROWS_TECHNIQUES.nameSlot, host);
     const l = layout();
     const a = l + 0x90;
     const w88 = host.createText(layer(), 1, s16(mem.read16(a + 4)), s16(mem.read16(a + 8)));
@@ -302,34 +288,7 @@ export function techniquesDraw(mem: PauseMemory, obj: number, host: TechniquesHo
         py += 0x2e;
     }
     host.draw74(0x140, 0);
-    let a = 0x13;
-    let b = 0x11;
-    let c = 0x27;
-    let d = 0x25;
-    for (let i = 0; i < size; i++) {
-        const fold = r(i * 0x10 + 0x19c);
-        if (fold !== 0) {
-            if (fold !== 0x1000) {
-                host.draw8C(fold, 0x1000, 0x1000);
-                host.draw94(0, d);
-                host.drawSprite(pack(0x02860000), 0x15, 0, b);
-                host.draw8C(r(i * 0x10 + 0x19c), r(i * 0x10 + 0x19c), 0x1000);
-                host.draw94(0x7c, c);
-                host.drawSprite(pack(0x02860000), 0x16, 0x67, a);
-                host.draw8C(r(i * 0x10 + 0x19c), 0x1000, 0x1000);
-                host.draw94(0, d);
-            } else {
-                host.draw8C(0x1000, 0x1000, 0x1000);
-                host.drawSprite(pack(0x02860000), 0x15, 0, b);
-                host.drawSprite(pack(0x02860000), 0x16, 0x67, a);
-            }
-            host.drawSprite(pack(0x02860000), 0x17, 0, b);
-        }
-        a += 0x2e;
-        b += 0x2e;
-        c += 0x2e;
-        d += 0x2e;
-    }
+    partyCardFoldRows(mem, size, obj + 0x19c, host);
     const foldT = r(0x1cc);
     if (foldT !== 0) {
         if (foldT !== 0x1000) {

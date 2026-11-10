@@ -41,6 +41,7 @@
 // engine/dw3/ui/index.ts barrel and data/translated_functions.json.
 
 import { ALBUM_COLLECTION_BYTE, ALBUM_COLLECTION_TABLE, ALBUM_CARD_MAX } from "./album-grid.ts";
+import { fadeStep } from "../screen-dim.ts";
 
 /** The save-global block; cellPaint's line ids and collection count read from it. */
 export const ALBUM_SAVE_PTR = 0x8005cca8;
@@ -237,8 +238,7 @@ export function albumPopupFadeStart(
     host.callMethod(obj, 0x28, [1]);
     mem.write32(obj + 0x10, 1);
     mem.write32(obj + 0x58, direction | 0);
-    // MIPS signed div: a zero divisor yields -1 for a positive dividend.
-    const step = frames === 0 ? -1 : Math.trunc(0xff00 / (frames | 0));
+    const step = fadeStep(frames);
     if ((direction | 0) === 0) {
         mem.write32(obj + 0x5c, 0);
         mem.write32(obj + 0x60, step | 0);

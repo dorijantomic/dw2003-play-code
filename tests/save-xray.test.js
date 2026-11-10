@@ -298,13 +298,12 @@ test("the F2 switch is off by default and gates the row, the page and every slot
   const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
   assert.ok(experimental, "EXPERIMENTAL is still one array literal");
   assert.match(experimental[1], /"savexray"/, "off until the player switches it on");
-  assert.match(ambience, /id="fx-savexray" hidden/, "the button row ships hidden");
-  assert.match(ambience, /const savexray = panel\.querySelector\("#fx-savexray"\); if \(savexray\) savexray\.hidden = !fx\.savexray;/,
-    "refreshPanel follows the switch");
-  assert.match(ambience, /if \(fx\.savexray\)[^;{}]*window\.open\("save-xray\.html", "_blank", "noopener"\)/,
-    "opened only behind the toggle's guard");
-  assert.equal(ambience.split("save-xray.html").length - 1, 1, "one reference to the page, no other link into it");
+  const devModel = read("../web/dev-panel-model.js"), devPanel = read("../web/dev-panel.js");
+  assert.match(devModel, /savexray: P\("save-xray\.html"/, "the Open button's page is in the F2 page model");
+  assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+  assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
+  assert.equal(devModel.split("save-xray.html").length - 1, 1, "one reference to the page, no other link into it");
+  assert.equal(ambience.split("save-xray.html").length - 1, 0, "ambience.js itself has no link");
   assert.doesNotMatch(ambience, /(get|has)\("savexray"\)/, "never a URL flag");
   assert.doesNotMatch(ambience, /mcardSlot\d/, "the off state reads no slot");
-  assert.match(ambience, /#fx-panel \.row\[hidden\] \{ display:none; \}/, "the panel's own rule that makes a hidden row vanish");
 });

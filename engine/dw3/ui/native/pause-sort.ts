@@ -15,7 +15,7 @@
 // picked rows; +0x94.. card folds; +0xE4 the swap fold.
 import { PAUSE_CTX, PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { partyPositionToRosterSlot } from "../../party-context.ts";
-import { partyCardRows, ROWS_SORT } from "./party-card-rows.ts";
+import { partyCardRows, partyCardWidgetGrid, ROWS_SORT } from "./party-card-rows.ts";
 import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
 
@@ -55,21 +55,7 @@ export function sortCtor(mem: PauseMemory, obj: number, ui: number, host: SortHo
     mem.write32(ui, host.createText(layer(), 1, s16(mem.read16(a + 4)), s16(mem.read16(a + 8))));
     const b = layout() + 0x90;
     mem.write32(ui + 0x88, host.createText(layer(), 1, s16(mem.read16(b + 4)), s16(mem.read16(b + 8))));
-    for (let row = 0; row < 3; row++) {
-        const yoff = row * 0x2e;
-        const l = layout();
-        mem.write32(ui + row * 0x2c + 4, host.createText(layer(), 1, s16(mem.read16(l + 4)), s16(mem.read16(l + 8) + yoff)));
-        for (let k = 0; k < 5; k++) {
-            const e = l + 0x14 + k * 0xc;
-            mem.write32(ui + row * 0x2c + 8 + k * 4,
-                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
-        }
-        for (let k = 0; k < 5; k++) {
-            const e = l + 0x50 + k * 0xc;
-            mem.write32(ui + row * 0x2c + 0x1c + k * 4,
-                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
-        }
-    }
+    partyCardWidgetGrid(mem, ui, layer, layout, ROWS_SORT.nameSlot, host);
 }
 
 /** F0x800980B0(obj, ui): the page's lifecycle. */

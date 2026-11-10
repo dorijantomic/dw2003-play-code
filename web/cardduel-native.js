@@ -25,12 +25,8 @@
 // The old hand-authored duel (web/cardduel.js) stays as the development
 // rollback (?legacyDuel=1).
 
-import { BOOSTER_ITEM_IDS, seedBoosterStock, commitBoosterStock, maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { BOOSTER_ITEM_IDS, seedBoosterStock, commitBoosterStock, SAVE_CARD_MAX, COLLECTION_CAP } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { encodeNativeScreenText, nativeScreenObjects, nativeScreenRead } from "./native-screen.js";
 import { cards } from "./cardstate.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
@@ -52,8 +48,6 @@ const FOLDER_STRIDE = 0x66;
 const FOLDER_COUNT = 3;
 const CARDS_OFF = 0x16;
 const CARDS_PER_FOLDER = 40;
-const CARD_MAX_ID = 0x13b;
-const CARD_COPIES_MAX = 9;
 
 /** The duel's close signal. Unlike the shop and report roots, this one never
  *  sets its lifecycle to 3: F0x80095BFC's state 2 (cardgame.s 0x00013100) runs
@@ -90,13 +84,13 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         if (col) {
             for (const [id, n] of col.owned ?? []) {
                 const cardId = Number(id);
-                if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) {
-                    write(CARD_COUNTS + cardId, Math.max(0, Math.min(CARD_COPIES_MAX, Number(n) || 0)), 1);
+                if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
+                    write(CARD_COUNTS + cardId, Math.max(0, Math.min(COLLECTION_CAP, Number(n) || 0)), 1);
                 }
             }
             for (const id of col.seen ?? []) {
                 const cardId = Number(id);
-                if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) write(CARD_SEEN + cardId, 1, 1);
+                if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) write(CARD_SEEN + cardId, 1, 1);
             }
             // The deck the duel plays: the three folder records. The name is
             // the folder's own stored name, blank until the player names one —
@@ -115,19 +109,8 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         }
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        d._host = host;
-        return true;
-    }
-
     /** The duel's result -> the walker's state. */
-    function commit() {
-        const host = d._host;
+    function commit(host) {
         const state = d._state;
         if (!host || !state) return;
         const won = (host.read(DUEL_WON, 4) >>> 0) === 1;
@@ -166,15 +149,11 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
     // deck, id)` seed a real bag too instead of throwing inside `heldCount`. The last
     // argument keeps the legacy rollback's four positional parameters untouched.
     d.open = (onClose = null, _opponentName = null, _opponentDeck = null, opponentId = null, state = null) => {
-        d._open = true;
         d._onClose = typeof onClose === "function" ? onClose : null;
         d._opponentId = Number.isInteger(opponentId) ? opponentId : null;
         d._state = state ?? d._state ?? d._getState?.() ?? null;
         d._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            d._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) d._pending = true;
+        d._begin();
     };
 
     d.isOpen = () => d._open;
@@ -190,48 +169,6 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         if (state && !d._state) d._state = state;
     };
 
-    d.update = (dt) => {
-        if (!d._open) return;
-        if (d._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                d._lastDiagnostic = "native duel boot failed (manifest/overlay missing)";
-                return;
-            }
-            d._pending = false;
-        }
-        const keys = d._state?.keys;
-        d._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (d._host.tick(dt) || duelScreenClosed()) d._finish();
-    };
-
-    d.draw = (ctx, viewW, viewH) => {
-        if (!d._open || !d._host) return;
-        d._host.draw(ctx, viewW, viewH);
-    };
-
-    d.close = () => {
-        if (d._open) d._finish();
-    };
-
-    d._finish = () => {
-        if (!d._open) return;
-        d._open = false;
-        d._pending = false;
-        const host = d._host;
-        if (host) {
-            commit(); // reads through d._host, so it must run first
-            host.teardown();
-        }
-        d._host = null;
-        const cb = d._onClose;
-        d._onClose = null;
-        cb?.();
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     d.diagnostics = () => ({
         open: d._open,
@@ -241,5 +178,12 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         lastDiagnostic: d._lastDiagnostic,
     });
 
-    return d;
+    return createNativeAdapter({
+        owner: d,
+        moduleId: MODULE_ID,
+        hostOptions: { playPackedSound: (id) => { sfx?.playPacked(id); }, seed },
+        frame: (host, dt) => host.tick(dt) || duelScreenClosed(),
+        commit,
+        label: "native duel boot failed (manifest/overlay missing)",
+    });
 }

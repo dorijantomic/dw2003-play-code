@@ -8,6 +8,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
+import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -26,6 +27,12 @@ export function createHelpMenuTranslated(sfx = null) {
         _ticks: 0, _request: 0, _closes: 0, _sounds: [], _packed: {}, _primed: false, _row: null,
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
+
+    // Abandoned by the caller, the menu disposes its session and runs nothing, as web/help-menu.js
+    // close() does; a menu the player left through "Return" or Cancel ran its own onClose.
+    const host = createTranslatedScreenHost(g, {
+        closeMode: CLOSE_SILENT, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
+    });
 
     const playSound = (id) => {
         const key = id >>> 0;
@@ -47,8 +54,7 @@ export function createHelpMenuTranslated(sfx = null) {
      * `onClose()`: the menu has finished (the player confirmed "Return" or pressed Cancel).
      */
     g.open = async (menuRow, packBytes = null, { onClose = null } = {}) => {
-        g._open = true;
-        g._pending = true;
+        const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;
         g._session = null;
@@ -56,21 +62,20 @@ export function createHelpMenuTranslated(sfx = null) {
         g._packed = {};
         g._primed = false;
         g._row = menuRow;
-        const request = ++g._request;
         try {
             const [shared, pack] = await Promise.all([
                 loadResidentResources(),
                 packBytes ?? loadEsdmgEntry(ui.yesNoTextFile(menuRow.textHandle), menuRow.textHandle & 0xffff, DATA_LABEL),
             ]);
-            if (request !== g._request) return;
+            if (!host.current(request)) return;
             const session = new ui.HelpMenuSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
-            session.open(menuRow, pack, { onClose: () => g._finish(onClose) });
+            session.open(menuRow, pack, { onClose: () => host.finish() });
             g._session = session;
             g._clock = new ui.MenuDisplayClock();
             g._pad = new ui.MenuPadWords();
             g._pending = false;
         } catch (error) {
-            if (request === g._request) fail(error);
+            if (host.current(request)) fail(error);
         }
     };
 
@@ -114,22 +119,9 @@ export function createHelpMenuTranslated(sfx = null) {
         ctx.restore();
     };
 
-    g._finish = (cb) => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        g._closes++;
-        ++g._request;
-        cb?.();
-    };
-
     /** Abandon the menu without running onClose (the field left another way). */
     g.close = () => {
-        if (!g._open) return;
-        g._session?.dispose();
-        g._open = false;
-        g._pending = false;
-        ++g._request;
+        host.close();
     };
 
     g.diagnostics = () => ({

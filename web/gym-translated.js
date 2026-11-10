@@ -18,13 +18,16 @@
 // Nothing else of the walker's model is touched; the screen pays no money and moves no day.
 //
 // Same public API as createGymNative: open/isOpen/handleKey/update/draw/close/diagnostics.
-import { elementValues, ROSTER_SLOT_CHARIDS, ui } from "./vendor/engine.js";
+import { elementValues, rosterSlotOfCharId, ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { driStatsAt } from "./dri-model.js";
+import { CHARID_TO_DIGID } from "./party.js";
 import { ensureStoredStats } from "./battle.js";
 import { createGymPrimPainter } from "./gym-vram-paint.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
+import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
 const PACK_NAMES = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
@@ -64,20 +67,6 @@ const loadBank = (language) => {
     return banksByLanguage.get(id);
 };
 
-/** The screen's text codec for the roster record's name: 0x04+d digits, 0x0E+n capitals, 0x28+n lower case. */
-export function encodeGymName(text, maxBytes = 23) {
-    const out = [];
-    for (const ch of String(text ?? "")) {
-        const code = ch.charCodeAt(0);
-        if (ch >= "0" && ch <= "9") out.push(0x04 + code - 0x30);
-        else if (ch >= "A" && ch <= "Z") out.push(0x0e + code - 0x41);
-        else if (ch >= "a" && ch <= "z") out.push(0x28 + code - 0x61);
-        else out.push(0x01, 0x01);
-        if (out.length >= maxBytes) break;
-    }
-    return out.slice(0, maxBytes);
-}
-
 /** The rank group a greeter's ID-card gates give (GYM-C010), for the lab path that has no greeter. */
 export function gymGroupForStage(stage, inventory, ranks) {
     const has = (id) => !!inventory?.some((s) => s.id === id && s.qty > 0);
@@ -101,7 +90,25 @@ export function createGymTranslated(sfx = null) {
 
     const playSound = (id) => { sfx?.playPacked(id); };
 
-    const rosterSlotFor = (charId) => ROSTER_SLOT_CHARIDS.indexOf(String(charId));
+    // Closed by the caller, the gym still runs onClose; a training session that never finished is
+    // disposed, one that finished already tore itself down (web/gym-translated.js always did this).
+    // `release` reads the summary and commits while the session is still alive, as the old `_finish` did.
+    const host = createTranslatedScreenHost(g, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_UNLESS_FINISHED, finishDispose: DISPOSE_UNLESS_FINISHED,
+        release(session) {
+            if (!session) return;
+            g._summary = {
+                finished: session.finished(), ticks: g._ticks, transition: session.transition(),
+                records: g._seeded.map((_, i) => session.record(i)),
+                sounds: session.sounds.slice(), displayCalls: session.displayCalls.map((c) => ({ ...c })),
+                uploads: session.uploads.length,
+            };
+            commit();
+        },
+    });
+
+    /** Roster slot of a manifest character id; -1 when it is not a roster species. */
+    const rosterSlotFor = (charId) => rosterSlotOfCharId(String(charId)) ?? -1;
 
     /** Walker state -> the session's seed (the RAM contract of the disc's screen). */
     function buildSeed(language) {
@@ -114,12 +121,12 @@ export function createGymTranslated(sfx = null) {
             if (slot < 0) break; // a pod is only ever shown for a roster species, and positions stay contiguous
             const ps = driStatsAt(state, i, g._data.digimonById) ?? {};
             const profile = g._data.digimonById[ps.digimonId ?? 0];
-            const core = profile ? ensureStoredStats(ps, profile) : (ps.stats ?? {});
+            const core = profile ? ensureStoredStats(ps, g._data.digimonById[CHARID_TO_DIGID[party[i]]] ?? profile) : (ps.stats ?? {});
             const bonus = ELEMENTS.map((k) => Number(ps.elemBonuses?.[k]) || 0);
             const member = {
                 position: i,
                 rosterSlot: slot,
-                nameBytes: encodeGymName(profile?.name ?? ps.name ?? ""),
+                nameBytes: encodeNativeScreenText(profile?.name ?? ps.name ?? ""),
                 level: Number(ps.level) || 1,
                 tp: Number(ps.tp) || 0,
                 hp: Number(ps.hp) || 0,
@@ -131,7 +138,7 @@ export function createGymTranslated(sfx = null) {
                 // plus every trained point, through the one shared helper. The
                 // session's own F0x80017174 fill adds the worn gear's resist on
                 // top, exactly as the original does.
-                elements: elementValues(profile, ps.elemBonuses),
+                elements: elementValues(g._data.digimonById[CHARID_TO_DIGID[party[i]]] ?? profile, ps.elemBonuses),
                 equipment: Array.isArray(state.equipment) ? (state.equipment[i] ?? undefined) : undefined,
                 lastUltraDrill: Number.isInteger(ps.lastUltraDrill) ? ps.lastUltraDrill & 0xff : 0,
             };
@@ -187,24 +194,21 @@ export function createGymTranslated(sfx = null) {
     }
 
     g.open = async (state, onClose = null, group = null, stage = null) => {
-        g._open = true;
-        g._pending = true;
+        const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;
         g._session = null;
         g._ticks = 0;
         g._summary = null;
         g._committed = 0;
-        g._onClose = onClose;
         g._state = state ?? null;
         g._stage = stage;
         g._lastDiagnostic = null;
-        const request = ++g._request;
         const selected = state?.languageByte;
         const language = Number.isInteger(selected) ? selected : 2;
         try {
             const [data, bank] = await Promise.all([loadShared(), loadBank(language)]);
-            if (request !== g._request) return;
+            if (!host.current(request)) return;
             g._data = data;
             let resolved = group;
             // The real route carries the greeter's bank-0x94 group; the debug/lab path passes the
@@ -215,7 +219,7 @@ export function createGymTranslated(sfx = null) {
             g._lastDiagnostic = Number.isInteger(resolved) ? null : "gym.open without a greeter group";
             g._bank = bank;
         } catch (error) {
-            if (request === g._request) fail(error);
+            if (host.current(request)) fail(error);
         }
     };
 
@@ -244,33 +248,10 @@ export function createGymTranslated(sfx = null) {
         ctx.restore();
     };
 
-    g.close = () => {
-        if (g._open) g._finish();
-    };
+    g.close = () => host.close();
 
-    g._finish = () => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        ++g._request;
-        const session = g._session;
-        if (session) {
-            const finished = session.finished();
-            // Read every private value while the session is alive.
-            g._summary = {
-                finished, ticks: g._ticks, transition: session.transition(),
-                records: g._seeded.map((_, i) => session.record(i)),
-                sounds: session.sounds.slice(), displayCalls: session.displayCalls.map((c) => ({ ...c })),
-                uploads: session.uploads.length,
-            };
-            commit();
-            if (!finished) session.dispose();
-        }
-        g._session = null;
-        const cb = g._onClose;
-        g._onClose = null;
-        cb?.();
-    };
+    // `web/native-session.js` ends a screen whose session finished by calling `_finish`.
+    g._finish = () => host.finish();
 
     /** The live text widgets (for focused checks that read what the screen says). */
     g.textWidgets = () => (g._session ? g._session.widgets.textWidgets() : []);

@@ -29,6 +29,7 @@ import { intToDecimalAscii } from "../dw3/ui/int-to-decimal.ts";
 import { decodeTextToken } from "../dw3/ui/text-decode.ts";
 import { fetchTableEntry } from "../dw3/ui/fetch-table.ts";
 import { loadPtrB3F8, loadPtrB400, setCurrentView } from "../dw3/globals.ts";
+import { SAVE_CARD_MAX } from "../dw3/save-block.ts";
 import { findDisplayViewCell } from "../dw3/display-service.ts";
 import { queueInterPhaseBanner } from "../dw3/ui/phase-banner.ts";
 import { applyQueuedGreyFlags, runQueuedAnnounce } from "../dw3/ui/duel-queue.ts";
@@ -842,7 +843,7 @@ export const BRIDGE_ENTRIES: readonly BridgeEntry[] = [
         let count = 0, card = page;
         while (m.read8(0x80048d34 + 0x4df + card) === 0) {
             count++;
-            if (card >= 0x13b) break;
+            if (card >= SAVE_CARD_MAX) break;
             card = (page + count) | 0;
             if (count >= 12) break;
         }

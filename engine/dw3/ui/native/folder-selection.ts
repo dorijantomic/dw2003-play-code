@@ -38,6 +38,8 @@
 // This is lane B (engine/dw3/ui/native/**); lane A owns the shared
 // engine/dw3/ui/index.ts barrel and data/translated_functions.json.
 
+import { fadeStep } from "../screen-dim.ts";
+
 /** The "Edit Folder" card-grid object. */
 export const FOLDER_ODD_HANDLER = 0x80086574;
 export const FOLDER_ODD_SIZE = 0x494;
@@ -175,7 +177,7 @@ export function folderPopupFadeStart(
     host.baseMethod28(popup, 1);
     mem.write32(popup + FOLDER_POPUP_FIELDS.run, 1);
     mem.write32(popup + FOLDER_POPUP_FIELDS.direction, direction | 0);
-    const step = (0xff00 / (frames | 0)) | 0;
+    const step = fadeStep(frames);
     if ((direction | 0) === 0) {
         mem.write32(popup + FOLDER_POPUP_FIELDS.value, 0);
         mem.write32(popup + FOLDER_POPUP_FIELDS.delta, step);

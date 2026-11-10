@@ -1,6 +1,8 @@
 // Complete SELL controller from pro/stitshop F0x80085F48. The object handles
 // the category menu, held-item list, quantity, sale, empty-category message,
 // and the return to the merchant root. Services are receiver-specific ports.
+import { PARTY_CONTEXT, LANGUAGE_CELL } from "../party-context.ts";
+import { SHOP_BIT_CAP } from "./shop-save-state.ts";
 
 export interface ShopSellMachineMemory {
   read8(address: number): number;
@@ -47,12 +49,12 @@ const ITEM = 0x64;
 const QUANTITY = 0x68;
 const HELD = 0x6c;
 const CHOICE = 0x78;
-const SAVE = 0x80048d34;
+const SAVE = PARTY_CONTEXT;
 const MONEY = SAVE + 0x6c;
 const HELD_BASE = SAVE + 0x7c;
-const LANGUAGE = 0x8005cca8;
+const LANGUAGE = LANGUAGE_CELL;
 const CATEGORY_TABLE = 0x8008caa8;
-const BIT_CAP = 0x98967f;
+const BIT_CAP = SHOP_BIT_CAP;
 const SFX_MOVE = 0x8004513e;
 const SFX_CONFIRM = 0x8004503c;
 const SFX_CANCEL = 0x800450bd;

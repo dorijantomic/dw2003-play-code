@@ -68,11 +68,13 @@ export interface PauseListHost {
     /** ctx+0x84(pack, clip, x, y) */
     drawSprite(pack: number, clip: number, x: number, y: number): void;
     /**
-     * EXTRA (not on the disc): when the host supplies this and it returns a bank, the list gets one more row after its own,
-     * labelled by string 0 of that one-string text bank (`bank` is its address). The panel behind the rows is the disc's own
-     * seven-row clip. Absent or null leaves the list exactly as the disc builds it.
+     * EXTRA (not on the disc): when the host supplies this and it returns rows, the list gets that many more rows after its
+     * own, in order. Row n is labelled by string `text` of the text bank at address `bank`. The panel behind the rows is the
+     * disc's own clip for five, six or seven rows (`pausePanelClip`); for eight or more rows it is the synthetic clip
+     * `PAUSE_PANEL_EXTRA_BASE + rows`, which web/panel-kit.js builds out of the disc's own tiles. Absent or empty leaves the
+     * list exactly as the disc builds it.
      */
-    extraRow?(): { bank: number } | null;
+    extraRows?(): ReadonlyArray<{ bank: number; text: number }>;
 }
 
 const GAME = 0x80048d34;
@@ -96,11 +98,20 @@ const s16 = (v: number) => (v << 16) >> 16;
  * past the party cards' slots (the third card's values end at 0xac) to 0xb0.
  */
 const cursorSlot = (mem: PauseListMemory, obj: number) => ((mem.read32(obj + 0x5c) | 0) > 6 ? 0xb0 : 0x24);
-/** The panel clip behind the rows: 0x1c (five rows) or 0x1b (six), exactly as on the disc, and the disc's own seven-row panel 0x19 when the extra row makes seven. */
-const panelClip = (mem: PauseListMemory, obj: number) => {
-    const rows = mem.read32(obj + 0x5c) | 0;
-    return rows > 6 ? 0x19 : (0x21 - rows) | 0;
-};
+/** First synthetic panel clip id: the clip for `rows` rows (eight or more) is `PAUSE_PANEL_EXTRA_BASE + rows` (web/panel-kit.js). */
+export const PAUSE_PANEL_EXTRA_BASE = 0x100;
+/** The panel clip behind `rows` rows: 0x1c (five) or 0x1b (six), exactly as on the disc, 0x19 for seven, a synthetic clip above. */
+export const pausePanelClip = (rows: number): number =>
+    rows > 7 ? PAUSE_PANEL_EXTRA_BASE + rows : rows > 6 ? 0x19 : (0x21 - rows) | 0;
+const panelClip = (mem: PauseListMemory, obj: number) => pausePanelClip(mem.read32(obj + 0x5c) | 0);
+/**
+ * Where row `i`'s text widget sits in the slot block. Rows 0-6 keep the disc's place (0x0c + 4i); the party cards own
+ * 0x28-0xac and the cursor sits at 0xb0 once there are more than six rows, so rows 7 and up go after the cursor.
+ */
+export const pauseRowSlot = (i: number): number => (i < 7 ? 0xc + i * 4 : 0xb4 + (i - 7) * 4);
+/** Bytes of slot block the list needs for `extraCount` extra rows: the disc's 0x84, or room up to the last row widget (at most six disc rows). */
+export const pauseSlotArea = (extraCount: number): number =>
+    extraCount > 0 ? 0xb4 + Math.max(0, 6 + extraCount - 7) * 4 : 0x84;
 const bank = (mem: PauseListMemory, host: PauseListHost) => host.textBank((mem.read32(BANK_BASE) + 0xb0) | 0);
 const slot = (mem: PauseListMemory, addr: number) => mem.read32(addr) | 0;
 
@@ -149,7 +160,7 @@ export function pauseListWidgets(mem: PauseListMemory, obj: number, slots: numbe
     const layer = s16(mem.read16(obj + 0x50));
     mem.write32(slots, host.createText(layer, 1, 0x98, 0x13));
     const rows = mem.read32(obj + 0x5c) | 0;
-    for (let i = 0; i < rows; i++) mem.write32(slots + 0xc + i * 4, host.createText(layer, 1, 0xbd, 0x31 + i * 0xe));
+    for (let i = 0; i < rows; i++) mem.write32(slots + pauseRowSlot(i), host.createText(layer, 1, 0xbd, 0x31 + i * 0xe));
     const cursor = host.createCursor(layer, 0, 0xb0, s16((mem.read32(obj + 0x58) | 0) * 0xe + 0x31));
     mem.write32(slots + cursorSlot(mem, obj), cursor);
     host.callMethod(cursor, 0x80, [0]);
@@ -298,15 +309,17 @@ function stepOpenClose(mem: PauseListMemory, obj: number, slots: number, host: P
         case 1:
             if (!pauseListFoldStep(mem, obj + 0x80)) return;
             pauseListCard(mem, slots, 1, 1, host);
-            const extra = host.extraRow?.() ?? null;
+            const extras = host.extraRows?.() ?? [];
+            const firstExtra = rows() - extras.length;
             for (let i = 0; i < rows(); i++) {
                 mem.write32(obj + 0x18, i);
-                if (extra && i === rows() - 1) { // the extra row's label comes from its own one-string bank
-                    host.callMethod(slot(mem, slots + 0xc + i * 4), 0x114, [extra.bank, 0]);
+                const extra = i >= firstExtra ? extras[i - firstExtra] : undefined;
+                if (extra) { // an extra row's label comes from its own text bank
+                    host.callMethod(slot(mem, slots + pauseRowSlot(i)), 0x114, [extra.bank, extra.text]);
                     continue;
                 }
                 const text = mem.read32(ROW_TEXT + i * 4 + (mem.read32(obj + 0x60) | 0) * 0x18) | 0;
-                host.callMethod(slot(mem, slots + 0xc + i * 4), 0x114, [bank(mem, host), text]);
+                host.callMethod(slot(mem, slots + pauseRowSlot(i)), 0x114, [bank(mem, host), text]);
             }
             mem.write32(obj + 0x18, Math.max(rows(), 0) || 0);
             host.sfx(PAUSE_LIST_SFX.open);
@@ -333,7 +346,7 @@ function stepOpenClose(mem: PauseListMemory, obj: number, slots: number, host: P
             pauseListCard(mem, slots, 1, 0, host);
             for (let i = 0; i < rows(); i++) {
                 mem.write32(obj + 0x18, i);
-                host.callMethod(slot(mem, slots + 0xc + i * 4), 0x144, [0]);
+                host.callMethod(slot(mem, slots + pauseRowSlot(i)), 0x144, [0]);
             }
             mem.write32(obj + 0x18, Math.max(rows(), 0) || 0);
             host.sfx(PAUSE_LIST_SFX.close);
@@ -419,7 +432,7 @@ export function pauseListTick(mem: PauseListMemory, obj: number, slots: number, 
         mem.write32(CARD_FLAG_OUT, 1);
         mem.write32(obj + 0x60, 1);
     } else mem.write32(CARD_FLAG_OUT, 0);
-    mem.write32(obj + 0x5c, ((mem.read32(obj + 0x60) | 0) + 5 + (host.extraRow?.() ? 1 : 0)) | 0);
+    mem.write32(obj + 0x5c, ((mem.read32(obj + 0x60) | 0) + 5 + (host.extraRows?.().length ?? 0)) | 0);
     mem.write32(obj + 0x64, pauseListMapGate(mem, host) >= 0 ? 1 : 0);
     pauseListWidgets(mem, obj, slots, host);
 }

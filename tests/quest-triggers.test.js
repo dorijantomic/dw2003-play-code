@@ -322,7 +322,8 @@ test("wiring: quests.js keeps st.triggers, ticks the runner, and the F2 switch r
     assert.deepEqual(q.state.triggers, {}, "loadState gives an old save its triggers map");
 
     // the switch is off by default: walking in does nothing at all
-    assert.notEqual(fx.questtriggers, true, "Quest triggers starts off");
+    assert.equal(fx.questtriggers, true, "Quest triggers start on (in, web/ship-list.js)");
+    fx.questtriggers = false;                           // this test walks the off case first, then switches it on
     questsTick("s200", 40, 40);
     questsTick("s200", 120, 120);
     await new Promise((r) => setTimeout(r, 0));

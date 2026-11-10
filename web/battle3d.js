@@ -336,7 +336,7 @@ export function slerpFlagFromUrl(search = "") {
   } catch { return false; }
 }
 if (typeof window !== "undefined" && window?.location?.search) {
-  if (slerpFlagFromUrl(window.location.search)) _slerpRot = true;
+  if (!window.__dwInstalled && slerpFlagFromUrl(window.location.search)) _slerpRot = true;   // the installed copy ignores the URL flag
 }
 if (typeof process !== "undefined" && process?.env?.ANIM_SLERP === "1") _slerpRot = true;
 
@@ -1331,6 +1331,25 @@ export const PLACEMENT_URL = "assets/battle/model_placement.json";
 // (engine/dw3/battle-presentation.ts `ARENA_BASE_Z`); re-exported here for the renderer and
 // its tests so the value cannot drift from the port.
 export { ARENA_BASE_Z };
+
+/** (many-vs-many) How far a clip carries its attacker toward the target, in PS1 z: the largest of its op2 moves (mode 3
+ *  arena-absolute target, mode 8 contact dash, mode 5 kind 4 leap). 0 = the clip never leaves its place (a cast, a hop). */
+export function attackReachZ(ops, homeZ = 0, mirrored = false) {
+  let reach = 0;
+  for (const o of ops || []) {
+    if (o.op !== 2) continue;
+    const w = o.words || [], mode = w[0] | 0;
+    if (mode === 3) reach = Math.max(reach, Math.abs((mirrored ? (w[4] | 0) : -(w[4] | 0)) - homeZ));
+    else if (mode === 8) reach = Math.max(reach, 0x2800);
+    else if (mode === 5 && (w[2] | 0) === 4) reach = Math.max(reach, Math.abs(((w[3] | 0) << 16 >> 16) + 0x2800));
+  }
+  return reach;
+}
+/** 0..1: the share of its run an attacker has made, from its forward travel (moveDelta z) over the clip's reach. */
+export function attackLateralFraction(moveZ, reach) {
+  return reach > 0 ? Math.min(1, Math.abs(moveZ) / reach) : 0;
+}
+
 
 // ─── THE PS1 battle world → render world mapping. There is exactly one. ───────
 //
@@ -3135,6 +3154,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
 // TOON-END
   let isolatedSide = "player";
   let viewerGridTex = null, viewerGridBufs = null;
+  let viewerStudio = true;   // false (glossary): isolated mode with no neutral background, no grid/axis lines, no floor shadow, see-through clear
 
   let camAz        = 0;          // current azimuth offset from straight-behind (rad)
   let orbitClock   = 0;          // drives the idle sweep
@@ -4032,7 +4052,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     const old = extras.get(id);
     removeFighter(id);
     const f = { id, side, folder, dx: old ? old.dx : dx, dx0: dx, dxT: old ? old.dxT : dx, dz: old ? old.dz : 0, latz: 0, latzT: 0, restW: 0, born: null,
-      lat: 0, latT: 0, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
+      lat: 0, latT: 0, follow: null, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
       visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null };
     extras.set(id, f);
     f.tex = loadTexture(gl, `assets/battle/textures/${folder}.png`);
@@ -4109,19 +4129,26 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     contactSoundType[A.side] = contactSoundTypeFor(techId);
     contactEvade[A.side] = miss;
     armDataField(techId);                      // a special's element backdrop, same as in a one-on-one fight
-    A.latT = D.dx - A.dx;                      // run along the lane that leads to the target, and come back afterwards
-    A.latzT = D.dz - A.dz;                     // (and the target's step of the slanted line-up)
-    const aLane = A.dx + A.latT, dLane = D.dx, aDz = A.dz + A.latzT, dDz = D.dz;
+    const aLane = D.dx, dLane = D.dx, aDz = D.dz, dDz = D.dz;   // the lane (and slant step) that leads to the target
+    // a clip that carries the attacker in (a dash or a leap) closes the sideways gap together with its own forward travel, so
+    // the way in is the straight line from its own place to the target's; a clip that stays put (a cast) slides over first
+    const nearX = () => (A.follow ? A.dx + A.lat : aLane), nearZ = () => (A.follow ? A.dz + A.latz : aDz);
     // an effect whose z is on the defender's side of the arena is at the defender; otherwise it is at the attacker
     const atDefender = (z, defSide) => (defSide === "enemy" ? z > 0 : z < 0);
+    const val = (v) => (typeof v === "function" ? v() : v);
     const shiftFx = (h, laneNear, laneFar, defSide, zNear, zFar) => ({
       ...h,
-      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + (atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + (atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
-      setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + laneNear, ...l.from.slice(1)] } : l),
+      onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + val(atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + val(atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
+      setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + val(laneNear), ...l.from.slice(1)] } : l),
     });
-    const attHooks = shiftFx(_fxHooks(A.side, _impactContact({ ...hooks, onMotion: dataFieldMotion })), aLane, dLane, D.side, aDz, dDz);
+    const attHooks = shiftFx(_fxHooks(A.side, _impactContact({ ...hooks, onMotion: dataFieldMotion })), nearX, dLane, D.side, nearZ, dDz);
     const defHooks = shiftFx(_fxHooks(D.side), dLane, dLane, D.side, dDz, dDz);
-    return coordinator.attack(A.anim8r, D.anim8r, techId, attHooks, { lethal, miss, defenderHooks: defHooks });
+    A.follow = null;
+    const started = coordinator.attack(A.anim8r, D.anim8r, techId, attHooks, { lethal, miss, defenderHooks: defHooks });
+    const reach = attackReachZ(A.anim8r.vm?.ops, (A.anim8r.homeSlot || arenaSlot(null, A.side)).z, !!A.anim8r._standsOnOtherSide?.());
+    if (reach > 0) { A.follow = { dx: D.dx - A.dx, dz: D.dz - A.dz, reach }; A.latT = 0; A.latzT = 0; }
+    else { A.latT = D.dx - A.dx; A.latzT = D.dz - A.dz; }   // run along the lane that leads to the target, and come back afterwards
+    return started;
   }
 
   // Per frame: pose every extra fighter into its own skeleton buffer (before the camera, so it can frame them).
@@ -4918,7 +4945,7 @@ void main() {
 
     const W = canvas.width, H = canvas.height;
     gl.viewport(0, 0, W, H);
-    if (builtArena) gl.clearColor(0, 0, 0, 0);
+    if (builtArena || (isolatedMode && !viewerStudio)) gl.clearColor(0, 0, 0, 0);
     else gl.clearColor(0.04, 0.04, 0.08, 1);   // #0a0a14 = the sky gradient's bottom stop
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -5010,8 +5037,15 @@ void main() {
       coordinator.tick(speed);
       _layoutExtras();
       for (const f of extras.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
-        f.lat += (f.latT - f.lat) * Math.min(1, 0.12 * speed);
-        f.latz += (f.latzT - f.latz) * Math.min(1, 0.12 * speed);
+        if (f.follow) {                                             // sideways in step with the clip's own run
+          if (f.anim8r?.vm && !f.anim8r.vm.ended) {
+            const k = attackLateralFraction(f.anim8r.moveDelta()[2], f.follow.reach);
+            f.lat = f.follow.dx * k; f.latz = f.follow.dz * k;
+          } else { f.follow = null; f.latT = 0; f.latzT = 0; }      // over: ease whatever is left back to its own place
+        } else {
+          f.lat += (f.latT - f.lat) * Math.min(1, 0.12 * speed);
+          f.latz += (f.latzT - f.latz) * Math.min(1, 0.12 * speed);
+        }
         f.dx += (f.dxT - f.dx) * Math.min(1, 0.12 * speed);         // to its measured place in the line-up
         if (f.latT !== 0 && !(f.anim8r?.vm && !f.anim8r.vm.ended)) { f.latT = 0; f.latzT = 0; }
       }
@@ -5452,7 +5486,7 @@ void main() {
     const bgTint = arenaTint;
     if (isolatedMode) {
       // Viewer: a neutral studio background, no sky texture / arena / backdrop.
-      drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, [0.085, 0.095, 0.115, 1]);
+      if (viewerStudio) drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, [0.085, 0.095, 0.115, 1]);
     } else if (dnaVoidActive) {
       drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, bgTint || [0, 0, 0, 1]);
     } else if (dfActive) {
@@ -5562,7 +5596,7 @@ void main() {
     // the viewer's isolated mode, where the neutral grid below is the ground).
     if (!dfActive && !dnaVoidActive && !arenaActive && !isolatedMode)
       drawQuad(gl, texP, pv, floorBufs, arenaTexture || whiteTex, 1, [0.8,0.8,0.85,1]);
-    if (isolatedMode) drawViewerGrid(pv);
+    if (isolatedMode && viewerStudio) drawViewerGrid(pv);
 
     // ── Digimon rendering (skeletal if loaded, billboard fallback) ──
     // Blast transformation: past the captured swap frame the fighter is the
@@ -5623,8 +5657,9 @@ void main() {
 
     // Floor shadow ellipses. The Blast vortex has no floor to cast onto — the
     // capture is a black void from f180 — so both shadows drop with it.
-    if (playerVisible && !blastVoid) drawShadow(gl, texP, pv, playerPos, 20, 8);
-    if (enemyVisible && !blastVoid)  drawShadow(gl, texP, pv, enemyPos,  20, 8);
+    const studioOff = isolatedMode && !viewerStudio;
+    if (playerVisible && !blastVoid && !studioOff) drawShadow(gl, texP, pv, playerPos, 20, 8);
+    if (enemyVisible && !blastVoid && !studioOff)  drawShadow(gl, texP, pv, enemyPos,  20, 8);
     if (atm) { _drawWeather(pv, atm, camEye, camLook); _atmosUniforms(null); }   // effects keep the game's own colours
 
     // ── op6 flight meshes: root at the muzzle, per-layer ctrl-track TRS animation ──
@@ -6199,6 +6234,9 @@ void main() {
 // SCENE-LIGHT-END
     /** This frame's fighter view-projection (column-major 4x4, render space), for checks. */
     getViewProjection() { return _fxView ? Array.from(_fxView.pv) : null; },
+    /** Isolated mode only: false = no neutral background, no grid or axis lines, no floor quad shadow, see-through clear
+     *  (needs createBattle3D(.., {alpha: true})). Default true = the animation viewer as before. Used by the glossary. */
+    setViewerStudio(on) { viewerStudio = !!on; return viewerStudio; },
     /** Isolated studio mode: neutral background + ground grid, no arena/sky/backdrop. */
     setIsolated(on, side = null) {
       isolatedMode = !!on;

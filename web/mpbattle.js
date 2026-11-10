@@ -20,6 +20,7 @@
 import { createBattle3D, resolveModelFolder } from "./battle3d.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { Arena, isSpread, T, plainLine } from "./mpbattle-rules.js";
+import { endBlast } from "./battle.js";                 // one end-of-Blast, shared with the one-on-one fight
 import { ITEM_BY_ID } from "./vendor/engine.js";
 import { createMenus } from "./mpbattle-menus.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
@@ -448,7 +449,7 @@ function onPick(key) {
 }
 
 /** A pad button (keyboard, the on-screen pad, a gamepad): it drives the game's menu, or moves the target mark. */
-function mpbKey(btn) {
+export function mpbKey(btn) {
     if (!F?.nat || !btn) return;
     const cmd = F.cmd;
     if (cmd?.stage === "target") {
@@ -704,7 +705,7 @@ function hostCommand(from, d) {
 
 function releaseBlasts() {                                    // a Blast does not outlive the fight: its gauge is spent
     const ar = F.H.arena;
-    for (const p of ar.P) for (const r of p.party) if (r.blast?.active) { r.blast = null; r.gauge = 0; }
+    for (const p of ar.P) for (const r of p.party) if (r.blast?.active) endBlast(r);
 }
 
 function hostGone(from) {                                     // a player's connection dropped mid-fight
@@ -741,6 +742,7 @@ async function begin(setup, isHost, hostId, done) {
         screenId: setup.screenId ?? null, mapId: setup.mapId ?? A.mapId?.() ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         bots: new Set((setup.bots ?? []).map((b) => b.id)), snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
     };
+    emit("fightSeen", winEvent(F.foes));            // only the species log listens (web/species-log.js): quests hear battleWon alone
     const U = F.ui = A.ui ?? (A.ui = buildUi());
     U.cards.clear(); U.foes.replaceChildren(); U.mine.replaceChildren(); U.foeKeys = ""; U.bar.replaceChildren(); U.log.replaceChildren(); U.plateMap.clear(); U.plates.replaceChildren();
     if (U.endEl) { U.endEl.remove(); U.endEl = null; }
@@ -839,6 +841,7 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
         // F2 -> Extras -> Co-op wins count for quests: both tamers were there, so both of their quests tick for this win
         // (the same event the one-on-one battle sends). Only a real second human counts — a practice 2v2 with a computer
         // partner is no co-op win — and the fight's own map is the host's, which rode the setup packet.
+        emit("fightBeaten", winEvent(f.foes));          // every 2 vs 2 win counts for the glossary, bots or not (quests: the gate below)
         if (window.__fx?.mpcredit && people(f.ids, f).length > 0) {
             const ev = winEvent(f.foes, { mapId: f.mapId, screenId: f.screenId });
             if (ev) emit("battleWon", ev);

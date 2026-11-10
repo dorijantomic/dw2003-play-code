@@ -21,6 +21,7 @@
 // escrddek.toml's 87 preset folder names — that screen does not exist, and
 // this file no longer has it (§7 of the doc).
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFramesMs, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { drawWindow } from "./uiRects.js";
 import { drawText, textWidth } from "./uifont.js";
@@ -73,8 +74,7 @@ const VSYNC_MS = 20;
 // stcrddek_ui.json, not new numbers.
 const ANIM_T = 0.2;
 const LEAVE_FADE_FRAMES = 0xA;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 export function createCardDeck(sfx = null) {
   const c = {
@@ -176,8 +176,8 @@ export function createCardDeck(sfx = null) {
 
   function paintLeaveFade(ctx) {
     if (!c.fadeLeaving) return;
-    const frames = Math.max(0, Math.floor((performance.now() - c.fadeT0) / VSYNC_MS));
-    const a = Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+    const frames = leaveFadeFramesMs(performance.now(), c.fadeT0);
+    const a = leaveFadeLevel(frames, LEAVE_FADE_DELTA);
     if (a <= 0) return;
     paintScreenDim(ctx, a * 255, 320, 240);
   }
@@ -366,8 +366,8 @@ export function createCardDeck(sfx = null) {
     if (!c._open) return;
     const now = performance.now();
     if (c.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((now - c.fadeT0) / VSYNC_MS));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { close(); return; }
+      const frames = leaveFadeFramesMs(now, c.fadeT0);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) { close(); return; }
     }
     c.tick += 1;
     const s = Math.max(1, Math.min(w / 320, h / 240));

@@ -7,6 +7,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
+import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -21,6 +22,12 @@ export function createYesNoTranslated(sfx = null) {
         _ticks: 0, _request: 0, _closes: 0, _events: [], _sounds: [], _packed: {}, _primed: false, _row: null,
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
+
+    // Abandoned by the caller, the box disposes its session and runs nothing: the host's answer is
+    // never delivered (web/yesno.js close()). A box the player answered ran its own onClose.
+    const host = createTranslatedScreenHost(g, {
+        closeMode: CLOSE_SILENT, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
+    });
 
     const playSound = (id) => {
         const key = id >>> 0;
@@ -42,8 +49,7 @@ export function createYesNoTranslated(sfx = null) {
      * `onStartEvent(id)`: run the event, then call g.childDone(). `onClose()`: the box has finished.
      */
     g.open = async (launcherRow, packBytes = null, { onStartEvent = null, onClose = null } = {}) => {
-        g._open = true;
-        g._pending = true;
+        const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;
         g._session = null;
@@ -52,24 +58,23 @@ export function createYesNoTranslated(sfx = null) {
         g._events = [];
         g._primed = false;
         g._row = launcherRow;
-        const request = ++g._request;
         try {
             const [shared, pack] = await Promise.all([
                 loadResidentResources(),
                 packBytes ?? loadEsdmgEntry(ui.yesNoTextFile(launcherRow.textHandle), launcherRow.textHandle & 0xffff, DATA_LABEL),
             ]);
-            if (request !== g._request) return;
+            if (!host.current(request)) return;
             const session = new ui.YesNoSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
             session.open(launcherRow, pack, {
                 onStartEvent: (id) => { g._events.push(id); onStartEvent?.(id); },
-                onClose: () => g._finish(onClose),
+                onClose: () => host.finish(),
             });
             g._session = session;
             g._clock = new ui.MenuDisplayClock();
             g._pad = new ui.MenuPadWords();
             g._pending = false;
         } catch (error) {
-            if (request === g._request) fail(error);
+            if (host.current(request)) fail(error);
         }
     };
 
@@ -108,22 +113,9 @@ export function createYesNoTranslated(sfx = null) {
         ctx.restore();
     };
 
-    g._finish = (cb) => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        g._closes++;
-        ++g._request;
-        cb?.();
-    };
-
     /** Abandon the box without running onClose (the field left another way). */
     g.close = () => {
-        if (!g._open) return;
-        g._session?.dispose();
-        g._open = false;
-        g._pending = false;
-        ++g._request;
+        host.close();
     };
 
     g.diagnostics = () => ({

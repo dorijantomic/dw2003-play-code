@@ -1,11 +1,12 @@
 // Native stgdglab (DRI desk) flow. Geometry is transcribed from the overlay
 // renderers/constructors named beside each draw block; screenshots are checks only.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFrames, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { drawIconGlyph, drawText } from "./uifont.js";
 import { loadPack, drawClip, drawPackBackdrop } from "./screenpack.js";
 import { starterPortraitClip } from "./portraits.js";
-import { elementValue, equipmentBonuses, padRepeatFires, ui } from "./vendor/engine.js";
+import { elementValue, padRepeatFires, ui } from "./vendor/engine.js";
 import {
   acquiredDriForms,
   driReserve,
@@ -24,6 +25,7 @@ import {
   switchInReservePartner,
   toggleLedgerTech,
 } from "./dri-model.js";
+import { storedNumbers, syncLeadEquipBonuses } from "./party.js";
 
 const NATIVE_W = 320;
 const ROOT_OPTIONS = ["Switch Digimon", "Digivolve", "Digivolve Chart"];
@@ -33,8 +35,7 @@ const ROOT_OPTIONS = ["Switch Digimon", "Digivolve", "Digivolve Chart"];
 // row, run the 8.8 dim word 0 → 0xFF00 in 30 frames (~a second at PAL).
 const VSYNC_S = 0.02;
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 // Select Action fold durations from F0x8008a51c: most panes 0xA vsyncs, a
 // few 8. Close ramps twice as fast (F0x8008f22c). Pivots from F0x80089aec.
 const FOLD_STEPS_BANNER = 0xA;
@@ -767,7 +768,10 @@ export function createDriMenu() {
     const leave = d._switchLeave;
     d._switchLeave = null;
     if (leave.kind === "confirm" && switchInReservePartner(d.state, leave.index, leave.charId, d.digimonById)) {
-      d.state.partnerStats.equipBonuses = equipmentBonuses(d.state.equipment?.[0] ?? {});
+      // One home: engine/dw3/equipment.ts `syncLeadEquipBonuses`, which hands the lead's
+      // ROSTER slot to `equipmentBonuses`, so the four-piece signature set reaches the
+      // cache. `null` storage: persistDriState below is the writer for this route.
+      syncLeadEquipBonuses(d.state, null);
       persistDriState(d.state);
       d.feedback = `${leave.name} joined the party.`;
     }
@@ -821,8 +825,8 @@ export function createDriMenu() {
     serviceMenuLeave();
     d._stepHeld(heldKeys);
     if (!d.fadeLeaving) return;
-    const frames = Math.max(0, Math.floor((d.time - d.fadeT0) / VSYNC_S));
-    if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) {
+    const frames = leaveFadeFrames(d.time, d.fadeT0);
+    if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) {
       if (d.fadeMode === "action") applyPendingAction();
       else d.close();
     }
@@ -1086,13 +1090,21 @@ export function createDriMenu() {
     });
   }
 
-  function statValue(member, key) {
+  function statValue(member, key, previewProfile = null) {
     const stored = member?.stats?.stats?.[key];
     if (stored != null) return stored;
-    if (STAT_KEYS.includes(key)) return member?.profile?.[key] ?? 0;
-    // The seven element values are the F0x80017174 scratch halfwords: the
-    // species base plus every trained point, read through the one shared helper.
-    return elementValue(member?.profile, member?.stats?.elemBonuses, key);
+    // A preview (the digivolve / change-type panel) draws what an OTHER form's own
+    // row would look like, so it keeps that row. Everything else is the stored
+    // record: its base is the STARTER's row — a digivolution only changes a
+    // "current form" word — from the one shared helper (web/party.js).
+    if (previewProfile) {
+      if (STAT_KEYS.includes(key)) return previewProfile[key] ?? 0;
+      return elementValue(previewProfile, member?.stats?.elemBonuses, key);
+    }
+    const numbers = storedNumbers(member?.charId, member?.stats, d.digimonById);
+    const coreIndex = STAT_KEYS.indexOf(key);
+    if (coreIndex >= 0) return numbers.core[coreIndex] ?? 0;
+    return numbers.elements[ELEM_KEYS.indexOf(key)] ?? 0;
   }
 
   // The Switch/picker Details view. Circle creates the F0x8008E8D0 detail object
@@ -1244,13 +1256,13 @@ export function createDriMenu() {
     drawText(ctx, String(skillLv), 0x12d, 0x6a, { alignRight: true });
     STAT_KEYS.forEach((key, index) => {
       const y = 0x7f + index * 0x0e;
-      drawText(ctx, String(statValue({ ...member, profile: target }, key)), 0x7d, y, { alignRight: true });
+      drawText(ctx, String(statValue(member, key, target)), 0x7d, y, { alignRight: true });
     });
     // Element glyphs come from cmfont 0x14's second column (dx=42 -> x=0x85);
     // only the values are text widgets (0xa7, 0x7f+0xe*i) [F0x8008d7cc].
     ELEM_KEYS.forEach((key, index) => {
       const y = 0x7f + index * 0x0e;
-      drawText(ctx, String(statValue({ ...member, profile: target }, key)), 0xa7, y, { alignRight: true });
+      drawText(ctx, String(statValue(member, key, target)), 0xa7, y, { alignRight: true });
     });
     // disasm: F0x8008e4cc line ~59 — the tech row icon is cmfont clip
     // `Unknown3[(tech&0x1fff)-1].f2 (+0x04) + 0x37`, drawn directly (no extra box
@@ -1302,11 +1314,11 @@ export function createDriMenu() {
     drawText(ctx, String(skillLv), 0x12d, 0x6a, { alignRight: true });
     STAT_KEYS.forEach((key, index) => {
       const y = 0x7f + index * 0x0e;
-      drawText(ctx, String(statValue({ ...member, profile: target }, key)), 0x7d, y, { alignRight: true });
+      drawText(ctx, String(statValue(member, key, target)), 0x7d, y, { alignRight: true });
     });
     ELEM_KEYS.forEach((key, index) => {
       const y = 0x7f + index * 0x0e;
-      drawText(ctx, String(statValue({ ...member, profile: target }, key)), 0xa7, y, { alignRight: true });
+      drawText(ctx, String(statValue(member, key, target)), 0xa7, y, { alignRight: true });
     });
     // The message panel (F0x80085dd0 state 4 / F0x80085470 widgets): four rows
     // at (0xA7, 0x83+0xE*i) — the three equipped forms then "Don't set." — the
@@ -1470,8 +1482,8 @@ export function createDriMenu() {
     else if (d.screen === "chart") drawChart(ctx, rows);
     drawFeedback(ctx);
     if (d.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((d.time - d.fadeT0) / VSYNC_S));
-      const a = Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+      const frames = leaveFadeFrames(d.time, d.fadeT0);
+      const a = leaveFadeLevel(frames, LEAVE_FADE_DELTA);
       paintScreenDim(ctx, a * 255, NATIVE_W, 240);
     }
     ctx.restore();

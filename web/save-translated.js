@@ -17,7 +17,9 @@
 // Unexplained resident data survives the next save via residentSaveImage.
 import { ui, rosterSlotOfCharId, itemCountEntries, ROSTER_SLOT_CHARIDS } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { buildDirectoryBlock, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 import { fetchBytes, fetchJson, loadResidentResources, loadProfileRecords } from "./resident-data.js";
@@ -45,19 +47,6 @@ function loadData(language) {
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
     return dataByLanguage.get(language);
-}
-
-/** The screen's text codec: 0x04+d digits, 0x0E+n capitals, 0x28+n lower case, else an extended space. */
-function encodeName(name) {
-    const bytes = [];
-    for (const ch of String(name ?? "")) {
-        const code = ch.charCodeAt(0);
-        if (ch >= "0" && ch <= "9") bytes.push(4 + code - 48);
-        else if (ch >= "A" && ch <= "Z") bytes.push(14 + code - 65);
-        else if (ch >= "a" && ch <= "z") bytes.push(40 + code - 97);
-        else bytes.push(1, 1);
-    }
-    return bytes;
 }
 
 export function createSaveTranslated(sfx = null) {
@@ -121,7 +110,7 @@ export function createSaveTranslated(sfx = null) {
             const shown = view[i] ?? st;
             members.push({
                 position: i, rosterSlot: slots[i] ?? i,
-                nameBytes: encodeName(state.digimonNames?.[party[i]] ?? shown.name),
+                nameBytes: encodeNativeScreenText(state.digimonNames?.[party[i]] ?? shown.name),
                 exp: Number(st.xp) || 0, level: Number(st.level) || 1,
                 lastUltraDrill: st.lastUltraDrill,
                 tp: st.tp, hp: st.hp, maxHp: st.maxHp, mp: st.mp, maxMp: st.maxMp,
@@ -137,7 +126,7 @@ export function createSaveTranslated(sfx = null) {
             if (!st && !(state.rosterOwned & (1 << slot))) continue;
             const rec = st ?? {};
             const shown = r._opts.reserveRoster?.(id, rec) ?? rec;
-            reserves.push({ position: -1, rosterSlot: slot, nameBytes: encodeName(state.digimonNames?.[id] ?? shown.name),
+            reserves.push({ position: -1, rosterSlot: slot, nameBytes: encodeNativeScreenText(state.digimonNames?.[id] ?? shown.name),
                 exp: rec.xp ?? 0, level: rec.level ?? 1, lastUltraDrill: rec.lastUltraDrill, tp: rec.tp, hp: rec.hp, maxHp: rec.maxHp, mp: rec.mp, maxMp: rec.maxMp,
                 core: shown.core, elements: shown.elements, equipment: state.reserveEquipment?.[id],
                 forms: { digimonId: rec.digimonId, equippedForms: rec.equippedForms, formLedger: rec.formLedger, rawLedger: rec.rawLedger } });
@@ -169,7 +158,7 @@ export function createSaveTranslated(sfx = null) {
             // The old `id < 256` filter dropped every accessory from SniperSuit up.
             bag: itemCountEntries(state),
             playSeconds: Math.max(0, Math.floor(r._opts?.playSeconds ?? state.playSeconds ?? 0)),
-            playerNameBytes: encodeName(state.playerName),
+            playerNameBytes: encodeNativeScreenText(state.playerName),
             members,
         };
     }
@@ -231,9 +220,31 @@ export function createSaveTranslated(sfx = null) {
         return result;
     }
 
+    // The screen's whole lifecycle, in one place (web/translated-screen-host.js): the card is
+    // disposed on every finish, and `release` is the old `_finish` body — summary, one commit,
+    // both read while the session is still alive.
+    const host = createTranslatedScreenHost(r, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_ALWAYS, finishDispose: DISPOSE_ALWAYS,
+        release(session) {
+            let result = { saved: [], loadedSlot: null };
+            if (session) {
+                r._summary = {
+                    finished: session.finished(), ticks: r._ticks,
+                    transition: session.transition(), sounds: session.sounds.slice(),
+                    transfers: session.services.transfers.map((t) => ({ ...t })),
+                    displayCalls: session.displayCalls.map((c) => ({ ...c })),
+                    soundArchives: session.soundArchives.slice(),
+                };
+                result = commit();
+            }
+            r._commit = result;
+        },
+    });
+
     r.open = (gameState, mode = "save", onClose = null, opts = {}) => {
-        r._open = true;
-        r._pending = true;
+        // A load replaces the page; the caller's continuation would resume a game that is gone,
+        // so it runs only when the close left no loaded slot (read after `release` set _commit).
+        const request = host.begin({ onClose: () => { if (r._commit?.loadedSlot == null) onClose?.(); } });
         r._failed = false;
         r._error = null;
         r._session = null;
@@ -243,13 +254,11 @@ export function createSaveTranslated(sfx = null) {
         r._mode = mode === "load" ? "load" : "save";
         r._state = gameState ?? null;
         r._opts = opts ?? {};
-        r._onClose = onClose;
         r._lastDiagnostic = null;
-        const request = ++r._request;
         loadData(language()).then((data) => {
-            if (request === r._request) r._data = data;
+            if (host.current(request)) r._data = data;
         }).catch((error) => {
-            if (request === r._request) fail(error);
+            if (host.current(request)) fail(error);
         });
     };
 
@@ -277,35 +286,10 @@ export function createSaveTranslated(sfx = null) {
         ctx.restore();
     };
 
-    r.close = () => {
-        if (r._open) r._finish();
-    };
+    r.close = () => host.close();
 
-    r._finish = () => {
-        if (!r._open) return;
-        r._open = false;
-        r._pending = false;
-        ++r._request;
-        const session = r._session;
-        let result = { saved: [], loadedSlot: null };
-        if (session) {
-            r._summary = {
-                finished: session.finished(), ticks: r._ticks,
-                transition: session.transition(), sounds: session.sounds.slice(),
-                transfers: session.services.transfers.map((t) => ({ ...t })),
-                displayCalls: session.displayCalls.map((c) => ({ ...c })),
-                soundArchives: session.soundArchives.slice(),
-            };
-            result = commit();
-            session.dispose();
-        }
-        r._commit = result;
-        r._session = null;
-        const cb = r._onClose;
-        r._onClose = null;
-        // A load replaces the page; the caller's continuation would resume a game that is gone.
-        if (result.loadedSlot === null) cb?.();
-    };
+    // `web/native-session.js` ends a screen whose session finished by calling `_finish`.
+    r._finish = () => host.finish();
 
     r.textWidgets = () => (r._session ? r._session.widgets.textWidgets() : []);
 

@@ -36,14 +36,11 @@
 // rollback until this route is accepted; nothing here falls back to it.
 
 import {
-    heldCount, itemCountEntries, maskFromButtons, readHeldByte, setHeldCount, writeItemArrays,
+    heldCount, itemCountEntries, readHeldByte, setHeldCount, writeItemArrays, MONEY_CAP,
+    ROSTER_STRIDE,
 } from "./vendor/engine.js";
 import { seedNativeScreenParty } from "./native-screen.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 
 const MODULE_ID = "pro/stfgtrep";
@@ -61,7 +58,6 @@ const WS_FLAG_BASE = 0x06;
 const WS_FORM_BASE = 0x07;
 
 const RECORDS = 0x80049494;
-const STRIDE = 0x3dc;
 const REC = {
     exp: 0x20, level: 0x24, tp: 0x26, hp: 0x28, maxHp: 0x2a,
     mp: 0x2c, maxMp: 0x2e, core: 0x30, elements: 0x3c,
@@ -69,7 +65,6 @@ const REC = {
 };
 const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
-const BIT_CAP = 0x98967f; // 9,999,999
 const PARTY_SLOTS = 3;
 
 export function createFightReportNative(sfx = null) {
@@ -100,7 +95,7 @@ export function createFightReportNative(sfx = null) {
             write(PARTY + i * 4, slot == null ? 0xffffffff : slot >>> 0, 4);
         }
         for (const p of s.participants ?? []) {
-            const base = RECORDS + (p.rosterSlot ?? 0) * STRIDE;
+            const base = RECORDS + (p.rosterSlot ?? 0) * ROSTER_STRIDE;
             write(base + REC.exp, (p.preExp ?? 0) >>> 0, 4);
             if (p.level != null) write(base + REC.level, p.level & 0xffff, 2);
             (p.core ?? []).forEach((v, j) => write(base + REC.core + j * 2, v & 0xffff, 2));
@@ -134,27 +129,13 @@ export function createFightReportNative(sfx = null) {
         return readHeldByte({ read8: (address) => r._host?.read(address, 1) ?? 0 }, itemId, SAVE);
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            rootCtor: ROOT_CTOR,
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        r._host = host;
-        r._seedBits = Math.max(0, Math.min(BIT_CAP, host.read(MONEY, 4) >>> 0));
-        const seedItemId = r._seed?.dropItemId ?? 0;
-        r._seedHeld = seedItemId > 0 ? readHostHeld(seedItemId) : 0;
-        return true;
-    }
-
     /** The screen's payout -> walker state. */
     function commit() {
         const host = r._host;
         const state = r._state;
         if (!host || !state) return;
         const bits = host.read(MONEY, 4) >>> 0;
-        state.bits = Math.max(0, Math.min(BIT_CAP, bits));
+        state.bits = Math.max(0, Math.min(MONEY_CAP, bits));
         // The one count the screen can change (the item it drops) goes through the
         // shared store: the difference from what we carry is added or taken, so the
         // 99 cap and the 0 floor are the store's (F0x800161D8).
@@ -177,7 +158,7 @@ export function createFightReportNative(sfx = null) {
      */
     function payout() {
         if (!r._open || !r._state || !r._host) return;
-        const bits = Math.max(0, Math.min(BIT_CAP, r._host.read(MONEY, 4) >>> 0));
+        const bits = Math.max(0, Math.min(MONEY_CAP, r._host.read(MONEY, 4) >>> 0));
         const itemId = r._seed?.dropItemId ?? 0;
         const held = itemId > 0 ? readHostHeld(itemId) : 0;
         if (bits === r._seedBits && held === r._seedHeld) return;
@@ -187,7 +168,6 @@ export function createFightReportNative(sfx = null) {
     }
 
     r.open = (opts = {}) => {
-        r._open = true;
         r._onClose = opts.onClose ?? null;
         r._state = opts.gameState ?? null;
         r._seed = {
@@ -200,10 +180,7 @@ export function createFightReportNative(sfx = null) {
         r._lastDiagnostic = null;
         r._seedBits = null;
         r._seedHeld = null;
-        preloadNativeScreens().catch((e) => {
-            r._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) r._pending = true;
+        r._begin();
     };
 
     r.isOpen = () => r._open;
@@ -214,62 +191,48 @@ export function createFightReportNative(sfx = null) {
         if (state && !r._state) r._state = state;
     };
 
-    r.update = (dt) => {
-        if (!r._open) return;
-        if (r._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                r._lastDiagnostic = "native report boot failed (manifest/overlay missing)";
-                return;
-            }
-            r._pending = false;
-        }
-        const keys = r._state?.keys;
-        r._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (r._host.tick(dt)) r._finish();
-        else payout();
-    };
-
-    r.draw = (ctx) => {
-        if (!r._open || !r._host) return;
-        // Framebuffer takeover: fit the native 320x240 image to the whole
-        // canvas (the shared rule), so a fullscreen battle canvas fills rather
-        // than drawing small in the top-left corner.
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        fitNativeScreen(ctx);
-        r._host.draw(ctx, 320, 240);
-        ctx.restore();
-    };
-
-    r.close = () => {
-        if (r._open) r._finish();
-    };
-
-    r._finish = () => {
-        if (!r._open) return;
-        r._open = false;
-        r._pending = false;
-        const host = r._host;
-        if (host) {
-            commit(); // reads through r._host, so it must run first
-            host.teardown();
-        }
-        r._host = null;
-        const cb = r._onClose;
-        r._onClose = null;
-        cb?.();
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     r.diagnostics = () => ({
         open: r._open,
         pending: r._pending,
         host: r._host?.state() ?? null,
         lastDiagnostic: r._lastDiagnostic,
+    });
+
+    createNativeAdapter({
+        owner: r,
+        moduleId: MODULE_ID,
+        hostOptions: {
+            rootCtor: ROOT_CTOR,
+            playPackedSound: (id) => { sfx?.playPacked(id); },
+            seed,
+        },
+        // The payout baseline is read off the booted RAM, so it is taken right
+        // after the host comes up (the shared boot is the only hook there).
+        afterBoot: (host) => {
+            r._seedBits = Math.max(0, Math.min(MONEY_CAP, host.read(MONEY, 4) >>> 0));
+            const seedItemId = r._seed?.dropItemId ?? 0;
+            r._seedHeld = seedItemId > 0 ? readHostHeld(seedItemId) : 0;
+        },
+        frame: (host, dt) => {
+            if (host.tick(dt)) return true;
+            payout();
+            return false;
+        },
+        // Framebuffer takeover: fit the native 320x240 image to the whole
+        // canvas (the shared rule), so a fullscreen battle canvas fills rather
+        // than drawing small in the top-left corner.
+        draw: (ctx, _viewW, _viewH) => {
+            if (!r._open || !r._host) return false;
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            fitNativeScreen(ctx);
+            r._host.draw(ctx, 320, 240);
+            ctx.restore();
+            return true;
+        },
+        commit: () => commit(), // reads through r._host, so it must run first
+        label: "native report boot failed (manifest/overlay missing)",
     });
 
     return r;

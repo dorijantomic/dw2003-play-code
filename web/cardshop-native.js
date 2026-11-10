@@ -26,12 +26,8 @@
 // The old hand-authored shop (web/cardshop.js) stays as the development
 // rollback (?legacyCardShop=1).
 
-import { BOOSTER_ITEM_IDS, seedBoosterStock, commitBoosterStock, maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { BOOSTER_ITEM_IDS, seedBoosterStock, commitBoosterStock, SAVE_CARD_MAX, COLLECTION_CAP, MONEY_CAP } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { cards } from "./cardstate.js";
 
 const MODULE_ID = "pro/stcrdshp";
@@ -41,9 +37,6 @@ const LAUNCHER_CELL = 0x8004b404;
 const MONEY = SAVE_CONTEXT + 0x6c;
 const CARD_COUNTS = SAVE_CONTEXT + 0x3a2;
 const CARD_SEEN = SAVE_CONTEXT + 0x4df;
-const CARD_MAX_ID = 0x13b;
-const CARD_COPIES_MAX = 9;
-const BIT_CAP = 0x98967f; // 9,999,999
 /** The teardown hand-off code that means "open the folder editor". */
 const TRANSITION_FOLDER_EDITOR = 0x400;
 
@@ -69,24 +62,14 @@ export function createCardShopNative(sfx = null) {
         if (!col) return;
         for (const [id, n] of col.owned ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) {
-                write(CARD_COUNTS + cardId, Math.max(0, Math.min(CARD_COPIES_MAX, Number(n) || 0)), 1);
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
+                write(CARD_COUNTS + cardId, Math.max(0, Math.min(COLLECTION_CAP, Number(n) || 0)), 1);
             }
         }
         for (const id of col.seen ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) write(CARD_SEEN + cardId, 1, 1);
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) write(CARD_SEEN + cardId, 1, 1);
         }
-    }
-
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        c._host = host;
-        return true;
     }
 
     /** The screen's writes -> the walker's state. */
@@ -94,12 +77,12 @@ export function createCardShopNative(sfx = null) {
         const host = c._host;
         const state = c._state;
         if (!host || !state) return;
-        state.bits = Math.max(0, Math.min(BIT_CAP, host.read(MONEY, 4) >>> 0));
+        state.bits = Math.max(0, Math.min(MONEY_CAP, host.read(MONEY, 4) >>> 0));
         commitBoosterStock(state, BOOSTER_ITEM_IDS, (address, size) => host.read(address, size));
         if (typeof localStorage !== "undefined") localStorage.setItem("inventory", JSON.stringify(state.inventory));
         const col = cards();
         if (col?.owned instanceof Map) {
-            for (let id = 1; id < CARD_MAX_ID; id++) {
+            for (let id = 1; id < SAVE_CARD_MAX; id++) {
                 const n = host.read(CARD_COUNTS + id, 1);
                 const have = col.owned.get(id) ?? 0;
                 if (n !== have) {
@@ -116,16 +99,13 @@ export function createCardShopNative(sfx = null) {
 
     // The walker's call site: open(state, onClose, onEditFolder, shopId).
     c.open = (state = null, onClose = null, onEditFolder = null, shopId = null) => {
-        c._open = true;
         c._state = state ?? c._state ?? null;
         c._onClose = onClose;
         c._onEditFolder = onEditFolder;
         c._shopId = Number.isInteger(shopId) ? shopId : null;
         c._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            c._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) c._pending = true;
+        c._transition = 0;
+        c._begin();
     };
 
     c.isOpen = () => c._open;
@@ -136,54 +116,6 @@ export function createCardShopNative(sfx = null) {
         if (state && !c._state) c._state = state;
     };
 
-    c.update = (dt) => {
-        if (!c._open) return;
-        if (c._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                c._lastDiagnostic = "native card shop boot failed (manifest/overlay missing)";
-                return;
-            }
-            c._pending = false;
-        }
-        const keys = c._state?.keys;
-        c._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (c._host.tick(dt)) c._finish();
-    };
-
-    c.draw = (ctx, viewW, viewH) => {
-        if (!c._open || !c._host) return;
-        c._host.draw(ctx, viewW, viewH);
-    };
-
-    c.close = () => {
-        if (c._open) c._finish();
-    };
-
-    c._finish = () => {
-        if (!c._open) return;
-        c._open = false;
-        c._pending = false;
-        const host = c._host;
-        // The Edit Folder option leaves the launcher request behind; read it
-        // before teardown and hand off exactly as the walker's launcher does.
-        const transition = host ? (host.read(0x8004b3fc, 4) >>> 0) : 0;
-        if (host) {
-            commit(); // reads through c._host, so it must run first
-            host.teardown();
-        }
-        c._host = null;
-        const editCb = c._onEditFolder;
-        c._onEditFolder = null;
-        const cb = c._onClose;
-        c._onClose = null;
-        if (transition === TRANSITION_FOLDER_EDITOR && editCb) editCb();
-        else cb?.();
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     c.diagnostics = () => ({
         open: c._open,
@@ -191,6 +123,31 @@ export function createCardShopNative(sfx = null) {
         shopId: c._shopId,
         host: c._host?.state() ?? null,
         lastDiagnostic: c._lastDiagnostic,
+    });
+
+    createNativeAdapter({
+        owner: c,
+        moduleId: MODULE_ID,
+        hostOptions: {
+            playPackedSound: (id) => { sfx?.playPacked(id); },
+            seed,
+        },
+        commit: (host) => {
+            // The Edit Folder option leaves the launcher request behind; read it
+            // before teardown and hand off exactly as the walker's launcher does.
+            c._transition = host.read(0x8004b3fc, 4) >>> 0;
+            commit(); // reads through c._host, so it must run first
+        },
+        closed: () => {
+            const editCb = c._onEditFolder;
+            c._onEditFolder = null;
+            const cb = c._onClose;
+            c._onClose = null;
+            if (c._transition === TRANSITION_FOLDER_EDITOR && editCb) editCb();
+            else cb?.();
+            c._transition = 0;
+        },
+        label: "native card shop boot failed (manifest/overlay missing)",
     });
 
     return c;

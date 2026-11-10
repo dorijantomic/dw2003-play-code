@@ -1,4 +1,4 @@
-// The Digimon Codex, part 3: the encounter finder (web/codex.js).
+// The Digimon Codex data, part 3: the encounter index (web/codex-data.js).
 //
 // A species search that answers "where can I meet it?": every real slot of every
 // stage's encounter pools that can roll it, with the stage number, the stage's own
@@ -10,9 +10,6 @@
 // engine/dw3/encounters.ts): stage_encounters.json picks the screen, field_encounters
 // .screens turns that screen into the party. A row is therefore a real roll, and the
 // same party stored twice (screen 5) honestly appears twice.
-//
-// F2 -> Extras -> "Digimon Codex (new)" (off by default), third tab. With the toggle
-// off there is no tab, no index and no fetch.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -20,61 +17,15 @@ import {
   encounterIndex,
   encounterSearch,
   encounterSpecies,
-  codexReset,
-  setCodexData,
-  codexLoad,
-  codexOpen,
-  codexTab,
-  codexQuery,
-  codexType,
-  codexRows,
-  codexPageCount,
-  codexPageIndex,
-  codexPageRows,
-  codexCursor,
-  tickCodex, openCodex,
-  codexPress,
-  codexDraw,
-} from "../web/codex.js";
+} from "../web/codex-data.js";
 
 const read = (p) => JSON.parse(readFileSync(p, "utf8"));
 const stageFile = read("web/assets/data/stage_encounters.json");
 const fieldFile = read("web/assets/data/field_encounters.json");
 const manifest = read("web/assets/manifest.json");
-const digimon = read("web/assets/data/digimon.json");
-const evolutions = read("web/assets/data/evolutions.json");
-const enemyFile = read("web/assets/data/enemies.json");
-const models = read("web/assets/battle/model_map.json");
 
 const mapName = new Map(manifest.maps.map((m) => [m.id, m.name]));
 const index = encounterIndex(stageFile, fieldFile, manifest);
-
-/** The fake fetchJson a node test hands codexLoad: returns the parsed tables, no network. */
-const fakeFetch = async (url) => {
-  if (/stage_encounters\.json/.test(url)) return stageFile;
-  if (/field_encounters\.json/.test(url)) return fieldFile;
-  if (/manifest\.json/.test(url)) return manifest;
-  if (/enemies\.json/.test(url)) return enemyFile;
-  if (/model_map\.json/.test(url)) return models;
-  if (/evolutions\.json/.test(url)) return evolutions;
-  return digimon;
-};
-
-/** A recording 2D context: enough of the canvas API for codexDraw, and a text log. */
-function fakeCtx() {
-  const calls = [];
-  const ctx = {
-    calls,
-    save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
-    fillRect() { calls.push(["fillRect"]); },
-    strokeRect() { calls.push(["strokeRect"]); },
-    fillText(text) { calls.push(["fillText", String(text)]); },
-    set font(v) {}, set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
-    set textBaseline(v) {}, set textAlign(v) {},
-  };
-  return ctx;
-}
-const drawnText = (ctx) => ctx.calls.filter((c) => c[0] === "fillText").map((c) => c[1]).join("\n");
 
 test("the index reads all 203 stages, indexes 4,029 non-zero slots as 4,254 real rows, and names every stage", () => {
   assert.equal(Object.keys(stageFile.stages).length, 203, "the extracted table still holds 203 stages");
@@ -184,88 +135,4 @@ test("the search returns a species' real rows, and an unknown species returns no
   assert.deepEqual(encounterSearch(index, ""), [], "an empty search is not a species");
   assert.deepEqual(encounterSpecies(index, "Numemon"), ["Numemon"], "an exact name never drags in its numbered variants");
   assert.equal(encounterSpecies(index, "umemon").length, 7, "a partial name lists the whole Numemon family");
-});
-
-test("with the toggle off there is no tab, no index and the pad falls through untouched", () => {
-  codexReset();
-  const ctx = fakeCtx();
-  assert.equal(tickCodex(false), false);
-  assert.equal(codexOpen(), false);
-  assert.equal(codexTab(), "partners");
-  assert.equal(codexRows().length, 0, "no index before the book opens");
-  assert.equal(codexPageCount(), 0);
-  assert.equal(codexPress("r1"), false, "a closed book swallows no press");
-  assert.equal(codexType("k"), false, "typing does nothing while closed");
-  assert.equal(codexDraw(ctx), false);
-  assert.equal(ctx.calls.length, 0, "no canvas call at all");
-});
-
-test("R1 twice reaches ENCOUNTERS; a search lists the real stages, zones, slots and party", async () => {
-  codexReset();
-  await codexLoad(fakeFetch);
-  openCodex();
-  assert.equal(codexTab(), "partners");
-  codexPress("r1");
-  assert.equal(codexTab(), "wild");
-  codexPress("r1");
-  assert.equal(codexTab(), "encounters", "the third tab of the same book");
-  assert.equal(codexRows().length, 193, "one entry per species with a pool");
-  assert.equal(codexPageCount(), 9, "193 species over pages of 24");
-  assert.equal(codexPageRows()[0].name, "Airdramon", "species are listed by name");
-
-  // Type the name; the list narrows to one entry and the detail columns list its rows.
-  for (const ch of "Kunemon") assert.equal(codexType(ch), true);
-  assert.equal(codexQuery(), "kunemon");
-  assert.equal(codexRows().length, 1);
-  assert.equal(codexPageRows()[0].name, "Kunemon");
-  assert.equal(codexCursor(), 0);
-
-  const ctx = fakeCtx();
-  const text = drawnText((codexDraw(ctx), ctx));
-  assert.match(text, /ENCOUNTERS/, "the page says which tab it is");
-  assert.match(text, /Kunemon/);
-  assert.match(text, /43 pools on 9 stages/);
-  assert.match(text, /205, 232, 233, 330, 335, 350, 355, 500, 940/, "every stage it can be met on");
-  assert.match(text, /s205/, "the stage id");
-  assert.match(text, /Central Sector — Asuka Bridge/, "the stage's own map name");
-  assert.match(text, /zone 4/, "the geographical zone");
-  assert.match(text, /slot 1/, "the slot in the eight-slot pool");
-  assert.match(text, /screen 263/, "the screen id the driver rolls");
-  assert.match(text, /Lv 6/);
-  assert.match(text, /HP 264/);
-  assert.match(text, /x35/, "the party's stat scale");
-  assert.match(text, /rate 0/, "the zone block's own rate level");
-  assert.ok(!text.includes("Hot Head"), "the partner page is not drawn underneath");
-
-  codexPress("backspace");
-  assert.equal(codexQuery(), "kunemo", "Backspace deletes the last letter");
-  codexPress("n");
-  assert.equal(codexQuery(), "kunemon", "a single delivered key is typed");
-
-  codexPress("l1");
-  assert.equal(codexTab(), "wild", "L1 comes back through the wild pages");
-  codexPress("r1");
-  assert.equal(codexTab(), "encounters");
-  codexPress("triangle");
-  assert.equal(codexTab(), "wild", "Triangle goes back from the finder");
-  codexPress("cross");
-  assert.equal(codexOpen(), false);
-});
-
-test("the finder rides the part-1 switch: one F2 key, EXPERIMENTAL, and game.js still gates on window.__fx?.codex", () => {
-  const ambience = readFileSync("web/ambience.js", "utf8");
-  assert.ok(ambience.includes('["codex", "Digimon Codex (new)"]'), "the one Extras pair is still there");
-  assert.equal((ambience.match(/\["codex",/g) ?? []).length, 1, "part 3 adds no second switch");
-  const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\]/);
-  assert.ok(/\"codex\"/.test(experimental[1]), "the book starts off until switched on");
-
-  const codex = readFileSync("web/codex.js", "utf8");
-  assert.match(codex, /window\.__codex/);
-  assert.match(codex, /encounterSearch/);
-  assert.ok(!/window\.__fx/.test(codex), "the book never reads the switch itself");
-
-  const game = readFileSync("web/game.js", "utf8");
-  assert.match(game, /tickCodex\(window\.__fx\?\.codex === true\)/, "one switch, the part-1 gate");
-  assert.match(game, /codexDraw\(ctx/);
-  assert.ok(!/__fx\?\.encounters|__fx\?\.codexEncounters/.test(game), "part 3 adds no second key");
 });

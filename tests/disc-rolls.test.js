@@ -164,11 +164,9 @@ test("tools/hit_table.mjs --json is all 443 techniques, skill 1 first at 110/128
 test("source gates: battle.js always uses the disc's merge and drop roll (no F2 key)", () => {
   const battle = readFileSync(join(ROOT, "web/battle.js"), "utf8");
   assert.match(battle, /mergeTechRecord\(s, rec, \{ useDiscAcc: true \}\)/, "the skill merge always carries the record's accuracy byte");
-  assert.match(battle, /dropPasses\(eStats\.drop_rate, RAND_U16\)/, "the drop draw is the disc's roll");
-  const block = battle.match(/function rollDrop\(eStats\) \{[\s\S]*?\n  \}/);
-  assert.ok(block, "rollDrop is still a function of eStats");
-  assert.doesNotMatch(block[0], /__fx/, "no switch inside rollDrop");
-  assert.doesNotMatch(block[0], /Math\.random/, "the old Math.random drop line is gone");
+  assert.match(battle, /rollBattleDrop\(b\._loot\.candidates, RAND_U16\)/, "the drop draw is the disc's one roll per battle");
+  assert.doesNotMatch(battle, /function rollDrop\(/, "the per-enemy roll is gone");
+  assert.doesNotMatch(battle, /Math\.random\(\) \* 255 < /, "the old Math.random drop line is gone");
   assert.match(battle, /rollFusionDrops\([^\n]*RAND_U16, true\)/, "fusion halves' loot rolls the same disc way");
   assert.doesNotMatch(battle, /discrolls/, "the key is gone from battle.js");
 });
@@ -177,4 +175,34 @@ test("the F2 row for discrolls is gone from ambience.js", () => {
   const amb = readFileSync(join(ROOT, "web/ambience.js"), "utf8");
   assert.doesNotMatch(amb, /discrolls/);
   assert.doesNotMatch(amb, /Disc-accurate hit & drop rolls/);
+});
+
+// One item drop per won battle (wfightmn .L0x00001e84-.L0x00001fdc): pick draw, then rate draw.
+import { rollBattleDrop } from "../web/tech-record.js";
+const seq = (words) => { const calls = []; let i = 0; const f = () => { calls.push(i); return words[i++]; }; f.calls = calls; return f; };
+
+test("rollBattleDrop: one enemy with an item = one pick draw + one rate draw", () => {
+  const rng = seq([7, 2]);
+  assert.equal(rollBattleDrop([{ drop_item: "A", drop_rate: 2 }], rng), "A"); // 2 < 3
+  assert.equal(rng.calls.length, 2);
+  const miss = seq([0, 3]);
+  assert.equal(rollBattleDrop([{ drop_item: "A", drop_rate: 1 }], miss), null); // 3 < 2 false
+  assert.equal(miss.calls.length, 2);
+});
+
+test("rollBattleDrop: three enemies with items = exactly two draws, at most one item", () => {
+  const list = [{ drop_item: "A", drop_rate: 0 }, { drop_item: "B", drop_rate: 255 }, { drop_item: "C", drop_rate: 0 }];
+  const rng = seq([4, 100]); // 4 % 3 = 1 -> B, 100 < 256
+  assert.equal(rollBattleDrop(list, rng), "B");
+  assert.equal(rng.calls.length, 2);
+  const rng2 = seq([3, 100]); // 3 % 3 = 0 -> A, rate 0: 100 < 1 false
+  assert.equal(rollBattleDrop(list, rng2), null);
+  assert.equal(rng2.calls.length, 2);
+});
+
+test("rollBattleDrop: no enemy with an item = no draw at all", () => {
+  const rng = seq([1, 1]);
+  assert.equal(rollBattleDrop([{ drop_item: "Null", drop_rate: 255 }, { drop_item: "", drop_rate: 255 }, null], rng), null);
+  assert.equal(rollBattleDrop([], rng), null);
+  assert.equal(rng.calls.length, 0);
 });

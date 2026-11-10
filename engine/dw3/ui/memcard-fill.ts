@@ -25,11 +25,12 @@
 //   otherwise           the populated layout above.
 
 import type { CallMethod, PartsMemory } from "./memcard-parts.ts";
+import { LANGUAGE_CELL as LANGUAGE_CELL_ADDRESS } from "../party-context.ts";
 
 export const MEMCARD_FILL_TABLE = 0x80088088;
 export const MEMCARD_FILL_STRIDE = 0x14;
 export const MEMCARD_FILL_INDEX = 0x8008876c;
-const LANGUAGE_CELL = 0x8005cca8;
+const LANGUAGE_CELL = LANGUAGE_CELL_ADDRESS;
 
 const s16 = (v: number): number => (v << 16) >> 16;
 

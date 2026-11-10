@@ -57,5 +57,9 @@ test("the album's ordinary route is the translated screen, the reference behind 
   assert.match(game, /GYM_PARAMS\.has\("nativeAlbum"\) \? cardAlbumNative : cardAlbumTranslated/,
     "the ordinary route is the translated screen; ?nativeAlbum=1 is the reference");
   const reference = readFileSync(new URL("../web/cardalbum-native.js", import.meta.url), "utf8");
-  assert.match(reference, /openNativeScreen/, "the reference still boots the shipped overlay");
+  // Since card 11 the adapter takes its lifecycle from createNativeAdapter, so the
+  // overlay is booted by the factory; what matters is that it names the shipped
+  // pro/stcrdabm root rather than a hand-authored screen.
+  assert.match(reference, /createNativeAdapter|openNativeScreen/, "the reference still boots the shipped overlay");
+  assert.match(reference, /moduleId: MODULE_ID/, "and names the shipped overlay root");
 });

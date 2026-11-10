@@ -139,7 +139,7 @@ test("wiring: co-op wins tick a defeat step on the fight's own map; another map 
     await installQuests({ stageEl: { append() {} }, idle: () => true });
     const q = globalThis.__quests;
     assert.ok(q, "the quest layer installed");
-    assert.equal(fx.mpcredit, false, "Co-op wins count for quests starts off");
+    assert.equal(fx.mpcredit, true, "Co-op wins count for quests starts on (auto in web/ship-list.js)");
 
     const begin = () => { q.lab.reset(); assert.equal(q.accept("fixture"), true, "the fixture quest is accepted"); };
     const win = (mapId = "s330", name = "Kunemon") => winEvent([{ name, level: 5 }], { mapId, screenId: 4 });

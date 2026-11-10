@@ -22,19 +22,14 @@
 // back. The old hand-authored screen (web/cardalbum.js) stays as the
 // development rollback (?legacyAlbum=1).
 
-import { maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { SAVE_CARD_MAX } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { cards } from "./cardstate.js";
 
 const MODULE_ID = "pro/stcrdabm";
 const SAVE_CONTEXT = 0x80048d34;
 /** The ever-obtained album flag array (one byte per card). */
 const CARD_SEEN = SAVE_CONTEXT + 0x4df;
-const CARD_MAX_ID = 0x13b;
 
 export function createCardAlbumNative(sfx = null) {
     const a = {
@@ -52,7 +47,7 @@ export function createCardAlbumNative(sfx = null) {
         if (!collection) return;
         const mark = (id) => {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) {
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
                 write(CARD_SEEN + cardId, 1, 1);
             }
         };
@@ -60,19 +55,8 @@ export function createCardAlbumNative(sfx = null) {
         for (const [id] of collection.owned ?? []) mark(id);
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        a._host = host;
-        return true;
-    }
-
     // The walker's call site passes only onClose; the lab passes nothing.
     a.open = (stateOrClose = null, onClose = null) => {
-        a._open = true;
         if (typeof stateOrClose === "function") {
             a._onClose = stateOrClose;
         } else {
@@ -80,10 +64,7 @@ export function createCardAlbumNative(sfx = null) {
             a._onClose = onClose;
         }
         a._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            a._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) a._pending = true;
+        a._begin();
     };
 
     a.isOpen = () => a._open;
@@ -94,44 +75,6 @@ export function createCardAlbumNative(sfx = null) {
         if (state && !a._state) a._state = state;
     };
 
-    a.update = (dt) => {
-        if (!a._open) return;
-        if (a._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                a._lastDiagnostic = "native album boot failed (manifest/overlay missing)";
-                return;
-            }
-            a._pending = false;
-        }
-        const keys = a._state?.keys;
-        a._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (a._host.tick(dt)) a._finish();
-    };
-
-    a.draw = (ctx, viewW, viewH) => {
-        if (!a._open || !a._host) return;
-        a._host.draw(ctx, viewW, viewH);
-    };
-
-    a.close = () => {
-        if (a._open) a._finish();
-    };
-
-    a._finish = () => {
-        if (!a._open) return;
-        a._open = false;
-        a._pending = false;
-        if (a._host) a._host.teardown();
-        a._host = null;
-        const cb = a._onClose;
-        a._onClose = null;
-        cb?.();
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     a.diagnostics = () => ({
         open: a._open,
@@ -140,5 +83,10 @@ export function createCardAlbumNative(sfx = null) {
         lastDiagnostic: a._lastDiagnostic,
     });
 
-    return a;
+    return createNativeAdapter({
+        owner: a,
+        moduleId: MODULE_ID,
+        hostOptions: { playPackedSound: (id) => { sfx?.playPacked(id); }, seed },
+        label: "native album boot failed (manifest/overlay missing)",
+    });
 }

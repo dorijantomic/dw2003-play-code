@@ -72,6 +72,7 @@
 
 import { findRegisteredHandleByKey, type DisplayServiceMemory } from "../../display-service.ts";
 import { setRectColour, type DisplayViewMemory } from "../../display-view.ts";
+import { fadeStep } from "../screen-dim.ts";
 
 export interface BattleLossMemory extends DisplayServiceMemory, DisplayViewMemory {
     /** The result byte and the sound id are read a byte at a time (`lbu`). */
@@ -290,12 +291,6 @@ export interface BattleLossHost {
 
 const u32 = (v: number): number => v >>> 0;
 const s32 = (v: number): number => v | 0;
-/** MIPS signed `div`/`mflo`, truncating toward zero. */
-function divLo(a: number, b: number): number {
-    if (b === 0) return a >= 0 ? -1 : 1;
-    if (a === -0x80000000 && b === -1) return -0x80000000;
-    return (a / b) | 0;
-}
 
 // ── the loss branch (0x800A9230) ─────────────────────────────────────────────
 
@@ -431,10 +426,10 @@ export function lossFadeArm(
     mem.write32(fade + LOSS_FADE_DIRECTION, direction | 0);
     if ((direction | 0) !== 0) {
         mem.write32(fade + LOSS_FADE_LEVEL, LOSS_FADE_LEVEL_MAX);
-        mem.write32(fade + LOSS_FADE_STEP, -divLo(LOSS_FADE_LEVEL_MAX, ticks | 0));
+        mem.write32(fade + LOSS_FADE_STEP, -fadeStep(ticks));
     } else {
         mem.write32(fade + LOSS_FADE_LEVEL, 0);
-        mem.write32(fade + LOSS_FADE_STEP, divLo(LOSS_FADE_LEVEL_MAX, ticks | 0));
+        mem.write32(fade + LOSS_FADE_STEP, fadeStep(ticks));
     }
 }
 

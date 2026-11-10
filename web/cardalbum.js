@@ -22,6 +22,7 @@
 // to the assets/cards/card_icons.png atlas, so owned cells show the card's
 // real art and unowned cells keep the placeholder frame.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFramesMs, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { drawText } from "./uifont.js";
 import { loadPack, drawClip, packReady, drawPackBackdrop } from "./screenpack.js";
@@ -57,8 +58,7 @@ const REVEAL_FRAMES_PER_CELL = 2;
 // 0 → 0xFF00 in 10 frames, then the album is gone. Entry is the same
 // duration the other way. F0x80084c38 case at unk10=0x32.
 const LEAVE_FADE_FRAMES = 0xA;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 function albumId(page, cell) {
   return page * PAGE_SIZE + cell + 1;
@@ -233,8 +233,8 @@ export function createCardAlbum(sfx = null) {
     if (!c._open) return;
     const nowMs = performance.now();
     if (c.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((nowMs - c.fadeT0) / VSYNC_MS));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { close(); return; }
+      const frames = leaveFadeFramesMs(nowMs, c.fadeT0);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) { close(); return; }
     }
     c.tick += 1;
     const s = Math.max(1, Math.min(w / 320, h / 240));
@@ -430,8 +430,8 @@ export function createCardAlbum(sfx = null) {
     }
 
     if (c.fadeLeaving || c.fadeEntering) {
-      const frames = Math.max(0, Math.floor((nowMs - c.fadeT0) / VSYNC_MS));
-      let a = Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+      const frames = leaveFadeFramesMs(nowMs, c.fadeT0);
+      let a = leaveFadeLevel(frames, LEAVE_FADE_DELTA);
       if (c.fadeEntering) {
         a = 1 - a;
         if (a <= 0) c.fadeEntering = false;

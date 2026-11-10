@@ -17,6 +17,8 @@
 //                                 layer [+0x50], bucket [+0x54], grey level [+0x5C] >> 8,
 //                                 semi-transparency mode 2 (background minus foreground).
 //                                 A host boundary; the browser paints the dim over the frame.
+import { fadeStep } from "../screen-dim.ts";
+
 export const REPORT_FADE_HANDLER = 0x80083164;
 export const REPORT_FADE_SIZE = 0x68;
 export const REPORT_FADE_START_ENTRY = 0x80082f98;
@@ -55,8 +57,7 @@ export function reportFadeStart(
     host.callMethod(obj, 0x28, [1]);
     mem.write32(obj + 0x10, 1);
     mem.write32(obj + 0x58, direction | 0);
-    // MIPS signed div: a zero divisor yields -1 for a positive dividend.
-    const step = frames === 0 ? -1 : Math.trunc(FADE_FULL / (frames | 0));
+    const step = fadeStep(frames);
     if ((direction | 0) === 0) {
         mem.write32(obj + 0x5c, 0);
         mem.write32(obj + 0x60, step | 0);

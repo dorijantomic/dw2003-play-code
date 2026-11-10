@@ -122,11 +122,8 @@ test("the F2 switch is in ambience.js's Extras row and EXPERIMENTAL, and gates t
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"movetheatre"/, "Move theatre starts off");
-    assert.match(ambience, /data-act="movetheatre"/, "the gated row carries its button");
-    assert.match(ambience, /move-theatre\.html/, "the button opens the page");
-    const row = ambience.match(/id="fx-movetheatre"[\s\S]*?<\/div>/);
-    assert.ok(row, "the button row exists in the panel");
-    assert.match(row[0], /data-act="movetheatre"/, "the button is inside that row");
-    assert.match(ambience, /hidden\s*=\s*!fx\.movetheatre/,
-        "the row is shown only while the toggle is on");
+    const devModel = source("../web/dev-panel-model.js"), devPanel = source("../web/dev-panel.js");
+    assert.match(devModel, /movetheatre: P\("move-theatre\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
 });

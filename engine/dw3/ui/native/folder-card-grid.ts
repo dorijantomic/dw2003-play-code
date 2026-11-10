@@ -49,6 +49,8 @@
 //
 // This is lane B (engine/dw3/ui/native/**); lane A owns the shared barrel.
 
+import { SAVE_CARD_MAX } from "../../card-limits.ts";
+
 /** The card grid object: handler, allocation size and children-block size. */
 export const FOLDER_GRID_HANDLER = 0x80086574;
 export const FOLDER_GRID_SIZE = 0x494;
@@ -71,7 +73,8 @@ export const FOLDER_SLOT_COUNT = 40;
 /** Per-card copy counts and the album/seen flag: owned[id] at +0x3A2 + id. */
 export const FOLDER_OWNED_BASE = 0x80048d34;
 export const FOLDER_OWNED_OFF = 0x3a2;
-export const FOLDER_CARD_MAX = 0x13b;
+/** Cards numbered below this are in range: the card-limits exclusive bound. */
+export const FOLDER_CARD_MAX = SAVE_CARD_MAX;
 /** The language/save cell the text-bank ids derive from. */
 export const FOLDER_GRID_SAVE_PTR = 0x8005cca8;
 /** The six cursor-pulse frame words. */

@@ -157,11 +157,10 @@ test("the F2 switch is the Extras pair and EXPERIMENTAL, with a button row hidde
   const ambience = readFileSync("web/ambience.js", "utf8");
   assert.ok(ambience.includes('["gymmap", "Gym map (new)"]'), "the Extras row has the pair");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"gymmap"/, "gymmap is off until switched on");
-  assert.match(ambience, /id="fx-gymmap" hidden/, "the button row starts hidden");
-  assert.match(ambience, /data-act="gymmap"/, "the button names its action");
-  assert.match(ambience, /#fx-gymmap[^\n]*hidden = !fx\.gymmap/, "the row follows the switch");
-  assert.match(ambience, /kind === "gymmap"[^\n]*fx\.gymmap/, "the click only opens the page while on");
-  assert.match(ambience, /window\.open\("gym-map\.html", "_blank", "noopener"\)/);
+  const devModel = readFileSync("web/dev-panel-model.js", "utf8"), devPanel = readFileSync("web/dev-panel.js", "utf8");
+  assert.match(devModel, /gymmap: P\("gym-map\.html"/, "the Open button's page is in the F2 page model");
+  assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+  assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
   assert.doesNotMatch(readFileSync("web/game.js", "utf8"), /gym-map|gymmap/, "the map is not a game.js hook");
 });
 

@@ -19,6 +19,8 @@ import { ELEMENT_KEYS } from "./effective-stats.ts";
 
 /** The resident party/save context (0x26C4 bytes). */
 export const PARTY_CONTEXT = 0x80048d34;
+/** The language cell the text-bank readers resolve through. */
+export const LANGUAGE_CELL = 0x8005cca8;
 /** Party position 0..2 -> roster slot map, u32[3] at ctx+0x70. */
 export const PARTY_MAP = PARTY_CONTEXT + 0x70;
 /** Roster record array: 0x3DC-byte records, index = starter species slot. */
@@ -26,8 +28,14 @@ export { ROSTER_RECORDS, ROSTER_STRIDE, EXTRA_ROSTER_RECORDS, rosterRecordAddres
 import { ROSTER_RECORDS, ROSTER_STRIDE, rosterRecordAddress } from "./roster-records.ts";
 /** The record's Unknown4 stats block (record + 0x08); F0x80017B4C returns it. */
 export const CUR_STATS = ROSTER_RECORDS + 0x08;
-/** Record-relative field offsets (u16 unless noted). */
+/**
+ * Record-relative field offsets (u16 unless noted): the ONE field map of a roster
+ * record. Every seed and every reader spells its offsets from here.
+ */
 export const RECORD_FIELDS = {
+    slotWord: 0x00, // u32: the member's roster slot + 3 (the gym and lab seeds)
+    currentForm: 0x04, // u32: the current form the form ledger points at
+    name: 0x08, // RECORD_NAME_BYTES then a NUL
     exp: 0x20, // u32
     level: 0x24,
     tp: 0x26,
@@ -37,7 +45,17 @@ export const RECORD_FIELDS = {
     maxMp: 0x2e,
     core: 0x30, // 6 x u16
     elements: 0x3c, // 7 x u16
+    equipped: 0x50, // 3 x u16: the equipped technique forms
+    ledger: 0x58, // RECORD_LEDGER_ENTRIES x RECORD_LEDGER_STRIDE
+    ultraByte: 0x3d4, // u8: the remembered Ultra Training drill
 } as const;
+/** The record's name field: 23 bytes, then a NUL. */
+export const RECORD_NAME_BYTES = 23;
+/** How many technique forms a record equips (the halfwords at `equipped`). */
+export const RECORD_EQUIPPED_VALUES = 3;
+/** The form ledger at `ledger`: 0x2C entries of 0x14 bytes. */
+export const RECORD_LEDGER_ENTRIES = 0x2c;
+export const RECORD_LEDGER_STRIDE = 0x14;
 
 /**
  * The original's own offset of the six equip halfwords, off `CUR_STATS` — the
@@ -83,6 +101,100 @@ export const ROSTER_EQUIP_OFFSETS_LIST = ROSTER_EQUIP_SLOTS.map((name) => ROSTER
 /** One member's equip halfword address, in this port's record base. */
 export function rosterEquipAddress(rosterSlot: number, name: RosterEquipSlot): number {
     return rosterRecordAddress(rosterSlot) + ROSTER_EQUIP_OFFSETS[name];
+}
+
+/** The writes a record seed makes; `NativeMemory` satisfies this. */
+export interface RosterRecordMemory {
+    write8(addr: number, value: number): void;
+    write16(addr: number, value: number): void;
+    write32(addr: number, value: number): void;
+}
+
+/** One form-ledger entry as a seed supplies it: the 0x14 bytes at `ledger + i * 0x14`. */
+export interface RosterLedgerSeed {
+    value: number;
+    formLevel: number;
+    present: number;
+    dvexp: number;
+    techniques: readonly number[];
+}
+
+/**
+ * The fields one seed writes into one roster record. Every field is optional: a seed
+ * writes only what it knows and leaves the rest of the record as it found it.
+ */
+export interface RosterRecordSeed {
+    /** u32 at +0x00: the member's roster slot + 3. */
+    slotWord?: number;
+    /** u32 at +0x04: the current form the ledger points at. */
+    currentForm?: number;
+    /** The record's name; up to RECORD_NAME_BYTES bytes, then a NUL. */
+    nameBytes?: readonly number[];
+    exp?: number;
+    level?: number;
+    tp?: number;
+    hp?: number;
+    maxHp?: number;
+    mp?: number;
+    maxMp?: number;
+    core?: readonly number[];
+    elements?: readonly number[];
+    /** The six worn items. Every seed writes all six, 0 in an empty slot. */
+    equipment?: RosterEquipment | undefined;
+    /** The RECORD_EQUIPPED_VALUES equipped technique forms. */
+    equipped?: readonly number[];
+    /** The form ledger; a null entry is zeroed but not filled. */
+    ledger?: readonly (RosterLedgerSeed | null | undefined)[];
+    /** u8 at +0x3D4: the remembered Ultra Training drill. */
+    ultraByte?: number;
+}
+
+/**
+ * Write one seed into the roster record at `record` (a `rosterRecordAddress`).
+ *
+ * The gym seed, the lab's seedSave and the fight report's seed each spelled these
+ * offsets out by hand; they all come here now, so the layout lives in RECORD_FIELDS
+ * alone and a field map change reaches every screen. The writes are the originals'
+ * own: a halfword per stat, `RECORD_NAME_BYTES` name bytes and a NUL, six equip
+ * halfwords in the original's order, and each ledger entry zeroed then filled.
+ */
+export function writeRosterRecord(mem: RosterRecordMemory, record: number, seed: RosterRecordSeed): void {
+    const f = RECORD_FIELDS;
+    if (seed.slotWord !== undefined) mem.write32(record + f.slotWord, seed.slotWord >>> 0);
+    if (seed.currentForm !== undefined) mem.write32(record + f.currentForm, seed.currentForm >>> 0);
+    if (seed.nameBytes) {
+        seed.nameBytes.slice(0, RECORD_NAME_BYTES).forEach((byte, i) => mem.write8(record + f.name + i, byte & 0xff));
+        mem.write8(record + f.name + Math.min(RECORD_NAME_BYTES, seed.nameBytes.length), 0);
+    }
+    if (seed.exp !== undefined) mem.write32(record + f.exp, seed.exp >>> 0);
+    const half = (offset: number, value: number | undefined): void => {
+        if (value !== undefined) mem.write16(record + offset, value & 0xffff);
+    };
+    half(f.level, seed.level);
+    half(f.tp, seed.tp);
+    half(f.hp, seed.hp);
+    half(f.maxHp, seed.maxHp);
+    half(f.mp, seed.mp);
+    half(f.maxMp, seed.maxMp);
+    (seed.core ?? []).forEach((value, i) => mem.write16(record + f.core + i * 2, value & 0xffff));
+    (seed.elements ?? []).forEach((value, i) => mem.write16(record + f.elements + i * 2, value & 0xffff));
+    const worn = seed.equipment ?? {};
+    ROSTER_EQUIP_OFFSETS_LIST.forEach((offset, i) => {
+        const id = worn[ROSTER_EQUIP_SLOTS[i]!];
+        mem.write16(record + offset, Number.isInteger(id) && id !== undefined && id > 0 && id <= 0xffff ? id : 0);
+    });
+    (seed.equipped ?? []).forEach((value, i) => mem.write16(record + f.equipped + i * 2, value & 0xffff));
+    seed.ledger?.forEach((entry, i) => {
+        const at = record + f.ledger + i * RECORD_LEDGER_STRIDE;
+        for (let offset = 0; offset < RECORD_LEDGER_STRIDE; offset += 4) mem.write32(at + offset, 0);
+        if (!entry) return;
+        mem.write16(at, entry.value & 0xffff);
+        mem.write8(at + 2, entry.formLevel & 0xff);
+        mem.write8(at + 3, entry.present & 0xff);
+        mem.write32(at + 4, entry.dvexp >>> 0);
+        entry.techniques.forEach((technique, j) => mem.write16(at + 8 + j * 2, technique & 0xffff));
+    });
+    if (seed.ultraByte !== undefined) mem.write8(record + f.ultraByte, seed.ultraByte & 0xff);
 }
 
 export interface MemoryReader {

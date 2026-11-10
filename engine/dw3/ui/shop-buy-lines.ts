@@ -1,6 +1,8 @@
 // The BUY controller's quantity and confirmation widget updates from stitshop
 // F0x800836F8 and F0x80083810. Widget methods themselves are shared ports.
 
+import { LANGUAGE_CELL } from "../party-context.ts";
+
 export interface ShopBuyLinesMemory {
   read16(address: number): number;
   read32(address: number): number;
@@ -15,7 +17,7 @@ export interface ShopBuyLinesHost {
   textMeasure(widget: number, enabled: number): void;
 }
 
-const LANGUAGE = 0x8005cca8;
+const LANGUAGE = LANGUAGE_CELL;
 const SHOP_BANK_OFFSET = 0x71;
 
 /** F0x800836F8: fill or hide "How many?", its marker, and the quantity. */

@@ -45,7 +45,9 @@ export const questNoneIndex = (count: number): number => questPromptIndex(count)
 export const questNoneLineIndex = (count: number): number => questPromptIndex(count) + 2;
 export const questReadPromptIndex = (count: number): number => questPromptIndex(count) + 3;
 /** The strings after these: every quest's full text, three lines to a page, quest by quest. */
-export const questDetailBase = (count: number): number => questPromptIndex(count) + 4;
+/** The empty page's second sentence line (the help box has two text lines). */
+export const questNoneLine2Index = (count: number): number => questPromptIndex(count) + 4;
+export const questDetailBase = (count: number): number => questPromptIndex(count) + 5;
 
 /** Build the page object (the pause host's builder for the extra row). */
 export function questsFactory(mem: PauseMemory, parent: number, host: QuestsHost): number {
@@ -111,7 +113,7 @@ function questsTick(mem: PauseMemory, obj: number, ui: number, host: QuestsHost)
   const showLines = () => {
     for (let k = 0; k < LINES; k++) {
       const widget = at(0x28 + k * 4);
-      if (count === 0) { if (k === 0) say(widget, questNoneLineIndex(count)); else hide(widget); }
+      if (count === 0) { if (k === 0) say(widget, questNoneLineIndex(count)); else if (k === 1) say(widget, questNoneLine2Index(count)); else hide(widget); }
       else say(widget, questLineIndex(count, r(0x60), k));
     }
   };

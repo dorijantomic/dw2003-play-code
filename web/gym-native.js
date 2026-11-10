@@ -20,14 +20,11 @@
 // The old hand-authored screen (web/gym.js) stays as the development rollback
 // until this route is accepted; nothing here falls back to it.
 
-import { elementValue, maskFromButtons, ROSTER_SLOT_CHARIDS } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { rosterSlotOfCharId, ROSTER_STRIDE } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { seedNativeScreenParty } from "./native-screen.js";
 import { driStatsAt } from "./dri-model.js";
+import { CHARID_TO_DIGID, storedFromRecord, storedNumbers } from "./party.js";
 import { ensureStoredStats, gymRepPercent, gymRepResults } from "./battle.js";
 import { drawClip, loadPack, packReady } from "./screenpack.js";
 import { gymGroupFor } from "./gym.js";
@@ -62,7 +59,6 @@ const SCENE_FALLBACK = { [TR_INTRO]: 450, [TR_WINDUP]: 360, [TR_HIT]: 520, [TR_M
 const MODULE_ID = "pro/stgtrain";
 const GYM_GROUP_CELL = 0x8004b404;
 const RECORDS = 0x80049494;
-const STRIDE = 0x3dc;
 const REC = {
     level: 0x24, tp: 0x26, hp: 0x28, maxHp: 0x2a, mp: 0x2c, maxMp: 0x2e,
     core: 0x30, elements: 0x3c,
@@ -71,11 +67,10 @@ const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const PARTY_SLOTS = 3;
 
-/** Roster slot for a manifest party char id, or -1 when it is not a roster
+/** Roster slot for a manifest party char id, or 0xffffffff when it is not a roster
  *  species (the packed party keeps the standing partners at the front). */
 function rosterSlotFor(charId) {
-    const i = ROSTER_SLOT_CHARIDS.indexOf(String(charId));
-    return i < 0 ? 0xffffffff : i;
+    return rosterSlotOfCharId(String(charId)) ?? 0xffffffff;
 }
 
 export function createGymNative(sfx = null) {
@@ -124,7 +119,7 @@ export function createGymNative(sfx = null) {
             return 0;
         };
         const writeName = (slot, name) => {
-            const base = RECORDS + slot * STRIDE + 0x08;
+            const base = RECORDS + slot * ROSTER_STRIDE + 0x08;
             const text = String(name ?? "").slice(0, 0x1b);
             for (let i = 0; i < text.length; i++) write(base + i, glyphId(text[i]), 1);
             write(base + text.length, 0, 1);
@@ -142,7 +137,7 @@ export function createGymNative(sfx = null) {
             if (slot === 0xffffffff) continue;
             const ps = driStatsAt(state, i, tables?.digimonById ?? {}) ?? {};
             const profile = tables?.digimonById?.[ps.digimonId ?? 0];
-            const core = profile ? ensureStoredStats(ps, profile) : (ps.stats ?? {});
+            const core = profile ? ensureStoredStats(ps, tables?.digimonById?.[CHARID_TO_DIGID[party[i]]] ?? profile) : (ps.stats ?? {});
             writeName(slot, profile?.name ?? ps.name ?? "");
             stats.push({
                 slot,
@@ -153,14 +148,12 @@ export function createGymNative(sfx = null) {
                 mp: Number(ps.mp) || 0,
                 maxMp: Number(ps.maxMp) || 0,
                 exp: Number(ps.xp) || 0,
-                core: CORE.map((k) => Number(core?.[k]) || 0),
-                // The roster record carries the STORED element halfwords — the species
-                // base plus every trained point (F0x80017174 copies them
-                // verbatim) — and the session's own original-code fill adds the
-                // worn gear's resist on top, because that is what F0x80017174
-                // does. One shared helper for the stored half, so no screen
-                // re-adds it by hand.
-                elements: ELEMENTS.map((k) => elementValue(profile, ps.elemBonuses, k)),
+                // The roster record's thirteen stat halfwords come from ONE shared
+                // helper (web/party.js storedNumbers): the STARTER's row plus the
+                // trained points and chips, never the worn form. The session's own
+                // original-code fill adds the worn gear's resist on top, because
+                // that is what F0x80017174 does.
+                ...storedNumbers(party[i], ps, tables?.digimonById ?? {}),
             });
         }
         seedNativeScreenParty({ positions, stats });
@@ -190,8 +183,8 @@ export function createGymNative(sfx = null) {
         rt?.cpu?.setStub(0x8008310c, () => (scene.gateOpen ? 1 : 0));
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
+    function hostOptions() {
+        return {
             seed: seedHostServed,
             // The overlay's rep-marker row only lands at the end of the session
             // and would double the host's progressive row (the 2026-09-21
@@ -200,10 +193,7 @@ export function createGymNative(sfx = null) {
             // 0x45 (ring) and 0x46 (X) are the rep row and nothing else
             // (docs/research/ui/stgtrain-decoded-2026-07-11.md).
             skipClip: (name, id) => name === "sttrng3" && (id === 0x45 || id === 0x46),
-        });
-        if (!host) return false;
-        g._host = host;
-        return true;
+        };
     }
 
     /** The trained record -> walker state. The screen writes the roster record
@@ -219,7 +209,7 @@ export function createGymNative(sfx = null) {
             if (slot === 0xffffffff) continue;
             const ps = driStatsAt(state, i, tables?.digimonById ?? {});
             if (!ps) continue;
-            const base = RECORDS + slot * STRIDE;
+            const base = RECORDS + slot * ROSTER_STRIDE;
             const r16 = (off) => host.read(base + off, 2);
             const r32 = (off) => host.read(base + off, 4);
             ps.level = r16(REC.level) || ps.level;
@@ -228,12 +218,17 @@ export function createGymNative(sfx = null) {
             ps.maxHp = r16(REC.maxHp);
             ps.mp = r16(REC.mp);
             ps.maxMp = r16(REC.maxMp);
-            const core = {};
-            CORE.forEach((k, j) => { core[k] = r16(REC.core + j * 2); });
-            ps.stats = core;
-            const elems = {};
-            ELEMENTS.forEach((k, j) => { elems[k] = r16(REC.elements + j * 2); });
-            ps.elemBonuses = elems;
+            const recCore = CORE.map((k, j) => r16(REC.core + j * 2));
+            const recElements = ELEMENTS.map((k, j) => r16(REC.elements + j * 2));
+            // The record holds the SEEDED numbers, so it is read back through the
+            // helper that undoes the seed (web/party.js storedFromRecord): the
+            // chips come off the six core halfwords and the starter's base off
+            // the seven element halfwords. Copying the record straight back
+            // folded both into the stored block and the next visit counted them
+            // again.
+            const stored = storedFromRecord(party[i], recCore, recElements, ps, tables?.digimonById ?? {});
+            ps.stats = stored.stats;
+            ps.elemBonuses = stored.elemBonuses;
             void r32;
         }
     }
@@ -260,10 +255,7 @@ export function createGymNative(sfx = null) {
         g._group = Number.isInteger(resolved) ? resolved : 0;
         g._lastDiagnostic = Number.isInteger(resolved) ? null : "gym.open without a greeter group";
         g._bootFrames = 0;
-        preloadNativeScreens().catch((e) => {
-            g._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) g._pending = true;
+        g._begin();
     };
 
     g.isOpen = () => g._open;
@@ -272,30 +264,6 @@ export function createGymNative(sfx = null) {
     // held word once per frame (state.keys carries every held button).
     g.handleKey = (_k, state) => {
         if (state && !g._state) g._state = state;
-    };
-
-    g.update = (dt) => {
-        if (!g._open) return;
-        if (g._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                g._lastDiagnostic = "native gym boot failed (manifest/overlay missing)";
-                return;
-            }
-            g._pending = false;
-        }
-        const keys = g._state?.keys;
-        g._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (g._host.tick(dt)) g._finish();
-    };
-
-    g.draw = (ctx, viewW, viewH) => {
-        if (!g._open || !g._host) return;
-        g._host.draw(ctx, viewW, viewH);
-        drawWorkoutScene(ctx, viewW, viewH);
     };
 
     // ── the workout scene (host-served presentation) ────────────────────────
@@ -472,25 +440,6 @@ export function createGymNative(sfx = null) {
         }
     }
 
-    g.close = () => {
-        if (g._open) g._finish();
-    };
-
-    g._finish = () => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        const host = g._host;
-        if (host) {
-            commit(); // reads the roster through g._host, so it must run first
-            host.teardown();
-        }
-        g._host = null;
-        const cb = g._onClose;
-        g._onClose = null;
-        cb?.();
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     g.diagnostics = () => ({
         open: g._open,
@@ -512,5 +461,17 @@ export function createGymNative(sfx = null) {
         lastDiagnostic: g._lastDiagnostic,
     });
 
-    return g;
+    return createNativeAdapter({
+        owner: g,
+        moduleId: MODULE_ID,
+        hostOptions,
+        // Reads the roster through g._host, so it must run before the teardown.
+        commit: () => commit(),
+        draw: (ctx, viewW, viewH) => {
+            if (!g._open || !g._host) return;
+            g._host.draw(ctx, viewW, viewH);
+            drawWorkoutScene(ctx, viewW, viewH);
+        },
+        label: "native gym boot failed (manifest/overlay missing)",
+    });
 }

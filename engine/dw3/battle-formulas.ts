@@ -776,16 +776,26 @@ export function hitGaugeGain(
 }
 
 /**
- * Blast target tier from the partner's battle level — event-0x12 handler ladder
+ * The five partner-level brackets of the event-0x12 Blast ladder, one row per
+ * tier: the level range it covers, inclusive, over the game's levels 1..99.
+ * F0x800a8bf4 @0x800a8cbc tests `slti 4 / 0x13 / 0x27 / 0x46`, i.e. the tiers
+ * break at 4, 19, 39 and 70. [BLAST-C002]
+ *
+ * The numbers live here and nowhere else: `levelTier` reads this table, and
+ * web/blast-ladder.js derives its display brackets from `levelTier`.
+ */
+export const BLAST_LEVEL_BRACKETS: ReadonlyArray<readonly [number, number]> = [
+  [1, 3], [4, 18], [19, 38], [39, 69], [70, 99],
+];
+
+/**
+ * Blast target tier from the partner's battle level — the event-0x12 ladder
  * (F0x800a8bf4 @0x800a8cbc: slti 4 / 0x13 / 0x27 / 0x46). level<4->0, <19->1,
  * <39->2, <70->3, else 4. [BLAST-C002]
  */
 export function levelTier(level: number): number {
-  if (level < 4) return 0;
-  if (level < 19) return 1;
-  if (level < 39) return 2;
-  if (level < 70) return 3;
-  return 4;
+  const tier = BLAST_LEVEL_BRACKETS.findIndex(([, max]) => level <= max);
+  return tier < 0 ? BLAST_LEVEL_BRACKETS.length - 1 : tier;
 }
 
 /**

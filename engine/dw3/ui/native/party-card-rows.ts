@@ -17,6 +17,7 @@
 import type { PartyCardFillHost, PartyCardFillMemory } from "../party-card-fill.ts";
 import { PARTY_CARD_LABEL_FIRST, PARTY_CARD_LABEL_HOLDER, PARTY_CARD_LABEL_STRIDE, PARTY_CARD_ROW_STRIDE,
     PARTY_CARD_TEXT_OFFSET } from "../party-card-fill.ts";
+import { s16 } from "../../gte-math.ts";
 
 export interface PartyCardRowLayout {
     /** The page's stat-index table (five words). */
@@ -62,4 +63,95 @@ export function partyCardRows(
     host.widgetSetFlagC1(w(layout.nameSlot), 0);
     for (let i = 0; i < FIELDS; i++) host.widgetSetFlagC1(w(layout.labelSlot + Math.imul(i, 4)), 0);
     for (let i = 0; i < FIELDS; i++) host.widgetSetFlagC1(w(layout.numberSlot + Math.imul(i, 4)), 0);
+}
+
+/** The row pitch every pause page draws its three rows at. */
+export const PARTY_CARD_ROW_PITCH = 0x2e;
+
+export interface PartyCardGridMemory {
+    read16(addr: number): number;
+    write32(addr: number, value: number): void;
+}
+
+export interface PartyCardGridHost {
+    createText(layer: number, kind: number, x: number, y: number): number;
+}
+
+/**
+ * The row loop the page constructors run before their own widgets: three rows of
+ * a name, five labels and five numbers, each row a pitch lower. `slotBase` is the
+ * name slot, read from the page's layout table.
+ */
+export function partyCardWidgetGrid(
+    mem: PartyCardGridMemory, ui: number, layer: () => number, layout: () => number,
+    slotBase: number, host: PartyCardGridHost,
+): void {
+    for (let row = 0; row < 3; row++) {
+        const yoff = row * PARTY_CARD_ROW_PITCH;
+        const base = row * PARTY_CARD_ROW_STRIDE;
+        const l = layout();
+        mem.write32(ui + base + slotBase,
+            host.createText(layer(), 1, s16(mem.read16(l + 4)), s16(mem.read16(l + 8) + yoff)));
+        for (let i = 0; i < FIELDS; i++) {
+            const e = layout() + 0x14 + i * 0xc;
+            mem.write32(ui + base + slotBase + 4 + i * 4,
+                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
+        }
+        for (let i = 0; i < FIELDS; i++) {
+            const e = layout() + 0x50 + i * 0xc;
+            mem.write32(ui + base + slotBase + 0x18 + i * 4,
+                host.createText(layer(), 3, s16(mem.read16(e - 4)), s16(mem.read16(e) + yoff)));
+        }
+    }
+}
+
+export interface PartyCardFoldMemory {
+    read32(addr: number): number;
+}
+
+export interface PartyCardFoldHost {
+    draw8C(a: number, b: number, c: number): void;
+    draw94(x: number, y: number): void;
+    drawSprite(pack: number, sprite: number, arg: number, y: number): void;
+    packHandle(id: number): number;
+}
+
+/**
+ * The card-and-fold loop of the page draws: each member's fold curve, its three
+ * sprites and the 0x17 bar, one pitch lower each row. `foldBase` is the page
+ * object plus the offset of member 0's fold word (0x19c techniques, 0x90 status,
+ * 0x7c card folders).
+ */
+export function partyCardFoldRows(
+    mem: PartyCardFoldMemory, size: number, foldBase: number, host: PartyCardFoldHost,
+): void {
+    const foldAt = (i: number): number => mem.read32(foldBase + Math.imul(i, 0x10)) | 0;
+    let a = 0x13;
+    let b = 0x11;
+    let c = 0x27;
+    let d = 0x25;
+    for (let i = 0; i < size; i++) {
+        const fold = foldAt(i);
+        if (fold !== 0) {
+            if (fold !== 0x1000) {
+                host.draw8C(fold, 0x1000, 0x1000);
+                host.draw94(0, d);
+                host.drawSprite(host.packHandle(0x02860000), 0x15, 0, b);
+                host.draw8C(foldAt(i), foldAt(i), 0x1000);
+                host.draw94(0x7c, c);
+                host.drawSprite(host.packHandle(0x02860000), 0x16, 0x67, a);
+                host.draw8C(foldAt(i), 0x1000, 0x1000);
+                host.draw94(0, d);
+            } else {
+                host.draw8C(0x1000, 0x1000, 0x1000);
+                host.drawSprite(host.packHandle(0x02860000), 0x15, 0, b);
+                host.drawSprite(host.packHandle(0x02860000), 0x16, 0x67, a);
+            }
+            host.drawSprite(host.packHandle(0x02860000), 0x17, 0, b);
+        }
+        a += PARTY_CARD_ROW_PITCH;
+        b += PARTY_CARD_ROW_PITCH;
+        c += PARTY_CARD_ROW_PITCH;
+        d += PARTY_CARD_ROW_PITCH;
+    }
 }

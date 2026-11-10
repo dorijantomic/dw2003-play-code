@@ -23,12 +23,8 @@
 // The old hand-authored editor (web/carddeck.js) stays as the development
 // rollback (?legacyDeck=1).
 
-import { maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { SAVE_CARD_MAX, COLLECTION_CAP } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { encodeNativeScreenText } from "./native-screen.js";
 import { decodeNativeText } from "./native-screen-text.js";
 import { cards } from "./cardstate.js";
@@ -44,8 +40,6 @@ const CARDS_OFF = 0x16;
 const CARDS_PER_FOLDER = 40;
 const CARD_COUNTS = SAVE_CONTEXT + 0x3a2;
 const CARD_SEEN = SAVE_CONTEXT + 0x4df;
-const CARD_MAX_ID = 0x13b;
-const CARD_COPIES_MAX = 9;
 
 export function createCardDeckNative(sfx = null) {
     const d = {
@@ -64,13 +58,13 @@ export function createCardDeckNative(sfx = null) {
         // Card availability (the same arrays the album seeds).
         for (const [id, n] of col.owned ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) {
-                write(CARD_COUNTS + cardId, Math.max(0, Math.min(CARD_COPIES_MAX, Number(n) || 0)), 1);
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
+                write(CARD_COUNTS + cardId, Math.max(0, Math.min(COLLECTION_CAP, Number(n) || 0)), 1);
             }
         }
         for (const id of col.seen ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId < CARD_MAX_ID) write(CARD_SEEN + cardId, 1, 1);
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) write(CARD_SEEN + cardId, 1, 1);
         }
         // The three folder records. A folder is blank until the player names
         // it — the original's new game zero-fills the name field and only the
@@ -88,19 +82,20 @@ export function createCardDeckNative(sfx = null) {
         }
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        d._host = host;
-        return true;
-    }
+    // The walker's call site passes only onClose; the lab passes state.
+    d.open = (stateOrClose = null, onClose = null) => {
+        if (typeof stateOrClose === "function") {
+            d._onClose = stateOrClose;
+        } else {
+            d._state = stateOrClose ?? d._state ?? null;
+            d._onClose = onClose;
+        }
+        d._lastDiagnostic = null;
+        d._begin();
+    };
 
     /** The screen's folder records -> the walker's collection. */
-    function commit() {
-        const host = d._host;
+    function commit(host) {
         const col = cards();
         if (!host || !col || !Array.isArray(col.folders)) return;
         for (let f = 0; f < FOLDER_COUNT; f++) {
@@ -134,70 +129,12 @@ export function createCardDeckNative(sfx = null) {
         }
     }
 
-    // The walker's call site passes only onClose; the lab passes state.
-    d.open = (stateOrClose = null, onClose = null) => {
-        d._open = true;
-        if (typeof stateOrClose === "function") {
-            d._onClose = stateOrClose;
-        } else {
-            d._state = stateOrClose ?? d._state ?? null;
-            d._onClose = onClose;
-        }
-        d._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            d._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) d._pending = true;
-    };
-
     d.isOpen = () => d._open;
 
     // Input arrives as key events, but the native screen reads the pad service's
     // held word once per frame (state.keys carries every held button).
     d.handleKey = (_k, state) => {
         if (state && !d._state) d._state = state;
-    };
-
-    d.update = (dt) => {
-        if (!d._open) return;
-        if (d._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                d._lastDiagnostic = "native folder editor boot failed (manifest/overlay missing)";
-                return;
-            }
-            d._pending = false;
-        }
-        const keys = d._state?.keys;
-        d._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (d._host.tick(dt)) d._finish();
-    };
-
-    d.draw = (ctx, viewW, viewH) => {
-        if (!d._open || !d._host) return;
-        d._host.draw(ctx, viewW, viewH);
-    };
-
-    d.close = () => {
-        if (d._open) d._finish();
-    };
-
-    d._finish = () => {
-        if (!d._open) return;
-        d._open = false;
-        d._pending = false;
-        const host = d._host;
-        if (host) {
-            commit(); // reads through d._host, so it must run first
-            host.teardown();
-        }
-        d._host = null;
-        const cb = d._onClose;
-        d._onClose = null;
-        cb?.();
     };
 
     /** Diagnostics for the lab and focused browser checks. */
@@ -208,5 +145,11 @@ export function createCardDeckNative(sfx = null) {
         lastDiagnostic: d._lastDiagnostic,
     });
 
-    return d;
+    return createNativeAdapter({
+        owner: d,
+        moduleId: MODULE_ID,
+        hostOptions: { playPackedSound: (id) => { sfx?.playPacked(id); }, seed },
+        commit,
+        label: "native folder editor boot failed (manifest/overlay missing)",
+    });
 }

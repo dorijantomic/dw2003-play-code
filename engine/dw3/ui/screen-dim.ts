@@ -57,6 +57,19 @@ export function dimDelta(frames: number): number {
 }
 
 /**
+ * The step a fade ramp stores at +0x60: `0xFF00 / frames` truncated, the
+ * original's own `div` result. Nine handlers wrote this line out by hand and
+ * three of them disagreed about a zero divisor; the original does not. MIPS
+ * `div` with a zero divisor leaves LO at -1 for a positive dividend, so a ramp
+ * started with no frames steps back by one and finishes on its next tick,
+ * instead of dividing by zero or standing still at level 0 forever.
+ */
+export function fadeStep(frames: number): number {
+  const n = frames | 0;
+  return n === 0 ? -1 : Math.trunc(DIM_FULL / n);
+}
+
+/**
  * The published dim level (0..255) after `frames` vsyncs of a ramp whose step
  * is `delta`. This is exactly `min(255, (frames * delta) >> 8)`, the shape the
  * screens already used -- it is gathered here so eight copies become one.

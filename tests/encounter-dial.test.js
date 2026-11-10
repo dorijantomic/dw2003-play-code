@@ -20,6 +20,7 @@ import {
 
 const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
 const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const devSrc = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");   // the F2 page draws the select
 const dialSrc = readFileSync(new URL("../web/encounter-dial.js", import.meta.url), "utf8");
 
 test("the decoded step counter is the one authority and the dial never re-implements it", () => {
@@ -85,16 +86,17 @@ test("game.js applies the dial at the field-tick call site, never in the engine"
 test("ambience.js: the Extras switch, the select, the change handler and the refresh", () => {
   assert.match(ambience, /\["encounterdial", "Encounter dial \(repel \/ lure\)"\]/, "the F2 row");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"encounterdial"/, "OFF until switched on");
-  assert.match(ambience, /<select data-dial[\s>]/, "the select exists in the panel HTML");
+  assert.match(devSrc, /<select data-dial[\s>]/, "the select exists in the panel HTML");
   for (const v of ["none", "rare", "normal", "lure"]) {
-    assert.match(ambience, new RegExp(`<option value="${v}"`), `${v} is offered`);
+    assert.match(devSrc, new RegExp(`<option value="${v}"`), `${v} is offered`);
   }
-  assert.match(ambience, /<option value="normal" selected>/, "normal is the default");
+  assert.match(devSrc, /<option value="normal" selected>/, "normal is the default");
   assert.match(ambience, /setFx\("encounterDialMode", t\.value\)/, "the change handler stores the mode");
   assert.match(ambience, /encounterDialMode = "normal"/, "fx starts at normal");
-  assert.match(ambience, /dl\.value = dialModeFromFx\(fx\)/, "refreshPanel shows the stored mode");
-  assert.match(ambience, /dlRow\.hidden = !fx\.encounterdial/, "the select hides with the switch");
-  assert.match(ambience, /id="fx-dial" hidden/, "the row ships hidden");
+  assert.match(devSrc, /e\.value = api\.dialMode\(\)/, "the page shows the stored mode");
+  assert.match(ambience, /dialMode: \(\) => dialModeFromFx\(fx\)/, "the stored mode comes from dialModeFromFx");
+  assert.match(devSrc, /row\.hidden = !fx\[row\.dataset\.showWhen\]/, "the select hides with the switch");
+  assert.match(devSrc, /data-show-when="encounterdial" hidden/, "the row ships hidden");
 });
 
 test("encounter-dial.js is pure: no DOM, no imports, no state", () => {

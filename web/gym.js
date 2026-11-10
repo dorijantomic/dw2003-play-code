@@ -21,6 +21,7 @@
 // 0-based group (GYM-Q001, gym_ranks.json / gymGroupFor). Lab and debug open
 // with no greeter, so gymRankFor is the ID-card fallback used only on that path.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFramesMs, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { drawWindow } from "./uiRects.js";
 import { assignAssetImage } from "./assets.js";
@@ -32,8 +33,9 @@ import {
   gymRepPercent, gymRepResults, gymSessionResult, ensureStoredStats,
   gymStatForId,
 } from "./battle.js";
-import { ensureDriPartyStats, driRoster, driStatsAt, driDigimonAt } from "./dri-model.js";
-import { elementValue, equipmentBonuses, ui } from "./vendor/engine.js";
+import { ensureDriPartyStats, driRoster, driStatsAt, driStarterAt, driDigimonAt } from "./dri-model.js";
+import { elementValueWithGear, storedNumbers } from "./party.js";
+import { equipmentBonuses, ui } from "./vendor/engine.js";
 
 // Native chrome layout (tools/extract_stgtrain_ui.py -> stgtrain_ui.json).
 // Pack STTRNGCS/STTRNGTM (LBA 0x28c/0x28d, disc-only, extracted the same way
@@ -169,8 +171,7 @@ const VSYNC_MS = 20;
 // only overlay call is direction 0, duration 0x1E: the 8.8 dim word runs
 // 0 → 0xFF00 in 30 frames, then the gym is gone.
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 const ANIM_T = 0.2; // window fold, 10 PAL vsyncs (window-fold-tween homolog)
 
 // HUD number colours after a session (SCREEN-OBJECT-METHODS-001,
@@ -538,7 +539,7 @@ export function createGym(sfx = null) {
     // training writes str = 0 + delta and the panel/DRI (which read stats.stats
     // as the ABSOLUTE total) show the delta as the whole stat — the base is
     // wiped. Battle already does this at entry (battle.js ensureStoredStats).
-    if (prof) ensureStoredStats(ps, prof);
+    if (prof) ensureStoredStats(ps, driStarterAt(state, g.trainSlot, g.digimonById) ?? prof);
     const gym = g.progression.gym;
     const entry = g.drills[g.drillSel];
     const dig = {
@@ -864,8 +865,8 @@ export function createGym(sfx = null) {
       g.actorScale = Math.min(ACTOR_SCALE_UNITY, frames * ACTOR_SCALE_IN_DELTA);
     }
     if (g.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((now - g.fadeT0) / VSYNC_MS));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { close(); return; }
+      const frames = leaveFadeFramesMs(now, g.fadeT0);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) { close(); return; }
     }
     const s = Math.max(1, Math.min(w / 320, h / 240));
     ctx.save();
@@ -960,9 +961,19 @@ export function createGym(sfx = null) {
         // native columns are 51 and 93.
         const HT2 = L?.hud_text ?? HUD_TEXT;
         const prof = member.profile, st = member.stats;
+        // The six core numbers are the roster record's own halfwords (fill
+        // F0x80084064 reads them back through the record helper at 0x8005b468),
+        // so they come from the one shared source: storedNumbers' `core` — the
+        // stored value plus the permanent chips, off the STARTER's row — with the
+        // WORN form's row only as the no-record fallback storedNumbers uses too.
+        const stored = storedNumbers(member.charId, st, g.digimonById, prof);
+        // The res rows are the record's own numbers, so they read the STARTER's
+        // profile (the base the trained points and gear sit on), not member.profile,
+        // which is the worn form and would pay the gear's own element shift twice.
+        const starter = driStarterAt(state, member.index ?? g.trainSlot, g.digimonById) ?? prof;
         const core = HT2.core, resC = HT2.res;
         CORE_ROWS.slice(0, core.rows).forEach((stat, i) => {
-          drawText(ctx, String(st?.stats?.[stat] ?? prof?.[stat] ?? 0),
+          drawText(ctx, String(stored.core[i] ?? 0),
             core.x, core.y0 + i * core.stepY,
             hudDeltaOpts(stat, { alignRight: true, kind: core.kind }));
         });
@@ -974,7 +985,7 @@ export function createGym(sfx = null) {
           // slots are the ones the original reads for this member.
           const slot = state.equipment?.[member.index ?? g.trainSlot] ?? {};
           const worn = equipmentBonuses(slot).elemResists ?? {};
-          const v = elementValue(prof, { ...(st?.elemBonuses ?? {}), ...worn }, res);
+          const v = elementValueWithGear(starter, st?.elemBonuses, worn, res);
           drawText(ctx, String(v), resC.x, resC.y0 + i * resC.stepY,
             hudDeltaOpts(res, { alignRight: true, kind: resC.kind }));
         });
@@ -1428,8 +1439,8 @@ export function createGym(sfx = null) {
       }
     }
     if (g.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((now - g.fadeT0) / VSYNC_MS));
-      const a = Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+      const frames = leaveFadeFramesMs(now, g.fadeT0);
+      const a = leaveFadeLevel(frames, LEAVE_FADE_DELTA);
       paintScreenDim(ctx, a * 255, 320, 240);
     }
     ctx.restore();

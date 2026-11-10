@@ -66,7 +66,8 @@ test("the interpreter check detects the interpreter when a graph links one", asy
 test("the ordinary duel route still boots the shipped overlay through the interpreter host", () => {
     const source = readFileSync(new URL("../web/cardduel-native.js", import.meta.url), "utf8");
     assert.match(source, /native-screen-host\.js/, "the adapter boots the overlay through the host");
-    assert.match(source, /openNativeScreen/, "the adapter opens an interpreter-backed screen");
+    // The call itself moved into the factory (card 11).
+    assert.match(source, /createNativeAdapter|openNativeScreen/, "the adapter opens an interpreter-backed screen");
     const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
     assert.match(game, /const USE_NATIVE_DUEL = !GYM_PARAMS\.has\("legacyDuel"\)/,
         "the card duel ordinary route is the native adapter, until the session can run a match");

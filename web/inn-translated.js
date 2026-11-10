@@ -18,6 +18,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { applyInnRest } from "./inn.js";
 import { fetchBytes, loadResidentResources } from "./resident-data.js";
+import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -46,6 +47,14 @@ export function createInnTranslated(sfx = null, bgm = null) {
         _bgm: bgm, time: 0,
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
+
+    // Taken away by the caller, the session is disposed before onClose runs, as this screen always
+    // did; a session that ended by itself already tore itself down, so the finish path disposes
+    // nothing. No `_pending` flag here, and `_session` stays readable after the close.
+    const host = createTranslatedScreenHost(inn, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_ALWAYS,
+        tracksPending: false, countsCloses: true, clearSession: false,
+    });
 
     const playSound = (id) => {
         const key = id >>> 0;
@@ -98,33 +107,26 @@ export function createInnTranslated(sfx = null, bgm = null) {
     inn.open = async (state, opts = {}) => {
         const record = innForStage(opts.map);
         if (!record) return null;
-        const request = ++inn._request;
+        const request = host.begin();
         const party = opts.party ?? partyOf(state);
         const quote = quoteInnStay(party, record.pricePerDigimon, state?.bits ?? 0);
-        // The screen is UP from the moment it is asked for, not from the moment
-        // its bank has finished loading. That is the contract every other translated
-        // adapter keeps — web/shop-translated.js:93 sets `_open` before its first
-        // await, web/dialogue-translated.js:94 and web/help-menu-translated.js:50 the
-        // same, and each bumps `_request` on the way out (web/shop-translated.js:141,
-        // web/dialogue-translated.js:174, web/help-menu-translated.js:122). This
-        // adapter set `_open` only after its await, so a close() that landed while the
-        // bank was still loading was swallowed: `finish()` saw a closed screen and
-        // returned, and the open then went on to raise a rest screen the caller had
-        // already dismissed. That is how a stay ended up alive underneath the memory
-        // card, taking the card's own confirm as a second "Stay in Inn"
-        // (tools/verify_inn_rest.mjs, "the card did not charge the stay a second
-        // time").
-        inn._open = true;
+        // The screen is UP from the moment it is asked for, not from the moment its bank has
+        // finished loading (web/translated-screen-host.js, begin). This adapter once set `_open`
+        // only after its await, so a close() that landed while the bank was still loading was
+        // swallowed: finish() saw a closed screen and returned, and the open then went on to raise
+        // a rest screen the caller had already dismissed. That is how a stay ended up alive
+        // underneath the memory card, taking the card's own confirm as a second "Stay in Inn"
+        // (tools/verify_inn_rest.mjs, "the card did not charge the stay a second time").
         try {
             const lang = language(state);
             const [shared, bank] = await Promise.all([loadResidentResources(), loadBank(lang)]);
-            if (request !== inn._request) return quote;
+            if (!host.current(request)) return quote;
             inn._session?.dispose();
             const session = new ui.InnSession(shared);
             inn._state = state;
             inn._record = record;
             inn._party = party;
-            inn._onClose = opts.onClose ?? null;
+            host.attach(opts.onClose ?? null);
             inn._queued = 0;
             inn._ticks = 0;
             inn._music = [];
@@ -137,34 +139,20 @@ export function createInnTranslated(sfx = null, bgm = null) {
             }, {
                 onRest: () => rest(session),
                 onMusic: (id, kind) => inn._music.push([id >>> 0, kind]),
-                onClose: () => finish(),
+                onClose: () => host.finish(),
             });
             inn._session = session;
             inn._clock = new ui.MenuDisplayClock();
         } catch (error) {
-            if (request === inn._request) { inn._open = false; fail(error); }
+            if (host.current(request)) { inn._open = false; fail(error); }
             return null;
         }
         return quote;
     };
 
-    // Both close paths bump `_request`, so an open() whose bank has not finished loading
-    // is discarded instead of raising the screen after the caller dismissed it — the same
-    // contract as web/dialogue-translated.js:166-177 and web/help-menu-translated.js:117-133.
-    function finish() {
-        if (!inn._open) return;
-        inn._open = false;
-        inn._closes++;
-        ++inn._request;
-        const cb = inn._onClose;
-        inn._onClose = null;
-        cb?.();
-    }
-
     /** Abandon the screen (the field left another way); onClose still runs, as web/inn.js close() does. */
     inn.close = () => {
-        inn._session?.dispose();
-        finish();
+        host.close();
     };
 
     // Button calls become the pressed word of the next display tick (logical bits: Up 4, Down 6,

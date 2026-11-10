@@ -33,7 +33,7 @@ import {
 } from "./native-screen.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
-import { NativeVblankClock } from "./vendor/engine.js";
+import { NativeVblankClock, maskFromButtons } from "./vendor/engine.js";
 
 /** Screen packs are extracted at the console's 320x240; the game canvas is
  *  640x480 and the field draws through the same 2x factor (ZOOM). */
@@ -196,6 +196,119 @@ export function openNativeScreen(moduleId, opts = {}) {
     };
     opts.seed?.({ read: nativeScreenRead, write: nativeScreenWrite, rt });
     return host;
+}
+
+/**
+ * The lifecycle every native screen adapter repeats: preload, the deferred boot
+ * while the manifest lands, the pad word from the walker's held keys, one frame
+ * of ticking, and the close that reads the screen's RAM back before teardown.
+ *
+ * The adapter module keeps what is its own — open()'s arguments, seed(), the
+ * RAM read-back in commit(), diagnostics — and hands the rest here. `owner` is
+ * the object open()/update()/close() live on; the factory installs `_begin`,
+ * `_boot`, `update`, `draw`, `close` and `_finish` on it.
+ *
+ * Hooks, all optional:
+ *   moduleId      the overlay root (required).
+ *   hostOptions   openNativeScreen's options, or a function returning them when
+ *                 a boot must build fresh ones (a memcard, a root argument).
+ *   preload       extra work before the manifest load (tables, banks).
+ *   pad(host, state) -> mask; default: the walker's held keys.
+ *   frame(host, dt) -> true when the screen is done; default `host.tick(dt)`.
+ *   afterBoot(host) runs once the overlay is up, for a screen that reads a
+ *                 baseline off the booted RAM (the fight report's payout).
+ *   commit(host, allowCommit) reads the screen's RAM back. Runs BEFORE the
+ *                 teardown on every close path, so a screen the console retired
+ *                 and one the player left record the same state. The copies
+ *                 disagreed here: the card screens read the RAM while the host
+ *                 was alive, the others after clearing it.
+ *   closed(allowCommit) the caller's callback, run after teardown; the default
+ *                 calls `owner._onClose` once and clears it.
+ *   label         the diagnostic for a boot that returns null.
+ *   draw          a screen-specific paint; the default is the host's own frame.
+ */
+export function createNativeAdapter({
+    owner,
+    moduleId,
+    hostOptions = {},
+    preload = preloadNativeScreens,
+    ready = nativeScreensReady,
+    pad = (host, state) => (state?.keys ? maskFromButtons(state.keys) : 0),
+    frame = (host, dt) => host.tick(dt),
+    afterBoot = null,
+    commit = null,
+    closed = null,
+    label = `native ${moduleId} boot failed (manifest/overlay missing)`,
+    draw = null,
+}) {
+    owner._boot = () => {
+        const opts = typeof hostOptions === "function" ? hostOptions() : hostOptions;
+        const host = openNativeScreen(moduleId, opts);
+        if (!host) return false;
+        owner._host = host;
+        // A screen whose baseline is read off the booted RAM takes it here, once.
+        if (afterBoot) afterBoot(host);
+        return true;
+    };
+
+    /** open()'s shared tail: preload, boot, or wait for the manifest. */
+    owner._begin = () => {
+        owner._open = true;
+        preload().catch((e) => {
+            owner._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
+        });
+        if (!owner._boot()) owner._pending = true;
+    };
+
+    owner.update = (dt, state) => {
+        if (!owner._open) return;
+        if (state && !owner._state) owner._state = state;
+        if (owner._pending) {
+            if (!ready()) {
+                preload().catch(() => {});
+                return;
+            }
+            if (!owner._boot()) {
+                owner._lastDiagnostic = label;
+                return;
+            }
+            owner._pending = false;
+        }
+        const host = owner._host;
+        if (!host) return;
+        host.setPad(pad(host, owner._state) >>> 0);
+        if (frame(host, dt)) owner._finish();
+    };
+
+    owner.draw = draw ?? ((ctx, viewW = NATIVE_SCREEN_W, viewH = NATIVE_SCREEN_H) => {
+        if (!owner._open || !owner._host) return false;
+        owner._host.draw(ctx, viewW, viewH);
+        return true;
+    });
+
+    owner.close = () => {
+        if (owner._open) owner._finish();
+    };
+
+    owner._finish = (allowCommit = true) => {
+        if (!owner._open) return;
+        owner._open = false;
+        owner._pending = false;
+        const host = owner._host;
+        if (host) {
+            if (allowCommit) commit?.(host, allowCommit);
+            host.teardown();
+        }
+        owner._host = null;
+        if (closed) closed(allowCommit, host);
+        else {
+            const cb = owner._onClose;
+            owner._onClose = null;
+            cb?.();
+        }
+    };
+
+    return owner;
 }
 
 export { nativeScreenActive };

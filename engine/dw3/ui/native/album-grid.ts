@@ -32,11 +32,14 @@
 // behaviour. This is lane B (engine/dw3/ui/native/**); lane A owns the shared
 // engine/dw3/ui/index.ts barrel and data/translated_functions.json.
 
+import { SAVE_CARD_MAX } from "../../card-limits.ts";
+
 /** The resident collection bitmap base; a card's byte is at +0x4DF + card. */
 export const ALBUM_COLLECTION_TABLE = 0x80048d34;
 export const ALBUM_COLLECTION_BYTE = 0x4df;
-/** Cards numbered below this are in range for the collection table. */
-export const ALBUM_CARD_MAX = 0x13b;
+/** Cards numbered below this are in range for the collection table.
+ *  One home: the card-limits exclusive bound the folder and shop code share. */
+export const ALBUM_CARD_MAX = SAVE_CARD_MAX;
 /** The album cell sprite pack. */
 export const PACK_ALBUM = 0x06050000;
 

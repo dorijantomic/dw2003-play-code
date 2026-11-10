@@ -50,9 +50,10 @@ const FLY_SHARE = 0.5;                          // a thrown copy's pivot travel 
 // developer override for a session (it never writes the player's stored choice), and OWNCLIPS=1 does
 // the same for the Node tools; setOwnClipsEnabled(v) pins it for a test or a lab.
 import { battleSetting } from "./battle-settings.js";
+import { isInstalledBuild } from "../ship-list.js";
 let override = null;          // null = follow the player's setting
 export function setOwnClipsEnabled(v) { override = v == null ? null : !!v; }
-export function ownClipsEnabled() { return override == null ? battleSetting("ownclips") : override; }
+export function ownClipsEnabled() { if (isInstalledBuild()) return false; return override == null ? battleSetting("ownclips") : override; }   // installed copy: out, no flag or setter turns it on
 /** Read the developer override out of a query string: `?ownclips=1` turns the rule on for the session. */
 export function ownClipsFlagFromUrl(search = "") {
   try {

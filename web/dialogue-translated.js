@@ -10,6 +10,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
+import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -69,6 +70,12 @@ export function createDialogueTranslated(sfx = null) {
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName, { paintRaw, opaqueClips: true });
 
+    // Closed by the caller, the box disposes its session and still runs onClose, as web/dialogue.js
+    // does; a line that ended by itself has nothing left to dispose.
+    const host = createTranslatedScreenHost(g, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_ALWAYS, countsCloses: true, clearSession: false,
+    });
+
     const playSound = (id) => {
         const key = id >>> 0;
         g._packed[key] = (g._packed[key] ?? 0) + 1;
@@ -83,7 +90,7 @@ export function createDialogueTranslated(sfx = null) {
         console.error("Translated dialogue failed", error);
         // The game route hands a failed line back to the hand-made box (the original close effects still run once).
         const onFail = g._onFail;
-        if (onFail) { g._onFail = null; g._open = false; g._onClose = null; ++g._request; onFail(error); }
+        if (onFail) { g._onFail = null; host.abandon(); onFail(error); }
     }
 
     /**
@@ -91,23 +98,20 @@ export function createDialogueTranslated(sfx = null) {
      * `mode`: { kind: "talk", npc: {x,y,facing,actorId} } or { kind: "say", plain, balloonMode, actor: {x,y,actorId} }.
      */
     g.open = async (source, mode, onClose = null, project = (x, y) => ({ sx: x, sy: y }), opts = {}) => {
-        g._open = true;
-        g._pending = true;
+        const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;
         g._session = null;
         g._ticks = 0;
         g._packed = {};
         g._prevHeld = false;
-        g._onClose = onClose;
         g._onFail = opts.onFail ?? null;
         g._latched = false;
         g._primed = false;
-        const request = ++g._request;
         try {
             const [shared, pack] = await Promise.all([loadResidentResources(), source.pack ?? (source.esdmg ? loadEsdmgEntry(source.esdmg, source.entry, DATA_LABEL) : loadDialogueFile(source.file, DATA_LABEL))]);
-            if (request !== g._request) return;
-            const session = new ui.DialogueSession({ font: shared.font, ranges: shared.ranges }, () => g._finish());
+            if (!host.current(request)) return;
+            const session = new ui.DialogueSession({ font: shared.font, ranges: shared.ranges }, () => host.finish());
             if (mode.kind === "talk") session.openTalk(pack, source.index, mode.npc, project);
             else session.openSay(pack, source.index, mode.actor ?? null, mode.balloonMode ?? 0, !!mode.plain, project);
             // Player-name control (operand 8): the original reads the NUL-terminated name at 0x80048d88.
@@ -120,7 +124,7 @@ export function createDialogueTranslated(sfx = null) {
             g._clock = new ui.MenuDisplayClock();
             g._pending = false;
         } catch (error) {
-            if (request === g._request) fail(error);
+            if (host.current(request)) fail(error);
         }
     };
 
@@ -163,21 +167,9 @@ export function createDialogueTranslated(sfx = null) {
         ctx.restore();
     };
 
-    g._finish = () => {
-        if (!g._open) return;
-        g._open = false;
-        g._pending = false;
-        g._closes++;
-        ++g._request;
-        const cb = g._onClose;
-        g._onClose = null;
-        cb?.();
-    };
-
+    /** The player dismissed the box: dispose the line, then run its onClose. */
     g.close = () => {
-        if (!g._open) return;
-        g._session?.dispose();
-        g._finish();
+        host.close();
     };
 
     g.diagnostics = () => ({

@@ -31,9 +31,10 @@ import {
     ITEM_BY_ID, effStats, hitGaugeGain,
 } from "./vendor/engine.js";
 import {
-    tryInflict, applyWeaponSecondary, triggerCounter, setCounterStance, battleRestorePlanFor, battleScriptedPlanFor,
+    tryInflict, applyWeaponSecondary, triggerCounter, setCounterStance, setEnemyCounterStance,
+    battleRestorePlanFor, battleScriptedPlanFor,
     restoreWalkerSentence, scriptedWalkerSentence, processTurnStart, ailmentWord,
-    normalizeDvGauge, DV_GAUGE_MAX, blastLandingHeal, setLiveBattleForm,
+    normalizeDvGauge, DV_GAUGE_MAX, blastLandingHeal, setLiveBattleForm, endBlast,
 } from "./battle.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { battleMsgText } from "./battlemsg-translated.js";
@@ -170,7 +171,7 @@ export class Arena {
         if (actor && actor.key[0] === "p" && actor.rec.blast?.active && actor.rec.hp > 0) {
             if (--actor.rec.blast.turns <= 0) {                           // the Blast runs out: the form goes back, the gauge is spent
                 const r = actor.rec;
-                setLiveBattleForm(r, r.blast.saved); r.blast = null; r.gauge = 0;
+                endBlast(r, { form: true });
                 res.lines.push(`${actor.rec.profile?.name ?? actor.name}: ${T(0x62)}`);   // "Back to normal!"
                 res.rows.push(this.#row(actor, 0, true));
             }
@@ -179,7 +180,7 @@ export class Arena {
             if (p.fled) continue;
             const r = p.rec;
             if (r.hp <= 0) {
-                if (r.blast?.active) { r.blast = null; r.gauge = 0; }      // a Blast does not outlive its Digimon
+                if (r.blast?.active) endBlast(r);                          // a Blast does not outlive its Digimon
                 if (this.#reserve(p)) p.needTag = true;
                 continue;
             }
@@ -410,7 +411,7 @@ export class Arena {
         const inc = me.party[slot];
         if (!inc || slot === me.act || inc.hp <= 0) { res.lines.push(`${me.name}: ${T(0x8e)}`); res.kind = "run"; res.refused = true; return res; }
         const out = me.rec;
-        if (out.blast?.active) { setLiveBattleForm(out, out.blast.saved); out.blast = null; out.gauge = 0; }   // a Tag forfeits the Blast
+        if (out.blast?.active) endBlast(out, { form: true });   // a Tag forfeits the Blast
         for (let i = this.pool.length - 1; i >= 0; i--) {                     // the outgoing Digimon's timers do not follow it
             const e = this.pool[i];
             if ((e.side | 0) === SIDE_PLAYER && (e.slot | 0) === (out.slot | 0)) this.pool.splice(i, 1);
@@ -505,7 +506,7 @@ export class Arena {
         if (!skill) { res.lines.push(`${foe.name}: ...`); return res; }
         if (!tech) { skill = { ...skill, attack_category: "physical", basic_attack: true }; }
         res.sk = skill.id | 0;
-        setCounterStance(skill, en);
+        setEnemyCounterStance(skill, en, tech);   // the disc gate: a basic technique (action 1) sets none
         const record = this.kit.techRecord(skill.id);
         const cat = record?.category | 0;
         if (tech && (cat === 4 || cat === 5)) {                      // an enemy healing or buffing

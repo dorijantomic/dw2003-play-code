@@ -16,6 +16,8 @@ import { shopRootCreateLabels } from './native/card-shop-startup.ts';
 import { shopRootTick } from './native/card-shop-tick.ts';
 import { shopRootFillPrompt, shopRootFillRows } from './card-shop-root-fill.ts';
 import { CardShopReveal } from './card-shop-reveal.ts';
+import { SAVE_CARD_MAX } from '../save-block.ts';
+import { fadeStep } from './screen-dim.ts';
 
 export interface CardShopCard {
   id: number; colour: string; kind: string; ap?: number; hp?: number; summonCost?: number; programCategory?: number;
@@ -150,7 +152,7 @@ export class CardShopSession {
         widget88: (w, v) => this.callWidget(w, 0x88, v),
         widget114: (w, source, index) => this.widgets.textSet(w, source, index),
         widget144: this.widgets.textShow,
-        widget64: (_w, _direction, frames) => { this.fade = 0; this.fadeDelta = Math.trunc(0xff00 / frames); },
+        widget64: (_w, _direction, frames) => { this.fade = 0; this.fadeDelta = fadeStep(frames); },
       }),
       resourceCall: (id) => { this.transition = id; this.closed = true; }, shopIdFor: () => this.shopId,
     });
@@ -501,7 +503,7 @@ export class CardShopChild {
     }
   }
   private gridCard(id:number,index:number):boolean{
-    if(id<1||id>=0x13b)return false;
+    if(id<1||id>=SAVE_CARD_MAX)return false;
     const card=this.owner.resources.cards.find((r)=>r.id===id);if(!card)return true;
     const d=this.owner.draw;const x=35+(index%6)*42,y=68+Math.floor(index/6)*54;
     const colours=['white','blue','green','red','black','brown'];

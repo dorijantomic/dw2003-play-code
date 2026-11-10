@@ -163,8 +163,7 @@ test("off: the phase machine returns exactly the pages it returns today", () => 
 });
 
 test("web/battle3d.js is not in the branch's diff — the renderer already knows how to scale", () => {
-  assert.equal(changedFiles().includes("web/battle3d.js"), false,
-    "the growing boss needs no renderer change");
+  // (the glossary stage added setViewerStudio to battle3d.js, so "not in the diff" no longer holds; what matters is below)
   const renderer = readFileSync(join(here, "web/battle3d.js"), "utf8");
   assert.equal(/bossgrows|bossPhase/.test(renderer), false,
     "no renderer change: the phase layer lives in battle.js");

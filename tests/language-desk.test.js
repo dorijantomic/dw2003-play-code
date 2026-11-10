@@ -131,10 +131,10 @@ test("the F2 switch is the Extras pair and EXPERIMENTAL, with a button row that 
   const ambience = readFileSync("web/ambience.js", "utf8");
   assert.ok(ambience.includes('["langdesk", "Language desk (new)"]'), "the Extras row has the pair");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"langdesk"/, "langdesk is off until switched on");
-  assert.match(ambience, /id="fx-langdesk" hidden/, "the button row starts hidden");
-  assert.match(ambience, /data-act="langdesk"/, "the button names its action");
-  assert.match(ambience, /#fx-langdesk[^\n]*hidden = !fx\.langdesk/, "the row follows the switch");
-  assert.match(ambience, /kind === "langdesk"[^\n]*fx\.langdesk/, "the click only opens the page while on");
+  const devModel = readFileSync("web/dev-panel-model.js", "utf8"), devPanel = readFileSync("web/dev-panel.js", "utf8");
+  assert.match(devModel, /langdesk: P\("language-desk\.html"/, "the Open button's page is in the F2 page model");
+  assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+  assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
 });
 
 test("the desk page exists, imports the module and draws its table from it", () => {

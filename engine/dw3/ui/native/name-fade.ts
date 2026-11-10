@@ -20,6 +20,8 @@
 // The allocator, the object methods and the dim-rectangle painter
 // (F0x80083138, a GPU primitive) are host boundaries.
 
+import { fadeStep } from "../screen-dim.ts";
+
 export const NAME_FADE_HANDLER = 0x8008327c;
 export const NAME_FADE_SIZE = 0x68;
 export const NAME_FADE_START_ENTRY = 0x800830b0;
@@ -61,7 +63,7 @@ export function nameFadeStart(
     host.callMethod(obj, 0x28, [1]);
     mem.write32(obj + 0x10, 1);
     mem.write32(obj + 0x58, direction | 0);
-    const step = frames === 0 ? -1 : Math.trunc(FADE_FULL / (frames | 0));
+    const step = fadeStep(frames);
     if ((direction | 0) === 0) {
         mem.write32(obj + 0x5c, 0);
         mem.write32(obj + 0x60, step | 0);

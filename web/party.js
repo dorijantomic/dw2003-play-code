@@ -1,4 +1,4 @@
-import { elementValues } from "./vendor/engine.js";
+import { ELEMENT_KEYS, elementValue, elementValues } from "./vendor/engine.js";
 
 /** The six core stats, in the original's own order. */
 const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];
@@ -64,6 +64,64 @@ export function baseStatsFor(digimonProfile) {
   };
 }
 
+// ONE home for a party member's stored numbers: the six core stats (the stored
+// value plus the permanent stat chips) and the seven element values, both read
+// off the STARTER's growth row — that is what the roster record holds, even
+// while the partner is wearing a digivolution, which only changes a "current
+// form" word. Screens that show a roster record call this instead of rebuilding
+// the two arrays from whatever form happens to be worn. `fallbackProfile` is
+// reached only when the char id has no row in digimonDB (old callers fell back
+// to the profile they had).
+export function storedNumbers(charId, stats, digimonDB, fallbackProfile = null) {
+  const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? fallbackProfile ?? null;
+  return {
+    core: CORE_STATS.map((k) => (Number(stats?.stats?.[k] ?? rookie?.[k] ?? 0) || 0)
+      + (Number(stats?.bonuses?.[k] ?? 0) || 0)),
+    elements: elementValues(rookie, stats?.elemBonuses),
+  };
+}
+
+// The exact inverse of `storedNumbers`, for the screens that hand a trained
+// roster record back. The record carries the SEEDED numbers (stored + chips,
+// species base + trained points), so copying the record's halfwords straight
+// into the partner block folds the chips into the stored stats and the species
+// base into the trained points — and the next visit counts both twice. Take
+// the chips off the core halfwords and the STARTER's base off the element
+// halfwords instead.
+export function storedFromRecord(charId, recCore, recElements, stats, digimonDB) {
+  const rookie = digimonDB?.[CHARID_TO_DIGID[charId]] ?? null;
+  const base = elementValues(rookie, null);
+  return {
+    stats: Object.fromEntries(CORE_STATS.map((k, i) =>
+      [k, (Number(recCore?.[i]) || 0) - (Number(stats?.bonuses?.[k]) || 0)])),
+    elemBonuses: Object.fromEntries(ELEMENT_KEYS.map((k, i) =>
+      [k, (Number(recElements?.[i]) || 0) - (base[i] || 0)])),
+  };
+}
+
+// ONE home for "an element value with the worn gear on": the record's trained
+// point and the worn piece's coded resist both ADD to the species base — the
+// original folds the gear into the trainer's own halfword with F0x80017578
+// (exe/fns.s L7998-L8048: `lhu`/`addu`/`sh`, capped at 0x3e7 = 999), never in
+// place of it. The gym HUD used to spread the gear over `elemBonuses`, so a
+// trained +5 under a +10 piece printed 10.
+// `elementPointsWithGear` is the merged point table (what a stored block's
+// `elemBonuses` means once the gear is folded in), `elementValueWithGear` the
+// capped value elementValue produces from it. Screens call the second; battle,
+// which carries the merged table on its fighter record, calls the first.
+export function elementPointsWithGear(elemBonuses, elemResists) {
+  const points = { ...(elemBonuses ?? {}) };
+  for (const [el, v] of Object.entries(elemResists ?? {})) {
+    const add = Number(v) || 0;
+    if (add) points[el] = (Number(points[el]) || 0) + add;
+  }
+  return points;
+}
+
+export function elementValueWithGear(profile, elemBonuses, elemResists, element) {
+  return elementValue(profile, elementPointsWithGear(elemBonuses, elemResists), element);
+}
+
 // Build the full roster view the status menu draws: one entry per party member, with
 // the LEAD's entry backed by the live battle-tracked partnerStats (so leveling/EXP/HP
 // stay in sync with battles) and the other members backed by their own static
@@ -113,9 +171,8 @@ export function partyRosterView(party, partnerStats, partyStats, digimonDB, name
       // permanent stat chips; `elements` is the one shared element value
       // (species base + every trained point, 999-capped) — the worn gear's
       // resist is added by F0x80017174 itself, so it is deliberately NOT here.
-      core: CORE_STATS.map((k) => (Number(stats?.stats?.[k] ?? prof?.[k] ?? 0) || 0)
-        + (Number(stats?.bonuses?.[k] ?? 0) || 0)),
-      elements: elementValues(prof, stats?.elemBonuses),
+      // The base is the STARTER's row, as the record holds it (pro/ststatus.s:9547 F0x80017174 fills from the record).
+      ...storedNumbers(charId, stats, digimonDB, prof),
     };
   });
 }

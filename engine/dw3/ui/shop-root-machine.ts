@@ -2,6 +2,8 @@
 // F0x8008B908. This object owns the BUY/SELL choice and the return to the field.
 // Values used for text and fold timing come from that routine and its data table.
 
+import { LANGUAGE_CELL } from "../party-context.ts";
+
 export interface ShopRootMachineMemory {
   read32(address: number): number;
   write32(address: number, value: number): void;
@@ -33,7 +35,7 @@ const RETURN_TO_MENU = 0x14;
 const SHOP_ID = 0x60;
 const CURSOR = 0x64;
 const SHOP_NAMES = 0x8008cb40;
-const LANGUAGE = 0x8005cca8;
+const LANGUAGE = LANGUAGE_CELL;
 const MONEY = 0x80048da0;
 const MOVE_SOUND = 0x8004513e;
 const CONFIRM_SOUND = 0x8004503c;

@@ -21,6 +21,7 @@
 // 0x14), separate from the cannot-afford refusal (0x13).
 // "Edit Folder" now hands off to the stcrddek deck editor.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFramesMs, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { drawText } from "./uifont.js";
 import { loadPack, drawClip, packReady, drawPackBackdrop } from "./screenpack.js";
@@ -57,8 +58,7 @@ export function __setLayout(json) { LAYOUT = json; }
 const COLOUR_FRAMES = ["white", "blue", "green", "red", "black", "brown"];
 const VSYNC_MS = 20;
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 // Pack reveal deals one slot every two vsyncs (pack_reveal_tick /
 // pack_reveal_delay_tick: frame delta >= 2).
 const REVEAL_FRAMES_PER_CARD = 2;
@@ -170,8 +170,8 @@ export function createCardShop(sfx = null) {
 
   function leaveFadeAlpha(nowMs = performance.now()) {
     if (!c.fadeLeaving) return 0;
-    const frames = Math.max(0, Math.floor((nowMs - c.fadeT0) / VSYNC_MS));
-    return Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+    const frames = leaveFadeFramesMs(nowMs, c.fadeT0);
+    return leaveFadeLevel(frames, LEAVE_FADE_DELTA);
   }
 
   function paintLeaveFade(ctx, nowMs) {
@@ -337,8 +337,8 @@ export function createCardShop(sfx = null) {
     if (!c._open) return;
     const nowMs = performance.now();
     if (c.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((nowMs - c.fadeT0) / VSYNC_MS));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { close(); return; }
+      const frames = leaveFadeFramesMs(nowMs, c.fadeT0);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) { close(); return; }
     }
     const s = Math.max(1, Math.min(w / 320, h / 240));
     ctx.save();

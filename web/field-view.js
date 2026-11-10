@@ -88,6 +88,18 @@ export function fieldFrameRule({ pad, mapW, fixedViewport = false, stagedScene =
     return { wideCamera: true, showSides: !fullScreenUi };
 }
 
+/** How dark the world beside a full-screen menu gets (HD Remaster + Wide overworld): the level a book uses behind its box. */
+export const MENU_SIDE_DIM = 0.5;
+
+/**
+ * The sides behind a full-screen screen. A screen that owns the whole picture: covered black.
+ * A screen that only draws over the field (`dimmableUi`: every open screen is such): the sides stay showing the field, dimmed.
+ */
+export function wideMenuSides({ fullScreenUi = false, dimmableUi = false }) {
+    const keep = !!fullScreenUi && !!dimmableUi;
+    return { coverSides: !!fullScreenUi && !keep, dim: keep ? MENU_SIDE_DIM : 0 };
+}
+
 /** Ease a 0..1 level toward a target at `rate` per second (the side covers and the camera blend). */
 export function easeLevel(level, target, dt, rate = 6) {
     const step = Math.max(0, dt) * rate;

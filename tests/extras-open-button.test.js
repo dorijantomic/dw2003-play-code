@@ -5,7 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { tickCutContent, openCutContent, cutContentOpen, cutContentPress } from "../web/cut-content.js";
-import { tickCodex, openCodex, codexOpen, codexPress, codexReset } from "../web/codex.js";
 import { tickBlastLadder, openBlastLadder, blastOpen, blastPress, blastReset } from "../web/blast-ladder.js";
 import { tickPlanner, openPlanner, plannerOpen, plannerPress, plannerReset } from "../web/evolution-planner.js";
 import { tickDamageLab, openDamageLab, damageLabOpen, damageLabPress, damageLabReset } from "../web/damage-lab.js";
@@ -18,7 +17,6 @@ globalThis.fetch = noFetch;   // a button open starts a data load; in node it ju
 
 const screens = [
   { name: "cutcontent", tick: tickCutContent, open: () => openCutContent(), isOpen: cutContentOpen, press: cutContentPress, reset: () => {} },
-  { name: "codex", tick: tickCodex, open: () => openCodex(), isOpen: codexOpen, press: codexPress, reset: codexReset },
   { name: "blastladder", tick: tickBlastLadder, open: () => openBlastLadder(), isOpen: blastOpen, press: blastPress, reset: blastReset },
   { name: "planner", tick: tickPlanner, open: () => openPlanner(), isOpen: plannerOpen, press: plannerPress, reset: plannerReset },
   { name: "damagelab", tick: tickDamageLab, open: () => openDamageLab(), isOpen: damageLabOpen, press: damageLabPress, reset: damageLabReset },
@@ -64,15 +62,17 @@ test("Escape is the pad name cross in the game's default (English) layout", () =
   assert.equal(buttonForKey("x"), "cross");
 });
 
-test("game.js exposes the opener and ambience.js has one Open button per screen", () => {
+test("game.js exposes the opener and the F2 page has one Open button per screen", () => {
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   const amb = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+  const model = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8");
+  assert.match(amb, /window\.__openExtra\?\.\(key\)/, "the F2 page's Open handler calls the opener");
   assert.match(game, /window\.__openExtra = \(name\) =>/);
-  for (const n of ["cutcontent", "codex", "blastladder", "planner", "damagelab", "replay", "soundtest"]) {
+  for (const n of ["cutcontent", "blastladder", "planner", "damagelab", "replay", "soundtest"]) {
     assert.match(game, new RegExp(`case "${n}":`), `${n} has an opener`);
-    assert.match(amb, new RegExp(`id="fx-open-${n}" hidden><button type="button" data-act="extra:${n}">Open `), `${n} has an Open button`);
+    assert.match(model, new RegExp(`\\b${n}: X\\(\\)`), `${n} has an Open button (an in-game screen in the F2 page model)`);
   }
-  for (const f of ["cut-content", "codex", "blast-ladder", "evolution-planner", "damage-lab", "replay-theatre"]) {
+  for (const f of ["cut-content", "blast-ladder", "evolution-planner", "damage-lab", "replay-theatre"]) {
     const src = readFileSync(new URL(`../web/${f}.js`, import.meta.url), "utf8");
     assert.doesNotMatch(src, /on && !S\.wasOn|enabled && !S\.wasOn/, `${f} has no rising-edge open`);
   }

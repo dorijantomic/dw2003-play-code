@@ -2,17 +2,17 @@
 // The screen logic runs in engine/dw3/ui; this file loads data, forwards pad
 // state, paints draw intents and commits the translated save fields.
 import {
-  elementValue, commitMerchantClose, ui, rosterSlotOfCharId,
+  commitMerchantClose, ui, rosterSlotOfCharId,
   wornCount, wornItemIds,
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession } from "./native-session.js";
-import { partyRosterView, syncLeadEquipBonuses } from "./party.js";
+import { CLOSE_NOTIFY, DISPOSE_NEVER, createTranslatedScreenHost } from "./translated-screen-host.js";
+import { partyRosterView, storedNumbers, syncLeadEquipBonuses } from "./party.js";
 import { ensureStoredStats } from "./battle.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 
-const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
-const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };
 
@@ -31,19 +31,6 @@ function loadCatalog() {
   return catalogPromise;
 }
 
-const encodeName = (name) => {
-  const bytes = [];
-  for (const ch of String(name ?? "")) {
-    const code = ch.charCodeAt(0);
-    if (ch >= "0" && ch <= "9") bytes.push(4 + code - 48);
-    else if (ch >= "A" && ch <= "Z") bytes.push(14 + code - 65);
-    else if (ch >= "a" && ch <= "z") bytes.push(40 + code - 97);
-    else bytes.push(1, 1);
-    if (bytes.length >= 23) break;
-  }
-  return new Uint8Array(bytes.slice(0, 23));
-};
-
 function saveSeed(state, db) {
   const view = partyRosterView(state.party, state.partnerStats, state.partyStats,
     db, state.digimonNames);
@@ -60,18 +47,18 @@ function saveSeed(state, db) {
       const rosterSlot = rosterSlotOfCharId(member.charId);
       if (rosterSlot == null) throw new Error("Merchant partner has no roster slot");
       const record = (i === 0 ? state.partnerStats : state.partyStats?.[i]) ?? {};
-      const core = member.profile ? ensureStoredStats(record, member.profile) : record.stats ?? {};
+      if (member.profile) ensureStoredStats(record, db[member.rookieId] ?? member.profile);
       return {
-        rosterSlot, starterSlot: rosterSlot, nameBytes: encodeName(member.name),
+        rosterSlot, starterSlot: rosterSlot, nameBytes: encodeNativeScreenText(member.name),
         exp: Number(member.xp) || 0, level: Number(member.level) || 0,
         tp: Number(member.tp) || 0, hp: Number(member.hp) || 0,
         maxHp: Number(member.maxHp) || 0, mp: Number(member.mp) || 0,
         maxMp: Number(member.maxMp) || 0,
-        core: CORE.map((key) => (Number(core[key]) || 0) + (Number(record.bonuses?.[key]) || 0)),
-        // The roster record's STORED element halfwords (species base + every
-        // trained point); the screen's own F0x80017174 fill adds the worn gear's
-        // resist on top. One shared helper for the stored half.
-        elements: ELEMENTS.map((key) => elementValue(member.profile, record.elemBonuses, key)),
+        // The roster record's thirteen stored halfwords come from ONE shared
+        // helper (web/party.js storedNumbers): the STARTER's row plus the
+        // trained points and chips, never the worn form. The screen's own
+        // F0x80017174 fill adds the worn gear's resist on top.
+        ...storedNumbers(member.charId, record, db),
         equipment: state.equipment?.[i] ?? {},
       };
     }),
@@ -92,13 +79,11 @@ export function createShopTranslated(sfx = null, options = {}) {
     if (!Number.isInteger(id) || id < 0 || id >= 30) {
       throw new Error("Merchant has no decoded shop id");
     }
-    shop._open = true;
+    const request = host.begin({ onClose });
     shop._state = opts.state ?? shop._state;
-    shop._onClose = onClose;
     shop._error = null;
     shop._clock = new ui.MenuDisplayClock();
     shop._session = null;
-    const request = ++shop._request;
     loadCatalog().then(async (data) => {
       const selectedLanguage = shop._state?.languageByte;
       const language = Number.isInteger(selectedLanguage) ? selectedLanguage : 2;
@@ -107,42 +92,27 @@ export function createShopTranslated(sfx = null, options = {}) {
         const bank = offset + language;
         return [bank, await readBytes(`shop-banks/${bank}.bin`)];
       })));
-      if (!shop._open || request !== shop._request) return;
+      if (!host.current(request)) return;
       shop._session = new ui.ShopRootSession(id, language,
         saveSeed(shop._state ?? {}, options.digimonDB?.() ?? {}),
         { ...data, banks },
         { playSound(sound) { sfx?.playPacked(sound); }, closeSave() {} });
     }).catch((error) => {
-      if (request !== shop._request) return;
+      if (!host.current(request)) return;
       shop._error = error;
       console.error("Translated merchant failed to open", error);
     });
   };
 
-  shop.isOpen = () => shop._open;
-  shop.handleKey = (_button, state) => { if (state) shop._state = state; };
-  shop.update = (dt) => {
-    if (!shop._open || !shop._session || shop._error) return;
-    for (const frame of shop._clock.advance(dt)) {
-      shop._session.tick(shop._state?.keys ?? [], frame.tick);
-      if (shop._session.finished()) { shop._finish(); break; }
-    }
-  };
-  shop.draw = (ctx, viewW) => {
-    if (!shop._open || !shop._session) return;
-    ctx.save();
-    ctx.scale(viewW / 320, viewW / 320);
-    paintNativeSession(ctx, renderer, shop._session);
-    ctx.restore();
-  };
-  shop.close = () => { if (shop._open) shop._finish(); };
-  shop._finish = () => {
-    if (!shop._open) return;
-    shop._open = false;
-    ++shop._request;
-    const state = shop._state;
-    if (state && shop._session) {
-      const result = shop._session.result();
+  // The merchant's lifecycle lives in web/translated-screen-host.js. `release` is the old `_finish`
+  // body; the merchant never disposed its session, so both close modes leave it alone here.
+  // `tracksPending` is off: this screen reports pending as "open with no session yet".
+  const host = createTranslatedScreenHost(shop, {
+    closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_NEVER, finishDispose: DISPOSE_NEVER, tracksPending: false,
+    release(session) {
+      const state = shop._state;
+      if (!state || !session) return;
+      const result = session.result();
       // One commit, in the original's order: the hand swaps the merchant made go
       // through the shared store (so the stored worn byte rises ONCE per piece and
       // the wearer record moves with it), then the block's own count arrays become
@@ -153,12 +123,26 @@ export function createShopTranslated(sfx = null, options = {}) {
       localStorage.setItem("inventory", JSON.stringify(state.inventory));
       localStorage.setItem("worn", JSON.stringify(state.worn ?? {}));
       localStorage.setItem("equipment", JSON.stringify(state.equipment));
+    },
+  });
+
+  shop.isOpen = () => shop._open;
+  shop.handleKey = (_button, state) => { if (state) shop._state = state; };
+  shop.update = (dt) => {
+    if (!shop._open || !shop._session || shop._error) return;
+    for (const frame of shop._clock.advance(dt)) {
+      shop._session.tick(shop._state?.keys ?? [], frame.tick);
+      if (shop._session.finished()) { host.finish(); break; }
     }
-    shop._session = null;
-    const callback = shop._onClose;
-    shop._onClose = null;
-    callback?.();
   };
+  shop.draw = (ctx, viewW) => {
+    if (!shop._open || !shop._session) return;
+    ctx.save();
+    ctx.scale(viewW / 320, viewW / 320);
+    paintNativeSession(ctx, renderer, shop._session);
+    ctx.restore();
+  };
+  shop.close = () => host.close();
   shop.diagnostics = () => ({
     execution: "translated",
     open: shop._open, pending: shop._open && !shop._session,

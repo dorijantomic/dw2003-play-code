@@ -28,6 +28,7 @@
 //  - the resident caller that opens this overlay
 
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { drawText } from "./uifont.js";
 import { loadPack, drawClip, packReady } from "./screenpack.js";
 import { padRepeatFires } from "./vendor/engine.js";
@@ -40,8 +41,7 @@ const cntselwn = loadPack("cntselwn");
 // Overlay F0x80082fc4: 0 to 255 over 30 frames. Same 8.8 leave dim as the
 // other screens (0xFF00 / 0x1E per vsync).
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 // Pane draws, F0x80082ef0 / 833dc / 83630 / 83894 / 83b00.
 const PANE = Object.freeze({
@@ -113,7 +113,7 @@ export function createCntyselMenu(sfx = null) {
 
   d.leaveFadeAlpha = () => {
     if (!d.fadeLeaving) return 0;
-    return Math.min(255, (d.fadeFrames * LEAVE_FADE_DELTA) >> 8) / 255;
+    return leaveFadeLevel(d.fadeFrames, LEAVE_FADE_DELTA);
   };
 
   function requestLeave() {
@@ -127,7 +127,7 @@ export function createCntyselMenu(sfx = null) {
     d.vsync += 1;
     if (d.fadeLeaving) {
       d.fadeFrames += 1;
-      if (d.fadeFrames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) {
+      if (leaveFadeDone(d.fadeFrames, LEAVE_FADE_DELTA)) {
         d.open = false;
         d.fadeLeaving = false;
         if (d.onPick && d.chosen) d.onPick(d.chosen);

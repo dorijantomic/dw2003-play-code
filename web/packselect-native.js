@@ -30,11 +30,7 @@
 // (?legacyPack=1).
 
 import { maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { encodeNativeScreenText, nativeScreenObjects, nativeScreenRead } from "./native-screen.js";
 import { decodeNativeText } from "./native-screen-text.js";
 
@@ -85,16 +81,6 @@ export function createPackSelectNative(sfx = null) {
         for (let i = 0; i < 3; i++) write(PARTY_MAP + i * 4, 0xffffffff, 4);
     }
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        p._host = host;
-        return true;
-    }
-
     /** Queue one synthesised pad press (the walker's wizard input is edge-based). */
     function press(mask) {
         p._queue.push(mask);
@@ -124,7 +110,6 @@ export function createPackSelectNative(sfx = null) {
     p.partners = () => p._partners.slice();
 
     p.open = (opts = {}) => {
-        p._open = true;
         p._done = false;
         p._sel = 0;
         p._partners = [];
@@ -133,10 +118,7 @@ export function createPackSelectNative(sfx = null) {
         p._queue.length = 0;
         p._hold = 0;
         p._mask = 0;
-        preloadNativeScreens().catch((e) => {
-            p._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) p._pending = true;
+        p._begin();
         return p;
     };
 
@@ -146,62 +128,6 @@ export function createPackSelectNative(sfx = null) {
         if (!root) return true;
         return (nativeScreenRead(root.addr + 0xc, 4) | 0) === 3;
     }
-
-    p.update = (dt, state) => {
-        if (state) p._state = state;
-        if (!p._open) return;
-        if (p._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                p._lastDiagnostic = "native pack wizard boot failed (manifest/overlay missing)";
-                return;
-            }
-            p._pending = false;
-        }
-        if (p._hold <= 0 && p._queue.length) {
-            p._mask = p._queue.shift();
-            p._hold = PRESS_FRAMES;
-        }
-        if (p._hold > 0) p._hold--;
-        else p._mask = 0;
-        const keys = p._state?.keys;
-        p._host.setPad(p._mask || (keys ? maskFromButtons(keys) : 0));
-        const closed = p._host.tick(dt) || packClosed();
-        p._lastTraps = p._host.state()?.traps ?? p._lastTraps;
-        if (closed) p._finish();
-    };
-    p.advance = p.update;
-
-    p.draw = (ctx, viewW, viewH) => {
-        if (!p._open || !p._host) return false;
-        p._host.draw(ctx, viewW, viewH);
-        return true;
-    };
-
-    p.close = () => {
-        if (p._open) p._finish();
-    };
-
-    p._finish = () => {
-        if (!p._open) return;
-        p._open = false;
-        const host = p._host;
-        if (host) {
-            p._accountName = p.accountName();
-            // The commit ran in the same tick the root's lifecycle turned 3, so
-            // these cells are final before teardown.
-            p._sel = (host.read(PACK_ID, 4) >>> 0) & 3;
-            const partners = [];
-            for (let i = 0; i < 3; i++) partners.push(host.read(PARTY_MAP + i * 4, 4) | 0);
-            p._partners = partners;
-            host.teardown();
-        }
-        p._host = null;
-        p._done = true;
-    };
 
     /** Diagnostics for the lab and focused browser checks. */
     p.diagnostics = () => ({
@@ -216,6 +142,46 @@ export function createPackSelectNative(sfx = null) {
         traps: p._host?.state()?.traps ?? p._lastTraps,
         lastDiagnostic: p._lastDiagnostic,
     });
+
+    createNativeAdapter({
+        owner: p,
+        moduleId: MODULE_ID,
+        hostOptions: {
+            playPackedSound: (id) => { sfx?.playPacked(id); },
+            seed,
+        },
+        // A synthesised press wins over the held word; with none queued the
+        // walker's own keys drive the wizard.
+        pad: (_host, state) => {
+            if (p._hold <= 0 && p._queue.length) {
+                p._mask = p._queue.shift();
+                p._hold = PRESS_FRAMES;
+            }
+            if (p._hold > 0) p._hold--;
+            else p._mask = 0;
+            return p._mask || (state?.keys ? maskFromButtons(state.keys) : 0);
+        },
+        frame: (host, dt) => {
+            const closed = host.tick(dt) || packClosed();
+            p._lastTraps = host.state()?.traps ?? p._lastTraps;
+            return closed;
+        },
+        commit: (host) => {
+            p._accountName = p.accountName();
+            // The commit ran in the same tick the root's lifecycle turned 3, so
+            // these cells are final before teardown.
+            p._sel = (host.read(PACK_ID, 4) >>> 0) & 3;
+            const partners = [];
+            for (let i = 0; i < 3; i++) partners.push(host.read(PARTY_MAP + i * 4, 4) | 0);
+            p._partners = partners;
+            p._done = true;
+        },
+        closed: () => { p._done = true; },
+        label: "native pack wizard boot failed (manifest/overlay missing)",
+    });
+
+    /** The walker's opening hand-off ticks the wizard through advance(). */
+    p.advance = p.update;
 
     return p;
 }

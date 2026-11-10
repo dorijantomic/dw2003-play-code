@@ -159,12 +159,13 @@ test("the F2 switch is off by default and the page is only reachable behind it",
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"cursorbook"/, "off until the player switches it on");
 
-    assert.match(ambience, /id="fx-cursorbook" hidden/, "the button row ships hidden");
-    assert.match(ambience, /cursorbook\.hidden = !fx\.cursorbook/, "refreshPanel follows the switch");
 
-    const refs = ambience.split("cursor-almanac.html").length - 1;
+    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const refs = devModel.split("cursor-almanac.html").length - 1;
     assert.equal(refs, 1, "one reference to the page, no other link into it");
-    assert.match(ambience, /if \(fx\.cursorbook\)[^;{}]*window\.open\("cursor-almanac\.html"/, "opened only behind the toggle's guard");
+    assert.match(devModel, /cursorbook: P\("cursor-almanac\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
     assert.doesNotMatch(ambience, /(get|has)\("cursorbook"\)/, "never a URL flag");
 
     const page = readFileSync(new URL("../web/cursor-almanac.html", import.meta.url), "utf8");

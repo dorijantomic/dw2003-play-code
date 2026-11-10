@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  widePadFor, mapFitsWide, wideBoxCameraX, scriptIsStaged, fieldFrameRule, easeLevel,
+  widePadFor, mapFitsWide, wideBoxCameraX, scriptIsStaged, fieldFrameRule, easeLevel, wideMenuSides, MENU_SIDE_DIM,
   setFieldViewPad, FIELD_VIEW_W, FIELD_VIEW_PAD,
 } from "../web/field-view.js";
 import { fieldCameraFollow } from "../engine/systems/field-camera.ts";
@@ -110,4 +110,11 @@ test("Authentic never goes wide", () => {
   assert.equal(canvas.width, 640);
   assert.equal(canvas.height, 480);
   assert.equal(calls.at(-1)[4], 0);
+});
+
+test("wide menus: sides dimmed for menus that draw over the field only, black for the rest", () => {
+  assert.equal(MENU_SIDE_DIM, 0.5);
+  assert.deepEqual(wideMenuSides({ fullScreenUi: true, dimmableUi: true }), { coverSides: false, dim: 0.5 });
+  assert.deepEqual(wideMenuSides({ fullScreenUi: true, dimmableUi: false }), { coverSides: true, dim: 0 });
+  assert.deepEqual(wideMenuSides({ fullScreenUi: false, dimmableUi: false }), { coverSides: false, dim: 0 });
 });

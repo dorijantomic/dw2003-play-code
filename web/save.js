@@ -24,6 +24,7 @@ import { checkSlot } from "./slot-check.js";
 // flow have no walker equivalent and are not faked — their strings ship in the
 // layout json but the screen never enters those states.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFrames, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import { ui } from "./vendor/engine.js";
 import { drawText } from "./uifont.js";
@@ -81,8 +82,7 @@ const BLOCK_SLOT_KEY = "mcardBlockSlot";
 // 0 → 0xFF00 in 30 frames, then the screen is gone.
 const VSYNC_S = 0.02;
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 // Keys the snapshot deliberately leaves alone: they describe the browser
 // session (which renderer/asset mode the player picked, which slots exist),
@@ -890,8 +890,8 @@ export function createSaveScreen(sfx = null) {
     if (!s._open) return;
     s.time += dt;
     if (s.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((s.time - s.fadeT0) / VSYNC_S));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) { s.close(); return; }
+      const frames = leaveFadeFrames(s.time, s.fadeT0);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) { s.close(); return; }
     }
     tickFold();
     // The slot chooser's own state machine runs every frame, before the pack
@@ -951,8 +951,8 @@ export function createSaveScreen(sfx = null) {
     }
 
     if (s.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((s.time - s.fadeT0) / VSYNC_S));
-      const a = Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+      const frames = leaveFadeFrames(s.time, s.fadeT0);
+      const a = leaveFadeLevel(frames, LEAVE_FADE_DELTA);
       paintScreenDim(ctx, a * 255, 320, 240);
     }
 

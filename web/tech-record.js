@@ -43,3 +43,17 @@ export function dropRoll(rate, draw) {
 export function dropPasses(rate, rng) {
   return dropRoll(rate, rng());
 }
+
+/**
+ * The disc's ONE item drop per won battle (pro/wfightmn.s .L0x00001e84-.L0x00001fdc).
+ * `candidates` are the enemy records that carry an item ({drop_item, drop_rate}). With none,
+ * no draw is made. Otherwise: draw 1 picks `RAND % count` (0x1f14-0x1f48), draw 2 is the
+ * pick's `RAND % 1024 < drop_rate + 1` roll (0x1f9c-0x1fcc). Returns the picked record's
+ * item or null. At most one item, always two draws in that order.
+ */
+export function rollBattleDrop(candidates, rng) {
+  const list = (candidates ?? []).filter((e) => e && e.drop_item && e.drop_item !== "Null");
+  if (list.length === 0) return null;
+  const pick = list[rng() % list.length];
+  return dropPasses(pick.drop_rate, rng) ? pick.drop_item : null;
+}

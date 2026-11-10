@@ -18,7 +18,8 @@
 // the party's level.
 import { fx } from "./ambience.js";
 import { on } from "./gameEvents.js";
-import { wrap } from "./dialogue-pack.js";
+import { fitByWidth, wrapByWidth, wrapToLines, BAND_TEXT_W } from "./text-fit.js";   // measured widths, not character counts
+import { textWidth } from "./uifont.js";
 import { validateScene } from "./quest-scenes.js";
 import { installTriggers } from "./quest-triggers.js";
 import { offersAt, offerLabels } from "./quest-offers.js";   // the offer loop's filters, written once (F2: pick which job)
@@ -684,7 +685,7 @@ export function questPropsOn(mapId) {
 const forGameText = (s) => String(s).replace(/(\d+)\/(\d+)/g, "$1 of $2").replace(/\s+\/\s+/g, " or ").replace(/[^A-Za-z0-9 .,'\-:!?"]/g, " ").replace(/\s+/g, " ").trim();
 
 /**
- * The extra row on the pause home list (see PauseSeed.extraRow in engine/dw3/ui/pause-root-session.ts). The label carries the
+ * The extra row on the pause home list (one of PauseSeed.extraRows in engine/dw3/ui/pause-root-session.ts, opens "quests"; web/pause-extra-rows.js lists it). The label carries the
  * number of quests that want attention (ready to claim, or new and not yet taken), e.g. "QUESTS 2". Null when quests are off.
  */
 export function questsPauseRow() {
@@ -706,10 +707,12 @@ export function questsDoneCount() { return Object.keys(st?.done ?? {}).length; }
 export function questDone(id) { return !!st?.done?.[id]; }
 
 /** What the QUESTS page lists: ready, open and new quests, each with the three lines shown under the list. */
+const EMPTY_SENTENCE = "Explore and talk to people. Quests appear as you play.";
 export function questsPausePage() {
     if (!enabled() || !defs.length) return null;
     const MARK = { ready: "! ", active: "- ", available: "? " };
-    const cut = (t, n) => (t.length > n ? t.slice(0, n) : t);           // the page has no room for an ellipsis
+    const W = (s) => textWidth(s);                                       // the game font's own advance widths
+    const TITLE_W = 126;                                                 // the list window's text area (x 189 to the window edge)
     const entries = logEntries().filter(({ d, s }) => s === "ready" || s === "active" || (s === "available" && isHere(d))).map(({ d, s }) => {
         const a = st.active[d.id];
         const k = d.objectives.findIndex((_, j) => ((a?.p[j]) || 0) < targetOf(d, j));
@@ -718,15 +721,15 @@ export function questsPausePage() {
             : s === "available" ? (d.offer ? `Talk to ${d.offer.name} in ${placesOf(d.offer.maps.slice(0, 1))}` : d.acceptAt ? `Accept it at ${placesOf(d.acceptAt.slice(0, 1))}` : "Open it with F3")
             : (k >= 0 ? objectiveText(d, k) : "");
         const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} ${it.name}`)].filter(Boolean).join(", ");
-        const line = (t) => cut(forGameText(t), 36);
+        const line = (t) => fitByWidth(forGameText(t), W, BAND_TEXT_W);     // the page has no room for an ellipsis
         // the full text, for reading: description, every objective with its progress, the reward and where to go
         const full = [d.text ?? "", ...d.objectives.map((_, j) => "- " + objectiveText(d, j)), rw ? `Reward: ${rw}` : "", goal]
-            .filter(Boolean).flatMap((t) => wrap(forGameText(t), 36));
+            .filter(Boolean).flatMap((t) => wrapByWidth(forGameText(t), W, BAND_TEXT_W));
         const pages = [];
         for (let i = 0; i < full.length; i += 3) pages.push([full[i] ?? "", full[i + 1] ?? "", full[i + 2] ?? ""]);
-        return { title: cut(MARK[s] + forGameText(d.short ?? d.title), 16), lines: [line(d.title), line(goal), line(rw ? `Reward: ${rw}` : "")], pages: pages.length ? pages : [["", "", ""]] };
+        return { title: fitByWidth(MARK[s] + forGameText(d.short ?? d.title), W, TITLE_W), lines: [line(d.title), line(goal), line(rw ? `Reward: ${rw}` : "")], pages: pages.length ? pages : [["", "", ""]] };
     });
-    return { prompt: "QUESTS   Enter: Read", readPrompt: "QUESTS   Enter: Next", entries };
+    return { prompt: "QUESTS   Enter: Read", readPrompt: "QUESTS   Enter: Next", emptyLines: wrapToLines(EMPTY_SENTENCE, W, BAND_TEXT_W), entries };
 }
 
 function installUi(stageEl) {

@@ -240,10 +240,11 @@ test("the F2 switch is off by default and gates the row, the page and its data",
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"bitledger"/, "off until the player switches it on");
-    assert.match(ambience, /id="fx-bitledger" hidden/, "the button row ships hidden");
-    assert.match(ambience, /const bitLedger = panel\.querySelector\("#fx-bitledger"\); if \(bitLedger\) bitLedger\.hidden = !fx\.bitledger;/, "refreshPanel follows the switch");
-    assert.match(ambience, /if \(fx\.bitledger\)[^;{}]*window\.open\("bit-ledger\.html", "_blank", "noopener"\)/, "opened only behind the toggle's guard");
-    assert.equal(ambience.split("bit-ledger.html").length - 1, 1, "one reference to the page, no other link into it");
+    const devModel = readText("../web/dev-panel-model.js"), devPanel = readText("../web/dev-panel.js");
+    assert.match(devModel, /bitledger: P\("bit-ledger\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
+    assert.equal(devModel.split("bit-ledger.html").length - 1, 1, "one reference to the page, no other link into it");
+    assert.equal(ambience.split("bit-ledger.html").length - 1, 0, "ambience.js itself has no link");
     assert.doesNotMatch(ambience, /(get|has)\("bitledger"\)/, "never a URL flag");
-    assert.match(ambience, /#fx-panel \.row\[hidden\] \{ display:none; \}/, "the panel's own rule that makes a hidden row vanish");
 });

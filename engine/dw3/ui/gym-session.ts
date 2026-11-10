@@ -51,9 +51,9 @@ import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import { VramMap } from "../../native/vram.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
-  PARTY_CONTEXT, PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
+  PARTY_CONTEXT, PARTY_MAP, RECORD_FIELDS, ROSTER_RECORDS, ROSTER_STRIDE,
   partyPositionToRosterSlot, persistentRosterSlot,
-  requestScreenTransition, rosterRecordAddress
+  requestScreenTransition, rosterRecordAddress, writeRosterRecord
 } from "../party-context.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemRecord } from "../item-record.ts";
@@ -118,10 +118,8 @@ export const GYM_LANGUAGE_CELL = 0x8005cca8;
 export const GYM_RANK_GROUP_CELL = 0x8004b404;
 export const GYM_PREVIOUS_SCREEN_CELL = 0x8004b400;
 export const GYM_PARTY_SLOTS = 3;
-/** The six equip halfwords of a roster record, in the original's order. */
-const RECORD_EQUIPMENT = ROSTER_EQUIP_OFFSETS_LIST;
 /** The remembered Ultra Training drill: byte at stats block + 0x3CC (record + 0x3D4). */
-export const GYM_ULTRA_BYTE = 0x3d4;
+export const GYM_ULTRA_BYTE = RECORD_FIELDS.ultraByte;
 
 export interface GymPackResource { id: number; sectors: number; data: Uint8Array }
 
@@ -382,23 +380,20 @@ export class GymSession {
     mem.write32(GYM_RANK_GROUP_CELL, seed.group >>> 0);
     mem.write32(GYM_PREVIOUS_SCREEN_CELL, seed.previousScreen >>> 0);
     for (const member of seed.members) {
-      const record = rosterRecordAddress(member.rosterSlot);
-      mem.write32(record, ((member.starterSlot ?? member.rosterSlot) + 3) >>> 0);
-      mem.write16(record + 0x24, member.level & 0xffff);
-      mem.write16(record + 0x26, member.tp & 0xffff);
-      mem.write16(record + 0x28, member.hp & 0xffff);
-      mem.write16(record + 0x2a, member.maxHp & 0xffff);
-      mem.write16(record + 0x2c, member.mp & 0xffff);
-      mem.write16(record + 0x2e, member.maxMp & 0xffff);
-      member.core.forEach((value, i) => mem.write16(record + 0x30 + i * 2, value & 0xffff));
-      member.elements.forEach((value, i) => mem.write16(record + 0x3c + i * 2, value & 0xffff));
-      const worn = member.equipment ?? {};
-      [worn.head, worn.body, worn.right, worn.left, worn.acc0, worn.acc1].forEach((id, i) => {
-        mem.write16(record + RECORD_EQUIPMENT[i]!, Number.isInteger(id) && id! > 0 && id! <= 0xffff ? id! : 0);
+      writeRosterRecord(mem, rosterRecordAddress(member.rosterSlot), {
+        slotWord: (member.starterSlot ?? member.rosterSlot) + 3,
+        nameBytes: member.nameBytes,
+        level: member.level,
+        tp: member.tp,
+        hp: member.hp,
+        maxHp: member.maxHp,
+        mp: member.mp,
+        maxMp: member.maxMp,
+        core: member.core,
+        elements: member.elements,
+        equipment: member.equipment,
+        ultraByte: member.lastUltraDrill,
       });
-      mem.write8(record + GYM_ULTRA_BYTE, member.lastUltraDrill & 0xff);
-      member.nameBytes.slice(0, 23).forEach((byte, i) => mem.write8(record + 0x08 + i, byte & 0xff));
-      mem.write8(record + 0x08 + Math.min(23, member.nameBytes.length), 0);
     }
   }
 
@@ -790,11 +785,12 @@ export class GymSession {
     const record = rosterRecordAddress(slot);
     const s16 = (v: number): number => (v << 16) >> 16;
     return {
-      level: s16(mem.read16(record + 0x24)), tp: s16(mem.read16(record + 0x26)), hp: s16(mem.read16(record + 0x28)),
-      maxHp: s16(mem.read16(record + 0x2a)), mp: s16(mem.read16(record + 0x2c)), maxMp: s16(mem.read16(record + 0x2e)),
-      core: Array.from({ length: 6 }, (_, i) => s16(mem.read16(record + 0x30 + i * 2))),
-      elements: Array.from({ length: 7 }, (_, i) => s16(mem.read16(record + 0x3c + i * 2))),
-      lastUltraDrill: mem.read8(record + GYM_ULTRA_BYTE),
+      level: s16(mem.read16(record + RECORD_FIELDS.level)), tp: s16(mem.read16(record + RECORD_FIELDS.tp)),
+      hp: s16(mem.read16(record + RECORD_FIELDS.hp)), maxHp: s16(mem.read16(record + RECORD_FIELDS.maxHp)),
+      mp: s16(mem.read16(record + RECORD_FIELDS.mp)), maxMp: s16(mem.read16(record + RECORD_FIELDS.maxMp)),
+      core: Array.from({ length: 6 }, (_, i) => s16(mem.read16(record + RECORD_FIELDS.core + i * 2))),
+      elements: Array.from({ length: 7 }, (_, i) => s16(mem.read16(record + RECORD_FIELDS.elements + i * 2))),
+      lastUltraDrill: mem.read8(record + RECORD_FIELDS.ultraByte),
     };
   }
 

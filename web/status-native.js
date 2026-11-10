@@ -51,13 +51,9 @@
 
 import {
     commitPauseClose, maskFromButtons, rosterSlotOfCharId, ui,
-    wornCount, WORN_MAX, wornItemIds,
+    wornCount, WORN_MAX, wornItemIds, SAVE_CARD_MAX, COLLECTION_CAP, MONEY_CAP, ITEM_ID_MAX,
 } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { RECORD_EQUIP_OFFSETS, seedNativeScreenParty } from "./native-screen.js";
 
 const MODULE_ID = "pro/ststatus";
@@ -70,16 +66,12 @@ const HELD_COUNTS = SAVE_CONTEXT + 0x7c;
  *  ststatus 0x8008F16C — both `lb` `base + 0x20F + id` straight into the "Equip"
  *  number). Seeded from the shared store's stored worn byte. */
 const WORN_COUNTS = SAVE_CONTEXT + 0x20f;
-const BIT_CAP = 0x98967f; // 9,999,999 (extract_bounds, money cap)
-const ITEM_MAX_ID = 402;
 const HELD_MAX = 99;
 /** Card collection: the per-card copy count (cap 9) at ctx+0x3A2 and the album's
  *  ever-obtained flag at ctx+0x4DF (commit-contract.md §4; the arrays the Card
- *  Album and the folder editor read). 316 catalog ids fit before the flag array. */
+ *  Album and the folder editor read). The id bound is SAVE_CARD_MAX, exclusive. */
 const CARD_COUNTS = SAVE_CONTEXT + 0x3a2;
 const CARD_SEEN = SAVE_CONTEXT + 0x4df;
-const CARD_MAX_ID = 316;
-const CARD_COPIES_MAX = 9;
 /** The resident screen launcher F0x80016B88's request cells: the pause pages use
  *  them once, when CARD FOLDERS hands off to the Card Album (0x1200) or the
  *  folder editor (0x400) (commit-contract.md §4). */
@@ -126,9 +118,9 @@ export function createStatusNative(sfx = null, opts = {}) {
         sfx?.playPacked(key);
     };
 
-    function boot() {
+    function hostOptions() {
         const state = st._state ?? {};
-        const host = openNativeScreen(MODULE_ID, {
+        return {
             playPackedSound,
             seed: ({ write, rt }) => {
                 // The page the player picked, exactly as the resident pause home
@@ -136,11 +128,11 @@ export function createStatusNative(sfx = null, opts = {}) {
                 const page = PAGES[st._entry] ?? PAGES.items;
                 write(ROW_CELL, page.row, 4);
                 write(VARIANT_CELL, page.variant, 4);
-                write(MONEY, Math.max(0, Math.min(BIT_CAP, Number(state.bits) || 0)), 4);
+                write(MONEY, Math.max(0, Math.min(MONEY_CAP, Number(state.bits) || 0)), 4);
                 for (const slot of Array.isArray(state.inventory) ? state.inventory : []) {
                     const id = Number(slot?.id);
                     const qty = Number(slot?.qty) || 0;
-                    if (Number.isInteger(id) && id > 0 && id <= ITEM_MAX_ID) {
+                    if (Number.isInteger(id) && id > 0 && id <= ITEM_ID_MAX) {
                         write(HELD_COUNTS + id, Math.max(0, Math.min(HELD_MAX, qty)), 1);
                     }
                 }
@@ -150,10 +142,7 @@ export function createStatusNative(sfx = null, opts = {}) {
                 seedNativeScreenParty(partySeed(state, rt));
                 seedCards(write);
             },
-        });
-        if (!host) return false;
-        st._host = host;
-        return true;
+        };
     }
 
     /** The party panels read the party map plus the roster records the field
@@ -214,14 +203,14 @@ export function createStatusNative(sfx = null, opts = {}) {
         if (!collection) return;
         for (const [id, n] of collection.owned ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId <= CARD_MAX_ID) {
-                write(CARD_COUNTS + cardId, Math.max(0, Math.min(CARD_COPIES_MAX, Number(n) || 0)), 1);
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
+                write(CARD_COUNTS + cardId, Math.max(0, Math.min(COLLECTION_CAP, Number(n) || 0)), 1);
                 st._cardsSeeded = true;
             }
         }
         for (const id of collection.seen ?? []) {
             const cardId = Number(id);
-            if (Number.isInteger(cardId) && cardId >= 1 && cardId <= CARD_MAX_ID) {
+            if (Number.isInteger(cardId) && cardId >= 1 && cardId < SAVE_CARD_MAX) {
                 write(CARD_SEEN + cardId, 1, 1);
                 st._cardsSeeded = true;
             }
@@ -229,17 +218,14 @@ export function createStatusNative(sfx = null, opts = {}) {
     }
 
     st.open = (state, entry = "items", onClose = null) => {
-        st._open = true;
         st._entry = PAGES[entry] ? entry : "items";
         st._cardsSeeded = false;
         sawChild = false;
         st._onClose = onClose;
         st._state = state ?? st._state ?? null;
         st._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            st._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) st._pending = true;
+        st._transition = null;
+        st._begin();
     };
 
     st.isOpen = () => st._open;
@@ -274,19 +260,15 @@ export function createStatusNative(sfx = null, opts = {}) {
         return aux ? (st._host.read(aux + 4, 4) >>> 0) : 0;
     }
 
-    st.update = (dt) => {
-        if (!st._open) return;
-        if (st._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                st._lastDiagnostic = "native status boot failed (manifest/overlay missing)";
-                return;
-            }
-            st._pending = false;
-        }
+    st.draw = (ctx, viewW, viewH) => {
+        if (!st._open || !st._host) return;
+        st._host.draw(ctx, viewW, viewH);
+    };
+
+    /** The frame hook: the pad word, the page's tick, the launcher request and
+     *  the child-slot close signal, in that order. Returns true when the pause
+     *  is over. */
+    function frame(host, dt) {
         const keys = st._state?.keys;
         // The pad word goes over as it stands. Its back bit is 0x4000 and its
         // confirm bit 0x2000, which are the bits the page reads
@@ -294,54 +276,38 @@ export function createStatusNative(sfx = null, opts = {}) {
         // own code is the original's. The page's cancel backs out one level and,
         // at its top level, folds the page away (which NULLs the child slot and
         // ends the pause), so it is the page that closes, not this adapter.
-        st._host.setPad(keys ? maskFromButtons(keys) : 0);
-        const finished = st._host.tick(dt);
+        host.setPad(keys ? maskFromButtons(keys) : 0);
+        const finished = host.tick(dt);
         // A page can ask the resident launcher (F0x80016B88) for another screen:
         // CARD FOLDERS does it for the Card Album (0x1200) and the folder editor
         // (0x400) and then waits for the launched screen to return. This host
         // loads one overlay, so the request is surfaced to the caller (web/game.js
         // opens the walker's screen for it) and the page closes instead of
         // wedging on a transition that will never complete.
-        const transition = st._host.read(TRANSITION, 4) >>> 0;
+        const transition = host.read(TRANSITION, 4) >>> 0;
         if (transition) {
-            const arg = st._host.read(TRANSITION + 8, 4) >>> 0;
             // A page that launched another screen keeps its close callback for
             // the return: that screen's end brings the STATUS screen back, and
             // reopenPage re-opens the page with it (see reopenPage above).
             st._returnClose = st._onClose;
-            st._finish();
-            opts.onTransition?.(transition, arg);
-            return;
+            st._transition = [transition, host.read(TRANSITION + 8, 4) >>> 0];
+            return true;
         }
         const child = pageChild();
         if (child) sawChild = true;
-        if (finished || (sawChild && !child)) st._finish();
-    };
+        return finished || (sawChild && !child);
+    }
 
-    st.draw = (ctx, viewW, viewH) => {
-        if (!st._open || !st._host) return;
-        st._host.draw(ctx, viewW, viewH);
-    };
-
-    st.close = () => {
-        if (!st._open) return;
-        st._finish();
-    };
-
-    st._finish = () => {
-        if (!st._open) return;
-        st._open = false;
-        st._pending = false;
-        const host = st._host;
-        st._host = null;
-        if (host) {
-            readBack(host);
-            host.teardown();
-        }
+    /** The close callback; a launcher request hands off to the caller's screen
+     *  opener after the close, as the resident launcher would. */
+    function closed() {
+        const transition = st._transition;
+        st._transition = null;
         const cb = st._onClose;
         st._onClose = null;
         cb?.();
-    };
+        if (transition) opts.onTransition?.(transition[0], transition[1]);
+    }
 
     /** Apply the resident save block the pause pages wrote, once, on close.
      *  The commit itself is the one shared routine both pause routes call
@@ -352,7 +318,7 @@ export function createStatusNative(sfx = null, opts = {}) {
         const state = st._state;
         if (!state) return;
         const inventory = [];
-        for (let id = 1; id <= ITEM_MAX_ID; id++) {
+        for (let id = 1; id <= ITEM_ID_MAX; id++) {
             const qty = Number(host.read(HELD_COUNTS + id, 1)) & 0xff;
             if (qty > 0) inventory.push({ id, qty });
         }
@@ -370,9 +336,9 @@ export function createStatusNative(sfx = null, opts = {}) {
         if (st._cardsSeeded && collection?.owned instanceof Map && collection?.seen instanceof Set) {
             const owned = new Map();
             const seen = new Set();
-            for (let id = 1; id <= CARD_MAX_ID; id++) {
+            for (let id = 1; id < SAVE_CARD_MAX; id++) {
                 const copies = Number(host.read(CARD_COUNTS + id, 1)) & 0xff;
-                if (copies > 0) owned.set(id, Math.min(CARD_COPIES_MAX, copies));
+                if (copies > 0) owned.set(id, Math.min(COLLECTION_CAP, copies));
                 if (Number(host.read(CARD_SEEN + id, 1)) & 0xff) seen.add(id);
             }
             cards = { owned, seen, live: collection };
@@ -471,5 +437,13 @@ export function createStatusNative(sfx = null, opts = {}) {
         lastDiagnostic: st._lastDiagnostic,
     });
 
-    return st;
+    return createNativeAdapter({
+        owner: st,
+        moduleId: MODULE_ID,
+        hostOptions,
+        commit: readBack,
+        frame,
+        closed,
+        label: "native status boot failed (manifest/overlay missing)",
+    });
 }

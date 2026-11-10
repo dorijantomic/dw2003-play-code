@@ -1,10 +1,9 @@
 // Browser adapter for the translated in-battle DNA screen. The screen's logic
 // runs in engine/dw3/ui (FightDnaSession: the shared partner list, reused from
-// the TAG port, then the DNA pane). This file loads its data, forwards the held
-// buttons and single presses, paints the picture calls (the PGFGTC00 pane frame,
-// the DNA row's backing, the MP plate and the list models' markers) and the
-// text widgets, and hands the answer back to web/battle.js. It never executes
-// original instructions and never requests an executable asset.
+// the TAG port, then the DNA pane). This file loads its data and hands that and
+// its own seed/answer/diagnostics to web/battle-menu-adapter.js, which runs the
+// open/press/update/draw/close machinery every battle menu shares. It never
+// executes original instructions and never requests an executable asset.
 // `?legacyDnaList=1` keeps the walker's own Switch / DNA DV pane
 // (web/battle.js drawDnaChoice).
 //
@@ -13,14 +12,11 @@
 // preload/diagnostics.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
-import { paintNativeSession } from "./native-session.js";
-import { wfightLoaderRegion } from "./wfight-translated.js";
-import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
+import { createBattleMenuAdapter, battleMenuLanguage } from "./battle-menu-adapter.js";
+import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 
 // The chrome is 0x00455000 (PGFGTC00, disc 1109). The original builds the
 // handle with `lui $a0, 0x455` (fightstg.s:21516).
-const PACK_NAMES = { 0x02860000: "cmfont", 0x04550000: "pgfgc00" };
-const PACKS = { 646: "cmfont", 1109: "pgfgc00" };
 // Bank 0x7F is the battle UI bank (battlecmd/); bank 0x4E is the Digimon-name
 // bank (wizard/). The pane asks [0x80044F4C](language + 0x7F) for "Switch",
 // "DNA DV", "MP" and "/", and (language + 0x4E) for a species name indexed by
@@ -31,7 +27,6 @@ const NAME_BANK = 0x4e;
 // bank the Digivolve form list reads.
 const TECH_BANK = 0xa2;
 const BANK_DIRS = [[UI_BANK, "battlecmd"], [NAME_BANK, "wizard"]];
-const PULSE_BUTTONS = new Set(["up", "down", "left", "right", "circle", "cross", "triangle", "square", "l1", "r1", "start", "select"]);
 const DATA_LABEL = "Battle DNA data";
 // The pane's three data blocks live in pro/fightstg's own image: the species strip's
 // eight-word config at 0x800A3594 and the option list's at 0x800A35B4, then the four
@@ -95,68 +90,30 @@ function loadData(language) {
     return dataPromise;
 }
 
-/** The 16bpp strip the marker blit copies from, as an opaque canvas. */
-function stripCanvas(bytes, w, h) {
-    if (typeof document === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const g = canvas.getContext("2d");
-    const image = g.createImageData(w, h);
-    for (let i = 0; i < w * h; i++) {
-        const c = bytes[i * 2] | (bytes[i * 2 + 1] << 8);
-        const r = c & 0x1f, gg = (c >> 5) & 0x1f, b = (c >> 10) & 0x1f;
-        image.data[i * 4] = (r << 3) | (r >> 2);
-        image.data[i * 4 + 1] = (gg << 3) | (gg >> 2);
-        image.data[i * 4 + 2] = (b << 3) | (b >> 2);
-        image.data[i * 4 + 3] = 0xff;
-    }
-    g.putImageData(image, 0, 0);
-    return canvas;
-}
-
 export function createBattleDnaTranslated(sfx = null, options = {}) {
-    const r = {
-        _open: false, _session: null, _data: null, _error: null, _failed: false,
-        _seed: null, _clock: null, _queue: [], _strip: null, _stripSource: null,
-        _ticks: 0, _answer: null, _species: null, _lastDiagnostic: null,
-        _releaseTicks: 0, _pulse: null, _language: 2,
-    };
-    const renderer = createNativeScreenRenderer({ packs: PACKS, pack: "pgfgc00" },
-        (directory) => PACK_NAMES[directory >>> 0] ?? null);
+    return createBattleMenuAdapter({
+        renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
+            (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
+        sfx,
+        options,
+        state: { _answer: null, _species: null, _language: 2 },
+        // The banks are cut per language, so the language is settled before the
+        // data is asked for and the screen's own copy is what start() uses.
+        beforeLoad: (r) => { r._language = battleMenuLanguage(options, "Battle DNA language index is invalid"); },
+        load: (r) => loadData(r._language),
+        loadFailure: "battle DNA data failed to load",
+        failureMessage: "translated DNA screen failed",
+        failureConsole: "Translated battle DNA screen failed",
+        languageError: "Battle DNA language index is invalid",
+        chosenField: false,
+        readChosen: (r) => r._answer,
 
-    const playSound = (id) => { sfx?.playPacked(id); };
-
-    function fail(error) {
-        r._error = error;
-        r._failed = true;
-        r._lastDiagnostic = `translated DNA screen failed: ${error?.message ?? error}`;
-        console.error("Translated battle DNA screen failed", error);
-    }
-
-    function language() {
-        const state = options.getState?.() ?? {};
-        const selected = state.languageByte;
-        const value = Number.isInteger(selected) ? selected : 2;
-        if (value < 0 || value > 6) throw new Error("Battle DNA language index is invalid");
-        return value;
-    }
-
-    r.preload = () => {
-        try { r._language = language(); } catch (error) { fail(error); return; }
-        loadData(r._language).then((data) => { r._data = data; }).catch((error) => {
-            r._lastDiagnostic = `battle DNA data failed to load: ${error?.message ?? error}`;
-        });
-    };
-
-    /**
-     * Open the DNA screen. `seed.step` picks the first step: "list" runs the
-     * shared partner list in DNA mode, "pane" (the default) opens the pane on
-     * the partner the caller already picked.
-     */
-    r.open = (seed = {}) => {
-        r._open = true;
-        r._seed = {
+        /**
+         * Open the DNA screen. `seed.step` picks the first step: "list" runs the
+         * shared partner list in DNA mode, "pane" (the default) opens the pane on
+         * the partner the caller already picked.
+         */
+        seed: (r, seed = {}) => ({
             step: seed.step === "list" ? "list" : "pane",
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             partnerIndex: Math.max(0, Math.min(2, Number(seed.partnerIndex ?? 1) | 0)),
@@ -176,190 +133,95 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
                 forms: m.forms ?? null,
                 preselected: Number(m.preselected ?? 0) & 0xffff,
             })),
-        };
-        r._answer = null;
-        r._species = null;
-        r._strip = null;
-        r._session = null;
-        r._queue.length = 0;
-        r._pulse = null;
-        r._releaseTicks = 0;
-        r._ticks = 0;
-        r._lastDiagnostic = null;
-        if (!r._data) r.preload();
-    };
+        }),
 
-    r.isOpen = () => r._open && !r._failed;
-    r.isPending = () => r._open && !r._session && !r._failed;
-    r.active = () => r._open && !!r._session;
-    r.failed = () => r._failed;
-    /** The answer word: -2 for a cancel, else the row in the low nibble. */
-    r.chosen = () => r._answer;
-    /** The DNA result species the confirm wrote through self+0x80. */
-    r.speciesOut = () => r._species;
-    /**
-     * The two extracted tables the DNA command's own rule reads, once the
-     * preload has landed: the 55 profile records at 0x8003EF5C and the 18-byte
-     * technique records at 0x80042BDC. The pane has them in its memory; the
-     * battle command path reads the SAME bytes through the shared rule in
-     * engine/dw3/ui/native/battle-dna-menu.ts, so one pairing answer serves both.
-     */
-    r.tables = () => (r._data ? { profiles: r._data.profiles, techniques: r._data.techniques } : null);
+        onOpen: (r) => {
+            r._answer = null;
+            r._species = null;
+            r._ticks = 0;
+        },
 
-    /** A key event as a single press: held for one display tick, then released. */
-    r.press = (button) => {
-        if (!PULSE_BUTTONS.has(button)) return;
-        r._queue.push(button);
-        if (r._queue.length > 16) r._queue.shift();
-    };
+        start: (r, data, language, playSound) => new ui.FightDnaSession(r._language, {
+            ...r._seed,
+        }, {
+            tables: data.tagTables,
+            dnaTables: data.tables,
+            panelTable: data.panelTable,
+            profiles: data.profiles,
+            font: data.font,
+            techniques: data.techniques,
+            banks: data.banks,
+            ...(data.cursorGlyphs ? { cursorGlyphs: data.cursorGlyphs } : {}),
+        }, { playSound }, r._seed.step === "list"),
 
-    function buttonsForTick(held) {
-        const buttons = new Set(held);
-        if (r._releaseTicks > 0) {
-            r._releaseTicks--;
-            r._pulse = null;
-        } else if (r._session && r._session.step() !== "done" && r._queue.length > 0) {
-            r._pulse = r._queue.shift();
-            buttons.add(r._pulse);
-            r._releaseTicks = 1;
-        }
-        return buttons;
-    }
-
-    /**
-     * One battle update. The pane does not close itself on a confirm: it writes
-     * the answer word and steps back to the species names (fightstg.s:22300-
-     * 22312, `self+0x2c(self, 0)`), and the coordinator is what closes it. So the
-     * answer is read off that word, and the cancel is the word -2 the pane leaves
-     * behind when it does close itself.
-     */
-    r.update = (keys, dt = 1 / 60) => {
-        if (!r._open || r._failed) return null;
-        if (!r._session) {
-            if (!r._data) {
-                if (!dataPromise) r.preload();
-                return null;
+        // The pane does not close itself on a confirm: it writes the answer word
+        // and steps back to the species names (fightstg.s:22300-22312,
+        // `self+0x2c(self, 0)`), and the coordinator is what closes it. So the
+        // answer is read off that word, and the cancel is the word -2 the pane
+        // leaves behind when it does close itself.
+        answer: (r, session) => {
+            const pane = session.pane;
+            if (session.step() === "done") {
+                r._answer = pane ? pane.answer() : -2;
+                r._species = pane ? pane.speciesOut() : null;
+                return { value: r._answer };
             }
-            try {
-                r._session = new ui.FightDnaSession(r._language, r._seed, {
-                    tables: r._data.tagTables,
-                    dnaTables: r._data.tables,
-                    panelTable: r._data.panelTable,
-                    profiles: r._data.profiles,
-                    font: r._data.font,
-                    techniques: r._data.techniques,
-                    banks: r._data.banks,
-                    ...(r._data.cursorGlyphs ? { cursorGlyphs: r._data.cursorGlyphs } : {}),
-                }, { playSound }, r._seed.step === "list");
-                r._clock = new ui.MenuDisplayClock();
-            } catch (error) { fail(error); return null; }
-        }
-        const held = keys ? [...keys] : [];
-        try {
-            for (const frame of r._clock.advance(dt)) {
-                r._session.tick(buttonsForTick(held), frame.tick);
-                r._ticks++;
-                const pane = r._session.pane;
-                if (r._session.step() === "done") {
-                    r._answer = pane ? pane.answer() : -2;
-                    r._species = pane ? pane.speciesOut() : null;
-                    return r._answer;
-                }
-                if (pane && r._answer === null) {
-                    const word = pane.answer();
-                    if (word !== -1) {
-                        r._answer = word;
-                        r._species = pane.speciesOut();
-                        return word;
-                    }
+            if (pane && r._answer === null) {
+                const word = pane.answer();
+                if (word !== -1) {
+                    r._answer = word;
+                    r._species = pane.speciesOut();
+                    return { value: word };
                 }
             }
-        } catch (error) {
-            fail(error);
-        }
-        return null;
-    };
+            return null;
+        },
 
-    r.draw = (ctx, viewW = 320) => {
-        if (!r._open || !r._session) return;
-        const active = r._session.step() === "pane" ? r._session.pane : r._session.list;
-        if (!active) return;
-        const s = viewW / 320;
-        ctx.save();
-        ctx.scale(s, s);
-        paintNativeSession(ctx, renderer, active, { fade: false });
-        paintMoves(ctx, active);
-        ctx.restore();
-    };
+        // The pane keeps reading the pad after its confirm, until it is done.
+        canQueue: (r, session) => !!session && session.step() !== "done",
+        done: (session) => session.step() === "done",
+        paintTarget: (r) => (r._session.step() === "pane" ? r._session.pane : r._session.list),
 
-    /** The vsync blit's VRAM-to-VRAM copies land on top of the finished frame. */
-    function paintMoves(ctx, session) {
-        const info = r._data?.manifest?.strip;
-        if (!info) return;
-        const [vx, vy] = info.vram;
-        if (!r._strip) {
-            const uploaded = wfightLoaderRegion(vx, vy, info.width, info.height);
-            r._stripSource = uploaded ? "loader-vram" : "data";
-            r._strip = stripCanvas(uploaded ?? r._data.strip, info.width, info.height);
-        }
-        if (!r._strip) return;
-        for (const m of session.moves ?? []) {
-            if (m.dstY >= 0x100) continue;
-            const sx = m.srcX - vx, sy = m.srcY - vy;
-            if (sx < 0 || sy < 0 || sx + m.w > info.width || sy + m.h > info.height) {
-                r._lastDiagnostic = `VRAM copy from ${m.srcX},${m.srcY} is outside the marker strip`;
-                continue;
-            }
-            ctx.drawImage(r._strip, sx, sy, m.w, m.h, m.dstX, m.dstY, m.w, m.h);
-        }
-    }
+        /**
+         * The two extracted tables the DNA command's own rule reads, once the
+         * preload has landed: the 55 profile records at 0x8003EF5C and the 18-byte
+         * technique records at 0x80042BDC. The pane has them in its memory; the
+         * battle command path reads the SAME bytes through the shared rule in
+         * engine/dw3/ui/native/battle-dna-menu.ts, so one pairing answer serves both.
+         */
+        extraApi: (r) => {
+            /** The DNA result species the confirm wrote through self+0x80. */
+            r.speciesOut = () => r._species;
+            r.tables = () => (r._data ? { profiles: r._data.profiles, techniques: r._data.techniques } : null);
+        },
 
-    r.close = () => {
-        if (!r._open) return;
-        r._open = false;
-        const session = r._session;
-        r._session = null;
-        if (session && session.step() !== "done") session.dispose();
-    };
-
-    r.diagnostics = () => {
-        const pane = r._session?.pane ?? null;
-        const list = r._session?.list ?? null;
-        return {
-            execution: "translated",
-            open: r._open,
-            pending: r.isPending(),
-            queued: r._queue.length,
-            failed: r._failed,
-            error: r._error?.message ?? null,
-            step: r._session?.step() ?? null,
-            answer: r._answer,
-            speciesOut: r._species,
-            ticks: r._ticks,
-            list: list ? {
-                rows: list.rows(), selection: list.selection(),
-                candidates: list.candidates(), panels: list.panels(),
-                ready: list.ready(), chosen: list.chosen(),
-            } : null,
-            pane: pane ? {
-                subState: pane.subState(), ready: pane.ready(),
-                species: pane.species(), stripCursor: pane.stripCursor(),
-                previewOption: pane.previewOption(), optionRow: pane.optionRow(),
-                selected: pane.selected(),
-                dnaId: pane.dnaId(), price: pane.price(),
-                combatant: pane.combatant(),
-                handoffs: pane.handoffs.map((h) => ({ ...h })),
-                preview: pane.preview(),
-                sounds: pane.sounds, tasks: pane.tree.tasks.size,
-                vsync: pane.vsyncInstalled(),
-                party: [0, 1, 2].map((slot) => ({ slot, ...pane.partyStatus(slot) })),
-            } : null,
-            seed: r._seed,
-            stripSource: r._stripSource,
-            renderer: renderer.stats,
-            lastDiagnostic: r._lastDiagnostic,
-        };
-    };
-
-    return r;
+        diagnostics: (r) => {
+            const pane = r._session?.pane ?? null;
+            const list = r._session?.list ?? null;
+            return {
+                step: r._session?.step() ?? null,
+                answer: r._answer,
+                speciesOut: r._species,
+                ticks: r._ticks,
+                list: list ? {
+                    rows: list.rows(), selection: list.selection(),
+                    candidates: list.candidates(), panels: list.panels(),
+                    ready: list.ready(), chosen: list.chosen(),
+                } : null,
+                pane: pane ? {
+                    subState: pane.subState(), ready: pane.ready(),
+                    species: pane.species(), stripCursor: pane.stripCursor(),
+                    previewOption: pane.previewOption(), optionRow: pane.optionRow(),
+                    selected: pane.selected(),
+                    dnaId: pane.dnaId(), price: pane.price(),
+                    combatant: pane.combatant(),
+                    handoffs: pane.handoffs.map((h) => ({ ...h })),
+                    preview: pane.preview(),
+                    sounds: pane.sounds, tasks: pane.tree.tasks.size,
+                    vsync: pane.vsyncInstalled(),
+                    party: [0, 1, 2].map((slot) => ({ slot, ...pane.partyStatus(slot) })),
+                } : null,
+            };
+        },
+    });
 }

@@ -204,10 +204,11 @@ test("the F2 switch is off by default and gates the row, the page and its data",
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"itemrulebook"/, "off until the player switches it on");
-    assert.match(ambience, /id="fx-itemrulebook" hidden/, "the button row ships hidden");
-    assert.match(ambience, /const itemRulebook = panel\.querySelector\("#fx-itemrulebook"\); if \(itemRulebook\) itemRulebook\.hidden = !fx\.itemrulebook;/, "refreshPanel follows the switch");
-    assert.match(ambience, /if \(fx\.itemrulebook\)[^;{}]*window\.open\("item-rulebook\.html", "_blank", "noopener"\)/, "opened only behind the toggle's guard");
-    assert.equal(ambience.split("item-rulebook.html").length - 1, 1, "one reference to the page, no other link into it");
+    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    assert.match(devModel, /itemrulebook: P\("item-rulebook\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
+    assert.equal(devModel.split("item-rulebook.html").length - 1, 1, "one reference to the page, no other link into it");
+    assert.equal(ambience.split("item-rulebook.html").length - 1, 0, "ambience.js itself has no link");
     assert.doesNotMatch(ambience, /(get|has)\("itemrulebook"\)/, "never a URL flag");
-    assert.match(ambience, /#fx-panel \.row\[hidden\] \{ display:none; \}/, "the panel's own rule that makes a hidden row vanish");
 });

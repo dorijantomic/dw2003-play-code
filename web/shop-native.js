@@ -20,24 +20,17 @@
 // comparison screen.
 
 import {
-    elementValue, maskFromButtons, reconcileHeldCounts, rosterSlotOfCharId, setEquippedItem,
-    wornCount, wornItemIds, WORN_MAX,
+    reconcileHeldCounts, rosterSlotOfCharId, setEquippedItem,
+    wornCount, wornItemIds, WORN_MAX, MONEY_CAP, ITEM_ID_MAX, ROSTER_STRIDE,
 } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { nativeRootCtorFor } from "./native-screen-roots.js";
 
 import { RECORD_EQUIP_OFFSETS, seedNativeScreenParty } from "./native-screen.js";
-import { partyRosterView, syncLeadEquipBonuses } from "./party.js";
+import { partyRosterView, storedNumbers, syncLeadEquipBonuses } from "./party.js";
 import { ensureStoredStats } from "./battle.js";
 
-const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
-const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const ROSTER = 0x80049494;
-const STRIDE = 0x3dc;
 
 const MODULE_ID = "pro/stitshop";
 /** The scene that owns the BUY/SELL menu; the manifest records only the BUY
@@ -53,9 +46,7 @@ const HELD_COUNTS = SAVE_CONTEXT + 0x7c;
  *  reads it with `lb base + 0x20F + id` (stitshop 0x80089ECC, file 0x721C) for
  *  its "Equip" number, and the equip-apply writes it (0x8008C880 / 0x8008CA30). */
 const WORN_COUNTS = SAVE_CONTEXT + 0x20f;
-const ITEM_MAX_ID = 402; // the shipped item catalogue ends at 402
 const HELD_MAX = 99;
-const BIT_CAP = 0x98967f; // 9,999,999 (shop-system-decompiled §2026-08-04)
 
 /** The seven packed sound ids the shop state machines play, as their browser
  *  names (claim shop-sfx-seven-2026-09-09, proved live 2026-09-10). They all
@@ -75,10 +66,11 @@ export function createShopNative(sfx = null, opts = {}) {
 
     const playPackedSound = (id) => { sfx?.playPacked(id); };
 
-    function boot() {
+    /** Host options, built at boot time so the shop id and state are current. */
+    function hostOptions() {
         const state = sh._state ?? {};
         const inventory = Array.isArray(state.inventory) ? state.inventory : [];
-        const host = openNativeScreen(MODULE_ID, {
+        return {
             rootCtor: SHOP_ROOT_CTOR,
             playPackedSound,
             preBoot: ({ write }) => write(SHOP_ID_CELL, sh._shopId | 0, 4),
@@ -92,25 +84,25 @@ export function createShopNative(sfx = null, opts = {}) {
                     positions: view.map(v => rosterSlotOfCharId(v.charId) ?? 0xffffffff),
                     stats: view.map((v, i) => {
                         const rec = (i === 0 ? state.partnerStats : state.partyStats?.[i]) ?? {};
-                        const core = v.profile ? ensureStoredStats(rec, v.profile) : rec.stats ?? {};
+                        if (v.profile) ensureStoredStats(rec, db[v.rookieId] ?? v.profile);
                         const slot = rosterSlotOfCharId(v.charId);
                         return { ...v, slot, starterSlot: slot, exp: v.xp,
                             forms: rec,
-                            core: CORE.map(k => (Number(core[k]) || 0) + (Number(rec.bonuses?.[k]) || 0)),
-                            // The roster record's STORED element halfwords (species base + every
-                            // trained point); the shop screen's own original-code
-                            // fill adds the worn gear's resist on top through
-                            // F0x80017174. One shared helper for the stored half.
-                            elements: ELEMENTS.map(k => elementValue(v.profile, rec.elemBonuses, k)),
+                            // The roster record's thirteen stored halfwords come from
+                            // ONE shared helper (web/party.js storedNumbers): the
+                            // STARTER's row plus the trained points and chips, never the
+                            // worn form. The screen's own original-code fill adds the
+                            // worn gear's resist on top through F0x80017174.
+                            ...storedNumbers(v.charId, rec, db),
                             equipment: state.equipment?.[i],
                         };
                     }),
                 });
-                write(MONEY, Number(state.bits) || 0, 4);
+                write(MONEY, Math.max(0, Math.min(MONEY_CAP, Math.trunc(Number(state.bits) || 0))), 4);
                 for (const slot of inventory) {
                     const id = Number(slot?.id);
                     const qty = Number(slot?.qty) || 0;
-                    if (Number.isInteger(id) && id > 0 && id <= ITEM_MAX_ID) {
+                    if (Number.isInteger(id) && id > 0 && id <= ITEM_ID_MAX) {
                         write(HELD_COUNTS + id, Math.max(0, Math.min(HELD_MAX, qty)), 1);
                     }
                 }
@@ -118,14 +110,10 @@ export function createShopNative(sfx = null, opts = {}) {
                     write(WORN_COUNTS + id, Math.max(0, Math.min(WORN_MAX, wornCount(state, id))), 1);
                 }
             },
-        });
-        if (!host) return false;
-        sh._host = host;
-        return true;
+        };
     }
 
     sh.open = (stock, onClose = null, opts = {}) => {
-        sh._open = true;
         sh._onClose = onClose;
         sh._state = opts.state ?? sh._state ?? null;
         // shopId is the native stock selector (STITSHOP_SHOPS[shop_id]). The
@@ -135,10 +123,7 @@ export function createShopNative(sfx = null, opts = {}) {
         sh._shopId = Number.isInteger(id) && id >= 0 ? id : 0;
         sh._lastDiagnostic = Number.isInteger(id) ? null : "shop.open without shopId";
         sh._bootFrames = 0;
-        preloadNativeScreens().catch((e) => {
-            sh._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) sh._pending = true;
+        sh._begin();
     };
 
     sh.isOpen = () => sh._open;
@@ -150,81 +135,38 @@ export function createShopNative(sfx = null, opts = {}) {
         if (state && !sh._state) sh._state = state;
     };
 
-    sh.update = (dt) => {
-        if (!sh._open) return;
-        if (sh._pending) {
-            sh._bootFrames += 1;
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                sh._lastDiagnostic = "native shop boot failed (manifest/overlay missing)";
-                return;
-            }
-            sh._pending = false;
+    /** The screen's wallet, bag and equip halfwords -> the walker's state. */
+    function commit(host) {
+        const bits = Number(host.read(MONEY, 4)) >>> 0;
+        const state = sh._state;
+        if (!state) return;
+        state.bits = Math.max(0, Math.min(MONEY_CAP, bits));
+        // The screen wrote the save block's held-count array; hand every
+        // count to the shared store instead of replacing the bag.
+        const inventory = [];
+        for (let id = 1; id <= ITEM_ID_MAX; id++) {
+            const qty = Number(host.read(HELD_COUNTS + id, 1)) & 0xff;
+            if (qty > 0) inventory.push({ id, qty });
         }
-        const keys = sh._state?.keys;
-        // The pad word goes over as it stands. The shop's own machines ask for
-        // logical 0x0D to confirm and 0x0E to cancel (shop-root-machine.ts:90/94),
-        // which are word bits 0x2000 and 0x4000 - the bits the walker now sends.
-        sh._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (sh._host.tick(dt)) sh._finish();
-    };
-
-    sh.draw = (ctx, viewW, viewH) => {
-        if (!sh._open || !sh._host) return;
-        sh._host.draw(ctx, viewW, viewH);
-    };
-
-    sh.close = () => {
-        if (!sh._open) return;
-        sh._finish();
-    };
-
-    sh._finish = () => {
-        if (!sh._open) return;
-        sh._open = false;
-        sh._pending = false;
-        const host = sh._host;
-        sh._host = null;
-        if (host) {
-            const bits = Number(host.read(MONEY, 4)) >>> 0;
-            const state = sh._state;
-            if (state) {
-                state.bits = Math.max(0, Math.min(BIT_CAP, bits));
-                // The screen wrote the save block's held-count array; hand every
-                // count to the shared store instead of replacing the bag.
-                const inventory = [];
-                for (let id = 1; id <= ITEM_MAX_ID; id++) {
-                    const qty = Number(host.read(HELD_COUNTS + id, 1)) & 0xff;
-                    if (qty > 0) inventory.push({ id, qty });
-                }
-                reconcileHeldCounts(state, inventory);
-                // The screen wrote the roster's six equip halfwords; diff them per
-                // member so the stored worn byte moves with the record
-                // (ststatus 0x8009A4AC / 0x8009A5E4).
-                state.equipment ??= [];
-                (state.party ?? []).forEach((member, i) => {
-                    const slot = rosterSlotOfCharId(member);
-                    if (slot == null) return;
-                    for (const [name, off] of RECORD_EQUIP_OFFSETS) {
-                        setEquippedItem(state, i, name, Number(host.read(ROSTER + slot * STRIDE + off, 2)) & 0xffff);
-                    }
-                });
-                syncLeadEquipBonuses(state);
-                if (typeof localStorage !== "undefined") {
-                    localStorage.setItem("equipment", JSON.stringify(state.equipment));
-                    localStorage.setItem("worn", JSON.stringify(state.worn ?? {}));
-                    localStorage.setItem("inventory", JSON.stringify(inventory));
-                }
+        reconcileHeldCounts(state, inventory);
+        // The screen wrote the roster's six equip halfwords; diff them per
+        // member so the stored worn byte moves with the record
+        // (ststatus 0x8009A4AC / 0x8009A5E4).
+        state.equipment ??= [];
+        (state.party ?? []).forEach((member, i) => {
+            const slot = rosterSlotOfCharId(member);
+            if (slot == null) return;
+            for (const [name, off] of RECORD_EQUIP_OFFSETS) {
+                setEquippedItem(state, i, name, Number(host.read(ROSTER + slot * ROSTER_STRIDE + off, 2)) & 0xffff);
             }
-            host.teardown();
+        });
+        syncLeadEquipBonuses(state);
+        if (typeof localStorage !== "undefined") {
+            localStorage.setItem("equipment", JSON.stringify(state.equipment));
+            localStorage.setItem("worn", JSON.stringify(state.worn ?? {}));
+            localStorage.setItem("inventory", JSON.stringify(inventory));
         }
-        const cb = sh._onClose;
-        sh._onClose = null;
-        cb?.();
-    };
+    }
 
     /** Diagnostics for the lab and focused browser checks. */
     sh.nativeState = () => sh._host?.state() ?? null;
@@ -255,5 +197,14 @@ export function createShopNative(sfx = null, opts = {}) {
         lastDiagnostic: sh._lastDiagnostic,
     });
 
-    return sh;
+    return createNativeAdapter({
+        owner: sh,
+        moduleId: MODULE_ID,
+        hostOptions,
+        // The pad word goes over as it stands. The shop's own machines ask for
+        // logical 0x0D to confirm and 0x0E to cancel (shop-root-machine.ts:90/94),
+        // which are word bits 0x2000 and 0x4000 - the bits the walker now sends.
+        commit,
+        label: "native shop boot failed (manifest/overlay missing)",
+    });
 }

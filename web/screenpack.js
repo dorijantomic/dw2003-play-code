@@ -8,6 +8,7 @@
 // authored dx/dy offsets. See docs/research/ui/menu-assets-decoded-2026-07-03.md.
 
 import { loadAssetImage } from "./assets.js";
+import { registerPausePanels } from "./panel-kit.js";
 
 const packs = {}; // name -> { img, map, ids, patterns }
 
@@ -38,6 +39,7 @@ export function loadPack(name) {
   fetch(`assets/ui/${name}_sheet.json`).then((r) => r.json()).then((j) => {
     p.map = j;
     p.ids = j.ids ?? j;
+    if (name === "cmfont") registerPausePanels(p.ids);
   }).catch(() => {});
   return p;
 }

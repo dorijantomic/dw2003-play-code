@@ -94,7 +94,9 @@ test("the three ordinary-route adapters still boot the shipped overlay through t
         const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
         assert.match(source, /native-screen-host\.js/,
             `${file} boots the overlay through the native screen host`);
-        assert.match(source, /openNativeScreen/, `${file} opens an interpreter-backed screen`);
+        // The call itself moved into the factory (card 11); what must stay true is
+        // that the adapter opens the overlay through that host.
+        assert.match(source, /createNativeAdapter|openNativeScreen/, `${file} opens an interpreter-backed screen`);
     }
     // web/game.js selects the native adapter with no query flag (the ordinary
     // route) for the duel; the ?legacy*=1 rollbacks are hand-authored, not

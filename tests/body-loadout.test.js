@@ -1,5 +1,5 @@
-// Loadout — what a body really throws, and how its clip is built (web/fight/body-loadout.js
-// and the fourth Digimon Codex tab in web/codex.js).
+// Loadout — what a body really throws, and how its clip is built (web/fight/body-loadout.js;
+// the in-game Codex tab that showed it is gone, the module stays).
 //
 // Every number here is read from the packs the battle plays, never typed in:
 //   actions[clip].ops  the disc's own action script for one slot
@@ -20,9 +20,6 @@
 // (`f3d_body.py`: op2 records `[:4]`, op3/op10 `[:3]`); where that slice differs from
 // the whole script the whole script is pinned and the slice is pinned beside it, so the
 // figure stays traceable (see the Agumon clip 5/11 tests).
-//
-// F2 -> Extras -> "Digimon Codex (new)" (off by default). With the switch off there is
-// no fourth tab, no anim.json fetch and no canvas call.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -38,21 +35,6 @@ import {
   silentClips,
   techniqueIds,
 } from "../web/fight/body-loadout.js";
-import {
-  codexReset,
-  codexLoadoutAnim,
-  codexLoadoutBody,
-  codexLoadoutBodyState,
-  codexOpen,
-  codexPageRows,
-  codexPress,
-  codexRows,
-  codexTab,
-  codexDraw,
-  setCodexData,
-  setLoadoutData,
-  tickCodex, openCodex,
-} from "../web/codex.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ASSETS = path.join(ROOT, "web/assets");
@@ -280,154 +262,12 @@ test("moveRows: Meramon's five moves join their clips, names, elements, meshes a
   ]);
 });
 
-// ── the page ─────────────────────────────────────────────────────────────────────
+// ── purity ───────────────────────────────────────────────────────────────────────
 
-/** A recording 2D context: enough of the canvas API for codexDraw, and a text log. */
-function fakeCtx() {
-  const calls = [];
-  const ctx = {
-    calls,
-    save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
-    fillRect() { calls.push(["fillRect"]); },
-    strokeRect() { calls.push(["strokeRect"]); },
-    fillText(text) { calls.push(["fillText", String(text)]); },
-    set font(v) {}, set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
-    set textBaseline(v) {}, set textAlign(v) {},
-  };
-  return ctx;
-}
-const drawnText = (ctx) => ctx.calls.filter((c) => c[0] === "fillText").map((c) => c[1]).join("\n");
-
-const evolutions = read("data/evolutions.json");
-const enemies = read("data/enemies.json");
-const encounters = {
-  stages: read("data/stage_encounters.json"),
-  screens: read("data/field_encounters.json"),
-  maps: read("manifest.json"),
-};
-
-/** Every body fetch the tab makes, so a test can prove it asks for one anim.json at a time. */
-const bodyFetches = [];
-const readBody = async (url) => {
-  bodyFetches.push(url);
-  const m = /^assets\/battle\/models\/([^/]+)\/anim\.json$/.exec(url);
-  if (!m) throw new Error(`the page asked for ${url}`);
-  return anim(m[1]);
-};
-
-function installBook() {
-  bodyFetches.length = 0;
-  codexReset();
-  setCodexData({ digimon: speciesList, skills }, evolutions, enemies, modelMap, encounters);
-  setLoadoutData({ index: folders, techTable, sounds, fetchJson: readBody });
-}
-
-test("the module is pure and the book fetches one body at a time", () => {
+test("the module is pure", () => {
   const src = fs.readFileSync(path.join(ROOT, "web/fight/body-loadout.js"), "utf8");
-  assert.ok(!/\bfetch\s*\(/.test(src), "no fetch");
+  assert.ok(!/fetch\s*\(/.test(src), "no fetch");
   assert.ok(!/node:fs|require\(/.test(src), "no filesystem");
-  assert.ok(!/\bwindow\.|\bdocument\./.test(src), "no DOM");
+  assert.ok(!/window\.|document\./.test(src), "no DOM");
   assert.ok(!/localStorage/.test(src), "the page stores nothing");
-  const codex = fs.readFileSync(path.join(ROOT, "web/codex.js"), "utf8");
-  const bodyFetches = codex.match(/fetcher\(`assets\/battle\/models\/\$\{[^}]+\}\/anim\.json`\)/g) ?? [];
-  assert.equal(bodyFetches.length, 1, "exactly one anim.json fetch, inside the body loader");
-  assert.match(codex, /assets\/battle\/models\/\$\{[^}]+\}\/anim\.json/);
-  assert.match(codex, /"loadout"/, "the fourth tab name");
-  assert.match(codex, /LOADOUT/, "the fourth tab label");
-});
-
-test("with the codex switch off there is no fourth tab, no body and no canvas call", () => {
-  installBook();
-  const ctx = fakeCtx();
-  assert.equal(tickCodex(false), false);
-  assert.equal(codexOpen(), false);
-  assert.equal(codexPress("r1"), false, "a closed book swallows no press");
-  assert.equal(codexDraw(ctx), false);
-  assert.equal(ctx.calls.length, 0);
-  assert.equal(codexLoadoutAnim(), null, "no body was fetched");
-});
-
-test("R1 three times reaches LOADOUT; opening a body fetches exactly its own anim.json", async () => {
-  installBook();
-  openCodex();
-  assert.equal(codexTab(), "partners");
-  codexPress("r1");
-  codexPress("r1");
-  codexPress("r1");
-  assert.equal(codexTab(), "loadout", "the fourth tab of the same book");
-  assert.equal(codexRows().length, 249, "one row per model pack");
-  assert.equal(codexPageRows()[0].folder, "m003agum", "bodies are listed by folder");
-  assert.deepEqual(codexPageRows()[0].names, ["Agumon"]);
-
-  await codexLoadoutBody();
-  assert.deepEqual(bodyFetches, ["assets/battle/models/m003agum/anim.json"], "one fetch, one body");
-  assert.equal(codexLoadoutBodyState().folder, "m003agum");
-  assert.equal(codexLoadoutAnim().folder, "m003agum");
-  assert.equal(codexLoadoutAnim().num_bones, 18);
-
-  // the same body again is not refetched
-  await codexLoadoutBody();
-  assert.equal(bodyFetches.length, 1);
-
-  // moving to Meramon (row 8 of the sorted list) opens that body instead
-  for (let i = 0; i < 7; i++) codexPress("down");
-  assert.equal(codexPageRows()[0].folder, "m003agum");
-  const row = codexRows()[7];
-  assert.equal(row.folder, "m009mera");
-  await codexLoadoutBody();
-  assert.equal(codexLoadoutBodyState().folder, "m009mera");
-  assert.equal(codexLoadoutAnim().folder, "m009mera");
-  assert.equal(bodyFetches.filter((u) => /m009mera/.test(u)).length, 1, "the open body is read once");
-  assert.ok(bodyFetches.every((u) => /^assets\/battle\/models\/[^/]+\/anim\.json$/.test(u)),
-    "the tab only ever asks for one body's anim.json");
-  codexPress("cross");
-  assert.equal(codexOpen(), false);
-});
-
-test("the LOADOUT page names each clip's tables, waits, mesh, effects, sounds and strike", async () => {
-  installBook();
-  setLoadoutData({ index: ["m009mera"], techTable, sounds });
-  openCodex();
-  codexPress("r1"); codexPress("r1"); codexPress("r1");
-  await codexLoadoutBody(async () => anim("m009mera"));
-  const ctx = fakeCtx();
-  assert.equal(codexDraw(ctx), true);
-  const text = drawnText(ctx);
-  assert.match(text, /LOADOUT/);
-  assert.match(text, /Meramon/, "the species that uses this body");
-  assert.match(text, /m009mera/);
-  // the clip line, from the script itself
-  assert.match(text, /c9 spell cast/);
-  assert.match(text, /tables 38/);
-  assert.match(text, /waits 25,50,21,10,100/);
-  assert.match(text, /mesh 371 @ 0,2816,-2944/);
-  assert.match(text, /fx 1013, 2, 5/);
-  assert.match(text, /comcd300/, "sound 51's own name from the 89-entry table");
-  assert.match(text, /STRIKE/);
-  // the species' moves, joined by clip
-  assert.match(text, /Flame Ball/);
-  assert.match(text, /fire/);
-  // the two odd-case lines, with the measured numbers
-  assert.match(text, /23 cases/);
-  assert.match(text, /76 authored attack clips/);
-  assert.match(text, /ExVeemon/);
-  assert.match(text, /SkullGreymon/);
-  assert.ok(!/\b27\b/.test(text), "the page never claims the knowledge base's 27");
-  codexPress("cross");
-});
-
-test("a clip with no strike prints 'no strike marker' and no invented shot", async () => {
-  installBook();
-  setLoadoutData({ index: ["m014monz"], techTable, sounds });
-  openCodex();
-  codexPress("r1"); codexPress("r1"); codexPress("r1");
-  await codexLoadoutBody(async () => anim("m014monz"));
-  const ctx = fakeCtx();
-  codexDraw(ctx);
-  const text = drawnText(ctx);
-  assert.match(text, /no strike marker/i, "the honest flag");
-  assert.match(text, /c9 spell cast/);
-  assert.match(text, /no projectile/, "this body launches nothing");
-  assert.ok(!/mesh \d/.test(text), "no mesh is invented for a body that throws none");
-  codexPress("cross");
 });

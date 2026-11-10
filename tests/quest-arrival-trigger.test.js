@@ -212,7 +212,8 @@ test("wiring: a map load through quests.js starts the arrival scene with the swi
     });
     const q = globalThis.__quests;
     assert.ok(q, "the quest layer installed");
-    assert.notEqual(fx.questtriggers, true, "Quest triggers starts off");
+    assert.equal(fx.questtriggers, true, "Quest triggers start on (in, web/ship-list.js)");
+    fx.questtriggers = false;                           // this test walks the off case first, then switches it on
     questsTick("s200", 100, 100);                       // the first tick of the load, switch off
     await new Promise((r) => setTimeout(r, 0));
     assert.equal(plays, 0, "no arrival test with the switch off");

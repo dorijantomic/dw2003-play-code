@@ -8,7 +8,7 @@
 // The adapter answers the same calls as the reference route: open(state, entry, onClose),
 // isOpen(), handleKey(key, state), update(dt), draw(ctx, w, h), close() and diagnostics().
 import {
-    commitPauseClose, maskFromButtons, rosterSlotOfCharId, wornCount, wornItemIds, ui,
+    commitPauseClose, maskFromButtons, rosterSlotOfCharId, wornCount, wornItemIds, ui, ITEM_ID_MAX,
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
@@ -25,7 +25,6 @@ const PACKS = {
     0x079b0000: "stwmp1map", 0x079b0001: "stwmp1area", 0x079b0002: "stwmp1icon",
 };
 const packNameFor = (handle) => PACKS[handle] ?? PACKS[(handle >>> 16) & 0xffff] ?? null;
-const ITEM_MAX_ID = 402;
 const PAGES = new Set(["home", "items", "sort", "map", "techniques", "status", "cardfolders", "quests"]);
 
 const DATA_LABEL = "Pause data";
@@ -131,20 +130,21 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         const inventory = [];
         for (const slot of Array.isArray(state.inventory) ? state.inventory : []) {
             const id = Number(slot?.id);
-            if (Number.isInteger(id) && id > 0 && id <= ITEM_MAX_ID) inventory.push({ id, qty: Number(slot?.qty) || 0 });
+            if (Number.isInteger(id) && id > 0 && id <= ITEM_ID_MAX) inventory.push({ id, qty: Number(slot?.qty) || 0 });
         }
         // The second count array: the ITEMS page's detail band reads its "Equip"
         // number from `base + 0x20F + id` (ststatus 0x8008F16C), so the stored worn
         // byte is seeded here and that figure is that byte.
         const worn = wornItemIds(state).map((id) => ({ id, qty: wornCount(state, id) }));
         const context = typeof opts.map === "function" ? (opts.map(state) ?? null) : null;
+        const extraRows = entry === "home" ? (opts.extraRows?.(state) ?? []) : [];
         return {
             page: entry, money: Number(state.bits) || 0, inventory, worn, party: partySeed(state),
             stage: context?.stage ?? 0, mapSeen: mapSeenReader(context),
             homeOverlay: st._homeOverlay, homeRow: st._homeRow,
             cardFoldersUnlocked: !!opts.cardFoldersUnlocked?.(),
-            // EXTRA (not on the disc): one more row on the pause home list (the extra quests) and the page it opens
-            ...(entry === "home" && opts.extraRow?.(state) ? { extraRow: opts.extraRow(state) } : {}),
+            // EXTRA (not on the disc): more rows on the pause home list (the extra quests, the GLOSSARY and OPTIONS books)
+            ...(extraRows.length ? { extraRows } : {}),
             ...(entry === "quests" && opts.questsPage?.(state) ? { quests: opts.questsPage(state) } : {}),
         };
     }
@@ -209,6 +209,8 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         st.open(st._state, page, st._returnClose, true);
         return true;
     };
+    /** Buttons (words) that were down when this pause came back from a book: the list ignores each until it is let go. */
+    st.blockUntilReleased = (words = []) => { st._blocked = new Set(words); };
     st.handleKey = (_k, state) => { if (state && !st._state) st._state = state; };
 
     st.update = (dt) => {
@@ -219,7 +221,11 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         // The held word is already the word the pages read: web/input.js hands every
         // screen the bit a physical button reaches, and the disc's rotation happens
         // there and only there (engine/systems/input-map.ts `padWordButton`).
-        const keys = st._state?.keys ? [...st._state.keys] : [];
+        let keys = st._state?.keys ? [...st._state.keys] : [];
+        if (st._blocked?.size) {
+            for (const w of [...st._blocked]) if (!keys.includes(w)) st._blocked.delete(w);
+            keys = keys.filter((w) => !st._blocked.has(w));
+        }
         // The console's pages see a press one frame after it happens: on the disc every
         // pause page reacted exactly one frame later than these pages fed at once (182 of 182
         // timed presses, docs/research/ui/captures/pause-menu-robot-map-2026-09-29.md).
@@ -233,6 +239,11 @@ export function createStatusTranslated(sfx = null, opts = {}) {
                         st._homeOverlay = true;
                         st._homeRow = result.row;
                         st.open(st._state, result.page, st._onClose, true);
+                    } else if (result?.kind === "book") {
+                        // GLOSSARY / OPTIONS: the list shuts for good (the pause is over) and the browser opens the book,
+                        // which brings the list back on this row when it closes (web/game.js openBook).
+                        st._finish(false);
+                        opts.onBook?.(result.book, result.row);
                     } else st._finish(false);
                 } else if (st._homeFlow && !session.transition()) {
                     readBack(session);

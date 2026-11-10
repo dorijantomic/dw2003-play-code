@@ -29,6 +29,7 @@
 import { paintScreenDim } from "./screendim.js";
 import { loadPack, drawClip, packReady, drawClipAtPaletteRow } from "./screenpack.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
+import { leaveFadeStep, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { drawText as uiDrawText, fontReady as uiFontReady } from "./uifont.js";
 import { ui } from "./vendor/engine.js";
 import {
@@ -51,8 +52,7 @@ const VSYNC_S = 0.02; // PAL 50 Hz, same beat as shop/gym leave fades
 // start_report_fade: 8.8 dim word 0 → 0xFF00 in 30 frames, then the screen
 // is gone. Same shape as the shop/gym leave dim.
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 // F0x80085c90: panel open is 10 vsyncs; close runs at twice that speed.
 const ROW_OPEN_FRAMES = 10;
@@ -207,7 +207,7 @@ export function createFightReport(sfx = null) {
 
   r.leaveFadeAlpha = () => {
     if (!r.fadeLeaving) return 0;
-    return Math.min(255, (r.fadeFrames * LEAVE_FADE_DELTA) >> 8) / 255;
+    return leaveFadeLevel(r.fadeFrames, LEAVE_FADE_DELTA);
   };
 
   function currentPage() {
@@ -253,7 +253,7 @@ export function createFightReport(sfx = null) {
     if (r.fadeLeaving) {
       r.fadeFrames += 1;
       for (let i = 0; i < r.rowPhase.length; i++) advanceRow(i);
-      if (r.fadeFrames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) r.close();
+      if (leaveFadeDone(r.fadeFrames, LEAVE_FADE_DELTA)) r.close();
       return;
     }
     for (let i = 0; i < r.rowPhase.length; i++) advanceRow(i);

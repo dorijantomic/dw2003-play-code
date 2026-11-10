@@ -128,18 +128,11 @@ test("the F2 Extras row is off by default and the page is only linked behind it"
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"cinema"/, "off until the player switches it on");
 
-    const refs = ambience.split("cinema.html").length - 1;
-    assert.equal(refs, 1, "one reference to the page, no other link into it");
-    assert.match(ambience, /if \(fx\.cinema\)[^;{}]*window\.open\("cinema\.html"/, "opened only behind the toggle's guard");
+    const devModel = read("../web/dev-panel-model.js"), devPanel = read("../web/dev-panel.js");
+    assert.match(devModel, /cinema: P\("cinema\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
+    assert.equal(devModel.split("cinema.html").length - 1, 1, "one reference to the page, no other link into it");
+    assert.equal(ambience.split("cinema.html").length - 1, 0, "ambience.js itself has no link");
     assert.doesNotMatch(ambience, /(get|has)\("cinema"\)/, "never a URL flag");
-    assert.match(ambience, /#fx-cinema/, "the gated button row");
-    assert.match(ambience, /id="fx-cinema" hidden/, "the button row starts hidden, as the toggle does");
-    assert.match(ambience, /const cinema = panel\.querySelector\("#fx-cinema"\); if \(cinema\) cinema\.hidden = !fx\.cinema;/,
-        "refreshPanel follows the toggle");
-    // `hidden` only hides an element while no stylesheet gives it a display
-    // again: the panel styles its rows as flex, so the row's own rule must hand
-    // a hidden row back to display:none (the label rows already do the same).
-    assert.match(ambience, /#fx-panel \.row \{ display:flex/, "rows are laid out as flex");
-    assert.match(ambience, /#fx-panel \.row\[hidden\] \{ display:none; \}/,
-        "a hidden row is really hidden, so the toggle off leaves no button");
 });

@@ -29,10 +29,10 @@
 // (?legacyDri=1); nothing here falls back to it.
 
 import {
-    maskFromButtons, ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, syncWornFromEquipment,
+    ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, rosterSlotOfCharId, syncWornFromEquipment, ROSTER_STRIDE,
 } from "./vendor/engine.js";
 import {
-    openNativeScreen,
+    createNativeAdapter,
     preloadNativeScreens,
     nativeScreensReady,
 } from "./native-screen-host.js";
@@ -45,7 +45,6 @@ const MODULE_ID = "pro/stgdglab";
 const SAVE_CONTEXT = 0x80048d34;
 const PARTY_MAP = SAVE_CONTEXT + 0x70;
 const ROSTER = 0x80049494;
-const STRIDE = 0x3dc;
 const PROFILE_TABLE = 0x8003ef5c;
 const PROFILE_STRIDE = 0x58;
 const PROFILE_ROWS = 55;
@@ -77,15 +76,24 @@ function loadTables() {
 }
 
 function rosterSlotFor(charId) {
-    const i = ROSTER_SLOT_CHARIDS.indexOf(String(charId));
-    return i < 0 ? EMPTY_SLOT : i;
+    return rosterSlotOfCharId(String(charId)) ?? EMPTY_SLOT;
 }
 
-function ownedSlots(state) {
+/** The roster slots a walker state holds: the owned mask, and with `includeParty`
+ *  the deployed party too (the lab seeds a record for every member it shows).
+ *  The one home for this walk — web/dri-native.js and web/lab-translated.js both
+ *  take their slot list from here. */
+export function ownedSlots(state, { includeParty = false } = {}) {
     const mask = Number(state?.rosterOwned) || 0;
-    const slots = [];
-    for (let s = 0; s < ROSTER_SLOTS; s++) if (mask & (1 << s)) slots.push(s);
-    return slots;
+    const slots = new Set();
+    for (let s = 0; s < ROSTER_SLOTS; s++) if (mask & (1 << s)) slots.add(s);
+    if (includeParty) {
+        for (const charId of state?.party ?? []) {
+            const s = rosterSlotOfCharId(String(charId));
+            if (s !== null) slots.add(s);
+        }
+    }
+    return [...slots].sort((a, b) => a - b);
 }
 
 /** The walker's stats object for a roster slot: the deployed party's live
@@ -136,17 +144,6 @@ export function createDriNative(sfx = null) {
         sfx?.playPacked(key);
     };
 
-    function boot() {
-        const state = d._state ?? {};
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound,
-            seed: ({ read, write }) => seed(read, write, state),
-        });
-        if (!host) return false;
-        d._host = host;
-        return true;
-    }
-
     /** Walker state -> the save cells the lab reads. Every owned roster slot
      *  gets a full record: owned marker, name, stats, gear, current form,
      *  equipped triple and its form ledger. */
@@ -160,7 +157,7 @@ export function createDriNative(sfx = null) {
             write(PARTY_MAP + i * 4, slot >>> 0, 4);
         }
         for (const slot of ownedSlots(state)) {
-            const rec = ROSTER + slot * STRIDE;
+            const rec = ROSTER + slot * ROSTER_STRIDE;
             const charId = ROSTER_SLOT_CHARIDS[slot];
             const starterId = rosterSlotDigimonId(slot);
             const stats = slotStats(state, slot) ?? baseStatsFor(db[starterId]) ?? {};
@@ -207,14 +204,10 @@ export function createDriNative(sfx = null) {
     }
 
     d.open = (state, onClose = null) => {
-        d._open = true;
         d._state = state ?? d._state ?? null;
         d._onClose = onClose;
         d._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            d._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) d._pending = true;
+        d._begin();
     };
 
     d.isOpen = () => d._open;
@@ -223,52 +216,6 @@ export function createDriNative(sfx = null) {
      *  keeps the state pointer fresh (the pad is read from state.keys). */
     d.handleKey = (_k, state) => {
         if (state && !d._state) d._state = state;
-    };
-
-    d.update = (dt) => {
-        if (!d._open) return;
-        if (d._pending) {
-            if (!nativeScreensReady() || !TABLES) {
-                if (nativeScreensReady()) loadTables().catch(() => {});
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                d._lastDiagnostic = "native lab boot failed (manifest/overlay missing)";
-                return;
-            }
-            d._pending = false;
-        }
-        const keys = d._state?.keys;
-        // The pad word goes over as it stands: this screen reads confirm on
-        // 0x2000 and back on 0x4000, the bits the walker now sends.
-        d._host.setPad(keys ? maskFromButtons(keys) : 0);
-        if (d._host.tick(dt)) d._finish();
-    };
-
-    d.draw = (ctx, viewW, viewH) => {
-        if (!d._open || !d._host) return;
-        d._host.draw(ctx, viewW, viewH);
-    };
-
-    d.close = () => {
-        if (!d._open) return;
-        d._finish();
-    };
-
-    d._finish = () => {
-        if (!d._open) return;
-        d._open = false;
-        d._pending = false;
-        const host = d._host;
-        d._host = null;
-        if (host) {
-            readBack(host);
-            host.teardown();
-        }
-        const cb = d._onClose;
-        d._onClose = null;
-        cb?.();
     };
 
     /** Apply the four cells the lab writes. The screen packs the party map
@@ -295,7 +242,7 @@ export function createDriNative(sfx = null) {
         }
         for (const slot of owned) {
             const stats = statBySlot.get(slot);
-            const rec = ROSTER + slot * STRIDE;
+            const rec = ROSTER + slot * ROSTER_STRIDE;
             const form = read(rec + CURRENT_FORM, 4) >>> 0;
             const starterId = CHARID_TO_DIGID[ROSTER_SLOT_CHARIDS[slot]];
             if (form === 0) stats.digimonId = starterId;
@@ -393,5 +340,23 @@ export function createDriNative(sfx = null) {
         lastDiagnostic: d._lastDiagnostic,
     });
 
-    return d;
+    return createNativeAdapter({
+        owner: d,
+        moduleId: MODULE_ID,
+        hostOptions: {
+            playPackedSound,
+            seed: ({ read, write }) => seed(read, write, d._state ?? {}),
+        },
+        // The lab's profile table has to be in memory before the boot: the
+        // screen packs the party map itself, and seeding needs the id map.
+        ready: () => nativeScreensReady() && !!TABLES,
+        preload: () => {
+            if (nativeScreensReady() && !TABLES) loadTables().catch(() => {});
+            return preloadNativeScreens();
+        },
+        // The pad word goes over as it stands: this screen reads confirm on
+        // 0x2000 and back on 0x4000, the bits the walker now sends.
+        commit: readBack,
+        label: "native lab boot failed (manifest/overlay missing)",
+    });
 }

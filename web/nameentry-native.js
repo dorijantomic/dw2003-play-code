@@ -32,14 +32,11 @@
 // The hand-authored keyboard (web/nameentry.js) stays as the development
 // rollback (?legacyName=1).
 
-import { maskFromButtons, ROSTER_SLOT_CHARIDS } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { rosterSlotOfCharId } from "./vendor/engine.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { nativeScreenObjects, nativeScreenRead, seedNativeScreenParty } from "./native-screen.js";
 import { driStatsAt } from "./dri-model.js";
+import { CHARID_TO_DIGID, storedNumbers } from "./party.js";
 import { ensureStoredStats } from "./battle.js";
 
 const MODULE_ID = "pro/stdgname";
@@ -53,11 +50,10 @@ const PARTY_MAP = 0x80048d34 + 0x70;
 const PARTY_SLOTS = 3;
 const LANGUAGE_INDEX = 0x8005cca8;
 
-/** Roster slot for a manifest party char id, or -1 when it is not a roster
+/** Roster slot for a manifest party char id, or 0xffffffff when it is not a roster
  *  species (same convention as web/gym-native.js and web/dri-native.js). */
 function rosterSlotFor(charId) {
-    const i = ROSTER_SLOT_CHARIDS.indexOf(String(charId));
-    return i < 0 ? 0xffffffff : i;
+    return rosterSlotOfCharId(String(charId)) ?? 0xffffffff;
 }
 
 /** The game's own byte encoding back to text (inverse of encodeNativeScreenText
@@ -118,7 +114,7 @@ export function createNameEntryNative(sfx = null, tables = null) {
             let ps = {};
             try { ps = driStatsAt(state, i, tables?.digimonById ?? {}) ?? {}; } catch { ps = {}; }
             const profile = tables?.digimonById?.[ps.digimonId ?? 0];
-            const core = profile ? ensureStoredStats(ps, profile) : (ps.stats ?? {});
+            if (profile) ensureStoredStats(ps, tables?.digimonById?.[CHARID_TO_DIGID[party[i]]] ?? profile);
             stats.push({
                 slot,
                 // The name the screen seeds its grid from: the walker's stored
@@ -131,7 +127,10 @@ export function createNameEntryNative(sfx = null, tables = null) {
                 mp: Number(ps.mp) || 0,
                 maxMp: Number(ps.maxMp) || 0,
                 exp: Number(ps.xp) || 0,
-                core: [Number(core?.str) || 0, Number(core?.def) || 0, Number(core?.spr) || 0, Number(core?.wis) || 0, Number(core?.spd) || 0, Number(core?.chr) || 0],
+                // The record's six stored core stats, from ONE shared helper
+                // (web/party.js storedNumbers) — it used to index a key no
+                // profile has, so the third column was always 0.
+                ...storedNumbers(party[i], ps, tables?.digimonById ?? {}),
             });
         }
         seedNativeScreenParty({ positions, stats });
@@ -146,17 +145,6 @@ export function createNameEntryNative(sfx = null, tables = null) {
             const idx = positions.indexOf(n._targetSlot);
             if (idx > 0) write(0x80087f3c, idx, 4);
         }
-    }
-
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed,
-        });
-        if (!host) return false;
-        n._host = host;
-        n._sawGrid = false;
-        return true;
     }
 
     /** The screen's own close: the pre-screen cancel sets the root's lifecycle 3,
@@ -212,7 +200,6 @@ export function createNameEntryNative(sfx = null, tables = null) {
 
     // The walker's call site: open({ initial, onDone }).
     n.open = (opts = {}) => {
-        n._open = true;
         n._initial = typeof opts.initial === "string" ? opts.initial : "";
         n._targetSlot = Number.isInteger(opts.slot) ? opts.slot : null;
         n._onDone = typeof opts.onDone === "function" ? opts.onDone : null;
@@ -220,10 +207,7 @@ export function createNameEntryNative(sfx = null, tables = null) {
         n._lastResult = null;
         n._lastValue = n._initial;
         n._lastDiagnostic = null;
-        preloadNativeScreens().catch((e) => {
-            n._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) n._pending = true;
+        n._begin();
     };
 
     n.isOpen = () => n._open;
@@ -278,32 +262,6 @@ export function createNameEntryNative(sfx = null, tables = null) {
     n.selectDel = () => {};
     n.selectEnd = () => {};
 
-    n.update = (dt, state) => {
-        if (state) n._state = state;
-        if (!n._open) return;
-        if (n._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                n._lastDiagnostic = "native naming boot failed (manifest/overlay missing)";
-                return;
-            }
-            n._pending = false;
-        }
-        const keys = n._state?.keys;
-        n._host.setPad(keys ? maskFromButtons(keys) : 0);
-        const hostFinished = n._host.tick(dt);
-        if (namingFinished() || hostFinished) n._finish();
-    };
-    n.advance = n.update;
-
-    n.draw = (ctx, viewW, viewH) => {
-        if (!n._open || !n._host) return;
-        n._host.draw(ctx, viewW, viewH);
-    };
-
     /** The name the screen currently shows: the live grid while it is up, the
      *  committed name after it closes, else the seed. */
     n.value = () => {
@@ -326,30 +284,6 @@ export function createNameEntryNative(sfx = null, tables = null) {
         if (n._open) n._finish(false);
     };
 
-    n._finish = (allowCommit = true) => {
-        if (!n._open) return;
-        n._open = false;
-        n._pending = false;
-        const host = n._host;
-        if (host) {
-            // Read the selected pair and committed record while RAM is alive.
-            const slot = selectedSlot();
-            const party = Array.isArray(n._state?.party) && n._state.party.length
-                ? n._state.party : (n._state?.pendingParty ?? []);
-            const memberId = slot === null ? null : party.find((id) => rosterSlotFor(id) === slot) ?? null;
-            const accepted = allowCommit && n._sawGrid && slot !== null && memberId !== null;
-            n._lastValue = accepted ? committedName(slot) : n._initial;
-            n._lastResult = { accepted, memberId: accepted ? memberId : null, value: n._lastValue };
-            host.teardown();
-        } else {
-            n._lastResult = { accepted: false, memberId: null, value: n._initial };
-        }
-        n._host = null;
-        const cb = n._onDone;
-        n._onDone = null;
-        cb?.(n._lastValue);
-    };
-
     /** Diagnostics for the lab and focused browser checks. */
     n.diagnostics = () => ({
         open: n._open,
@@ -359,6 +293,41 @@ export function createNameEntryNative(sfx = null, tables = null) {
         host: n._host?.state() ?? null,
         lastDiagnostic: n._lastDiagnostic,
     });
+
+    createNativeAdapter({
+        owner: n,
+        moduleId: MODULE_ID,
+        hostOptions: () => {
+            n._sawGrid = false;
+            return {
+                playPackedSound: (id) => { sfx?.playPacked(id); },
+                seed,
+            };
+        },
+        frame: (host, dt) => host.tick(dt) || namingFinished(),
+        commit: (host, allowCommit) => {
+            // Read the selected pair and committed record while RAM is alive.
+            const slot = selectedSlot();
+            const party = Array.isArray(n._state?.party) && n._state.party.length
+                ? n._state.party : (n._state?.pendingParty ?? []);
+            const memberId = slot === null ? null : party.find((id) => rosterSlotFor(id) === slot) ?? null;
+            const accepted = allowCommit && n._sawGrid && slot !== null && memberId !== null;
+            n._lastValue = accepted ? committedName(slot) : n._initial;
+            n._lastResult = { accepted, memberId: accepted ? memberId : null, value: n._lastValue };
+        },
+        closed: () => {
+            // A close before the overlay booted has no record to read: the
+            // naming was cancelled.
+            n._lastResult ??= { accepted: false, memberId: null, value: n._initial };
+            const cb = n._onDone;
+            n._onDone = null;
+            cb?.(n._lastValue);
+        },
+        label: "native naming boot failed (manifest/overlay missing)",
+    });
+
+    /** The walker's rename flow ticks the screen through advance(). */
+    n.advance = n.update;
 
     return n;
 }

@@ -1,5 +1,5 @@
 // The developers' own 62 battle animation names — the clip glossary the game never printed
-// (web/fight/clip-names.js, and the fifth Digimon Codex tab in web/codex.js).
+// (web/fight/clip-names.js; the in-game Codex tab that showed it is gone, the table stays).
 //
 // Source of the names and the id arithmetic: ddw3-walker
 // docs/research/battle/scene-test-tool-wfightts-2026-08-05.md. The tool's clip picker is a
@@ -7,9 +7,6 @@
 // maps to timeline table 0..61. The names are typed in as facts (the label image is
 // Shift-JIS; the tool spells them with fullwidth digits and a fullwidth minus); the pack
 // counts beside them are computed here from the 249 shipped anim.json packs, never typed.
-//
-// F2 -> Extras -> "Digimon Codex (new)" (off by default). The Clips tab rides that switch;
-// with it off no page exists and the canvas gets no call.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
@@ -17,47 +14,18 @@ import path from "node:path";
 
 import {
   CLIP_NAMES_62,
-  CLIP_ID_CAVEAT,
   PACK_COUNTS,
   PACK_TOTAL,
   clipFamily,
   clipLabel,
   packCountsFrom,
 } from "../web/fight/clip-names.js";
-import {
-  codexCursor,
-  codexDraw,
-  codexPageCount,
-  codexPageRows,
-  codexPress,
-  codexReset,
-  codexRows,
-  codexTab,
-  setCodexData,
-  tickCodex, openCodex,
-} from "../web/codex.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 const MODELS = path.join(ROOT, "web/assets/battle/models");
 const HAVE_PACKS = existsSync(path.join(MODELS, "index.json"));
 const skip = HAVE_PACKS ? false : "model packs are not installed";
-
-/** A recording 2D context: enough of the canvas API for codexDraw, and a text log. */
-function fakeCtx() {
-  const calls = [];
-  const ctx = {
-    calls,
-    save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
-    fillRect() { calls.push(["fillRect"]); },
-    strokeRect() { calls.push(["strokeRect"]); },
-    fillText(text) { calls.push(["fillText", String(text)]); },
-    set font(v) {}, set fillStyle(v) {}, set strokeStyle(v) {}, set lineWidth(v) {},
-    set textBaseline(v) {}, set textAlign(v) {},
-  };
-  return ctx;
-}
-const drawnText = (ctx) => ctx.calls.filter((c) => c[0] === "fillText").map((c) => c[1]).join("\n");
 
 /** Every pack's parsed anim.json, the same files the battle plays. */
 function readPacks() {
@@ -221,60 +189,4 @@ test("the model viewer's inline labels carry the known corrections", () => {
   assert.ok(html.includes('16: "typed item arm"'), "clip 16 is a typed item arm");
   // the debug vocabulary in battle3d.js is a different list; it is not touched
   assert.ok(!/clip-names/.test(read("web/battle3d.js")), "battle3d.js keeps its own debug names");
-});
-
-test("the Clips tab rides the codex switch: off draws nothing, on shows all 62 names with tables, pack counts and the caveat", () => {
-  const disc = JSON.parse(read("web/assets/data/digimon.json"));
-  const evolutions = JSON.parse(read("web/assets/data/evolutions.json"));
-  codexReset();
-  const offCtx = fakeCtx();
-  assert.equal(tickCodex(false), false);
-  assert.equal(codexDraw(offCtx, 0), false);
-  assert.equal(offCtx.calls.length, 0, "with the switch off the canvas gets no call");
-
-  setCodexData(disc, evolutions); // no enemy/finder tables: those two tabs are skipped
-  openCodex();
-  for (let i = 0; i < 5 && codexTab() !== "clips"; i++) codexPress("r1");
-  assert.equal(codexTab(), "clips", "the fifth tab is reachable from the pad");
-  assert.equal(codexRows().length, 62);
-  assert.equal(codexPageCount(), 3, "62 rows over pages of 24");
-  assert.equal(codexRows()[0].jp, "ウェイト−０");
-
-  const ctx = fakeCtx();
-  assert.equal(codexDraw(ctx), true);
-  const text = drawnText(ctx);
-  for (const part of [
-    "CLIPS",
-    "ウェイト−０",
-    "タタカウ−０",
-    "t0",
-    "249/249",
-    "1 / 3",
-    "list position + 1",
-    "SCENE-Q002",
-    "needs_evidence",
-    "engine id 1",
-  ]) {
-    assert.ok(text.includes(part), `the page carries "${part}"`);
-  }
-  // the caveat is the module's own sentence
-  assert.ok(text.includes(CLIP_ID_CAVEAT.slice(0, 40)), "the header prints the module's caveat");
-
-  // the last page, the last row: JOGRESS-5, table 61, authored by no pack
-  codexPress("right");
-  codexPress("right");
-  assert.equal(codexCursor(), 0);
-  for (let i = 0; i < 13; i++) codexPress("down");
-  const lastRow = codexPageRows()[codexCursor()];
-  assert.equal(lastRow.id, 62);
-  const lastCtx = fakeCtx();
-  codexDraw(lastCtx);
-  const lastText = drawnText(lastCtx);
-  assert.ok(lastText.includes("ジョグレス−５"));
-  assert.ok(lastText.includes("t61"));
-  assert.ok(lastText.includes("0/249"));
-  assert.ok(lastText.includes("engine id 62"));
-  assert.ok(lastText.includes("0 of the 249"), "the detail says no pack authors this table");
-  assert.ok(lastText.includes("3 / 3"));
-  tickCodex(false);
 });

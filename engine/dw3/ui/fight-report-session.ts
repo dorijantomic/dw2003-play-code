@@ -59,9 +59,10 @@ import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import { frameDelta } from "../../systems/frame-clock.ts";
 import {
-  PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
+  PARTY_MAP, RECORD_EQUIPPED_VALUES, RECORD_FIELDS, RECORD_LEDGER_ENTRIES, RECORD_LEDGER_STRIDE,
+  ROSTER_RECORDS, ROSTER_STRIDE,
   partyPositionToRosterSlot, persistentRosterSlot,
-  requestScreenTransition, rosterRecordAddress
+  requestScreenTransition, rosterRecordAddress, writeRosterRecord
 } from "../party-context.ts";
 import { validateEquippedForm } from "../form-ledger.ts";
 import { acquiredForms } from "../form-ledger-edit.ts";
@@ -70,6 +71,7 @@ import {
   heldArrayAddress, wornArrayAddress, writeItemArrays, readHeldByte, readItemArrays, type ItemCountEntry,
 } from "../item-store.ts";
 import { seedRosterForms, type RosterFormState } from "./roster-form-state.ts";
+import { SHOP_BIT_CAP } from "./shop-save-state.ts";
 import { ScreenTextBanks } from "./screen-text-banks.ts";
 import { ShopDrawIntents } from "./shop-draw-intents.ts";
 import { ShopWidgetServices } from "./shop-widget-services.ts";
@@ -121,13 +123,11 @@ export const REPORT_HELD = heldArrayAddress(0, REPORT_SAVE);
 export const REPORT_WORN = wornArrayAddress(0, REPORT_SAVE);
 /** The report workspace the battle overlay fills (F0x800A7C00 / F0x800A69F0 / F0x800A6B18). */
 export const REPORT_WORKSPACE = 0x80042b84;
-export const REPORT_MONEY_CAP = 9_999_999;
+export const REPORT_MONEY_CAP = SHOP_BIT_CAP;
 export const REPORT_HELD_CAP = HELD_MAX;
 export const REPORT_PARTY_SLOTS = 3;
 export const REPORT_TABLES_BASE = 0x80086a88;
 export const REPORT_TEXT_BANKS = [0x55, 0x4e, 0x6a, 0xa2] as const;
-/** The six equip halfwords of a roster record (head, body, right, left, acc0, acc1). */
-const RECORD_EQUIPMENT = ROSTER_EQUIP_OFFSETS_LIST;
 
 /**
  * One newly learned form per partner per report.
@@ -349,24 +349,21 @@ export class FightReportSession {
     }
     for (const member of seed.members) {
       const record = rosterRecordAddress(member.rosterSlot);
-      mem.write32(record, ((member.starterSlot ?? member.rosterSlot) + 3) >>> 0);
       if (member.forms) seedRosterForms(mem, record, member.forms);
-      mem.write32(record + 0x20, member.exp >>> 0);
-      mem.write16(record + 0x24, member.level & 0xffff);
-      mem.write16(record + 0x26, (member.tp ?? 0) & 0xffff);
-      mem.write16(record + 0x28, (member.hp ?? 0) & 0xffff);
-      mem.write16(record + 0x2a, (member.maxHp ?? 0) & 0xffff);
-      mem.write16(record + 0x2c, (member.mp ?? 0) & 0xffff);
-      mem.write16(record + 0x2e, (member.maxMp ?? 0) & 0xffff);
-      (member.core ?? []).forEach((value, i) => mem.write16(record + 0x30 + i * 2, value & 0xffff));
-      (member.elements ?? []).forEach((value, i) => mem.write16(record + 0x3c + i * 2, value & 0xffff));
-      const worn = member.equipment ?? {};
-      [worn.head, worn.body, worn.right, worn.left, worn.acc0, worn.acc1].forEach((id, i) => {
-        mem.write16(record + RECORD_EQUIPMENT[i]!, Number.isInteger(id) && id! > 0 && id! <= 0xffff ? id! : 0);
+      writeRosterRecord(mem, record, {
+        slotWord: (member.starterSlot ?? member.rosterSlot) + 3,
+        nameBytes: member.nameBytes,
+        exp: member.exp,
+        level: member.level,
+        tp: member.tp ?? 0,
+        hp: member.hp ?? 0,
+        maxHp: member.maxHp ?? 0,
+        mp: member.mp ?? 0,
+        maxMp: member.maxMp ?? 0,
+        core: member.core ?? [],
+        elements: member.elements ?? [],
+        equipment: member.equipment,
       });
-      // The record's raw name string, terminated so a shorter name cannot inherit stale glyphs.
-      member.nameBytes.slice(0, 23).forEach((byte, i) => mem.write8(record + 0x08 + i, byte & 0xff));
-      mem.write8(record + 0x08 + Math.min(23, member.nameBytes.length), 0);
     }
     mem.write32(REPORT_MONEY, seed.bits >>> 0);
     writeItemArrays(mem, seed.bag, REPORT_SAVE);
@@ -665,8 +662,8 @@ export class FightReportSession {
     if (slot < 0) throw new Error("No partner at that fight report position");
     const record = rosterRecordAddress(slot);
     const ledger = [];
-    for (let i = 0; i < 0x2c; i++) {
-      const at = record + 0x58 + i * 0x14;
+    for (let i = 0; i < RECORD_LEDGER_ENTRIES; i++) {
+      const at = record + RECORD_FIELDS.ledger + i * RECORD_LEDGER_STRIDE;
       const form = mem.read16(at);
       if (((form << 16) >> 16) < 3) continue;
       ledger.push({
@@ -675,12 +672,12 @@ export class FightReportSession {
       });
     }
     return {
-      exp: mem.read32(record + 0x20) | 0, level: (mem.read16(record + 0x24) << 16) >> 16,
-      tp: (mem.read16(record + 0x26) << 16) >> 16, maxHp: (mem.read16(record + 0x2a) << 16) >> 16,
-      maxMp: (mem.read16(record + 0x2e) << 16) >> 16,
-      core: Array.from({ length: 6 }, (_, i) => (mem.read16(record + 0x30 + i * 2) << 16) >> 16),
-      elements: Array.from({ length: 7 }, (_, i) => (mem.read16(record + 0x3c + i * 2) << 16) >> 16),
-      equipped: Array.from({ length: 3 }, (_, i) => mem.read16(record + 0x50 + i * 2)),
+      exp: mem.read32(record + RECORD_FIELDS.exp) | 0, level: (mem.read16(record + RECORD_FIELDS.level) << 16) >> 16,
+      tp: (mem.read16(record + RECORD_FIELDS.tp) << 16) >> 16, maxHp: (mem.read16(record + RECORD_FIELDS.maxHp) << 16) >> 16,
+      maxMp: (mem.read16(record + RECORD_FIELDS.maxMp) << 16) >> 16,
+      core: Array.from({ length: 6 }, (_, i) => (mem.read16(record + RECORD_FIELDS.core + i * 2) << 16) >> 16),
+      elements: Array.from({ length: 7 }, (_, i) => (mem.read16(record + RECORD_FIELDS.elements + i * 2) << 16) >> 16),
+      equipped: Array.from({ length: RECORD_EQUIPPED_VALUES }, (_, i) => mem.read16(record + RECORD_FIELDS.equipped + i * 2)),
       ledger,
     };
   }

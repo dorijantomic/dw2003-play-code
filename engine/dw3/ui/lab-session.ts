@@ -42,9 +42,10 @@ import { NativeMemory } from "../../native/memory.ts";
 import { PackedSoundCursor } from "../../systems/packed-sound.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
-  PARTY_CONTEXT, PARTY_MAP, ROSTER_EQUIP_OFFSETS_LIST, ROSTER_RECORDS, ROSTER_STRIDE,
+  PARTY_CONTEXT, PARTY_MAP, RECORD_EQUIPPED_VALUES, RECORD_FIELDS, RECORD_LEDGER_ENTRIES,
+  RECORD_LEDGER_STRIDE, ROSTER_RECORDS, ROSTER_STRIDE,
   getFollowerRosterSlot, partyPositionToRosterSlot,
-  persistentRosterSlot, requestScreenTransition, rosterRecordAddress
+  persistentRosterSlot, requestScreenTransition, rosterRecordAddress, writeRosterRecord
 } from "../party-context.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemRecord } from "../item-record.ts";
@@ -102,13 +103,8 @@ export const LAB_TEXT_BANKS = [0x39, 0x4e, 0x47, 0xa2, 0x9b] as const;
 export const LAB_SAVED_SELECTOR_CELL = PARTY_CONTEXT + 0x34;
 export const LAB_PARTY_SLOTS = 3;
 export const LAB_ROSTER_SLOTS = MAX_ROSTER_SLOTS;
-export const LAB_LEDGER_ENTRIES = 0x2c;
-export const LAB_LEDGER_STRIDE = 0x14;
-/** The six equip halfwords of a roster record, in the original's order. */
-const RECORD_EQUIPMENT = ROSTER_EQUIP_OFFSETS_LIST;
-const RECORD_LEDGER = 0x58;
-const RECORD_EQUIPPED = 0x50;
-const RECORD_CURRENT_FORM = 0x04;
+export const LAB_LEDGER_ENTRIES = RECORD_LEDGER_ENTRIES;
+export const LAB_LEDGER_STRIDE = RECORD_LEDGER_STRIDE;
 const SCRATCH_BUFFERS = 5;
 const SCRATCH_BYTES = 0x100;
 /** The three picker rows of the Select Action choice table 0x8008F4B8: Switch, Digivolve, Chart. */
@@ -330,34 +326,22 @@ export class LabSession {
     }
     mem.write32(LAB_SAVED_SELECTOR_CELL, seed.returnSelector >>> 0);
     for (const member of seed.members) {
-      const record = rosterRecordAddress(member.slot);
-      mem.write32(record, (member.slot + 3) >>> 0);
-      mem.write32(record + RECORD_CURRENT_FORM, member.currentForm >>> 0);
-      member.nameBytes.slice(0, 23).forEach((byte, i) => mem.write8(record + 0x08 + i, byte & 0xff));
-      mem.write8(record + 0x08 + Math.min(23, member.nameBytes.length), 0);
-      mem.write32(record + 0x20, member.exp >>> 0);
-      mem.write16(record + 0x24, member.level & 0xffff);
-      mem.write16(record + 0x26, member.tp & 0xffff);
-      mem.write16(record + 0x28, member.hp & 0xffff);
-      mem.write16(record + 0x2a, member.maxHp & 0xffff);
-      mem.write16(record + 0x2c, member.mp & 0xffff);
-      mem.write16(record + 0x2e, member.maxMp & 0xffff);
-      member.core.forEach((value, i) => mem.write16(record + 0x30 + i * 2, value & 0xffff));
-      member.elements.forEach((value, i) => mem.write16(record + 0x3c + i * 2, value & 0xffff));
-      const worn = member.equipment ?? {};
-      [worn.head, worn.body, worn.right, worn.left, worn.acc0, worn.acc1].forEach((id, i) => {
-        mem.write16(record + RECORD_EQUIPMENT[i]!, Number.isInteger(id) && id! > 0 && id! <= 0xffff ? id! : 0);
-      });
-      member.equipped.forEach((value, i) => mem.write16(record + RECORD_EQUIPPED + i * 2, value & 0xffff));
-      member.ledger.forEach((entry, i) => {
-        const at = record + RECORD_LEDGER + i * LAB_LEDGER_STRIDE;
-        for (let o = 0; o < LAB_LEDGER_STRIDE; o += 4) mem.write32(at + o, 0);
-        if (!entry) return;
-        mem.write16(at, entry.value & 0xffff);
-        mem.write8(at + 2, entry.formLevel & 0xff);
-        mem.write8(at + 3, entry.present & 0xff);
-        mem.write32(at + 4, entry.dvexp >>> 0);
-        entry.techniques.forEach((t, j) => mem.write16(at + 8 + j * 2, t & 0xffff));
+      writeRosterRecord(mem, rosterRecordAddress(member.slot), {
+        slotWord: member.slot + 3,
+        currentForm: member.currentForm,
+        nameBytes: member.nameBytes,
+        exp: member.exp,
+        level: member.level,
+        tp: member.tp,
+        hp: member.hp,
+        maxHp: member.maxHp,
+        mp: member.mp,
+        maxMp: member.maxMp,
+        core: member.core,
+        elements: member.elements,
+        equipment: member.equipment,
+        equipped: member.equipped,
+        ledger: member.ledger,
       });
     }
   }
@@ -585,10 +569,10 @@ export class LabSession {
     const mem = this.mem;
     const record = rosterRecordAddress(slot);
     return {
-      currentForm: mem.read32(record + RECORD_CURRENT_FORM) >>> 0,
-      equipped: Array.from({ length: 3 }, (_, i) => mem.read16(record + RECORD_EQUIPPED + i * 2)),
+      currentForm: mem.read32(record + RECORD_FIELDS.currentForm) >>> 0,
+      equipped: Array.from({ length: RECORD_EQUIPPED_VALUES }, (_, i) => mem.read16(record + RECORD_FIELDS.equipped + i * 2)),
       ledger: Array.from({ length: LAB_LEDGER_ENTRIES }, (_, i) => {
-        const at = record + RECORD_LEDGER + i * LAB_LEDGER_STRIDE;
+        const at = record + RECORD_FIELDS.ledger + i * LAB_LEDGER_STRIDE;
         const value = mem.read16(at);
         if (value === 0) return null;
         return {

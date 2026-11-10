@@ -1,4 +1,4 @@
-// web/battlefields.js — the Codex's Battlefields table: where a stage fights and
+// web/battlefields.js — the Battlefields table: where a stage fights and
 // which technique changes the world. Pure: no DOM, no fetch, no state.
 //
 // Two halves, both read from the manifests the battle itself loads:

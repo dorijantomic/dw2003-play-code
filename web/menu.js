@@ -25,12 +25,12 @@ import { paintScreenDim } from "./screendim.js";
 import { asButton } from "./input.js";
 import {
   ITEM_BY_ID, useItem, itemUsableInField, EQUIPMENT_BY_ID, EQUIP_SLOTS as EQUIP_ROW_SLOTS, equipItem, unequipItem, equipmentBonuses, ui,
-  pauseEquipListIds, pauseEquipRowAdmits, rosterSlotOfCharId, elementValue,
+  pauseEquipListIds, pauseEquipRowAdmits, rosterSlotOfCharId,
   fieldTechniqueRows, isPartyWide, useFieldTechnique, HEAL_SCALE_STAT,
   listScrollbarThumb, padRepeatFires, screenIdForStage,
   listItemIds, heldCount, wornCount, commitEquipSlot, syncWornFromEquipment,
 } from "./vendor/engine.js";
-import { partyRosterView, baseStatsFor, CHARID_TO_DIGID, syncLeadEquipBonuses } from "./party.js";
+import { partyRosterView, baseStatsFor, CHARID_TO_DIGID, syncLeadEquipBonuses, elementValueWithGear } from "./party.js";
 import { profileTechSlots } from "./form-tech-slots.js";
 import { formLedgerRecord } from "./dri-model.js";
 import { dvLevelForExp } from "./battle.js";
@@ -493,7 +493,16 @@ function sheetStatValue(p, slots, stat, rosterSlot = null) {
   // the rise there — and the record itself already carries them on the disc),
   // with the worn gear folded on top (F0x80017174). Reading `stats` alone
   // under-reported every chipped member by the chip's amount.
-  const base = Number(p?.stats?.[stat] ?? p?.profile?.[stat] ?? 0) + Number(p?.bonuses?.[stat] ?? 0);
+  // The base is the record's own halfword — partyRosterView's `core`, i.e.
+  // storedNumbers() (web/party.js), which rebuilds stored + chips off the
+  // STARTER's row. Rebuilding it here from p.stats/p.profile fell back to the
+  // WORN form's row (partyRosterView's `profile`) for a member with no stored
+  // stats, so the sheet printed a digivolution's base as if it were stored.
+  const i = STAT_ROWS.indexOf(stat);
+  const stored = Array.isArray(p?.core) ? p.core[i] : null;
+  const base = stored != null
+    ? Number(stored) || 0
+    : Number(p?.stats?.[stat] ?? p?.profile?.[stat] ?? 0) + Number(p?.bonuses?.[stat] ?? 0);
   const b = equipmentBonuses(slots, rosterSlot);
   return Math.min(999, base + (b[stat] ?? 0));
 }
@@ -502,15 +511,25 @@ function sheetStatValue(p, slots, stat, rosterSlot = null) {
  * The STATUS sheet's element number: the one value the original's F0x80017174
  * scratch holds at +0x18..+0x24 — the species base plus every trained point
  * plus the worn gear's coded resist, capped at 999. Read through the shared
- * helper (engine/dw3/effective-stats.ts) so the sheet, the shop, the gym and
- * the battle divisor cannot drift apart. The sheet never floors, because
- * F0x8008C1C0 only caps.
+ * helper (web/party.js elementValueWithGear, over engine/dw3/effective-stats.ts's
+ * elementValue) so the sheet, the shop, the gym and the battle divisor cannot
+ * drift apart. The sheet never floors, because F0x8008C1C0 only caps.
  */
 function sheetResValue(p, slots, res) {
   const b = equipmentBonuses(slots);
-  const worn = Number(b.elemResists?.[res] ?? 0) || 0;
-  const points = worn ? { ...(p?.elemBonuses ?? {}), [res]: (p?.elemBonuses?.[res] ?? 0) + worn } : p?.elemBonuses;
-  return elementValue(p?.profile, points, res);
+  const i = RES_ROWS.indexOf(res);
+  // The base is the record's own halfword — partyRosterView's `elements`, i.e.
+  // storedNumbers() (web/party.js): the STARTER's species base plus every trained
+  // point, 999-capped. The worn piece's coded resist is ADDED to it by F0x80017578,
+  // never in place of it, so it can only go in as the point table. Passing
+  // p.profile here put the WORN form's resistance row underneath the trained
+  // points — and dropped them, because a roster entry carries no `elemBonuses`.
+  const stored = Array.isArray(p?.elements) ? p.elements[i] : null;
+  if (stored != null) {
+    return elementValueWithGear({ resistances: { [res]: stored } }, null, b.elemResists, res);
+  }
+  // A hand-built block with no record halfword: nothing else to stand on.
+  return elementValueWithGear(p?.profile, p?.elemBonuses, b.elemResists, res);
 }
 
 // The See Digivolve panel's numbers (F0x80088A44). Both of its branches read the

@@ -227,11 +227,10 @@ test("the F2 pair and the gated page branch (off by default, no URL flag)", () =
     const ambience = text("../web/ambience.js");
     assert.ok(ambience.includes('["silence", "Silence report (dev)"]'), "the Extras row has the pair");
     assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"silence"/, "silence is off until switched on");
-    assert.match(ambience, /id="fx-silence" hidden/, "the button row starts hidden");
-    assert.match(ambience, /data-act="silence"/, "the button names its action");
-    assert.match(ambience, /#fx-silence[^\n]*hidden = !fx\.silence/, "the row follows the switch");
-    assert.match(ambience, /kind === "silence"[^\n]*fx\.silence/, "the click only opens the page while on");
-    assert.match(ambience, /window\.open\("silence-report\.html"/, "the button opens the page");
+    const devModel = text("../web/dev-panel-model.js"), devPanel = text("../web/dev-panel.js");
+    assert.match(devModel, /silence: P\("silence-report\.html"/, "the Open button's page is in the F2 page model");
+    assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
+    assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
     assert.doesNotMatch(ambience, /q\.(has|get)\("silence"\)/, "never a URL flag");
     assert.doesNotMatch(text("../web/silence-report.html"), /location\.search/, "the page has no flag of its own");
 });

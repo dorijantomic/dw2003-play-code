@@ -1,5 +1,6 @@
 // web/audio.js
 import { battleVoiceGate } from "./battle-voice-gate.js";
+import { BASE_GAIN, clampLevel, scaleGain } from "./volume-levels.js";
 import { packedSampleResolver } from "./packed-sound.js";
 import {
   createSpuVoicePool, renderPhraseNote, PHRASE_SAMPLE_RATE as SAMPLE_RATE,
@@ -60,7 +61,8 @@ export function createExclusiveRegister() {
 export function createBgmPlayer(register = createExclusiveRegister()) {
   const el = new Audio();
   el.loop = true;
-  el.volume = 0.6;
+  el.volume = BASE_GAIN.music;
+  let musicLevel = 1;                       // the OPTIONS music volume (web/volume-levels.js); 1 = the game's own 0.6
   const player = { muted: false, current: null, el };
 
   // This track's own stop entry, handed to the register: the exclusive
@@ -106,9 +108,17 @@ export function createBgmPlayer(register = createExclusiveRegister()) {
   player.playJingle = (trackId) => {
     if (player.muted) return;
     let je = jingles.get(trackId);
-    if (!je) { je = new Audio(); je.volume = 0.6; jingles.set(trackId, je); }
+    if (!je) { je = new Audio(); je.volume = scaleGain(BASE_GAIN.music, musicLevel); jingles.set(trackId, je); }
     je.src = "assets/music/" + trackId + ".ogg";
     je.play().catch(() => {});
+  };
+
+  /** OPTIONS music volume, 0..1 (1 = today). Applies to the track and to every jingle element. */
+  player.setVolume = (level) => {
+    musicLevel = clampLevel(level);
+    // once web/fxaudio.js routes the element through its gain node (musicfx on), that gain carries the level: element stays at 1 x 0.6
+    el.volume = scaleGain(BASE_GAIN.music, el.routedToGain ? 1 : musicLevel);
+    for (const je of jingles.values()) je.volume = scaleGain(BASE_GAIN.music, musicLevel);
   };
 
   // call on every user gesture; resumes if autoplay was blocked
@@ -129,10 +139,12 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   const ctx = Ctx ? new Ctx() : null;
   const gain = ctx ? ctx.createGain() : null;
-  if (gain) { gain.gain.value = 0.7; gain.connect(ctx.destination); }
+  if (gain) { gain.gain.value = BASE_GAIN.effects; gain.connect(ctx.destination); }
   let manifest = null;
   const buffers = {}; // name -> AudioBuffer | Promise
   const player = { muted: false };
+  /** OPTIONS sound volume, 0..1 (1 = today's 0.7): the master gain every effect voice goes through. */
+  player.setVolume = (level) => { if (gain) gain.gain.value = scaleGain(BASE_GAIN.effects, level); };
   const battleGate = battleVoiceGate();
 
   // ── the resident driver's real arbitration (EXE F0x8002006c and callees) ──

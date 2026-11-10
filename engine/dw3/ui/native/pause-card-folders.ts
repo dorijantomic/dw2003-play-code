@@ -22,10 +22,11 @@
 // +0x90 two choices; +0x98 the choice cursor; +0x9C the fade object.
 import { PAUSE_LANGUAGE_CELL, type PauseMemory, type PauseServices } from "./pause-services.ts";
 import { partyPositionToRosterSlot } from "../../party-context.ts";
-import { partyCardRows, ROWS_CARD_FOLDERS } from "./party-card-rows.ts";
+import { partyCardFoldRows, partyCardRows, partyCardWidgetGrid, ROWS_CARD_FOLDERS } from "./party-card-rows.ts";
 import { digimonPictureAt, digimonPictureRowEnded } from "../digimon-picture.ts";
 import { findRegisteredHandleByKey } from "../../display-service.ts";
 import type { PartyCardFillHost } from "../party-card-fill.ts";
+import { fadeStep } from "../screen-dim.ts";
 
 export const CARD_FOLDERS_HANDLER = 0x80084a98;
 export const CARD_FOLDERS_SIZE = 0xd4;
@@ -66,19 +67,7 @@ export function cardFoldersCtor(mem: PauseMemory, obj: number, ui: number, host:
     const layout = () => mem.read32(LAYOUT) | 0;
     const text = (kind: number, x: number, y: number) => host.createText(layer(), kind, s16(x), s16(y));
     const put = (off: number, widget: number) => mem.write32(ui + off, widget);
-    for (let row = 0; row < 3; row++) {
-        const yoff = row * 0x2e;
-        const l = layout();
-        put(row * 0x2c, text(1, mem.read16(l + 4), mem.read16(l + 8) + yoff));
-        for (let k = 0; k < 5; k++) {
-            const e = layout() + 0x14 + k * 0xc;
-            put(row * 0x2c + 4 + k * 4, text(3, mem.read16(e - 4), mem.read16(e) + yoff));
-        }
-        for (let k = 0; k < 5; k++) {
-            const e = layout() + 0x50 + k * 0xc;
-            put(row * 0x2c + 0x18 + k * 4, text(3, mem.read16(e - 4), mem.read16(e) + yoff));
-        }
-    }
+    partyCardWidgetGrid(mem, ui, layer, layout, ROWS_CARD_FOLDERS.nameSlot, host);
     const b = layout() + 0x90;
     const head = host.createText(layer(), 1, mem.read16s(b + 4), mem.read16s(b + 8));
     put(0x84, head);
@@ -146,34 +135,7 @@ export function cardFoldersDraw(mem: PauseMemory, obj: number, host: CardFolders
         py += 0x2e;
     }
     host.draw74(0x140, 0);
-    let a = 0x13;
-    let b = 0x11;
-    let c = 0x27;
-    let d = 0x25;
-    for (let i = 0; i < size; i++) {
-        const fold = r(0x7c + i * 0x10);
-        if (fold !== 0) {
-            if (fold !== 0x1000) {
-                host.draw8C(fold, 0x1000, 0x1000);
-                host.draw94(0, d);
-                host.drawSprite(pack(0x02860000), 0x15, 0, b);
-                host.draw8C(r(0x7c + i * 0x10), r(0x7c + i * 0x10), 0x1000);
-                host.draw94(0x7c, c);
-                host.drawSprite(pack(0x02860000), 0x16, 0x67, a);
-                host.draw8C(r(0x7c + i * 0x10), 0x1000, 0x1000);
-                host.draw94(0, d);
-            } else {
-                host.draw8C(0x1000, 0x1000, 0x1000);
-                host.drawSprite(pack(0x02860000), 0x15, 0, b);
-                host.drawSprite(pack(0x02860000), 0x16, 0x67, a);
-            }
-            host.drawSprite(pack(0x02860000), 0x17, 0, b);
-        }
-        a += 0x2e;
-        b += 0x2e;
-        c += 0x2e;
-        d += 0x2e;
-    }
+    partyCardFoldRows(mem, size, obj + 0x7c, host);
     const panel = r(0xbc);
     if (panel !== 0) {
         if (panel !== 0x1000) {
@@ -407,8 +369,7 @@ export function dimQuadStart(mem: PauseMemory, obj: number, direction: number, f
     host.callMethod(obj, 0x28, [1]);
     mem.write32(obj + 0x10, 1);
     mem.write32(obj + 0x58, direction);
-    // MIPS `div` with a zero divisor: -1 (the dividend 0xff00 is positive).
-    const step = frames === 0 ? -1 : (0xff00 / frames) | 0;
+    const step = fadeStep(frames);
     if (direction === 0) {
         mem.write32(obj + 0x5c, 0);
         mem.write32(obj + 0x60, step);

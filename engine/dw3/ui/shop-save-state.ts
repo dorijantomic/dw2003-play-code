@@ -1,6 +1,8 @@
 // Browser save state <-> resident data fields read and written by the translated
 // merchant tasks. This is an adapter, not a game rule interpreter.
 import { MAX_ROSTER_SLOTS } from "../roster.ts";
+import { MONEY_CAP } from "../../systems/shop-manager.ts";
+import { ITEM_ID_MAX } from "../item-directories.ts";
 import type { NativeMemory } from "../../native/memory.ts";
 import { syncWornFromEquipment, wornCount, wornItemIds, type ItemStoreState } from "../item-store.ts";
 import {
@@ -30,8 +32,10 @@ export const SHOP_HELD_BASE = 0x80048db0;
  * a partner's hand is therefore not for sale.
  */
 export const SHOP_WORN_BASE = 0x80048f43;
-export const SHOP_ITEM_MAX_ID = 402;
-export const SHOP_BIT_CAP = 9999999;
+/** The item catalogue bound: one number, from the item directories. */
+export const SHOP_ITEM_MAX_ID = ITEM_ID_MAX;
+/** The wallet ceiling: one number, from the economy layer (systems/shop-manager). */
+export const SHOP_BIT_CAP = MONEY_CAP;
 
 /**
  * The merchant's hand swap moving ONE copy off a hand — the shared store's

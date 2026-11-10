@@ -39,9 +39,10 @@ import { foldRecordStatsIntoBonuses, type StatCarrier } from "../party-context.t
 import { reconcileHeldCounts, setEquippedItem, type ItemStoreState } from "../item-store.ts";
 import { ROSTER_SLOT_COUNT, rosterSlotDigimonId, rosterSlotOfCharId } from "../roster.ts";
 import { EQUIP_SLOTS, syncLeadEquipBonuses, type EquipmentSlots } from "../equipment.ts";
+import { SHOP_BIT_CAP } from "./shop-save-state.ts";
 
 /** The money ceiling the extracted bounds report (9,999,999; extract_bounds). */
-export const PAUSE_MONEY_CAP = 0x98967f;
+export const PAUSE_MONEY_CAP = SHOP_BIT_CAP;
 
 /** The subset of `localStorage` this routine writes; null where there is none (node). */
 export interface PauseCloseStorage {

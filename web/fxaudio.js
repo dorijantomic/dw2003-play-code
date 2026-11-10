@@ -4,6 +4,7 @@
 // block sound before a gesture) and driven every frame by the ambience layer.
 let ac = null, master = null, rain = null, wind = null, sand = null, crickets = null, gust = null;
 let armed = false;
+let level = 1;                 // the OPTIONS sound volume (web/volume-levels.js); 1 = the game's own 0.55
 window.__fxaudioVer = "no-wind-2";
 
 function noiseBuffer(ctx, seconds = 2) {
@@ -23,7 +24,7 @@ function loopNoise(ctx, buf, type, freq, q) {
 function build() {
     if (ac) return true;
     try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { return false; }
-    master = ac.createGain(); master.gain.value = 0.55; master.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = 0.55 * level; master.connect(ac.destination);
     const buf = noiseBuffer(ac, 3);
     rain = loopNoise(ac, buf, "bandpass", 3200, 0.5);
     wind = loopNoise(ac, buf, "lowpass", 480, 0.7);
@@ -53,10 +54,13 @@ arm();
 
 const ease = (param, v, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
 
+/** OPTIONS sound volume, 0..1 (1 = today). Takes effect on the next setSound call, which runs every frame. */
+export function setWeatherVolume(v) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }
+
 // levels: { rain, wind (0..1), sand, night } ; on = the Sound switch
 export function setSound(on, lv) {
     if (!ac) return;
-    ease(master.gain, on ? 0.55 : 0, ac, 0.2);
+    ease(master.gain, on ? 0.55 * level : 0, ac, 0.2);
     ease(rain.g.gain, on ? lv.rain * 0.16 : 0, ac);
     ease(wind.g.gain, 0, ac, 0.8);   // wind loop removed (harsh); node kept silent
     ease(sand.g.gain, 0, ac);   // sandstorm hiss removed (sounded like wind gusts)
@@ -171,6 +175,15 @@ export function setAmbience(on, lv) {
 // duck it and muffle it. Connected only the first time it is wanted (and only once the
 // AudioContext is running, so it can never silence the music).
 let mus = null;
+let musLevel = 1;              // the OPTIONS music volume. Once the element is routed through `mus`, THIS gain scales it
+                               // and the element itself stays at the game's own 0.6 (el.routedToGain, read by audio.js), so the level never applies twice.
+let musOn = false, musDuck = 0;
+const musicGainTarget = () => musLevel * (musOn ? 1 - 0.42 * musDuck : 1);
+/** OPTIONS music volume, 0..1. Not routed: audio.js scales el.volume. Routed: the gain node below does. */
+export function setMusicVolume(v) {
+    const n = Number(v); musLevel = v === undefined || v === null || v === "" || !Number.isFinite(n) ? 1 : Math.min(1, Math.max(0, n));
+    if (mus && ac) ease(mus.g.gain, musicGainTarget(), ac, 0.05);
+}
 export function setMusic(el, on, duck, muffle) {
     if (!ac || ac.state !== "running" || !el) return;
     if (!mus) {
@@ -181,8 +194,10 @@ export function setMusic(el, on, duck, muffle) {
             const g = ac.createGain();
             src.connect(f); f.connect(g); g.connect(ac.destination);
             mus = { f, g };
+            el.routedToGain = true; el.volume = 0.6;    // from now on the gain carries the level (see audio.js setVolume)
         } catch { return; }
     }
-    ease(mus.g.gain, on ? 1 - 0.42 * duck : 1, ac, 0.9);
+    musOn = !!on; musDuck = duck;
+    ease(mus.g.gain, musicGainTarget(), ac, 0.9);
     ease(mus.f.frequency, on ? 22000 - 20200 * muffle : 22000, ac, 0.9);
 }

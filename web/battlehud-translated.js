@@ -24,6 +24,9 @@ import { packReady, drawClip, drawClipWidth } from "./screenpack.js";
 import { decodeGameName } from "./nameentry-translated.js";
 import { battleMsgBank, battleMsgText } from "./battlemsg-translated.js";
 import { fetchBytes } from "./resident-data.js";
+// One builder for the record's +0x1c ailment byte: the command rows and this marker
+// loop read the same field, so the byte is built in one place (battlecmd-translated.js).
+import { battleAilmentByte } from "./battlecmd-translated.js";
 
 const {
   BATTLE_HUD_ACTIVE_SLOT, BATTLE_HUD_BANK_SEPARATOR, BATTLE_HUD_DV_FILL_CEL_FILLING,
@@ -71,13 +74,9 @@ function recordStore() {
     return mem;
 }
 
-/** The ailment byte the marker state test reads (record +0x1c): any set bit counts. */
-export function battleHudAilmentByte(member) {
-    if (!member) return 0;
-    if (Number.isInteger(member.statusBits)) return member.statusBits & 0xff;
-    const a = member.ailments ?? {};
-    return (a.poison ? 1 : 0) | (a.frozen ? 2 : 0) | (a.confuse ? 4 : 0) | (a.sleep ? 8 : 0);
-}
+// The marker state test reads the record's +0x1c byte (FIGHTSTG_F0x800934f0's loop:
+// `lbu $v0, 0x1c($s1)` / `bnez $v0` / `li $a1, 0x3`, fightstg.fns.s:17473-17476), which
+// is the same byte the command rows use, so this builds it with battleAilmentByte.
 
 function writeRecord(mem, sideIndex, slot, member) {
     if (!member) return;
@@ -85,7 +84,7 @@ function writeRecord(mem, sideIndex, slot, member) {
     mem.write16(rec + 0x00, 1);
     mem.write16(rec + 0x06, Number(member.maxHp ?? 0) | 0);
     mem.write16(rec + 0x08, Number(member.hp ?? 0) | 0);
-    mem.write8(rec + 0x1c, battleHudAilmentByte(member));
+    mem.write8(rec + 0x1c, battleAilmentByte(member));
 }
 
 /**

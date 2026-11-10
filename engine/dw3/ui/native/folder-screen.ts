@@ -20,6 +20,7 @@
 // engine/dw3/ui/index.ts barrel and the registry.
 
 import { BASE_TABLE } from "../create-text-element.ts";
+import { screenBandSpin } from "./screen-band-spin.ts";
 
 /** The folder screen's class handler installed at +0x48. */
 export const FOLDER_SCREEN_HANDLER = 0x80089e98;
@@ -84,18 +85,7 @@ export function folderDrawChrome(
     host.setOrigin(0x280, 0);
 
     // Band ping-pong counter: +0x5C toggles; +0x58 advances 0..0x5F.
-    let spin = 0;
-    if ((mem.read32(obj + 0x5c) | 0) !== 0) {
-        const next = (mem.read32(obj + 0x58) | 0) + 1;
-        mem.write32(obj + 0x58, next);
-        if (next < 0x60) spin = next;
-        mem.write32(obj + 0x58, spin);
-        mem.write32(obj + 0x5c, 0);
-    } else {
-        mem.write32(obj + 0x5c, 1);
-    }
-    const spinValue = mem.read32(obj + 0x58) | 0;
-    host.drawSprite(host.packResolve(PACK_FOLDER), 8, spinValue, spinValue);
+    screenBandSpin(mem, obj, PACK_FOLDER, host);
 
     host.setLayer(mem.read32(obj + 0x50) | 0, (mem.read32(obj + 0x54) | 0) - 1);
     const c4 = mem.read32(obj + 0xc4) | 0;

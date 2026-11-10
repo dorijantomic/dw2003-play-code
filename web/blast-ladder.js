@@ -33,20 +33,30 @@
 // comparison. DOM-free: node imports this module and the tests draw into a fake
 // context; the browser hands it the real one.
 
-/** The partner-level brackets, one per tier: [min, max], level 1..99. */
-export const BLAST_BRACKETS = [[1, 3], [4, 18], [19, 38], [39, 69], [70, 99]];
+import { levelTier } from "./vendor/engine.js";
 
 /**
- * The tier a partner battle level reads: the event-0x12 ladder, identical to
- * engine/dw3/battle-formulas.ts::levelTier (the tests hold the two together).
+ * The partner-level brackets, one per tier: [min, max], level 1..99.
+ *
+ * The ladder itself lives in one place — engine/dw3/battle-formulas.ts, as
+ * `levelTier` over the exported `BLAST_LEVEL_BRACKETS` table — so the brackets
+ * shown here are read back out of that function instead of being repeated.
  */
-export function tierForLevel(level) {
-  if (level < 4) return 0;
-  if (level < 19) return 1;
-  if (level < 39) return 2;
-  if (level < 70) return 3;
-  return 4;
-}
+export const BLAST_BRACKETS = (() => {
+  const rows = [];
+  for (let level = 1; level <= 99; level++) {
+    const tier = levelTier(level);
+    if (rows[tier]) rows[tier][1] = level;
+    else rows[tier] = [level, level];
+  }
+  return rows;
+})();
+
+/**
+ * The tier a partner battle level reads: the event-0x12 ladder. The engine's
+ * `levelTier` IS the ladder; this name is kept for the F2 page, which reads it.
+ */
+export const tierForLevel = levelTier;
 
 /**
  * The ladder text for a tier: "level 1-3", "level 4-18", ... Pure.

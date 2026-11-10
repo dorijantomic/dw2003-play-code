@@ -16,10 +16,11 @@ import { MAX_ROSTER_SLOTS, ROSTER_SLOT_COUNT } from "../roster.ts";
 import { NativeMemory } from "../../native/memory.ts";
 import type { PadButton } from "../../systems/input-map.ts";
 import {
-  PARTY_MAP, RECORD_FIELDS, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES,
+  PARTY_MAP, PARTY_CONTEXT, LANGUAGE_CELL, RECORD_FIELDS, ROSTER_RECORDS, ROSTER_STRIDE, ROSTER_EQUIP_ENTRIES,
   partyPositionToRosterSlot, persistentRosterSlot,
   requestScreenTransition, SCREEN_TRANSITION_A, SCREEN_TRANSITION_B, rosterRecordAddress
 } from "../party-context.ts";
+import { SHOP_BIT_CAP, SHOP_ITEM_MAX_ID } from "./shop-save-state.ts";
 import { buildEffectiveStats } from "../effective-stats.ts";
 import { itemIconClip, itemRecord } from "../item-record.ts";
 import { ScreenTextBanks } from "./screen-text-banks.ts";
@@ -60,7 +61,7 @@ import {
   cardFoldersRoot, dimQuadFactory, dimQuadStart, dimQuadTick,
 } from "./native/pause-card-folders.ts";
 import { pauseGridWord, pauseSeenScan, pauseStageByte } from "./native/pause-misc.ts";
-import { pauseListBuild, pauseListTick } from "./native/pause-list.ts";
+import { pauseListBuild, pauseListTick, pauseSlotArea } from "./native/pause-list.ts";
 import { buildTextBankImage } from "./native/game-text.ts";
 import { QUESTS_HANDLER, questsFactory, questsRoot } from "./native/pause-quests.ts"; // EXTRA: the QUESTS page
 import { mapServerFromStage } from "./native/map-server.ts";
@@ -72,7 +73,7 @@ export const PAUSE_TABLES_SIZE = 0x152c;
 /** The text families the pause host loads, in its own order, then the map's two. */
 /** The map page adds its zone names: 8..14 on the first server, 1..7 on the second. */
 export const PAUSE_TEXT_BANK_OFFSETS = [0xb0, 0x6a, 0x63, 0x4e, 0x47, 0xa2, 0x9b, 0x08, 0x01] as const;
-export const PAUSE_LANGUAGE_CELL = 0x8005cca8;
+export const PAUSE_LANGUAGE_CELL = LANGUAGE_CELL;
 /** The two cells the resident pause home fills before the host spawns its page. */
 export const PAUSE_ROW_CELL = 0x8005ccf0;
 export const PAUSE_VARIANT_CELL = 0x8005ccf4;
@@ -80,12 +81,12 @@ const PAUSE_HOST_HANDLER = 0x80099894;
 const PAUSE_HOST_SIZE = 0x78;
 const PAUSE_HOST_EXTRA = 8;
 
-const SAVE_CONTEXT = 0x80048d34;
+const SAVE_CONTEXT = PARTY_CONTEXT;
 export const PAUSE_MONEY = SAVE_CONTEXT + 0x6c;
 export const PAUSE_HELD_COUNTS = SAVE_CONTEXT + 0x7c;
 export const PAUSE_WORN_COUNTS = SAVE_CONTEXT + 0x20f;
 export const PAUSE_STAGE_CELL = 0x80048d68;
-export const PAUSE_ITEM_MAX_ID = 402;
+export const PAUSE_ITEM_MAX_ID = SHOP_ITEM_MAX_ID;
 /**
  * Worn-slot halfword offsets (record relative), the order the STATUS sheet reads
  * them. The numbers live once, in `party-context`: the pause EQUIP page edits the
@@ -161,13 +162,16 @@ export interface PauseSeed {
   /** Whether a map cell has been seen (the page's flag reader). */
   mapSeen?: (flagId: number) => boolean;
   /**
-   * EXTRA (not on the disc): one more row at the end of the pause home list, with this label (letters, digits and spaces).
-   * Choosing it opens the QUESTS page (`page: "quests"`), the builder the disc's own table names for that slot.
+   * EXTRA (not on the disc): more rows at the end of the pause home list, in order, each with its label (letters, digits and
+   * spaces). `opens: "quests"` opens the QUESTS page (the builder the disc's own table names for the slot after CARD FOLDERS);
+   * any other `opens` ends the list with `{ kind: "book", book, row }` and the browser opens that screen (GLOSSARY, OPTIONS).
    */
-  extraRow?: { label: string };
+  extraRows?: ReadonlyArray<{ label: string; opens: string }>;
   /** EXTRA (not on the disc): what the QUESTS page lists. Each entry's `lines` are the three description lines shown under the list. */
   quests?: {
     prompt: string; readPrompt: string;
+    /** The (up to) two lines shown when there are no quests, already wrapped to the band's width by the caller (web/text-fit.js). */
+    emptyLines?: readonly string[];
     /** `pages`: the quest's full text, three lines to a page. */
     entries: ReadonlyArray<{ title: string; lines: readonly [string, string, string]; pages: ReadonlyArray<readonly [string, string, string]> }>;
   };
@@ -213,7 +217,7 @@ export class PauseRootSession {
   private frame = 0;
   private sawPage = false;
   private closed = false;
-  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "exit" } | null = null;
+  private homeResultValue: { kind: "page"; page: PausePage; row: number } | { kind: "book"; book: string; row: number } | { kind: "exit" } | null = null;
   private homeBackdrop = 0;
 
   constructor(language: number, seed: PauseSeed, resources: PauseResources, host: PauseSessionHost) {
@@ -300,11 +304,11 @@ export class PauseRootSession {
     const questStrings = quests ? [
       ...quests.entries.map((e) => e.title),
       ...quests.entries.flatMap((e) => [...e.lines]),
-      quests.prompt, "None right now", "Talk to people and explore. New quests unlock as you play.", quests.readPrompt,
+      quests.prompt, "None right now", quests.emptyLines?.[0] ?? "Explore and talk to people.", quests.readPrompt, quests.emptyLines?.[1] ?? "",
       ...quests.entries.flatMap((e) => e.pages.flatMap((p) => [...p])),
     ] : [];
     const detailStart: number[] = [];                       // where each quest's full text starts in that bank
-    if (quests) { let at = quests.entries.length * 4 + 4; for (const e of quests.entries) { detailStart.push(at); at += e.pages.length * 3; } }
+    if (quests) { let at = quests.entries.length * 4 + 5; for (const e of quests.entries) { detailStart.push(at); at += e.pages.length * 3; } }
     const questsBank = quests ? this.loadBank(questStrings, 0x7f01) : 0;
     const questsHost = {
       ...services, alloc: this.allocTask, bank: () => questsBank, count: () => quests?.entries.length ?? 0,
@@ -319,9 +323,10 @@ export class PauseRootSession {
       cardFoldersFactory: (obj) => cardFoldersFactory(mem, obj, foldersHost),
       questsFactory: (obj) => questsFactory(mem, obj, questsHost),
     });
-    const extraBank = seed.page === "home" && seed.extraRow ? this.loadBank([seed.extraRow.label], 0x7f00) : 0;
+    const extraRows = seed.page === "home" ? (seed.extraRows ?? []) : [];
+    const extraBank = extraRows.length ? this.loadBank(extraRows.map((row) => row.label), 0x7f00) : 0;
     const homeHost = {
-      extraRow: () => (extraBank ? { bank: extraBank } : null),
+      extraRows: () => extraRows.map((_, text) => ({ bank: extraBank, text })),
       sfx: host.playSound,
       callMethod: (target: number, slot: number, args: number[]) => { this.call(target, slot, args); return 0; },
       textBank: (id: number) => this.banks.source(id),
@@ -414,7 +419,7 @@ export class PauseRootSession {
     });
     this.tree = new TranslatedTaskTree(mem, classes, (task) => this.widgets.retireTask(task));
     if (seed.page === "home") {
-      this.root = this.tree.allocate(HOME_HANDLER, 0xac, seed.extraRow ? 0xb4 : 0x84); // 0xb4: room for the cursor's slot, which moves past the seventh row
+      this.root = this.tree.allocate(HOME_HANDLER, 0xac, pauseSlotArea(seed.extraRows?.length ?? 0)); // 0xb4 and up: room for the cursor's slot, which moves past the seventh row, and for rows 8 and 9
       pauseListBuild(mem, this.root, 0x1002, seed.homeRow ?? 0);
       if (seed.homeOverlay) {
         this.homeBackdrop = this.widgets.arena.alloc(0x60);
@@ -481,8 +486,11 @@ export class PauseRootSession {
 
   private selectHomePage(): void {
     const row = this.mem.read32(PAUSE_ROW_CELL) | 0;
-    if (this.seed.extraRow && row === (this.mem.read32(this.root + 0x5c) | 0) - 1) {
-      this.homeResultValue = { kind: "page", page: "quests", row }; // EXTRA: the row after the disc's own
+    const extras = this.seed.extraRows ?? [];
+    const firstExtra = (this.mem.read32(this.root + 0x5c) | 0) - extras.length;
+    if (extras.length && row >= firstExtra) { // EXTRA: the rows after the disc's own
+      const extra = extras[row - firstExtra]!;
+      this.homeResultValue = extra.opens === "quests" ? { kind: "page", page: "quests", row } : { kind: "book", book: extra.opens, row };
       return;
     }
     const page = (["items", "sort", "map", "techniques", "status", "cardfolders"] as PausePage[])[row];
@@ -540,7 +548,7 @@ export class PauseRootSession {
     mem.write32(PAUSE_VARIANT_CELL, page?.variant ?? 0);
     mem.write32(0x80048d34 + 0x34, seed.stage ?? 0);
     mem.write8(0x80048f42, seed.cardFoldersUnlocked ? 1 : 0);
-    mem.write32(PAUSE_MONEY, Math.max(0, Math.min(0x98967f, Math.trunc(seed.money) || 0)));
+    mem.write32(PAUSE_MONEY, Math.max(0, Math.min(SHOP_BIT_CAP, Math.trunc(seed.money) || 0)));
     mem.write32(PAUSE_STAGE_CELL, seed.stage ?? 0);
     for (const slot of seed.inventory) {
       if (Number.isInteger(slot.id) && slot.id > 0 && slot.id <= PAUSE_ITEM_MAX_ID) {

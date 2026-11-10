@@ -16,12 +16,13 @@
 // Fail-soft by construction: a trap disables that one object and is counted;
 // nativeScreenState() reports it.
 
-import { ui } from "./vendor/engine.js";
+import { ui, ROSTER_STRIDE } from "./vendor/engine.js";
 // The interpreter is NEVER statically imported here: it lives in the
 // research-only bundle web/vendor/engine-native.js, reached through this
 // dynamic doorway (see web/native-runtime.js). loadNativeScreens() awaits it
 // before any screen boots, so boot and tick stay synchronous once loaded.
 import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 
 const BASE = "assets/native/screens";
 
@@ -74,23 +75,10 @@ export function setNativeScreenPad(buttons, port = 0) {
     if (state.current?.rt) state.current.rt.setPadHeld(port, buttons >>> 0);
 }
 
-/** Encode a display name into the screen text codec (web/native-screen-text.js:
- *  a single byte 0x04+d = digit, 0x0e+n = A-Z, 0x28+n = a-z; the two-byte pair
- *  0x01,0x01 is the extended space). Names the pause pages show are read as raw
- *  strings out of the roster record (record +0x08), so they use this codec. */
-export function encodeNativeScreenText(s, maxBytes = 23) {
-    const out = [];
-    for (const ch of String(s ?? "")) {
-        const c = ch.charCodeAt(0);
-        if (ch >= "0" && ch <= "9") out.push(0x04 + (c - 0x30));
-        else if (ch >= "A" && ch <= "Z") out.push(0x0e + (c - 0x41));
-        else if (ch >= "a" && ch <= "z") out.push(0x28 + (c - 0x61));
-        else if (ch === "'" || ch === "-" || ch === ".") out.push(0x01, 0x01); // unknown: space
-        else out.push(0x01, 0x01);
-        if (out.length >= maxBytes) break;
-    }
-    return out.slice(0, maxBytes);
-}
+// The name encoder lives in web/name-bytes.js (import-free) so the translated
+// screens can take it without reaching this module; re-exported here because
+// the native screens and web/memcard.js already import it from this path.
+export { encodeNativeScreenText };
 
 /** Worn-slot halfword offsets (record relative), in the order the STATUS sheet
  *  and the See Equipment window read them (commit-contract.md §1/§5).
@@ -120,13 +108,12 @@ export function seedNativeScreenParty(seed = {}) {
     if (!mem) return false;
     const PARTY = 0x80048d34 + 0x70;
     const REC = 0x80049494;
-    const STRIDE = 0x3dc;
     const positions = seed.positions ?? [];
     for (let i = 0; i < 3; i++) {
         mem.write32(PARTY + i * 4, i < positions.length ? positions[i] >>> 0 : 0xffffffff);
     }
     for (const s of seed.stats ?? []) {
-        const r = REC + (s.slot ?? 0) * STRIDE;
+        const r = REC + (s.slot ?? 0) * ROSTER_STRIDE;
         const w16 = (off, v) => { if (v !== undefined && v !== null) mem.write16(r + off, v & 0xffff); };
         mem.write32(r + 0x00, ((s.starterSlot ?? s.slot ?? 0) + 3) >>> 0);
         if (s.forms) ui.seedRosterForms(mem, r, s.forms);

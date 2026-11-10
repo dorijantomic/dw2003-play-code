@@ -1,5 +1,6 @@
 import "./extra-roster.js";   // first: it wraps fetch so digimon.json / evolutions.json carry the extra species
 import { storyCommand, cardDuelCloseWrites } from './vendor/engine.js';
+import { itemForDropName } from "./drop-item.js";
 import { bindCardInventory } from "./cardstate.js";
 import { paintScreenDim, subtractLayer, dimFillStyle } from "./screendim.js";
 import {
@@ -28,7 +29,6 @@ import {
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
 } from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
 import { tickCutContent, openCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
-import { tickCodex, openCodex, codexPress, codexDraw, codexOpen } from "./codex.js"; // EXPERIMENT: F2 -> Extras -> Digimon Codex (new; off by default)
 import { tickBlastLadder, openBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
 import { tickPlanner, openPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
 import { tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabOpen } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> Damage Lab (new; off by default)
@@ -59,7 +59,7 @@ import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, q
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
-import { installMpBattle, mpbHost, mpbMessage, mpbPeerGone, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
+import { installMpBattle, mpbKey, mpbHost, mpbMessage, mpbPeerGone, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { installChat, buildChatPack } from "./chat.js";
@@ -83,7 +83,7 @@ import {
 } from "./assets.js";
 import { installPixelFilter } from "./gpu-pixel-filter.js";
 import { createCanvasResolutionController } from "./canvas-resolution.js";
-import { setFieldViewPad, widePadFor, wideBoxCameraX, fieldFrameRule, scriptIsStaged, easeLevel, FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
+import { setFieldViewPad, widePadFor, wideBoxCameraX, fieldFrameRule, wideMenuSides, scriptIsStaged, easeLevel, FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 import { createTextbox, autoBalloonMode } from "./textbox.js";
 import { createChoice } from "./choice.js";
 import { createInn } from "./inn.js";
@@ -389,6 +389,21 @@ import { createSceneSkip } from "./sceneSkip.js";
 import { loadPlaceCard, createPlaceCard } from "./placecard.js";
 import { loadPlaceCardTranslated, createPlaceCardTranslated } from "./placecard-translated.js";
 import { asButton, attachGamepad, isPadButton } from "./input.js";
+import { createItemLog, watchBag } from "./item-log.js";   // owned / seen ITEMS for GLOSSARY, same store as the species log
+import { createSpeciesLog, installSpeciesLog } from "./species-log.js";   // Met / Defeated counter for GLOSSARY, records always (no switch)
+import { on as onGameEvent } from "./gameEvents.js";
+import { pauseExtraRows } from "./pause-extra-rows.js";   // GLOSSARY / OPTIONS rows on the pause list (dev switches `glossary`, `options`)
+import { createBookHost } from "./book-host.js";
+import { createGlossaryBook } from "./glossary-book.js";
+import { createStage } from "./glossary-stage.js";
+import { createPartnerFallback } from "./glossary-fallback.js";
+import { loadGlossaryData } from "./glossary-digimon.js";
+import { loadItemsData } from "./glossary-items.js";
+import { battleHudNameBank } from "./battlehud-translated.js";
+import { createFreeCamera } from "./anim-viewer-camera.js";
+import { createBattle3D, resolveModelFolder, setFighterTint } from "./battle3d.js";   // already loaded by battle.js: no extra cost
+import { createOptionsBook } from "./options-book.js";
+import { createRetryLoader } from "./retry-loader.js";
 import {
     FIELD_LOCATION_KEY,
     decodeFieldLocation,
@@ -406,6 +421,41 @@ const bgm = createBgmPlayer(soundRegister);
 window.__bgm = bgm;
 const sfx = createSfxPlayer(soundRegister);
 window.__sfx = sfx;
+bgm.setVolume(window.__fx?.musicVolume);       // OPTIONS volumes (web/volume-levels.js): 1 = the game's own gain
+sfx.setVolume(window.__fx?.soundVolume);
+// GLOSSARY and OPTIONS (web/book-host.js): one host runs whichever book the pause list opens.
+const itemLog = createItemLog();            // owned/seen items: watchBag(state, itemLog) below the state, noteSeen at the shop and the win report
+const speciesLog = createSpeciesLog();      // installed below (installSpeciesLog), read by GLOSSARY > DIGIMON
+const glossaryLoader = createRetryLoader(() => loadGlossaryData());   // the species, built once from the tables on first open; a failed fetch is tried again after 5 s
+const glossaryStage = createStage({
+    makeRenderer: (canvas) => createBattle3D(canvas, null, { alpha: true }),
+    makeCamera: createFreeCamera,
+    resolveFolder: resolveModelFolder,
+    setTint: setFighterTint,
+    drawFallback: createPartnerFallback(),
+});
+function glossarySpecies() {             // null until the tables are in
+    return glossaryLoader.get();
+}
+let glossaryItemLoader = null;   // GLOSSARY > ITEMS tables, built once on first need (a failed fetch is tried again after 5 s)
+function glossaryItems() {
+    glossaryItemLoader ??= createRetryLoader(() => loadItemsData(undefined, battleHudNameBank));
+    return {
+        data: glossaryItemLoader.get(),
+        info: (id) => ITEM_BY_ID[id] ?? null,                 // the real name and description the shop and the equip footer show
+        ids: () => itemLog.knownIds(),
+        held: (id) => heldCount(state, id),
+    };
+}
+window.__glossaryStage = glossaryStage;      // dev hook for the screenshot tools (like window.__books)
+const books = createBookHost({
+    sfx,
+    factories: {
+        glossary: (args) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
+        options: (args) => createOptionsBook(args),
+    },
+});
+window.__books = books;
 const PACKED_JINGLES = {
     "0x010c0000": "digi_en0",
     "0x010c0001": "digi_en1",
@@ -601,7 +651,8 @@ installQuests({
         localStorage.setItem("bits", String(state.bits));
     },
 });
-if (/[?&]questlab=1\b/.test(location.search)) import("./quest-lab.js");   // test panel for the extra quests
+installSpeciesLog({ on: onGameEvent, log: speciesLog });   // listens to battleStarted / battleWon, same event bus as the quests
+if (!window.__dwInstalled && /[?&]questlab=1\b/.test(location.search)) import("./quest-lab.js");   // test panel for the extra quests
 
 // EXPERIMENT (mounts): the game-side hooks the ride needs. The mount layer itself is web/mount.js; it is OFF
 // unless F2 -> Extras -> Mount is on AND a quest unlocked a mount (the quest layer's own done state, never a
@@ -953,9 +1004,10 @@ const statusOptions = {
     // The map page asks the flag store which places you have walked into — the bits the
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
     map: (state) => pauseMapContext(state, undefined, engineFlagSeen),
-    // Extra quests: one more row on the pause list (after CARD FOLDERS) and the page it opens.
-    extraRow: () => questsPauseRow(),
+    // Extra rows on the pause list (after CARD FOLDERS): QUESTS, then the GLOSSARY and OPTIONS books while their dev switches are on.
+    extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx }),
     questsPage: () => questsPausePage(),
+    onBook: (book, row) => openBook(book, row),
     // The CARD FOLDERS row's gate: the resident home list's own byte, D0x80048f42 =
     // save+0x20E = carried[402] — the Folder Bag key item (claim
     // UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14). It used to read "has
@@ -1046,7 +1098,7 @@ menu.nativeOpen = () => !!status?.isOpen();
 // every button on them are one system of the original — the resident list
 // F0x8001270c and its builder 0x8001345C — tabulated once in
 // docs/research/ui/pause-home-button-table-2026-10-04.md.
-const pauseHome = () => openPauseHome({ state, status, menu });
+const pauseHome = (row = 0) => openPauseHome({ state, status, menu, row });
 // The Demo Setup screen has no place on the disc's pause list (nothing writes
 // the row), so it is a debug-only extra and its Back has no original answer.
 // It returns to the same one list every other route returns to.
@@ -1087,6 +1139,17 @@ menu.cardFolderUnlocked = () => carriesFolderBag(state);
 const backToCardFolders = () => returnToPauseCardFolders({ state, status, menu });
 menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open(backToCardFolders); };
 menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open(backToCardFolders); };
+// GLOSSARY / OPTIONS: the pause list ended on that row (status-translated onBook); the book runs over the frozen field and the list
+// comes back on the same row when it shuts. The confirm that chose the row is still down: the host ignores it until it is let go.
+// If a button is still down after the host's release cap, the reopened list ignores it until it is let go (blockUntilReleased).
+const openBook = (book, row) => {
+    books.open(book, (held) => {
+        pauseHome(row);
+        status?.blockUntilReleased?.(held);
+    }, state.keys);
+};
+// Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
+window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));
 // East Sector - Duel Island, the card-duel venue (docs/research/story-
 // progression/GAME_WALKTHROUGH.md).
 Promise.all([loadCatalog(), loadStarter()]).then(() => { ensureStarterFolder(); persistCollection(); });
@@ -1139,7 +1202,8 @@ function openFightReport(opts = {}) {
         formFlags: [0, 0, 0],
     }));
     const dropItemId = opts.dropItemId
-        ?? (opts.droppedItem ? (ITEM_BY_NAME?.[opts.droppedItem]?.id ?? 0) : 0);
+        ?? (opts.droppedItem ? (itemForDropName(opts.droppedItem, ITEM_BY_NAME, ITEM_BY_ID)?.id ?? 0) : 0);
+    if (dropItemId > 0) itemLog.noteSeen([dropItemId]);   // GLOSSARY > ITEMS: the win screen names this drop
     fightReportNative.open({
         gameState: state,
         battleId: opts.battleId ?? 0,
@@ -1283,7 +1347,7 @@ function openNativeReport(b, onClose) {
         const party = Array.isArray(state.party) ? state.party : [];
         const partySlots = rows.map((row) => rosterSlotOfCharId(party[row.index ?? 0]));
         const firstDrop = (b._loot?.drops ?? []).find(Boolean) ?? null;
-        const dropItemId = firstDrop ? (ITEM_BY_NAME?.[firstDrop]?.id ?? 0) : 0;
+        const dropItemId = firstDrop ? (itemForDropName(firstDrop, ITEM_BY_NAME, ITEM_BY_ID)?.id ?? 0) : 0;
         b._reportPaidItemId = dropItemId;
         fightReportNative.open({
             gameState: state,
@@ -1774,6 +1838,29 @@ function plannerPartyMembers() {
         };
     }).filter(Boolean);
 }
+// GLOSSARY > DIGIMON: every species the party wears now counts as owned (forms worn in battle arrive as `formWorn` events). Only
+// the current party is read: no past history is invented. Lab evolutions and loaded saves are caught by the timer.
+function noteOwnedSpecies() {
+    try { speciesLog.noteOwned(glossaryPartners().flatMap((p) => [p.rookie, p.form]).filter(Boolean)); } catch { /* the party is not ready yet */ }
+}
+setInterval(noteOwnedSpecies, 3000);
+// GLOSSARY > DIGIMON: the party as the glossary reads it. `rookie` is the starter species, `form` the species it wears now.
+function glossaryPartners() {
+    const view = partyRosterView(state.party ?? [], state.partnerStats, state.partyStats, menu.digimonDB ?? {}, state.digimonNames);
+    return view.slice(0, 3).map((row, i) => {
+        const record = i === 0 ? state.partnerStats : state.partyStats?.[i];
+        if (!record) return null;
+        const slot = rosterSlotOfCharId(row.charId) ?? (Number(row.rookieId) - 1);
+        return {
+            slot,
+            rookie: menu.digimonDB?.[row.rookieId]?.name ?? null,
+            form: row.formName,
+            formId: Number(row.digimonId),
+            level: Number(record.level ?? 1),
+            live: { formLevels: Object.fromEntries((record.formLedger ?? []).map((entry) => [Number(entry.id), Number(entry.formLevel ?? 1)])), level: Number(record.level ?? 1), stats: record },
+        };
+    }).filter(Boolean);
+}
 // Console aid: __planner.rows() is the selected partner's list; __planner.press("down") drives the page.
 window.__planner = {
     open: () => plannerOpen(),
@@ -1798,6 +1885,7 @@ bindCardShopInventory(state).catch((error) => console.error("Card pack inventory
 // the write itself is what pushes the index into the pad map. Reading it still
 // yields `undefined` until something picks a language, exactly as before.
 let languageByte;
+watchBag(state, itemLog);   // every slot that enters state.inventory (storeAddItem, drops, steal, shop, gifts, quests) is logged as owned; the bag now counts too
 Object.defineProperty(state, "languageByte", {
     get: () => languageByte,
     set: (value) => {
@@ -1964,11 +2052,22 @@ window.__encounter = {
 // function) from a verifier without walking the counter down.
 window.__fieldToBattle = () => triggerRandomEncounter(currentMap().id, state.x, state.y);
 // Testing aid: the "Force encounter" button (or F9) fires the game's own random encounter from the field.
+// The installed copy (window.__dwInstalled, web/installed-build.js) has no button and no F9; the owner PC keeps both.
 {
     const fire = () => window.__fieldToBattle();
     const btn = document.getElementById("force-enc");
-    btn?.addEventListener("click", () => { btn.blur(); fire(); });
-    addEventListener("keydown", (e) => { if (e.code === "F9") { e.preventDefault(); fire(); } });
+    if (window.__dwInstalled) btn?.remove();
+    else {
+        btn?.addEventListener("click", () => { btn.blur(); fire(); });
+        addEventListener("keydown", (e) => { if (e.code === "F9") { e.preventDefault(); fire(); } });
+    }
+}
+// Installed copy: the top-bar Partner, Map, Showcase and Chapter selects are hidden (they stay in the page, so the code that fills them still runs).
+if (window.__dwInstalled) {
+    for (const id of ["charSelect", "mapSelect", "showcaseSelect", "chapterSelect"]) {
+        const label = document.getElementById(id)?.closest("label");
+        if (label) label.style.setProperty("display", "none", "important");
+    }
 }
 // ?encounter=1 (Playtest Lab, "force an encounter"): once the field is up, fire the game's own random
 // encounter, retrying until its guards (cutscene, fade, textbox) let it through and a battle is running.
@@ -2174,6 +2273,7 @@ window.__labOpen = (name, arg) => {
                 // shops.json rows are {id,name} objects; the shop takes raw ids
                 // (same normalize as the in-game zone path at :920). The native
                 // shop selects its own stock by shop id.
+                itemLog.noteSeen(s0.items.map((i) => i.id ?? i));   // GLOSSARY > ITEMS: the shop rows were shown
                 shop.open(s0.items.map((i) => i.id ?? i), null, { name: s0.name, state, shopId: which });
             });
             break;
@@ -2437,7 +2537,7 @@ window.__cutscene = cutscene;
 // HD Remaster wide overworld (web/field-view.js, F2 -> Screen -> Wide overworld, off by default).
 // camK: 1 = the wide camera clamp, 0 = the disc's own; sides: 1 = the extra map at the sides shows,
 // 0 = covered. staged: the running scene moves an actor or the camera, so it plays in the original framing.
-const wideField = { camK: 0, sides: 0, staged: false, t: 0, padL: 0 };
+const wideField = { camK: 0, sides: 0, dim: 0, staged: false, t: 0, padL: 0 };   // dim: how dark the visible sides are
 window.__wideField = wideField;
 {
     const startScene = cutscene.start;
@@ -2451,7 +2551,21 @@ function fieldFullScreenUiOpen() {
     return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
-        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || codexOpen() || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen()
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen() || books.isOpen()
+        || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
+}
+// Wide overworld menus (web/field-view.js wideMenuSides): the screens that only draw their own box over the field (pause list, status,
+// inn, shop, dri lab, gym, save, the GLOSSARY / OPTIONS books) may show the world dimmed at the sides. These keep black sides: the card
+// screens, the fight report and the movie fill the canvas, the name / pack / title / end / map-select screens and the stage wipe replace
+// the picture, and the dev pages sit over everything. (Every screen of this list is also in fieldFullScreenUiOpen.)
+function fieldDrawsOverFieldUiOpen() {
+    return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
+        || gym.isOpen() || saveScreen.isOpen() || books.isOpen());
+}
+function fieldTakesOverUiOpen() {
+    return !!(cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
+        || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
+        || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen()
         || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
 }
 function fieldStageFilled() {
@@ -5023,6 +5137,17 @@ function ensureSpriteAssets(id) {
     return promise;
 }
 
+// The leader's own sheet, asked for again when render finds it missing. Retained first, because ensureSpriteAssets drops
+// an npc-kind image that is not retained (the leader's pack is one); retried at most every 2 s so a failing fetch is not hammered.
+const leaderSheetRetryAt = new Map();
+function requestLeaderSheet(id, now = performance.now()) {
+    if (!id) return;
+    retainedSpriteIds.add(id);
+    if (now < (leaderSheetRetryAt.get(id) ?? 0)) return;
+    leaderSheetRetryAt.set(id, now + 2000);
+    ensureSpriteAssets(id);
+}
+
 async function loadCollisionForStage(id) {
     if (state.collision[id]) return state.collision[id];
     if (collisionLoadPromises.has(id)) return collisionLoadPromises.get(id);
@@ -5860,7 +5985,7 @@ function applyStoryCommand(command) {
         if (command.kind === "item_shop" || command.kind === "card_shop" || command.kind === "inn") {
             const index = command.index;
             const rec = state.shops?.[index];
-            if (command.kind === "item_shop") shop.open(rec?.items ?? [], null, { name: rec?.name, state, shopId: index });
+            if (command.kind === "item_shop") { itemLog.noteSeen(rec?.items ?? []); shop.open(rec?.items ?? [], null, { name: rec?.name, state, shopId: index }); }
             // CARD SHOP — CORRECTED 2026-08-08. The card shop is 0x31..0x43 and
             // 0x46..0x4A, not 0x1e..0x30: set_flag routes those to
             // launch_ui(0x1300, index), 0x1300 is STCRDSHP, and `index` is the
@@ -7453,7 +7578,8 @@ function runStageHandoff(exit) {
 // they are covered (1 - wideField.sides). Box coordinates; the strips are padL wide outside the box.
 function drawWideSideCovers(ctx) {
     const padL = wideField.padL;
-    const a = 1 - wideField.sides;
+    // Covered = black; shown with a menu open (wide overworld) = dimmed by wideField.dim.
+    const a = (1 - wideField.sides) + wideField.sides * wideField.dim;
     if (!(padL > 0) || a <= 0) return;
     ctx.save();
     ctx.globalAlpha = Math.min(1, a);
@@ -7713,19 +7839,17 @@ function dispatchInput(k, e, raw = "") {
     }
     if (!state.started) return;
 
+    // GLOSSARY / OPTIONS: the open book reads the held pad itself (update -> books.update); a press only has to stay off the field.
+    if (books.isOpen()) {
+        e.preventDefault?.();
+        return;
+    }
+
     // EXPERIMENT (cut-content gallery): while the page is up it owns the pad — Left/Right turn a page, Cross/Start
     // close it, every other press is swallowed — so nothing reaches the field underneath. Closed, it answers false
     // and every press falls through exactly as before.
     if (cutContentPress(k)) {
         state.keys.delete(k);   // the press was the page's, so a held Cross/Start cannot act on the field the moment it closes
-        e.preventDefault();
-        return;
-    }
-
-    // EXPERIMENT (Digimon Codex): while the book is up it owns the pad exactly like the gallery above — Left/Right page,
-    // Up/Down the row, Cross/Start close, every other press swallowed. Closed, it answers false and nothing changes.
-    if (codexPress(k)) {
-        state.keys.delete(k);
         e.preventDefault();
         return;
     }
@@ -8456,6 +8580,7 @@ const gamepad = attachGamepad({
         bgm.unlock(); sfx.unlock();
         if (titleInput) { titleInput(button); return; }
         if (!state.started) return;
+        if (mpbVisible()) { mpbKey(button); return; }   // the 2 vs 2 fight owns the pad: it drives the battle cursor, not the overworld
         dispatchInput(button, PAD_EVENT, "");
     },
 });
@@ -8472,6 +8597,7 @@ function padLoop(t) {
     const dt = padLastT ? Math.min((t - padLastT) / 1000, 0.1) : 0;
     padLastT = t;
     gamepad.tick(dt);
+    if (mpbVisible()) state.keys.clear();   // held pad buttons must not walk the character during a 2 vs 2 fight
     // Screens that can open BEFORE the sim loop starts still need a tick source.
     // The title's Continue launches the memory card in load mode (the original's
     // code 0xC00), and the sim loop only starts with the game, so without this the
@@ -8546,7 +8672,6 @@ window.__openExtra = (name) => {
     if (!replayFieldFree()) return false;
     switch (name) {
         case "cutcontent": if (fx.cutcontent !== true) return false; openCutContent(); return true;
-        case "codex": if (fx.codex !== true) return false; openCodex(); return true;
         case "blastladder": if (fx.blastladder !== true) return false; openBlastLadder(); return true;
         case "planner": if (fx.planner !== true) return false; openPlanner(); return tickPlanner(true, plannerPartyMembers);
         case "damagelab": if (fx.damagelab !== true) return false; openDamageLab(); return true;
@@ -8557,16 +8682,14 @@ window.__openExtra = (name) => {
 };
 
 function update(dt) {
+    // GLOSSARY / OPTIONS (web/book-host.js): while a book is up the field is frozen and the book reads the held pad.
+    books.update(dt, state.keys);
+    if (books.isOpen()) return;
     // EXPERIMENT (cut-content gallery): F2 -> Extras -> Cut-content gallery opens a read-only text page on the
     // setting's rising edge. While it is up the field is frozen (nothing moves under a page the player is reading)
     // and dispatchInput gives it every press; with the setting off the page never exists and this costs one call.
     tickCutContent(window.__fx?.cutcontent === true);
     if (cutContentOpen()) return;
-    // EXPERIMENT (Digimon Codex): F2 -> Extras -> "Digimon Codex (new)" opens the partner book on the setting's
-    // rising edge. While it is up the field is frozen and dispatchInput gives it every press; with the setting off
-    // the book never exists and this costs one comparison.
-    tickCodex(window.__fx?.codex === true);
-    if (codexOpen()) return;
     // EXPERIMENT (Blast ladder): F2 -> Extras -> "Blast ladder (new)" opens the five-form card on the setting's rising
     // edge. While it is up the field is frozen and dispatchInput gives it every press; with the setting off the page
     // never exists and this costs one comparison.
@@ -10263,14 +10386,17 @@ function render() {
         const now = performance.now();
         const dtw = wideField.t ? Math.min(0.1, (now - wideField.t) / 1000) : 0;
         wideField.t = now;
+        const overUi = fieldDrawsOverFieldUiOpen(), takeUi = fieldTakesOverUiOpen();
+        const menuSides = wideMenuSides({ fullScreenUi: fieldFullScreenUiOpen(), dimmableUi: overUi && !takeUi });
         const rule = fieldFrameRule({
             pad: FIELD_VIEW_PAD, mapW: m.width,
             fixedViewport: !!m.fixedViewportBackground,
             stagedScene: (cutscene.isActive() && wideField.staged) || !!state.diveDemo,
             nativeCentre: !!nativeCenter, labCamera: labCam.active,
-            fullScreenUi: fieldFullScreenUiOpen(),
+            fullScreenUi: menuSides.coverSides,
         });
         const camTarget = rule.wideCamera ? 1 : 0, sideTarget = rule.showSides ? 1 : 0;
+        wideField.dim = easeLevel(wideField.dim, menuSides.dim, dtw, 10);
         wideField.camK = easeLevel(wideField.camK, camTarget, dtw, camTarget < wideField.camK ? 10 : 4);
         wideField.sides = easeLevel(wideField.sides, sideTarget, dtw, sideTarget < wideField.sides ? 10 : 4);
         const wideX = wideField.camK > 0 ? wideBoxCameraX(camCenterX, m.width, FIELD_VIEW_PAD) : null;
@@ -10664,6 +10790,14 @@ function render() {
                 ctx.beginPath();
                 ctx.rect(-1e4, -1e4, 3e4, Math.round(cutRow - lastCam.y) + 1e4);
                 ctx.clip();
+            }
+            // The leader sheet is not ready (still loading, evicted, or its load failed): draw nothing this frame, like
+            // every other actor, and make sure it is requested. drawSprite would throw on an undefined sheet, and an
+            // exception out of render() ends the frame loop for good (frame() reschedules after render).
+            if (!isLoadedAsset(sheet)) {
+                if (cutRow != null) ctx.restore();
+                requestLeaderSheet(c.id);
+                return;
             }
             const info = drawEntitySprite(
                 c, sheet, state.clipImgs[c.id], drawX, drawY,
@@ -11199,8 +11333,6 @@ function render() {
     sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (cut-content gallery): the read-only page sits over everything, including the battle HUD.
     cutContentDraw(ctx, VIEW_W, VIEW_H);
-    // EXPERIMENT (Digimon Codex): the partner book sits over everything too; it draws only while open.
-    codexDraw(ctx, null, VIEW_W, VIEW_H);
     // EXPERIMENT (Blast ladder): the starter card, over everything, drawn only while its page is open.
     blastDraw(ctx, null, VIEW_W, VIEW_H);
     // EXPERIMENT (Next forms planner): the read-only page sits over everything too; it draws only while open.
@@ -11209,6 +11341,8 @@ function render() {
     damageLabDraw(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (Replay theatre): the scene list sits over everything too; it draws only while the page is open.
     replayDraw(ctx, VIEW_W, VIEW_H);
+    // GLOSSARY / OPTIONS: over everything, drawn only while a book is open.
+    books.draw(ctx, VIEW_W, VIEW_H, wideField.padL, wideField.padL > 0);
 
     if (fade.alpha > 0) {
         drawTransitionWipe(ctx, camX, camY);

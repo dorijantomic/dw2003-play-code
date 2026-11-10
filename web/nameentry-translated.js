@@ -4,7 +4,7 @@
 // hands the confirmed names back to the walker's state. It never executes
 // original instructions; `?nativeName=1` keeps the original-code screen as a
 // research reference (web/nameentry-native.js).
-import { ui, ROSTER_SLOT_CHARIDS } from "./vendor/engine.js";
+import { ui, rosterSlotOfCharId } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
 import { partyRosterView } from "./party.js";
@@ -51,10 +51,9 @@ export function decodeGameName(bytes) {
     return out.trim();
 }
 
-const rosterSlotFor = (charId) => {
-    const i = ROSTER_SLOT_CHARIDS.indexOf(String(charId));
-    return i < 0 ? null : i;
-};
+/** Roster slot of a manifest char id, or null when it is not a roster species
+ *  (the engine helper's own miss value; the call site filters null out). */
+const rosterSlotFor = (charId) => rosterSlotOfCharId(String(charId));
 
 export function createNameEntryTranslated(sfx = null, options = {}) {
     const n = {

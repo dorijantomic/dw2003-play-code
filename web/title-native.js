@@ -25,12 +25,7 @@
 // The walker's own title (web/titlescreen.js, drawn from the extracted art)
 // stays as the development rollback (?legacyTitle=1).
 
-import { maskFromButtons } from "./vendor/engine.js";
-import {
-    openNativeScreen,
-    preloadNativeScreens,
-    nativeScreensReady,
-} from "./native-screen-host.js";
+import { createNativeAdapter } from "./native-screen-host.js";
 import { nativeScreenObjects, nativeScreenRead } from "./native-screen.js";
 
 const MODULE_ID = "pro/stdwtitl";
@@ -66,16 +61,6 @@ export function createTitleNative(sfx = null) {
         _launchArgument: 0,
     };
 
-    function boot() {
-        const host = openNativeScreen(MODULE_ID, {
-            playPackedSound: (id) => { sfx?.playPacked(id); },
-            seed: () => {},
-        });
-        if (!host) return false;
-        n._host = host;
-        return true;
-    }
-
     /** Queue one synthesised pad press; the walker's title input is edge-based
      *  (up/down/confirm/start) while the screen samples the held word. */
     function press(mask) {
@@ -84,8 +69,6 @@ export function createTitleNative(sfx = null) {
     }
 
     n.open = () => {
-        n._open = true;
-        n._pending = false;
         n._done = false;
         n._result = 1;
         n._started = false;
@@ -94,10 +77,7 @@ export function createTitleNative(sfx = null) {
         n._queue.length = 0;
         n._hold = 0;
         n._mask = 0;
-        preloadNativeScreens().catch((e) => {
-            n._lastDiagnostic = `native screen preload failed: ${e?.message ?? e}`;
-        });
-        if (!boot()) n._pending = true;
+        n._begin();
         return n;
     };
 
@@ -129,30 +109,6 @@ export function createTitleNative(sfx = null) {
         return n.confirm();
     };
 
-    n.tick = () => {
-        if (!n._open) return;
-        if (n._pending) {
-            if (!nativeScreensReady()) {
-                preloadNativeScreens().catch(() => {});
-                return;
-            }
-            if (!boot()) {
-                n._lastDiagnostic = "native title boot failed (manifest/overlay missing)";
-                return;
-            }
-            n._pending = false;
-        }
-        if (n._hold <= 0 && n._queue.length) {
-            n._mask = n._queue.shift();
-            n._hold = PRESS_FRAMES;
-        }
-        if (n._hold > 0) n._hold--;
-        else n._mask = 0;
-        if (n._mask === PAD_START) n._started = true;
-        n._host.setPad(n._mask);
-        if (n._host.tick() || titleClosed()) n._finish();
-    };
-
     /** The screen's close: the root object's lifecycle reaches 3 after the fade. */
     function titleClosed() {
         const root = nativeScreenObjects().find((o) => (o.cb >>> 0) === ROOT_CB);
@@ -160,33 +116,8 @@ export function createTitleNative(sfx = null) {
         return (nativeScreenRead(root.addr + 0xc, 4) | 0) === 3;
     }
 
-    n.draw = (ctx, viewW, viewH) => {
-        if (!n._open || !n._host) return false;
-        n._host.draw(ctx, viewW, viewH);
-        return true;
-    };
-
     n.isDone = () => n._done;
     n.result = () => n._result;
-
-    n._finish = () => {
-        if (!n._open) return;
-        n._open = false;
-        const host = n._host;
-        const kind = host ? host.read(LAUNCH_KIND, 4) >>> 0 : 0;
-        n._launchCode = kind;
-        n._launchArgument = host ? host.read(LAUNCH_ARG, 4) | 0 : 0;
-        // The walker's three outcomes (web/titlescreen.js): Start launches the
-        // game, Continue opens the memory-card LOAD screen, and the
-        // language-dependent 0xE01/0xE02 arm is the idle/attract loop.
-        if (kind === TITLE_LAUNCH_START) n._result = 1;          // RESULT_START
-        else if (kind === TITLE_LAUNCH_CONTINUE) n._result = 2;  // RESULT_CONTINUE
-        else if (kind === 0) n._result = 3;                      // closed without a launch: idle
-        else n._result = 3;                                      // RESULT_IDLE
-        n._done = true;
-        host?.teardown();
-        n._host = null;
-    };
 
     n.close = () => {
         if (n._open) n._finish();
@@ -205,6 +136,52 @@ export function createTitleNative(sfx = null) {
         host: n._host?.state() ?? null,
         lastDiagnostic: n._lastDiagnostic,
     });
+
+    createNativeAdapter({
+        owner: n,
+        moduleId: MODULE_ID,
+        hostOptions: {
+            playPackedSound: (id) => { sfx?.playPacked(id); },
+            seed: () => {},
+        },
+        // The walker's title input is edge-based, so the adapter holds each
+        // queued press for PRESS_FRAMES and hands that word over itself.
+        pad: () => {
+            if (n._hold <= 0 && n._queue.length) {
+                n._mask = n._queue.shift();
+                n._hold = PRESS_FRAMES;
+            }
+            if (n._hold > 0) n._hold--;
+            else n._mask = 0;
+            if (n._mask === PAD_START) n._started = true;
+            return n._mask;
+        },
+        frame: (host, dt) => host.tick(dt) || titleClosed(),
+        commit: (host) => {
+            const kind = host.read(LAUNCH_KIND, 4) >>> 0;
+            n._launchCode = kind;
+            n._launchArgument = host.read(LAUNCH_ARG, 4) | 0;
+            // The walker's three outcomes (web/titlescreen.js): Start launches
+            // the game, Continue opens the memory-card LOAD screen, and the
+            // language-dependent 0xE01/0xE02 arm is the idle/attract loop.
+            if (kind === TITLE_LAUNCH_START) n._result = 1;          // RESULT_START
+            else if (kind === TITLE_LAUNCH_CONTINUE) n._result = 2;  // RESULT_CONTINUE
+            else n._result = 3;                                      // RESULT_IDLE
+            n._done = true;
+        },
+        closed: () => {
+            // A close before the overlay booted has no launch word to read:
+            // the screen closed without a launch, which is the idle arm.
+            if (!n._done) {
+                n._done = true;
+                n._result = 3;
+            }
+        },
+        label: "native title boot failed (manifest/overlay missing)",
+    });
+
+    /** The walker's title loop calls tick(), not update(dt). */
+    n.tick = () => n.update();
 
     return n;
 }

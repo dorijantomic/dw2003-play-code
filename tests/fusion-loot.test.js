@@ -131,12 +131,12 @@ test("source gate: the fused branch sits on bossId, pays the other halves, and n
     "the fused body rolls the OTHER halves' drops");
   assert.match(block, /enemiesDB, RAND_U16, true\)/, "the stream is the disc roll, always on");
   // The ordinary path is byte-for-byte today's, and it is what the fused body skips.
-  assert.match(block, /const drop = rollDrop\(b\.enemy\.eStats\);/);
-  assert.match(block, /if \(drop\) b\._loot\.drops\.push\(drop\);/);
+  assert.match(block, /\(b\._loot\.candidates \?\?= \[\]\)\.push\(es\);/, "the ordinary path only collects the candidate");
+  assert.match(block, /rollBattleDrop\(b\._loot\.candidates, RAND_U16\)/, "the win rolls the battle's one drop");
   const fusedArm = block.match(/if \(fusionBoss\) \{[\s\S]*?\n    \} else \{/)?.[0] ?? "";
   assert.ok(fusedArm, "the fusion guard and the ordinary path are an if/else");
-  assert.doesNotMatch(fusedArm, /rollDrop\(/, "rollDrop is not called for the fused boss");
+  assert.doesNotMatch(fusedArm, /candidates/, "the fused body is not a candidate");
   assert.match(fusedArm, /b\._loot\.drops\.push\(item\)/, "every dropped item joins the loot list");
-  // One ordinary call site, unchanged.
-  assert.equal((battle.match(/rollDrop\(b\.enemy\.eStats\)/g) ?? []).length, 1);
+  // One roll site for the ordinary path.
+  assert.equal((battle.match(/rollBattleDrop\(/g) ?? []).length, 1);
 });

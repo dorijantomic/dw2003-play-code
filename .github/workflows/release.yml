@@ -165,6 +165,10 @@ jobs:
           python packaging/build_bundle.py --bin stage/bin --out dist/DW2003 \
             --version "${{ steps.ver.outputs.version }}" --cache "$RUNNER_TEMP/bundle-cache"
 
+      # The marker that tells the installed game from a checkout (web/ship-list.js, web/index.html). Not in git.
+      - name: Mark the bundle as the installed game
+        run: echo "window.__dwInstalled = true;" > dist/DW2003/app/web/installed-build.js
+
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh

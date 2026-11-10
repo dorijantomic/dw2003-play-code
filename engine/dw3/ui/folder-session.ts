@@ -66,6 +66,7 @@ import {
   CardViewTextContext, installCardRecords, installCardViewTables, cardRecordAddress,
   CARD_PAK_FILES_BASE, type CardRecord, type CardViewTextHost,
 } from "./native/card-view-text.ts";
+import { SAVE_CARD_MAX, SAVE_CARD_COPIES } from "../save-block.ts";
 
 /** The folder chrome / rows draw from this pack handle (directory 0x063E). */
 /** The CARDPAK record store the colour census and the detail panels read. */
@@ -81,7 +82,6 @@ const FOLDER_RECORD_STRIDE = 0x66;
 /** Per-card copy / ever-obtained arrays the picker's row values read. */
 const CARD_COUNTS = 0x80048d34 + 0x3a2;
 const CARD_SEEN = 0x80048d34 + 0x4df;
-const CARD_MAX_ID = 0x13b;
 /** The language/save cell the bank ids derive from (also the resource cell). */
 const SAVE_PTR = 0x8005cca8;
 /** The keyboard's character tables the pack's text banks ship beside. */
@@ -171,14 +171,17 @@ export class FolderSession {
     installCardRecords(this.mem, resources.cards);
     for (const [id, count] of resources.owned ?? []) {
       const card = Number(id);
-      if (Number.isInteger(card) && card >= 1 && card < CARD_MAX_ID) {
-        this.mem.write8(CARD_COUNTS + card, count & 0xff);
+      if (Number.isInteger(card) && card >= 1 && card < SAVE_CARD_MAX) {
+        // The disc never lets a count pass 9: the shop refuses the tenth copy
+        // (pro/stcrdshp.s:4774-4790), so the byte is capped here too.
+        const held = Math.max(0, Math.min(SAVE_CARD_COPIES, Number(count) || 0));
+        this.mem.write8(CARD_COUNTS + card, held);
         this.mem.write8(CARD_SEEN + card, 1);
       }
     }
     for (const id of resources.seen ?? []) {
       const card = Number(id);
-      if (Number.isInteger(card) && card >= 1 && card < CARD_MAX_ID) this.mem.write8(CARD_SEEN + card, 1);
+      if (Number.isInteger(card) && card >= 1 && card < SAVE_CARD_MAX) this.mem.write8(CARD_SEEN + card, 1);
     }
     this.seedFolders(resources.folders);
 

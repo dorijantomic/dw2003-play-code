@@ -12,7 +12,7 @@
 // What is NOT settled, and the page must keep saying: the identity between the picker's
 // 62-entry source table and the engine's op2-indexed timeline array rests on the loop bound
 // plus label-to-slot alignment, and the join against fightstg's own selectors is still
-// `needs_evidence` (SCENE-Q002). CLIP_ID_CAVEAT below is the sentence the Codex prints.
+// `needs_evidence` (SCENE-Q002). CLIP_ID_CAVEAT below is the sentence a page that lists the clips must print.
 //
 // The pack counts are numbers, not guesses: `packCountsFrom` recomputes each table's count
 // from the 249 shipped `web/assets/battle/models/*/anim.json` files, and
@@ -20,12 +20,12 @@
 // typed count that drifts from the assets fails the suite. A table counts as authored by a
 // pack when that pack's `timeline[table].table` carries at least one frame.
 //
-// Pure: no DOM, no fetch, no node built-ins. The Codex imports the rows; the sound-audit and
+// Pure: no DOM, no fetch, no node built-ins. The sound-audit and
 // animation-viewer pages import clipLabel().
 
 export const PACK_TOTAL = 249;
 
-/** The caveat the Codex header states, in the research doc's own words. */
+/** The caveat a clip list states, in the research doc's own words. */
 export const CLIP_ID_CAVEAT =
   "The tool passes a clip's list position + 1 as the engine animation id; "
   + "the join against fightstg's own selectors (SCENE-Q002) is still needs_evidence.";

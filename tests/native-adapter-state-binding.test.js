@@ -59,8 +59,10 @@ function openBody(source) {
   throw new Error("unbalanced open() braces");
 }
 
-/** An adapter that seeds from the state it holds: `const state = x._state ?? {}`. */
-const readsHeldState = (source) => /const state = \w+\._state \?\? \{\};/.test(source);
+/** An adapter that seeds from the state it holds: `const state = x._state ?? {}`,
+ *  or the same read handed straight to the factory seed
+ *  (`seed: ({ read, write }) => seed(read, write, d._state ?? {})`). */
+const readsHeldState = (source) => /\w+\._state \?\? \{\}/.test(source);
 
 const members = adapters.filter((f) => readsHeldState(readFileSync(`web/${f}`, "utf8")));
 const binds = (f) => /(\w+)\._state = /.test(openBody(readFileSync(`web/${f}`, "utf8")));

@@ -173,6 +173,19 @@ export function enemyDisplayName(en) {
 }
 
 /**
+ * The name a battle MESSAGE prints for an enemy: the authored display name when the
+ * record has one, else the disc's own name line (bank 0x4e line `record.nameId`, the
+ * same line the HUD plate reads), else the enemy table's species key. The numbered
+ * records (Goburimon2, Cardmon3, ...) carry the plain species line on the disc.
+ */
+export function enemyMessageName(en, record, nameBank, fallback = "") {
+  if (en?.displayName != null) return String(en.displayName);
+  const line = record?.nameId == null ? null : nameBank?.[record.nameId | 0];
+  if (typeof line === "string" && line !== "") return line;
+  return String(en?.eStats?.digimon_id ?? en?.profile?.name ?? fallback);
+}
+
+/**
  * Merge the authored fusion skills into a skill map, only with the switch on.
  *
  * The map is returned untouched (the same object) when the switch is off or there is

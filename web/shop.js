@@ -39,12 +39,13 @@
 //     (123,38) + window clip 12 @ (175,67). Message plate: clip 21 @ (123,132).
 // All strings are the real esitshop.toml entries.
 import { paintScreenDim } from "./screendim.js";
+import { leaveFadeStep, leaveFadeFrames, leaveFadeLevel, leaveFadeDone } from "./leave-fade.js";
 import { asButton } from "./input.js";
 import {
   ITEM_BY_ID, EQUIPMENT_BY_ID, storeAddItem, storeRemoveItem, heldCount, wornCount,
   commitEquipEvent, createShopManager,
   computeEquipPreview, gearAccessibleForLine, shopEquipSwap, rosterSlotOfCharId, ui,
-  shopBuyRefusal, shopBuyQuantityCeiling, shopBuyCommit, shopBuyAfterEquip,
+  shopBuyRefusal, shopBuyQuantityCeiling, shopBuyCommit, shopBuyAfterEquip, MONEY_CAP,
 } from "./vendor/engine.js";
 import { drawText, textWidth, drawIconGlyph } from "./uifont.js";
 import { loadPack, drawClip, drawPackBackdrop } from "./screenpack.js";
@@ -78,7 +79,6 @@ const WEAPON_CLASS_LINES = {
   2: "Left Hand", 3: "Right or Left", 4: "Head", 5: "Body",
   6: "Accessory", 7: "Both Hands", 8: "Accessory",
 };
-const BIT_CAP = 0x98967f;                              // 9,999,999
 
 const NATIVE_W = 320;
 const ROW_H = 14;      // list row pitch (0x0E)
@@ -114,8 +114,7 @@ const VSYNC_S = 0.02; // PAL 50 Hz, same beat ANIM_T counts in
 // triangle runs direction 0, duration 0x1E: the 8.8 dim word goes
 // 0 → 0xFF00 in 30 frames, then the shop is gone. F0x8008b908 case 20.
 const LEAVE_FADE_FRAMES = 0x1E;
-const LEAVE_FADE_MAX = 0xFF00;
-const LEAVE_FADE_DELTA = Math.trunc(LEAVE_FADE_MAX / LEAVE_FADE_FRAMES);
+const LEAVE_FADE_DELTA = leaveFadeStep(LEAVE_FADE_FRAMES);
 
 const stshop = loadPack("stshop");
 
@@ -222,9 +221,8 @@ export function createShop(sfx = null) {
 
   function leaveFadeAlpha() {
     if (!sh.fadeLeaving) return 0;
-    const t = sh.time - sh.fadeT0 - LEAVE_FOLD_FRAMES * VSYNC_S;
-    const frames = Math.max(0, Math.floor(t / VSYNC_S));
-    return Math.min(255, (frames * LEAVE_FADE_DELTA) >> 8) / 255;
+    const frames = leaveFadeFrames(sh.time, sh.fadeT0 + LEAVE_FOLD_FRAMES * VSYNC_S);
+    return leaveFadeLevel(frames, LEAVE_FADE_DELTA);
   }
 
   function paintLeaveFade(ctx) {
@@ -506,7 +504,7 @@ export function createShop(sfx = null) {
     const mgr = createShopManager({
       getGold: () => state.bits,
       setGold: (n) => {
-        state.bits = Math.max(0, Math.min(BIT_CAP, n));
+        state.bits = Math.max(0, Math.min(MONEY_CAP, n));
         if (typeof localStorage !== "undefined") localStorage.setItem("bits", String(state.bits));
       },
       // The merchant's own commit is the original's: both directions go through
@@ -649,9 +647,8 @@ export function createShop(sfx = null) {
     if (!sh._open) return;
     sh.time += dt;
     if (sh.fadeLeaving) {
-      const t = sh.time - sh.fadeT0 - LEAVE_FOLD_FRAMES * VSYNC_S;
-      const frames = Math.max(0, Math.floor(t / VSYNC_S));
-      if (frames * LEAVE_FADE_DELTA >= LEAVE_FADE_MAX) sh.close();
+      const frames = leaveFadeFrames(sh.time, sh.fadeT0 + LEAVE_FOLD_FRAMES * VSYNC_S);
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) sh.close();
     }
   };
 

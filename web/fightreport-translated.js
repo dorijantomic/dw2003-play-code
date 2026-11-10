@@ -26,9 +26,11 @@
 //
 // Same public API as createFightReportNative: open/isOpen/handleKey/update/draw/
 // close/diagnostics.
-import { heldCount, itemCountEntries, setHeldCount, setReportOwnedForms, ui } from "./vendor/engine.js";
+import { heldCount, itemCountEntries, setHeldCount, setReportOwnedForms, ui, MONEY_CAP } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
+import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 
@@ -36,7 +38,6 @@ import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from
 const PACKS = { 1951: "stfrpt", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
 const BANKS = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, "pause"]];
-const BIT_CAP = 9_999_999;
 
 const DATA_LABEL = "Fight report data";
 
@@ -56,20 +57,6 @@ function loadData(language) {
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
     return dataByLanguage.get(language);
-}
-
-/** The screen's text codec: 0x04+d digits, 0x0E+n capitals, 0x28+n lower case, else an extended space. */
-function encodeName(name) {
-    const bytes = [];
-    for (const ch of String(name ?? "")) {
-        const code = ch.charCodeAt(0);
-        if (ch >= "0" && ch <= "9") bytes.push(4 + code - 48);
-        else if (ch >= "A" && ch <= "Z") bytes.push(14 + code - 65);
-        else if (ch >= "a" && ch <= "z") bytes.push(40 + code - 97);
-        else bytes.push(1, 1);
-        if (bytes.length >= 23) break;
-    }
-    return bytes.slice(0, 23);
 }
 
 const rand16 = () => (Math.random() * 0x10000) | 0;
@@ -100,7 +87,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
             .map((p) => ({
                 position: p.pos ?? 0,
                 rosterSlot: p.rosterSlot ?? 0,
-                nameBytes: encodeName(p.name),
+                nameBytes: encodeNativeScreenText(p.name),
                 exp: Number(p.preExp) || 0,
                 level: Number(p.level) || 1,
                 tp: p.tp, hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp,
@@ -152,7 +139,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         const session = r._session;
         const state = r._state;
         if (!session || !state) return;
-        state.bits = Math.max(0, Math.min(BIT_CAP, session.bits()));
+        state.bits = Math.max(0, Math.min(MONEY_CAP, session.bits()));
         // The dropped item's count goes through the shared store as an add/remove
         // (F0x800161D8): the 99 cap and the 0 floor are the store's.
         const itemId = r._opts?.dropItemId ?? 0;
@@ -183,9 +170,30 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         r._seedHeld = held;
     }
 
+    // The report's lifecycle lives in web/translated-screen-host.js. `release` is the old `_finish`
+    // body: the summary and the payout are read while the session is alive, and a session that
+    // finished is left alone because it already tore itself down.
+    const host = createTranslatedScreenHost(r, {
+        closeMode: CLOSE_NOTIFY, closeDispose: DISPOSE_UNLESS_FINISHED, finishDispose: DISPOSE_UNLESS_FINISHED,
+        release(session) {
+            if (!session) return;
+            const finished = session.finished();
+            // Read every private and paid value while the session is alive.
+            const positions = (r._opts?.participants ?? []).map((p) => p.pos ?? 0);
+            r._summary = {
+                finished, ticks: r._ticks, bits: session.bits(),
+                heldDrop: (r._opts?.dropItemId ?? 0) > 0 ? session.heldCount(r._opts.dropItemId) : null,
+                transition: session.transition(),
+                records: positions.map((pos) => { try { return { pos, ...session.record(pos) }; } catch { return null; } }),
+                sounds: session.sounds.slice(), loadedBanks: session.loadedBanks.slice(),
+                displayCalls: session.displayCalls.map((c) => ({ ...c })),
+            };
+            if (finished) commit();
+        },
+    });
+
     r.open = (opts = {}) => {
-        r._open = true;
-        r._pending = true;
+        const request = host.begin({ onClose: opts.onClose ?? null });
         r._failed = false;
         r._error = null;
         r._session = null;
@@ -193,17 +201,15 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         r._summary = null;
         r._seedBits = null;
         r._seedHeld = null;
-        r._onClose = opts.onClose ?? null;
         r._state = opts.gameState ?? null;
         r._opts = opts;
         r._lastDiagnostic = null;
         const selected = r._state?.languageByte;
         const language = Number.isInteger(selected) ? selected : 2;
-        const request = ++r._request;
         loadData(language).then((data) => {
-            if (request === r._request) r._data = data;
+            if (host.current(request)) r._data = data;
         }).catch((error) => {
-            if (request === r._request) fail(error);
+            if (host.current(request)) fail(error);
         });
     };
 
@@ -236,36 +242,10 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         ctx.restore();
     };
 
-    r.close = () => {
-        if (r._open) r._finish();
-    };
+    r.close = () => host.close();
 
-    r._finish = () => {
-        if (!r._open) return;
-        r._open = false;
-        r._pending = false;
-        ++r._request;
-        const session = r._session;
-        if (session) {
-            const finished = session.finished();
-            // Read every private and paid value while the session is alive.
-            const positions = (r._opts?.participants ?? []).map((p) => p.pos ?? 0);
-            r._summary = {
-                finished, ticks: r._ticks, bits: session.bits(),
-                heldDrop: (r._opts?.dropItemId ?? 0) > 0 ? session.heldCount(r._opts.dropItemId) : null,
-                transition: session.transition(),
-                records: positions.map((pos) => { try { return { pos, ...session.record(pos) }; } catch { return null; } }),
-                sounds: session.sounds.slice(), loadedBanks: session.loadedBanks.slice(),
-                displayCalls: session.displayCalls.map((c) => ({ ...c })),
-            };
-            if (finished) commit();
-            else session.dispose();
-        }
-        r._session = null;
-        const cb = r._onClose;
-        r._onClose = null;
-        cb?.();
-    };
+    // `web/native-session.js` ends a screen whose session finished by calling `_finish`.
+    r._finish = () => host.finish();
 
     /** The live text widgets (for focused checks that read what the screen says). */
     r.textWidgets = () => (r._session ? r._session.widgets.textWidgets() : []);

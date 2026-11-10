@@ -41,7 +41,7 @@ import { createBattleFormTranslated } from "./battleform-translated.js";
 import { createBattleDnaTranslated } from "./battledna-translated.js";
 import {
   battleHudBarColors, battleHudDvFrame, battleHudDvPaint, battleHudEnemyRecords,
-  battleHudPartyPips, battleHudPlateLabels, battleHudPlayerRecords, translatedBattleHudEnabled,
+  battleHudNameBankSync, battleHudPartyPips, battleHudPlateLabels, battleHudPlayerRecords, translatedBattleHudEnabled,
 } from "./battlehud-translated.js";
 import { battleMsgBank, battleMsgBankSync, battleMsgPaint, battleMsgText, translatedBattleMsgEnabled } from "./battlemsg-translated.js";
 import { createWfightNative } from "./wfightmn-native.js";
@@ -50,12 +50,14 @@ import { createWfightTranslated } from "./wfight-translated.js";
 // into one fighter. Pure rules in web/fusion.js; the authored boss + its new technique are
 // built into web/fusion_bosses.json by tools/build_fusion_bosses.py.
 import {
-  enemyDisplayName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, partyEntriesFor,
+  enemyDisplayName, enemyMessageName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, partyEntriesFor,
 } from "./fusion.js";
 // Both halves' loot (same F2 key, off by default): the fused body rolls the OTHER
 // halves' real drops — never the body's own row a second time. Pure rules in
 // web/fusion-loot.js.
 import { rollFusionDrops } from "./fusion-loot.js";
+// enemies.json drop names are compact ("ArmorChip"); the item table is keyed by display name.
+import { itemForDropName } from "./drop-item.js";
 import { drawEffects } from "./fight/effect-player.js";
 import { isThrowItem } from "./fight/fight-tables.js";
 import { contactDamager } from "./fight/contact-damage.js";
@@ -67,7 +69,7 @@ import { phaseFor, phaseRows, phaseEffects } from "./boss-phase.js";
 // Disc-accurate hit & drop rolls (always on, no F2 switch): the technique record's own
 // +0x06 accuracy byte (`elemCtx`) on the skill merge, and the disc's own enemy drop draw
 // (`RAND_U16() % 1024 < drop_rate + 1`, wfightmn 0x1f84). Pure rules in web/tech-record.js.
-import { mergeTechRecord, dropPasses } from "./tech-record.js";
+import { mergeTechRecord, rollBattleDrop } from "./tech-record.js";
 import { battleDelta, battleSpeedOn } from "./battle-speed.js";
 import { drawBlastCurtain, drawBlastFlash, digivolveDemoOn } from "./blast-presentation.js";
 import { assignAssetImage } from "./assets.js";
@@ -132,7 +134,7 @@ import {
   cureStatusEvent, cureAllStatusEvents, STATUS_EVENT_POOL_SIZE,
   weaponDrainHeal as engineWeaponDrainHeal, equipmentBonuses,
   weaponCritByte, crestSuppressedByWeapon, wornFamilyBytes,
-  elementValue, battleCoreStat,
+  elementValue, battleCoreStat, combatantElements,
   poisonTimelineDamage as enginePoisonTimelineDamage,
   applyAilment as engineApplyAilment, tryInflict as engineTryInflict,
   tryInstantDeath as engineTryInstantDeath,
@@ -171,12 +173,13 @@ import {
 // The two fight-task spawners (engine/dw3/battle-task-spawn.ts) are wired too: the fight
 // task F0x80090c44 (the acting fighter's action object, its tick the technique record
 // machine) and its data variant the plate-HUD spawner F0x80093cc8.
-import { ui } from "./vendor/engine.js";
+import { ui, scaledStat, battleStats } from "./vendor/engine.js";
 import { learnOneTechnique, markOneLoadable } from "./form-tech-slots.js";
-import { CHARID_TO_DIGID, baseStatsFor } from "./party.js";
+import { CHARID_TO_DIGID, baseStatsFor, elementPointsWithGear } from "./party.js";
 import { loadPack, drawClip, drawClipWidth, clipSize, packReady, drawClipAtPaletteRow } from "./screenpack.js";
 import { drawText as uiDrawText, drawIconGlyph, fontReady as uiFontReady } from "./uifont.js";
 import { drawItemIcon, itemFamily } from "./itemicons.js";
+import { scaleEnemyStat } from "./enemy-stats.js";
 
 // Native post-battle fight-report chrome (stfgtrep overlay). See
 // docs/research/ui/stfgtrep-decoded-2026-07-12.md — the census row asking
@@ -872,21 +875,14 @@ export function dnaFusedForm(scripts, profiles, actionId, digimon) {
 }
 
 // ── Pure stat scaling + evolution logic (module-level so it is unit-testable) ──
-// Stat scaling: starters use real growth rates; champions use growth=1 (low but real).
-export function scaledStat(profile, statKey, level) {
-  const base   = profile[statKey]   ?? 0;
-  const growth = profile.growth?.[statKey] ?? 1;
-  return Math.round(base + growth * (level - 1));
-}
-export function scaledHp(profile, level) {
-  if (profile.is_starter) return scaledStat(profile, "hp", level);
-  // Champions store hp=1, growth_hp=1 — approximate from combat stats.
-  return Math.round(80 + scaledStat(profile, "str", level) * level);
-}
-export function scaledMp(profile, level) {
-  if (profile.is_starter) return scaledStat(profile, "mp", level);
-  return Math.round(20 + scaledStat(profile, "spt", level) * Math.floor(level / 2 + 1));
-}
+// One home: engine/dw3/battle-stats.ts. Its formulas are pulled in through the vendored
+// bundle — `scaledStat` is a top-level export there, the other three ride the
+// `battleStats` namespace (engine/index.ts:629 `export * as battleStats`; only
+// scaledStat/partyCharismaTotal are also named at engine/index.ts:630). Re-exported
+// here because web/glossary-digimon.js, web/debugPanel.js and the tests import them
+// from this module; do not define a second copy.
+const { scaledHp, scaledMp, evolvedMaxStats } = battleStats;
+export { scaledStat, scaledHp, scaledMp, evolvedMaxStats };
 
 // Sequential boss party: after the member at `index` is defeated, decide whether the next
 // member steps in (gauntlet) or the whole party is down. Pure.
@@ -966,6 +962,51 @@ export function enemyVitals(real, fallback) {
 export function setLiveBattleForm(record, profile) {
   record.profile = profile;
   return record;
+}
+
+/**
+ * The Blast target profile for one battle record: the record's ROOKIE profile's
+ * `blasts[]` (profile +0x50+tier) read by the event-0x12 ladder
+ * (engine/dw3/battle-formulas.ts::blastTargetId), or null when it has no Blast.
+ *
+ * One body for both fights: the one-on-one battle's own pick and the online
+ * fight's `mpKit.blastForm` both call it. The profile table is handed in, since
+ * the page's `digimonDB` is a closure of its own.
+ */
+export function blastTargetProfile(rec, db) {
+  const rookie = db?.[rec?.rookieId];
+  const id = blastTargetId(rookie?.blasts, rec?.level ?? 1);
+  return id ? (db?.[id] ?? null) : null;
+}
+
+/**
+ * END OF BLAST — the one place a Blast stops, whatever ended it (its own
+ * countdown, the revert program 0x62, a Tag commit, or the fight ending).
+ *
+ * The state write is the disc's shared release 0x800A7328 (wfightmn
+ * .L0x00002174): the standing reserved second form (+0x1A) is dropped with it,
+ * and the DV/Blast gauge at the roster record's +0x58 goes to zero. The zeroed
+ * gauge reaches the card only through `persist`, which the arms that save supply
+ * (the one-on-one loss arm writes nothing). `form` puts the record back into the
+ * profile the Blast borrowed; it is off by default because the one-on-one battle
+ * restores the form itself before it calls this (revertBlast, so the model is
+ * back before the effect plays) and the online death arm has no form to go back
+ * to. A Blast does not outlive its Digimon either way.
+ *
+ * `holder` is where the standing Blast lives — the battle in the one-on-one
+ * fight (`b.blast`), the record itself online (`r.blast`, `{active, saved,
+ * turns}`) — and `rec` is the record whose gauge it spent; they are the same
+ * object online, so the online call is plain `endBlast(r)`. Returns true when a
+ * Blast was ended.
+ */
+export function endBlast(holder, { rec = holder, form = false, persist = null } = {}) {
+  const blast = holder?.blast;
+  if (!blast?.active) return false;
+  if (form && blast.saved) setLiveBattleForm(rec, blast.saved);
+  holder.blast = null;
+  rec.gauge = 0;
+  if (persist) persist();
+  return true;
 }
 
 /**
@@ -1134,12 +1175,12 @@ export function persistPlayerGauge(b) {
  */
 export function releaseReservedSecondForm(b, persist = true) {
   if (!b?.blast?.active) return false;
-  b.blast = null;
   b._blastPending = false;
   b._blastRevertPending = false;
-  b.player.gauge = 0;
-  if (persist) persistPlayerGauge(b);
-  return true;
+  // The one-on-one arm of endBlast: the standing reservation lives on the battle
+  // (`b.blast`), the gauge it spent on the partner record (`b.player.gauge`), and
+  // the form is already back before this runs (revertBlast restores it first).
+  return endBlast(b, { rec: b.player, persist: persist ? () => persistPlayerGauge(b) : null });
 }
 
 /**
@@ -1280,14 +1321,7 @@ export function blastLandingHeal(player) {
   return { healed: player.hp !== wasHp, curedConfuse };
 }
 
-// Max HP/MP for a digimon profile at a level (used both on level-up and on evolution),
-// plus the permanent stat-item bonuses. Pure.
-export function evolvedMaxStats(profile, level, bonuses) {
-  return {
-    maxHp: scaledHp(profile, level) + (bonuses?.hp ?? 0),
-    maxMp: scaledMp(profile, level) + (bonuses?.mp ?? 0),
-  };
-}
+// evolvedMaxStats is re-exported above, from engine/dw3/battle-stats.ts (one home).
 
 // Which digivolutions this line can take right now. The disc has EIGHT trees, one
 // per roster slot, and its unlock routine picks the tree by slot (0x8008903C) and
@@ -1528,18 +1562,22 @@ export function applyLevelUpGains(ps, gains, lu) {
 // the damage the battle left. The old walker code healed the partner to full here.
 //
 // `growthProfile` is the row the disc's rolls read: the member's STARTER species'
-// (levelUpGrowthProfile), never the active form's. `prof` stays the active form for
-// the two host-side fallbacks — the stored-stat seed (ensureStoredStats) and the
-// no-progression-table branch — which have no disc counterpart.
+// (levelUpGrowthProfile), never the active form's. `prof` stays the active form only
+// for the no-progression-table branch, which has no disc counterpart.
 export function applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
-    ensureStoredStats(ps, prof);
+    ensureStoredStats(ps, growthProfile);
     for (let lv = oldLevel + 1; lv <= newLevel; lv++)
       applyLevelUpGains(ps, rollLevelUpGains(growthProfile, lv, lu), lu);
   } else {
-    ps.maxHp = scaledStat(prof, "hp", newLevel) + (ps.bonuses?.hp ?? 0);
-    ps.maxMp = scaledStat(prof, "mp", newLevel) + (ps.bonuses?.mp ?? 0);
+    // No progression table (progression.json failed to load — loadData's `.catch(() =>
+    // null)` at :3410): the same max HP/MP rule as evolution, so a non-starter form gets
+    // 80 + str*level, not the `hp` placeholder. This is the only path that reaches here:
+    // every battle entry point awaits loadData, and the shipped table has `level_up`.
+    const { maxHp, maxMp } = evolvedMaxStats(prof, newLevel, ps.bonuses);
+    ps.maxHp = maxHp;
+    ps.maxMp = maxMp;
   }
   const tpCap = lu?.tp_cap ?? 99;
   ps.tp = Math.min((ps.tp ?? 0) + (lu?.tp_per_level ?? 5) * (newLevel - oldLevel), tpCap);
@@ -2794,6 +2832,11 @@ function enemyStatRecordFor(name) {
   const i = enemyStatIndexForName(name);
   return i >= 0 ? enemyStatRecords[i] : null;
 }
+/** Enemy name for battle messages: the disc name line the HUD plate reads (see fusion.js). */
+function enemyMsgName(en, fallback = "Enemy") {
+  const record = enemyStatRecordFor(en?.eStats?.enemy_id ?? en?.profile?.name ?? "");
+  return enemyMessageName(en, record, battleHudNameBankSync(), fallback);
+}
 export function battleHudPlateLabelsFor(b) {
   const activePlayerIndex = b.activePlayerIndex ?? 0;
   const activeEnemyIndex = b.enemySlot ?? 0;
@@ -2825,6 +2868,14 @@ export function battleHudPlateLabelsFor(b) {
 export function setCounterStance(skill, user) {
   if (skill?.effect === "counter") { user.counterStance = { uses: 3 }; return true; }
   return false;
+}
+
+// Disc fightstg.s:28440-28463: an enemy using its own basic technique (f7 == 10 on records
+// 302/303/335 "Fight") takes the ordinary attack path and sets no stance. Only a named
+// technique (action 2/3) can give an enemy a counter stance.
+export function setEnemyCounterStance(skill, user, usesTech) {
+  if (!usesTech) return false;
+  return setCounterStance(skill, user);
 }
 
 export function triggerCounter(attacker, defender, dmgTaken, attackerName) {
@@ -3565,7 +3616,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (!stealProc(enemyFactor, thiefSpd, foeSpd, techWeight, stealBonus, RAND_U16())) return { text: "", page: null };
     const dropName = enemy.eStats?.drop_item;
     if (!dropName || dropName === "Null") return { text: " ...but there was nothing to steal!", page: null };
-    const item = window.__ITEM_BY_NAME?.[dropName];
+    const item = itemForDropName(dropName);
     if (!item) return { text: " ...but the item slipped away!", page: null };
     // The shared store, so a stolen item at the original's 99 cap stays at 99
     // (F0x800161D8) instead of running to 100.
@@ -3604,20 +3655,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // a turn-queue schedule of 6 player + 3 enemy turns. While active, techniques
   // are MP-free and the gauge takes no further gain (a Tag would forfeit it).
 
-  /** Resolve this player's Blast target profile, or null if none applies. */
-  function blastTargetProfile(b = battle) {
-    const p = b?.player;
-    if (!p) return null;
-    const rookie = digimonDB?.[p.rookieId];
-    const targetId = blastTargetId(rookie?.blasts, p.level ?? 1);
-    return targetId ? (digimonDB?.[targetId] ?? null) : null;
-  }
-
   /** True when the gauge just saturated and an automatic Blast can fire. */
   function blastReady(b = battle) {
     return !b?.blast?.active
         && (b?.player?.gauge ?? 0) >= DV_GAUGE_MAX
-        && !!blastTargetProfile(b);
+        && !!blastTargetProfile(b?.player, digimonDB);
   }
 
   /**
@@ -3629,7 +3671,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    */
   function triggerBlast(b = battle) {
     const p = b.player;
-    const target = blastTargetProfile(b);
+    const target = blastTargetProfile(p, digimonDB);
     if (!target) return false;
     b.blast = { active: true, savedFormId: p.profile?.id ?? p.rookieId, playerTurns: 6 };
     sfx?.playBank?.("evo_00", "evolutio"); // shared digivolution jingle EVOLUTIO [BLAST-C009]
@@ -3816,7 +3858,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // FIGHTSTG_F0x8009ec94 scales the resolved species primary stats by the
     // encounter enemy-struct +0x0a halfword / 16. A value of 16 is identity.
     const scaledEnemyStat = (name) => eStats
-      ? Math.trunc((Number(eStats[name] ?? 1) * enemyStatScale) / 16)
+      ? scaleEnemyStat(eStats[name], enemyStatScale)
       : scaledStat(enemyProf, name, enemyLevel);
     return {
       profile: enemyProf,
@@ -3891,6 +3933,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const formId = Number(requestedFormId ?? configuredId);
     const configuredProfile = digimonDB[configuredId] ?? digimonDB[member.rookieId];
     const profile = digimonDB[formId] ?? configuredProfile;
+    // The roster row's own species: the starter of this slot (F0x8009EC94 reads the
+    // fixed DIGIMON_PROFILES row, and the pause menu / lab write only the worn-form
+    // word, ps.digimonId). A worn form therefore always differs from it.
+    const starterProfile = digimonDB[member.rookieId];
     const level = ps.level ?? 1;
     const bn = ps.bonuses ?? {};
     // Combat initialization reads the equipped slots themselves, the same
@@ -3902,9 +3948,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // table is keyed by (F0x80017174 indexes 0x8004B53C by the slot the save context
     // handed it), not the party position.
     const eb = equipmentBonuses(equipment, member.slot);
-    const st = ensureStoredStats(ps, configuredProfile);
-    const maxHp = Number(ps.maxHp ?? scaledHp(configuredProfile, level));
-    const maxMp = Number(ps.maxMp ?? scaledMp(configuredProfile, level));
+    // The stored body is the roster row's own (the starter's), so a record with none
+    // is seeded from the starter, never from the worn form that is added on top.
+    const st = ensureStoredStats(ps, starterProfile);
+    const maxHp = Number(ps.maxHp ?? scaledHp(starterProfile, level));
+    const maxMp = Number(ps.maxMp ?? scaledMp(starterProfile, level));
     const accFx = {};
     for (const f of eb.effects ?? []) accFx[f.kind] = (accFx[f.kind] ?? 0) + (f.amount || 1);
     // The MP proxies are slot-assigned, not cumulative: FIGHTSTG_F0x800a1d3c keeps
@@ -3912,8 +3960,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // means one −10, never −15.
     const mpProxies = (eb.effects ?? []).filter((f) => f.kind === "mp_cost_down");
     const mpCostDown = mpProxies.length ? (mpProxies[mpProxies.length - 1].amount || 1) : 0;
-    const pElem = { ...(ps.elemBonuses ?? {}) };
-    for (const [el, v] of Object.entries(eb.elemResists ?? {})) pElem[el] = (pElem[el] ?? 0) + v;
+    // The trained points with the worn gear's coded resist folded on top, through
+    // the one shared helper (web/party.js) — the same sum the status sheet and the
+    // gym HUD print, so the battle divisor cannot drift from them.
+    const pElem = elementPointsWithGear(ps.elemBonuses, eb.elemResists);
     const pStatusRes = {};
     for (const [stName, v] of Object.entries(eb.statusResists ?? {}))
       pStatusRes[stName === "paralyze" ? "frozen" : stName] = v;
@@ -3935,14 +3985,15 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return {
       profile, level, rosterIndex: member.index, rookieId: member.rookieId, statsRecord: ps,
       // The species the numbers below belong to (F0x8009EC94's profile-block
-      // species: the form the roster itself is in). While the live form differs
-      // from it the live form's own base stats are added on every read.
-      savedSpeciesId: configuredId,
+      // species: the roster slot's own starter row, which a form change never
+      // alters). While the live form differs from it, a form worn from the pause
+      // menu or lab included, the live form's own base stats are added on every read.
+      savedSpeciesId: member.rookieId,
       // The roster's own species record, the row savedSpeciesId names. The live
       // `profile` above is swapped by every form change, and F0x8009EC94 keeps
       // building the seven element values and the five status resistances from
       // THIS row before adding the live form's own on top.
-      savedProfile: configuredProfile ?? profile,
+      savedProfile: starterProfile,
       rosterSpeciesId: ps.digimonId ?? configuredId,
       hp: Math.min(Number(ps.hp ?? maxHp), maxHp),
       maxHp,
@@ -4122,7 +4173,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       _finaleRecordedTechId: 0,
       _finaleCopiedAttack: null,
       _finaleAfter: null,
-      _loot: { drops: [] },                 // drop list; endBattle banks every name here
+      _loot: { drops: [], candidates: [] }, // drops: what endBattle banks; candidates: defeated enemies carrying an item (one disc roll at the win)
 
       menuSel: 0,
       techSel: 0,
@@ -4201,7 +4252,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // [0x80055c48] (fieldstg.s .L0x00007448-.L0x00007458; s0 = 0x800519ec, +0x425c).
     // Every stop of the field into a battle is that handoff, so the cue belongs here.
     sfx?.play("encounts");
-    emitGameEvent("battleStarted", { mapId: battle?.mapId ?? null, screenId: battle?.screenId ?? null });   // optional layers (extra quests) hear it
+    emitGameEvent("battleStarted", { mapId: battle?.mapId ?? null, screenId: battle?.screenId ?? null, enemies: (battle?.party ?? []).map((e) => e?.enemyId).filter((n) => typeof n === "string") });   // optional layers (extra quests, the glossary counter) hear it
 
     // Battle music: per-battle packed id at battle-struct+0x2b30 = the
     // trigger record's tag (mined into battle_music.json — batl00/batl10 for
@@ -4747,7 +4798,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     for (const cure of (b._ailmentCures ?? [])) {
       const targetName = cure.combatant === b.player
         ? b.player.profile.name
-        : (b.enemy.profile?.name ?? "Enemy");
+        : enemyMsgName(b.enemy);
       // The timed cure keeps the walker's own sentence: only Sleep's cure page is decoded
       // (FIGHTSTG_F0x80091534's twin at fightstg.s:14734, id 0x2b "Awake!", kind 7), and
       // the frozen/confuse/poison cure words have no writer anywhere in the two battle
@@ -4757,7 +4808,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     for (const event of events) {
       const targetName = event.combatant === b.player
         ? b.player.profile.name
-        : (b.enemy.profile?.name ?? "Enemy");
+        : enemyMsgName(b.enemy);
       if (event.kind === "regen") {
         // The gradual-HP-recovery source is an actor machine beside the poison tick
         // (pro/wfightmn.s `.L0x00002480`): one line object, one `+0xac` call with
@@ -4773,7 +4824,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     for (const [combatant, amount] of poisonTotals) {
       const targetName = combatant === b.player
         ? b.player.profile.name
-        : (b.enemy.profile?.name ?? "Enemy");
+        : enemyMsgName(b.enemy);
       pages.unshift({
         text: `${targetName} is hurt by poison! ${amount} damage!`,
         spec: enginePoisonTickMessageSpec(targetName, amount),
@@ -5105,7 +5156,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       b._mode1EscapeShown = true;
       b.state = ST.RESULT_MSG;
       b._nextState = ST.NONE;
-      const escName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+      const escName = enemyMsgName(b.enemy);
       sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.FLEEING], name: escName }, "Fleeing!");
       b.timer = 0;
       setTimeout(() => { if (battle === b) endBattle("enemy-fled"); }, 1400);
@@ -5944,7 +5995,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           // message-panel VM kind 4, not a floating number — BATTLE-Q004-DMGMSG-001).
           // Reaction lives here — in the normal battle view — not during the void sequence.
           if (dna.hit) renderer3d?.setEnemyAnim?.("hit");
-          const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+          const enemyName = enemyMsgName(b.enemy);
           if (dna.hit) commitDnaImpact(b, dna);
           else b.message = `${dna.fusedName ?? dna.resultProfile.name}! ${enemyName} evaded!`;
           b._dnaPresentation = null;
@@ -5998,7 +6049,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           renderer3d?.setFaceCamVisible?.(true);
           renderer3d?.dnaPresentationStop?.();
           renderer3d?.setPlayerAnim("idle");
-          const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+          const enemyName = enemyMsgName(b.enemy);
           if (dna.hit) commitDnaImpact(b, dna);
           else b.message = `${dna.fusedName ?? dna.resultProfile.name}! ${enemyName} evaded!`;
           b._dnaPresentation = null;
@@ -6025,7 +6076,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // EXP/BIT/DVEXP come from the battle's own reward record; only drops were
         // accumulated per defeated enemy in defeatCurrentEnemy. First drop shown on the
         // win screen; endBattle applies every drop to the inventory.
-        const itemTable = window.__ITEM_BY_NAME;
         // A defeated Cardmon grants a guaranteed Booster in place of the ordinary
         // drop (its sprite records are drop_rate 0), so the report shows it AND
         // endBattle banks it from _loot.drops like any other drop.
@@ -6034,7 +6084,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           ? (window.__ITEM_BY_ID?.[boosterId]?.name ?? null) : null;
         if (boosterName && !b._loot.drops.includes(boosterName)) b._loot.drops.push(boosterName);
         const firstDrop = b._loot.drops.find(Boolean) ?? null;
-        const droppedItem = firstDrop ? (itemTable?.[firstDrop] ?? null) : null;
+        const droppedItem = firstDrop ? itemForDropName(firstDrop) : null;
         const rewards = winRewards(b);
         // Only the participants still standing at the outcome are paid, and only
         // they divide the share (paidParticipants; pro/wfightmn.s
@@ -6166,14 +6216,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the fusion layer off the ordinary path below is exactly today's.
     const fusionBoss = b.enemy?.bossId ? fusionBossesDB?.[b.enemy.bossId] ?? null : null;
     if (fusionBoss) {
-      // The stream is the disc's RAND_U16 word, exactly as rollDrop's line does.
+      // The stream is the disc's RAND_U16 word, exactly as rollBattleDrop does.
       // One live draw per owed row; every item that lands joins the loot list the report banks.
       for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, enemiesDB, RAND_U16, true)) {
         b._loot.drops.push(item);
       }
     } else {
-      const drop = rollDrop(b.enemy.eStats);
-      if (drop) b._loot.drops.push(drop);
+      // The disc rolls ONE item per won battle (wfightmn .L0x00001e84-.L0x00001fdc), not one
+      // per enemy: a defeated enemy that carries an item only joins the candidates here.
+      const es = b.enemy.eStats;
+      if (es && es.drop_item && es.drop_item !== "Null") (b._loot.candidates ??= []).push(es);
     }
 
     // The Galacticmon finale's scripted sequence replaces the gauntlet swap for the
@@ -6204,6 +6256,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const step = gauntletNext(b.party, b.partyIndex);
     const nextEnemy = step.done ? null : buildEnemyRecord(step.entry);
     if (!nextEnemy) {
+      // The battle's single disc drop roll: pick one candidate (RAND % count), then its rate.
+      const drop = rollBattleDrop(b._loot.candidates, RAND_U16);
+      if (drop) b._loot.drops.push(drop);
+      b._loot.candidates = [];
       b.state = ST.WIN;
       b.timer = 0;
       b.message = "Battle Won!";
@@ -6232,7 +6288,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(nextEnemy));
     // A fresh timeline is a fresh turn for the command phase's Frozen gate.
     b._turnSeq = (b._turnSeq ?? 0) + 1;
-    const nextName = enemyDisplayName(nextEnemy);
+    const nextName = enemyMsgName(nextEnemy, "");
     // The model follows the body species, never an authored display name (Millenniummon has
     // no model folder of its own; its body is Kimeramon).
     swapEnemyModel(nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? nextName);
@@ -6301,7 +6357,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (boss.transform === "whiteout") renderer3d?.whiteOut?.(20);
     setFighterTint("enemy", boss.tint ?? null);
     swapEnemyModel(boss.body);
-    const name = enemyDisplayName(en);
+    const name = enemyMsgName(en, "");
     setResultPages(b, [
       `${(boss.halves ?? []).join(" and ")} fuse!`,
       `${name} appears!`,
@@ -6491,6 +6547,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the next turn is queued as an ordinary code-2 turn. The EVOLUTIO jingle is
     // 34 frames later, so it is fired by the presentation, not here.
     commitBattleFormChange(b, profile, b.activePlayerIndex);
+    emitGameEvent("formWorn", { name: profile.name });   // the glossary counts a form you wore as met
     swapPlayerModel(profile.name);
     // The original's box is empty while the transformation plays: its "Digivolved!"
     // page is built only when the sequence ends (the `blastShow.endSpec` below).
@@ -6606,7 +6663,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     dna.committed = true;   // then the disc's special-encounter finalizer, WFIGHTMN 0x800aabf0
     dna.damage = finalizePlayerDamage(b, dna.damage); dna.lethal = dna.damage > 0 && dna.damage >= b.enemy.hp; b.enemy.hp = Math.max(0, b.enemy.hp - dna.damage);
     if (dna.damage > 0) noteFinalBossPhaseDamage(b);
-    const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+    const enemyName = enemyMsgName(b.enemy);
     setResultPages(b, [
       // The fusion attack runs through the shared damage stage, so its two lines are the
       // box's own `kind 4` page (`esmfight[0x0b]` "{1} damage!") and, when it takes the
@@ -6677,7 +6734,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // (talk-system speaker id 0).
     renderer3d?.setFaceCamSpeaker?.(0);
     const pname     = b.player.profile.name;
-    const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+    const enemyName = enemyMsgName(b.enemy);
 
     // Action resolve, not the turn gate: the original's guard here is F0x80098600, which
     // tests the sleep bit (0x08) and nothing else. The Frozen roll already happened in
@@ -6976,7 +7033,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           extra += after.text + weapon.text + stolen.text
                       + triggerStanceCounter(b, "enemy", b.player, b.enemy, total, pname)
                       + triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
-          if (usedCounter) message += ` ${pname} braces to counter!`;
           const ailPage = ailmentBoxPage(enemyName, after.ail ?? weapon.ail);
           // The one machine that picks this line (FIGHTSTG_F0x8008cb70, ported by
           // engine/dw3/battle-result-page.ts). An instant-death KO lands on its second
@@ -7024,11 +7080,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // The counter stance has no page of its own on this path in the two overlays:
         // the only `esmfight[0x0a]` "Counter! {1}!" page is `kind 5` inside the technique
         // machine FIGHTSTG_F0x8008ee84 (`pro/fightstg.s:12546`-`:12556`), which this miss
-        // never reaches, so the note stays in the walker's own sentence.
-        const countered = usedCounter ? ` ${pname} braces to counter!` : "";
+        // never reaches, so the miss prints no counter note at all (the old invented
+        // "braces to counter!" sentence is gone).
         setResultPages(b, [
-          { text: text + countered, spec: techniqueSpec(b, skill) },
-          { text: text + countered, spec: evadeSpec(b, enemyName) },
+          { text, spec: techniqueSpec(b, skill) },
+          { text, spec: evadeSpec(b, enemyName) },
         ]);
         renderer3d?.playerAttack(skill.id ?? b.player.profile.tech_basic, { miss: true });
       }
@@ -7036,7 +7092,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const item  = action.item;
       const state = getState();
       const pname = b.player.profile.name;
-      const enemyName = b.enemy.eStats?.digimon_id ?? b.enemy.profile?.name ?? "Enemy";
+      const enemyName = enemyMsgName(b.enemy);
       // Start the item-use motion through the item machine's own 3-D entries. The original's
       // FIGHTSTG_F0x8008d3b4 dispatches on the used item id: ids 77-90 take the 14-word jump
       // table at 0x80082ee4 — the typed THROW arms (clips 15/14/17, each with its own motion,
@@ -7175,7 +7231,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const en = b.enemy;
     // NEW content (F2 -> Extras -> "Fusion bosses"): a fused body shows its authored name
     // on every page it speaks, not the species it is drawn as.
-    const name = enemyDisplayName(en);
+    const name = enemyMsgName(en, "");
     // Combatant record +0x04, once per action turn and BEFORE any gate: the code-3
     // "enemy action turn" handler bumps the acting slot's counter and then spawns the
     // turn script (`wfightmn.s:4140-4148`), so a turn the ailment gate skips still counts
@@ -7265,7 +7321,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       en.mp -= mpCost;
     }
 
-    const usedCounter = setCounterStance(skill, en);  // f7=10: enemy gains a counter stance
+    const usedCounter = setEnemyCounterStance(skill, en, usesTech);  // f7=10 on a named technique only; the basic attack sets none
     // The record's own dispatch byte decides the count, exactly as on the player's
     // Fight: +0x0A == 9 -> the record's +0x11 hits, +0x0A < 2 -> one (the enemy side
     // carries no Multi Crest +0x37 byte, so that diversion cannot fire), else one.
@@ -7367,7 +7423,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // Cardmon's attack lands the persistent stat penalty on the member it hit.
         applyPostHitDispatch(b, restoreRecord); if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._forcedFlee = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c)
         b.message += inflicted.text;
-        if (usedCounter) b.message += ` ${name} braces to counter!`;
         b.message = prefix + b.message;
         // The line names the Digimon that took the damage, as on the player's side.
         // The enemy's technique announcement is the sequencer's OWN page before the
@@ -7421,8 +7476,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // defender's name when nothing landed, either side (`pro/fightstg.s:14673`/`:14674`).
       // The enemy path used to leave a typed sentence here, so the announcement plate
       // above was the only page; now the miss reads the disc's own words too.
-      const countered = usedCounter ? ` ${name} braces to counter!` : "";
-      sayOriginal(b, evadeSpec(b, pname), prefix + `${pname} evaded!` + countered);
+      sayOriginal(b, evadeSpec(b, pname), prefix + `${pname} evaded!`);
       renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, { miss: true });
     }
   }
@@ -7499,14 +7553,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return ` ${defenderName} countered for ${r.dmg} damage!`;
   }
 
-  // Roll enemy item drop. Returns item name string or null.
-  function rollDrop(eStats) {
-    if (!eStats || !eStats.drop_item || eStats.drop_item === "Null") return null;
-    // wfightmn 0x1f84's own draw, `RAND_U16() % 1024 < drop_rate + 1`, on the shared stream
-    // (exp-levelup-rewards-decoded-2026-07-10.md line 44). Always on.
-    return dropPasses(eStats.drop_rate, RAND_U16) ? eStats.drop_item : null;
-  }
-
   // Resolve a digimon profile by its DiscId. The evolution trees name their forms by
   // DigimonId (the 1-based species-table row), which is also what the form ledger keys,
   // so nothing in the unlock path has to go through a name and get it misspelled.
@@ -7579,8 +7625,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const ps = member?.stats;
     if (!prof || !member || !ps) return { ok: false };
     const from = member.current?.name ?? "Your partner";
-    const level = ps.level ?? 1;
-    const { maxHp, maxMp } = evolvedMaxStats(prof, level, ps.bonuses);
     ps.formLedger ??= [];
     if (isFormDigimonId(prof.id) && !ps.formLedger.some((record) => Number(record.id) === Number(prof.id)))
       ps.formLedger.push({ id: prof.id, formLevel: 1, dvexp: 0, techSlots: [0, 0, 0, 0, 0, 0] });
@@ -7591,12 +7635,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const fitted = autoEquipForm(ps.equippedForms, prof.id);
       ps.equippedForms = fitted.equipped;
     }
+    // Wearing a form writes only the current-form word (pro/ststatus.s:7655-7663): stats, max HP/MP and HP/MP stay the member's own; buildPlayerRecord adds the form on top in battle.
     ps.digimonId = prof.id;          // persisted partner identity (restored on load)
-    ps.maxHp = maxHp; ps.maxMp = maxMp;
-    ps.hp = maxHp; ps.mp = maxMp;    // evolution restores HP/MP
-    // Form change swaps the stat body: reseed the stored core block from the new
-    // profile at the current level (trained deltas belong to the previous form).
-    ps.stats = seedStoredStats(prof, level);
+    emitGameEvent("formWorn", { name: prof.name });   // the glossary counts a form you wore as met
     if (rosterIndex === 0) {
       state.partnerStats = ps;
       const char = state.manifest?.characters?.[state.charIdx];
@@ -7618,7 +7659,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (!prof || !ps) return null;
     const level = ps.level ?? 1;
     const b = ps.bonuses ?? {};
-    const st = ensureStoredStats(ps, prof);
+    const st = ensureStoredStats(ps, digimonDB?.[CHARID_TO_DIGID[state?.party?.[0]]] ?? prof);
     const stat = (k) => st[k] + (b[k] ?? 0);
     // DV (form) level: derived from the current form's DVEXP bank (fn 0x800865c0).
     const formCap = prof.dv_cap ?? 100;
@@ -7819,17 +7860,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // dropped item when the route is on; do not pay them a second time.
       // Gauntlets can bank several drops, so only the one the screen paid is
       // excluded and the rest still land here.
-      const itemTable = window.__ITEM_BY_NAME;
       const paidByReport = b._reportNative === true;
       const paidItemId = paidByReport ? (b._reportPaidItemId ?? 0) : 0;
       let drops = b._loot.drops;
       if (paidItemId > 0) {
-        const firstIdx = drops.findIndex((name) => name && itemTable?.[name]);
+        const firstIdx = drops.findIndex((name) => name && itemForDropName(name));
         if (firstIdx >= 0) drops = drops.filter((_, i) => i !== firstIdx);
       }
       let applied = false;
       for (const name of drops) {
-        const item = itemTable?.[name];
+        const item = itemForDropName(name);
         if (!item) continue;
         // The store's add arm clamps at 99, as the original's does (F0x800161D8):
         // a loot stack already at the cap takes the drop and stays at 99.
@@ -7858,7 +7898,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       localStorage.setItem("bits", String(state.bits));
       battle = null;
       // optional layers (extra quests) hear every win; no listener means nothing happens
-      emitGameEvent("battleWon", { enemies: (b.party ?? []).map((e) => e.enemyId).filter((n) => typeof n === "string"), mapId: b.mapId ?? null, screenId: b.screenId ?? null });
+      emitGameEvent("battleWon", { enemies: (b.party ?? []).map((e) => e?.enemyId).filter((n) => typeof n === "string"), mapId: b.mapId ?? null, screenId: b.screenId ?? null });
       b.onWin?.({ xp: activeProgress.xp, bits, levelUp: activeProgress.levelUp,
         newLevel: activeProgress.newLevel, droppedItem,
         availableEvos: activeProgress.availableEvos, participantProgress: progress });
@@ -8036,7 +8076,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       panelBlock: [
         rec?.level | 0, 0, rec?.hp | 0, rec?.maxHp | 0, rec?.mp | 0, rec?.maxMp | 0,
         rec?.str | 0, rec?.def | 0, rec?.spt | 0, rec?.wis | 0, rec?.spd | 0, rec?.chr | 0,
-        ...elems.map((k) => elemValue(rec?.profile, rec?.elemBonuses, k)),
+        ...elems.map((k) => elemValue(rec?.savedProfile, rec?.elemBonuses, k)),
         0, 0, 0,
       ],
       preselected: (rec?.profile?.tech_signature ?? 0) & 0xffff,
@@ -8287,9 +8327,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   function confirmJokePick(b, row) {
     const joke = b.confusedMenu?.[row] ?? b.confusedMenu?.[0];
     const magnitude = b.player.ailments.confuse?.power ?? 0;
-    // The gag's wind term is the defender's own element value: the F0x80017174
-    // scratch halfword, read through the one shared helper.
-    const effectiveWind = elementValue(b.player.profile, b.player.elemBonuses, "wind");
+    // The gag's wind term is the block F0x8009EC94 has just rebuilt
+    // (fightstg.s:32129 `jal FIGHTSTG_F0x8009ec94`, then the two halfwords at
+    // block +0x1E and +0x12 summed at :32136-32139): the roster row's own value
+    // plus the live form's own on top, read through the shared in-battle helper.
+    const effectiveWind = combatantElements(b.player).wind;
     const equippedResistance = b.player.statusResists?.confuse;
     const confuseResistance = equippedResistance
       ?? b.player.profile?.status_resist?.confuse
@@ -9786,8 +9828,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         });
         const lu = progressionDB?.level_up;
         const oldLevel = ps.level ?? 1, newXp = Math.min((ps.xp ?? 0) + reward.xp, lu?.exp_cap ?? 999999);
-        const newLevel = lu ? levelForExp(oldLevel, newXp, prof.growth_xp ?? 8, lu) : oldLevel;
-        if (newLevel > oldLevel) applyLevelUp(ps, prof, oldLevel, newLevel, lu);
+        // The disc's curve and rolls read the STARTER's row (0x8003EF5C + slot*0x58), never the worn form's.
+        const growthProfile = levelUpGrowthProfile({ rookieId: CHARID_TO_DIGID[state.party?.[0]], profile: prof }, digimonDB) ?? prof;
+        const newLevel = lu ? levelForExp(oldLevel, newXp, growthProfile.growth_xp ?? 8, lu) : oldLevel;
+        if (newLevel > oldLevel) applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile);
         ps.xp = newXp;
         state.bits = Math.min((state.bits | 0) + reward.bits, 9999999);
         persist();
@@ -9834,11 +9878,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         return roster.map((member, i) => ({ member, rec: buildPlayerRecord(member, i === 0 && prof ? prof.id : null) }));
       },
       /** The profile Blast would turn this Digimon into at its level, or null. */
-      blastForm: (rec) => {
-        const rookie = digimonDB?.[rec?.rookieId];
-        const id = blastTargetId(rookie?.blasts, rec?.level ?? 1);
-        return id ? (digimonDB?.[id] ?? null) : null;
-      },
+      blastForm: (rec) => blastTargetProfile(rec, digimonDB),
       /** The form (by its name) the record takes, as the game's own Digivolve / Tag / Blast commits do. */
       setFormByName: (rec, name) => {
         const p = Object.values(digimonDB ?? {}).find((x) => x?.name === name);
@@ -9854,7 +9894,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         if (!stealProc(record?.field04 ?? 0, effStats(thief).spd | 0, effStats(enemy).spd | 0, techWeight, thief.stealBonus ?? 0, RAND_U16())) return { ok: false, missed: true };
         const dropName = enemy.eStats?.drop_item;
         if (!dropName || dropName === "Null") return { ok: false, nothing: true };
-        const item = window.__ITEM_BY_NAME?.[dropName];
+        const item = itemForDropName(dropName);
         if (!item) return { ok: false, nothing: true };
         return { ok: true, item: item.id, name: battleMsgText(0x6a, item.id) || item.name };
       },

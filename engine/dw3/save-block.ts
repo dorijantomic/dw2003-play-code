@@ -49,7 +49,19 @@ export function decodeSaveRoster(image: ArrayLike<number>, profiles: Uint8Array)
 }
 
 /** Card data shares the resident save context with the party (album/folder decodes). */
-export const SAVE_CARD_MAX = 0x13b;
+/** The screen bound (exclusive, ids 1..314). Defined in the import-free
+ *  engine/dw3/card-limits.ts so the album and folder controllers do not link
+ *  engine/native; re-exported here so web/vendor/engine.js keeps the export. */
+export { SAVE_CARD_MAX } from "./card-limits.ts";
+/** Last card id the resident card tables store (0x13b = 315). The tables are
+ *  316 bytes each (ids 0..315) and the memory-card save copies the whole 0x26C4
+ *  block (pro/stgmcard.s), so id 315 is stored. This is the stored table, not
+ *  the screen limit above. */
+export const SAVE_CARD_TABLE_LAST = 0x13b;
+/** Copies of one card that may be held. One home: the engine's own cap, which
+ *  the card shop enforces and the save clamp uses (9 — the shop refuses the
+ *  tenth copy, pro/stcrdshp.s:4774-4790, message 0x14). */
+export { COLLECTION_CAP as SAVE_CARD_COPIES } from "../systems/card-battle.ts";
 export const SAVE_FOLDER_COUNT = 3;
 export const SAVE_FOLDER_SIZE = 0x66;
 export const SAVE_FOLDER_CARDS = 40;
@@ -61,7 +73,7 @@ export interface ResidentCards {
 export function seedSaveCards(mem: NativeMemory, cards: ResidentCards): void {
   const held = new Map(cards.owned);
   const seen = new Set(cards.seen);
-  for (let id = 1; id <= SAVE_CARD_MAX; id++) {
+  for (let id = 1; id <= SAVE_CARD_TABLE_LAST; id++) {
     mem.write8(PARTY_CONTEXT + 0x3a2 + id, held.get(id) ?? 0);
     mem.write8(PARTY_CONTEXT + 0x4df + id, seen.has(id) ? 1 : 0);
   }
@@ -76,7 +88,7 @@ export function seedSaveCards(mem: NativeMemory, cards: ResidentCards): void {
 export function readSaveCards(mem: NativeMemory): ResidentCards {
   const owned: [number, number][] = [];
   const seen: number[] = [];
-  for (let id = 1; id <= SAVE_CARD_MAX; id++) {
+  for (let id = 1; id <= SAVE_CARD_TABLE_LAST; id++) {
     const n = mem.read8(PARTY_CONTEXT + 0x3a2 + id);
     if (n) owned.push([id, n]);
     if (mem.read8(PARTY_CONTEXT + 0x4df + id)) seen.push(id);
