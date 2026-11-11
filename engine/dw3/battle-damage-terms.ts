@@ -1342,18 +1342,17 @@ export function damageTermRoll(threshold: number, roll7: number): boolean {
  * (`docs/research/evidence/ledger.json` EV-DIGIMON-PROFILES-0x8003ef5c-2026-09-13).
  *
  * The halfword compared against them is `lh $v1, 0x10($v0)` over a record base of
- * `0x800a4460 + index*0x20`, i.e. `0x800a4470 + index*0x20 + 0x10` = the player record's
- * **`+0x10`, the ATTACK MODIFIER** — the same halfword `FIGHTSTG_F0x800a1aa8` writes
- * (`sh $v0, 0x10($a1)` fightstg.s:32296) and `FIGHTSTG_F0x8009ec94` folds into the
- * effective block (`lh $v0, 0x10($s3)` :29291). **Not** the profile id at `+0x00`. The
- * previous revision of this file had no such check at all; this is the port of what the
- * assembly says, and the walk of eight rows is the walk it says.
+ * `0x800a4460 + index*0x20`, i.e. `0x800a4470 + index*0x20` = the player record's **`+0x00`,
+ * its own Digimon id** (the records start at 0x800a4470: the `0x10` is the base's own offset,
+ * not a field). CORRECTED 2026-11-11: this block used to read it as `+0x10`, the attack
+ * modifier, which added the 0x10 twice. The disc's C (`~/dw3_decomp` battle_mode/rolls.c:400-409
+ * `FIGHTSTG_rollDedigivolve`) says it outright: it walks `DIGIMON_DATA[0..PARTNER_COUNT)` and
+ * returns 0 (no roll) when `DIGIMON_DATA[i].id == fighters[0][active[0]].id`, i.e. when the
+ * partner is already one of the eight partner base Digimon: nothing to de-digivolve.
+ * The caller resolves that in its own id space (`playerActiveRookie`).
  *
- * Rows 0..7 carry profile ids 383, 385, 384, 3, 145, 366, 373 and 31 — the first eight
- * Digimon of the disc's own roster order (Kotemon, Kumamon, Monmon, Agumon, Veemon,
- * Guilmon, Renamon, Patamon). GUESS, not established: the eight ids look like a profile-id
- * set, and the author may have meant the record's `+0x00`; the instruction says `0x10`, so
- * `0x10` is what ships.
+ * Rows 0..7 carry profile ids 383, 385, 384, 3, 145, 366, 373 and 31: the eight partner base
+ * Digimon in the disc's own id space (the walker numbers the same eight 1..8).
  */
 export const DAMAGE_TERM_STATUS_ROLL_PROFILES: readonly number[] = Object.freeze([
   0x17f, 0x181, 0x180, 0x003, 0x091, 0x16e, 0x175, 0x01f,
@@ -1512,11 +1511,12 @@ export interface Category5Options {
   /** The roll landed, for 391 — whose getter may answer zero without rolling. */
   rollStatusLanded?: boolean;
   /**
-   * 391 only: the PLAYER's active record `+0x10`, the ATTACK MODIFIER. `FIGHTSTG_F0x800a13c0`
-   * walks the first eight `DIGIMON_PROFILES` rows against it and returns zero on a match,
-   * before it ever calls `rand` — see {@link damageTermStatusRollBlocked}.
+   * 391 only: the PLAYER's active fighter is one of the eight partner base Digimon, in the
+   * CALLER's own id space (the walker: ids 1..8). `FIGHTSTG_F0x800a13c0` / `rollDedigivolve`
+   * (rolls.c:400-409) compare the record's id (`+0x00`) with those eight and return zero on a
+   * match, before they ever call `rand` — see {@link damageTermStatusRollBlocked}.
    */
-  playerActiveAttackModifier?: number;
+  playerActiveRookie?: boolean;
   /** The stat targets for the two stat arms, in slot order. */
   targets?: readonly Category5StatTarget[];
   /** The three per-encounter gate bytes `0x80042b62..0x80042b64`, index 0 = `0x62`. */
@@ -1568,8 +1568,7 @@ export function category5Plan(
     : 0;
   // 391's getter answers zero without drawing a number when the player's active record
   // `+0x10` is one of the eight profile ids it walks (FIGHTSTG_F0x800a13c0 :31765-:31771).
-  const rollBlocked = arm.effect === "statusOnly"
-    && damageTermStatusRollBlocked(options.playerActiveAttackModifier ?? 0);
+  const rollBlocked = arm.effect === "statusOnly" && options.playerActiveRookie === true;
   const rollLanded = arm.effect === "statusOnly"
     ? !rollBlocked && (options.rollStatusLanded ?? false)
     : options.rollLanded ?? false;

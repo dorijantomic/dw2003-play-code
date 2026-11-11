@@ -2,7 +2,7 @@
 //   FIGHTSTG_getEnemyAction   :438-470   table action kinds 5..8 are the targets -2..-5
 //   FIGHTSTG_pickEnemySwitch  :9-62      which team member comes in (-1 = none)
 //   switchEnemyOut            :150-166   the page for the pick (esmfight 0x4D, kind 1) or the failure (0x8E, kind 2)
-//   updateEnemyTurn substates :270-297   5: entrance(id, side 1, 0) after the page; 6: wait done; 4: name page (kind 0xD)
+//   updateEnemyTurn substates :270-297   5: entrance(id, side 1, 0) after the page; 6: wait done; 4: wait the slot empty, name page (kind 0xD)
 //   normal_battle/menu.c      :1088-1096 the next enemy after a KO: the lowest slot with an id and hp
 // The game's enemy team is its boss party (web/battle.js b.party): slot i is party[i], three slots at most.
 
@@ -11,12 +11,21 @@ export const ENEMY_SWITCH_MSG_TAKING_OUT = 0x4d;
 /** esmfight 0x8E, kind 2 (enemy_turn.c:163-166): "Switch failed!". */
 export const ENEMY_SWITCH_MSG_FAILED = 0x8e;
 /**
- * The frame, in the side 0x10 entrance's own count, where the entering enemy's name page (kind 0xD, enemy_turn.c
- * showEnemyName) is made: the entrance commits at f114 (entrance.c, `done`); the turn task sees `done` in substate 6
- * and sets substate 4 (enemy_turn.c:279-286), which makes the page on its next update. Not proven: whether the turn
- * task updates before or after the entrance task inside one frame (this is the earliest, f114 + 1).
+ * The entrance frame (f0 = the task's first update, the scale of engine/systems/blast-presentation.ts) on which the
+ * entrance task is GONE for the task that started it, and so the frame every page that waits for it is made on.
+ * Proof, all from ~/dw3_decomp:
+ *   - the entrance is stored in the caller's ONE child slot, a union (include/battle/battle_mode/task.h BattleChild:
+ *     `message` and `entrance` are the same pointer), so `children->message == NULL` (enemy_turn.c:264 substate 4,
+ *     the name page) and `children->task.task == NULL` (menu.c:413 tag, :1131 KO, :946 blast end, :1192 digidevolve)
+ *     are the SAME test: the slot is empty only once the entrance task has been reaped;
+ *   - src/engine/task/registry.c executeTask/runChildTasks: a task in state TASK_KILL runs one last update, is
+ *     destroyed, and its slot is cleared AFTER its parent's update of that frame;
+ *   - entrance.c:154-163 state 7 (f299) sets state 3 = TASK_KILL; it is reaped on f300; its parent sees NULL on f301.
+ * So no page exists during f0..f300 on either side (the page BEFORE the entrance is gone first: enemy_turn.c substate
+ * 5 and menu.c:367 / :1088 wait for it). The first page is made on f301: over the last 60 frames of the player entrance's
+ * camera glide (a separate camera task, entrance.c:155 fade 60) and at the end of the enemy one (fade 1).
  */
-export const ENEMY_SELFTAG_NAME_FRAME = 115;
+export const ENTRANCE_TASK_END_FRAME = 301;
 
 /** Table action kind -> EnemyTurn.target (enemy_turn.c:456-466): 5 -> -2 (slot 0), 6 -> -3, 7 -> -4, 8 -> -5 (random other). */
 export function enemySwitchTarget(kind) {

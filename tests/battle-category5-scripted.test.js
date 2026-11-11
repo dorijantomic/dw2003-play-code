@@ -83,7 +83,7 @@ function battle() {
     affinity: 0, statMods: { str: 0, def: 0, spd: 0 }, ailments: {},
   };
   const player = {
-    profile: { name: "Marsmon", id: 1, family: 1 }, level: 10, hp: 300, maxHp: 300,
+    profile: { name: "Marsmon", id: 100, family: 1 }, level: 10, hp: 300, maxHp: 300,
     mp: 60, maxMp: 60, str: 100, def: 100, spt: 100, wis: 40, spd: 100,
     affinity: 0, statMods: { str: 0, def: 0, spd: 0 }, ailments: {},
   };
@@ -498,10 +498,11 @@ test("391's ROLL FUNCTION is not 211/212's: eight profile rows gate it", () => {
     assert.equal(damageTermStatusRollBlocked(id), false, `modifier ${id} is not refused`);
   }
 
-  // The blocked halfword is record `+0x10`, the ATTACK MODIFIER, on the PLAYER's active
-  // fighter -- whichever side casts.
+  // The compared halfword is the record's id (+0x00; rolls.c:400-409 FIGHTSTG_rollDedigivolve compares the
+  // fighter id with the eight partner base Digimon), on the PLAYER's active fighter -- whichever side casts.
+  // The walker's eight are ids 1..8.
   const blocked = battle();
-  blocked.player.statMods = { str: 383, def: 0, spd: 0 };
+  blocked.player.profile.id = 4;
   const byPlayer = battleScriptedPlanFor(blocked, 0, record(391), 391,
     { name: "Marsmon", roll7: 1 });
   assert.equal(byPlayer.rollBlocked, true);
@@ -510,9 +511,9 @@ test("391's ROLL FUNCTION is not 211/212's: eight profile rows gate it", () => {
   const byEnemy = battleScriptedPlanFor(blocked, 1, record(391), 391, { name: "Knightmon" });
   assert.equal(byEnemy.rollBlocked, true, "the getter reads the PLAYER's record either way");
 
-  // An attack modifier that is not one of the eight lets the roll happen as before.
+  // A form that is not one of the eight lets the roll happen; the attack modifier is NOT what is compared.
   const free = battle();
-  free.player.statMods = { str: DAMAGE_TERM_STATUS_ROLL_PROFILES[7] + 1, def: 0, spd: 0 };
+  free.player.statMods = { str: DAMAGE_TERM_STATUS_ROLL_PROFILES[0], def: 0, spd: 0 };
   const lands = battleScriptedPlanFor(free, 0, record(391), 391,
     { name: "Marsmon", roll7: 5 });
   assert.equal(lands.rollBlocked, false);
@@ -521,12 +522,12 @@ test("391's ROLL FUNCTION is not 211/212's: eight profile rows gate it", () => {
 
   // And the plan's own answer is the getter's, whether the caller supplies the roll or not.
   const viaPlan = category5Plan(record(391), 391, {
-    side: 0, rollStatusLanded: true, playerActiveAttackModifier: 145,
+    side: 0, rollStatusLanded: true, playerActiveRookie: true,
   });
   assert.equal(viaPlan.rollBlocked, true);
   assert.equal(viaPlan.rollLanded, false);
   assert.equal(category5Plan(record(391), 391, {
-    side: 0, rollStatusLanded: true, playerActiveAttackModifier: 144,
+    side: 0, rollStatusLanded: true, playerActiveRookie: false,
   }).rollLanded, true);
 });
 

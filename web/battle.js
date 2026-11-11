@@ -125,7 +125,6 @@ import {
   damageTermCategory5Arm,
   damageTermCategory5Side,
   damageTermRoll,
-  damageTermStatusRollBlocked,
   DAMAGE_TERM_STAT_ROWS,
   damageTermMpMoved, RESULT_QUEUE,
   damageTermPenaltyMode,
@@ -185,7 +184,7 @@ import { drawItemIcon, itemFamily } from "./itemicons.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import {
   enemySwitchTarget, enemySelfTagPick, enemyTeamSlots, firstAliveEnemySlot,
-  ENEMY_SWITCH_MSG_TAKING_OUT, ENEMY_SELFTAG_NAME_FRAME,
+  ENEMY_SWITCH_MSG_TAKING_OUT, ENTRANCE_TASK_END_FRAME,
 } from "./enemy-switch.js";
 
 // Native post-battle fight-report chrome (stfgtrep overlay). See
@@ -703,6 +702,7 @@ export const MSG = Object.freeze({
   DEFEATED: 0x51,        // kind 2, wfightmn.s:3265 -- "Defeated!", the fallen enemy's page
   BLASTED: 0x61,         // kind 2, wfightmn.s:2977 (and kind 1 at fightstg.s:14077)
   BACK_TO_NORMAL: 0x62,  // kind 2, wfightmn.s .L0x0000316c
+  DIGIDEVOLVED: 0x47,    // kind 2, menu.c:1192 WFIGHTMN_digidevolve: "Digidevolved!" after tech 0x187 (391)
   DNA_DV: 0x3a,          // kind 2, fightstg.s .L0x8008f810
   FROZEN_BLOCK: 0x56,     // kind 2, wfightmn.s .L0x000017a4 (command-menu step 1)
 });
@@ -2233,13 +2233,12 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
   // walker's own random order is the original's. A caller may hand the draw in instead.
   const rolls = arm.effect === "lockFlee" || arm.effect === "lockDigivolve" ||
     arm.effect === "statusOnly";
-  // The status-only arm's getter is FIGHTSTG_F0x800a13c0, and it walks eight
-  // DIGIMON_PROFILES rows against the PLAYER's active record `+0x10` BEFORE it draws
-  // (pro/fightstg.s:31761-:31774; a match answers `move_ $v0, $zr` in the `bne`'s delay
-  // slot at :31771). A match spends no random number at all, so a blocked cast must not
-  // take a draw either.
-  const rollBlocked = arm.effect === "statusOnly"
-    && damageTermStatusRollBlocked(playerActiveAttackModifier(b));
+  // The status-only arm's getter is FIGHTSTG_F0x800a13c0 = FIGHTSTG_rollDedigivolve (battle_mode/rolls.c): it walks the
+  // eight partner base Digimon against the PLAYER's active fighter id (record +0x00) BEFORE it draws (pro/fightstg.s:
+  // 31761-:31774; a match answers `move_ $v0, $zr` in the `bne`'s delay slot at :31771). A match spends no random
+  // number at all, so a blocked cast must not take a draw either.
+  const playerActiveRookie = playerActiveIsRookie(b);
+  const rollBlocked = arm.effect === "statusOnly" && playerActiveRookie;
   const roll7 = options.roll7 ?? (rolls && !rollBlocked ? (RAND_U16() & 0x7f) : 0);
   const rollLanded = options.rollLanded ?? (rolls && damageTermRoll(record.f8 ?? 0, roll7));
   const rollStatusLanded = rollBlocked ? false
@@ -2271,7 +2270,7 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
     targetHp: mpDest?.hp ?? 0,
     targetMaxHp: mpDest?.maxHp ?? 0,
     healWisdom: actingFighterWisdom(b, acting),
-    playerActiveAttackModifier: playerActiveAttackModifier(b),
+    playerActiveRookie,
     affinityBefore: targetRec?.affinity ?? 0,
   });
   if (!plan) return null;
@@ -2362,21 +2361,25 @@ function category5Targets(b, targetSide, arm) {
   return out;
 }
 
+/** Tech 0x187 (391): its roll landed, so tech_action.c:586-588 queues EVENT_DIGIDEVOLVE and builds no page. */
+export function forcedDedigivolveLanded(plan) {
+  return plan?.effect === "statusOnly" && plan.rollLanded === true;
+}
+
 function activeSlotOf(b, side) {
   return (side | 0) < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
 }
 
 /**
- * The PLAYER's active fighter's record `+0x10`, the ATTACK MODIFIER — the halfword
- * `FIGHTSTG_F0x800a13c0` (391's own roll getter) compares against the first eight
- * `DIGIMON_PROFILES` rows: `lw $v0, 0x8($v1)` at pro/fightstg.s:31761 reads the player's
- * active index, `sll $v0, 0x5` / `addu $v0, $v1` at :31763-:31764 make the record, and
- * `lh $v1, 0x10($v0)` at :31765 reads `+0x10`. Whichever side casts, it is the PLAYER's
- * record the getter walks.
+ * The PLAYER's active fighter is one of the eight partner base Digimon (the walker's ids 1..8, `rookieId`'s space):
+ * `FIGHTSTG_rollDedigivolve` (rolls.c:400-409) compares `DIGIMON_DATA[0..PARTNER_COUNT).id` with the record's id
+ * (`+0x00`; the old `+0x10` reading added the base's own 0x10 twice, see engine/dw3/battle-damage-terms.ts). Whichever
+ * side casts, it is the PLAYER's active record it reads.
  */
-function playerActiveAttackModifier(b) {
+function playerActiveIsRookie(b) {
   const rec = battleRestoreTargets(b, 0)[activeSlotOf(b, 0)];
-  return statModifier(rec, 0);
+  const id = Number(rec?.profile?.id ?? rec?.rookieId ?? 0);
+  return id >= 1 && id <= 8;
 }
 
 /** The acting side's active fighter's WIS, the getter's own second operand. */
@@ -2449,7 +2452,7 @@ function setStatModifier(rec, stat, value) {
  *
  * Exported so the category-5 tests can drive one action without the whole battle loop.
  */
-export function battleStatusEventAdvance(b) {
+export function battleStatusEventAdvance(b, playerSpd) {
   const pool = b?.statusEvents;
   if (!pool || pool.length !== STATUS_EVENT_POOL_SIZE) return [];
   // The original asks for the delay with the PLAYER side's byte whatever acted
@@ -2457,7 +2460,7 @@ export function battleStatusEventAdvance(b) {
   // numerator is that side's own effective SPD (`lh $v0, 0xa($a3)` `:26284`), with the
   // other side only feeding the `isqrt` seed (`:26238`). So this is not per-acted-side.
   const expiries = advanceStatusEvents(
-    pool, statusEventActionDelay(effectiveSpd(b.player), effectiveSpd(b.enemy)));
+    pool, statusEventActionDelay(playerSpd ?? effectiveSpd(b.player), effectiveSpd(b.enemy)));
   for (const expiry of expiries) {
     if (expiry.kind === "stat" || expiry.kind === "lock") {
       const records = battleRestoreTargets(b, (expiry.side | 0) < 1 ? 0 : 1);
@@ -3776,9 +3779,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }
     }
 
-    if (show.pageAt != null && !show.pageSaid && frame >= show.pageAt) {
-      show.pageSaid = true;
-      show.onPage?.();
+    // The entrance task is reaped on f300 and its caller sees the empty slot on f301 (ENTRANCE_TASK_END_FRAME): the
+    // next page is made THEN, not at the end of the camera glide (f361 on the player side), and it is drawn over it.
+    if (show.entrance && !show.taskEnded && frame >= ENTRANCE_TASK_END_FRAME) {
+      show.taskEnded = true;
+      if (show.endMessage) sayOriginal(b, show.endSpec ?? null, show.endMessage);
+      show.pageMade = !!show.endMessage || show.onTaskEnd?.() === true;   // onTaskEnd returns true when it made a page
     }
 
     // Unconditional full heal [BLAST-C007], landing on its captured frame. Only
@@ -3793,12 +3799,19 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (b.confusedMenu) b.confusedMenu = null;
     }
 
-    if (s.done) {
+    // An entrance is over on ENTRANCE_TASK_END_FRAME (f301), not on the window end (f361 on the player side): that is
+    // the frame the parent task sees the entrance task gone and makes its page; the battle runs on and the page is
+    // answerable while the player entrance camera glide (f299-f360, the camera task) finishes, owned by the digivolve
+    // camera past this stop (digiCam.reset keeps a running fade). The previous update must already have published the
+    // f299 return stage so the renderer armed the glide: a stop in the same update as the first f>=299 state loses it.
+    const ended = s.done || (show.entrance && frame >= ENTRANCE_TASK_END_FRAME && prevFrame >= ENTRANCE_TASK_END_FRAME - 2);
+    if (ended) {
       b.blastShow = null;
       renderer3d?.blastPresentationStop?.();
       renderer3d?.setFaceCamVisible?.(true);
-      if (show.endMessage) sayOriginal(b, show.endSpec ?? null, show.endMessage);
-      else if (!show.pageSaid) clearBattleLine(b);   // the original's box is empty when the cinematic ends
+      if (show.entrance) { if (!show.endMessage && !show.pageMade) clearBattleLine(b); }   // its page was made at f301
+      else if (show.endMessage) sayOriginal(b, show.endSpec ?? null, show.endMessage);
+      else clearBattleLine(b);   // the original's box is empty when the cinematic ends
       b.timer = 0;
       show.onDone?.();
       // The saved battle track was re-played on f651 (musicFrame above); the revert's PLAYER11 is a
@@ -3849,14 +3862,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * flash over f178, final fade + other model shown + motion 1 (2 weak) f299. `onDone` runs when the window ends.
    * `name` is the entering fighter's model (species name or id). The clock waits until that model is loaded.
    */
-  function startEntrance(b, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, pageAt = null, onPage = null }) {
+  function startEntrance(b, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }) {
     const show = {
       program: side ? FormChangeProgram.ENTRANCE_ENEMY : FormChangeProgram.BLAST_REVERT,
       frame: 0, target: null, swapped: false, healed: false, state: null, sounded: false,
       endMessage, endSpec, swapName: name, entranceSide: side ? 1 : 0, onSwap, onDone,
-      // A page the CALLER's task makes on its own frame while the entrance still runs (the enemy's own tag: the
-      // name page, enemy_turn.c substate 4, does not wait for the task to end). `pageAt` is in entrance frames.
-      pageAt, onPage, pageSaid: false,
+      // The entrance TASK is gone for its caller on ENTRANCE_TASK_END_FRAME (f301): every page that waits for it (the
+      // `endMessage`, the enemy's name page) is made then, while the player entrance's camera glide still runs to f360.
+      onTaskEnd, taskEnded: false,
       entrance: { folder: null, ready: !renderer3d },
     };
     b.blastShow = show;
@@ -3877,8 +3890,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * The enemy's own tag after its "Taking out Digimon!" page was read (enemy_turn.c substate 5):
    * FIGHTSTG_startEntrance(enemies[switchTo].id, 1, 0), the SAME side 0x10 entrance every other enemy entrance runs.
    * The active slot is committed at the cut, f114 (substate 6 `entrance->done`; the swapped-out record stays in the
-   * team with its hp), and the entering enemy's name page (kind 0xD, substate 4) is made one update later,
-   * ENEMY_SELFTAG_NAME_FRAME, while the entrance still plays; reading it ends the turn.
+   * team with its hp). The entering enemy's name page (kind 0xD, substate 4) waits for the child slot, which holds the
+   * entrance task, so it is made when the task is gone (ENTRANCE_TASK_END_FRAME, f301); reading it ends the turn.
    */
   function startEnemySelfTag(b, tag) {
     const next = enemyTeamRecord(b, tag.slot);
@@ -3895,14 +3908,40 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b.enemy = next;
         applyGiantScales(renderer3d, b.party?.[b.partyIndex], giantModeOn());
       },
-      pageAt: ENEMY_SELFTAG_NAME_FRAME,
-      onPage: () => {
+      // enemy_turn.c substate 4 waits for the child slot, which holds the entrance: the name page is made when the
+      // task is gone (ENTRANCE_TASK_END_FRAME), not at f115.
+      onTaskEnd: () => {
         tag.stage = "named";
         setResultPages(b, [{
           text: `${nextName} steps forward!`,
           spec: { kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName] },
         }]);
+        return true;
       },
+    });
+  }
+
+  /**
+   * EVENT_DIGIDEVOLVE, WFIGHTMN_digidevolve (menu.c:1164-1198), queued by tech 0x187 = 391 "Helter Skelter"
+   * (tech_action.c:585-589) when its roll landed: the partner goes back to its OWN Digimon (the party member's base
+   * form, DIGIMON_DATA[member].id), its charge is dropped (unit->charge = 0), a standing Blast is cancelled
+   * (WFIGHTMN_cancelBlast: only a `temporary` fighter loses its gauge and its Blast-end event; the release below
+   * is that and is a no-op without a Blast), then the ONE entrance runs (FIGHTSTG_startEntrance(unit->id, 0, weak),
+   * the same program as Blast ending) and "Digidevolved!" (esmfight 0x47, kind 2) is made once the task is gone.
+   * HP, MP, statuses, the DV gauge of a manual form and the form flags are untouched (nothing else is written).
+   * The partner's queued technique event (EVENT_PARTNER_TECH) has no counterpart in this game's turn model.
+   */
+  function forcedDedigivolve(b) {
+    const p = b.player;
+    const saved = digimonDB?.[p.rookieId] ?? p.profile;
+    setLiveBattleForm(p, saved);
+    clearActionAffinity(b, 0);
+    releaseReservedSecondForm(b);
+    clearBattleLine(b);
+    startEntrance(b, {
+      side: 0, name: saved.name,
+      endMessage: `${saved.name}\nDigidevolved!`,
+      endSpec: { kind: MSG_KIND.OUTCOME, payload: [MSG.DIGIDEVOLVED], name: saved.name },
     });
   }
 
@@ -4846,15 +4885,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   /** The battle loop's call into the pool; the body is the exported advance below. */
-  function statusEventQueueAdvance(b) {
-    return battleStatusEventAdvance(b);
+  function statusEventQueueAdvance(b, playerSpd) {
+    return battleStatusEventAdvance(b, playerSpd);
   }
 
-  function queueAfterAction(b, acted) {
+  // playerSpd: the player speed the delay is read with when it is not the live active fighter's
+  // (Tag: menu.c:312 asks getDelay at command time, before WFIGHTMN_tag swaps active[0]).
+  function queueAfterAction(b, acted, playerSpd) {
     // A new turn on the shared timeline, so the command phase's Frozen gate rolls again
     // (F0x800a7418 step 1 runs once per player turn, `wfightmn.s:1494-1540`).
     b._turnSeq = (b._turnSeq ?? 0) + 1;
-    const step = scheduleNextActor(b.timeline, acted, effectiveSpd(b.player), effectiveSpd(b.enemy));
+    const step = scheduleNextActor(b.timeline, acted, playerSpd ?? effectiveSpd(b.player), effectiveSpd(b.enemy));
     // THE STATUS-EVENT QUEUE IS THE BATTLE CLOCK. `FIGHTSTG_F0x8009ba4c`
     // (`pro/fightstg.s:25779`) has no frame tick: every action-resolution epilogue asks
     // `[0x800a437c](side, 0)` for the next delay and re-enqueues the turn event with it
@@ -4867,7 +4908,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // advance writes are cleared FIRST, or the previous turn's would be re-read.
     b._poisonTick = null;
     b._ailmentCures = [];
-    statusEventQueueAdvance(b);
+    statusEventQueueAdvance(b, playerSpd);
     const events = advanceAilmentTimeline([b.player, b.enemy], step.elapsed);
     // Each status moment is a battle message box PAGE of its own, in the original: the
     // poison tick is one line object and one `+0xac` call with kind 15, and the shared
@@ -5213,6 +5254,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (tag.stage === "taking") { tag.stage = "entering"; startEnemySelfTag(b, tag); b.timer = 0; return; }
       if (tag.stage === "named") { b._selfTag = null; queueAfterAction(b, "enemy"); }
     }
+    // EVENT_DIGIDEVOLVE (tech 0x187) was pushed FIRST, delay 1 (battle.c:143-149): it is popped before the turn's
+    // status events and the Blast events (menu.c:1355 pop after the turn task is gone), and the turn's own delay is
+    // already queued (the caller ran queueAfterAction before this).
+    if (b._dedigivolvePending) { b._dedigivolvePending = false; forcedDedigivolve(b); b.timer = 0; return; }
     if (b._forcedFlee) {
       b._forcedFlee = false;
       b.state = ST.RESULT_MSG;
@@ -6023,8 +6068,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       b.timer += dt;
       if (b.timer > TAG_PRESENTATION.outgoingSeconds) {
         const presentation = applyPlayerAction();
-        // The tag commits the new active fighter at the entrance's cut (f114), and the turn is queued with
-        // THAT fighter's speed: commitTag calls queueAfterAction.
+        // The tag commits the new active fighter at the entrance's cut (f114); the turn is queued with the
+        // OUTGOING fighter's speed (read at command time, menu.c:312): commitTag calls queueAfterAction.
         if (presentation !== true) queueAfterAction(b, "player");
         if (presentation === "dna") {
           b.state = ST.DNA_PRESENT;
@@ -6603,6 +6648,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       memberName: member.name,
       profile,
       action,
+      // menu.c:312 queuePlayerTurn(getDelay(0, 0)) runs in the command dispatch, BEFORE WFIGHTMN_tag
+      // swaps active[0]: the delay uses the OUTGOING fighter's speed. A forced KO replacement does
+      // not pass that dispatch (WFIGHTMN_knockOut sets substate 5 = WFIGHTMN_tag directly, menu.c:1119),
+      // so it queues no turn at all: the next turn was already queued.
+      spd: b._forcedTag ? null : effectiveSpd(b.player),
     };
     sayOriginal(b, {
       kind: MSG_KIND.OUTCOME, payload: [MSG.GO_FOR_IT], name: member.name,
@@ -6612,9 +6662,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
 
   /**
    * The Tag commit, menu.c:388-398 (WFIGHTMN_tag state 2, run when `entrance->done` is set at the cut):
-   * the new fighter becomes the active one, then the turn is queued with ITS speed.
+   * the new fighter becomes the active one, the turn was queued at command time with the OUTGOING speed (spd; none when forced).
    */
-  function commitTag(b, action) {
+  function commitTag(b, action, spd) {
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
     const profile = digimonDB[action.formId];
@@ -6650,7 +6700,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // so the report pays that form's DVEXP and ladder too.
     markFormTaken(b, action.rosterIndex, profile.id);
     b.participantIndices.add(action.rosterIndex);
-    queueAfterAction(b, "player");
+    if (typeof spd === "number") queueAfterAction(b, "player", spd);
   }
 
   function applyDvAction(action) {
@@ -7064,10 +7114,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           ? { kind: scripted.page.kind, payload: scripted.page.payload,
               name: scripted.page.name, slots: scripted.page.slots }
           : null;
-        setResultPages(b, [{
-          text: scriptedWalkerSentence(scripted, skill, pname),
-          spec,
-        }]);
+        // Tech 0x187 (391) with its roll landed builds NO page: it queues EVENT_DIGIDEVOLVE (tech_action.c:586-588).
+        if (forcedDedigivolveLanded(scripted)) {
+          setResultPages(b, []);
+          clearBattleLine(b);
+          b._dedigivolvePending = true;
+        } else {
+          setResultPages(b, [{
+            text: scriptedWalkerSentence(scripted, skill, pname),
+            spec,
+          }]);
+        }
         renderer3d?.playerAttack(skill.id ?? b.player.profile.tech_basic, { miss: false });
         b.pendingAction = null;
         return false;
@@ -7518,7 +7575,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
             name: scripted.page.name, slots: scripted.page.slots }
         : null;
       const text = scriptedWalkerSentence(scripted, skill, name);
-      if (spec) sayOriginal(b, spec, text); else sayWalker(b, text);
+      if (forcedDedigivolveLanded(scripted)) {
+        // Tech 0x187 (391), roll landed: no page, EVENT_DIGIDEVOLVE is queued first (tech_action.c:586-588). The turn's
+        // own delay is queued by the caller BEFORE the event runs (enemy_turn.c:260 ends the turn, menu.c:1446-1461
+        // pops the event after), so the de-digivolve comes from advanceAfterResult.
+        clearBattleLine(b);
+        b._dedigivolvePending = true;
+      } else if (spec) sayOriginal(b, spec, text); else sayWalker(b, text);
       renderer3d?.enemyAttack(skill.id ?? en.profile?.tech_basic, { miss: false });
       return;
     }
@@ -8711,7 +8774,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         startEntrance(b, {
           side: 0, name: tag.profile.name,
           endMessage: `${tag.memberName} switches to ${tag.profile.name}!`,
-          onSwap: () => commitTag(b, tag.action),
+          onSwap: () => commitTag(b, tag.action, tag.spd),
           onDone: () => { b._tagPresentation = null; b.state = ST.RESULT_MSG; b.timer = 0; },
         });
         return true;
@@ -9767,7 +9830,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The Blast transformation keeps BOTH HP plates and drops every menu: the
     // capture shows the command list gone from the first frame of the effect
     // (the "... Blasted!" line is dismissed and no input is accepted for ~14 s).
-    if (b.blastShow) { ctx.restore(); ctx.restore(); return; }
+    // The entrance's own page (the next one is made on f301, ENTRANCE_TASK_END_FRAME) is drawn over the camera glide.
+    if (b.blastShow) {
+      if (b.blastShow.entrance && msgSession?.active && !msgSession.finished) {
+        battleMsgPaint(ctx, msgSession.frame(), nativeText, { pgfgc00, cmfont });
+      }
+      ctx.restore(); ctx.restore(); return;
+    }
 
     if (b.state === ST.PLAYER_MENU) {
       // The shipped pro/fightstg overlay draws the six-row list with its own

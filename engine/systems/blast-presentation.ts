@@ -347,11 +347,11 @@ export interface BlastPresentationState {
   wipeRow?: number;
   wireOn?: boolean;
   /** The enemy model's layer is off, startChange .. returnToBattle (f0..f650) for Blast and manual DV; f19..f298 for the player entrance. */
-  enemyHidden?: boolean;
+  enemyHidden?: boolean | undefined;
   /** The entrance only: 0 = player side (key2 0), 1 = enemy side (key2 0x10). Undefined for Blast and manual DV. */
   entranceSide?: 0 | 1;
   /** The enemy entrance hides the PLAYER partner from f19 until f298 (shown again on f299). */
-  playerHidden?: boolean;
+  playerHidden?: boolean | undefined;
 }
 
 /**

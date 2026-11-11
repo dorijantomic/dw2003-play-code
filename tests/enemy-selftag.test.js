@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   enemySwitchTarget, pickEnemySwitch, firstAliveEnemySlot, enemyTeamSlots, enemySelfTagPick,
-  ENEMY_SWITCH_MSG_TAKING_OUT, ENEMY_SWITCH_MSG_FAILED, ENEMY_SELFTAG_NAME_FRAME,
+  ENEMY_SWITCH_MSG_TAKING_OUT, ENEMY_SWITCH_MSG_FAILED, ENTRANCE_TASK_END_FRAME,
 } from "../web/enemy-switch.js";
 import { pickEnemyAiMove } from "../engine/dw3/battle-formulas.ts";
 import {
@@ -126,13 +126,15 @@ test("after a KO the next enemy is the lowest slot with an id and hp", () => {
 });
 
 // ── the presentation: the side 0x10 entrance, commit at f114, name message after it ───────────────────
-test("self-tag runs the enemy entrance: commit on f114, the name page on the next update", () => {
+test("self-tag runs the enemy entrance: commit on f114, the name page when the entrance task is gone (f301)", () => {
   const sch = entranceCameraSchedule(1);
   assert.equal(sch.swapFrame, 114);
   assert.equal(formChangeState(FormChangeProgram.ENTRANCE_ENEMY, 113).showNewModel, false);
   assert.equal(formChangeState(FormChangeProgram.ENTRANCE_ENEMY, 114).showNewModel, true);
-  // enemy_turn.c:279-286: substate 6 sees done and sets 4, substate 4 makes the message on the next update
-  assert.equal(ENEMY_SELFTAG_NAME_FRAME, sch.swapFrame + 1);
+  // enemy_turn.c:264-267 substate 4 tests `children->message == NULL`, the SAME union slot the entrance sits in
+  // (include/battle/battle_mode/task.h BattleChild), so the name page waits until the task is reaped: f301
+  assert.equal(ENTRANCE_TASK_END_FRAME, 301);
+  assert.equal(ENTRANCE_TASK_END_FRAME, sch.returnFrame + 2, "killed f299, reaped f300, the parent sees NULL f301");
   assert.equal(ENEMY_SWITCH_MSG_TAKING_OUT, 0x4d);
 });
 
@@ -145,7 +147,8 @@ test("battle.js wires it: pick -> 0x4D page -> side 1 entrance -> commit at the 
   const start = BATTLE.match(/function startEnemySelfTag\(([\s\S]*?)\n  \}\n/)?.[0] ?? "";
   assert.match(start, /startEntrance\(b, \{\s*side: 1/, "the side 0x10 entrance, reused");
   assert.match(start, /onSwap/, "the active slot is committed at the cut");
-  assert.match(start, /ENEMY_SELFTAG_NAME_FRAME/, "the name page is raised on its own frame");
+  assert.match(start, /onTaskEnd: \(\) => \{\s+tag\.stage = "named";/, "the name page is made when the entrance task is gone");
+  assert.doesNotMatch(start, /pageAt|onPage/, "no page at f115");
   // KO: the next enemy is the lowest living slot, not index + 1
   assert.match(BATTLE, /firstAliveEnemySlot\(/);
   // the status events of the turn come after the tag finishes (enemy_turn.c substate 3), not before

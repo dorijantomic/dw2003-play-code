@@ -44,7 +44,7 @@ function battle() {
     affinity: 0, statMods: { str: 0, def: 0, spd: 0 }, ailments: {},
   };
   const player = {
-    profile: { name: "Marsmon", id: 1, family: 1 }, level: 10, hp: 300, maxHp: 300,
+    profile: { name: "Marsmon", id: 100, family: 1 }, level: 10, hp: 300, maxHp: 300,
     mp: 60, maxMp: 60, str: 100, def: 100, spt: 100, wis: 40, spd: 100,
     affinity: 0, statMods: { str: 0, def: 0, spd: 0 }, ailments: {},
   };
@@ -99,9 +99,9 @@ test("391 cast by the player stages on the ENEMY, not on the caster", () => {
   assert.deepEqual(b.player.statMods, { str: 0, def: 0, spd: 0 });
   // The plan's own target side is the same answer the helper gives.
   assert.equal(category5Plan(record(391), 391,
-    { side: 0, rollStatusLanded: true, playerActiveAttackModifier: 0 }).side, 1);
+    { side: 0, rollStatusLanded: true, playerActiveRookie: false }).side, 1);
   assert.equal(category5Plan(record(391), 391,
-    { side: 1, rollStatusLanded: true, playerActiveAttackModifier: 0 }).side, 0,
+    { side: 1, rollStatusLanded: true, playerActiveRookie: false }).side, 0,
   "the enemy's cast still lands on the player");
 });
 

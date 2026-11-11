@@ -826,10 +826,10 @@ test("entrance wiring: renderer reads the INCOMING fighter's shot and hides the 
   const tag = b.slice(tagAt, b.indexOf("function commitTag", tagAt));
   assert.ok(!tag.includes("setPlayerVisible(false)"), "the outgoing model is not hidden at once");
   assert.ok(!tag.includes("b.activePlayerIndex = action.rosterIndex"), "the active record is not committed in applyTagAction");
-  assert.match(b, /onSwap: \(\) => commitTag\(b, tag\.action\)/);
+  assert.match(b, /onSwap: \(\) => commitTag\(b, tag\.action, tag\.spd\)/);
   assert.match(b, /side: 0, name: tag\.profile\.name,/);
   const commit = b.slice(b.indexOf("function commitTag"), b.indexOf("function applyDvAction"));
-  assert.ok(commit.includes("b.activePlayerIndex = action.rosterIndex;") && commit.includes('queueAfterAction(b, "player");'));
+  assert.ok(commit.includes("b.activePlayerIndex = action.rosterIndex;") && commit.includes('queueAfterAction(b, "player", spd);'));
   assert.ok(!b.includes("tagArrivalComplete") && !b.includes("arrivalFrames"), "the invented arrival timer is gone");
   assert.ok(!/legacyTagSwap|USE_ORIGINAL_TAG_SWAP/.test(b), "no legacyTagSwap URL flag");
   // Blast ending: the model swap moved from the commit to the cut

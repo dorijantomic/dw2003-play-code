@@ -13,6 +13,8 @@ Not yet in a release. No `v0.1.4` tag exists; the commits below are in the tree 
 - A tag, a KO replacement and the next enemy play the entrance. An enemy can tag itself out, as in the original.
 - The HUD draws a square for each member of the enemy team.
 - After a KO the next team member comes in (before, the battle was won after the first KO).
+- Pages after an entrance (tag, KO replacement, enemy self-tag) appear on frame 301 as in the original, over the camera glide. A Tag turn is timed with the outgoing Digimon's speed; a KO replacement adds no turn.
+- Helter Skelter (Persiamon) de-digivolves the partner to its base form with the entrance and "Digidevolved!", as in the original; the base-form check reads the fighter id.
 
 ### Field
 - Firefox speed: grass copied once per frame, the field is not drawn under a battle, the 3D battle has its own layer; field 12 -> 172 fps, battle 10 -> 63 fps in Firefox at 960x720 (c880c2be5).
