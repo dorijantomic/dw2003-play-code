@@ -368,7 +368,7 @@ export {
   BlastPhase, BLAST_PHASES, blastPhaseAt, blastPresentationState,
   DV_TASK_START_FRAME, DV_STAGE_OUT_FIRST_FRAME, DV_EVOLUTIO_FRAME, DV_CUT_FRAME, DV_WIPE_END_FRAME, DV_FLASH_START_FRAME, DV_SWAP_FRAME, DV_WIPE_BACK_FIRST_FRAME, DV_WIPE_BACK_END_FRAME, DV_NEW_MOTION_FRAME, DV_STAGE_BACK_FRAME, DV_PLAIN_CUT_FRAME, DV_RETURN_FRAME, DV_TASK_END_FRAME, DV_END_FRAME,
   CHANGE_STAGE_MODEL_FRAME, CHANGE_STAGE_BACK_MODEL_FRAME, CHANGE_STAGE_MANUAL, CHANGE_STAGE_BLAST, CHANGE_STAGE_BATTLE, CHANGE_STAGE_FULL,
-  changeStage, changeStageBg, CHANGE_STAGE_MOTION_FRAMES, changeStageMotionFrame,
+  changeStage, changeStageBg, CHANGE_STAGE_MOTION_FRAMES, changeStageMotionFrame, changeStageRotAt, changeStageMeshMatrix, type ChangeStageRotKeys,
   digivolveWipeRow, digivolveWireOn, digivolveFlashLevel, digivolveStageBrightness, formChangeMusicFrame, type FormChangeCameraSchedule,
   FormChangeProgram, formChangeState, formChangeLength, formChangeSoundFrame, formChangeCameraSchedule, revertCameraSchedule, entranceCameraSchedule, type EntranceCameraSchedule, ENTRANCE_ENEMY_LAST_FRAME, ENTRANCE_ENEMY_CAMERA_FADE_END_FRAME, revertFlashLevel, REVERT_FLASH_START_FRAME, REVERT_FLASH_FULL_FRAME, REVERT_FLASH_END_FRAME, REVERT_FLASH_KILL_FRAME, REVERT_VISUAL_END_FRAME, REVERT_CAMERA_FADE_END_FRAME, type RevertCameraSchedule,
   EVOL_EFFECT, EVOL_POS, EVOL_EFFECT_SCHEDULE, evolEffectsDue, driverEvolSchedule, type EvolSpawn,

@@ -41,7 +41,7 @@ import { ui, arenaPlacement, patchCopyRect, ARENA_BASE_Z,
   actorTeardown, ACTOR_RES_OFFSETS, ACTOR_TEARDOWN_STATE,
   RAND_U16,
   createBattleOpenCamera, formChangeCameraSchedule, entranceCameraSchedule, FormChangeProgram,
-  changeStageBg, changeStageMotionFrame, CHANGE_STAGE_FULL } from "./vendor/engine.js";
+  changeStageBg, changeStageMotionFrame, changeStageMeshMatrix, CHANGE_STAGE_FULL } from "./vendor/engine.js";
 import { createDigivolveCamera, createRevertCamera, stepFormChangeFrame, skipFormChange, DV_SHOT_INDEX, REVERT_SHOT_INDEX } from "./fight/digivolve-camera.js";
 const { createBattleFaceBox, battleFaceBoxVisible } = ui;
 
@@ -1206,34 +1206,15 @@ function drawQuad(gl, prog, mvp, bufs, tex, alpha, tint) {
   gl.drawElements(gl.TRIANGLES, bufs.count, gl.UNSIGNED_SHORT, 0);
 }
 
-// A stage model's bone rotation (stage.c / model_mesh.c: RotMatrixZYX_gte, R = Rz * Ry * Rx, angles in 4096 per
-// turn, PS1 space) as a column-major mat4, applied to the mesh before the fight-model -> world mapping.
-function psxRotMat4(rx, ry, rz) {
-  const k = Math.PI * 2 / 4096;
-  const cx = Math.cos(rx * k), sx = Math.sin(rx * k);
-  const cy = Math.cos(ry * k), sy = Math.sin(ry * k);
-  const cz = Math.cos(rz * k), sz = Math.sin(rz * k);
-  const r = [cz * cy, cz * sx * sy - cx * sz, cz * cx * sy + sx * sz,
-             sz * cy, sz * sx * sy + cx * cz, sz * cx * sy - sx * cz,
-             -sy,     cy * sx,                cy * cx];
+// A change-stage mesh's matrix (model_mesh.c FIGHTSTG_updateModel: RotMatrixZYX_gte, R = Rz * Ry * Rx, F0x8002b45c;
+// the bone rotation from FIGHTSTG_poseBone's integer key blend): ONE function in the engine, changeStageMeshMatrix,
+// builds it from the mesh's rotation keys and the motion frame; this only lays its row-major 3x3 (1.0 = 0x1000) out
+// as a column-major mat4 for the mesh, applied before the fight-model -> world mapping.
+function changeStageMat4(keys, frame) {
+  const r = changeStageMeshMatrix(keys, frame);
   const m = mat4Identity();
-  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col];
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col] / 4096;
   return m;
-}
-// model_mesh.c FIGHTSTG_poseBone: the rotation track's value at motion frame `u` (an exact key, else the
-// linear blend of the two keys round it; before the first key / after the last it holds the end key).
-function rotKeysAt(keys, u) {
-  if (!keys || !keys.length) return [0, 0, 0];
-  if (u <= keys[0][0]) return [keys[0][1], keys[0][2], keys[0][3]];
-  for (let i = 1; i < keys.length; i++) {
-    if (u <= keys[i][0]) {
-      const a = keys[i - 1], b = keys[i];
-      const t = (u - a[0]) / (b[0] - a[0]);
-      return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t];
-    }
-  }
-  const e = keys[keys.length - 1];
-  return [e[1], e[2], e[3]];
 }
 
 // Draw one projectile mesh layer (interleaved static pos+uv buffers, non-indexed tris).
@@ -5736,7 +5717,7 @@ void main() {
         if (!g.count) continue;
         const tex = arenaTextureFor(shownArena, g);
         let gm = mvp;
-        if (stageId && g.rotKeys) { const r = rotKeysAt(g.rotKeys, motionU); gm = mat4Mul(mvp, psxRotMat4(r[0], r[1], r[2])); }
+        if (stageId && g.rotKeys) gm = mat4Mul(mvp, changeStageMat4(g.rotKeys, motionU));
         const idx = arenaDebug.cull ? arenaCullIndices(gm, g) : null;
         if (idx) arenaCullLog.groups.push({ page: g.page, clut: g.clut, kept: idx.length / 3, total: (g.count / 3) | 0 });
         if (_pf3) _ptri += (g.count / 3) | 0;

@@ -37,6 +37,7 @@
 // "Blasted!" message before the task starts (menu.c WFIGHTMN_blast shows it, then starts the task).
 
 import { createTransformationSchedule } from "../dw3/battle-effect-driver-host.ts";
+import { rotMatrixZYX, type Mat3 } from "../dw3/gte-math.ts";
 
 /** The change task's first run (state 0: SOUND.loadBank(0x45)). */
 export const DV_TASK_START_FRAME = 0;
@@ -279,6 +280,51 @@ export const CHANGE_STAGE_MOTION_FRAMES = 1500;
 export function changeStageMotionFrame(frame: number): number {
   const t = Math.max(0, frame - CHANGE_STAGE_MODEL_FRAME);
   return (t % CHANGE_STAGE_MOTION_FRAMES) + 1;
+}
+
+/** A change-stage mesh bone's rotation track: [frame, x, y, z] keys, 4096 angle units a turn. */
+export type ChangeStageRotKeys = ReadonlyArray<ReadonlyArray<number>>;
+
+const s16c = (v: number): number => (v << 16) >> 16;
+
+/**
+ * The bone rotation at motion frame `frame` (model_mesh.c FIGHTSTG_poseBone, the rotation track): a key whose frame is
+ * exactly `frame` is taken as it is; otherwise the first key at or after the frame (cur) and the key before it (prev) give
+ * t = ((frame - prev.frame) << 12) / (cur.frame - prev.frame) (C integer division), step = (t * (cur - prev)) >> 12 per
+ * axis (gte_gpf12: IR0 * IR >> 12, arithmetic shift, IR saturated to 16 bits), out = prev + step as a 16-bit value.
+ * Past the last key the last key holds (the shipped loop never reaches that: frames are 1..1500, the last key is 1501).
+ */
+export function changeStageRotAt(keys: ChangeStageRotKeys, frame: number): [number, number, number] {
+  if (!keys.length) return [0, 0, 0];
+  const f = Math.trunc(frame);
+  let i = 0;
+  for (; i < keys.length; i++) {
+    if (keys[i]![0] === f) return [keys[i]![1]!, keys[i]![2]!, keys[i]![3]!];
+    if (keys[i]![0]! >= f) break;
+  }
+  if (i === 0 || i >= keys.length) {
+    const k = keys[Math.min(i, keys.length - 1)]!;
+    return [k[1]!, k[2]!, k[3]!];
+  }
+  const prev = keys[i - 1]!, cur = keys[i]!;
+  const t = Math.trunc(((f - prev[0]!) << 12) / (cur[0]! - prev[0]!));
+  const ax = (a: number, b: number): number => {
+    const d = s16c(b - a);
+    const m = (t * d) >> 12;
+    return s16c(a + (m > 0x7fff ? 0x7fff : m < -0x8000 ? -0x8000 : m));
+  };
+  return [ax(prev[1]!, cur[1]!), ax(prev[2]!, cur[2]!), ax(prev[3]!, cur[3]!)];
+}
+
+/**
+ * The change-stage mesh's rotation matrix at motion frame `frame` (model_mesh.c FIGHTSTG_updateModel: RotMatrixZYX_gte
+ * (&bone->rot, &bone->local), F0x8002b45c, R = Rz * Ry * Rx, row-major 3x3, 1.0 = 0x1000), then ScaleMatrix with the
+ * bone's scale: MEFT1028 and MEFT1031 carry scale 0x1000 and translation 0 on every mesh (their ctrl bins), so the local
+ * matrix is the rotation alone.
+ */
+export function changeStageMeshMatrix(keys: ChangeStageRotKeys, frame: number): Mat3 {
+  const r = changeStageRotAt(keys, frame);
+  return rotMatrixZYX(r[0], r[1], r[2]);
 }
 
 /**
