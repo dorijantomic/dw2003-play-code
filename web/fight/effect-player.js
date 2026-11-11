@@ -226,7 +226,7 @@ export class EffectPlayer {
       if (!sx || !sy) continue;                      // F0x800893dc: draw only when scaled
       const rot = plan.rotation ?? { x: 0, y: 0, z: 0 };
       out.push({
-        arch: ins.arch, frame: plan.frame, clutShift: plan.clut,
+        arch: ins.arch, frame: plan.frame, clutShift: plan.clut, type: ins.type,
         side: ins.side, screen: plan.screen, pos: ins.pos,
         dx: ch[2] | 0, dy: ch[3] | 0, sx, sy,
         // The three RotMatrix angles about the draw point (PS1 units: 4096 = 360 deg).
@@ -254,7 +254,7 @@ export async function loadEffectAssets(base = "assets/battle/effects") {
 }
 
 /** The sheet clip a sprite descriptor draws (channel 1 selects a palette-cycled "id@shift" variant). */
-function effectClip(arch, s) {
+export function effectClip(arch, s) {
   return (s.clutShift ? arch?.clips?.[`${s.frame}@${s.clutShift & 0xFF}`] : null)
     ?? arch?.clips?.[String(s.frame)];
 }
@@ -275,6 +275,96 @@ export function effectsBlendBackdrop(list, manifest) {
 }
 
 /**
+ * Effect types the original sends to BATTLE_LAYER_FRONT (over everything): sprite_effect.c:432-438
+ * (FIGHTSTG_updateSpriteEffect) - 1000-1002 and 1007. Every other op3 effect goes to
+ * BATTLE_LAYER_MODELS, the fighters' own ordering table.
+ */
+export const FRONT_EFFECT_TYPES = new Set([1000, 1001, 1002, 1007]);
+
+/**
+ * Which side of the fighters a sprite draws on. sprite_anim.c:13-45 (FIGHTSTG_drawSpriteAnim):
+ * pos.z == -1 -> ordering-table depth 0xFFF = drawn BEFORE every fighter polygon ("under");
+ * pos.z == 0x7FFF -> depth 0 = drawn AFTER them ("over"); world-space points are projected and
+ * stay "over" here. FRONT effects are "over" whatever their z. A descriptor with no numeric
+ * `type` (the presentation's own synthetic sprites) is never classed "under".
+ */
+export function effectLayer(s) {
+  if (typeof s?.type !== "number") return "over";
+  if (FRONT_EFFECT_TYPES.has(s.type)) return "over";
+  return s.screen && (s.pos?.z | 0) === -1 ? "under" : "over";
+}
+
+/**
+ * The placement of one sprite, shared by the 2D pass (drawEffects) and the GL pass
+ * (web/fight/effect-under-gl.js) so the two cannot differ. `view` as drawEffects.
+ * Returns null when the sprite is not drawn. Units: canvas px.
+ */
+export function spriteGeometry(s, clip, view) {
+  let x, y;
+  if (s.screen) {
+    // BOTH sentinels are CENTRE-relative — but "centre" is the DRAW OFFSET OF THE LAYER the
+    // effect sits on, not the screen. The draw routine F0x8008921c (fightstg.s L6334-6376)
+    // tests z against 0x7fff and -1 and sends both to the same block at .L0x8008926c, which
+    // stores x and y into the draw point unchanged; the sentinels differ only in the OT depth
+    // stored next (0 vs 0xfff) — see effectLayer() below, which picks the side, never the spot.
+    // The layer offset is where the point is counted from: sprite_effect.c:457-461 sends ids
+    // 1000-1002 and 1007 to BATTLE_LAYER_FRONT and every other id to BATTLE_LAYER_MODELS;
+    // types.h:59-61 gives FRONT setOffset(0,0) and MODELS setOffset(0xA0,0x78) = (160,120),
+    // and layer.c:136-137 applies that offset as the GPU draw-env origin. So the 4 FRONT ids
+    // are authored against the TOP-LEFT corner (1002 at (160,120) is the screen centre; the
+    // full-screen 1000/1001 clips are anchored at 0,0), while every MODELS effect is
+    // centre-relative — of 1,450 screen-space op3 spawns the 1,300 at (0,0) are MODELS ones
+    // meaning "around the Digimon", not the top-left. Treating both as centre-relative threw
+    // the FRONT ids (1002 and the 1007 Blast start fire, the 1000/1001 DNA burst) half a
+    // screen down-right.
+    const o = FRONT_EFFECT_TYPES.has(s.type) ? 1 : 0;
+    x = view.centerX + (s.pos.x - 160 * o) * view.pxScale;
+    y = view.centerY + (s.pos.y - 120 * o) * view.pxScale;
+  } else {
+    const p = view.worldToScreen(s.pos, s.side);
+    if (!p) return null;
+    x = p.x; y = p.y;
+  }
+  x += s.dx * view.pxScale;
+  y += s.dy * view.pxScale;
+  // Negative scale = MIRROR about the draw point (PS1 sprite scaling is signed - the DNA
+  // fusion burst 1004 and orb 1006 are the mirrored halves/pair; they were silently
+  // dropped when the negative width fell through the < 1 cull).
+  const fx = s.sx < 0 ? -1 : 1, fy = s.sy < 0 ? -1 : 1;
+  const w = clip.w * Math.abs(s.sx) * view.pxScale;
+  const h = clip.h * Math.abs(s.sy) * view.pxScale;
+  if (w < 1 || h < 1) return null;
+  // Rotate about the draw point, mirror if scale is negative, then place the authored
+  // anchor (ox,oy) - the flip moves the anchor to the other side by itself. All THREE
+  // angles apply: tip and turn foreshorten the sprite's quad (its plane turns away from
+  // the camera), spin turns it in the screen plane. Sprites with no angles keep the
+  // identity matrix, so the common case is untouched.
+  const rx = s.rotX | 0, ry = s.rotY | 0;
+  const rz = s.rotZ != null ? (s.rotZ | 0) : Math.round((s.rot || 0) * TURN / (Math.PI * 2));
+  let A = 1, B = 0, C = 0, D = 1;
+  if (rx || ry) {
+    const m = spriteMatrix2x2(rx, ry, rz);
+    A = m.a; B = m.b; C = m.c; D = m.d;
+  } else if (rz) {
+    const r = (rz / TURN) * Math.PI * 2;
+    A = Math.cos(r); B = Math.sin(r); C = -B; D = A;
+  }
+  return {
+    // canvas affine = translate(x,y) . rotation/tip/turn . scale(fx,fy)
+    a: A * fx, b: B * fx, c: C * fy, d: D * fy, e: x, f: y,
+    dx: clip.ox * Math.abs(s.sx) * view.pxScale,
+    dy: clip.oy * Math.abs(s.sy) * view.pxScale,
+    w, h,
+  };
+}
+
+/** The four canvas-px corners (TL, TR, BR, BL) of a rect (dx,dy,w,h) drawn under geometry `g`. */
+export function spriteCorners(g, rect = g) {
+  const pts = [[rect.dx, rect.dy], [rect.dx + rect.w, rect.dy], [rect.dx + rect.w, rect.dy + rect.h], [rect.dx, rect.dy + rect.h]];
+  return pts.map(([u, v]) => [g.a * u + g.c * v + g.e, g.b * u + g.d * v + g.f]);
+}
+
+/**
  * Draw one tick's sprites onto a 2D context. `view`:
  *   worldToScreen(psxOffset, side) → {x,y} canvas px (project an attacker-relative PS1 point)
  *   centerX, centerY (canvas px of the PSX screen centre), pxScale (canvas px per PSX px)
@@ -290,35 +380,9 @@ export function drawEffects(ctx, list, manifest, images, view) {
     // clutShift (channel 1) selects a palette-cycled variant, pre-cut as "id@shift"
     const clip = effectClip(arch, s);
     if (!clip || !clip.w || !clip.h) continue;
-    let x, y;
-    if (s.screen) {
-      // BOTH sentinels are CENTRE-relative. The draw routine F0x8008921c (fightstg.s
-      // L6334-6376) tests z against 0x7fff and against -1 and sends both to the same block at
-      // .L0x8008926c, which stores x and y into the draw point unchanged; the sentinels differ
-      // only in the OT depth stored next (0 vs 0xfff), i.e. how far forward the sprite sits,
-      // never where it sits. The shipped data agrees: of 1,450 screen-space op3 spawns across
-      // the 245 model packs, 1,300 are (0,0) - on the Digimon the camera centres - and the
-      // negative ones (-101,39), (-30,-15) only mean anything against a centre. The 18 at
-      // (-160,-120) are full-screen clips pinned to the top-left corner, and type 2041's own
-      // record adds dx/dy = (160,120) to bring its clip back to the middle.
-      // Treating 0x7fff as absolute 320x240 threw all 1,300 into the top-left corner: Diamond
-      // Storm's shard burst and four-petal bloom drew there instead of around Renamon.
-      x = view.centerX + s.pos.x * view.pxScale;
-      y = view.centerY + s.pos.y * view.pxScale;
-    } else {
-      const p = view.worldToScreen(s.pos, s.side);
-      if (!p) continue;
-      x = p.x; y = p.y;
-    }
-    x += s.dx * view.pxScale;
-    y += s.dy * view.pxScale;
-    // Negative scale = MIRROR about the draw point (PS1 sprite scaling is signed — the DNA
-    // fusion burst 1004 and orb 1006 are the mirrored halves/pair; they were silently
-    // dropped when the negative width fell through the < 1 cull).
-    const fx = s.sx < 0 ? -1 : 1, fy = s.sy < 0 ? -1 : 1;
-    const w = clip.w * Math.abs(s.sx) * view.pxScale;
-    const h = clip.h * Math.abs(s.sy) * view.pxScale;
-    if (w < 1 || h < 1) continue;
+    const g = spriteGeometry(s, clip, view);
+    if (!g) continue;
+    const { w, h, dx, dy } = g;
     ctx.save();
     // PS1 semi-transparency mode from the clip record: 1 = B+F (additive), 3 = B+F/4,
     // 0 = B/2+F/2 (half-mix), 2 = B-F (approximated), else opaque. (Same mapping as the
@@ -335,23 +399,7 @@ export function drawEffects(ctx, list, manifest, images, view) {
       ctx.globalCompositeOperation = "multiply";
       ctx.filter = "invert(1)";
     }
-    // Rotate about the draw point, mirror if scale is negative, then place the authored
-    // anchor (ox,oy) — the flip moves the anchor to the other side by itself. All THREE
-    // angles apply: tip and turn foreshorten the sprite's quad (its plane turns away from
-    // the camera), spin turns it in the screen plane. Sprites with no angles skip the
-    // transform entirely, so the common case is untouched.
-    ctx.translate(x, y);
-    const rx = s.rotX | 0, ry = s.rotY | 0;
-    const rz = s.rotZ != null ? (s.rotZ | 0) : Math.round((s.rot || 0) * TURN / (Math.PI * 2));
-    if (rx || ry) {
-      const m = spriteMatrix2x2(rx, ry, rz);
-      ctx.transform(m.a, m.b, m.c, m.d, 0, 0);
-    } else if (rz) {
-      ctx.rotate((rz / TURN) * Math.PI * 2);
-    }
-    if (fx < 0 || fy < 0) ctx.scale(fx, fy);
-    const dx = clip.ox * Math.abs(s.sx) * view.pxScale;
-    const dy = clip.oy * Math.abs(s.sy) * view.pxScale;
+    ctx.transform(g.a, g.b, g.c, g.d, g.e, g.f);
     ctx.drawImage(img, clip.x, clip.y, clip.w, clip.h, dx, dy, w, h);
     // The PS1 blends a semi-transparent sprite only where the palette entry's STP bit is
     // set; a texel with the bit clear is drawn SOLID inside the same sprite. The extractor

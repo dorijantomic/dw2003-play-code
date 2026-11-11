@@ -14,6 +14,7 @@
 
 import { assetMode, setAssetMode, assetRequest, hdAssetUrl,
          ASSET_MODE_AUTHENTIC, ASSET_MODE_HD } from "./assets.js";
+import { buildBossList, esdmgStagesNeeded, filterBossList, startBossBattle } from "./devtools-bosslist.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -155,6 +156,60 @@ async function loadData() {
   dataReady = true;
 }
 
+// ── "Bosses & tamers": every scripted battle, one click, the opponent's whole party ──
+// Row building lives in devtools-bosslist.js (pure, tested). The data is fetched once
+// (the same files the game reads) and only when the Battles pane is first drawn.
+let bossRowsPromise = null;
+function loadBossRows() {
+  bossRowsPromise ??= (async () => {
+    const j = (p) => fetch(p).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const [stageEnc, fieldEnc, scripted] = await Promise.all([
+      j("assets/data/stage_encounters.json"), j("assets/data/field_encounters.json"), j("assets/data/scripted_battles.json"),
+    ]);
+    if (!stageEnc || !fieldEnc) throw new Error("stage_encounters.json / field_encounters.json did not load");
+    const esdmgByStage = {};
+    await Promise.all(esdmgStagesNeeded(scripted).map(async (n) => { esdmgByStage[n] = await j(`assets/events/esdmg${n}.json`); }));
+    return buildBossList({ stageEnc, fieldEnc, scripted: scripted ?? {}, esdmgByStage,
+      manifestMaps: DATA.manifest.maps ?? [], stageNames: DATA.stageNames });
+  })();
+  return bossRowsPromise;
+}
+
+function renderBossList(pane) {
+  pane.append(el("h2", {}, "Bosses & tamers"));
+  pane.append(el("div", { className: "hint" },
+    "Every scripted battle (the script launcher's zone block 3 of each stage; wild encounters are not here). ",
+    "Click a row: the normal startScreen path with the opponent's WHOLE party, so an enemy tag can happen. ",
+    "Opponent = the one non-player speaker of the pre-fight scene; 'unknown' when the data holds none or several."));
+  const search = el("input", { type: "text", id: "btBossSearch", placeholder: "search name, place, Digimon, screen id", style: "width:340px" });
+  const count = el("span", { className: "hint" });
+  const list = el("div", { id: "btBossList", style: "max-height:360px;overflow:auto;margin-top:6px" });
+  pane.append(el("div", { className: "row" }, search, count), list);
+
+  let rows = [];
+  const draw = () => {
+    const shown = filterBossList(rows, search.value);
+    count.textContent = `${shown.length} of ${rows.length}`;
+    list.textContent = "";
+    for (const r of shown) {
+      const places = r.places.slice(0, 3).map((p) => `${p.mapId} ${p.mapName}`.trim()).join("; ")
+        + (r.places.length > 3 ? `; +${r.places.length - 3} more` : "");
+      const party = r.party.map((p) => `${p.name} L${p.level}`).join(", ");
+      const b = el("button", { className: "act", style: "display:block;width:100%;text-align:left;margin:2px 0",
+        textContent: `${r.opponent} | ${places} | ${party} | screen ${r.screenId}` });
+      b.title = r.speakers.length ? `speakers in the pre-fight scene: ${r.speakers.join(", ")}` : "";
+      b.addEventListener("click", async () => {
+        const ok = await startBossBattle(win().__dev, r, win().__mapInfo?.().id);
+        log(`boss list: screen ${r.screenId} (${r.opponent}, ${r.party.length} Digimon) -> ${ok ? "started" : "no party for screen"}`);
+      });
+      list.append(b);
+    }
+  };
+  search.addEventListener("input", draw);
+  list.textContent = "loading…";
+  loadBossRows().then((r) => { rows = r; draw(); }, (e) => { list.textContent = `could not build the list: ${e.message}`; });
+}
+
 // arena-id -> a (stage, screen) pair whose trigger record selects it, so a
 // chosen arena can be forced through the renderer's own setArenaStage.
 function arenaReverseMap() {
@@ -289,6 +344,8 @@ function renderBattles() {
     log(`startScreenBattle ${id} -> ${ok ? "started" : "no party for screen"}`);
   });
   pane.append(el("div", { className: "row" }, scr, scrGo));
+
+  renderBossList(pane);
 
   pane.append(el("h2", {}, "In-battle paths (existing hooks)"));
   pane.append(el("div", { className: "hint" }, "Enabled while a battle is live. These call the same "

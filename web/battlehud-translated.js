@@ -126,12 +126,20 @@ export function battleHudPlayerRecords(b) {
     });
 }
 
-/** The enemy side's one record (a missing enemy is absent, so no marker is drawn). */
-export function battleHudEnemyRecords(b) {
-    const e = b.enemy;
-    if (!e) return [null, null, null];
-    return [{ hp: Number(e.hp ?? 0), maxHp: Number(e.maxHp ?? 0),
-        ailments: e.ailments, statusBits: e.statusBits }, null, null];
+/**
+ * The enemy side's records. The original keeps three enemy combatant records at
+ * 0x800a44d0 (stride 0x20; a slot whose id is 0 is empty, wfightmn setup loop at file
+ * 0x8bdc-0x8c0c, docs/research/battle/battle-invocation.md) and the marker loop draws
+ * every present one unless the battle-kind word 0x800a4536 is 4 or more (the finale).
+ * Without `team` the side has its one record (a missing enemy is absent, so no marker
+ * is drawn). With `team` (an array of up to three slot records, in slot order, null for
+ * an empty slot) every present member is returned, a knocked-out one with hp 0.
+ */
+export function battleHudEnemyRecords(b, team = null) {
+    const rec = (e) => (e ? { hp: Number(e.hp ?? 0), maxHp: Number(e.maxHp ?? 0),
+        ailments: e.ailments, statusBits: e.statusBits } : null);
+    if (Array.isArray(team) && team.length > 0) return [0, 1, 2].map((i) => rec(team[i]));
+    return [rec(b.enemy), null, null];
 }
 
 /** The bar length in 128ths of the full 128-pixel bar (.L0x800936b4-.L0x800936d4). */

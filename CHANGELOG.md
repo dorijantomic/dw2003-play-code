@@ -3,6 +3,30 @@
 Newest first. Player-facing notes for each release are in `packaging/RELEASE_NOTES.md`.
 A feature marked "off for players" is not in the installed game: it is hidden and forced off there (`web/ship-list.js`) and shows only on a source checkout under F2.
 
+## Unreleased
+
+Not yet in a release. No `v0.1.4` tag exists; the commits below are in the tree but were left out of the v0.1.4 section.
+
+### Battle
+- Digivolve, Blast and de-digivolve follow the original change task: same timeline, camera, flash, wipe, effects and music frames. Blast and manual changes use the original change stages MEFT1028 / MEFT1031.
+- The FRONT effect layer is placed as in the original. Effects that belong under the fighters are drawn under them with the original blends (opaque, half, add, subtract, quarter).
+- A tag, a KO replacement and the next enemy play the entrance. An enemy can tag itself out, as in the original.
+- The HUD draws a square for each member of the enemy team.
+- After a KO the next team member comes in (before, the battle was won after the first KO).
+
+### Field
+- Firefox speed: grass copied once per frame, the field is not drawn under a battle, the 3D battle has its own layer; field 12 -> 172 fps, battle 10 -> 63 fps in Firefox at 960x720 (c880c2be5).
+
+### Online
+- A dropped player keeps their seat for 2 minutes ("away") and can come back to the same id, name and place; Leave frees the seat at once. The relay checks rejoin-aware games every 5 s.
+- A multiplayer fight waits for an away player (60 s) and shows "Connection lost. Reconnecting..." on the dropped side.
+
+### Installer and build
+- HD Remaster in the setup page (on by default), built in the background while playing; the upscaler runs on ONNX Runtime and a full HD pack takes about 20 min instead of 52+ (1b798fde8).
+
+### Under the hood
+- Dev tools: a "Bosses & tamers" list with the 213 scripted battles, each with its full team.
+
 ## v0.1.4 (2026-11-10)
 
 256 commits since v0.1.3. Known issue: the macOS build fails on GitHub (runner macos-14 unsupported), so there is no Mac download in this release.

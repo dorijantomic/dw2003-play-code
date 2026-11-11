@@ -180,24 +180,34 @@ test("the bgm player restarts the same track after the register is replaced", as
     "the saved track starts again from the top");
 });
 
-test("both EVOLUTIO programs start through the register, and the replay restores the track", () => {
+test("both EVOLUTIO programs start through the register, and the replay restores the track", async () => {
   const src = battleJs();
   const starts = src.match(/sfx\?\.playBank\?\.\("evo_00", "evolutio"\)/g) || [];
-  assert.equal(starts.length, 2, "Blast-on's trigger and manual DV's sound frame both start EVOLUTIO");
+  // ONE shared call serves Blast-on and manual DV: it fires on the presentation sound frame (f-180,
+  // formChangeSoundFrame), in the same arm that plays the revert / entrance PLAYER11.
+  assert.equal(starts.length, 1, "one shared EVOLUTIO start serves Blast-on and manual DV");
+  const arm = src.match(/if \(!show\.sounded && soundFrame != null && frame >= soundFrame\) \{([\s\S]*?)\n    \}/);
+  assert.ok(arm, "the presentation's sound-frame arm exists");
+  assert.ok(arm[1].includes('sfx?.playBank?.("evo_00", "evolutio")'),
+    "the EVOLUTIO start sits inside the sound-frame arm");
   // NO explicit stop call: the disc's rule is two exclusive starts — EVOLUTIO
   // (bit 30) takes the register, and the register stops the battle track it
   // replaces (fns.s:17704-17717).  The old bgm.play(null) pair stopped a track
   // the shared register now ends for it.
   assert.ok(!src.includes("bgm?.play(null)") && !src.includes("bgm.play(null)"),
     "no per-case stop calls: the register ends the track EVOLUTIO replaces");
-  const done = src.indexOf("if (s.done) {");
-  assert.ok(done > 0, "the presentation's end arm should exist");
-  const replay = src.slice(done, done + 1200);
-  assert.ok(replay.includes("bgm.play(b._battleTrack);"),
-    "the end of the transformation must re-play the saved track");
-  assert.ok(replay.includes("FormChangeProgram.MANUAL_DV")
-    && replay.includes("FormChangeProgram.BLAST_ON"),
-    "both EVOLUTIO programs replay; the revert's PLAYER11 does not");
+  // The replay: the saved track starts again on the music frame (f651, returnToBattle), in one arm shared by
+  // both EVOLUTIO programs; the revert / entrance (PLAYER11) has no music frame.
+  const music = src.match(/if \(!show\.musicBack && musicFrame != null && frame >= musicFrame\) \{([\s\S]*?)\n    \}/);
+  assert.ok(music, "the music-frame arm should exist");
+  assert.ok(music[1].includes("bgm.play(b._battleTrack);"),
+    "the return of the transformation must re-play the saved track");
+  const { FormChangeProgram, formChangeMusicFrame } = await import("../engine/systems/blast-presentation.ts");
+  assert.ok(formChangeMusicFrame(FormChangeProgram.MANUAL_DV) != null
+    && formChangeMusicFrame(FormChangeProgram.BLAST_ON) != null,
+    "both EVOLUTIO programs replay");
+  assert.equal(formChangeMusicFrame(FormChangeProgram.BLAST_REVERT), null, "the revert's PLAYER11 does not");
+  assert.equal(formChangeMusicFrame(FormChangeProgram.ENTRANCE_ENEMY), null, "nor does the enemy entrance");
   // The register exists and is seeded at battle start.
   assert.ok(src.includes("battle._battleTrack = musicForScreen(screenId, mapId);"),
     "the battle must save its current track like [0x80042b30]");

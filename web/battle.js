@@ -82,8 +82,8 @@ import { nearestTell, tellText } from "./enemy-tells.js";
 import {
   physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, fleeChance, drainHeal, RAND_U16,
   hitGaugeGain, levelTier, blastTargetId, counterCrestProc, enemyFleeProc, runAwayLine,
-  blastPresentationState, BLAST_FIRST_FRAME,
-  FormChangeProgram, formChangeState, formChangeSoundFrame, evolEffectsDue,
+  blastPresentationState, BLAST_FIRST_FRAME, DV_TASK_START_FRAME,
+  FormChangeProgram, formChangeState, formChangeSoundFrame, formChangeMusicFrame, evolEffectsDue,
   statusRoll, counterDamage,
   enemyMoveCondition,
   pickEnemyAiMove,
@@ -183,6 +183,10 @@ import { loadPack, drawClip, drawClipWidth, clipSize, packReady, drawClipAtPalet
 import { drawText as uiDrawText, drawIconGlyph, fontReady as uiFontReady } from "./uifont.js";
 import { drawItemIcon, itemFamily } from "./itemicons.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
+import {
+  enemySwitchTarget, enemySelfTagPick, enemyTeamSlots, firstAliveEnemySlot,
+  ENEMY_SWITCH_MSG_TAKING_OUT, ENEMY_SELFTAG_NAME_FRAME,
+} from "./enemy-switch.js";
 
 // Native post-battle fight-report chrome (stfgtrep overlay). See
 // docs/research/ui/stfgtrep-decoded-2026-07-12.md — the census row asking
@@ -323,16 +327,12 @@ export function currentMenuItems(b) {
   return MENU_ITEMS;
 }
 export const DV_GAUGE_MAX = 1000;
+// Tag = message 0x38 ("Go for it!"), then FIGHTSTG_startEntrance(id, 0, weak) (entrance.c, menu.c:382): the
+// camera, flash, PLAYER11 and model swap are the entrance program (engine FormChangeProgram.BLAST_REVERT, side 0).
 export const TAG_PRESENTATION = Object.freeze({
   sequence: 0x38,
   outgoingSeconds: 0.6,
-  arrivalFrames: 131,
-  arrivalSeconds: 131 / 60,
-  arrivalClip: "idle",
 });
-export function tagArrivalComplete(elapsedSeconds) {
-  return elapsedSeconds * 60 >= TAG_PRESENTATION.arrivalFrames;
-}
 
 // Split the decoded clip-12 fullScript into single-actor stage chunks. The script never
 // shows two of its actors at once (slot 1 = parent A, slot 2 = parent B, slot 3 = result),
@@ -3151,12 +3151,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // then closes the Tag and hands the turn back (:16327 reads it, :16335 calls
   // self+0x2C(self, 2)), so the command list comes back rather than the partner
   // list. There is no separate form screen before the pane: a confirmed position
-  // seats the pane directly. `?legacyTagSwap=1` keeps the walker's own DNA-DV
-  // row pane (drawDnaChoice) instead of the translated one, on the partner's
-  // live form; Cross there reopens the partner list.
-  const USE_ORIGINAL_TAG_SWAP = typeof location === "undefined"
-    ? true
-    : !new URLSearchParams(location.search).has("legacyTagSwap");
+  // seats the pane directly.
   // The follow-up both Tag and DNA commands land on: the translated pane from
   // F0x800980E4 (web/battledna-translated.js, engine FightDnaSession). It is
   // the original's ONE object, so this single adapter serves the DNA command and
@@ -3164,7 +3159,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // strip plus "Switch" and "DNA DV" with the Jogress price, and without one the
   // "Switch" row on its own.
   // `?legacyDnaList=1` keeps the walker's own Switch / DNA DV pane for the DNA
-  // command; `?legacyTagSwap=1` keeps the walker's chain for the Tag follow-up.
+  // command.
   const USE_TRANSLATED_DNA = typeof location === "undefined"
     ? false
     : !new URLSearchParams(location.search).has("legacyDnaList");
@@ -3669,32 +3664,32 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   /**
-   * Begin Blast-on. The form swap and the full heal no longer land on this
-   * call: the runtime capture (BLAST-C010) shows a ~14 s transformation in which
-   * the model changes at frame 312 and the heal lands at frame 600, so both are
-   * applied by advanceBlastPresentation() on their captured frames. The state
-   * flags and the jingle still land here.
+   * Begin Blast-on. The form swap, the full heal and the EVOLUTIO jingle do not land on
+   * this call: the original change task (digimon_change.c, timeline in
+   * engine/systems/blast-presentation.ts) plays EVOLUTIO on f-180, swaps the model on f278 and
+   * the menu heals when the new model's motion is 13 (f438), so advanceBlastPresentation()
+   * applies them on those frames, counted from the task start f-214. The state flags land here.
    */
   function triggerBlast(b = battle) {
     const p = b.player;
     const target = blastTargetProfile(p, digimonDB);
     if (!target) return false;
     b.blast = { active: true, savedFormId: p.profile?.id ?? p.rookieId, playerTurns: 6 };
-    sfx?.playBank?.("evo_00", "evolutio"); // shared digivolution jingle EVOLUTIO [BLAST-C009]
+    // The shared digivolution jingle EVOLUTIO [BLAST-C009] is played by advanceBlastPresentation on f-180.
     // EVOLUTIO (0x41140000) is a bit-30 music-start id: its start takes the one
     // exclusive-track register D0x80055c34 and the register stops the held battle
     // track through it — no explicit stop call is needed (fns.s:17704-17717). The
-    // track is re-triggered when the transformation ends (see the replay in
+    // track is re-triggered by returnToBattle on f651 (see the replay in
     // advanceBlastPresentation), and that start stops EVOLUTIO in turn.
     // esmfight 0x61 = "Blasted!", shown under the name banner (obj A carries
     // string 0x16 = "{1}", the bare name slot).
     sayOriginal(b,
       { kind: MSG_KIND.OUTCOME, payload: [MSG.BLASTED], name: p.profile?.name ?? "Your partner" },
       `${p.profile?.name ?? "Your partner"} Blasted!`);
-    // The presentation itself. `frame` counts the capture's own frames.
+    // The presentation itself. `frame` counts 60 Hz ticks, f0 = the start cut; the task starts on f-214.
     b.blastShow = {
       program: FormChangeProgram.BLAST_ON,
-      frame: 0, target, swapped: false, healed: false, state: null, sounded: true,
+      frame: DV_TASK_START_FRAME, target, swapped: false, healed: false, state: null, sounded: false,
       endMessage: "",   // the "Blasted!" line already showed; nothing follows it
     };
     // No face-cam inset during the transformation: the capture is a clean scene
@@ -3703,7 +3698,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return true;
   }
 
-  // The capture is a 60 Hz recording, so its frame numbers are the unit here.
+  // The change task counts 60 Hz game ticks: the presentation frame advances 60 per second.
   const BLAST_CAPTURE_HZ = 60;
 
   /**
@@ -3714,6 +3709,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    */
   function advanceBlastPresentation(b, dt) {
     const show = b.blastShow;
+    // An entrance first has its entering fighter's model loaded (the original adds it hidden in state 0 before
+    // anything shows): the presentation clock does not start until the folder is resolved and preloaded.
+    if (show.entrance && !show.entrance.ready) return;
     // "Digivolve Demo: OFF" (the pause-menu setting) skips the CINEMATIC only.
     // The program still runs; it is advanced far enough in one step to cross
     // every threshold it owns, so the model swap, the full heal and the end
@@ -3722,7 +3720,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const skip = !digivolveDemoOn();
     if (skip) show.frame = 1e6;
     else show.frame += dt * BLAST_CAPTURE_HZ;
-    const prevFrame = show.lastFrame ?? -1;
+    const prevFrame = show.lastFrame ?? -Infinity;
     const frame = Math.round(show.frame);
     show.lastFrame = frame;
     const s = formChangeState(show.program, frame);
@@ -3735,35 +3733,52 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }
     }
     show.state = s;
-    renderer3d?.blastPresentationSet?.(s);
+    renderer3d?.blastPresentationSet?.(s, show.program, skip,
+      () => lowHpStance(show.entranceSide === 1 ? b.enemy : b.player), show.entrance ?? null);
 
     // The "... Blasted!" line is dismissed before the animation proper starts.
     if (show.program === FormChangeProgram.BLAST_ON
       && show.frame >= BLAST_FIRST_FRAME && b.message) b.message = "";
 
-    // Each program's jingle fires on its captured frame, not at commit:
-    // Manual DV's EVOLUTIO at +34 (dv_manual.txt: commit f6005, SOUND
-    // 0x41140000 f6039) and the revert's PLAYER11 at +50 (blast_run4.txt:
-    // commit f5938, SOUND 0xa0045ec9 f5991). Blast-on's EVOLUTIO is played by
-    // triggerBlast and marks itself sounded, so this never double-fires.
+    // Each program's jingle fires on its own frame, not at commit: EVOLUTIO on f-180 for
+    // Blast and manual DV (substate 1, once the stage fade-out is over) and the revert's
+    // PLAYER11 at +50 (blast_run4.txt: commit f5938, SOUND 0xa0045ec9 f5991).
     const soundFrame = formChangeSoundFrame(show.program);
     if (!show.sounded && soundFrame != null && frame >= soundFrame) {
       show.sounded = true;
-      if (show.program === FormChangeProgram.MANUAL_DV) {
-        sfx?.playBank?.("evo_00", "evolutio");   // takes the register; the battle track stops
-      }
-      else if (show.program === FormChangeProgram.BLAST_REVERT) sfx?.play("player11");
+      if (show.program === FormChangeProgram.BLAST_REVERT || show.program === FormChangeProgram.ENTRANCE_ENEMY) sfx?.play("player11");
+      else sfx?.playBank?.("evo_00", "evolutio");   // takes the register; the battle track stops
+    }
+    // returnToBattle (f651, the run that arms the camera fade): the battle music starts again. That
+    // start stops EVOLUTIO through the same register — two exclusive starts, no stop call.
+    const musicFrame = formChangeMusicFrame(show.program);
+    if (!show.musicBack && musicFrame != null && frame >= musicFrame) {
+      show.musicBack = true;
+      if (bgm && b._battleTrack) bgm.play(b._battleTrack);
     }
 
-    // Model hide/swap point: from here the fighter IS the incoming form, drawn
-    // as a wireframe first and solid later by the renderer. The revert and
-    // manual DV have already swapped at commit (their captures put the model
-    // load before the presentation), so `target` is null for them and this is
-    // a no-op.
-    if (!show.swapped && s.showNewModel && show.target) {
+    // Swap point (f278, swapInNewDigimon): from here the fighter IS the incoming form, wiped in
+    // over its wireframe by the renderer. Blast and manual DV both swap here. The ENTRANCE (either side)
+    // swaps at its cut, f114 (entrance.c showEnteringModel: models->setId), and its caller commits its record in
+    // the same step through `onSwap` (menu.c: `entrance->done`).
+    if (!show.swapped && s.showNewModel && (show.target || show.swapName)) {
       show.swapped = true;
-      setLiveBattleForm(b.player, show.target);   // temporary, not persisted (like manual DV)
-      swapPlayerModel(show.target.name);
+      if (show.target) setLiveBattleForm(b.player, show.target);   // temporary, not persisted (like manual DV)
+      show.onSwap?.();
+      const folder = show.entrance?.folder;
+      if (show.entranceSide === 1) {
+        if (folder && renderer3d) renderer3d.setEnemyDigimon(folder);
+        else swapEnemyModel(show.swapName);
+      } else if (folder && renderer3d) {
+        renderer3d.setPlayerDigimon(folder);
+      } else {
+        swapPlayerModel(show.target?.name ?? show.swapName);
+      }
+    }
+
+    if (show.pageAt != null && !show.pageSaid && frame >= show.pageAt) {
+      show.pageSaid = true;
+      show.onPage?.();
     }
 
     // Unconditional full heal [BLAST-C007], landing on its captured frame. Only
@@ -3783,18 +3798,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       renderer3d?.blastPresentationStop?.();
       renderer3d?.setFaceCamVisible?.(true);
       if (show.endMessage) sayOriginal(b, show.endSpec ?? null, show.endMessage);
-      else clearBattleLine(b);   // the original's box is empty when the cinematic ends
+      else if (!show.pageSaid) clearBattleLine(b);   // the original's box is empty when the cinematic ends
       b.timer = 0;
-      // The digivolution path re-plays the saved battle track once the transformation
-      // ends: fightstg F0x80089cd8 loads [0x80042b30] and hands it to the packed-sound
-      // player (.L0x8008a764-.L0x8008a778). That start stops EVOLUTIO through the same
-      // register — two exclusive starts, no stop call. Both EVOLUTIO programs run
-      // through that path, so both restore the track; the revert's PLAYER11 is a
+      show.onDone?.();
+      // The saved battle track was re-played on f651 (musicFrame above); the revert's PLAYER11 is a
       // positional one-shot that never touches the register and has nothing to restore.
-      if ((show.program === FormChangeProgram.MANUAL_DV
-        || show.program === FormChangeProgram.BLAST_ON) && bgm && b._battleTrack) {
-        bgm.play(b._battleTrack);
-      }
     }
   }
 
@@ -3809,8 +3817,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const p = b.player;
     if (!b.blast) return;
     const saved = digimonDB?.[b.blast.savedFormId] ?? digimonDB?.[p.rookieId] ?? p.profile;
+    // The roster record is restored here (capture: STATE form 0x177 -> 0x175 before the presentation); the 3D
+    // MODEL is swapped by the entrance at its cut, f114 (menu.c:942 FIGHTSTG_startEntrance(prevId, 0, weak)).
     setLiveBattleForm(p, saved);
-    swapPlayerModel(saved.name);
     // The shared release (0x800A7328) is what drops the reservation: it zeroes the
     // roster gauge [BLAST-C001/C002] and clears the standing reserved second form.
     // The Digivolve commit and the Tag commit run the same routine, so all three
@@ -3824,14 +3833,77 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // 11, tone 13, note 73, and the bank does contain it. It fires 50 frames
     // into the sequence, not at commit (blast_run4.txt: commit f5938, SOUND
     // f5991), so advanceBlastPresentation plays it on its captured frame.
-    b.blastShow = {
-      program: FormChangeProgram.BLAST_REVERT,
-      frame: 0, target: null, swapped: true, healed: false, state: null, sounded: false,
+    startEntrance(b, {
+      side: 0, name: saved.name,
       // esmfight 0x62 verbatim, on its own line under the name (wfightmn.s .L0x0000316c).
       endMessage: `${saved.name}\nBack to normal!`,
       endSpec: { kind: MSG_KIND.OUTCOME, payload: [MSG.BACK_TO_NORMAL], name: saved.name },
+    });
+  }
+
+  /**
+   * FIGHTSTG_startEntrance(id, side, weak), entrance.c: the one "a model comes in" presentation. `side` 0 is the
+   * player (Blast ending, tag, KO replacement), 1 the enemy (next enemy, boss bodies). The frames are the engine's
+   * (FormChangeProgram.BLAST_REVERT / ENTRANCE_ENEMY): fade armed f-10, the other side's model hidden f19, PLAYER11 +
+   * white flash f50, the cut f114 (this is where `onSwap` commits the caller's record and the model is swapped),
+   * flash over f178, final fade + other model shown + motion 1 (2 weak) f299. `onDone` runs when the window ends.
+   * `name` is the entering fighter's model (species name or id). The clock waits until that model is loaded.
+   */
+  function startEntrance(b, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, pageAt = null, onPage = null }) {
+    const show = {
+      program: side ? FormChangeProgram.ENTRANCE_ENEMY : FormChangeProgram.BLAST_REVERT,
+      frame: 0, target: null, swapped: false, healed: false, state: null, sounded: false,
+      endMessage, endSpec, swapName: name, entranceSide: side ? 1 : 0, onSwap, onDone,
+      // A page the CALLER's task makes on its own frame while the entrance still runs (the enemy's own tag: the
+      // name page, enemy_turn.c substate 4, does not wait for the task to end). `pageAt` is in entrance frames.
+      pageAt, onPage, pageSaid: false,
+      entrance: { folder: null, ready: !renderer3d },
     };
+    b.blastShow = show;
     renderer3d?.setFaceCamVisible?.(false);
+    if (renderer3d) {
+      const load = Promise.resolve(resolveModelFolder(name)).then((folder) => {
+        show.entrance.folder = folder || null;
+        return folder ? renderer3d?.preloadDigimon?.(folder) : null;
+      });
+      Promise.race([load, new Promise((resolve) => setTimeout(resolve, 4000))])
+        .catch(() => null)
+        .then(() => { show.entrance.ready = true; });
+    }
+    return show;
+  }
+
+  /**
+   * The enemy's own tag after its "Taking out Digimon!" page was read (enemy_turn.c substate 5):
+   * FIGHTSTG_startEntrance(enemies[switchTo].id, 1, 0), the SAME side 0x10 entrance every other enemy entrance runs.
+   * The active slot is committed at the cut, f114 (substate 6 `entrance->done`; the swapped-out record stays in the
+   * team with its hp), and the entering enemy's name page (kind 0xD, substate 4) is made one update later,
+   * ENEMY_SELFTAG_NAME_FRAME, while the entrance still plays; reading it ends the turn.
+   */
+  function startEnemySelfTag(b, tag) {
+    const next = enemyTeamRecord(b, tag.slot);
+    if (!next) { b._selfTag = null; queueAfterAction(b, "enemy"); return; }
+    const nextName = enemyMsgName(next, "");
+    startEntrance(b, {
+      side: 1,
+      name: next.eStats?.digimon_id ?? next.profile?.name ?? nextName,
+      onSwap: () => {
+        b._team ??= [];
+        b._team[b.partyIndex] = b.enemy;
+        b._team[tag.slot] = undefined;
+        b.partyIndex = tag.slot;
+        b.enemy = next;
+        applyGiantScales(renderer3d, b.party?.[b.partyIndex], giantModeOn());
+      },
+      pageAt: ENEMY_SELFTAG_NAME_FRAME,
+      onPage: () => {
+        tag.stage = "named";
+        setResultPages(b, [{
+          text: `${nextName} steps forward!`,
+          spec: { kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName] },
+        }]);
+      },
+    });
   }
 
   /** Count one elapsed player turn while Blast is active; flag the revert when the schedule expires. */
@@ -3868,6 +3940,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       : scaledStat(enemyProf, name, enemyLevel);
     return {
       profile: enemyProf,
+      // The disc id the team rules test (menu.c:1088 id != 0): enemyToProfile has none, field_encounters does.
+      speciesId: enemyStatIdByName?.[eStats?.enemy_id] ?? (Number(enemyProf.id) || 0),
       eStats,                                 // raw sdigiedt entry (null for legacy numeric enemies)
       // The authored name the plate and the pages show instead of the body species
       // (NEW content, web/fusion.js: the fused body is drawn and stored as Kimeramon).
@@ -5132,6 +5206,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // Set only while the sequence is in flight, and cleared before it runs so a beat
     // that puts up no page cannot re-enter itself.
     if (b._finaleAfter) { const run = b._finaleAfter; b._finaleAfter = null; run(); b.timer = 0; return; }
+    // The enemy's own tag (enemy_turn.c substates 5, 6, 4, 3): the 0x4D page is read -> the side 0x10 entrance
+    // runs -> its name page is read -> the turn ends (its status events are queued now, for the new enemy).
+    if (b._selfTag) {
+      const tag = b._selfTag;
+      if (tag.stage === "taking") { tag.stage = "entering"; startEnemySelfTag(b, tag); b.timer = 0; return; }
+      if (tag.stage === "named") { b._selfTag = null; queueAfterAction(b, "enemy"); }
+    }
     if (b._forcedFlee) {
       b._forcedFlee = false;
       b.state = ST.RESULT_MSG;
@@ -5850,7 +5931,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the row it took in the low nibble and the species under its cursor in the
     // high nibble. Cross on the names writes -2; both phase routes restart
     // their partner picker on that word (fightstg.s:16314-16316).
-    if (USE_ORIGINAL_TAG_SWAP && b.state === ST.PLAYER_DNA_CHOICE
+    if (b.state === ST.PLAYER_DNA_CHOICE
         && USE_TRANSLATED_DNA && !dnaNative.failed() && !b._dnaBranchBlocked) {
       if (!dnaNative.isOpen()) dnaNative.open(dnaPaneSeed(b));
       const answer = dnaNative.update(getState()?.keys, dt);
@@ -5942,7 +6023,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       b.timer += dt;
       if (b.timer > TAG_PRESENTATION.outgoingSeconds) {
         const presentation = applyPlayerAction();
-        queueAfterAction(b, "player");
+        // The tag commits the new active fighter at the entrance's cut (f114), and the turn is queued with
+        // THAT fighter's speed: commitTag calls queueAfterAction.
+        if (presentation !== true) queueAfterAction(b, "player");
         if (presentation === "dna") {
           b.state = ST.DNA_PRESENT;
           b.timer = 0;
@@ -5963,17 +6046,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
 
     if (b.state === ST.TAG_PRESENT) {
-      if (b._tagPresentation?.phase === "arrival") {
-        b.timer += dt;
-        if (tagArrivalComplete(b.timer)) {
-          renderer3d?.setPlayerAnim("idle");
-          renderer3d?.setPlayerVisible(true);
-          b.message = `${b._tagPresentation.memberName} switches to ${b._tagPresentation.profile.name}!`;
-          b._tagPresentation = null;
-          b.state = ST.RESULT_MSG;
-          b.timer = 0;
-        }
-      }
+      // "prompt": the 0x38 line waits for Circle (handleKey). "entrance": b.blastShow runs the entrance and its
+      // onDone moves on to RESULT_MSG (the loop above returns while it runs).
       return;
     }
 
@@ -6071,7 +6145,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       b.timer += dt;
       if (b.timer > 0.6) {
         applyEnemyAction();
-        queueAfterAction(b, "enemy");
+        // The enemy's own tag ends its turn only after the entrance and the name page (enemy_turn.c substates
+        // 3-6): the turn's status events are queued then (advanceAfterResult), with the new enemy in place.
+        if (!b._selfTag) queueAfterAction(b, "enemy");
         b.state = ST.RESULT_MSG;
         b.timer = 0;
       }
@@ -6260,8 +6336,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       return;
     }
 
-    const step = gauntletNext(b.party, b.partyIndex);
-    const nextEnemy = step.done ? null : buildEnemyRecord(step.entry);
+    // A real team (enemyTeamActive): the next enemy is the lowest slot with an id and hp (menu.c:1088-1096), so a member
+    // that tagged out earlier comes back with the hp it had; else the party's next entry in order.
+    const team = enemyTeamActive(b);
+    const slot = team ? firstAliveEnemySlot(enemyTeamSlots(enemyTeamRecords(b))) : -1;
+    const step = team
+      ? (slot < 0 ? { done: true } : { done: false, index: slot, entry: b.party[slot] })
+      : gauntletNext(b.party, b.partyIndex);
+    const nextEnemy = step.done ? null : (team ? enemyTeamRecord(b, step.index) : buildEnemyRecord(step.entry));
     if (!nextEnemy) {
       // The battle's single disc drop roll: pick one candidate (RAND % count), then its rate.
       const drop = rollBattleDrop(b._loot.candidates, RAND_U16);
@@ -6290,24 +6372,31 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
     nextEnemy.statusImmunities = b.statusImmunities;
 
-    b.partyIndex = step.index;
-    b.enemy = nextEnemy;
-    b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(nextEnemy));
-    // A fresh timeline is a fresh turn for the command phase's Frozen gate.
-    b._turnSeq = (b._turnSeq ?? 0) + 1;
     const nextName = enemyMsgName(nextEnemy, "");
-    // The model follows the body species, never an authored display name (Millenniummon has
-    // no model folder of its own; its body is Kimeramon).
-    swapEnemyModel(nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? nextName);
-    // Giant mode part 1: the next boss-party member may be a different size than the last.
-    applyGiantScales(renderer3d, b.party?.[b.partyIndex], giantModeOn());
-    sayOriginal(b, {
-      kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName],
-    }, `${nextName} steps forward!`);
     b.menuSel = 0;
     b._nextState = ST.PLAYER_MENU;
     b.state = ST.RESULT_MSG;
     b.timer = 0;
+    // menu.c:1110 WFIGHTMN_knockOut: FIGHTSTG_startEntrance(next enemy id, 1, weak). The record is committed at
+    // the cut (f114, `entrance->done`), the "steps forward" line (message 0xD) comes after the task ends (f299).
+    // The model follows the body species, never an authored display name (Millenniummon has
+    // no model folder of its own; its body is Kimeramon).
+    startEntrance(b, {
+      side: 1,
+      name: nextEnemy.eStats?.digimon_id ?? nextEnemy.profile?.name ?? nextName,
+      endMessage: `${nextName} steps forward!`,
+      endSpec: { kind: MSG_KIND.NEXT_OUT, payload: [0], slots: [nextName] },
+      onSwap: () => {
+        if (team) { b._team ??= []; b._team[b.partyIndex] = b.enemy; b._team[step.index] = undefined; }
+        b.partyIndex = step.index;
+        b.enemy = nextEnemy;
+        b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(nextEnemy));
+        // A fresh timeline is a fresh turn for the command phase's Frozen gate.
+        b._turnSeq = (b._turnSeq ?? 0) + 1;
+        // Giant mode part 1: the next boss-party member may be a different size than the last.
+        applyGiantScales(renderer3d, b.party?.[b.partyIndex], giantModeOn());
+      },
+    });
   }
 
   /**
@@ -6399,19 +6488,32 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       if (next) {
         next.statusImmunities = b.statusImmunities;
         next.battleKind = beat.kind;
-        b.enemy = next;
-        b.partyIndex = beat.member;
-        b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(next));
-        // A fresh timeline is a fresh turn for the command phase's Frozen gate.
-        b._turnSeq = (b._turnSeq ?? 0) + 1;
         const nextName = next.eStats?.digimon_id ?? next.profile?.name ?? "Enemy";
-        swapEnemyModel(nextName);
-        // Giant mode part 1: a scripted phase change may swap in a different-sized body too.
-        applyGiantScales(renderer3d, entry, giantModeOn());
+        // menu.c:1034 bringSecondEnemy / :1241 bringLastEnemy: FIGHTSTG_startEntrance(id, 1, 0). The record is
+        // committed at the cut (f114) and the beat's pages come after the task ends (f299).
+        startEntrance(b, {
+          side: 1, name: nextName,
+          onSwap: () => {
+            b.enemy = next;
+            b.partyIndex = beat.member;
+            b.timeline = initialActorTimeline(effectiveSpd(b.player), effectiveSpd(next));
+            // A fresh timeline is a fresh turn for the command phase's Frozen gate.
+            b._turnSeq = (b._turnSeq ?? 0) + 1;
+            // Giant mode part 1: a scripted phase change may swap in a different-sized body too.
+            applyGiantScales(renderer3d, entry, giantModeOn());
+          },
+          onDone: () => finishFinaleBeat(b, index, beat),
+        });
+        return;
       }
     } else if (b.enemy) {
       b.enemy.battleKind = beat.kind;
     }
+    finishFinaleBeat(b, index, beat);
+  }
+
+  /** The rest of a finale beat: the head's attack record and the beat's pages (after the body has entered). */
+  function finishFinaleBeat(b, index, beat) {
     if (beat.head) {
       // Arm 22 state 2: the head's own attack record (technique 440, the "?????"
       // skill) is rebuilt from the technique row latched at 0x800a4538. The record
@@ -6492,6 +6594,31 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }, "Cannot tag.");
       return false;
     }
+    // menu.c WFIGHTMN_tag: message 0x38 FIRST (input-gated, below), then FIGHTSTG_startEntrance, and the commit
+    // (commitTag) when the entrance's cut sets `done` (f114). Nothing is hidden here: the outgoing model stays
+    // on screen until the cut, and the roster record stays the outgoing one.
+    b._tagPresentation = {
+      phase: "prompt",
+      sequence: TAG_PRESENTATION.sequence,
+      memberName: member.name,
+      profile,
+      action,
+    };
+    sayOriginal(b, {
+      kind: MSG_KIND.OUTCOME, payload: [MSG.GO_FOR_IT], name: member.name,
+    }, `${member.name}\nGo for it!`);
+    return true;
+  }
+
+  /**
+   * The Tag commit, menu.c:388-398 (WFIGHTMN_tag state 2, run when `entrance->done` is set at the cut):
+   * the new fighter becomes the active one, then the turn is queued with ITS speed.
+   */
+  function commitTag(b, action) {
+    const member = b.playerRoster[action.rosterIndex];
+    const incoming = b.playerRecords[action.rosterIndex];
+    const profile = digimonDB[action.formId];
+    if (!member || !incoming || !profile) return;
     // Tag while Blast is active forfeits the charge. The shared cleanup
     // F0x800a7328 tests the combatant's reserved second form at +0x1a, and when
     // it is set it ZEROES the DV/Blast gauge at +0x58 and clears the flag
@@ -6523,20 +6650,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // so the report pays that form's DVEXP and ladder too.
     markFormTaken(b, action.rosterIndex, profile.id);
     b.participantIndices.add(action.rosterIndex);
-    // Native event 4 / shared presentation selector 2 runs sequence 0x38:
-    // remove outgoing actor, show the input-gated "Go for it!" message, then
-    // load the chosen model. The arrival pose runs after confirmation.
-    renderer3d?.setPlayerVisible(false);
-    b._tagPresentation = {
-      phase: "prompt",
-      sequence: TAG_PRESENTATION.sequence,
-      memberName: member.name,
-      profile,
-    };
-    sayOriginal(b, {
-      kind: MSG_KIND.OUTCOME, payload: [MSG.GO_FOR_IT], name: member.name,
-    }, `${member.name}\nGo for it!`);
-    return true;
+    queueAfterAction(b, "player");
   }
 
   function applyDvAction(action) {
@@ -6555,13 +6669,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // 34 frames later, so it is fired by the presentation, not here.
     commitBattleFormChange(b, profile, b.activePlayerIndex);
     emitGameEvent("formWorn", { name: profile.name });   // the glossary counts a form you wore as met
-    swapPlayerModel(profile.name);
+    // The model is NOT swapped here: the original adds it hidden as model 1 on f-180 and swapInNewDigimon
+    // takes slot 0 on f278 (advanceBlastPresentation swaps it then, `swapName`).
     // The original's box is empty while the transformation plays: its "Digivolved!"
     // page is built only when the sequence ends (the `blastShow.endSpec` below).
     clearBattleLine(b);
     b.blastShow = {
       program: FormChangeProgram.MANUAL_DV,
-      frame: 0, target: null, swapped: true, healed: false, state: null, sounded: false,
+      frame: DV_TASK_START_FRAME, target: null, swapName: profile.name, swapped: false, healed: false, state: null, sounded: false,
       // The original's own line: wfightmn.s .L0x00001abc calls unkAC(kind 12), whose
       // arm puts `esmfight[0x16]` = "{1}" on line one (the Digimon's name, filled by
       // F0x80098d14) and `esmfight[0x37]` = "Digivolved! {1}!" on line two, with the
@@ -7194,6 +7309,45 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     return false;
   }
 
+  // The enemy TEAM: the original keeps up to three enemy records at once (fighters[1][0..2], one active) and its
+  // turn can switch to another (enemy_turn.c FIGHTSTG_pickEnemySwitch); a KO brings the lowest living slot
+  // (menu.c:1088-1096). Here slot i is the boss party's entry i. Not a team: a one-member party, the Galacticmon finale
+  // (its three members are phases of one body, specialMode 4) and the F2 fusion bodies.
+  function enemyTeamActive(b) {
+    return !!b?.enemy && (b.party?.length ?? 0) > 1 && b.specialMode !== 4
+      && !b.enemy.bossId && !b.party.some((entry) => entry?.fuseInto);
+  }
+
+  /** Slot i's record: the active one is b.enemy; the others are built once (full hp) and kept, so a member that tagged
+   *  out keeps its hp, mp and ailments. null for a slot the party does not have or whose species does not resolve. */
+  function enemyTeamRecord(b, i) {
+    if (i === b.partyIndex) return b.enemy;
+    const entry = b.party?.[i];
+    if (!entry) return null;
+    b._team ??= [];
+    if (b._team[i] === undefined) {
+      const rec = buildEnemyRecord(entry);
+      if (rec) rec.statusImmunities = b.statusImmunities;
+      b._team[i] = rec ?? null;
+    }
+    return b._team[i];
+  }
+
+  /** The three slots' records, in slot order. */
+  function enemyTeamRecords(b) {
+    const out = [];
+    for (let i = 0; i < Math.min(3, b.party?.length ?? 0); i++) out.push(enemyTeamRecord(b, i));
+    return out;
+  }
+
+  /** check_move_cond 10's operands for the actor `en`: the team's slots and the active one, or just `en` alone. */
+  function enemyConditionSlots(b, en) {
+    if (b && en === b.enemy && enemyTeamActive(b)) {
+      return { enemySlots: enemyTeamSlots(enemyTeamRecords(b)), activeEnemyIndex: b.partyIndex };
+    }
+    return { enemySlots: enemyTeamSlots([en]), activeEnemyIndex: 0 };
+  }
+
   // Pick enemy action from ai_moves (sdigiedt Moves struct) through the engine's
   // F0x80088564 selection loop (engine/dw3/battle-formulas.ts::pickEnemyAiMove): rows
   // 0..2 are condition-tested in order and the first passing row wins; the FOURTH row
@@ -7208,17 +7362,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // check_move_cond operands: the active party form (0x800a4468 record +0x00
     // -> DIGIMON_PROFILES row), the party member's own ailment byte (record +0x1c,
     // cond 9), the field element (0x800a4530), the battle id (0x80042b2c) and
-    // encounter config byte 1 (0x80042b59). The walker fights one enemy at a time, so
-    // the enemy-slot scan sees only this actor and condition 10 is false -- a
-    // simultaneous multi-enemy model is a separate divergence, not something to fake here.
+    // encounter config byte 1 (0x80042b59). The enemy-slot scan (cond 10) reads the enemy
+    // team (enemyConditionSlots: the boss party, slots 0..2); a one-member fight sees only
+    // this actor, so condition 10 is false there.
     const context = {
       partyProfileId: battle.player?.profile?.id ?? null,
       partyAilmentByte: battleAilmentByte(battle.player),
       fieldElementId: battle.field ? elementId(battle.field.element) : 0,
       battleId: battle.screenId ?? null,
       encounterGateByte: battle.encounterGateBytes?.[1] ?? null,
-      enemySlots: [{ speciesId: Number(en.profile?.id) || 0, hp: en.hp }],
-      activeEnemyIndex: 0,
+      ...enemyConditionSlots(battle, en),
     };
     // F2 -> Battle -> "Pattern breaker" (new, off by default; web/enemy-tells.js): the
     // every-Nth rows (comparator 18) test one turn further on, so each such special
@@ -7295,8 +7448,21 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // zero candidate count (`fightstg.s:5771-5824`). Every one resolves to -1, and that
     // failure arm puts up kind-2 esmfight 0x8E "Switch failed!" and enters the routine's
     // terminal state (`fightstg.s:6159-6188`): the turn is SPENT and the enemy does
-    // nothing. A solo fight can only pay for trying.
-    if ((move.action | 0) >= 5 && (move.action | 0) <= 8) {
+    // nothing. A solo fight can only pay for trying. With a team (enemyTeamActive) the pick is the
+    // original's FIGHTSTG_pickEnemySwitch (web/enemy-switch.js); a pick is the enemy's own tag:
+    // enemy_turn.c switchEnemyOut (page esmfight 0x4D kind 1), then the side 0x10 entrance.
+    if (enemySwitchTarget(move.action) !== 0) {
+      const team = enemyTeamActive(b);
+      const pick = enemySelfTagPick(move, enemyTeamSlots(team ? enemyTeamRecords(b) : [en]),
+        team ? b.partyIndex : 0, RAND_U16);
+      if (team && pick >= 0) {
+        b._selfTag = { slot: pick, stage: "taking" };
+        setResultPages(b, [{
+          text: "Taking out Digimon!",
+          spec: { kind: MSG_KIND.ONE_LINE, payload: [ENEMY_SWITCH_MSG_TAKING_OUT] },
+        }]);
+        return;
+      }
       sayOriginal(b, { kind: MSG_KIND.OUTCOME, payload: [MSG.SWITCH_FAILED], name },
         `${name}: Switch failed!`);
       return;
@@ -7540,8 +7706,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       fieldElementId: battle.field ? elementId(battle.field.element) : 0,
       battleId: battle.screenId ?? null,
       encounterGateByte: battle.encounterGateBytes?.[1] ?? null,
-      enemySlots: [{ speciesId: Number(defender.profile?.id) || 0, hp: defender.hp }],
-      activeEnemyIndex: 0,
+      ...enemyConditionSlots(battle, defender),
     };
     if (enemyMoveCondition(row.comparator, row.value ?? 0, defender, RAND_U16,
       attacker, context) !== true) return "";
@@ -8297,19 +8462,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     b.tagTargetIndex = position;
     b.formSel = 0;
     const form = formOptionsFor(position)[0] ?? null;
-    // The forced KO replacement on the walker's LEGACY chain (?legacyTagSwap=1)
-    // is not a voluntary command or turn: the old state-12 arm committed the Tag
-    // presentation at once, and the pane is not driven on that chain, so keep
-    // that commit here rather than collecting a phantom press on the pane.
-    if (form && b._forcedTag && !USE_ORIGINAL_TAG_SWAP) {
-      if (applyTagAction({ type: "tag", rosterIndex: position, formId: form.id })) {
-        b._forcedTag = false;
-        b.pendingAction = null;
-        b.state = ST.TAG_PRESENT;
-        b.timer = 0;
-      }
-      return;
-    }
     // Seat the pane. Its species strip is what lets the player move to another
     // form, so this only needs the partner's live form as the fallback the
     // legacy row list and the non-loaded-pane case read.
@@ -8414,7 +8566,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // it answers -2, so the walker's hp>0 list must not pre-empt the pane: two
       // dead partners must still show grey rows, and only a one-Digimon party
       // must reach the pane.
-      if (!USE_ORIGINAL_TAG_SWAP || !(USE_TRANSLATED_TAG && !tagNative.failed())) {
+      if (!(USE_TRANSLATED_TAG && !tagNative.failed())) {
         if (!tagMembers().length) { b.menuNotice = "No partner to tag."; return; }
       }
       b.state = ST.PLAYER_TAG;
@@ -8553,14 +8705,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const tag = b._tagPresentation;
       if (tag?.phase === "prompt" && (k === "circle")) {
         sfx?.play("system07");
-        tag.phase = "loading";
-        b.message = "";
-        Promise.resolve(swapPlayerModel(tag.profile.name)).catch(() => false).then(() => {
-          if (battle !== b || b._tagPresentation !== tag) return;
-          renderer3d?.setPlayerVisible(true);
-          renderer3d?.setPlayerAnim(TAG_PRESENTATION.arrivalClip);
-          tag.phase = "arrival";
-          b.timer = 0;
+        tag.phase = "entrance";
+        clearBattleLine(b);
+        // FIGHTSTG_startEntrance(commands->digimon, 0, weak); the message 0x39 line waits for the end of the task.
+        startEntrance(b, {
+          side: 0, name: tag.profile.name,
+          endMessage: `${tag.memberName} switches to ${tag.profile.name}!`,
+          onSwap: () => commitTag(b, tag.action),
+          onDone: () => { b._tagPresentation = null; b.state = ST.RESULT_MSG; b.timer = 0; },
         });
         return true;
       }
@@ -8962,9 +9114,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const pips = partyPipCels(b);
     // The translated marker loop draws the members the original would draw, at the
     // original's own x table and y, and picks the cel from the member's own state.
+    const hudTeam = enemyTeamActive(b) ? enemyTeamRecords(b) : null;
     const translatedPips = USE_TRANSLATED_HUD ? battleHudPartyPips(
-      battleHudPlayerRecords(b), battleHudEnemyRecords(b),
-      { activePlayerIndex: b.activePlayerIndex ?? 0, activeEnemyIndex: b.enemySlot ?? 0 }) : null;
+      battleHudPlayerRecords(b), battleHudEnemyRecords(b, hudTeam),
+      { activePlayerIndex: b.activePlayerIndex ?? 0, activeEnemyIndex: hudTeam ? (b.partyIndex ?? 0) : 0,
+        mode: battleKindOf(b) }) : null;
     const pipReady = packReady(pgfgc00);
     const drawPip = (cel, x, y) => {
       if (pipReady && cel != null) { hudClip(cel, x, y); return; }

@@ -3,46 +3,106 @@
 // Sequence 0x61 on the shared presentation manager (BLAST-C006: the same manager
 // runs Tag 0x38, Blast-revert 0x62 and manual DV 0x37). This module owns only the
 // TIMELINE; web/blast-presentation.js draws it and web/battle3d.js supplies the
-// camera, the model swap and the void background.
+// camera, the model swap, the stage fade and the wipe.
 //
-// GROUND TRUTH — authority 1, runtime capture, `BLAST-C010`:
-//   docs/research/battle/captures/blast-presentation-2026-07-14/README.md
-//   Windows Redux rig build 314, Renamon (form 0x175) -> blast form 0x10b,
-//   shots every 8 frames from f24 to f880, press at f20. A second independent
-//   run (2026-07-14b, 44 shots every 20f) reproduced every phase boundary.
+// GROUND TRUTH for Blast and manual digivolve: the ORIGINAL change task,
+// FIGHTSTG_updateDigimonChange (dw3_decomp src/battle/battle_mode/digimon_change.c, 0x80089CD8),
+// run frame by frame through the walker MIPS interpreter (ddw3-walker
+// tests/helpers/digivolve-change-oracle.js) and confirmed on the real game
+// (BizHawk, ~/dv-camera/RIG-digivolve.md). Manual (key2 = 0) and Blast (key2 = 1) run the
+// SAME timeline; they differ only in the motions and the sprite effects.
 //
-// The PHASE BOUNDARIES below are those captured frames and nothing else. What is
-// NOT decoded is the interpolation *shape* inside each phase — the capture is a
-// contact sheet every 8 frames, so it fixes when each element appears and
-// disappears, never its easing curve. Every curve here is therefore a marked
-// WALKER VISUAL: linear or smoothstep, chosen to hit the captured endpoints. Do
-// not present any curve shape as decoded.
+// UNITS. Every frame here is a 60 Hz GAME TICK (the original's task counters, getFrameTime). The
+// presentation frame n is the change task's call count (n = 0 is its first run, no disc wait); the
+// START CUT (substate 2, startChange) is n = 214. The comments below write f = n - 214 (f0 = the start cut). The old constants of this file (swap 312, return 800, manual return 660,
+// last frame 739, flash f521..614) were frame numbers of a Redux capture counted in PAL vsyncs
+// (50 Hz), named as if they were presentation ticks; they are gone.
 //
-// The three one-to-eight-frame gaps between captured phases (310->312, 648->656,
-// 792->800) are sampling artifacts of the 8-frame shot interval, not pauses in
-// the animation. Phases are treated as contiguous.
+//   f-214      task start: SOUND.loadBank(0x45)
+//   f-213      setStage(0x1C manual / 0x1F Blast, 32, 32): the battle stage fades to black f-211..f-180
+//   f-180      EVOLUTIO (0x41140000), the new Digimon is added as model 1 (hidden), 180-tick hold
+//   f0         startChange: cut to near shot 9, wipe of the old model into its wireframe (2 rows/tick),
+//              old model motion 14 (Blast) / 13 (manual), the enemy hidden, effects 1007 / 1000+1001
+//   f119       wipe done (old model layer off), effect 1002
+//   f240       startWhiteFlash(32): +7 per tick, 255 on f276-f277
+//   f278       swap: new model takes slot 0, cut to its shot 9, endWhiteFlash (level -7 per tick, 0 from f314)
+//   f316..436  wipe of the new model in over its wireframe (2 rows/tick, from f317); f436 effects 1003 / 1008
+//   f437       new model motion 13   (Blast: the full heal lands when the menu sees it, f438)
+//   f618..649  stage back to the battle stage (32 ticks out of the change stage, then 32 in)
+//   f649       cut to plain shot 9;  f651 camera fade to the enemy view (60), enemy shown, battle music,
+//              final motion;  f711 task state 3: the presentation ends
+//
+// What is NOT decoded: the look of the change stages 0x1C / 0x1F (FILE_FIGHT_STAGES data, not in the C
+// source; the renderer keeps the black void for them), the wireframe's own colour, and the length of the
+// "Blasted!" message before the task starts (menu.c WFIGHTMN_blast shows it, then starts the task).
 
 import { createTransformationSchedule } from "../dw3/battle-effect-driver-host.ts";
 
-/** Frame the presentation becomes visible (X-press at f20 clears the message). */
-export const BLAST_FIRST_FRAME = 24;
-/** Last captured frame; the camera is back at the battle view. */
-export const BLAST_LAST_FRAME = 880;
-/** Total run length, ~14 s at 60 Hz. The claim rounds this to "~860 frames". */
-export const BLAST_TOTAL_FRAMES = BLAST_LAST_FRAME - BLAST_FIRST_FRAME;
+/** The change task's first run (state 0: SOUND.loadBank(0x45)). */
+export const DV_TASK_START_FRAME = 0;
+/** The stage task's first fade-out run (setStage(0x1C / 0x1F, 32, 32) was called on f-213). */
+export const DV_STAGE_OUT_FIRST_FRAME = 3;
+/** EVOLUTIO plays and the new Digimon is added as model 1; the stage fade-out is over. */
+export const DV_EVOLUTIO_FRAME = 34;
+/** startChange: the start cut, the wipe begins (clip0.h 238 on this frame). */
+export const DV_CUT_FRAME = 214;
+/** wipeToWireframe's last run: clip0.h 0, the old model's layer off, effect 1002. */
+export const DV_WIPE_END_FRAME = 333;
+/** startWhiteFlash(32). */
+export const DV_FLASH_START_FRAME = 454;
+/** swapInNewDigimon: setId(1, 0), the cut to the new model's shot 9, endWhiteFlash. */
+export const DV_SWAP_FRAME = 492;
+/** The first wipeFromWireframe run (clip0.h 2). */
+export const DV_WIPE_BACK_FIRST_FRAME = 531;
+/** wipeFromWireframe's last run: clip0.h 240, the wireframe layer off, effect 1003 / 1008. */
+export const DV_WIPE_BACK_END_FRAME = 650;
+/** The new model's motion 13. */
+export const DV_NEW_MOTION_FRAME = 651;
+/** The stage task is in its fade back to the battle stage from here (setStage was called on f617). */
+export const DV_STAGE_BACK_FRAME = 832;
+/** The change stage (0x1C manual digivolve / 0x1F Blast): its model is created on stage run 35 (black), the old stage is gone. */
+export const CHANGE_STAGE_MODEL_FRAME = 35;
+/** The battle stage's model is created again on stage run DV_CUT_FRAME + 650 (black); its fade-in runs DV_CUT_FRAME + 651..DV_CUT_FRAME + 682. */
+export const CHANGE_STAGE_BACK_MODEL_FRAME = DV_CUT_FRAME + 650;
+/** digimon_change.c:253: setStage(task->key2 != 0 ? 0x1F : 0x1C, 32, 32): the manual digivolve's stage. */
+export const CHANGE_STAGE_MANUAL = 0x1C;
+/** The Blast change stage. */
+export const CHANGE_STAGE_BLAST = 0x1F;
+/** BlastPresentationState.stage 0: the battle's own stage (BATTLE_SETUP.stage), which the change task fades out and back in. */
+export const CHANGE_STAGE_BATTLE = 0;
+/** stage.c: the stage model's colour is 0..0x80 (0x80 = the model as is); the fade is 0..0x1000 in steps of 0x1000 / 32 = 128 a run. */
+export const CHANGE_STAGE_FULL = 0x80;
+/** substate 12: the plain shot-9 cut. */
+export const DV_PLAIN_CUT_FRAME = 863;
+/** returnToBattle: camera fade to the enemy view, enemy shown, battle music, final motion. */
+export const DV_RETURN_FRAME = 865;
+/** The task's state 3 (first run): the change task is over. */
+export const DV_TASK_END_FRAME = 925;
+/** The presentation ends when the camera fade has snapped (shown f712 = 926). */
+export const DV_END_FRAME = 926;
 
 /**
- * The frame the original model hides and the new form takes over ("the model-
- * hide / swap point", captured at f312 with the whiteout).
+ * Frame the "... Blasted!" line is cleared. The original shows it BEFORE the task starts (the menu
+ * waits for its end, menu.c WFIGHTMN_blast step 1); its length is the message task's and is not in
+ * the harness, so the walker keeps the 24 ticks it already showed it for, counted from the task start.
  */
-export const BLAST_SWAP_FRAME = 312;
+export const BLAST_FIRST_FRAME = DV_TASK_START_FRAME + 24;
+/** Blast and manual DV end on the same frame. */
+export const BLAST_LAST_FRAME = DV_END_FRAME;
+/** Run length in ticks, from the task start. */
+export const BLAST_TOTAL_FRAMES = BLAST_LAST_FRAME - DV_TASK_START_FRAME;
+
+/** The swap frame (both programs). */
+export const BLAST_SWAP_FRAME = DV_SWAP_FRAME;
 
 /**
- * The frame the full heal lands. The capture: "The full heal (2589->3000) lands
- * during the solid-model resolve (~f600)". BLAST-C007 independently establishes
- * the heal is unconditional; this fixes only WHEN it becomes visible.
+ * The frame the full heal lands (Blast only). menu.c WFIGHTMN_blast step 2 polls
+ * `models->get(models, 0)->motion == 13` and then sets hp = maxHp; the new model's motion becomes 13 on
+ * f437 (substate 9; the change task is a CHILD of the menu task and registry.c executeTask runs the
+ * parent first), so the menu sees it on f438. The old model's motion is 14 (Blast), never 13. This
+ * frame is derived from those two sources, not run (the menu task is not in the harness).
  */
-export const BLAST_HEAL_FRAME = 600;
+export const BLAST_HEAL_FRAME = DV_NEW_MOTION_FRAME + 1;
 
 export const BlastPhase = {
   PUSH_IN: "push_in",
@@ -53,30 +113,45 @@ export const BlastPhase = {
   RESOLVE: "resolve",
   REVEAL: "reveal",
   WIND_DOWN: "wind_down",
+  /** The original change task's own stretches (Blast and manual DV), by substate. */
+  STAGE_OUT: "stage_out",
+  EVOLUTIO_HOLD: "evolutio_hold",
+  WIPE_TO_WIREFRAME: "wipe_to_wireframe",
+  WIREFRAME_HOLD: "wireframe_hold",
+  FLASH_RISE: "flash_rise",
+  FLASH_FALL: "flash_fall",
+  WIPE_FROM_WIREFRAME: "wipe_from_wireframe",
+  NEW_FORM_HOLD: "new_form_hold",
+  STAGE_BACK: "stage_back",
+  RETURN: "return",
 } as const;
 
 export type BlastPhaseValue = typeof BlastPhase[keyof typeof BlastPhase];
 
-/** The captured phase table, verbatim from the contact sheets. */
+/** The change task's stretches (Blast and manual DV), from the substate changes of the run. */
 export const BLAST_PHASES: ReadonlyArray<{
   id: BlastPhaseValue; from: number; to: number; caption: string;
 }> = Object.freeze([
-  { id: BlastPhase.PUSH_IN, from: 24, to: 180,
-    caption: "message clears; the Digimon idles; the camera pushes in on the battle backdrop" },
-  { id: BlastPhase.VORTEX, from: 180, to: 312,
-    caption: "background goes black; a golden EVOLUTION ribbon vortex spins up around the original model" },
-  { id: BlastPhase.IGNITE, from: 312, to: 360,
-    caption: "the original model whites out and flames ignite from below (model hide / swap point)" },
-  { id: BlastPhase.WIREFRAME, from: 360, to: 430,
-    caption: "a green wireframe of the new form materializes standing in the fire" },
-  { id: BlastPhase.DATA_BURST, from: 430, to: 560,
-    caption: "data-burst hexagram, yellow circuit-pattern fill and a white flash" },
-  { id: BlastPhase.RESOLVE, from: 560, to: 656,
-    caption: "the flash peaks and the wireframe resolves into the solid new form; the heal lands" },
-  { id: BlastPhase.REVEAL, from: 656, to: 800,
-    caption: "the new form is fully revealed, then a second fire burst erupts around it" },
-  { id: BlastPhase.WIND_DOWN, from: 800, to: 880,
-    caption: "flames subside, the ribbons wind down and the camera returns to the battle view" },
+  { id: BlastPhase.STAGE_OUT, from: DV_TASK_START_FRAME, to: DV_EVOLUTIO_FRAME,
+    caption: "state 0 loads the sound bank, the model and the change file; substate 0 sets the change stage (the battle stage fades out)" },
+  { id: BlastPhase.EVOLUTIO_HOLD, from: DV_EVOLUTIO_FRAME, to: DV_CUT_FRAME,
+    caption: "EVOLUTIO, the new Digimon added hidden as model 1, 180 ticks" },
+  { id: BlastPhase.WIPE_TO_WIREFRAME, from: DV_CUT_FRAME, to: DV_WIPE_END_FRAME,
+    caption: "start cut on shot 9, the old model wiped into its wireframe, 2 rows per tick" },
+  { id: BlastPhase.WIREFRAME_HOLD, from: DV_WIPE_END_FRAME, to: DV_FLASH_START_FRAME,
+    caption: "the old Digimon is all wireframe, 120 ticks" },
+  { id: BlastPhase.FLASH_RISE, from: DV_FLASH_START_FRAME, to: DV_SWAP_FRAME,
+    caption: "white flash, +7 per tick, until the flash task's substate is set" },
+  { id: BlastPhase.FLASH_FALL, from: DV_SWAP_FRAME, to: DV_WIPE_BACK_FIRST_FRAME - 1,
+    caption: "swap to the new model, the flash falls 7 per tick and is gone on f315" },
+  { id: BlastPhase.WIPE_FROM_WIREFRAME, from: DV_WIPE_BACK_FIRST_FRAME - 1, to: DV_NEW_MOTION_FRAME,
+    caption: "the new model wiped in over its wireframe, 2 rows per tick" },
+  { id: BlastPhase.NEW_FORM_HOLD, from: DV_NEW_MOTION_FRAME, to: DV_STAGE_BACK_FRAME - 1,
+    caption: "new model motion 13, 180 ticks" },
+  { id: BlastPhase.STAGE_BACK, from: DV_STAGE_BACK_FRAME - 1, to: DV_PLAIN_CUT_FRAME,
+    caption: "the battle stage fades back in" },
+  { id: BlastPhase.RETURN, from: DV_PLAIN_CUT_FRAME, to: DV_END_FRAME,
+    caption: "plain shot-9 cut, camera fade to the enemy view, battle music" },
 ]);
 
 /** Clamp helper. */
@@ -90,16 +165,131 @@ function span(frame: number, from: number, to: number): number {
   return clamp01((frame - from) / (to - from));
 }
 
-/** WALKER VISUAL easing. The capture fixes endpoints, never the curve. */
-function smooth(t: number): number {
-  const c = clamp01(t);
-  return c * c * (3 - 2 * c);
+export function blastPhaseAt(frame: number): BlastPhaseValue {
+  if (frame < DV_TASK_START_FRAME) return BlastPhase.STAGE_OUT;
+  for (const p of BLAST_PHASES) if (frame < p.to) return p.id;
+  return BlastPhase.RETURN;
 }
 
-export function blastPhaseAt(frame: number): BlastPhaseValue {
-  if (frame < BLAST_FIRST_FRAME) return BlastPhase.PUSH_IN;
-  for (const p of BLAST_PHASES) if (frame < p.to) return p.id;
-  return BlastPhase.WIND_DOWN;
+// ── The change task's frame functions (checked against the interpreter, frame by frame) ────────────
+
+/**
+ * The wipe row: native screen row (0..240) where the solid model layer ends and the wireframe layer
+ * begins. digimon_change.c: BATTLE_LAYER_MODELS is clipped to clip0 = {0, 0, 320, h} and
+ * BATTLE_LAYER_WIREFRAME to clip1 = {0, y, 320, 240 - y}, and h == y on every frame, so the solid model
+ * shows rows [0, row) and the wireframe rows [row, 240).
+ *   f < 0        240 (clip0 = the whole screen)
+ *   f0..f119     240 - 2 * (f + 1)    (wipeToWireframe, 2 rows per tick, 0 on f119)
+ *   f120..f316   0                    (the wireframe fills the screen; swapInNewDigimon sets clip0.h = 0)
+ *   f317..f436   2 * (f - 316)        (wipeFromWireframe, 240 on f436)
+ *   f > 436      240
+ */
+export function digivolveWipeRow(frame: number): number {
+  const f = Math.floor(frame);
+  if (f < DV_CUT_FRAME) return 240;
+  if (f <= DV_WIPE_END_FRAME) return 240 - 2 * (f - DV_CUT_FRAME + 1);
+  if (f < DV_WIPE_BACK_FIRST_FRAME) return 0;
+  if (f <= DV_WIPE_BACK_END_FRAME) return 2 * (f - (DV_WIPE_BACK_FIRST_FRAME - 1));
+  return 240;
+}
+
+/** The wireframe layer is on from startChange (layers[1].enabled) until wipeFromWireframe ends. */
+export function digivolveWireOn(frame: number): boolean {
+  const f = Math.floor(frame);
+  return f >= DV_CUT_FRAME && f < DV_WIPE_BACK_END_FRAME;
+}
+
+/**
+ * The white flash level (0..255): startWhiteFlash(32) on f240, speed = 0xFF / 32 = 7, +7 per tick from
+ * f240 (7) to 252 on f275, 255 on f276 and f277; swapInNewDigimon's endWhiteFlash on f278 makes it fall
+ * 7 per tick (248 on f278 ... 3 on f313), 0 from f314 (the task is gone on f315).
+ */
+export function digivolveFlashLevel(frame: number): number {
+  const f = Math.floor(frame);
+  if (f < DV_FLASH_START_FRAME || f >= DV_SWAP_FRAME + 36) return 0;
+  if (f < DV_SWAP_FRAME) return Math.min(0xFF, 7 * (f - (DV_FLASH_START_FRAME - 1)));
+  return 0xFF - 7 * (f - (DV_SWAP_FRAME - 1));
+}
+
+/**
+ * How much of the battle stage is showing, 0..1 (stage.c: the stage task fades the stage model colour
+ * and the screen background by `fade`, 128 of 4096 per tick, 32 ticks):
+ *   f < -211     1
+ *   f-211..f-180 1 - (f + 212) / 32  (setStage(change stage): the battle stage fades out)
+ *   f-180..f650  0                   (the change stage: a black void here, its own look is data, not decoded;
+ *                                     f618..f648 it fades out, f649..f650 the battle stage waits at black)
+ *   f651..f681   (f - 650) / 32      (the battle stage fades in)
+ *   f >= 682     1
+ */
+export function digivolveStageBrightness(frame: number): number {
+  const f = Math.floor(frame);
+  if (f <= DV_STAGE_OUT_FIRST_FRAME - 1) return 1;
+  if (f < DV_EVOLUTIO_FRAME) return 1 - (f - (DV_STAGE_OUT_FIRST_FRAME - 1)) / 32;
+  if (f <= DV_RETURN_FRAME - 1) return 0;
+  if (f < DV_RETURN_FRAME + 31) return (f - (DV_RETURN_FRAME - 1)) / 32;
+  return 1;
+}
+
+/** FIGHTSTG_lerpVector on one channel: from + (((to - from) * t) >> 12), t = the stage fade 0..0x1000. */
+function stageLerp(from: number, to: number, fade: number): number {
+  return from + (((to - from) * fade) >> 12);
+}
+
+/**
+ * The stage on screen and its model colour on presentation frame F (stage.c FIGHTSTG_updateStage
+ * through digimon_change.c's two setStage calls), read off the real stage task:
+ *  - runs 3..34: the battle stage fades out, colour lerp(0x80, 0, 128 (F - 2));
+ *  - run 35: the change stage's model is created, colour 0 (prepareStageModel);
+ *  - runs 36..67: it fades in, colour lerp(0, 0x80, 128 (F - 35)); it is full until run 831;
+ *  - runs 832..863: it fades out (setStage(BATTLE_SETUP.stage, 32, 32) was called at the end of run 831);
+ *  - run 864: the battle stage's model is created again, colour 0; runs 865..896 it fades in.
+ * The model killed at the end of a fade-out is black, so those black frames name the stage that faded.
+ * The interpreter's frame time is 1 a run (a real run can take more).
+ */
+export function changeStage(blast: boolean, frame: number): { stage: number; level: number } {
+  const F = Math.max(0, frame);
+  const change = blast ? CHANGE_STAGE_BLAST : CHANGE_STAGE_MANUAL;
+  const step = 0x1000 / 32;
+  if (F < DV_STAGE_OUT_FIRST_FRAME) return { stage: CHANGE_STAGE_BATTLE, level: CHANGE_STAGE_FULL };
+  if (F <= DV_EVOLUTIO_FRAME) {
+    const fade = step * (F - (DV_STAGE_OUT_FIRST_FRAME - 1));
+    return { stage: CHANGE_STAGE_BATTLE, level: stageLerp(CHANGE_STAGE_FULL, 0, fade) };
+  }
+  if (F <= DV_STAGE_BACK_FRAME - 1) {
+    const fade = Math.min(0x1000, step * (F - CHANGE_STAGE_MODEL_FRAME));
+    return { stage: change, level: stageLerp(0, CHANGE_STAGE_FULL, fade) };
+  }
+  if (F < CHANGE_STAGE_BACK_MODEL_FRAME) {
+    const fade = Math.min(0x1000, step * (F - (DV_STAGE_BACK_FRAME - 1)));
+    return { stage: change, level: stageLerp(CHANGE_STAGE_FULL, 0, fade) };
+  }
+  const fade = Math.min(0x1000, step * (F - CHANGE_STAGE_BACK_MODEL_FRAME));
+  return { stage: CHANGE_STAGE_BATTLE, level: stageLerp(0, CHANGE_STAGE_FULL, fade) };
+}
+
+/** The change stage's motion (the stage's motions file, entry 0: one step of frames 1..1500, then the 0x8000 key loops it). */
+export const CHANGE_STAGE_MOTION_FRAMES = 1500;
+
+/**
+ * The motion frame (1..1500) the change stage's model shows on presentation frame F: it advances one
+ * frame a run (FIGHTSTG_stepMotion, keyframe += FIGHTSTG_battle.frames) from the run its model is
+ * created on and loops. The model task's first run can be one or two runs after the creation (not
+ * measured), so this is within a couple of frames.
+ */
+export function changeStageMotionFrame(frame: number): number {
+  const t = Math.max(0, frame - CHANGE_STAGE_MODEL_FRAME);
+  return (t % CHANGE_STAGE_MOTION_FRAMES) + 1;
+}
+
+/**
+ * The screen background the stage task sets on a frame (FIGHTSTG_fadeStage): the stage's bgColor
+ * (FightStageInfo.bgColor) lerped with the same fade as the model colour, which on both the fade-out
+ * (bgColor -> 0, level = 0x80 - fade / 32) and the fade-in (0 -> bgColor, level = fade / 32) comes to
+ * (channel * level) >> 7. A black result is set as (1, 1, 1): black is drawn as 1, 1, 1.
+ */
+export function changeStageBg(bg: ReadonlyArray<number>, level: number): [number, number, number] {
+  const r = ((bg[0] ?? 0) * level) >> 7, g = ((bg[1] ?? 0) * level) >> 7, b = ((bg[2] ?? 0) * level) >> 7;
+  return r !== 0 || g !== 0 || b !== 0 ? [r, g, b] : [1, 1, 1];
 }
 
 export interface BlastPresentationState {
@@ -111,117 +301,109 @@ export interface BlastPresentationState {
   progress: number;
   done: boolean;
 
-  /** Camera dolly toward the fighter, 0 = battle view, 1 = fully pushed in. */
+  /**
+   * Camera dolly toward the fighter. Only the REVERT still uses it (its camera is the entrance
+   * machine, entrance.c, a separate task). Blast and manual DV are 0: their camera is the
+   * original's cut and fade (formChangeCameraSchedule).
+   */
   cameraPush: number;
-  /** Backdrop fade to the black void, 0..1. */
+  /** Black over the battle stage, 0..1 (1 - digivolveStageBrightness). */
   voidAlpha: number;
-  /** EVOLUTION ribbon vortex opacity and accumulated spin in turns. */
+  /**
+   * The fight stage the stage task has on screen: CHANGE_STAGE_BATTLE (the battle's own), or
+   * CHANGE_STAGE_MANUAL / CHANGE_STAGE_BLAST (the change stage, see changeStage). Programs that do not
+   * drive the stage task (the revert) keep CHANGE_STAGE_BATTLE at CHANGE_STAGE_FULL.
+   */
+  stage: number;
+  /** That stage model's colour, 0..CHANGE_STAGE_FULL (the last setColor value of stage.c FIGHTSTG_fadeStage). */
+  stageLevel: number;
+  /** The change stage this program sets (CHANGE_STAGE_MANUAL / CHANGE_STAGE_BLAST), 0 when it sets none: the renderer loads it ahead. */
+  stageChange: number;
+  /** Blast and manual DV: no original source for any of these walker visuals, so they are 0. */
   ribbonAlpha: number;
   ribbonTurns: number;
-  /** Original model: visible until the swap, whiting out as it goes. */
+  /** Original model: shown until the swap. */
   showOldModel: boolean;
   oldModelWhiteout: number;
-  /** Fire wall rising from the bottom of the screen, 0..1. */
   fireIntensity: number;
-  /** Green wireframe of the new form, 0..1. */
+  /** The wireframe layer is on (1) or off (0): the original draws it at full strength, no fade. */
   wireframeAlpha: number;
-  /** Data-burst hexagram: two overlapping triangles inside a ring. */
   hexagramAlpha: number;
   hexagramScale: number;
-  /** Yellow circuit-pattern fill sweeping the hexagram, 0..1. */
   circuitFill: number;
   /** Full-screen white flash, 0..1. */
   flashAlpha: number;
-  /** Solid textured new model, 0..1. */
+  /** The original flash level 0..255, ADDED to the screen (digivolveFlashLevel / revertFlashLevel). */
+  flashLevel?: number;
+  /** 1 while the solid model layer shows any rows (Blast, manual DV), or the revert's model is on. */
   solidAlpha: number;
   showNewModel: boolean;
-  /** True once the unconditional full heal has landed (BLAST-C007 / f600). */
+  /** True once the unconditional full heal has landed (BLAST-C007, WFIGHTMN_blast step 2). */
   healed: boolean;
+  /**
+   * Blast and manual DV only (digivolveWipeRow): the solid layer shows native rows [0, wipeRow), the
+   * wireframe layer (when wireOn) rows [wipeRow, 240). Undefined for the revert.
+   */
+  wipeRow?: number;
+  wireOn?: boolean;
+  /** The enemy model's layer is off, startChange .. returnToBattle (f0..f650) for Blast and manual DV; f19..f298 for the player entrance. */
+  enemyHidden?: boolean;
+  /** The entrance only: 0 = player side (key2 0), 1 = enemy side (key2 0x10). Undefined for Blast and manual DV. */
+  entranceSide?: 0 | 1;
+  /** The enemy entrance hides the PLAYER partner from f19 until f298 (shown again on f299). */
+  playerHidden?: boolean;
 }
 
 /**
- * The whole presentation as a pure function of its frame. Every boundary is a
- * captured frame; every curve between boundaries is a WALKER VISUAL.
+ * One frame of the change task (Blast and manual DV share it). `blast` picks the change stage (0x1F / 0x1C);
+ * `healFrame` is the frame the heal lands, or null for the manual digivolve.
  */
-export function blastPresentationState(frame: number): BlastPresentationState {
-  const f = Math.max(0, frame);
+function changeState(blast: boolean, frame: number, healFrame: number | null): BlastPresentationState {
+  const f = Math.floor(frame);
   const phase = blastPhaseAt(f);
   const cur = BLAST_PHASES.find((p) => p.id === phase)!;
-
-  // Phase 1: the camera dollies in across the whole 24..180 window.
-  const cameraPush = f < 800
-    ? smooth(span(f, 24, 180))
-    // Phase 8 returns it. The capture shows the model shrinking again by f872.
-    : 1 - smooth(span(f, 800, 880));
-
-  // Phase 2 opens by replacing the arena with black.
-  const voidAlpha = smooth(span(f, 180, 240));
-
-  // Ribbons spin up at 180 and are still turning at 872; they wind down last.
-  const ribbonAlpha = smooth(span(f, 180, 232)) * (1 - smooth(span(f, 824, 880)));
-  // 12 turns over the ~700 frames they are up. WALKER VISUAL: the contact sheet
-  // cannot resolve revolution count between 8-frame samples.
-  const ribbonTurns = ribbonAlpha > 0 ? (f - 180) / 58 : 0;
-
-  // The original model whites out over 312..360 and is gone at the swap point.
-  const oldModelWhiteout = smooth(span(f, 300, 344));
-  const showOldModel = f < BLAST_SWAP_FRAME + 48;
-
-  // Fire burns TWICE, and the gap between the two is the point. The contact
-  // sheets show flames from f312 to about f520, then nothing behind the flash
-  // and the hexagram (f584-f648 are black with the wireframe resolving), then a
-  // far bigger SECOND burst with a white core from about f696 to f792, subsiding
-  // through the wind-down. An earlier draft of this module held the first fire
-  // at full for the whole run; that made the "second fire burst" invisible,
-  // which the capture flatly contradicts.
-  const fireFirst = smooth(span(f, 312, 360)) * (1 - smooth(span(f, 520, 572)));
-  const fireSecond = smooth(span(f, 656, 704)) * (1 - smooth(span(f, 792, 872)));
-  const fireIntensity = clamp01(Math.max(fireFirst, fireSecond));
-
-  // Green wireframe materializes 360..430, holds through the data burst, and
-  // dissolves as the solid model takes over across the resolve.
-  const wireframeAlpha = smooth(span(f, 360, 430)) * (1 - smooth(span(f, 600, 672)));
-
-  // Hexagram grows in at 430 and is gone once the model is solid.
-  const hexagramAlpha = smooth(span(f, 430, 468)) * (1 - smooth(span(f, 608, 656)));
-  const hexagramScale = 0.35 + 0.65 * smooth(span(f, 430, 500));
-  const circuitFill = smooth(span(f, 468, 560));
-
-  // The white flash is a PLATEAU, not a spike: the capture is at or near full
-  // white across f552, f560, f568 and f576 — four consecutive 8-frame shots —
-  // so it rises into f552, holds to f576, and clears by f616.
-  const flashAlpha = smooth(span(f, 520, 552)) * (1 - smooth(span(f, 576, 616)));
-
-  // The solid model resolves in over the back half of the resolve phase.
-  const solidAlpha = smooth(span(f, 592, 664));
-  const showNewModel = f >= BLAST_SWAP_FRAME;
-
+  const row = digivolveWipeRow(f);
+  const wireOn = digivolveWireOn(f);
+  const level = digivolveFlashLevel(f);
   return {
     frame: f,
     phase,
     phaseProgress: span(f, cur.from, cur.to),
-    progress: clamp01((f - BLAST_FIRST_FRAME) / BLAST_TOTAL_FRAMES),
-    done: f >= BLAST_LAST_FRAME,
-    cameraPush,
-    voidAlpha,
-    ribbonAlpha,
-    ribbonTurns,
-    showOldModel,
-    oldModelWhiteout,
-    fireIntensity,
-    wireframeAlpha,
-    hexagramAlpha,
-    hexagramScale,
-    circuitFill,
-    flashAlpha,
-    solidAlpha,
-    showNewModel,
-    healed: f >= BLAST_HEAL_FRAME,
+    progress: clamp01((f - DV_TASK_START_FRAME) / BLAST_TOTAL_FRAMES),
+    done: f >= DV_END_FRAME,
+    // The camera is the original's cut and fade (formChangeCameraSchedule), not a curve here.
+    cameraPush: 0,
+    voidAlpha: 1 - digivolveStageBrightness(f),
+    stage: changeStage(blast, f).stage,
+    stageLevel: changeStage(blast, f).level,
+    stageChange: blast ? CHANGE_STAGE_BLAST : CHANGE_STAGE_MANUAL,
+    ribbonAlpha: 0,
+    ribbonTurns: 0,
+    showOldModel: f < DV_SWAP_FRAME,
+    oldModelWhiteout: 0,
+    fireIntensity: 0,
+    wireframeAlpha: wireOn ? 1 : 0,
+    hexagramAlpha: 0,
+    hexagramScale: 1,
+    circuitFill: 0,
+    flashAlpha: level / 0xFF,
+    flashLevel: level,
+    solidAlpha: row > 0 ? 1 : 0,
+    showNewModel: f >= DV_SWAP_FRAME,
+    healed: healFrame !== null && f >= healFrame,
+    wipeRow: row,
+    wireOn,
+    enemyHidden: f >= DV_CUT_FRAME && f < DV_RETURN_FRAME,
   };
 }
 
+/** Blast (key2 = 1) on presentation frame `frame` (the original's change task, ticks from the start cut). */
+export function blastPresentationState(frame: number): BlastPresentationState {
+  return changeState(true, frame, BLAST_HEAL_FRAME);
+}
+
 /** Seconds of wall clock for the whole presentation at the 60 Hz reference. */
-export const BLAST_PRESENTATION_SECONDS = BLAST_LAST_FRAME / 60;
+export const BLAST_PRESENTATION_SECONDS = BLAST_TOTAL_FRAMES / 60;
 
 // ───────────────────────────────────────────────────────────────────────────────
 // The other two sequences on the same shared manager
@@ -263,8 +445,13 @@ export const BLAST_PRESENTATION_SECONDS = BLAST_LAST_FRAME / 60;
 export const FormChangeProgram = {
   /** Blast on, sequence 0x61 — the fully captured one. */
   BLAST_ON: "blast_on",
-  /** Blast revert, sequence 0x62. */
+  /**
+   * The PLAYER-side entrance, FIGHTSTG_startEntrance(id, 0, weak) (entrance.c): Blast ending (sequence 0x62),
+   * a player tag and a player KO replacement. The name is the first caller; the program is the entrance.
+   */
   BLAST_REVERT: "blast_revert",
+  /** The ENEMY-side entrance, FIGHTSTG_startEntrance(id, 1, weak) (key2 = 0x10): the next enemy, the boss bodies. */
+  ENTRANCE_ENEMY: "entrance_enemy",
   /** Manual DV, sequence 0x37 plus the per-Digimon sequence on object 0x4e. */
   MANUAL_DV: "manual_dv",
 } as const;
@@ -280,8 +467,14 @@ export type FormChangeProgramValue =
 //   f5991  SOUND a0045ec9 = PLAYER11          <- +50
 //   f6205  PRESMSG sel=02 payload 0x62        <- +264
 //   f6267  PRESMSG sel=02 payload 0x08        <- +326, normal messaging resumes
-/** Length of the revert window, f5941..f6267. */
-export const REVERT_LAST_FRAME = 326;
+/** The captured window, f5941..f6267: the walker visual (void, ribbons, wireframe) runs on it. */
+export const REVERT_VISUAL_END_FRAME = 326;
+/**
+ * Length of the revert presentation. The camera is the entrance machine's (entrance.c,
+ * FIGHTSTG_updateEntrance key2 = 0) and its last frame is REVERT_CAMERA_FADE_END_FRAME (360, the
+ * snap onto the enemy view), so the window is 361 frames, longer than the captured 326.
+ */
+export const REVERT_LAST_FRAME = 361;
 /** PLAYER11 fires here, 50 frames in. */
 export const REVERT_SOUND_FRAME = 50;
 /**
@@ -293,47 +486,193 @@ export const REVERT_SOUND_FRAME = 50;
  * continuous effect rather than pretending to know which.
  */
 export const REVERT_SEQUENCE_MSG_FRAME = 264;
-/** The revert restores the form BEFORE the presentation, and never heals. */
-export const REVERT_SWAP_FRAME = 0;
+/**
+ * The entrance swaps the model at the cut (showEnteringModel: models->setId, f114) and never heals. The
+ * ROSTER record (form, gauge) is restored at the commit; the 3D model is not.
+ */
+export const REVERT_SWAP_FRAME = 114;
+/**
+ * Enemy-side entrance: the final fade (returnToBattle, f299) is 1 frame, not 60 (entrance.c state 7,
+ * `key2 != 0 ? 1 : 60`; interpreter: fade time 1048576 = 0x100000 / 1). The camera snaps on f300 and the
+ * window ends on f301, the same "snap frame + 1" the player's 361 is (299 + 61 + 1).
+ */
+export const ENTRANCE_ENEMY_CAMERA_FADE_END_FRAME = 300;
+export const ENTRANCE_ENEMY_LAST_FRAME = 301;
 
-// ── Manual DV (sequence 0x37 + per-Digimon) ────────────────────────────────────
-// dv_manual.txt, DV to Kyubimon:
-//   f6002  EVSUBMIT code=02 sched=727          <- next turn queued as a NORMAL turn
-//   f6005  CLEANUP; MLOAD form=0176 a1=0       <- commit; note a1=0, not Blast's 1
-//   f6039  SOUND 41140000 = EVOLUTIO           <- +34
-//   f6744  SOUND 60080000 = BATL0000           <- +739, battle BGM returns
-//   f6801  PRESMSG sel=0c payload {0, 0x0f}    <- 0x0f = Kyubimon's profile row
-/** Length of the manual-DV window, commit to BGM return. */
-export const MANUAL_DV_LAST_FRAME = 739;
-/** EVOLUTIO fires here, 34 frames in. */
-export const MANUAL_DV_SOUND_FRAME = 34;
-/** Manual DV loads its model at commit (a1=0), so the swap is frame 0. */
-export const MANUAL_DV_SWAP_FRAME = 0;
+// ── Manual DV (key2 = 0): the same change task as Blast ───────────────────────────────────────────
+// WFIGHTMN_digivolve (menu.c) starts FIGHTSTG_startDigimonChange(id, 0): the timeline above, with the old model's
+// motion 13 (Blast: 14), effects 1000 + 1001 / 1003 (Blast: 1007 / 1008), no heal, and a final motion of 2 when
+// the partner's idleMotion is not 0 (Blast: 1). The old capture's numbers (EVOLUTIO +34, BGM +739, model load at
+// commit) were PAL vsyncs counted from the commit: +34 PAL frames is n = 34 here (EVOLUTIO) and the BGM is n = 865.
+/** Length of the manual-DV window: the task's state 3. */
+export const MANUAL_DV_LAST_FRAME = DV_END_FRAME;
+/** EVOLUTIO fires here (substate 1 step 0, once the stage fade-out is over). */
+export const MANUAL_DV_SOUND_FRAME = DV_EVOLUTIO_FRAME;
+/** The swap frame: swapInNewDigimon (the model is added hidden as model 1 on f-180, it takes slot 0 here). */
+export const MANUAL_DV_SWAP_FRAME = DV_SWAP_FRAME;
 
 /** Total frames for one program. */
 export function formChangeLength(program: FormChangeProgramValue): number {
   if (program === FormChangeProgram.BLAST_REVERT) return REVERT_LAST_FRAME;
+  if (program === FormChangeProgram.ENTRANCE_ENEMY) return ENTRANCE_ENEMY_LAST_FRAME;
   if (program === FormChangeProgram.MANUAL_DV) return MANUAL_DV_LAST_FRAME;
   return BLAST_LAST_FRAME;
 }
 
-/** The frame each program's jingle fires, or null when it has none. */
+/**
+ * The digivolution camera, WHEN, and the change task's other per-frame events. The maths is the original's
+ * (FIGHTSTG_updateDigimonChange, digimon_change.c): startChange cuts to the partner's near shot 9 offset by
+ * -homePos.z, swapInNewDigimon cuts to the same again for the new model, substate 12 cuts to plain shot 9, and
+ * returnToBattle fades to the enemy view (the arena shot) over 60 frames. Manual digivolve and Blast run the same
+ * camera. Nothing moves in between. The frames are the interpreter's (see the header), both programs:
+ *   taskStartFrame   0   (n; f-214) the camera task runs from the task's first run (the stepper counts from here)
+ *   startFrame        0   start cut, old model motion startMotion, enemy hidden
+ *   swapFrame       278   swap cut (and the new model's own shot 9)
+ *   newMotionFrame  437   the new model's motion newMotion (13)
+ *   returnFrame     649   plain shot-9 cut (substate 12)
+ *   fadeFrame       651   returnToBattle: fade to the enemy view, enemy shown, final motion, battle music
+ * Motions: old model 14 (Blast) / 13 (manual) on f0; the final motion is `returnMotion` (1), or
+ * `weakReturnMotion` when the partner's idleMotion is not 0 (manual 2, Blast 1: `key2 != 0 || idleMotion == 0 ? 1 : 2`).
+ * The revert runs the entrance machine instead (entrance.c) and has no schedule here.
+ */
+export interface FormChangeCameraSchedule {
+  taskStartFrame: number;
+  startFrame: number;
+  swapFrame: number;
+  newMotionFrame: number;
+  returnFrame: number;
+  fadeFrame: number;
+  startMotion: number;
+  newMotion: number;
+  returnMotion: number;
+  weakReturnMotion: number;
+}
+
+export function formChangeCameraSchedule(
+  program: FormChangeProgramValue,
+): FormChangeCameraSchedule | null {
+  if (program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY) return null;
+  const manual = program === FormChangeProgram.MANUAL_DV;
+  return {
+    taskStartFrame: DV_TASK_START_FRAME,
+    startFrame: DV_CUT_FRAME,
+    swapFrame: manual ? MANUAL_DV_SWAP_FRAME : BLAST_SWAP_FRAME,
+    newMotionFrame: DV_NEW_MOTION_FRAME,
+    returnFrame: DV_PLAIN_CUT_FRAME,
+    fadeFrame: DV_RETURN_FRAME,
+    startMotion: manual ? 13 : 14,
+    newMotion: 13,
+    returnMotion: 1,
+    weakReturnMotion: manual ? 2 : 1,
+  };
+}
+
+/**
+ * The revert's camera, WHEN: FIGHTSTG_updateEntrance (entrance.c), state 1, key2 = 0. Frame f is
+ * the entrance's frame e minus 11: the capture puts PLAYER11 (played at the flash start, e61) at
+ * presentation f50, so e1 (fade armed, counter already 1) is f-10 and presentation f0 = e11.
+ *   s0           e1    camera.fade(current -> near shot 10, 60)                 f-10
+ *   s1           e30   counter >= 30: the ENEMY model (0x10) is hidden            f19
+ *   s1           e60   counter >= 60: next substate (nextSubstate zeroes counter + step)
+ *   s2           e61   startWhiteFlash(60): speed 0xFF/60 = 4, the flash task is a child and runs
+ *                      after its parent in the same frame, level 4 on e61
+ *   (flash)      e124  level 4*64 = 256 >= 0xFF: substate != 0                    f113
+ *   s3           e125  sees it: showEnteringModel = camera.set(near shot 10), a CUT   f114
+ *   s4/s5        e126  endWhiteFlash(60); the flash fades 4 per frame, below 0 on its 64th frame
+ *                      (e189, state KILL), is destroyed on e190, the parent sees NULL on e191
+ *   s6           e191  step = 1 on e191 (nextSubstate zeroed it), step >= 120 on e310
+ *   s7           e310  camera.fade(current -> enemy view, 60), enemy shown again     f299
+ * The fade is 60 frames: frame k = 1 at f300, the snap (frame 61) at f360.
+ */
+export interface RevertCameraSchedule {
+  fadeFrame: number;      // fade to near shot 10
+  hideFrame: number;      // enemy hidden from this frame
+  cutFrame: number;       // cut to near shot 10 (flash full)
+  returnFrame: number;    // enemy shown + fade to the enemy view
+}
+export const REVERT_CAMERA_FADE_END_FRAME = 360;
+export function revertCameraSchedule(): RevertCameraSchedule {
+  return { fadeFrame: -10, hideFrame: 19, cutFrame: 114, returnFrame: 299 };
+}
+
+/**
+ * The entrance machine of either side (FIGHTSTG_startEntrance(id, side, weak), key2 = 0 / 0x10). Every event frame
+ * is the same for both sides (interpreter run, key2 0 and 0x10: fade armed n0, other model hidden n29, PLAYER11 +
+ * flash start n60, cut + done + motion 13 n124, final fade + other model shown + motion 1 (2 weak) n309; f = n - 10).
+ * What differs is WHICH models: the player side hides the ENEMY and shows the new fighter in near shot 10; the enemy
+ * side hides the PLAYER partner and shows the new enemy in its far shot 2. And the length of the final fade: 60 frames
+ * for the player, 1 for the enemy (entrance.c state 7). `swapFrame` is the cut: models->setId puts the new fighter
+ * in the slot there, and the caller commits its record there (`done = 1`).
+ */
+export interface EntranceCameraSchedule extends RevertCameraSchedule {
+  side: 0 | 1;
+  swapFrame: number;        // models->setId + motion 13 + done = 1, the same call as the cut
+  returnFadeFrames: number; // the final fade: 60 (player) / 1 (enemy)
+  shotIndex: number;        // getFighterView(side, shotIndex): near 10 (player) / far 2 (enemy)
+  hiddenSide: 0 | 1;        // whose model is off from hideFrame to returnFrame: the OTHER side's
+  lastFrame: number;        // the window: the final fade's snap frame + 1
+}
+export function entranceCameraSchedule(side: 0 | 1): EntranceCameraSchedule {
+  return {
+    ...revertCameraSchedule(),
+    side,
+    swapFrame: 114,
+    returnFadeFrames: side === 0 ? 60 : 1,
+    shotIndex: side === 0 ? 10 : 2,
+    hiddenSide: side === 0 ? 1 : 0,
+    lastFrame: side === 0 ? REVERT_LAST_FRAME : ENTRANCE_ENEMY_LAST_FRAME,
+  };
+}
+
+/**
+ * The white flash of the revert, per presentation frame, in the original's 0..255 level
+ * (white_flash.c FIGHTSTG_updateWhiteFlash / entrance.c). f = entrance frame e - 11.
+ *   startWhiteFlash(60): speed = 0xFF / 60 = 4 (integer); level starts 0, +4 each frame from e61 (f50):
+ *   level = 4 * (f - 49) up to f112 (252); 4 * 64 = 256 >= 0xFF on e124 (f113): level 255, substate != 0.
+ *   Held 255 on f114 (the entrance sees it, cuts). endWhiteFlash(60) on e126 (f115): speed 4, DONE:
+ *   level -= 4 per frame (251 on f115 ... 3 on f177); < 0 on f178: level 0, KILL.
+ * Drawn as a full-screen 320x240 quad r=g=b=level, code 0x2A, tpage 0xA0 (additive B+F), front layer.
+ * Same function in web/fight/digivolve-camera.js (a test compares them).
+ */
+export const REVERT_FLASH_START_FRAME = 50;
+export const REVERT_FLASH_FULL_FRAME = 113;
+export const REVERT_FLASH_END_FRAME = 115;
+export const REVERT_FLASH_KILL_FRAME = 178;
+export function revertFlashLevel(frame: number): number {
+  const f = Math.floor(frame);
+  if (f < REVERT_FLASH_START_FRAME || f >= REVERT_FLASH_KILL_FRAME) return 0;
+  if (f < REVERT_FLASH_FULL_FRAME) return 4 * (f - (REVERT_FLASH_START_FRAME - 1));
+  if (f < REVERT_FLASH_END_FRAME) return 0xFF;
+  return 0xFF - 4 * (f - (REVERT_FLASH_END_FRAME - 1));
+}
+
+/**
+ * The frame each program's jingle fires, or null when it has none: EVOLUTIO on f-180 for Blast and manual
+ * digivolve (substate 1 step 0), PLAYER11 +50 for the revert.
+ */
 export function formChangeSoundFrame(program: FormChangeProgramValue): number | null {
-  if (program === FormChangeProgram.BLAST_REVERT) return REVERT_SOUND_FRAME;
-  if (program === FormChangeProgram.MANUAL_DV) return MANUAL_DV_SOUND_FRAME;
-  return 0;   // Blast-on's EVOLUTIO is played at trigger by the caller.
+  if (program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY) return REVERT_SOUND_FRAME;
+  return DV_EVOLUTIO_FRAME;
+}
+
+/**
+ * The frame the battle music is started again (returnToBattle: SOUND.playSound(BATTLE_SETUP.music), the same
+ * run that arms the camera fade, f651); null for the revert (PLAYER11 is a one-shot, nothing to restore).
+ */
+export function formChangeMusicFrame(program: FormChangeProgramValue): number | null {
+  return program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY ? null : DV_RETURN_FRAME;
 }
 
 /**
  * The revert, sequence 0x62. Captured: 326 frames, PLAYER11 at f50, the form
  * already restored before frame 0, no heal, gauge already zeroed. Everything
- * else below is WALKER VISUAL — a de-digivolution read backwards through the
- * same effect vocabulary: the blast form breaks down into the green wireframe,
- * the wireframe collapses through a brief flash, and the original form settles
- * out of it as the ribbons fall away.
+ * else is entrance.c (FIGHTSTG_updateEntrance, key2 = 0): a white flash and the
+ * model switched on at the cut. No void, ribbons, wireframe or solid fade-in.
  */
-function revertState(f: number): BlastPresentationState {
-  const T = REVERT_LAST_FRAME;
+function entranceState(f: number, side: 0 | 1): BlastPresentationState {
+  const T = REVERT_VISUAL_END_FRAME;
+  const sch = entranceCameraSchedule(side);
+  const hidden = f >= sch.hideFrame && f < sch.returnFrame;
   return {
     frame: f,
     phase: f < 160 ? BlastPhase.WIREFRAME
@@ -341,65 +680,42 @@ function revertState(f: number): BlastPresentationState {
         : f < 264 ? BlastPhase.RESOLVE : BlastPhase.WIND_DOWN,
     phaseProgress: span(f, 0, T),
     progress: clamp01(f / T),
-    done: f >= T,
-    // A much smaller push than Blast-on: this is a short beat, not a set piece.
-    cameraPush: smooth(span(f, 0, 60)) * (1 - smooth(span(f, 250, T))),
-    voidAlpha: smooth(span(f, 20, 70)) * (1 - smooth(span(f, 270, T))),
-    ribbonAlpha: smooth(span(f, 30, 80)) * (1 - smooth(span(f, 240, 310))),
-    ribbonTurns: f > 30 ? (f - 30) / 42 : 0,
-    // The outgoing (blast) form is gone from the start — the capture restores it
-    // one frame before the presentation opens.
-    showOldModel: false,
+    done: f >= sch.lastFrame,
+    // The camera is the entrance machine's (revertCameraSchedule), not a dolly.
+    cameraPush: 0,
+    voidAlpha: 0,                           // entrance.c draws no void
+    stage: CHANGE_STAGE_BATTLE,             // the revert never drives the stage task
+    stageLevel: CHANGE_STAGE_FULL,
+    stageChange: 0,
+    ribbonAlpha: 0,                         // entrance.c draws no ribbons
+    ribbonTurns: 0,
+    // The entering fighter's OLD model stays on screen until the cut (entrance.c: models->setId at
+    // showEnteringModel, f114); the new one is on from there.
+    showOldModel: f < sch.swapFrame,
     oldModelWhiteout: 0,
     fireIntensity: 0,                       // no flames in a de-digivolution
-    wireframeAlpha: smooth(span(f, 40, 110)) * (1 - smooth(span(f, 190, 250))),
+    wireframeAlpha: 0,                      // entrance.c sets layers[0].wireframe = 0 and draws none
     hexagramAlpha: 0,                       // no data-burst on the way down
     hexagramScale: 1,
     circuitFill: 0,
-    flashAlpha: smooth(span(f, 170, 205)) * (1 - smooth(span(f, 215, 255))),
-    solidAlpha: smooth(span(f, 215, 268)),
-    showNewModel: true,                     // the restored form IS the model
+    flashAlpha: revertFlashLevel(f) / 0xFF,
+    flashLevel: revertFlashLevel(f),
+    solidAlpha: f >= sch.cutFrame ? 1 : 0,   // showEnteringModel (cut, f114) enables the model; no fade-in
+    showNewModel: f >= sch.swapFrame,       // models->setId at the cut
     healed: false,                          // captured: no heal at revert
+    entranceSide: side,
+    // The OTHER side's model: the enemy for the player entrance, the player partner for the enemy one.
+    enemyHidden: side === 0 ? hidden : undefined,
+    playerHidden: side === 1 ? hidden : undefined,
   };
 }
 
 /**
- * Manual DV, sequence 0x37 plus the per-Digimon sequence keyed by the target's
- * profile row. Captured: 739 frames, EVOLUTIO at f34, the model loaded at commit
- * (a1=0), the next turn queued as an ordinary turn, no heal, and — unlike the
- * revert — the DV gauge is NOT zeroed. Everything else is WALKER VISUAL: it is
- * the Blast vocabulary compressed into the shorter captured window, with no
- * second fire burst, since nothing establishes one here.
+ * Manual DV (key2 = 0): the same change task as Blast (changeState), no heal. The DV gauge is NOT zeroed and
+ * the next turn is queued as an ordinary turn (dv_manual.txt, decoded commit order).
  */
 function manualDvState(f: number): BlastPresentationState {
-  const T = MANUAL_DV_LAST_FRAME;
-  return {
-    frame: f,
-    phase: f < 150 ? BlastPhase.PUSH_IN
-      : f < 260 ? BlastPhase.VORTEX
-        : f < 330 ? BlastPhase.IGNITE
-          : f < 430 ? BlastPhase.WIREFRAME
-            : f < 560 ? BlastPhase.DATA_BURST
-              : f < 660 ? BlastPhase.RESOLVE : BlastPhase.WIND_DOWN,
-    phaseProgress: span(f, 0, T),
-    progress: clamp01(f / T),
-    done: f >= T,
-    cameraPush: f < 660 ? smooth(span(f, 0, 150)) : 1 - smooth(span(f, 660, T)),
-    voidAlpha: smooth(span(f, 150, 205)) * (1 - smooth(span(f, 690, T))),
-    ribbonAlpha: smooth(span(f, 150, 200)) * (1 - smooth(span(f, 670, 730))),
-    ribbonTurns: f > 150 ? (f - 150) / 50 : 0,
-    showOldModel: false,      // the model is swapped at commit (captured a1=0)
-    oldModelWhiteout: 0,
-    fireIntensity: smooth(span(f, 260, 320)) * (1 - smooth(span(f, 560, 640))),
-    wireframeAlpha: smooth(span(f, 330, 420)) * (1 - smooth(span(f, 570, 645))),
-    hexagramAlpha: smooth(span(f, 430, 470)) * (1 - smooth(span(f, 600, 655))),
-    hexagramScale: 0.35 + 0.65 * smooth(span(f, 430, 500)),
-    circuitFill: smooth(span(f, 470, 560)),
-    flashAlpha: smooth(span(f, 520, 560)) * (1 - smooth(span(f, 585, 630))),
-    solidAlpha: smooth(span(f, 595, 665)),
-    showNewModel: true,
-    healed: false,            // captured: manual DV does not heal
-  };
+  return changeState(false, f, null);
 }
 
 // ── The REAL effect art ────────────────────────────────────────────────────────
@@ -452,48 +768,28 @@ export const EVOL_EFFECT = {
 } as const;
 
 /**
- * When each effect is spawned, in this program's own frames.
- *
- * DECODED 2026-10-06 (authority 2, the disc's own fields; see
- * docs/research/battle/blast-driver-spawn-timing-2026-10-06.md). The controller
- * FIGHTSTG_F0x80089cd8 runs ONE substate per frame; the spawns are the gate
- * closes of substates 2, 3 and 8, not captured frames:
- *
- *   substate 1's `0xb4` timer gate closes  -> substate 2 spawns the start effect
- *   substate 3's 0xf0/(2*delta) counter    -> spawns the shared effect
- *   substate 8's 0xf0/(2*delta) counter    -> spawns the end effect
- *
- * At delta = 1 the START effect and the SHARED effect are STATIC and land at
- * frames 180 and 299 (proven over the ORIGINAL words by
- * tests/engine/unit/battle-effect-driver-timing.test.ts). The END effect is NOT
- * static: substates 5 and 7 spawn a slot overlay (FIGHTSTG_F0x800930c0, class
- * FIGHTSTG_F0x80092f7c) and wait on THAT object's runtime progress — its own 37-
- * frame readiness gate then its managed teardown — so it lands in a band, ~580-
- * 616 under the disc's own overlay gate. The sequence START is likewise gated by
- * the E000EVOL resource load in the construct stages.
- *
- * The frames below are the PRE-2026-10-06 WALKER VISUAL alignment to the capture
- * sheet (180/312/656 for Blast, 150/260/560 for manual DV). They differ from the
- * decoded disc frames by 0 / -13 / ~-40 and +30 / +39 / ~+56 respectively, and
- * the capture's phase boundaries are the spawned effects' OWN visual timelines,
- * not the driver's spawn frames. SUPERSEDED 2026-10-06: the ordinary path now spawns
- * at the PORTED DRIVER's own frames (driverEvolSchedule below), so this frozen table
- * is kept only for reference and for tests to compare against. Do not treat the
- * values below as decoded.
+ * When each effect is spawned, in presentation frames (f0 = the start cut). The ORIGINAL's own calls
+ * (digimon_change.c, run through the interpreter, FIGHTSTG_startSpriteEffect recorded):
+ *   f0    startChange        manual 1000 + 1001, Blast 1007     at (0, 0, 0x7FFF)
+ *   f119  wipeToWireframe    1002 (both)                        at (160, 120, 0x7FFF), the wipe is done
+ *   f436  wipeFromWireframe  manual 1003, Blast 1008            at (-160, -120, -1), behind (z -1)
+ * The ported transformation driver (driverEvolSchedule below) spawns the same effects on frames 180 / 299 /
+ * ~616: those count from the 180-tick hold's start (n = 34), so the presentation frame is the driver's + 34 (214 / 333 / 650).
  */
 export const EVOL_EFFECT_SCHEDULE: Readonly<Record<string, ReadonlyArray<EvolSpawn>>> = Object.freeze({
   [FormChangeProgram.BLAST_ON]: Object.freeze([
-    { frame: 180, type: EVOL_EFFECT.BLAST_START, pos: EVOL_POS.ORIGIN },
-    { frame: 312, type: EVOL_EFFECT.SHARED, pos: EVOL_POS.CENTRE },
-    { frame: 656, type: EVOL_EFFECT.BLAST_END, pos: EVOL_POS.NEG_CENTRE },
+    { frame: DV_CUT_FRAME, type: EVOL_EFFECT.BLAST_START, pos: EVOL_POS.ORIGIN },
+    { frame: DV_WIPE_END_FRAME, type: EVOL_EFFECT.SHARED, pos: EVOL_POS.CENTRE },
+    { frame: DV_WIPE_BACK_END_FRAME, type: EVOL_EFFECT.BLAST_END, pos: EVOL_POS.NEG_CENTRE },
   ]),
   [FormChangeProgram.MANUAL_DV]: Object.freeze([
-    { frame: 150, type: EVOL_EFFECT.DV_A, pos: EVOL_POS.ORIGIN },
-    { frame: 150, type: EVOL_EFFECT.DV_B, pos: EVOL_POS.ORIGIN },
-    { frame: 260, type: EVOL_EFFECT.SHARED, pos: EVOL_POS.CENTRE },
-    { frame: 560, type: EVOL_EFFECT.DV_END, pos: EVOL_POS.NEG_CENTRE },
+    { frame: DV_CUT_FRAME, type: EVOL_EFFECT.DV_A, pos: EVOL_POS.ORIGIN },
+    { frame: DV_CUT_FRAME, type: EVOL_EFFECT.DV_B, pos: EVOL_POS.ORIGIN },
+    { frame: DV_WIPE_END_FRAME, type: EVOL_EFFECT.SHARED, pos: EVOL_POS.CENTRE },
+    { frame: DV_WIPE_BACK_END_FRAME, type: EVOL_EFFECT.DV_END, pos: EVOL_POS.NEG_CENTRE },
   ]),
   [FormChangeProgram.BLAST_REVERT]: Object.freeze([]),
+  [FormChangeProgram.ENTRANCE_ENEMY]: Object.freeze([]),
 });
 
 /** The spawn positions the driver's spawn calls pass (EFFECT_DRIVER_SPAWN_POS_*). */
@@ -506,6 +802,7 @@ const DRIVER_FLAG: Readonly<Record<string, number | null>> = Object.freeze({
   [FormChangeProgram.BLAST_ON]: 1,
   [FormChangeProgram.MANUAL_DV]: 0,
   [FormChangeProgram.BLAST_REVERT]: null,
+  [FormChangeProgram.ENTRANCE_ENEMY]: null,
 });
 
 function driverPos(table: number): { readonly x: number; readonly y: number; readonly z: number } {
@@ -524,7 +821,8 @@ const driverScheduleCache = new Map<string, ReadonlyArray<EvolSpawn>>();
  * is a decoded fact (it never calls the effect controller).
  *
  * The first two spawns are static disc timers; the third sits behind the slot-overlay
- * child's runtime gate (a named boundary — see createTransformationSchedule).
+ * child's runtime gate (a named boundary — see createTransformationSchedule). Its frames count from the
+ * start of the 180-tick hold (n = 34): the presentation frame is the driver's plus 34.
  */
 export function driverEvolSchedule(program: FormChangeProgramValue): ReadonlyArray<EvolSpawn> {
   const cached = driverScheduleCache.get(program);
@@ -539,14 +837,13 @@ export function driverEvolSchedule(program: FormChangeProgramValue): ReadonlyArr
 }
 
 /**
- * The spawns due on `frame` for `program`, given the last frame already fired. The
- * schedule is the PORTED DRIVER's (driverEvolSchedule), so the ordinary transformation
- * path runs the driver's own spawn times and positions.
+ * The spawns due on `frame` for `program`, given the last frame already fired: the ORIGINAL's schedule
+ * (EVOL_EFFECT_SCHEDULE: f0, f119, f436), the same effects the change task spawns.
  */
 export function evolEffectsDue(
   program: FormChangeProgramValue, prevFrame: number, frame: number,
 ): EvolSpawn[] {
-  const sched = driverEvolSchedule(program);
+  const sched = EVOL_EFFECT_SCHEDULE[program] ?? [];
   return sched.filter((s) => s.frame > prevFrame && s.frame <= frame).map((s) => ({ ...s }));
 }
 
@@ -554,8 +851,9 @@ export function evolEffectsDue(
 export function formChangeState(
   program: FormChangeProgramValue, frame: number,
 ): BlastPresentationState {
-  const f = Math.max(0, frame);
-  if (program === FormChangeProgram.BLAST_REVERT) return revertState(f);
-  if (program === FormChangeProgram.MANUAL_DV) return manualDvState(f);
-  return blastPresentationState(f);
+  // Blast and manual DV count from the task start (n = 0); the start cut is n = 214.
+  if (program === FormChangeProgram.BLAST_REVERT) return entranceState(Math.max(0, frame), 0);
+  if (program === FormChangeProgram.ENTRANCE_ENEMY) return entranceState(Math.max(0, frame), 1);
+  if (program === FormChangeProgram.MANUAL_DV) return manualDvState(frame);
+  return blastPresentationState(frame);
 }

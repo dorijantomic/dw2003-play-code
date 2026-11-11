@@ -47,8 +47,10 @@ REPO = Path(__file__).resolve().parent.parent
 EFFECT = DDW3 / "pack/dw2003/fight/effect"
 OUT = REPO / "web/assets/battle/arenas"
 
-# The 29 stage packs. 1..29 (SFSTDATA index N -> MEFT10<NN>); 0 aliases 1.
-STAGE_IDS = list(range(1, 30))
+# The 29 stage packs. 1..29 (SFSTDATA index N -> MEFT10<NN>); 0 aliases 1. Plus 31: the Blast change
+# stage (digimon_change.c:253 setStage(0x1F)); 28 (0x1C) is the manual-digivolve change stage and is
+# already inside 1..29.
+STAGE_IDS = list(range(1, 30)) + [31]
 MEFT_OFFSET = REPO / "docs/research/fight-3d/data/sfstdata_effect_table.json"
 # Per-CLUT-group atlas page (page0 / page1) — THE decoded model, read off the live packets by
 # tools/derive_arena_mesh_pages.py. Each CLUT group `(col,row)` is drawn from exactly one atlas
@@ -179,6 +181,13 @@ def _palette_degenerate(pal: list[int]) -> bool:
     return lit < 3
 
 
+# The change stages (digimon_change.c:253, setStage(0x1C / 0x1F)): their stage model plays motion 1 of
+# its own motions file (0.bin: one step, frames 1..1500, then a 0x8000 key that loops it), so the meshes
+# turn for the whole change presentation. Their groups carry `rotKeys`, the mesh's ctrl rotation track
+# [[frame, x, y, z], ...] (PS1 angle units, 4096 = a turn, bone rot applied as Rz * Ry * Rx).
+ROT_KEY_PACKS = ("meft1028", "meft1031")
+
+
 def arena_geometry(pack: str) -> dict:
     """Arena geometry as GROUPS keyed by (page, CLUT group).
 
@@ -202,8 +211,13 @@ def arena_geometry(pack: str) -> dict:
             if key not in groups:
                 groups[key] = {"page": page, "clut": [c[0], c[1]],
                                "spinDeg": round(spin, 3), "pos": [], "uv": [], "cullRef": []}
+                if pack in ROT_KEY_PACKS and ctrl and ctrl.get("r"):
+                    groups[key]["rotKeys"] = [[int(k) for k in kf] for kf in ctrl["r"] if 0 <= kf[0] < 30000]
+                    groups[key]["_mesh"] = row
                 order.append(key)
             g = groups[key]
+            if "_mesh" in g and g["_mesh"] != row:
+                raise SystemExit(f"{pack}: group {key} merges meshes {g['_mesh']} and {row}: rotKeys would be wrong")
             # STRIP/Z vertex order (0=BL,1=TL,2=BR,3=TR): split [0,1,2]+[1,3,2], not loop order.
             tri = [0, 1, 2, 1, 3, 2] if len(p["idx"]) == 4 else [0, 1, 2]
             # The original culls a PRIMITIVE with one NCLIP on its first three projected
@@ -220,6 +234,8 @@ def arena_geometry(pack: str) -> dict:
                 g["pos"] += [v[0], v[1], v[2]]
                 g["uv"] += [p["uv"][c2][0] / 256.0, p["uv"][c2][1] / 256.0]
             g["cullRef"] += [first] * (len(tri) // 3)
+    for k in order:
+        groups[k].pop("_mesh", None)
     return {"rotFrames": eb.ROT_FRAMES, "blend": "opaque",
             "groups": [groups[k] for k in order]}
 

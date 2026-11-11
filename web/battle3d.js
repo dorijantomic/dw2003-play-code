@@ -18,7 +18,8 @@ import { applyOp5, fovYFromH, createCameraRecord, fieldsFromShot,
 import { createIdleDirector, createIdleClock, idleDirectorTick } from "./fight/battle-idle-director.js";
 import { FightCoordinator } from "./fight/fight-coordinator.js";
 import { setMoveSpeed } from "./fight/action-vm.js";
-import { EffectPlayer, loadEffectAssets } from "./fight/effect-player.js";
+import { EffectPlayer, loadEffectAssets, effectLayer } from "./fight/effect-player.js";
+import { drawUnderEffects } from "./fight/effect-under-gl.js";
 import { setTechTable, techRecord, REACTION_HIT_CLIP, REACTION_DEATH_CLIP, REACTION_EVADE_CLIP, setItemUseEffects, itemUseEffect,
          setThrowItemEffects, throwItemEffect, setSkillTable } from "./fight/fight-tables.js";
 import { setFallbackDonor, prepareModelDonors } from "./fight/clip-fallback.js";
@@ -39,7 +40,9 @@ import { ui, arenaPlacement, patchCopyRect, ARENA_BASE_Z,
   SLOW_MO_PUBLISH_AT, SLOW_MO_ACCUM_COST,
   actorTeardown, ACTOR_RES_OFFSETS, ACTOR_TEARDOWN_STATE,
   RAND_U16,
-  createBattleOpenCamera } from "./vendor/engine.js";
+  createBattleOpenCamera, formChangeCameraSchedule, entranceCameraSchedule, FormChangeProgram,
+  changeStageBg, changeStageMotionFrame, CHANGE_STAGE_FULL } from "./vendor/engine.js";
+import { createDigivolveCamera, createRevertCamera, stepFormChangeFrame, skipFormChange, DV_SHOT_INDEX, REVERT_SHOT_INDEX } from "./fight/digivolve-camera.js";
 const { createBattleFaceBox, battleFaceBoxVisible } = ui;
 
 // ─── Shader sources ───────────────────────────────────────────────────────────
@@ -1203,12 +1206,42 @@ function drawQuad(gl, prog, mvp, bufs, tex, alpha, tint) {
   gl.drawElements(gl.TRIANGLES, bufs.count, gl.UNSIGNED_SHORT, 0);
 }
 
+// A stage model's bone rotation (stage.c / model_mesh.c: RotMatrixZYX_gte, R = Rz * Ry * Rx, angles in 4096 per
+// turn, PS1 space) as a column-major mat4, applied to the mesh before the fight-model -> world mapping.
+function psxRotMat4(rx, ry, rz) {
+  const k = Math.PI * 2 / 4096;
+  const cx = Math.cos(rx * k), sx = Math.sin(rx * k);
+  const cy = Math.cos(ry * k), sy = Math.sin(ry * k);
+  const cz = Math.cos(rz * k), sz = Math.sin(rz * k);
+  const r = [cz * cy, cz * sx * sy - cx * sz, cz * cx * sy + sx * sz,
+             sz * cy, sz * sx * sy + cx * cz, sz * cx * sy - sx * cz,
+             -sy,     cy * sx,                cy * cx];
+  const m = mat4Identity();
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col];
+  return m;
+}
+// model_mesh.c FIGHTSTG_poseBone: the rotation track's value at motion frame `u` (an exact key, else the
+// linear blend of the two keys round it; before the first key / after the last it holds the end key).
+function rotKeysAt(keys, u) {
+  if (!keys || !keys.length) return [0, 0, 0];
+  if (u <= keys[0][0]) return [keys[0][1], keys[0][2], keys[0][3]];
+  for (let i = 1; i < keys.length; i++) {
+    if (u <= keys[i][0]) {
+      const a = keys[i - 1], b = keys[i];
+      const t = (u - a[0]) / (b[0] - a[0]);
+      return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t];
+    }
+  }
+  const e = keys[keys.length - 1];
+  return [e[1], e[2], e[3]];
+}
+
 // Draw one projectile mesh layer (interleaved static pos+uv buffers, non-indexed tris).
-function drawProjLayer(gl, prog, mvp, layer, tex, alpha = 1.0) {
+function drawProjLayer(gl, prog, mvp, layer, tex, alpha = 1.0, tint = null) {
   gl.useProgram(prog.program);
   gl.uniformMatrix4fv(prog.uMVP, false, mvp);
   gl.uniform1f(prog.uAlpha, alpha);
-  gl.uniform4fv(prog.uTint, [1, 1, 1, 1]);
+  gl.uniform4fv(prog.uTint, tint || [1, 1, 1, 1]);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.uniform1i(prog.uTex, 0);
@@ -1288,13 +1321,13 @@ function arenaCullIndices(mvp, layer) {
 
 // Draw one arena layer through the ported cull: only the front-facing primitives
 // are drawn (the original's own post-cull set). Uses a dynamic index buffer.
-function drawProjLayerIndexed(gl, prog, mvp, layer, tex, idx) {
-  if (!idx) { drawProjLayer(gl, prog, mvp, layer, tex, 1); return; }
+function drawProjLayerIndexed(gl, prog, mvp, layer, tex, idx, tint = null) {
+  if (!idx) { drawProjLayer(gl, prog, mvp, layer, tex, 1, tint); return; }
   if (!layer.ibo) layer.ibo = gl.createBuffer();
   gl.useProgram(prog.program);
   gl.uniformMatrix4fv(prog.uMVP, false, mvp);
   gl.uniform1f(prog.uAlpha, 1.0);
-  gl.uniform4fv(prog.uTint, [1, 1, 1, 1]);
+  gl.uniform4fv(prog.uTint, tint || [1, 1, 1, 1]);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.uniform1i(prog.uTex, 0);
@@ -2351,6 +2384,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     b.pos = g.pos;                     // kept for the per-frame back-face cull (arenaCullIndices)
     b.uv = g.uv;                       // kept for the battle atmosphere moon pick (_atmosMoonPick)
     b.cullRef = g.cullRef || null;     // triangle -> the triangle whose projected sign governs it
+    b.rotKeys = g.rotKeys || null;     // the change stages' mesh rotation track (tools/extract_arenas.py ROT_KEY_PACKS)
     return b;
   }
   // Lazy per-(page, CLUT) texture: one PNG per palette group the pack's meshes reference,
@@ -2590,6 +2624,20 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
   function cannedShotSlot(side, index) {
     const key = modelKeyFromFolder(side === "player" ? playerFolder : enemyFolder);
     const cam = !key ? null : side === "player" ? playerNearCamera() : placementTable[key]?.camera;
+    const eye = cam?.eye?.[index], look = cam?.look?.[index];
+    if (eye && look) return { eye, target: look, H: cam.view?.[index] };
+    return null;
+  }
+
+  // getFighterView(side, index) of the fighter that is ABOUT to enter (FIGHTSTG_updateEntrance reads the new
+  // fighter's record before models->setId): near shot 10 of the incoming partner form, far shot 2 of the incoming
+  // enemy. Until the swap `folder` is not the live model, so the record is read by its key; once swapped it is
+  // the live model and cannedShotSlot answers (the fitted near table for a model without its own).
+  function entranceShot(side, folder, index) {
+    const name = side ? "enemy" : "player";
+    if (!folder || folder === (side ? enemyFolder : playerFolder)) return cannedShotSlot(name, index);
+    const key = modelKeyFromFolder(folder);
+    const cam = !key ? null : side ? placementTable[key]?.camera : nearCameraFor(placementTable, key);
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
     if (eye && look) return { eye, target: look, H: cam.view?.[index] };
     return null;
@@ -3081,7 +3129,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
   }
   function _toonBodies() {
     const out = [];
-    if (!(blastState && blastState.showNewModel) && playerVisible && playerModel && playerSkelBufs) out.push([playerModel, playerSkelBufs, playerTex]);
+    if (!(blastState && blastState.wipeRow !== undefined && blastState.showNewModel) && playerVisible && playerModel && playerSkelBufs) out.push([playerModel, playerSkelBufs, playerTex]);
     if (enemyVisible && enemyModel && enemySkelBufs) out.push([enemyModel, enemySkelBufs, enemyTex]);
     for (const f of extras.values()) if (f.visible && f.model && f.bufs) out.push([f.model, f.bufs, f.tex]);
     return out;
@@ -3476,7 +3524,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
         idleDirector = null; directorRetired = false;
       }
     }
-    camScriptOwned = !!opts.scriptOwnsCamera || camRec.isGliding() || directorRetired;
+    camScriptOwned = !!opts.scriptOwnsCamera || camRec.isGliding() || directorRetired || !!dvCam?.owns();
     if (m === "defeat" && camMode !== "defeat") {
       defeatDelta = 0; defeatClock = 0;
       // F0x8008c93c's FIRST tick takes the camera with an explicit cut:
@@ -3626,6 +3674,48 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     if (a) a.baseTable = low ? 1 : 0;
   }
 
+  // entrance.c / model_mesh.c: control->motion m plays timeline table m - 1; motion 1 / 2 are the two
+  // idle tables (idleMotion 0 / 1), which the animator holds as baseTable.
+  function playPlayerMotion(motion) {
+    if (!playerAnim8r) return false;
+    if (motion === 1 || motion === 2) {
+      playerAnim8r.baseTable = motion === 2 ? 1 : 0;
+      playerAnim8r.setIdle();
+      return true;
+    }
+    const t = playerModel?.timeline?.[motion - 1]?.table;
+    if (!t || !t.length) return false;
+    playerAnim8r.playTimelineTable(t);
+    return true;
+  }
+
+  // The enemy side of playPlayerMotion (entrance.c sets the ENTERING fighter's motion, either side).
+  function playEnemyMotion(motion) {
+    if (!enemyAnim8r) return false;
+    if (motion === 1 || motion === 2) {
+      enemyAnim8r.baseTable = motion === 2 ? 1 : 0;
+      enemyAnim8r.setIdle();
+      return true;
+    }
+    const t = enemyModel?.timeline?.[motion - 1]?.table;
+    if (!t || !t.length) return false;
+    enemyAnim8r.playTimelineTable(t);
+    return true;
+  }
+
+  // The entrance asks for motion 13 on the cut frame, the same call that swaps the model (models->setId). Here the
+  // swap is the new model loading, so the request waits until the live model IS the entering folder and its animator
+  // exists, then plays; a later request (motion 1 / 2 at f299) replaces it.
+  let entranceMotion = null;
+  function entranceMotionTry() {
+    const e = entranceMotion;
+    if (!e) return;
+    const live = e.side ? enemyFolder : playerFolder;
+    if ((e.folder && e.folder !== live) || !(e.side ? enemyAnim8r : playerAnim8r)) return;
+    if ((e.side ? playEnemyMotion : playPlayerMotion)(e.motion)) entranceMotion = null;
+  }
+  function entranceMotionSet(side, folder, motion) { entranceMotion = { side, folder, motion }; entranceMotionTry(); }
+
   function setPlayerVisible(visible) { playerVisible = !!visible; }
   // DNA clip 12 hides the enemy for the void sequence (op2 [2,4] / [1,4]; slot 4 = enemy).
   let enemyVisible = true;
@@ -3733,8 +3823,53 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     arenaTint = [c(r), c(g), c(b), 1];
     return arenaTint.slice();
   }
-  function blastPresentationSet(state) { blastState = state || null; }
-  function blastPresentationStop() { blastState = null; effectPlayer?.clear(); }
+  // The digivolution camera (normal digivolve and Blast, FIGHTSTG_updateDigimonChange): cuts to
+  // the partner's near shot 9 + the -homePos.z offset at the start (f0) and at the model swap (f278), holds,
+  // cuts to plain shot 9 (f649) and fades to the arena shot over 60 frames (f651). See fight/digivolve-camera.js.
+  // The revert (de-digivolve) runs the entrance machine's camera instead (FIGHTSTG_updateEntrance,
+  // key2 = 0): fade to near shot 10, enemy hidden, cut, fade back to the enemy view (createRevertCamera).
+  let dvCam = null;
+  let dvFrame = 0;
+  function dvHome() {
+    return playerAnim8r?.homeSlot || arenaSlotFor(playerFolder, "player", placementTable);
+  }
+  // `entrance` = { folder }: the model folder of the fighter that enters (entrance.c key1), for the programs
+  // BLAST_REVERT (player side, key2 0) and ENTRANCE_ENEMY (enemy side, key2 0x10).
+  function blastPresentationSet(state, program, skipped = false, weak = false, entrance = null) {
+    blastState = state || null;
+    entranceMotionTry();
+    // "Digivolve Demo: OFF": the end state of the original presentation in one step.
+    if (skipped) { skipFormChange(camRec, dvCam, () => introShot(), setEnemyVisible); dvCam = null; return; }
+    const isRevert = program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY;
+    const eSide = program === FormChangeProgram.ENTRANCE_ENEMY ? 1 : 0;
+    const schedule = state && !state.done && program != null
+      ? (isRevert ? entranceCameraSchedule(eSide) : formChangeCameraSchedule(program)) : null;
+    if (!schedule) { dvCam?.stop(); dvCam = null; return; }
+    dvFrame = state.frame;
+    if (!dvCam && isRevert) {
+      // The OTHER side's model is hidden f19..f298: the enemy on the player entrance, the partner on the enemy one.
+      dvCam = createRevertCamera({
+        camRec, schedule,
+        shotTen: () => entranceShot(eSide, entrance?.folder, schedule.shotIndex),
+        arena: () => introShot(),
+        setEnemyVisible: eSide ? setPlayerVisible : setEnemyVisible,
+        setMotion: (m) => entranceMotionSet(eSide, entrance?.folder, m), weak,
+      });
+    } else if (!dvCam) {
+      dvCam = createDigivolveCamera({
+        camRec, schedule,
+        shotNine: () => cannedShotSlot("player", DV_SHOT_INDEX),
+        arena: () => introShot(),
+        homeZ: () => dvHome().z,
+        modelKey: () => playerFolder,
+        // startChange hides the enemy model (f0), returnToBattle shows it (f651) and gives the partner its
+        // final motion; motions 14/13 on f0, 13 on f437 (digimon_change.c); weak = the partner's idleMotion != 0.
+        setEnemyVisible: setEnemyVisible,
+        setMotion: playPlayerMotion, weak,
+      });
+    }
+  }
+  function blastPresentationStop() { dvCam?.stop(); dvCam = null; blastState = null; entranceMotion = null; effectPlayer?.clear(); }
 
   /**
    * Spawn one of the transformation's REAL effect types on the fighter.
@@ -3794,11 +3929,41 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     const [frame, clutShift, dx, dy, sx, sy, c6, c7, angle] = chans;
     if (!sx || !sy || frame === 255) return null;
     return {
+      type: Number(type),   // the real effect type, so effectLayer() classes it like the original (FRONT 1000-1002/1007, else MODELS = under at z -1)
       arch: typeRec.arch, frame: frame | 0, clutShift: clutShift | 0,
       side: "player", screen: true, pos,
       dx: dx | 0, dy: dy | 0, sx: sx / 0x1000, sy: sy / 0x1000,
       rot: (angle | 0) * Math.PI * 2 / 4096, c6: c6 | 0, c7: c7 | 0,
     };
+  }
+  // The DNA presentation's authored-record sprites (1000 intro, 1001 glyph layers, 1003 fusion burst), typed.
+  function _dnaSampleSprites() {
+    const list = [];
+      // Registry owner 0x33 creates 1000 + 1001 at (0,0,32767). Program
+      // 1000 is its 42-tick lead-in; 1001 is the looping DIGIMON/glyph field.
+      if (dnaPresentation) {
+        const centre = { x: 0, y: 0, z: 32767 };
+        const intro = _sampleEffectRecord(1000, 0, dnaPresentation.tick, centre);
+        if (intro) list.push(intro);
+        // Program 1001 is a framebuffer-building sequence: clips 10..28 add one
+        // four-tick digital layer apiece. State-8 proves the completed layers
+        // remain together behind the actor, rather than replacing one another.
+        const builtThrough = Math.min(72, Math.floor(dnaPresentation.tick / 4) * 4);
+        for (let phase = 0; phase <= builtThrough; phase += 4) {
+          const glyphLayer = _sampleEffectRecord(1001, 0, phase, centre);
+          if (glyphLayer) list.push(glyphLayer);
+        }
+        if (dnaPresentation.fusionTick != null) {
+          // The owner spawns 1003 at (-160,-120,-1). Its (+160,+120)
+          // defaults center both counter-rotating records exactly.
+          const corner = { x: -160, y: -120, z: -1 };
+          for (let i = 0; i < 2; i++) {
+            const burst = _sampleEffectRecord(1003, i, dnaPresentation.fusionTick, corner);
+            if (burst) list.push(burst);
+          }
+        }
+      }
+    return list;
   }
   function setEnemyAnim(anim)  { enemyAnim = anim;  _applyNamed(enemyAnim8r, anim, _fxHooks("enemy")); }
   // The victory gesture: the model's own table 44, else (DW2 motion on, ?dw2motion=1) the DW2 victory clip I merged by
@@ -4963,16 +5128,24 @@ void main() {
     // The slot plus the action VM's movement delta are one PS1 coordinate, and ps1ToRender is
     // the ONE mapping into render world; the bob is the walker's own render-space hover.
     const ARENA = MODEL_SCALE;
+    // The digivolution camera runs here, before the placement, because the change holds the
+    // partner at the slot origin (pos.x = pos.z = 0, pos.y = homePos.y: startChange and
+    // swapInNewDigimon) for exactly the span its shot-9 cut carries the -homePos.z offset.
+    // ONE frame of the original's order: camera run, view snapshot, then the change's cuts / fades
+    // (stepFormChangeFrame, shared with the tests). The frame is drawn with the snapshot.
+    const dvView = dvCam ? stepFormChangeFrame(camRec, dvCam, dvFrame).shot : null;
+    const dvAtOrigin = !!dvCam?.atOrigin();
     const pBob = Math.sin(animTime * 3) * 2;
     const eBob = Math.sin(animTime * 3 + Math.PI) * 2;
     // Slot position + the action VM's movement delta (op2 modes 3/7/8: dash to contact,
     // signature leap, return home). Delta is PS1 units, same frame as the slot.
-    const pMove = playerAnim8r ? playerAnim8r.moveDelta() : [0, 0, 0];
+    const pMove = playerAnim8r && !dvAtOrigin ? playerAnim8r.moveDelta() : [0, 0, 0];
     const eMove = enemyAnim8r  ? enemyAnim8r.moveDelta()  : [0, 0, 0];
     // The VM's op2 movement is a delta from the home slot on every axis, so the home slot
     // is added on every axis. (This retires the DNA-only Y compensation that used to sit
     // here: it existed solely because home Y was the one axis the placement did not re-add.)
-    const pHome = playerAnim8r?.homeSlot || arenaSlot(null, "player");
+    const pHomeSlot = playerAnim8r?.homeSlot || arenaSlot(null, "player");
+    const pHome = dvAtOrigin ? { ...pHomeSlot, x: 0, z: 0 } : pHomeSlot;
     const eHome = enemyAnim8r?.homeSlot  || arenaSlot(null, "enemy");
     const playerPos = ps1ToRender([pHome.x + pMove[0], pHome.y + pMove[1], pHome.z + pMove[2]],
                                   ARENA);
@@ -5033,7 +5206,8 @@ void main() {
       // 0x1000 in ~61 ticks = ~1.0 s, the disc's own 60 frames at 60 Hz. It used to be handed
       // GLOBAL_SPEED (the walker's 2x animation tempo, a visual preference), which halved the
       // glide to ~0.5 s and read as a fast zoom rather than the original's slow one.
-      camRec.tick(CAMERA_FRAME_DELTA);
+      // While a form change runs, its camera run is stepFormChangeFrame's (once per presentation frame).
+      if (!dvCam) camRec.tick(CAMERA_FRAME_DELTA);
       coordinator.tick(speed);
       _layoutExtras();
       for (const f of extras.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
@@ -5306,7 +5480,7 @@ void main() {
     // gating this cut on `camScriptOwned` left the retire shot on screen for the whole loss
     // beat and the defeat shot was never seen. The loss camera takes the one live record,
     // exactly as `setCameraMode`'s own note says the victory / loss / tag cameras do.
-    if (camMode !== "free" && (!camScriptOwned || camMode === "defeat")) {
+    if (camMode !== "free" && ((!camScriptOwned && !dvCam?.owns()) || camMode === "defeat")) {
       // The opening flourish installed its own record in the "opening" arm above — a cut or a
       // glide — and once it self-destructs the record holds the plain arena re-cut it left. The
       // battle's generic behind/over-the-shoulder shot must not overwrite it.
@@ -5332,7 +5506,7 @@ void main() {
         ], { issuer: "battle" });
       }
     }
-    const shot = camRec.sample();
+    const shot = dvView || camRec.sample();
     // The viewer's FREE camera wins over the record: its eye/look are already render space (the
     // page hands them in through setFreeCameraView), so no ps1ToRender and no record. This is the
     // whole isolation: op5 cuts still update the record (the info panel reports them), but the
@@ -5404,43 +5578,12 @@ void main() {
     }
     const farPlane = explicitShot || giantNearCam || camMode === "free" || battleWide ? 60000 : 8000;
     const proj = mat4Perspective(fovRad, W/H, 1, farPlane);
-    // Blast phase 1 is a camera PUSH-IN on the fighter (captured f24-f180) and
-    // phase 8 returns it (f800-f880). Dolly the eye toward the player along its
-    // own view ray rather than narrowing the fov, so the framing changes the way
-    // a moving camera does and the backdrop parallax comes with it.
-    // WALKER VISUAL: the capture fixes that it pushes in and how far it reads,
-    // not the exact eye path.
-    let camEye = eye, camLook = look, camUp = up;
-    if (blastState && blastState.cameraPush > 0) {
-      // FIT the shot to the model rather than dollying a fixed fraction. Three
-      // hand-tuned fractions (0.42, 0.22, 0.12) all cropped the figure, because
-      // the INCOMING form is usually a far bigger Digimon than the one being
-      // blasted, so any constant framed for one model fails for the next. Solve
-      // for the distance at which this frame's actual mesh height fills the
-      // target share of the view, and ease into it.
-      // WALKER VISUAL: the capture fixes that the camera pushes in and that the
-      // whole figure stays in shot, not the eye path that achieves it.
-      // 0.52 leaves headroom: the fit is solved against the mesh's REST bounds,
-      // and the revealed form animates past them (arms raised), which clipped
-      // its head at 0.62.
-      const FILL = 0.52;                                // share of frame height
-      const dx = eye[0] - pCenter[0], dy = eye[1] - pCenter[1], dz = eye[2] - pCenter[2];
-      const len = Math.hypot(dx, dy, dz) || 1;
-      const fit = (pH / FILL) / (2 * Math.tan(fovRad / 2));
-      const g = blastState.cameraPush;
-      const d = len + (fit - len) * g;
-      camEye = [pCenter[0] + (dx / len) * d, pCenter[1] + (dy / len) * d,
-        pCenter[2] + (dz / len) * d];
-      // Centre the aim on the fighter's own mesh centre, so the framing does not
-      // depend on which way this scene's model space runs.
-      camLook = [
-        look[0] + (pCenter[0] - look[0]) * g,
-        look[1] + (pCenter[1] - look[1]) * g,
-        look[2] + (pCenter[2] - look[2]) * g,
-      ];
-    }
+    // The digivolve and revert cameras (fight/digivolve-camera.js) are camera RECORDS (cuts and fades), so
+    // nothing here moves the eye: no dolly, no push-in.
+    const camEye = eye, camLook = look;
+    let camUp = up;
     // The +0x2c roll turns the finished SCREEN, so it is applied last, to the render-space up
-    // vector, after the blast dolly has settled camEye/camLook. 7 shipped packs author it.
+    // vector, after the camera record has settled camEye/camLook. 7 shipped packs author it.
     if (rollDeg) camUp = applyScreenRoll(camUp, camEye, camLook, rollDeg);
     const view = mat4LookAt(camEye, camLook, camUp);
     const pv   = mat4Mul(proj, view);
@@ -5466,15 +5609,28 @@ void main() {
 
     const dfActive = dataFieldIsActive();
     syncSpecialLoop(dfActive);   // the pack's own BT_LOOP voice lives exactly as long as the pack
-    // The Blast vortex replaces the arena with the same black void the DNA
-    // presentation uses, from its captured f180 fade onward.
-    const blastVoid = !!blastState && blastState.voidAlpha >= 1;
+    // The change presentation (digimon_change.c) drives the stage task: the battle stage fades out, the
+    // change stage (0x1C manual digivolve = MEFT1028, 0x1F Blast = MEFT1031) fades in and holds, then
+    // it fades out and the battle stage fades in again (engine changeStage: stage + model colour per
+    // frame). The stage in `blastState.stage` is drawn as the arena, its model colour as the tint and
+    // its background colour (FIGHTSTG_fadeStage) as the sky. The void is only the stand-in while the
+    // stage's pack is still loading (or when the battle has no disc arena).
+    const stageId = blastState ? (blastState.stage | 0) : 0;
+    const stageLevel = blastState && blastState.stageLevel != null ? blastState.stageLevel : CHANGE_STAGE_FULL;
+    const stageName = (id) => `meft10${String(id).padStart(2, "0")}`;
+    if (blastState && blastState.stageChange) {          // load the change stage's pack and textures ahead of its frame
+      const ahead = loadArenaPack(stageName(blastState.stageChange));
+      if (ahead.groups) for (const g of ahead.groups) if (g.count) arenaTextureFor(ahead, g);
+    }
+    const shownArena = stageId ? loadArenaPack(stageName(stageId)) : activeArena;
+    const shownReady = !!(shownArena && shownArena.groups && shownArena.groups.length);
+    const blastDark = !!blastState && blastState.voidAlpha >= 1;   // the battle stage is black: no shadows
+    const blastVoid = blastDark && !shownReady;
     const dnaVoidActive = !!dnaPresentation || blastVoid;
     // The ordinary battle's per-area arena (MEFT10<trigger param>), when one is loaded. It is
     // drawn the same way as the special backdrop — a scene of wall+floor meshes through this
     // frame's camera — but it is the environment for the WHOLE fight, not a cast window.
-    const arenaActive = !dfActive && !dnaVoidActive
-      && !!(activeArena && activeArena.groups && activeArena.groups.length);
+    const arenaActive = !dfActive && !dnaVoidActive && shownReady;
 
     // battle atmosphere (F2 -> Atmosphere, off by default): only over the ordinary per-area arena
     const atm = arenaActive && !isolatedMode ? _atmosFrame(camEye, camLook) : null;
@@ -5532,7 +5688,19 @@ void main() {
       // original shows. `arenaLegacy` keeps the pre-decode alpha/one-palette render for captures.
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      if (!builtArena) drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, arenaBg || bgTint || [0, 0, 0, 1]);   // the arena view's sky colour
+      let skyColor = arenaBg || bgTint || [0, 0, 0, 1];   // the arena view's sky colour
+      let stageTint = null;
+      if (blastState && (stageId || stageLevel !== CHANGE_STAGE_FULL)) {
+        // the stage task's own fade (FIGHTSTG_fadeStage): model colour = level / 0x80, background = bgColor * level >> 7
+        const base = stageId
+          ? (arenaManifest?.byArena?.[String(stageId)]?.bg ?? [0, 0, 0])
+          : (arenaBg ? arenaBg.slice(0, 3).map((v) => Math.round(v * 255)) : [0, 0, 0]);
+        const c = changeStageBg(base, stageLevel);
+        skyColor = [c[0] / 255, c[1] / 255, c[2] / 255, 1];
+        const k = stageLevel / CHANGE_STAGE_FULL;
+        stageTint = [k, k, k, 1];
+      }
+      if (!builtArena) drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, 1, skyColor);   // the arena view's sky colour
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
       const world = ps1ToRenderMatrix(MODEL_SCALE * (multiCam ? arenaScale : 1));   // larger for many fighters (_layoutExtras)
       const mvp = mat4Mul(bdPV, world);
@@ -5561,14 +5729,19 @@ void main() {
       if (panoP?.paint) _drawArenaPaint(panoP, mvp, world, atm);
       const _pf3 = globalThis.__perfHook3d, _pt3 = _pf3 ? performance.now() : 0;   // dev-only timing hook (web/perf-test.js); unset = no change
       let _ptri = 0;
-      for (const g of panoP || builtArena ? [] : activeArena.groups) {
+      // The change stage's model plays its motion (frames 1..1500, looping): each mesh turns by its
+      // rotation track at the motion frame. The battle stage is drawn at rest (its end pose).
+      const motionU = stageId && blastState ? changeStageMotionFrame(blastState.frame) : 0;
+      for (const g of panoP || builtArena ? [] : shownArena.groups) {
         if (!g.count) continue;
-        const tex = arenaTextureFor(activeArena, g);
-        const idx = arenaDebug.cull ? arenaCullIndices(mvp, g) : null;
+        const tex = arenaTextureFor(shownArena, g);
+        let gm = mvp;
+        if (stageId && g.rotKeys) { const r = rotKeysAt(g.rotKeys, motionU); gm = mat4Mul(mvp, psxRotMat4(r[0], r[1], r[2])); }
+        const idx = arenaDebug.cull ? arenaCullIndices(gm, g) : null;
         if (idx) arenaCullLog.groups.push({ page: g.page, clut: g.clut, kept: idx.length / 3, total: (g.count / 3) | 0 });
         if (_pf3) _ptri += (g.count / 3) | 0;
-        if (arenaDebug.cull) drawProjLayerIndexed(gl, texP, mvp, g, tex, idx);
-        else drawProjLayer(gl, texP, mvp, g, tex, 1);
+        if (arenaDebug.cull) drawProjLayerIndexed(gl, texP, gm, g, tex, idx, stageTint);
+        else drawProjLayer(gl, texP, gm, g, tex, 1, stageTint);
       }
       if (_pf3) _pf3("arenaGroups", performance.now() - _pt3, _ptri);
       gl.enable(gl.BLEND);
@@ -5606,12 +5779,33 @@ void main() {
       drawQuad(gl, texP, pv, floorBufs, arenaTexture || whiteTex, 1, [0.8,0.8,0.85,1]);
     if (isolatedMode && viewerStudio) drawViewerGrid(pv);
 
+    // The change stage's fades (stage.c, engine digivolveStageBrightness): the battle stage dims to black
+    // before the change and comes back from black after it. The stage is the sky / arena / floor drawn
+    // above, so a black layer at voidAlpha darkens exactly that, under the fighters and the sprites.
+    // (voidAlpha 1 is the black void branch above.)
+    if (blastState && blastState.voidAlpha > 0 && blastState.voidAlpha < 1) {
+      const depthOn = gl.isEnabled(gl.DEPTH_TEST);
+      gl.disable(gl.DEPTH_TEST);
+      gl.depthMask(false);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      drawQuad(gl, texP, IDENT_MVP, skyBufs, whiteTex, blastState.voidAlpha, [0, 0, 0, 1]);
+      gl.depthMask(true);
+      if (depthOn) gl.enable(gl.DEPTH_TEST);
+    }
+
+    // op3 sprites spawned at z == -1 (every effect but 1000-1002/1007) sit BEFORE the fighters in the
+    // original ordering table: over the stage, under the Digimon (sprite_anim.c:13-45). Drawn here,
+    // after the backdrop/arena/floor and before the fighters; getEffectDraw() leaves them out of the 2D pass.
+    if (effectPlayer && effectAssets) {
+      const underFx = [...effectPlayer.renderList(), ..._dnaSampleSprites()].filter(s => effectLayer(s) === "under");
+      if (underFx.length) drawUnderEffects(gl, underFx, effectAssets.manifest, effectAssets.images, { centerX: W / 2, centerY: H / 2, pxScale: H / 240, worldToScreen: () => null }, W, H);   // screen-space sprites only: same view maths as getEffectDraw
+    }
+
     // ── Digimon rendering (skeletal if loaded, billboard fallback) ──
-    // Blast transformation: past the captured swap frame the fighter is the
-    // INCOMING form, drawn first as a green wireframe and then as the solid
-    // model, cross-fading on the decoded schedule. Between the swap and the
-    // wireframe materializing (f312-f360) neither is drawn — the capture has the
-    // old model whited out and the flames covering that gap, and those are
+    // Blast and manual digivolve: the change task wipes the partner between its solid layer (rows above
+    // the wipe row) and its green wireframe layer (rows below); the model is the old partner until the
+    // swap (f278) and the new form after it (state.wipeRow, see the block below). The white flash is
     // painted by web/blast-presentation.js over this frame.
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
     if (sceneLight) _sceneLightDraw(true);
@@ -5624,19 +5818,30 @@ void main() {
     const softA = !!window.__fx?.softalpha;
     if (softA) { gl.useProgram(texP.program); gl.uniform2f(texP.uSoftA, 1, 2 / 1024); }
 // SOFTA-END
-    if (blastState && blastState.showNewModel && playerModel && playerSkelBufs) {
-      if (blastState.solidAlpha > 0) {
-        drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, fighterTint("player"),
-          blastState.solidAlpha);
+    if (blastState && blastState.wipeRow !== undefined && playerModel && playerSkelBufs) {
+      // Blast and manual DV: the change task's wipe (digimon_change.c setChangeClips, engine
+      // digivolveWipeRow). The solid layer is clipped to the top native rows [0, wipeRow), the wireframe
+      // layer of the SAME model to the rows [wipeRow, 240). The model is the old partner until the swap
+      // (f278), the new one after it; the main view spans the 240 native rows over the canvas height.
+      const rowPx = Math.round(blastState.wipeRow * H / 240);
+      gl.enable(gl.SCISSOR_TEST);
+      if (rowPx > 0) {
+        gl.scissor(0, H - rowPx, W, rowPx);
+        drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, fighterTint("player"));
       }
-      if (blastState.wireframeAlpha > 0) {
+      if (blastState.wireOn && rowPx < H) {
+        gl.scissor(0, 0, W, H - rowPx);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.ONE, gl.ONE);                    // additive: it glows
         drawSkeletalMesh(gl, texP, pv, playerSkelBufs, whiteTex,
-          [0.18, 1.0, 0.28, 1], blastState.wireframeAlpha, true);
+          [0.18, 1.0, 0.28, 1], 1, true);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       }
+      gl.disable(gl.SCISSOR_TEST);
     } else if (playerVisible && playerModel && playerSkelBufs) {
+      // Also the entrance (entrance.c): no wipe, no wireframe, the ordinary model. The entering fighter's OLD model
+      // stays until the cut (models->setId, f114), the new one is drawn from there; the other side's model is
+      // hidden through playerVisible / enemyVisible.
       drawSkeletalMesh(gl, texP, pv, playerSkelBufs, playerTex || whiteTex, fighterTint("player"));
     } else if (playerVisible) {
       // The billboard quad's normal is render +Z, which under the one mapping is the PS1
@@ -5666,8 +5871,8 @@ void main() {
     // Floor shadow ellipses. The Blast vortex has no floor to cast onto — the
     // capture is a black void from f180 — so both shadows drop with it.
     const studioOff = isolatedMode && !viewerStudio;
-    if (playerVisible && !blastVoid && !studioOff) drawShadow(gl, texP, pv, playerPos, 20, 8);
-    if (enemyVisible && !blastVoid && !studioOff)  drawShadow(gl, texP, pv, enemyPos,  20, 8);
+    if (playerVisible && !blastDark && !studioOff) drawShadow(gl, texP, pv, playerPos, 20, 8);
+    if (enemyVisible && !blastDark && !studioOff)  drawShadow(gl, texP, pv, enemyPos,  20, 8);
     if (atm) { _drawWeather(pv, atm, camEye, camLook); _atmosUniforms(null); }   // effects keep the game's own colours
 
     // ── op6 flight meshes: root at the muzzle, per-layer ctrl-track TRS animation ──
@@ -5949,7 +6154,7 @@ void main() {
     // them, which it only does with the switch on.
     whiteOut,
     setFighterTint,
-    setFighterBaseIdle,
+    setFighterBaseIdle, playPlayerMotion, playEnemyMotion,
     dnaOrbIgnite, dnaOrbsPath, dnaOrbsClear,
     dnaPresentationStart, dnaFusionStart, dnaPresentationStop,
     blastPresentationSet, blastPresentationStop, blastSpawnEffect,
@@ -6342,32 +6547,9 @@ void main() {
     // the GL frame (see fight/effect-player.js drawEffects). null when nothing is active.
     getEffectDraw() {
       if (!effectPlayer || !effectAssets || !_fxView) return null;
-      const list = effectPlayer.renderList();
+      const list = effectPlayer.renderList().filter(s => effectLayer(s) !== "under");   // the under sprites are drawn in the GL pass
       const { pv, w, h, playerPos, enemyPos } = _fxView;
-      // Registry owner 0x33 creates 1000 + 1001 at (0,0,32767). Program
-      // 1000 is its 42-tick lead-in; 1001 is the looping DIGIMON/glyph field.
-      if (dnaPresentation) {
-        const centre = { x: 0, y: 0, z: 32767 };
-        const intro = _sampleEffectRecord(1000, 0, dnaPresentation.tick, centre);
-        if (intro) list.push(intro);
-        // Program 1001 is a framebuffer-building sequence: clips 10..28 add one
-        // four-tick digital layer apiece. State-8 proves the completed layers
-        // remain together behind the actor, rather than replacing one another.
-        const builtThrough = Math.min(72, Math.floor(dnaPresentation.tick / 4) * 4);
-        for (let phase = 0; phase <= builtThrough; phase += 4) {
-          const glyphLayer = _sampleEffectRecord(1001, 0, phase, centre);
-          if (glyphLayer) list.push(glyphLayer);
-        }
-        if (dnaPresentation.fusionTick != null) {
-          // The owner spawns 1003 at (-160,-120,-1). Its (+160,+120)
-          // defaults center both counter-rotating records exactly.
-          const corner = { x: -160, y: -120, z: -1 };
-          for (let i = 0; i < 2; i++) {
-            const burst = _sampleEffectRecord(1003, i, dnaPresentation.fusionTick, corner);
-            if (burst) list.push(burst);
-          }
-        }
-      }
+      list.push(..._dnaSampleSprites().filter(x => effectLayer(x) !== "under"));   // typed samples: 1003 (z -1) is drawn in the GL pass
       // DNA orb overlay sprites (see dnaOrbIgnite/dnaOrbsPath above). Emitted as
       // screen-space descriptors in PSX centre-origin px, same as op3 z=32767 sprites.
       if (dnaOrbs?.orbiting) {

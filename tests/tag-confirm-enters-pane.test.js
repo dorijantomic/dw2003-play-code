@@ -33,11 +33,10 @@ function makeConfirmTag() {
   const formOptionsFor = () => [{ id: 9, name: "Kyubimon" }];
   const dnaChoiceFor = () => null;
   const applyTagAction = () => true;
-  const USE_ORIGINAL_TAG_SWAP = true;
   const fn = new Function(
-    "ST", "formOptionsFor", "dnaChoiceFor", "applyTagAction", "USE_ORIGINAL_TAG_SWAP",
+    "ST", "formOptionsFor", "dnaChoiceFor", "applyTagAction",
     sliceFunction("confirmTag") + "\nreturn confirmTag;",
-  )(ST, formOptionsFor, dnaChoiceFor, applyTagAction, USE_ORIGINAL_TAG_SWAP);
+  )(ST, formOptionsFor, dnaChoiceFor, applyTagAction);
   return { fn, ST };
 }
 
