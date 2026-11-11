@@ -29,8 +29,10 @@ export function addresses() {
 }
 
 const PER_IP = 12;                       // sockets one address may hold open at once
+export const PING_MS = 5000;             // the heartbeat; sockets that sent rj=1 or key= are checked every beat (found in 5 to 10 s), the others every 6th (30 s, as before)
+const SLOW_EVERY = 6;
 
-export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub({ maxPeers: Number(process.env.MP_MAX) || undefined }) } = {}) {
+export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub({ maxPeers: Number(process.env.MP_MAX) || undefined }), pingMs = PING_MS } = {}) {
     const byIp = new Map();
     const server = http.createServer((req, res) => {
         if (req.url === "/info") {
@@ -53,10 +55,11 @@ export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub({ max
         const q = new URL(req.url, "http://relay").searchParams;
         const sendRaw = (s) => { if (ws.readyState === ws.OPEN) ws.send(s); };
         if (n >= PER_IP) { sendRaw(JSON.stringify({ t: "err", reason: "busy" })); ws.close(); return; }
-        const r = hub.open(sendRaw, { room: q.get("room"), create: q.get("create") === "1", name: q.get("name") });
+        const r = hub.open(sendRaw, { room: q.get("room"), create: q.get("create") === "1", name: q.get("name"), rj: q.get("rj") === "1", key: q.get("key") });
         if (r.error) { sendRaw(JSON.stringify({ t: "err", reason: r.error })); ws.close(); return; }
         byIp.set(ip, n + 1);
         ws.isAlive = true;
+        ws.fast = q.get("rj") === "1" || !!q.get("key");   // rejoin-aware: the fast rhythm
         ws.on("pong", () => { ws.isAlive = true; });
         ws.on("message", (data) => r.session.onMessage(data.toString()));
         ws.on("close", () => {
@@ -67,13 +70,17 @@ export function startRelay({ port = 20031, host = "0.0.0.0", hub = new Hub({ max
         ws.on("error", () => ws.terminate());
     });
     // drop sockets that stopped answering (a closed laptop, a lost connection) so their player disappears for the others
+    let tick = 0;
     const beat = setInterval(() => {
+        tick++;
         for (const ws of wss.clients) {
+            if (!ws.fast && tick % SLOW_EVERY !== 0) continue;   // older games: judged every 30 s, exactly as today
             if (!ws.isAlive) { ws.terminate(); continue; }
             ws.isAlive = false;
             ws.ping();
         }
-    }, 30000);
+        hub.sweep();                                             // expire away seats
+    }, pingMs);
     return new Promise((resolve) => {
         server.listen(port, host, () => resolve({
             port: server.address().port, hub,

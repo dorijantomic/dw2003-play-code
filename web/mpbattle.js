@@ -28,6 +28,7 @@ import { asButton } from "./input.js";
 import { registerPixelScreen } from "./gpu-pixel-filter.js";
 import { emit } from "./gameEvents.js";                 // a co-op win can reach the quest layer, as a one-on-one win does
 import { winEvent } from "./mp-credit.js";             // the same `battleWon` record, built from the fight's foes and map
+import { createPause, createLink, pzText, SELF, LINK_TEXT } from "./mpbattle-pause.js";   // rejoin: who is away, what waits (pure, tested in node)
 
 const TURN_MS = 45000;              // how long a player may think
 const MIN_ANIM_MS = 900;            // the shortest pause after an action
@@ -303,7 +304,7 @@ function syncScene() {
 function render() {
     const U = F?.ui; if (!U) return;
     const S = F.S;
-    if (!S) { U.title.textContent = F.label || "Fight"; U.status.textContent = "Waiting for everyone to get ready..."; return; }
+    if (!S) { U.title.textContent = F.label || "Fight"; U.status.textContent = F.link.text ?? "Waiting for everyone to get ready..."; return; }
     const mine = S.P.find((p) => p.id === A.myId());
     if (mine) {
         if (!F.isHost && mine.pt) mine.pt.forEach((q, i) => { const r = F.party[i]?.rec; if (r) { r.hp = q.hp; r.mp = q.mp; r.gauge = q.dv; } });   // the referee's numbers are the true ones
@@ -334,7 +335,7 @@ function render() {
     }
     const t = S.t;
     const who = !t ? "" : t[0] === "e" ? (S.E.find((e) => "e" + e.i === t)?.n ?? "Enemy") : (S.P.find((p) => "p" + p.id === t)?.pn ?? "Player");
-    U.status.textContent = S.ph !== "play" ? "" : t === "p" + A.myId() ? "YOUR TURN" : t ? `${who}'s turn` : "";
+    U.status.textContent = F.link.text ?? (S.ph !== "play" ? "" : t === "p" + A.myId() ? "YOUR TURN" : S.pz ? pzText(S.pz, S.P) : t ? `${who}'s turn` : "");
     renderCmd();
 }
 
@@ -375,10 +376,10 @@ function renderCmd() {
         return;
     }
     const myKey = "p" + A.myId();
-    const mineTurn = S && S.ph === "play" && S.t === myKey && F.me.hp > 0 && !F.iFled;
+    const mineTurn = S && S.ph === "play" && S.t === myKey && F.me.hp > 0 && !F.iFled && !F.link.active;
     if (!mineTurn) {
         F.cmd = null;
-        bar.append(mk("span", "hint", F.iFled ? "You ran away. Watching the rest of the fight." : S?.ph === "play" ? "Waiting..." : ""));
+        bar.append(mk("span", "hint", F.iFled ? "You ran away. Watching the rest of the fight." : S?.ph === "play" ? (S.pz ? pzText(S.pz, S.P) : "Waiting...") : ""));
         return;
     }
     const btn = (label, fn, disabled) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
@@ -470,7 +471,7 @@ function driveNative(dt) {
     const myId = A.myId(), myKey = "p" + myId;
     const mine = S?.P.find((p) => p.id === myId);
     const forced = !!(S && S.ft && S.t === myKey);
-    const mineTurn = !!(S && S.ph === "play" && S.t === myKey && !F.iFled && mine && (forced || !mine.ko));
+    const mineTurn = !!(S && S.ph === "play" && S.t === myKey && !F.iFled && !F.link.active && mine && (forced || !mine.ko));
     F.ui.pad.classList.toggle("on", mineTurn);
     if (!mineTurn) { if (N.mode) N.close(); if (F.cmd) { F.cmd = null; renderCmd(); } N.update(dt); return; }
     if (N.busy() && !F.cmd) { N.update(dt); return; }                // let the last action's lines finish in the window first
@@ -568,10 +569,12 @@ function afterAnim(fn) {
 
 function snapshot(ph = "play") {
     const H = F.H, ar = H.arena;
+    const pz = H.pause?.view();                                // who is away and for how long, only while someone is
     return {
         r: H.round, w: ar.wave, t: H.turn, ph, g: H.log.slice(), ev: H.ev ?? null, ft: H.forced ? 1 : 0, ln: H.ln ?? [], lq: H.lq | 0,
         E: ar.waveFoes().map((e) => ({ i: e.i, n: e.name, lv: e.rec.level | 0, ...ar.plate(e) })),
         P: ar.P.map((p) => ({ id: p.id, pn: p.name, n: p.rec.profile?.name ?? "?", lv: p.rec.level | 0, ...ar.plate(p), ko: p.rec.hp <= 0 || p.fled ? 1 : 0, pt: ar.partyPlate(p), ac: p.act })),
+        ...(pz ? { pz } : {}),
     };
 }
 /** The other PEOPLE in the fight (not me, not a computer-played practice partner). `fight` defaults to the fight I am in;
@@ -608,6 +611,7 @@ function hostBegin() {
 
 function nextTurn() {
     const H = F.H, ar = H.arena;
+    if (H.pause.gate("next", nextTurn)) return;                // a player is away: wait here, nothing is lost (web/mpbattle-pause.js)
     clearTimeout(H.turnTimer);
     H.turn = null;
     const st = ar.state();
@@ -621,10 +625,7 @@ function nextTurn() {
         say(`${actor.name}: Choose the next Digimon.`);
         broadcast();
         if (F.bots.has(actor.id)) { botTurn(key); return; }
-        H.turnTimer = later(TURN_MS, () => {
-            const slot = actor.party.findIndex((r, i) => i !== actor.act && r.hp > 0);
-            if (H.forced && H.turn === key && slot >= 0) hostCommand(Number(key.slice(1)), { fid: F.fid, c: { k: "tag", slot } });
-        });
+        armForcedTimer(key, actor);
         return;
     }
     H.turns = (H.turns | 0) + 1;                               // "round" = everyone standing has had about one action
@@ -666,8 +667,18 @@ function armTurnTimer(key, actor) {
     H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
 }
 
+function armForcedTimer(key, actor) {                          // the forced swap's own timer (it was inline in nextTurn)
+    const H = F.H;
+    clearTimeout(H.turnTimer);
+    H.turnTimer = later(TURN_MS, () => {
+        const slot = actor.party.findIndex((r, i) => i !== actor.act && r.hp > 0);
+        if (H.forced && H.turn === key && slot >= 0) hostCommand(Number(key.slice(1)), { fid: F.fid, c: { k: "tag", slot } });
+    });
+}
+
 function foeTurn(key) {
     const H = F.H, ar = H.arena;
+    if (H.pause.gate("foe", () => foeTurn(key))) return;       // the enemy's action (already due) waits until nobody is away
     const res = ar.foeAction(key);
     ar.finish(key, res);
     say(res.lines); setEvent(res);
@@ -709,13 +720,53 @@ function releaseBlasts() {                                    // a Blast does no
 }
 
 function hostGone(from) {                                     // a player's connection dropped mid-fight
-    const H = F.H; if (!H?.arena) return;
-    const p = H.arena.byKey("p" + from); if (!p || p.fled) return;
+    const H = F.H; if (!H?.arena) return false;
+    const p = H.arena.byKey("p" + from); if (!p || p.fled) return false;
     p.fled = true; say(`${p.name} left the fight.`);
     const wasTurn = H.turn === p.key;
     if (wasTurn) { clearTimeout(H.turnTimer); H.turn = null; }
     broadcast();
-    if (wasTurn || H.arena.state() !== "play") later(MIN_ANIM_MS, nextTurn);
+    if (wasTurn || H.arena.state() !== "play") { later(MIN_ANIM_MS, nextTurn); return true; }   // true: nextTurn is already on its way
+    return false;
+}
+
+/** A guest's link dropped (the relay said `away`): wait for them up to AWAY_MS. They are NOT marked fled; their turn, if it is theirs, stays theirs. */
+function hostAway(from) {
+    const H = F.H; if (!H?.arena) return;
+    const p = H.arena.byKey("p" + from);
+    if (!p || p.fled || F.bots?.has(from) || H.pause.has(from)) return;
+    if (H.turn === p.key) clearTimeout(H.turnTimer);           // their 45 s must not run while they cannot answer
+    H.pause.add(from, (id) => { if (!F?.H) return; releasePause(hostGone(id) ? ["next"] : []); });   // not back in time: they have left, as before
+    say(`${p.name} lost connection. Waiting...`);
+    broadcast();                                               // everyone's screen shows "Waiting for ..."
+}
+
+/** The guest's own game says it is back (mpb `back`). A guest who already left gets `left`; otherwise everyone gets the full picture. */
+function hostBack(from) {
+    const H = F.H; if (!H?.arena) return;
+    const p = H.arena.byKey("p" + from); if (!p) return;
+    if (p.fled) { A.send([from], { k: "left", fid: F.fid }); return; }
+    const was = H.pause.remove(from);
+    if (was) say(`${p.name} is back.`);
+    broadcast();                                               // the current full snapshot: clears "Waiting" and gives the returner the fight (also when never marked away)
+    if (!was) return;
+    if (!H.pause.size) rearmTurn();
+    releasePause();
+}
+
+function rearmTurn() {                                         // the turn that was waiting gets its full 45 s again
+    const H = F.H, key = H.turn;
+    if (!key || key[0] !== "p") return;
+    const actor = H.arena.byKey(key);
+    if (!actor || actor.fled || F.bots.has(actor.id)) return;
+    if (H.forced) armForcedTimer(key, actor); else armTurnTimer(key, actor);
+}
+
+/** Run what the gate held back, once nobody is away. `covered` = calls another path already schedules (hostGone's nextTurn). */
+function releasePause(covered = []) {
+    const run = F.H.pause.release({ covered });
+    if (!run) return;                                          // someone is still away: stay parked
+    for (const f of run) later(0, f);
 }
 
 function hostEnd(state) {
@@ -741,6 +792,7 @@ async function begin(setup, isHost, hostId, done) {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
         screenId: setup.screenId ?? null, mapId: setup.mapId ?? A.mapId?.() ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         bots: new Set((setup.bots ?? []).map((b) => b.id)), snap: A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
+        link: createLink({ onEnd: () => { if (F) finish(false, { fled: true, hostLeft: true }); } }),
     };
     emit("fightSeen", winEvent(F.foes));            // only the species log listens (web/species-log.js): quests hear battleWon alone
     const U = F.ui = A.ui ?? (A.ui = buildUi());
@@ -763,7 +815,7 @@ async function begin(setup, isHost, hostId, done) {
     if (isHost) {
         F.H = {
             P: new Map([[mePublic.id, { ...mePublic, rec: me, party: party.map((m) => m.rec) }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
-            arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false, res: new Map(),
+            arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false, res: new Map(), pause: createPause(),
         };
         for (const b of setup.bots ?? []) {                    // a computer-played practice partner is ready at once
             const recs = b.party.map((r) => kit.pack(r));
@@ -809,12 +861,57 @@ export function mpbMessage(from, d) {
             list[i - 1] = d.rec; F.H.res.set(from, list);
         } else if (d.k === "decline") { F.ids = F.ids.filter((x) => x !== from); if (F.H.P.size >= F.ids.length) hostBegin(); }
         else if (d.k === "cmd") hostCommand(from, d);
+        else if (d.k === "back") hostBack(from);
     } else if (from === F.hostId) {
         if (d.k === "go") F.waves = Math.max(1, Math.min(20, d.waves | 0));
-        else if (d.k === "st") { F.S = d.S; render(); }
+        else if (d.k === "st") { F.S = d.S; F.link.clear(); render(); }
         else if (d.k === "left") finish(false, { fled: true });
         else if (d.k === "end") finish(!!d.won, { fled: d.st === "fled" });
     }
+}
+
+/** The relay says someone's link dropped but their seat is kept. Referee: wait for that guest. Guest: if it is the referee, wait for it. */
+export function mpbPeerAway(id) {
+    if (!F) return;
+    if (!F.isHost) { if (id === F.hostId) { F.link.refWait(); render(); } return; }
+    if (F.H?.arena) hostAway(id); else mpbPeerGone(id);        // before the fight starts there is nothing to wait for: as a left player
+}
+/** The relay says a seat is back. Guest: the referee is back, stop waiting for it (it sends a snapshot on its own link back).
+ *  Referee: nothing, it waits for that guest's own `back` message (a reloaded page has no fight to come back to). */
+export function mpbPeerBack(id) {
+    if (!F || F.isHost) return;
+    if (id === F.hostId && F.link.text === LINK_TEXT.ref) { F.link.clear(); render(); }
+}
+
+/** MY link dropped (multiplayer.js `linklost`): keep the screen, say so, disable choices, give up after AWAY_MS. */
+export function mpbLinkLost() {
+    if (!F) return;
+    F.cmd = null; if (F.nat) { F.nat.close(); F.nat.clearSay(); }
+    F.link.lost();
+    if (F.isHost) hostLinkLost();                              // nothing may run on while nobody can hear me
+    render();
+}
+/** MY link is back (`linkback`). resumed = the relay gave me my old id. A new id cannot rejoin the fight: leave cleanly. */
+export function mpbLinkBack(resumed) {
+    if (!F) return;
+    if (!resumed) { finish(false, { fled: true, hostLeft: true }); return; }
+    if (F.isHost) { F.link.clear(); hostLinkBack(); render(); return; }
+    F.link.reconnected();                                      // 10 s for the referee's snapshot, left or end; an older referee ignores `back`
+    A.send([F.hostId], { k: "back", fid: F.fid });
+    render();
+}
+
+function hostLinkLost() {
+    const H = F.H; if (!H?.arena) return;
+    clearTimeout(H.turnTimer);                                 // a guest's 45 s must not run while its answer cannot reach me
+    H.pause.add(SELF, null);
+}
+function hostLinkBack() {
+    const H = F.H; if (!H?.arena) return;
+    H.pause.remove(SELF);
+    broadcast();                                               // everyone carries on from the current picture
+    if (!H.pause.size) rearmTurn();
+    releasePause();
 }
 
 /** Someone left the room mid-fight. */
@@ -829,6 +926,8 @@ function finish(won, { fled = false, hostLeft = false } = {}) {
     const f = F; if (!f) return;
     for (const t of f.timers ?? []) clearTimeout(t);
     clearTimeout(f.H?.readyTimer); clearTimeout(f.H?.turnTimer);
+    f.H?.pause?.clear();
+    f.link?.clear();
     F = null;                                   // from here on the fight is over; the screen stays up for the result
     fled = fled || f.iFled;
     let reward = null, report = null, committed = false;

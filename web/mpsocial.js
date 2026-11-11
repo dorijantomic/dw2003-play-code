@@ -8,7 +8,7 @@
 // Trade swaps items and BIT between two players; both press Confirm on the same offer and each game moves its own items.
 //
 // Nothing here writes a story flag. Names and chat from other players are only ever put on the page as text.
-import { mpOn, isOnline, myId, myName, peerList, peerOf, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
+import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 
 const MAX_LOG = 300;
@@ -70,7 +70,7 @@ function drawLog() {
 
 function badge() {
     if (!el.tabs) return;
-    const n = peerList().length + 1;
+    const n = playingCount();
     el.tabs.players.textContent = `PLAYERS ${n}`;
     el.unread.textContent = S.collapsed && S.unread ? String(Math.min(S.unread, 99)) : "";
     el.unread.hidden = !(S.collapsed && S.unread);
@@ -104,7 +104,7 @@ function drawPlayers() {
         const nm = h("b", "nm", (p.id === partner ? "★ " : "") + p.name); nm.style.color = isChamp(p) ? "#ffd34d" : nameColor(p.name);
         const where = h("div", "sub", `${levelLine(p.card)}  ·  ${place(p.map)}${p.map && p.map === here ? "  ●" : ""}`);
         const acts = h("div", "acts", btn("Inspect", () => openInspect(p.id)));
-        if (!p.self) {
+        if (!p.self && !p.away) {
             acts.append(btn("Trade", () => askTrade(p.id)), btn("Duel", () => askDuel(p.id)),
                 p.id === partner ? btn("Leave party", leaveParty) : btn("Team up", () => askParty(p.id)));
             if (p.map && p.map !== here) {
@@ -119,7 +119,7 @@ function drawPlayers() {
                 acts.append(go);
             }
         }
-        el.players.append(h("div", "pl", h("div", "who", nm, p.self ? " (you)" : "", isChamp(p) ? h("span", "chmp", "  SERVER CHAMP") : ""), where, acts));
+        el.players.append(h("div", "pl", h("div", "who", nm, p.self ? " (you)" : "", p.away ? h("span", "sub", "  (away)") : "", isChamp(p) ? h("span", "chmp", "  SERVER CHAMP") : ""), where, acts));
     }
     badge();
 }
@@ -174,6 +174,7 @@ function newTrade(st, id) { return { st, id, mine: { items: {}, bits: 0 }, their
 function askTrade(id) {
     if (trade) { note("You are already in a trade."); return; }
     const p = peerOf(id); if (!p) return;
+    if (p.away) { note(`${p.name} is away.`); return; }
     trade = newTrade("out", id);
     sendTrade({ op: "ask", to: id });
     drawTrade();
@@ -285,6 +286,7 @@ function onTrade(m) {
 function askDuel(id) {
     if (duel || trade) { note("Finish what you are doing first."); return; }
     const p = peerOf(id); if (!p) return;
+    if (p.away) { note(`${p.name} is away.`); return; }
     if (!p.card?.party?.length) { note(`${p.name} has no Digimon to fight with yet.`); return; }
     if (!api.canFight()) { note("Not now - finish what you are doing first."); return; }
     duel = { st: "out", id, mine: null, theirs: null };
@@ -293,7 +295,7 @@ function askDuel(id) {
 }
 
 function startFight() {
-    const p = peerOf(duel?.id);
+    const p = peerHere(duel?.id);
     if (!p) { endDuel("They left."); return; }
     duel.st = "fight"; drawDuel();
     const started = api.startDuel(p.card, (res) => {
@@ -308,7 +310,7 @@ function startFight() {
 function verdict() {
     if (!duel?.mine) return;
     const n = peerOf(duel.id)?.name ?? "your friend";
-    if (!duel.theirs) { if (!peerOf(duel.id)) endDuel(`${n} left before finishing the duel.`); return; }
+    if (!duel.theirs) { if (!peerHere(duel.id)) endDuel(`${n} left before finishing the duel.`); return; }
     const score = (r) => (r.won ? 1 : 0) + r.hp, me = score(duel.mine), them = score(duel.theirs);
     const pct = (r) => (r.won ? `won with ${Math.round(r.hp * 100)}% HP left` : "lost");
     const text = Math.abs(me - them) < 0.02 ? "A draw!" : me > them ? `You win the duel against ${n}!` : `${n} wins the duel.`;
@@ -367,12 +369,12 @@ const scaleFoes = (foes, m) => foes.map((f) => ({
 
 export const coopPartner = () => partner;
 /** True when a fight should be offered to the partner right now. */
-export const coopReady = () => !!(isOnline() && partner != null && peerOf(partner) && !coop && !rolling && !duel && !trade);
+export const coopReady = () => !!(isOnline() && partner != null && peerHere(partner) && !coop && !rolling && !duel && !trade);
 export function coopRolling(on) { rolling = !!on; }
 
 /** Offer a fight to my partner. `start(foes, partnerId)` runs it here (partnerId null = fight alone). Returns false when I have no partner (the caller just fights). */
 export function coopTry(foes, label, start, screens) {
-    if (!(isOnline() && partner != null && peerOf(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
+    if (!(isOnline() && partner != null && peerHere(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
     rolling = false;
     const m = strength(), scaled = scaleFoes(foes, m);
     coop = { st: "out", id: partner, foes, scaled, label, start, screens, timer: setTimeout(() => {
@@ -388,6 +390,7 @@ export function coopTry(foes, label, start, screens) {
 function askParty(id) {
     if (partner != null) { note("You are already teamed up. Leave your party first."); return; }
     const p = peerOf(id); if (!p) return;
+    if (p.away) { note(`${p.name} is away.`); return; }
     partyAsk = { id, out: true };
     sendCoop({ op: "pask", to: id }); note(`You asked ${p.name} to team up.`); drawPlayers();
 }
@@ -715,11 +718,11 @@ export function installSocial({ stageEl, api: a }) {
         else if (type === "sys") note(d.text);
         else if (type === "roster") {
             drawPlayers(); drawInspect(); badge();
-            if (trade && !peerOf(trade.id)) endTrade("The other player left.");
-            if (duel && !peerOf(duel.id) && duel.st !== "fight") endDuel("The other player left.");
-            if (partner != null && !peerOf(partner)) { partner = null; note("Your party partner left."); }
-            if (partyAsk && !peerOf(partyAsk.id)) { partyAsk = null; drawCoop(); }
-            if (coop && !peerOf(coop.id)) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); }
+            if (trade && !peerHere(trade.id)) endTrade("The other player left.");
+            if (duel && !peerHere(duel.id) && duel.st !== "fight") endDuel("The other player left.");
+            if (partner != null && !peerHere(partner)) { partner = null; note("Your party partner left."); }
+            if (partyAsk && !peerHere(partyAsk.id)) { partyAsk = null; drawCoop(); }
+            if (coop && !peerHere(coop.id)) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); }
         }
         else if (type === "trade") onTrade(d);
         else if (type === "duel") onDuel(d);

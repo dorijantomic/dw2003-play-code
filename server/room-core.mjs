@@ -5,7 +5,9 @@
 // lines, a small "player card" the player chose to share, and the items two players agree to swap.
 //
 // A client connects with a URL query: `?create=1&name=Ken` makes a new room and gets its code, `?room=ABCDE&name=Ana`
-// joins one. After that it sends small JSON messages:
+// joins one. Add `&rj=1` to say "I know about seats" (every current game does): the relay then keeps a dropped player's seat
+// "away" for AWAY_MS and sends `key` in `welcome`; `&key=...` takes that seat back (same id, name, place). Older games send
+// neither and are treated exactly as before. After that a client sends small JSON messages:
 //   {t:"pos", map, x, y, dir, mv}   where I am (only players in the same stage are told)
 //   {t:"emote", e}                  a small icon over my head, e = 0..7
 //   {t:"chat", text}                a line of talk: in everyone's chat log, and over my head for players in my stage
@@ -16,15 +18,18 @@
 //   {t:"coop", op, to, ...}         team-up and shared fights between two players (see #coop)
 //   {t:"duel", op, to, hp, won}     a friendly duel: ask / yes / no / cancel / result, passed to player `to` (see #direct)
 //   {t:"lg", op, ...}               a Server Champ night among the room's tamers (see #lg)
+//   {t:"bye"}                     I am leaving for good (the Leave button): my seat is freed at once, not kept
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
 // and receives:
 //   {t:"welcome", id, room, host, roster:[{id,name,map,card}]}
+//   welcome also carries key (rj only), and for a returning seat resumed:true and at:{map,x,y,dir}; roster entries of away seats carry away:true
+//   {t:"away", id} / {t:"back", id}   a rj player's seat went away / came back (older games get leave / join instead)
 //   {t:"join", id, name} / {t:"leave", id}
 //   {t:"pos", id, map, x, y, dir, mv} / {t:"gone", id} (that player left my stage) / {t:"emote", id, e}
 //   {t:"at", id, map}               that player is now in this stage (everyone is told, so the list can say where)
 //   {t:"chat", id, text, map} / {t:"feed", id, kind, text} / {t:"card", id, card}
 //   {t:"trade", op, ...}
-//   {t:"err", reason}   reasons: no_room, full, exists, busy, bad
+//   {t:"err", reason}   reasons: no_room, full, exists, busy, bad, gone (the key is not a seat of this room, or it expired)
 import { newLeague, nextPairing, report, forfeit, matchScore, packLeague } from "../web/mp-league.js";
 
 export const MAX_PEERS = 50;         // a room of friends; positions only go to the same stage, so this stays cheap
@@ -41,6 +46,17 @@ const CHAT_MAX = 100, FEED_MAX = 90, CARD_MAX = 2000;
 const FEED_KINDS = new Set(["level", "quest", "evolve", "info"]);
 const DUEL_OPS = new Set(["ask", "yes", "no", "cancel", "result"]);
 const COOP_OPS = new Set(["pask", "pyes", "pno", "pleave", "ask", "yes", "no", "cancel", "hit", "stat"]);
+
+export const AWAY_MS = 120000;       // how long a dropped rejoin-aware player's seat is kept (id, name, place, card)
+const KEY_RE = /^[0-9a-f]{32}$/;
+const NOOP = () => {};
+
+/** A seat key: 128 random bits from the platform's secure generator (never Math.random), 32 hex characters. The relay makes it; a client cannot choose it. */
+export function makeKey() {
+    const b = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(b);
+    return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
 
 export function makeCode(rand = Math.random) {
     let s = "";
@@ -78,18 +94,21 @@ function cleanOffer(o) {
 }
 
 export class Hub {
-    constructor({ rand = Math.random, now = () => Date.now(), maxPeers = MAX_PEERS } = {}) {
+    constructor({ rand = Math.random, now = () => Date.now(), maxPeers = MAX_PEERS, awayMs = AWAY_MS, keyGen = makeKey } = {}) {
         this.rand = rand;
         this.now = now;
         this.maxPeers = maxPeers;
-        this.rooms = new Map();      // code -> { peers: Map(id -> peer) }
+        this.awayMs = awayMs;
+        this.keyGen = keyGen;
+        this.rooms = new Map();      // code -> { peers: Map(id -> peer), host, league, pair }; an away seat stays in `peers` with away = true
         this.trades = new Map();     // peer id -> its open trade (both players point at the same object)
         this.nextId = 1;
     }
 
-    /** Connect a client. `send(string)` delivers to it. Returns { session } or { error }. */
-    open(send, { room, create, name } = {}) {
-        let code;
+    /** Connect a client. `send(string)` delivers to it. `rj` = it knows about seats; `key` = it wants its old seat back. Returns { session } or { error }. */
+    open(send, { room, create, name, rj = false, key = null } = {}) {
+        const aware = !!rj || !!key;                     // every current game; an older game sends neither and is treated as before
+        let code, seat = null;
         if (create) {
             if (this.rooms.size >= MAX_ROOMS) return { error: "busy" };
             code = room ? cleanCode(room) : null;
@@ -102,27 +121,76 @@ export class Hub {
         } else {
             code = cleanCode(room);
             if (!code) return { error: "bad" };
-            if (!this.rooms.has(code)) return { error: "no_room" };
-            if (this.rooms.get(code).peers.size >= this.maxPeers) return { error: "full" };
+            const known = this.rooms.get(code);
+            if (!known) return { error: "no_room" };
+            if (key) {
+                seat = KEY_RE.test(key) ? ([...known.peers.values()].find((p) => p.key === key) ?? null) : null;
+                if (!seat) return { error: "gone" };        // not a seat of THIS room, or it expired
+                if (!seat.away) seat = null;                // still live (a second tab): no take-over, join as a new player below
+            }
+            if (!seat && known.peers.size >= this.maxPeers) return { error: "full" };
         }
         const r = this.rooms.get(code);
+        if (seat) return this.#resume(code, r, seat, send);
         const peer = {
             id: this.nextId++, name: cleanName(name), send, map: null, x: 0, y: 0, dir: "down", mv: 0,
             card: null, lastChat: 0, tokens: LIMIT * 2, last: this.now(),
+            rj: aware, key: aware ? this.keyGen() : null, away: false, awayAt: 0, gen: 0, bye: false,
         };
-        const roster = [...r.peers.values()].map((p) => ({ id: p.id, name: p.name, map: p.map, card: p.card }));
+        const roster = [...r.peers.values()].filter((p) => aware || !p.away).map((p) => this.#entry(p));   // an older client never hears about an away seat (as if it had left)
         r.peers.set(peer.id, peer);
         if (r.host == null) r.host = peer.id;               // whoever made the room runs its Server Champ nights
-        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster });
+        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, ...(aware ? { key: peer.key } : {}) });
         if (r.league) this.#to(peer, { t: "lg", op: "state", host: r.host, ev: null, pair: r.pair, lg: packLeague(r.league) });   // join mid-night: see the bracket
         for (const o of r.peers.values()) if (o !== peer) this.#to(o, { t: "join", id: peer.id, name: peer.name });
+        return { session: this.#session(code, peer) };
+    }
+
+    /** One roster row. Only an away seat carries `away`, so a plain roster has the same shape as before. */
+    #entry(p) {
+        return p.away ? { id: p.id, name: p.name, map: p.map, card: p.card, away: true } : { id: p.id, name: p.name, map: p.map, card: p.card };
+    }
+
+    /** The handle a socket gets. A close or message from a socket that has since been replaced by a return (gen moved on) is ignored. */
+    #session(code, peer) {
+        const gen = peer.gen;
         return {
-            session: {
-                id: peer.id, room: code,
-                onMessage: (raw) => this.#message(code, peer, raw),
-                onClose: () => this.#close(code, peer),
-            },
+            id: peer.id, room: code,
+            onMessage: (raw) => { if (peer.gen === gen) this.#message(code, peer, raw); },
+            onClose: () => { if (peer.gen === gen) this.#close(code, peer); },
         };
+    }
+
+    /** A returning seat: same id, name, card and place. The name in the URL is ignored. */
+    #resume(code, r, peer, send) {
+        peer.send = send; peer.gen++; peer.away = false; peer.awayAt = 0;
+        peer.tokens = LIMIT * 2; peer.last = this.now();
+        const roster = [...r.peers.values()].filter((p) => p !== peer).map((p) => this.#entry(p));
+        const cur = r.peers.get(r.host);
+        const takeHost = r.host !== peer.id && (!cur || cur.away);   // every present player left while the host was away: the first to return runs the room
+        if (takeHost) r.host = peer.id;
+        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, key: peer.key, resumed: true, at: { map: peer.map, x: peer.x, y: peer.y, dir: peer.dir } });
+        if (r.league) this.#to(peer, { t: "lg", op: "state", host: r.host, ev: null, pair: r.pair, lg: packLeague(r.league) });
+        for (const o of r.peers.values()) {
+            if (o === peer) continue;
+            if (o.rj) this.#to(o, { t: "back", id: peer.id });
+            else { this.#to(o, { t: "join", id: peer.id, name: peer.name }); if (peer.card) this.#to(o, { t: "card", id: peer.id, card: peer.card }); }
+        }
+        if (takeHost) for (const o of r.peers.values()) if (o !== peer) this.#to(o, { t: "host", id: r.host });
+        this.#show(r, peer);
+        return { session: this.#session(code, peer) };
+    }
+
+    /** Tell the room where a returning player stands: the same fan-out as walking into a stage (#pos). */
+    #show(r, peer) {
+        if (!peer.map) return;
+        this.#others(r, peer, { t: "at", id: peer.id, map: peer.map });
+        const msg = { t: "pos", id: peer.id, map: peer.map, x: peer.x, y: peer.y, dir: peer.dir, mv: 0 };
+        for (const o of r.peers.values()) {
+            if (o === peer || o.away || o.map !== peer.map) continue;
+            this.#to(o, msg);
+            this.#to(peer, { t: "pos", id: o.id, map: o.map, x: o.x, y: o.y, dir: o.dir, mv: o.mv });
+        }
     }
 
     #to(peer, obj) {
@@ -134,14 +202,37 @@ export class Hub {
 
     #close(code, peer) {
         const r = this.rooms.get(code);
-        if (!r || !r.peers.delete(peer.id)) return;
+        if (!r || !r.peers.has(peer.id) || peer.away) return;
+        if (peer.rj && !peer.bye) { this.#away(r, peer); return; }   // a drop keeps the seat; "bye" (Leave) does not
+        this.#remove(code, r, peer);
+    }
+
+    /** The old removal, unchanged: the player is gone for good. */
+    #remove(code, r, peer) {
+        r.peers.delete(peer.id);
         this.#endTrade(r, peer, "left");
         for (const o of r.peers.values()) this.#to(o, { t: "leave", id: peer.id });
         if (!r.peers.size) { this.rooms.delete(code); return; }   // the room and its Server Champ night are gone
+        this.#dropFromNight(r, peer);
+    }
+
+    /** A rj player's socket closed: keep the seat for awayMs. Id, name, map, x, y, dir and card stay. */
+    #away(r, peer) {
+        peer.away = true; peer.awayAt = this.now(); peer.send = NOOP;
+        this.#endTrade(r, peer, "away");              // the client shows "ended the trade." for a reason it has no text for
+        for (const o of r.peers.values()) if (o !== peer) this.#to(o, o.rj ? { t: "away", id: peer.id } : { t: "leave", id: peer.id });
+        this.#dropFromNight(r, peer);
+    }
+
+    /** Host role and Server Champ night when `peer` is gone or away (the rules of the old #close, unchanged). */
+    #dropFromNight(r, peer) {
         if (r.host === peer.id) {
-            // only the host can run a night, so theirs ends here; the next tamer can open a new one
+            // only the host can run a night, so theirs ends here; the next present tamer can open a new one
+            const next = [...r.peers.values()].find((p) => p !== peer && !p.away);
             const had = r.league != null;
-            r.league = null; r.pair = null; r.host = [...r.peers.keys()][0];
+            r.league = null; r.pair = null;
+            if (!next) return;                        // everyone else is away too: the first to return takes the role (#resume)
+            r.host = next.id;
             if (had) this.#league(r, { k: "closed" });
             for (const o of r.peers.values()) this.#to(o, { t: "host", id: r.host });
         } else if (r.league && r.league.ids.includes(peer.id) && !r.league.dropped.includes(peer.id)) {
@@ -154,9 +245,22 @@ export class Hub {
         }
     }
 
+    /** Remove every away seat older than awayMs. The relay calls this on every heartbeat. */
+    sweep() {
+        const t = this.now();
+        for (const [code, r] of [...this.rooms]) {
+            for (const p of [...r.peers.values()]) {
+                if (!p.away || t - p.awayAt < this.awayMs) continue;
+                r.peers.delete(p.id);
+                for (const o of r.peers.values()) if (o.rj) this.#to(o, { t: "leave", id: p.id });   // older clients got their leave when the seat went away
+            }
+            if (!r.peers.size) this.rooms.delete(code);
+        }
+    }
+
     #message(code, peer, raw) {
         const r = this.rooms.get(code);
-        if (!r || typeof raw !== "string" || raw.length > MAX_MESSAGE) return;
+        if (!r || peer.away || typeof raw !== "string" || raw.length > MAX_MESSAGE) return;
         if (raw.length > SMALL && !raw.startsWith('{"t":"card"') && !raw.startsWith('{"t":"mpb"')) return;
         const t = this.now();
         peer.tokens = Math.min(LIMIT * 2, peer.tokens + ((t - peer.last) / 1000) * LIMIT);
@@ -166,6 +270,7 @@ export class Hub {
         let m;
         try { m = JSON.parse(raw); } catch { return; }
         if (!m || typeof m !== "object") return;
+        if (m.t === "bye") { peer.bye = true; return; }   // the Leave button: my close is not a drop
         if (m.t === "ping") return this.#to(peer, { t: "pong" });
         if (m.t === "pos") return this.#pos(r, peer, m);
         if (m.t === "chat") return this.#chat(r, peer, m);
@@ -230,7 +335,7 @@ export class Hub {
     // for them: it checks the op, fills in who it is from, and passes on only the few plain fields that op may carry.
     #direct(r, peer, m, type, ops) {
         const to = r.peers.get(m.to);
-        if (!to || to === peer || !ops.has(m.op)) return;
+        if (!to || to === peer || to.away || !ops.has(m.op)) return;
         const out = { t: type, op: m.op, from: peer.id };
         if (m.op === "result") {
             out.hp = typeof m.hp === "number" && Number.isFinite(m.hp) ? Math.max(0, Math.min(1, m.hp)) : 0;
@@ -247,7 +352,7 @@ export class Hub {
         const ids = (Array.isArray(m.to) ? m.to : [m.to]).slice(0, 8);
         for (const id of ids) {
             const to = r.peers.get(id);
-            if (to && to !== peer) this.#to(to, { t: "mpb", from: peer.id, d: m.d });
+            if (to && to !== peer && !to.away) this.#to(to, { t: "mpb", from: peer.id, d: m.d });
         }
     }
 
@@ -257,7 +362,7 @@ export class Hub {
     // Like duels, the relay only checks, labels the sender and passes on a few plain fields.
     #coop(r, peer, m) {
         const to = r.peers.get(m.to);
-        if (!to || to === peer || !COOP_OPS.has(m.op)) return;
+        if (!to || to === peer || to.away || !COOP_OPS.has(m.op)) return;
         const out = { t: "coop", op: m.op, from: peer.id };
         if (m.op === "ask") {
             const foes = [];
@@ -307,7 +412,7 @@ export class Hub {
             if (r.league && r.league.phase !== "done") return no("open");   // one night at a time; a won one makes way for the next
             const ids = Array.isArray(m.ids) ? m.ids : [];
             if (ids.length < 2 || ids.length > 8 || new Set(ids).size !== ids.length
-                || !ids.every((id) => Number.isInteger(id) && r.peers.has(id))) return no("ids");
+                || !ids.every((id) => Number.isInteger(id) && r.peers.has(id) && !r.peers.get(id).away)) return no("ids");
             r.league = newLeague({ ids, bestOf: m.bestOf === 1 ? 1 : 3 });
             r.pair = null;
             return this.#league(r, { k: "open" });
@@ -348,7 +453,7 @@ export class Hub {
         const tr = this.trades.get(peer.id);
         if (m.op === "ask") {
             const to = r.peers.get(m.to);
-            if (!to || to === peer || tr || this.trades.has(to.id)) return this.#to(peer, { t: "trade", op: "end", reason: to ? "busy" : "gone" });
+            if (!to || to.away || to === peer || tr || this.trades.has(to.id)) return this.#to(peer, { t: "trade", op: "end", reason: to && !to.away ? "busy" : "gone" });
             const t = { a: peer.id, b: to.id, state: "asked", offer: {}, ok: {} };
             this.trades.set(peer.id, t); this.trades.set(to.id, t);
             return this.#to(to, { t: "trade", op: "ask", from: peer.id });

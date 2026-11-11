@@ -59,7 +59,7 @@ import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, q
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
-import { installMpBattle, mpbKey, mpbHost, mpbMessage, mpbPeerGone, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
+import { installMpBattle, mpbKey, mpbHost, mpbMessage, mpbPeerGone, mpbPeerAway, mpbPeerBack, mpbLinkLost, mpbLinkBack, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
 import { installChat, buildChatPack } from "./chat.js";
@@ -4988,6 +4988,10 @@ mpOn((type, d) => {
         if (d.d?.k === "setup" && mpIdle() && fieldPartySize(state.party) > 0) startFieldBattle(() => mpbMessage(d.from, d.d));   // the same hand-off for a friend's fight
         else mpbMessage(d.from, d.d);
     } else if (type === "leave") mpbPeerGone(d.id);
+    else if (type === "away") mpbPeerAway(d.id);
+    else if (type === "back") mpbPeerBack(d.id);
+    else if (type === "linklost") mpbLinkLost();
+    else if (type === "linkback") mpbLinkBack(d.resumed);
 });
 
 // EXPERIMENT (multiplayer co-op): a wild fight while teamed up spawns two Digimon from the same area's pool; the partner is
@@ -11489,7 +11493,7 @@ window.__dev = {
     // Start a battle from a global scripted screen id (field_encounters.json).
     startScreenBattle: (screenId, opts = {}) => battle.startScreen(
         Number(screenId), opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
-        { mapId: opts.mapId ?? currentMap().id },
+        { mapId: opts.mapId ?? currentMap().id, lead: opts.lead ?? true },
     ),
     // Play one stage event directly through the walker's own cutscene path.
     // Events normally fire from a controller (step VM / talk launcher / flag);

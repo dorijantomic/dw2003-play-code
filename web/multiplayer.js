@@ -25,6 +25,7 @@ import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "Th
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
+const KEY_SEAT = "dw.mp.seat";        // { base, room, key }: my seat in the last room, so a crash or a closed tab can come back to it
 const SEND_MS = 100;            // at most ten position updates a second
 const BEAT_MS = 2000;           // standing still, still say "I am here" now and then
 const STALE_MS = 9000;          // a player silent this long is hidden (their connection probably dropped)
@@ -39,7 +40,7 @@ const mp = {
     peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteIx, emoteUntil, say, sayUntil, card }
     me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteIx: null, emoteUntil: 0 },
     sent: { map: null, x: 0, y: 0, dir: "", mv: 0, at: 0 },
-    retry: 0, retryTimer: 0, want: null, beat: 0,
+    retry: 0, retryTimer: 0, want: null, beat: 0, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
     ui: null, lastTick: 0,
 };
 
@@ -58,9 +59,13 @@ export const amHost = () => mp.status === "online" && mp.hostId != null && mp.ho
 export const serverChampOn = () => typeof window !== "undefined" && window.__fx?.serverchamp === true;
 /** The F2 switch: F2 -> Extras -> "Chat: keep every line I type", off by default. Off = a line leaves at once, as before. */
 export const chatQueueOn = () => typeof window !== "undefined" && window.__fx?.chatqueue === true;
-/** Everyone in the room except me: [{ id, name, map, card }] */
-export const peerList = () => [...mp.peers].map(([id, p]) => ({ id, name: p.name, map: p.map, card: p.card }));
+/** Everyone in the room except me: [{ id, name, map, card, away }] */
+export const peerList = () => [...mp.peers].map(([id, p]) => ({ id, name: p.name, map: p.map, card: p.card, away: !!p.away }));
 export const peerOf = (id) => mp.peers.get(id) ?? null;
+/** The peer, only when they are really here: a player who is away (dropped, seat kept) is not. */
+export const peerHere = (id) => { const p = mp.peers.get(id); return p && !p.away ? p : null; };
+/** How many are playing, me included, not counting players who are away. */
+export const playingCount = () => [...mp.peers.values()].filter((p) => !p.away).length + 1;
 
 /** What a friend typed ("25.1.2.3", "25.1.2.3:20031", "ws://...") -> a WebSocket address, or null. */
 function wsAddress(text) {
@@ -78,37 +83,70 @@ const REASONS = {
     busy: "The server is busy. Try again in a moment.",
     bad: "That is not a room code (five letters and numbers).",
     exists: "That code is taken. Try again.",
+    gone: "Your place in that room has expired. Join again with the code.",
 };
+
+// ------------------------------------------------------------ my seat (the relay's key for me, kept so a drop can come back)
+const SEAT_ROOM = /^[A-HJ-NP-Z2-9]{5}$/, SEAT_KEY = /^[0-9a-f]{32}$/;
+function loadSeat() {
+    try {
+        const s = JSON.parse(localStorage.getItem(KEY_SEAT) || "null");
+        return s && typeof s.base === "string" && SEAT_ROOM.test(s.room ?? "") && SEAT_KEY.test(s.key ?? "") ? s : null;
+    } catch { return null; }
+}
+function saveSeat(s) { try { localStorage.setItem(KEY_SEAT, JSON.stringify({ base: s.base, room: s.room, key: s.key })); } catch { /* storage blocked */ } }
+function clearSeat() { try { localStorage.removeItem(KEY_SEAT); } catch { /* storage blocked */ } }
+/** Clear the saved seat only when it is the one named (another tab's seat is not mine to erase). */
+function dropSeat({ key = null, room = null } = {}) {
+    const s = loadSeat();
+    if (s && (!key || s.key === key) && (!room || s.room === String(room).toUpperCase())) clearSeat();
+}
+/** The saved key for this base and room, or null (a seat for another room is ignored). */
+const seatKeyFor = (base, room) => { const s = loadSeat(); return s && s.base === base && s.room === String(room ?? "").toUpperCase() ? s.key : null; };
+/** Save the seat from a welcome, unless it is a NEW player who joined because the seat in storage was still live (that seat is another tab's). */
+function keepSeat(base, m) {
+    const old = loadSeat();
+    if (m.resumed || !old || old.base !== base || old.room !== m.room || old.key === m.key) saveSeat({ base, room: m.room, key: m.key });
+}
 
 function setStatus(s, text) { mp.status = s; render(text); emit("status", { status: s }); }
 
-/** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE" } */
+/** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE", key?: seat key } */
 export function connect(want) {
     disconnect(true);
     const base = want.base;
     if (!base) { setStatus("off", "That address does not look right. Use the numbers your friend shows, like 25.1.2.3"); return; }
     mp.want = want;
     mp.name = (mp.name || "Tamer").slice(0, 12);
-    const q = new URLSearchParams({ name: mp.name });
-    if (want.create) q.set("create", "1"); else q.set("room", want.room);
+    const q = new URLSearchParams({ name: mp.name, rj: "1" });          // always: "I know about seats"
+    let sentKey = null;
+    if (want.create) q.set("create", "1");
+    else { q.set("room", want.room); sentKey = want.key ?? seatKeyFor(base, want.room); if (sentKey) q.set("key", sentKey); }
     let ws;
     try { ws = new WebSocket(`${base}/?${q}`); } catch { setStatus("off", "Could not open a connection."); return; }
     mp.ws = ws;
     setStatus("connecting", "Connecting...");
-    let gotWelcome = false;
     ws.onmessage = (e) => {
         let m; try { m = JSON.parse(e.data); } catch { return; }
         if (m.t === "welcome") {
-            gotWelcome = true; mp.retry = 0;
-            mp.id = m.id; mp.room = m.room; mp.want = { base, room: m.room };   // a reconnect rejoins this room
-            mp.hostId = m.host ?? null;
+            const wasLost = mp.lost;
+            mp.hadWelcome = true; mp.autoTry = false; mp.retry = 0; mp.lost = false;
+            mp.id = m.id; mp.room = m.room; mp.hostId = m.host ?? null;
+            mp.want = { base, room: m.room, key: m.key ?? null };         // a reconnect rejoins this room with this seat
+            if (m.key) keepSeat(base, m);
             mp.peers.clear();
-            for (const p of m.roster) { const q = newPeer(p.name); q.map = p.map ?? null; q.card = p.card ?? null; mp.peers.set(p.id, q); }
+            for (const p of m.roster) { const q = newPeer(p.name); q.map = p.map ?? null; q.card = p.card ?? null; q.away = !!p.away; q.hidden = !!p.away; mp.peers.set(p.id, q); }
             mp.sent.at = 0; mp.sent.map = null;                                  // announce myself straight away
             setStatus("online");
-            emit("sys", { text: `You joined room ${m.room}.` });
+            if (!m.resumed) emit("sys", { text: `You joined room ${m.room}.` });
             emit("roster");
+            if (wasLost) emit("linkback", { resumed: !!m.resumed });             // after roster: the screens redraw, then the fight resumes
         } else if (m.t === "err") {
+            mp.hadWelcome = false;
+            if (m.reason === "gone") dropSeat({ key: sentKey });
+            else if (m.reason === "no_room") dropSeat({ room: mp.want?.room });
+            if (m.reason === "gone" && !mp.autoTry && mp.want?.room) { connect({ base, room: mp.want.room }); return; }   // my seat is lost: join once as a new player
+            mp.autoTry = false;
             mp.want = null;
             setStatus("off", REASONS[m.reason] ?? "The server said no.");
         } else if (m.t === "join") {
@@ -118,6 +156,12 @@ export function connect(want) {
             const p = mp.peers.get(m.id); mp.peers.delete(m.id); render(); if (p) toast(`${p.name} left`);
             emit("leave", { id: m.id });
             if (p) emit("sys", { text: `${p.name} left.` }); emit("roster");
+        } else if (m.t === "away") {
+            const p = mp.peers.get(m.id); if (p) { p.away = true; p.hidden = true; }   // gone from the field, not from the room
+            render(); emit("away", { id: m.id }); emit("roster");
+        } else if (m.t === "back") {
+            const p = mp.peers.get(m.id); if (p) { p.away = false; p.hidden = false; p.seen = 0; }
+            render(); emit("back", { id: m.id }); emit("roster");
         } else if (m.t === "gone") {
             const p = mp.peers.get(m.id); if (p) p.hidden = true;
         } else if (m.t === "at") {
@@ -157,13 +201,19 @@ export function connect(want) {
     };
     ws.onclose = () => {
         if (mp.ws !== ws) return;                  // I closed it myself
-        mp.ws = null; mp.peers.clear(); emit("roster");
+        mp.ws = null; mp.peers.clear();
+        if (mp.hadWelcome && !mp.lost) { mp.lost = true; emit("linklost", {}); }   // once per drop, before roster
+        emit("roster");
         resetChatQueue();                          // a dropped connection does not keep half-sent lines waiting forever
-        if (mp.want && gotWelcome && mp.retry < 5) {
+        if (mp.want && mp.hadWelcome && mp.retry < 5) {
             const wait = 1500 * 2 ** mp.retry++;
             setStatus("connecting", "Connection lost. Reconnecting...");
             mp.retryTimer = setTimeout(() => connect(mp.want), wait);
-        } else if (mp.status !== "off") setStatus("off", gotWelcome ? "Connection lost." : "Could not reach your friend. Check the address, that you are on the same Hamachi / Tailscale network, and that their game is still hosting.");
+        } else if (mp.status !== "off") {
+            const had = mp.hadWelcome; mp.hadWelcome = false;             // giving up: the next fresh connect starts clean
+            mp.lost = false; mp.autoTry = false;
+            setStatus("off", had ? "Connection lost." : "Could not reach your friend. Check the address, that you are on the same Hamachi / Tailscale network, and that their game is still hosting.");
+        }
     };
     ws.onerror = () => { /* onclose follows and reports it */ };
 }
@@ -191,14 +241,33 @@ export async function hostGame() {
 export function disconnect(quiet = false) {
     clearTimeout(mp.retryTimer);
     if (!quiet) mp.hosting = false;
-    const ws = mp.ws; mp.ws = null; mp.want = quiet ? mp.want : null;
+    const ws = mp.ws; mp.ws = null;
+    if (ws && ws.readyState === 1) try { ws.send(JSON.stringify({ t: "bye" })); } catch { /* going anyway */ }
     if (ws) try { ws.close(); } catch { /* already closed */ }
-    mp.peers.clear(); mp.room = null; mp.id = null; mp.hostId = null;
-    resetChatQueue();                             // lines still waiting die with the connection, and say so
-    if (!quiet) setStatus("off");
+    mp.peers.clear();
+    if (!quiet) {                                  // every retry is quiet: a retry keeps my id, room and host, so GAME's myId() stays mine
+        const myKey = mp.want?.key;                // my seat, not whichever seat storage holds (another tab may own that one)
+        mp.room = null; mp.id = null; mp.hostId = null; mp.want = null;
+        mp.hadWelcome = false; mp.lost = false; mp.autoTry = false;
+        if (myKey) dropSeat({ key: myKey });       // I left: my seat is gone (the relay frees it on bye anyway)
+        resetChatQueue();                          // lines still waiting die with the connection, and say so
+        setStatus("off");
+    }
 }
 
-function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false }; }
+/** Page start: if my last room left a seat in storage, try ONCE to take it back (same id, name, place). A failure stops with a message;
+ *  it never joins as a new player and never retries. Returns true when it started a try. */
+export function rejoinSaved(defaultName) {
+    if (mp.status !== "off") return false;
+    const seat = loadSeat(); if (!seat) return false;
+    mp.name = String((typeof defaultName === "function" ? defaultName() : defaultName) || "Tamer").slice(0, 12);
+    mp.hosting = false; mp.host = seat.base.replace(/^ws:\/\//, "");
+    mp.autoTry = true;
+    connect({ base: seat.base, room: seat.room, key: seat.key });
+    return true;
+}
+
+function newPeer(name) { return { name, map: null, x: null, y: null, tx: 0, ty: 0, dir: "down", mv: 0, animTime: 0, seen: 0, emote: "", emoteIx: null, emoteUntil: 0, say: "", sayUntil: 0, card: null, hidden: false, away: false }; }
 export const sendRaw = (o) => { if (mp.ws?.readyState === 1) { mp.ws.send(JSON.stringify(o)); return true; } return false; };
 const sayTime = (text) => Math.min(SAY_MS + 3000, 3200 + text.length * 70);
 
@@ -260,6 +329,7 @@ export function multiplayerTick(mapId, st) {
     const now = performance.now();
     const dt = Math.min(0.1, (now - (mp.lastTick || now)) / 1000);
     mp.lastTick = now;
+    if (!mp.autoTried && mp.defaultName) { mp.autoTried = true; rejoinSaved(mp.defaultName); }   // page start: take my old seat back, once
     mp.me.map = mapId; mp.me.x = Math.round(st.x); mp.me.y = Math.round(st.y); mp.me.dir = st.dir;
     mp.me.mv = st.moving || st._cutTarget ? 1 : 0;
     if (mp.status !== "online") return;
@@ -342,7 +412,7 @@ function render(note) {
     const u = mp.ui; if (!u) return;
     const online = mp.status === "online";
     u.badge.hidden = !online;
-    u.badge.textContent = online ? `ROOM ${mp.room}  ·  ${mp.peers.size + 1} playing` : "";
+    u.badge.textContent = online ? `ROOM ${mp.room}  ·  ${playingCount()} playing` : "";
     u.off.hidden = online || mp.status === "connecting";
     u.on.hidden = !online;
     u.msg.textContent = note ?? (online ? "" : mp.status === "connecting" ? "Connecting..." : "");
@@ -354,7 +424,7 @@ function render(note) {
         u.addrs.style.whiteSpace = "pre";
         u.addrs.hidden = !mp.hosting;
         u.code.textContent = mp.room;
-        u.roster.textContent = [mp.name + " (you)", ...[...mp.peers.values()].map((p) => p.name)].join(", ");
+        u.roster.textContent = [mp.name + " (you)", ...[...mp.peers.values()].map((p) => (p.away ? `${p.name} (away)` : p.name))].join(", ");
     }
 }
 
@@ -411,6 +481,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     stageEl.append(panel, badge, toastEl);
     const $ = (id) => panel.querySelector("#" + id);
     mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") };
+    mp.defaultName = defaultName;               // the first multiplayerTick uses it for the page-start rejoin
     EMOTES.forEach((t, i) => {
         const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.title = `Emote ${i + 1}`;
         b.onclick = () => sendEmote(i);
