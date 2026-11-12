@@ -16,9 +16,12 @@ Not yet in a release. No `v0.1.4` tag exists; the commits below are in the tree 
 - Pages after an entrance (tag, KO replacement, enemy self-tag) appear on frame 301 as in the original, over the camera glide. A Tag turn is timed with the outgoing Digimon's speed; a KO replacement adds no turn.
 - Helter Skelter (Persiamon) de-digivolves the partner to its base form with the entrance and "Digidevolved!", as in the original; the base-form check reads the fighter id.
 - The change stages turn their parts with the original's whole-number key blend and Rz*Ry*Rx order (model_mesh.c); they are unlit, as on the disc.
+- Every technique works out damage, critical hits, status, timers, steal, counters and cures as in the original, checked for all 443 techniques by `tools/check_all_techs.mjs` (5892523ef). Fixes that change play: magic critical hits (damage, and the chance for Normal-element magic); confusion recovery time; the chance of Card attacks (421-428) uses the WIS of the right side; weapon element and Multi Crest apply to physical techniques, not only the basic attack, and Multi Crest never adds hits to magic; cure techniques clear pending locks; Counter Crest damage; Galacticmon's technique 440 keeps its magic category.
+- Galacticmon copies the last technique the player used (hit, zero damage or miss) into 440 with the original rules and tables (82501d85e).
 
 ### Field
 - Firefox speed: grass copied once per frame, the field is not drawn under a battle, the 3D battle has its own layer; field 12 -> 172 fps, battle 10 -> 63 fps in Firefox at 960x720 (c880c2be5).
+- The ending runs as in the original: the win goes to the boss movie, then the language credits movie, then the post-game. The story movies MOVIED02-07 play, and the movie colour range is pinned (82501d85e).
 
 ### Online
 - A dropped player keeps their seat for 2 minutes ("away") and can come back to the same id, name and place; Leave frees the seat at once. The relay checks rejoin-aware games every 5 s.
