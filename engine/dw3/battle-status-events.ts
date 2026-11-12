@@ -239,9 +239,7 @@ export const STATUS_EVENT_CODES: readonly StatusEventCodeRow[] = Object.freeze([
   },
   {
     code: 0x06, name: "a per-fighter timed event", stager: 0x8009c6a4, delayOpcode: null,
-    portState: "named-not-ported",
-    reason: "its three callers pass the Blast / form-change payloads " +
-      "(`li $v0, 0xbd` :26631), and those live on the form-change machine.",
+    portState: "ported",
   },
   {
     code: 0x07, name: "a global timed event", stager: 0x8009c740, delayOpcode: null,
@@ -972,6 +970,63 @@ export function stageStatusEventSideTick(
   });
 }
 
+/** The payload the Auto Recover technique writes: its own id 189 (`li $v0, 0xbd`, :26631/:26702). */
+export const AUTO_RECOVER_PAYLOAD = 0xbd;
+
+/**
+ * `FIGHTSTG_F0x8009c6a4` - stage the regen machine's event, code 6 (`pro/fightstg.s:26615`-`:26654`).
+ * An existing entry for the side and slot only has its payload rewritten to `0xbd` (:26636-:26639,
+ * its time is NOT touched); otherwise a new one is enqueued with time 1000 (:26642). The event is
+ * not freed when it fires (word -1); the regen machine reloads 1000 (wfightmn.s:2381).
+ */
+export function stageStatusEventRegen(
+  pool: StatusEventPool, side: number, slot: number, payload: number,
+): number {
+  const existing = findStatusEvent(pool, 0x06, side, slot);
+  const found = existing >= 0 ? pool[existing] : null;
+  if (found) {
+    found.payload = AUTO_RECOVER_PAYLOAD;
+    return existing;
+  }
+  return enqueueStatusEvent(pool, {
+    code: 0x06, time: 1000, side, slot, payload: payload | 0, payload2: 0,
+  });
+}
+
+/**
+ * `endAutoRecover` (machine 0x800a8118, wfightmn.s:2261-2342), the consumer of code 5: finds the
+ * side's code-6 entry and frees it, unless the fighter wears the Recover Crest, in which case it
+ * keeps the entry and zeroes its payload (wfightmn.s:2320-2330). Returns the index acted on, or -1.
+ */
+export function endStatusEventRegen(
+  pool: StatusEventPool, side: number, wearsCrest: boolean,
+): number {
+  for (let i = 0; i < pool.length; i++) {
+    const e = pool[i];
+    if (!e || e.code !== 0x06 || (e.side | 0) !== (side | 0)) continue;
+    if (wearsCrest) e.payload = 0;
+    else { e.code = 0; e.time = 0; e.payload = 0; e.payload2 = 0; }
+    return i;
+  }
+  return -1;
+}
+
+/**
+ * The global timed event, `FIGHTSTG_F0x8009c740` (`pro/fightstg.s:26656`-`:26703`): code 7,
+ * time clamped to `0x7fff` (`:26669`-`:26671`), side 0, slot -1 (`:26685`). The field
+ * techniques queue it with `1000 + 12 * SPT` (`:14068`-`:14074`). An existing entry only has
+ * its time rewritten (`sh $s0, 0x2($v0)` `:26697`), so a new field tech replaces the timer.
+ */
+export function stageStatusEventGlobal(pool: StatusEventPool, time: number): number {
+  const t = Math.min(0x7fff, Math.trunc(time));
+  const existing = findStatusEvent(pool, 0x07, 0, -1);
+  if (existing >= 0) {
+    pool[existing]!.time = t;
+    return existing;
+  }
+  return enqueueStatusEvent(pool, { code: 0x07, time: t, side: 0, slot: -1, payload: 0, payload2: 0 });
+}
+
 /**
  * Cure one ailment: free its recovery entry from the pool.
  *
@@ -1046,9 +1101,12 @@ export interface StatusEventExpiry {
   /**
    * `'stat'` = put the modifier halfword back to zero; `'lock'` = release the lock;
    * `'ailment'` = the recovery came due, so the record's ailment bit is cleared;
-   * `'poison'` = the recurring poison tick came due.
+   * `'poison'` = the recurring poison tick came due;
+   * `'regen'` = the regen machine tick came due (code 6, every 1000 units);
+   * `'sideTick'` = code 5 fired (endAutoRecover, wfightmn 0x800a8118: Auto Recover ends);
+   * `'clearField'` = code 7 fired (clearField, wfightmn 0x800a8458: the field is zeroed).
    */
-  kind: "stat" | "lock" | "ailment" | "poison";
+  kind: "stat" | "lock" | "ailment" | "poison" | "regen" | "sideTick" | "clearField";
   /** The stat number, for `kind === 'stat'`. */
   stat?: 0 | 1 | 2;
   /** The lock index, for `kind === 'lock'`. */
@@ -1057,7 +1115,7 @@ export interface StatusEventExpiry {
   bit?: number;
   /** The ailment, for `kind === 'ailment' | 'poison'`. */
   ailment?: string;
-  /** The payload the stager stored, for `kind === 'poison'`. */
+  /** The payload the stager stored, for `kind === 'poison'` and `'regen'` (189 = Auto Recover, 0 = the crest). */
   payload?: number;
 }
 
@@ -1094,7 +1152,9 @@ export function advanceStatusEvents(pool: StatusEventPool, units: number): Statu
     // must never see the same entry twice -- otherwise a zero-time survivor would fire
     // again on the very next pick and the loop would never end.
     if (fired.has(pick.index)) break;
-    fired.add(pick.index);
+    // The regen machine reloads 1000 inside its own consumer (wfightmn.s:2381) before the next
+    // pick, so the clock keeps running: one advance can carry several ticks.
+    if (pick.code !== 0x06) fired.add(pick.index);
     left -= pick.time;
     const entry = pool[pick.index];
     if (!entry) break;
@@ -1112,6 +1172,12 @@ export function advanceStatusEvents(pool: StatusEventPool, units: number): Statu
         code: pick.code, name: row.name, side: entry.side, slot: entry.slot,
         kind: "lock", lock, bit: statusEventLockBit(pick.code) ?? 0,
       });
+    } else if (pick.code === 0x05 || pick.code === 0x06 || pick.code === 0x07) {
+      out.push({
+        code: pick.code, name: row?.name ?? "", side: entry.side, slot: entry.slot,
+        kind: pick.code === 0x05 ? "sideTick" : pick.code === 0x06 ? "regen" : "clearField",
+        payload: entry.payload | 0,
+      });
     } else if (ail) {
       out.push({
         code: pick.code, name: row?.name ?? ail.ailment,
@@ -1120,6 +1186,7 @@ export function advanceStatusEvents(pool: StatusEventPool, units: number): Statu
         ailment: ail.ailment, bit: ail.bit, payload: entry.payload | 0,
       });
     }
+    if (pick.code === 0x06) entry.time = 1000;
     if (statusEventFreesSlot(pick.code)) {
       entry.code = 0;
       entry.time = 0;

@@ -193,17 +193,20 @@ test("a category-4 technique cannot miss — the applier rolls on 2 and 3 only",
   }
   // The walker's own rule: one gate, keyed on the record's category byte, both sides.
   const gates = BATTLE_JS.match(/battleRestorePlanFor\(b, [01],/g) ?? [];
-  assert.equal(gates.length, 2,
-    "both the player's and the enemy's technique paths must run the category-4 arm");
+  // 3 = player technique + enemy technique + the DNA fusion path (DNA 375 restore, disc-correct).
+  assert.equal(gates.length, 3,
+    "the player's, the enemy's and the DNA fusion path must run the category-4 arm");
   // And neither of them may reach the resolver first.
   const playerBlock = BATTLE_JS.slice(
-    BATTLE_JS.indexOf("const restore = battleRestorePlanFor(b, 0,"),
+    // start at the player TECHNIQUE call (the DNA call now comes first in the file)
+    BATTLE_JS.indexOf("const restore = battleRestorePlanFor(b, 0, restoreRecord,"),
     BATTLE_JS.indexOf("// Every remaining technique on this path is an ORDINARY attack"));
   assert.ok(playerBlock.length > 0 && !playerBlock.includes("resolveAttack"),
     "the player's category-4 path must not call resolveAttack");
   const enemyBlock = BATTLE_JS.slice(
     BATTLE_JS.indexOf("const restore = battleRestorePlanFor(b, 1,"),
-    BATTLE_JS.indexOf("// F0x8009d4b8: the multi-hit applier re-rolls only accuracy on one computed\n    // damage value. Miss only if all whiff.\n    let total = 0, healTotal = 0, anyHit = false;\n    if (restoreRecord?.dispatch === DAMAGE_TERM_REPEAT_WORD) {"));
+    // the enemy block ends where the multi-hit applier starts (the field-write lines sit between)
+    BATTLE_JS.indexOf("// F0x8009d4b8: the multi-hit applier re-rolls only accuracy on one computed"));
   assert.ok(enemyBlock.length > 0 && !enemyBlock.includes("resolveAttack"),
     "the enemy's category-4 path must not call resolveAttack");
 });
@@ -591,10 +594,12 @@ test("applying the plan writes HP and cures ailments on the walker's own records
   assert.equal(heal.arm.name, "healActive");
   assert.equal(b.playerRecords[1].hp, 30 + Math.min(amount, 20));
   assert.equal(b.playerRecords[0].hp, 40, "only the active member is healed");
-  // Auto Recover (189) sets the walker's own gradual-recovery flag on the active record.
+  // Auto Recover (189) stages the disc's code-5 end and code-6 tick events for the active record
+  // (no battle-long flag: tests/battle-disc-durations.test.js drives the ticks and the end).
   const regen = battleRestorePlanFor(b, 0, TECH_TABLE["189"], 189, { name: "Agumon" });
   assert.equal(regen.regen, true);
-  assert.equal(b.playerRecords[1].regeneration, true);
+  assert.equal(b.playerRecords[1].autoRecover, true);
+  assert.equal(b.statusEvents.filter((e) => e.code === 5 || e.code === 6).length, 2);
   // Crimson Flame (100) restores only the member at 0 HP.
   const revive = battleRestorePlanFor(b, 0, TECH_TABLE["100"], 100, { name: "Agumon" });
   assert.deepEqual(revive.fullRestore, [false, false, true]);

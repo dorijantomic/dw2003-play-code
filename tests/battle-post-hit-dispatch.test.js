@@ -51,7 +51,7 @@ test("CENSUS: the running arms carry the disc's own addresses, the rest are the 
   // The 15 `jal` targets in the dispatcher body (fightstg.s:28130-28199), by dispatch.
   const expected = {
     2: 0x8009d140, 3: 0x8009d1dc, 4: 0x8009d2c4, 5: 0x8009d3ac,
-    6: 0x8009d470, 8: 0x8009d61c, 11: 0x8009d768, 12: 0x8009d7a4,
+    6: 0x8009d470, 8: 0x8009d61c, 11: 0x8009d768, 12: 0x8009d7a4, 13: 0x8009e0b4,
     26: 0x8009d858, 27: 0x8009d944, 29: 0x8009da0c,
     32: 0x8009daac, 33: 0x8009db94, 34: 0x8009dc8c,
   };

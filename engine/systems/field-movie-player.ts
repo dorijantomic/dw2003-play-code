@@ -49,7 +49,7 @@
 // [0, 18, 320, 208] — the same rect the shipped title player uses
 // (web/assets/data/stdwtitl_ui.json `movie_display.logical`).
 
-import { movieRow } from "../dw3/screen-routing.ts";
+import { movieRow, movieRowForLanguage } from "../dw3/screen-routing.ts";
 import { type MovieRow } from "../dw3/movie-destinations.ts";
 import { FIELD_TICK_RATE } from "./field-movement.ts";
 
@@ -106,9 +106,12 @@ export class FieldMoviePlayer {
     private ended: MovieEndReason | null = null;
 
     /** `F0x80083f48` + `F0x80083cc0`: the launch code names the movie row. Returns
-     *  the row, or null for a code that names no movie (the player stays closed). */
-    open(launchCode: number): MovieRow | null {
-        const row = movieRow(launchCode);
+     *  the row, or null for a code that names no movie (the player stays closed).
+     *  `languageByte` is the language global (D0x8005CCA8): row 11 loads the
+     *  file it picks (see `movieRowForLanguage`); the default 2 is English. */
+    open(launchCode: number, languageByte = 2): MovieRow | null {
+        const named = movieRow(launchCode);
+        const row = named ? movieRowForLanguage(named, languageByte) : null;
         this.code = launchCode;
         this.row = row;
         this.blanks = 0;

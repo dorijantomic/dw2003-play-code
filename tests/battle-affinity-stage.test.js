@@ -365,7 +365,7 @@ test("CENSUS: one clear, on the shared no-damage gate, both sides, unconditional
   const defs = BATTLE_JS.match(/export function clearActionAffinity\b/g) ?? [];
   assert.equal(defs.length, 1, "the clear must be written once, shared by both sides");
   const calls = BATTLE_JS.match(/clearActionAffinity\(b, side\)/g) ?? [];
-  assert.equal(calls.length, 3, "the one definition plus one call in each no-damage gate");
+  assert.equal(calls.length, 4, "the one definition plus one call in each no-damage gate and in castFieldTechnique (fightstg.s:13092 has no category test)");
   // The category-4 heal/cure gate and the category-5 charge gate, and nowhere else.
   const restoreBody = BATTLE_JS.slice(
     BATTLE_JS.indexOf("export function battleRestorePlanFor"),

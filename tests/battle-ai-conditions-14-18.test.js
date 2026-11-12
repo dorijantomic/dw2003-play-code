@@ -12,6 +12,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { enemySwitchTarget } from "../web/enemy-switch.js";
 import { enemyMoveCondition, pickEnemyAiMove } from "../engine/dw3/battle-formulas.ts";
 
 const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
@@ -86,7 +87,7 @@ test("the counter row drives the enemy counter, not a hard-coded basic attack", 
         "+0x43 == 0 is tested directly (fightstg.s:12512-12514)");
     assert.match(body, /enemyMoveCondition\(row\.comparator/, "the row's condition is check_move_cond");
     assert.match(body, /enemyActionSkillId\(action, defender\.eStats/, "action 1/2/3 -> attack/move_1/move_2");
-    assert.match(body, /resolveAttack\(defender, attacker/, "a full attack by the defender");
+    assert.match(body, /engineResolveCounterBlow\(defender, attacker, skill, damage,/, "the counter blow is damage*f9/64 via resolveCounterBlow");
     // Both enemy-side counter sites (the basic attack and the technique path).
     const calls = SRC.match(/triggerEnemyCounterRow\(b, b\.player, b\.enemy, total, pname, enemyName\)/g) ?? [];
     assert.equal(calls.length, 2, "basic-attack and technique commits both read the row");
@@ -97,8 +98,11 @@ test("the counter row drives the enemy counter, not a hard-coded basic attack", 
 
 test("actions 5..8 spend the turn on the disc's 0x8E \"Switch failed!\" page", () => {
     const act = SRC.match(/function applyEnemyAction\(\)\s*\{([\s\S]*?)\n  \}\n/)[1];
-    assert.match(act, /\(move\.action \| 0\) >= 5 && \(move\.action \| 0\) <= 8/,
+    assert.match(act, /enemySwitchTarget\(move\.action\) !== 0/,
         "the four switch actions are handled before the skill map");
+    for (let a = 0; a <= 12; a++) {
+        assert.equal(enemySwitchTarget(a) !== 0, a >= 5 && a <= 8, `action ${a}: switch iff 5..8`);
+    }
     assert.match(act, /MSG\.SWITCH_FAILED/, "esmfight 0x8E is the page");
     const switchArm = act.indexOf("MSG.SWITCH_FAILED");
     const skillMap = act.indexOf("enemyActionSkillId(move.action || 1");

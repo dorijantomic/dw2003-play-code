@@ -1258,6 +1258,8 @@ let fieldMovieDone = null;
 const fieldMovie = createFieldMoviePlayer(
     () => { const done = fieldMovieDone; fieldMovieDone = null; done?.(); },
     (error) => console.error("[field-movie]", error),
+    null,
+    () => state.languageByte ?? 2,
 );
 battle.setFieldMovieHandoff(async () => {
     const handoff = battleHandoff(state.progressOrdinal);

@@ -6,7 +6,7 @@
 import {
   physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, drainHeal, drainProcRoll, RAND_U16,
   statusInflictionRoll, ailmentOfEffect, poisonTimelineDamage, regenTick, frozenBlockRoll,
-  counterDamage,
+  counterBlowBase,
   type ElementalField, type StatPenalty,
 } from "./battle-formulas.ts";
 import { ENEMY_GAG_LINES } from "./battle-confusion.ts";
@@ -57,7 +57,12 @@ export interface Combatant {
   battleKind?: number;
   /** Recover Crest's battle-long recurring source; it is not a curable status bit. */
   regeneration?: boolean;
-  counterStance?: { uses: number };
+  /** Auto Recover (tech 189) runs on this fighter: its tick is rand%9+8 (F0x800a01ac, non-zero payload), not the crest's rand%5+4. */
+  regenStrong?: boolean;
+  /** Auto Recover (tech 189) runs as a code-6 pool event (1000-unit tick); the per-action crest tick is skipped meanwhile. */
+  autoRecover?: boolean;
+  /** The fighter also wears the Recover Crest, so the crest source outlives Auto Recover (wfightmn.s:2320-2329). */
+  regenCrest?: boolean;
   profile?: {
     id?: number;
     resistances?: Record<string, number>;
@@ -801,8 +806,8 @@ export function advanceAilmentTimeline(
   const events: AilmentTimelineEvent[] = [];
   void elapsed;
   for (const c of combatants) {
-    if (c.regeneration && c.hp > 0 && c.hp < c.maxHp) {
-      const amount = regenTick(c.maxHp, RAND_U16);
+    if (c.regeneration && !c.autoRecover && c.hp > 0 && c.hp < c.maxHp) {
+      const amount = regenTick(c.maxHp, RAND_U16, c.regenStrong === true);
       c.hp = Math.min(c.maxHp, c.hp + amount);
       events.push({ combatant: c, ailment: "regen", kind: "regen", amount });
     }
@@ -944,19 +949,25 @@ export function partyIconCel(index: number, active: boolean): number {
   return (active ? 0x0c : 0x3c) + Math.max(0, Math.min(3, index | 0));
 }
 
-export function setCounterStance(skill: Skill | null, user: Combatant): boolean {
-  if (skill?.effect === "counter") { user.counterStance = { uses: 3 }; return true; }
-  return false;
-}
-
-export function triggerCounter(
-  attacker: Combatant, defender: Combatant, dmgTaken: number, attackerName: string,
-): string {
-  const cs = defender.counterStance;
-  if (!cs || cs.uses <= 0 || dmgTaken <= 0 || defender.hp <= 0) return "";
-  const back = counterDamage(dmgTaken);
-  if (back <= 0) return "";
-  attacker.hp = Math.max(0, attacker.hp - back);
-  if (--cs.uses <= 0) delete defender.counterStance;
-  return ` ${attackerName} took ${back} counter damage!`;
+/**
+ * A counter blow, the way the reaction object runs it (F0x8008ee84, fightstg.s:12517-12600): the
+ * PHYSICAL accuracy method `+0x9c` on the countering technique first (a miss ends it), then the
+ * damage method `+0x90` = F0x8009ff40 with the damage just taken. That method scales the base
+ * (`counterBlowBase`: `taken * f9 / 64`, `/ 32` when the counterer's charge byte `+0x1b` is set,
+ * unscaled for the player's own basic technique) and runs it through the damage tail
+ * (`resolveDamage` = F0x8009f6dc). `f9` is the countering record's `+0x0c`.
+ */
+export function resolveCounterBlow(
+  counterer: Combatant, target: Combatant, skill: Skill | null, damageTaken: number, f9: number,
+  rng: () => number = RAND_U16, field?: ElementalField | null, playerBasicTech = false,
+): AttackResult {
+  const built = buildAttack(counterer, target, skill);
+  const { def } = built;
+  // F0x8009ff40 always runs the PHYSICAL tail F0x8009f6dc (fightstg.s:30469-30476), even for a magical
+  // technique; the player basic-tech path holds the Multi Crest 0.4x gate off (sb $zr 0x37, :30503).
+  const sk = { ...built.sk, magical: false };
+  const atk = playerBasicTech ? { ...built.atk, multiAttack: false } : built.atk;
+  if (!rollHit(atk, def, sk, rng)) return { hit: false, dmg: 0, heal: 0 };
+  const base = counterBlowBase(damageTaken, f9, !!counterer.aura, playerBasicTech);
+  return { hit: true, dmg: Math.max(0, resolveDamage(base, atk, def, sk, rng, field)), heal: 0 };
 }

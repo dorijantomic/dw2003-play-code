@@ -31,18 +31,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { movieReturnScreen, movieRow } from "../engine/index.ts";
+import { FieldMoviePlayer, movieReturnScreen, movieRow, movieRowForLanguage } from "../engine/index.ts";
+import { movieRecordFor } from "../web/field-movie.js";
 import { MOVIE_ROWS } from "../engine/dw3/movie-destinations.ts";
 
 const manifest = JSON.parse(readFileSync("web/assets/movie/manifest.json", "utf8"));
 
-/** The adapter's own resolution (web/field-movie.js movieRecordFor). */
-function shippedRecord(row) {
-  const movies = manifest?.movies ?? {};
-  const byIndex = Object.values(movies).find((m) => m.index === row.fileIndex);
-  if (byIndex) return byIndex;
-  return movies[row.file.replace(/_STR$/, "").toLowerCase()] ?? null;
-}
+const shippedRecord = (row) => movieRecordFor(manifest, row);
 
 /** A clone without `git lfs pull` leaves pointer files where the streams go;
  *  the manifest is still the contract, but its size only matches the real
@@ -71,6 +66,24 @@ test("the finale's ending rows resolve to shipped streams", () => {
     const path = `web/assets/movie/${record.file}`;
     assert.ok(existsSync(path), `${path} is shipped`);
     if (!isLfsPointer(path)) assert.equal(statSync(path).size, record.size, path);
+  }
+});
+
+// The story handoffs 0xE04-0xE09 (wstag s805, s295, s206, s311, s815) play rows
+// 3-8 = MOVIED02..MOVIED07 (disc files 2034, 2027-2031).
+test("story handoffs 0xE04-0xE09 resolve to MOVIED02-07, no 'No shipped asset' skip", () => {
+  const files = [2034, 2027, 2028, 2029, 2030, 2031];
+  for (let i = 0; i < 6; i++) {
+    const code = 0xe04 + i;
+    const row = movieRow(code);
+    assert.ok(row, `0x${code.toString(16)} names a row`);
+    assert.equal(row.index, 3 + i);
+    assert.equal(row.fileIndex, files[i]);
+    assert.equal(row.file, `MOVIED0${2 + i}_STR`);
+    const record = shippedRecord(row);
+    assert.ok(record, `No shipped asset for ${row.file} (disc file ${row.fileIndex})`);
+    assert.equal(record.file, `movied0${2 + i}.mp4`);
+    assert.ok(existsSync(`web/assets/movie/${record.file}`));
   }
 });
 
@@ -139,4 +152,35 @@ test("the post-game story handoff's row ships and resolves where the disc sends 
   // before that (the MOVIEE02 tail regression's class) would stall the movie.
   assert.ok(record.frames >= row.frames,
     `movied01.mp4 carries ${record.frames} pictures, the row counts ${row.frames}`);
+});
+
+test("row 11 loads the file the language byte picks: 0 jpn 02, 1 usa 03, anything else 04", () => {
+  // F0x80083cc0's mode-11 switch on D0x8005CCA8 (exe-decomp/stdwtitl_c/
+  // F0x80083cc0.c; stdwtitl.norm.s .L0x0000506c-.L0x0000508c): three triples,
+  // the same 0x671 = 1649 frames and the same return 0x2d7 in each. Driven
+  // through the real player's open(), then each pick must resolve to a shipped stream.
+  const expected = [[0, 2213, "MOVIEE02_STR", "moviee02.mp4"], [1, 2071, "MOVIEE03_STR", "moviee03.mp4"],
+    [2, 2070, "MOVIEE04_STR", "moviee04.mp4"], [5, 2070, "MOVIEE04_STR", "moviee04.mp4"]];
+  for (const [language, fileIndex, file, mp4] of expected) {
+    const player = new FieldMoviePlayer();
+    const row = player.open(0xe0c, language);
+    assert.equal(row.index, 11);
+    assert.equal(row.fileIndex, fileIndex, `language ${language}`);
+    assert.equal(row.file, file, `language ${language}`);
+    assert.equal(row.frames, 1649);
+    assert.equal(row.destination, 0x2d7);
+    assert.equal(movieRowForLanguage(movieRow(0xe0c), language).file, file);
+    const record = shippedRecord(row);
+    assert.equal(record.file, mp4, `language ${language} ships ${mp4}`);
+    assert.ok(record.frames >= row.frames);
+    assert.ok(existsSync(`web/assets/movie/${mp4}`));
+  }
+  // The default (no byte given) is English = MOVIEE04.
+  assert.equal(new FieldMoviePlayer().open(0xe0c).file, "MOVIEE04_STR");
+  // No other row has a language arm: every other row is itself.
+  for (let code = 0xe01; code <= 0xe0b; code++) {
+    for (const language of [0, 1, 2, 5]) {
+      assert.equal(new FieldMoviePlayer().open(code, language), movieRow(code), `row of 0x${code.toString(16)}`);
+    }
+  }
 });

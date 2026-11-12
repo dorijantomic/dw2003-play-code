@@ -119,33 +119,34 @@ test("the latch takes the disc's own qualifying technique rows", () => {
   assert.equal(finaleRecordsTechnique(4, 0, tech["438"]), false, "clip 5 excludes it");
 });
 
-test("the copied attack takes the recorded row's fields, keeping the head's own id and name", () => {
+test("the copied attack takes the recorded row's fields and name, keeping the head's own id", () => {
   // The head's attack record is technique 440 — 0x80044aba = 0x80042bca + 18 * 440,
   // enemies.json's `attack` for Galacticmon3, whose shipped name is "?????".
   assert.equal(FINALE_HEAD_ATTACK_ID, 440);
   const head = { id: 440, name: "?????", element: "normal", damage_scalar: 1, effect_id: 1, effect_power: 127, clip: 9 };
-  const copied = finaleCopiedAttackSkill(head, { element: "wind", damage_scalar: 72, effect_id: 1, effect_power: 1, clip: 9 });
+  const copied = finaleCopiedAttackSkill(head, { name: "Boom Bubble", element: "wind", elem1: 5, damage_scalar: 72, effect_id: 1, effect_power: 1, clip: 9 });
   assert.equal(copied.id, 440, "the attack id stays the head's own");
-  assert.equal(copied.name, "?????", "the record carries no name: the head keeps its own");
+  assert.equal(copied.name, "Boom Bubble", "the announcement shows the recorded technique's name");
   assert.equal(copied.element, "wind");
   assert.equal(copied.damage_scalar, 72);
-  assert.equal(copied.effect_id, 1);
-  assert.equal(copied.effect_power, 1);
+  assert.equal(copied.effect_id, 1, "+0x0a is 1: not copied");
+  assert.equal(copied.effect_power, 127, "+0x0c not copied when +0x0a is 1");
   // Arm 22's own skip: rows whose clip is 5 or 12 are not copied.
   assert.deepEqual(finaleCopiedAttackSkill(head, { element: "wind", clip: 5 }), head);
   assert.deepEqual(finaleCopiedAttackSkill(head, { element: "wind", clip: 12 }), head);
   // A zero latch leaves the head's own attack untouched (arm 22's zero-index path).
   assert.deepEqual(finaleCopiedAttackSkill(head, null), head);
   assert.deepEqual(finaleCopiedAttackSkill(head, undefined), head);
+  assert.equal(finaleCopiedAttackSkill(head, null).name, "?????", "no record: the name stays ?????");
   // With the shipped rows: skill 440 gains Boom Bubble's (60) element and scalar.
   const skills = skillRows();
-  const merged = finaleCopiedAttackSkill(skills[440], skills[60]);
+  const merged = finaleCopiedAttackSkill(skills[440], { ...skills[60], elem1: techRows()[60].elem1 });
   assert.equal(merged.id, 440);
-  assert.equal(merged.name, "?????");
+  assert.equal(merged.name, skills[60].name);
   assert.equal(merged.element, skills[60].element);
   assert.equal(merged.damage_scalar, skills[60].damage_scalar);
-  assert.equal(merged.effect_id, skills[60].effect_id);
-  assert.equal(merged.effect_power, skills[60].effect_power);
+  assert.equal(merged.effect_id, skills[440].effect_id, "+0x0a 1: not copied");
+  assert.equal(merged.effect_power, skills[440].effect_power);
   assert.notEqual(merged.damage_scalar, skills[440].damage_scalar, "the scalar actually changes");
 });
 
@@ -194,7 +195,8 @@ test("the beats chain through the result pages, and the latch records the tail-p
   // The latch (F0x800aa06c) sits at the two landed damaging commits that carry a
   // technique row — the basic attack's and the technique's — before the wrapper.
   const calls = src.match(/recordFinaleTechnique\(b, (basicTechId|actionTechId)\)/g) || [];
-  assert.equal(calls.length, 2, "the basic and technique commits");
+  assert.equal(calls.length, 4, "the basic and technique commits, and their two miss paths");
+  assert.ok(!/if \(total > 0\) recordFinaleTechnique/.test(src), "no damage gate: 0 damage and a miss still record (wfightmn.s:4b5c-4b7c)");
   const rec = src.slice(src.indexOf("function recordFinaleTechnique"), src.indexOf("function applyTagAction"));
   assert.ok(rec.includes("finaleRecordsTechnique(battleKindOf(b), 0, row)"),
     "the engine predicate carries the whole gate");
@@ -213,4 +215,54 @@ test("the kind word drives the rolls, the counter and the head's attack from the
   assert.ok(src.includes("if (b._finaleCopiedAttack && (requestedSkillId | 0) === FINALE_HEAD_ATTACK_ID) skill = b._finaleCopiedAttack;"));
   // The switch itself is the pure, kind-gated rule.
   assert.ok(src.includes("return specialMode === 4 && battleKind === 6 && landedCount >= 3;"));
+});
+
+test("the copied attack follows wfightmn.s:3c10-3d90 byte for byte", () => {
+  const raw0 = { f8: 127, sigEffect: 0, effect: 2, motion: 57 };
+  const head = { id: 440, name: "?????", element: "normal", elem1: 1, damage_scalar: 1, effect_id: 1, effect_power: 127, clip: 9, power: 750, attack_cat: 3, techRecord: raw0 };
+  const player = { name: "Boom Bubble", element: "wind", elem1: 5, damage_scalar: 72, effect_id: 5, effect_power: 9, clip: 11, power: 20, attack_cat: 2, techRecord: { f8: 33 } };
+  // +0x0a 5 (copied), element 5: +0x0a/b/c copied, effect table hit (5 -> 22, 50, 0).
+  const copied = finaleCopiedAttackSkill(head, player);
+  assert.equal(copied.effect_id, 5);
+  assert.equal(copied.effect_power, 9, "+0x0c");
+  assert.equal(copied.techRecord.f8, 33, "+0x0b");
+  assert.deepEqual([copied.techRecord.sigEffect, copied.techRecord.effect, copied.techRecord.motion], [0, 22, 50],
+    "table hit: +0x0d = 0, +0x0e = entry+4, +0x0f = entry+8");
+  assert.equal(copied.element, "wind", "+0x07 >= 2");
+  assert.equal(copied.damage_scalar, 72, "+0x08");
+  assert.equal(copied.power, 750, "power stays 750");
+  assert.equal(copied.attack_cat, 3, "category stays magic");
+  assert.deepEqual(head.techRecord, raw0, "the input is not mutated");
+  // Effect table miss (7 is not a row): +0x0a/b/c copied, +0x0d/e/f stay.
+  const miss = finaleCopiedAttackSkill(head, { ...player, effect_id: 7, elem1: 1 });
+  assert.equal(miss.effect_id, 7);
+  assert.deepEqual(miss.techRecord, { ...raw0, f8: 33 });
+  // +0x0a in {0,1,9,10,12}: +0x0a/b/c not copied; element >= 2 then runs the element table.
+  for (const e of [0, 1, 9, 10, 12]) {
+    const r = finaleCopiedAttackSkill(head, { ...player, effect_id: e });
+    assert.equal(r.effect_id, 1, `+0x0a ${e}: not copied`);
+    assert.equal(r.effect_power, 127);
+    assert.equal(r.techRecord.f8, 127, "+0x0b not copied");
+    assert.deepEqual([r.techRecord.sigEffect, r.techRecord.effect, r.techRecord.motion], [43, 14, 29],
+      "head +0x0a < 2: element 5 row {5, 14, 29, 43}");
+    assert.equal(r.element, "wind");
+    assert.equal(r.damage_scalar, 72);
+  }
+  // +0x07 < 2: element and +0x08 stay, the element table never runs.
+  for (const elem1 of [0, 1]) {
+    const r = finaleCopiedAttackSkill(head, { ...player, effect_id: 1, elem1 });
+    assert.equal(r.element, "normal");
+    assert.equal(r.damage_scalar, 1);
+    assert.deepEqual(r.techRecord, raw0);
+  }
+  // A copied +0x0a (>= 2) blocks the element table: the effect-table bytes survive.
+  const both = finaleCopiedAttackSkill(head, { ...player, effect_id: 2, elem1: 8 });
+  assert.deepEqual([both.techRecord.sigEffect, both.techRecord.effect, both.techRecord.motion], [0, 19, 26]);
+  assert.equal(both.element, "wind", "+0x07/+0x08 are still copied");
+  // clip 5 or 12 copies nothing.
+  for (const clip of [5, 12]) {
+    const skipped = finaleCopiedAttackSkill(head, { ...player, clip });
+    assert.deepEqual(skipped, head, `clip ${clip}: nothing copied, plain values stay`);
+    assert.equal(skipped.name, "?????");
+  }
 });

@@ -2395,7 +2395,9 @@ export const DAMAGE_TERM_POST_HIT_ARMS: readonly DamageTermPostHitArm[] = Object
   { dispatch: 10, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
   { dispatch: 11, arm: 0x8009d768, role: "party-stat-read" },
   { dispatch: 12, arm: 0x8009d7a4, role: "weapon-roll-arm" },
-  { dispatch: 13, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
+  // 430 Dark Pupil: `.L0x80083260` = 0x8009e0b4, the dispatcher body that jals F0x8009dd64
+  // (fightstg.s:343-:375, :28170-:28200). It is NOT the bare return.
+  { dispatch: 13, arm: 0x8009e0b4, role: "flee-lock" },
   { dispatch: 14, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
   { dispatch: 15, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
   { dispatch: 16, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
@@ -2411,7 +2413,7 @@ export const DAMAGE_TERM_POST_HIT_ARMS: readonly DamageTermPostHitArm[] = Object
   { dispatch: 26, arm: 0x8009d858, role: null },
   { dispatch: 27, arm: 0x8009d944, role: null },
   { dispatch: 28, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
-  { dispatch: 29, arm: 0x8009da0c, role: null },
+  { dispatch: 29, arm: 0x8009da0c, role: "mp-absorb" },
   { dispatch: 30, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
   { dispatch: 31, arm: DAMAGE_TERM_POST_HIT_RETURN, role: null },
   { dispatch: 32, arm: 0x8009daac, role: "stat-penalty" },
@@ -2432,6 +2434,63 @@ export function damageTermPostHitArm(dispatch: number): DamageTermPostHitArm | n
 export function damageTermPostHitArmRuns(dispatch: number): boolean {
   const arm = damageTermPostHitArm(dispatch);
   return arm !== null && arm.arm !== DAMAGE_TERM_POST_HIT_RETURN;
+}
+
+// ── The post-hit arms that queue a result slot: 13 (flee lock), 26/27 (stat down), 29 (MP) ──
+//
+// The dispatcher arm only writes ctx[0x38 + dispatch] (fightstg.s:28170-28200, :27943-27985);
+// the QUEUE CONSUMER (F0x80091534) does the work and prints the page.
+
+/** The technique record whose `+0x0c` times the flee lock's draw: 211, never 430 (fightstg.s:27098). */
+export const DAMAGE_TERM_FLEE_LOCK_RECORD = 211;
+/** `esmfight[0x33]` "Strength [down]!" (slot 26) and `esmfight[0x34]` "Defense [down]!" (slot 27). */
+export const DAMAGE_TERM_STRENGTH_DOWN_WORD = 0x33;
+export const DAMAGE_TERM_DEFENSE_DOWN_WORD = 0x34;
+
+/**
+ * Dispatch 13's landing roll (fightstg.s:31842-31865, through `[0x800a4648]`): `(rand & 0x7f)`
+ * against the TRIGGERING record's own `+0x0b` (430 = 64). No WIS term, unlike the penalty roll.
+ */
+export function damageTermFleeLockRoll(effectP1: number, rng: () => number): boolean {
+  return ((rng() & 0x7f) | 0) < ((Math.trunc(Number(effectP1)) | 0));
+}
+
+/**
+ * Dispatch 29's amount (F0x8009da0c, fightstg.s:27943-27985): the player active's MAX MP times
+ * the record's `+0x0c` over 128, capped at the player's current MP; nothing is queued when the
+ * player has no MP, and the slot byte is the amount's low 8 bits (`lbu $v1, 0x2c` / `sb`), so an
+ * amount that is a multiple of 256 queues nothing. Returns the amount moved, 0 for no page.
+ */
+export function damageTermPostHitMpAbsorb(
+  record: Partial<DamageTermRecord> | null | undefined, playerMp: number, playerMaxMp: number,
+): number {
+  const cur = Math.trunc(Number(playerMp)) | 0;
+  if (cur <= 0) return 0;
+  const product = Math.imul(Math.trunc(Number(playerMaxMp)) | 0, Math.trunc(Number(record?.crit ?? 0)) | 0);
+  let amount = (product < 0 ? product + 0x7f : product) >> 7;
+  if (cur < amount) amount = cur;
+  return (amount & 0xff) === 0 ? 0 : amount;
+}
+
+/**
+ * The consumer's kind-2 page for slots 13 / 26 / 27 (fightstg.s:15233-15243, :15264-15269 into the
+ * shared tail `.L0x80091a9c`): payload `[word, 0x10 if the acting side byte is 0 else 0]`, so
+ * the name on line one is the fighter OPPOSITE the actor (the locked / weakened one).
+ */
+export function damageTermPostHitSlotPage(
+  word: number, name: string | null, actingSide: number,
+): BattleMessagePage | null {
+  const page = battleMessagePage(2, { name, index: word });
+  if (!page) return null;
+  page.payload[1] = (Math.trunc(Number(actingSide)) | 0) < 1 ? 0x10 : 0;
+  return page;
+}
+
+/** The consumer's kind-18 page for slot 29: `[0x10, amount, 1]` -> "{1} MP absorbed!" (fightstg.s:15066-15109). */
+export function damageTermPostHitMpPage(name: string | null, amount: number): BattleMessagePage | null {
+  const page = battleMessagePage(18, { name, numbers: [amount], mp: true });
+  if (page) page.payload[0] = 0x10;   // `li $v0, 0x10` / `sw $v0, 0x54($s3)` (fightstg.s:15068-15072)
+  return page;
 }
 
 // ── The persistent stat-penalty producer — dispatches 32 / 33 / 34 ─────────────────────

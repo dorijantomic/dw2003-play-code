@@ -1,5 +1,4 @@
-// The elemental field war (F2 -> Extras -> "Elemental field war", off by default).
-//
+// The elemental field techniques (213..219). Before: F2 -> Extras switch, off by default. Now always on (see battle.js castFieldTechnique).
 // The seven field ITEMS (77..83) have always written the battlefield element. The
 // seven field TECHNIQUES (213..219) are the record machine's category-6 arm and
 // print the disc's own word (esmfight[elem1 + 0x61], "Fire field!" .. "Dark
@@ -92,22 +91,15 @@ test("the engine's field adjustment is the real +base*power/128 and -base*power/
     assert.equal(elementalFieldAdjustment(1000, "normal", { element: "fire", power: 100 }), 0);
 });
 
-test("battle.js writes the field from the category-6 record and counts player turns behind the toggle", () => {
-    // F2 -> Extras -> "Elemental field war": off unless the player switched it on.
-    assert.match(BATTLE_SRC, /window\.__fx\?\.fieldwar === true/, "the fieldwar gate");
-    // The missing half: the technique's own record writes the field pair.
-    assert.match(BATTLE_SRC,
-        /b\.field = \{ element: elementNameForElem1\(restoreRecord\.elem1\), power: restoreRecord\.crit \}/,
-        "category 6 writes the element and the record's own 64 power byte");
-    // The self-moving field: every fourth player action steps the cycle and says its word.
-    assert.match(BATTLE_SRC, /nextField\(b\.field\)/, "the turn advance steps the cycle");
-    assert.match(BATTLE_SRC, /fieldName\(/, "the battle prints the disc's own field word");
-    assert.match(BATTLE_SRC, /% 4 === 0/, "the field moves every fourth player action");
+test("battle.js writes the field from the category-6 record, always, with the disc power and timer", () => {
+    // F0x800907cc: no switch. The technique's own record writes the field pair.
+    assert.doesNotMatch(BATTLE_SRC, /fieldWarEnabled|__fx\?\.fieldwar/, "no fieldwar gate");
+    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 0, restoreRecord, elementNameForElem1\(restoreRecord\.elem1\)\)/);
+    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 1, restoreRecord, elementNameForElem1\(restoreRecord\.elem1\)\)/);
+    assert.match(BATTLE_SRC, /Math\.min\(127, \(record\.crit \| 0\) \+ Math\.trunc\(spt \/ 10\)\)/, "power 64 + SPT/10, cap 127");
+    assert.match(BATTLE_SRC, /1000 \+ 12 \* spt/, "duration 1000 + 12*SPT");
 });
 
-test("ambience.js offers the switch in Extras and keeps it off by default", () => {
-    assert.match(AMBIENCE_SRC, /\["fieldwar", "Elemental field war/,
-        "the Extras row the F2 panel draws");
-    assert.match(AMBIENCE_SRC, /const EXPERIMENTAL = \[[^\]]*"fieldwar"/,
-        "fieldwar is experimental, so presets never switch it on");
+test("ambience.js carries no fieldwar switch", () => {
+    assert.doesNotMatch(AMBIENCE_SRC, /fieldwar/);
 });

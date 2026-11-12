@@ -56,6 +56,32 @@ export function movieRow(launchCode: number): MovieRow | null {
   return MOVIE_ROWS[(launchCode & 0xff) - 1] ?? null;
 }
 
+/** The movie row whose file the language byte picks (F0x80083cc0's mode 11). */
+export const MOVIE_LANGUAGE_ROW_INDEX = 11;
+
+/** Row 11's three language variants. F0x80083cc0 reads the language global
+ *  (D0x8005CCA8) and loads {file, frames, return} from one of three triples:
+ *  0 = .L0x0000506c (MOVIEE02_STR, jpn), 1 = .L0x00005078 (MOVIEE03_STR, usa),
+ *  anything else = .L0x00005084 (MOVIEE04_STR, eng/fra/ita/ger/spn); the frame
+ *  count (0x671 = 1649) and the return selector (0x2d7) are the same in all
+ *  three (exe-decomp/stdwtitl.norm.s .L0x0000506c-.L0x0000508c; the switch in
+ *  exe-decomp/stdwtitl_c/F0x80083cc0.c). No other row has a language arm. */
+export const MOVIE_LANGUAGE_VARIANTS: { jpn: MovieRow; usa: MovieRow; other: MovieRow } = {
+  jpn: MOVIE_ROWS[MOVIE_LANGUAGE_ROW_INDEX],
+  usa: { ...MOVIE_ROWS[MOVIE_LANGUAGE_ROW_INDEX], fileIndex: 2071, file: 'MOVIEE03_STR', label: '.L0x00005078' },
+  other: { ...MOVIE_ROWS[MOVIE_LANGUAGE_ROW_INDEX], fileIndex: 2070, file: 'MOVIEE04_STR', label: '.L0x00005084' },
+};
+
+/** The row the movie object really loads for a language byte: row 11 follows
+ *  the language switch above, every other row is itself. */
+export function movieRowForLanguage(row: MovieRow, languageByte: number): MovieRow {
+  if (row.index !== MOVIE_LANGUAGE_ROW_INDEX) return row;
+  const language = languageByte | 0;
+  if (language === 0) return MOVIE_LANGUAGE_VARIANTS.jpn;
+  if (language === 1) return MOVIE_LANGUAGE_VARIANTS.usa;
+  return MOVIE_LANGUAGE_VARIANTS.other;
+}
+
 // ── The field → battle handoff's transition selector ────────────────────────
 //
 // `F0x8008B798`, the field's battle setup (pro/fieldstg.s:8916-8919), reads the

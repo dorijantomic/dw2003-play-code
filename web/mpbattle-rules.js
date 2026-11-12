@@ -7,7 +7,7 @@
 //   what an enemy does the game's enemy AI (pickEnemyAiMove over the species' own four move rows), including its flee action,
 //                      with the real list of enemies standing there for the "how many of us are left" conditions
 //   a blow             the game's resolver: accuracy, the critical roll, STR/DEF or SPT, element, armour; multi-hit; drain
-//   what comes with it ailments from techniques and signature weapons, instant death, counter stance
+//   what comes with it ailments from techniques and signature weapons, instant death
 //   status             start-of-turn sleep / frozen / confused; the shared status-event pool for poison ticks, recoveries and
 //                      buffs wearing off; gradual HP recovery
 //   heals and buffs    the category-4 restore plans and the category-5 plans (Double Power, Soul Charge, locks...)
@@ -19,7 +19,7 @@
 //   the DV gauge       every Digimon has its own: it fills from the hits it takes (hitGaugeGain), and a full gauge is the
 //                      automatic Blast: the Digimon takes its Blast form, is fully healed, fights MP-free for 6 of its turns
 //   stealing           a steal technique that lands rolls the game's steal roll (stealProc) for the enemy's drop item
-// What is NOT the game's: choosing a target among several (enemies weigh up wounded, helpless and counter-ready players;
+// What is NOT the game's: choosing a target among several (enemies weigh up wounded and helpless players;
 // players pick), and spread techniques (a strong magic attack hits everyone on the other side at 65% damage).
 //
 // One game (the "referee", the player who started the fight) holds every fighter's record and runs all of this, so every number
@@ -31,7 +31,7 @@ import {
     ITEM_BY_ID, effStats, hitGaugeGain,
 } from "./vendor/engine.js";
 import {
-    tryInflict, applyWeaponSecondary, triggerCounter, setCounterStance, setEnemyCounterStance,
+    tryInflict, applyWeaponSecondary,
     battleRestorePlanFor, battleScriptedPlanFor,
     restoreWalkerSentence, scriptedWalkerSentence, processTurnStart, ailmentWord,
     normalizeDvGauge, DV_GAUGE_MAX, blastLandingHeal, setLiveBattleForm, endBlast,
@@ -272,8 +272,6 @@ export class Arena {
             if (st?.ok) { stolen = st.item; lines.push(`${attName}: ${T(0x26)} ${T(0x09, st.name)}`); }          // "Stole {item}!"
             else if (st?.nothing) lines.push(`${attName}: ...but there was nothing to steal!`);
         }
-        const counter = triggerCounter(att, def, dmg, attName);   // a counter stance sends half of it back
-        if (counter) lines.push(counter.trim());
         return { hit: true, dmg, lines, instantDeath: !!inflicted.text, stolen };
     }
 
@@ -339,9 +337,10 @@ export class Arena {
         }
         const record = this.kit.techRecord(skill.id);
         const cat = record?.category | 0;
+        // f7 == 10 (63 / 90 / 121 / 122): a player's use does nothing on the disc (F0x8009e0cc -> F0x8009d72c, fightstg.s:28425-28461).
+        if ((record?.dispatch | 0) === 10) return { lines: [], rows: [], a: key, sk: skill.id | 0, kind: "self" };
         if (cat === 4 || cat === 5) return this.#support(me, skill, record, cmd);
         const lines = [`${me.name}: ${cmd.k === "tech" ? T(0x09, skill.name) : T(MSG.ATTACK)}`];
-        setCounterStance(skill, A);
         const targets = isSpread(skill) ? foes : this.#usableTarget(foes, cmd.t);
         const res = this.#damageAction(me, skill, targets);
         res.lines.unshift(...lines);
@@ -452,7 +451,7 @@ export class Arena {
     }
 
     // ---------------------------------------------------------- an enemy's turn
-    /** Weigh up the players: the wounded and the helpless draw fire; a counter stance is avoided; the last victim is slightly spared. */
+    /** Weigh up the players: the wounded and the helpless draw fire; the last victim is slightly spared. */
     #pickTarget(foe) {
         const alive = this.alivePlayers();
         if (alive.length < 2) return alive[0] ?? null;
@@ -461,7 +460,6 @@ export class Arena {
             let w = 1 + 2.2 * (1 - pct);
             if (pct < 0.25) w += 1.5;
             if (r.ailments?.sleep || r.ailments?.frozen) w += 0.7;
-            if (r.counterStance?.uses > 0) w *= 0.45;
             if (this.lastTarget.get(foe.key) === p.key) w *= 0.8;
             return w;
         });
@@ -506,7 +504,6 @@ export class Arena {
         if (!skill) { res.lines.push(`${foe.name}: ...`); return res; }
         if (!tech) { skill = { ...skill, attack_category: "physical", basic_attack: true }; }
         res.sk = skill.id | 0;
-        setEnemyCounterStance(skill, en, tech);   // the disc gate: a basic technique (action 1) sets none
         const record = this.kit.techRecord(skill.id);
         const cat = record?.category | 0;
         if (tech && (cat === 4 || cat === 5)) {                      // an enemy healing or buffing

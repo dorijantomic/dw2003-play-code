@@ -117,9 +117,9 @@ test("the delay the disc reads really moves with effective SPD", () => {
 
 test("all seven timeline/status/flee sites pass the effective SPD", () => {
   const sites = [
-    ["status clock", /statusEventActionDelay\(effectiveSpd\(b\.player\), effectiveSpd\(b\.enemy\)\)/],
+    ["status clock", /statusEventActionDelay\(playerSpd \?\? effectiveSpd\(b\.player\), effectiveSpd\(b\.enemy\)\)/],
     ["battle boot", /initialActorTimeline\(effectiveSpd\(initialPlayer\), effectiveSpd\(enemyObj\)\)/],
-    ["turn schedule", /scheduleNextActor\(b\.timeline, acted, effectiveSpd\(b\.player\), effectiveSpd\(b\.enemy\)\)/],
+    ["turn schedule", /scheduleNextActor\(b\.timeline, acted, playerSpd \?\? effectiveSpd\(b\.player\), effectiveSpd\(b\.enemy\)\)/],
     ["party step", /initialActorTimeline\(effectiveSpd\(b\.player\), effectiveSpd\(nextEnemy\)\)/],
     ["finale beat", /initialActorTimeline\(effectiveSpd\(b\.player\), effectiveSpd\(next\)\)/],
     ["enemy flee", /enemyFleeProc\(effectiveSpd\(b\.player\), effectiveSpd\(en\), /],

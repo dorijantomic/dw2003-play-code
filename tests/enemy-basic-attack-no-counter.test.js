@@ -1,24 +1,13 @@
-// Disc fightstg.s:28440-28463: an enemy basic attack (record f7 == 10, e.g. 302/303/335 "Fight")
-// takes the ordinary attack path and sets no counter stance. Named techniques are unchanged.
+// Disc fightstg.s:28425-28461: record f7 == 10 never builds a counter stance. A players use of it does nothing
+// (F0x8009e0cc -> F0x8009d72c); an enemys own attack (302/303/335 "Fight") is an ordinary attack. The only counter
+// the disc has is the enemy rows +0x42 action (see tests/battle-tech-round3-disc.test.js), so the invented 3-use
+// stance API is gone.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setEnemyCounterStance } from "../web/battle.js";
+import * as battle from "../web/battle.js";
 
-const fight = { id: 335, effect: "counter", basic_attack: true };
-const named = { id: 63, effect: "counter" };
-
-test("enemy basic attack (action 1) sets no stance even when effect is counter", () => {
-  const en = {};
-  assert.equal(setEnemyCounterStance(fight, en, false), false);
-  assert.equal(en.counterStance, undefined);
-});
-test("enemy named counter technique still sets the stance", () => {
-  const en = {};
-  assert.equal(setEnemyCounterStance(named, en, true), true);
-  assert.deepEqual(en.counterStance, { uses: 3 });
-});
-test("non-counter technique sets nothing", () => {
-  const en = {};
-  assert.equal(setEnemyCounterStance({ id: 1, effect: "damage" }, en, true), false);
-  assert.equal(en.counterStance, undefined);
+test("the invented counter-stance API no longer exists", () => {
+  assert.equal(battle.setCounterStance, undefined);
+  assert.equal(battle.setEnemyCounterStance, undefined);
+  assert.equal(battle.triggerCounter, undefined);
 });

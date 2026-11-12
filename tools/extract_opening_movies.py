@@ -21,7 +21,8 @@ file 0x8a5 MOVIEE02_STR (jpn), 0x817 MOVIEE03_STR (usa) or 0x816 MOVIEE04_STR
 :1069-1071 the mode-11 dispatch, :1082-1112 the language arms; the triples at
 .L0x0000506c/.L0x00005078/.L0x00005084; exe-decomp/stdwtitl_c/F0x80083cc0.c's
 language switch). The walker reads the table's row 11 (MOVIEE02_STR) and ships
-that stream; the other two variants are a named gap, not shipped.
+that stream; the other two variants (moviee03, moviee04) are built by the same
+code and the game picks the file by the language byte.
 
 The extracted 2048-byte STR files omit part of each XA sound sector. Reading
 the original 2352-byte sectors preserves the complete audio stream. The movie
@@ -72,10 +73,24 @@ MOVIES = (
     # MOVIED01_STR (row 2; 465 frames in the row): the s780 reunion's story
     # handoff, 0xE03. The stream carries 480 pictures; measured 2026-10-14.
     ("movied01", 0x7EA, {"sectors": 4808, "frames": 480, "video": 4200, "audio": 601, "zero": 7}),
+    # MOVIED02..MOVIED07 (rows 3-8, files 2034, 2027-2031; names and file ids
+    # from engine/dw3/movie-destinations.ts = pro/stdwtitl.s .L0x0000500c-
+    # .L0x00005048). Story handoffs 0xE04-0xE09 (wstag s805, s295, s206, s311,
+    # s815). Censuses measured from the Europe disc 2026-11-12.
+    ("movied02", 0x7F2, {"sectors": 3752, "frames": 375, "video": 3282, "audio": 469, "zero": 1}),
+    ("movied03", 0x7EB, {"sectors": 9768, "frames": 976, "video": 8540, "audio": 1221, "zero": 7}),
+    ("movied04", 0x7EC, {"sectors": 5776, "frames": 577, "video": 5049, "audio": 722, "zero": 5}),
+    ("movied05", 0x7ED, {"sectors": 6768, "frames": 676, "video": 5915, "audio": 846, "zero": 7}),
+    ("movied06", 0x7EE, {"sectors": 2408, "frames": 240, "video": 2100, "audio": 301, "zero": 7}),
+    ("movied07", 0x7EF, {"sectors": 3536, "frames": 353, "video": 3089, "audio": 442, "zero": 5}),
     # MOVIEE01_STR (row 10; 655 frames in the row) and MOVIEE02_STR (row 11;
     # 1649): the finale's win chain. Censuses measured 2026-10-10.
     ("moviee01", 0x7F3, {"sectors": 6712, "frames": 671, "video": 5872, "audio": 839, "zero": 1}),
     ("moviee02", 0x8A5, {"sectors": 16650, "frames": 1665, "video": 14569, "audio": 2026, "zero": 55}),
+    # The other two language variants of row 11 (MOVIEE03_STR usa, MOVIEE04_STR
+    # eng/fra/ita/ger/spn): the same 16650-sector layout as MOVIEE02.
+    ("moviee03", 0x817, {"sectors": 16650, "frames": 1665, "video": 14569, "audio": 2026, "zero": 55}),
+    ("moviee04", 0x816, {"sectors": 16650, "frames": 1665, "video": 14569, "audio": 2026, "zero": 55}),
 )
 # The two openings share one video track (different audio), which is why their
 # videoSha256 matches; that identity check is scoped to them, not to every movie.
@@ -138,6 +153,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--disc", type=Path, default=DEFAULT_DISC)
     parser.add_argument("--out", type=Path, default=ROOT / "web/assets/movie")
+    parser.add_argument("--only", nargs="+", metavar="NAME",
+                        help="build just these movies and merge them into the existing manifest")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     with args.disc.open("rb") as source:
@@ -145,8 +162,13 @@ def main():
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     manifest = {"generatedBy": "tools/extract_opening_movies.py", "source": "raw Mode 2 disc sectors",
                 "movies": {}}
+    manifest_path = args.out / "manifest.json"
+    if args.only and manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text())
     with tempfile.TemporaryDirectory(prefix="dw3-movies-") as scratch:
         for name, index, expected in MOVIES:
+            if args.only and name not in args.only:
+                continue
             raw = Path(scratch) / f"{name}.str"
             record = extract_stream(args.disc, exe, base, index, raw, expected)
             output = args.out / f"{name}.mp4"
@@ -167,17 +189,18 @@ def main():
             subprocess.run([ffmpeg, "-hide_banner", "-y", "-loglevel", "error",
                             "-f", "psxstr", "-i", str(raw), "-map", "0:v:0",
                             "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-                            "-pix_fmt", "yuv420p", *audio, *cut,
+                            "-pix_fmt", "yuv420p", "-vf", "setparams=range=unspecified", *audio, *cut,
                             "-movflags", "+faststart", str(output)], check=True)
             record["file"] = output.name
             record["size"] = output.stat().st_size
             record["sha256"] = hashlib.sha256(output.read_bytes()).hexdigest()
             manifest["movies"][name] = record
             print(name, output, record["size"])
-    videos = {manifest["movies"][name]["videoSha256"] for name in OPENING_MOVIES}
-    if len(videos) != 1:
+    videos = {manifest["movies"][name]["videoSha256"] for name in OPENING_MOVIES
+              if name in manifest["movies"]}
+    if len(videos) > 1:
         raise ValueError("the two opening movies unexpectedly have different video data")
-    (args.out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 if __name__ == "__main__":

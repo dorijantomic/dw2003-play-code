@@ -225,33 +225,82 @@ export function finaleRecordsTechnique(
 }
 
 /**
+ * The raw record bytes the walker's skill rows do not carry, in the shipped table's
+ * own field names (`fight_tech_table.json`): `+0x0b` f8, `+0x0d` sigEffect, `+0x0e`
+ * effect (the effect type, NOT the skill row's decoded effect name), `+0x0f` motion.
+ */
+export interface FinaleCopiedRawBytes {
+    f8?: number;
+    sigEffect?: number;
+    effect?: number;
+    motion?: number;
+}
+
+/**
  * The record fields arm 22 copies into the head's attack record, as the walker's
  * skill rows carry them (the extracted table's names in the comment on each field).
  */
 export interface FinaleCopiedRow {
+    /** The technique's name (the disc's attack announcement prints it). */
+    name?: string;
     /** `+0x10` — the clip byte arm 22 skips rows on. */
     clip?: number;
     /** `+0x07` elem1, shipped as the element name. */
     element?: string;
+    /** `+0x07` raw (the overlay's `>= 2` gate and the element table key). */
+    elem1?: number;
     /** `+0x08` scalar. */
     damage_scalar?: number;
     /** `+0x0a` dispatch. */
     effect_id?: number;
     /** `+0x0c` crit. */
     effect_power?: number;
+    /** `+0x0b`, `+0x0d`, `+0x0e`, `+0x0f` in the table's field names (no skill-row home). */
+    techRecord?: FinaleCopiedRawBytes;
 }
 
 /**
- * Arm 22 state 2's record build: the head's attack record takes the recorded row's
- * `+0x07` (element), `+0x08` (damage scalar), `+0x0a` (effect id) and `+0x0c` (effect
- * power) — the fields the walker's skill model carries; the copied `+0x0b` f8 and the
- * id-keyed `+0x0d/+0x0e/+0x0f` lookups have no skill-row home and are the named gap.
- * The attack keeps its own id and name ("?????"): the record carries no name and the
- * id stays 440 (`wfightmn.s:3869-3947`).
+ * WFIGHTMN_effectVisuals (`wfightmn.s` data at 0x800aad10, file 0x4F30, 12-byte rows
+ * {effect, scriptEffect, scriptSound}, row[0] == -1 ends it). Hit on the copied `+0x0a`:
+ * `+0x0e` = row[1], `+0x0f` = row[2], `+0x0d` = 0 (`wfightmn.s:3bd4-3bec`).
+ */
+export const FINALE_EFFECT_VISUALS: ReadonlyArray<readonly [number, number, number]> = [
+    [2, 19, 26], [3, 20, 26], [4, 21, 27], [5, 22, 50], [6, 26, 50], [8, 28, 39],
+];
+
+/**
+ * WFIGHTMN_elementVisuals (0x800aad64, file 0x4F84, 16-byte rows {element, scriptEffect,
+ * scriptSound, scriptStage}). Hit on the copied `+0x07`: `+0x0e` = row[1], `+0x0f` =
+ * row[2], `+0x0d` = row[3] (`wfightmn.s:3d64-3d90`).
+ */
+export const FINALE_ELEMENT_VISUALS: ReadonlyArray<readonly [number, number, number, number]> = [
+    [2, 5, 64, 34], [3, 9, 45, 37], [4, 11, 44, 40], [5, 14, 29, 43],
+    [6, 16, 44, 46], [7, 65, 64, 49], [8, 7, 64, 52],
+];
+
+/** The `+0x0a` values arm 22 does not copy (`wfightmn.s:3c90-3cac`: < 2, 9, 10, 12). */
+const FINALE_NO_EFFECT_COPY = (effect: number): boolean =>
+    effect < 2 || effect === 9 || effect === 10 || effect === 12;
+
+/**
+ * Arm 22 state 2's record build (`wfightmn.s:3c10-3d90`): technique 440 is reset from
+ * 443 (identical plain values, so `base`), then, when a technique was recorded and its
+ * clip (+0x10) is not 5 or 12:
+ *   1. the recorded `+0x0a` is not 0/1/9/10/12: `+0x0a`, `+0x0b`, `+0x0c` are copied,
+ *      then the effect table is searched by that `+0x0a`; a hit sets `+0x0e`, `+0x0f`
+ *      and `+0x0d` = 0. A miss changes nothing.
+ *   2. the recorded `+0x07` is >= 2: `+0x07` and `+0x08` are copied (the `+0x08` store
+ *      sits in the branch delay slot, so it runs whenever `+0x07` >= 2); then, only
+ *      when the head's own `+0x0a` is < 2 (it is 1 on the disc, so whenever step 1
+ *      copied nothing), the element table is searched by `+0x07`: a hit sets `+0x0e`,
+ *      `+0x0f`, `+0x0d` from the row. Every disc element 2..8 hits.
+ * Power (750) and category (magic) are never touched. The attack keeps id 440 and the
+ * announced name is the recorded technique's (`fightstg.s:14574-14579`); "?????"
+ * shows only when nothing was recorded. A null row leaves the head's attack untouched
+ * (`3c58 beqz $a0`).
  *
- * A row whose clip is 5 or 12 is not copied at all (`wfightmn.s:3869-3880`); a null
- * row (nothing was recorded) leaves the head's own attack untouched, which is arm
- * 22's zero-index path (`wfightmn.s:3869` `beqz $a0` -> sub-state 4).
+ * `base.techRecord` is the head's own raw `+0x0b/+0x0d/+0x0e/+0x0f`; the result's
+ * `techRecord` is those bytes after the overlay.
  */
 export function finaleCopiedAttackSkill<T extends FinaleCopiedRow>(
     base: T,
@@ -260,11 +309,27 @@ export function finaleCopiedAttackSkill<T extends FinaleCopiedRow>(
     if (!recorded) return base;
     const clip = (recorded.clip ?? 0) | 0;
     if (clip === 5 || clip === 12) return base;
-    return {
-        ...base,
-        element: recorded.element,
-        damage_scalar: recorded.damage_scalar,
-        effect_id: recorded.effect_id,
-        effect_power: recorded.effect_power,
-    };
+    const out: T = { ...base, name: recorded.name ?? base.name };
+    const raw: FinaleCopiedRawBytes = { ...(base.techRecord ?? {}) };
+    let rawTouched = false;
+    const effect = (recorded.effect_id ?? 0) | 0;
+    if (!FINALE_NO_EFFECT_COPY(effect)) {
+        out.effect_id = recorded.effect_id;
+        out.effect_power = recorded.effect_power;
+        if (recorded.techRecord?.f8 !== undefined) { raw.f8 = recorded.techRecord.f8; rawTouched = true; }
+        const hit = FINALE_EFFECT_VISUALS.find((row) => row[0] === effect);
+        if (hit) { raw.effect = hit[1]; raw.motion = hit[2]; raw.sigEffect = 0; rawTouched = true; }
+    }
+    const elem1 = (recorded.elem1 ?? 0) | 0;
+    if (elem1 >= 2) {
+        out.element = recorded.element;
+        out.elem1 = elem1;
+        out.damage_scalar = recorded.damage_scalar;
+        if (((out.effect_id ?? 0) | 0) < 2) {
+            const hit = FINALE_ELEMENT_VISUALS.find((row) => row[0] === elem1);
+            if (hit) { raw.effect = hit[1]; raw.motion = hit[2]; raw.sigEffect = hit[3]; rawTouched = true; }
+        }
+    }
+    if (rawTouched || base.techRecord) out.techRecord = raw;
+    return out;
 }

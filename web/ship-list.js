@@ -24,7 +24,7 @@ const IN = [
 const AUTO = ["widefield", "battlewide", "uisharp", "smartcam", "mpbubbles", "mpcredit", "glossary", "options", "dw2motion"];
 const OUT = [
     "devils", "villagers", "hd2d", "battleatmos", "mount", "mountseat", "fusionbosses", "bossphases", "bossmusic", "bossgrows",
-    "giantmode", "fieldwar", "omen", "practice2v2", "enemytells", "aishift", "ownclips", "smoothanim", "battlepano",
+    "giantmode", "omen", "practice2v2", "enemytells", "aishift", "ownclips", "smoothanim", "battlepano",
     "toonoutline", "toonshade", "softalpha", "blastladder", "planner", "movetheatre", "cutcontent", "stageselect", "soundtest",
     "soundtrack", "cinema", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "showfps", "itemrulebook", "cursorbook", "weaponlab",
     "bitledger", "savexray", "saveverify", "replay", "redirectview", "arrivallab", "anglermap", "serverchamp", "chatqueue",

@@ -1149,9 +1149,13 @@ export function poisonTimelineDamage(
   return Math.min(Math.max(1, raw), Math.trunc(maxHp / 2));
 }
 
-/** Regen HP-gain per turn — F0x800a01ac (type==0): R=rng%5+4, floor(maxHp·R/128), cap 9999. */
-export function regenTick(maxHp: number, rng: () => number): number {
-  const R = (rng() % 5) + 4;
+/**
+ * Regen HP-gain per tick — F0x800a01ac (fightstg.s:30561-30618): floor(maxHp·R/128), cap 9999.
+ * Third argument 0 (the Recover Crest's source): R = rng%5+4. Non-zero (Auto Recover, tech 189,
+ * which writes its own id into the event payload): R = rng%9+8. `strong` selects the second.
+ */
+export function regenTick(maxHp: number, rng: () => number, strong = false): number {
+  const R = strong ? (rng() % 9) + 8 : (rng() % 5) + 4;
   return Math.min(9999, Math.floor((maxHp * R) / 128));
 }
 
@@ -1231,9 +1235,23 @@ export function scheduleNextActor(
   return { elapsed, next };
 }
 
-/** Counter retaliation — reflects the incoming hit at half strength (damage >> 1). */
-export function counterDamage(damageTaken: number): number {
-  return Math.max(0, damageTaken >> 1);
+/**
+ * The counter blow's BASE value — F0x8009ff40 (fightstg.s:30481-30520). `damageTaken * f9 / 64`
+ * (`sra 6`, with `+0x3f` first when the product is negative), where f9 is the countering
+ * technique record's own `+0x0c`; `/ 32` (`sra 5`, `+0x1f`) when the COUNTERING fighter's
+ * charge byte `+0x1b` (Aura Plug 75) is non-zero (`lbu $a0, 0x1b($s1)` / `beqz`). The
+ * player side with its species' own basic technique (`s3 == 1`) skips the scale and hands
+ * `damageTaken` through unchanged. The base then goes through the damage tail
+ * (`F0x8009f6dc` = `resolveDamage`).
+ */
+export function counterBlowBase(
+  damageTaken: number, f9: number, charged = false, playerBasicTech = false,
+): number {
+  const taken = Math.trunc(Number(damageTaken)) | 0;
+  if (playerBasicTech) return taken;
+  const product = Math.imul(taken, Math.trunc(Number(f9)) | 0);
+  return charged ? (product < 0 ? product + 0x1f : product) >> 5
+    : (product < 0 ? product + 0x3f : product) >> 6;
 }
 
 // ── The persistent stat-penalty consumer — the producer's other half ──────────────────

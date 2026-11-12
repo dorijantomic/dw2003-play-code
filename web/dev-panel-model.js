@@ -80,7 +80,6 @@ export const DEV_ROWS = Object.freeze([
     R("battle", "Bosses", "bossmusic", "Phase music", "The battle music changes when a boss enters a new phase."),
     R("battle", "Bosses", "bossgrows", "The boss grows", "The boss is drawn bigger in later phases."),
     R("battle", "Ideas", "giantmode", "Giant mode", "Any fighter in a battle can be drawn at another size."),
-    R("battle", "Ideas", "fieldwar", "Elemental field war", "Field techniques set the battlefield element, and it shifts by itself every four turns."),
     R("battle", "Ideas", "omen", "A feeling before a fight", "Warns that a wild fight is close."),
     R("battle", "Ideas", "practice2v2", "Practice 2 vs 2", "Wild fights become 2 vs 2 with a computer partner."),
     R("battle", "Ideas", "enemytells", "Enemy tells", "A countdown under the enemy shows its next timed special."),

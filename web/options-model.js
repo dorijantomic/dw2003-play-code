@@ -30,7 +30,7 @@ export const EXTRA_GROUPS = Object.freeze([
     { id: "mount", label: "Mount", keys: ["mount", "mountseat"], help: "Ride a Digimon that a quest gives you. You sit on its back." },
     { id: "boss", label: "Boss ideas", keys: ["fusionbosses", "bossphases", "bossmusic", "bossgrows"], help: "Bosses fuse, change tactics at low health, change music and grow." },
     { id: "giant", label: "Giant mode", keys: ["giantmode"], help: "Digimon in battle can be drawn bigger or smaller than usual." },
-    { id: "battleideas", label: "Battle ideas", keys: ["fieldwar", "omen", "enemytells", "aishift"], help: "Enemy countdowns, fields that change element, a warning before wild fights." },
+    { id: "battleideas", label: "Battle ideas", keys: ["omen", "enemytells", "aishift"], help: "Enemy countdowns, a warning before wild fights." },
     { id: "battlemotion", label: "Battle motion", keys: ["ownclips", "dw2motion", "smoothanim"], help: "Digimon show their own attack moves, and battle animation looks smoother." },
     { id: "camera", label: "Camera and look", keys: ["smartcam", "battlepano", "softalpha", "battleatmos"], help: "Camera dodges rocks, painted backdrops, smooth edges, battle sky and weather." },
     { id: "villagers", label: "Villagers", keys: ["villagers"], help: "Extra villagers walk around in towns and cities." },

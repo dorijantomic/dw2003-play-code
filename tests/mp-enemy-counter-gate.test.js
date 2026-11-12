@@ -1,7 +1,5 @@
-// Card 05-online-counter-gate: the online arena runs the SAME enemy counter-stance gate as
-// single player (web/battle.js setEnemyCounterStance, disc fightstg.s:28440-28463). A foe's
-// own basic technique (action 1) sets no stance even when the skill record says effect
-// "counter"; a named technique (action 2) still sets one.
+// The online arena runs the same rule as single player: no counter stance exists. A foe using a record whose
+// effect is "counter" (f7 == 10) builds none, whether it is its own Fight or a named technique.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Arena } from "../web/mpbattle-rules.js";
@@ -26,19 +24,14 @@ function foeTurn(aiMoves) {
   return { foe, res: ar.foeAction("e0") };
 }
 
-// Three rows whose condition fails (mp < 0), so the pick falls through to row 3, action 2.
 const namedRows = [
   { comparator: 4, value: 0 }, { comparator: 4, value: 0 }, { comparator: 4, value: 0 }, { action: 2 },
 ];
 
-test("online: a foe's own Fight carrying effect counter sets no stance", () => {
-  const { foe, res } = foeTurn(undefined);
-  assert.equal(res.sk, 335, "the foe used its own Fight record");
-  assert.equal(foe.counterStance, undefined);
-});
-
-test("online: a foe's named counter technique still sets the stance", () => {
-  const { foe, res } = foeTurn(namedRows);
-  assert.equal(res.sk, 63, "the foe used its named technique");
-  assert.deepEqual(foe.counterStance, { uses: 3 });
+test("online: a foe's own Fight or named record with effect counter builds no stance", () => {
+  for (const rows of [undefined, namedRows]) {
+    const { foe, res } = foeTurn(rows);
+    assert.ok(res.sk === 335 || res.sk === 63, "the foe used one of its records");
+    assert.equal(foe.counterStance, undefined);
+  }
 });

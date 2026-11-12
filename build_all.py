@@ -1301,6 +1301,7 @@ STAGES = [
           outputs=("web/assets/movie/movieop2.mp4", "web/assets/movie/movieopn.mp4",
                    "web/assets/movie/movied08.mp4", "web/assets/movie/movied01.mp4",
                    "web/assets/movie/moviee01.mp4", "web/assets/movie/moviee02.mp4",
+                   "web/assets/movie/moviee03.mp4", "web/assets/movie/moviee04.mp4",
                    "web/assets/movie/manifest.json")),
     Stage("ui_font", ["tools/extract_ui_font.py"], str(REPO), uv_with=("pillow",),
           inputs=(DISC,),

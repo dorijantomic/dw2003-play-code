@@ -11,11 +11,11 @@ const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8")
 const BLOCK = SRC.match(/export const FX_GROUPS = \[([\s\S]*?)\n\];/)[1];
 const FX_KEYS = [...BLOCK.matchAll(/\["(\w+)", "[^"]*"\]/g)].map((m) => m[1]);
 
-test("all 101 FX_DEFS keys are present exactly once", () => {
-    assert.equal(FX_KEYS.length, 101);
-    assert.equal(new Set(FX_KEYS).size, 101);
+test("all 100 FX_DEFS keys are present exactly once", () => {
+    assert.equal(FX_KEYS.length, 100);
+    assert.equal(new Set(FX_KEYS).size, 100);
     const keys = DEV_ROWS.map((r) => r.key);
-    assert.equal(keys.length, 101);
+    assert.equal(keys.length, 100);
     assert.deepEqual([...keys].sort(), [...FX_KEYS].sort());
 });
 
@@ -40,7 +40,7 @@ test("the tabs and sub-headings are the agreed ones", () => {
     assert.deepEqual(keysOf("world", "Menus"), ["glossary", "options"]);
     assert.deepEqual(rowsOfTab("quests").map((r) => r.key), ["quests", "questtriggers", "questemotes", "questplacecard", "questsecondjob", "mount", "mountseat"]);
     assert.deepEqual(keysOf("battle", "Bosses"), ["fusionbosses", "bossphases", "bossmusic", "bossgrows"]);
-    assert.deepEqual(keysOf("battle", "Ideas"), ["giantmode", "fieldwar", "omen", "practice2v2", "enemytells", "aishift"]);
+    assert.deepEqual(keysOf("battle", "Ideas"), ["giantmode", "omen", "practice2v2", "enemytells", "aishift"]);
     assert.deepEqual(keysOf("battle", "Pace"), ["battlespeed", "encounterdial"]);
     assert.deepEqual(keysOf("battle", "Motion"), ["ownclips", "dw2motion", "smoothanim"]);
     assert.deepEqual(keysOf("battle", "Look"), ["battlewide", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "hd2d"]);
@@ -106,7 +106,7 @@ test("filter All / In / Auto / Out follows ship-list.js", () => {
     }
     let total = 0;
     for (const f of ["in", "auto", "out"]) total += DEV_ROWS.filter((r) => shipClass(r.key) === f).length;
-    assert.equal(total, 101, "every key has a ship class");
+    assert.equal(total, 100, "every key has a ship class");
     assert.deepEqual(selectRows({ tab: "online", filter: "auto" }).map((r) => r.key), ["mpbubbles", "mpcredit"]);
     assert.deepEqual(selectRows({ tab: "online", filter: "in" }), []);
     const shipOf = (k) => (k === "rain" ? "out" : "in");
@@ -123,7 +123,7 @@ test("search and filter combine across tabs", () => {
 test("groupRows keeps sub-heading order and splits by tab when searching", () => {
     const g = groupRows(selectRows({ tab: "battle" }));
     assert.deepEqual(g.map((x) => x.sub), ["Bosses", "Ideas", "Pace", "Motion", "Look"]);
-    assert.equal(g.reduce((n, x) => n + x.rows.length, 0), 23);
+    assert.equal(g.reduce((n, x) => n + x.rows.length, 0), 22);
     const s = groupRows(selectRows({ query: "page" }));
     assert.ok(new Set(s.map((x) => x.tab)).size > 1);
 });

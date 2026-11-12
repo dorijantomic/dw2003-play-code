@@ -21,7 +21,8 @@ const ARENAS = join(ROOT, "web/assets/battle/arenas");
 
 test("the per-area arena family is extracted (MEFT1001-1029)", () => {
   const man = JSON.parse(readFileSync(join(ARENAS, "manifest.json"), "utf8"));
-  assert.equal(Object.keys(man.byArena).length, 29, "29 stage packs");
+  assert.equal(Object.keys(man.byArena).length, 30, "30 stage packs: 1..29 plus the Blast change stage 31");
+  assert.equal(man.byArena["31"]?.pack, "meft1031", "arena 31 pack");
   for (let i = 1; i <= 29; i++) {
     const a = man.byArena[String(i)];
     assert.ok(a && a.pack === `meft10${String(i).padStart(2, "0")}`, `arena ${i} pack`);

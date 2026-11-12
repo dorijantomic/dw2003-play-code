@@ -31,14 +31,14 @@ const MOVIE_DIR = "assets/movie/";
 
 /** The shipped asset for a movie row, by the disc's own file index (the one
  *  identifier the row and the manifest share); the filename is the fallback. */
-function movieRecordFor(manifest, row) {
+export function movieRecordFor(manifest, row) {
   const movies = manifest?.movies ?? {};
   const byIndex = Object.values(movies).find((m) => m.index === row.fileIndex);
   if (byIndex) return byIndex;
   return movies[row.file.replace(/_STR$/, "").toLowerCase()] ?? null;
 }
 
-export function createFieldMoviePlayer(onEnd, onError = console.error, createVideo = null) {
+export function createFieldMoviePlayer(onEnd, onError = console.error, createVideo = null, languageByte = () => 2) {
   const video = createVideo ? createVideo() : document.createElement("video");
   video.playsInline = true;
   video.preload = "auto";
@@ -77,7 +77,7 @@ export function createFieldMoviePlayer(onEnd, onError = console.error, createVid
      *  async and hands back through `onEnd` either way. */
     async open(launchCode) {
       const token = ++generation;
-      const row = player.open(launchCode);
+      const row = player.open(launchCode, languageByte());
       active = row !== null;
       code = launchCode;
       blocked = false;

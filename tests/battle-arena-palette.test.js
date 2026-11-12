@@ -127,7 +127,7 @@ test("the arena render binds the group's own palette texture and records the dec
     "the per-CLUT texture URL is derived from the group's page+clut");
   const branch = B3D.slice(B3D.indexOf("} else if (arenaActive) {"));
   const slice = branch.slice(0, branch.indexOf("} else {\n      drawQuad"));
-  assert.match(slice, /arenaTextureFor\(activeArena, g\)/, "each group draws with its own palette texture");
+  assert.match(slice, /arenaTextureFor\(shownArena, g\)/, "each group draws with its own palette texture");
   // The decoded GPU blend is OPAQUE (cmd 0x2C) and is APPLIED (blending disabled).
   assert.match(slice, /NOW APPLIED/, "the branch records the decoded opaque blend as applied");
   assert.match(slice, /gl\.disable\(gl\.BLEND\)/, "the arena is drawn opaque (blending off)");
@@ -140,7 +140,7 @@ test("the arena draw runs the ported back-face cull on each group", () => {
   assert.match(B3D, /function drawProjLayerIndexed\(/, "culled layers draw through an index buffer");
   const branch = B3D.slice(B3D.indexOf("} else if (arenaActive) {"));
   const slice = branch.slice(0, branch.indexOf("} else {\n      drawQuad"));
-  assert.match(slice, /drawProjLayerIndexed\(gl, texP, mvp, g, tex, idx\)/,
+  assert.match(slice, /drawProjLayerIndexed\(gl, texP, gm, g, tex, idx, stageTint\)/,
     "each group is drawn through the cull");
 });
 
