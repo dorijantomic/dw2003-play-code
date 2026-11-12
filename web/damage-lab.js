@@ -188,7 +188,9 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
 
   // 6 — special op (Multi Crest plain attack x2/5)
   const specialBefore = running;
-  const special = !!S.basic_attack && multiCrestPlainAttack(!!A.multiAttack, S);
+  // Every physical row with dispatch < 2 takes it (F0x8009f6dc 0x8009f868-0x8009f8c0), not
+  // only basic attacks; the magical leaf never reaches this stage.
+  const special = !magical && multiCrestPlainAttack(!!A.multiAttack, S);
   if (special) {
     running = Math.trunc((running * 2) / 5);
     stages.push({
@@ -200,7 +202,7 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
     stages.push({
       name: "special-op",
       value: running,
-      note: A.multiAttack && S.basic_attack
+      note: A.multiAttack && !magical && num(S.effect_id) < 2
         ? "Multi Crest is on, but this record's clip is 0x0b or 0x0c: one full hit"
         : "not a Multi Crest plain attack: unchanged",
     });
@@ -217,7 +219,8 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
   const critical = magical ? magicalCritProc(A, D, S, capture) : critProc(A, D, S, capture);
   let critNote;
   if (critical) {
-    const r = (rng() & 0x3f) + 0x20;          // 32..95
+    // physical leaf: (RAND & 0x3f) + 0x20; magical leaf (0x8009fd54-0x8009fda4): RAND % 65 + 0x20
+    const r = (magical ? rng() % 65 : rng() & 0x3f) + 0x20;
     running += Math.floor((running * r) / 64);
     critNote = `roll ${critRoll & 0x7f}: crit, +${r}/64 (${critBefore} -> ${running})`;
   } else {

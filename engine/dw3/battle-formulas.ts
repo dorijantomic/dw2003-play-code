@@ -82,7 +82,7 @@ export interface Skill {
   /** Raw +0x0C, TechData.effectPower: the crit-chance addition of a TECH_EFFECT_CRITICAL
    *  technique (and the drain ratio, a boost's amount, ... by effect). */
   effect_power?: number;
-  basic_attack?: boolean;   // enables the equipment +0x2b/+0x2c basic-attack term
+  basic_attack?: boolean;   // a caller's marker for the species' own basic attack; the damage stage no longer reads it (the +0x2b/+0x2c weapon element and the Multi Crest 0.4x apply to every physical row, F0x8009f6dc 0x8009f804-0x8009f8c0)
   /** Raw record byte +0x10, the action-script clip. The Multi-Crest plain-attack
    *  gate (F0x8009e0cc .L0x8009e24c and F0x8009f6dc .L0x8009f88c) skips the 3-hit
    *  diversion and the 0.4x stage when this byte is 0x0b or 0x0c. */
@@ -464,7 +464,8 @@ export function critProc(atk: EffStats, def: EffStats, skill: Skill, rng: () => 
 /**
  * Magical critical roll — F0x800a0514, called by F0x8009fab4.
  *
- *   chance = min(0x40, trunc(skill[+0x8] * 100 / defender element)) + 4,
+ *   chance = min(0x40, trunc(skill[+0x8] * 100 / defender element)) + 4
+ *            (element 1 = normal divides by the defender's +0x0a = SPD, :30816-:30819),
  *            or that scalar term + 0x40 when skill[+0x9] >= 2 matches the
  *            defender's +0x25; + the TARGET's three record intensity terms.
  *
@@ -488,9 +489,12 @@ export function magicalCritProc(
   rng: () => number,
 ): boolean {
   const element = skill.element;
+  // The divisor is the halfword at defender block + 0x0a + 2*(element - 2)
+  // (`addiu $v0, -0x2; sll 1; addu; lh 0xc($v0)`, fightstg.s:30816-30819): elements
+  // 2..8 read the element table, element 1 (normal) reads the defender's +0x0a = SPD.
   const resistance = element && element !== "normal"
     ? (def.resistances?.[element] ?? 0)
-    : 0;
+    : def.spd;
   let scalarTerm = 0;
   if (resistance !== 0 && skill.damage_scalar != null) {
     scalarTerm = Math.min(0x40, Math.trunc((skill.damage_scalar * 100) / resistance));
@@ -562,12 +566,18 @@ export function resolveDamage(
     s0 += Math.trunc(s0 / 2);
   }
   const equipElement = atk.elementalAttack?.element;
-  if (skill.basic_attack && equipElement && def.resistances) {
+  // F0x8009f6dc .L0x8009f804-.L0x8009f864: the worn weapon element (+0x2b/+0x2c) is
+  // added on EVERY physical row whose own element byte skill+0x7 is < 2 and whose clip
+  // byte skill+0x10 is not 0x0b/0x0c; there is no basic-attack test. A row with an
+  // element >= 2 takes the skill-element arm above instead (the two arms are exclusive).
+  const plainElement = !skill.element || skill.element === "normal";
+  const clipIsPrecision = skill.clip === 0x0b || skill.clip === 0x0c;
+  if (!skill.magical && plainElement && !clipIsPrecision && equipElement && def.resistances) {
     const resistance = Math.max(1, def.resistances[equipElement] ?? 100);
     s0 += Math.trunc((s0 * atk.elementalAttack!.amount * 2) / resistance);
   }
-  // Special-op stage — F0x8009f6dc L29950-L29972: on a plain attack (skill f7
-  // < 2, the browser basic_attack path) whose attacker carries the effective
+  // Special-op stage — F0x8009f6dc L29950-L29972: on a physical row (skill f7
+  // < 2, any such row, not only basic attacks) whose attacker carries the effective
   // +0x37 gate (Multi Crest — the same gate that diverts the resolver to the
   // 3-hit applier, fightstg.s:28502 -> 28580) the running damage is scaled by
   // trunc(2/5): the 0x66666667 magic applied to s0<<2 then >>2. The gate's first
@@ -579,14 +589,18 @@ export function resolveDamage(
   // The tail runs ONCE for the whole action (the applier's loop calls only the
   // accuracy method, fightstg.s:27628/:27631), so the 0.4x scale is applied to
   // the one value every hit shares, not once per hit.
-  if (skill.basic_attack && multiCrestPlainAttack(!!atk.multiAttack, skill)) {
+  // Every physical row with dispatch (+0x0a) < 2 and a clip other than 0x0b/0x0c takes it
+  // (:29950-:29958 carries no basic-attack test).
+  if (!skill.magical && multiCrestPlainAttack(!!atk.multiAttack, skill)) {
     s0 = Math.trunc((s0 * 2) / 5);
   }
   const critical = skill.magical
     ? magicalCritProc(atk, def, skill, rng)
     : critProc(atk, def, skill, rng);
   if (critical) {
-    const r = (rng() & 0x3f) + 0x20; // 32..95
+    // Physical leaf (F0x8009f8e4): `rng & 0x3f` + 0x20. Magical leaf (F0x8009fab4,
+    // 0x8009fd54-0x8009fda4): the 0x7e07e07f multiply is a divide by 65, so RAND % 65 + 0x20.
+    const r = (skill.magical ? rng() % 65 : rng() & 0x3f) + 0x20;
     s0 += Math.floor((s0 * r) / 64);
   }
   const armor = def.armor ?? 0;
@@ -930,10 +944,17 @@ export function multiCrestPlainAttack(
  */
 export function basicAttackHitCount(
   multiAttack: boolean,
-  skill: { effect_id?: number; effect?: string; hits?: number; clip?: number } | null | undefined,
+  skill: { effect_id?: number; effect?: string; hits?: number; clip?: number; magical?: boolean; attack_category?: string } | null | undefined,
 ): number {
   const dispatch = effectByteOf(skill);
-  if (dispatch < 2) return multiCrestPlainAttack(multiAttack, skill) ? 3 : 1;
+  // The game hands in the skill row (attack_category "magical"); the engine's damage stage
+  // sees the same row as `magical`. Either spelling means the magical branch.
+  const magical = skill?.magical ?? skill?.attack_category === "magical";
+  // The Multi Crest diversion (0x8009e238-0x8009e26c) sits in the PHYSICAL branch of the
+  // resolver only; the magical branch (0x8009e37c-0x8009e394) sends dispatch < 2 to the
+  // exit and only dispatch 9 to the applier. It applies to EVERY physical row with
+  // dispatch < 2, a technique as well as a basic attack.
+  if (dispatch < 2) return !magical && multiCrestPlainAttack(multiAttack, skill) ? 3 : 1;
   if (dispatch === 9) return Math.max(1, Math.trunc(skill?.hits ?? 1));
   return 1;
 }
@@ -1176,8 +1197,8 @@ export type TimedAilment = "frozen" | "confuse" | "sleep";
 // were read — see docs/research/battle/battle-formula-leaves.md, "The ailment recoveries
 // and the poison tick — the same pool, five more codes": it read the technique's
 // `effect_p2` where the arm reads the global `0x800a435d` (the record's own `+0x38`
-// ailment id), and it computed confusion mode 0 as `draw % 8001` where the arm computes
-// `draw - 8001 * (draw / 2710)`, which is 2000 for every draw from 2710 up.
+// ailment id). Confusion mode 0 (opcode 8) is `RAND % 8001` clamped to 2000..6000
+// (fightstg.s 0x8009be7c-0x8009bec0: the magic 0x830e3cfd is signed, so the divide is by 8001).
 
 /** Normal code-2 action delay — F0x8009bda4 opcode 0 / param [1000,707,1414]. */
 export function actionTimelineDelay(ownSpd: number, opponentSpd: number): number {

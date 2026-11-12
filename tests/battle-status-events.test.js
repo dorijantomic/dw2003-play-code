@@ -23,7 +23,7 @@ import {
   STATUS_EVENT_AILMENTS, STATUS_EVENT_DELAY_ARMS, STATUS_EVENT_CONSUMER_ACTION_TYPES,
   STATUS_EVENT_ACTION_HANDLERS, statusEventActionType, statusEventActionHandler,
   statusEventAilmentBit, statusEventAilmentCode, statusEventAilmentDelay,
-  statusEventConfusionDelay, statusEventDelayArm, statusEventDivide2710,
+  statusEventConfusionDelay, statusEventDelayArm, statusEventDivide8001,
   statusEventRecoveryDelay, statusEventTickDelay, cureStatusEvent, cureAllStatusEvents,
   STATUS_EVENT_ALL_CURE_CODES,
   stageStatusEventAilment, stageStatusEventSideTick,
@@ -350,12 +350,19 @@ test("the pick: a code 2/3 incumbent yields, any other code keeps the earlier sl
   assert.equal(pick.index, 0, "an ordinary incumbent keeps a tie against code 2");
   assert.equal(pick.code, 0x0d);
 
-  // Now the incumbent IS code 2, and the newcomer's time is not strictly earlier, so the
-  // priority test lets the newcomer take over.
+  // Now the incumbent IS code 2 and the newcomer TIES it (incumbent time >= newcomer time,
+  // `slt $v0, $a2` / `bnez` 0x8009ba98-0x8009ba9c not taken): the tie step lets the newcomer
+  // take over.
   const pool2 = emptyStatusEventPool();
   pool2[0] = entry(0x02, 500, 0, 0, 0);
-  pool2[9] = entry(0x0d, 900, 0, 0, 0);
-  assert.equal(pickNextStatusEvent(pool2).index, 9, "a code 2 incumbent yields");
+  pool2[9] = entry(0x0d, 500, 0, 0, 0);
+  assert.equal(pickNextStatusEvent(pool2).index, 9, "a code 2 incumbent yields on a tie");
+  // A LATER newcomer never displaces it: the incumbent's time is strictly below the
+  // newcomer's, so the tie step is skipped (0x8009ba98 `bnez` -> 0x8009bac4).
+  const pool2b = emptyStatusEventPool();
+  pool2b[0] = entry(0x02, 500, 0, 0, 0);
+  pool2b[9] = entry(0x0d, 900, 0, 0, 0);
+  assert.equal(pickNextStatusEvent(pool2b).index, 0, "a code 2 incumbent keeps against a later entry");
 
   // Two ordinary codes tie: the earlier slot keeps it, because the incumbent's code is
   // not 2 or 3 so the priority test fails.
@@ -663,15 +670,17 @@ test("CODE 0x0b: the confused recovery runs opcode 8, whose own arithmetic floor
   assert.equal(statusEventAilmentDelay("confuse",
     { draw: 0x8000, ownSpt: 100, magnitude: 0x20, otherA: 0, otherB: 0 }, 0),
     statusEventConfusionDelay(() => 0x8000 / 0x10000));
-  // The disc's magic divides by 2710 while the rebuild multiplies by 8001, so the arm's
-  // own answer is 2000 for every draw from 2710 up.
-  assert.equal(statusEventDivide2710(2709), 0);
-  assert.equal(statusEventDivide2710(2710), 1, "the magic-and-shift pair divides by 2710");
-  assert.equal(statusEventConfusionDelay(() => 2709 / 0x10000), 2709);
-  assert.equal(statusEventConfusionDelay(() => 2710 / 0x10000), 2000);
-  assert.equal(statusEventConfusionDelay(() => 1), 2000);
-  assert.equal(statusEventConfusionDelay(() => 0.99999), 2000);
-  assert.equal(pool[at].time, 2000);
+  // fightstg.s 0x8009be7c-0x8009bec0: the magic 0x830e3cfd is signed, the divide is by 8001,
+  // so the arm is RAND % 8001, clamped to 2000..6000 by opcode 8's triple.
+  assert.equal(statusEventDivide8001(8000), 0);
+  assert.equal(statusEventDivide8001(8001), 1, "the magic-and-shift pair divides by 8001");
+  assert.equal(statusEventConfusionDelay(() => 1999 / 0x10000), 2000);
+  assert.equal(statusEventConfusionDelay(() => 2710 / 0x10000), 2710);
+  assert.equal(statusEventConfusionDelay(() => 6000 / 0x10000), 6000);
+  assert.equal(statusEventConfusionDelay(() => 6001 / 0x10000), 6000);
+  assert.equal(statusEventConfusionDelay(() => 8001 / 0x10000), 2000);
+  assert.equal(statusEventConfusionDelay(() => 0.99999), 2000);  // 65535 % 8001 = 1527 -> floor 2000
+  assert.equal(pool[at].time, 2000);  // 0x8000 % 8001 = 736 -> floor 2000
   // A non-zero technique id takes opcode 10 instead, whose arm has the 3000 term.
   assert.equal(statusEventDelayArm(10), 0x8009bf90);
   const other = stageStatusEventAilment(pool, stage("confuse", {

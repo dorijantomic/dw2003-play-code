@@ -78,3 +78,43 @@ test("both story paths call the shared function, never a bare skill.hits", () =>
   assert.ok(!/const hits = skill\?\.hits \?\? 1;/.test(SRC),
     "the enemy's side no longer reads skill.hits without the dispatch test");
 });
+
+test("the Multi Crest diversion is the PHYSICAL branch only, and a technique takes it as a basic attack does", () => {
+  // F0x8009e0cc: the physical branch (0x8009e238-0x8009e26c) diverts dispatch < 2 to the three-hit
+  // applier; the magical branch (0x8009e37c-0x8009e394) sends dispatch < 2 to the exit.
+  const phys = skillOf(437);                   // Ragnarok Cannon: a physical technique, dispatch < 2
+  assert.equal(TECH["437"].category, 2);
+  assert.ok(TECH["437"].dispatch < 2);
+  assert.equal(basicAttackHitCount(true, phys), 3, "a physical technique takes it too (no basic-attack test)");
+  assert.equal(basicAttackHitCount(false, phys), 1);
+  const mag = skillOf(91);                     // KongouKaimandara: magical, dispatch < 2
+  assert.equal(TECH["91"].category, 3);
+  assert.ok(TECH["91"].dispatch < 2);
+  assert.equal(mag.attack_category, "magical");
+  assert.equal(basicAttackHitCount(true, mag), 1, "the skill row (attack_category magical) is one hit");
+  assert.equal(basicAttackHitCount(true, { ...mag, attack_category: undefined, magical: true }), 1, "the engine spelling too");
+});
+
+test("the 0.4x tail applies to a physical technique and never to a magical one", () => {
+  const atk = { str: 100, def: 0, spt: 0, wis: 0, spd: 0, level: 1, multiAttack: true, resistances: {} };
+  const def = { str: 0, def: 100, spt: 100, wis: 0, spd: 0, level: 1, family: 0, resistances: {} };
+  const rng = () => 127;
+  const phys = { ...skillOf(437), magical: false };
+  assert.equal(resolveDamage(1000, atk, def, phys, rng, null), 400, "physical technique under Multi Crest: x2/5");
+  const mag = { ...skillOf(91), magical: true };
+  assert.equal(resolveDamage(1000, atk, def, mag, rng, null), resolveDamage(1000, { ...atk, multiAttack: false }, def, mag, rng, null));
+});
+
+test("a basic-attack row keeps its own category: only id 440 (the finale head) is tech_basic and magical", () => {
+  const basics = SKILLS.filter((s) => s.tech_basic);
+  const notPhysical = basics.filter((s) => TECH[String(s.id)].category !== 2).map((s) => s.id);
+  assert.deepEqual(notPhysical, [440], "the only tech_basic row that is not category 2 (physical) is 440");
+  for (const s of basics) {
+    assert.equal(s.attack_category, TECH[String(s.id)].category === 3 ? "magical" : "physical", `skill ${s.id}`);
+  }
+  const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  assert.ok(!/basicSkill \? \{ \.\.\.basicSkill, attack_category: "physical" \}/.test(SRC),
+    "the player's Fight no longer forces physical over the row's own category");
+  assert.ok(!/if \(!usesTech && skill\) skill = \{ \.\.\.skill, attack_category: "physical" \};/.test(SRC),
+    "the enemy's own attack no longer forces physical (440 is magical on the disc)");
+});

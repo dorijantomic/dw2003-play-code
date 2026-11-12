@@ -1,23 +1,15 @@
-// F4 — the three FIXED-SIDE category-5 arms when the PLAYER is the one casting them.
+// The three FIXED-SIDE category-5 arms when the PLAYER is the one casting them.
 //
-// WHAT WAS WRONG. `DAMAGE_TERM_ARMS_CATEGORY5` carried 391 as `target: "playerActive"`
-// and 392/400 as `target: "enemy"`, and `damageTermCategory5Side` read those literally: the
-// side was fixed whichever fighter cast. That is what the disc's own streams say —
-// 391 stages its status event on `0x800a4468` (`FIGHTSTG_F0x8009cff4` :27256) and 392/400
-// read `0x800a4468` / `0x800a446c` for the two records they move MP between or heal
-// (:13938-:13939, :13993) — but it is only CORRECT because the retail data never lets the
-// player cast them (391 sits on Persiamon's enemy row; 392/400 on no player row at all).
+// 392 and 400 are the disc's literal answer whoever casts (fightstg.s 0x80090654-0x800906fc
+// and 0x80090734-0x80090798): 392 moves MP from the PLAYER's active record
+// (0x800a4470 + [0x800a4468]*0x20) to the ENEMY's (0x800a44d0 + [0x800a446c]*0x20), and
+// 400 heals the ENEMY's active record and sets its charge byte to 32; the heal amount
+// reads the ACTING side's WIS ($a0 = lbu 0x50($s4)). A player cast of either gives the
+// same two records, so a player cast of 392 gives the enemy MP and 400 heals the enemy.
 //
-// The walker's extra species row carries `techs: [390, 391, ...]`, so 391 IS player-
-// reachable here, and the literal reading put the status on the caster. The repair keeps
-// the arm's MEANING: the fixed side is the side the technique is aimed at, i.e. the
-// opponent of whoever casts. For an enemy caster that is the player (391) or the enemy
-// itself (392/400, which steal for / heal the caster); for a player caster the same
-// operand is the enemy (391) or the player (392/400). `fixedSide` on the arm table names
-// the disc's side and `damageTermCategory5Side` flips it for a side-0 caster only.
-//
-// Every assertion below fails on the code before this change, where the three arms
-// reported the disc's literal side for both casters.
+// 391 is the one walker repair kept: its stream stages the status on 0x800a4468 (the
+// player), which for a player cast would be a self-write, so the walker aims it at the
+// enemy instead (the shipped table gives 391 to Persiamon's enemy row only).
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -71,11 +63,11 @@ test("the side a fixed-side arm writes to, from the caster's side", () => {
   // casts it — never the caster itself.
   assert.equal(sideOf(391, 1), 0, "Persiamon's Helter Skelter lands on the player");
   assert.equal(sideOf(391, 0), 1, "and on the enemy when the player casts it");
-  // 392 and 400 write side 1, the caster's own side for the only caster the disc has.
+  // 392 and 400 write side 1 whoever casts them (0x80090654-0x800906fc, 0x80090734-0x80090798).
   assert.equal(sideOf(392, 1), 1, "the MP drain reads 0x800a446c, the enemy's index");
-  assert.equal(sideOf(392, 0), 0, "which is the PLAYER's side when the player casts it");
+  assert.equal(sideOf(392, 0), 1, "and the same index when the player casts it");
   assert.equal(sideOf(400, 1), 1, "Gilead Plant heals the enemy's active fighter");
-  assert.equal(sideOf(400, 0), 0, "and the player's when the player casts it");
+  assert.equal(sideOf(400, 0), 1, "and the enemy's when the player casts it");
   // The arms the disc targets by ROLE are untouched: a debuff row still XORs, and the
   // two locks still name the player.
   assert.equal(sideOf(205, 0), 1);
@@ -105,38 +97,38 @@ test("391 cast by the player stages on the ENEMY, not on the caster", () => {
   "the enemy's cast still lands on the player");
 });
 
-test("392 cast by the player drains the ENEMY's MP into the player", () => {
+test("392 cast by the player moves the PLAYER's MP onto the enemy (disc fixed sides)", () => {
   const b = battle();
-  b.player.mp = 20;      // headroom below the maximum, so the landing MP is visible
+  b.player.mp = 60;
   b.enemy.mp = 80;
   const plan = battleScriptedPlanFor(b, 0, record(392), 392, { name: "Marsmon" });
   assert.equal(plan.effect, "mpDrain");
-  // `maxMP * record[+0x0C] / 128` with the SOURCE's maximum, capped at what it has: the
-  // enemy's 100 MP max, record 392's +0x0C byte of 8.
-  assert.equal(plan.mpMoved, 6, "trunc(100 * 8 / 128)");
-  assert.equal(b.enemy.mp, 74, "the source loses the whole amount");
-  assert.equal(b.player.mp, 26, "the caster gains it");
+  // `maxMP * record[+0x0C] / 128` with the SOURCE's maximum, capped at what it has
+  // (0x80090688-0x8009069c): the player's 60 MP max, record 392's +0x0C byte of 8.
+  assert.equal(plan.mpMoved, 3, "trunc(60 * 8 / 128)");
+  assert.equal(b.player.mp, 57, "the source (the player) loses the whole amount");
+  assert.equal(b.enemy.mp, 83, "the destination (the enemy) gains it");
   assert.equal(plan.page.kind, 18);
-  assert.equal(plan.page.slots[0], "6");
-  // The caster is clamped to its OWN maximum, and the source still pays in full.
+  assert.equal(plan.page.slots[0], "3");
+  // The destination is clamped to its OWN maximum, and the source still pays in full.
   const bAtMax = battle();
-  bAtMax.enemy.mp = 80;
+  bAtMax.enemy.mp = 99;
   const atMax = battleScriptedPlanFor(bAtMax, 0, record(392), 392, { name: "Marsmon" });
-  assert.equal(atMax.mpMoved, 6);
-  assert.equal(bAtMax.player.mp, 60, "already at 60/60");
-  assert.equal(bAtMax.enemy.mp, 74);
+  assert.equal(atMax.mpMoved, 3);
+  assert.equal(bAtMax.player.mp, 57);
+  assert.equal(bAtMax.enemy.mp, 100, "clamped at 100/100");
 });
 
-test("392 cast by the player refuses when the ENEMY has no MP", () => {
+test("392 refuses when the PLAYER (the source) has no MP, whoever casts it", () => {
   const b = battle();
-  b.enemy.mp = 0;
+  b.player.mp = 0;
   const plan = battleScriptedPlanFor(b, 0, record(392), 392, { name: "Marsmon" });
   assert.equal(plan.mpMoved, 0);
   assert.equal(plan.page.kind, 2);
   assert.deepEqual(plan.page.payload, [0x2f, 0x10]);
-  assert.equal(b.player.mp, 60, "the caster keeps its MP");
-  assert.equal(b.enemy.mp, 0);
-  // The enemy's cast is still the shipped arm: the player's MP is the source.
+  assert.equal(b.player.mp, 0);
+  assert.equal(b.enemy.mp, 100);
+  // The enemy's cast is the same arm: the player's MP is the source.
   const byEnemy = battle();
   byEnemy.player.mp = 0;
   const refused = battleScriptedPlanFor(byEnemy, 1, record(392), 392, { name: "Persiamon" });
@@ -144,25 +136,23 @@ test("392 cast by the player refuses when the ENEMY has no MP", () => {
   assert.equal(byEnemy.enemy.mp, 100);
 });
 
-test("400 cast by the player heals and charges the PLAYER, not the enemy", () => {
+test("400 cast by the player heals and charges the ENEMY (disc fixed side)", () => {
   const b = battle();
-  b.player.maxHp = 9000;
-  b.player.hp = 100;
+  b.enemy.maxHp = 9000;
+  b.enemy.hp = 100;
+  b.enemy.affinity = 80;
   b.player.affinity = 80;
   const plan = battleScriptedPlanFor(b, 0, record(400), 400, { name: "Marsmon" });
   assert.equal(plan.effect, "healCharge");
-  assert.equal(plan.side, 0, "the fixed side 0x800a446c flipped to the caster");
+  assert.equal(plan.side, 1, "the fixed side 0x800a446c: the enemy, whoever casts");
   // The power term is record 400's own and the wisdom term the CASTER's (`$a0` is the
   // acting side's byte, :13996), which for a player cast is the player's 40.
   assert.equal(plan.healAmount, damageTermHealAmount(TECH_TABLE["400"].power, 40));
   assert.equal(plan.healAmount, 512 + 40);
-  assert.equal(b.player.hp, 100 + plan.healAmount);
-  assert.equal(b.player.affinity, 0x20, "the arm's literal 32 lands on the caster");
-  assert.equal(b.enemy.hp, 500, "the enemy is untouched");
-  assert.equal(b.enemy.affinity, 0);
-  // The clear at `fightstg.s:13092` runs first on the acting side, so the record the arm
-  // reads back is already empty — `affinityBefore` is 0 however charged the cast was.
-  assert.equal(plan.affinityBefore, 0);
+  assert.equal(b.enemy.hp, 100 + plan.healAmount);
+  assert.equal(b.enemy.affinity, 0x20, "the arm's literal 32 lands on the enemy");
+  assert.equal(b.player.hp, 300, "the caster is untouched");
+  assert.equal(b.player.affinity, 0, "the clear at fightstg.s:13092 spent the caster's own byte");
   // The enemy's cast is unchanged: it heals itself.
   const byEnemy = battle();
   byEnemy.enemy.maxHp = 9000;
@@ -174,9 +164,9 @@ test("400 cast by the player heals and charges the PLAYER, not the enemy", () =>
   assert.equal(byEnemy.player.hp, 300);
 });
 
-test("the heal is capped by the caster's own maximum HP on a player cast", () => {
+test("the heal is capped by the healed (enemy) record's maximum HP on a player cast", () => {
   const b = battle();
-  b.player.hp = 290;
+  b.enemy.hp = 490;
   battleScriptedPlanFor(b, 0, record(400), 400, { name: "Marsmon" });
-  assert.equal(b.player.hp, 300, "the `+0x06` cap is the record the arm writes");
+  assert.equal(b.enemy.hp, 500, "the `+0x06` cap is the record the arm writes");
 });

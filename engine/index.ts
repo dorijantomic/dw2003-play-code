@@ -1213,7 +1213,7 @@ export {
   statusEventActionType, statusEventAilmentBit, statusEventAilmentCode,
   statusEventAilmentDelay, statusEventClamp, statusEventConfusionDelay,
   statusEventDelay, statusEventDelayArm,
-  statusEventDivide2710, statusEventDraw, statusEventFreesSlot, statusEventIsqrt,
+  statusEventDivide8001, statusEventDraw, statusEventFreesSlot, statusEventIsqrt,
   statusEventLockBit, statusEventLockDelay, statusEventLockHeld, statusEventLockIndex,
   statusEventRecoveryDelay, statusEventStatDelay, statusEventStatDelayUnrefreshing,
   statusEventStatIndex, statusEventTickDelay,

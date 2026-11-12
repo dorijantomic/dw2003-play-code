@@ -1245,21 +1245,27 @@ export function damageTermCategory5Arm(techniqueId: number): DamageTermCategory5
  * name a side outright — 391 writes its status event's word 3 as `lw $v1, 0x4468($v0)`
  * (`FIGHTSTG_F0x8009cff4` :27256), and 392/400 read `0x800a4468`/`0x800a446c` for the two
  * records they move MP between or heal (:13938-:13939, :13993) — with no test on who is
- * acting. For the enemy caster that fixed side IS the opponent, which is why the disc can
- * write it that way: the shipped table gives 391 to Persiamon's row and 392/400 to no
- * player row at all. The walker's extra rows can put 391 in a player's hands (its `techs`
- * list carries `[390, 391, ...]`), and the literal disc answer there is a self-write: the
- * status would be staged on the caster. That unreachable-on-retail behaviour is not what
- * the arm means, so {@link DamageTermCategory5Arm.fixedSide} names the side and this
- * function flips it for a side-0 caster: a fixed side of 1 is the caster's own side and
- * 0 the opponent, exactly as when an enemy casts. Documented as a walker repair, not as
- * disc emulation.
+ * acting. 392 and 400 are the disc's literal answer whoever casts: 392 moves MP from the
+ * PLAYER's active record (0x800a4470 + [0x800a4468]*0x20, `lw $v1, 0x8($v0)` :13939) to
+ * the ENEMY's (0x800a44d0 + [0x800a446c]*0x20, `lw $a0, 0xc($v0)` :13938)
+ * (0x80090654-0x800906fc), and 400 heals the ENEMY's active record and sets its charge byte
+ * (0x80090734-0x80090798, `lw $a2, 0xc($v1)` :13993). A player cast of either gives
+ * the same two records, so this function returns the arm's own `fixedSide` for both.
+ *
+ * 391 is the one remaining walker repair: its stream stages the status on
+ * `0x800a4468` (the player), the shipped table gives 391 to Persiamon's enemy row only, and
+ * the walker's extra species row can put 391 in a player's hands, where the literal answer
+ * is a self-write. {@link DamageTermCategory5Arm.fixedSide} names the disc's side and this
+ * function flips it for a side-0 caster of the `statusOnly` arm alone.
  */
 export function damageTermCategory5Side(
   arm: DamageTermCategory5Arm | null, actingSide: number, row?: DamageTermStatRow | null,
 ): number {
   const acting = (Math.trunc(Number(actingSide)) | 0) < 1 ? 0 : 1;
-  if (arm?.fixedSide !== undefined) return acting < 1 ? (arm.fixedSide ^ 1) : arm.fixedSide;
+  if (arm?.fixedSide !== undefined) {
+    if (arm.effect === "statusOnly" && acting < 1) return arm.fixedSide ^ 1;
+    return arm.fixedSide;
+  }
   if (arm?.target === "acting" && row && row.direction < 0) return acting < 1 ? 1 : 0;
   switch (arm?.target) {
     case "acting": return acting;
@@ -2539,8 +2545,12 @@ export function damageTermPenaltyMode(dispatch: number): DamageTermPenaltyMode |
  * `FIGHTSTG_F0x800a1458` — the stat-penalty landing roll. Chance is the technique's
  * `+0x0b` byte plus `trunc((wisHigh − wisLow) / 8)`; success is `(rand & 0x7f) < chance`.
  *
- *   fightstg.s:31900 `.L0x800a149c` lh  $v1, 0x8($v0)   # eff block 0x800a4580 +0x08 (WIS)
- *   fightstg.s:31901 `.L0x800a14a0` lh  $v0, 0x48($v0)  # eff block 0x800a45c0 +0x08 (WIS)
+ *   The two blocks are fixed by SIDE, not by who acts: F0x800a1458 calls F0x8009ec94
+ *   with (0, 0, [0x4468]) = the player and (0x10, 1, [0x446c]) = the enemy, and
+ *   F0x8009ec94 (`beqz $s6` at 0x8009ecc0) writes side 0 to 0x800a45c0, side 1 to
+ *   0x800a4580. So wisHigh = ENEMY WIS, wisLow = PLAYER WIS: chance = f8 + (enemy - player)/8.
+ *   fightstg.s:31900 `.L0x800a149c` lh  $v1, 0x8($v0)   # eff block 0x800a4580 +0x08 (enemy WIS)
+ *   fightstg.s:31901 `.L0x800a14a0` lh  $v0, 0x48($v0)  # eff block 0x800a45c0 +0x08 (player WIS)
  *   fightstg.s:31903 `.L0x800a14a8` subu $s0, $v1, $v0
  *   fightstg.s:31911 `.L0x800a14c4` lbu $v1, 0xb($v0)   # record +0x0b, effect_p1
  *   fightstg.s:31912 `.L0x800a14c8` bgez $s0, …          # the +7 is the divide's sign fix
@@ -2563,9 +2573,9 @@ export function damageTermPenaltyRoll(
 export interface DamageTermPenaltyInput {
   /** record +0x0b, the arm's landing threshold. */
   effectP1: number;
-  /** effective block `0x800a4580 + 0x08` (the acting side's WIS). */
+  /** effective block `0x800a4580 + 0x08`: the ENEMY's WIS (F0x8009ec94 fills 0x4580 for side 1). */
   wisHigh: number;
-  /** effective block `0x800a45c0 + 0x08` (the other side's WIS). */
+  /** effective block `0x800a45c0 + 0x08`: the PLAYER's WIS (side 0). */
   wisLow: number;
   /** record +0x0c, the amount added to a slot. */
   magnitude: number;

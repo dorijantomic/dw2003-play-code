@@ -173,12 +173,11 @@ test("a charge writes the target's record, and only that one", () => {
   assert.equal(b3.player.affinity, 127);
 });
 
-test("Gilead Plant's arm writes the CASTER's side, whichever side that is", () => {
+test("Gilead Plant's arm writes the ENEMY's side, whichever side casts it", () => {
   // :13992 `addiu $v1, 0x4460` + :13994 `addiu $v1, 0x70` = 0x800a44d0, side 1's party
-  // array, read at :29704-29705 by the same effective-stat builder. The disc's only user
-  // is an enemy caster, for which that IS the caster's own side; the walker flips the
-  // fixed side for a side-0 caster (`damageTermCategory5Side`), so the heal and the charge
-  // keep landing on the caster instead of on a hard-coded enemy.
+  // array, read at :29704-29705 by the same effective-stat builder (0x80090734-0x80090798).
+  // The disc names that side outright, with no test on who is acting, so a player's cast
+  // heals and charges the enemy.
   const b = battle();
   const plan = battleAffinityPlanFor(b, 1, TECH_TABLE[String(GILEAD_PLANT)], GILEAD_PLANT,
     { name: "Raidenmon" });
@@ -186,23 +185,22 @@ test("Gilead Plant's arm writes the CASTER's side, whichever side that is", () =
   assert.equal(plan.byte, 32);
   assert.equal(plan.page.payload[0], DAMAGE_TERM_GENERATE_WORD);
   assert.equal(b.enemy.affinity, 32);
-  // Cast by the player it lands on the PLAYER's record: the enemy's byte stays untouched.
+  // Cast by the player it STILL lands on the ENEMY's record.
   const b2 = battle();
   const fromPlayer = battleAffinityPlanFor(b2, 0, TECH_TABLE[String(GILEAD_PLANT)],
     GILEAD_PLANT, { name: "Marsmon" });
-  assert.equal(fromPlayer.side, 0);
-  assert.equal(b2.player.affinity, 32);
-  assert.equal(b2.enemy.affinity, undefined, "the enemy is not charged by a player's cast");
-  // ...and the caster's own charge is CLEARED first and then set by the arm, because the
-  // clear at `fightstg.s:13092` runs on the acting side and the arm now writes that same
-  // record — so the cast always ends on the arm's own 32.
+  assert.equal(fromPlayer.side, 1);
+  assert.equal(b2.enemy.affinity, 32);
+  assert.ok(!b2.player.affinity, "the caster is not charged by its own cast");
+  // The caster's own charge is CLEARED by the state-1 clear (`fightstg.s:13092`, acting
+  // side), and the arm writes the enemy's record, which still holds the 32 it had.
   b2.player.affinity = 80;
+  b2.enemy.affinity = 50;
   const after = battleAffinityPlanFor(b2, 0, TECH_TABLE[String(GILEAD_PLANT)],
     GILEAD_PLANT, { name: "Marsmon" });
-  assert.equal(b2.player.affinity, 32, "the write wins over the clear, not over the old byte");
-  assert.equal(b2.enemy.affinity, undefined);
-  assert.equal(after.replaced, 0,
-    "the clear emptied the very record the write reads back");
+  assert.equal(b2.enemy.affinity, 32, "the arm writes the literal 32 over the enemy's byte");
+  assert.ok(!b2.player.affinity, "the clear spent the caster's own byte");
+  assert.equal(after.replaced, 50, "the arm reads back the enemy's own byte, which the clear did not touch");
 });
 
 test("the gate is honest: an ordinary attack charges nobody", () => {

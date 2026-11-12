@@ -502,7 +502,7 @@ export class Arena {
         let tech = usesTech && !!skill;
         if (!skill) { skill = en.fightSkill ? { ...en.fightSkill } : null; tech = false; }
         if (!skill) { res.lines.push(`${foe.name}: ...`); return res; }
-        if (!tech) { skill = { ...skill, attack_category: "physical", basic_attack: true }; }
+        if (!tech) { skill = { ...skill, basic_attack: true }; }
         res.sk = skill.id | 0;
         const record = this.kit.techRecord(skill.id);
         const cat = record?.category | 0;

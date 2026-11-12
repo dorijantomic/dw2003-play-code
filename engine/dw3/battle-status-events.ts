@@ -478,13 +478,18 @@ export function pickNextStatusEvent(pool: StatusEventPool): StatusEventPick | nu
     const e = pool[i];
     if (!e || e.code === 0) continue;
     const time = e.time | 0;
-    // A strictly earlier entry always wins. One that is NOT strictly earlier only takes
-    // over from an incumbent whose code is 2 or 3 -- `lhu $v0, ($v1)` / `addiu $v0, -0x2`
-    // / `sltiu $v0, 0x2` / `beqz $v0` on the INCUMBENT's code, not the newcomer's
-    // (`pro/fightstg.s:25799`-`:25812`). So those two codes yield on a tie and the earlier
-    // slot keeps an otherwise equal one.
-    const incumbentCode = best >= 0 ? pool[best]!.code | 0 : 0;
-    if (time < bestTime || (best >= 0 && ((incumbentCode - 2) >>> 0) < 2)) {
+    // F0x8009ba4c 0x8009ba78-0x8009bad8. With an incumbent: if the incumbent's time is
+    // STRICTLY below the newcomer's (`slt $v0, $a2` / `bnez` 0x8009ba98-0x8009ba9c) the
+    // tie step is skipped; otherwise (incumbent time >= newcomer time) a newcomer takes
+    // over when the INCUMBENT's code is 2 or 3 (`lhu $v0, ($v1)` / `addiu $v0, -0x2` /
+    // `sltiu $v0, 0x2` / `beqz` 0x8009baa4-0x8009bab4). Then, whatever happened, a newcomer
+    // strictly below the running best time takes over (`slt $v0, $v1, $t0` 0x8009bac8).
+    // So code 2 and 3 yield on a TIE only, never to a later entry.
+    if (best >= 0 && bestTime >= time && ((((pool[best]!.code | 0) - 2) >>> 0) < 2)) {
+      best = i;
+      bestTime = time;
+    }
+    if (time < bestTime) {
       best = i;
       bestTime = time;
     }
@@ -687,32 +692,30 @@ export function statusEventTickDelay(ownSpt: number, rand: () => number): number
  * (`sll $a0, $a1, 0x6` / `subu $a0, $a1` / `sll $v1, $a0, 0x7` / `subu $v1, $a0` =
  * `q * 8001`) and subtracts.
  *
- * **The disc's own divisor and multiplier disagree.** The magic-and-shift pair divides by
- * **2710** (`q` is zero for every draw below 2710 and one at 2710), while the rebuild
- * multiplies by 8001 — so the arm computes `draw - 8001 * (draw / 2710)`, which is
- * negative for every draw from 2710 up. Opcode 8's triple is `[0, 2000, 6000]`, so the
- * `2000` floor is what that leaves: **the confusion recovery is 2000 units for every
- * draw from 2710 up, and `max(2000, draw)` below it.** This is the routine's arithmetic,
- * not a reading of it; the previous port computed `draw % 8001`, which this arm does not.
+ * The magic `0x830e3cfd` is a SIGNED word (`lui 0x830e` sets the sign bit; `mult` is the
+ * signed multiply), so `((mulhi + draw) >> 12) - (draw >> 31)` is `draw / 8001`, and the
+ * rebuild multiplies that quotient by 8001: the arm is `draw % 8001` (fightstg.s
+ * 0x8009be7c-0x8009bec0). The tail 0x8009c2a4 then clamps it with opcode 8's triple
+ * `[0, 2000, 6000]`: the confusion recovery is `RAND % 8001` clamped to 2000..6000.
  */
 export function statusEventConfusionDelay(rand: () => number): number {
   const draw = statusEventDraw(rand);
-  const q = statusEventDivide2710(draw);
+  const q = statusEventDivide8001(draw);
   const roll = draw - q * 63 * 127;
   return statusEventClamp(roll, 8);
 }
 
 /**
- * The opcode-8 arm's divide: `((mulhi(draw, 0x830e3cfd) + draw) >> 12) - (draw >> 31)`.
- * Reproduced instruction for instruction, so it keeps the magic's own off-by-one edges
- * (255 of the 65536 draws land one above `floor(draw / 2710)`).
+ * The opcode-8 arm's divide: `((mulhi(draw, 0x830e3cfd) + draw) >> 12) - (draw >> 31)`
+ * with the magic as the signed word it is (-2096218883): this is `floor(draw / 8001)`
+ * for every 16-bit draw. Reproduced instruction for instruction.
  */
-export function statusEventDivide2710(draw: number): number {
+export function statusEventDivide8001(draw: number): number {
   const n = (draw | 0) & 0xffff;
   // `mult` is a signed 64-bit multiply and `mfhi` keeps its HIGH word, so the product has
-  // to be formed in full (it is at most 1.5e14, well inside a double's exact range) and the
-  // high half then wrapped back to a signed 32-bit word before the add.
-  const high = Math.floor((0x830e3cfd * n) / 0x100000000) | 0;
+  // to be formed in full (|product| < 1.4e14, exact in a double) and the high half
+  // then wrapped to a signed 32-bit word before the add.
+  const high = Math.floor((-2096218883 * n) / 0x100000000) | 0;
   const sum = (high + n) | 0;
   return (sum >> 12) - (n >> 31);
 }

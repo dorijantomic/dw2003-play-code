@@ -172,12 +172,14 @@ test("0x800a0514 magicalCritProc: effStats supplies the target's intensity sum",
     assert.equal(target.magicalCritStatusBonus, 11); // 64>>3 + 16>>3 + 3>>1
     assert.equal(target.magicalCritStatusBonus, target.critStatusBonus);
     assert.equal(effStats(mk({})).magicalCritStatusBonus, 0);
-    // And the roll reads it: base chance 4 -> 15 against the frozen target, while the
-    // same draw never crits against a clean one (element "normal" adds no scalar term).
+    // And the roll reads it. Element "normal" divides the scalar by the defender's +0x0a
+    // (SPD, fightstg.s:30816-30819): 100 * 2 / 40 = 5, so the chance is 5 + 4 = 9 on a clean
+    // target and 9 + 11 = 20 against the frozen one.
     const skill = { element: "normal", damage_scalar: 2, target_family: 0 };
-    assert.equal(magicalCritProc({}, target, skill, at(14)), true);
-    assert.equal(magicalCritProc({}, target, skill, at(15)), false);
-    assert.equal(magicalCritProc({}, effStats(mk({})), skill, at(14)), false);
+    assert.equal(magicalCritProc({}, target, skill, at(19)), true);
+    assert.equal(magicalCritProc({}, target, skill, at(20)), false);
+    assert.equal(magicalCritProc({}, effStats(mk({})), skill, at(8)), true);
+    assert.equal(magicalCritProc({}, effStats(mk({})), skill, at(9)), false);
 });
 
 test("0x8009f6dc resolveDamage: the attacker family match adds half again", () => {

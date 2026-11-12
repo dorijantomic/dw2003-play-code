@@ -2067,6 +2067,18 @@ export function applyBattleRestorePlan(b, side, plan) {
     }
     const mask = plan?.cure?.[i] | 0;
     clearRestoreAilments(rec, mask);
+    // The even half of the cure window (190/192/194/196) runs F0x8009c330 on every PRESENT
+    // slot (record halfword +0 non-zero, fallen or not) and frees that ailment's pending
+    // event there whatever the record's ailment bits say (0x8009c37c-0x8009c49c: the bit
+    // clear `sb $v1, 0x1c($a2)` is unconditional, the free reads only the `which` index
+    // from the technique id). which 0/1/2 = one code from `.L0x800a43d4`, 3 = the six codes.
+    if (plan?.arm?.name === "cureWindow" && !plan.arm.oddHalf) {
+      const evSide = (side | 0) < 1 ? 0 : 0x10;
+      const evSlot = (rec.slot ?? i) | 0;
+      const which = plan.arm.cureSlot | 0;
+      if (which === 3) cureAllStatusEvents(pool, evSide, evSlot);
+      else cureStatusEvent(pool, ["poison", "frozen", "confuse"][which], evSide, evSlot);
+    }
     if (mask) {
       const sideByte = (side | 0) < 1 ? 0 : 0x10;
       // The record's own slot when it carries one (the walker's active fighter does), the
@@ -2281,8 +2293,9 @@ export function battleRestorePlanFor(b, side, record, techniqueId, options = {})
  *     index, `:13939` the player's), so this arm does not walk the party. A source with no
  *     MP answers "No effect!" through **kind 2** with 0x10 in word 1 (`:13946` jumps to
  *     `:13989`, whose delay slot loads 0x2f and whose tail asks kind 2 at `:14022`).
- *     The fixed side is the CASTER's here, so a player cast drains the enemy (`mpSource`/
- *     `mpDest` in `battleScriptedPlanFor`).
+ *     The two sides are fixed whoever casts (0x80090654-0x800906fc): the source is always
+ *     the PLAYER's active fighter and the destination the ENEMY's, so a player cast moves
+ *     the player's MP onto the enemy (`mpSource`/`mpDest` in `battleScriptedPlanFor`).
  *   * `.L0x80090734` — **400** (Gilead Plant): HP restored on the enemy's active fighter
  *     (`:14006 sh $v0, 0x8($s0)`, capped at `+0x06` at `:14010`-`:14014`) and its charge
  *     byte set to the literal 32 (`:14015`-`:14016). The heal's amount comes from
@@ -2323,7 +2336,10 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
   const acting = (side | 0) < 1 ? 0 : 1;
   const targetSide = damageTermCategory5Side(arm, acting, category5Row(arm, id));
   const activeSlot = acting < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
-  const targetRec = battleRestoreTargets(b, targetSide)[activeSlot] ?? null;
+  // The fixed-side arms name the active fighter of THEIR side, not the acting side's
+  // slot index.
+  const targetSlot = damageTermCategory5Arm(id)?.fixedSide !== undefined ? activeSlotOf(b, targetSide) : activeSlot;
+  const targetRec = battleRestoreTargets(b, targetSide)[targetSlot] ?? null;
   const targets = category5Targets(b, targetSide, arm, id);
   // The three arms that roll: `(rand & 0x7f) < record[+0x0B]`, the threshold being the
   // technique record's own `f8` byte (the extractor's name for `+0x0B`).
@@ -2345,13 +2361,11 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}
   const playerRec = b?.player ?? null;
   const enemyRec = b?.enemy ?? null;
   // The MP-drain arm and the heal arm name their two ACTIVE records by SIDE, not by role:
-  // MP moves off `0x800a4468`'s fighter (:13939) onto `0x800a446c`'s (:13938), and the
-  // heal writes the `0x800a446c` one (:14006). For an enemy caster that pair is
-  // (opponent -> caster); the engine flips the fixed side when the PLAYER casts
-  // (`damageTermCategory5Side`), so the pair stays (opponent -> caster) whichever side
-  // acts, and these two locals follow it.
-  const mpSource = acting < 1 ? enemyRec : playerRec;
-  const mpDest = acting < 1 ? playerRec : enemyRec;
+  // MP moves off `0x800a4468`'s fighter (the player, :13939) onto `0x800a446c`'s (the
+  // enemy, :13938), and the heal writes the `0x800a446c` one (:14006). Whichever side
+  // casts, the source is the player and the destination the enemy.
+  const mpSource = playerRec;
+  const mpDest = enemyRec;
   const plan = category5Plan(record, id, {
     side: acting,
     name: options.name ?? null,
@@ -2668,8 +2682,7 @@ function applyCategory5Plan(b, plan, ctx) {
     if (targetRec && plan.affinity !== null) targetRec.affinity = plan.affinity;
   }
   // The MP transfer follows the two SIDES the arm names, not the two roles: `mpSource`
-  // and `mpDest` are (opponent, caster) whichever side acted, so a player cast drains the
-  // enemy instead of draining itself into the enemy.
+  // is the player's active fighter and `mpDest` the enemy's whichever side acted.
   if (plan.effect === "mpDrain" && ctx.mpSource && ctx.mpDest) {
     const moved = plan.mpMoved | 0;
     if (moved > 0) {
@@ -2681,7 +2694,7 @@ function applyCategory5Plan(b, plan, ctx) {
     // `sh $v0, 0x8($s0)` :14006 adds the getter's amount to the healed record's `+0x08`,
     // and the `beqz`'s DELAY slot :14045 puts `+0x06` (the maximum) back when the sum
     // overshot it — so the cap is that record's own maximum HP. `targetRec` is the side
-    // `damageTermCategory5Side` picked: the caster's own active fighter.
+    // `damageTermCategory5Side` picked: the enemy's active fighter, whoever cast.
     const before = targetRec.hp | 0;
     targetRec.hp = Math.min(targetRec.maxHp | 0, before + (plan.healAmount | 0));
   }
@@ -2764,7 +2777,7 @@ function applyCategory5Plan(b, plan, ctx) {
  * `docs/research/battle/fightstg-command-dispatch.md`) and resolve it through F0x80017b4c
  * to `&DIGIMON_CUR_STATS + slot*0x3dc`, then `lhu` the slot, add the record's `+0x0c` and
  * store it back. The landing chance is F0x800a1458 (`:31793`): it rebuilds BOTH sides'
- * effective blocks and tests `record[+0x0b] + trunc((playerWIS - enemyWIS)/8)` against
+ * effective blocks and tests `record[+0x0b] + trunc((enemyWIS - playerWIS)/8)` against
  * `rand & 0x7f`, ignoring the side byte it is handed. The shipped family is the Cardmon
  * enemy attacks (techniques 421..428, all category 2), so the target really is the player.
  *
@@ -2784,8 +2797,11 @@ export function applyPostHitDispatch(b, record, options = {}) {
   const slots = [before.str, before.def, before.spd];
   const result = applyDamageTermPenalty(slots, {
     effectP1: record.f8 | 0,
-    wisHigh: engineEffStats(b.player).wis | 0,
-    wisLow: (b.enemy ? engineEffStats(b.enemy).wis : 0) | 0,
+    // Block 0x800a4580 holds the ENEMY's effective stats and 0x800a45c0 the PLAYER's
+    // (F0x8009ec94 `beqz $s6` picks 0x45c0 for side 0, 0x4580 for side 1; F0x800a1458
+    // calls it for (0, [0x4468]) then (1, [0x446c])), so the difference is enemy - player.
+    wisHigh: (b.enemy ? engineEffStats(b.enemy).wis : 0) | 0,
+    wisLow: engineEffStats(b.player).wis | 0,
     magnitude: record.crit | 0,
     dispatch,
     rng: options.rng ?? RAND_U16,
@@ -7094,15 +7110,18 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       applyDvAction(action);
     } else if (action.type === "fight") {
       const basicSkill = skillDB[b.player.profile.tech_basic];
-      let skill = basicSkill ? { ...basicSkill, attack_category: "physical" } : null;
+      // The row's own category: every player basic technique is a physical row on the disc
+      // (only id 440, the finale head's attack, is a basic row that is magical).
+      let skill = basicSkill ? { ...basicSkill } : null;
       // The record the original's own page chooser reads: the technique id is
       // `self+0x54` (`pro/fightstg.s:13109` forms `0x80042bca + 18 * id` from it), and for
       // a basic attack that id is the form's own basic technique. The id runs through the
       // fight task spawner (FIGHTSTG_F0x80090c44), which stores the acting side at +0x50 and
       // the technique word at +0x54; the machine reads the id back off the spawned object.
       const basicTechId = spawnFightTaskFor(0, skill?.id ?? b.player.profile.tech_basic ?? 0).technique;
-      // *Power accessories (opcode 16): basic attacks consume the effective
-      // +0x2b element and +0x2c magnitude in the shared damage stage.
+      // The worn weapon element (+0x2b/+0x2c, *Power accessories) is added by the shared
+      // damage stage to every physical row whose own element is below 2 (basic attacks and
+      // techniques alike, F0x8009f6dc 0x8009f804-0x8009f864): there is no basic-attack test.
       if (skill) skill = { ...skill, basic_attack: true };
       // F0x8009e0cc .L0x8009e238-.L0x8009e3a4: the record's own dispatch byte (+0x0A)
       // picks the count — 9 takes the multi-hit applier on the record's +0x11 hits,
@@ -7230,7 +7249,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         }
         b.player.mp -= cost;
       }
-      const hits = skill.hits ?? 1;
+      // The resolver's own count (F0x8009e0cc 0x8009e238-0x8009e26c): dispatch 9 = the
+      // record's +0x11, dispatch < 2 on a physical row with Multi Crest = 3, else one.
+      const hits = basicAttackHitCount(b.player.multiAttack, skill);
       // A CATEGORY-4 record is a heal or a cure, not a hit, so it never enters the
       // resolver at all: the record machine's category-4 handler `0x8008fbec`
       // (`pro/fightstg.s:13269`-`:13664`) is what runs, and the applier
@@ -7690,7 +7711,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // the row latched while the tail stood, so that id serves the rebuilt record from
     // the head phase on (claim wfightmn-finale-kinds-2026-10-10).
     if (b._finaleCopiedAttack && (requestedSkillId | 0) === FINALE_HEAD_ATTACK_ID) skill = b._finaleCopiedAttack;
-    if (!usesTech && skill) skill = { ...skill, attack_category: "physical" };
     if (!usesTech && skill) skill = { ...skill, basic_attack: true };
     if (usesTech) {
       const mpCost = techniqueMpCost(skill.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
@@ -7884,7 +7904,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const basic = skillDB[defender.profile?.tech_basic];
     const skill = basic ? { ...basic, attack_category: "physical" } : null;
     const counterSkill = skill ? { ...skill, basic_attack: true } : null;
-    const r = resolveAttack(defender, attacker, counterSkill, RAND_U16, b.field);
+    // The Crest's swing is F0x8008ee84 -> the damage method F0x8009ff40 (0x800a4610) on the
+    // player's own basic technique: `s3 == 1` (side 0 and the technique id equals the
+    // profile's basic id, 0x8009ff6c-0x8009ffb0), so the physical tail runs on base = the
+    // damage taken, unscaled, with the Multi Crest byte held off (0x800a0044-0x800a0070).
+    const r = engineResolveCounterBlow(defender, attacker, counterSkill, damage, 0, RAND_U16, b.field, true);
     queueCounter(b, "player", { dmg: r.hit ? r.dmg : 0, hit: !!r.hit, techId: defender.profile?.tech_basic });
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
     return ` ${defenderName} countered for ${r.dmg} damage!`;
@@ -10194,7 +10218,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     };
     const basic = (rec) => {
       const s = skillDB[rec?.profile?.tech_basic];
-      return s ? { ...s, attack_category: "physical", basic_attack: true } : null;
+      return s ? { ...s, basic_attack: true } : null;
     };
     return {
       enemyRecord: (e, screenId = null) => {
@@ -10225,7 +10249,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       myTechs: (rec, blastOn = false) => mpKitTechs(rec, blastOn),
       /** One attack, rolled by the game's own resolver. Returns { hit, dmg, landed, attempts }. */
       attack: (att, def, skill) => {
-        const n = skill?.basic_attack ? basicAttackHitCount(att.multiAttack, skill) : Math.max(1, skill?.hits ?? 1);
+        const n = basicAttackHitCount(att.multiAttack, skill);
         const r = n > 1 ? resolveMultiHit(att, def, skill, n, RAND_U16, null) : resolveAttack(att, def, skill, RAND_U16, null);
         return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n };
       },
@@ -10233,7 +10257,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       /** What an enemy can do: its basic attack, and its two moves when they are attack techniques. */
       foeMoves: (en) => {
         const out = [];
-        const b0 = en.fightSkill ? { ...en.fightSkill, attack_category: "physical", basic_attack: true } : null;
+        const b0 = en.fightSkill ? { ...en.fightSkill, basic_attack: true } : null;
         if (b0) out.push({ skill: b0, cost: 0, tech: false });
         for (const action of [2, 3]) {
           const s = skillDB[enemyActionSkillId(action, en.eStats ?? {})];
