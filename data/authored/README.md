@@ -14,3 +14,4 @@ that could run from the public ddw3 tree.
 | `web/assets/data/dna_clip12.json` | camera/slot measurements of the DNA-digivolve clip, recorded from an emulator session |
 | `web/assets/data/extra_species_canon.json` | the enemy-only Digimon made player forms: their fixed ids (56 on, append only) and canonical pre-evolutions (Digimon World 2 / anime lineage); `tools/build_extra_species.py` derives stats, techniques and unlock rules from the disc's own enemy rows |
 | `web/assets/data/fishing_extras.json` | per fishing stage, a small table of rare extra rewards (item, card pack, bits, hint bottle) that can come on top of a won fishing fight; our own content, balance rule in its `balance` block, read by `web/fishing-extras.js` |
+| `web/assets/data/gym_extra.json` | the three extra training halls (greeter id, town, theme, per card tier which existing drill ids); ids only, rows/gains read from the game at run time; our own content, read by `web/gym-extra.js` |

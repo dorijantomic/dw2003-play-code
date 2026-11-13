@@ -35,6 +35,7 @@ import { tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabO
 import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, openReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
+import { gymExtraHallAt, gymExtraPlan } from "./gym-extra.js";
 import { rollExtra, areaOf, messageFor, createFishFinds } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
 
@@ -3337,6 +3338,7 @@ async function init() {
             state.ambushTiles = amb ?? {};
             state.fishingSpots = fish ?? {};
             // Our own extra-rewards table for the fishing spots; a missing file just means no extras.
+            state.gymExtra = await fetch("assets/data/gym_extra.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);   // extra training halls (web/gym-extra.js)
             state.fishingExtras = await fetch("assets/data/fishing_extras.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
             state.treeStages = trees ?? {};
             state.diveFormMarkers = dfm ?? {};
@@ -8465,6 +8467,14 @@ function dispatchInput(k, e, raw = "") {
                     const dlgState = pickDialogueFor(npc, state.flags);
                     if (engineBridge && engineBridge.onTalk(npc.npc_id)) return;
                     if (questTalk(npc.npc_id, currentMap().id, !!dlgState)) return;   // an extra quest takes this conversation (never a story one)
+                    // An extra training hall greeter (web/gym-extra.js): speaks, then opens the gym screen on the themed drills.
+                    const gymHall = gymExtraHallAt(state.gymExtra, currentMap().id, npc.npc_id);
+                    if (gymHall) {
+                        const plan = gymExtraPlan(state.gymExtra, gymHall, state.inventory);
+                        const hallMap = currentMap().id;
+                        questSpeak(npc.npc_id, gymHall.trainer, gymHall.greeting.join("\n\n")).then(() => gym.open(state, null, plan.group, hallMap, plan.drills));
+                        return;
+                    }
                     if (!dlgState) return; // no ptrB dialogue — non-speaking variant
                     openTalkLine(
                         dlgState.dialogue,

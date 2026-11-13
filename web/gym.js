@@ -395,7 +395,7 @@ export function createGym(sfx = null) {
   // debug/lab path has no greeter, so it may pass `stage` instead and let the
   // decoded gym_ranks.json table resolve the group; with neither, the ID-card
   // approximation is used.
-  g.open = async (state, onClose = null, group = null, stage = null) => {
+  g.open = async (state, onClose = null, group = null, stage = null, onlyDrills = null) => {
     if (!g.progression) {
       try {
         g.progression = await (await fetch("assets/data/progression.json")).json();
@@ -416,6 +416,8 @@ export function createGym(sfx = null) {
     g.trainSlot = 0;
     g.selSlot = 0;
     g.drills = gymDrillsForRank(g.rank, g.progression.gym);
+    // An extra hall (web/gym-extra.js) keeps only its themed drills out of the game own menu.
+    if (onlyDrills) g.drills = g.drills.filter((e) => onlyDrills.includes(e.drill));
     // Skip the pod-select screen entirely for a single-member party (nothing
     // to choose between) — matches the real screen only appearing with >1
     // trainable party member.

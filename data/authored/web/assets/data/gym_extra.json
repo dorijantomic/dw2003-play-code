@@ -1,0 +1,42 @@
+{
+  "_comment": "Three extra training halls (idea I6): a greeter our own characters file stands in a town that has no disc gym, and on talk opens the game gym screen (web/gym.js) with the existing drill menu cut down to the hall theme. Only drill ids (the compact 1-24 ids of progression.json gym.rank_menus) are stored here, never a table row: the screen reads each drill row, its gain curve, its TP cost and its ultra rules from the game at run time, so a hall trains exactly like a disc gym at that rank. A tier picks the rank_menus group (0-based, the same index the disc greeters write) and the drill ids kept from that menu. Rank gate = ID cards as on the disc: PlatinumID 42 -> platinum; SilverID 40 + GoldID 41 -> gold; SilverID 40 -> silver; none -> none. npc_id and position are mirrored in data/authored/quests/new_characters.json (the greeter sprite and place).",
+  "cards": { "silver": 40, "gold": 41, "platinum": 42 },
+  "halls": [
+    {
+      "id": "windrunner", "name": "Windrunner Dojo", "trainer": "Coach Rin",
+      "npc_id": 1100, "map": "s660", "town": "Byakko City (West)", "x": 978, "y": 618, "dir": "down",
+      "theme": ["spd", "wis"],
+      "greeting": ["Welcome to the Windrunner Dojo. We train speed and wisdom here, nothing else.", "Ready to work out?"],
+      "tiers": {
+        "none": { "group": 0, "drills": [4, 5] },
+        "silver": { "group": 1, "drills": [4, 5] },
+        "gold": { "group": 6, "drills": [16, 17] },
+        "platinum": { "group": 13, "drills": [16, 17] }
+      }
+    },
+    {
+      "id": "ironwall", "name": "Ironwall Gym", "trainer": "Coach Hal",
+      "npc_id": 1101, "map": "s760", "town": "Genbu City (North)", "x": 710, "y": 702, "dir": "down",
+      "theme": ["def", "maxHp"],
+      "greeting": ["This is the Ironwall Gym. We build defence and a thick skin of health.", "Ready to work out?"],
+      "tiers": {
+        "none": { "group": 0, "drills": [2] },
+        "silver": { "group": 3, "drills": [2, 11] },
+        "gold": { "group": 6, "drills": [14, 11] },
+        "platinum": { "group": 13, "drills": [14, 23] }
+      }
+    },
+    {
+      "id": "titanforge", "name": "Titan Forge", "trainer": "Coach Bo",
+      "npc_id": 1102, "map": "s500", "town": "Suzaku City (South)", "x": 690, "y": 618, "dir": "down",
+      "theme": ["str", "maxMp"],
+      "greeting": ["Welcome to the Titan Forge. Strength first, and a deep well of MP behind it.", "Ready to work out?"],
+      "tiers": {
+        "none": { "group": 0, "drills": [1] },
+        "silver": { "group": 1, "drills": [1, 6] },
+        "gold": { "group": 6, "drills": [13, 6] },
+        "platinum": { "group": 13, "drills": [13, 18] }
+      }
+    }
+  ]
+}

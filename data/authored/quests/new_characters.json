@@ -59,6 +59,69 @@
      "dir": "down"
     }
    ]
+  },
+  {
+   "npc_id": 1100,
+   "name": "Coach Rin",
+   "look": {
+    "skin": "#f0c8a0",
+    "hair": "#2a6a4a",
+    "hairstyle": "spiky",
+    "top": "#e8e8f0",
+    "bottom": "#2a4a7a",
+    "shoes": "#e0e0e0",
+    "accent": "#e0b020"
+   },
+   "residents": [
+    {
+     "map": "s660",
+     "x": 978,
+     "y": 618,
+     "dir": "down"
+    }
+   ]
+  },
+  {
+   "npc_id": 1101,
+   "name": "Coach Hal",
+   "look": {
+    "skin": "#d8a878",
+    "hair": "#202028",
+    "hairstyle": "short",
+    "top": "#5a6a80",
+    "bottom": "#303848",
+    "shoes": "#202028",
+    "accent": "#a0c0e0"
+   },
+   "residents": [
+    {
+     "map": "s760",
+     "x": 710,
+     "y": 702,
+     "dir": "down"
+    }
+   ]
+  },
+  {
+   "npc_id": 1102,
+   "name": "Coach Bo",
+   "look": {
+    "skin": "#e8b890",
+    "hair": "#703018",
+    "hairstyle": "short",
+    "top": "#b03020",
+    "bottom": "#402820",
+    "shoes": "#202028",
+    "accent": "#e0b020"
+   },
+   "residents": [
+    {
+     "map": "s500",
+     "x": 690,
+     "y": 618,
+     "dir": "down"
+    }
+   ]
   }
  ]
 }
