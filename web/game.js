@@ -56,6 +56,7 @@ import {
     questGhostSet, questGhostActor, questGhostImage, questGhostClear, questGhostState, questGhostMap,
     installQuestGhostCamera, installQuestGhostGate, questSceneCameraToPlayer,
 } from "./quest-ghost.js";
+import { walkBlendNext } from "./walk-blend.js";
 import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, questNpcMark, questsDoneCount, questDone, questPropsOn, questsEnabled, questNeededNpcs } from "./quests.js";
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
@@ -10127,10 +10128,13 @@ function drawActorShadow(x, y, kind, clipId, actorHeightFixed = 0, groundOffsetF
 // `bottom` is the frame's vertical registration (the same shift `spriteBottomShift` applies
 // to the sheet path); the original's Y math has no mirror branch, so it is the same number
 // whichever way the sprite faces.
-function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0) {
+function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0, alpha = 1) {
     const sx = col * meta.clipFrameW;
     const drawY = Math.round(y - lastCam.y - meta.clipFrameH) + bottom;
-    billboardDraws.push({
+    // alpha < 1 = the walk blend's fading-in next frame (web/walk-blend.js): same pixels, partial opacity.
+    const prevAlpha = ctx.globalAlpha;
+    if (alpha < 1) ctx.globalAlpha = prevAlpha * alpha;
+    else billboardDraws.push({
         row: drawY, shift: bottom, groundRow: Math.round(y - lastCam.y),
         screenX: Math.round(x - lastCam.x), cellH: meta.clipFrameH, path: "clip", col,
     });
@@ -10140,6 +10144,7 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0) {
             clipImg, sx, 0, meta.clipFrameW, meta.clipFrameH,
             Math.round(x - lastCam.x - meta.clipFrameW / 2), drawY,
         );
+        ctx.globalAlpha = prevAlpha;
         return;
     }
     const screenX = Math.round(x - lastCam.x);
@@ -10152,6 +10157,7 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0) {
         -meta.clipFrameW / 2, drawY,
     );
     ctx.restore();
+    ctx.globalAlpha = prevAlpha;
 }
 
 // Clip "1" is the idle/breathing clip on every sprite that has clip data (verified
@@ -10198,13 +10204,19 @@ function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest) {
     }
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
 }
-function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null) {
+function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null, walkBlend = false) {
+    // walkBlend: false = off, else the seconds already elapsed inside the current field tick (walk-blend.js).
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));
         const clipTime = isMoving || activeClip != null ? animTime : (idleTime ?? 0);
         const resolved = clipId != null ? clipFrame(meta.clips, clipId, dir, clipTime) : null;
         if (resolved != null) {
             drawClipFrame(meta, clipImg, x, y, resolved.col, resolved.mirror, resolved.bottom);
+            // Leader / partners walking: fade the next walk frame in over the last part of this one.
+            if (walkBlend !== false && isMoving && activeClip == null) {
+                const nb = walkBlendNext(meta.clips, clipId, dir, clipTime, walkBlend);
+                if (nb) drawClipFrame(meta, clipImg, x, y, nb.col, nb.mirror, nb.bottom, nb.w);
+            }
             return {
                 mode: isMoving ? (String(clipId) === String(FIELD_RUN_CLIP) ? "run" : "walk")
                     : activeClip != null ? "clip" : "idle",
@@ -10918,6 +10930,7 @@ function render() {
                 playerAnimTime, playerFrameIdx,
                 (state.moving || !!state._cutTarget) && !riderStill, state._idleTime,
                 state.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
+                (state._inCutscene || playerStopping) ? 0 : fieldTickAccumulator,
             );
             if (cutRow != null) ctx.restore();
             debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: c.id, info });
@@ -10935,7 +10948,7 @@ function render() {
                     const gi = g.moving ? walkFrameIndex(timingForDir(c.frameDurations, g.dir), g.animTime) : 0;
                     drawActorShadow(g.x, g.y, PLAYER_ENTITY_KIND, undefined, 0, 0);
                     drawEntitySprite(c, sheet, state.clipImgs[c.id], g.x, g.y, g.dir, undefined, g.animTime, gi,
-                        g.moving, 0, g.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP);
+                        g.moving, 0, g.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP, 0);
                 },
             });
         }
@@ -11013,6 +11026,7 @@ function render() {
             pAnimTime, pfidx,
             f.gathering || (!fieldBusy && state.moving), f._idleTime,
             f.gathering || (!fieldBusy && state.moving) ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
+            f.gathering ? 0 : fieldTickAccumulator,
         );
         debugInfos.push({ x: f.x, y: f.y, label: pc.name ?? `party${i}`, sprite: pc.id, info });
     }
