@@ -15,6 +15,7 @@
 import { assetMode, setAssetMode, assetRequest, hdAssetUrl,
          ASSET_MODE_AUTHENTIC, ASSET_MODE_HD } from "./assets.js";
 import { buildBossList, esdmgStagesNeeded, filterBossList, startBossBattle } from "./devtools-bosslist.js";
+import { labBossParty, labBossValid } from "./fusion.js";
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, props = {}, ...kids) => {
@@ -210,6 +211,35 @@ function renderBossList(pane) {
   loadBossRows().then((r) => { rows = r; draw(); }, (e) => { list.textContent = `could not build the list: ${e.message}`; });
 }
 
+// ── Fusion Lab bosses: the private file web/assets/data/fusion_lab_bosses.json (git-ignored) ──
+// Written by "Make boss" on web/fusion-lab.html. Absent = the section says so and nothing else
+// happens. A click fights the boss's body species first; when it falls it fuses (needs
+// F2 -> Extras -> "Fusion bosses" ticked, exactly like Millenniummon).
+function renderLabBosses(pane) {
+  pane.append(el("h2", {}, "Fusion Lab bosses"));
+  const box = el("div", { className: "hint" }, "loading…");
+  pane.append(box);
+  fetch("assets/data/fusion_lab_bosses.json").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => {
+    const rows = Object.values(j?.bosses ?? {}).filter(labBossValid);
+    box.textContent = "";
+    if (!rows.length) { box.textContent = "none yet (Fusion Lab: save a favourite, then Make boss)."; return; }
+    box.append(el("div", {}, "Needs F2 -> Extras -> Fusion bosses ticked. The body species fights first and fuses when it falls."));
+    for (const rec of rows) {
+      const b = el("button", { className: "act", style: "display:block;width:100%;text-align:left;margin:2px 0",
+        textContent: `${rec.displayName ?? rec.id} | ${rec.halves.join(" + ")} | L${rec.level} | ${rec.hp} HP` });
+      b.addEventListener("click", async () => {
+        const ok = await startLabBoss(rec);
+        log(`lab boss ${rec.id} (${rec.displayName ?? ""}) -> ${ok ? "started" : "not started"}`);
+      });
+      box.append(b);
+    }
+  });
+}
+
+function startLabBoss(rec) {
+  return win().__dev.startPartyBattle(labBossParty(rec), { mapId: win().__mapInfo?.().id });
+}
+
 // arena-id -> a (stage, screen) pair whose trigger record selects it, so a
 // chosen arena can be forced through the renderer's own setArenaStage.
 function arenaReverseMap() {
@@ -346,6 +376,7 @@ function renderBattles() {
   pane.append(el("div", { className: "row" }, scr, scrGo));
 
   renderBossList(pane);
+  renderLabBosses(pane);
 
   pane.append(el("h2", {}, "In-battle paths (existing hooks)"));
   pane.append(el("div", { className: "hint" }, "Enabled while a battle is live. These call the same "
@@ -562,6 +593,7 @@ function installDev() {
     reload: (map) => reloadGame(map),
     startBattle: (opts) => win().__dev?.startBattle?.(opts),
     startScreenBattle: (id, opts) => win().__dev?.startScreenBattle?.(id, opts),
+    startPartyBattle: (party, opts) => win().__dev?.startPartyBattle?.(party, opts),
     playEvent: (map, id) => win().__dev?.playEvent?.(map, id),
     setFlag: (id, val) => win().__dev?.setFlag?.(id, val),
     setArena: (id) => applyArena(Number(id)),

@@ -50,7 +50,7 @@ import { createWfightTranslated } from "./wfight-translated.js";
 // into one fighter. Pure rules in web/fusion.js; the authored boss + its new technique are
 // built into web/fusion_bosses.json by tools/build_fusion_bosses.py.
 import {
-  enemyDisplayName, enemyMessageName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, partyEntriesFor,
+  enemyDisplayName, enemyMessageName, fusedRecord, fusionEnabled, fusionOnDefeat, mergeFusionSkills, mergeLabBosses, partyEntriesFor,
 } from "./fusion.js";
 // Both halves' loot (same F2 key, off by default): the fused body rolls the OTHER
 // halves' real drops — never the body's own row a second time. Pure rules in
@@ -3632,6 +3632,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       fusionBossesDB = fj?.bosses ?? null;
       skillDB = mergeFusionSkills(skillDB, fj?.skills, true);
     } catch { fusionBossesDB = null; }
+    // Fusion Lab bosses (web/fusion-lab.html "Make boss"): a private, git-ignored file in
+    // web/assets. Absent = nothing happens; the authored table stays exactly as it was.
+    try {
+      const r = await fetch("assets/data/fusion_lab_bosses.json", { cache: "no-store" });
+      if (r.ok) fusionBossesDB = mergeLabBosses(fusionBossesDB ?? {}, await r.json());
+    } catch { /* no Lab bosses */ }
   }
 
   // Roll a random encounter for (mapId, player x,y) against the authentic field tables.
@@ -6585,12 +6591,13 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    */
   function fuseIntoBoss(b, boss) {
     const en = b?.enemy;
-    const bodyRow = enemiesDB?.[boss?.body] ?? null;
+    // A Fusion Lab part with no enemies.json row (a partner form) brings its own stat row in `boss.rows`.
+    const bodyRow = enemiesDB?.[boss?.body] ?? boss?.rows?.[boss?.body] ?? null;
     if (!en || !bodyRow) return;
-    const halves = (boss.halves ?? []).map((name) => enemiesDB?.[name] ?? null).filter(Boolean);
+    const halves = (boss.halves ?? []).map((name) => enemiesDB?.[name] ?? boss.rows?.[name] ?? null).filter(Boolean);
     const fused = fusedRecord({
       halves, body: boss.body, level: boss.level, hp: boss.hp,
-      statScale: boss.statScale, moves: boss.moves,
+      statScale: boss.statScale, moves: boss.moves, aiFill: boss.aiFill === true,
     });
     // The body's own row with the fused attack, the two techniques and the AI rows on top;
     // its resistances, status bytes and drop stay the body's, because the fused fighter IS
@@ -6626,7 +6633,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (b.party?.[b.partyIndex]) b.party[b.partyIndex].fuseInto = null;
     if (boss.transform === "whiteout") renderer3d?.whiteOut?.(20);
     setFighterTint("enemy", boss.tint ?? null);
-    swapEnemyModel(boss.body);
+    // A Fusion Lab boss is drawn as its own built model folder, not as a species name.
+    if (boss.modelFolder) renderer3d?.setEnemyDigimon?.(boss.modelFolder);
+    else swapEnemyModel(boss.body);
     const name = enemyMsgName(en, "");
     setResultPages(b, [
       `${(boss.halves ?? []).join(" and ")} fuse!`,

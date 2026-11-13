@@ -273,8 +273,12 @@ void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
             let camDist = 1500;
             let camTarget = [0, 600, 0];  // center on model: Y-flip puts model at +54..+1157, center≈605
 
-            const MIN_DIST = 50,
-                MAX_DIST = 8000;
+            const MIN_DIST = 50;
+            // The zoom limit and the far plane follow the model's size: a big Digimon (the Fusion Lab's WarGreymon is ~6500
+            // units tall) needs a fit distance past 8000 and a far plane past 10000, or the fit is clamped and the view is
+            // far too close / clipped. Small models keep exactly the old 8000 / 10000.
+            let MAX_DIST = 8000;
+            let FAR_PLANE = 10000;
 
             function getEye() {
                 const cd = Math.cos(camPhi);
@@ -546,8 +550,10 @@ void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
                 if (lo[0] < hi[0]) {
                     camTarget = [(lo[0]+hi[0])/2, (lo[1]+hi[1])/2, (lo[2]+hi[2])/2];
                     const radius = 0.5 * Math.hypot(hi[0]-lo[0], hi[1]-lo[1], hi[2]-lo[2]);
-                    camDist = Math.max(MIN_DIST,
-                              Math.min(MAX_DIST, radius / Math.tan(Math.PI / 8) * 1.15));
+                    const fit = radius / Math.tan(Math.PI / 8) * 1.15;
+                    MAX_DIST = Math.max(8000, fit * 3);
+                    FAR_PLANE = Math.max(10000, (fit + radius) * 1.5);
+                    camDist = Math.max(MIN_DIST, Math.min(MAX_DIST, fit));
                 }
 
                 let mf = 0;
@@ -817,7 +823,7 @@ void main() { gl_FragColor = vec4(0.0, 1.0, 0.5, 1.0); }`;
 
                 if (!model || !skelBufs) return;
 
-                const proj = mat4Perspective(Math.PI / 4, W / H, 1, 10000);
+                const proj = mat4Perspective(Math.PI / 4, W / H, 1, FAR_PLANE);
                 const eye = getEye();
                 const view = mat4LookAt(eye, camTarget, [0, 1, 0]);
                 const pv = mat4Mul(proj, view);

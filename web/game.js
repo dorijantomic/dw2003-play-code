@@ -11497,6 +11497,12 @@ window.__dev = {
         Number(screenId), opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
         { mapId: opts.mapId ?? currentMap().id, lead: opts.lead ?? true },
     ),
+    // Start a battle from a resolved party (the same startParty the field uses): entries are
+    // {name, level, hp, mp, stat_scale, fuseInto?}. Used by the dev toolset's Fusion Lab boss list.
+    startPartyBattle: (party, opts = {}) => battle.startParty(
+        party, opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
+        { mapId: opts.mapId ?? currentMap().id },
+    ),
     // Play one stage event directly through the walker's own cutscene path.
     // Events normally fire from a controller (step VM / talk launcher / flag);
     // this bypasses the gate and plays the script, which is what a tester wants.

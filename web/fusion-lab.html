@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fusion Lab (dev)</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; background: #15171c; color: #e6e6e6; margin: 0; }
+  header { padding: 10px 16px; background: #20242c; border-bottom: 1px solid #333; }
+  header b { font-size: 16px; }
+  main { display: grid; grid-template-columns: minmax(420px, 560px) 1fr; gap: 16px; padding: 16px; }
+  section { background: #1d2027; border: 1px solid #333; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  h2 { margin: 0 0 8px; font-size: 14px; color: #9ec5ff; }
+  input, select, button { font: inherit; background: #101216; color: #e6e6e6; border: 1px solid #444; border-radius: 4px; padding: 4px 6px; }
+  button { cursor: pointer; background: #2b3f63; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; padding: 8px; background: #161920; border-radius: 4px; }
+  .row .cands { flex-basis: 100%; font-size: 12px; }
+  .warn { color: #ffcf5c; } .err { color: #ff7b7b; white-space: pre-wrap; } .ok { color: #8be28b; }
+  .small { font-size: 12px; color: #9aa; } pre { white-space: pre-wrap; font-size: 11px; max-height: 260px; overflow: auto; background: #101216; padding: 6px; }
+  iframe { width: 100%; height: 520px; border: 1px solid #333; background: #000; }
+  li { margin-bottom: 4px; } ul { padding-left: 18px; margin: 4px 0; }
+  .fav { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .fav span { flex: 1; }
+</style>
+</head>
+<body>
+<header><b>Fusion Lab</b> <span class="small">dev page. Needs the helper server on port 8791 (see DW2003-INDEX.md). Models and favourites are private, never committed.</span>
+  <span id="helper" class="small"></span></header>
+<main>
+  <div>
+    <section>
+      <h2>1. Base Digimon</h2>
+      <input id="base" list="all" size="40" placeholder="type a name, e.g. Greymon" autocomplete="off">
+      <button id="random">Random</button>
+      <div id="why" class="small"></div>
+      <div id="baseWarn" class="warn"></div>
+      <div class="small">Earlier fusions can be a base too: they are listed as "fusion m99...".</div>
+      <div class="small" id="rookieNote"></div>
+    </section>
+    <section>
+      <h2>2. Parts to replace</h2>
+      <div id="rows"></div>
+      <button id="addRow">Add part row</button>
+    </section>
+    <section>
+      <h2>3. Build</h2>
+      <button id="build">Build fusion</button> <span id="status" class="small"></span>
+      <div id="error" class="err"></div>
+      <div id="summary"></div>
+      <details><summary class="small">fuse.py output</summary><pre id="raw"></pre></details>
+    </section>
+    <section>
+      <h2>Battle data</h2>
+      <button id="battleBtn">Show battle data</button> <span class="small">stats, kept resistances, attacks and why, who may fuse. Shown after every build.</span>
+      <div id="battle"></div>
+    </section>
+    <section>
+      <h2>4. Name and save</h2>
+      <input id="favName" placeholder="name" size="24"> <button id="save" disabled>Save to favourites</button>
+      <span id="saveMsg" class="small"></span>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2>Result <span id="resId" class="small"></span></h2>
+      <iframe id="viewer" title="model viewer"></iframe>
+    </section>
+    <section>
+      <h2>Favourites</h2>
+      <div id="favs" class="small">none yet</div>
+    </section>
+  </div>
+</main>
+<datalist id="all"></datalist>
+<script type="module" src="fusion-lab.js"></script>
+</body>
+</html>

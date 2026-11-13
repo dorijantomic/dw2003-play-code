@@ -20,19 +20,27 @@ export function fusionEnabled() {
 }
 
 /**
- * The blended primary stats: each stat is `round(max(a, b) + 0.25 * min(a, b))`.
- *
- * Our own rule (new content): the bigger half dominates, the smaller still adds a
- * quarter of itself, so neither half's weakness survives the fusion. `a` and `b` are
- * enemy stat rows (enemies.json) or anything else carrying the five keys.
+ * One blended number: `round(max + 0.25 * secondLargest)`. With two values this is the
+ * original `max + 0.25 * min` rule exactly; a third or fourth donor adds nothing more, so
+ * a long recipe cannot pile stat on stat. A single value is returned as it is.
  */
-export function blendStats(a, b) {
+export function blendValues(values) {
+  const v = (Array.isArray(values) ? values : []).map((x) => Number(x ?? 0) || 0).sort((p, q) => q - p);
+  return Math.round((v[0] ?? 0) + 0.25 * (v[1] ?? 0));
+}
+
+/**
+ * The blended primary stats: each stat is `round(max + 0.25 * second largest)` over every
+ * row given. `blendStats(a, b)` and `blendStats([a, b, c, ...])` both work.
+ *
+ * Our own rule (new content): the biggest part dominates, the next one still adds a
+ * quarter of itself, so neither half's weakness survives the fusion. The rows are enemy
+ * stat rows (enemies.json) or anything else carrying the five keys.
+ */
+export function blendStats(...rows) {
+  const list = Array.isArray(rows[0]) ? rows[0] : rows;
   const out = {};
-  for (const key of FUSION_STATS) {
-    const x = Number(a?.[key] ?? 0) || 0;
-    const y = Number(b?.[key] ?? 0) || 0;
-    out[key] = Math.round(Math.max(x, y) + 0.25 * Math.min(x, y));
-  }
+  for (const key of FUSION_STATS) out[key] = blendValues(list.map((r) => r?.[key]));
   return out;
 }
 
@@ -73,30 +81,53 @@ export function fusedAiMoves(rows) {
 }
 
 /**
+ * AI rows for a fusion whose technique slots were refilled from several donors (Fusion
+ * Lab bosses). The body's own rows stay as they are; every filled slot (`move_1`, `move_2`)
+ * that no row calls gets one, by changing the action of the LAST row whose action is used
+ * more than once (a row keeps its own condition). Nothing changes when every filled slot
+ * is already called, so a fusion that keeps its body's kit keeps its body's AI exactly.
+ */
+export function ensureAiRows(rows, moves = []) {
+  const src = Array.isArray(rows) && rows.length
+    ? rows.map((r) => ({ ...(r ?? {}) }))
+    : fusedAiMoves(null);
+  const [, move1 = 0, move2 = 0] = moves;
+  for (const [action, id] of [[2, move1], [3, move2]]) {
+    if (!(Number(id) > 0) || src.some((r) => (r.action | 0) === action)) continue;
+    for (let i = src.length - 1; i >= 0; i--) {
+      const a = src[i].action | 0;
+      if (src.filter((r) => (r.action | 0) === a).length > 1) { src[i] = { ...src[i], action }; break; }
+    }
+  }
+  return src;
+}
+
+/**
  * One fused combat record, from the halves' real stat rows and the authored boss spec.
  *
- *   halves     [bodyRow, otherRow] — enemies.json rows, in the authored halves order
+ *   halves     [bodyRow, otherRow, ...] — enemies.json rows, body first (a Fusion Lab boss may list more)
  *   body       the species the fused body is drawn as (the model swap)
  *   level      the fused level (authored)
  *   hp         the authored HP — the two encounter screens' HP added by the build script
  *   statScale  the boss screen's own stat scale + the authored delta (18 = 16 + 2)
  *   moves      [attack, move_1, move_2] — the real two-hit Fight, Dark Elemental and
  *              the authored Time Unlimited
+ *   aiFill     Fusion Lab bosses: keep the body's AI rows and only add a row for each
+ *              technique slot that was refilled (ensureAiRows), instead of the authored
+ *              promotion of one row to move_2
  *
  * Every primary stat is the blend times statScale/16, rounded — the same +0x0a/16
  * multiplier FIGHTSTG_F0x8009ec94 applies to an enemy row. Nothing is a full heal: the
  * record's HP is the authored number, not a player's maximum.
  */
-export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statScale = 16, moves = [] } = {}) {
-  const [a, b] = halves;
-  const blend = blendStats(a, b);
+export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statScale = 16, moves = [], aiFill = false } = {}) {
+  const a = halves[0];
+  const blend = blendStats(halves);
   const scale = Math.max(1, Number(statScale) || 16);
   const stats = {};
   for (const key of FUSION_STATS) stats[key] = Math.round((blend[key] * scale) / 16);
   const [attack = 0, move1 = 0, move2 = 0] = moves;
-  const mpA = enemyMpFor(a, level);
-  const mpB = enemyMpFor(b, level);
-  const mp = Math.round(Math.max(mpA, mpB) + 0.25 * Math.min(mpA, mpB));
+  const mp = blendValues(halves.map((row) => enemyMpFor(row, level)));
   const maxHp = Math.max(0, Number(hp) || 0);
   return {
     body: body ?? null,
@@ -108,7 +139,7 @@ export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statS
     attack: Number(attack) || 0,
     move_1: Number(move1) || 0,
     move_2: Number(move2) || 0,
-    ai_moves: fusedAiMoves(a?.ai_moves),
+    ai_moves: aiFill ? ensureAiRows(a?.ai_moves, moves) : fusedAiMoves(a?.ai_moves),
   };
 }
 
@@ -201,4 +232,53 @@ export function mergeFusionSkills(skillDB, skills, fxOn = false) {
     if (row && row.id != null) out[row.id] = { ...row };
   }
   return out;
+}
+
+// ── Fusion Lab bosses ─────────────────────────────────────────────────────────────────
+// A fusion made on web/fusion-lab.html and saved as a favourite can be turned into a boss
+// by tools/fusion_lab_server.py ("Make boss"). The record is written to
+// web/assets/data/fusion_lab_bosses.json, a private, git-ignored file (the fused model and
+// its numbers come from the disc). The game reads it only when the Fusion bosses switch is
+// on and only if the file exists; the records join the authored ones and go through the
+// same fusedRecord / fuseIntoBoss path.
+
+/** A Fusion Lab model folder (m800lab1, m990fus1, ...): nothing else is ever fetched. */
+export const LAB_MODEL_RE = /^m[0-9]{3}[a-z0-9_]+$/;
+
+/** Is this a usable Lab boss record? (Shape only; the numbers are the helper's.) */
+export function labBossValid(rec) {
+  return !!rec && typeof rec === "object"
+    && typeof rec.id === "string" && rec.id !== ""
+    && Array.isArray(rec.halves) && rec.halves.length >= 1 && rec.halves.every((h) => typeof h === "string" && h !== "")
+    && typeof rec.body === "string" && rec.body !== ""
+    && typeof rec.modelFolder === "string" && LAB_MODEL_RE.test(rec.modelFolder)
+    && Number(rec.hp) > 0 && Array.isArray(rec.moves) && rec.moves.length === 3;
+}
+
+/**
+ * Add the Lab bosses to the authored table. An authored id is never replaced, a record
+ * that is not valid is skipped. `table` is returned as it is when nothing is added.
+ */
+export function mergeLabBosses(table, lab) {
+  const rows = lab?.bosses && typeof lab.bosses === "object" ? Object.values(lab.bosses) : [];
+  const good = rows.filter(labBossValid);
+  if (!good.length) return table;
+  const out = { ...(table ?? {}) };
+  for (const rec of good) if (!(rec.id in out)) out[rec.id] = { ...rec, aiFill: true };
+  return out;
+}
+
+/**
+ * The party a Lab boss is fought as: its body species first (as an ordinary encounter
+ * entry, the strongest screen the disc has it on), carrying `fuseInto` the boss id, so
+ * the existing rule "the last body falls, the fusion appears" does the rest.
+ */
+export function labBossParty(rec) {
+  const p = rec?.party ?? {};
+  return [{
+    name: rec?.body, id: p.id, level: p.level, hp: p.hp, mp: p.mp, stat_scale: p.stat_scale ?? 16,
+    // a body with no enemies.json row (a partner form) is fought from its digimon.json profile, by id
+    ...(p.digimonId != null ? { digimonId: p.digimonId } : {}),
+    fuseInto: rec?.id,
+  }];
 }
