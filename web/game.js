@@ -35,6 +35,7 @@ import { tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabO
 import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, openReplay, replayPress, replayTake, replayDraw, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
+import { rollExtra, areaOf, messageFor, createFishFinds } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState, fx } from "./ambience.js";
@@ -3274,6 +3275,8 @@ async function init() {
             state.fireTraps = ft ?? {};
             state.ambushTiles = amb ?? {};
             state.fishingSpots = fish ?? {};
+            // Our own extra-rewards table for the fishing spots; a missing file just means no extras.
+            state.fishingExtras = await fetch("assets/data/fishing_extras.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
             state.treeStages = trees ?? {};
             state.diveFormMarkers = dfm ?? {};
             state.stageCastLists = scl; // null when missing: fall back to the derived files
@@ -3303,6 +3306,7 @@ async function init() {
             state.fireTraps = {};
             state.ambushTiles = {};
             state.fishingSpots = {};
+            state.fishingExtras = null;
             state.treeStages = {};
             state.talkEventIds = [];
         }
@@ -4575,12 +4579,46 @@ function playerPackMeta(packId) {
  * takes slot 4, which is a Cardmon on every one of the forty-six fishing
  * stages; band 2 takes slot 7, the area's big water Digimon.
  */
+const fishFinds = createFishFinds();
+/**
+ * Pay a fishing extra: the game's own item store / bits, the "got it" sound
+ * (item_get) and the game's own plain message box. Waits until the fight report,
+ * fade and wipe are gone so the box is not drawn under them. Remembered in the
+ * found-flags (dw.fishfinds.v1) for the Angler's almanac.
+ */
+function awardFishingExtra({ area: areaId, entry }) {
+    const area = (state.fishingExtras.areas ?? []).find((a) => a.id === areaId);
+    if (!area) return;
+    let tries = 0;
+    const go = () => {
+        const busy = battle.isActive() || cutscene.isActive() || textbox.isOpen() || choice.isOpen() || state.menuOpen || fade.dir !== 0 || !!state.wipe28;
+        if (busy && tries++ < 300) { setTimeout(go, 200); return; }
+        let itemName = null;
+        if (entry.kind === "item") {
+            storeAddItem(state, entry.item, 1);
+            localStorage.setItem("inventory", JSON.stringify(state.inventory));
+            itemName = ITEM_BY_ID?.[entry.item]?.name ?? entry.name;
+        } else if (entry.kind === "bits") {
+            state.bits = Math.min((state.bits ?? 0) + entry.bits, 9999999);
+            localStorage.setItem("bits", String(state.bits));
+        }
+        fishFinds.note(area.id, entry);
+        sfx.play("item_get");
+        questSpeak(null, "", messageFor(state.fishingExtras, area, entry, itemName));
+    };
+    go();
+}
+
 function startFishingCatch(mapId, slot) {
     const rec = state.fishingSpots?.[mapId]?.catch?.[String(slot)];
     if (!rec) return;
+    // The disc catch above is untouched. On top of it, ONE separate roll against
+    // this stage's small extras table (web/fishing-extras.js): drawn now, paid
+    // only if the fight is won (a Digimon that flees pays nothing).
+    const extra = state.fishingExtras ? rollExtra(state.fishingExtras, mapId, Math.random) : null;
     startFieldBattle(() => battle.startScreen(
         rec.screenId,
-        (res) => presentVictory(res),
+        (res) => presentVictory(res, () => { if (extra && !res?.enemyFled) awardFishingExtra(extra); }),
         null, // flee: the cast is already spent
         gameOverToTitle,
         { mapId },

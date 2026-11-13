@@ -46,6 +46,10 @@
   .catch .meta { color: #7f9ab3; font: 11.5px ui-monospace, monospace; }
   .catch .pays { color: #ffd34d; }
   .catch .pays.unknown { color: #ff9f7a; }
+  .stage .extras { grid-column: 1 / -1; color: #9fb3cc; font-size: 12px; }
+  .stage .extras .cap { color: #6f8aa3; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; margin-right: 8px; }
+  .stage .extras .x { display: inline-block; margin: 2px 8px 2px 0; padding: 1px 9px; border: 1px solid #24506b; border-radius: 999px; background: #0b1a29; color: #6f86a3; }
+  .stage .extras .x.found { border-color: #ffd34d; color: #ffd34d; }
   .src { margin-top: 26px; color: #6f86a3; font-size: 11.5px; font-family: ui-monospace, monospace; }
   .error { color: #ffb27a; font-weight: 600; }
 </style>
@@ -60,7 +64,9 @@
     all forty-six stages, the one whose kill can pay a booster. Band two takes <b>slot 7</b>, the
     area's big water Digimon. A visit starts with <b>sixteen casts</b>, and stepping onto the map
     again refills them. This page only prints the shipped tables: it changes no fishing rule, no
-    catch table and no reward.
+    catch table and no reward. <b>Extras:</b> on top of a won catch there is a small chance of a
+    rare extra (an item, a card pack, some bits, an old bottle with a hint). The extras show as
+    <b>???</b> until you have found each one once.
   </p>
 </header>
 <main>
@@ -80,11 +86,12 @@
   <div id="stages"></div>
   <p class="src">
     Sources: web/assets/data/fishing_spots.json · field_encounters.json · progression.json ·
-    manifest.json. The decode is ddw3-walker docs/research/field/fishing-system-decoded-2026-07-11.md.
+    manifest.json · fishing_extras.json (ours). The decode is ddw3-walker docs/research/field/fishing-system-decoded-2026-07-11.md.
   </p>
 </main>
 <script type="module">
 import { almanac, cardmonStages, waterIndex, rewardFor } from "./fishing-almanac.js";
+import { extrasRows, createFishFinds } from "./fishing-extras.js";
 
 const $ = (id) => document.getElementById(id);
 const summaryEl = $("summary"), shownEl = $("shown"), listEl = $("stages");
@@ -95,6 +102,7 @@ const rewardText = (record) => record
   : "unknown";
 
 let rows = [], rewards = null, cardmonOnly = false, pickedSpecies = null;
+let extras = [];
 const items = [];
 
 try {
@@ -105,6 +113,11 @@ try {
     fetch("assets/manifest.json").then((r) => r.json()),
   ]);
   rewards = progression.battle_rewards;
+  // Our own extra-rewards table; the page still works without it.
+  const extraData = await fetch("assets/data/fishing_extras.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const itemTable = await fetch("assets/data/item_effects.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const names = new Map((itemTable?.items ?? []).map((i) => [i.id, i.name]));
+  if (extraData) extras = extrasRows(extraData, createFishFinds().read(), (id) => names.get(id) ?? null);
   rows = almanac(fish, encounters.screens, rewards, manifest.maps);
 } catch (error) {
   summaryEl.className = "error";
@@ -184,6 +197,24 @@ for (const row of rows) {
   // Cardmon's record comes from the same lookup, its own screen id.
   el.append(place, spotsEl, catchCell("cardmon", "4", row.cardmon, rewardFor(rewards, row.cardmon.screen)),
     catchCell("water", "7", row.water, row.reward));
+  // The stage's extra rewards: ??? until found once (the found-flags the game keeps).
+  const extraRow = extras.find((x) => x.stage === row.stage);
+  if (extraRow) {
+    const box = document.createElement("div");
+    box.className = "extras";
+    const found = extraRow.entries.filter((x) => x.found).length;
+    const cap = document.createElement("span");
+    cap.className = "cap";
+    cap.textContent = `Extras ${found}/${extraRow.entries.length} · ${extraRow.total}% a win`;
+    box.append(cap);
+    for (const x of extraRow.entries) {
+      const chip = document.createElement("span");
+      chip.className = "x" + (x.found ? " found" : "");
+      chip.textContent = x.found ? `${x.label} · ${x.percent}%` : "???";
+      box.append(chip);
+    }
+    el.append(box);
+  }
   items.push(el);
   listEl.append(el);
 }

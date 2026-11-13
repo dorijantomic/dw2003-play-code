@@ -1,0 +1,2757 @@
+{
+ "_comment": "Hand-authored by this project (our own content, no disc tables copied). Extra rewards that can come on top of a fishing win. The disc catch (a battle: slot 4 Cardmon, slot 7 water Digimon) is never touched. Item ids are the game's own item numbers; names are checked by tests/fishing-extras.test.js. BALANCE RULE: see \"balance\".",
+ "balance": {
+  "rule": "Per catch the extra chance is 3 to 8 percent in total. Tier = the stage's slot-4 Cardmon level (12, 27, 42, 47 -> tier 1..4), which is how far the story has got when that stage's water is fished. An item's worth is its shop buy price (or twice its sell price when the shop never sells it). A normal entry is worth no more than the tier ceiling, which is about what the shops already sell at that point; a very rare entry (1 percent or less) may be worth up to double the ceiling. Bits never exceed the smallest bits one win of that tier's big water Digimon pays. Card packs are the same item class the disc's own Cardmon catch pays on the same cast. The extra is paid only when the fight is won, never when the Digimon flees.",
+  "item_value_ceiling": {
+   "1": 130,
+   "2": 550,
+   "3": 1300,
+   "4": 2500
+  },
+  "very_rare_multiplier": 2,
+  "very_rare_max_percent": 1,
+  "bits_ceiling": {
+   "1": 60,
+   "2": 100,
+   "3": 150,
+   "4": 400
+  },
+  "min_total_percent": 3,
+  "max_total_percent": 8,
+  "tier_by_cardmon_level": {
+   "12": 1,
+   "27": 2,
+   "42": 3,
+   "47": 4
+  },
+  "card_pack_item_ids": [
+   375,
+   377,
+   380,
+   390
+  ]
+ },
+ "hints": [
+  "A visit to the water gives you sixteen casts. Leave the map and come back for sixteen more.",
+  "One band of the meter hooks a Cardmon. The other band hooks the big Digimon of these waters.",
+  "No pole, no cast. The fishing spots only open once you own the fishing pole.",
+  "Kick the trees near the water too. Only one tree on each map holds a Digimon."
+ ],
+ "areas": [
+  {
+   "id": "asuka-city",
+   "name": "Asuka City",
+   "theme": "town",
+   "flavour": "Something is tangled on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 82,
+     "name": "MachineField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 67,
+     "name": "ReviveDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    }
+   ]
+  },
+  {
+   "id": "amaterasu-city",
+   "name": "Amaterasu City",
+   "theme": "town",
+   "flavour": "Something is tangled on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 82,
+     "name": "MachineField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 67,
+     "name": "ReviveDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 82,
+     "name": "MachineField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 69,
+     "name": "EnergyDisk",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    }
+   ]
+  },
+  {
+   "id": "central-park",
+   "name": "Central Park",
+   "theme": "town",
+   "flavour": "Something is tangled on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 82,
+     "name": "MachineField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 67,
+     "name": "ReviveDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 82,
+     "name": "MachineField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 69,
+     "name": "EnergyDisk",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    }
+   ]
+  },
+  {
+   "id": "wire-forest-entrance",
+   "name": "Wire Forest Entrance",
+   "theme": "forest",
+   "flavour": "Something is snagged on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 74,
+     "name": "GuardPlug",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 75,
+     "name": "AuraPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    }
+   ]
+  },
+  {
+   "id": "west-wire-forest",
+   "name": "West Wire Forest",
+   "theme": "forest",
+   "flavour": "Something is snagged on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 74,
+     "name": "GuardPlug",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 75,
+     "name": "AuraPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 49,
+     "name": "PowerChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "kicking-forest",
+   "name": "Kicking Forest",
+   "theme": "forest",
+   "flavour": "Something is snagged on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 74,
+     "name": "GuardPlug",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 75,
+     "name": "AuraPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 49,
+     "name": "PowerChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "bulk-bridge",
+   "name": "Bulk Bridge",
+   "theme": "forest",
+   "flavour": "Something is snagged on the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 74,
+     "name": "GuardPlug",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 81,
+     "name": "ThunderField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 49,
+     "name": "PowerChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "shell-beach",
+   "name": "Shell Beach",
+   "theme": "sea",
+   "flavour": "A shell washes up with your catch.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 68,
+     "name": "SoberDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 69,
+     "name": "EnergyDisk",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    }
+   ]
+  },
+  {
+   "id": "plug-cape",
+   "name": "Plug Cape",
+   "theme": "sea",
+   "flavour": "A shell washes up with your catch.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 68,
+     "name": "SoberDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 69,
+     "name": "EnergyDisk",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 56,
+     "name": "WaterChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "south-cape",
+   "name": "South Cape",
+   "theme": "sea",
+   "flavour": "A shell washes up with your catch.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 68,
+     "name": "SoberDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 56,
+     "name": "WaterChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "phoenix-bay",
+   "name": "Phoenix Bay",
+   "theme": "sea",
+   "flavour": "A shell washes up with your catch.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 68,
+     "name": "SoberDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 56,
+     "name": "WaterChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "divermons-lake",
+   "name": "Divermon's Lake",
+   "theme": "lake",
+   "flavour": "Something glints in the lake.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 69,
+     "name": "EnergyDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 70,
+     "name": "LifeDisk",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 78,
+     "name": "WaterField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 56,
+     "name": "WaterChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "lake-of-ice",
+   "name": "Lake of Ice",
+   "theme": "cold",
+   "flavour": "Something frozen bobs up from the ice.",
+   "entries": [
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 79,
+     "name": "IceField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 70,
+     "name": "LifeDisk",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 57,
+     "name": "IceChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 57,
+     "name": "IceChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "bios-swamp",
+   "name": "Bios Swamp",
+   "theme": "swamp",
+   "flavour": "Something muddy clings to the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 66,
+     "name": "AntidoteDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 51,
+     "name": "MindChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "tranquil-swamp",
+   "name": "Tranquil Swamp",
+   "theme": "swamp",
+   "flavour": "Something muddy clings to the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 66,
+     "name": "AntidoteDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 51,
+     "name": "MindChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "jungle-grave",
+   "name": "Jungle Grave",
+   "theme": "swamp",
+   "flavour": "Something muddy clings to the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 66,
+     "name": "AntidoteDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 51,
+     "name": "MindChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "ether-jungle",
+   "name": "Ether Jungle",
+   "theme": "swamp",
+   "flavour": "Something muddy clings to the line.",
+   "entries": [
+    {
+     "key": "field.1",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      1
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.1",
+     "kind": "item",
+     "item": 66,
+     "name": "AntidoteDisk",
+     "tiers": [
+      1
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "bits.1",
+     "kind": "bits",
+     "bits": 60,
+     "tiers": [
+      1
+     ],
+     "chance": 1.0
+    },
+    {
+     "key": "bottle.1",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      1
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.1",
+     "kind": "item",
+     "item": 375,
+     "name": "Booster1b",
+     "tiers": [
+      1
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "field.3",
+     "kind": "item",
+     "item": 83,
+     "name": "DarkField",
+     "tiers": [
+      3
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.3",
+     "kind": "item",
+     "item": 45,
+     "name": "UltraCharge",
+     "tiers": [
+      3
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.3",
+     "kind": "bits",
+     "bits": 150,
+     "tiers": [
+      3
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.3",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      3
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.3",
+     "kind": "item",
+     "item": 380,
+     "name": "Booster6b",
+     "tiers": [
+      3
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "chip.3",
+     "kind": "item",
+     "item": 51,
+     "name": "MindChip",
+     "tiers": [
+      3
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "pelche-oasis",
+   "name": "Pelche Oasis",
+   "theme": "oasis",
+   "flavour": "Something sparkles in the oasis.",
+   "entries": [
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 80,
+     "name": "WindField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 73,
+     "name": "PowerPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 58,
+     "name": "WindChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "south-badland",
+   "name": "South Badland",
+   "theme": "oasis",
+   "flavour": "Something sparkles in the oasis.",
+   "entries": [
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 80,
+     "name": "WindField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 73,
+     "name": "PowerPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 3,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 58,
+     "name": "WindChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 1,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  },
+  {
+   "id": "north-badland-e",
+   "name": "North Badland E",
+   "theme": "oasis",
+   "flavour": "Something sparkles in the oasis.",
+   "entries": [
+    {
+     "key": "field.2",
+     "kind": "item",
+     "item": 80,
+     "name": "WindField",
+     "tiers": [
+      2
+     ],
+     "chance": 1.0,
+     "very_rare": false
+    },
+    {
+     "key": "support.2",
+     "kind": "item",
+     "item": 73,
+     "name": "PowerPlug",
+     "tiers": [
+      2
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.2",
+     "kind": "bits",
+     "bits": 100,
+     "tiers": [
+      2
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.2",
+     "kind": "hint",
+     "hint": 0,
+     "tiers": [
+      2
+     ],
+     "chance": 0.5
+    },
+    {
+     "key": "card.2",
+     "kind": "item",
+     "item": 377,
+     "name": "Booster3b",
+     "tiers": [
+      2
+     ],
+     "chance": 0.5,
+     "very_rare": false
+    },
+    {
+     "key": "support.4",
+     "kind": "item",
+     "item": 76,
+     "name": "DVPlug",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "chip.4",
+     "kind": "item",
+     "item": 58,
+     "name": "WindChip",
+     "tiers": [
+      4
+     ],
+     "chance": 1.5,
+     "very_rare": false
+    },
+    {
+     "key": "bits.4",
+     "kind": "bits",
+     "bits": 400,
+     "tiers": [
+      4
+     ],
+     "chance": 1.5
+    },
+    {
+     "key": "bottle.4",
+     "kind": "hint",
+     "hint": 2,
+     "tiers": [
+      4
+     ],
+     "chance": 0.75
+    },
+    {
+     "key": "card.4",
+     "kind": "item",
+     "item": 390,
+     "name": "RBooster01",
+     "tiers": [
+      4
+     ],
+     "chance": 0.75,
+     "very_rare": false
+    },
+    {
+     "key": "boost.4",
+     "kind": "item",
+     "item": 53,
+     "name": "BoostChip",
+     "tiers": [
+      4
+     ],
+     "chance": 0.5,
+     "very_rare": true
+    }
+   ]
+  }
+ ],
+ "stages": {
+  "s202": {
+   "area": "asuka-city",
+   "tier": 1
+  },
+  "s203": {
+   "area": "amaterasu-city",
+   "tier": 2
+  },
+  "s921": {
+   "area": "amaterasu-city",
+   "tier": 1
+  },
+  "s330": {
+   "area": "central-park",
+   "tier": 1
+  },
+  "s331": {
+   "area": "central-park",
+   "tier": 2
+  },
+  "s940": {
+   "area": "central-park",
+   "tier": 2
+  },
+  "s335": {
+   "area": "wire-forest-entrance",
+   "tier": 1
+  },
+  "s336": {
+   "area": "wire-forest-entrance",
+   "tier": 2
+  },
+  "s941": {
+   "area": "wire-forest-entrance",
+   "tier": 2
+  },
+  "s350": {
+   "area": "west-wire-forest",
+   "tier": 1
+  },
+  "s351": {
+   "area": "west-wire-forest",
+   "tier": 2
+  },
+  "s944": {
+   "area": "west-wire-forest",
+   "tier": 4
+  },
+  "s400": {
+   "area": "kicking-forest",
+   "tier": 1
+  },
+  "s401": {
+   "area": "kicking-forest",
+   "tier": 2
+  },
+  "s953": {
+   "area": "kicking-forest",
+   "tier": 4
+  },
+  "s450": {
+   "area": "bulk-bridge",
+   "tier": 1
+  },
+  "s451": {
+   "area": "bulk-bridge",
+   "tier": 3
+  },
+  "s340": {
+   "area": "shell-beach",
+   "tier": 1
+  },
+  "s341": {
+   "area": "shell-beach",
+   "tier": 2
+  },
+  "s942": {
+   "area": "shell-beach",
+   "tier": 1
+  },
+  "s345": {
+   "area": "plug-cape",
+   "tier": 1
+  },
+  "s346": {
+   "area": "plug-cape",
+   "tier": 2
+  },
+  "s943": {
+   "area": "plug-cape",
+   "tier": 3
+  },
+  "s495": {
+   "area": "south-cape",
+   "tier": 1
+  },
+  "s496": {
+   "area": "south-cape",
+   "tier": 3
+  },
+  "s485": {
+   "area": "phoenix-bay",
+   "tier": 1
+  },
+  "s486": {
+   "area": "phoenix-bay",
+   "tier": 3
+  },
+  "s380": {
+   "area": "divermons-lake",
+   "tier": 1
+  },
+  "s381": {
+   "area": "divermons-lake",
+   "tier": 2
+  },
+  "s950": {
+   "area": "divermons-lake",
+   "tier": 3
+  },
+  "s715": {
+   "area": "lake-of-ice",
+   "tier": 3
+  },
+  "s716": {
+   "area": "lake-of-ice",
+   "tier": 4
+  },
+  "s455": {
+   "area": "bios-swamp",
+   "tier": 1
+  },
+  "s456": {
+   "area": "bios-swamp",
+   "tier": 3
+  },
+  "s465": {
+   "area": "tranquil-swamp",
+   "tier": 1
+  },
+  "s466": {
+   "area": "tranquil-swamp",
+   "tier": 3
+  },
+  "s480": {
+   "area": "jungle-grave",
+   "tier": 1
+  },
+  "s481": {
+   "area": "jungle-grave",
+   "tier": 3
+  },
+  "s490": {
+   "area": "ether-jungle",
+   "tier": 1
+  },
+  "s491": {
+   "area": "ether-jungle",
+   "tier": 3
+  },
+  "s560": {
+   "area": "pelche-oasis",
+   "tier": 2
+  },
+  "s561": {
+   "area": "pelche-oasis",
+   "tier": 4
+  },
+  "s550": {
+   "area": "south-badland",
+   "tier": 2
+  },
+  "s551": {
+   "area": "south-badland",
+   "tier": 4
+  },
+  "s570": {
+   "area": "north-badland-e",
+   "tier": 2
+  },
+  "s571": {
+   "area": "north-badland-e",
+   "tier": 4
+  }
+ }
+}
