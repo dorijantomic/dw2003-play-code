@@ -106,3 +106,26 @@ frames of a game NPC sheet (rows per `web/assets/manifest.json`), enlarged 14 ti
 - Hagurumon (Veemon sheet, 4 across): floating grey metal gear with a face in the middle, small gear arms on the sides.
 
 If the generator repaints the reference instead of a new creature, use a blank grid of the same size as the guide.
+
+## Option 4: let the game write the Gemini prompt (tools/newnpc_export.py)
+
+For a new townsperson, trainer or boss that you make with Gemini by hand, the tool builds the prompt from the game's own sprites:
+
+1. `python3 tools/newnpc_export.py <map_id> [--like <sprite id>] [--role townsperson|trainer|boss] [--name "Ada"] [--desc "a fisher with a straw hat"]`
+   writes `~/dw3-newnpcs/<name>-<id>/` (outside the repo, never committed):
+   - `prompt.txt` the words for Gemini. Measured from the real townspeople sprites on that map (or, if the map has fewer than 3,
+     from all townspeople sprites of the game): figure height (the disc's are 33 to 35; a boss is 44, the biggest the 24 x 48 cell
+     holds), width, colour count, outline colour, and a flat background colour that is not in any measured palette. Layout is the
+     "views" one above: 3 figures in a row (front, side facing right, back), 1536 x 512.
+   - `ref.png` 3 to 4 real sprites of that map, enlarged 6 times (disc art: local only).
+   - `entry.json` the `new_characters.json` entry: next free npc id from 1103, `views`, `height`, and a walkable spot found with the
+     game's collision (12 x 8 foot box, away from exits and other NPCs, near where the map's people stand).
+   - `measured.json` the numbers behind it.
+2. Paste `prompt.txt` and `ref.png` into Gemini; save its picture as `views.png` in that folder.
+3. `python3 tools/newnpc_export.py --install <folder>` checks the picture (1 to 4 separate figures), copies it to
+   `data/authored/quests/art/`, adds the entry to `data/authored/quests/new_characters.json` and `quests/new_characters.json`,
+   and runs `tools/make_quest_sprites.py`. On any failure both json files are put back. (By hand: copy the picture to the path
+   in `entry.json`, paste the entry into both files, run `make_quest_sprites.py`.)
+
+Name, voice and quests for the new id still go in `characters.json` and a `pack_*.py` (a boss fight is a `fight` goal in the DSL).
+Test: `node --test tests/newnpc-export.test.js` (synthetic data only).
