@@ -13,6 +13,7 @@
 //              of everything (weather falls over the party), fading in when a
 //              map loads. Density scales with the map's own grass share.
 import { classSource, variantBase } from "./mapclass.js";
+import { SNOWY, SANDY, isOpenAirMapName } from "./map-open-air.js";
 import { resetScenery, drawScenery, groundScenery, tickWet, wetLevel, todPhaseNow, todColor, cueBolt } from "./scenery.js";
 import { syncVillagers, removeVillagers } from "./crowd.js";
 import { setSound, thunder, footstep, setAmbience, setMusic, setWeatherVolume, setMusicVolume } from "./fxaudio.js";
@@ -184,22 +185,6 @@ function markApplicable(map, p) {
 }
 
 // ----------------------------------------------------------------- profile
-const OPEN_AIR = [
-    /^Central Sector — (Asuka City|Amaterasu City|Asuka Bridge|Amaterasu Bridge|Central Park|Wire Forest Entrance|Shell Beach|Plug Cape)/,
-    /^East Sector — (West Wire Forest|East Wire Forest|Protocol Forest|Divermon's Lake|Duel Island|Wind Prairie|Kicking Forest|Seiryu City|Qing Long City)/,
-    /^South Sector — (Bulk Swamp|Bulk Bridge|Bios Swamp|Tranquil Swamp|Jungle Grave|Phoenix Bay|Ether Jungle|South Cape|Suzaku City|Zhu Que City)/,
-    /^West Sector — (Pelche Oasis|Bullet Valley|Byakko City|Bai Hu City)/,
-    /^North Sector — (Boot Mountain|Genbu City|Xuan Wu City)/,
-    /^Kusanagi City — Street Corner/,
-];
-const SNOWY = [
-    /^North Sector — (Snow Mountain|Freeze Mountain|Lake of Ice|Battle Gate)/,
-    /^East Sector — Tyranno Valley/,
-];
-// Dry places get a sandstorm instead of rain.
-const SANDY = [
-    /^West Sector — (Pelche Oasis|Bullet Valley|South Badland|North Badland W|North Badland E|Noise Desert|S Noise Desert|Mobius Desert)/,
-];
 const FOGGY = [
     /^South Sector — (Bulk Swamp|Bios Swamp|Tranquil Swamp|Jungle Grave|Phoenix Bay|Ether Jungle)/,
     /^East Sector — (Protocol Forest|Kicking Forest|West Wire Forest|East Wire Forest)/,
@@ -210,10 +195,7 @@ const SHAFTY = [
     /^East Sector — (West Wire Forest|East Wire Forest|Kicking Forest|Divermon's Lake)/,
     /^South Sector — (Ether Jungle|Jungle Grave)/,
 ];
-/** Open air by the map name (the game's one open-air / indoor split: snow and sand places count as open air). Everything else is indoor. */
-export function isOpenAirMapName(name) {
-    return SNOWY.some((r) => r.test(name)) || SANDY.some((r) => r.test(name)) || OPEN_AIR.some((r) => r.test(name));
-}
+export { isOpenAirMapName };
 const profiles = new Map(); // stageId -> profile
 
 function scan(img) {
