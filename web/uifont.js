@@ -231,6 +231,30 @@ export function drawText(ctx, text, x, y, opts = {}) {
   return cx - x;
 }
 
+/**
+ * Where drawText() would put each glyph of `text` (same pen, same per-glyph dx/adv, same `cellWidth` / `glyphMetrics`), without
+ * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The vector UI look (web/ui-css.js) places one smooth glyph at
+ * each of these pens, so its spacing is the game's own. [] until the font has loaded.
+ */
+export function layoutGlyphs(text, x, opts = {}) {
+  if (!fontReady()) return [];
+  const { kind = 1, scale = 1, cellWidth = null, glyphMetrics = null } = opts;
+  const out = [];
+  let cx = x;
+  for (const ch of units(text)) {
+    const source = glyphFor(kind, ch);
+    const g = source && glyphMetrics ? { ...source, ...glyphMetrics(map.chars[ch]) } : source;
+    out.push({ ch, x: cx, dx: g ? (g.dx || 0) * scale : 0 });
+    cx += g ? (cellWidth ?? advanceOf(g)) * scale : (cellWidth ?? 6) * scale;
+  }
+  return out;
+}
+
+/** The face colours of CLUT row `row` of font `kind` ([[r,g,b,a], ...]) from the loaded manifest, or null. */
+export function fontClutRow(kind, row = 0) {
+  return map?.cluts?.[String(kind)]?.rows?.[String(row)] ?? null;
+}
+
 /** Draw a named icon glyph (str/def/.../dark). Returns false until loaded. */
 export function drawIconGlyph(ctx, name, x, y, scale = 1) {
   if (!fontReady()) return false;

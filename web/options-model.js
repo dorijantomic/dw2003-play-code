@@ -143,6 +143,7 @@ export function applyDetail(store, level) {
 const DIAL = Object.freeze(["rare", "normal", "lure"]);        // fewer / normal / more (web/encounter-dial.js DIAL_MODES)
 const TODS = Object.freeze(["auto", "day", "golden", "dusk", "night"]);
 const WEATHERS = Object.freeze(["auto", "always", "storm", "clear"]);   // web/ambience.js: the F2 select's values
+const UI_LOOKS = Object.freeze(["pixel", "smooth"]);      // web/ui-css-model.js: pixel = the game's own pictures (default), smooth = the same shapes drawn as sharp vectors
 const MAP_SCREENS = Object.freeze(["classic", "new"]);   // web/map-screen-book.js; classic = the game's own MAP page
 const VOLUMES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);   // tenths; 10 = today's gain
 
@@ -189,6 +190,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
         },
         timeOfDay: valueRow("timeOfDay", "Time of day", "Keep the map at one time of day, or let it change by itself.", "todMode", TODS, ["Auto", "Day", "Golden", "Dusk", "Night"]),
         weather: valueRow("weather", "Weather", "Random weather, weather all the time, storms only, or clear skies.", "weatherMode", WEATHERS, ["Random", "Always", "Storms", "Clear"]),
+        uiLook: valueRow("uiLook", "UI look", "Pixel is the original look. Smooth draws the text boxes with sharp edges.", "uiLook", UI_LOOKS, ["Pixel", "Smooth"]),
         mapScreen: valueRow("mapScreen", "Map screen", "The map the pause menu opens. New shows visited areas and links.", "mapScreen", MAP_SCREENS, ["Classic", "New"]),
         pixelFilter: valueRow("pixelFilter", "Pixel filter", "Smooths the blocky pixels of the whole picture.", "spriteFilter", pixelFilters.map((f) => f[0]), pixelFilters.map((f) => f[1])),
         musicVolume: volumeRow("musicVolume", "Music volume", "How loud the music is. 100 is the normal level.", "musicVolume"),
@@ -211,7 +213,7 @@ export const HOST_NOTE = "Set by the host.";
 /** The four pages, in order, and the row ids on each (Q / E switch the page). EFFECTS rows open a category (see createOptionsModel). */
 export const PAGES = Object.freeze([
     { id: "game", label: "GAME", rows: ["battleSpeed", "randomFights", ...SHOWN_EXTRAS.map((id) => `extra:${id}`), "mapScreen"] },
-    { id: "screen", label: "SCREEN", rows: ["detail", "timeOfDay", "weather", "pixelFilter"] },
+    { id: "screen", label: "SCREEN", rows: ["detail", "timeOfDay", "weather", "pixelFilter", "uiLook"] },
     { id: "sound", label: "SOUND", rows: ["musicVolume", "soundVolume"] },
     { id: "effects", label: "EFFECTS", rows: EFFECT_CATEGORIES.map((c) => `cat:${c.id}`) },
 ]);

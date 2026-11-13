@@ -15,7 +15,7 @@
 // `0x01, 0x01`. Extended tokens come from the shipped uifont charset so uifont
 // resolves them; unresolved codes are counted, never guessed.
 
-import { drawText, fontReady } from "./uifont.js";
+import { drawText, fontReady, layoutGlyphs } from "./uifont.js";
 import { ui } from "./vendor/engine.js";
 const { decodeTextToken } = ui;
 
@@ -261,4 +261,41 @@ export function drawNativeTextWidgets(ctx, widgets, opts = {}) {
         }
     }
     return stats;
+}
+
+/**
+ * The same visible lines drawNativeTextWidgets() would paint, as data instead of pixels: one run per line, with the pen of every
+ * glyph ({ text, kind, clut, x, y, glyphs: [{ ch, x, dx }] }). The vector UI look (web/ui-css.js) draws these with a smooth
+ * font at the game's own pens. Same decode, same reveal window, same positions; nothing is invented here.
+ */
+export function collectNativeTextRuns(widgets, opts = {}) {
+    const runs = [];
+    if (!fontReady()) return runs;
+    for (const w of widgets) {
+        if (!w.visible) continue;
+        const kind = kindOf(w);
+        if (kind === null) continue;
+        const plain = w.lines.map((l) => (l.bytes && l.len ? decodeNativeText(l.bytes).text : ""));
+        for (const line of w.lines.slice(0, 1)) {
+            if (!line.bytes || !line.len) continue;
+            const { text } = decodeWidgetLine(w, line, plain, opts);
+            if (!text || text === "�") continue;
+            const x = w.alignWidth ? w.penX - w.alignWidth : w.penX;
+            const parts = text.split("\n");
+            for (let k = 0; k < parts.length; k++) {
+                if (!parts[k]) continue;
+                const glyphs = layoutGlyphs(parts[k], x, {
+                    kind, cellWidth: w.fixedPitch ? w.cellWidth : null,
+                    glyphMetrics: (info) => {
+                        if (!info) return {};
+                        const rec = w.read32(w.font + (info.t === "b" ? 4 : 8)) + info.i * 11;
+                        const signed = (n) => (n << 24) >> 24;
+                        return { dx: signed(w.read8(rec + 7)), dy: signed(w.read8(rec + 8)), adv: w.read8(rec + 9) };
+                    },
+                });
+                runs.push({ text: parts[k], kind, clut: w.colour | 0, x, y: w.penY + k * w.lineHeight, glyphs });
+            }
+        }
+    }
+    return runs;
 }

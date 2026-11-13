@@ -42,7 +42,7 @@ test("every home that names a row names a real row, and every row is on a page",
     }
     const onPages = PAGES.flatMap((p) => p.rows).sort();
     assert.deepEqual(onPages, Object.keys(rows).sort());
-    assert.deepEqual(PAGES.map((p) => p.rows.length), [5, 4, 2, 6]);
+    assert.deepEqual(PAGES.map((p) => p.rows.length), [5, 5, 2, 6]);
 });
 
 test("the four pages are GAME, SCREEN, SOUND, EFFECTS", () => {

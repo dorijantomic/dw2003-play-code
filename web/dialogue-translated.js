@@ -7,7 +7,9 @@
 // Drives the UI Lab and the game's ordinary NPC talk route (web/game.js; ?legacyTextbox=1 keeps web/textbox.js).
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
-import { drawNativeTextWidgets } from "./native-screen-text.js";
+import { collectNativeTextRuns, drawNativeTextWidgets } from "./native-screen-text.js";
+import { layoutFromIntents } from "./ui-css-model.js";
+import { uiCssAvailable, uiCssShowDialogue, uiLookSmooth } from "./ui-css.js";
 import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
@@ -62,11 +64,12 @@ function paintRaw(ctx, raw, getPack) {
 }
 
 const DATA_LABEL = "Dialogue data";
+let boxCount = 0;
 
 export function createDialogueTranslated(sfx = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null,
-        _ticks: 0, _request: 0, _onClose: null, _latched: false, _primed: false, _onFail: null, _packed: {}, _prevHeld: false, _closes: 0, _sounds: [],
+        _key: `dialogue${++boxCount}`, _ticks: 0, _request: 0, _onClose: null, _latched: false, _primed: false, _onFail: null, _packed: {}, _prevHeld: false, _closes: 0, _sounds: [],
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName, { paintRaw, opaqueClips: true });
 
@@ -160,6 +163,14 @@ export function createDialogueTranslated(sfx = null) {
         if (!g._open || !g._session) return;
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         const { calls, contextMarkers, raw } = g._session.drawIntents();
+        // OPTIONS > UI look: Smooth draws the same box as DOM + CSS vectors (web/ui-css.js); Pixel (default) is the canvas below.
+        if (uiLookSmooth() && uiCssAvailable()) {
+            const runs = collectNativeTextRuns(g._session.textWidgets(), { revealWindow: true });
+            if (uiCssShowDialogue(g._key, layoutFromIntents(calls, raw, contextMarkers), runs, { w: viewW, h: viewH })) {
+                g._painted = runs.map((r) => r.text);
+                return;
+            }
+        }
         ctx.save();
         ctx.scale(s, s);
         renderer.draw(ctx, calls, null, [], contextMarkers, raw);
