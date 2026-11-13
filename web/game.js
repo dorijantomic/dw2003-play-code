@@ -59,6 +59,7 @@ import { installQuests,questsTick, questTalk, questsPauseRow, questsPausePage, q
 import { installMultiplayer, multiplayerTick, multiplayerGhosts, multiplayerSelf, drawGhostLabel, isOnline, sendChat, mpOn, myId, myName, peerOf, sendMpb } from "./multiplayer.js"; // EXPERIMENT: optional multiplayer (F4)
 import { questsCreditChallenge } from "./quests.js";
 import { installSocial, socialQuestDone, coopTry, coopReady, coopRolling } from "./mpsocial.js";
+import { pickSpotNear } from "./mp-goto.js"; // EXPERIMENT (multiplayer): where to stand next to a friend
 import { installMpBattle, mpbKey, mpbHost, mpbMessage, mpbPeerGone, mpbPeerAway, mpbPeerBack, mpbLinkLost, mpbLinkBack, mpbVisible } from "./mpbattle.js"; // EXPERIMENT: many-vs-many fights for multiplayer // EXPERIMENT: multiplayer chat, feed, inspect, trade
 import { drawQuestMark } from "./questmarks.js"; // extra quests: the red ? and ! over characters // extra quests
 import { buildPack, paginate } from "./dialogue-pack.js"; // extra quests: lines in the disc's own text format
@@ -549,11 +550,24 @@ installSocial({
         mapName: (id) => state.manifest?.maps?.find((m) => m.id === id)?.name ?? null,
         busy: () => !!state.started && (battle.isActive() || cutscene.isActive() || fade.dir !== 0 || mpbVisible()),
         releaseKeys: () => state.keys.clear(),
-        warp: (id) => {
-            const idx = state.manifest?.maps?.findIndex((m) => m.id === id) ?? -1;
-            if (idx < 0 || !mpIdle()) return false;
-            loadAndSetMap(idx);
-            return true;
+        // "Go to the other player" (web/mpsocial.js, web/mp-goto.js): where I stand, whether I may be moved now, and the move itself.
+        where: () => ({ map: state.manifest?.maps?.[state.mapIdx]?.id ?? null, x: Math.round(state.x), y: Math.round(state.y), dir: state.dir }),
+        canGo: () => mpIdle() && !mpbVisible(),
+        // Warp me next to (x, y) on `mapId` through the ordinary stage change (runStageHandoff: the same wipe and load as an exit;
+        // setMap then gathers my followers on me). The spot comes from pickSpotNear on that map's own collision grid, so never a wall.
+        // Resolves "ok", "busy", "nomap" or "noroom".
+        warpNear: async (mapId, x, y) => {
+            const idx = state.manifest?.maps?.findIndex((m) => m.id === mapId) ?? -1;
+            if (idx < 0) return "nomap";
+            if (!mpIdle() || mpbVisible()) return "busy";
+            const grid = await loadCollisionForStage(mapId);
+            if (!mpIdle() || mpbVisible()) return "busy";            // the game moved on while the map's collision loaded
+            const m = state.manifest.maps[idx];
+            const spot = pickSpotNear((px, py) => !grid || !rectBlocked(grid, px - 6, py - 8, px + 6, py), x, y, { w: m.width, h: m.height });
+            if (!spot) return "noroom";
+            const dx = x - spot.x, dy = y - spot.y;
+            runStageHandoff({ to: mapId, spawnX: spot.x, spawnY: spot.y, scripted: true, dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up") });
+            return "ok";
         },
         bits: () => state.bits | 0,
         canFight: () => mpIdle() && fieldPartySize(state.party) > 0 && !mpbVisible(),

@@ -106,6 +106,30 @@ test("duel messages go only to the player they name, with the sender filled in a
     assert.equal(b.got.filter((m) => m.t === "duel").length, 2);
 });
 
+test("go-to messages go only to the player they name; the place is cleaned and only comes with `at`", () => {
+    const { a, b, hub } = pair();
+    const c = client(hub, { room: a.last("welcome").room, name: "Cy" });
+    send(a, { t: "goto", op: "ask", to: b.session.id, map: "s1", x: 5 });             // an ask carries no place
+    assert.deepEqual(b.last("goto"), { t: "goto", op: "ask", from: a.session.id });
+    assert.equal(c.last("goto"), undefined);
+    send(b, { t: "goto", op: "at", to: a.session.id, from: 999, map: "s540", x: 120.6, y: 88, dir: "up-left" });
+    assert.deepEqual(a.last("goto"), { t: "goto", op: "at", from: b.session.id, map: "s540", x: 121, y: 88, dir: "up-left" });
+    send(b, { t: "goto", op: "at", to: a.session.id, map: "s540", x: 1, y: 2, dir: "<<bad>>" });
+    assert.equal(a.last("goto").dir, "down");                                          // bad facing falls back
+    const n = a.got.filter((m) => m.t === "goto").length;
+    send(b, { t: "goto", op: "at", to: a.session.id, map: "../x", x: 1, y: 2 });       // bad stage id: dropped
+    send(b, { t: "goto", op: "at", to: a.session.id, map: "s1", x: 1e9, y: 2 });        // number out of range: dropped
+    send(b, { t: "goto", op: "at", to: a.session.id, map: "s1", x: "1", y: 2 });       // not a number: dropped
+    send(b, { t: "goto", op: "explode", to: a.session.id });                            // unknown op: dropped
+    send(b, { t: "goto", op: "ask", to: b.session.id });                                // not to myself
+    send(b, { t: "goto", op: "no", to: 12345 });                                        // nobody there
+    assert.equal(a.got.filter((m) => m.t === "goto").length, n);
+    send(b, { t: "goto", op: "no", to: a.session.id });
+    assert.deepEqual(a.last("goto"), { t: "goto", op: "no", from: b.session.id });
+    send(a, { t: "goto", op: "cancel", to: b.session.id });
+    assert.deepEqual(b.last("goto"), { t: "goto", op: "cancel", from: a.session.id });
+});
+
 test("co-op messages: foes are cleaned, hits are bounds-checked, the sender is filled in", () => {
     const { a, b } = pair();
     send(a, { t: "coop", op: "pask", to: b.session.id });

@@ -8,13 +8,15 @@
 // Trade swaps items and BIT between two players; both press Confirm on the same offer and each game moves its own items.
 //
 // Nothing here writes a story flag. Names and chat from other players are only ever put on the page as text.
-import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
+import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendGoto, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
+import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
 
 const MAX_LOG = 300;
 const S = { tab: "all", log: [], collapsed: false, unread: 0 };
-let api = null, dock = null, el = {}, trade = null, duel = null, inspectId = null, goArm = null;
+let api = null, dock = null, el = {}, trade = null, duel = null, go = null, inspectId = null;
 let prevParty = null, lastCardJson = "";
+let myMapSeen = null;                                        // the map my PLAYERS row was last drawn for
 let league = null, leaguePair = null, leagueGames = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
 
 // ------------------------------------------------------------ small helpers
@@ -106,18 +108,8 @@ function drawPlayers() {
         const acts = h("div", "acts", btn("Inspect", () => openInspect(p.id)));
         if (!p.self && !p.away) {
             acts.append(btn("Trade", () => askTrade(p.id)), btn("Duel", () => askDuel(p.id)),
-                p.id === partner ? btn("Leave party", leaveParty) : btn("Team up", () => askParty(p.id)));
-            if (p.map && p.map !== here) {
-                const go = btn(goArm === p.id ? "Sure?" : "Go", () => {
-                    if (goArm !== p.id) { goArm = p.id; setTimeout(() => { if (goArm === p.id) { goArm = null; drawPlayers(); } }, 2500); drawPlayers(); return; }
-                    goArm = null;
-                    if (!api.warp(p.map)) note("Not now - finish what you are doing first.");
-                    else note(`You went to ${place(p.map)} to find ${p.name}.`);
-                    drawPlayers();
-                });
-                go.title = `Travel to ${place(p.map)}. Your story is not changed.`;
-                acts.append(go);
-            }
+                p.id === partner ? btn("Leave party", leaveParty) : btn("Team up", () => askParty(p.id)),
+                Object.assign(btn("Go to", () => askGoto(p.id)), { title: `Ask ${p.name} if you can come to them` }));
         }
         el.players.append(h("div", "pl", h("div", "who", nm, p.self ? " (you)" : "", p.away ? h("span", "sub", "  (away)") : "", isChamp(p) ? h("span", "chmp", "  SERVER CHAMP") : ""), where, acts));
     }
@@ -455,6 +447,60 @@ function onCoop(m) {
     }
 }
 
+// ------------------------------------------------------------ go to a player
+// "Go to": I ask, they get a yes/no (a team-up partner is answered for them at once). On yes their game sends the place it
+// stands in (stage id, x, y); my game then warps me next to it with the game's own stage change (api.warpNear). Neither of us
+// may be in a battle, a cutscene or a menu. No answer in 14 s = cancelled, like a co-op invite.
+function askGoto(id) {
+    const p = peerOf(id); if (!p) return;
+    if (p.away) { note(`${p.name} is away.`); return; }
+    if (go) { note("Finish what you are doing first."); return; }
+    if (!api.canGo()) { note("Not now - finish what you are doing first."); return; }
+    go = { st: "out", id, timer: setTimeout(() => { if (go?.st === "out") { sendGoto({ op: "cancel", to: id }); endGoto(`No answer from ${peerOf(id)?.name ?? "that player"}.`); } }, GOTO_TIMEOUT_MS) };
+    sendGoto({ op: "ask", to: id });
+    note(`You asked ${p.name} if you can come to them.`);
+    drawGoto();
+}
+
+function endGoto(msg) {
+    if (go) clearTimeout(go.timer);
+    go = null; if (el.go) el.go.hidden = true;
+    if (msg) note(msg);
+}
+
+function answerGoto(id) {                                        // I say yes: tell them where I stand
+    const w = api.where();
+    if (!w?.map) { sendGoto({ op: "no", to: id }); return; }
+    sendGoto({ op: "at", to: id, map: w.map, x: w.x, y: w.y, dir: w.dir });
+}
+
+function drawGoto() {
+    const box = el.go; if (!box) return;
+    if (!go || go.st !== "in") { box.hidden = true; return; }
+    const who = peerOf(go.id)?.name ?? "A player";
+    box.hidden = false; box.replaceChildren();
+    box.append(h("div", "hd", h("div", "ttl", `${who} wants to come to you`)),
+        h("div", "acts", btn("Yes", () => { const id = go.id; endGoto(); if (api.canGo()) answerGoto(id); else sendGoto({ op: "no", to: id }); }),
+            btn("No", () => { sendGoto({ op: "no", to: go.id }); endGoto(); })));
+}
+
+async function onGoto(m) {
+    const n = peerOf(m.from)?.name ?? "A player";
+    if (m.op === "ask") {
+        if (go || !api.canGo()) { sendGoto({ op: "no", to: m.from }); return; }
+        if (m.from === partner) { answerGoto(m.from); note(`${n} is coming to you.`); return; }   // a team-up partner needs no prompt
+        go = { st: "in", id: m.from, timer: setTimeout(() => { if (go?.st === "in") { sendGoto({ op: "no", to: go.id }); endGoto(); } }, GOTO_TIMEOUT_MS) };
+        note(`${n} wants to come to you.`); if (S.collapsed) toggleCollapse(); drawGoto();
+    } else if (!go || go.id !== m.from) return;
+    else if (m.op === "cancel" && go.st === "in") endGoto(`${n} cancelled.`);
+    else if (m.op === "no" && go.st === "out") endGoto(`${n} cannot be reached right now.`);
+    else if (m.op === "at" && go.st === "out") {
+        endGoto();
+        const r = await api.warpNear(m.map, m.x, m.y);
+        note(r === "ok" ? `You went to ${n}.` : r === "noroom" ? `There is no free ground next to ${n}.` : r === "busy" ? "Not now - finish what you are doing first." : `${n} is somewhere you cannot go.`);
+    }
+}
+
 // ------------------------------------------------------------ the Server Champ night
 // The game's own Online Center promises exactly this: "Server Champs can battle with others to be the next World
 // Champ", and the stated goal "to become the strongest of the over 200,000 players" (dw3-systems-reference,
@@ -581,6 +627,8 @@ export function socialQuestDone(title) { if (isOnline() && api) post("quest", `f
 
 function pollSelf() {
     if (!api) return;
+    const mapNow = api.currentMapId();
+    if (mapNow !== myMapSeen) { myMapSeen = mapNow; drawPlayers(); }      // my map changed: my row and every "same map" mark follow
     const on = serverChampOn();
     if (on !== champOn) {                                    // the switch flipped: the bracket strip appears or goes
         champOn = on;
@@ -684,8 +732,9 @@ export function installSocial({ stageEl, api: a }) {
     const tradeBox = h("div", "mp-win wide"); tradeBox.hidden = true;
     const duelBox = h("div", "mp-win"); duelBox.hidden = true;
     const coopBox = h("div", "mp-win"); coopBox.hidden = true;
-    stageEl.append(dock, inspect, tradeBox, duelBox, coopBox);
-    el = { log, players, tabs, unread, toggle, inspect, trade: tradeBox, duel: duelBox, coop: coopBox };
+    const goBox = h("div", "mp-win"); goBox.hidden = true;
+    stageEl.append(dock, inspect, tradeBox, duelBox, coopBox, goBox);
+    el = { log, players, tabs, unread, toggle, inspect, trade: tradeBox, duel: duelBox, coop: coopBox, go: goBox };
     tabs.all.classList.add("on");
 
     const submit = () => {
@@ -701,7 +750,7 @@ export function installSocial({ stageEl, api: a }) {
         input.blur(); api.releaseKeys();
     };
     // typing here must not walk the character or press game buttons
-    for (const box of [dock, inspect, tradeBox, duelBox, coopBox]) {
+    for (const box of [dock, inspect, tradeBox, duelBox, coopBox, goBox]) {
         for (const type of ["keydown", "keyup", "keypress"]) box.addEventListener(type, (e) => { if (e.key !== "F4") e.stopPropagation(); });
         box.addEventListener("focusin", () => api.releaseKeys());
     }
@@ -722,14 +771,16 @@ export function installSocial({ stageEl, api: a }) {
             if (duel && !peerHere(duel.id) && duel.st !== "fight") endDuel("The other player left.");
             if (partner != null && !peerHere(partner)) { partner = null; note("Your party partner left."); }
             if (partyAsk && !peerHere(partyAsk.id)) { partyAsk = null; drawCoop(); }
+            if (go && !peerHere(go.id)) endGoto("The other player left.");
             if (coop && !peerHere(coop.id)) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); }
         }
         else if (type === "trade") onTrade(d);
         else if (type === "duel") onDuel(d);
         else if (type === "coop") onCoop(d);
+        else if (type === "goto") onGoto(d);
         else if (type === "league") onLeague(d);
         else if (type === "status") {
-            if (d.status !== "online") { if (trade) endTrade(); if (duel && duel.st !== "fight") endDuel(); closeInspect(); partner = null; partyAsk = null; clearLeague(); if (coop) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); } }
+            if (d.status !== "online") { if (trade) endTrade(); if (duel && duel.st !== "fight") endDuel(); if (go) endGoto(); closeInspect(); partner = null; partyAsk = null; clearLeague(); if (coop) { clearTimeout(coop.timer); const c = coop; coop = null; drawCoop(); if (c.st === "out") c.start(c.foes); } }
             dock.style.display = d.status === "online" && !api.busy() ? "" : "none";
             badge();
         }

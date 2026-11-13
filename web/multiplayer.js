@@ -189,6 +189,8 @@ export function connect(want) {
             emit("trade", m);
         } else if (m.t === "duel") {
             emit("duel", m);
+        } else if (m.t === "goto") {
+            emit("goto", m);
         } else if (m.t === "coop") {
             emit("coop", m);
         } else if (m.t === "mpb") {
@@ -317,6 +319,7 @@ export function sendFeed(kind, text) { return sendRaw({ t: "feed", kind, text })
 export function sendCard(card) { return sendRaw({ t: "card", card }); }
 export const sendTrade = (o) => sendRaw({ t: "trade", ...o });
 export const sendDuel = (o) => sendRaw({ t: "duel", ...o });
+export const sendGoto = (o) => sendRaw({ t: "goto", ...o });
 export const sendCoop = (o) => sendRaw({ t: "coop", ...o });
 /** A many-vs-many fight message to these players (web/mpbattle.js). */
 export const sendMpb = (ids, d) => sendRaw({ t: "mpb", to: ids, d });
@@ -479,6 +482,11 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     badge.id = "mp-badge"; badge.hidden = true; badge.title = "Multiplayer (F4)";
     toastEl = document.createElement("div"); toastEl.id = "mp-toast";
     stageEl.append(panel, badge, toastEl);
+    // the room label sits under the map label (#hud, whose height changes with the partner row)
+    const hudEl = document.getElementById("hud");
+    const placeBadge = () => { badge.style.top = (hudEl && hudEl.offsetHeight ? hudEl.offsetTop + hudEl.offsetHeight + 4 : 8) + "px"; };
+    if (hudEl && typeof ResizeObserver === "function") new ResizeObserver(placeBadge).observe(hudEl);
+    placeBadge();
     const $ = (id) => panel.querySelector("#" + id);
     mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") };
     mp.defaultName = defaultName;               // the first multiplayerTick uses it for the page-start rejoin

@@ -17,6 +17,7 @@
 //   {t:"mpb", to:[ids], d:{...}}    a many-vs-many fight message (turns, actions, results) passed to those players (see #mpb)
 //   {t:"coop", op, to, ...}         team-up and shared fights between two players (see #coop)
 //   {t:"duel", op, to, hp, won}     a friendly duel: ask / yes / no / cancel / result, passed to player `to` (see #direct)
+//   {t:"goto", op, to, map, x, y, dir} "I want to go to you": ask / no / cancel, and at{map,x,y,dir} = my place, sent back to the asker (see #goto)
 //   {t:"lg", op, ...}               a Server Champ night among the room's tamers (see #lg)
 //   {t:"bye"}                     I am leaving for good (the Leave button): my seat is freed at once, not kept
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
@@ -45,6 +46,7 @@ const CHAT_GAP = 600;                // ms between two chat lines from one playe
 const CHAT_MAX = 100, FEED_MAX = 90, CARD_MAX = 2000;
 const FEED_KINDS = new Set(["level", "quest", "evolve", "info"]);
 const DUEL_OPS = new Set(["ask", "yes", "no", "cancel", "result"]);
+const GOTO_OPS = new Set(["ask", "no", "cancel", "at"]);
 const COOP_OPS = new Set(["pask", "pyes", "pno", "pleave", "ask", "yes", "no", "cancel", "hit", "stat"]);
 
 export const AWAY_MS = 120000;       // how long a dropped rejoin-aware player's seat is kept (id, name, place, card)
@@ -279,6 +281,7 @@ export class Hub {
         if (m.t === "trade") return this.#trade(r, peer, m);
         if (m.t === "duel") return this.#direct(r, peer, m, "duel", DUEL_OPS);
         if (m.t === "coop") return this.#coop(r, peer, m);
+        if (m.t === "goto") return this.#goto(r, peer, m);
         if (m.t === "mpb") return this.#mpb(r, peer, m);
         if (m.t === "lg") return this.#lg(r, peer, m);
         if (m.t === "emote" && Number.isInteger(m.e) && m.e >= 0 && m.e <= 7) {
@@ -340,6 +343,21 @@ export class Hub {
         if (m.op === "result") {
             out.hp = typeof m.hp === "number" && Number.isFinite(m.hp) ? Math.max(0, Math.min(1, m.hp)) : 0;
             out.won = !!m.won;
+        }
+        this.#to(to, out);
+    }
+
+    // ---- #goto
+    // "Go to the other player": ask / no / cancel carry nothing; at{map,x,y,dir} is the answerer's own place, sent to the asker.
+    // Only the named player gets it, the sender is filled in, and the place is cleaned like a position (stage id, numbers, facing).
+    #goto(r, peer, m) {
+        const to = r.peers.get(m.to);
+        if (!to || to === peer || to.away || !GOTO_OPS.has(m.op)) return;
+        const out = { t: "goto", op: m.op, from: peer.id };
+        if (m.op === "at") {
+            if (!MAP_ID.test(m.map ?? "") || !finite(m.x, 100000) || !finite(m.y, 100000)) return;
+            out.map = m.map; out.x = Math.round(m.x); out.y = Math.round(m.y);
+            out.dir = DIRS.test(m.dir ?? "") ? m.dir : "down";
         }
         this.#to(to, out);
     }

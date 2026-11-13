@@ -17,6 +17,7 @@ Line numbers are for the files as they are on this branch. Files: `web/multiplay
 - `web/multiplayer.js`: the F4 panel, the WebSocket, position sending, smoothing of other players (MP:367-447 panel, MP:86-169 connect).
 - `web/mpsocial.js`: chat / feed / players / inspect / trade / duel / team-up / Server Champ box (SOC:11 imports, SOC:711-736 event wiring).
 - `web/mpbattle.js` (+ `mpbattle-rules.js`, `mpbattle-menus.js`, `mp-credit.js`): the many-vs-many fight. One player is the referee (BAT:1-20).
+- `web/mp-goto.js`: pure "stand next to this spot" picker for Go to (rings of spots around the friend, first one the game's foot-box test says is free).
 - `web/mp-league.js`: pure rules of the Server Champ night; the relay keeps the object (ROOM:28, ROOM:295-332).
 - `web/game.js` hooks: `installMultiplayer` GAME:504, `installMpBattle` GAME:506-523, `installSocial` GAME:544-613, fight messages GAME:4986-4991, per-frame tick GAME:11019, other players drawn GAME:10816-10818 and GAME:11017-11018.
 - `web/cardduel-net.js` is NOT connected to the relay: only its own test imports it (`tests/cardduel-net.test.js:16`; no `web/` file imports it).
@@ -91,6 +92,7 @@ All messages are JSON text. Every message except a card and an `mpb` must be 600
 | `trade` | ask, yes, no, cancel, offer (up to 12 items, bits), ok; back: ask, open, offer, ok, done, end | The relay keeps both offers and who pressed OK; any change clears both OKs (ROOM:347-384). On `done` each game moves its own items (GAME:595-610). On event only. |
 | `duel` | ask, yes, no, cancel, result (hp 0..1, won) | Passed to one named player (ROOM:231-240). On event. |
 | `coop` | pask, pyes, pno, pleave (team up); ask (foes up to 6, label, screens), yes, no, cancel | Passed to one named player (ROOM:258-281). A fight invite times out after 14 s on both sides (SOC:378-382, SOC:442). |
+| `goto` | ask, no, cancel, at (map, x, y, dir) | "Go to" in the PLAYERS tab. Passed to one named player (ROOM `#goto`). The asked player answers `at` with the stage id and position they stand at (a yes; a team-up partner is answered at once with no prompt) or `no`; the asker's game then warps next to that spot (`warpNear`, GAME api, `web/mp-goto.js` picks a walkable spot). 14 s timeout on both sides; refused while either player is in a battle, cutscene or menu. On event only. |
 | `coop` hit / stat | enemy index + hp; my Digimon name and hp | Accepted by the relay (ROOM:273-279). The client code never sends them (no `op: "hit"` or `op: "stat"` in `web/`). Unused. |
 | `lg` | open, next, win, drop | Server Champ night. Only sent when F2 switch "Server Champ league" is on (MP:255). Host-only except `drop` (ROOM:295-332). The relay sends the whole bracket on every change (ROOM:290-293). |
 
