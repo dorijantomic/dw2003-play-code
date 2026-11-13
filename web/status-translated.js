@@ -12,6 +12,9 @@ import {
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
+import { collectNativeTextRuns } from "./native-screen-text.js";
+import { fadeDim, pauseHomeLayout, widgetInside } from "./ui-css-model.js";
+import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 
 // The picture handles the pages ask for: the pause chrome, the shared item/icon
@@ -28,6 +31,7 @@ const packNameFor = (handle) => PACKS[handle] ?? PACKS[(handle >>> 16) & 0xffff]
 const PAGES = new Set(["home", "items", "sort", "map", "techniques", "status", "cardfolders", "quests"]);
 
 const DATA_LABEL = "Pause data";
+let pauseCount = 0;
 
 let sharedPromise = null;
 const loadShared = () => {
@@ -79,8 +83,13 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         // still know how to close the pause. See returnToPauseCardFolders in
         // web/pause-home.js for the evidence.
         _returnClose: null,
+        _uiKey: `pause${++pauseCount}`,
     };
-    const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor);
+    // OPTIONS > UI look: Smooth draws the pause home list (panel, money band, row labels, cursor) as DOM + CSS (web/ui-css.js).
+    // While it does, the canvas skips exactly those cmfont clips and those text widgets; Pixel never fills this set.
+    const skipClips = new Set();
+    const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor,
+        { skipClip: (name, id) => skipClips.size > 0 && name === "cmfont" && skipClips.has(id) });
     const playPackedSound = (id) => {
         const key = id >>> 0;
         st._packed[key] = (st._packed[key] ?? 0) + 1;
@@ -258,12 +267,26 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         }
     };
 
-    st.draw = (ctx, viewW = 320) => {
+    st.draw = (ctx, viewW = 320, viewH = viewW * 0.75) => {
         if (!st._open || !st._session) return;
         const session = st._session;
+        skipClips.clear();
+        let skipWidget = null;
+        if (st._entry === "home" && uiLookSmooth() && uiCssAvailable()) {
+            const lay = pauseHomeLayout(session.draw.calls, session.draw.contextMarkers);
+            if (lay) {
+                const inside = (w) => widgetInside(lay.textRects, w.penX, w.penY);
+                const runs = collectNativeTextRuns(session.widgets.textWidgets(), { only: inside });
+                if (uiCssShow(st._uiKey, { tiled: lay.tiled }, runs, { w: viewW, h: viewH }, { dim: fadeDim(session.quads) })) {
+                    for (const id of lay.skipClips) skipClips.add(id);
+                    skipWidget = inside;
+                }
+            }
+        }
+        if (!skipWidget) uiCssHide(st._uiKey);
         ctx.save();
         ctx.scale(viewW / 320, viewW / 320);
-        paintNativeSession(ctx, renderer, session, { fade: false });
+        paintNativeSession(ctx, renderer, session, { fade: false, skipWidget });
         for (const q of session.quads) {
             // The fade is a subtractive quad whose grey level is how far the screen has darkened.
             ctx.fillStyle = q.semiTransparent ? `rgba(0,0,0,${q.r / 255})` : `rgb(${q.r},${q.g},${q.b})`;
@@ -277,6 +300,7 @@ export function createStatusTranslated(sfx = null, opts = {}) {
     st._finish = (commit = true) => {
         if (!st._open) return;
         st._open = false;
+        uiCssHide(st._uiKey);
         ++st._request;
         const session = st._session;
         st._session = null;

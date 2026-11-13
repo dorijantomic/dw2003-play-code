@@ -19,6 +19,10 @@
 //     (substate 10). The window's fold and the close-before-answer timing are the
 //     remaining part of the same decode (the walker still shows/hides instantly).
 import { drawWindow } from "./uiRects.js";
+import { choiceLayout } from "./ui-css-model.js";
+import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
+
+let choiceCount = 0;
 
 /** The move blip: `ori $a0,0x513e` at file 0x19bc (the packed id). */
 export const CHOICE_MOVE_SOUND = 0x8004513e;
@@ -26,6 +30,7 @@ export const CHOICE_MOVE_SOUND = 0x8004513e;
 export const CHOICE_CONFIRM_SOUND = 0x8004503c;
 
 export function createChoice(sfx = null) {
+  const uiKey = `choice${++choiceCount}`;
   const ch = {
     prompt: "",
     options: [],
@@ -65,7 +70,11 @@ export function createChoice(sfx = null) {
 
   // Drawn in SCREEN space (call after ctx.restore()).
   ch.draw = (ctx, viewW, viewH) => {
-    if (!ch.isOpen()) return;
+    if (!ch.isOpen()) { uiCssHide(uiKey); return; }
+    // OPTIONS > UI look: Smooth draws this same box (window, prompt, options, cursor, at these same positions) as DOM + CSS
+    // vectors (web/ui-css.js) and leaves the canvas empty; Pixel (default) is the canvas drawing below, unchanged.
+    if (uiLookSmooth() && uiCssAvailable() && uiCssShow(uiKey, { choice: choiceLayout(ch, viewW, viewH) }, [], { w: viewW, h: viewH })) return;
+    uiCssHide(uiKey);
     const lineH = 24, pad = 16;
     const boxH = pad * 2 + lineH + ch.options.length * lineH;
     const x = 12, w = viewW - 24;

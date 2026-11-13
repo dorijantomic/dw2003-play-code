@@ -227,6 +227,7 @@ export function drawNativeTextWidgets(ctx, widgets, opts = {}) {
     if (!fontReady()) return stats;
     for (const w of widgets) {
         if (!w.visible) continue;
+        if (opts.skip && opts.skip(w)) continue;   // a widget the vector UI look draws instead (web/ui-css.js)
         const kind = kindOf(w);
         if (kind === null) { stats.unknown += 1; continue; }
         // Decode every line first so a 0x02,0x05,N substitution can render the
@@ -273,6 +274,7 @@ export function collectNativeTextRuns(widgets, opts = {}) {
     if (!fontReady()) return runs;
     for (const w of widgets) {
         if (!w.visible) continue;
+        if (opts.only && !opts.only(w)) continue;   // `only`: the widgets this overlay draws (the others stay on the canvas)
         const kind = kindOf(w);
         if (kind === null) continue;
         const plain = w.lines.map((l) => (l.bytes && l.len ? decodeNativeText(l.bytes).text : ""));

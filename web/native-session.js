@@ -14,9 +14,9 @@ import { paintScreenDim } from "./screendim.js";
  * welcome message — must ask for it; a screen that draws the whole line instead
  * stops at the first pause control code and never advances a page.
  */
-export function paintNativeSession(ctx, renderer, session, { fade = true, revealWindow = false } = {}) {
+export function paintNativeSession(ctx, renderer, session, { fade = true, revealWindow = false, skipWidget = null } = {}) {
     renderer.draw(ctx, session.draw.calls, null, [], session.draw.contextMarkers);
-    drawNativeTextWidgets(ctx, session.widgets.textWidgets(), { revealWindow });
+    drawNativeTextWidgets(ctx, session.widgets.textWidgets(), skipWidget ? { revealWindow, skip: skipWidget } : { revealWindow });
     if (!fade) return;
     const level = session.fadeLevel();
     if (level) paintScreenDim(ctx, level, 320, 240);

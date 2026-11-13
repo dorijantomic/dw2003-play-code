@@ -9,8 +9,10 @@
 // The CSS layer draws only what the game already decided: positions come from the session's own draw calls
 // (layoutFromIntents), the text from its own widgets. Timing, input and sound are untouched.
 //
-// Pause list (part b): measured and pinned here (PAUSE_LIST), but NOT drawn in CSS yet: its row text, cursor and icons are
-// canvas-drawn on top of the panel, and a DOM panel above the canvas would cover them. See the report.
+// Slice 2 (second half of this file): the choice list, the Yes/No window and the pause home list (panel, money band, row text and
+// cursor). Their pieces are flat bands and lines like the balloon's: tile row tables (TILES) are composed into the fewest
+// rectangles (composeRects) so the DOM layer draws them as sharp boxes. The canvas skips exactly the sprites and text widgets the
+// overlay draws (pauseHomeLayout / widgetInside), so nothing is drawn twice and nothing is hidden.
 
 export const UI_W = 320;
 export const UI_H = 240;
@@ -272,6 +274,283 @@ export function layoutFromIntents(calls, raw = [], contextMarkers = []) {
     return { balloon, band };
 }
 
+// ================================================================================================ slice 2
+// ------------------------------------------------------------------------------------------------ tiles (cmfont frames)
+/**
+ * Row tables of the cmfont frames the list panel, the money band and the Yes/No window are built from, read from the sheet:
+ * frame -> { w, h, rows: [[firstRow, rowCount, [[hexColour | null (clear), runWidth], ...]], ...] }. Every frame is a flat band
+ * or line pattern (a 1px blue-violet edge, navy bodies, a dark row line), nothing else. Frames 56..61 are the pause list panel
+ * (engine/dw3/ui/native/pause-list.ts, web/panel-kit.js), 47/48 the money band (clip 0x1a), 62/63 the Yes/No window (clip 0x45).
+ */
+export const TILES = Object.freeze({
+    47: { w: 24, h: 21, rows: [
+        [0, 1, [["6868d0",24]]],
+        [1, 2, [["000048",24]]],
+        [3, 1, [["6868d0",24]]],
+        [4, 14, [["000020",24]]],
+        [18, 1, [["6868d0",24]]],
+        [19, 2, [["000008",24]]],
+    ] },
+    48: { w: 12, h: 21, rows: [
+        [0, 1, [["6868d0",10],[null,2]]],
+        [1, 1, [["000048",9],["6868d0",1],[null,2]]],
+        [2, 1, [["000048",9],["6868d0",1],["000008",2]]],
+        [3, 1, [["6868d0",5],["000048",4],["6868d0",1],["000008",2]]],
+        [4, 10, [["000020",4],["6868d0",1],["000048",4],["6868d0",1],["000008",2]]],
+        [14, 1, [["000020",3],["303068",1],["6868d0",1],["000048",4],["6868d0",1],["000008",2]]],
+        [15, 1, [["000020",2],["303068",1],["6868d0",1],["000048",5],["6868d0",1],["000008",2]]],
+        [16, 1, [["000020",1],["303068",1],["6868d0",1],["000048",6],["6868d0",1],["000008",2]]],
+        [17, 1, [["303068",1],["6868d0",1],["000048",7],["6868d0",1],["000008",2]]],
+        [18, 1, [["6868d0",10],["000008",2]]],
+        [19, 2, [["000008",12]]],
+    ] },
+    56: { w: 40, h: 22, rows: [
+        [0, 1, [[null,4],["6868d0",36]]],
+        [1, 1, [[null,3],["6868d0",1],["303068",1],["000048",35]]],
+        [2, 1, [[null,2],["6868d0",1],["303068",1],["000048",36]]],
+        [3, 1, [[null,1],["6868d0",1],["303068",1],["6868d0",37]]],
+        [4, 1, [["6868d0",1],["303068",1],["000020",38]]],
+        [5, 16, [["6868d0",1],["000020",39]]],
+        [21, 1, [["6868d0",1],["000020",20],["282870",19]]],
+    ] },
+    57: { w: 40, h: 22, rows: [
+        [0, 1, [["6868d0",40]]],
+        [1, 2, [["000048",40]]],
+        [3, 1, [["6868d0",40]]],
+        [4, 17, [["000020",40]]],
+        [21, 1, [["282870",40]]],
+    ] },
+    58: { w: 40, h: 14, rows: [
+        [0, 13, [["6868d0",1],["000020",39]]],
+        [13, 1, [["6868d0",1],["000020",20],["282870",19]]],
+    ] },
+    59: { w: 40, h: 14, rows: [
+        [0, 13, [["000020",40]]],
+        [13, 1, [["282870",40]]],
+    ] },
+    60: { w: 40, h: 20, rows: [
+        [0, 13, [["6868d0",1],["000020",39]]],
+        [13, 1, [["6868d0",1],["303068",1],["000020",19],["282870",19]]],
+        [14, 1, [[null,1],["6868d0",1],["303068",1],["000020",37]]],
+        [15, 1, [[null,2],["6868d0",1],["303068",1],["000020",36]]],
+        [16, 1, [[null,3],["6868d0",1],["303068",1],["000020",35]]],
+        [17, 1, [[null,4],["5050a0",36]]],
+        [18, 1, [[null,5],["000008",35]]],
+        [19, 1, [[null,6],["000008",34]]],
+    ] },
+    61: { w: 40, h: 20, rows: [
+        [0, 13, [["000020",40]]],
+        [13, 1, [["282870",40]]],
+        [14, 3, [["000020",40]]],
+        [17, 1, [["5050a0",40]]],
+        [18, 2, [["000008",40]]],
+    ] },
+    62: { w: 20, h: 50, rows: [
+        [0, 1, [["6868d0",20]]],
+        [1, 46, [["000020",20]]],
+        [47, 1, [["6868d0",20]]],
+        [48, 2, [["000008",20]]],
+    ] },
+    63: { w: 4, h: 50, rows: [
+        [0, 1, [["6868d0",4]]],
+        [1, 46, [["6868d0",1],["000020",3]]],
+        [47, 1, [["6868d0",4]]],
+        [48, 2, [["000008",4]]],
+    ] },
+});
+
+// ------------------------------------------------------------------------------------------------ composing tiles into boxes
+/**
+ * Lay `placements` ([[frame, dx, dy], ...], back to front) on a w x h grid and return the fewest boxes that cover it:
+ * [{ x, y, w, h, colour }] in native px relative to the grid origin. Clear texels leave what is behind them (as the sheet's
+ * alpha does). Pure.
+ */
+export function composeRects(placements, w, h) {
+    const grid = Array.from({ length: h }, () => new Array(w).fill(null));
+    for (const [frame, dx, dy] of placements) {
+        const t = TILES[frame];
+        if (!t) throw new Error(`no tile ${frame}`);
+        for (const [start, count, runs] of t.rows) {
+            for (let r = 0; r < count; r++) {
+                const y = dy + start + r;
+                if (y < 0 || y >= h) continue;
+                let x = dx;
+                for (const [c, n] of runs) {
+                    if (c) for (let i = 0; i < n; i++) if (x + i >= 0 && x + i < w) grid[y][x + i] = c;
+                    x += n;
+                }
+            }
+        }
+    }
+    const open = new Map();   // "x,w,colour" -> the box still growing downwards
+    const rects = [];
+    for (let y = 0; y < h; y++) {
+        let x = 0;
+        while (x < w) {
+            const c = grid[y][x];
+            let e = x + 1;
+            while (e < w && grid[y][e] === c) e++;
+            if (c) {
+                const key = `${x},${e - x},${c}`, r = open.get(key);
+                if (r && r.y + r.h === y) r.h++;
+                else { const nr = { x, y, w: e - x, h: 1, colour: `#${c}` }; rects.push(nr); open.set(key, nr); }
+            }
+            x = e;
+        }
+    }
+    return rects;
+}
+
+const composed = new Map();
+function composedCached(key, build) {
+    if (!composed.has(key)) composed.set(key, build());
+    return composed.get(key);
+}
+
+/** The pause list panel for `rows` rows: top band (frames 56/57), rows-2 middle bands (58/59), bottom band (60/61); 160 wide. */
+export function pausePanelPlacements(rows) {
+    const P = PAUSE_LIST.panel, out = [];
+    const band = (left, mid, dy) => { out.push([left, 0, dy]); for (let c = 1; c < P.w / P.tile; c++) out.push([mid, c * P.tile, dy]); };
+    band(56, 57, 0);
+    for (let b = 0; b < rows - 2; b++) band(58, 59, P.topH + b * P.bandH);
+    band(60, 61, P.topH + (rows - 2) * P.bandH);
+    return out;
+}
+export const pausePanelRects = (rows) => composedCached(`panel${rows}`, () => composeRects(pausePanelPlacements(rows), PAUSE_LIST.panel.w, panelHeightFor(rows)));
+
+/** The money band (clip 0x1a): four 24-wide column frames and the 12-wide slanted end, 108 x 21. */
+export const MONEY_BAND_PLACEMENTS = Object.freeze([[47, 0, 0], [47, 24, 0], [47, 48, 0], [47, 72, 0], [48, 96, 0]]);
+export const moneyBandRects = () => composedCached("band", () => composeRects(MONEY_BAND_PLACEMENTS, PAUSE_LIST.helpBand.w, PAUSE_LIST.helpBand.h));
+
+/** The Yes/No window (clip 0x45): sixteen 20-wide frames and the two 4-wide upright lines at x 12 and 306, 320 x 50. */
+export const YESNO_WINDOW = Object.freeze({ clip: 0x45, w: 320, h: 50 });
+export const YESNO_PLACEMENTS = Object.freeze([...Array.from({ length: 16 }, (_, i) => [62, i * 20, 0]), [63, 12, 0], [63, 306, 0]]);
+export const yesNoRects = () => composedCached("yesno", () => composeRects(YESNO_PLACEMENTS, YESNO_WINDOW.w, YESNO_WINDOW.h));
+
+// ------------------------------------------------------------------------------------------------ from the game's draw calls
+/** A sprite draw as a placed rect: { x, y, w, h, sx, sy, px, py } (sx/sy = the scale the renderer applies about (px, py)). */
+const placedRect = (s, w, h) => ({ x: s.x, y: s.y, w, h, sx: s.sx, sy: s.sy, px: s.px, py: s.py });
+
+/** Where a placed rect lands: the renderer does translate(px,py) scale(sx,sy) translate(-px,-py), so a point p goes to px + (p - px) * sx. */
+export function scaledRect(r) {
+    const sx = r.sx ?? 1, sy = r.sy ?? 1, px = r.px ?? 0, py = r.py ?? 0;
+    return { x: px + (r.x - px) * sx, y: py + (r.y - py) * sy, w: r.w * sx, h: r.h * sy };
+}
+
+/** Panel clip -> row count: the disc's three (0x1c 5, 0x1b 6, 0x19 7) and web/panel-kit.js's extra ones (0x100 + rows, 8..12). */
+export const PAUSE_PANEL_CLIP_ROWS = Object.freeze({ 0x1c: 5, 0x1b: 6, 0x19: 7 });
+export const PAUSE_PANEL_EXTRA_BASE = 0x100;
+export function pausePanelRows(clip) {
+    if (PAUSE_PANEL_CLIP_ROWS[clip]) return PAUSE_PANEL_CLIP_ROWS[clip];
+    return clip > PAUSE_PANEL_EXTRA_BASE + 7 && clip <= PAUSE_PANEL_EXTRA_BASE + 12 ? clip - PAUSE_PANEL_EXTRA_BASE : 0;
+}
+
+/**
+ * The pause home list as the overlay shows it, from the session's own draw calls: the row panel (any of its clips, at (168,40))
+ * and the money band (clip 0x1a at (0,158)). Returns null when neither is drawn (another page). `tiled` = what the overlay
+ * draws; `skipClips` = the cmfont clips the canvas must then not draw; `textRects` = the native rects whose text widgets
+ * (row labels, the cursor, the BIT amount) the overlay draws instead of the canvas.
+ */
+export function pauseHomeLayout(calls, contextMarkers = []) {
+    const sprites = spritesFromCalls(calls, contextMarkers);
+    const P = PAUSE_LIST.panel, B = PAUSE_LIST.helpBand;
+    const ps = sprites.find((s) => s.x === P.x && s.y === P.y && pausePanelRows(s.id) > 0);
+    const bs = sprites.find((s) => s.id === B.clip && s.x === B.x && s.y === B.y);
+    if (!ps && !bs) return null;
+    const tiled = [], skipClips = [], textRects = [];
+    if (ps) {
+        const rows = pausePanelRows(ps.id), h = panelHeightFor(rows);
+        tiled.push({ name: "pause-panel", rect: placedRect(ps, P.w, h), rects: pausePanelRects(rows) });
+        skipClips.push(ps.id);
+        textRects.push({ x: P.x, y: P.y, w: P.w, h });
+    }
+    if (bs) {
+        tiled.push({ name: "pause-money-band", rect: placedRect(bs, B.w, B.h), rects: moneyBandRects() });
+        skipClips.push(bs.id);
+        textRects.push({ x: B.x, y: B.y, w: B.w, h: B.h });
+    }
+    return { tiled, skipClips, textRects };
+}
+
+/** True when a text widget's pen sits inside one of the native rects (the widget belongs to a panel the overlay draws). */
+export function widgetInside(rects, penX, penY) {
+    return rects.some((r) => penX >= r.x && penX < r.x + r.w && penY >= r.y && penY < r.y + r.h);
+}
+
+/** The Yes/No box from its own draw calls: the window clip (scaled about its pivot while it folds open or shut), or null. */
+export function yesNoLayout(calls, contextMarkers = []) {
+    const s = spritesFromCalls(calls, contextMarkers).find((x) => x.id === YESNO_WINDOW.clip);
+    if (!s) return null;
+    return { tiled: [{ name: "yesno-window", rect: placedRect(s, YESNO_WINDOW.w, YESNO_WINDOW.h), rects: yesNoRects() }] };
+}
+
+/** The full-screen fade the pause pages submit as a semi-transparent flat quad (web/status-translated.js draw): 0..1 darkening. */
+export function fadeDim(quads = []) {
+    let dim = 0;
+    for (const q of quads) if (q.semiTransparent && q.w >= UI_W && q.h >= UI_H) dim = Math.max(dim, Math.min(1, q.r / 255));
+    return dim;
+}
+
+// ------------------------------------------------------------------------------------------------ the list cursor and symbol glyphs
+/**
+ * The cursor frames the game swaps in the list cursor's text widget (uifont.js CURSOR_FRAMES: [enter] small solid triangle,
+ * [enter2] large solid triangle, [select] short bar, [space2] nothing). Kind-1 face, 8 wide x 12 high cell, 7 advance; each
+ * row is one char per pixel, "." clear, "1" the font palette's shadow entry, "2" its face entry (read off the sheet).
+ */
+export const SYMBOL_GLYPHS = Object.freeze({
+    "[enter]": Object.freeze({ w: 8, h: 12, rows: ["........", "111.....", "1221....", "12221...", "122221..", "1222221.", "1222221.", "122221..", "12221...", "1221....", "111.....", "........"] }),
+    "[enter2]": Object.freeze({ w: 8, h: 12, rows: ["........", "222.....", "2222....", "22222...", "222222..", "2222222.", "2222222.", "222222..", "22222...", "2222....", "222.....", "........"] }),
+    "[select]": Object.freeze({ w: 8, h: 12, rows: ["........", "........", "........", "........", "111111..", "1222221.", "1222221.", "111111..", "........", "........", "........", "........"] }),
+    "[space2]": Object.freeze({ w: 8, h: 12, rows: Array.from({ length: 12 }, () => "........") }),
+});
+
+/** A symbol glyph as boxes [{ x, y, w, h, index }] (index 1 = shadow entry, 2 = face entry); equal runs on neighbouring rows are one box. */
+export function glyphBoxes(glyph) {
+    const open = new Map(), out = [];
+    glyph.rows.forEach((row, y) => {
+        let x = 0;
+        while (x < row.length) {
+            const c = row[x];
+            let e = x + 1;
+            while (e < row.length && row[e] === c) e++;
+            if (c !== ".") {
+                const key = `${x},${e - x},${c}`, b = open.get(key);
+                if (b && b.y + b.h === y) b.h++;
+                else { const nb = { x, y, w: e - x, h: 1, index: Number(c) }; out.push(nb); open.set(key, nb); }
+            }
+            x = e;
+        }
+    });
+    return out;
+}
+
+// ------------------------------------------------------------------------------------------------ the choice list
+/**
+ * web/choice.js draws the quest / lot choice list itself (the game has no translated session for it): a bottom-anchored box in
+ * VIEW pixels, 12 from the sides and bottom, rgb(0,0,32) with a 1px rgb(104,104,208) edge, a prompt line and one 24px row per
+ * option with a cursor. `choiceLayout` is that same arithmetic, converted to the 320x240 space the overlay lives in.
+ */
+export const CHOICE_LOOK = Object.freeze({
+    lineH: 24, pad: 16, margin: 12, fontPx: 16, fill: "rgb(0,0,32)", edge: "rgb(104,104,208)",
+    prompt: "#e8e8f8", cursor: "#f0f0f0", picked: "#ffffff", other: "#a8a8c8", font: "monospace",
+});
+export function choiceLayout(choice, viewW = 640, viewH = 480) {
+    const L = CHOICE_LOOK, s = uiViewScale(viewW, viewH), n = (v) => v / s;
+    const options = choice.options ?? [];
+    const boxH = L.pad * 2 + L.lineH + options.length * L.lineH;
+    const x = L.margin, w = viewW - 2 * L.margin, y = viewH - boxH - L.margin;
+    const rowY = (i) => y + L.pad + L.lineH + i * L.lineH + 14;      // text baseline of option i
+    const idx = Math.max(0, Math.min(options.length - 1, choice.cursorIdx | 0));
+    return {
+        scale: s, fontPx: n(L.fontPx), edge: n(1),
+        window: { x: n(x), y: n(y), w: n(w), h: n(boxH) },
+        prompt: { text: String(choice.prompt ?? ""), x: n(x + L.pad), y: n(y + L.pad + 12), fill: L.prompt },
+        options: options.map((text, i) => ({ text: String(text), x: n(x + L.pad + 16), y: n(rowY(i)), fill: i === idx ? L.picked : L.other })),
+        cursor: options.length ? { text: "▶", x: n(x + L.pad - 4), y: n(rowY(idx)), fill: L.cursor } : null,
+    };
+}
+
+// ------------------------------------------------------------------------------------------------ options value
 /** The OPTIONS row's value is "smooth" only when chosen; anything else (missing, old save, junk) is the untouched pixel look. */
 export const UI_LOOKS = Object.freeze(["pixel", "smooth"]);
 export const isSmoothLook = (value) => value === "smooth";

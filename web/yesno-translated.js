@@ -5,7 +5,9 @@
 // It never executes original instructions and never runs events: start_event is handed to the host.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
-import { drawNativeTextWidgets } from "./native-screen-text.js";
+import { collectNativeTextRuns, drawNativeTextWidgets } from "./native-screen-text.js";
+import { yesNoLayout } from "./ui-css-model.js";
+import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
@@ -15,11 +17,13 @@ const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 const KEY_BITS = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13]];
 
 const DATA_LABEL = "YesNo data";
+let boxCount = 0;
 
 export function createYesNoTranslated(sfx = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null, _pad: null,
         _ticks: 0, _request: 0, _closes: 0, _events: [], _sounds: [], _packed: {}, _primed: false, _row: null,
+        _key: `yesno${++boxCount}`,
     };
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
@@ -67,7 +71,7 @@ export function createYesNoTranslated(sfx = null) {
             const session = new ui.YesNoSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
             session.open(launcherRow, pack, {
                 onStartEvent: (id) => { g._events.push(id); onStartEvent?.(id); },
-                onClose: () => host.finish(),
+                onClose: () => { uiCssHide(g._key); host.finish(); },
             });
             g._session = session;
             g._clock = new ui.MenuDisplayClock();
@@ -106,6 +110,17 @@ export function createYesNoTranslated(sfx = null) {
         if (!g._open || !g._session) return;
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         const { calls, contextMarkers } = g._session.drawIntents();
+        // OPTIONS > UI look: Smooth draws the window, the prompt, both answers and the cursor as DOM + CSS (web/ui-css.js): the
+        // whole box, so nothing of it is left on the canvas. Pixel (default) is the canvas below, unchanged.
+        const layout = uiLookSmooth() && uiCssAvailable() ? yesNoLayout(calls, contextMarkers) : null;
+        if (layout) {
+            const runs = collectNativeTextRuns(g._session.textWidgets());
+            if (uiCssShow(g._key, layout, runs, { w: viewW, h: viewH })) {
+                g._painted = runs.map((r) => r.text);
+                return;
+            }
+        }
+        uiCssHide(g._key);
         ctx.save();
         ctx.scale(s, s);
         renderer.draw(ctx, calls, null, [], contextMarkers, []);
@@ -115,6 +130,7 @@ export function createYesNoTranslated(sfx = null) {
 
     /** Abandon the box without running onClose (the field left another way). */
     g.close = () => {
+        uiCssHide(g._key);
         host.close();
     };
 

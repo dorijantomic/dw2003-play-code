@@ -5,9 +5,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-    BALLOON_FRAME, BALLOON_MODES, CLIP, MARKER, PAUSE_LIST, PLAIN_BAND, TAIL_ROWS, TEXT_FACES, UI_H, UI_W,
-    balloonParts, balloonRects, isSmoothLook, layoutFromIntents, panelHeightFor, spritesFromCalls, tailInnerPolygon, tailPolygon,
-    uiPlacement, uiRectToScreen, uiViewScale,
+    BALLOON_FRAME, BALLOON_MODES, CHOICE_LOOK, CLIP, MARKER, PAUSE_LIST, PLAIN_BAND, SYMBOL_GLYPHS, TAIL_ROWS, TEXT_FACES, TILES, UI_H, UI_W,
+    YESNO_PLACEMENTS, YESNO_WINDOW, MONEY_BAND_PLACEMENTS,
+    balloonParts, balloonRects, choiceLayout, composeRects, fadeDim, glyphBoxes, isSmoothLook, layoutFromIntents, moneyBandRects, panelHeightFor,
+    pauseHomeLayout, pausePanelPlacements, pausePanelRects, pausePanelRows, scaledRect, spritesFromCalls, tailInnerPolygon, tailPolygon,
+    uiPlacement, uiRectToScreen, uiViewScale, widgetInside, yesNoLayout, yesNoRects,
 } from "../web/ui-css-model.js";
 import { PAGES, buildRows, createOptionsModel } from "../web/options-model.js";
 
@@ -81,7 +83,7 @@ test("the plain window: band rows, origin of its text, and the marker", () => {
     assert.equal(TEXT_FACES[2].cellH, 9);
 });
 
-test("pause list frames (measured, not drawn in CSS yet)", () => {
+test("pause list frames (measured; slice 2 draws the panel and the money band in CSS)", () => {
     assert.deepEqual([PAUSE_LIST.panel.x, PAUSE_LIST.panel.y, PAUSE_LIST.panel.w], [168, 40, 160]);
     assert.deepEqual([5, 6, 7].map(panelHeightFor), [84, 98, 112]);                                  // equals the sheet's clips 0x1c 0x1b 0x19
     assert.deepEqual([PAUSE_LIST.helpBand.x, PAUSE_LIST.helpBand.y, PAUSE_LIST.helpBand.w, PAUSE_LIST.helpBand.h], [0, 158, 108, 21]);
@@ -206,4 +208,161 @@ test("wiring: default is pixel, the game path is untouched unless the row says s
     assert.match(dt, /renderer\.draw\(ctx, calls, null, \[\], contextMarkers, raw\);/);   // the pixel path is still there, after the branch
     for (const f of ["ui-css.js", "ui-css-model.js"]) assert.doesNotMatch(src(f), /location\.search|URLSearchParams/, `${f} reads no URL flag`);
     assert.match(src("ui-css.js"), /window\.__uiCss = \{/);
+});
+
+// ================================================================================================ slice 2
+const area = (rects) => rects.reduce((a, r) => a + r.w * r.h, 0);
+
+test("tiles: every frame's rows cover its height exactly and its runs add up to its width", () => {
+    assert.deepEqual(Object.keys(TILES).map(Number), [47, 48, 56, 57, 58, 59, 60, 61, 62, 63]);
+    for (const [frame, t] of Object.entries(TILES)) {
+        let next = 0;
+        for (const [start, count, runs] of t.rows) {
+            assert.equal(start, next, `frame ${frame} rows are contiguous`);
+            next += count;
+            assert.equal(runs.reduce((a, [, n]) => a + n, 0), t.w, `frame ${frame} row ${start} is ${t.w} wide`);
+        }
+        assert.equal(next, t.h, `frame ${frame} is ${t.h} high`);
+    }
+    assert.deepEqual([TILES[56].w, TILES[56].h, TILES[58].h, TILES[60].h, TILES[47].w, TILES[48].w, TILES[62].w, TILES[63].w, TILES[62].h], [40, 22, 14, 20, 24, 12, 20, 4, 50]);
+});
+
+test("the pause panel is the sheet's own composition: 22 + 14 per middle band + 20 high, 160 wide, boxes never overlap", () => {
+    assert.deepEqual([5, 6, 7, 8, 9].map((n) => pausePanelPlacements(n).length), [20, 24, 28, 32, 36]);   // = the layer counts of clips 0x1c 0x1b 0x19 and the extra ones
+    for (const [rows, boxes] of [[5, 41], [6, 44], [7, 47], [8, 50], [9, 53]]) {
+        const rects = pausePanelRects(rows), h = panelHeightFor(rows);
+        assert.equal(rects.length, boxes, `${rows} rows`);
+        assert.equal(Math.max(...rects.map((r) => r.y + r.h)), h);
+        assert.equal(Math.max(...rects.map((r) => r.x + r.w)), 160);
+        assert.equal(area(rects), 160 * h - 31, `${rows} rows: every texel but the 31 clear ones in the two chamfered corners`);
+        const seen = new Set();
+        for (const r of rects) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) { assert.ok(!seen.has(y * 160 + x), "no overlap"); seen.add(y * 160 + x); }
+    }
+    // the edge line, the body, the row line
+    const p5 = pausePanelRects(5);
+    assert.ok(p5.some((r) => r.colour === "#6868d0" && r.x === 4 && r.y === 0 && r.w === 156 && r.h === 1), "top edge");
+    assert.ok(p5.some((r) => r.colour === "#282870" && r.y === 21 && r.x === 21 && r.w === 139 && r.h === 1), "first row line, from x 21 to the edge");
+    assert.deepEqual(new Set(p5.map((r) => r.colour)), new Set(["#6868d0", "#303068", "#000048", "#000020", "#282870", "#5050a0", "#000008"]));
+});
+
+test("the money band (108 x 21) and the Yes/No window (320 x 50) compose from their frames", () => {
+    assert.deepEqual(MONEY_BAND_PLACEMENTS.map(([f, dx]) => `${f}@${dx}`), ["47@0", "47@24", "47@48", "47@72", "48@96"]);
+    assert.equal(moneyBandRects().length, 24);
+    assert.equal(area(moneyBandRects()), 108 * 21 - 4);                      // the slanted end clears two texels in each of its top two rows
+    assert.equal(Math.max(...moneyBandRects().map((r) => r.x + r.w)), 108);
+    assert.equal(YESNO_PLACEMENTS.length, 18);
+    assert.deepEqual(YESNO_PLACEMENTS.slice(-2), [[63, 12, 0], [63, 306, 0]]);
+    assert.equal(yesNoRects().length, 8);
+    assert.equal(area(yesNoRects()), 320 * 50);
+    assert.ok(yesNoRects().some((r) => r.colour === "#6868d0" && r.x === 12 && r.w === 1 && r.y === 1 && r.h === 46), "the upright line at x 12");
+    assert.deepEqual([YESNO_WINDOW.clip, YESNO_WINDOW.w, YESNO_WINDOW.h], [0x45, 320, 50]);
+});
+
+test("composeRects: later frames cover earlier ones only where they are not clear", () => {
+    const r = composeRects([[56, 0, 0]], 40, 22);
+    assert.equal(area(r), 40 * 22 - 10);                                      // four + three + two + one clear texels at the top-left chamfer
+    assert.equal(composeRects([[56, 0, 0], [57, 0, 0]], 40, 22).length, composeRects([[57, 0, 0]], 40, 22).length, "frame 57 is solid, so it hides frame 56");
+});
+
+test("pauseHomeLayout: the panel and the money band from the session's own draw calls, any row count", () => {
+    const home = (clip) => [{ method: "setScale", args: [0x1000, 0x1000, 0x1000] }, sprite(0x15, 0, 0x11), sprite(0x18, 0x22, 0xd), sprite(clip, 0xa8, 0x28), sprite(0x1a, 0, 0x9e)];
+    for (const [clip, rows] of [[0x1c, 5], [0x1b, 6], [0x19, 7], [0x108, 8], [0x109, 9]]) {
+        const lay = pauseHomeLayout(home(clip), [0]);
+        assert.equal(pausePanelRows(clip), rows);
+        assert.deepEqual(lay.skipClips, [clip, 0x1a], "the canvas skips exactly these clips");
+        const [panel, band] = lay.tiled;
+        assert.deepEqual([panel.name, panel.rect.x, panel.rect.y, panel.rect.w, panel.rect.h], ["pause-panel", 168, 40, 160, panelHeightFor(rows)]);
+        assert.deepEqual([band.name, band.rect.x, band.rect.y, band.rect.w, band.rect.h], ["pause-money-band", 0, 158, 108, 21]);
+        assert.deepEqual(lay.textRects, [{ x: 168, y: 40, w: 160, h: panelHeightFor(rows) }, { x: 0, y: 158, w: 108, h: 21 }]);
+    }
+    // the cards, the prompt and other clips stay on the canvas: not skipped
+    assert.ok(!pauseHomeLayout(home(0x1c), [0]).skipClips.includes(0x15));
+    // other pages: no panel at (168,40), no band at (0,158)
+    assert.equal(pauseHomeLayout([sprite(0x1c, 10, 40), sprite(0x1a, 0, 0)], []), null);
+    assert.equal(pauseHomeLayout([], []), null);
+    assert.deepEqual([0x1d, 0x100, 0x107, 0x10d, 0].map(pausePanelRows), [0, 0, 0, 0, 0]);
+});
+
+test("pauseHomeLayout: the panel's slide-in keeps the game's own scale and pivot", () => {
+    const calls = [{ method: "setScale", args: [0x666, 0x1000, 0x1000] }, { method: "setPos", args: [320, 82] }, sprite(0x1c, 0xa8, 0x28)];
+    const t = pauseHomeLayout(calls, []).tiled[0];
+    near(t.rect.sx, 0x666 / 0x1000);
+    assert.deepEqual([t.rect.px, t.rect.py], [320, 82]);
+    const w = scaledRect(t.rect);
+    near(w.x, 320 + (168 - 320) * t.rect.sx); near(w.w, 160 * t.rect.sx); near(w.y, 40); assert.equal(w.h, 84);   // pinned at the right edge
+    assert.deepEqual(scaledRect({ x: 5, y: 6, w: 7, h: 8 }), { x: 5, y: 6, w: 7, h: 8 });
+});
+
+test("widgetInside: the row labels, the cursor and the BIT amount belong to the overlay, the party cards and the top help line do not", () => {
+    const rects = pauseHomeLayout([sprite(0x1c, 0xa8, 0x28), sprite(0x1a, 0, 0x9e)], []).textRects;
+    for (const [x, y] of [[189, 49], [189, 105], [176, 49], [176, 91], [70, 166], [66, 166]]) assert.equal(widgetInside(rects, x, y), true, `${x},${y}`);
+    for (const [x, y] of [[152, 19], [55, 19], [16, 28], [94, 138], [189, 125], [167, 60], [70, 180], [66, 157]]) assert.equal(widgetInside(rects, x, y), false, `${x},${y}`);
+});
+
+test("fadeDim: only a full-screen semi-transparent quad dims the overlay", () => {
+    assert.equal(fadeDim([]), 0);
+    assert.equal(fadeDim([{ semiTransparent: true, w: 320, h: 240, r: 128 }]), 128 / 255);
+    assert.equal(fadeDim([{ semiTransparent: true, w: 6, h: 90, r: 200 }, { semiTransparent: false, w: 320, h: 240, r: 200 }]), 0, "a scroll bar or an opaque quad is not the fade");
+    assert.equal(fadeDim([{ semiTransparent: true, w: 320, h: 240, r: 255 }]), 1);
+});
+
+test("yesNoLayout: the window clip 0x45, scaled about its pivot while it folds open", () => {
+    const fold = [{ method: "setScale", args: [0x666, 0x1000, 0x1000] }, { method: "setPos", args: [0, 195] }, sprite(0x45, 0, 0xac)];
+    const t = yesNoLayout(fold, [0]).tiled[0];
+    assert.equal(t.name, "yesno-window");
+    assert.deepEqual([t.rect.x, t.rect.y, t.rect.w, t.rect.h], [0, 172, 320, 50]);
+    near(scaledRect(t.rect).w, 320 * 0x666 / 0x1000);
+    const open = yesNoLayout([sprite(0x45, 0, 0xac)], []).tiled[0];
+    assert.deepEqual(scaledRect(open.rect), { x: 0, y: 172, w: 320, h: 50 });
+    assert.equal(yesNoLayout([sprite(0x1c, 0, 0xac)], []), null);
+});
+
+test("cursor glyphs: the four frames the game swaps, as boxes in the font's shadow (1) and face (2) entries", () => {
+    assert.deepEqual(Object.keys(SYMBOL_GLYPHS), ["[enter]", "[enter2]", "[select]", "[space2]"]);
+    const count = (g) => glyphBoxes(g).reduce((a, b) => a + b.w * b.h, 0);
+    assert.deepEqual(Object.values(SYMBOL_GLYPHS).map((g) => g.rows.length), [12, 12, 12, 12]);
+    assert.deepEqual(Object.values(SYMBOL_GLYPHS).map(count), [50, 50, 26, 0]);   // triangle texels (3+4+5+6+7+7+6+5+4+3), bar texels (6+7+7+6)
+    assert.deepEqual(glyphBoxes(SYMBOL_GLYPHS["[select]"]).filter((b) => b.index === 2), [{ x: 1, y: 5, w: 5, h: 2, index: 2 }]);
+    assert.ok(glyphBoxes(SYMBOL_GLYPHS["[enter2]"]).every((b) => b.index === 2), "the large triangle is all face colour");
+    for (const g of Object.values(SYMBOL_GLYPHS)) for (const row of g.rows) assert.equal(row.length, 8);
+});
+
+test("choiceLayout: web/choice.js's own arithmetic in the 320x240 space (view 640x480: 2 view px per native px)", () => {
+    const c = choiceLayout({ prompt: "Q", options: ["Yes", "No"], cursorIdx: 1 }, 640, 480);
+    assert.equal(c.scale, 2);
+    // boxH = 16*2 + 24 + 2*24 = 104; x = 12, w = 616, y = 480 - 104 - 12 = 364
+    assert.deepEqual(c.window, { x: 6, y: 182, w: 308, h: 52 });
+    assert.deepEqual([c.prompt.x, c.prompt.y], [14, 196]);                          // (x + 16, y + 16 + 12) / 2
+    assert.deepEqual(c.options.map((o) => [o.x, o.y, o.fill]), [[22, 209, "#a8a8c8"], [22, 221, "#ffffff"]]);   // (x + 32, y + 40 + i*24 + 14) / 2
+    assert.deepEqual([c.cursor.x, c.cursor.y, c.cursor.text], [12, 221, "▶"]);   // (x + 16 - 4, row of option 1) / 2
+    assert.equal(c.fontPx, 8); assert.equal(c.edge, 0.5);
+    // the canvas draws at 3 view px per native px: same box, same shape
+    const big = choiceLayout({ prompt: "Q", options: ["Yes", "No"], cursorIdx: 0 }, 960, 720);
+    assert.equal(big.scale, 3); near(big.window.w, (960 - 24) / 3); near(big.window.y, (720 - 104 - 12) / 3);
+    assert.equal(big.options[0].fill, "#ffffff"); assert.equal(big.options[1].fill, "#a8a8c8");
+    assert.equal(choiceLayout({ prompt: "x", options: [], cursorIdx: 0 }).cursor, null);
+    assert.equal(CHOICE_LOOK.fill, "rgb(0,0,32)");
+});
+
+test("choice.js, uiRects.js and the overlay agree on the colours and the 16px monospace", () => {
+    const c = src("choice.js"), u = src("uiRects.js");
+    assert.match(u, /ctx\.fillStyle = "rgb\(0, 0, 32\)"/); assert.match(u, /ctx\.strokeStyle = "rgb\(104, 104, 208\)"/);
+    for (const col of [CHOICE_LOOK.prompt, CHOICE_LOOK.cursor, CHOICE_LOOK.picked, CHOICE_LOOK.other]) assert.ok(c.includes(`"${col}"`), col);
+    assert.match(c, /ctx\.font = "16px monospace"/);
+    assert.match(c, /const lineH = 24, pad = 16;/); assert.match(c, /const x = 12, w = viewW - 24;/);
+});
+
+test("wiring slice 2: each owner draws the overlay only in Smooth, skips what it draws, and falls back to the unchanged pixel path", () => {
+    const ch = src("choice.js"), yn = src("yesno-translated.js"), st = src("status-translated.js"), nt = src("native-screen-text.js"), ns = src("native-session.js");
+    assert.match(ch, /if \(uiLookSmooth\(\) && uiCssAvailable\(\) && uiCssShow\(uiKey, \{ choice: choiceLayout\(ch, viewW, viewH\) \}/);
+    assert.match(ch, /const lineH = 24, pad = 16;/, "the canvas drawing is still there");
+    assert.match(yn, /uiLookSmooth\(\) && uiCssAvailable\(\) \? yesNoLayout\(calls, contextMarkers\) : null/);
+    assert.match(yn, /renderer\.draw\(ctx, calls, null, \[\], contextMarkers, \[\]\);/);
+    assert.match(st, /st\._entry === "home" && uiLookSmooth\(\) && uiCssAvailable\(\)/);
+    assert.match(st, /skipClip: \(name, id\) => skipClips\.size > 0 && name === "cmfont" && skipClips\.has\(id\)/);
+    assert.match(st, /paintNativeSession\(ctx, renderer, session, \{ fade: false, skipWidget \}\)/);
+    assert.match(st, /if \(!skipWidget\) uiCssHide\(st\._uiKey\)/);
+    assert.match(nt, /if \(opts\.skip && opts\.skip\(w\)\) continue;/);
+    assert.match(ns, /skipWidget \? \{ revealWindow, skip: skipWidget \} : \{ revealWindow \}/, "without a skip the text call is the old one");
+    assert.match(src("ui-css.js"), /export function uiCssHide\(key\)/);
 });
