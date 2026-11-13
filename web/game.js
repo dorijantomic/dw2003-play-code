@@ -39,6 +39,7 @@ import { gymExtraHallAt, gymExtraPlan } from "./gym-extra.js";
 import { loadNewMaps, mergeNewMaps, newMapScene, addNewMapExits } from "./newmaps.js"; // maps made after the disc (Gemini HD maps): data/authored/web/assets/data/newmaps/
 import { rollExtra, areaOf, messageFor, createFishFinds } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
+import { renderUnderwater, underwaterInfo, UW_W, UW_H } from "./fishing-underwater.js"; // fishing: a 3D underwater inset while the line is in the water (reads state.fishing only)
 
 import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState, isOpenAirMapName, fx } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
@@ -4626,6 +4627,14 @@ function startFishingCast(spot) {
     state.moving = false;
     state.stopping = false;
 }
+
+// Script hook for the underwater view: drive one cast live. cast() uses the real spot under the
+// player (or an explicit {dx,dy}); strike() is the same edge the circle button sends.
+window.__fishingUw = {
+    cast(spot) { if (state.fishing) return false; const sp = spot ?? fishingSpotHere(); if (!sp) return false; startFishingCast(sp); return true; },
+    strike() { if (!state.fishing) return false; state.fishing.strike = true; return true; },
+    info() { return { ...underwaterInfo(), run: state.fishing ? { ...state.fishing.run } : null }; },
+};
 
 /** The P002PLYF manifest record, or undefined if the pack did not load. */
 function fishingSpriteMeta() {
@@ -10387,6 +10396,15 @@ const FISH_BAR_TRACK = 0x3e;
 function drawFishing(ctx, camX, camY) {
     const f = state.fishing;
     if (!f) return;
+
+    // The underwater inset (three.js, GPU). Read-only on `f`; null (no WebGL, page hidden) = nothing drawn.
+    const uw = renderUnderwater(f, currentMap().id, state.fishingExtras, performance.now() / 1000);
+    if (uw) {
+        ctx.drawImage(uw, 0, uw.height - UW_H, UW_W, UW_H, 6, 6, UW_W, UW_H);   // the inset lives in the shared canvas bottom-left corner
+        ctx.strokeStyle = "#0a2a3a";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(5, 5, 130, 98);
+    }
 
     // Nothing is drawn during the settle: the original's draw block sits after
     // the meter update, and the settle phase returns before it ever gets there.

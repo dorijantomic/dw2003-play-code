@@ -18,6 +18,7 @@
 import * as THREE from "./lib3d/three.module.js";
 import { waterPixelTest } from "./water3d.js";
 import { classSource } from "./mapclass.js";
+import { getSharedRenderer, sharedLost } from "./gl-shared.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
@@ -45,17 +46,11 @@ let material = null;
 const stages = new Map();    // stageId -> { bands: [{mesh, y0, y1}], count } | null
 
 function ensureRenderer() {
+    if (renderer && sharedLost()) return false;
     if (renderer) return true;
     try {
-        const canvas = document.createElement("canvas");
-        canvas.width = VIEW_W * PX;
-        canvas.height = VIEW_H * PX;
-        renderer = new THREE.WebGLRenderer({
-            canvas, alpha: true, antialias: true, premultipliedAlpha: true,
-        });
-        renderer.setPixelRatio(1);
-        renderer.setSize(VIEW_W * PX, VIEW_H * PX, false);
-        renderer.setClearColor(0x000000, 0);
+        renderer = getSharedRenderer(VIEW_W * PX, VIEW_H * PX);   // the field's one WebGL context (gl-shared.js)
+        if (!renderer) throw new Error("no shared WebGL context");
     } catch (e) {
         console.warn("grass3d: WebGL unavailable", e);
         renderer = null;
@@ -283,7 +278,7 @@ export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
     if (NO_GRASS_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;
-    if (renderer.domElement.width !== VIEW_W * PX) renderer.setSize(VIEW_W * PX, VIEW_H * PX, false);
+    if (renderer.domElement.width !== VIEW_W * PX || renderer.domElement.height !== VIEW_H * PX) renderer.setSize(VIEW_W * PX, VIEW_H * PX, false);
     let st = stages.get(stageId);
     if (st === undefined) {
         const cls = classSource(stageId, mapImg);
