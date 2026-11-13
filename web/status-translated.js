@@ -235,7 +235,11 @@ export function createStatusTranslated(sfx = null, opts = {}) {
             if (session.finished()) {
                 if (st._homeFlow && st._entry === "home") {
                     const result = session.homeResult();
-                    if (result?.kind === "page") {
+                    if (result?.kind === "page" && result.page === "map" && opts.newMapScreen?.()) {
+                        // OPTIONS > Map screen: New. The MAP row opens the new map book instead of the disc's page (same way out and back as a book).
+                        st._finish(false);
+                        opts.onBook?.("mapscreen", result.row);
+                    } else if (result?.kind === "page") {
                         st._homeOverlay = true;
                         st._homeRow = result.row;
                         st.open(st._state, result.page, st._onClose, true);

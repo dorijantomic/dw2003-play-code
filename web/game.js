@@ -406,6 +406,7 @@ import { battleHudNameBank } from "./battlehud-translated.js";
 import { createFreeCamera } from "./anim-viewer-camera.js";
 import { createBattle3D, resolveModelFolder, setFighterTint } from "./battle3d.js";   // already loaded by battle.js: no extra cost
 import { createOptionsBook } from "./options-book.js";
+import { createMapScreenBook } from "./map-screen-book.js";
 import { createRetryLoader } from "./retry-loader.js";
 import {
     FIELD_LOCATION_KEY,
@@ -456,6 +457,14 @@ const books = createBookHost({
     factories: {
         glossary: (args) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
         options: (args) => createOptionsBook(args),
+        // OPTIONS > GAME > Map screen: New. Read once when it opens: the manifest names, the scenes' exits, the visited flag, the current map.
+        mapscreen: (args) => createMapScreenBook({
+            sfx: args.sfx,
+            data: () => ({
+                maps: state.manifest.maps, scenes: state.scenes, currentId: currentMap().id,
+                seen: (id) => { const sid = screenIdForStage(fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); },
+            }),
+        }),
     },
 });
 window.__books = books;
@@ -1024,6 +1033,8 @@ const statusOptions = {
     // The map page asks the flag store which places you have walked into — the bits the
     // field entry wrote (engine loadStage -> set_flag(0x1E00 + screen id, 1)).
     map: (state) => pauseMapContext(state, undefined, engineFlagSeen),
+    // OPTIONS > GAME > Map screen: New makes the MAP row open web/map-screen-book.js instead of the disc's page.
+    newMapScreen: () => window.__fx?.mapScreen === "new",
     // Extra rows on the pause list (after CARD FOLDERS): QUESTS, then the GLOSSARY and OPTIONS books while their dev switches are on.
     extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx }),
     questsPage: () => questsPausePage(),
@@ -1169,6 +1180,7 @@ const openBook = (book, row) => {
     }, state.keys);
 };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
+window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys));
 window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));
 // East Sector - Duel Island, the card-duel venue (docs/research/story-
 // progression/GAME_WALKTHROUGH.md).
