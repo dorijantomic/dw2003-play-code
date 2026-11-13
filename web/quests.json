@@ -18304,6 +18304,1343 @@
       ]
     },
     {
+      "id": "i5_kid_wire_forest",
+      "title": "The Wire Forest Dare",
+      "giver": "Kid",
+      "short": "Forest dare",
+      "text": "A kid in the East Wire Forest dares you to beat three Goburimon and one Kokatorimon, and to come back with all your fingers.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Goburimon"
+          ],
+          "count": 3,
+          "maps": [
+            "s355",
+            "s356"
+          ]
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Kokatorimon"
+          ],
+          "count": 1,
+          "maps": [
+            "s355",
+            "s356"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 300,
+        "items": [
+          {
+            "name": "Antidote Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 56,
+            "map": "s355"
+          }
+        ],
+        "level": 9,
+        "visited": [
+          "s355"
+        ]
+      },
+      "offer": {
+        "npc": 56,
+        "name": "Kid",
+        "maps": [
+          "s355"
+        ],
+        "lines": [
+          "Hey! You! I have a game. It is called Who Is Scared Of The Forest.",
+          "I am not scared. I am just standing here. On purpose. Facing the path.",
+          "Beat three Goburimon and one Kokatorimon. The bird one. It is very loud and very pointy.",
+          "Do it and I will say you are braver than me. Out loud. Twice."
+        ],
+        "doneLines": [
+          "You did it! All of them! Even the loud one!",
+          "Okay. You are braver than me. That is once. I will say it again when someone is listening.",
+          "Here. It is my Antidote Disk. I took it so nobody would say I forgot to be careful."
+        ],
+        "remindLines": [
+          "Three Goburimon and one Kokatorimon. I am counting, so no cheating.",
+          "I am still not scared. My knees are just resting."
+        ],
+        "ask": "Take the dare?",
+        "scene": [
+          {
+            "walk": 56,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 56
+          },
+          {
+            "say": 56,
+            "name": "Kid",
+            "text": "Hey! You! I have a game. It is called Who Is Scared Of The Forest."
+          },
+          {
+            "together": 56,
+            "dist": 130
+          },
+          {
+            "say": 56,
+            "name": "Kid",
+            "text": "I am not scared. I am just standing here. On purpose. Facing the path."
+          },
+          {
+            "say": 56,
+            "name": "Kid",
+            "text": "Beat three Goburimon and one Kokatorimon. The bird one. It is very loud and very pointy."
+          },
+          {
+            "say": 56,
+            "name": "Kid",
+            "text": "Do it and I will say you are braver than me. Out loud. Twice."
+          },
+          {
+            "ask": "Take the dare?",
+            "options": [
+              "Dare accepted",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 56
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 56,
+            "to": "origin"
+          },
+          {
+            "arrive": 56
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 56,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 56
+        },
+        {
+          "say": 56,
+          "name": "Kid",
+          "text": "You did it! All of them! Even the loud one!"
+        },
+        {
+          "say": 56,
+          "name": "Kid",
+          "text": "Okay. You are braver than me. That is once. I will say it again when someone is listening."
+        },
+        {
+          "say": 56,
+          "name": "Kid",
+          "text": "Here. It is my Antidote Disk. I took it so nobody would say I forgot to be careful."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 56,
+          "to": "origin"
+        },
+        {
+          "arrive": 56
+        }
+      ]
+    },
+    {
+      "id": "i5_geek_prairie_hum",
+      "title": "The Prairie Hum",
+      "giver": "Geek",
+      "short": "Prairie hum",
+      "text": "The Geek in the Wind Prairie hears a hum under the wind. Ask the Researcher in Tyranno Valley what it is, then quiet three Yanmamon.",
+      "objectives": [
+        {
+          "type": "talk",
+          "npc": 43,
+          "name": "Researcher",
+          "maps": [
+            "s405"
+          ],
+          "lines": [
+            "The hum? Yes, yes, I logged it. Three-second period, rising, then cut off.",
+            "Hm. No, wait. It is the Yanmamon. Their wings. Eleven hundred beats a minute and the wind carries the sound all the way down the grass.",
+            "Tell your friend the hum is real and the thing making it can be fought."
+          ],
+          "scene": [
+            {
+              "walk": 43,
+              "to": {
+                "near": "player",
+                "gap": 40
+              }
+            },
+            {
+              "arrive": 43
+            },
+            {
+              "say": 43,
+              "name": "Researcher",
+              "text": "The hum? Yes, yes, I logged it. Three-second period, rising, then cut off."
+            },
+            {
+              "together": 43,
+              "dist": 130
+            },
+            {
+              "say": 43,
+              "name": "Researcher",
+              "text": "Hm. No, wait. It is the Yanmamon. Their wings. Eleven hundred beats a minute and the wind carries the sound all the way down the grass."
+            },
+            {
+              "say": 43,
+              "name": "Researcher",
+              "text": "Tell your friend the hum is real and the thing making it can be fought."
+            },
+            {
+              "apart": 43
+            },
+            {
+              "wait": 12
+            },
+            {
+              "walk": 43,
+              "to": "origin"
+            },
+            {
+              "arrive": 43
+            }
+          ],
+          "label": "Ask the Researcher about the hum"
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Yanmamon"
+          ],
+          "count": 3,
+          "maps": [
+            "s395",
+            "s396"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 51,
+            "map": "s395"
+          },
+          {
+            "npc": 43,
+            "map": "s405"
+          }
+        ],
+        "level": 11,
+        "visited": [
+          "s395"
+        ]
+      },
+      "offer": {
+        "npc": 51,
+        "name": "Geek",
+        "maps": [
+          "s395"
+        ],
+        "lines": [
+          "Listen. No, listen. Do you hear it? Under the wind. A hum. Pitch about 180 hertz, wobbling.",
+          "I have written down: one, it is not the wind. Two, it is not me. Three, I do not know what it is.",
+          "There is a Researcher in Tyranno Valley with a lot of notebooks. Ask him. Then deal with whatever it is.",
+          "Please. I cannot sleep and I do not even live here."
+        ],
+        "doneLines": [
+          "Wings. It was wings. Of course it was wings.",
+          "It is quiet! I can hear the grass. It is very loud, the grass.",
+          "Here. A Revive Disk. Item one on my list of things I was not going to need."
+        ],
+        "remindLines": [
+          "The Researcher in Tyranno Valley. Notebooks, goggles, you cannot miss him.",
+          "And then the hum. I will keep listening. For science."
+        ],
+        "ask": "Look into the hum?",
+        "scene": [
+          {
+            "walk": 51,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 51
+          },
+          {
+            "say": 51,
+            "name": "Geek",
+            "text": "Listen. No, listen. Do you hear it? Under the wind. A hum. Pitch about 180 hertz, wobbling."
+          },
+          {
+            "together": 51,
+            "dist": 130
+          },
+          {
+            "say": 51,
+            "name": "Geek",
+            "text": "I have written down: one, it is not the wind. Two, it is not me. Three, I do not know what it is."
+          },
+          {
+            "say": 51,
+            "name": "Geek",
+            "text": "There is a Researcher in Tyranno Valley with a lot of notebooks. Ask him. Then deal with whatever it is."
+          },
+          {
+            "say": 51,
+            "name": "Geek",
+            "text": "Please. I cannot sleep and I do not even live here."
+          },
+          {
+            "ask": "Look into the hum?",
+            "options": [
+              "I will look",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 51
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 51,
+            "to": "origin"
+          },
+          {
+            "arrive": 51
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 51,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 51
+        },
+        {
+          "say": 51,
+          "name": "Geek",
+          "text": "Wings. It was wings. Of course it was wings."
+        },
+        {
+          "say": 51,
+          "name": "Geek",
+          "text": "It is quiet! I can hear the grass. It is very loud, the grass."
+        },
+        {
+          "say": 51,
+          "name": "Geek",
+          "text": "Here. A Revive Disk. Item one on my list of things I was not going to need."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 51,
+          "to": "origin"
+        },
+        {
+          "arrive": 51
+        }
+      ]
+    },
+    {
+      "id": "i5_cape_ledger",
+      "title": "A Ledger for the Cape",
+      "giver": "Office Worker",
+      "short": "Cape ledger",
+      "text": "An Office Worker at South Cape needs the bay lights checked at Phoenix Bay and the Shellmon on the cape thinned out before his ledger is due.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s485",
+          "label": "Walk to Phoenix Bay and look at the lights"
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Shellmon"
+          ],
+          "count": 3,
+          "maps": [
+            "s495",
+            "s496"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 550,
+        "items": [
+          {
+            "name": "Energy Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 53,
+            "map": "s495"
+          }
+        ],
+        "level": 15,
+        "visited": [
+          "s495"
+        ]
+      },
+      "offer": {
+        "npc": 53,
+        "name": "Office Worker",
+        "maps": [
+          "s495"
+        ],
+        "lines": [
+          "Good day. I am from the harbour office. I am here to count things and I have counted two.",
+          "The ledger wants three more lines. One, the lights at Phoenix Bay are lit. Two, the Shellmon on this cape do not block the road.",
+          "I would go myself. My shoes are office shoes and the Shellmon have opinions about them.",
+          "Would you walk to the bay, look at the lights, and thin the Shellmon on your way back?"
+        ],
+        "doneLines": [
+          "Lights lit. Road clear. Three lines, all true. This is the best ledger I have written.",
+          "I will mention you in the margin. Only the margin, I am afraid, but it is a fine margin.",
+          "Here. An Energy Disk, from the harbour budget. Please do not tell the harbour."
+        ],
+        "remindLines": [
+          "Phoenix Bay for the lights. Then three Shellmon off the cape road.",
+          "I have brought a pen. I will not be needing the pen until you are back."
+        ],
+        "ask": "Fill in the ledger?",
+        "scene": [
+          {
+            "walk": 53,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 53
+          },
+          {
+            "say": 53,
+            "name": "Office Worker",
+            "text": "Good day. I am from the harbour office. I am here to count things and I have counted two."
+          },
+          {
+            "together": 53,
+            "dist": 130
+          },
+          {
+            "say": 53,
+            "name": "Office Worker",
+            "text": "The ledger wants three more lines. One, the lights at Phoenix Bay are lit. Two, the Shellmon on this cape do not block the road."
+          },
+          {
+            "say": 53,
+            "name": "Office Worker",
+            "text": "I would go myself. My shoes are office shoes and the Shellmon have opinions about them."
+          },
+          {
+            "say": 53,
+            "name": "Office Worker",
+            "text": "Would you walk to the bay, look at the lights, and thin the Shellmon on your way back?"
+          },
+          {
+            "ask": "Fill in the ledger?",
+            "options": [
+              "I will check",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 53
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 53,
+            "to": "origin"
+          },
+          {
+            "arrive": 53
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 53,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 53
+        },
+        {
+          "say": 53,
+          "name": "Office Worker",
+          "text": "Lights lit. Road clear. Three lines, all true. This is the best ledger I have written."
+        },
+        {
+          "say": 53,
+          "name": "Office Worker",
+          "text": "I will mention you in the margin. Only the margin, I am afraid, but it is a fine margin."
+        },
+        {
+          "say": 53,
+          "name": "Office Worker",
+          "text": "Here. An Energy Disk, from the harbour budget. Please do not tell the harbour."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 53,
+          "to": "origin"
+        },
+        {
+          "arrive": 53
+        }
+      ]
+    },
+    {
+      "id": "i5_bay_antidotes",
+      "title": "Antidotes for the Bay",
+      "giver": "Young Woman",
+      "short": "Bay antidotes",
+      "text": "A young woman at Phoenix Bay needs two Antidote Disks for her Digimon, and the Apemon that bit it chased off the shore path.",
+      "objectives": [
+        {
+          "type": "bring",
+          "item": "Antidote Disk",
+          "count": 2,
+          "label": "Bring two Antidote Disks"
+        },
+        {
+          "type": "defeat",
+          "species": [
+            "Apemon"
+          ],
+          "count": 2,
+          "maps": [
+            "s485",
+            "s486"
+          ]
+        }
+      ],
+      "reward": {
+        "bits": 400,
+        "items": [
+          {
+            "name": "Revive Disk",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 50,
+            "map": "s485"
+          }
+        ],
+        "level": 14,
+        "visited": [
+          "s485"
+        ]
+      },
+      "offer": {
+        "npc": 50,
+        "name": "Young Woman",
+        "maps": [
+          "s485"
+        ],
+        "lines": [
+          "Oh, thank goodness. Are you heading to town? Do you have a moment?",
+          "My partner was bitten by an Apemon on the shore path and the poison is not clearing. I have nothing left.",
+          "The shop in Suzaku City sells Antidote Disks. Could you bring me two?",
+          "And please chase the Apemon off the path. Two of them, I think. I would not ask if I were not scared."
+        ],
+        "doneLines": [
+          "It is breathing easier already. Thank you. Thank you both.",
+          "I do not have much, but a Revive Disk is no use to me now and two would be a waste. Take them."
+        ],
+        "remindLines": [
+          "Two Antidote Disks, and the Apemon off the shore path.",
+          "My partner is resting. It is very brave. It just wants you to hurry."
+        ],
+        "ask": "Help her?",
+        "scene": [
+          {
+            "walk": 50,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 50
+          },
+          {
+            "say": 50,
+            "name": "Young Woman",
+            "text": "Oh, thank goodness. Are you heading to town? Do you have a moment?"
+          },
+          {
+            "together": 50,
+            "dist": 130
+          },
+          {
+            "say": 50,
+            "name": "Young Woman",
+            "text": "My partner was bitten by an Apemon on the shore path and the poison is not clearing. I have nothing left."
+          },
+          {
+            "say": 50,
+            "name": "Young Woman",
+            "text": "The shop in Suzaku City sells Antidote Disks. Could you bring me two?"
+          },
+          {
+            "say": 50,
+            "name": "Young Woman",
+            "text": "And please chase the Apemon off the path. Two of them, I think. I would not ask if I were not scared."
+          },
+          {
+            "ask": "Help her?",
+            "options": [
+              "I will help",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 50
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 50,
+            "to": "origin"
+          },
+          {
+            "arrive": 50
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 50,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 50
+        },
+        {
+          "say": 50,
+          "name": "Young Woman",
+          "text": "It is breathing easier already. Thank you. Thank you both."
+        },
+        {
+          "say": 50,
+          "name": "Young Woman",
+          "text": "I do not have much, but a Revive Disk is no use to me now and two would be a waste. Take them."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 50,
+          "to": "origin"
+        },
+        {
+          "arrive": 50
+        }
+      ]
+    },
+    {
+      "id": "i5_oasis_race",
+      "title": "The Oasis Race",
+      "giver": "Girl in Red Cap",
+      "short": "Oasis race",
+      "text": "The Girl in the Red Cap at Pelche Oasis bets you cannot beat three Airdramon at the water and still be first to the Mobius Desert.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Airdramon2"
+          ],
+          "count": 3,
+          "maps": [
+            "s560",
+            "s561"
+          ]
+        },
+        {
+          "type": "visit",
+          "map": "s640",
+          "label": "Reach the Mobius Desert"
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 101,
+            "map": "s560"
+          }
+        ],
+        "level": 24,
+        "visited": [
+          "s560"
+        ]
+      },
+      "offer": {
+        "npc": 101,
+        "name": "Girl in Red Cap",
+        "maps": [
+          "s560"
+        ],
+        "lines": [
+          "Hey. You look fast. I look faster, but you look fast.",
+          "Race. Three Airdramon off the water here, then all the way to the Mobius Desert. First one there wins.",
+          "I will go ahead and tell you I already won. That way when you lose, it is not a surprise.",
+          "Well? Or are you saving your legs for something better?"
+        ],
+        "doneLines": [
+          "Huh. You got here. And the water is clear. And you have not even fallen over.",
+          "Fine. You win. I will win next time. I will win very hard next time.",
+          "Here. A Super Charge. My prize money, and a bad winner pays up anyway."
+        ],
+        "remindLines": [
+          "Three Airdramon off the water, then the Mobius Desert. I am already stretching.",
+          "You are not slow. You are just not me. Go."
+        ],
+        "ask": "Take the race?",
+        "scene": [
+          {
+            "walk": 101,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 101
+          },
+          {
+            "say": 101,
+            "name": "Girl in Red Cap",
+            "text": "Hey. You look fast. I look faster, but you look fast."
+          },
+          {
+            "together": 101,
+            "dist": 130
+          },
+          {
+            "say": 101,
+            "name": "Girl in Red Cap",
+            "text": "Race. Three Airdramon off the water here, then all the way to the Mobius Desert. First one there wins."
+          },
+          {
+            "say": 101,
+            "name": "Girl in Red Cap",
+            "text": "I will go ahead and tell you I already won. That way when you lose, it is not a surprise."
+          },
+          {
+            "say": 101,
+            "name": "Girl in Red Cap",
+            "text": "Well? Or are you saving your legs for something better?"
+          },
+          {
+            "ask": "Take the race?",
+            "options": [
+              "Race you",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 101
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 101,
+            "to": "origin"
+          },
+          {
+            "arrive": 101
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 101,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 101
+        },
+        {
+          "say": 101,
+          "name": "Girl in Red Cap",
+          "text": "Huh. You got here. And the water is clear. And you have not even fallen over."
+        },
+        {
+          "say": 101,
+          "name": "Girl in Red Cap",
+          "text": "Fine. You win. I will win next time. I will win very hard next time."
+        },
+        {
+          "say": 101,
+          "name": "Girl in Red Cap",
+          "text": "Here. A Super Charge. My prize money, and a bad winner pays up anyway."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 101,
+          "to": "origin"
+        },
+        {
+          "arrive": 101
+        }
+      ]
+    },
+    {
+      "id": "i5_hall_charges",
+      "title": "Charges for the Hall",
+      "giver": "Traveler",
+      "short": "Hall charges",
+      "text": "A Traveler at Mirage Hall wants two Super Charges before he climbs, and a look at Mirage Tower to see whether the stairs are still there.",
+      "objectives": [
+        {
+          "type": "bring",
+          "item": "Super Charge",
+          "count": 2,
+          "label": "Bring two Super Charges"
+        },
+        {
+          "type": "visit",
+          "map": "s645",
+          "label": "Look up at Mirage Tower"
+        }
+      ],
+      "reward": {
+        "bits": 900,
+        "items": [
+          {
+            "name": "Ultra Charge",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 47,
+            "map": "s651"
+          }
+        ],
+        "level": 26,
+        "visited": [
+          "s651"
+        ]
+      },
+      "offer": {
+        "npc": 47,
+        "name": "Traveler",
+        "maps": [
+          "s651"
+        ],
+        "lines": [
+          "Ah, a person with legs. I have walked a good deal of this world and it has been kind to me, mostly.",
+          "I want to climb the Mirage Tower. I have been told the stairs are there. I have also been told they are not.",
+          "Bring me two Super Charges from the shop in Byakko City and I will believe the first story.",
+          "And go and look at the Tower first. I would rather hear it from someone who still has the use of their knees."
+        ],
+        "doneLines": [
+          "The stairs are there. Hah. In my experience the stairs are always there, it is the legs that go.",
+          "Here. An Ultra Charge. I carried it across half the world and I have never found the day to use it. Perhaps today."
+        ],
+        "remindLines": [
+          "Two Super Charges, and a good look at Mirage Tower.",
+          "Do not climb it. I am saving the climb. It is about the only thing I have left to save."
+        ],
+        "ask": "Go and look?",
+        "scene": [
+          {
+            "walk": 47,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 47
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "Ah, a person with legs. I have walked a good deal of this world and it has been kind to me, mostly."
+          },
+          {
+            "together": 47,
+            "dist": 130
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "I want to climb the Mirage Tower. I have been told the stairs are there. I have also been told they are not."
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "Bring me two Super Charges from the shop in Byakko City and I will believe the first story."
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "And go and look at the Tower first. I would rather hear it from someone who still has the use of their knees."
+          },
+          {
+            "ask": "Go and look?",
+            "options": [
+              "I will look",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 47
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 47,
+            "to": "origin"
+          },
+          {
+            "arrive": 47
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 47,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 47
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "The stairs are there. Hah. In my experience the stairs are always there, it is the legs that go."
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "Here. An Ultra Charge. I carried it across half the world and I have never found the day to use it. Perhaps today."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 47,
+          "to": "origin"
+        },
+        {
+          "arrive": 47
+        }
+      ]
+    },
+    {
+      "id": "i5_freeze_flask",
+      "title": "A Flask for Freeze Mountain",
+      "giver": "Traveler",
+      "short": "Freeze flask",
+      "text": "A Traveler on Freeze Mountain has a cold flask and no fire. Clear three Frigimon off the path and walk down to the Mountain Inn for something hot.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Frigimon"
+          ],
+          "count": 3,
+          "maps": [
+            "s705",
+            "s706"
+          ]
+        },
+        {
+          "type": "visit",
+          "map": "s701",
+          "label": "Walk down to the Mountain Inn"
+        }
+      ],
+      "reward": {
+        "bits": 1000,
+        "items": [
+          {
+            "name": "Super Charge",
+            "count": 2
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 47,
+            "map": "s705"
+          }
+        ],
+        "level": 37,
+        "visited": [
+          "s705"
+        ]
+      },
+      "offer": {
+        "npc": 47,
+        "name": "Traveler",
+        "maps": [
+          "s705"
+        ],
+        "lines": [
+          "Fine weather. If you like weather that is trying to be a wall.",
+          "I have a flask and the flask has gone cold. I have been told that the Inn has a fire. I have not been told how to reach the Inn with a Frigimon on every second rock.",
+          "Three of them, off the path, and I will walk down behind you. In my experience, the one in front takes the bites.",
+          "And in the Inn, you can say I sent you. It does not help. But it is nice to be sent."
+        ],
+        "doneLines": [
+          "Warm! Look at that, a flask that is not an ice block. You are a very good person to have on a mountain.",
+          "Here. Two Super Charges. I was keeping them for a rainy day, but up here it only ever snows."
+        ],
+        "remindLines": [
+          "Three Frigimon off the path. Then the Inn and the fire.",
+          "My flask has not got warmer. I have been checking."
+        ],
+        "ask": "Clear the path?",
+        "scene": [
+          {
+            "walk": 47,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 47
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "Fine weather. If you like weather that is trying to be a wall."
+          },
+          {
+            "together": 47,
+            "dist": 130
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "I have a flask and the flask has gone cold. I have been told that the Inn has a fire. I have not been told how to reach the Inn with a Frigimon on every second rock."
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "Three of them, off the path, and I will walk down behind you. In my experience, the one in front takes the bites."
+          },
+          {
+            "say": 47,
+            "name": "Traveler",
+            "text": "And in the Inn, you can say I sent you. It does not help. But it is nice to be sent."
+          },
+          {
+            "ask": "Clear the path?",
+            "options": [
+              "I will clear it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 47
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 47,
+            "to": "origin"
+          },
+          {
+            "arrive": 47
+          }
+        ]
+      },
+      "ordered": true,
+      "doneScene": [
+        {
+          "walk": 47,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 47
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "Warm! Look at that, a flask that is not an ice block. You are a very good person to have on a mountain."
+        },
+        {
+          "say": 47,
+          "name": "Traveler",
+          "text": "Here. Two Super Charges. I was keeping them for a rainy day, but up here it only ever snows."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 47,
+          "to": "origin"
+        },
+        {
+          "arrive": 47
+        }
+      ]
+    },
+    {
+      "id": "i5_kulon_lamps",
+      "title": "Lamps for the Kulon Mine",
+      "giver": "Old Man",
+      "short": "Mine lamps",
+      "text": "The Old Man in the Kulon Mine keeps the lamps lit for the miners. Three Drimogemon have dug up his lamp oil, and he needs two Energy Disks to fill the lamps again.",
+      "objectives": [
+        {
+          "type": "defeat",
+          "species": [
+            "Drimogemon"
+          ],
+          "count": 3,
+          "maps": [
+            "s710",
+            "s711"
+          ]
+        },
+        {
+          "type": "bring",
+          "item": "Energy Disk",
+          "count": 2,
+          "label": "Bring two Energy Disks"
+        }
+      ],
+      "reward": {
+        "bits": 1100,
+        "items": [
+          {
+            "name": "Life Disk",
+            "count": 1
+          }
+        ]
+      },
+      "unlock": {
+        "met": [
+          {
+            "npc": 57,
+            "map": "s710"
+          }
+        ],
+        "level": 38,
+        "visited": [
+          "s710"
+        ]
+      },
+      "offer": {
+        "npc": 57,
+        "name": "Old Man",
+        "maps": [
+          "s710"
+        ],
+        "lines": [
+          "Sit, sit. The ground is cold but it is honest. I am the one who keeps the lamps here.",
+          "Three Drimogemon dug through my oil shed last night. They did not drink it. They just wanted to see what was under it. That is the sort of neighbours I have.",
+          "Clear them out for an old man. And bring me two Energy Disks from the Genbu City shop. The lamps drink them in a way I do not understand and do not question.",
+          "The mine has been dark before. I would rather it were not dark tonight."
+        ],
+        "doneLines": [
+          "There. Look at them burn. A whole row of small suns in a hole in the ground.",
+          "Take this Life Disk. It has kept me alive for a long time, and I would rather it kept somebody lively."
+        ],
+        "remindLines": [
+          "Three Drimogemon, and two Energy Disks for the lamps.",
+          "They do not mind the dark, the Drimogemon. It is the miners who mind."
+        ],
+        "ask": "Light the lamps?",
+        "scene": [
+          {
+            "walk": 57,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 57
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "Sit, sit. The ground is cold but it is honest. I am the one who keeps the lamps here."
+          },
+          {
+            "together": 57,
+            "dist": 130
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "Three Drimogemon dug through my oil shed last night. They did not drink it. They just wanted to see what was under it. That is the sort of neighbours I have."
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "Clear them out for an old man. And bring me two Energy Disks from the Genbu City shop. The lamps drink them in a way I do not understand and do not question."
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "The mine has been dark before. I would rather it were not dark tonight."
+          },
+          {
+            "ask": "Light the lamps?",
+            "options": [
+              "I will help",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 57
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 57,
+            "to": "origin"
+          },
+          {
+            "arrive": 57
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 57,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 57
+        },
+        {
+          "say": 57,
+          "name": "Old Man",
+          "text": "There. Look at them burn. A whole row of small suns in a hole in the ground."
+        },
+        {
+          "say": 57,
+          "name": "Old Man",
+          "text": "Take this Life Disk. It has kept me alive for a long time, and I would rather it kept somebody lively."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 57,
+          "to": "origin"
+        },
+        {
+          "arrive": 57
+        }
+      ]
+    },
+    {
       "id": "lf_pass",
       "title": "The Pass in the Box",
       "giver": "Tailmon",

@@ -47,3 +47,11 @@ lf_charm
 lf_ticket
 zz_mount
 zz_fly
+i5_kid_wire_forest
+i5_geek_prairie_hum
+i5_cape_ledger
+i5_bay_antidotes
+i5_oasis_race
+i5_hall_charges
+i5_freeze_flask
+i5_kulon_lamps

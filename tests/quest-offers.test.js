@@ -80,10 +80,10 @@ test("the real data: Leomon 27 on s330 has 11 jobs waiting, and they page three 
   assert.equal(pageCount(1), 1);
 });
 
-test("the real data: 55 of the 118 (npc, map) giver slots carry two or more jobs", () => {
+test("the real data: 55 of the 125 (npc, map) giver slots carry two or more jobs", () => {
   const slots = new Set();
   for (const d of DEFS) for (const m of d.offer?.maps ?? []) slots.add(`${d.offer.npc}@${m}`);
-  assert.equal(slots.size, 118, "the measured giver slots");
+  assert.equal(slots.size, 125, "the measured giver slots");
   let stacked = 0;
   for (const key of slots) {
     const at = key.indexOf("@");
