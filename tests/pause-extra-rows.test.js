@@ -40,7 +40,7 @@ test("ambience.js lists both switches in Extras and in EXPERIMENTAL (off at firs
 
 test("game.js hands the rows to the pause list and opens the books from the pause list's own result", () => {
     const game = read("../web/game.js");
-    assert.match(game, /extraRows: \(\) => pauseExtraRows\(\{ quests: questsPauseRow\(\), fx: window\.__fx \}\),/);
+    assert.match(game, /extraRows: \(\) => pauseExtraRows\(\{ quests: questsPauseRow\(\), fx: window\.__fx, fly: questDone\(FLY_QUEST\) \}\),/);
     assert.match(game, /onBook: \(book, row\) => openBook\(book, row\),/);
     assert.doesNotMatch(game, /extraRow: \(\) => questsPauseRow\(\)/, "the single-row option is gone");
     const status = read("../web/status-translated.js");

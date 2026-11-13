@@ -6,6 +6,8 @@
 // label is six to eight letters so it fits the panel. The book's name is still open (GLOSSARY, DIGIDEX or BOOK): it is
 // written once, here.
 
+import { FLY_ROW_LABEL } from "./fly-points.js";
+
 /** The row labels of the two books. */
 export const BOOK_LABELS = Object.freeze({ glossary: "GLOSSARY", options: "OPTIONS" });
 
@@ -13,12 +15,13 @@ export const BOOK_LABELS = Object.freeze({ glossary: "GLOSSARY", options: "OPTIO
 export const pauseLabelOk = (label) => /^[A-Za-z0-9 ]{1,12}$/.test(String(label));
 
 /**
- * `quests` is what web/quests.js questsPauseRow() returns ({ label } or null); `fx` is the F2 switch object. A book row is
+ * `quests` is what web/quests.js questsPauseRow() returns ({ label } or null); `fx` is the F2 switch object; `fly` is true once quest zz_fly is done (the FLY row, web/fly-points.js). A book row is
  * there only while its dev switch is exactly true (default off: web/ambience.js EXPERIMENTAL).
  */
-export function pauseExtraRows({ quests = null, fx = null } = {}) {
+export function pauseExtraRows({ quests = null, fx = null, fly = false } = {}) {
     const rows = [];
     if (quests && pauseLabelOk(quests.label)) rows.push({ label: quests.label, opens: "quests" });
+    if (fly === true) rows.push({ label: FLY_ROW_LABEL, opens: "fly" });     // once the flight quest is done: not a switch, a key
     if (fx?.glossary === true) rows.push({ label: BOOK_LABELS.glossary, opens: "glossary" });
     if (fx?.options === true) rows.push({ label: BOOK_LABELS.options, opens: "options" });
     return rows;

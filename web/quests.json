@@ -34730,6 +34730,153 @@
       ]
     },
     {
+      "id": "zz_fly",
+      "title": "The Wind Egg",
+      "giver": "Old Man",
+      "short": "The Wind Egg",
+      "text": "The Old Man says the Digi-Egg of Love hears the wind. Stand in the Wind Prairie and let it hear you.",
+      "objectives": [
+        {
+          "type": "visit",
+          "map": "s395",
+          "label": "Stand in the Wind Prairie and feel the wind"
+        },
+        {
+          "type": "level",
+          "level": 10,
+          "label": "Reach level 10 with your partner"
+        }
+      ],
+      "reward": {},
+      "unlock": {
+        "met": [
+          {
+            "npc": 57,
+            "map": "s200"
+          }
+        ],
+        "level": 8,
+        "visited": [
+          "s330"
+        ]
+      },
+      "offer": {
+        "npc": 57,
+        "name": "Old Man",
+        "maps": [
+          "s200"
+        ],
+        "lines": [
+          "Sit down a moment, little one. I will tell you a very old thing.",
+          "There is an egg that listens to the wind. The Digi-Egg of Love. A Hawkmon wearing it grows wings that carry two.",
+          "It does not listen to just anyone. Go and stand in the Wind Prairie, and grow a little first. Level 10 will do.",
+          "Will you go and let the wind have a look at you?"
+        ],
+        "doneLines": [
+          "There. Do you feel it? The egg has heard you.",
+          "Your partner may now take flight to any town or open land you have already walked. Open the pause menu and choose FLY.",
+          "It will not carry you where you have not been, nor under the earth, nor over the deep. Those roads are still yours to dig and swim."
+        ],
+        "remindLines": [
+          "The Wind Prairie, little one. And a partner with some strength in the legs.",
+          "The wind is patient. It is the one thing older than I am."
+        ],
+        "scene": [
+          {
+            "walk": 57,
+            "to": {
+              "near": "player",
+              "gap": 40
+            }
+          },
+          {
+            "arrive": 57
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "Sit down a moment, little one. I will tell you a very old thing."
+          },
+          {
+            "together": 57,
+            "dist": 130
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "There is an egg that listens to the wind. The Digi-Egg of Love. A Hawkmon wearing it grows wings that carry two."
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "It does not listen to just anyone. Go and stand in the Wind Prairie, and grow a little first. Level 10 will do."
+          },
+          {
+            "say": 57,
+            "name": "Old Man",
+            "text": "Will you go and let the wind have a look at you?"
+          },
+          {
+            "ask": "Take the job?",
+            "options": [
+              "I will do it",
+              "Not now"
+            ]
+          },
+          {
+            "apart": 57
+          },
+          {
+            "wait": 12
+          },
+          {
+            "walk": 57,
+            "to": "origin"
+          },
+          {
+            "arrive": 57
+          }
+        ]
+      },
+      "doneScene": [
+        {
+          "walk": 57,
+          "to": {
+            "near": "player",
+            "gap": 40
+          }
+        },
+        {
+          "arrive": 57
+        },
+        {
+          "say": 57,
+          "name": "Old Man",
+          "text": "There. Do you feel it? The egg has heard you."
+        },
+        {
+          "say": 57,
+          "name": "Old Man",
+          "text": "Your partner may now take flight to any town or open land you have already walked. Open the pause menu and choose FLY."
+        },
+        {
+          "say": 57,
+          "name": "Old Man",
+          "text": "It will not carry you where you have not been, nor under the earth, nor over the deep. Those roads are still yours to dig and swim."
+        },
+        {
+          "wait": 12
+        },
+        {
+          "walk": 57,
+          "to": "origin"
+        },
+        {
+          "arrive": 57
+        }
+      ]
+    },
+    {
       "id": "zz_fx_demo",
       "title": "Cipher's field test",
       "giver": "Cipher",

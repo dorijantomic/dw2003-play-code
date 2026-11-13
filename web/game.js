@@ -395,7 +395,9 @@ import { asButton, attachGamepad, isPadButton } from "./input.js";
 import { createItemLog, watchBag } from "./item-log.js";   // owned / seen ITEMS for GLOSSARY, same store as the species log
 import { createSpeciesLog, installSpeciesLog } from "./species-log.js";   // Met / Defeated counter for GLOSSARY, records always (no switch)
 import { on as onGameEvent } from "./gameEvents.js";
-import { pauseExtraRows } from "./pause-extra-rows.js";   // GLOSSARY / OPTIONS rows on the pause list (dev switches `glossary`, `options`)
+import { pauseExtraRows } from "./pause-extra-rows.js";
+import { FLY_POINTS, FLY_QUEST, arrivalSpot, flyBlock, flyPlaces } from "./fly-points.js";   // FLY row: quest zz_fly, visited towns only
+import { createFlyBook } from "./fly-book.js";   // GLOSSARY / OPTIONS rows on the pause list (dev switches `glossary`, `options`)
 import { createBookHost } from "./book-host.js";
 import { createGlossaryBook } from "./glossary-book.js";
 import { createStage } from "./glossary-stage.js";
@@ -452,11 +454,14 @@ function glossaryItems() {
     };
 }
 window.__glossaryStage = glossaryStage;      // dev hook for the screenshot tools (like window.__books)
+let flyChosen = null;            // the place the FLY book chose, flown to when the book has shut
 const books = createBookHost({
     sfx,
     factories: {
         glossary: (args) => createGlossaryBook({ sfx: args.sfx, getSpecies: glossarySpecies, getLog: () => speciesLog, getPartners: glossaryPartners, stage: glossaryStage, getItems: glossaryItems }),
         options: (args) => createOptionsBook(args),
+        // FLY (quest zz_fly): the visited fly points; the chosen one is flown to after the pause list has gone (openBook).
+        fly: (args) => createFlyBook({ sfx: args.sfx, data: () => ({ places: currentFlyPlaces() }), choose: (p) => { flyChosen = p; } }),
         // OPTIONS > GAME > Map screen: New. Read once when it opens: the manifest names, the scenes' exits, the visited flag, the current map.
         mapscreen: (args) => createMapScreenBook({
             sfx: args.sfx,
@@ -553,6 +558,22 @@ function mpCard() {
     return { v: 1, chapter: state.chapter ?? 1, bits: state.bits | 0, quests: questsDoneCount(), party };
 }
 const mpIdle = () => state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
+// The ordinary map change to a spot beside (x, y) on `mapId` (runStageHandoff scripted:true: the same wipe and load as an exit; setMap
+// then gathers my followers on me). Used by the online "Go to" (warpNear) and by FLY (flyTo). `idle()` is asked before and after the
+// collision loads. The spot comes from pickSpotNear on that map's own collision grid, so never a wall. Resolves "ok", "busy", "nomap" or "noroom".
+async function warpToMap(mapId, x, y, idle, dir = null) {
+    const idx = state.manifest?.maps?.findIndex((m) => m.id === mapId) ?? -1;
+    if (idx < 0) return "nomap";
+    if (!idle()) return "busy";
+    const grid = await loadCollisionForStage(mapId);
+    if (!idle()) return "busy";            // the game moved on while the map's collision loaded
+    const m = state.manifest.maps[idx];
+    const spot = pickSpotNear((px, py) => !grid || !rectBlocked(grid, px - 6, py - 8, px + 6, py), x, y, { w: m.width, h: m.height });
+    if (!spot) return "noroom";
+    const dx = x - spot.x, dy = y - spot.y;
+    runStageHandoff({ to: mapId, spawnX: spot.x, spawnY: spot.y, scripted: true, dir: dir ?? (Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up")) });
+    return "ok";
+}
 installSocial({
     stageEl: document.getElementById("stage"),
     api: {
@@ -567,19 +588,7 @@ installSocial({
         // Warp me next to (x, y) on `mapId` through the ordinary stage change (runStageHandoff: the same wipe and load as an exit;
         // setMap then gathers my followers on me). The spot comes from pickSpotNear on that map's own collision grid, so never a wall.
         // Resolves "ok", "busy", "nomap" or "noroom".
-        warpNear: async (mapId, x, y) => {
-            const idx = state.manifest?.maps?.findIndex((m) => m.id === mapId) ?? -1;
-            if (idx < 0) return "nomap";
-            if (!mpIdle() || mpbVisible()) return "busy";
-            const grid = await loadCollisionForStage(mapId);
-            if (!mpIdle() || mpbVisible()) return "busy";            // the game moved on while the map's collision loaded
-            const m = state.manifest.maps[idx];
-            const spot = pickSpotNear((px, py) => !grid || !rectBlocked(grid, px - 6, py - 8, px + 6, py), x, y, { w: m.width, h: m.height });
-            if (!spot) return "noroom";
-            const dx = x - spot.x, dy = y - spot.y;
-            runStageHandoff({ to: mapId, spawnX: spot.x, spawnY: spot.y, scripted: true, dir: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up") });
-            return "ok";
-        },
+        warpNear: (mapId, x, y) => warpToMap(mapId, x, y, () => mpIdle() && !mpbVisible()),
         bits: () => state.bits | 0,
         canFight: () => mpIdle() && fieldPartySize(state.party) > 0 && !mpbVisible(),
         // co-op: the same enemy on two screens with one shared HP pool (see web/mpsocial.js)
@@ -1036,7 +1045,7 @@ const statusOptions = {
     // OPTIONS > GAME > Map screen: New makes the MAP row open web/map-screen-book.js instead of the disc's page.
     newMapScreen: () => window.__fx?.mapScreen === "new",
     // Extra rows on the pause list (after CARD FOLDERS): QUESTS, then the GLOSSARY and OPTIONS books while their dev switches are on.
-    extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx }),
+    extraRows: () => pauseExtraRows({ quests: questsPauseRow(), fx: window.__fx, fly: questDone(FLY_QUEST) }),
     questsPage: () => questsPausePage(),
     onBook: (book, row) => openBook(book, row),
     // The CARD FOLDERS row's gate: the resident home list's own byte, D0x80048f42 =
@@ -1174,11 +1183,42 @@ menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open(backToCardFolder
 // comes back on the same row when it shuts. The confirm that chose the row is still down: the host ignores it until it is let go.
 // If a button is still down after the host's release cap, the reopened list ignores it until it is let go (blockUntilReleased).
 const openBook = (book, row) => {
+    if (book === "fly") { openFly(row); return; }
     books.open(book, (held) => {
         pauseHome(row);
         status?.blockUntilReleased?.(held);
     }, state.keys);
 };
+// FLY (web/fly-points.js): the pause row exists only once quest zz_fly is done. Flying needs open air and a free field; the book lists the
+// visited fly points; the chosen one is reached by the game's own map change (warpToMap) once the book has shut and the pause is over.
+const flyFree = () => !!state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+    && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry && !mpbVisible() && !state.handoffHold && !state.launch
+    && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm && !state._questScene;
+const flySeen = (id) => { const sid = screenIdForStage(fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); };
+const currentFlyPlaces = () => flyPlaces({ maps: state.manifest?.maps ?? [], seen: flySeen, currentId: currentMap()?.id ?? null });
+const flyAirNow = () => isOpenAirMapName(currentMap()?.name ?? "");
+function openFly(row) {
+    const block = !questDone(FLY_QUEST) ? "Not now." : flyBlock({ openAir: flyAirNow(), free: flyFree() });
+    if (block) { questSpeak(null, "", block); return; }
+    books.open("fly", () => {
+        const chosen = flyChosen; flyChosen = null;
+        if (!chosen) { pauseHome(row); return; }
+        flyTo(chosen.id).then((r) => { if (r !== "ok") questSpeak(null, "", "Not now."); });
+    }, state.keys);
+}
+/** Fly to a fly point: resolves "ok" or why not. Every rule is re-checked here, whoever asks (the book, the window.__fly hook). */
+async function flyTo(id) {
+    if (!FLY_POINTS.includes(id) || !questDone(FLY_QUEST)) return "no";
+    if (!flyFree() || state.menuOpen || books.isOpen()) return "busy";
+    if (!flyAirNow()) return "air";
+    if (!flySeen(id)) return "unseen";
+    if (currentMap()?.id === id) return "here";
+    const spot = arrivalSpot(state.scenes, id);
+    if (!spot) return "nospot";
+    return warpToMap(id, spot.x, spot.y, () => flyFree() && !state.menuOpen && !books.isOpen(), spot.dir);
+}
+// Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
+window.__fly = { places: () => currentFlyPlaces(), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
 window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys));
 window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));
