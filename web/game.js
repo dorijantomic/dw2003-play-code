@@ -36,6 +36,7 @@ import { replayRows, replayLadder, replayOnMap, replayRefused, tickReplay, openR
 import { omenLevel, omenCues } from "./omen.js"; // EXPERIMENT: "A feeling before a fight" — the field's warning that a wild Digimon is close (F2 -> Extras; off by default)
 import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"; // EXPERIMENT: F2 -> Extras -> Encounter dial (repel / lure) — a volume knob on the game's own step counter (off by default)
 import { gymExtraHallAt, gymExtraPlan } from "./gym-extra.js";
+import { loadNewMaps, mergeNewMaps, newMapScene, addNewMapExits } from "./newmaps.js"; // maps made after the disc (Gemini HD maps): data/authored/web/assets/data/newmaps/
 import { rollExtra, areaOf, messageFor, createFishFinds } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
 
@@ -3067,6 +3068,12 @@ async function init() {
     }
 
     state.manifest = await (await fetch("assets/manifest.json")).json();
+    // Maps made after the disc join the manifest like a disc map (web/newmaps.js); none installed = nothing changes.
+    state.newMaps = await loadNewMaps(
+        (url) => fetch(url).then((r) => (r.ok ? r.json() : null)),
+        (url) => fetch(url, { method: "HEAD" }).then((r) => r.ok),
+    ).catch(() => ({ records: [], scenes: {}, exits: {} }));
+    mergeNewMaps(state.manifest, state.newMaps);
     knownStageIds = state.manifest.maps.map((m) => m.id);
     manifestSprites = new Map([
         ...state.manifest.characters.map((record) => [record.id, { record, kind: "character" }]),
@@ -3156,10 +3163,14 @@ async function init() {
     const npcPrograms = (await npcProgramsResponse.json()).stages;
     const sceneLoads = state.manifest.maps.map(async (m) => {
         try {
-            const res = await fetch("assets/scenes/" + m.id + ".json");
-            const scene = res.ok
-                ? await res.json()
-                : { npcs: [], exits: [], zones: [] };
+            const own = newMapScene(state.newMaps, m.id);
+            const res = own ? null : await fetch("assets/scenes/" + m.id + ".json");
+            const scene = own
+                ? structuredClone(own)
+                : res.ok
+                    ? await res.json()
+                    : { npcs: [], exits: [], zones: [] };
+            addNewMapExits(state.newMaps, m.id, scene); // doors that lead into the new maps
             scene.npcs = applyNpcPrograms(scene.npcs ?? [], npcPrograms[m.id] ?? []);
             scene.exits = scene.exits ?? [];
             scene.zones = scene.zones ?? [];
