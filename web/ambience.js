@@ -27,6 +27,7 @@ import { needsPractice2v2Reset } from "./options-model.js";
 import { createDevView, DEV_PANEL_CSS } from "./dev-panel.js";   // the F2 page (tabs, search, In / Auto / Out filter), built on first open
 import { DEV_OPEN } from "./dev-panel-model.js";
 import { SHIP, shipClass, isInstalledBuild, applyShipDefaults, finishShipLoad, UPGRADE_MARK_KEY } from "./ship-list.js";   // what players get per switch (in / auto / out)
+import { createRuleOverride } from "./host-rules.js";   // multiplayer: the host's battle rules over my own values
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
@@ -83,9 +84,12 @@ try {
     if (r.upgraded) { localStorage.setItem(STORE_KEY, JSON.stringify({ ...fx })); localStorage.setItem(UPGRADE_MARK_KEY, "1"); }
 } catch { }
 const stored = { ...fx };   // what the panel last saved; URL flags below never reach it
+// Multiplayer: the host's battle rules (web/host-rules.js) sit over the player's own values while connected; never saved.
+const hostRules = createRuleOverride(fx);
 
 // game.js and the labs read these flags; the panel owns them now.
 function syncLegacyFlags() {
+    hostRules.reimpose();       // a preset / profile / All on may have written a locked key: the host's value wins
     window.__noGrass3d = !fx.grass;
     window.__noWater3d = !fx.water;
     window.__noSeamFix = !fx.seam;
@@ -103,7 +107,7 @@ function applyVolumes() {
     setMusicVolume(fx.musicVolume);
 }
 function save(keys = null) {
-    for (const k of keys || Object.keys(fx)) stored[k] = fx[k];
+    for (const k of keys || Object.keys(fx)) if (hostRules.canSave(k)) stored[k] = fx[k];   // a key the host decides is never written to my own save
     try { localStorage.setItem(STORE_KEY, JSON.stringify(stored)); } catch { }
 }
 export function setNum(key, value) {
@@ -127,6 +131,12 @@ export function setFxMany(values) {
     refreshPanel();
 }
 window.__setFxMany = setFxMany;
+/** web/multiplayer.js: apply(rules) while I am a guest in a room, clear() on leaving it (or when I become the host). locked(key) is read by OPTIONS and F2. */
+window.__hostRules = {
+    apply(rules) { hostRules.apply(rules); syncLegacyFlags(); refreshPanel(); },
+    clear() { hostRules.clear(); syncLegacyFlags(); refreshPanel(); },
+    locked: (k) => hostRules.locked(k),
+};
 window.__isWaterAt = (x, y) => isWaterAt(S.map ? S.map.id : "", x, y);
 window.__setFx = setFx;
 // URL flags from the older experiments still win for the session.
@@ -1111,6 +1121,7 @@ export function installFxPanel(stageEl) {
         fx, shipOf: shipClass,
         spriteFilters: Object.entries(SPRITE_FILTERS).filter(([k]) => k === "off" || GPU_FILTER_NAMES.includes(k)),
         dialMode: () => dialModeFromFx(fx),
+        locked: (k) => hostRules.locked(k),
         close: () => { if (!panel.hidden) toggle(); },
         // the DW2 extras (Mount) need the player's own Digimon World 2 disc: say so, with the launcher's extras page
         // (asked once, when the page is first opened; a closed page makes no request)

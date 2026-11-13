@@ -20,10 +20,13 @@
 //   {t:"goto", op, to, map, x, y, dir} "I want to go to you": ask / no / cancel, and at{map,x,y,dir} = my place, sent back to the asker (see #goto)
 //   {t:"lg", op, ...}               a Server Champ night among the room's tamers (see #lg)
 //   {t:"bye"}                     I am leaving for good (the Leave button): my seat is freed at once, not kept
+//   {t:"rules", rules:{...}}        the HOST only: my battle settings (web/host-rules.js keys). The relay keeps the latest per room, cleans it,
+//                                   puts it in every welcome and passes it to the others; a message from anyone but the host is dropped
 //   {t:"ping"}                      keep-alive, answered with {t:"pong"}
 // and receives:
 //   {t:"welcome", id, room, host, roster:[{id,name,map,card}]}
 //   welcome also carries key (rj only), and for a returning seat resumed:true and at:{map,x,y,dir}; roster entries of away seats carry away:true
+//   welcome also carries rules (the host's, when it has sent them); {t:"rules", rules} later when the host changes them
 //   {t:"away", id} / {t:"back", id}   a rj player's seat went away / came back (older games get leave / join instead)
 //   {t:"join", id, name} / {t:"leave", id}
 //   {t:"pos", id, map, x, y, dir, mv} / {t:"gone", id} (that player left my stage) / {t:"emote", id, e}
@@ -32,6 +35,7 @@
 //   {t:"trade", op, ...}
 //   {t:"err", reason}   reasons: no_room, full, exists, busy, bad, gone (the key is not a seat of this room, or it expired)
 import { newLeague, nextPairing, report, forfeit, matchScore, packLeague } from "../web/mp-league.js";
+import { cleanRules } from "../web/host-rules.js";
 
 export const MAX_PEERS = 50;         // a room of friends; positions only go to the same stage, so this stays cheap
 export const MAX_ROOMS = 200;        // per relay, so a flood of "create" cannot fill its memory
@@ -119,7 +123,7 @@ export class Hub {
                 for (let i = 0; i < 20 && (!code || this.rooms.has(code)); i++) code = makeCode(this.rand);
             }
             if (this.rooms.has(code)) return { error: "exists" };
-            this.rooms.set(code, { peers: new Map(), host: null, league: null, pair: null });
+            this.rooms.set(code, { peers: new Map(), host: null, league: null, pair: null, rules: null });
         } else {
             code = cleanCode(room);
             if (!code) return { error: "bad" };
@@ -142,7 +146,7 @@ export class Hub {
         const roster = [...r.peers.values()].filter((p) => aware || !p.away).map((p) => this.#entry(p));   // an older client never hears about an away seat (as if it had left)
         r.peers.set(peer.id, peer);
         if (r.host == null) r.host = peer.id;               // whoever made the room runs its Server Champ nights
-        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, ...(aware ? { key: peer.key } : {}) });
+        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, ...(aware ? { key: peer.key } : {}), ...(r.rules ? { rules: r.rules } : {}) });
         if (r.league) this.#to(peer, { t: "lg", op: "state", host: r.host, ev: null, pair: r.pair, lg: packLeague(r.league) });   // join mid-night: see the bracket
         for (const o of r.peers.values()) if (o !== peer) this.#to(o, { t: "join", id: peer.id, name: peer.name });
         return { session: this.#session(code, peer) };
@@ -171,7 +175,7 @@ export class Hub {
         const cur = r.peers.get(r.host);
         const takeHost = r.host !== peer.id && (!cur || cur.away);   // every present player left while the host was away: the first to return runs the room
         if (takeHost) r.host = peer.id;
-        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, key: peer.key, resumed: true, at: { map: peer.map, x: peer.x, y: peer.y, dir: peer.dir } });
+        this.#to(peer, { t: "welcome", id: peer.id, room: code, host: r.host, roster, key: peer.key, resumed: true, at: { map: peer.map, x: peer.x, y: peer.y, dir: peer.dir }, ...(r.rules ? { rules: r.rules } : {}) });
         if (r.league) this.#to(peer, { t: "lg", op: "state", host: r.host, ev: null, pair: r.pair, lg: packLeague(r.league) });
         for (const o of r.peers.values()) {
             if (o === peer) continue;
@@ -284,9 +288,19 @@ export class Hub {
         if (m.t === "goto") return this.#goto(r, peer, m);
         if (m.t === "mpb") return this.#mpb(r, peer, m);
         if (m.t === "lg") return this.#lg(r, peer, m);
+        if (m.t === "rules") return this.#rules(r, peer, m);
         if (m.t === "emote" && Number.isInteger(m.e) && m.e >= 0 && m.e <= 7) {
             for (const o of r.peers.values()) if (o !== peer && o.map && o.map === peer.map) this.#to(o, { t: "emote", id: peer.id, e: m.e });
         }
+    }
+
+    /** The host's battle settings: kept per room (latest wins), cleaned to the known keys, passed to everyone else. Anyone but the host is ignored. */
+    #rules(r, peer, m) {
+        if (r.host !== peer.id) return;
+        const rules = cleanRules(m.rules);
+        if (!Object.keys(rules).length) return;
+        r.rules = rules;
+        this.#others(r, peer, { t: "rules", rules });
     }
 
     #pos(r, peer, m) {

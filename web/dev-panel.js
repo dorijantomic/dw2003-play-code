@@ -112,7 +112,7 @@ export function createDevView(panel, api) {
             ? `<div class="dr-x" data-show-when="encounterdial" hidden><select data-dial aria-label="Encounter dial" title="How often random fights come"><option value="none">none (no random fights)</option><option value="rare">rare (fewer)</option><option value="normal" selected>normal (the game's own rate)</option><option value="lure">lure (more)</option></select></div>`
             : "";
         return `<div class="dr${st.na.has(r.key) ? " na" : ""}" data-key="${r.key}"${st.na.has(r.key) ? ` title="This effect does not apply on this map"` : ""}>
-          <label><input type="checkbox" data-fx="${r.key}"><span><span class="dr-name">${esc(r.name)}</span><span class="dr-why">${esc(r.why)}</span></span></label>
+          <label><input type="checkbox" data-fx="${r.key}"><span><span class="dr-name">${esc(r.name)}</span><span class="dr-why">${esc(r.why)}</span><span class="dr-why dr-host" data-host-lock="${r.key}" hidden>Set by the host.</span></span></label>
           <span class="dr-b dr-b-${cls}" title="${esc(b[1])}">${b[0]}</span>
           ${open ? `<button type="button" data-act="open:${r.key}" title="Switch it on first, then open it here">Open</button>` : ""}${dial}</div>`;
     }
@@ -140,7 +140,9 @@ export function createDevView(panel, api) {
     function sync() {
         if (!built) return;
         const fx = api.fx;
-        for (const el of main.querySelectorAll("[data-fx]")) el.checked = !!fx[el.dataset.fx];
+        const locked = (k) => !!api.locked?.(k);        // multiplayer: the host decides this key (web/host-rules.js)
+        for (const el of main.querySelectorAll("[data-fx]")) { el.checked = !!fx[el.dataset.fx]; el.disabled = locked(el.dataset.fx); }
+        for (const el of main.querySelectorAll("[data-host-lock]")) el.hidden = !locked(el.dataset.hostLock);
         for (const b of main.querySelectorAll("[data-act^='open:']")) b.disabled = !fx[b.dataset.act.slice(5)];
         const c = tabCounts(fx);
         let total = 0, on = 0;
@@ -154,11 +156,11 @@ export function createDevView(panel, api) {
         set("[data-quality]", (e) => { e.value = fx.quality; });
         set("[data-tod]", (e) => { e.value = fx.todMode; });
         set("[data-spritefilter]", (e) => { e.value = fx.spriteFilter; });
-        set("[data-dial]", (e) => { e.value = api.dialMode(); });
+        set("[data-dial]", (e) => { e.value = api.dialMode(); e.disabled = locked("encounterDialMode"); });
         set("[data-dp-total]", (e) => { e.textContent = `${on} of ${total} switches are on.`; });
         for (const k of ["lightGain", "hd2dStrength", "battleSpeed"]) {
             const r = main.querySelector(`[data-slider="${k}"]`), v = main.querySelector(`[data-val="${k}"]`);
-            if (r) r.value = fx[k]; if (v) v.textContent = (+fx[k]).toFixed(2);
+            if (r) { r.value = fx[k]; r.disabled = locked(k); } if (v) v.textContent = (+fx[k]).toFixed(2);
         }
         for (const row of main.querySelectorAll("[data-show-when]")) row.hidden = !fx[row.dataset.showWhen];
     }

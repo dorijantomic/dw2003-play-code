@@ -54,6 +54,8 @@ Line numbers are for the files as they are on this branch. Files: `web/multiplay
 4. Client on `welcome`: stores id, room, host id, roster, resets retry count, announces its position straight away, goes "online" (MP:101-110).
 5. No password, no version check, no other handshake. Not found in the code.
 
+**Host battle rules**: while connected as a guest, the host's values for those eight keys replace the guest's own in the live settings object (`window.__fx`, `web/ambience.js`, layer `createRuleOverride` in `web/host-rules.js`). They are never written to the guest's saved settings (`save()` skips locked keys), so leaving the room, a failed link, or becoming the host puts the guest's own values back. The relay (`server/room-core.mjs` `#rules`) accepts `rules` only from the room's current host and cleans it to those keys with small valid values. OPTIONS (Battle speed, Random fights) and F2 show the host value, locked, with "Set by the host." Looks, sound and field-warning switches are not part of it.
+
 **Who has authority**
 - The relay: who is in the room, the room's "host" id (the player who created it; ROOM:115), trades (ROOM:339-384), the Server Champ bracket (ROOM:290-332). It also cleans and limits every message.
 - Each client: its own position, name, card, level-up news. The relay trusts them within limits (ROOM:184-189 only checks map id format and number range).
@@ -73,6 +75,7 @@ All messages are JSON text. Every message except a card and an `mpb` must be 600
 | `welcome` (relay to new) | id, room, host id, roster of `{id,name,map,card}` | on connect | grows with players and their cards (up to ~2000 bytes per card) | once |
 | `join` / `leave` (relay to all) | id, name / id | someone joins / leaves | tiny | on event |
 | `host` (relay to all) | new host id | the host left and others remain (ROOM:141-146) | tiny | on event |
+| `rules` (host to relay; relay to the others) | the host's battle settings: `battlespeed`, `battleSpeed`, `encounterdial`, `encounterDialMode`, `fusionbosses`, `bossphases`, `aishift`, `practice2v2` (`web/host-rules.js`) | host: on room start, on becoming host, and when one of the eight changes (checked on the 50 ms timer, at most every 400 ms). Relay: keeps the latest per room, also in every `welcome` (`rules` field) | under 300 bytes (the relay drops anything over 600) | on event |
 | `pos` (client to relay) | map, x, y, dir, moving | timer every 50 ms checks (MP:444, MP:277-284): sends if changed and at least 100 ms since last, at once on a map change, or if 2000 ms passed since last | about 80 bytes (ROOM:32 comment) | up to 10 per second while moving, 1 per 2 s still |
 | `pos` (relay to others) | same plus id | only to players in the same map (ROOM:192-200) | about 80 bytes | one copy per player in the same map |
 | `at` (relay to others) | id, map | when a player's map changes, to everyone (ROOM:190) | tiny | on event |

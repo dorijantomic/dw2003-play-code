@@ -22,6 +22,7 @@
 import { createChatQueue } from "./chat-queue.js";
 import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
+import { pickRules } from "./host-rules.js";          // the host's battle settings every guest plays by
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
@@ -42,6 +43,7 @@ const mp = {
     sent: { map: null, x: 0, y: 0, dir: "", mv: 0, at: 0 },
     retry: 0, retryTimer: 0, want: null, beat: 0, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
     ui: null, lastTick: 0,
+    rules: null, rulesSent: "", rulesAt: 0,   // rules: the host's battle settings (what the relay last told me); rulesSent: what I last sent as host
 };
 
 // ------------------------------------------------------------ events for the social dock
@@ -109,6 +111,26 @@ function keepSeat(base, m) {
     if (m.resumed || !old || old.base !== base || old.room !== m.room || old.key === m.key) saveSeat({ base, room: m.room, key: m.key });
 }
 
+/** Guest: play by the host's rules (the game's own values stay saved, untouched). Host, or not in a room: my own values. Called after every change of room, host or rules. */
+function applyRules() {
+    const hr = typeof window !== "undefined" ? window.__hostRules : null;
+    if (!hr) return;
+    if (mp.room != null && mp.hostId != null && mp.hostId !== mp.id && mp.rules) hr.apply(mp.rules); else hr.clear();
+    mp.rulesSent = "";                                      // a role change: the host side starts again with a fresh send
+}
+/** The link is over (left, refused, gave up): the host's rules go, my own values come back. */
+function dropRules() { mp.rules = null; applyRules(); }
+/** Host: tell the room my battle settings when they are new or changed (checked on the 50 ms timer, sent at most every 400 ms). */
+function sendRules() {
+    if (!amHost() || typeof window === "undefined" || !window.__fx) return;
+    const now = performance.now();
+    if (now - mp.rulesAt < 400) return;
+    mp.rulesAt = now;
+    const rules = pickRules(window.__fx), json = JSON.stringify(rules);
+    if (json === mp.rulesSent) return;
+    if (sendRaw({ t: "rules", rules })) mp.rulesSent = json;
+}
+
 function setStatus(s, text) { mp.status = s; render(text); emit("status", { status: s }); }
 
 /** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE", key?: seat key } */
@@ -131,13 +153,14 @@ export function connect(want) {
         if (m.t === "welcome") {
             const wasLost = mp.lost;
             mp.hadWelcome = true; mp.autoTry = false; mp.retry = 0; mp.lost = false;
-            mp.id = m.id; mp.room = m.room; mp.hostId = m.host ?? null;
+            mp.id = m.id; mp.room = m.room; mp.hostId = m.host ?? null; mp.rules = m.rules ?? null;
             mp.want = { base, room: m.room, key: m.key ?? null };         // a reconnect rejoins this room with this seat
             if (m.key) keepSeat(base, m);
             mp.peers.clear();
             for (const p of m.roster) { const q = newPeer(p.name); q.map = p.map ?? null; q.card = p.card ?? null; q.away = !!p.away; q.hidden = !!p.away; mp.peers.set(p.id, q); }
             mp.sent.at = 0; mp.sent.map = null;                                  // announce myself straight away
             setStatus("online");
+            applyRules();
             if (!m.resumed) emit("sys", { text: `You joined room ${m.room}.` });
             emit("roster");
             if (wasLost) emit("linkback", { resumed: !!m.resumed });             // after roster: the screens redraw, then the fight resumes
@@ -148,6 +171,7 @@ export function connect(want) {
             if (m.reason === "gone" && !mp.autoTry && mp.want?.room) { connect({ base, room: mp.want.room }); return; }   // my seat is lost: join once as a new player
             mp.autoTry = false;
             mp.want = null;
+            dropRules();
             setStatus("off", REASONS[m.reason] ?? "The server said no.");
         } else if (m.t === "join") {
             mp.peers.set(m.id, newPeer(m.name)); render(); toast(`${m.name} joined`);
@@ -198,7 +222,9 @@ export function connect(want) {
         } else if (m.t === "lg") {
             emit("league", m);
         } else if (m.t === "host") {
-            mp.hostId = m.id; emit("roster");
+            mp.hostId = m.id; applyRules(); emit("roster");
+        } else if (m.t === "rules") {
+            mp.rules = m.rules ?? null; applyRules();
         }
     };
     ws.onclose = () => {
@@ -214,6 +240,7 @@ export function connect(want) {
         } else if (mp.status !== "off") {
             const had = mp.hadWelcome; mp.hadWelcome = false;             // giving up: the next fresh connect starts clean
             mp.lost = false; mp.autoTry = false;
+            dropRules();
             setStatus("off", had ? "Connection lost." : "Could not reach your friend. Check the address, that you are on the same Hamachi / Tailscale network, and that their game is still hosting.");
         }
     };
@@ -250,6 +277,7 @@ export function disconnect(quiet = false) {
     if (!quiet) {                                  // every retry is quiet: a retry keeps my id, room and host, so GAME's myId() stays mine
         const myKey = mp.want?.key;                // my seat, not whichever seat storage holds (another tab may own that one)
         mp.room = null; mp.id = null; mp.hostId = null; mp.want = null;
+        dropRules();                               // the host's rules end with the room: my own settings are back
         mp.hadWelcome = false; mp.lost = false; mp.autoTry = false;
         if (myKey) dropSeat({ key: myKey });       // I left: my seat is gone (the relay frees it on bye anyway)
         resetChatQueue();                          // lines still waiting die with the connection, and say so
@@ -520,7 +548,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
         if (e.key === "F4") { e.preventDefault(); openPanel(); }
         else if (e.key === "Escape" && !panel.hidden && panel.contains(document.activeElement)) openPanel(false);
     });
-    mp.beat = setInterval(sendPresence, 50);     // a timer, not the render loop: a hidden or covered window still says "I am here"
+    mp.beat = setInterval(() => { sendPresence(); sendRules(); }, 50);     // a timer, not the render loop: a hidden or covered window still says "I am here"
     // for tests and the console
     window.__mp = { mp, connect, hostGame, disconnect, sendEmote, sendChat, ghosts: multiplayerGhosts, open: openPanel };
 }

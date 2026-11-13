@@ -144,7 +144,7 @@ const WEATHERS = Object.freeze(["auto", "always", "storm", "clear"]);   // web/a
 const VOLUMES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);   // tenths; 10 = today's gain
 
 const toggleRow = (id, label, help, keys) => ({
-    id, label, help, choices: ["Off", "On"],
+    id, label, help, keys, choices: ["Off", "On"],
     read: (s) => (on(s, keys) ? 1 : 0), write: (s, i) => setAll(s, keys, i === 1),
 });
 const valueRow = (id, label, help, key, values, labels) => ({
@@ -161,7 +161,7 @@ const volumeRow = (id, label, help, key) => ({
 export function buildRows(pixelFilters = [["off", "Off"]]) {
     const rows = {
         battleSpeed: {
-            id: "battleSpeed", label: "Battle speed", numeric: true, choices: SPEEDS.map((v) => `x${v}`),
+            id: "battleSpeed", label: "Battle speed", keys: ["battlespeed", "battleSpeed"], numeric: true, choices: SPEEDS.map((v) => `x${v}`),
             help: "How fast battles play. x1 is the speed of the original game.",
             read: (s) => {
                 if (s.get("battlespeed") !== true) return 0;                       // the switch is off: the game really runs x1
@@ -172,7 +172,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
             write: (s, i) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
         },
         randomFights: {
-            id: "randomFights", label: "Random fights", choices: ["Fewer", "Normal", "More"],
+            id: "randomFights", label: "Random fights", keys: ["encounterdial", "encounterDialMode"], choices: ["Fewer", "Normal", "More"],
             help: "How often wild Digimon attack you while you walk.",
             read: (s) => (s.get("encounterdial") === true ? DIAL.indexOf(s.get("encounterDialMode")) : 1),   // -1 = "none" set in F2
             customLabel: () => "Never",
@@ -201,6 +201,9 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
     return rows;
 }
 
+/** Short note shown for a row the host decides (multiplayer: web/host-rules.js). */
+export const HOST_NOTE = "Set by the host.";
+
 /** The four pages, in order, and the row ids on each (Q / E switch the page). EFFECTS rows open a category (see createOptionsModel). */
 export const PAGES = Object.freeze([
     { id: "game", label: "GAME", rows: ["battleSpeed", "randomFights", ...SHOWN_EXTRAS.map((id) => `extra:${id}`)] },
@@ -216,6 +219,7 @@ export const PAGES = Object.freeze([
  */
 export function createOptionsModel(store, pixelFilters) {
     const rows = buildRows(pixelFilters);
+    const lockedRow = (r) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
     const backRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
     let page = 0, row = 0, top = 0, open = null;          // open = the EFFECTS category that is showing its switches, or null
     const switchRows = (c) => [...c.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
@@ -223,7 +227,7 @@ export function createOptionsModel(store, pixelFilters) {
     const here = () => pageRows()[row];
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };
     const close = () => { const c = open; open = null; row = c.cat; top = 0; };
-    const toggleHere = () => { const r = here(); const i = r.read(store); r.write(store, i === 1 ? 0 : 1); return "change"; };
+    const toggleHere = () => { const r = here(); if (lockedRow(r)) return null; const i = r.read(store); r.write(store, i === 1 ? 0 : 1); return "change"; };
     return {
         page: () => page,
         row: () => row - top,
@@ -235,15 +239,15 @@ export function createOptionsModel(store, pixelFilters) {
         view() {
             return pageRows().slice(top, top + LIST_ROWS).map((r) => {
                 const i = r.read(store);
-                const fixed = r.menu || r.back;
+                const locked = lockedRow(r), fixed = r.menu || r.back || locked;
                 return {
-                    id: r.id, label: r.label, numeric: !!r.numeric, help: r.help, menu: !!r.menu,
+                    id: r.id, label: r.label, numeric: !!r.numeric, help: locked ? HOST_NOTE : r.help, menu: !!r.menu, locked,
                     value: i < 0 ? (r.customLabel?.() ?? "Custom") : r.choices[i],
                     custom: i < 0, canLeft: !fixed && i > 0, canRight: r.menu ? true : !fixed && i < r.choices.length - 1,
                 };
             });
         },
-        help: () => here().help,
+        help: () => (lockedRow(here()) ? HOST_NOTE : here().help),
         switchPage(d) {
             const next = Math.min(PAGES.length - 1, Math.max(0, page + d));
             if (next === page) return null;
@@ -258,7 +262,7 @@ export function createOptionsModel(store, pixelFilters) {
         change(d) {
             const r = here();
             if (r.menu) return d > 0 ? this.select() : null;
-            if (r.back) return null;
+            if (r.back || lockedRow(r)) return null;
             const i = r.read(store);
             const next = i < 0 ? (d > 0 ? 0 : r.choices.length - 1) : Math.min(r.choices.length - 1, Math.max(0, i + d));
             if (next === i) return null;

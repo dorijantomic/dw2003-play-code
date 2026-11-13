@@ -53,8 +53,8 @@ export function rowLayout(widthOf, r, win = OPTIONS_WINDOW) {
     return { label: fitByWidth(r.label, (s) => widthOf(s, 1), room), valueRight: right, valueLeft: left, leftArrowX: left - ARROW_W, rightArrowX: right + 2, kind };
 }
 
-export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o) } = {}) {
-    const store = { get: (k) => fx()?.[k], setMany: (o) => setFxMany(o) };
+export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!window.__hostRules?.locked(k) } = {}) {
+    const store = { get: (k) => fx()?.[k], setMany: (o) => setFxMany(o), locked: (k) => locked(k) };
     const model = createOptionsModel(store, pixelFilterChoices());
     const cue = (result) => { if (result) sfx?.play?.("system02"); };
     return {
