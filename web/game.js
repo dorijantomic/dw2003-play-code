@@ -396,7 +396,7 @@ import { createItemLog, watchBag } from "./item-log.js";   // owned / seen ITEMS
 import { createSpeciesLog, installSpeciesLog } from "./species-log.js";   // Met / Defeated counter for GLOSSARY, records always (no switch)
 import { on as onGameEvent } from "./gameEvents.js";
 import { pauseExtraRows } from "./pause-extra-rows.js";
-import { FLY_POINTS, FLY_QUEST, arrivalSpot, flyBlock, flyPlaces } from "./fly-points.js";   // FLY row: quest zz_fly, visited towns only
+import { FLY_POINTS, FLY_QUEST, arrivalSpot, flyBlock, flyCopiesOf, flyCopyFor, flyPlaces } from "./fly-points.js";   // FLY row: quest zz_fly, visited towns only
 import { createFlyBook } from "./fly-book.js";   // GLOSSARY / OPTIONS rows on the pause list (dev switches `glossary`, `options`)
 import { createBookHost } from "./book-host.js";
 import { createGlossaryBook } from "./glossary-book.js";
@@ -1195,7 +1195,8 @@ const flyFree = () => !!state.started && !battle.isActive() && !cutscene.isActiv
     && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry && !mpbVisible() && !state.handoffHold && !state.launch
     && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm && !state._questScene;
 const flySeen = (id) => { const sid = screenIdForStage(fieldScreenTable, id); return sid != null && engineFlagSeen(0x1e00 + sid); };
-const currentFlyPlaces = () => flyPlaces({ maps: state.manifest?.maps ?? [], seen: flySeen, currentId: currentMap()?.id ?? null });
+const flySeenAny = (id) => flyCopiesOf(state.manifest?.maps ?? [], state.scenes, id).some(flySeen);   // any copy of the place walked into
+const currentFlyPlaces = () => flyPlaces({ maps: state.manifest?.maps ?? [], seen: flySeen, currentId: currentMap()?.id ?? null, scenes: state.scenes });
 const flyAirNow = () => isOpenAirMapName(currentMap()?.name ?? "");
 function openFly(row) {
     const block = !questDone(FLY_QUEST) ? "Not now." : flyBlock({ openAir: flyAirNow(), free: flyFree() });
@@ -1211,14 +1212,17 @@ async function flyTo(id) {
     if (!FLY_POINTS.includes(id) || !questDone(FLY_QUEST)) return "no";
     if (!flyFree() || state.menuOpen || books.isOpen()) return "busy";
     if (!flyAirNow()) return "air";
-    if (!flySeen(id)) return "unseen";
-    if (currentMap()?.id === id) return "here";
-    const spot = arrivalSpot(state.scenes, id);
+    if (!flySeenAny(id)) return "unseen";
+    // The copy a door from here leads to on foot (the world this map is in); unresolved = refuse with the reason, never a guess.
+    const copy = flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id });
+    if (copy.why) return copy.why;
+    if (currentMap()?.id === copy.id) return "here";
+    const spot = arrivalSpot(state.scenes, copy.id);
     if (!spot) return "nospot";
-    return warpToMap(id, spot.x, spot.y, () => flyFree() && !state.menuOpen && !books.isOpen(), spot.dir);
+    return warpToMap(copy.id, spot.x, spot.y, () => flyFree() && !state.menuOpen && !books.isOpen(), spot.dir);
 }
 // Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
-window.__fly = { places: () => currentFlyPlaces(), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
+window.__fly = { places: () => currentFlyPlaces(), copy: (id) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
 window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys));
 window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));

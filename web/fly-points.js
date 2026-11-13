@@ -3,11 +3,14 @@
 // Rules (lore: the Digi-Egg of Love, Hawkmon -> Halsemon, carries two on the wind):
 //   * Only the maps in FLY_POINTS: towns and open-air hubs reached on foot. Never a dungeon, an interior, or any map that
 //     only a dig or a swim reaches (the West and North Sectors, Duel Island, the sea): those roads stay the player's to dig and swim.
-//     Every point is exactly one stage id; the Asuka / Amaterasu copies of a later chapter are not listed.
-//   * A point is offered only after the player has walked into that very map (the same flag the MAP page reads).
+//     Every point is one stage id, but the world holds copies of each place (normal / Amaterasu / the s9xx finale world: same size,
+//     same exit rectangles). On foot a door never leaves its own world, so the world you stand in decides the copy: flyCopyFor.
+//   * A point is offered once the player has walked into any copy of it (the same flag the MAP page reads).
 //   * Flight starts only from open air, with a free field (no battle, cutscene, quest scene, dive form, wipe or story hand-off).
 //   * You arrive by the game's own map change (web/game.js flyTo -> runStageHandoff scripted:true), the party gathers on you.
 // tests/fly-points.test.js holds every rule; the fly points are listed once, here.
+
+import { isOpenAirMapName } from "./map-open-air.js";
 
 /** The quest that gives the flight (data/authored/quests/pack_zz_fly.py). */
 export const FLY_QUEST = "zz_fly";
@@ -30,15 +33,111 @@ export function flyLabel(name) {
 }
 
 /**
- * The visited fly points, in FLY_POINTS order, except the map you stand on: [{ id, label }].
- * `maps` = the manifest maps ({ id, name }); `seen(id)` = "have I walked into this map".
+ * The copies of every place: maps with the same size and the same exit rectangles (the normal world, its Amaterasu twin, the s9xx
+ * finale twin), each group sorted by map id. Map<id, string[]>; a map with no twin is absent. Pure; cached per `scenes` object.
  */
-export function flyPlaces({ maps = [], seen = () => false, currentId = null, points = FLY_POINTS } = {}) {
+const twinCache = new WeakMap();
+export function mapTwins(maps, scenes) {
+    const hit = scenes && typeof scenes === "object" ? twinCache.get(scenes) : null;
+    if (hit && hit.maps === maps) return hit.groups;
+    const bySig = new Map();
+    for (const m of maps ?? []) {
+        const ex = (scenes?.[m.id]?.exits ?? []).filter((e) => !e._entranceReturn);
+        if (!ex.length) continue;
+        const sig = `${m.width}x${m.height}|` + ex.map((e) => [e.x, e.y, e.w, e.h].join(",")).sort().join(";");
+        if (!bySig.has(sig)) bySig.set(sig, []);
+        bySig.get(sig).push(m.id);
+    }
+    const groups = new Map();
+    const num = (id) => Number(String(id).replace(/\D/g, ""));
+    for (const ids of bySig.values()) {
+        if (ids.length < 2) continue;
+        ids.sort((a, b) => num(a) - num(b));
+        for (const id of ids) groups.set(id, ids);
+    }
+    if (scenes && typeof scenes === "object") twinCache.set(scenes, { maps, groups });
+    return groups;
+}
+
+/** The worlds: the normal one, its Amaterasu copy, the s9xx finale copy (index = world number). */
+export const WORLDS = Object.freeze(["normal", "amaterasu", "s9xx"]);
+const idNum = (id) => Number(String(id).replace(/\D/g, ""));
+
+/** The world of a map from its twin group alone: s9xx ids = the finale world, the others take their rank by id (0 normal, 1 Amaterasu). */
+function rankWorld(group, id) {
+    if (idNum(id) >= 900) return 2;
+    const r = group.filter((x) => idNum(x) < 900).indexOf(id);
+    return r >= 0 && r < 2 ? r : -1;
+}
+
+/**
+ * Which world every OPEN-AIR map is in: Map<id, 0|1|2> (index into WORLDS). A twinned map takes its rank in its twin group. A map with
+ * no twin (Ether Jungle, the s9xx Plug Cape...) takes the world its open-air neighbours (exits in or out) are in, when they all agree,
+ * repeated until nothing changes. A map with no such neighbour (Kusanagi Street Corner) stays out: world unknown.
+ * Underground / dig maps are not followed (they join the worlds). Pure; cached per `scenes` object.
+ */
+const worldCache = new WeakMap();
+export function mapWorlds(maps, scenes) {
+    const hit = scenes && typeof scenes === "object" ? worldCache.get(scenes) : null;
+    if (hit && hit.maps === maps) return hit.worlds;
+    const twins = mapTwins(maps, scenes);
+    const air = new Set((maps ?? []).filter((m) => isOpenAirMapName(m.name)).map((m) => m.id));
+    const worlds = new Map();
+    for (const id of air) {
+        const g = twins.get(id);
+        const w = g ? rankWorld(g, id) : -1;
+        if (w >= 0) worlds.set(id, w);
+    }
+    const adj = new Map();
+    const link = (a, b) => { if (air.has(a) && air.has(b)) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); } };
+    for (const [from, sc] of Object.entries(scenes ?? {})) for (const e of sc?.exits ?? []) if (e?.to) { link(from, e.to); link(e.to, from); }
+    for (let changed = true; changed;) {
+        changed = false;
+        for (const id of air) {
+            if (worlds.has(id)) continue;
+            const ws = new Set([...(adj.get(id) ?? [])].filter((n) => worlds.has(n)).map((n) => worlds.get(n)));
+            if (ws.size === 1) { worlds.set(id, [...ws][0]); changed = true; }
+        }
+    }
+    if (scenes && typeof scenes === "object") worldCache.set(scenes, { maps, worlds });
+    return worlds;
+}
+
+/**
+ * Which copy of fly point `id` a door from `currentId` leads to on foot: the copy in the same world as the map you stand on.
+ * { id } or { why }: "world-unknown" (the map you stand on has no known world), "no-copy" (that world holds no copy of the point).
+ * Never a guess.
+ */
+export function flyCopyFor({ maps, scenes, currentId, id }) {
+    const w = mapWorlds(maps, scenes).get(currentId);
+    if (w === undefined) return { why: "world-unknown" };
+    const g = mapTwins(maps, scenes).get(id);
+    const copy = g ? g.find((x) => rankWorld(g, x) === w) : null;
+    return copy ? { id: copy } : { why: "no-copy" };
+}
+
+/** Every copy of a fly point (just itself when it has no twin). */
+export const flyCopiesOf = (maps, scenes, id) => mapTwins(maps, scenes).get(id) ?? [id];
+
+/**
+ * The visited fly points, in FLY_POINTS order, except the place you stand on (any of its copies): [{ id, label }].
+ * `maps` = the manifest maps ({ id, name }); `seen(id)` = "have I walked into this map"; a point counts as visited when any of its
+ * copies was. With `scenes`, a point whose copy cannot be resolved from where you stand is left out, and the label is the copy's.
+ */
+export function flyPlaces({ maps = [], seen = () => false, currentId = null, points = FLY_POINTS, scenes = null } = {}) {
     const byId = new Map(maps.map((m) => [m.id, m]));
-    const out = [];
+    const out = [], used = new Set();
     for (const id of points) {
-        const m = byId.get(id);
-        if (!m || id === currentId || !seen(id)) continue;
+        let m = byId.get(id);
+        const copies = scenes ? flyCopiesOf(maps, scenes, id) : [id];
+        if (!m || copies.includes(currentId) || !copies.some((c) => seen(c))) continue;
+        if (scenes) {
+            const c = flyCopyFor({ maps, scenes, currentId, id });
+            if (c.why) continue;
+            if (used.has(c.id)) continue;   // s200 and s201 are one place seen from two worlds: listed once
+            used.add(c.id);
+            m = byId.get(c.id) ?? m;
+        }
         out.push({ id, label: flyLabel(m.name) });
     }
     return out;
