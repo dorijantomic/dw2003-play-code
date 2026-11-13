@@ -192,8 +192,8 @@ test("Sound: four own rows write exactly their own key, no other row writes a so
 
 test("OPTIONS no longer carries rows whose keys are all auto or out", () => {
     const rows = buildRows(FILTERS);
-    for (const id of ["wide", "hd2d", "toon", "extra:mount", "extra:boss", "extra:giant", "extra:battleideas", "extra:battlemotion", "extra:camera", "extra:villagers", "extra:online"]) assert.ok(!(id in rows), id);
-    assert.ok("extra:quests" in rows && "battleSpeed" in rows && "randomFights" in rows && "musicVolume" in rows && "soundVolume" in rows);
+    for (const id of ["wide", "hd2d", "toon", "extra:boss", "extra:giant", "extra:battleideas", "extra:battlemotion", "extra:camera", "extra:villagers", "extra:online"]) assert.ok(!(id in rows), id);
+    assert.ok("extra:quests" in rows && "extra:mount" in rows && "battleSpeed" in rows && "randomFights" in rows && "musicVolume" in rows && "soundVolume" in rows);
     const onPages = PAGES.flatMap((p) => p.rows);
     for (const id of onPages) assert.ok(id in rows, id);
 });

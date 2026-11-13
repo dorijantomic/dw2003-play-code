@@ -72,7 +72,7 @@ export const DEV_ROWS = Object.freeze([
     R("quests", "Quests", "questemotes", "Quest emotes", "A quest scene can show a reaction bubble above a character."),
     R("quests", "Quests", "questplacecard", "Quest place cards", "A quest scene can show the blue place-name card."),
     R("quests", "Quests", "questsecondjob", "Pick which job to take", "When a character has several jobs, they ask which one you want."),
-    R("quests", "Quests", "mount", "Mount", "After a quest unlocks it, you can ride a Digimon on the map (needs your own Digimon World 2 disc)."),
+    R("quests", "Quests", "mount", "Mount", "After a quest unlocks it, you can ride a Digimon on the map: R or the pad Select climbs on and off (needs your own Digimon World 2 disc)."),
     R("quests", "Quests", "mountseat", "Rider sits in the saddle", "The rider sits in the saddle instead of floating over the mount."),
     // ---- Battle
     R("battle", "Bosses", "fusionbosses", "Fusion bosses", "Kimeramon and Machinedramon fuse into Millenniummon."),

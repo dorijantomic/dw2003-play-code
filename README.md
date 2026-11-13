@@ -114,7 +114,7 @@ once.
 | Left / right shoulder (page through lists) | **Q** / **E** |
 | Left / right trigger | **1** / **3** |
 | Start (pause menu) | **I** |
-| Select | **R** |
+| Select (also climbs on and off a mount, once the Unimon quest in Central Park is done) | **R** |
 
 ### Gamepad / joystick
 

@@ -27,7 +27,7 @@ import {
     installMount, mountTick, mountPress, mountRiding, mountHidesFollowers, mountSpeedFactor,
     mountRiderLift, mountRiderShiftX, mountRiderCutRow, mountPlayerLatch, mountDrawable, mountForceDismount, moveWithSubSteps,
     mountActorDef, mountActorHidden, mountActorDraw, mountHidesRiderShadow,
-} from "./mount.js"; // EXPERIMENT: quest-unlocked mounts (F2 -> Extras -> Mount; off by default)
+} from "./mount.js"; // quest-unlocked mounts (OPTIONS -> Mount, on at the start; R or pad Select rides)
 import { tickCutContent, openCutContent, cutContentPress, cutContentDraw, cutContentOpen } from "./cut-content.js"; // EXPERIMENT: F2 -> Extras -> Cut-content gallery (dev; off by default)
 import { tickBlastLadder, openBlastLadder, blastPress, blastDraw, blastOpen } from "./blast-ladder.js"; // EXPERIMENT: F2 -> Extras -> Blast ladder (new; off by default)
 import { tickPlanner, openPlanner, plannerPress, plannerDraw, plannerOpen, plannerRowsNow, plannerCursor, plannerSelection } from "./evolution-planner.js"; // EXPERIMENT: F2 -> Extras -> Next forms planner (new; off by default)
@@ -38,7 +38,7 @@ import { dialModeFromFx, dialAllowsFight, dialReset } from "./encounter-dial.js"
 import { rollExtra, areaOf, messageFor, createFishFinds } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { castsLeft } from "./fishing-almanac.js"; // EXPERIMENT: F2 -> Extras -> Angler's almanac — the field's "casts left this visit" line (off by default)
 
-import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState, fx } from "./ambience.js";
+import { applyScene, ambienceFor, groundFxFor, ambienceSilence, installFxPanel, swayFor, setAmbienceScene, clearAmbienceScene, tickAmbienceScene, ambienceLightning, ambienceSceneState, isOpenAirMapName, fx } from "./ambience.js";
 import { loadTileIndex, tileIndexReady, tiledMap, tickTiles, retainTiledMaps } from "./map-tiles.js";
 import { installPost2d } from "./post2d.js";
 import { compileScene, castOf } from "./quest-scenes.js";
@@ -669,13 +669,14 @@ installQuests({
 installSpeciesLog({ on: onGameEvent, log: speciesLog });   // listens to battleStarted / battleWon, same event bus as the quests
 if (!window.__dwInstalled && /[?&]questlab=1\b/.test(location.search)) import("./quest-lab.js");   // test panel for the extra quests
 
-// EXPERIMENT (mounts): the game-side hooks the ride needs. The mount layer itself is web/mount.js; it is OFF
-// unless F2 -> Extras -> Mount is on AND a quest unlocked a mount (the quest layer's own done state, never a
-// story flag). `canStand` is this file's own foot-box test, so a dismount spot is the game's walkable ground.
+// Mounts: the game-side hooks the ride needs. The mount layer itself is web/mount.js; it rides once the "Mount" switch is
+// on (it is at the start), a quest unlocked a mount (the quest layer's own done state, never a story flag) and the
+// player's own DW2 models are installed (`hasModel`). `canStand` is this file's own foot-box test, so a dismount spot is the game's walkable ground.
 installMount({
     groundShadow: (c, x, y, w, h, alpha) => drawGroundShadow(c, x, y, w, h, alpha),
     state: () => state,
     enabled: () => window.__fx?.mount === true,
+    hasModel: (url) => fetch(url, { method: "HEAD", cache: "no-store" }).then((r) => r.ok).catch(() => false),
     questDone: (id) => questDone(id),
     canStand: (x, y) => {
         const grid = state.collision[currentMap()?.id];
@@ -685,6 +686,9 @@ installMount({
     resetFollowers: () => resetFollowers(),
     placeFollowers: (spots) => placeFollowersAt(spots),
     sfx: (id) => sfx.play(id),
+    // no riding indoors: the same open-air / indoor split the ambience layer uses (web/ambience.js isOpenAirMapName)
+    indoor: () => { const n = currentMap()?.name; return !!n && !isOpenAirMapName(n); },
+    say: (text) => { questSpeak(null, "", text); },
     fieldReady: () => !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
         && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry
         && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm
@@ -7844,9 +7848,10 @@ function dispatchInput(k, e, raw = "") {
         cycleGameScreen(document, document.getElementById("stage"));
         return;
     }
-    // EXPERIMENT (mounts): "r" rides / steps off, and only when F2 -> Extras -> Mount is on and a quest
-    // unlocked a mount (mountPress answers false otherwise, so the press falls through to everything else).
-    if (raw === "r" && !state.nameEntry && !e.ctrlKey && !e.metaKey && !e.altKey && mountPress(state)) {
+    // Mounts: "r" (the keyboard's Select) or the pad's Select button rides / steps off, and only when the Mount switch is on,
+    // a quest unlocked a mount and the DW2 models are installed (mountPress answers false otherwise, so the press falls
+    // through to everything else).
+    if ((raw === "r" || k === "select") && !state.nameEntry && !e.ctrlKey && !e.metaKey && !e.altKey && mountPress(state)) {
         e.preventDefault?.();
         return;
     }

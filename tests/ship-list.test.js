@@ -45,26 +45,27 @@ async function loadAmbience({ installed, saved, mark, search = "" }) {
 }
 
 // ---------------------------------------------------------------- the list
-test("ship list: every FX_DEFS key has exactly one entry, no extras, counts 44 / 9 / 48", async () => {
+test("ship list: every FX_DEFS key has exactly one entry, no extras, counts 45 / 9 / 46", async () => {
     const { FX_DEFS } = await loadAmbience({});
     const keys = FX_DEFS.map(([k]) => k);
-    assert.equal(keys.length, 101);
-    assert.equal(new Set(keys).size, 101, "FX_DEFS has no duplicate key");
+    assert.equal(keys.length, 100);
+    assert.equal(new Set(keys).size, 100, "FX_DEFS has no duplicate key");
     assert.deepEqual(Object.keys(SHIP).sort(), [...keys].sort(), "same keys, none missing, none extra");
-    assert.equal(SHIP_IN.length, 44);
+    assert.equal(SHIP_IN.length, 45);
     assert.equal(SHIP_AUTO.length, 9);
-    assert.equal(SHIP_OUT.length, 48);
-    assert.equal(new Set([...SHIP_IN, ...SHIP_AUTO, ...SHIP_OUT]).size, 101, "no key sits in two classes");
+    assert.equal(SHIP_OUT.length, 46);
+    assert.equal(new Set([...SHIP_IN, ...SHIP_AUTO, ...SHIP_OUT]).size, 100, "no key sits in two classes");
     for (const k of keys) assert.ok(["in", "auto", "out"].includes(SHIP[k]), k);
 });
 
 test("ship list: the named auto keys and a sample of in / out keys", () => {
     assert.deepEqual([...SHIP_AUTO].sort(), "widefield battlewide uisharp smartcam mpbubbles mpcredit glossary options dw2motion".split(" ").sort());
-    for (const k of ["quests", "questtriggers", "questemotes", "questplacecard", "questsecondjob", "battlespeed", "encounterdial", "leaves", "fireflies", "steps", "sound", "footsteps", "rain", "tod"]) assert.equal(shipClass(k), "in", k);
-    for (const k of ["mount", "hd2d", "ownclips", "smoothanim", "chatqueue", "devils", "villagers", "serverchamp", "anglermap"]) assert.equal(shipClass(k), "out", k);
+    for (const k of ["quests", "questtriggers", "questemotes", "questplacecard", "questsecondjob", "mount", "battlespeed", "encounterdial", "leaves", "fireflies", "steps", "sound", "footsteps", "rain", "tod"]) assert.equal(shipClass(k), "in", k);
+    for (const k of ["mountseat", "hd2d", "ownclips", "smoothanim", "chatqueue", "devils", "villagers", "serverchamp", "anglermap"]) assert.equal(shipClass(k), "out", k);
     assert.equal(shipClass("quality"), null);
     assert.equal(shipForced("rain"), null);
-    assert.equal(shipForced("mount"), false);
+    assert.equal(shipForced("mountseat"), false);
+    assert.equal(shipForced("mount"), null);
     assert.equal(shipForced("dw2motion"), true);
 });
 
@@ -111,9 +112,9 @@ for (const installed of [false, true]) {
 }
 
 test("owner PC: every switch stays changeable and a saved dw.fx.v1 is respected", async () => {
-    const { fx, setFx, setFxMany } = await loadAmbience({ saved: { rain: false, mount: true, dw2motion: false, widefield: false, quests: false } });
+    const { fx, setFx, setFxMany } = await loadAmbience({ saved: { rain: false, mountseat: true, dw2motion: false, widefield: false, quests: false } });
     assert.equal(fx.rain, false);
-    assert.equal(fx.mount, true, "an out key saved on stays on for the owner");
+    assert.equal(fx.mountseat, true, "an out key saved on stays on for the owner");
     assert.equal(fx.dw2motion, false);
     assert.equal(fx.widefield, false);
     assert.equal(fx.quests, false, "no upgrade pass on the owner PC");
@@ -126,22 +127,22 @@ test("owner PC: every switch stays changeable and a saved dw.fx.v1 is respected"
 
 // ---------------------------------------------------------------- rule 3: installed
 test("installed: out forced off and auto forced on, whatever the save says", async () => {
-    const saved = { mount: true, hd2d: true, ownclips: true, smoothanim: true, chatqueue: true, dw2motion: false, widefield: false, glossary: false, options: false };
+    const saved = { mountseat: true, hd2d: true, ownclips: true, smoothanim: true, chatqueue: true, dw2motion: false, widefield: false, glossary: false, options: false };
     const { fx } = await loadAmbience({ installed: true, saved });
     for (const k of SHIP_OUT) assert.equal(fx[k], false, k);
     for (const k of SHIP_AUTO) assert.equal(fx[k], true, k);
 });
 
 test("installed: URL flags, window setters, presets, scenes and direct writes can not change out / auto", async () => {
-    const { fx, setFx, setFxMany, applyScene } = await loadAmbience({ installed: true, search: "?noambience=1&weather=always&mount=1&hd2d=1&ownclips=1" });
-    setFx("mount", true); setFx("dw2motion", false);
+    const { fx, setFx, setFxMany, applyScene } = await loadAmbience({ installed: true, search: "?noambience=1&weather=always&mountseat=1&hd2d=1&ownclips=1" });
+    setFx("mountseat", true); setFx("dw2motion", false);
     setFxMany({ hd2d: true, widefield: false, practice2v2: true });
     window.__setFx("villagers", true); window.__setFxMany({ ownclips: true, options: false });
     window.__applyPreset("cinematic");
     applyScene({ tod: "day", mode: "clear" });
     fx.cinema = true; fx.glossary = false;
     Object.assign(window.__fx, { toonoutline: true, battlewide: false });
-    assert.doesNotThrow(() => { window.__fx.mount = true; });
+    assert.doesNotThrow(() => { window.__fx.mountseat = true; });
     for (const k of SHIP_OUT) assert.equal(fx[k], false, k);
     for (const k of SHIP_AUTO) assert.equal(fx[k], true, k);
     assert.equal(window.__fx, fx);
@@ -175,12 +176,12 @@ test("installed: an old save with an in key off gets the in defaults once (one s
 });
 
 test("finishShipLoad: owner PC changes nothing; installed upgrades once then locks", () => {
-    const own = { rain: false, mount: true };
+    const own = { rain: false, mountseat: true };
     assert.deepEqual(finishShipLoad(own, { installed: false }), { upgraded: false, installed: false });
-    assert.deepEqual(own, { rain: false, mount: true });
-    const inst = { rain: false, mount: true, dw2motion: false };
+    assert.deepEqual(own, { rain: false, mountseat: true });
+    const inst = { rain: false, mountseat: true, dw2motion: false };
     assert.equal(finishShipLoad(inst, { installed: true, markValue: null }).upgraded, true);
-    assert.equal(inst.rain, true); assert.equal(inst.mount, false); assert.equal(inst.dw2motion, true);
+    assert.equal(inst.rain, true); assert.equal(inst.mountseat, false); assert.equal(inst.dw2motion, true);
     const inst2 = { rain: false };
     assert.equal(finishShipLoad(inst2, { installed: true, markValue: "1" }).upgraded, false);
     assert.equal(inst2.rain, false);
@@ -189,8 +190,8 @@ test("finishShipLoad: owner PC changes nothing; installed upgrades once then loc
 test("lockShipped keeps keys visible to spread and JSON, and ignores writes", () => {
     const o = applyShipDefaults({});
     lockShipped(o);
-    o.mount = true; o.dw2motion = false;
-    assert.equal({ ...o }.mount, false);
+    o.mountseat = true; o.dw2motion = false;
+    assert.equal({ ...o }.mountseat, false);
     assert.equal(JSON.parse(JSON.stringify(o)).dw2motion, true);
 });
 

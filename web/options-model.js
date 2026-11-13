@@ -27,7 +27,7 @@ export const DETAIL_QUALITY = Object.freeze({ original: "low", low: "low", mediu
 /** The groups of invented features. A row is ON when any of its keys is on; moving it sets all of them. Only SHOWN_EXTRAS get an OPTIONS row; the rest are "out" or "auto" for players and live on F2. */
 export const EXTRA_GROUPS = Object.freeze([
     { id: "quests", label: "Quests", keys: ["quests", "questtriggers", "questemotes", "questplacecard", "questsecondjob"], help: "Extra quests. Scenes start when you step on certain spots." },
-    { id: "mount", label: "Mount", keys: ["mount", "mountseat"], help: "Ride a Digimon that a quest gives you. You sit on its back." },
+    { id: "mount", label: "Mount", keys: ["mount"], help: "Ride a Digimon that a quest gives you. R or Select climbs on and off." },
     { id: "boss", label: "Boss ideas", keys: ["fusionbosses", "bossphases", "bossmusic", "bossgrows"], help: "Bosses fuse, change tactics at low health, change music and grow." },
     { id: "giant", label: "Giant mode", keys: ["giantmode"], help: "Digimon in battle can be drawn bigger or smaller than usual." },
     { id: "battleideas", label: "Battle ideas", keys: ["omen", "enemytells", "aishift"], help: "Enemy countdowns, a warning before wild fights." },
@@ -38,7 +38,9 @@ export const EXTRA_GROUPS = Object.freeze([
 ]);
 /** One-time reset: older builds let the Battle ideas row switch practice2v2 on, which made every wild fight 2 vs 2. Returns true when practice2v2 must be turned off once (done = the stored marker). */
 export function needsPractice2v2Reset(fx, done) { return !done && !!fx?.practice2v2; }
-export const SHOWN_EXTRAS = Object.freeze(["quests"]);
+/** One-time reset: the Mount switch started out off (a dev switch); it is a game feature now and starts on. Returns true when an old save that holds it off must turn it on once (done = the stored marker). The player may switch it off again in OPTIONS and it stays off. */
+export function needsMountOnReset(fx, done) { return !done && fx?.mount !== true; }
+export const SHOWN_EXTRAS = Object.freeze(["quests", "mount"]);
 const WIDE_KEYS = Object.freeze(["widefield", "battlewide"]);
 const TOON_KEYS = Object.freeze(["toonoutline", "toonshade"]);
 /** Keys that stay on F2 only (developer pages and labs). */
@@ -115,7 +117,7 @@ export const OPTIONS_HOME = (() => {
     for (const c of EFFECT_CATEGORIES) for (const i of c.items) if (!(i.key in home)) home[i.key] = `effects:${c.id}`;
     for (const g of EXTRA_GROUPS) for (const k of g.keys) home[k] = SHOWN_EXTRAS.includes(g.id) ? `extra:${g.id}` : "f2";
     for (const k of F2_ONLY_KEYS) home[k] = "f2";
-    home.glossary = "f2"; home.options = "f2";
+    home.glossary = "f2"; home.options = "f2"; home.mountseat = "f2";
     return Object.freeze(home);
 })();
 

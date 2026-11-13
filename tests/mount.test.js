@@ -9,16 +9,16 @@ import fs from "node:fs";
 import {
   MOUNTS, MOUNT_SPEED, mountSpeedFactor, mountRiderLift, mountHidesFollowers, mountFreezesInput,
   mountSubSteps, moveWithSubSteps, findDismountSpot, followerSpots, mountTick, mountPress,
-  mountForceDismount, mountState, installMount, mountPlayerLatch,
+  mountForceDismount, mountState, installMount, mountPlayerLatch, mountUseAsset, mountEnabled, mountActorHidden, unlockedIds, NO_ROOM_LINE,
 } from "../web/mount.js";
 import {
   parseDw2Gltf, measureRig, calibrateGait, gaitFootfalls, clipWalkStats, MOUNT_VIEW, PALETTE, nearestPalette, sampleClipPose,
 } from "../web/mount3d.js";
 
 // ── a field stub: the same shape game.js passes to installMount ──────────────────────────────
-function fakeWorld({ enabled = true, quest = true, grid = null } = {}) {
+function fakeWorld({ enabled = true, quest = true, grid = null, asset = true, hasModel = undefined, indoor = false } = {}) {
   const state = { x: 100, y: 100, dir: "right", moving: false, collision: { s330: grid } };
-  const calls = { placed: 0, reset: 0, sfx: [] };
+  const calls = { placed: 0, reset: 0, sfx: [], said: [] };
   const canStand = (x, y) => !grid || !blocked(grid, x, y);
   installMount({
     state: () => state,
@@ -28,9 +28,13 @@ function fakeWorld({ enabled = true, quest = true, grid = null } = {}) {
     resetFollowers: () => { calls.reset += 1; },
     placeFollowers: () => { calls.placed += 1; },
     sfx: (id) => calls.sfx.push(id),
+    indoor: () => indoor,
+    say: (t) => calls.said.push(t),
     fieldReady: () => true,
     mustDismount: () => false,
+    ...(hasModel ? { hasModel } : {}),
   });
+  if (asset) mountUseAsset({ fake: true });      // a node test has no WebGL: the model counts as loaded
   mountForceDismount();
   return { state, calls, canStand };
 }
@@ -65,7 +69,7 @@ test("the table: Unimon is the first mount, 3x the walk, unlocked only by its qu
   assert.ok(u.size > 35 && u.size <= 80);           // a person is ~35 px; a mount is one to two of them
 });
 
-// the mount waits for its model before it fades in; here the load fails fast (no server), which also releases it
+// the mount waits for its model before it fades in; settle() lets a model check or a load that fails fast (no server) finish
 async function settle(state) {
   mountTick(0, state);
   await new Promise((r) => setTimeout(r, 30));
@@ -106,6 +110,25 @@ test("off by default: no press, no tick, no change to the player at all", () => 
   for (let i = 0; i < 60; i++) mountTick(1 / 50, state);
   assert.deepEqual({ x: state.x, y: state.y, dir: state.dir }, before);
   assert.equal(mountState().mode, "idle");
+});
+
+test("no riding indoors: the press is used, one line is said, nothing starts; open air rides", () => {
+  const inside = fakeWorld({ indoor: true });
+  assert.equal(mountPress(inside.state), true);
+  assert.equal(mountState().mode, "idle");
+  assert.deepEqual(inside.calls.said, [NO_ROOM_LINE]);
+  assert.equal(NO_ROOM_LINE, "No room to ride in here.");
+  assert.equal(inside.calls.sfx.length, 0);
+  const outside = fakeWorld({ indoor: false });
+  assert.equal(mountPress(outside.state), true);
+  assert.equal(mountState().mode, "summoning");
+  assert.deepEqual(outside.calls.said, []);
+  mountForceDismount();
+});
+
+test("the game feeds the indoor hook from the ambience layer's open-air list, no list of its own", () => {
+  const g = fs.readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  assert.match(g, /indoor: \(\) => \{[^}]*!isOpenAirMapName\(n\)/);
 });
 
 test("locked until the quest: the press does nothing without the unlock", () => {
@@ -287,4 +310,102 @@ test("field Unimon anim_E1 is a gallop: four hooves each touch the ground and li
     assert.ok(hi - lo > 0.05 * H, `hoof ${f} lifts`);
     assert.ok(ys.some((y) => y - lo < 0.01 * H), `hoof ${f} lands`);
   }
+});
+
+// ── the mount as a real game feature (not a dev switch) ──────────────────────────────────────────
+import { shipClass, applyShipDefaults } from "../web/ship-list.js";
+import { EXTRA_GROUPS, SHOWN_EXTRAS, needsMountOnReset } from "../web/options-model.js";
+import { buttonForKey } from "../web/vendor/engine.js";
+const readSrc = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+
+test("on by default: 'in' for players, on at the start, not an experimental dev switch, and an OPTIONS row", () => {
+  assert.equal(shipClass("mount"), "in");
+  assert.equal(applyShipDefaults({}).mount, true);
+  const amb = readSrc("../web/ambience.js");
+  const exp = amb.match(/const EXPERIMENTAL = \[([^\]]*)\]/)[1];
+  assert.ok(!/"mount"/.test(exp), "mount is not in EXPERIMENTAL");
+  assert.ok(/"mountseat"/.test(exp), "the saddle split stays an experiment");
+  assert.equal(shipClass("mountseat"), "out");
+  assert.ok(SHOWN_EXTRAS.includes("mount"));
+  assert.deepEqual(EXTRA_GROUPS.find((g) => g.id === "mount").keys, ["mount"]);
+});
+
+test("an old save that holds the Mount switch off turns it on once, then the player's choice stands", () => {
+  assert.equal(needsMountOnReset({ mount: false }, null), true);
+  assert.equal(needsMountOnReset({}, null), true);
+  assert.equal(needsMountOnReset({ mount: true }, null), false);
+  assert.equal(needsMountOnReset({ mount: false }, "1"), false, "after the one-time pass OPTIONS can switch it off");
+  assert.match(readSrc("../web/ambience.js"), /needsMountOnReset\(fx, localStorage\.getItem\("dw\.fx\.mountdefault"\)\)/);
+});
+
+test("R and the pad's Select are the same press, and the game's own help says so", () => {
+  assert.equal(buttonForKey("r"), "select");
+  const game = readSrc("../web/game.js");
+  assert.match(game, /\(raw === "r" \|\| k === "select"\)[^\n]*mountPress\(state\)/);
+  assert.match(readSrc("../web/index.html"), /R select \(also rides a mount\)/);
+  assert.match(readSrc("../README.md"), /Select \(also climbs on and off a mount[^|]*\| \*\*R\*\*/);
+});
+
+test("the quest ships and the unlock is the quest layer's own saved state (the mount keeps none of its own)", () => {
+  const shipped = readSrc("../data/authored/quests/shipped.txt").split("\n").map((l) => l.trim());
+  assert.ok(shipped.includes("zz_mount"));
+  assert.ok(readSrc("../data/authored/quests/pack_zz_mount.py").includes("Select on a pad"));
+  const w = fakeWorld({ quest: true });
+  assert.deepEqual(unlockedIds(), ["unimon"]);
+  // a fresh load: nothing of the ride is kept, the unlock comes back from the quest layer
+  installMount({ state: () => w.state, enabled: () => true, questDone: (id) => id === "zz_mount", canStand: () => true, fieldReady: () => true });
+  assert.equal(mountState().mode, "idle");
+  assert.deepEqual(unlockedIds(), ["unimon"]);
+  assert.deepEqual(Object.keys(mountState()).filter((k) => /save|store/i.test(k)), []);
+});
+
+test("no DW2 models: the layer hides, the press does nothing, the quest character is off the map", async () => {
+  const w = fakeWorld({ hasModel: () => Promise.resolve(false) });
+  await settle(w.state);
+  assert.equal(mountEnabled(), false);
+  assert.equal(mountPress(w.state), false);
+  assert.equal(mountState().mode, "idle");
+  assert.deepEqual(unlockedIds(), []);
+  assert.equal(mountActorHidden({ npc_id: 1006 }), true);
+});
+
+test("DW2 models present (both the ride and the hurt model are checked): the layer is on and the press rides", async () => {
+  const asked = [];
+  const w = fakeWorld({ hasModel: (u) => { asked.push(u); return Promise.resolve(true); } });
+  assert.equal(mountEnabled(), false, "off until the check has answered");
+  await settle(w.state);
+  assert.deepEqual(asked.sort(), [MOUNTS[0].actor.hurt.model, MOUNTS[0].model].sort());
+  assert.equal(mountEnabled(), true);
+  assert.equal(mountActorHidden({ npc_id: 1006 }), false);
+  assert.equal(mountPress(w.state), true);
+  assert.equal(mountState().mode, "summoning");
+});
+
+test("a failed check for one of the two models counts as missing", async () => {
+  const w = fakeWorld({ hasModel: (u) => Promise.resolve(!u.includes("033UNIM")) });
+  await settle(w.state);
+  assert.equal(mountPress(w.state), false);
+});
+
+test("the model cannot be loaded or drawn: the ride is called off, never an invisible mount at 3x", async () => {
+  const w = fakeWorld({ asset: false });          // node has no server and no WebGL: the load fails
+  assert.equal(mountPress(w.state), true);
+  await settle(w.state);
+  for (let i = 0; i < 5; i++) mountTick(1 / 50, w.state);
+  assert.equal(mountState().mode, "idle");
+  assert.equal(mountSpeedFactor(), 1);
+  assert.equal(mountPress(w.state), false, "and it does not start again");
+});
+
+test("a map change, a battle, a menu or a ladder always puts the player back on foot", () => {
+  const game = readSrc("../web/game.js");
+  const calls = (game.match(/mountForceDismount\(\);/g) || []).length;
+  assert.ok(calls >= 5, `game.js dismounts at the map change, the battle starts, the ladder and the save load (${calls})`);
+  assert.match(game, /mustDismount: \(\) => battle\.isActive\(\) \|\| cutscene\.isActive\(\) \|\| state\.menuOpen/);
+});
+
+test("the launcher's extras page says what the mount needs and how to ride", () => {
+  const html = readSrc("../launcher/setup/extras.html");
+  assert.match(html, /Without it the Unimon mount and its quest stay hidden/);
+  assert.match(html, /press R \(Select on a pad\)/);
 });

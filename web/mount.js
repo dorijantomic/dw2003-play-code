@@ -10,7 +10,10 @@
 // sub-steps), hiding/restoring the followers, refusing encounters, the ride/dismount animation and the
 // per-mount unlock.
 //
-// Everything is OFF unless F2 -> Extras -> Mount is on AND the mount is unlocked, so normal play is
+// A real game feature: the OPTIONS row "Mount" is on at the start (web/ship-list.js "in"), and the mount exists once
+// its quest (zz_mount, Central Park) is done. Press R on the keyboard or Select on a pad to climb on and off.
+// It needs the player's own DW2 models (web/dw2models/, built by the launcher's extras page): without them the layer
+// hides itself, the quest character included, and a press does nothing. Switched off, or not unlocked, normal play is
 // unchanged (tests/mount.test.js proves it position by position).
 import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit, mountRenderInfo, probeFramebuffer, renderSelfTest, sceneProbe } from "./mount3d.js";
 
@@ -60,7 +63,7 @@ export const MOUNTS = [
 ];
 
 export const MOUNT_SPEED = 3;           // x the walk, the one constant MOUNT.md names
-export const MOUNT_KEY = "r";           // ride / dismount
+export const MOUNT_KEY = "r";           // ride / dismount (the pad's Select button reaches the same press, web/game.js dispatchInput)
 const SUMMON_SECS = 0.35;               // the mount fades in where the player stands before the climb starts
 const MOUNT_SECS = 19 / 60;             // the disc's own mount-onto-the-rail clip length (game.js MOUNT_SECS_BOTTOM)
 const DISMOUNT_SECS = 13 / 60;          // ... and its step-off (DISMOUNT_SECS_BOTTOM)
@@ -82,6 +85,7 @@ const S = {
   lastRender: 0,
   renders: 0,
   rider: null,             // the saddle split's seat this frame: { dx, lift, seatX, seatY } (null without it)
+  models: new Map(),       // mount id -> true | false once the host has checked that its DW2 files exist (absent = not asked yet)
 };
 
 let host = null;
@@ -95,6 +99,26 @@ export function installMount(hooks) {
   S.def = null;
   S.asset = null;
   S.loading = false;
+  S.rendererFailed = false;
+  S.models = new Map();
+  probeModels();
+}
+
+/** Ask the host once whether each mount's DW2 files (the ride model and the hurt quest character) are installed. A host with no
+ * `hasModel` hook (the tests) counts every model as present. */
+function probeModels() {
+  if (typeof host?.hasModel !== "function") return;
+  const run = host;
+  for (const def of MOUNTS) {
+    const urls = [def.model, def.actor?.hurt?.model].filter(Boolean);
+    Promise.all(urls.map((u) => Promise.resolve(run.hasModel(u)).then(Boolean, () => false)))
+      .then((oks) => { if (host === run) S.models.set(def.id, oks.every(Boolean)); });
+  }
+}
+/** This mount's DW2 models are installed (always true without a host check; false until the check has said yes). */
+export function mountModelReady(def) {
+  if (typeof host?.hasModel !== "function") return true;
+  return S.models.get(def.id) === true;
 }
 
 export function mountState() {
@@ -114,7 +138,7 @@ export function mountActorDef(npcId) {
 export function mountActorHidden(npc) {
   const def = mountActorDef(npc?.npc_id);
   if (!def) return false;
-  if (!enabled()) return true;
+  if (!enabled() || !mountModelReady(def)) return true;       // no switch / no DW2 models: the quest character is not on the map
   return !!host?.questDone?.(def.unlock) && S.mode !== "idle";
 }
 
@@ -144,18 +168,18 @@ export function mountActorDraw(ctx, npc, camX, camY, timeSec = 0) {
   return true;
 }
 
-/** Is the mount layer switched on? (F2 -> Extras -> Mount, off by default.) */
+/** Is the mount layer on? The player's OPTIONS row "Mount" (on at the start) AND at least one mount's DW2 models are installed. */
 export function mountEnabled() { return enabled(); }
-function enabled() { return !!host?.enabled?.(); }
+function enabled() { return !!host?.enabled?.() && MOUNTS.some(mountModelReady); }
 
 /** The mount ids the player has unlocked (their quest is done), in table order. */
 export function unlockedIds() {
   const out = [];
-  for (const m of MOUNTS) if (m.unlock && host?.questDone?.(m.unlock)) out.push(m.id);
+  for (const m of MOUNTS) if (m.unlock && mountModelReady(m) && host?.questDone?.(m.unlock)) out.push(m.id);
   return out;
 }
 function unlockedDef() {
-  for (const m of MOUNTS) if (m.unlock && host?.questDone?.(m.unlock)) return m;
+  for (const m of MOUNTS) if (m.unlock && mountModelReady(m) && host?.questDone?.(m.unlock)) return m;
   return null;
 }
 
@@ -314,9 +338,16 @@ async function ensureAsset() {
   }
 }
 
+/** Tests and verifiers: hand the layer an already-loaded asset (a node test has no WebGL to load the model with). */
+export function mountUseAsset(asset) { S.asset = asset; S.rendererFailed = false; }
+
+/** The line shown when the ride button is pressed on an indoor map. */
+export const NO_ROOM_LINE = "No room to ride in here.";
+
 function startMount(state) {
   const def = unlockedDef();
-  if (!def) return false;
+  if (!def || S.rendererFailed) return false;     // no unlock, or the model could not be drawn: never an invisible mount
+  if (host?.indoor?.()) { host?.say?.(NO_ROOM_LINE); return true; }   // no riding inside buildings: the press is used, nothing starts
   S.def = def;
   S.mode = "summoning";
   S.animT = 0;
@@ -371,6 +402,7 @@ export function mountTick(dt, state, { mapId = null } = {}) {
   ensureAsset();
   if (S.mode === "summoning") {
     // wait for the model (a first ride may still be loading it), then let it fade in before the climb
+    if (S.rendererFailed) { mountForceDismount(); return false; }     // it could not be loaded or drawn: stay on foot
     if (S.asset || S.rendererFailed) S.animT += dt;
     if (S.animT >= SUMMON_SECS) { S.mode = "mounting"; S.animT = 0; }
     return true;

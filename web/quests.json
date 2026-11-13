@@ -36166,7 +36166,7 @@
         ],
         "doneLines": [
           "The burning is gone. Look, I can stand.",
-          "I keep my word. Call me when the road is long, and I will come. Press R, and climb on."
+          "I keep my word. Call me when the road is long, and I will come. Press R, or Select on a pad, and climb on."
         ],
         "remindLines": [
           "Two Antidote Disks, little one. The poison is slow, but it is not kind.",
@@ -36248,7 +36248,7 @@
         {
           "say": 1006,
           "name": "Unimon",
-          "text": "I keep my word. Call me when the road is long, and I will come. Press R, and climb on."
+          "text": "I keep my word. Call me when the road is long, and I will come. Press R, or Select on a pad, and climb on."
         },
         {
           "wait": 12

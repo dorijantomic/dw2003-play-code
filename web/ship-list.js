@@ -17,13 +17,13 @@ const IN = [
     "rain", "rainwater", "snow", "sand", "lightning", "gusts", "breath", "frost", "screenfx",
     "tod", "nightlight", "clouds", "lamps", "lightpool", "lightreveal", "indoor", "fog", "shafts", "heat", "sparkle", "pollen",
     "leaves", "fireflies",
-    "quests", "questtriggers", "questemotes", "questplacecard", "encounterdial", "battlespeed", "questsecondjob",
+    "quests", "questtriggers", "questemotes", "questplacecard", "encounterdial", "battlespeed", "questsecondjob", "mount",
     "steps", "puddles",
     "sound", "ambience", "musicfx", "footsteps",
 ];
 const AUTO = ["widefield", "battlewide", "uisharp", "smartcam", "mpbubbles", "mpcredit", "glossary", "options", "dw2motion"];
 const OUT = [
-    "devils", "villagers", "hd2d", "battleatmos", "mount", "mountseat", "fusionbosses", "bossphases", "bossmusic", "bossgrows",
+    "devils", "villagers", "hd2d", "battleatmos", "mountseat", "fusionbosses", "bossphases", "bossmusic", "bossgrows",
     "giantmode", "omen", "practice2v2", "enemytells", "aishift", "ownclips", "smoothanim", "battlepano",
     "toonoutline", "toonshade", "softalpha", "blastladder", "planner", "movetheatre", "cutcontent", "stageselect", "soundtest",
     "soundtrack", "cinema", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "showfps", "itemrulebook", "cursorbook", "weaponlab",

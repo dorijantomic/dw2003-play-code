@@ -22,16 +22,16 @@ function defaults() {
 const memoryStore = (fx = defaults()) => ({ fx, get: (k) => fx[k], setMany: (o) => Object.assign(fx, o) });
 const FILTERS = [["off", "Off"], ["bilinear", "Smooth"], ["epx", "EPX"]];
 
-test("the 99 effect keys are read from ambience.js, and each has exactly one home", () => {
+test("the 98 effect keys are read from ambience.js, and each has exactly one home", () => {
     const keys = PAIRS.filter((k) => k !== "glossary" && k !== "options");
-    assert.equal(keys.length, 99);
+    assert.equal(keys.length, 98);
     assert.deepEqual(keys.filter((k) => !(k in OPTIONS_HOME)), [], "no key without a home");
     assert.deepEqual(Object.keys(OPTIONS_HOME).filter((k) => !PAIRS.includes(k)), [], "no home for a key that does not exist");
     const count = (h) => Object.values(OPTIONS_HOME).filter((v) => v === h).length;
     assert.deepEqual([count("detail"), F2_ONLY_KEYS.length], [35, 26]);
-    assert.equal(Object.values(OPTIONS_HOME).filter((v) => v.startsWith("extra:")).length, 5, "only the Quests row is left of the extras");
+    assert.equal(Object.values(OPTIONS_HOME).filter((v) => v.startsWith("extra:")).length, 6, "only the Quests and Mount rows are left of the extras");
     assert.equal(Object.values(OPTIONS_HOME).filter((v) => v.startsWith("effects:")).length, 4, "the four sound keys (the other 33 EFFECTS keys are Detail keys too)");
-    assert.equal(count("f2"), 55, "26 dev keys, wide x2, hd2d, toon x2, 22 hidden extras keys, glossary, options");
+    assert.equal(count("f2"), 53, "26 dev keys, wide x2, hd2d, toon x2, hidden extras keys (mountseat is one), glossary, options");
 });
 
 test("every home that names a row names a real row, and every row is on a page", () => {
@@ -42,7 +42,7 @@ test("every home that names a row names a real row, and every row is on a page",
     }
     const onPages = PAGES.flatMap((p) => p.rows).sort();
     assert.deepEqual(onPages, Object.keys(rows).sort());
-    assert.deepEqual(PAGES.map((p) => p.rows.length), [3, 4, 2, 6]);
+    assert.deepEqual(PAGES.map((p) => p.rows.length), [4, 4, 2, 6]);
 });
 
 test("the four pages are GAME, SCREEN, SOUND, EFFECTS", () => {
@@ -70,7 +70,8 @@ test("at the game's own defaults Detail reads High and every row reads today's b
     assert.equal(shown.pixelFilter, "Off");
     assert.deepEqual([shown.musicVolume, shown.soundVolume], ["100", "100"]);
     assert.equal(shown["extra:quests"], "On", "Quests stay on, as today");
-    for (const g of EXTRA_GROUPS.filter((x) => x.id !== "quests")) assert.ok(!(`extra:${g.id}` in shown), `${g.id} has no row`);
+    assert.equal(shown["extra:mount"], "On", "Mount starts on: it is a game feature");
+    for (const g of EXTRA_GROUPS.filter((x) => x.id !== "quests" && x.id !== "mount")) assert.ok(!(`extra:${g.id}` in shown), `${g.id} has no row`);
     for (const c of EFFECT_CATEGORIES) assert.equal(shown[`cat:${c.id}`], "All", c.id);
 });
 
@@ -209,7 +210,8 @@ test("the cursor never wraps, switching page resets the row, and the help line f
     assert.equal(m.moveRow(1), "move");
     assert.match(m.help(), /wild Digimon/);
     assert.equal(m.moveRow(1), "move");
-    assert.equal(m.moveRow(1), null, "GAME has three rows");
+    assert.equal(m.moveRow(1), "move");
+    assert.equal(m.moveRow(1), null, "GAME has four rows");
     assert.equal(m.switchPage(-1), null);
     assert.equal(m.switchPage(1), "move");
     assert.equal(m.row(), 0);

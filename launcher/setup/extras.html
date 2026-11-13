@@ -137,10 +137,10 @@ async function poll() {
   $("dw2-err").classList.toggle("hidden", st !== "failed");
   if (st === "failed") $("dw2-err").textContent = s.error;
   if (!s.available) $("dw2-state").textContent = "This install has no DW2 model converter, so these extras cannot be built.";
-  else if (st === "done") $("dw2-state").innerHTML = `<span class="done">Installed</span> · ${s.models.length} models${s.motion ? ` · battle animations for ${s.motion.species} Digimon` : ""}. Switch features on in the game: F2 → Extras.`;
+  else if (st === "done") $("dw2-state").innerHTML = `<span class="done">Installed</span> · ${s.models.length} models${s.motion ? ` · battle animations for ${s.motion.species} Digimon` : ""}. The Unimon mount: finish the Unimon quest in Central Park, then press R (Select on a pad) to ride.`;
   else if (st === "building") { $("dw2-state").textContent = "Building…"; $("dw2-step").textContent = (s.log || []).slice(-1)[0] || ""; $("dw2-bar").style.width = "60%"; }
   else if (st === "receiving") $("dw2-state").textContent = "Copying your disc…";
-  else $("dw2-state").textContent = "Not installed.";
+  else $("dw2-state").textContent = "Not installed. Without it the Unimon mount and its quest stay hidden in the game.";
   if (st === "building" || st === "receiving") timer = setTimeout(poll, 1000);
 }
 poll();

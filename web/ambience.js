@@ -23,7 +23,7 @@ import { GPU_FILTER_NAMES } from "./gpu-pixel-filter.js";
 import { isBattleLayer, setFlatReader } from "./battle-layer.js";
 import { SPRITE_FILTERS } from "./sprite-filters.js";
 import { dialModeFromFx } from "./encounter-dial.js";   // F2 -> Extras -> Encounter dial (repel / lure)
-import { needsPractice2v2Reset } from "./options-model.js";
+import { needsPractice2v2Reset, needsMountOnReset } from "./options-model.js";
 import { createDevView, DEV_PANEL_CSS } from "./dev-panel.js";   // the F2 page (tabs, search, In / Auto / Out filter), built on first open
 import { DEV_OPEN } from "./dev-panel-model.js";
 import { SHIP, shipClass, isInstalledBuild, applyShipDefaults, finishShipLoad, UPGRADE_MARK_KEY } from "./ship-list.js";   // what players get per switch (in / auto / out)
@@ -57,7 +57,7 @@ const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77
 const STORE_KEY = "dw.fx.v1";
 export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
-const EXPERIMENTAL = ["showfps", "villagers", "hd2d", "mount", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "battlespeed", "movetheatre", "showfps", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
+const EXPERIMENTAL = ["showfps", "villagers", "hd2d", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "battlespeed", "movetheatre", "showfps", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
 const MANUAL = [...EXPERIMENTAL, ...BATTLE];
 for (const k of MANUAL) fx[k] = false;
@@ -75,6 +75,11 @@ for (const k of ["butterflies", "birds", "dragonflies", "fish", "critters", "wil
 try {
     if (needsPractice2v2Reset(fx, localStorage.getItem("dw.fx.p2vreset"))) { fx.practice2v2 = false; localStorage.setItem(STORE_KEY, JSON.stringify({ ...fx })); }
     localStorage.setItem("dw.fx.p2vreset", "1");
+} catch { }
+// Old saves: the Mount switch was a dev switch, off; it is a game feature now (on at the start). Turn it on once; OPTIONS can switch it off again.
+try {
+    if (needsMountOnReset(fx, localStorage.getItem("dw.fx.mountdefault"))) { fx.mount = true; localStorage.setItem(STORE_KEY, JSON.stringify({ ...fx })); }
+    localStorage.setItem("dw.fx.mountdefault", "1");
 } catch { }
 // Installed copy (the packaged release; marker web/installed-build.js): "out" forced off, "auto" forced on, F2 does nothing,
 // and an old save with an "in" key off gets the "in" defaults once. The owner PC (a checkout) keeps every switch and its save.
@@ -204,6 +209,10 @@ const SHAFTY = [
     /^East Sector — (West Wire Forest|East Wire Forest|Kicking Forest|Divermon's Lake)/,
     /^South Sector — (Ether Jungle|Jungle Grave)/,
 ];
+/** Open air by the map name (the game's one open-air / indoor split: snow and sand places count as open air). Everything else is indoor. */
+export function isOpenAirMapName(name) {
+    return SNOWY.some((r) => r.test(name)) || SANDY.some((r) => r.test(name)) || OPEN_AIR.some((r) => r.test(name));
+}
 const profiles = new Map(); // stageId -> profile
 
 function scan(img) {
@@ -235,7 +244,7 @@ function profileOf(map, mapImg) {
     const base = cls === mapImg ? here : scan(cls);
     const snowy = SNOWY.some((r) => r.test(map.name));
     const sandy = SANDY.some((r) => r.test(map.name));
-    const open = snowy || sandy || OPEN_AIR.some((r) => r.test(map.name));
+    const open = isOpenAirMapName(map.name);
     const night = open && !!variantBase(map.id) && here.lum < 80;
     p = {
         open, snowy, sandy, night,
