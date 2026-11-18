@@ -4,8 +4,7 @@
 // FIGHTSTG_F0x800934f0's .L0x80093950-.L0x80093a44 marker loop, FIGHTSTG_F0x80093364
 // and the build arm of FIGHTSTG_F0x80093a74); this file seeds the memory the original
 // reads and hands the results to web/battle.js's picture and text painters. It never
-// executes original instructions. `?legacyBattleHud=1` keeps the walker's hand-drawn
-// markers, bar and digits.
+// executes original instructions.
 //
 // The bar colour. The bar is one POLY_G4 — the GPU command F0x8009e77c patches in
 // is 0x38 — so the two words each branch of F0x800934f0 hands it are the quad's
@@ -16,6 +15,7 @@
 // 0xff370d in red at or below it. The player's quad puts vertex 0 on the left and
 // the enemy's on the right, so the same pair runs in opposite directions on the
 // two plates.
+import { capturing as uiCCapturing } from "./ui-c/capture.js";
 import { ui } from "./vendor/engine.js";
 // The enemy-id resolver (engine/dw3/battle-enemy-id.ts, FIGHTSTG_F0x8009b8d0): the
 // synthetic record table below is resolved through the PORT's scan, not a predicate.
@@ -48,11 +48,6 @@ export const BATTLE_HUD_NAME_BANK = 0x4e;
 
 /** The fill cels are 40x8 in the chrome pack (ids 51-58), so the fill cannot exceed it. */
 const BATTLE_HUD_DV_FILL_W = 40;
-
-/** `?legacyBattleHud=1` keeps the walker's hand-drawn plate. */
-export function translatedBattleHudEnabled(search) {
-    return !new URLSearchParams(search).has("legacyBattleHud");
-}
 
 function rgbHex([r, g, b]) {
     return `#${[r, g, b].map((v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, "0")).join("")}`;
@@ -257,7 +252,8 @@ export function battleHudDvPaint(ctx, frame, packs) {
     const pack = packs?.pgfgc00 ?? null;
     const ready = !!pack && packReady(pack);
     if (ready) drawClip(ctx, pack, String(frame.outer.cel), frame.outer.x, frame.outer.y);
-    if (frame.backing) {
+    // Look C capture: the C gauge has its own well, the black trough is not painted under it
+    if (frame.backing && !uiCCapturing()) {
         const { x, y, w, h, rgb } = frame.trough;
         if (w > 0 && h > 0) {
             ctx.fillStyle = `rgb(${rgb[0].join(",")})`;

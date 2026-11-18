@@ -67,7 +67,6 @@ fx.lightGain = 1;            // Light strength slider (0 to 2)
 fx.hd2dStrength = 1;         // HD-2D strength slider (0 to 2)        // experimental: off until you switch it on
 fx.battleSpeed = 2;          // Faster battles slider (1 to 3, the x1 / x1.5 / x2 / x3 positions; web/battle-speed.js)
 fx.mapScreen = "classic";   // OPTIONS > GAME > Map screen: "classic" (the game's MAP page) or "new" (web/map-screen-book.js)
-fx.uiLook = "pixel";        // OPTIONS > SCREEN > UI look: "pixel" (the game's own pictures) or "smooth" (the text box as sharp vectors, web/ui-css.js)
 fx.musicVolume = 1;         // OPTIONS music volume, 0..1; 1 = the game's own gain (web/volume-levels.js)
 fx.soundVolume = 1;         // OPTIONS sound volume, 0..1; 1 = the game's own gain
 fx.encounterDialMode = "normal";  // Encounter dial setting (only read while F2 -> Extras -> Encounter dial is on; web/encounter-dial.js)

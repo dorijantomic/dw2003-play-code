@@ -15,8 +15,9 @@
 // `0x01, 0x01`. Extended tokens come from the shipped uifont charset so uifont
 // resolves them; unresolved codes are counted, never guessed.
 
-import { drawText, fontReady, layoutGlyphs } from "./uifont.js";
+import { drawText, fontClutRow, fontReady, layoutGlyphs, textWidth } from "./uifont.js";
 import { ui } from "./vendor/engine.js";
+import { capturing, runsHook } from "./ui-c/capture.js";
 const { decodeTextToken } = ui;
 
 const FONT_BANK_BASE = 0x8004dd74; // *(0x8004de00); kind stride 0x18
@@ -225,9 +226,18 @@ export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } =
 export function drawNativeTextWidgets(ctx, widgets, opts = {}) {
     const stats = { ready: fontReady(), widgets: widgets.length, lines: 0, drawn: 0, unknown: 0, texts: [] };
     if (!fontReady()) return stats;
+    if (capturing()) {
+        // Look C capture scope (web/ui-c): the widgets become runs (data), the overlay writes them as DOM text. Same decode, same window.
+        const runs = collectNativeTextRuns(widgets, opts);
+        for (const r of runs) r.face = runFace(r.kind, r.clut);
+        runsHook(runs);
+        stats.lines = runs.length; stats.drawn = runs.length;
+        for (const r of runs) stats.texts.push(r.text);
+        return stats;
+    }
     for (const w of widgets) {
         if (!w.visible) continue;
-        if (opts.skip && opts.skip(w)) continue;   // a widget the vector UI look draws instead (web/ui-css.js)
+        if (opts.skip && opts.skip(w)) continue;   // a widget the look C overlay draws instead (web/ui-c)
         const kind = kindOf(w);
         if (kind === null) { stats.unknown += 1; continue; }
         // Decode every line first so a 0x02,0x05,N substitution can render the
@@ -265,8 +275,19 @@ export function drawNativeTextWidgets(ctx, widgets, opts = {}) {
 }
 
 /**
+ * The face colour of a text run drawn in CLUT row `clut` of font `kind`, as CSS, or null for the face's own row (0). The face is the
+ * slot the plain row paints its letters with (slot 2: the white 232 of row 0), read from the loaded font manifest at run time -- so a
+ * raised stat value (row 1) shows the disc's light blue and a partner that cannot equip (row 7) its grey. Labels only (kind 1).
+ */
+export function runFace(kind, clut, rowOf = fontClutRow) {
+    if (!clut || kind !== 1) return null;
+    const c = rowOf(kind, clut)?.[2];
+    return Array.isArray(c) && c[3] ? `rgb(${c[0]},${c[1]},${c[2]})` : null;
+}
+
+/**
  * The same visible lines drawNativeTextWidgets() would paint, as data instead of pixels: one run per line, with the pen of every
- * glyph ({ text, kind, clut, x, y, glyphs: [{ ch, x, dx }] }). The vector UI look (web/ui-css.js) draws these with a smooth
+ * glyph ({ text, kind, clut, x, y, glyphs: [{ ch, x, dx }] }). The look C overlay (web/ui-c) draws these with a smooth
  * font at the game's own pens. Same decode, same reveal window, same positions; nothing is invented here.
  */
 export function collectNativeTextRuns(widgets, opts = {}) {
@@ -295,7 +316,7 @@ export function collectNativeTextRuns(widgets, opts = {}) {
                         return { dx: signed(w.read8(rec + 7)), dy: signed(w.read8(rec + 8)), adv: w.read8(rec + 9) };
                     },
                 });
-                runs.push({ text: parts[k], kind, clut: w.colour | 0, x, y: w.penY + k * w.lineHeight, glyphs });
+                runs.push({ text: parts[k], kind, clut: w.colour | 0, x, y: w.penY + k * w.lineHeight, right: w.alignWidth ? w.penX : null, w: w.alignWidth || textWidth(parts[k], kind), glyphs });
             }
         }
     }

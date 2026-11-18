@@ -9,6 +9,7 @@ import { WORD } from "./ui-kit-input.js";
 import { drawHeader, drawHelpBox, drawPanel, withFold } from "./ui-kit.js";
 import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { createMapScreenModel } from "./map-screen-model.js";
+import { partHook } from "./ui-c/capture.js";
 
 /** The panel (7 columns of 40 px = 280 px, 7 bands) and, inside it, the box the areas are placed in. */
 export const MAP_PANEL = Object.freeze({ x: 20, y: 40, cols: 7, bands: 7, pivot: [160, 110] });
@@ -24,6 +25,8 @@ export function createMapScreenBook({ sfx = null, data } = {}) {
     return {
         windows: ["title", "list", "help"],
         wall: false,
+        // look C (web/ui-c/books.js): the cursor points at an area box, not at a list row
+        look: Object.freeze({ rows: false }),
         model,
         act(buttons) {
             if (buttons.has(WORD.back)) return "back";
@@ -42,22 +45,30 @@ export function createMapScreenBook({ sfx = null, data } = {}) {
             if (pl >= 1) {
                 const at = (id) => { const p = model.position(id); return p ? [MAP_BOX.x + p.x, MAP_BOX.y + p.y] : null; };
                 const seenOf = new Map(model.nodes().map((n) => [n.id, n.seen]));
-                ctx.lineWidth = 1;
+                const here = model.currentId(), cur = model.cursor();
+                // [x0, y0, x1, y1, both ends seen] per link; inside a look C scope the links and boxes are handed over as parts
+                const segs = [];
                 for (const [a, b] of model.edges()) {
                     const pa = at(a), pb = at(b);
-                    if (!pa || !pb) continue;
-                    ctx.strokeStyle = seenOf.get(a) && seenOf.get(b) ? COL.link : COL.linkDim;
-                    ctx.beginPath(); ctx.moveTo(pa[0] + 0.5, pa[1] + 0.5); ctx.lineTo(pb[0] + 0.5, pb[1] + 0.5); ctx.stroke();
+                    if (pa && pb) segs.push([pa[0], pa[1], pb[0], pb[1], !!(seenOf.get(a) && seenOf.get(b))]);
                 }
-                const here = model.currentId(), cur = model.cursor();
+                const look = partHook(ctx, { part: "mapLinks", x: MAP_BOX.x - NODE, y: MAP_BOX.y - NODE, w: MAP_BOX.w + 2 * NODE, h: MAP_BOX.h + 2 * NODE, segs });
+                ctx.lineWidth = 1;
+                if (!look) for (const [x0, y0, x1, y1, seen] of segs) {
+                    ctx.strokeStyle = seen ? COL.link : COL.linkDim;
+                    ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.stroke();
+                }
                 for (const n of model.nodes()) {
                     const p = at(n.id);
                     if (!p) continue;
                     const x = p[0] - NODE / 2, y = p[1] - NODE / 2;
-                    ctx.fillStyle = n.seen ? (n.id === here ? COL.here : COL.seen) : COL.unseen;
-                    ctx.fillRect(x, y, NODE, NODE);
-                    ctx.strokeStyle = n.seen ? COL.edge : COL.link;
-                    ctx.strokeRect(x + 0.5, y + 0.5, NODE - 1, NODE - 1);
+                    const state = n.seen ? (n.id === here ? "here" : "seen") : "unseen";
+                    if (!(look && partHook(ctx, { part: "mapNode", x, y, w: NODE, h: NODE, state }))) {
+                        ctx.fillStyle = n.seen ? (n.id === here ? COL.here : COL.seen) : COL.unseen;
+                        ctx.fillRect(x, y, NODE, NODE);
+                        ctx.strokeStyle = n.seen ? COL.edge : COL.link;
+                        ctx.strokeRect(x + 0.5, y + 0.5, NODE - 1, NODE - 1);
+                    }
                     if (!n.seen) drawText(ctx, "?", p[0] - 2, p[1] - 6, { kind: 1, clut: 7 });
                 }
                 const hp = here ? at(here) : null;

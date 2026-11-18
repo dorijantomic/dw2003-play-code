@@ -17,7 +17,6 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const layout = JSON.parse(
   readFileSync(path.join(ROOT, "web/assets/data/stgtrain_ui.json"), "utf8"));
-const gymSrc = readFileSync(path.join(ROOT, "web/gym.js"), "utf8");
 
 test("the HUD's two stat columns are six core and seven resistances", () => {
   const { core, res } = layout.hud_text;
@@ -46,14 +45,6 @@ test("the name, level, HP and MP rows sit on their own columns", () => {
   }
   assert.deepEqual([t.tp.labelX, t.tp.valueX, t.tp.y], [16, 44, 187]);
   assert.equal(t.tp.valueRight, true);
-});
-
-test("gym.js no longer carries the pixel-measured stat columns", () => {
-  // The old code drew the two columns at x=56 and x=100 and glued each label
-  // to its padded number. Both are gone; the file reads the layout instead.
-  assert.ok(!/String\(st\?\.stats\?\.\[stat\][^)]*\), 56,/.test(gymSrc));
-  assert.ok(!/drawText\(ctx, `HP\$\{pad\(/.test(gymSrc));
-  assert.ok(gymSrc.includes("HUD_TEXT"));
 });
 
 test("the confirm, session and grid plates are all in the layout", () => {
@@ -130,18 +121,6 @@ test("a finished session says one line on the bottom plate", () => {
   assert.equal(r.revealRate, 6, "the 6 is the text reveal rate");
 });
 
-test("gym.js draws the result line from the layout and keeps no palette-6 reading", () => {
-  // The screen consumes the corrected data: the draw call passes the layout's
-  // own clut, and the pre-load fallback carries palette 0 and the rate, not
-  // the old palette-6 reading.
-  assert.ok(gymSrc.includes("{ clut: sr.clut }"));
-  assert.ok(!/clut: 6\b/.test(gymSrc), "no palette-6 literal is left");
-  const fb = gymSrc.match(/session_result \?\? \{([^}]*)\}/);
-  assert.ok(fb, "gym.js has a session_result fallback");
-  assert.ok(/clut: 0\b/.test(fb[1]), "the fallback palette is 0");
-  assert.ok(/revealRate: 6\b/.test(fb[1]), "the fallback carries the reveal rate");
-});
-
 test("the pod row and its beam are in the layout, not only in gym.js", () => {
   const sc = layout.select_chrome;
   assert.deepEqual([sc.pods.x0, sc.pods.stepX, sc.pods.y], [164, 48, 129]);
@@ -206,26 +185,6 @@ test("not enough TP opens the prompt plate and writes on it", () => {
   assert.ok(wy > prompt.y && wy < prompt.y + 30, "the line is on that plate");
 });
 
-test("gym.js draws the TP screen's plates before what sits on them", () => {
-  // lastIndexOf: the same guard opens the key handler earlier in the file.
-  const block = gymSrc.slice(gymSrc.lastIndexOf('if (g.screen === "tp") {'));
-  const plates = block.indexOf("confirmPlates(ctx, [");
-  const icon = block.indexOf("drawLargeDrillIcon(ctx)");
-  const prompt = block.indexOf('ROLE("pick_tp_amount")');
-  assert.ok(plates >= 0 && icon > plates, "the icon draws after the plates");
-  assert.ok(prompt > plates, "the prompt line draws after the plates");
-  const roles = block.slice(plates, block.indexOf("]", plates));
-  assert.ok(roles.includes('"title"') && roles.includes('"banner"'));
-  assert.ok(roles.includes('"question"'));
-  assert.ok(!roles.includes('"icon_frame"'), "the amount box is not open yet");
-  // The confirm screen keeps the box, and takes the tall plate.
-  const cblock = gymSrc.slice(gymSrc.lastIndexOf('if (g.screen === "confirm") {'));
-  const croles = cblock.slice(cblock.indexOf("confirmPlates(ctx, ["),
-    cblock.indexOf("]", cblock.indexOf("confirmPlates(ctx, [")));
-  assert.ok(croles.includes('"icon_frame"') && croles.includes('"result"'));
-  assert.ok(!croles.includes('"question"'), "the short plate is shut by 0x10");
-});
-
 // ── The words, from the game's own message bank ─────────────────────────────
 // Every fill site on this screen passes bank 0x10B, and that bank is the
 // language file lang_file/dw2003/eng/estraini.toml. Two passes on 2026-09-04
@@ -285,14 +244,3 @@ test("what a finished session says is the bank's own template", () => {
     "Results:[pause][clear]Dark Defense is up by {1}!\\nSpirit is down by {2}...[pause]");
 });
 
-test("gym.js carries no English of its own for this screen", () => {
-  // The three tables it used to keep -- names, descriptions, amounts -- are
-  // gone, and no drawText call is handed a hand-typed line any more. The one
-  // literal left is the shared cursor glyph token, which is not a word.
-  for (const gone of ["DRILL_NAMES", "DRILL_DESCS", "TP_LABELS"])
-    assert.ok(!gymSrc.includes(gone), `${gone} is still in web/gym.js`);
-  const literals = [...gymSrc.matchAll(/drawText\(ctx, "([^"]*)"/g)]
-    .map((m) => m[1]);
-  assert.deepEqual([...new Set(literals)], ["[arrow-right]"]);
-  assert.ok(gymSrc.includes("LAYOUT?.strings?.all"), "it reads the bank");
-});

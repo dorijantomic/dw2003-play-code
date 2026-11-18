@@ -4,6 +4,8 @@
 import { ui, maskFromButtons } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintScreenDim } from "./screendim.js";
+import * as uiC from "./ui-c/index.js";
+import { composeLanguage } from "./ui-c/screens.js";
 const { CountryScreen, MenuPadWords, MenuDisplayClock, createTaskState, setState0, countryScreenStartupTick } = ui;
 
 export const CNTYSEL_ROOT_CB = 0x80083d18;
@@ -141,7 +143,8 @@ export function createCntyselNative(sfx = null, music = null) {
             ctx.scale(viewW / viewport.width, viewW / viewport.width);
             ctx.fillStyle = `rgb(${setup.clear.join(",")})`;
             ctx.fillRect(viewport.x, viewport.y, setup.width, setup.height);
-            renderer.draw(ctx, draws, null, [], contexts);
+            // look C: the language page in the capture scope (flags and words stay the game's pictures)
+            uiC.scope("ui-lang", ctx, { enable: true, compose: composeLanguage, dim: Math.min(1, fade / 255) }, () => renderer.draw(ctx, draws, null, [], contexts));
             if (fade) {
                 ctx.save();
                 ctx.translate(dim.x, dim.y);

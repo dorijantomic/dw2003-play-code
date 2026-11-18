@@ -20,6 +20,7 @@
 // intent stream yet. That is the named Phase 4 text-element item.
 
 import { drawClip, drawClipAtPaletteRow, loadPack, packReady } from "./screenpack.js";
+import { artHook } from "./ui-c/capture.js";
 import { drawPartnerPicture, isPartnerPicture } from "./partner-pictures.js";
 
 // VRAM-backed sprites. The card class's +0x34 emit publishes a 32x32 textured
@@ -333,7 +334,8 @@ export function createNativeScreenRenderer(entry, packNameForDir, options = {}) 
                 const d = draws[i];
                 if (d.bucket !== b) continue;
                 if (d.kind === "vram") {
-                    if (typeof options.paintPrim === "function") options.paintPrim(ctx, d.call);
+                    // look C scope: a VRAM picture (card face, drill picture) is art, drawn on the art canvas like a partner picture
+                    if (typeof options.paintPrim === "function") { if (!artHook(ctx, (c) => options.paintPrim(c, d.call))) options.paintPrim(ctx, d.call); }
                     else stats.skipped += 1;
                     continue;
                 }
@@ -361,7 +363,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options = {}) 
                         ctx.scale(d.sx, d.sy);
                         ctx.translate(-d.px, -d.py);
                     }
-                    if (drawPartnerPicture(ctx, d.id, d.x, d.y)) stats.clips += 1;
+                    if (artHook(ctx, (c) => drawPartnerPicture(c, d.id, d.x, d.y)) || drawPartnerPicture(ctx, d.id, d.x, d.y)) stats.clips += 1;   // look C scope: art canvas
                     ctx.restore();
                     continue;
                 }

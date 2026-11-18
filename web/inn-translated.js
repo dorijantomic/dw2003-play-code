@@ -14,6 +14,8 @@
 // (docs/research/audio/sound-system.md, "The exclusive-track register"). Neither is the SEQ music, so
 // both go through sfx.playPacked and the bgm track is left playing.
 import { innForStage, quoteInnStay, restAtInn, ui } from "./vendor/engine.js";
+import * as uiC from "./ui-c/index.js";
+import { composeWindow } from "./ui-c/screens.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { applyInnRest } from "./inn.js";
@@ -187,8 +189,10 @@ export function createInnTranslated(sfx = null, bgm = null) {
         const { calls, contextMarkers } = inn._session.drawIntents();
         ctx.save();
         ctx.scale(s, s);
-        renderer.draw(ctx, calls, null, [], contextMarkers, []);
-        inn._painted = drawNativeTextWidgets(ctx, inn._session.textWidgets()).texts;
+        uiC.scope("ui-inn", ctx, { enable: true, compose: composeWindow, dim: 0 }, () => {
+            renderer.draw(ctx, calls, null, [], contextMarkers, []);
+            inn._painted = drawNativeTextWidgets(ctx, inn._session.textWidgets()).texts;
+        });
         ctx.restore();
         drawFade(ctx, inn._session.fadeIntent(), viewW, viewH);
     };

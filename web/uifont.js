@@ -35,6 +35,7 @@
 // white of the number face -- web/battle.js listPageHint() is the one place
 // that pair is written.
 
+import { capturingText, textRunHook, artHook } from "./ui-c/capture.js";
 import { assetImageScale, loadAssetImage, tagAssetSource } from "./assets.js";
 
 let img = null;
@@ -207,6 +208,12 @@ export function drawText(ctx, text, x, y, opts = {}) {
   // undefined check when the trace is off, which is always in play.
   if (globalThis.__uiTextTrace) globalThis.__uiTextTrace.add(String(text));
   const { kind = 1, clut = 0, scale = 1, color = null, alignRight = false, cellWidth = null, glyphMetrics = null } = opts;
+  // Look C capture scope that takes plain text (web/ui-c, the battle HUD): the run as data, same pens, nothing painted.
+  if (fontReady() && capturingText(ctx)) {
+    const w = textWidth(text, kind) * scale, x0 = alignRight ? x - w : x;
+    textRunHook(ctx, { text: String(text), kind, clut: clut | 0, x: x0, y, right: alignRight ? x : null, w, glyphs: layoutGlyphs(String(text), x0, { kind, cellWidth, glyphMetrics }) });
+    return w;
+  }
   if (alignRight) x -= textWidth(text, kind) * scale;
   if (!fontReady()) {
     ctx.fillStyle = color ?? "#e8e8f0";
@@ -233,7 +240,7 @@ export function drawText(ctx, text, x, y, opts = {}) {
 
 /**
  * Where drawText() would put each glyph of `text` (same pen, same per-glyph dx/adv, same `cellWidth` / `glyphMetrics`), without
- * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The vector UI look (web/ui-css.js) places one smooth glyph at
+ * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The look C overlay (web/ui-c) places one smooth glyph at
  * each of these pens, so its spacing is the game's own. [] until the font has loaded.
  */
 export function layoutGlyphs(text, x, opts = {}) {
@@ -260,8 +267,9 @@ export function drawIconGlyph(ctx, name, x, y, scale = 1) {
   if (!fontReady()) return false;
   const r = map.icons?.[name];
   if (!r) return false;
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale);
+  const paint = (c) => { c.imageSmoothingEnabled = false; c.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
+  // a look C scope (web/ui-c) keeps the icon as a picture on its art canvas, over the C plates
+  if (!artHook(ctx, paint)) paint(ctx);
   return true;
 }
 

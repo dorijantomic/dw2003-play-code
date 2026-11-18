@@ -30,11 +30,7 @@ test("no screen keeps a private copy of the card bound", () => {
     "engine/dw3/ui/native/album-grid.ts",
     "engine/dw3/ui/native/folder-card-grid.ts",
     "engine/native/bridge.ts",
-    "web/cardalbum-native.js",
-    "web/carddeck-native.js",
     "web/cardduel-native.js",
-    "web/cardshop-native.js",
-    "web/status-native.js",
   ];
   for (const f of files) {
     const src = stripComments(read(f));
@@ -47,7 +43,7 @@ test("no screen keeps a private copy of the card bound", () => {
 });
 
 test("no screen keeps a private copy of the copy cap", () => {
-  for (const f of ["web/carddeck-native.js", "web/cardduel-native.js", "web/cardshop-native.js", "web/status-native.js"]) {
+  for (const f of ["web/cardduel-native.js"]) {
     const src = read(f);
     assert.ok(!/CARD_COPIES_MAX/.test(src), `${f} still has its own copy cap`);
     assert.ok(/COLLECTION_CAP/.test(src), `${f} does not use COLLECTION_CAP`);

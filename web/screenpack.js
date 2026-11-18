@@ -10,6 +10,7 @@
 import { loadAssetImage } from "./assets.js";
 import { registerPausePanels } from "./panel-kit.js";
 import { noteBackdropBlend } from "./battle-layer.js";
+import { clipHook } from "./ui-c/capture.js";
 
 const packs = {}; // name -> { img, map, ids, patterns }
 
@@ -27,7 +28,7 @@ export function loadPack(name) {
   // patterns is keyed by clip id, not one per pack: sttrng3 alone holds eight
   // different scrolling walls (0x2d..0x34, one per training ground), so a
   // single cached pattern would draw the wrong cave.
-  const p = { img: null, map: null, ids: null, patterns: {} };
+  const p = { name, img: null, map: null, ids: null, patterns: {} };
   packs[name] = p;
   if (ABSENT_PACKS.has(name)) return p;
   // Guarded so pure-logic modules that import screen-pack-drawing helpers
@@ -65,6 +66,7 @@ export function clipSize(p, id) {
 
 /** Draw clip `id` of pack `p` with its top-left at (x, y). Native pixels × scale. */
 export function drawClip(ctx, p, id, x, y, scale = 1) {
+  if (clipHook(ctx, p, id, x, y, (c) => drawClip(c, p, id, x, y, scale))) return true;   // look C capture scope (web/ui-c)
   const clip = p.ids?.[String(id)];
   if (!clip || !p.img) return false;
   ctx.imageSmoothingEnabled = false;
@@ -106,6 +108,7 @@ export function drawClip(ctx, p, id, x, y, scale = 1) {
  * docs/research/ui/dialogue-window-placement-decoded-2026-07-02.md.
  */
 export function drawClipOpaque(ctx, p, id, x, y, scale = 1) {
+  if (clipHook(ctx, p, id, x, y, (c) => drawClipOpaque(c, p, id, x, y, scale))) return true;
   const clip = p?.ids?.[String(id)];
   if (!clip || !p.img) return false;
   ctx.imageSmoothingEnabled = false;
@@ -122,6 +125,7 @@ export function drawClipOpaque(ctx, p, id, x, y, scale = 1) {
  * whose sprite is an authored 40x8 fill revealed up to the gauge's own width.
  */
 export function drawClipWidth(ctx, p, id, x, y, width) {
+  if (clipHook(ctx, p, id, x, y, (c) => drawClipWidth(c, p, id, x, y, width), width)) return true;
   const clip = p.ids?.[String(id)];
   if (!clip || !p.img || !(width > 0)) return false;
   ctx.imageSmoothingEnabled = false;
@@ -200,10 +204,10 @@ export function drawClipAtPaletteRow(ctx, p, id, row, x, y, scale = 1) {
  *   stgdglab 0x37  @0x0000c1b8   DRI lab         web/dri.js
  *   stgmcard 0x1e  @0x00004da8   save            web/save.js
  *   stfgtrep 0x1e  @0x0000210c   fight report    web/battle.js
- *   stcrdabm 0x08  @0x00001910   card album      web/cardalbum.js
- *   stcrddek 0x08  @0x0000628c   card deck       web/carddeck.js
- *   stcrdshp 0x08  @0x000054cc   card shop       web/cardshop.js
- *   stdgname 0x24  @0x00003798   naming          web/nameentry.js
+ *   stcrdabm 0x08  @0x00001910   card album      web/cardalbum-translated.js
+ *   stcrddek 0x08  @0x0000628c   card deck       web/carddeck-translated.js
+ *   stcrdshp 0x08  @0x000054cc   card shop       web/cardshop-translated.js
+ *   stdgname 0x24  @0x00003798   naming          web/nameentry-translated.js
  *   stgtrain  var  @0x00002498   training ground web/gym.js  (clip id is read
  *                                from the state object, one of sttrng3
  *                                0x2d..0x34 per ground, not an immediate)
@@ -214,7 +218,7 @@ export function drawClipAtPaletteRow(ctx, p, id, row, x, y, scale = 1) {
  * year because it matched one spelling only.
  *
  * The card duel is the one exception and is NOT routed here: its tiles are
- * 64×64 with a 0x40 wrap, and web/cardduel.js already draws it correctly.
+ * 64×64 with a 0x40 wrap, and web/cardduel-native.js already draws it correctly.
  */
 export function drawPackBackdrop(ctx, p, clipId, viewW, viewH, timeSec) {
   const grid = p.ids?.[String(clipId)];

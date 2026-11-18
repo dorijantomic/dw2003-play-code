@@ -2,7 +2,7 @@
 //
 // The wallet cell (save ctx + 0x6C) is the u32 the original stops at 9,999,999
 // and floors at 0. The browser screens used to spell that ceiling out (or keep
-// their own copy of it), and web/shop-native.js wrote `state.bits` raw into the
+// their own copy of it), and the reference merchant wrote `state.bits` raw into the
 // cell: a seed above the ceiling landed in RAM while the next read handed the
 // capped value back, so the screen's copy and the cell disagreed.
 //
@@ -50,18 +50,9 @@ test("the save context and the language cell agree with their one declaration", 
   assert.equal(SAVE_CONTEXT, PARTY_CONTEXT, "the two declarations still name the same cell");
 });
 
-test("the shop seed writes the wallet through the ceiling, never raw", () => {
-  const src = read("web/shop-native.js");
-  assert.match(src, /write\(MONEY, Math\.max\(0, Math\.min\(MONEY_CAP, Math\.trunc\(Number\(state\.bits\) \|\| 0\)\)\), 4\)/,
-    "the seed clamps money to 0..MONEY_CAP");
-  assert.doesNotMatch(src, /write\(MONEY, Number\(state\.bits\) \|\| 0, 4\)/, "the old unclamped write is gone");
-});
-
 test("the screens that print the wallet share the engine's constant", () => {
   for (const file of [
-    "web/shop-native.js", "web/status-native.js",
-    "web/shop.js", "web/cardshop-native.js", "web/fightreport-native.js",
-    "web/fightreport-translated.js",
+    "web/shop.js", "web/fightreport-translated.js",
   ]) {
     const src = read(file);
     assert.doesNotMatch(src, /const\s+BIT_CAP\s*=/, `${file} must not declare its own money cap`);
@@ -71,7 +62,7 @@ test("the screens that print the wallet share the engine's constant", () => {
 });
 
 test("the item screens share the catalogue bound", () => {
-  for (const file of ["web/shop-native.js", "web/status-native.js", "web/status-translated.js"]) {
+  for (const file of ["web/status-translated.js"]) {
     const src = read(file);
     assert.doesNotMatch(src, /const\s+ITEM_MAX_ID\s*=\s*402/, `${file} must not declare its own item bound`);
     assert.match(src, /ITEM_ID_MAX/, `${file} takes the bound from the engine`);

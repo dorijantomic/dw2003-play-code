@@ -13,7 +13,7 @@ const everyRow = (m) => {
 test("an empty or nonsense settings object still gives every row a value text", () => {
     for (const fx of [{}, { weatherMode: "stormy", todMode: 7, spriteFilter: "nearest4", battleSpeed: "fast", battlespeed: true, musicVolume: "loud", soundVolume: null, quality: 12 }]) {
         const rows = everyRow(createOptionsModel(store(fx), [["off", "Off"]]));
-        assert.equal(Object.keys(rows).length, 5 + 5 + 2 + 6);
+        assert.equal(Object.keys(rows).length, 5 + 4 + 2 + 6);
         for (const r of Object.values(rows)) assert.equal(typeof r.value, "string", r.id);
     }
 });

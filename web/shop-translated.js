@@ -12,6 +12,7 @@ import { CLOSE_NOTIFY, DISPOSE_NEVER, createTranslatedScreenHost } from "./trans
 import { partyRosterView, storedNumbers, syncLeadEquipBonuses } from "./party.js";
 import { ensureStoredStats } from "./battle.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
+import { composeWindow } from "./ui-c/screens.js";
 
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };
@@ -139,7 +140,7 @@ export function createShopTranslated(sfx = null, options = {}) {
     if (!shop._open || !shop._session) return;
     ctx.save();
     ctx.scale(viewW / 320, viewW / 320);
-    paintNativeSession(ctx, renderer, shop._session);
+    paintNativeSession(ctx, renderer, shop._session, { ui: { key: "ui-shop", compose: composeWindow } });
     ctx.restore();
   };
   shop.close = () => host.close();

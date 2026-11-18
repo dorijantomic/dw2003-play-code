@@ -12,8 +12,7 @@
 //      no interpreter host. The browser verifier
 //      (tools/verify_translated_album.mjs) refuses a screen that reports
 //      anything else, and it also aborts every assets/native/** request.
-//   3. The ordinary route is the translated screen; the shipped overlay is the
-//      explicit research reference behind ?nativeAlbum=1.
+//   3. The ordinary route is the translated screen.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -50,16 +49,9 @@ test("the album adapter declares translated execution and links no interpreter h
     "the album adapter must not link an interpreter host");
 });
 
-test("the album's ordinary route is the translated screen, the reference behind ?nativeAlbum=1", () => {
+test("the album's ordinary route is the translated screen", () => {
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(game, /const cardAlbum = GYM_PARAMS\.has\("legacyAlbum"\) \? cardAlbumLegacy/,
-    "the album route branches on the flags");
-  assert.match(game, /GYM_PARAMS\.has\("nativeAlbum"\) \? cardAlbumNative : cardAlbumTranslated/,
-    "the ordinary route is the translated screen; ?nativeAlbum=1 is the reference");
-  const reference = readFileSync(new URL("../web/cardalbum-native.js", import.meta.url), "utf8");
-  // Since card 11 the adapter takes its lifecycle from createNativeAdapter, so the
-  // overlay is booted by the factory; what matters is that it names the shipped
-  // pro/stcrdabm root rather than a hand-authored screen.
-  assert.match(reference, /createNativeAdapter|openNativeScreen/, "the reference still boots the shipped overlay");
-  assert.match(reference, /moduleId: MODULE_ID/, "and names the shipped overlay root");
+  assert.match(game, /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\nconst cardAlbum = cardAlbumTranslated;/,
+    "the album route is the translated screen");
+  assert.doesNotMatch(game, /cardAlbumNative|cardAlbumLegacy/, "no other album route is built");
 });

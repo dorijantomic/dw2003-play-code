@@ -31,6 +31,24 @@
   #refgrid figcaption { font-size: 10px; color: #7d879c; margin-top: 2px; }
   #refgrid figcaption b { color: #9fb0d0; font-weight: 600; }
   #hint { color: #7d879c; font-size: 12px; max-width: 640px; text-align: center; }
+  #viewbar { display: flex; gap: 6px; }
+  button.vbtn { background: #1a1e2c; color: #cdd3e0; border: 1px solid #2c3346; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+  button.vbtn.active { background: #2d54c8; border-color: #3d6bff; color: #fff; }
+  #remaster { display: none; flex-direction: column; align-items: center; gap: 10px; }
+  body.remaster #remaster { display: flex; }
+  body.remaster #frameWrap, body.remaster #hint, body.remaster #refbox, body.remaster #refstrip { display: none !important; }
+  body.remaster #single-list { display: none; }
+  #rmList { display: none; }
+  body.remaster #rmList { display: block; }
+  #panes { display: flex; gap: 12px; }
+  #panes figure { margin: 0; }
+  #panes figcaption { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #7d879c; margin-bottom: 4px; }
+  #panes iframe { pointer-events: none; }
+  #rpanel { width: 1292px; max-width: 100%; box-sizing: border-box; background: #12121e; border: 1px solid #232838; border-radius: 6px; padding: 8px 12px; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; margin: 0; }
+  #rnote { color: #7d879c; font-size: 11px; max-width: 1292px; }
+  #rmList .grp { margin: 10px 0 2px; font-size: 10px; color: #6b7488; }
+  #runall { display: block; width: 100%; margin: 6px 0; background: #173b59; color: #a9deff; border: 1px solid #4a91ba; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+  button.scr.na { opacity: .45; }
 </style>
 </head>
 <body>
@@ -38,6 +56,8 @@
   <h1>DDW3 UI Lab</h1>
   <div class="sub">Every screen, rendered by the real game.js</div>
   <a class="maplink" href="ui-flow.html">Screen route map →</a>
+  <div id="rmList"><h2>Remaster screens</h2><button id="runall" type="button">Run all</button><div id="rmButtons"></div></div>
+  <div id="single-list">
   <h2>Registration</h2>
   <button class="scr" data-scr="assetmode">Visual Mode</button>
   <button class="scr" data-scr="nameentry">Name Entry</button>
@@ -68,8 +88,18 @@
   <button class="scr" data-scr="nativescreen">Native Screen (boot)</button>
   <button class="scr" data-scr="save">Memory Card (Save)</button>
   <button class="scr" data-scr="load">Memory Card (Load)</button>
+  </div>
 </div>
 <div id="main">
+  <div id="viewbar"><button class="vbtn active" id="vSingle" type="button">Single</button><button class="vbtn" id="vRemaster" type="button">Remaster vs Pixel</button></div>
+  <div id="remaster">
+    <div id="panes">
+      <figure><figcaption>Pixel (the disc look)</figcaption><iframe id="gamePx" title="pixel"></iframe></figure>
+      <figure><figcaption>Remaster (look C)</figcaption><iframe id="gameRm" title="remaster"></iframe></figure>
+    </div>
+    <pre id="rpanel">Pick a screen on the left. Numbers appear here.</pre>
+    <div id="rnote">Not covered here (no key script yet, tested with synthetic fixtures instead): item sort, quest detail, album card detail, booster, DRI digivolve, gym TP picker, pack-select sub-steps, battle target picker, DNA, lose. Rows shown grey have no key script yet.</div>
+  </div>
   <div id="frameWrap">
     <iframe id="game" title="game"></iframe>
   </div>
@@ -107,7 +137,7 @@ const STRIPS = { cardduel: "cardduel" };
 // __labOpen. `cardduel-lab` is a second, from-scratch renderer of the duel.
 const PAGES = { "cardduel-lab": "cardduel-lab.html", "cardduel-real": "cardduel-real.html", nativescreen: "native-screen-lab.html" };
 // Forward the lab's own query params to the game iframe so a verifier can ask
-// for a development rollback route (e.g. ui-lab.html?legacyReport=1). GAME_URL
+// for a route (e.g. ui-lab.html?skipTitle=1). GAME_URL
 // is the single source for both the initial src and the reload comparison.
 const labQs = new URLSearchParams(location.search);
 const requestedScreen = labQs.get("screen");
@@ -177,6 +207,139 @@ function open(name, arg) {
 }
 document.querySelectorAll(".scr").forEach((b) =>
   b.addEventListener("click", () => open(b.dataset.scr, b.dataset.arg)));
+</script>
+<script type="module">
+// The "Remaster vs Pixel" view: the same game twice (left: look C switched off, right: look C), the same keys sent to both, numbers under them.
+import { LAB_SCREENS, SEEDS, stepsFor, needsFor } from "./ui-lab-screens.js";
+const $ = (id) => document.getElementById(id);
+const pxFrame = $("gamePx"), rmFrame = $("gameRm"), panel = $("rpanel");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const frames = () => [pxFrame, rmFrame];
+let view = "single", busy = false;
+
+function setView(v) {
+  view = v;
+  document.body.classList.toggle("remaster", v === "remaster");
+  $("vSingle").classList.toggle("active", v === "single");
+  $("vRemaster").classList.toggle("active", v === "remaster");
+  if (v === "remaster" && !pxFrame.getAttribute("src")) { loadFrame(pxFrame); loadFrame(rmFrame); }
+}
+$("vSingle").addEventListener("click", () => setView("single"));
+$("vRemaster").addEventListener("click", () => setView("remaster"));
+
+function loadFrame(f) {
+  return new Promise((resolve) => {
+    f.addEventListener("load", () => {
+      try {
+        const s = f.contentDocument.createElement("style");
+        s.textContent = "header,#hint,#hud{display:none!important} #stage{margin:0}";
+        f.contentDocument.head.appendChild(s);
+      } catch { /* same origin */ }
+      resolve();
+    }, { once: true });
+    f.src = GAME_URL + "&_=" + Date.now();
+  });
+}
+async function frameReady(f, ms = 30000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const w = f.contentWindow;
+    if (w && w.__labOpen && w.__state?.started && w.__uiC?.ready?.()) {
+      if (f === pxFrame) w.__uiC.setEnabled(false);       // the pixel pane: look C off (a development hook, not saved)
+      return true;
+    }
+    await sleep(200);
+  }
+  return false;
+}
+async function freshFrames() {
+  await Promise.all(frames().map(loadFrame));         // wait for the new document, so an old window is never mistaken for the new one
+  const ok = await Promise.all(frames().map((f) => frameReady(f)));
+  return ok.every(Boolean);
+}
+
+// keys: the lab sends every key to both games, so they see the same input
+function send(type, key) {
+  const letter = key.length === 1;
+  const init = { key: letter ? key.toLowerCase() : key, code: letter ? "Key" + key.toUpperCase() : key, bubbles: true, cancelable: true };
+  for (const f of frames()) { const w = f.contentWindow; w.document.dispatchEvent(new w.KeyboardEvent(type, init)); }
+}
+async function press(key, n = 1) { for (let i = 0; i < n; i++) { send("keydown", key); await sleep(60); send("keyup", key); await sleep(140); } }
+for (const type of ["keydown", "keyup"]) document.addEventListener(type, (e) => {
+  if (view !== "remaster" || busy || e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(e.target?.tagName ?? "")) return;
+  e.preventDefault();
+  send(type, e.key);
+});
+
+const probe = "JSON.stringify(window.__status && __status.diagnostics ? (({ open, page, classes, transition, entry }) => ({ open, page, classes, transition, entry }))(__status.diagnostics()) : null)";
+const state = (f) => { try { return f.contentWindow.eval(probe); } catch (e) { return "probe error " + e.message; } };
+const rm = () => rmFrame.contentWindow;
+
+function numbers() {
+  const u = rm().__uiC;
+  const chk = u.check(), cov = u.coverage(), cost = u.cost();
+  const scopes = Object.entries(cov).map(([k, v]) => ({ text: `${k}: claimed ${v.claimed.length}, art ${v.unclaimed.length}, flat plates unclaimed ${v.flatUnclaimed}, canvas text ${v.canvasText}, DOM text ${v.domText}`, flat: v.flatUnclaimed }));
+  return { worst: chk.worst, parts: chk.count, bad: chk.parts.length, scopes, overflow: u.overflow(), cost };
+}
+function show(id, n, parityNote) {
+  panel.textContent = [
+    `screen ${id}`,
+    `parts ${n.parts}, worst rect error ${n.worst.toFixed(3)} px (${n.bad} over 0.5 px)`,
+    ...(n.scopes.length ? n.scopes.map((s) => s.text) : ["no look C scope is showing (this screen is still pixel)"]),
+    `text overflow: ${n.overflow.length ? n.overflow.join(" | ") : "none"}`,
+    `scope cost: median ${n.cost.median.toFixed(3)} ms, max ${n.cost.max.toFixed(3)} ms over ${n.cost.n} frames`,
+    `parity (state strings after every key): ${parityNote}`,
+  ].join("\n");
+}
+
+async function runRow(row) {
+  if (busy) return null;
+  busy = true;
+  try {
+    document.querySelectorAll("#rmButtons button").forEach((b) => b.classList.toggle("active", b.dataset.id === row.id));
+    const steps = stepsFor(row.id);
+    if (!steps) { panel.textContent = `screen ${row.id}: no key script yet`; return { id: row.id, skipped: true }; }
+    panel.textContent = `screen ${row.id}: loading both games...`;
+    if (!(await freshFrames())) { panel.textContent = `screen ${row.id}: a game did not start in 30 s`; return { id: row.id, error: "boot" }; }
+    for (const n of needsFor(row.id)) if (SEEDS[n]) await Promise.all(frames().map((f) => f.contentWindow.eval(SEEDS[n])));
+    let first = null, keys = 0;
+    for (const [kind, a, b] of steps) {
+      if (kind === "eval") await Promise.all(frames().map((f) => f.contentWindow.eval(a)));
+      else if (kind === "wait") await sleep(a);
+      else {
+        await press(a, b ?? 1); keys += b ?? 1;
+        const [l, r] = frames().map(state);
+        if (!first && l !== r) first = `first difference after key ${a}: pixel ${l} | remaster ${r}`;
+      }
+    }
+    await sleep(500);
+    const [l, r] = frames().map(state);
+    if (!first && l !== r) first = `first difference at the end: pixel ${l} | remaster ${r}`;
+    const n = numbers();
+    show(row.id, n, first ? "no, " + first : `yes (${keys} keys, ${l === "null" ? "no probe for this screen" : "state equal"})`);
+    return { id: row.id, ...n, parity: !first };
+  } finally { busy = false; }
+}
+
+// sidebar: one button per table row, grouped by build task
+const groups = new Map();
+for (const row of LAB_SCREENS) { if (!groups.has(row.task)) groups.set(row.task, []); groups.get(row.task).push(row); }
+const host = $("rmButtons");
+for (const [task, rows] of groups) {
+  const h = document.createElement("div"); h.className = "grp"; h.textContent = task === "pixel" ? "left pixel by design" : `task ${task}`; host.appendChild(h);
+  for (const row of rows) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "scr" + (stepsFor(row.id) ? "" : " na"); b.dataset.id = row.id; b.textContent = row.label;
+    b.addEventListener("click", () => runRow(row));
+    host.appendChild(b);
+  }
+}
+$("runall").addEventListener("click", async () => {
+  const out = [];
+  for (const row of LAB_SCREENS) { if (!stepsFor(row.id)) continue; const r = await runRow(row); if (r) out.push(r); }
+  panel.textContent = out.map((r) => `${r.id}: ${r.error ?? `parts ${r.parts}, worst ${r.worst.toFixed(2)} px, unclaimed flat plates ${r.scopes.reduce((a, s) => a + s.flat, 0)}, parity ${r.parity ? "yes" : "NO"}`}`).join("\n");
+});
+window.__labRemaster = { runRow: (id) => runRow(LAB_SCREENS.find((r) => r.id === id)), setView, press, frames: () => frames() };
 </script>
 </body>
 </html>

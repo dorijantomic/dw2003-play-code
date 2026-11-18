@@ -155,7 +155,7 @@ function fields(rt) {
 }
 
 const CASES = [
-    { name: "default count 0", state: 0, count: 0 },
+    // count 0 is not compared: the disc always has a partner, and there the state would stay 0 for ever; tests/pause-empty-party.test.js covers our empty party.
     { name: "default count 1", state: 0, count: 1, sub: 0 },
     { name: "default count 1 sub 1", state: 0, count: 1, sub: 1 },
     { name: "default count 2", state: 0, count: 2 },

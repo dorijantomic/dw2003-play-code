@@ -4,8 +4,6 @@
 // and the closing dim, serves the virtual card, and COMMITS the outcome to the
 // walker's persistence once, after the screen has closed. It never executes original
 // instructions and never requests an executable asset.
-// `?nativeSave=1` keeps the original-code screen as a research reference
-// (web/save-native.js); `?legacySave=1` keeps the hand-made screen (web/save.js).
 //
 // Card contract (web/memcard.js builds the directory block): the card is the walker's
 // three localStorage slots. During the screen a written save image lands in a session
@@ -19,6 +17,7 @@ import { ui, rosterSlotOfCharId, itemCountEntries, ROSTER_SLOT_CHARIDS } from ".
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { composeMemcard } from "./ui-c/screens.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { buildDirectoryBlock, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
@@ -282,7 +281,7 @@ export function createSaveTranslated(sfx = null) {
         const s = viewW / 320;
         ctx.save();
         ctx.scale(s, s);
-        paintNativeSession(ctx, renderer, r._session);
+        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-save", compose: composeMemcard } });
         ctx.restore();
     };
 

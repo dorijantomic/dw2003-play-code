@@ -4,7 +4,7 @@
 // decoded pipeline — see docs/research/battle/battle-formula-leaves.md.
 
 import {
-  physicalBase, magicalBase, resolveDamage, rollHit, rollMagicHit, drainHeal, drainProcRoll, RAND_U16,
+  physicalBase, magicalBase, resolveDamage, type DamageInfo, rollHit, rollMagicHit, drainHeal, drainProcRoll, RAND_U16,
   statusInflictionRoll, ailmentOfEffect, poisonTimelineDamage, regenTick, frozenBlockRoll,
   counterBlowBase,
   type ElementalField, type StatPenalty,
@@ -156,7 +156,7 @@ export interface Skill {
   basic_attack?: boolean;
 }
 
-export interface AttackResult { hit: boolean; dmg: number; heal: number; }
+export interface AttackResult { hit: boolean; dmg: number; heal: number; /** look only: the critical roll came up / the element x family multiplier (reporting, never read by the rules) */ crit?: boolean; eff?: number; }
 
 /**
  * The original's turn-start gate page, `FIGHTSTG_F0x80088564`'s `+0xac` call: line 1 the
@@ -503,7 +503,8 @@ export function resolveAttackSequence(
     : rollHit(atk, def, sk, rng);
   let landed = firstLanded ? 1 : 0;
   // 2. the damage value, once, whether or not the first roll landed.
-  const dmgPerHit = Math.max(1, resolveDamage(base, atk, def, sk, rng, field));
+  const info: DamageInfo = { crit: false, eff: 1 };
+  const dmgPerHit = Math.max(1, resolveDamage(base, atk, def, sk, rng, field, info));
   const heal = firstLanded && skill?.effect === "drain" && drainProcRoll(skill.effect_p1 ?? 0, rng)
     ? drainHeal(dmgPerHit, skill.effect_p2 ?? 0, !!attacker.aura)
     : 0;
@@ -523,7 +524,7 @@ export function resolveAttackSequence(
   // their own gates (`clearActionAffinity` in `web/battle.js`), because the original's
   // clear carries no category test.
   consumeAffinity(attacker);
-  return { hit: landed > 0, dmg: dmgPerHit * landed, heal, dmgPerHit, landed, attempts, firstLanded };
+  return { hit: landed > 0, dmg: dmgPerHit * landed, heal, dmgPerHit, landed, attempts, firstLanded, crit: info.crit, eff: info.eff };
 }
 
 export function resolveAttack(
@@ -531,7 +532,7 @@ export function resolveAttack(
   field?: ElementalField | null,
 ): AttackResult {
   const r = resolveAttackSequence(attacker, defender, skill, 1, rng, field);
-  return { hit: r.hit, dmg: r.dmg, heal: r.heal };
+  return { hit: r.hit, dmg: r.dmg, heal: r.heal, crit: r.crit, eff: r.eff };
 }
 
 export interface MultiHitResult extends AttackResult {
@@ -969,5 +970,7 @@ export function resolveCounterBlow(
   const atk = playerBasicTech ? { ...built.atk, multiAttack: false } : built.atk;
   if (!rollHit(atk, def, sk, rng)) return { hit: false, dmg: 0, heal: 0 };
   const base = counterBlowBase(damageTaken, f9, !!counterer.aura, playerBasicTech);
-  return { hit: true, dmg: Math.max(0, resolveDamage(base, atk, def, sk, rng, field)), heal: 0 };
+  const info: DamageInfo = { crit: false, eff: 1 };
+  const dmg = Math.max(0, resolveDamage(base, atk, def, sk, rng, field, info));
+  return { hit: true, dmg, heal: 0, crit: info.crit, eff: info.eff };
 }

@@ -14,6 +14,10 @@
 // cap, because the original has none.
 import { ui } from "./vendor/engine.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
+import * as uiC from "./ui-c/index.js";
+import { composePlaceCard } from "./ui-c/message.js";
+
+let cardCount = 0;
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 // A quest's own two names (the `placecard` scene step, web/quest-scenes.js) are not in the disc's name banks, so that
 // card is the plain-string one in web/placecard.js: the same bars, the same typewriter, hold and slit, drawn from
@@ -163,14 +167,20 @@ export function createPlaceCardTranslated() {
         ctx.clip();
         ctx.scale(s, s);
         ctx.imageSmoothingEnabled = false;
-        // Paint order: the GPU walks the bar entry from its head, so the first quad is the bottom one.
-        for (const q of session.drawIntents()) {
-            if (!q.w || !q.h) continue;
-            ctx.fillStyle = `rgb(${q.colour[0]},${q.colour[1]},${q.colour[2]})`;
-            ctx.fillRect(q.x, q.y, q.w, q.h);
-        }
-        // The names sit in ordering-table entry 0, the bars in entry 1: the names paint over them.
-        card._painted = drawNativeTextWidgets(ctx, session.textWidgets(), { revealWindow: true }).texts;
+        const quads = session.drawIntents();
+        // look C (web/ui-c, task T6): the bars become the C6b card in the game's own rects and paint order, the names the game's typed runs;
+        // the slit is the layer's clip. When the overlay cannot draw, the same code paints the pixels.
+        card._key ??= `placecardT${++cardCount}`;
+        uiC.scope(card._key, ctx, { enable: true, clip: slit, compose: (sc) => composePlaceCard(sc, { quads }) }, () => {
+            // Paint order: the GPU walks the bar entry from its head, so the first quad is the bottom one.
+            if (!uiC.capturing()) for (const q of quads) {
+                if (!q.w || !q.h) continue;
+                ctx.fillStyle = `rgb(${q.colour[0]},${q.colour[1]},${q.colour[2]})`;
+                ctx.fillRect(q.x, q.y, q.w, q.h);
+            }
+            // The names sit in ordering-table entry 0, the bars in entry 1: the names paint over them.
+            card._painted = drawNativeTextWidgets(ctx, session.textWidgets(), { revealWindow: true }).texts;
+        });
         ctx.restore();
     };
 

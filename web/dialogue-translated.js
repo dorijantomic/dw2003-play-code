@@ -4,12 +4,12 @@
 // the box fill and opening-frame wipe (raw GPU primitives), and the text, and feeds the confirm key.
 // It never executes original instructions and never requests an executable asset.
 //
-// Drives the UI Lab and the game's ordinary NPC talk route (web/game.js; ?legacyTextbox=1 keeps web/textbox.js).
+// Drives the UI Lab and the game's ordinary NPC talk route (web/game.js; a line that cannot load falls back to web/textbox.js).
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
-import { collectNativeTextRuns, drawNativeTextWidgets } from "./native-screen-text.js";
-import { layoutFromIntents } from "./ui-css-model.js";
-import { uiCssAvailable, uiCssShowDialogue, uiLookSmooth } from "./ui-css.js";
+import { drawNativeTextWidgets } from "./native-screen-text.js";
+import * as uiC from "./ui-c/index.js";
+import { composeTalk } from "./ui-c/message.js";
 import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
@@ -31,6 +31,8 @@ const FILL_TEXTURES = new Map([["45:2c57:bc", { pack: "cmfont", sx: 80, sy: 0, s
 
 function paintRaw(ctx, raw, getPack) {
     const { kind, intent } = raw;
+    // inside the look C scope the balloon / band and the opening outline lines are C parts (web/ui-c/message.js): no pixels
+    if (uiC.capturing() && (kind === "tailLine" || kind === "frameFill")) return true;
     if (kind === "tailLine") {
         const [x0, y0, x1, y1] = intent.points;
         const [r, g, b] = intent.color;
@@ -163,18 +165,16 @@ export function createDialogueTranslated(sfx = null) {
         if (!g._open || !g._session) return;
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         const { calls, contextMarkers, raw } = g._session.drawIntents();
-        // OPTIONS > UI look: Smooth draws the same box as DOM + CSS vectors (web/ui-css.js); Pixel (default) is the canvas below.
-        if (uiLookSmooth() && uiCssAvailable()) {
-            const runs = collectNativeTextRuns(g._session.textWidgets(), { revealWindow: true });
-            if (uiCssShowDialogue(g._key, layoutFromIntents(calls, raw, contextMarkers), runs, { w: viewW, h: viewH })) {
-                g._painted = runs.map((r) => r.text);
-                return;
-            }
-        }
+        // look C (web/ui-c, task T6): the game's own draw runs inside the capture scope; the balloon pieces, tail, band halves and more
+        // marker become the C6 balloon / C9 band, the opening animation's outline lines C edge lines, the text the game's typed runs.
+        // When the overlay cannot draw (fonts not loaded, no stage) the scope runs the same draw as pixels.
+        const lines = (raw ?? []).filter((r) => r.kind === "tailLine").map((r) => r.intent);
         ctx.save();
         ctx.scale(s, s);
-        renderer.draw(ctx, calls, null, [], contextMarkers, raw);
-        g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets(), { revealWindow: true }).texts;
+        uiC.scope(g._key, ctx, { enable: true, compose: (sc) => composeTalk(sc, { lines }) }, () => {
+            renderer.draw(ctx, calls, null, [], contextMarkers, raw);
+            g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets(), { revealWindow: true }).texts;
+        });
         ctx.restore();
     };
 

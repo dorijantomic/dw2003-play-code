@@ -2,8 +2,7 @@
 // The screens' logic runs in engine/dw3/ui (PauseRootSession); this file loads its
 // data, seeds the walker's party, bag and money into the session, forwards the held
 // buttons, paints the picture calls, text and the two flat quads, and reads the changes
-// back once on close. It never executes original instructions; `?nativeStatus=1` keeps
-// the original-code overlay as a research reference (web/status-native.js).
+// back once on close. It never executes original instructions.
 //
 // The adapter answers the same calls as the reference route: open(state, entry, onClose),
 // isOpen(), handleKey(key, state), update(dt), draw(ctx, w, h), close() and diagnostics().
@@ -12,9 +11,9 @@ import {
 } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
-import { collectNativeTextRuns } from "./native-screen-text.js";
-import { fadeDim, pauseHomeLayout, widgetInside } from "./ui-css-model.js";
-import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
+import * as uiC from "./ui-c/index.js";
+import { pickPauseScreen } from "./ui-c/screens.js";
+import { dimOf } from "./ui-c/geometry.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 
 // The picture handles the pages ask for: the pause chrome, the shared item/icon
@@ -85,11 +84,7 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         _returnClose: null,
         _uiKey: `pause${++pauseCount}`,
     };
-    // OPTIONS > UI look: Smooth draws the pause home list (panel, money band, row labels, cursor) as DOM + CSS (web/ui-css.js).
-    // While it does, the canvas skips exactly those cmfont clips and those text widgets; Pixel never fills this set.
-    const skipClips = new Set();
-    const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor,
-        { skipClip: (name, id) => skipClips.size > 0 && name === "cmfont" && skipClips.has(id) });
+    const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor);
     const playPackedSound = (id) => {
         const key = id >>> 0;
         st._packed[key] = (st._packed[key] ?? 0) + 1;
@@ -270,23 +265,12 @@ export function createStatusTranslated(sfx = null, opts = {}) {
     st.draw = (ctx, viewW = 320, viewH = viewW * 0.75) => {
         if (!st._open || !st._session) return;
         const session = st._session;
-        skipClips.clear();
-        let skipWidget = null;
-        if (st._entry === "home" && uiLookSmooth() && uiCssAvailable()) {
-            const lay = pauseHomeLayout(session.draw.calls, session.draw.contextMarkers);
-            if (lay) {
-                const inside = (w) => widgetInside(lay.textRects, w.penX, w.penY);
-                const runs = collectNativeTextRuns(session.widgets.textWidgets(), { only: inside });
-                if (uiCssShow(st._uiKey, { tiled: lay.tiled }, runs, { w: viewW, h: viewH }, { dim: fadeDim(session.quads) })) {
-                    for (const id of lay.skipClips) skipClips.add(id);
-                    skipWidget = inside;
-                }
-            }
-        }
-        if (!skipWidget) uiCssHide(st._uiKey);
         ctx.save();
         ctx.scale(viewW / 320, viewW / 320);
-        paintNativeSession(ctx, renderer, session, { fade: false, skipWidget });
+        // The pause home is look C (web/ui-c): the scope turns the clips and text it claims into DOM parts; every other page is still pixels.
+        const screen = pickPauseScreen(session.draw.calls, st._entry);
+        uiC.scope(st._uiKey, ctx, { enable: !!screen, compose: screen?.compose, dim: dimOf(session.quads) },
+            () => paintNativeSession(ctx, renderer, session, { fade: false }));
         for (const q of session.quads) {
             // The fade is a subtractive quad whose grey level is how far the screen has darkened.
             ctx.fillStyle = q.semiTransparent ? `rgba(0,0,0,${q.r / 255})` : `rgb(${q.r},${q.g},${q.b})`;
@@ -300,7 +284,7 @@ export function createStatusTranslated(sfx = null, opts = {}) {
     st._finish = (commit = true) => {
         if (!st._open) return;
         st._open = false;
-        uiCssHide(st._uiKey);
+        uiC.hide(st._uiKey);
         ++st._request;
         const session = st._session;
         st._session = null;

@@ -14,10 +14,10 @@
 //      the shop/lab proof: those controllers reach engine/native/memory.ts, these
 //      reach nothing under engine/native/.
 //
-//   2. The ORDINARY route is still interpreter-backed for all three screens. The
-//      adapters web/cardalbum-native.js, web/carddeck-native.js and
-//      web/cardduel-native.js boot the shipped overlays through
-//      web/native-screen-host.js, and web/game.js selects them with no query flag.
+//   2. The ORDINARY route of the duel is still interpreter-backed. The adapter
+//      web/cardduel-native.js boots the shipped overlay through
+//      web/native-screen-host.js, and web/game.js selects it. (The album and the
+//      folder editor are translated screens now.)
 //      That is the measured residue (tools/execution_forbidden_audit.mjs,
 //      docs/research/systems/execution-forbidden-audit-2026-10-05.md: "Card
 //      Album / Card folder editor / Card duel -- interpreter-reachable"). This
@@ -84,13 +84,11 @@ test("the interpreter check detects the interpreter when a graph links one", asy
         `expected the interpreter when bundling it, saw ${JSON.stringify(flagged)}`);
 });
 
-test("the three ordinary-route adapters still boot the shipped overlay through the interpreter host", () => {
+test("the ordinary-route duel adapter still boots the shipped overlay through the interpreter host", () => {
     // The residue, asserted so it cannot disappear from the measurement without
-    // the adapter actually being converted. Each adapter must import the native
-    // screen host (the interpreter driver). The FOLDER editor and the DUEL are
-    // still selected with no query flag; the ALBUM is now the translated screen
-    // (below), and the same adapter stays as its ?nativeAlbum=1 reference.
-    for (const file of ["web/cardalbum-native.js", "web/carddeck-native.js", "web/cardduel-native.js"]) {
+    // the adapter actually being converted. The adapter must import the native
+    // screen host (the interpreter driver).
+    for (const file of ["web/cardduel-native.js"]) {
         const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
         assert.match(source, /native-screen-host\.js/,
             `${file} boots the overlay through the native screen host`);
@@ -98,17 +96,14 @@ test("the three ordinary-route adapters still boot the shipped overlay through t
         // that the adapter opens the overlay through that host.
         assert.match(source, /createNativeAdapter|openNativeScreen/, `${file} opens an interpreter-backed screen`);
     }
-    // web/game.js selects the native adapter with no query flag (the ordinary
-    // route) for the duel; the ?legacy*=1 rollbacks are hand-authored, not
-    // translated. The album's and the folder editor's ordinary routes are the
-    // translated screens, with the native adapters behind ?nativeAlbum=1 /
-    // ?nativeFolder=1.
+    // web/game.js selects the native adapter for the duel. The album's and the
+    // folder editor's ordinary routes are the translated screens.
     const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-    assert.match(game, /const cardAlbum = GYM_PARAMS\.has\("legacyAlbum"\) \? cardAlbumLegacy\n\s*: GYM_PARAMS\.has\("nativeAlbum"\) \? cardAlbumNative : cardAlbumTranslated/,
+    assert.match(game, /const cardAlbum = cardAlbumTranslated;/,
         "the Card Album ordinary route is the translated screen");
-    assert.match(game, /const cardDeck = GYM_PARAMS\.has\("legacyDeck"\) \? cardDeckLegacy\n\s*: GYM_PARAMS\.has\("nativeFolder"\) \? cardDeckNative : cardDeckTranslated/,
+    assert.match(game, /const cardDeck = cardDeckTranslated;/,
         "the folder editor ordinary route is the translated screen");
-    assert.match(game, /const USE_NATIVE_DUEL = !GYM_PARAMS\.has\("legacyDuel"\)/,
+    assert.match(game, /const cardDuel = cardDuelNative;/,
         "the card duel ordinary route is the native adapter");
 });
 

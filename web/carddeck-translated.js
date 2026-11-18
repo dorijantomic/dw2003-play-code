@@ -2,15 +2,16 @@
 // The screen logic runs in engine/dw3/ui (FolderSession over the folder-list
 // controllers, the editor card grid and the rename keyboard); this file loads
 // data, forwards pad state, paints the recorded draw intents and commits the
-// folder records back to the walker's collection. The interpreted reference is
-// web/carddeck-native.js behind ?nativeFolder=1.
+// folder records back to the walker's collection.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
+import { composeDeck } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
-import { cards, persistCollection, loadCatalog, catalog } from "./cardstate.js";
+import { cards, persistCollection, loadCatalog, catalog, loadCardIcons, drawCardIcon } from "./cardstate.js";
 
-const PACKS = { 1598: "stcdsp" };
+// 1904 = namedt: the folder rename is the name keyboard (without it every keyboard clip was skipped, text only)
+const PACKS = { 1598: "stcdsp", 1904: "namedt" };
 const COLOURS = { white: 1, blue: 2, green: 3, red: 4, black: 5, brown: 6 };
 const STAGES = { "in-training": 1, rookie: 2, champion: 3, ultimate: 4, mega: 5 };
 const LABEL = "Card folder";
@@ -70,6 +71,7 @@ function resources(resident, banks, tables) {
     banks,
     cards: cardRecords,
     font: resident.font,
+    cursorGlyphs: resident.cursorGlyphs,
     folders,
     owned: col?.owned ?? new Map(),
     seen: col?.seen ?? [],
@@ -83,7 +85,14 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     _renderer: null, _clock: null, _error: null, _request: 0,
   };
   const renderer = createNativeScreenRenderer({ pack: "stcdsp", packs: PACKS },
-    (directory) => PACKS[directory >>> 16] ?? null);
+    (directory) => PACKS[directory >>> 16] ?? null, {
+      // the grid cell's card picture (same painter as the card shop)
+      paintPrim(ctx, call) {
+        if (call.method !== "cardSprite") throw new Error("Unknown card-folder picture");
+        const [id, x, y, alpha] = call.args;
+        ctx.save(); ctx.globalAlpha = alpha / 255; drawCardIcon(ctx, id, x, y); ctx.restore();
+      },
+    });
   deck._renderer = renderer;
 
   deck.open = (stateOrClose = null, onClose = null) => {
@@ -96,6 +105,7 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     }
     deck._error = null;
     deck._session = null;
+    loadCardIcons();
     deck._clock = new ui.MenuDisplayClock();
     const request = ++deck._request;
     const language = Number.isInteger(deck._state?.languageByte) ? deck._state.languageByte : 2;
@@ -123,7 +133,7 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     if (!deck._open || !deck._session) return;
     ctx.save();
     ctx.scale(viewW / 320, viewW / 320);
-    paintNativeSession(ctx, renderer, deck._session);
+    paintNativeSession(ctx, renderer, deck._session, { ui: { key: "ui-deck", compose: composeDeck } });
     ctx.restore();
   };
   deck.close = () => { if (deck._open) deck._finish(); };

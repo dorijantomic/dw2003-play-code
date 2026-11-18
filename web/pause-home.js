@@ -3,7 +3,7 @@
 // Until 2026-10-04 the pause home was reachable three ways and two of them were
 // a second, hand-written copy of the same list: web/menu.js carried its own row
 // names, its own order and its own cursor, sound and gate rules. The UI lab
-// (`__labOpen("menu")`) opened THAT copy too, and so did `?legacyPause=1` (a switch now gone, which used to be the field's other way in).
+// (`__labOpen("menu")`) opened THAT copy too.
 // Both routes now come through the translated page. The rows, the order, the
 // gate and every button on them are one system of the original — the resident
 // list F0x8001270c and its builder 0x8001345C — and the one table of it is
@@ -14,10 +14,8 @@
 // Demo lab screen's Back, which must land on the same list. The translated page
 // is engine/dw3/ui/pause-root-session.ts behind web/status-translated.js.
 //
-// `status` is null only under `?legacyStatus=1`, which is the hand-authored
-// rollback as a whole: with no translated adapter there is no translated list to
-// open, so that route keeps web/menu.js. No production route and no lab route
-// reaches it.
+// `status` is the translated adapter. A null `status` (a caller with no translated
+// adapter) keeps web/menu.js; no production route and no lab route reaches it.
 export function openPauseHome({ state, status, menu, row = 0 }) {
   if (typeof status?.openHome === "function") {
     state.menuOpen = true;
@@ -58,9 +56,8 @@ export function openPauseHome({ state, status, menu, row = 0 }) {
 // `+0x70` is written only by Up (`= 0`) and Down (`= 1`) and confirm turns that
 // into `+0x14 = 1 / 2` (pro/ststatus.s:1616, 1645, 1691-1699) — and Backing out
 // of it returns to the home list on the CARD FOLDERS row. That is what
-// `status.reopenPage` opens. Only under `?legacyStatus=1`, where there is no
-// translated page to reopen, does the copy in web/menu.js answer — one
-// rollback, not a second copy in ordinary play.
+// `status.reopenPage` opens. Only with no translated page to reopen
+// does the copy in web/menu.js answer — not a second copy in ordinary play.
 export function returnToPauseCardFolders({ state, status, menu }) {
   if (typeof status?.reopenPage === "function" && status.reopenPage("cardfolders", 5)) {
     state.menuOpen = true;

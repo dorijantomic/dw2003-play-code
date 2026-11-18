@@ -32,7 +32,6 @@
 import { asButton } from "./input.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
 import { createBattle3D, resolveModelFolder, setFighterTint, clampFighterScale } from "./battle3d.js";
-import { createBattleCommandNative } from "./battlecmd-native.js";
 import { createBattleCommandTranslated, battleAilmentByte } from "./battlecmd-translated.js";
 import { createBattleTechTranslated } from "./battletech-translated.js";
 import { createBattleItemTranslated } from "./battleitem-translated.js";
@@ -41,10 +40,9 @@ import { createBattleFormTranslated } from "./battleform-translated.js";
 import { createBattleDnaTranslated } from "./battledna-translated.js";
 import {
   battleHudBarColors, battleHudDvFrame, battleHudDvPaint, battleHudEnemyRecords,
-  battleHudNameBankSync, battleHudPartyPips, battleHudPlateLabels, battleHudPlayerRecords, translatedBattleHudEnabled,
+  battleHudNameBankSync, battleHudPartyPips, battleHudPlateLabels, battleHudPlayerRecords,
 } from "./battlehud-translated.js";
-import { battleMsgBank, battleMsgBankSync, battleMsgPaint, battleMsgText, translatedBattleMsgEnabled } from "./battlemsg-translated.js";
-import { createWfightNative } from "./wfightmn-native.js";
+import { battleMsgBank, battleMsgBankSync, battleMsgPaint, battleMsgText } from "./battlemsg-translated.js";
 import { createWfightTranslated } from "./wfight-translated.js";
 // NEW content (F2 -> Extras -> "Fusion bosses", off by default): two real species blending
 // into one fighter. Pure rules in web/fusion.js; the authored boss + its new technique are
@@ -164,7 +162,6 @@ import {
   spawnFightTask, spawnPlateHud,
   FIGHT_TASK_ARG_BYTE_OFF, FIGHT_TASK_ARG_WORD_OFF,
   BATTLE_MESSAGE_CLOSE_BIT, BATTLE_MESSAGE_PRESS_SOUND, BattleMessageSession,
-  advanceFrameClock, frameDelta,
   newOpeningState, stepOpeningPhase, openingLineRoll, ambushRoll, introVariantFor,
   OPENING_PHASES, OPENING_PHASE_COUNT, openingPhaseFor,
   FINALE_MSG_BODY, FINALE_MSG_LEARNED, FINALE_HEAD_ATTACK_ID,
@@ -182,8 +179,11 @@ import {
 import { ui, scaledStat, battleStats } from "./vendor/engine.js";
 import { learnOneTechnique, markOneLoadable } from "./form-tech-slots.js";
 import { CHARID_TO_DIGID, baseStatsFor, elementPointsWithGear } from "./party.js";
-import { loadPack, drawClip, drawClipWidth, clipSize, packReady, drawClipAtPaletteRow } from "./screenpack.js";
+import { loadPack, drawClip, clipSize, packReady, drawClipAtPaletteRow } from "./screenpack.js";
 import { drawText as uiDrawText, drawIconGlyph, fontReady as uiFontReady } from "./uifont.js";
+import * as uiC from "./ui-c/index.js";
+import { partHook as uiCPart } from "./ui-c/capture.js";
+import { composeBattle } from "./ui-c/battlehud.js";
 import { drawItemIcon, itemFamily } from "./itemicons.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import {
@@ -309,10 +309,7 @@ export function applyFormLearnPass(record, formProfile) {
 // F0x800a1910 independently rolls whether confirmation becomes Attack or gag.
 // The rows themselves are drawn by the shared pro/fightstg list (the joke owner
 // F0x8009A898 on the joke config 0x800A3634), so this only decides WHAT the rows
-// say and hands the shuffle to it; `?legacyJokeMenu=1` keeps the walker's own
-// hand-drawn list for that case.
-const JOKE_LEGACY = typeof location !== "undefined" &&
-  new URLSearchParams(location.search).has("legacyJokeMenu");
+// say and hands the shuffle to it.
 
 /** The six shuffled joke rows for this decision, built once, or null. */
 export function jokeMenuRows(b) {
@@ -320,9 +317,6 @@ export function jokeMenuRows(b) {
   if (b.confusedMenu?.length !== 6) b.confusedMenu = shuffleJokeMenu(RAND_U16);
   return b.confusedMenu;
 }
-
-/** True when the walker's own list must draw the confused rows. */
-function useLegacyJokeList(b) { return JOKE_LEGACY && !!jokeMenuRows(b); }
 
 export function currentMenuItems(b) {
   const joke = jokeMenuRows(b);
@@ -650,7 +644,7 @@ export const BATTLE_UI_LAYOUT = Object.freeze({
   hpBar: { y: 37, h: 6, enemyRight: 143, playerLeft: 175 },
   // Party status markers: F0x800934f0 draws them at the halfword table 0x800a34c0
   // (271, 282, 293 for the party; 37, 26, 15 for the enemy) and at the literal y
-  // 0x30. The hand-drawn path below keeps its own anchors behind ?legacyBattleHud=1.
+  // 0x30. The hand-drawn fallback path below keeps its own anchors.
   enemyPips: { x: 37, y: 48, count: 1, step: 14 },
   playerPips: { x: 271, y: 48, count: 3, step: 11 },
   // The two HP numbers the original builds with F0x8001AE38(0x1005,3,...) at
@@ -1290,22 +1284,6 @@ export function paidParticipants(b) {
 // story flag. Then result byte 2 alone asks the launcher for 0xE00, the title screen.
 // See docs/research/battle/battle-loss-decoded-2026-10-02.md, whose step 4 left this
 // routine unread; the reads above are from the assembly.
-export const LOSE_EFFECT_FRAMES = 0xf0; // F0x8008c93c phase 2 at >= 0xF0 delta units
-export const LOSE_FADE_TICKS = 10;      // F0x8008a83c(obj, 0, 10)
-
-/**
- * The loss exit at `frames` delta units (1 per frame) after the defeat beat began:
- * how black the screen is, and whether the battle is over. The fade reaches full
- * black two ticks before the exit, so the launch happens out of black rather than
- * out of a half-faded picture.
- */
-export function lossExitFrame(frames) {
-  const f = Math.max(0, Number(frames) || 0);
-  const fade = f < LOSE_EFFECT_FRAMES ? 0
-    : Math.min(1, (Math.floor(f - LOSE_EFFECT_FRAMES) + 1) / LOSE_FADE_TICKS);
-  return { fade, finished: f >= LOSE_EFFECT_FRAMES + LOSE_FADE_TICKS + 2 };
-}
-
 /**
  * The Blast-on landing heal, decoded from wfightmn F0x800a8bf4 (state 2):
  *
@@ -1790,8 +1768,13 @@ export function applyGymEffects(ps, effects, lu) {
 
 export const foldElemBonuses = engineFoldElemBonuses;
 export const effStats = engineEffStats;
-export const resolveAttack = engineResolveAttack;
-export const resolveMultiHit = engineResolveMultiHit;
+// Look only (web/ui-c): the last resolved blow, as a read-only note { seq, kind, hit, dmg, heal, crit, eff } for the damage pop. seq counts blows, so the pop
+// fires once per hit event; nothing here feeds back into a number or the RNG order.
+let hitSeq = 0, hitNote = null;
+const noteHit = (kind, r) => { hitNote = { seq: ++hitSeq, kind, hit: !!r.hit, dmg: r.dmg | 0, heal: r.heal | 0, crit: !!r.crit, eff: Number.isFinite(r.eff) ? r.eff : 1 }; return r; };
+export const lastHitNote = () => hitNote;
+export const resolveAttack = (...a) => noteHit("hit", engineResolveAttack(...a));
+export const resolveMultiHit = (...a) => noteHit("hit", engineResolveMultiHit(...a));
 export const weaponSecondaryProc = engineWeaponSecondaryProc;
 
 export const applyAilment = engineApplyAilment;
@@ -1836,8 +1819,7 @@ export function tryInflict(skill, defender, defenderName, attacker) {
  * byte), and `landed` is whether a blow connected.
  *
  * The result is `{ choice, page }`: `page` is the message spec for the arm, and is null
- * exactly when the original prints nothing. `?legacyBattleMsg=1` never reaches this — it
- * keeps the walker's own hand-drawn sentence for every case it had before.
+ * exactly when the original prints nothing.
  */
 export function chooseResultLine({ record = null, multiHit = false, instantDeath = false,
   landed = true, name = null, damage = 0 }) {
@@ -1877,7 +1859,7 @@ export function attackPageSpec(name) {
 /**
  * The page a landed ailment is put up as, or null when nothing landed.
  *
- * `text` is the walker's own flat sentence for `?legacyBattleMsg=1` and `peek()`;
+ * `text` is the walker's own flat sentence for `peek()`;
  * `spec` is the original's own `unkAC(line, 2, payload)` call — line 1 the afflicted
  * Digimon's name, line 2 the game's one word ("Poisoned!" / "Frozen!" / "Confused!" /
  * "Sleep!", `esmfight` 0x1e..0x21, written by FIGHTSTG_F0x80091534's applier arms).
@@ -2861,7 +2843,7 @@ function applyMpAbsorbDispatch(b, record, options = {}) {
 export { damageTermCategory4Arm as category4ArmFor };
 
 /**
- * The sentence `?legacyBattleMsg=1` and `peek()` still read for a category-5 technique.
+ * The sentence `peek()` still reads for a category-5 technique.
  *
  * It is never what the original's box draws — `plan.page` is, from the record machine's
  * own arms — and it states no number the game never shows. What the arm changed is on
@@ -2912,7 +2894,7 @@ export function chargeWalkerSentence(charge, skill, who) {
 }
 
 /**
- * The sentence `?legacyBattleMsg=1` and `peek()` still read for a category-4 technique.
+ * The sentence `peek()` still reads for a category-4 technique.
  *
  * It is NEVER what the original's own panel draws — `restore.page` is — and it exists so
  * the legacy flag has something honest to say. It FOLLOWS THE PAGE: when the original's
@@ -3195,47 +3177,27 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // Step F: the six-row command list runs the translated pro/fightstg list
   // (web/battlecmd-translated.js, engine FightCommandSession). The walker keeps
   // the 3D scene and the HP plates; the list owns its highlight, marker and
-  // confirm. `?nativeBattleCmd=1` runs the original-code reference instead
-  // (web/battlecmd-native.js); `?legacyBattleCmd=1` is the walker's hand-made
-  // list (also the route under `node --test`, where there is no location).
-  const USE_NATIVE_COMMAND = (() => {
-    if (typeof location === "undefined") return false;
-    return !new URLSearchParams(location.search).has("legacyBattleCmd");
-  })();
+  // confirm.
   // Step F: the HP plate's party markers, bar fill and number row run the
   // translated pro/fightstg routine (engine/dw3/ui/native/battle-hud.ts, painted by
-  // web/battlehud-translated.js). `?legacyBattleHud=1` keeps the hand-drawn plate.
-  const USE_TRANSLATED_HUD = typeof location !== "undefined" &&
-    translatedBattleHudEnabled(location.search);
-  const USE_REFERENCE_COMMAND = (() => {
-    if (typeof location === "undefined") return false;
-    return new URLSearchParams(location.search).get("nativeBattleCmd") === "1";
-  })();
+  // web/battlehud-translated.js).
   // The in-battle message line runs the translated pro/fightstg panel
   // (engine/dw3/ui/native/battle-message-line.ts, painted by
   // web/battlemsg-translated.js): the chrome pack's own window picture at native
   // (11, 188), the two lines at (20, 194) and (20, 208), the second three display
   // ticks after the first, and the blinking prompt at (291, 208) until Circle.
-  // `?legacyBattleMsg=1` keeps the hand-drawn rectangle below.
-  const USE_TRANSLATED_MSG = typeof location !== "undefined" &&
-    translatedBattleMsgEnabled(location.search);
-  const msgSession = USE_TRANSLATED_MSG
-    ? new BattleMessageSession({
-        textOf: battleMsgText, paint: () => {},
-        // The reveal machine's phase-3 press blip: `lui $a0, 0x4` with `ori $a0, 0x1c`
-        // in the `jalr` delay slot (pro/fightstg.s .L0x80098bd4) — SYSTEM07 0x4001C
-        // through [0x80055C48], the same confirm blip the menus play. Every battle
-        // line sounds it on the Circle press that reads it, "Annihilated..." included.
-        playSound: (id) => { if ((id >>> 0) === BATTLE_MESSAGE_PRESS_SOUND) sfx?.play("system07"); },
-      })
-    : null;
+  const msgSession = new BattleMessageSession({
+    textOf: battleMsgText, paint: () => {},
+    // The reveal machine's phase-3 press blip: `lui $a0, 0x4` with `ori $a0, 0x1c`
+    // in the `jalr` delay slot (pro/fightstg.s .L0x80098bd4) — SYSTEM07 0x4001C
+    // through [0x80055C48], the same confirm blip the menus play. Every battle
+    // line sounds it on the Circle press that reads it, "Annihilated..." included.
+    playSound: (id) => { if ((id >>> 0) === BATTLE_MESSAGE_PRESS_SOUND) sfx?.play("system07"); },
+  });
   // The battle's OPENING PHASE MACHINE (engine/dw3/battle-opening-machine.ts), the
   // port of pro/wfightmn's #2 arm (F0x800a6c44): the seven phases whose exit hands
-  // the fight to the turn machinery. `?legacyIntroTimer=1` rolls back to the walker's
-  // old flat 1.2 s INTRO timer for a side-by-side; `?introNoLine=1` forces the
+  // the fight to the turn machinery. `?introNoLine=1` forces the
   // phase-1 opening-line gate to "no line" so the phase-5 EXIT can be observed.
-  const USE_LEGACY_INTRO_TIMER = typeof location !== "undefined"
-    && new URLSearchParams(location.search).has("legacyIntroTimer");
   const FORCE_INTRO_NO_LINE = typeof location !== "undefined"
     && new URLSearchParams(location.search).has("introNoLine");
   // The pad word the session's close rule reads: only bit 0x2000 (Circle) matters.
@@ -3246,36 +3208,23 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // i.e. 256/307 of it = 60.4 Hz, which is the rate the message line's rules are stated
   // in: the second line after 3 ticks, the glyph one frame every 4.
   const msgClock = new ui.MenuDisplayClock();
-  const commandNative = USE_REFERENCE_COMMAND
-    ? createBattleCommandNative(sfx)
-    : createBattleCommandTranslated(sfx, { getState });
+  const commandNative = createBattleCommandTranslated(sfx, { getState });
   // Step F, TECH screen: the six-row technique list runs the translated
   // pro/fightstg screen (web/battletech-translated.js, engine
   // FightTechSession) with its own paging, greyed unaffordable rows, page
   // arrows, description pane and marker highlight.
-  // `?legacyTechList=1` keeps the walker's hand-drawn list.
-  const USE_TRANSLATED_TECH = typeof location === "undefined"
-    ? false
-    : !new URLSearchParams(location.search).has("legacyTechList");
   const techNative = createBattleTechTranslated(sfx, { getState });
   // The ITEM screen: the translated pro/fightstg list owns the surface from the
   // frame the ITEM command is chosen, with the original's seven rows a page,
   // clamped pages, the quantity the player is carrying, page arrows, the
   // description pane and the marker highlight.
-  // `?legacyItemList=1` keeps the walker's hand-drawn list.
-  const USE_TRANSLATED_ITEM = typeof location === "undefined"
-    ? false
-    : !new URLSearchParams(location.search).has("legacyItemList");
   const itemNative = createBattleItemTranslated(sfx, { getState });
   // The TAG partner list: the translated pro/fightstg screen (F0x80097498, built
   // by F0x80097984) owns the surface from the frame the Tag command is chosen.
   // It lists the two partners that are not the acting member, keeps a knocked-out
   // partner listed with a grey plate the cursor cannot confirm, clamps the cursor,
   // answers Cross as a cancel only when the battle may cancel, and returns the
-  // chosen party slot. `?legacyTagList=1` keeps the walker's hand-drawn list.
-  const USE_TRANSLATED_TAG = typeof location === "undefined"
-    ? false
-    : !new URLSearchParams(location.search).has("legacyTagList");
+  // chosen party slot.
   const tagNative = createBattleTagTranslated(sfx, { getState });
   // The Digivolve panel's seven elemental values, in the order the game's own
   // stat ids run (record +0x34.. fire, water, ice, wind, thunder, machine, dark).
@@ -3286,10 +3235,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // form the Digimon is already in). It answers with the species id the original
   // writes into the command screen's parked word, and the battle then runs the
   // walker's own DV commit, so the two routes cannot drift.
-  // `?legacyFormList=1` keeps the walker's hand-drawn list.
-  const USE_TRANSLATED_FORM = typeof location === "undefined"
-    ? false
-    : !new URLSearchParams(location.search).has("legacyFormList");
   const formNative = createBattleFormTranslated(sfx, { getState });
   // What follows a confirmed partner. The original does not swap straight away:
   // both Tag callers allocate the SAME follow-up object -- F0x800988fc at
@@ -3311,29 +3256,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // the Tag follow-up alike: with a DNA pairing it shows the result-species
   // strip plus "Switch" and "DNA DV" with the Jogress price, and without one the
   // "Switch" row on its own.
-  // `?legacyDnaList=1` keeps the walker's own Switch / DNA DV pane for the DNA
-  // command.
-  const USE_TRANSLATED_DNA = typeof location === "undefined"
-    ? false
-    : !new URLSearchParams(location.search).has("legacyDnaList");
   const dnaNative = createBattleDnaTranslated(sfx, { getState });
   // Step G: pro/wfightmn's boot loader (it asks the cache for the scene packs,
   // uploads them to VRAM and retires) runs as the translated loader task
   // (web/wfight-translated.js, engine WfightLoaderSession). The walker keeps the
-  // turn loop, the 3D scene and the HUD. `?nativeWfight=1` runs the original-code
-  // loader instead (web/wfightmn-native.js), a research reference;
-  // `?legacyWfight=1` skips the boot loader.
-  const USE_NATIVE_WFIGHT = (() => {
-    if (typeof location === "undefined") return false;
-    return !new URLSearchParams(location.search).has("legacyWfight");
-  })();
-  const USE_REFERENCE_WFIGHT = (() => {
-    if (typeof location === "undefined") return false;
-    return new URLSearchParams(location.search).get("nativeWfight") === "1";
-  })();
-  const wfightNative = USE_REFERENCE_WFIGHT
-    ? createWfightNative()
-    : createWfightTranslated({ getState });
+  // turn loop, the 3D scene and the HUD.
+  const wfightNative = createWfightTranslated({ getState });
   // Production hand-off for the post-fight results screen (Phase 6.3). When a
   // host sets it, the victory "report" phase opens the native pro/stfgtrep
   // screen instead of drawing the inline report; the screen pays the BIT and
@@ -3419,7 +3347,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // between 5 canned shots) plays while picking a command — the states we captured live.
   // Actions are framed over-the-shoulder ("behind") with op5 script cuts overriding them;
   // intro uses "behind". WIN keeps the older orbit sweep. LOSE plays the original's own
-  // defeat camera (FIGHTSTG_F0x8008c93c) — ?legacyLossCam=1 keeps the older sweep.
+  // defeat camera (FIGHTSTG_F0x8008c93c).
   const DIRECTOR_STATES = new Set([
     ST.PLAYER_MENU, ST.PLAYER_TECH, ST.PLAYER_ITEM,
     ST.PLAYER_TAG, ST.PLAYER_DV, ST.PLAYER_DNA_CHOICE,
@@ -3434,19 +3362,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   // answers the script's ownership directly. Nothing here clears the record; the owner replaces
   // it. The `SCRIPT_OWNED_CAMERA_STATES` freeze list was removed 2026-10-08 (worker-bc) because
   // the retire makes it unnecessary; see `.dw3-research/camera-retire-implement-2026-10-08/`.
-  const LEGACY_LOSS_CAM = new URLSearchParams(location.search).get("legacyLossCam") === "1";
-  // ?legacyLossPose=1 drops the loss beat's slow motion (and leaves the animation clock at
-  // the normal speed), so a reviewer can see the old picture beside the original's. The
-  // original arms `[0x800a4548](2)` in the defeat effect's FIRST tick (F0x8008c93c
-  // .L0x8008ca48), which is the same frame the camera cuts.
-  const LEGACY_LOSS_POSE = new URLSearchParams(location.search).get("legacyLossPose") === "1";
-  // ?legacyLoss=1 keeps the whole hand-written loss beat below (LOSE_EFFECT_FRAMES /
-  // lossExitFrame and the slow-motion arm in update()). The port replaces all of it with
-  // the original's own objects, so the two smaller flags above only mean anything on this
-  // path.
-  const USE_LEGACY_LOSS = new URLSearchParams(location.search).get("legacyLoss") === "1";
-  /** The camera the loss beat shows: the original's close shot, or the older sweep. */
-  const lossCameraMode = () => (LEGACY_LOSS_CAM ? "orbit" : "defeat");
+  /** The camera the loss beat shows: the original's close shot. */
+  const lossCameraMode = () => "defeat";
   /**
    * The walker's own wording for a battle-message bank index, used only as the panel's
    * identity key and when the bank has not loaded yet; the panel's words come from the
@@ -4376,12 +4293,12 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // Phase 6.3 group 4: start fetching pro/fightstg now so the intro covers the
     // overlay's one-time load and the command list is up on the first frame the
     // player can act, and run the original battle boot pipeline (pro/wfightmn).
-    if (USE_NATIVE_COMMAND) commandNative.preload();
-    if (USE_TRANSLATED_TECH) techNative.preload();
-    if (USE_TRANSLATED_TAG) tagNative.preload();
-    if (USE_TRANSLATED_FORM) formNative.preload();
-    if (USE_TRANSLATED_DNA) dnaNative.preload();
-    if (USE_NATIVE_WFIGHT) wfightNative.open();
+    commandNative.preload();
+    techNative.preload();
+    tagNative.preload();
+    formNative.preload();
+    dnaNative.preload();
+    wfightNative.open();
     const state      = getState();
     const playerProf = getPlayerProfile(state);
     if (!playerProf) return;
@@ -4492,15 +4409,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // reads — without it a battle that never changed form would bank no DVEXP
     // (stfgtrep.s state 0x14 arm, file 0x12C0, reads byte 7 + formIndex).
     markFormTaken(battle, 0, initialPlayer.profile.id);
-    // ?legacyIntroTimer=1 keeps the walker's old behaviour verbatim: the "Ambush!" line
-    // is armed at creation and a flat 1.2 s timer hands the menu the turn. The default
-    // route runs the ported seven-phase machine instead.
-    if (USE_LEGACY_INTRO_TIMER) {
-      battle.message = "Ambush!";
-      battle._msgSpec = { kind: MSG_KIND.ONE_LINE, payload: [MSG.AMBUSH] };
-      battle._msgSpecFor = "Ambush!";
-      battle._introLineArmed = true;
-    }
     renderer3d?.setFaceCamVisible?.(true);
     // Both sides reach the SAME pool and name themselves in the original's own terms, so
     // `applyAilment` can queue a recovery without knowing which battle it is in. The side
@@ -5213,7 +5121,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * two line objects do (each handler returns while its line slot is occupied,
    * `lw $v0, ($s3); bnez $v0, ...` throughout 0x8008dcd8-0x8008ede8).
    *
-   * `walker` is what `?legacyBattleMsg=1` and `peek()` still see; it is the old sentence
+   * `walker` is what `peek()` still sees; it is the old sentence
    * and it is never what the original's own panel draws.
    */
   function showItemPage(b, prefix, walker, pages) {
@@ -5503,21 +5411,17 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * here instead of once per browser frame -- at 60 Hz one browser frame in six is too
    * short to be a field, and a loss beat counted on browser frames would run at the
    * display's speed rather than the original's. With the panel rolled back
-   * (?legacyBattleMsg=1) nothing else advances the clock, so this does it.
    */
   function advanceDisplayFrames(dt) {
-    if (msgSession) return msgClock.advance(dt);
-    advanceFrameClock();
-    return [{ tick: 0, delta: frameDelta() }];
+    return msgClock.advance(dt);
   }
 
   function tickBattleMessage(b, dt) {
     const frames = advanceDisplayFrames(dt);
     b._displayFrames = frames;
-    if (!msgSession) return;
     // While the opening machine has not yet armed the line (its phases 0..4) there is no
     // battle line to show. Suppress the open here so no empty box appears before the
-    // original's phase 5 makes its window; `?legacyIntroTimer=1` arms at creation.
+    // original's phase 5 makes its window.
     if (b.state === ST.INTRO && !b._introLineArmed) return;
     for (const frame of frames) {
       msgSession.tick(frame.tick, msgPadWords);
@@ -5563,8 +5467,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   /**
    * Put up a battle line the original's own call site would put up.
    *
-   * `walker` stays in `b.message` so `?legacyBattleMsg=1` still draws the old
-   * hand-drawn rectangle with the walker's own sentence, and so `peek()` still
+   * `walker` stays in `b.message` so `peek()` still
    * reports what the battle is saying; `spec` is the original's `unkAC(task, kind,
    * payload)` call, which the translated panel turns into the game's two lines:
    * the acting Digimon's name and what the bank says happened.
@@ -5641,10 +5544,9 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       playSound: (id) => { if ((id >>> 0) === 0x60040008) bgm?.play("gameover"); },
       armDefeatEffect: () => { renderer3d?.setCameraMode?.(lossCameraMode()); return 0; },
       turnDefeatCamera: () => {},
-      // ?legacyLossPose=1 is the reviewer's switch for the loss beat's animation
-      // speed, so it still answers here: the port owns the level's arming and
-      // lowering, the renderer draws the quarter-speed result.
-      slowMotion: LEGACY_LOSS_POSE ? () => {} : (level) => renderer3d?.setSlowMotion?.(level),
+      // The port owns the level's arming and lowering, the renderer draws the
+      // quarter-speed result.
+      slowMotion: (level) => renderer3d?.setSlowMotion?.(level),
     }, { onLaunch: (code) => { b._lossLaunch = code >>> 0; } });
     session.begin();
     b._lossSession = session;
@@ -5661,7 +5563,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   function enterLossState(b) {
     b.state = ST.LOSE;
     b._lossSession = null;
-    if (!USE_LEGACY_LOSS) startLossSession(b);
+    startLossSession(b);
   }
 
   /**
@@ -5847,16 +5749,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
    * The opening machine's per-frame step. Returns nothing; when the machine EXITs
    * (top state -> 1) the walker enters its command menu, which is the hand-off the
    * original makes to the already-ported secondary sequencer F0x800a9cb4.
-   *
-   * `?legacyIntroTimer=1` runs the walker's former flat timer instead.
    */
   function stepBattleOpening(b, dt) {
-    if (USE_LEGACY_INTRO_TIMER) {
-      b.timer += dt;
-      if (commandPhaseWaitsForLine(msgSession, b.state)) return;
-      if (b.timer > 1.2) { b.state = ST.PLAYER_MENU; b.menuSel = 0; }
-      return;
-    }
     stepOpeningPhase(b._opening, openingPorts(b));
     b.timer += dt;
     if (b._opening.exited) {
@@ -5973,11 +5867,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // pointer. Nothing on the loss path lowers the level again -- F0x8008c93c's phase 3
     // would, but no writer of phase 3 was found -- so it stays at 2 until the scene goes.
     // The ported loss arms the level from the defeat effect's own first tick (the
-    // session's slowMotion port), so this arm belongs to the ?legacyLoss=1 beat only.
-    if (USE_LEGACY_LOSS && b.state === ST.LOSE && !LEGACY_LOSS_POSE && !b._loseSlowMoArmed) {
-      b._loseSlowMoArmed = true;
-      renderer3d?.setSlowMotion?.(2);
-    }
+    // session's slowMotion port).
     // The close-up face box is one object of the HUD, not a flag: it is up while this
     // side's command menu is up and down from the moment a battle message line is up
     // (engine/dw3/ui/native/battle-face-box.ts; the rule and the five-frame capture in
@@ -6010,7 +5900,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // The battle's OPENING PHASE MACHINE (port of pro/wfightmn's #2 arm). It replaces
       // the walker's flat 1.2 s timer: the seven phases run one per frame and the exit
       // (top state 1) hands the fight to the command menu — the original's hand-off to
-      // the secondary sequencer F0x800a9cb4. `?legacyIntroTimer=1` keeps the old timer.
+      // the secondary sequencer F0x800a9cb4.
       stepBattleOpening(b, dt);
       return;
     }
@@ -6026,7 +5916,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The TECH screen: the translated pro/fightstg list owns the surface from
     // the frame the TECH command is chosen, and update() hands the chosen
     // technique id back on the frame the player confirms (-2 is a cancel).
-    if (b.state === ST.PLAYER_TECH && USE_TRANSLATED_TECH && !techNative.failed()) {
+    if (b.state === ST.PLAYER_TECH && !techNative.failed()) {
       if (!techNative.isOpen()) techNative.open(techListSeed(b));
       const chosen = techNative.update(getState()?.keys, dt);
       if (chosen !== null && chosen !== undefined) {
@@ -6045,7 +5935,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // comes back on the frame the player confirms (-2 is a cancel), and the
     // battle then runs the very same confirm path the Circle press takes, so the
     // native and legacy routes cannot drift.
-    if (b.state === ST.PLAYER_ITEM && USE_TRANSLATED_ITEM && !itemNative.failed()) {
+    if (b.state === ST.PLAYER_ITEM && !itemNative.failed()) {
       if (!itemNative.isOpen()) itemNative.open(itemListSeed(b));
       const chosen = itemNative.update(getState()?.keys, dt);
       if (chosen !== null && chosen !== undefined) {
@@ -6063,7 +5953,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The TAG partner list: the translated pro/fightstg screen owns the surface
     // from the frame the Tag command is chosen, and update() hands the chosen
     // party slot back on the frame the player confirms (-2 is a cancel).
-    if (b.state === ST.PLAYER_TAG && USE_TRANSLATED_TAG && !tagNative.failed()) {
+    if (b.state === ST.PLAYER_TAG && !tagNative.failed()) {
       if (!tagNative.isOpen()) tagNative.open(tagListSeed(b));
       const chosen = tagNative.update(getState()?.keys, dt);
       if (chosen !== null && chosen !== undefined) {
@@ -6089,7 +5979,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The Digivolve form list: the translated pro/fightstg screen owns the surface
     // from the frame the DV command is chosen. update() hands back the chosen
     // species id on the frame the player confirms, and -2 on a cancel.
-    if (b.state === ST.PLAYER_DV && USE_TRANSLATED_FORM && !formNative.failed()) {
+    if (b.state === ST.PLAYER_DV && !formNative.failed()) {
       if (!formNative.isOpen()) formNative.open(formListSeed(b));
       const species = formNative.update(getState()?.keys, dt);
       if (species !== null && species !== undefined) {
@@ -6110,7 +6000,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // high nibble. Cross on the names writes -2; both phase routes restart
     // their partner picker on that word (fightstg.s:16314-16316).
     if (b.state === ST.PLAYER_DNA_CHOICE
-        && USE_TRANSLATED_DNA && !dnaNative.failed() && !b._dnaBranchBlocked) {
+        && !dnaNative.failed() && !b._dnaBranchBlocked) {
       if (!dnaNative.isOpen()) dnaNative.open(dnaPaneSeed(b));
       const answer = dnaNative.update(getState()?.keys, dt);
       if (answer !== null && answer !== undefined) {
@@ -6144,8 +6034,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         b.timer = 0;
         return;
       }
-      if (USE_NATIVE_COMMAND && !commandNative.failed() && !wfightNative.isOpen()
-          && !useLegacyJokeList(b)) {
+      if (!commandNative.failed() && !wfightNative.isOpen()) {
         // Null unless the acting Digimon is confused, and then the six joke rows
         // this decision is drawn from (shuffled once, as the original's owner does).
         const joke = jokeMenuRows(b);
@@ -6413,21 +6302,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }
 
     if (b.state === ST.LOSE) {
-      if (USE_LEGACY_LOSS) {
-        // GAMEOVER 0x60040008 = music-start: COMMON SEP sequence 8, a sequenced
-        // jingle (build_music.py renders it as gameover.ogg) -- not a sample.
-        if (b.timer === 0 && bgm) bgm.play("gameover"); // endBattle restores the field track
-        b.timer += dt;
-        // wfightmn loss branch (0x800a9230): the defeat effect F0x8008c93c runs for
-        // 0xF0 delta units (1 per frame), then the mode-2 tick 0x800a7c00 starts the
-        // fade object F0x8008aaac: a full-screen grey quad, subtractive (ABR 2), its
-        // level rising 0 -> 0xFF00 in 10 ticks and then held. The 0xE00 (title)
-        // request follows on the next state. No button is read on this path.
-        const { fade, finished } = lossExitFrame(b.timer * 60);
-        b._loseFade = fade;
-        if (finished) endBattle("lose");
-        return;
-      }
       // The translated sequence, one tick per displayed frame: the exit F0x800a7c00,
       // the defeat effect F0x8008c93c and the fade F0x8008aa08 are the original's own
       // objects, in the session's memory, and the delta they count is the shared frame
@@ -7101,8 +6975,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     if (action.type === "confused") {
       // The joke gag is the battle message box's own two lines (F0x8009a734,
       // fightstg.s:24505-24595): the Digimon's name, then the phrase off 0x800a35e4. The
-      // walker's sentence stays in `b.message` only so `?legacyBattleMsg=1` and `peek()`
-      // still have something to say.
+      // walker's sentence stays in `b.message` only so `peek()`
+      // still has something to say.
       sayOriginal(b, jokeGagMessageSpec(pname, action.jokeIndex ?? 0, action.flavorBit ?? 0),
         prefix + `${pname} is confused! ${action.flavor}`);
     } else if (action.type === "tag") {
@@ -7205,7 +7079,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
             // right (kinds 18 and 17), not fragments of the damage sentence: the
             // original's weapon machine builds each line object and asks the panel
             // separately (FIGHTSTG_F0x80091534, fightstg.s:15005 / :15055). The walker
-            // keeps the flat sentence above for ?legacyBattleMsg=1 and for peek().
+            // keeps the flat sentence above for peek().
             weapon.page ? { text: weapon.text, spec: weapon.page } : null,
             stolen.page ? { text: stolen.text, spec: stolen.page } : null,
             lethal || b.enemy.hp <= 0 ? { text: `${enemyName} has been defeated!`,
@@ -7917,7 +7791,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // player's own basic technique: `s3 == 1` (side 0 and the technique id equals the
     // profile's basic id, 0x8009ff6c-0x8009ffb0), so the physical tail runs on base = the
     // damage taken, unscaled, with the Multi Crest byte held off (0x800a0044-0x800a0070).
-    const r = engineResolveCounterBlow(defender, attacker, counterSkill, damage, 0, RAND_U16, b.field, true);
+    const r = noteHit("counter", engineResolveCounterBlow(defender, attacker, counterSkill, damage, 0, RAND_U16, b.field, true));
     queueCounter(b, "player", { dmg: r.hit ? r.dmg : 0, hit: !!r.hit, techId: defender.profile?.tech_basic });
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
     return ` ${defenderName} countered for ${r.dmg} damage!`;
@@ -7977,8 +7851,8 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       : base;
     // F0x8009ff40 (fightstg.s:30399-30520): the blow's base is the damage just taken times the countering
     // record's own f9 (+0x0c) / 64, or / 32 while the countering fighter's charge byte +0x1b (Aura Plug) is on.
-    const r = engineResolveCounterBlow(defender, attacker, skill, damage,
-      fightTechDB?.[String(skillId)]?.crit | 0, RAND_U16, b.field);
+    const r = noteHit("counter", engineResolveCounterBlow(defender, attacker, skill, damage,
+      fightTechDB?.[String(skillId)]?.crit | 0, RAND_U16, b.field));
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
     attacker.hp = Math.max(0, attacker.hp - r.dmg);
     return ` ${defenderName} countered for ${r.dmg} damage!`;
@@ -8257,7 +8131,15 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       unlocked.push({ name: acquiredProf.name, slotFull, id: acquiredProf.id });
     }
 
+    // read-only look data for the victory rings (web/ui-c): how far through its level the EXP stood before and stands after
+    const levelFrac = (xp, lv) => {
+      if (!lu) return 0;
+      const g = growthProfile.growth_xp ?? 8, lo = lv <= 1 ? 0 : levelUpThreshold(g, lv, lu), hi = levelUpThreshold(g, lv + 1, lu);
+      return Number.isFinite(hi) && hi > lo ? Math.max(0, Math.min(1, (xp - lo) / (hi - lo))) : 1;
+    };
+    const ringA = levelFrac(oldXp, oldLevel), ringB = levelUp ? 1 : levelFrac(newXp, newLevel);
     return {
+      ringA, ringB,
       xp: reward.xp, oldXp, oldLevel, newLevel, levelUp, availableEvos,
       before, formId: prof.id,
       name: b.playerRoster[rosterIndex]?.name ?? prof?.name ?? "",
@@ -8411,7 +8293,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The item action's own first page is the announcement the disc shows (kind 14,
     // `FIGHTSTG_F0x8008dac0` outer step 0, `fightstg.s:11161`): the Digimon's name and
     // the item's own name out of bank 0x6a. The old sentence stays only as what
-    // `?legacyBattleMsg=1` and `peek()` read.
+    // `peek()` read.
     sayOriginal(b, itemAnnouncementSpec(b, item), `Used ${item.name}!`);
   }
 
@@ -8825,7 +8707,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // it answers -2, so the walker's hp>0 list must not pre-empt the pane: two
       // dead partners must still show grey rows, and only a one-Digimon party
       // must reach the pane.
-      if (!(USE_TRANSLATED_TAG && !tagNative.failed())) {
+      if (tagNative.failed()) {
         if (!tagMembers().length) { b.menuNotice = "No partner to tag."; return; }
       }
       b.state = ST.PLAYER_TAG;
@@ -8983,7 +8865,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // the original's controller instruction returns before it arms anything while the
       // line's own slot is occupied, so there is no menu to press and the press belongs to
       // the line alone (commandPhaseWaitsForLine, `wfightmn.s:1494-1496`). This covers the
-      // translated list and the walker's own (`?legacyBattleCmd=1`) equally.
+      // translated list and the walker's own fallback list equally.
       if (commandPhaseWaitsForLine(msgSession, b.state)) return true;
       // The Frozen gate owns the turn before the list exists, so a press on this frame
       // reaches nothing at all (F0x800a7418 step 1, `wfightmn.s:1503-1512`). The roll
@@ -8996,7 +8878,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // never moves underneath it. update() turns the overlay's chosen row into
       // the same confirmCommand() call the Circle press below makes. If the
       // overlay never loads (10s), the walker's list takes over again.
-      if (USE_NATIVE_COMMAND && !commandNative.failed() && !useLegacyJokeList(b)) {
+      if (!commandNative.failed()) {
         commandNative.press(k);
         return true;
       }
@@ -9022,7 +8904,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const techs = playerTechs();
       // The translated list reads the pad itself (the same single-press edge
       // the command list uses), so the walker's own cursor never moves under it.
-      if (USE_TRANSLATED_TECH && !techNative.failed()) { techNative.press(k); return true; }
+      if (!techNative.failed()) { techNative.press(k); return true; }
       // An empty list (a form with no learned technique halfwords) is a real state the
       // disc opens and leaves the player to cancel: `FIGHTSTG_F0x800967A0` builds the
       // widget at `:20577`-`:20591` and arms it with nothing to pick, and only Cross
@@ -9054,7 +8936,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // The translated list reads the pad itself (the same single-press edge
       // the command and TECH lists use), so the walker's own cursor never moves
       // under it.
-      if (USE_TRANSLATED_ITEM && !itemNative.failed()) { itemNative.press(k); return true; }
+      if (!itemNative.failed()) { itemNative.press(k); return true; }
       if (k === "up")   { sfx?.play("system06"); b.itemSel = (b.itemSel - 1 + items.length) % items.length; return true; }
       if (k === "down") { sfx?.play("system06"); b.itemSel = (b.itemSel + 1) % items.length; return true; }
       if (k === "circle") {
@@ -9067,7 +8949,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         // `FIGHTSTG_F0x8008dac0` outer step 0, `fightstg.s:11161`): the acting Digimon's
         // name on line one and the item's own name out of bank 0x6a on line two, so the
         // player presses Circle before the effect runs. The old typed sentence stays
-        // only as what `?legacyBattleMsg=1` and `peek()` read.
+        // only as what `peek()` read.
         sayOriginal(b, itemAnnouncementSpec(b, item), `Used ${item.name}!`);
         return true;
       }
@@ -9078,7 +8960,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       // The shipped pro/fightstg list owns the whole TAG phase, exactly as it
       // does the command phase: the key is swallowed here and forwarded as a pad
       // pulse, so the walker's own wrapping cursor never moves underneath it.
-      if (USE_TRANSLATED_TAG && !tagNative.failed()) {
+      if (!tagNative.failed()) {
         tagNative.press(k);
         return true;
       }
@@ -9103,7 +8985,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The Digivolve list reads the pad itself (the same single-press edge the TECH
     // list uses), so the walker's own cursor never moves under it. The post-Tag
     // form list is a different original screen and keeps the walker's drawing.
-    if (b.state === ST.PLAYER_DV && USE_TRANSLATED_FORM && !formNative.failed()) {
+    if (b.state === ST.PLAYER_DV && !formNative.failed()) {
       formNative.press(k);
       return true;
     }
@@ -9138,7 +9020,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }
     }
 
-    if (b.state === ST.PLAYER_DNA_CHOICE && USE_TRANSLATED_DNA && !dnaNative.failed()) {
+    if (b.state === ST.PLAYER_DNA_CHOICE && !dnaNative.failed()) {
       // The translated pane reads the pad itself (the same single-press edge the
       // command, TECH, ITEM and TAG lists use), so the walker's own row toggle
       // never moves under it.
@@ -9306,12 +9188,16 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   }
 
   function paintHpBar(x, y, w, h, cur, max, side = 0) {
+    // Look C (web/ui-c/battlehud.js): the bar is a C part -- its length against the full length, and the game's own two colours.
+    const sideName = side ? "enemy" : "player";
+    if (uiCPart(ctx, { part: "hpBar", side: sideName, x, y, w: Math.max(0, w), h, full: hpBarFillRect(sideName, max, max).w,
+      colors: battleHudBarColors(cur, max, side) })) return;
     if (w <= 0) return;
     // The original's bar is one untextured POLY_G4 whose four vertex colours ramp
     // ACROSS the bar (word 0 on vertices 0 and 2, word 1 on 1 and 3), so the
     // gradient runs left to right — the enemy's quad lists vertex 0 on the right,
     // which battleHudBarColors already accounts for.
-    const [left, right] = USE_TRANSLATED_HUD ? battleHudBarColors(cur, max, side) : hpBarColors(cur, max);
+    const [left, right] = battleHudBarColors(cur, max, side);
     const grad = ctx.createLinearGradient(x, y, x + w, y);
     grad.addColorStop(0, left);
     grad.addColorStop(1, right);
@@ -9374,10 +9260,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // The translated marker loop draws the members the original would draw, at the
     // original's own x table and y, and picks the cel from the member's own state.
     const hudTeam = enemyTeamActive(b) ? enemyTeamRecords(b) : null;
-    const translatedPips = USE_TRANSLATED_HUD ? battleHudPartyPips(
+    const translatedPips = battleHudPartyPips(
       battleHudPlayerRecords(b), battleHudEnemyRecords(b, hudTeam),
       { activePlayerIndex: b.activePlayerIndex ?? 0, activeEnemyIndex: hudTeam ? (b.partyIndex ?? 0) : 0,
-        mode: battleKindOf(b) }) : null;
+        mode: battleKindOf(b) });
     const pipReady = packReady(pgfgc00);
     const drawPip = (cel, x, y) => {
       if (pipReady && cel != null) { hudClip(cel, x, y); return; }
@@ -9403,18 +9289,14 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }
     }
     // The gauge's own frames are the chrome pack's cels 0x1e and 0x0b, which the
-    // translated gauge block draws itself (see the DV block below). Only the
-    // hand-drawn plate behind ?legacyBattleHud=1 keeps the stand-in frame.
-    if (originalChrome && !USE_TRANSLATED_HUD) {
-      drawChrome("hpFrameAlt", L.dv.x, L.dv.y, L.dv.w, L.dv.h);
-    }
+    // translated gauge block draws itself (see the DV block below).
 
     // FIGHTSTG_F0x80093364 (through the ported plate build) draws the enemy's name at
     // (17, 21) and the player's at (174, 21) as kind 1 elements, and the build arm's
     // third element is the slash between the two HP numbers. The player's name is the
     // active roster member's own stored name, so it follows a rename and survives the
     // digivolved form the 3D actor is showing.
-    const plateLabels = USE_TRANSLATED_HUD ? battleHudPlateLabelsFor(b) : null;
+    const plateLabels = battleHudPlateLabelsFor(b);
     if (plateLabels) {
       nativeText(plateLabels.enemy.text, plateLabels.enemy.x, plateLabels.enemy.y,
         { kind: plateLabels.enemy.kind });
@@ -9436,7 +9318,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const tell = nearestTell(b.enemy.eStats?.ai_moves, b.enemy.turnCounter ?? 0);
       if (tell) nativeText(tellText(tell), enemy.nameX, enemy.y + enemy.h + 2, { kind: 1 });
     }
-    if (USE_TRANSLATED_HUD) {
+    {
       // F0x800935cc / F0x80093628: two number elements at (0x10b, 0x1a) and
       // (0x12e, 0x1a), the eased HP the bar is showing and the roster maximum.
       // The elements are right-anchored on their own x: the shown HP ends at 0x10b
@@ -9456,13 +9338,32 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       }
       nativeText(String(b.player.maxHp), L.hpNumbers.maxX, L.hpNumbers.maxY,
         { kind: 3, alignRight: true });
-    } else {
-      nativeText(`${b.player.hp}/${b.player.maxHp}`, player.hpRight, player.nameY, {
-        kind: 3, alignRight: true,
-      });
     }
     const eDisp = b._hpPlate ? hpPlateShown(b._hpPlate, 1) : b.enemy.hp;
     const pDisp = pDispShown(b);
+    // Look C (web/ui-c/battlehud.js): the numbers the player's rings show, as ONE read-only part (nothing outside a capture). The HP is the
+    // value the game's own plate is easing (the bar and the number read the same word); MP, the DV gauge and the other partners are read raw.
+    if (uiC.capturing()) {
+      const act = b.activePlayerIndex ?? 0;
+      const roster = b.playerRoster ?? [];
+      const nameOf = (i) => roster[i]?.name ?? b.playerRecords?.[i]?.profile?.name ?? "";
+      const others = [];
+      (b.playerRecords ?? []).slice(0, 3).forEach((rec, i) => {
+        if (i !== act && rec) others.push({ name: nameOf(i), hp: rec.hp, maxHp: rec.maxHp, mp: rec.mp, maxMp: rec.maxMp });
+      });
+      uiCPart(ctx, { part: "battleData", x: 0, y: 0, w: 0, h: 0,
+        name: plateLabels?.player?.text || nameOf(act) || (b.player.profile?.name ?? ""), level: b.player.level ?? 1,
+        hp: pDisp, maxHp: b.player.maxHp, mp: b.player.mp, maxMp: b.player.maxMp,
+        gauge: normalizeDvGauge(b.player.gauge), maxGauge: DV_GAUGE_MAX, others,
+        // read-only looks for the arc lists, the enemy callout and the who-acts marker (nothing here feeds back into the game)
+        hpReal: b.player.hp, eHpReal: b.enemy.hp, hitNote, pFirst: b.playerFirst !== false, eScr: renderer3d?.getEnemyScreen?.() ?? null, face: renderer3d?.getFaceBoxShown ? !!renderer3d.getFaceBoxShown() : true,
+        st: b.state, enemy: { name: plateLabels?.enemy?.text || b.enemy.displayName || b.enemy.profile?.name || "", level: b.enemy.level ?? 1, hp: eDisp, maxHp: b.enemy.maxHp },
+        ...(b.state === ST.PLAYER_TECH ? (() => {
+          const ts = playerTechs(), top = visibleList(ts, b.techSel).top, mpDown = b.player.mpCostDown ?? 0;
+          return { techTop: top, techs: ts.map((sk) => ({ name: sk.name, element: sk.element ?? "", cost: techniqueMpCost(sk.mp_cost ?? 20, sk.techWord ?? 0, { mpCostDown: mpDown }) })), free: !!b.blast?.active };
+        })() : {}),
+        ...(b.state === ST.PLAYER_ITEM ? (() => { const its = usableItems(); return { itemTop: visibleList(its, b.itemSel).top, items: its.map((it) => ({ name: it.name, qty: it.qty ?? 0 })) }; })() : {}) });
+    }
     if (plates) {
       const eBar = hpBarFillRect("enemy", eDisp, b.enemy.maxHp);
       const pBar = hpBarFillRect("player", pDisp, b.player.maxHp);
@@ -9491,8 +9392,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // 0x37+phase at full) at (265,62), then the inner frame cel 0x0b over the fill.
     // The phase is (tick >> 2) & 3, so it steps once every four frames.
     const dv = L.dv;
-    const dvFrame = (Math.trunc((b._hudClock || 0) * HUD_CLOCK_HZ) >> 2) & 3;
-    if (USE_TRANSLATED_HUD) {
+    {
       const frame = battleHudDvFrame({
         gauge: b.player.gauge, tick: Math.trunc((b._hudClock || 0) * HUD_CLOCK_HZ),
         slot: b.activePlayerIndex ?? 0,
@@ -9508,32 +9408,6 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
           : ["#ffb52c", "#ffa018", "#ffb52c", "#e09a20"];
         ctx.fillStyle = dvFills[frame.phase];
         ctx.fillRect(dv.x + 3, dv.y + 3, Math.round((dv.w - 6) * level / 10), Math.max(1, dv.h - 6));
-      }
-    } else {
-      const dvLevel = dvGaugeLength(b.player.gauge);
-      if (!originalChrome) {
-        ctx.fillStyle = "#d5d5d5";
-        ctx.fillRect(dv.x, dv.y, dv.w, dv.h);
-        ctx.fillStyle = "#05060a";
-        ctx.fillRect(dv.x + 2, dv.y + 2, dv.w - 4, dv.h - 4);
-      } else {
-        ctx.fillStyle = "#05060a";
-        ctx.fillRect(dv.x + 3, dv.y + 3, dv.w - 6, Math.max(1, dv.h - 6));
-      }
-      // Filling uses sprite set 0x33+(t>>2)&3; full (1000) uses 0x37+(t>>2)&3.
-      const gaugeCel = dvGaugeCel(b.player.gauge, dvFrame);
-      hudCels.push({ cel: gaugeCel, x: DV_GAUGE_ANCHOR.x, y: DV_GAUGE_ANCHOR.y,
-                     known: HUD_CELS_DECODED.has(gaugeCel),
-                     size: clipSize(pgfgc00, String(gaugeCel)) });
-      const gaugeDrawn = packReady(pgfgc00) && drawClipWidth(
-        ctx, pgfgc00, String(dvGaugeCel(b.player.gauge, dvFrame)),
-        DV_GAUGE_ANCHOR.x, DV_GAUGE_ANCHOR.y, dvGaugeWidth(b.player.gauge));
-      if (!gaugeDrawn) {
-        const dvFills = dvLevel >= 10
-          ? ["#ffd56a", "#ffe08a", "#ffc83c", "#ffb52c"]
-          : ["#ffb52c", "#ffa018", "#ffb52c", "#e09a20"];
-        ctx.fillStyle = dvFills[dvFrame];
-        ctx.fillRect(dv.x + 3, dv.y + 3, Math.round((dv.w - 6) * dvLevel / 10), Math.max(1, dv.h - 6));
       }
     }
 
@@ -9570,7 +9444,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
   /** The "No techs!" / "Cannot digivolve." notice over whichever list is up. */
   function drawMenuNotice(b) {
     if (!b.menuNotice) return;
-    drawNativePanel(118, 194, 186, 25, "rgba(0,4,45,0.94)");
+    if (!uiCPart(ctx, { part: "notice", x: 118, y: 194, w: 186, h: 25 })) drawNativePanel(118, 194, 186, 25, "rgba(0,4,45,0.94)");
     nativeText(b.menuNotice, 125, 201, { kind: 1 });
   }
 
@@ -9585,6 +9459,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
         const k = selected ? ((Math.trunc((b._hudClock || 0) * 50) >> 2) % 5) : 0;
         const rowId = k === 0 ? "34" : `34#${k}`;
         drawClip(ctx, pgfgc00, rowId, C.iconX, y);
+        if (selected) uiCPart(ctx, { part: "focus", x: C.iconX + 1, y: y + 1, w: 12, h: 12 });   // look C: the focused row
         nativeText(items[i], C.boxX, y, { kind: 1 });
       } else if (chromeReady()) {
         drawChrome("commandIcon", C.iconX, y);
@@ -9669,7 +9544,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const skill = techs[index];
       drawListSelector(L.iconX, y, index === b.techSel);
       if (!skill) continue;
-      drawIconGlyph(ctx, skill.element ?? "thunder", L.glyphX, y, 1);
+      if (!uiC.capturing()) drawIconGlyph(ctx, skill.element ?? "thunder", L.glyphX, y, 1);
       nativeText(skill.name, L.labelX, y, { kind: 1 });
     }
     const selected = techs[b.techSel];
@@ -9699,7 +9574,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       const item = items[index];
       drawListSelector(L.iconX, y, index === b.itemSel);
       if (!item) continue;
-      drawItemIcon(ctx, item.id, L.glyphX, y, 1);
+      if (!uiC.capturing()) drawItemIcon(ctx, item.id, L.glyphX, y, 1);
       nativeText(item.name, L.labelX, y, { kind: 1 });
     }
     const selected = items[b.itemSel];
@@ -9930,10 +9805,10 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     const b  = battle;
     // The native results screen owns the whole framebuffer while it is up; the
     // battle must not paint over it (web/game.js draws the report afterwards).
-    if (b._reportNative) return;
+    if (b._reportNative) { uiC.hide("ui-battle"); return; }
     // The finale's ending chain owns the whole framebuffer the same way: the
     // host's movie adapter draws it over the battle's last pose frame.
-    if (b._endingHosted) return;
+    if (b._endingHosted) { uiC.hide("ui-battle"); return; }
     const cw = canvas.width, ch = canvas.height;  // real device px (fullscreen)
     const W  = BATTLE_REF_W;   // 640 — logical UI layout space (scaled to fill below)
     const H  = BATTLE_REF_H;   // 480
@@ -9957,6 +9832,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       ctx.imageSmoothingEnabled = false;
       drawFightReport(b);
       ctx.restore();
+      uiC.hide("ui-battle");   // look C: the report owns the screen, the HUD layer goes with the HUD
       return;
     }
 
@@ -10018,67 +9894,70 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     ctx.translate(nativeX, nativeY);
     ctx.scale(nativeScale, nativeScale);
     ctx.imageSmoothingEnabled = false;
-    // Jogress is staged behind the normal battle plates; the dense state-8
-    // replay keeps both HP plates, party pips, and DV gauge visible through
-    // the entire parent-orb flight and only the op7 white-out washes them out.
-    drawBattleHud(b);
+    // Look C (web/ui-c/battlehud.js): the whole 2D chrome below is one capture scope. The clips, the HUD's text and the bar / notice
+    // parts become the C overlay; nothing about the battle changes (same calls, same order, same state). The 3D close-up stays under
+    // the overlay and the bezel ring leaves its window open. The lose fade dims the overlay the way it darkens the canvas.
+    const chrome = () => {
+      // Jogress is staged behind the normal battle plates; the dense state-8
+      // replay keeps both HP plates, party pips, and DV gauge visible through
+      // the entire parent-orb flight and only the op7 white-out washes them out.
+      drawBattleHud(b);
 
-    // The Blast transformation keeps BOTH HP plates and drops every menu: the
-    // capture shows the command list gone from the first frame of the effect
-    // (the "... Blasted!" line is dismissed and no input is accepted for ~14 s).
-    // The entrance's own page (the next one is made on f301, ENTRANCE_TASK_END_FRAME) is drawn over the camera glide.
-    if (b.blastShow) {
-      if (b.blastShow.entrance && msgSession?.active && !msgSession.finished) {
-        battleMsgPaint(ctx, msgSession.frame(), nativeText, { pgfgc00, cmfont });
+      // The Blast transformation keeps BOTH HP plates and drops every menu: the
+      // capture shows the command list gone from the first frame of the effect
+      // (the "... Blasted!" line is dismissed and no input is accepted for ~14 s).
+      // The entrance's own page (the next one is made on f301, ENTRANCE_TASK_END_FRAME) is drawn over the camera glide.
+      if (b.blastShow) {
+        if (b.blastShow.entrance && msgSession?.active && !msgSession.finished) {
+          battleMsgPaint(ctx, msgSession.frame(), nativeText, { pgfgc00, cmfont });
+        }
+        return;
       }
-      ctx.restore(); ctx.restore(); return;
-    }
 
-    if (b.state === ST.PLAYER_MENU) {
-      // The shipped pro/fightstg overlay draws the six-row list with its own
-      // chrome and sliding highlight; the walker's drawn list is the rollback
-      // and the confused-gag case. The menu notice ("No techs!") rides on top.
-      if (commandNative.active()) {
-        commandNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
-        drawMenuNotice(b);
-      } else {
-        drawCommandMenu(b);
-      }
-    } else if (b.state === ST.PLAYER_TECH) {
-      if (techNative.active()) techNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
-      else drawTechMenu(b);
-    } else if (b.state === ST.PLAYER_ITEM) {
-      if (itemNative.active()) itemNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
-      else drawItemMenu(b);
-    } else if (b.state === ST.PLAYER_TAG) {
-      if (tagNative.active()) tagNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW);
-      else drawTagMenu(b);
-    } else if (b.state === ST.PLAYER_DNA_CHOICE) {
-      if (dnaNative.active()) dnaNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW);
-      else drawDnaChoice(b);
-    } else if (b.state === ST.PLAYER_DV) {
-      if (formNative.active()) formNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
-      else drawFormMenu(b, b.activePlayerIndex, "Digivolve");
-    } else if ((b.state !== ST.WIN || b._victoryPhase === "pose") &&
-               b.state !== ST.DNA_PRESENT &&
-               !(b.state === ST.TAG_PRESENT && b._tagPresentation?.phase !== "prompt")) {
-      const msg = b.state === ST.LOSE ? "Annihilated..." : b.message; // esmfight 0x53, set at 0x800a924c
-      if (msgSession) {
+      if (b.state === ST.PLAYER_MENU) {
+        // The shipped pro/fightstg overlay draws the six-row list with its own
+        // chrome and sliding highlight; the walker's drawn list is the rollback
+        // and the confused-gag case. The menu notice ("No techs!") rides on top.
+        if (commandNative.active()) {
+          commandNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
+          drawMenuNotice(b);
+        } else {
+          drawCommandMenu(b);
+        }
+      } else if (b.state === ST.PLAYER_TECH) {
+        if (techNative.active()) techNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
+        else drawTechMenu(b);
+      } else if (b.state === ST.PLAYER_ITEM) {
+        if (itemNative.active()) itemNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
+        else drawItemMenu(b);
+      } else if (b.state === ST.PLAYER_TAG) {
+        if (tagNative.active()) tagNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW);
+        else drawTagMenu(b);
+      } else if (b.state === ST.PLAYER_DNA_CHOICE) {
+        if (dnaNative.active()) dnaNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW);
+        else drawDnaChoice(b);
+      } else if (b.state === ST.PLAYER_DV) {
+        if (formNative.active()) formNative.draw(ctx, BATTLE_UI_LAYOUT.nativeW, BATTLE_UI_LAYOUT.nativeH);
+        else drawFormMenu(b, b.activePlayerIndex, "Digivolve");
+      } else if ((b.state !== ST.WIN || b._victoryPhase === "pose") &&
+                 b.state !== ST.DNA_PRESENT &&
+                 !(b.state === ST.TAG_PRESENT && b._tagPresentation?.phase !== "prompt")) {
         // The original's own window picture, lines and blinking prompt. With no message
         // up there is no object and no panel (F0x80098924 is only reached while the
-        // controller is in its state 1), so nothing is painted -- the legacy
-        // rectangle below is the ?legacyBattleMsg=1 rollback only.
+        // controller is in its state 1), so nothing is painted.
         if (msgSession.active && !msgSession.finished) {
           battleMsgPaint(ctx, msgSession.frame(), nativeText, { pgfgc00, cmfont });
         }
-      } else {
-        const M = BATTLE_UI_LAYOUT.message;
-        drawNativePanel(M.x, M.y, M.w, M.h, "rgba(0,4,45,0.94)");
-        String(msg).split("\n").slice(0, 2).forEach((line, i) =>
-          nativeText(line, M.x + 8, M.y + 4 + i * 11, { kind: 1 }));
       }
-    }
+    };
+    uiC.scope("ui-battle", ctx, {
+      enable: packReady(pgfgc00), texts: true, top: true,
+      dim: b.state === ST.LOSE && b._loseFade > 0 ? Math.min(1, b._loseFade) : 0,
+      compose: (sc) => composeBattle(sc, { view: BATTLE_UI_LAYOUT.portraitView, stage: sc.stage }),
+    }, chrome);
     ctx.restore();
+    // The Blast transformation returns before the lose fade, as it always has.
+    if (b.blastShow) { ctx.restore(); return; }
 
     if (b.state === ST.LOSE && b._loseFade > 0) drawSubtractiveFade(ctx, cw, ch, b._loseFade);
 
@@ -10260,7 +10139,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       attack: (att, def, skill) => {
         const n = basicAttackHitCount(att.multiAttack, skill);
         const r = n > 1 ? resolveMultiHit(att, def, skill, n, RAND_U16, null) : resolveAttack(att, def, skill, RAND_U16, null);
-        return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n };
+        return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n, crit: !!r.crit, eff: r.eff ?? 1 };
       },
       skillOf: (id) => skillDB[id] ?? null,
       /** What an enemy can do: its basic attack, and its two moves when they are attack techniques. */
@@ -10418,11 +10297,11 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
       anchor: { ...DV_GAUGE_ANCHOR },
       // The ported block's own four calls: the two frame cels, the black trough and
       // the fill, in the original's order (web/battlehud-translated.js).
-      frame: USE_TRANSLATED_HUD ? battleHudDvFrame({
+      frame: battleHudDvFrame({
         gauge: battle.player.gauge,
         tick: Math.trunc((battle._hudClock || 0) * HUD_CLOCK_HZ),
         slot: battle.activePlayerIndex ?? 0,
-      }) : null,
+      }),
     } : null),
     // Debug read-out for the 100x60 picture box (layer key 0x1009): which side's
     // close-up it currently shows, its viewport, and WHICH model record that
@@ -10437,7 +10316,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     }),
     // Headless read-out of the plate's two names and the slash between the HP
     // numbers (FIGHTSTG_F0x80093364 and F0x80093a74's build arm).
-    debugPlateLabels: () => (battle && USE_TRANSLATED_HUD ? battleHudPlateLabelsFor(battle) : null) };
+    debugPlateLabels: () => (battle ? battleHudPlateLabelsFor(battle) : null) };
 }
 
 /**

@@ -1,3 +1,4 @@
+import * as uiC from "./ui-c/index.js";
 import "./extra-roster.js";   // first: it wraps fetch so digimon.json / evolutions.json carry the extra species
 import { storyCommand, cardDuelCloseWrites } from './vendor/engine.js';
 import { itemForDropName } from "./drop-item.js";
@@ -92,7 +93,6 @@ import { createCanvasResolutionController } from "./canvas-resolution.js";
 import { setFieldViewPad, widePadFor, wideBoxCameraX, fieldFrameRule, wideMenuSides, scriptIsStaged, easeLevel, FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 import { createTextbox, autoBalloonMode } from "./textbox.js";
 import { createChoice } from "./choice.js";
-import { createInn } from "./inn.js";
 import { createInnTranslated } from "./inn-translated.js";
 // All gameplay-logic helpers come from the bundled TS engine (web/vendor/engine.js) — the
 // single source of truth. The former web/{scene,cutscene,screen-routing,dialogue,items}.js
@@ -292,29 +292,19 @@ import {
     setTalkLaunchBindings,
     talkLaunchEventForBit,
     resolveTalkLaunchRecord,
-    // The game's ONE random stream (the disc's own table walk at [0x8004dc0c]).
-    // The native overlay interpreter's rand16 reads it too, so a stage that runs
-    // original ambience code draws from the same word as the rest of the game.
-    RAND_U16,
 } from "./vendor/engine.js";
 import { createFlagStore } from "./flag-store.js";
 import { partyCharisma, loadCharismaDb } from "./charisma.js";
 import { createEngineBridge } from "./engine-bridge.js";
 import { PACKS } from "./packs.js";
 import { fieldPartySize, grantPack, partyRosterView } from "./party.js";
-import { createNameEntry, drawNameEntry } from "./nameentry.js";
-import { createNameEntryNative } from "./nameentry-native.js";
 import { createNameEntryTranslated } from "./nameentry-translated.js";
-import { createPackSelect, drawPackSelect } from "./stplnmet.js";
-import { createPackSelectNative } from "./packselect-native.js";
 import { createPackSelectTranslated } from "./packselect-translated.js";
-import { createEndScreen, drawEndScreen } from "./endscreen.js";
 import { createEndCardTranslated, loadEndCardTranslated } from "./endscreen-translated.js";
 import {
     createTitleScreen, drawTitleScreen, titleOptionRects, titleViewTransform,
     RESULT_START, RESULT_CONTINUE, RESULT_IDLE,
 } from "./titlescreen.js";
-import { createTitleNative } from "./title-native.js";
 import {
     loadFieldcom,
     fieldcomReady,
@@ -324,7 +314,6 @@ import {
     drawStoryBubble,
     drawSparkleActor,
     balloonAnchorY,
-    KIND as FC_KIND,
 } from "./fieldcom.js";
 import {
     loadDiveDemo,
@@ -333,7 +322,7 @@ import {
     drawDiveParticles,
 } from "./dive-demo.js";
 import { loadPointSprites, preloadPointSpriteStage, retainPointSpriteStages, drawEffects, drawEffectsUnderMap, drawStageOverlayShapes, drawNativeIntents, drawStageObjectSprites, drawAnnotatorShapes, drawStreetVehicles, drawStreetScreens, drawFireTrapBursts, drawLaunchPads, launchPads, setLaunchPadsEnabled, setPointSprite, launchPadDebug, drawStreetGlows, drawStingerPopup, stingerPopupProbe, streetGlowProbe, setPointRecordActorSound, setPointRecordActorMusic, setPointRecordOrdinal, setPointRecordAnchor, setPointRecordFlag, drawScrollLayers, scrollLayerEntries, pointRecordActors, pointSpriteProbe } from "./effects.js";
-import { loadNativeStages, enterNativeStage, tickNativeStage, fireNativeEffect, advanceFieldBlanks, resetFieldBlanks } from "./native-stage.js";
+import { tickNativeStage, fireNativeEffect, advanceFieldBlanks, resetFieldBlanks } from "./native-stage.js";
 import { beginDrawOrderLog, takeDrawOrderLog, actorDrawsUnderMap, ENTITY_BUCKET, sortDrawables } from "./draw-order.js";
 import { loadFallingObjects, fireStageObject, fireNativeStageObject, paceStageObjects, stageObjectDraws, streetScreenQuads, clearStageObjects, annotatorActive, annotatorMarkers, setAnnotatorRandom, setStageObjectSound, setStageObjectOrdinal, stageObjectState, stageAmbienceDiagnostics, STAGE_AMBIENCE_EXECUTION } from "./stage-objects.js";
 import { fieldCharPendingPixels, fieldCharAddY, resetFieldChar, fieldCharState } from "./vendor/engine.js";
@@ -343,45 +332,29 @@ import { packedIsMusicStart, packedKey } from "./packed-sound.js";
 import { createMenu, pauseMapContext, migrateVisitedMaps } from "./menu.js";
 import { openPauseHome, returnToPauseCardFolders } from "./pause-home.js";
 import { createShopTranslated } from "./shop-translated.js";
-import { createShopNative } from "./shop-native.js";
 import { nativeScreenRead, nativeScreenWrite } from "./native-screen.js";
 import { nativeScreenObjects } from "./native-screen.js";
 import { nativeTextWidgets } from "./native-screen.js";
 import { encodeNativeScreenText } from "./native-screen.js";
 import { decodeNativeText } from "./native-screen-text.js";
-import { createDriMenu } from "./dri.js";
-import { createDriNative, slotStats } from "./dri-native.js";
+import { slotStats } from "./dri-native.js";
 import { createLabTranslated } from "./lab-translated.js";
 import { createDialogueTranslated } from "./dialogue-translated.js";
 import { createYesNoTranslated } from "./yesno-translated.js";
 import { createHelpMenuTranslated } from "./help-menu-translated.js";
 import { gunslingerSwitchCommand, applyGunslingerSwitch } from "./gunslinger-switch.js";
 import { ui as engineUi, dungeonSwitchCommand, applyDungeonSwitchCommand, newPadSwitchObject } from "./vendor/engine.js";
-import { createGym } from "./gym.js";
-import { createGymNative } from "./gym-native.js";
 import { createGymTranslated } from "./gym-translated.js";
-import { createStatusNative } from "./status-native.js";
 import { createStatusTranslated } from "./status-translated.js";
 import { createTitleMoviePlayer } from "./title-movie.js";
 import { createFieldMoviePlayer } from "./field-movie.js";
-import { createCardShop } from "./cardshop.js";
-import { createCardShopNative } from "./cardshop-native.js";
 import { createCardShopTranslated, bindCardShopInventory } from "./cardshop-translated.js";
-import { createCardAlbum } from "./cardalbum.js";
-import { createCardAlbumNative } from "./cardalbum-native.js";
 import { createCardAlbumTranslated } from "./cardalbum-translated.js";
-import { createCardDeck } from "./carddeck.js";
-import { createCardDeckNative } from "./carddeck-native.js";
 import { createCardDeckTranslated } from "./carddeck-translated.js";
-import { createCardDuel } from "./cardduel.js";
 import { createCardDuelNative } from "./cardduel-native.js";
 import { loadCatalog, loadStarter, ensureStarterFolder, cards, grantCard, loseCard, ownedCount, persistCollection, collectionSnapshot, resetCollection, catalog as cardCatalog } from "./cardstate.js";
-import { createSaveScreen } from "./save.js";
-import { createSaveNative } from "./save-native.js";
 import { createSaveTranslated } from "./save-translated.js";
-import { createBattle, paidParticipants } from "./battle.js";
-import { createFightReport, buildFightReportPages } from "./fightreport.js";
-import { createFightReportNative } from "./fightreport-native.js";
+import { createBattle, paidParticipants, buildFightReportPages } from "./battle.js";
 import { createFightReportTranslated } from "./fightreport-translated.js";
 import { toggleGameFullscreen, cycleGameScreen, restoreWindowFill } from "./fullscreen.js";
 restoreWindowFill(document);
@@ -389,10 +362,9 @@ import { ephemeralActorRecord } from "./cutscene-actors.js";
 import { createDebugPanel } from "./debugPanel.js";
 import { createStagslctMenu } from "./stagslct.js";
 import { createSoundTest } from "./soundtest.js";
-import { createCntyselMenu } from "./cntysel.js";
 import { createCntyselNative } from "./cntysel-native.js";
 import { createSceneSkip } from "./sceneSkip.js";
-import { loadPlaceCard, createPlaceCard } from "./placecard.js";
+import { loadPlaceCard } from "./placecard.js";
 import { loadPlaceCardTranslated, createPlaceCardTranslated } from "./placecard-translated.js";
 import { asButton, attachGamepad, isPadButton } from "./input.js";
 import { createItemLog, watchBag } from "./item-log.js";   // owned / seen ITEMS for GLOSSARY, same store as the species log
@@ -503,7 +475,7 @@ const PACKED_MUSIC = {
 
 // The END card the title overlay raises before handing the machine to the first opening movie.
 // The card runs the translated title-overlay routines (F0x80082E9C / F0x80082D70 / F0x80084628 /
-// F0x8008453C, engine EndCardSession); ?legacyEnd=1 keeps web/endscreen.js. Its first callback
+// F0x8008453C, engine EndCardSession). Its first callback
 // stops every sound (D0x80055C64), which is sfx.stopAll() here.
 const NO_GRASS3D = new URLSearchParams(location.search).has("nograss3d");
 const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
@@ -799,15 +771,12 @@ function chatTick(dt) {
         chatBox.pressConfirm(); chatShownAt = performance.now() / 1000; chatPresses++;
     }
 }
-const USE_LEGACY_END = new URLSearchParams(location.search).has("legacyEnd");
-const endCard = USE_LEGACY_END ? null : createEndCardTranslated({ stopSound: () => sfx.stopAll() });
+const endCard = createEndCardTranslated({ stopSound: () => sfx.stopAll() });
 
 // The end-of-cast fishing balloon before its pop was decoded: one static cel
 // 0x35 with the row-1 glyph, drawn from the opening frame. The decoded balloon
 // (the story bubble's own model) puffs up, holds, then deflates — see the block
-// in render(). `?legacyFishBubble=1` keeps the old single static balloon.
-const LEGACY_FISH_BUBBLE =
-    new URLSearchParams(location.search).has("legacyFishBubble");
+// in render().
 
 const fade = { alpha: 0, dir: 0, pending: null }; // dir: 1 fading out, -1 fading in
 window.__fade = fade;
@@ -815,12 +784,8 @@ window.__fade = fade;
 // The stage-change wipe runs on the original's own frame counter (web/stage-wipe.js,
 // translated from fieldstg F0x8008A5E4); the shared fade's alpha is taken from it so
 // the stage swap still lands exactly where it always did, on a full close.
-// ?legacyWipe=1 keeps the old fade-clock wipe.
-const USE_LEGACY_WIPE = new URLSearchParams(location.search).has("legacyWipe");
 // The field->battle handoff plays the A28 checkerboard (web/stage-wipe.js,
-// fieldstg F0x80089F7C) before the battle. ?legacyBattleHandoff=1 keeps the old
-// immediate cut, so a verifier can capture before and after from one build.
-const USE_LEGACY_BATTLE_HANDOFF = new URLSearchParams(location.search).has("legacyBattleHandoff");
+// fieldstg F0x80089F7C) before the battle.
 
 const VIEW_W = 640;
 const VIEW_H = 480;   // 240 native lines at ZOOM 2 -- the screen the disc sets,
@@ -900,13 +865,12 @@ let fieldFrame = null; // last canvas-resolution snapshot: device pixels per log
 const viewCam = { x: 0, y: 0, active: false };
 const labCam = { x: 0, y: 0, active: false }; // web/seam-lab.html only — see __labCam
 
-const legacyTextbox = createTextbox(sfx);
+const fallbackTextbox = createTextbox(sfx);
 // The translated conversation box (engine/dw3/ui/dialogue-session.ts): the ordinary NPC talk route
-// (estalkNN lines) and the cutscene SAY lines (esdmgNNN entries); ?legacyTextbox=1 keeps web/textbox.js for
-// both. Defeat messages and hand-built pages still use web/textbox.js.
+// (estalkNN lines) and the cutscene SAY lines (esdmgNNN entries). Defeat messages, hand-built pages and a
+// failed load still use web/textbox.js.
 const dialogueBox = createDialogueTranslated(sfx);
 window.__dialogueBox = dialogueBox;
-const USE_TRANSLATED_TALK = !new URLSearchParams(location.search).has("legacyTextbox");
 // `textbox` is a facade over both boxes: it reports open while EITHER is open (so every gate and the
 // verifier fleet that reads window.__textbox.isOpen() keeps working); everything else is the legacy box.
 // Readable copy of the line the translated box shows (from the same disc text), so checks that read
@@ -922,13 +886,11 @@ const yesNoWindowUp = () => yesNoBox.isOpen() && !yesNoAwaitingChild;
 // The five NPC help counters (s210 event 8; s924 events 1602/1604; s935 events 1616/1618): the
 // counter says its line, then eight topics and a cursor take the screen (engine/dw3/ui/help-menu-session.ts,
 // translated from wstag210 F0x800A5E74 and its four copies). The menu starts no event, so the talk
-// simply continues when it closes. ?legacyHelpMenu=1 leaves today's behaviour (the event plays and
-// ends with nothing on screen) for the rollback check.
-const USE_TRANSLATED_HELP_MENU = !new URLSearchParams(location.search).has("legacyHelpMenu");
+// simply continues when it closes.
 const helpMenuBox = createHelpMenuTranslated(sfx);
 window.__helpMenu = helpMenuBox;
 const helpMenuWindowUp = () => helpMenuBox.isOpen();
-const textbox = new Proxy(legacyTextbox, {
+const textbox = new Proxy(fallbackTextbox, {
     get(target, prop) {
         if (prop === "dialogue" && dialogueBox.isOpen()) return translatedDialogueText;
         if (prop === "isOpen") return () =>
@@ -945,85 +907,41 @@ const textbox = new Proxy(legacyTextbox, {
 const choice = createChoice(sfx);
 window.__choice = choice;   // checks: whether a list / yes-no question is up
 const menu = createMenu(sfx);
-// Ordinary merchants use the shipped shop screen; the authored shop remains
-// The original-execution merchant remains available to research checks only.
-const USE_NATIVE_SHOP = new URLSearchParams(location.search).has("nativeShop");
 // The field's own stage ambience (the overlay's per-stage actor registry) is
-// OUR translated code on the ordinary route: the ambient point-sprite
+// OUR translated code: the ambient point-sprite
 // decorations, the stage-owned rock/decor/pad actors, the street broadcast,
 // lights and screens, the stingers, the fixed sprites, the display-slot
 // players/ensembles and the draw-context annotators all run from
-// web/stage-objects.js + web/effects.js over engine/systems/**. The original
-// overlay is an explicit research route only (?nativeStages), the way
-// ?nativeShop=1 is for the merchant. Nothing boots it with no flag.
-const USE_NATIVE_STAGE = new URLSearchParams(location.search).has("nativeStages");
+// web/stage-objects.js + web/effects.js over engine/systems/**.
 const shopTranslated = createShopTranslated(sfx, { digimonDB: () => menu.digimonDB ?? {} });
-const shop = USE_NATIVE_SHOP ? createShopNative(sfx, { digimonDB: () => menu.digimonDB ?? {} }) : shopTranslated;
-// The Digimon Lab is the pro/stgdglab screen; the hand-authored desk stays as the
-// development rollback (?legacyDri=1).
-const driLegacy = createDriMenu();
+const shop = shopTranslated;
 // The training gym is the pro/stgtrain screen: the real pod select, the drill list with
 // its pictures (STTRNG0), the TP/confirm plates, the session with the workout scene (the
 // trainee and the props play the disc's TRANIN scripts), the result text and the stat roll.
 // It runs translated code (engine/dw3/ui/gym-session.ts, web/gym-translated.js, proof
-// tools/verify_translated_gym.mjs). The original-code overlay stays behind ?nativeGym=1 as a
-// research reference (web/gym-native.js; its workout is host-drawn) and `?legacyGym=1` rolls
-// back to the hand-authored web/gym.js.
-const GYM_PARAMS = new URLSearchParams(location.search);
-const USE_NATIVE_GYM = !GYM_PARAMS.has("legacyGym");
-const USE_REFERENCE_GYM = GYM_PARAMS.has("nativeGym");
-const USE_NATIVE_DRI = !GYM_PARAMS.has("legacyDri");
+// tools/verify_translated_gym.mjs).
 // The Digimon Lab runs translated code (engine/dw3/ui/lab-session.ts, web/lab-translated.js, proof
-// tools/verify_translated_lab.mjs). The original-code overlay stays behind ?nativeLab=1 as a
-// research reference (web/dri-native.js) and `?legacyDri=1` rolls back to the hand-made web/dri.js.
-const USE_REFERENCE_LAB = GYM_PARAMS.has("nativeLab");
-// Phase 6.3 pause/status route: the pause page is the default, with the
-// hand-authored menu page as the rollback (?legacyStatus=1).
-const USE_NATIVE_STATUS = !GYM_PARAMS.has("legacyStatus");
-// The pause pages run translated code (engine/dw3/ui/pause-root-session.ts). The
-// original-code overlay stays behind ?nativeStatus=1 as a research reference.
-const USE_REFERENCE_STATUS = GYM_PARAMS.has("nativeStatus");
-// `?legacyPause=1` is GONE (2026-10-04). It used to select web/menu.js's own
-// hand-written copy of the pause home, which the UI lab opened too: a second
-// list with its own row names for one system of the original. Every route that
-// has a translated pause page now opens THAT page — the field's START, the lab's
+// tools/verify_translated_lab.mjs).
+// The pause pages run translated code (engine/dw3/ui/pause-root-session.ts).
+// Every route that has a translated pause page opens THAT page: the field's START, the lab's
 // Status Menu button and the Digivolve Demo screen's Back all go through
-// openPauseHome() below, and ?legacyStatus=1 remains the single hand-authored
-// rollback (it leaves `status` null, so there is no translated list to open).
+// openPauseHome() below.
 // Proof: tools/verify_pause_home_one_list.mjs.
 // The naming screen: the DRI desk's rename (and the opening's standalone
-// naming) run the translated pro/stdgname screen by default. The original-code
-// overlay stays as an explicit research reference (?nativeName=1) and the
-// hand-authored keyboard as the development rollback (?legacyName=1).
+// naming) run the translated pro/stdgname screen.
 // Contract: the screen seeds its grid from the roster record's name field and
 // its OK export writes the trimmed name back into that same field.
-const USE_NATIVE_NAME = !GYM_PARAMS.has("legacyName");
-const USE_REFERENCE_NAME = GYM_PARAMS.has("nativeName");
-// The ordinary title uses the translated title controller and extracted art.
-// The original-code screen remains an explicit research reference.
-const USE_NATIVE_TITLE = GYM_PARAMS.has("nativeTitle");
-// The starter-pack wizard is the native pro/stplnmet overlay (Phase 6.3 group 3,
-// cut over 2026-09-22): the opening's registration hand-off opens
-// web/packselect-native.js, the player types the account name on the screen's own
-// keyboard, picks a pack and answers "Register account?", and the adapter reads
+// The registration wizard (pro/stplnmet) runs translated code: the opening's registration
+// hand-off opens web/packselect-translated.js, the player types the account name on the
+// screen's own keyboard, picks a pack and answers "Register account?", and the adapter reads
 // the committed pack index back (0x8004B374) for the walker's grantPack.
-// `?legacyPack=1` keeps the hand-authored wizard (web/stplnmet.js).
-const USE_NATIVE_PACK = !GYM_PARAMS.has("legacyPack");
-// The registration wizard runs translated code; the original-code screen stays
-// behind ?nativePack=1 as a research reference.
-const USE_REFERENCE_PACK = GYM_PARAMS.has("nativePack");
-const packSelectNative = USE_REFERENCE_PACK ? createPackSelectNative(sfx) : createPackSelectTranslated(sfx);
-/** Open the starter-pack wizard: native by default, the walker's wizard under
- *  ?legacyPack=1. */
+const packSelectNative = createPackSelectTranslated(sfx);
+/** Open the starter-pack wizard. */
 function openPackSelect(opts = {}) {
-    if (!USE_NATIVE_PACK) return createPackSelect(opts);
     return packSelectNative.open({ state, ...opts });
 }
-const nameEntryNative = USE_REFERENCE_NAME
-    ? createNameEntryNative(sfx)
-    : createNameEntryTranslated(sfx, { digimonDB: () => menu.digimonDB ?? {} });
-const gymLegacy = createGym(sfx);
-const gym = USE_NATIVE_GYM ? (USE_REFERENCE_GYM ? createGymNative(sfx) : createGymTranslated(sfx)) : gymLegacy;
+const nameEntryNative = createNameEntryTranslated(sfx, { digimonDB: () => menu.digimonDB ?? {} });
+const gym = createGymTranslated(sfx);
 const statusOptions = {
     // The pages draw the BASE Digimon's name out of the roster record, so the
     // adapter seeds exactly the name the menus show: the player's nickname when
@@ -1057,51 +975,35 @@ const statusOptions = {
     // folders", which the boot starter grant makes true for everyone.
     cardFoldersUnlocked: () => carriesFolderBag(state),
 };
-const status = !USE_NATIVE_STATUS ? null
-    : USE_REFERENCE_STATUS ? createStatusNative(sfx, statusOptions)
-    : createStatusTranslated(sfx, statusOptions);
-const driMenu = USE_NATIVE_DRI ? (USE_REFERENCE_LAB ? createDriNative(sfx) : createLabTranslated(sfx)) : driLegacy;
-// Ordinary card merchants execute the translated root, stock, booster and reveal.
-// The original-code host is an explicit research route (?nativeCardShop=1).
-const cardShopLegacy = createCardShop(sfx);
-const cardShopNative = createCardShopNative(sfx);
+const status = createStatusTranslated(sfx, statusOptions);
+const driMenu = createLabTranslated(sfx);
+// Card merchants execute the translated root, stock, booster and reveal.
 const cardShopTranslated = createCardShopTranslated(sfx, {
     stage: () => screenIdForStage(fieldScreenTable, currentMap().id) ?? 0,
 });
-const cardShop = GYM_PARAMS.has("legacyCardShop") ? cardShopLegacy
-    : GYM_PARAMS.has("nativeCardShop") ? cardShopNative : cardShopTranslated;
+const cardShop = cardShopTranslated;
 // Card Album / Folder editor / duel (stcrdabm, stcrddek, cardgame). The
 // catalog they browse is decoded data; see web/cardstate.js for which of the
 // surrounding rules are decoded and which are walker rules.
-// The Album's ordinary route is now the translated screen
+// The Album is the translated screen
 // (web/cardalbum-translated.js over engine/dw3/ui/album-session.ts: the
-// already-oracled pro/stcrdabm controllers running as registered tasks). The
-// shipped overlay stays as the explicit research reference behind
-// ?nativeAlbum=1, and the hand-authored screen as the rollback ?legacyAlbum=1.
+// already-oracled pro/stcrdabm controllers running as registered tasks).
 const cardAlbumTranslated = createCardAlbumTranslated(sfx);
-const cardAlbumLegacy = createCardAlbum(sfx);
-const cardAlbumNative = createCardAlbumNative(sfx);
-const cardAlbum = GYM_PARAMS.has("legacyAlbum") ? cardAlbumLegacy
-    : GYM_PARAMS.has("nativeAlbum") ? cardAlbumNative : cardAlbumTranslated;
-// The Folder editor's chooser now runs our translated code: the factory, the
+const cardAlbum = cardAlbumTranslated;
+// The Folder editor's chooser runs our translated code: the factory, the
 // picker tick, the label builder, the row fill and the colour census are
 // engine/dw3/ui ports, composed by engine/dw3/ui/folder-session.ts behind
-// web/carddeck-translated.js. The shipped pro/stcrddek overlay stays as the
-// explicit research reference (?nativeFolder=1), and the hand-authored editor
-// as the development rollback (?legacyDeck=1). The editor's card grid and name
+// web/carddeck-translated.js. The editor's card grid and name
 // keyboard are not translated yet and the session names them as such.
-const cardDeckLegacy = createCardDeck(sfx);
-const cardDeckNative = createCardDeckNative(sfx);
 const cardDeckTranslated = createCardDeckTranslated(sfx);
-const cardDeck = GYM_PARAMS.has("legacyDeck") ? cardDeckLegacy
-    : GYM_PARAMS.has("nativeFolder") ? cardDeckNative : cardDeckTranslated;
+const cardDeck = cardDeckTranslated;
 // The shop's Edit Folder opens the SAME folder screen as the pause menu's Card
 // Folders row. On the disc both routes hand off to launcher code 0x400 =
 // pro/stcrddek (stcrdshp's option 3, "Edit Folder" —
 // docs/research/ui/stcrdshp-decoded-2026-07-12.md §0; the pause page
 // F0x80084A34 launches 0x400 too), so the shop route must not open a second,
 // hand-authored editor. This opens the module's one `cardDeck` binding, which
-// also keeps the ?legacyDeck=1 rollback applying to both routes together.
+// is the one binding both routes use.
 // Leaving the screen returns to the field, where the hand-off left the player.
 function openCardShopFolder() {
     cardDeck.open();
@@ -1112,17 +1014,14 @@ function openCardShopFolder() {
 // result (0x80048AC0 plus the per-opponent win count) commits into the walker's
 // state. Proven from ordinary play by tools/verify_native_duel_play.mjs and at
 // the screen level by tools/verify_native_duel.mjs /
-// tools/verify_native_duel_commit.mjs. The hand-authored duel stays as the
-// development rollback: `?legacyDuel=1`.
-const USE_NATIVE_DUEL = !GYM_PARAMS.has("legacyDuel");
-const cardDuelLegacy = createCardDuel(sfx, bgm);
+// tools/verify_native_duel_commit.mjs.
 // `getState` is a getter, not the object: `state` is declared further down this
 // module, and the duel adapter seeds its bag synchronously from it the moment a
 // duel opens. The accessor is also what keeps a duel opened through the debug
 // hook (`window.__cardDuel.open(onClose, name, deck, id)`, used by the card-duel
 // verifiers) seeded from the same bag the game uses.
 const cardDuelNative = createCardDuelNative(sfx, bgm, { getState: () => state });
-const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy;
+const cardDuel = cardDuelNative;
 // CARD FOLDERS on the status menu (esstatus string 11) — the entry that makes
 // the Album and the folder editor reachable in normal play. Before this they
 // opened only from the debug lab. The entry is gated the way the game gates it:
@@ -1130,9 +1029,8 @@ const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy;
 // folder grant on the Yellow Cruiser does.
 // The collection is { owned: Map, folders: [], ... } — NOT an array. Gate on
 // holding a folder, which is what Divermon's grant on the Yellow Cruiser gives.
-// The pause home's STATUS entry hands over to the native pause page when the
-// route is on (Phase 6.3); the legacy status-list stays as the rollback. Keys
-// are not double-handled: the native page owns the pad while it is open.
+// The pause home's STATUS entry hands over to the translated pause page. Keys
+// are not double-handled: the page owns the pad while it is open.
 menu.nativeOpen = () => !!status?.isOpen();
 // THE pause home. The field's START, the UI lab's Status Menu button and the
 // Digivolve Demo lab screen's Back all call this one function (web/pause-home.js),
@@ -1146,17 +1044,12 @@ const pauseHome = (row = 0) => openPauseHome({ state, status, menu, row });
 // the row), so it is a debug-only extra and its Back has no original answer.
 // It returns to the same one list every other route returns to.
 menu.backToHome = pauseHome;
-// MAP is absent from the reference route: row 2 of the overlay's factory table IS the
-// map page (ctor 0x80099324, tick F0x8009913c), but it reads the RESIDENT map service
-// object (0x8009B6EC) which the original-code runtime does not build — it draws nothing
-// there (captures .dw3-research/status-route/map-row2-blank.png). The translated route
+// MAP: row 2 of the overlay's factory table IS the map page (ctor 0x80099324, tick
+// F0x8009913c); it reads the RESIDENT map service object (0x8009B6EC). The translated route
 // ports that service (engine/dw3/ui/native/pause-misc.ts), so it opens the page. Demo
 // Setup is an opt-in developer row the original never reaches from the pause home; the
 // walker's own panel serves it.
-const PAUSE_PAGE_ENTRIES = new Map(USE_REFERENCE_STATUS ? [
-    ["ITEMS", "items"], ["SORT", "sort"], ["TECHNIQUES", "techniques"],
-    ["STATUS", "status"], ["CARD FOLDERS", "cardfolders"], ["Demo Setup", "demosetup"],
-] : [
+const PAUSE_PAGE_ENTRIES = new Map([
     ["ITEMS", "items"], ["SORT", "sort"], ["MAP", "map"], ["TECHNIQUES", "techniques"],
     ["STATUS", "status"], ["CARD FOLDERS", "cardfolders"],
 ]);
@@ -1166,7 +1059,7 @@ menu.onNativePage = (label) => {
     status.open(state, entry, () => { menu.screen = "home"; });
     return true;
 };
-// The same flag store answers the legacy MAP pane's markers (?legacyStatus=1 rollback).
+// The same flag store answers web/menu.js's MAP pane markers.
 menu.mapSeen = engineFlagSeen;
 // The same gate as the translated page's seed: the resident byte D0x80048f42 is
 // carried[402], the Folder Bag (UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14).
@@ -1177,8 +1070,7 @@ menu.cardFolderUnlocked = () => carriesFolderBag(state);
 // STATUS screen back when they close — so the player lands on the pause's OWN
 // CARD FOLDERS page, not on a second hand-drawn copy of it. The one return
 // route is returnToPauseCardFolders (web/pause-home.js), which reopens the
-// translated page; only under ?legacyStatus=1, with no translated page to
-// reopen, does web/menu.js's own panel answer.
+// translated page.
 const backToCardFolders = () => returnToPauseCardFolders({ state, status, menu });
 menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open(backToCardFolders); };
 menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open(backToCardFolders); };
@@ -1234,36 +1126,21 @@ window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started &
 Promise.all([loadCatalog(), loadStarter()]).then(() => { ensureStarterFolder(); persistCollection(); });
 // The post-fight results screen (pro/stfgtrep) runs as translated code in ordinary
 // play: engine FightReportSession behind web/fightreport-translated.js, no
-// PlayStation instruction and no interpreter. `?nativeReport=1` runs the shipped
-// overlay through the MIPS interpreter instead (web/fightreport-native.js), a
-// research reference that needs the executable assets. The hand-authored module
-// stays as the explicit development rollback (?legacyReport=1) — see
+// PlayStation instruction and no interpreter — see
 // docs/plans/2026-09-28-translated-game-completion-plan.md.
-const USE_NATIVE_REPORT = !GYM_PARAMS.has("legacyReport");
-const USE_REFERENCE_REPORT = GYM_PARAMS.get("nativeReport") === "1";
-const fightReportLegacy = createFightReport(sfx);
-const fightReportNative = USE_REFERENCE_REPORT
-    ? createFightReportNative(sfx)
-    : createFightReportTranslated(sfx, { getState: () => state });
-const fightReport = USE_NATIVE_REPORT ? fightReportNative : fightReportLegacy;
+const fightReportNative = createFightReportTranslated(sfx, { getState: () => state });
+const fightReport = fightReportNative;
 // The memory-card save/load screen (pro/stgmcard) runs as translated code in
 // ordinary play: engine MemcardSession behind web/save-translated.js, the walker's
 // three localStorage slots served as the card through web/memcard.js, no PlayStation
-// instruction and no interpreter. `?nativeSave=1` runs the shipped overlay through
-// the MIPS interpreter instead (web/save-native.js), a research reference that
-// needs the executable assets. `?legacySave=1` rolls back to web/save.js.
-const USE_NATIVE_SAVE = !GYM_PARAMS.has("legacySave");
-const USE_REFERENCE_SAVE = GYM_PARAMS.get("nativeSave") === "1";
-const saveScreenLegacy = createSaveScreen(sfx);
-const saveScreenNative = USE_REFERENCE_SAVE ? createSaveNative(sfx) : createSaveTranslated(sfx);
-const saveScreen = USE_NATIVE_SAVE ? saveScreenNative : saveScreenLegacy;
+// instruction and no interpreter.
+const saveScreenNative = createSaveTranslated(sfx);
+const saveScreen = saveScreenNative;
 
 /** Open the post-fight results screen. The walker's report data (rows built by
  *  web/battle.js buildFightReportRows, plus pages) is translated into the
- *  native overlay's RAM contract (the 0x80042b84 workspace + roster records)
- *  when the native route is on; the legacy screen takes the data as-is. */
+ *  overlay's RAM contract (the 0x80042b84 workspace + roster records). */
 function openFightReport(opts = {}) {
-    if (!USE_NATIVE_REPORT) { fightReportLegacy.open(opts); return; }
     const rows = opts.rows ?? [];
     const party = Array.isArray(state.party) ? state.party : [];
     const partySlots = rows.map((row) => rosterSlotOfCharId(party[row.index ?? 0]));
@@ -1421,8 +1298,6 @@ battle.setEndingHandoff({
 const REPORT_CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 // (shared with the multiplayer fight: `onClose` is what runs when the player leaves the screen)
 function openNativeReport(b, onClose) {
-        // `?legacyReport=1`: leave the battle's own inline report in charge.
-        if (!USE_NATIVE_REPORT) return false;
         const rows = b._winReportRows ?? [];
         const progress = b._winProgress ?? [];
         const party = Array.isArray(state.party) ? state.party : [];
@@ -1436,6 +1311,8 @@ function openNativeReport(b, onClose) {
             dropItemId,
             // The BIT payout reads this partner's worn BIT Adapter (workspace +4).
             activePos: b.activePlayerIndex ?? rows[0]?.index ?? 0,
+            // read-only look data for the victory screen (web/ui-c/vic.js): the battle's own progress and reward records
+            view: { progress: b._winProgress ?? [], reward: b._winReward ?? null },
             partySlots,
             participants: rows.map((row) => {
                 const pos = row.index ?? 0;
@@ -1483,16 +1360,15 @@ battle.setReportHandoff({ open: (b) => openNativeReport(b, () => { battle.finish
 // per-Digimon price come from the map, not from the flag — the resident screen
 // class scans D0x8003edcc by current screen id. See engine/dw3/inn.ts.
 // The inn runs the translated resident screen (F0x80011dac / F0x800119a8 /
-// F0x800110e0, engine InnSession); ?legacyInn=1 keeps the hand-made web/inn.js.
-const inn = new URLSearchParams(location.search).has("legacyInn") ? createInn(sfx) : createInnTranslated(sfx);
+// F0x800110e0, engine InnSession).
+const inn = createInnTranslated(sfx);
 const debugPanel = createDebugPanel();
 // The location title card the field plays on every stage entry — the area name
 // and the place name, typed out over sliding bars. See web/placecard.js.
 // The card runs the translated fieldstg routines (F0x80087d68 / F0x80087974 /
 // F0x800875ac / F0x80087704 / F0x80087854, engine PlaceCardSession) with the
-// disc's name banks for every language; ?legacyPlaceCard=1 keeps web/placecard.js.
-const USE_LEGACY_PLACE_CARD = new URLSearchParams(location.search).has("legacyPlaceCard");
-const placeCard = USE_LEGACY_PLACE_CARD ? createPlaceCard() : createPlaceCardTranslated();
+// disc's name banks for every language.
+const placeCard = createPlaceCardTranslated();
 // Native stagslct (gate/area-travel) menu — see web/stagslct.js header for the
 // decode. The real in-game trigger for this screen is unresolved (open gap in
 // docs/research/ui/stagslct-decoded-2026-07-11.md), so it is reachable only
@@ -1507,11 +1383,8 @@ const soundTest = createSoundTest({
     sfx,
     music: { play: (track) => bgm.play(track), stop: () => bgm.play(null) },
 });
-const cntyselMenu = createCntyselMenu(sfx);   // SYSTEM07 cursor / SYSTEM08 confirm
 // Fully translated language screen; the adapter retains its historical name.
-// `?legacyCntysel=1` keeps the earlier authored screen for comparison.
 // Input contract: engine/dw3/ui/native/country-select-tick.ts (Start / `i`).
-const USE_NATIVE_CNTYSEL = !GYM_PARAMS.has("legacyCntysel");
 const cntyselNative = createCntyselNative(sfx, bgm);
 // Story scene-skipper (dev): jump to any master-ordinal beat. All mutation routes through
 // the same game functions a real play uses, so jumps reproduce on-screen behaviour faithfully.
@@ -1536,24 +1409,16 @@ const sceneSkip = createSceneSkip({
 });
 window.__sceneSkip = sceneSkip;
 window.__textbox = textbox;
-window.__legacyTextbox = legacyTextbox; // checks: which box holds the line
+window.__fallbackTextbox = fallbackTextbox; // checks: which box holds the line
 window.__menu = menu;
 window.__status = status;
 window.__cardAlbum = cardAlbum;
-window.__cardAlbumNative = cardAlbumNative; // native album (pro/stcrdabm)
-window.__cardAlbumLegacy = cardAlbumLegacy; // development rollback (web/cardalbum.js)
-window.__cardDeckNative = cardDeckNative; // native folder editor (pro/stcrddek)
-window.__cardDeckLegacy = cardDeckLegacy; // development rollback (web/carddeck.js)
 window.__cardShop = cardShop;
 window.__cardShopTranslated = cardShopTranslated;
-window.__cardShopNative = cardShopNative; // native card shop (pro/stcrdshp)
-window.__cardShopLegacy = cardShopLegacy; // development rollback (web/cardshop.js)
 window.__cardDuelNative = cardDuelNative; // native card duel (pro/cardgame)
 window.__nameEntryNative = nameEntryNative; // native naming screen (pro/stdgname)
 window.__cntyselNative = cntyselNative; // native boot country/language screen (pro/cnty_sel)
-window.__cntyselMenu = cntyselMenu; // the hand-authored rollback screen (?legacyCntysel=1)
 window.__packSelectNative = packSelectNative; // native starter-pack wizard (pro/stplnmet)
-window.__cardDuelLegacy = cardDuelLegacy; // development rollback (web/cardduel.js)
 window.__nativeScreenRead = nativeScreenRead; // focused-check RAM probe for native screens
 window.__nativeScreenWrite = nativeScreenWrite; // focused-check prerequisite seeding (the lab exposes the same pair)
 window.__nativeScreenObjects = nativeScreenObjects; // focused-check object list
@@ -1570,12 +1435,8 @@ window.__applyStoryFlag = (id, expected) => applyStoryFlag(id, expected);
 window.__shop = shop;
 window.__shopTranslated = shopTranslated; // direct handle for browser-owned shop checks
 window.__reportNative = fightReportNative; // native results screen (pro/stfgtrep)
-window.__reportLegacy = fightReportLegacy; // development rollback (web/fightreport.js)
 window.__saveNative = saveScreenNative; // native save/load screen (pro/stgmcard)
-window.__saveLegacy = saveScreenLegacy; // development rollback (web/save.js)
-window.__gymLegacy = gymLegacy; // development rollback module (web/gym.js)
 window.__dri = driMenu;
-window.__driLegacy = driLegacy;
 window.__battle = battle;
 window.__gym = gym;
 window.__inn = inn;
@@ -2115,9 +1976,8 @@ window.__pointRecordActors = {
 // makes the step sound).
 window.__footstepCount = () => footstepCount;
 // Debug-only: the field's stage-ambience execution mode. `execution` is
-// "translated" on the ordinary route -- the overlay runs only under the
-// explicit ?nativeStages research switch -- so tools/verify_translated_field_
-// ambience.mjs can refuse any other mark with no flag set.
+// "translated" -- so tools/verify_translated_field_
+// ambience.mjs can refuse any other mark.
 window.__stageAmbience = {
     execution: STAGE_AMBIENCE_EXECUTION,
     diagnostics: (mapId) => stageAmbienceDiagnostics(mapId ?? currentMap().id),
@@ -2202,7 +2062,7 @@ window.__labClose = () => {
     if (textbox?.isOpen?.()) textbox.close?.();
     if (dialogueBox.isOpen()) dialogueBox.close();
     if (status?.isOpen?.()) status.close?.();
-    for (const ui of [shop, driMenu, gym, cardShop, cardAlbum, cardDeck, cardDuel, saveScreen, fightReport, inn, cntyselMenu, cntyselNative]) {
+    for (const ui of [shop, driMenu, gym, cardShop, cardAlbum, cardDeck, cardDuel, saveScreen, fightReport, inn, cntyselNative]) {
         if (ui?.isOpen?.()) { if (ui.close) ui.close(); else ui._open = false; }
     }
 };
@@ -2242,19 +2102,15 @@ window.__labOpen = (name, arg) => {
         // takes clip 0, "END".
         case "endscreen":
             state.endScreenDone = () => { state.endScreen = null; };
-            if (USE_LEGACY_END) {
-                state.endScreen = createEndScreen();
-            } else {
-                // The card's last callback asks for the first opening movie, which the walker
-                // does not ship; the lab closes the screen as it always has.
-                endCard.open(() => {
-                    const onDone = state.endScreenDone;
-                    state.endScreen = null;
-                    state.endScreenDone = null;
-                    onDone?.();
-                });
-                state.endScreen = endCard;
-            }
+            // The card's last callback asks for the first opening movie, which the walker
+            // does not ship; the lab closes the screen as it always has.
+            endCard.open(() => {
+                const onDone = state.endScreenDone;
+                state.endScreen = null;
+                state.endScreenDone = null;
+                onDone?.();
+            });
+            state.endScreen = endCard;
             window.__labEnd = state.endScreen;
             break;
         // The native title screen. In the game it renders into its own HTML
@@ -2296,8 +2152,7 @@ window.__labOpen = (name, arg) => {
             if (menu.openAt) menu.openAt("demosetup"); else menu.reset();
             break;
         case "dri":
-            if (USE_NATIVE_DRI) driMenu.open(state, null);
-            else driMenu.open(null, null, state);
+            driMenu.open(state, null);
             break;
         // No greeter on the debug/lab path, so pass the stage and let the decoded
         // gym_ranks.json table pick the rank group it would have launched with.
@@ -2364,7 +2219,7 @@ window.__labOpen = (name, arg) => {
         // on the field rather than in a screen of its own, so the lab just
         // restarts it over whatever map is loaded.
         case "placecard":
-            (USE_LEGACY_PLACE_CARD ? loadPlaceCard() : loadPlaceCardTranslated()).then(() => {
+            loadPlaceCardTranslated().then(() => {
                 placeCard.begin("s780");
                 window.__labPlaceCard = placeCard;
             });
@@ -2397,22 +2252,14 @@ window.__labOpen = (name, arg) => {
                 adapterByIndex: { 0: true },
                 rewardXp: 268,
             });
-            window.__labFightReport = fightReportLegacy;
             window.__reportNative = fightReportNative;
             break;
         case "cntysel":
-            if (USE_NATIVE_CNTYSEL) {
-                cntyselNative.open((row, language) => {
-                    window.__labLanguage = row;
-                    window.__labLanguageByte = language;
-                });
-                window.__labCntyselNative = cntyselNative;
-            } else {
-                cntyselMenu.show((row) => {
-                    window.__labLanguage = row;
-                });
-                window.__labCntysel = cntyselMenu;
-            }
+            cntyselNative.open((row, language) => {
+                window.__labLanguage = row;
+                window.__labLanguageByte = language;
+            });
+            window.__labCntyselNative = cntyselNative;
             break;
     }
 };
@@ -2512,7 +2359,7 @@ const getNpcResolver = (actorId) => {
 // script's 4th SAY operand = balloon quadrant; 4/none = plain system window).
 // The esdmg bank + entry of the cutscene being played (set by playStoryEvent): SAY line p1 is raw line p1 of the entry
 // (raw line 0 is an empty placeholder; the walker string is p1 - 1), the text the original reads from the story bank [0x80099DC8]. The translated box draws
-// the disc bytes; ?legacyTextbox=1 (or a failed load) keeps web/textbox.js with the parsed pages.
+// the disc bytes; a failed load keeps web/textbox.js with the parsed pages.
 let cutsceneEsdmgRef = null;
 const cutsceneTextbox = {
     isOpen: () => textbox.isOpen(),
@@ -2534,10 +2381,10 @@ const cutsceneTextbox = {
         const e = spk == null || mode == null ? null : cutscene.entity(spk);
         if (spk != null && mode != null && !e) storyDbg("SAY speaker not found", spk, "line", line, "→ no window");
         const legacy = () =>
-            legacyTextbox.open(parsed, onClose, () =>
+            fallbackTextbox.open(parsed, onClose, () =>
                 // textbox draws post-zoom in screen px — scale world coords up.
                 e ? { x: (e.x - lastCam.x) * ZOOM, y: (e.y - lastCam.y) * ZOOM, mode } : null);
-        if (!USE_TRANSLATED_TALK || !cutsceneEsdmgRef || line == null) return legacy();
+        if (!cutsceneEsdmgRef || line == null) return legacy();
         const project = (x, y) => ({
             sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
             sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
@@ -2633,7 +2480,7 @@ function fieldFullScreenUiOpen() {
         || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
         || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen() || books.isOpen()
-        || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
+        || cntyselNative.isOpen() || state.wipe28);
 }
 // Wide overworld menus (web/field-view.js wideMenuSides): the screens that only draw their own box over the field (pause list, status,
 // inn, shop, dri lab, gym, save, the GLOSSARY / OPTIONS books) may show the world dimmed at the sides. These keep black sides: the card
@@ -2647,7 +2494,7 @@ function fieldTakesOverUiOpen() {
     return !!(cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
         || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
         || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen()
-        || (USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open) || state.wipe28);
+        || cntyselNative.isOpen() || state.wipe28);
 }
 function fieldStageFilled() {
     return !!(document.fullscreenElement || document.documentElement.classList.contains("window-fill"));
@@ -2662,7 +2509,7 @@ let extraResidents = [];   // where the extra quests' own characters stand (see 
  */
 function openTalkLine(ref, onClose, npc, legacyAnchor) {
     const legacy = () => textbox.open(getDialogue(ref), onClose, legacyAnchor);
-    if (!USE_TRANSLATED_TALK || !npc || !/^estalk0\d$/.test(ref?.file ?? "")) return legacy();
+    if (!npc || !/^estalk0\d$/.test(ref?.file ?? "")) return legacy();
     const project = (x, y) => ({
         sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
         sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
@@ -2675,7 +2522,7 @@ function openTalkLine(ref, onClose, npc, legacyAnchor) {
         project,
         {
             playerNameBytes: encodeNativeScreenText(state.playerName),
-            onFail: () => legacyTextbox.open(getDialogue(ref), onClose, legacyAnchor),
+            onFail: () => fallbackTextbox.open(getDialogue(ref), onClose, legacyAnchor),
         },
     );
 }
@@ -2695,8 +2542,7 @@ function questSpeak(npcId, name, text) {
                 return () => ({ x: (npc.x - lastCam.x) * ZOOM, y: (npc.y - lastCam.y) * ZOOM, mode });
             })()
             : null;
-        const fallback = () => legacyTextbox.open({ name, pages }, resolve, anchor);
-        if (!USE_TRANSLATED_TALK) return fallback();
+        const fallback = () => fallbackTextbox.open({ name, pages }, resolve, anchor);
         const project = (x, y) => ({
             sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
             sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
@@ -3420,11 +3266,11 @@ async function init() {
 
     // The stage-entry location title card's name table and bar templates.
     // Non-fatal: without it an arrival simply goes unannounced.
-    const placecard_load = (USE_LEGACY_PLACE_CARD ? loadPlaceCard() : loadPlaceCardTranslated()).catch(() => {});
+    const placecard_load = loadPlaceCardTranslated().catch(() => {});
 
     // The END card's language table. Non-fatal: the card falls back to its own overlay
     // table only if the shipped one fails to load, and the session rejects a drift.
-    const endcard_load = (USE_LEGACY_END ? Promise.resolve() : loadEndCardTranslated()).catch(() => {});
+    const endcard_load = loadEndCardTranslated().catch(() => {});
 
     // Ambient point-sprite decorations (windmills/fans/torches — see
     // web/effects.js). Non-fatal: stages simply show no ambient effects.
@@ -3434,12 +3280,6 @@ async function init() {
     // (tools/extract_falling_objects.py). This is the route that plays in the
     // shipped game; see web/stage-objects.js. Non-fatal.
     const falling_objects_load = loadFallingObjects().catch(() => {});
-
-    // Original stage execution is an explicit research route. Other native
-    // screens request their reference images when that screen is opened.
-    const native_stage_reference_load = new URLSearchParams(location.search).has("nativeStages")
-        ? loadNativeStages().catch((e) => console.warn("[native-stage] load failed:", e?.message ?? e))
-        : Promise.resolve();
 
     // Foreground map-overlay index (walk-behind pipes/poles/canopies): map tiles
     // are 3-layered on PS1 and layers >= 1 draw OVER sprites; the flat map PNGs
@@ -3487,7 +3327,6 @@ async function init() {
         endcard_load,
         effects_load,
         falling_objects_load,
-        native_stage_reference_load,
         overlays_load,
         ground_load,
         layer2_load,
@@ -3580,7 +3419,7 @@ async function init() {
 
     // A memory-card load reloads the page into the loaded slot; go straight to
     // the field instead of the language and title screens (set once by
-    // web/save-translated.js / save-native.js before the reload).
+    // web/save-translated.js before the reload).
     let resumeAfterLoad = false;
     try {
         resumeAfterLoad = sessionStorage.getItem("resumeAfterLoad") === "1";
@@ -3646,9 +3485,6 @@ async function init() {
     // Only the LOAD direction is reachable from this button, and a load restores
     // the slot and reloads the page instead of calling back (web/save-translated.js
     // `_finish`), so backing out of Continue answers 0xE00: the title comes back.
-    // The hand-made card (`?legacySave=1`) and the interpreter reference
-    // (`?nativeSave=1`) record no selector, and in LOAD mode the decoded answer
-    // is 0xE00 for them too.
     const MEMCARD_TITLE_SCREEN = 0xe00;
     const memoryCardExitScreen = () => {
         const code = saveScreen.diagnostics?.()?.summary?.transition?.[0];
@@ -3767,7 +3603,6 @@ async function init() {
     // the walker's heading and buttons remain available.
     const titleCanvas = document.getElementById("title-canvas");
     const titleCtx = titleCanvas?.getContext("2d") ?? null;
-    // ?nativeTitle=1 runs the original-code screen for reference comparisons.
     // The resident launcher's PREVIOUS screen code — the code of the screen a
     // launch replaces. The launcher records it on every screen change, and the
     // title's Japanese idle timeout reads it back to alternate its two opening
@@ -3783,13 +3618,9 @@ async function init() {
     // launches 0xC00 with argument 0 (the LOAD row), and when the card hands
     // back 0xE00 the title is entered with the card as its previous screen.
     const MEMCARD_SCREEN_CODE = 0xc00;
-    const newTitle = () => USE_NATIVE_TITLE
-        ? createTitleNative(sfx).open()
-        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
-    // Construct the research screen only on that explicit route. Recreate the
-    // translated title after language selection to use the chosen text clips.
-    let ts = USE_NATIVE_TITLE ? createTitleNative(sfx)
-        : createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
+    const newTitle = () => createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
+    // Recreate the translated title after language selection to use the chosen text clips.
+    let ts = createTitleScreen({ language: state.languageByte ?? 2, previousScreenCode });
     // F0x80083cc0 state 1 (stdwtitl.s:1172-1190): once the movie object is
     // gone the movie screen launches its row's destination word with argument
     // 0. Both opening rows carry 0x0e00, the title screen, so the attract loop
@@ -3877,19 +3708,6 @@ async function init() {
             let drew;
             if (movie.isOpen()) {
                 drew = movie.draw(titleCtx, w, h, bgm.muted);
-            } else if (USE_NATIVE_TITLE) {
-                // Fit-and-centre the 320x240 screen in the canvas the way the
-                // walker's own title does, so the aspect ratio is preserved.
-                const t = titleViewTransform(w, h);
-                // The native screen draws its own background, so the letterbox
-                // bars must be black rather than the walker's fallback art.
-                titleCtx.fillStyle = "#000";
-                titleCtx.fillRect(0, 0, w, h);
-                titleCtx.save();
-                titleCtx.translate(t.offsetX, t.offsetY);
-                titleCtx.scale(t.scale, t.scale);
-                drew = ts.draw(titleCtx, 320, 240);
-                titleCtx.restore();
             } else {
                 drew = drawTitleScreen(titleCtx, ts, w, h, bgImg);
             }
@@ -3926,10 +3744,9 @@ async function init() {
     // BEFORE the title; its confirm writes the language byte 0x8005CCA8 and
     // hands 0xE01/0xE02 (the opening movies) to the launcher.
     const languageOpen = () =>
-        USE_NATIVE_CNTYSEL ? cntyselNative.isOpen() : cntyselMenu.open;
+        cntyselNative.isOpen();
     const startTitle = () => {
-        if (USE_NATIVE_TITLE) ts.open();
-        else ts = newTitle();
+        ts = newTitle();
         title.hidden = false;
         // A title opening again starts its real-time clock fresh, so the first
         // browser frame spends no time it did not live through.
@@ -4068,8 +3885,7 @@ launchTitleScreen = () => {
             titleCtx.save();
             titleCtx.translate(t.offsetX, t.offsetY);
             titleCtx.scale(t.scale, t.scale);
-            if (USE_NATIVE_CNTYSEL) cntyselNative.draw(titleCtx, 320, 240);
-            else cntyselMenu.draw(titleCtx, 320, 240);
+            cntyselNative.draw(titleCtx, 320, 240);
             titleCtx.restore();
         }
         requestAnimationFrame(bootLanguageFrame);
@@ -4108,8 +3924,7 @@ launchTitleScreen = () => {
             startMovie(launchCode || (state.languageByte === 0 ? 0xe01 : 0xe02));
             requestAnimationFrame(titleFrame);
         };
-        if (USE_NATIVE_CNTYSEL) cntyselNative.open(onPick);
-        else cntyselMenu.show((row) => onPick(row, 0));
+        cntyselNative.open(onPick);
         requestAnimationFrame(bootLanguageFrame);
     }
 
@@ -4122,7 +3937,7 @@ launchTitleScreen = () => {
             const t = titleViewTransform(rect.width, rect.height);
             const sx = (ev.clientX - rect.left - t.offsetX) / t.scale;
             const sy = (ev.clientY - rect.top - t.offsetY) / t.scale;
-            for (const r of (USE_NATIVE_TITLE ? [] : titleOptionRects(ts))) {
+            for (const r of titleOptionRects(ts)) {
                 if (sx >= r.x && sx < r.x + r.w && sy >= r.y && sy < r.y + r.h) {
                     if (ts.choose(r.index)) playTitleSounds();
                     return;
@@ -5052,11 +4867,7 @@ function presentVictory(_res, after) {
 // catch and a scripted story fight all play this ONE wipe. `update()` steps the
 // shared schedule (web/stage-wipe.js) and runs `pending.run()` when it is spent;
 // the old walker cut straight to the battle at every one of these sites.
-//
-// `?legacyBattleHandoff=1` keeps the old immediate cut, for the before/after
-// capture (tools/verify_checkerboard_handoff.mjs).
 function startFieldBattle(run) {
-    if (USE_LEGACY_BATTLE_HANDOFF) { run(); return; }
     state.wipe28 = { ...createCheckerboard(), pending: { run } };
 }
 
@@ -6214,23 +6025,14 @@ function applyStoryCommand(command) {
         } else if (command.kind === "digimon_lab" || command.kind === "name") {
             const index = command.index;
             if (index === 0) {
-                // The DRI desk owns the complete native stgdglab flow: root,
-                // Switch, Digivolve and the four-page Digivolve Chart. The
-                // native route boots the shipped overlay; the legacy desk keeps
-                // its pick -> openAction dance for the rollback.
-                if (USE_NATIVE_DRI) driMenu.open(state, null);
-                else {
-                    driMenu.open((pick) => {
-                        driMenu.openAction(pick, state, battle);
-                    });
-                }
+                // The DRI desk owns the complete stgdglab flow: root,
+                // Switch, Digivolve and the four-page Digivolve Chart.
+                driMenu.open(state, null);
             } else if (index === 1 && state.party?.length) {
                 state.nameEntry = openNameEntry({});
                 state.nameEntryDone = () => {
                     // The translated screen can confirm several partners in one visit.
-                    const results = !USE_NATIVE_NAME
-                        ? [{ accepted: true, memberId: state.party[0], value: state.nameEntry.value() }]
-                        : state.nameEntry.results?.() ?? [state.nameEntry.result?.()];
+                    const results = state.nameEntry.results?.() ?? [state.nameEntry.result?.()];
                     let changed = false;
                     for (const result of results) {
                         if (result?.accepted && result.memberId) {
@@ -6265,11 +6067,9 @@ function applyCardDuelCloseHousekeeping(won) {
     for (const write of cardDuelCloseWrites(won === true)) storyFlags.set(write.id, write.value);
 }
 
-/** Open the naming screen: the native pro/stdgname overlay by default, the
- *  hand-authored keyboard under ?legacyName=1. The native screen reads the pad
+/** Open the naming screen (pro/stdgname). The screen reads the pad
  *  from `state.keys` each frame, so the returned object needs no per-key calls. */
 function openNameEntry(opts = {}) {
-    if (!USE_NATIVE_NAME) return createNameEntry(opts);
     nameEntryNative.open({ initial: opts.initial ?? "", state });
     return nameEntryNative;
 }
@@ -6973,7 +6773,6 @@ function playYesNoEvent(ev, onDone) {
 // topic's page and closes on "Return" or Cancel, starting nothing. Tried before the Yes/No boxes,
 // which are the other native family. Returns false when `ev` is not one of the five.
 function playHelpMenuEvent(ev, onDone) {
-    if (!USE_TRANSLATED_HELP_MENU) return false;
     const mapId = currentMap().id;
     const row = engineUi?.helpMenuFor?.(Number(mapId.replace(/^s/, "")), ev.id);
     if (!row) return false;
@@ -7247,31 +7046,6 @@ function playStoryEvent(ev, onDone) {
     }
 
     let hooks = null;
-    if (ev.flag_key === "014a0001" && state.findings && !USE_NATIVE_PACK) {
-        const mi = state.findings.menu_interleave;
-        hooks = { afterSay: {} };
-        hooks.afterSay[mi.pack_choice_after_say] = (resume) => {
-            // Native "Choose a Starter Pack" screen (stplnmet wizard step 2),
-            // replacing the old plain choice-list. On confirm it proceeds to
-            // the existing partner picker.
-            state.packSelect = openPackSelect();
-            state.packSelectDone = () => {
-                const packIdx = state.packSelect.sel();
-                state.packSelect = null;
-                // Registration only records the chosen pack. The first listed
-                // Digimon is the initial lead; formation can be changed later
-                // through Status > Sort. Ownership/field followers begin only
-                // after the selected s212 download variant completes.
-                const memberIds = PACKS[packIdx].members.map((m) => m.charId);
-                state.pendingParty = grantPack(memberIds, 0).party;
-                state.packId = "ABC"[packIdx];
-                engine?.state.vars.set("$party.pack", packIdx); // s212 download gate selector
-                localStorage.setItem("pendingParty", JSON.stringify(state.pendingParty));
-                localStorage.setItem("packId", state.packId);
-                resume();
-            };
-        };
-    }
 
     // Save original positions of static NPCs so we can restore them after the cutscene
     // (cutscene SETPOS/WALKTO moves them in-place; they must return to spawn positions).
@@ -7458,29 +7232,19 @@ function routeStoryHandoff(ev, handoff, screenId) {
                 scripted: true, // cutscene handoff — bypass the OnExit player-exit gate
             });
         } else if (r?.kind === "nameentry") {
-            if (USE_NATIVE_PACK) {
-                state.packSelect = openPackSelect();
-                state.packSelectDone = () => {
-                    const packIdx = state.packSelect.sel();
-                    state.playerName = state.packSelect.accountName();
-                    const memberIds = PACKS[packIdx].members.map((m) => m.charId);
-                    state.pendingParty = grantPack(memberIds, 0).party;
-                    state.packId = "ABC"[packIdx];
-                    engine?.state.vars.set("$party.pack", packIdx);
-                    localStorage.setItem("playerName", state.playerName);
-                    localStorage.setItem("pendingParty", JSON.stringify(state.pendingParty));
-                    localStorage.setItem("packId", state.packId);
-                    state.packSelect = null;
-                    checkStageCutscene(currentMap().id);
-                };
-                return;
-            }
-            state.nameEntry = openNameEntry({});
-            state.nameEntryDone = () => {
-                state.playerName = state.nameEntry.value();
+            state.packSelect = openPackSelect();
+            state.packSelectDone = () => {
+                const packIdx = state.packSelect.sel();
+                state.playerName = state.packSelect.accountName();
+                const memberIds = PACKS[packIdx].members.map((m) => m.charId);
+                state.pendingParty = grantPack(memberIds, 0).party;
+                state.packId = "ABC"[packIdx];
+                engine?.state.vars.set("$party.pack", packIdx);
                 localStorage.setItem("playerName", state.playerName);
-                state.nameEntry = null;
-                checkStageCutscene(currentMap().id); // ev 3 (014a0002) fires next
+                localStorage.setItem("pendingParty", JSON.stringify(state.pendingParty));
+                localStorage.setItem("packId", state.packId);
+                state.packSelect = null;
+                checkStageCutscene(currentMap().id);
             };
         }
     }
@@ -7507,42 +7271,11 @@ function checkStageCutscene(mapId) {
     // 0xe744-0xe760), so the accumulated displacement starts again at zero here.
     resetFieldChar();
     resetFieldBlanks();
-    // The stage's ORDINARY ambience is OUR translated code: the point-record
+    // The stage's ambience is OUR translated code: the point-record
     // actors, the rocks, the street corner and every other stage-object member
     // are built and ticked by web/stage-objects.js over engine/systems/** (the
     // boot happens in web/effects.js prepareEffects and the tick in
-    // paceStageObjects). Only the explicit ?nativeStages research route boots
-    // the original overlay here; with no flag the interpreter never runs, and
-    // it is not asked for (native_stage_reference_load is skipped above).
-    if (USE_NATIVE_STAGE) {
-        try {
-            enterNativeStage(mapId, {
-                setFlag: (id, v) => flagBackend.set(id, !!v),
-                getFlag: (id) => flagBackend.get(id),
-                rand16: () => RAND_U16() & 0xfff,
-                ordinal: () => Number(engine?.state.vars.get("$story.ordinal") ?? 0),
-                startEvent: (id) => storyDbg("NATIVE start_event", id, "(ambience-initiated; not auto-played)"),
-                playPackedSound: (id) => {
-                    const stem = PACKED_JINGLES[`0x${(id >>> 0).toString(16).padStart(8, "0")}`];
-                    if (stem) bgm?.playJingle?.(stem);
-                },
-            });
-        } catch (e) {
-            console.warn("[native]", mapId, e);
-        }
-        // One native tick BEFORE the OnEnterMap event: on the console the street
-        // entry's first update creates the screen-content driver (id 0x321) and
-        // THEN starts the opening scene (wstag780 0x800a74cc calls the event
-        // launcher itself). Firing the event first made its SETANIM 0x321 hits
-        // construct a second driver through the effect registry, so the wall
-        // screens ran two animations at once (the announcement stinger's sequence
-        // under the default loop). Tick once so the stage owns its actors first.
-        try {
-            tickNativeStage(mapId);
-        } catch (e) {
-            console.warn("[native] first tick", mapId, e);
-        }
-    }
+    // paceStageObjects).
     if (engineBridge) engineBridge.onStageEnter(mapId);
     // The s260 auction's arrival gate: FIELDSTG_runStoryEvents runs on the field
     // load, so arm it here; the per-frame tick below fires the lot once the field
@@ -7730,38 +7463,6 @@ function drawWideSideCovers(ctx) {
     ctx.restore();
 }
 
-// The legacy hand-drawn stage wipe, kept for ?legacyWipe=1. The decoded one is
-// below it.
-const LEGACY_WIPE_TILE = 128; // 64x64 at 320x240, doubled for the 640x480 view
-const LEGACY_WIPE_LEVEL = 128;
-function drawLegacyTransitionWipe(ctx) {
-    const p = Math.max(0, Math.min(fade.alpha, 1));
-    if (p <= 0) return;
-    if (p >= 1) {
-        ctx.save();
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-        ctx.restore();
-        return;
-    }
-    // The clear window keeps the decoded aspect: width and height fall in the
-    // 10 : 7 ratio.
-    const winW = VIEW_W * (1 - p);
-    const winH = VIEW_H - (VIEW_W - winW) * 0.7;
-    const wx = (VIEW_W - winW) / 2;
-    const wy = (VIEW_H - winH) / 2;
-    subtractLayer(ctx, 0, 0, VIEW_W, VIEW_H, (layer) => {
-        layer.fillStyle = dimFillStyle(p * LEGACY_WIPE_LEVEL);
-        for (let y = 0; y < VIEW_H; y += LEGACY_WIPE_TILE)
-            for (let x = 0; x < VIEW_W; x += LEGACY_WIPE_TILE)
-                layer.fillRect(x, y, LEGACY_WIPE_TILE, LEGACY_WIPE_TILE);
-        // Black subtracts nothing, so this window stays bright: the field
-        // shows through it until it closes.
-        layer.fillStyle = "#000";
-        layer.fillRect(wx, wy, winW, winH);
-    });
-}
-
 // The A28 checkerboard loading wipe's draw arm (fieldstg asm 0x76D4-0x78EC):
 // one 64x40 quad per cell the schedule has not yet consumed, at the cell's
 // current (slid) position. The grid positions are SCREEN pixels (0..320 x
@@ -7800,7 +7501,6 @@ function drawCheckerboardWipe(ctx) {
 // Native coordinates: the state, the geometry and the tile size are all 320x240
 // (VIEW_W/VIEW_H are the device buffer), so everything is scaled by ZOOM here.
 function drawTransitionWipe(ctx, camX, camY) {
-    if (USE_LEGACY_WIPE) return drawLegacyTransitionWipe(ctx);
     const clock = state.wipe;
     if (clock.phase !== 1 && clock.phase !== -1) return;
 
@@ -7954,17 +7654,10 @@ function dispatchInput(k, e, raw = "") {
         cntyselNative.press(k);
         return;
     }
-    if (cntyselMenu.open) {
-        e.preventDefault();
-        cntyselMenu.handleKey(k);
-        return;
-    }
     // The memory card also runs BEFORE the game starts: the title's Continue
     // opens it in LOAD mode (web/game.js contEl.onclick) while state.started is
     // still false. The translated card samples the held word, which the publish
-    // above already feeds, but the hand-made card (?legacySave=1) reads keys as
-    // discrete presses — without this branch its Back never arrives and the
-    // player cannot leave it. Scoped to the pre-game case so the running game's
+    // above already feeds. Scoped to the pre-game case so the running game's
     // own screen order further down is untouched.
     if (!state.started && saveScreen.isOpen()) {
         e.preventDefault();
@@ -8103,7 +7796,6 @@ function dispatchInput(k, e, raw = "") {
             !cardShop.isOpen() &&
             !saveScreen.isOpen() &&
             !fightReport.isOpen() &&
-            !cntyselMenu.open &&
             !cntyselNative.isOpen()
         ) {
             // U-27 / home tick: START is not read once the pause menu is open.
@@ -8140,7 +7832,7 @@ function dispatchInput(k, e, raw = "") {
         // 0x4000 this branch is on, so it needs no translation: one level back
         // inside the page, and at the page's top level the page folds away and
         // the host's child slot goes NULL — which is what closes the pause
-        // (web/status-native.js).
+        // (web/status-translated.js).
         if (status?.isOpen()) {
             status.handleKey(k, state);
             return;
@@ -8177,8 +7869,8 @@ function dispatchInput(k, e, raw = "") {
                 // The list's own back word folds it shut: 0x800450BD
                 // (exe/fns.s:3420 plays it on the back arm of F0x8001270c).
                 // The host owns the fold — the list's port is what plays the
-                // word, and this branch IS that fold on the rollback route
-                // (?legacyStatus=1). The translated page plays its own.
+                // word, and this branch IS that fold for web/menu.js's own list.
+                // The translated page plays its own.
                 sfx.play("system01");
                 state.menuOpen = false;
                 menu.reset();
@@ -8225,30 +7917,9 @@ function dispatchInput(k, e, raw = "") {
     if (state.nameEntry) {
         e.preventDefault();
         const ne = state.nameEntry;
-        // The native screen samples the pad's held word once per frame, so it
-        // needs no per-key dispatch; the legacy keyboard does.
-        if (USE_NATIVE_NAME) {
-            ne.handleKey(k, state);
-            return;
-        }
-        // VERIFIED 2026-07-14 (rig save state 5): single 15x7 keyboard, no
-        // charset pages. DEL/SPC/arrows/OK are grid cells you navigate to and
-        // press — so `press()` dispatches by cell and OK confirms via
-        // selectEnd. q/e paging removed (no pages).
-        if (k === "up") ne.moveUp();
-        else if (k === "down") ne.moveDown();
-        else if (k === "left") ne.moveLeft();
-        else if (k === "right") ne.moveRight();
-        else if (k === "circle") {
-            ne.press();
-            if (ne.isDone()) state.nameEntryDone();
-        }
-        else if (k === "backspace") ne.selectDel();
-        // Tab kept as a keyboard shortcut for the on-screen OK cell.
-        else if (k === "tab") {
-            ne.selectEnd();
-            if (ne.isDone()) state.nameEntryDone();
-        }
+        // The screen samples the pad's held word once per frame, so it
+        // needs no per-key dispatch.
+        ne.handleKey(k, state);
         return;
     }
 
@@ -8756,11 +8427,7 @@ function padLoop(t) {
     // The boot country/language screen (code 0x1600) is the same case: it runs
     // before the game starts, so the sim loop cannot tick it.
     if (!state.started) {
-        if (USE_NATIVE_CNTYSEL) {
-            if (cntyselNative.isOpen()) cntyselNative.update?.(dt, state.keys);
-        } else if (cntyselMenu.open) {
-            cntyselMenu.update?.(dt, state.keys);
-        }
+        if (cntyselNative.isOpen()) cntyselNative.update?.(dt, state.keys);
     }
     requestAnimationFrame(padLoop);
 }
@@ -8897,7 +8564,8 @@ function update(dt) {
     // Play clock. The memory-card file record carries an h/m/s play time
     // (record +0x28/+0x2A/+0x2C, decoded in stgmcard F0x8008316c), so the
     // walker keeps a real one instead of writing zeros onto the save card.
-    state.playSeconds = (state.playSeconds || 0) + dt;
+    // The title is up (boot, or after a lost fight) while the field is still loaded underneath: no play time then.
+    if (state.started) state.playSeconds = (state.playSeconds || 0) + dt;
     scheduleFieldLocationSave();
     sweepCollectionSave();
     textbox.update(dt);
@@ -8952,8 +8620,7 @@ function update(dt) {
     // The native naming screen ticks from the main update, not the draw block:
     // the opening's hand-off can hold the frame before the field draws again,
     // and a screen that is only stepped while drawing never advances there.
-    if (USE_NATIVE_NAME && state.nameEntry) state.nameEntry.update?.(dt, state);
-    cntyselMenu.update(dt, state.keys);
+    if (state.nameEntry) state.nameEntry.update?.(dt, state);
     cntyselNative.update(dt, state.keys); // native language-select host step
     inn.tick(dt);
     driMenu.update(dt, state.keys);
@@ -8963,22 +8630,12 @@ function update(dt) {
     // The native wizard closes inside its own tick (the commit store sets the
     // root's lifecycle to 3), so the walker's done handler must run from here;
     // the legacy wizard's own key path still fires it on a press.
-    if (USE_NATIVE_PACK && state.packSelect?.isDone?.() && state.packSelectDone) state.packSelectDone();
+    if (state.packSelect?.isDone?.() && state.packSelectDone) state.packSelectDone();
     if (state.endScreen) {
-        if (USE_LEGACY_END) {
-            state.endScreen.tick(1);
-            if (state.endScreen.isDone()) {
-                const onDone = state.endScreenDone;
-                state.endScreen = null;
-                state.endScreenDone = null;
-                onDone?.();
-            }
-        } else {
-            // The card samples the held pad on every callback, so it needs the walker's
-            // current keys, and it runs one callback per display tick.
-            state.endScreen.setHeld(state.keys ?? []);
-            state.endScreen.step(dt);
-        }
+        // The card samples the held pad on every callback, so it needs the walker's
+        // current keys, and it runs one callback per display tick.
+        state.endScreen.setHeld(state.keys ?? []);
+        state.endScreen.step(dt);
     }
     if (state.titleScreen) {
         // Real elapsed seconds, exactly as the title's own loop gives it: the
@@ -9127,13 +8784,8 @@ function update(dt) {
         // The translated wipe runs the original's frame count (32 to close, 21 to
         // open) and the shared fade's alpha is read off it, so the stage swap
         // still fires on a full close -- just 32 frames in instead of 20.
-        // `?legacyWipe=1` keeps the old fade-clock ramp.
-        if (USE_LEGACY_WIPE) {
-            fade.alpha = Math.min(fade.alpha + fade.dir * dt * 3, 1);
-        } else {
-            stepWipeClock(state.wipe, fade.dir, dt);
-            fade.alpha = Math.min(Math.max(wipeProgress(state.wipe), 0), 1);
-        }
+        stepWipeClock(state.wipe, fade.dir, dt);
+        fade.alpha = Math.min(Math.max(wipeProgress(state.wipe), 0), 1);
         if (fade.alpha >= 1 && fade.pending) {
             let ex = fade.pending;
             // WRAP MAZE. A maze stage's shipped exits come from its arrival-pad
@@ -9283,6 +8935,7 @@ function update(dt) {
         state.packSelect ||
         state.endScreen ||
         state.titleScreen ||
+        !state.started ||   // the title is up over a still-loaded field (after a lost fight): it must not walk
         state.menuOpen ||
         shop.isOpen() ||
         driMenu.isOpen() ||
@@ -9295,7 +8948,6 @@ function update(dt) {
         inn.isOpen() ||
         saveScreen.isOpen() ||
         fightReport.isOpen() ||
-        cntyselMenu.open ||
         cntyselNative.isOpen()
     ) {
         state.moving = false;
@@ -10527,6 +10179,9 @@ function render() {
     // A battle frame whose battle.draw() paints or clears every pixel: the field underneath is never seen, so only its pure
     // pixel work (3D water, 3D grass, the y-sorted draw list, front quest fx) is skipped; every tick and state update still runs.
     const skipField = battle.isActive() && !!battle.coversField?.();
+    // Look C (web/ui-c): the field's own screens (place card, balloons...) keep their old pixels under the battle this frame, as in
+    // the pixel game; their DOM layers would otherwise sit on top of the battle.
+    uiC.cover(skipField);
     if (battle.isActive()) {
         // Battle owns the shared canvas at device resolution and establishes
         // its own transforms. The field underneath is fully covered.
@@ -11385,7 +11040,7 @@ function render() {
     // contradicts FISH-010's "same rod-and-splash" clause) and
     // fieldcom-balloon-draws-last-cel-before-state-3-2026-10-02.
     const resultBubble = state.fishing?.result ?? null;
-    if (resultBubble && fieldcomReady() && !LEGACY_FISH_BUBBLE) {
+    if (resultBubble && fieldcomReady()) {
         const { openFrames, closeFrames } = resultBubbleFrames(resultBubble);
         // `false` means the actor has finished its close (stage 3): it is not
         // deleted, it just draws nothing, so the walker drops it too.
@@ -11395,15 +11050,6 @@ function render() {
             Math.round(balloonAnchorY(state.y - camY, state.submarimon)),
             RESULT_BUBBLE_ROW, openFrames, closeFrames, fieldcomTick(),
         )) state.fishing.result = null;
-    } else if (resultBubble && fieldcomReady()) {
-        // `?legacyFishBubble=1` — the walker's old single static balloon.
-        drawIndicatorBubble(
-            ctx,
-            Math.round(state.x - camX),
-            Math.round(balloonAnchorY(state.y - camY, state.submarimon)),
-            FC_KIND.smoke,
-            fieldcomTick(),
-        );
     }
 
     // Party-indicator actor (FIELDSTG object type 0x16). It is owned by field
@@ -11496,7 +11142,8 @@ function render() {
     }
 
     // Over the field, under everything the player can interact with.
-    placeCard.draw(ctx, VIEW_W, VIEW_H);
+    // update() returns at an open book before placeCard.step, so it would freeze on screen behind the book.
+    if (!books.isOpen()) placeCard.draw(ctx, VIEW_W, VIEW_H);
 
     textbox.draw(ctx, VIEW_W, VIEW_H);
     choice.draw(ctx, VIEW_W, VIEW_H);
@@ -11504,19 +11151,11 @@ function render() {
         // The naming screen holds the name until it has finished going dark
         // (SCREEN-OBJECT-NAME-AUDIT-001, thirty frames). The native adapter
         // ticks the screen here, because its pad comes from state.keys.
-        if (!USE_NATIVE_NAME) state.nameEntry.advance?.(1);
-        if (USE_NATIVE_NAME) state.nameEntry.draw?.(ctx, VIEW_W, VIEW_H);
-        else drawNameEntry(ctx, state.nameEntry, VIEW_W, VIEW_H);
+        state.nameEntry.draw?.(ctx, VIEW_W, VIEW_H);
         if (state.nameEntry.isDone() && state.nameEntryDone) state.nameEntryDone();
     }
-    if (state.packSelect) {
-        if (USE_NATIVE_PACK) state.packSelect.draw?.(ctx, VIEW_W, VIEW_H);
-        else drawPackSelect(ctx, state.packSelect, VIEW_W, VIEW_H);
-    }
-    if (state.endScreen) {
-        if (USE_LEGACY_END) drawEndScreen(ctx, state.endScreen, VIEW_W, VIEW_H);
-        else state.endScreen.draw(ctx, VIEW_W, VIEW_H);
-    }
+    if (state.packSelect) state.packSelect.draw?.(ctx, VIEW_W, VIEW_H);
+    if (state.endScreen) state.endScreen.draw(ctx, VIEW_W, VIEW_H);
     if (state.titleScreen) drawTitleScreen(ctx, state.titleScreen, VIEW_W, VIEW_H);
 
     if (inn.isOpen()) inn.draw(ctx, VIEW_W, VIEW_H);
@@ -11534,20 +11173,19 @@ function render() {
     if (cardDuel.isOpen()) cardDuel.draw(ctx, VIEW_W, VIEW_H, state);
     if (saveScreen.isOpen()) saveScreen.draw(ctx, VIEW_W, VIEW_H, state);
     if (fightReport.isOpen()) {
-        // The native results screen is a framebuffer takeover (the original
+        // The results screen is a framebuffer takeover (the original
         // switches the display environment); clear the field behind it.
-        if (USE_NATIVE_REPORT) {
-            ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.restore();
-        }
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.restore();
         fightReport.draw(ctx, VIEW_W, VIEW_H);
     }
     if (status?.isOpen()) status.draw(ctx, VIEW_W, VIEW_H);
     else if (state.menuOpen) menu.draw(ctx, VIEW_W, VIEW_H, state);
     if (battle.isActive()) battle.draw();
+    uiC.cover(false);
     // The field movie takes the whole screen (its draw fills black first), the
     // same way the original's movie screen owns the display while it plays.
     if (fieldMovie.isOpen()) fieldMovie.draw(ctx, VIEW_W, VIEW_H);
@@ -11555,8 +11193,7 @@ function render() {
     debugPanel.drawOverlay(ctx, VIEW_W, VIEW_H, state);
     stagslctMenu.draw(ctx, VIEW_W, VIEW_H);
     soundTest.draw(ctx, VIEW_W, VIEW_H);
-    if (USE_NATIVE_CNTYSEL) cntyselNative.draw(ctx, VIEW_W, VIEW_H);
-    else cntyselMenu.draw(ctx, VIEW_W, VIEW_H);
+    cntyselNative.draw(ctx, VIEW_W, VIEW_H);
     sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (cut-content gallery): the read-only page sits over everything, including the battle HUD.
     cutContentDraw(ctx, VIEW_W, VIEW_H);

@@ -10,7 +10,7 @@
 // "Use it on who?" confirm is 0x4001C (:19550) and the party-wide list's is
 // 0x8004503C (:19292).
 //
-// The hand-written copy (web/menu.js, the ?legacyStatus=1 rollback) used to
+// The hand-written copy (web/menu.js) used to
 // play "savedemo" (0x00040015 — a different sample) on a landed heal and
 // "system01" (0x800450BD — the back cue) on a refusal; both are the divergence
 // row in docs/research/ui/pause-home-button-table-2026-10-04.md §13. Fixed

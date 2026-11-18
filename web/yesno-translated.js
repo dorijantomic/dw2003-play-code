@@ -5,9 +5,9 @@
 // It never executes original instructions and never runs events: start_event is handed to the host.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
-import { collectNativeTextRuns, drawNativeTextWidgets } from "./native-screen-text.js";
-import { yesNoLayout } from "./ui-css-model.js";
-import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
+import { drawNativeTextWidgets } from "./native-screen-text.js";
+import * as uiC from "./ui-c/index.js";
+import { composeWindow } from "./ui-c/screens.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
 
@@ -71,7 +71,7 @@ export function createYesNoTranslated(sfx = null) {
             const session = new ui.YesNoSession({ font: shared.font, ranges: shared.ranges, cursorGlyphs: shared.cursorGlyphs });
             session.open(launcherRow, pack, {
                 onStartEvent: (id) => { g._events.push(id); onStartEvent?.(id); },
-                onClose: () => { uiCssHide(g._key); host.finish(); },
+                onClose: () => { host.finish(); },
             });
             g._session = session;
             g._clock = new ui.MenuDisplayClock();
@@ -110,27 +110,19 @@ export function createYesNoTranslated(sfx = null) {
         if (!g._open || !g._session) return;
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         const { calls, contextMarkers } = g._session.drawIntents();
-        // OPTIONS > UI look: Smooth draws the window, the prompt, both answers and the cursor as DOM + CSS (web/ui-css.js): the
-        // whole box, so nothing of it is left on the canvas. Pixel (default) is the canvas below, unchanged.
-        const layout = uiLookSmooth() && uiCssAvailable() ? yesNoLayout(calls, contextMarkers) : null;
-        if (layout) {
-            const runs = collectNativeTextRuns(g._session.textWidgets());
-            if (uiCssShow(g._key, layout, runs, { w: viewW, h: viewH })) {
-                g._painted = runs.map((r) => r.text);
-                return;
-            }
-        }
-        uiCssHide(g._key);
+        // look C (web/ui-c, task T5): the game's own draw runs inside the capture scope; the window clip becomes the C question box, the
+        // prompt and the Yes / No rows DOM text (claims.js cmfont 69 = 0x45). Look C off = the same calls on the canvas.
         ctx.save();
         ctx.scale(s, s);
-        renderer.draw(ctx, calls, null, [], contextMarkers, []);
-        g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets()).texts;
+        uiC.scope(g._key, ctx, { enable: true, compose: composeWindow }, () => {
+            renderer.draw(ctx, calls, null, [], contextMarkers, []);
+            g._painted = drawNativeTextWidgets(ctx, g._session.textWidgets()).texts;
+        });
         ctx.restore();
     };
 
     /** Abandon the box without running onClose (the field left another way). */
     g.close = () => {
-        uiCssHide(g._key);
         host.close();
     };
 

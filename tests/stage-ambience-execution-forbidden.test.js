@@ -13,9 +13,8 @@
 //      linked the interpreter would add engine/native/runtime.ts and fail here;
 //      the negative control below proves the check detects one when a graph does
 //      link it.
-//   2. The overlay is behind an explicit research switch. web/game.js defines
-//      USE_NATIVE_STAGE from ?nativeStages and only calls enterNativeStage /
-//      tickNativeStage inside `if (USE_NATIVE_STAGE)`, so no flag never boots it.
+//   2. The overlay is never booted on the stage-entry path. web/game.js does not
+//      load or enter a native stage; it only ticks the (idle) stage clock.
 //   3. The adapter declares `execution: "translated"` and the browser verifier
 //      (tools/verify_translated_field_ambience.mjs) aborts every
 //      assets/native/** request and refuses any other mark.
@@ -75,17 +74,11 @@ test("the interpreter check detects the interpreter when a graph links one", asy
     `expected the interpreter in the research-entry graph, saw ${JSON.stringify(flagged)}`);
 });
 
-test("the overlay is behind an explicit research switch on the stage-entry path", () => {
+test("the overlay is never booted on the stage-entry path", () => {
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(game,
-    /const USE_NATIVE_STAGE = new URLSearchParams\(location\.search\)\.has\("nativeStages"\)/,
-    "web/game.js defines USE_NATIVE_STAGE from ?nativeStages");
-  // The boot and the per-frame entry tick are both inside the guard; the
-  // decision line the audit locates is the guarded `enterNativeStage(mapId, {`.
-  assert.match(game, /if \(USE_NATIVE_STAGE\) \{\s*try \{\s*enterNativeStage\(mapId, \{/,
-    "enterNativeStage(mapId, { is inside `if (USE_NATIVE_STAGE)`");
-  assert.match(game, /if \(USE_NATIVE_STAGE\) \{[\s\S]*?tickNativeStage\(mapId\)/,
-    "the first native tick is inside `if (USE_NATIVE_STAGE)`");
+  assert.doesNotMatch(game, /enterNativeStage|loadNativeStages|USE_NATIVE_STAGE/,
+    "web/game.js neither loads nor enters a native stage");
+  assert.doesNotMatch(game, /nativeStages/, "no URL switch boots the overlay");
 });
 
 test("the ambience adapter declares translated execution and its browser check denies executable assets", () => {

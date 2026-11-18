@@ -1,0 +1,2 @@
+#ui-c-root .uic-bar-track { position: absolute; background: var(--c-track); }
+#ui-c-root .uic-bar-fill { position: absolute; left: 0; top: 0; height: 100%; }

@@ -12,6 +12,7 @@
 import { ui } from "./vendor/engine.js";
 import { paintNativeSession } from "./native-session.js";
 import { wfightLoaderRegion } from "./wfight-translated.js";
+import { capturing as uiCCapturing, partHook as uiCPart } from "./ui-c/capture.js";
 
 /** The buttons a queued press is allowed to carry. */
 export const BATTLE_PULSE_BUTTONS = new Set([
@@ -56,8 +57,8 @@ export function stripCanvas(bytes, w, h) {
 
 /**
  * The vsync blit's VRAM-to-VRAM copies land on top of the finished frame. The
- * strip is what the battle boot loader uploaded to VRAM; on the `?legacyWfight=1`
- * route no loader ran, so the identical bytes come from the data build.
+ * strip is what the battle boot loader uploaded to VRAM; when no loader ran, the
+ * identical bytes come from the data build.
  */
 export function paintStripMoves(ctx, state, moves) {
     const info = state._data?.manifest?.strip;
@@ -223,7 +224,11 @@ export function createBattleMenuAdapter(spec) {
         ctx.save();
         ctx.scale(s, s);
         paintNativeSession(ctx, renderer, target, { fade: false });
-        paintStripMoves(ctx, r, target.moves);
+        // Look C capture (web/ui-c/battlehud.js): the marker copies are the focus, handed over as data (the row they land in is the
+        // focused row); outside a capture they are blitted as always.
+        if (uiCCapturing()) {
+            for (const m of target.moves ?? []) if (m.dstY < 0x100) uiCPart(ctx, { part: "focus", x: m.dstX, y: m.dstY, w: m.w, h: m.h });
+        } else paintStripMoves(ctx, r, target.moves);
         ctx.restore();
     };
 

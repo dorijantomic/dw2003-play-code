@@ -2,11 +2,11 @@
 // The screen's logic runs in engine/dw3/ui (NameRootSession); this file loads
 // its data, forwards the held buttons, paints the picture calls and text, and
 // hands the confirmed names back to the walker's state. It never executes
-// original instructions; `?nativeName=1` keeps the original-code screen as a
-// research reference (web/nameentry-native.js).
+// original instructions.
 import { ui, rosterSlotOfCharId } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
+import { composeName } from "./ui-c/screens.js";
 import { partyRosterView } from "./party.js";
 import { fetchBytes, loadResidentResources } from "./resident-data.js";
 
@@ -143,7 +143,7 @@ export function createNameEntryTranslated(sfx = null, options = {}) {
         if (!n._open || !n._session) return;
         ctx.save();
         ctx.scale(viewW / 320, viewW / 320);
-        paintNativeSession(ctx, renderer, n._session);
+        paintNativeSession(ctx, renderer, n._session, { ui: { key: "ui-name", compose: composeName } });
         ctx.restore();
     };
 

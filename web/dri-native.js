@@ -25,8 +25,8 @@
 //   * the roster record's ledger region (record+0x58, 44 x 0x14) holds
 //     {value0 u16, formLevel u8, present u8, DVEXP u32, six flagged tech u16}.
 //
-// The hand-authored screen (web/dri.js) stays as the development rollback
-// (?legacyDri=1); nothing here falls back to it.
+// This screen is no longer opened by the game (web/lab-translated.js runs the desk); the
+// helpers lab-translated.js imports (ownedSlots, slotStats) live here.
 
 import {
     ROSTER_SLOT_CHARIDS, rosterSlotDigimonId, rosterSlotOfCharId, syncWornFromEquipment, ROSTER_STRIDE,

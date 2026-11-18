@@ -4,11 +4,9 @@
 // web/battle-menu-adapter.js, which runs the open/press/update/draw/close
 // machinery every battle menu shares, then hands the chosen row back to
 // web/battle.js. It never executes original instructions and never requests an
-// executable asset. `?nativeBattleCmd=1` keeps the original-code list as a
-// research reference (web/battlecmd-native.js); `?legacyBattleCmd=1` keeps the
-// walker's hand-made list.
+// executable asset.
 //
-// Same public API as createBattleCommandNative: open/update/draw/close/press/
+// Public API: open/update/draw/close/press/
 // isOpen/isPending/active/failed/chosen/preload/diagnostics.
 //
 // The confused player's list is the SAME widget on the original's joke config:
@@ -16,8 +14,7 @@
 // engine/dw3/battle-confusion.ts shuffleJokeMenu) opens it as pro/fightstg's
 // joke owner F0x8009A898, whose rows are the eight joke commands 0x6B+index,
 // never greyed, and whose confirm answers with the chosen joke row instead of a
-// command. `?legacyJokeMenu=1` (read by web/battle.js) keeps the walker's own
-// hand-drawn list for that case.
+// command.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";

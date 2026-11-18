@@ -3,11 +3,11 @@
 // The wizard's logic runs in engine/dw3/ui (WizardRootSession); this file loads
 // its data, forwards the held buttons, paints the picture calls and text, and
 // hands the account name and chosen pack back to the walker's opening. It never
-// executes original instructions; `?nativePack=1` keeps the original-code
-// screen as a research reference (web/packselect-native.js).
+// executes original instructions.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
+import { composeWizard } from "./ui-c/screens.js";
 import { decodeGameName, encodeGameName } from "./nameentry-translated.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 
@@ -114,7 +114,7 @@ export function createPackSelectTranslated(sfx = null) {
         // resource string whose [pause] control codes page it. Without this the
         // painter re-decodes line 0 from the start and stops at the first pause,
         // so "Welcome to Digimon Online." is the only page a player ever sees.
-        paintNativeSession(ctx, renderer, p._session, { fade: false, revealWindow: true });
+        paintNativeSession(ctx, renderer, p._session, { fade: false, revealWindow: true, ui: { key: "ui-pack", compose: composeWizard } });
         ctx.restore();
         return true;
     };

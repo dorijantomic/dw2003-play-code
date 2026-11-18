@@ -63,6 +63,7 @@ test("the folder adapter declares translated execution and links no interpreter 
 test("web/game.js routes the ordinary folder editor at the translated adapter", () => {
   const source = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   assert.match(source, /createCardDeckTranslated\(sfx\)/, "the translated folder adapter is built");
-  assert.match(source, /GYM_PARAMS\.has\("nativeFolder"\)\s*\?\s*cardDeckNative\s*:\s*cardDeckTranslated/,
-    "the native overlay is behind ?nativeFolder=1 and the ordinary route uses the translated adapter");
+  assert.match(source, /const cardDeck = cardDeckTranslated;/,
+    "the ordinary route uses the translated adapter");
+  assert.doesNotMatch(source, /cardDeckNative|cardDeckLegacy/, "no other folder editor is built");
 });

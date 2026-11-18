@@ -98,12 +98,6 @@ test("every screen that shows \"Equip n\" reads the stored worn byte", () => {
     "the pause ITEMS band draws a count");
   assert.match(menu, /function equippedCountOf\(state, itemId\) \{\s*\n\s*ensureEquipment\(state\);\s*\n\s*return wornCount\(state, Number\(itemId\)\);/,
     "and that count IS the stored worn byte, not a scan of the wearer record");
-  // Both native pages seed the byte into the save block they hand the original's
-  // own code, so the ported `0x20F` loads read it.
-  for (const file of ["web/status-native.js", "web/shop-native.js"]) {
-    assert.match(read(file), /WORN_COUNTS \+ id, Math\.max\(0, Math\.min\(WORN_MAX, wornCount\(state, id\)\)\), 1\)/,
-      `${file} seeds the worn array into the save block`);
-  }
   assert.match(read("web/status-translated.js"),
     /const worn = wornItemIds\(state\)\.map\(\(id\) => \(\{ id, qty: wornCount\(state, id\) \}\)\);/,
     "the translated pause page seeds it too");
@@ -147,23 +141,15 @@ const CALLERS = [
   ["engine/dw3/ui/pause-close-commit.ts", /setEquippedItem\(state, slot, name, id\);/,
     "the pause page's worn-slot diff, both routes"],
   ["web/status-translated.js", /commitPauseClose\(\{/, "the translated pause page calls it"],
-  ["web/status-native.js", /commitPauseClose\(\{/, "the reference pause page calls it"],
   ["engine/dw3/ui/shop-close-commit.ts", /commitEquipEvent\(state, swap\.party, swap\.equipment\);/,
     "the translated merchant's equip swap"],
   ["engine/dw3/ui/shop-close-commit.ts", /reconcileHeldCounts\(state, result\.inventory\);/, "the translated merchant's commit"],
-  ["web/shop-native.js", /reconcileHeldCounts\(state, inventory\);/, "the reference merchant's commit"],
   ["web/fightreport-translated.js", /setHeldCount\(state, itemId, session\.heldCount\(itemId\), heldCount\(state, itemId\)\);/,
     "the post-battle report's commit"],
-  ["web/fightreport-native.js", /setHeldCount\(state, itemId, readHostHeld\(itemId\), heldCount\(state, itemId\)\);/,
-    "the reference report's commit"],
   // The save image and the report's seed both carry the block's TWO count arrays
   // for all 402 ids (item store gap 7): these pin the seed to the shared writer,
   // because a per-route `id < 256` filter there loses every accessory in the band.
-  ["web/save-native.js", /writeItemArrays\(\{ write8:[\s\S]*?\},\s*itemCountEntries\(state\), SAVE\);/,
-    "the reference card screen's bag seed"],
   ["web/save-translated.js", /bag: itemCountEntries\(state\),/, "the card screen's bag seed"],
-  ["web/fightreport-native.js", /writeItemArrays\(\{ write8:[\s\S]*?\},\s*itemCountEntries\(state\), SAVE\);/,
-    "the reference report's bag seed"],
   ["web/fightreport-translated.js", /bag: itemCountEntries\(state\),/, "the report's bag seed"],
   ["web/debugPanel.js", /storeAddItem\(state, item\.id, 1\);/, "the debug panel's grant"],
 ];

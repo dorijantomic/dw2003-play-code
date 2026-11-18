@@ -5,8 +5,6 @@
 // picture calls, the text and the closing dim, and commits what the screen changed to the walker's
 // state once, after it has closed. It never executes original instructions and never requests an
 // executable asset.
-// `?nativeLab=1` keeps the original-code screen as a research reference (web/dri-native.js);
-// `?legacyDri=1` keeps the hand-made screen (web/dri.js).
 //
 // State contract (who changes what, exactly once). The screen changes only four kinds of save cell
 // (stgdglab-writes-only-four-save-cells-2026-09-21), and on close the adapter reads each once:
@@ -35,6 +33,7 @@ import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } fro
 import { baseStatsFor, CHARID_TO_DIGID } from "./party.js";
 import { ensureFormLedger } from "./dri-model.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
+import { composeWindow } from "./ui-c/screens.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 
 /** The lab's picture handles: the stdglabo archive (chrome and the chart's portraits) and CMFONT. */
@@ -349,7 +348,7 @@ export function createLabTranslated(sfx = null) {
         const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
         ctx.save();
         ctx.scale(s, s);
-        paintNativeSession(ctx, renderer, g._session);
+        paintNativeSession(ctx, renderer, g._session, { ui: { key: "ui-lab", compose: composeWindow } });
         if (g._ledgerPages > 1) {
             ctx.font = "8px monospace";
             ctx.fillStyle = "#ffe36b";

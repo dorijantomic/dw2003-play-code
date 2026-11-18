@@ -21,9 +21,6 @@
 //   * the duel result is 0x80048AC0 (s32, 1 = the player won) and the win
 //     counter the duel banks.
 //   * the root's lifecycle reaching 3 is the player leaving the duel.
-//
-// The old hand-authored duel (web/cardduel.js) stays as the development
-// rollback (?legacyDuel=1).
 
 import { BOOSTER_ITEM_IDS, seedBoosterStock, commitBoosterStock, SAVE_CARD_MAX, COLLECTION_CAP } from "./vendor/engine.js";
 import { createNativeAdapter } from "./native-screen-host.js";

@@ -1,0 +1,34 @@
+/* Battle hit feedback (look C "Arc + Dock"): the hit banner (who acts small, the move big and slanted), the damage number that pops at the target,
+   the list rows on the arc. CSS animations only; reduced motion = no animation. */
+#ui-c-root .uic-hit-who { text-shadow: 0 1px 8px #000; }
+#ui-c-root .uic-hit-title { text-shadow: 0 0 28px rgba(248, 152, 0, .7), 0 3px 14px #000; transform: skewX(-8deg); transform-origin: 0 100%; animation: uic-hit-in .35s cubic-bezier(.2, .9, .2, 1) both; }
+/* the damage pop: white and outlined; the type changes colour, size and the small tag. ONE .pp per hit event (parts.js fillPop), it plays once and fades. */
+#ui-c-root .uic-pop { display: block; text-align: center; font-family: var(--f-label); color: #fff; white-space: nowrap; pointer-events: none; }
+#ui-c-root .uic-pop .pp { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; animation: uic-pop-in 1.5s both; }
+#ui-c-root .uic-pop .nm { font-weight: 400; line-height: 1; -webkit-text-stroke: .09em var(--c-hud-slab); paint-order: stroke fill; text-shadow: 0 .06em .18em rgba(0, 0, 0, .85); }
+#ui-c-root .uic-pop-player .nm { text-shadow: 0 0 .3em rgba(255, 61, 110, .8), 0 .06em .18em rgba(0, 0, 0, .85); }
+#ui-c-root .uic-pop .tg { font-style: normal; font-size: var(--tg); line-height: 1; letter-spacing: .08em; padding: .12em .5em .1em; margin-bottom: .1em; transform: skewX(-8deg); color: var(--c-orange-ink); background: var(--c-num); }
+#ui-c-root .uic-pop-crit .nm { color: var(--c-gold); text-shadow: 0 0 .3em rgba(255, 213, 106, .85), 0 .06em .18em rgba(0, 0, 0, .85); }
+#ui-c-root .uic-pop-crit .tg { background: var(--c-gold); }
+#ui-c-root .uic-pop-weak .nm { color: var(--c-num); }
+#ui-c-root .uic-pop-resist .nm { color: #b6bccf; text-shadow: 0 .06em .18em rgba(0, 0, 0, .85); }
+#ui-c-root .uic-pop-resist .tg { background: #8c93a8; }
+#ui-c-root .uic-pop-heal .nm { color: var(--c-hp-b); text-shadow: 0 0 .3em rgba(58, 224, 138, .8), 0 .06em .18em rgba(0, 0, 0, .85); }
+#ui-c-root .uic-pop-miss .nm { color: var(--c-cyan); font-style: italic; letter-spacing: .06em; -webkit-text-stroke-width: .1em; }
+#ui-c-root .uic-pop-counter .tg { background: var(--c-orange); }
+#ui-c-root .uic-pop-status .tg, #ui-c-root .uic-pop-dmg[class*="uic-pop-st-"] .tg { color: #fff; }
+#ui-c-root .uic-pop-st-poison .tg { background: var(--c-pip-sick); }
+#ui-c-root .uic-pop-st-frozen .tg { background: var(--c-locked); }
+#ui-c-root .uic-pop-st-confuse .tg { background: var(--c-orange); color: var(--c-orange-ink); }
+#ui-c-root .uic-pop-st-sleep .tg { background: var(--c-pc-blue); }
+/* the turn arc (top right): round nodes with the actor's initial; the one acting now is biggest and ringed in orange, enemies carry a red rim */
+#ui-c-root .uic-node { box-sizing: border-box; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--f-label); color: #fff; background: var(--c-hud-body); border: .14em solid var(--c-cyan); box-shadow: 0 0 0 .1em rgba(0, 8, 40, .8), 0 .2em .5em rgba(0, 0, 0, .6); pointer-events: none; }
+#ui-c-root .uic-node-enemy { border-color: var(--c-hot); background: #2a0620; }
+#ui-c-root .uic-node-now { border-color: var(--c-orange); box-shadow: 0 0 .9em rgba(248, 152, 0, .7), 0 .2em .5em rgba(0, 0, 0, .6); }
+#ui-c-root .uic-node-now.uic-node-enemy { border-color: var(--c-hot); box-shadow: 0 0 .9em rgba(255, 61, 110, .75), 0 .2em .5em rgba(0, 0, 0, .6); }
+#ui-c-root .uic-node-later { opacity: .55; }
+#ui-c-root .uic-node .nl { line-height: 1; }
+@keyframes uic-hit-in { 0% { opacity: 0; transform: skewX(-8deg) translateX(-24px); } 100% { opacity: 1; transform: skewX(-8deg); } }
+@keyframes uic-pop-in { 0% { opacity: 0; transform: translateY(14px) scale(.6); } 14% { opacity: 1; transform: translateY(-6px) scale(1.18); } 30% { transform: translateY(0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px) scale(1); } }
+/* the list caption: a slim light line of the description (no box), the same shadow as the arc words */
+#ui-c-root .uic-cap { text-shadow: 0 2px 12px rgba(0, 8, 40, .95), 0 0 3px rgba(0, 8, 40, .9); }

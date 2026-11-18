@@ -19,8 +19,8 @@
 //     (substate 10). The window's fold and the close-before-answer timing are the
 //     remaining part of the same decode (the walker still shows/hides instantly).
 import { drawWindow } from "./uiRects.js";
-import { choiceLayout } from "./ui-css-model.js";
-import { uiCssAvailable, uiCssHide, uiCssShow, uiLookSmooth } from "./ui-css.js";
+import * as uiC from "./ui-c/index.js";
+import { composeWindow } from "./ui-c/screens.js";
 
 let choiceCount = 0;
 
@@ -28,6 +28,22 @@ let choiceCount = 0;
 export const CHOICE_MOVE_SOUND = 0x8004513e;
 /** The confirm blip: `ori $a0,0x503c` at file 0x1a38. */
 export const CHOICE_CONFIRM_SOUND = 0x8004503c;
+
+/**
+ * The box in the field Yes / No box's own native frame (cmfont 69 at y 172, 320 x 50 for two options: the prompt 4 below the top at x 18,
+ * the options at x 28 on a 14 pitch, the cursor at x 18 on the cursor row ([enter] pose: this box does not blink it), 4 spare at the bottom). More options grow the box up;
+ * the bottom stays at 222. Pure: { parts, runs } for the look C composer (a "question" part, as claims.js gives cmfont 69).
+ */
+export const CHOICE_BOX = Object.freeze({ x: 0, bottom: 222, w: 320, pad: 4, pitch: 14, promptX: 18, optionX: 28, cursorX: 18 });
+export function choiceScene(ch) {
+  const B = CHOICE_BOX, n = ch.options.length, h = B.pad * 2 + B.pitch * (n + 1), y = B.bottom - h;
+  const rel = { a: 1, d: 1, e: 0, f: 0 };
+  const parts = [{ part: "question", layer: "over", rows: 0, pack: "choice", id: "box", x: B.x, y, bx: 0, by: 0, w: B.w, h, rel }];
+  const runs = [{ text: ch.prompt, x: B.promptX, y: y + B.pad, kind: 1 }];
+  ch.options.forEach((o, i) => runs.push({ text: o, x: B.optionX, y: y + B.pad + B.pitch * (i + 1), kind: 1 }));
+  runs.push({ text: "[enter]", x: B.cursorX, y: y + B.pad + B.pitch * (ch.cursorIdx + 1), kind: 1 });
+  return { parts, runs };
+}
 
 export function createChoice(sfx = null) {
   const uiKey = `choice${++choiceCount}`;
@@ -70,11 +86,15 @@ export function createChoice(sfx = null) {
 
   // Drawn in SCREEN space (call after ctx.restore()).
   ch.draw = (ctx, viewW, viewH) => {
-    if (!ch.isOpen()) { uiCssHide(uiKey); return; }
-    // OPTIONS > UI look: Smooth draws this same box (window, prompt, options, cursor, at these same positions) as DOM + CSS
-    // vectors (web/ui-css.js) and leaves the canvas empty; Pixel (default) is the canvas drawing below, unchanged.
-    if (uiLookSmooth() && uiCssAvailable() && uiCssShow(uiKey, { choice: choiceLayout(ch, viewW, viewH) }, [], { w: viewW, h: viewH })) return;
-    uiCssHide(uiKey);
+    if (!ch.isOpen()) { uiC.hide(uiKey); return; }
+    // look C (web/ui-c, task T5): the C question box, the same composer as the field Yes / No box (choiceScene); the canvas below is the
+    // fallback when the overlay is not there.
+    const s = Math.max(1, Math.min(viewW / 320, viewH / 240));
+    ctx.save();
+    ctx.scale(s, s);
+    const shown = uiC.scope(uiKey, ctx, { enable: true, compose: () => composeWindow(choiceScene(ch)) }, () => {});
+    ctx.restore();
+    if (shown) return;
     const lineH = 24, pad = 16;
     const boxH = pad * 2 + lineH + ch.options.length * lineH;
     const x = 12, w = viewW - 24;

@@ -5,6 +5,8 @@
 // packed sounds. It never executes original instructions and never runs events: the menu starts
 // none, so closing it hands control straight back.
 import { ui } from "./vendor/engine.js";
+import * as uiC from "./ui-c/index.js";
+import { composeHelp } from "./ui-c/screens.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
@@ -107,15 +109,17 @@ export function createHelpMenuTranslated(sfx = null) {
         const { calls, contextMarkers } = g._session.drawIntents();
         ctx.save();
         ctx.scale(s, s);
-        renderer.draw(ctx, calls, null, [], contextMarkers, []);
-        // The eight titles are set whole; the page is the typewriter, so only its revealed run
-        // is painted (the same split dialogue-translated.js makes for the conversation box).
-        const page = g._session.pageAddress();
-        const widgets = g._session.textWidgets();
-        g._painted = [
-            ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr !== page)).texts,
-            ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr === page), { revealWindow: true }).texts,
-        ];
+        uiC.scope("ui-help", ctx, { enable: true, compose: composeHelp, dim: 0 }, () => {
+            renderer.draw(ctx, calls, null, [], contextMarkers, []);
+            // The eight titles are set whole; the page is the typewriter, so only its revealed run
+            // is painted (the same split dialogue-translated.js makes for the conversation box).
+            const page = g._session.pageAddress();
+            const widgets = g._session.textWidgets();
+            g._painted = [
+                ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr !== page)).texts,
+                ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr === page), { revealWindow: true }).texts,
+            ];
+        });
         ctx.restore();
     };
 

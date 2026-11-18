@@ -30,7 +30,7 @@ import { ShopDrawIntents } from "./shop-draw-intents.ts";
 import { ShopPadInput } from "./shop-pad-input.ts";
 import { TranslatedTaskTree, type TranslatedTaskClass } from "./translated-task-tree.ts";
 import { windowFoldStart, windowFoldTick } from "./window-fold.ts";
-import { installShopFont } from "./shop-font.ts";
+import { loadResidentResources, type ResidentTextResources } from "./resident-text-host.ts";
 import { fetchTableEntry } from "./fetch-table.ts";
 import {
   uiIconSetUnk60, uiIconSetUnk7c,
@@ -97,6 +97,9 @@ export interface FolderResources {
   banks: ReadonlyMap<number, Uint8Array>;
   cards: readonly FolderCardRecord[];
   font: Uint8Array;
+  /** Resident RAM ranges and the cursor glyph table (resident-data.js), as the card shop loads them. */
+  ranges?: ResidentTextResources["ranges"];
+  cursorGlyphs?: ResidentTextResources["cursorGlyphs"];
   /** The folder records the walker's collection holds, seeded on entry. */
   folders: readonly FolderFolderRecord[];
   /** Cards the walker owns / has ever seen, for the row counters and bank reads. */
@@ -150,6 +153,7 @@ export class FolderSession {
   private readonly bankIds: Set<number>;
   private cardView!: CardViewTextContext;
   private primitiveScratch = 0;
+  private resolvedCard = 0;
   private frame = 0;
   private closed = false;
   private popup = 0;
@@ -161,7 +165,9 @@ export class FolderSession {
     if (!Number.isInteger(language) || language < 0 || language > 6) throw new Error("Invalid folder language");
     this.language = language;
     this.host = host;
-    installShopFont(this.mem, resources.font);
+    // The shop font AND the resident cursor glyph table: without the table the list cursor child
+    // gets a null string and draws no glyph (the card shop loads it the same way).
+    loadResidentResources(this.mem, { font: resources.font, ranges: resources.ranges, cursorGlyphs: resources.cursorGlyphs });
     for (const table of resources.tables ?? []) this.mem.load(table.bytes, table.base);
     this.mem.write32(SAVE_PTR, language);
 
@@ -415,14 +421,20 @@ export class FolderSession {
       draw8C: this.draw.setScale, draw94: this.draw.setPos,
       drawSprite: this.draw.drawSprite, packResolve: this.draw.packResolve,
       initCardView: () => this.cardView.init(),
-      cardResolve: (id: number) => this.cardView.select(id),
+      cardResolve: (id: number) => { this.resolvedCard = id | 0; this.cardView.select(id); },
       cardBadge: () => this.cardView.kind(),
       cardByte: (offset: number) => this.cardView.byte(offset),
       cardSetPairA: (x: number, y: number) => this.cardView.setPairA(x, y),
       cardSetPairB: (x: number, y: number) => this.cardView.setPairB(x, y),
       cardSetSize: (col: number, row: number) => this.cardView.setSize(col, row),
       cardDispatch: (layer: number, bucket: number) => { this.cardView.dispatch(layer, bucket); },
-      cardDrawCell: (x: number, y: number) => this.cardView.drawCell(x, y),
+      cardDrawCell: (x: number, y: number) => {
+        // The grid cell's card picture (the disc queues one textured primitive; the extracted atlas paints it).
+        if (this.resolvedCard >= 1 && this.resolvedCard < SAVE_CARD_MAX) {
+          this.draw.calls.push({ method: "cardSprite", args: [this.resolvedCard, x, y, 255] });
+        }
+        this.cardView.drawCell(x, y);
+      },
       cardCommit: () => this.cardView.commit(),
       foldStart: (sub: number, direction: number) => windowFoldStart(this.mem, sub, direction),
       foldTick: (sub: number) => windowFoldTick(this.mem, sub),

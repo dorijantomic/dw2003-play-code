@@ -37,7 +37,7 @@
 // `stepPhase`. Load, Summon and Compile are played one turn at a time, using
 // the engine's own turn machines (`beginProgramTurns` / `playProgramTurn` /
 // `passProgramTurn`, `beginSummonTurns` / `takeSummonTurn` / `endSummonTurn`),
-// which is exactly what the duel screen at web/cardduel.js drives. A phase is
+// which is exactly what the (former hand-authored) duel screen drove. A phase is
 // parked by the engine's own `duel.human` flag: it is set only for the frame
 // that opens the turn machine, because the engine parks these phases when a
 // screen drives them (card-battle.ts applyCeremonyOp cases 0x98/0x99 and 0x9A),

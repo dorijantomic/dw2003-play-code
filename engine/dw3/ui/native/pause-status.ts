@@ -739,6 +739,8 @@ export function statusDetailTick(mem: PauseMemory, obj: number, ui: number, host
 /** F0x8008DDB0(obj, ui): open, pick a partner, hand over to a child page, close. */
 export function statusTick(mem: PauseMemory, obj: number, ui: number, host: StatusHost): void {
     const r = (off: number) => mem.read32(obj + off) | 0;
+    // No partner (a new game before any is granted) lays the page out like one partner: the state is the count, and 0 is the state that starts the page.
+    const size = () => Math.max(r(0x5c), 1);
     const w = (off: number, v: number) => mem.write32(obj + off, v | 0);
     const at = (off: number) => mem.read32(ui + off) | 0;
     const bit = (bits: number, code: number) => (bits >> host.padBit(0, code)) & 1;
@@ -760,8 +762,8 @@ export function statusTick(mem: PauseMemory, obj: number, ui: number, host: Stat
         default:
             start(0x88, 1);
             start(0xb8, 1);
-            if (r(0x5c) === 1) start(0xc8, 1);
-            w(0x10, r(0x5c));
+            if (size() === 1) start(0xc8, 1);
+            w(0x10, size());
             return;
         case 1:
             host.foldTick(obj + 0x88);
@@ -825,7 +827,7 @@ export function statusTick(mem: PauseMemory, obj: number, ui: number, host: Stat
                 if (v < 0) w(0x7c, 0);
             } else if (pressedOrRepeat(6)) {
                 const v = r(0x7c) + 1;
-                const limit = r(0x5c) - 1;
+                const limit = size() - 1;
                 w(0x7c, v);
                 if (limit < v) w(0x7c, limit);
             }
@@ -833,7 +835,8 @@ export function statusTick(mem: PauseMemory, obj: number, ui: number, host: Stat
                 host.playSound(0x4001b);
                 return;
             }
-            if (pressed(0xd)) {
+            // The pick opens a partner's sheet: with no partner on the pedestal (a new game before any is granted) there is no sheet to open.
+            if (pressed(0xd) && partyPositionToRosterSlot(mem, r(0x7c)) >= 0) {
                 host.playSound(0x4001c);
                 w(0x78, 0);
                 w(0x74, 0);
@@ -866,16 +869,16 @@ export function statusTick(mem: PauseMemory, obj: number, ui: number, host: Stat
             }
             return;
         case 0x32:
-            start(r(0x5c) * 0x10 + 0x78, 0);
-            rows(r(0x5c) - 1, 0);
+            start(size() * 0x10 + 0x78, 0);
+            rows(size() - 1, 0);
             start(0xc8, 0);
             hide(0x88);
             hide(0x8c);
-            if (r(0x5c) === 1) {
+            if (size() === 1) {
                 start(0xb8, 0);
                 hide(0);
             }
-            w(0x10, r(0x5c) + 0x32);
+            w(0x10, size() + 0x32);
             return;
         case 0x33:
             host.foldTick(obj + 0x88);

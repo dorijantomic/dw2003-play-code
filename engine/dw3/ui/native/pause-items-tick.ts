@@ -81,6 +81,8 @@ export function pauseItemsTick(
     host: PauseItemsTickHost,
 ): void {
     const count = () => mem.read32(obj + 0x5c) | 0;
+    // The page layout of a party of `count`; no partner (a new game before any is granted) lays out like one.
+    const layout = () => Math.max(count(), 1);
     const act = (ptr: number, flag: number) => host.widgetAct(ptr, flag);
     const ready = (ptr: number) => host.widgetReady(ptr) | 0;
     const rowFill = (index: number, flag: number) => host.rowFill(obj, arg1, index, flag);
@@ -290,7 +292,7 @@ export function pauseItemsTick(
             if (ready(obj + 0x3fc) !== 0) {
                 host.callMethod(mem.read32(arg1) | 0, 0x114, [host.resourceBase((lang() + 0xb0) | 0), 0x27]);
                 host.rowFill(obj, arg1, 0, 1);
-                if (count() !== 1) {
+                if (layout() !== 1) {
                     act(obj + 0x3dc, 1);
                     advance();
                     return;
@@ -302,7 +304,7 @@ export function pauseItemsTick(
         case 0x16:
             if (ready(obj + 0x3dc) !== 0) {
                 host.rowFill(obj, arg1, 1, 1);
-                if (count() === 2) {
+                if (layout() === 2) {
                     mem.write32(obj + 0x10, 0x18);
                     return;
                 }
@@ -369,7 +371,7 @@ export function pauseItemsTick(
             }
             return;
         case 0x1b:
-            switch (count()) {
+            switch (layout()) {
                 case 2:
                     act(obj + 0x3dc, 0);
                     host.rowFill(obj, arg1, 1, 0);
@@ -416,7 +418,7 @@ export function pauseItemsTick(
             mem.write32(obj + 0x0c, 3);
             return;
         case 0x32:
-            switch (count()) {
+            switch (layout()) {
                 case 2:
                     act(obj + 0x3dc, 0);
                     act(obj + 0x40c, 0);
@@ -444,9 +446,9 @@ export function pauseItemsTick(
             host.callMethod(mem.read32(arg1 + 0x8c) | 0, 0x144, [0]);
             host.callMethod(mem.read32(arg1 + 0xa0) | 0, 0x144, [0]);
             host.callMethod(mem.read32(arg1 + 0x9c) | 0, 0x144, [0]);
-            if (count() !== 3) footer(0);
+            if (layout() !== 3) footer(0);
             host.callMethod(mem.read32(arg1 + 0xb8) | 0, 0x80, [0]);
-            mem.write32(obj + 0x10, (count() + 0x32) | 0);
+            mem.write32(obj + 0x10, (layout() + 0x32) | 0);
             return;
         case 0x33:
             ready(obj + 0x3cc);
@@ -576,7 +578,10 @@ export function pauseItemsTick(
                 act(obj + 0x42c, 1);
                 act(obj + 0x41c, 1);
             }
-            mem.write32(obj + 0x10, cnt);
+            // No partner at all (a new game before any is granted) starts like a one-partner page: the
+            // disc always has at least one, and a state equal to the count would be 0 here, the very
+            // state this branch handles, so the page would never come up and take no key.
+            mem.write32(obj + 0x10, cnt > 0 ? cnt : 1);
             return;
         }
     }

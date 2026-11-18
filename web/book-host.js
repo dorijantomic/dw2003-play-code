@@ -17,6 +17,14 @@ import { createKitInput, WORD } from "./ui-kit-input.js";
 import { createFoldChain, dimField, SFX_OPEN, SFX_CLOSE } from "./ui-kit.js";
 import { createStatusBackdrop } from "./status-backdrop.js";
 import { isPadButton } from "./vendor/engine.js";
+import * as uiC from "./ui-c/index.js";
+import { partHook } from "./ui-c/capture.js";
+import { composeBookScreen } from "./ui-c/screens.js";
+
+/** The look C layer of the open book (web/ui-c/books.js composes it). */
+export const BOOK_UI_KEY = "ui-book";
+/** The status backdrop's scroll in native px (web/screenpack.js drawPackBackdrop: 25 px a second, a 96 px tile). */
+const backdropScroll = (t) => (t * 25) % 96;
 
 /** After the book has shut, wait for the player to let go of the pad (at most this many displayed frames) before the pause list returns. */
 export const RELEASE_WAIT_FRAMES = 25;
@@ -44,7 +52,7 @@ export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof 
             return true;
         },
         /** Force it shut at once (a lab reset). */
-        close() { book?.close?.(); book = null; chain = null; onBack = null; },
+        close() { book?.close?.(); book = null; chain = null; onBack = null; uiC.hide(BOOK_UI_KEY); },
         /** One real frame: `dt` seconds, `held` = web/game.js state.keys. */
         update(dt, held) {
             if (!book) return;
@@ -78,12 +86,17 @@ export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof 
             const k = Math.min(viewW / 320, viewH / 240);
             ctx.translate((viewW - 320 * k) / 2, (viewH - 240 * k) / 2);
             ctx.scale(k, k);
-            if (book.wall) {
-                if (sidesByField) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 320, 240); ctx.clip(); }
-                backdrop.draw(ctx, 320, 240);
-                if (sidesByField) ctx.restore();
-            }
-            book.draw(ctx, { progress: (n) => chain.folds[n].progress(), ticks, dt: lastDt });
+            // look C (web/ui-c): one scope in the 320 x 240 box; the book's clips, its drawText runs and the parts it hands over (bars,
+            // map boxes, the wall's scroll) become the C layer. The canvas keeps the dim of the field under it.
+            const s = book;
+            uiC.scope(BOOK_UI_KEY, ctx, { enable: true, texts: true, compose: composeBookScreen(s.look) }, () => {
+                if (s.wall && !partHook(ctx, { part: "backdrop", x: backdropScroll(backdrop.time()), y: backdropScroll(backdrop.time()), w: 320, h: 240 })) {
+                    if (sidesByField) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 320, 240); ctx.clip(); }
+                    backdrop.draw(ctx, 320, 240);
+                    if (sidesByField) ctx.restore();
+                }
+                s.draw(ctx, { progress: (n) => chain.folds[n].progress(), ticks, dt: lastDt });
+            });
             ctx.restore();
         },
     };

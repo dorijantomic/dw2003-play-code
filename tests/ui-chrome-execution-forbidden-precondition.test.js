@@ -92,7 +92,7 @@ test("the audit measures the Card Album and folder editor converted and the duel
   assert.equal(folder.class, "ours", "the folder editor's ordinary route runs the translated session");
   assert.equal(folder.entry, "engine/dw3/ui/folder-session.ts", "the folder's measured entry is the session");
   assert.deepEqual(folder.forbidden, [], "the folder reaches no forbidden native module");
-  assert.equal(folder.reference && folder.reference.flag, "nativeFolder", "the overlay survives only behind ?nativeFolder=1");
+  assert.equal(folder.reference, null, "no interpreter adapter survives for the folder editor");
 
   const duel = audit.surfaces.find((s) => s.id === "cardgame");
   assert.ok(duel, "the card duel is in the frozen audit");

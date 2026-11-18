@@ -1,0 +1,10 @@
+/* z 12: above #title-screen (10, opaque, holds the title / language / menu canvas), below the style chooser (30) and the panels (40+) */
+#ui-c-root { position: absolute; left: 0; top: 0; pointer-events: none; overflow: hidden; z-index: 12; -webkit-font-smoothing: antialiased; }
+#ui-c-root .uic-scope { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+#ui-c-root .uic-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+#ui-c-root canvas.uic-art { position: absolute; image-rendering: pixelated; background: transparent; border: none; border-radius: 0; max-width: none; max-height: none; }
+#ui-c-root .uic-box { position: absolute; }
+#ui-c-root .uic-shadowed { filter: drop-shadow(var(--sx, 0px) var(--sy, 0px) 0 var(--c-shadow)); }
+#ui-c-root .uic-fill { position: absolute; }
+#ui-c-root .uic-dim { position: absolute; background: var(--c-wash); }
+#ui-c-root .uic-wall { position: absolute; background: var(--c-wall); }

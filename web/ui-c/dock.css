@@ -1,0 +1,59 @@
+/* The battle command dock (parts.js fillDock, base.dockPart): six words each at a fixed slot on an arc around the ring, the focused word slid
+   into the dock beside the ring (CSS transition, triggered by the focus class), a faint outline ghost on its slot, a pointer bead on the ring.
+   The arc animates by CSS alone on the compositor (slow tick turn, glow breath, opacity); a focus move plays one 160 ms kick (data-kick a / b
+   alternate so the same animation restarts), removed on animationend. Reduced motion: no animation, no transition, instant moves. */
+#ui-c-root .uic-dock { pointer-events: none; }
+#ui-c-root .uic-dock > * { position: absolute; }
+#ui-c-root .uic-dock .dk-gd { -webkit-mask-image: conic-gradient(from 0deg, #0000 0deg, #000 16deg, #000 108deg, #0000 126deg, #0000 360deg); mask-image: conic-gradient(from 0deg, #0000 0deg, #000 16deg, #000 108deg, #0000 126deg, #0000 360deg); }
+#ui-c-root .uic-dock .dk-gd { animation: uic-dk-breath 4.5s ease-in-out infinite; }
+#ui-c-root .uic-dock .dk-dkarc { animation: uic-dk-breath 3.2s ease-in-out infinite; }
+#ui-c-root .uic-dock svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+#ui-c-root .uic-dock .dk-spin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; will-change: transform; animation: uic-dk-turn 140s linear infinite; }
+#ui-c-root .uic-dock .dk-line { stroke: rgba(110, 210, 255, .4); }
+#ui-c-root .uic-dock .dk-ticks { stroke: rgba(150, 220, 255, .5); }
+#ui-c-root .uic-dock .dk-major { stroke: rgba(190, 240, 255, .8); }
+#ui-c-root .uic-dock .dk-dkline { stroke: rgba(255, 178, 30, .5); filter: drop-shadow(0 0 4px rgba(255, 178, 30, .5)); }
+#ui-c-root .uic-dock .dk-flash { stroke: #bff0ff; opacity: 0; filter: drop-shadow(0 0 6px var(--c-cyan)); }
+#ui-c-root .uic-dock[data-kick="a"] .dk-flash { animation: uic-dk-flash-a .16s ease-out; }
+#ui-c-root .uic-dock[data-kick="b"] .dk-flash { animation: uic-dk-flash-b .16s ease-out; }
+#ui-c-root .uic-dock .dk-ptr { height: calc(2 * var(--dk)); margin-top: calc(-1 * var(--dk)); transform-origin: 0 50%; transform: rotate(-10deg); opacity: 0; transition: opacity .25s;
+    background: linear-gradient(90deg, transparent 0, transparent 98%, rgba(56, 208, 255, .2) 98%, var(--c-cyan) 100%); filter: drop-shadow(0 0 5px rgba(56, 208, 255, .8)); }
+#ui-c-root .uic-dock .dk-ptr::before { content: ""; position: absolute; left: calc(100% - 14 * var(--dk)); top: calc(-5 * var(--dk)); width: calc(12 * var(--dk)); height: calc(12 * var(--dk)); border-radius: 50%;
+    background: var(--c-gold); box-shadow: 0 0 0 calc(3 * var(--dk)) rgba(255, 178, 30, .35), 0 0 calc(14 * var(--dk)) var(--c-orange); }
+#ui-c-root .uic-dock.has .dk-ptr { opacity: 1; }
+#ui-c-root .uic-dock .dk-w, #ui-c-root .uic-dock .dk-g { position: absolute; white-space: nowrap; font-family: var(--f-label); transform-origin: 0 50%; }
+#ui-c-root .uic-dock .dk-w { opacity: .85; transition: transform .38s cubic-bezier(.2, .8, .2, 1), opacity .3s; }
+#ui-c-root .uic-dock .dk-w.on { transform: translate(var(--tx), var(--ty)) scale(var(--sc)); opacity: 1; }
+#ui-c-root .uic-dock .dk-w .wd { position: relative; display: block; transform-origin: 0 50%; transition: filter .3s; }
+#ui-c-root .uic-dock .dk-w.on .wd { filter: drop-shadow(0 0 calc(14 * var(--dk)) rgba(248, 152, 0, .6)); }
+#ui-c-root .uic-dock .dk-w .ol { display: block; color: rgba(222, 236, 255, .95); text-shadow: 0 2px 16px rgba(0, 8, 40, .95), 0 0 3px rgba(0, 8, 40, .9); }
+#ui-c-root .uic-dock .dk-w .fl { position: absolute; left: 0; top: 0; display: block; color: transparent; background: linear-gradient(90deg, #fff3b8, #ffb21e 45%, #f87800); -webkit-background-clip: text; background-clip: text; clip-path: inset(0 100% 0 0); transition: clip-path .4s cubic-bezier(.2, .8, .2, 1); }
+#ui-c-root .uic-dock .dk-w.on .fl { clip-path: inset(0 0 0 0); }
+#ui-c-root .uic-dock[data-kick="a"] .dk-w.on .wd { animation: uic-dk-pop-a .16s ease-out; }
+#ui-c-root .uic-dock[data-kick="b"] .dk-w.on .wd { animation: uic-dk-pop-b .16s ease-out; }
+#ui-c-root .uic-dock .dk-g { color: transparent; -webkit-text-stroke: max(1px, var(--dk)) rgba(110, 210, 255, .7); opacity: 0; transition: opacity .3s; }
+#ui-c-root .uic-dock .dk-g.on { opacity: .4; }
+@keyframes uic-dk-turn { to { transform: rotate(360deg); } }
+@keyframes uic-dk-breath { 50% { opacity: .72; } }
+@keyframes uic-dk-flash-a { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes uic-dk-flash-b { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes uic-dk-pop-a { 0% { transform: scale(1); } 45% { transform: scale(1.09); } 100% { transform: scale(1); } }
+@keyframes uic-dk-pop-b { 0% { transform: scale(1); } 45% { transform: scale(1.09); } 100% { transform: scale(1); } }
+/* list rows on the arc (name, element chip, MP cost): the same slots and dock slide as the commands */
+#ui-c-root .uic-dock .dk-w.rw { display: flex; align-items: center; }
+#ui-c-root .uic-dock .dk-w.rw .tn { flex: 0 1 auto; min-width: 0; display: block; overflow: hidden; white-space: nowrap; text-overflow: clip; font-family: var(--f-text); font-weight: 700; color: #e6eeff;
+    text-shadow: 0 2px 14px rgba(0, 8, 40, .95), 0 0 3px rgba(0, 8, 40, .9); transition: color .2s; }
+#ui-c-root .uic-dock .dk-w.rw .chip { font-style: normal; flex: none; display: block; box-sizing: border-box; text-align: center; font-family: var(--f-label); letter-spacing: .5px; border: 1.5px solid currentColor; border-radius: 99px; color: var(--c-cyan); }
+#ui-c-root .uic-dock .dk-w.rw .tm { flex: none; display: block; text-align: right; font-family: var(--f-text); font-weight: 700; color: var(--c-num); text-shadow: 0 2px 12px #000; }
+#ui-c-root .uic-dock .dk-w.rw.on .tn { color: #ffd270; text-shadow: 0 0 18px rgba(248, 152, 0, .65), 0 2px 12px #000; }
+#ui-c-root .uic-dock .dk-w.rw.dis .tn, #ui-c-root .uic-dock .dk-w.rw.dis .tm { color: #6f7aa8; }
+#ui-c-root .uic-dock .dk-w.rw.dis .chip { opacity: .45; }
+#ui-c-root .uic-dock .dk-w.rw::after { content: ""; position: absolute; left: 0; bottom: -4px; height: 2px; width: 0; background: linear-gradient(90deg, var(--c-orange), rgba(248, 152, 0, 0)); transition: width .35s; }
+#ui-c-root .uic-dock .dk-w.rw.on::after { width: 100%; }
+#ui-c-root .uic-dock .dk-ttl { position: absolute; white-space: nowrap; font-family: var(--f-label); letter-spacing: 6px; color: var(--c-cyan); text-shadow: 0 1px 8px #000; display: flex; align-items: center; gap: .6em; }
+#ui-c-root .uic-dock .dk-ttl .cap { font-style: normal; font-size: .75em; letter-spacing: 0; padding: 0 .5em; border: 1.5px solid currentColor; border-radius: 4px; color: var(--c-dim-label); }
+/* the jolt: a small physical kick of the resting arc on every cursor move (the flash is separate) */
+#ui-c-root .uic-dock[data-kick="a"] .dk-gd { animation: uic-dk-breath 4.5s ease-in-out infinite, uic-dk-jolt-a .15s ease-out; }
+#ui-c-root .uic-dock[data-kick="b"] .dk-gd { animation: uic-dk-breath 4.5s ease-in-out infinite, uic-dk-jolt-b .15s ease-out; }
+@keyframes uic-dk-jolt-a { 0% { transform: translate(-3px, 2px) rotate(-1.5deg); } 100% { transform: none; } }
+@keyframes uic-dk-jolt-b { 0% { transform: translate(-3px, 2px) rotate(-1.5deg); } 100% { transform: none; } }

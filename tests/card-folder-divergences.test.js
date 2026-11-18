@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 const read = (p) => readFileSync(p, "utf8");
 
 test("no folder screen writes a default name (folders are blank until named)", () => {
-    for (const file of ["web/carddeck-native.js", "web/cardduel-native.js"]) {
+    for (const file of ["web/cardduel-native.js"]) {
         const src = read(file);
         assert.doesNotMatch(src, /Folder \$\{/, `${file} must not invent a folder name`);
         assert.match(src, /encodeNativeScreenText\(folder\?\.name \?\? ""/,

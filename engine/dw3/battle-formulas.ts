@@ -516,6 +516,10 @@ export function magicalElementalFactor(raw: number): number {
 }
 
 /** Element + crit + armor + clamp stage — F0x8009f6dc. */
+/** Read-only reporting of one damage roll (look only): `crit` = the critical roll came up, `eff` = the element x family multiplier the stages applied
+ *  (1 = a neutral defender, i.e. resistance value 100). Filling it never changes a number and never draws from the RNG. */
+export interface DamageInfo { crit: boolean; eff: number; }
+
 export function resolveDamage(
   base: number,
   atk: EffStats,
@@ -523,7 +527,9 @@ export function resolveDamage(
   skill: Skill,
   rng: () => number,
   field?: ElementalField | null,
+  info?: DamageInfo | null,
 ): number {
+  let eff = 1;
   let s0 = base + elementalFieldAdjustment(base, skill.element, field);
   // Stage 2 — F0x8009f6dc .L0x8009f740-.L0x8009f7a8, PHYSICAL tail only (F0x8009fab4,
   // the magical leaf, never calls this routine). `skill+0x9 >= 2` matched against the
@@ -534,7 +540,7 @@ export function resolveDamage(
   // at most one bonus applies: the family arm jumps over the byte scan, and the scan's
   // match jumps straight to the bonus.
   if (!skill.magical) {
-    const boost = () => { s0 += (s0 + (s0 >>> 31)) >> 1; };
+    const boost = () => { s0 += (s0 + (s0 >>> 31)) >> 1; eff *= 1.5; };
     if ((skill.target_family ?? 0) >= 2) {
       if (skill.target_family === def.family) boost();
     } else {
@@ -552,6 +558,7 @@ export function resolveDamage(
     const raw = def.resistances?.[elem] ?? 100;
     if (skill.magical) {
       s0 = Math.trunc((s0 * magicalElementalFactor(raw)) / 100);
+      eff *= magicalElementalFactor(raw) / 100;
     } else if (def.resistances) {
       // F0x8009f6dc .L0x8009f7d8-.L0x8009f864: a technique whose element byte is
       // >= 2 adds `2 * running * skill[+0x8] / defenderElement`, the defender's
@@ -560,10 +567,12 @@ export function resolveDamage(
       // same direction the magical curve above and the accessory term below use.
       // There is no `running * element / 100` stage in the original's tail.
       s0 += Math.trunc((2 * s0 * (skill.damage_scalar ?? 0)) / Math.max(1, raw));
+      eff *= (1 + (2 * (skill.damage_scalar ?? 0)) / Math.max(1, raw)) / (1 + (2 * (skill.damage_scalar ?? 0)) / 100);   // against a neutral defender (100) = 1
     }
   }
   if (skill.magical && (skill.target_family ?? 0) >= 2 && skill.target_family === def.family) {
     s0 += Math.trunc(s0 / 2);
+    eff *= 1.5;
   }
   const equipElement = atk.elementalAttack?.element;
   // F0x8009f6dc .L0x8009f804-.L0x8009f864: the worn weapon element (+0x2b/+0x2c) is
@@ -575,6 +584,7 @@ export function resolveDamage(
   if (!skill.magical && plainElement && !clipIsPrecision && equipElement && def.resistances) {
     const resistance = Math.max(1, def.resistances[equipElement] ?? 100);
     s0 += Math.trunc((s0 * atk.elementalAttack!.amount * 2) / resistance);
+    eff *= (1 + (atk.elementalAttack!.amount * 2) / resistance) / (1 + (atk.elementalAttack!.amount * 2) / 100);
   }
   // Special-op stage — F0x8009f6dc L29950-L29972: on a physical row (skill f7
   // < 2, any such row, not only basic attacks) whose attacker carries the effective
@@ -597,6 +607,7 @@ export function resolveDamage(
   const critical = skill.magical
     ? magicalCritProc(atk, def, skill, rng)
     : critProc(atk, def, skill, rng);
+  if (info) { info.crit = critical; info.eff = Math.round(eff * 100) / 100; }
   if (critical) {
     // Physical leaf (F0x8009f8e4): `rng & 0x3f` + 0x20. Magical leaf (F0x8009fab4,
     // 0x8009fd54-0x8009fda4): the 0x7e07e07f multiply is a divide by 65, so RAND % 65 + 0x20.

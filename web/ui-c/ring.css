@@ -1,0 +1,38 @@
+/* The living HP / MP / DV ring of the battle HUD (parts.js fillRing). The tick layers spin by CSS alone (own elements, compositor); the DV arc
+   pulses by opacity on its own element when full. No per-frame JS; reduced motion stops both. */
+#ui-c-root .uic-ring > * { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+#ui-c-root .uic-ring svg { display: block; width: 100%; height: 100%; overflow: visible; }
+#ui-c-root .uic-ring .tk { stroke: var(--c-ring-tk); }
+#ui-c-root .uic-ring .tk2 { stroke: var(--c-ring-tk2); }
+#ui-c-root .uic-ring .scan { stroke: var(--c-cyan); }
+#ui-c-root .uic-ring .trk { stroke: var(--c-ring-trk); }
+#ui-c-root .uic-ring .dvt { stroke: var(--c-ring-dvt); }
+#ui-c-root .uic-ring .disc { stroke: none; }
+#ui-c-root .uic-ring .dv { stroke: var(--c-cyan); transition: stroke-dasharray .6s ease; }
+#ui-c-root .uic-ring .mp { transition: stroke-dasharray .5s ease; }
+#ui-c-root .uic-ring-mini .hp { transition: stroke-dasharray .5s ease; }
+#ui-c-root .uic-ring-base { filter: drop-shadow(0 0 6px rgba(56, 208, 255, .3)); }
+#ui-c-root .uic-ring-spin { will-change: transform; animation: uic-ring-spin 90s linear infinite; }
+#ui-c-root .uic-ring-spin.rev { animation-duration: 140s; animation-direction: reverse; }
+#ui-c-root .uic-ring.full .dv { stroke: var(--c-gold); }
+#ui-c-root .uic-ring.full .uic-ring-dv { filter: drop-shadow(0 0 7px var(--c-gold)); animation: uic-ring-pulse 1.3s ease-in-out infinite; }
+#ui-c-root .uic-ring.down { opacity: .55; }
+#ui-c-root .uic-ring-pulse { box-sizing: border-box; border: 2px solid var(--c-cyan); border-radius: 50%; opacity: 0; box-shadow: 0 0 16px var(--c-cyan), inset 0 0 14px rgba(56, 208, 255, .5); pointer-events: none; }
+#ui-c-root .uic-ring[data-pulse="a"] .uic-ring-pulse { animation: uic-ring-pulse-a .5s ease-out; }
+#ui-c-root .uic-ring[data-pulse="b"] .uic-ring-pulse { animation: uic-ring-pulse-b .5s ease-out; }
+@keyframes uic-ring-pulse-a { 0% { transform: scale(.92); opacity: .95; } 100% { transform: scale(1.75); opacity: 0; } }
+@keyframes uic-ring-pulse-b { 0% { transform: scale(.92); opacity: .95; } 100% { transform: scale(1.75); opacity: 0; } }
+@keyframes uic-ring-spin { to { transform: rotate(360deg); } }
+@keyframes uic-ring-pulse { 50% { opacity: .55; } }
+/* the MP a technique would spend: the arc shows what is left, the part that would go glows hot (own arc under the MP arc) */
+#ui-c-root .uic-ring .mpx { stroke: var(--c-hot-ink); opacity: 0; }
+#ui-c-root .uic-ring.prev .mpx { opacity: .9; filter: drop-shadow(0 0 5px var(--c-hot)); }
+#ui-c-root .uic-ring.act { filter: drop-shadow(0 0 7px rgba(56, 208, 255, .55)); }
+/* a hit on the ring: one short shake of the whole ring */
+#ui-c-root .uic-ring[data-hurt="a"] { animation: uic-ring-hurt-a .42s ease-out; }
+@keyframes uic-ring-hurt-a { 0%, 100% { transform: none; } 12% { transform: translate(-4px, 2px); } 28% { transform: translate(4px, -2px); } 46% { transform: translate(-3px, 1px); } 64% { transform: translate(2px, -1px); } 82% { transform: translate(-1px, 0); } }
+/* HP colour like the enemy bar: green from 50 %, yellow below 50 %, red below 25 % (the gradient stops read these tokens); red breathes softly */
+#ui-c-root .uic-ring[data-hp-state="mid"] { --c-hp-a: var(--c-foe-mid-a); --c-hp-b: var(--c-foe-mid-b); }
+#ui-c-root .uic-ring[data-hp-state="low"] { --c-hp-a: var(--c-foe-low-a); --c-hp-b: var(--c-foe-low-b); }
+#ui-c-root .uic-ring[data-hp-state="low"] .hp { animation: uic-hp-low 1.2s ease-in-out infinite; }
+@keyframes uic-hp-low { 50% { opacity: .55; } }

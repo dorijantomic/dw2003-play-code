@@ -10,9 +10,9 @@
 //   - the three card screens (album, folder editor, duel) run the shipped
 //     overlay in ordinary play, so the first time one opens it calls
 //     loadNativeRuntime();
-//   - the field's ?nativeStages research route calls it through
+//   - a research verifier's native stage calls it through
 //     web/native-stage.js;
-//   - every ?native* research adapter calls it through web/native-screen.js.
+//   - every native research adapter calls it through web/native-screen.js.
 //
 // The module namespace is cached, so a second call is free and callers that can
 // only run synchronously once the screen is booted (bootNativeScreen,

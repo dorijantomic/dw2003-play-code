@@ -9,7 +9,7 @@
 //
 // Ground rule: no coordinate in this file is invented. Where the disc's own
 // geometry is not in cardduel_ui.json it is cited to the measured constant in
-// web/cardduel.js and named as such.
+// the (former) web/cardduel.js and named as such.
 
 import { loadPack, drawClip, drawClipAtPaletteRow, packReady } from "./screenpack.js";
 import { createSfxPlayer, createBgmPlayer, createExclusiveRegister } from "./audio.js";
@@ -45,7 +45,7 @@ const ALT_ICON_BASE = 49;
 const STRIP_ORIGIN = () => UI.strip_origin.pal;
 const FLIP_FRAMES = 8;
 // The disc's own message-box rows, measured 2026-08-24/2026-09-12 and carried
-// in web/cardduel.js as PLAY_BOX / CONFIRM_BOX (message-box table 0x800A59B0:
+// in the (former) web/cardduel.js as PLAY_BOX / CONFIRM_BOX (message-box table 0x800A59B0:
 // box 0 at y138, box 2 at y50).
 const PLAY_BOX = { y: 138, h: 48, textX: 28, textY: 143, lineH: 14, markX: 14 };
 const CONFIRM_BOX = { y: 50, h: 48, textX: 28, textY: 55, lineH: 14, markX: 14 };

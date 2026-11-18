@@ -4,8 +4,6 @@
 // picture calls, the text, the sprite actors' VRAM primitives and the closing dim, and commits
 // what the screen changed to the walker's state once, after it has closed. It never executes
 // original instructions and never requests an executable asset.
-// `?nativeGym=1` keeps the original-code screen as a research reference (web/gym-native.js);
-// `?legacyGym=1` keeps the hand-made screen (web/gym.js).
 //
 // State contract (who changes what, exactly once). The screen changes only the partner's private
 // roster record: the TP cost (charged when the player answers Yes), the six core stats, the seven
@@ -28,6 +26,7 @@ import { ensureStoredStats } from "./battle.js";
 import { createGymPrimPainter } from "./gym-vram-paint.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
+import { composeWindow } from "./ui-c/screens.js";
 
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
 const PACK_NAMES = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
@@ -244,7 +243,7 @@ export function createGymTranslated(sfx = null) {
         ctx.save();
         ctx.scale(s, s);
         painter.beginFrame();
-        paintNativeSession(ctx, renderer, g._session);
+        paintNativeSession(ctx, renderer, g._session, { ui: { key: "ui-gym", compose: composeWindow } });
         ctx.restore();
     };
 

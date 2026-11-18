@@ -7,7 +7,6 @@
 // the original reaches through function pointers — the text-bank getter, the pack
 // resolver and the sprite painter — and paints through the same native-text helper
 // web/battle.js already uses. It never executes original instructions.
-// `?legacyBattleMsg=1` keeps web/battle.js's hand-drawn rectangle.
 //
 // What the player sees with this on: the battle's own window picture
 // (PGFGTC00 cel 49, 296 x 38) at native (11, 188), the first line at (20, 194) and the
@@ -35,11 +34,6 @@ const {
   battleMessageDraw, battleMessageKindFor, battleMessageLineIndex, battleMessagePromptClipId,
   battleMessagePromptFrame,
 } = ui;
-
-/** `?legacyBattleMsg=1` keeps web/battle.js's hand-drawn message rectangle. */
-export function translatedBattleMsgEnabled(search) {
-    return !new URLSearchParams(search).has("legacyBattleMsg");
-}
 
 /** The game key that drives `BATTLE_MESSAGE_CLOSE_BIT` (0x2000 = Circle). */
 export const BATTLE_MSG_CLOSE_KEY = "circle";

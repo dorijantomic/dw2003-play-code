@@ -18,6 +18,7 @@ import { headerCounts, listRows, logSnapshot, pageOne, pageTwoLines, partnerOf, 
 import { VISIBLE, createGlossaryModel } from "./glossary-model.js";
 import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glossary-items.js";
 import { drawItemIcon } from "./itemicons.js";
+import { artHook } from "./ui-c/capture.js";
 
 const rect = (x, y, cols, bands) => ({ x, y, w: cols * 40, h: panelPixelHeight(bands), cols, bands });
 export const GLOSSARY_LAYOUT = Object.freeze({
@@ -269,7 +270,10 @@ function drawPageOne(ctx, pm, pf, c, log, model, stage, view, w) {
     const lines = cardLines(p1, (s) => w(s), L.cardRight - L.cardX, L.cardRows.length);
     const shown = model.reveal(lines.length);             // the title is always there; one more line every 2 frames, the footer last
     if (pm >= 1) {
-        const drawn = stage?.draw(ctx, L.image.x, L.image.y, L.image.w, L.image.h, view.dt) ?? false;
+        // look C (web/ui-c): the model picture goes on the scope's art canvas, over the C panel; outside a scope it is painted here
+        let drawn = false;
+        const paint = (c) => { drawn = stage?.draw(c, L.image.x, L.image.y, L.image.w, L.image.h, view.dt) ?? false; };
+        if (!artHook(ctx, paint)) paint(ctx);
         if (!drawn) {
             const label = "No picture";
             drawText(ctx, label, L.image.x + (L.image.w - w(label)) / 2, L.image.y + (L.image.h - 12) / 2, { clut: 7 });

@@ -9,7 +9,7 @@
 //
 // WHY THIS EXISTS ALONGSIDE web/native-stage.js: the MIPS interpreter can also
 // run these objects, but production must not execute original machine code, and
-// the interpreter's images are a research route (`?nativeStages`). Before this
+// the interpreter's images are a research route (a native stage). Before this
 // module the s415 crevice ride drew no boulders at all in the shipped game: the
 // script's SETANIM 816..825 had nothing to construct them. The translated route
 // is the one that plays in the game; the interpreter route still runs the same
@@ -235,14 +235,14 @@ export function fireStageObject(stageId, id, sub) {
     // fifteen members in one module -- the Asuka City download halos, the login
     // flash, the Kusanagi City / Undersea Base decor and the s805/s810/s820
     // picture drivers. Each claims the stage's own ambient point-sprite records
-    // by their atlas byte and animates them. Under ?nativeStages the original
+    // by their atlas byte and animates them. Under a native stage the original
     // code owns those records, so the port stands down and none is driven twice.
     if (!nativeStage(stageId) && firePointRecordStageObject(stageId, id, sub)) {
         return true;
     }
     // The street broadcast (s780, engine/systems/street-vehicles.ts): SETANIM
     // 0x320 with sub 0x320/0x324 sets the broadcast object's sub-state, and its
-    // tick puts the cars on the street. Under ?nativeStages the original code
+    // tick puts the cars on the street. Under a native stage the original code
     // owns that object itself, so the port stands down and no car is drawn twice.
     if (!nativeStage(stageId) && fireStreetBroadcast(stageId, id, sub)) return true;
     // The wall/column screens (s780, engine/systems/street-screens.ts): SETANIM
@@ -341,7 +341,7 @@ export function fireStageObject(stageId, id, sub) {
 /**
  * The street screens are built by their own tick (the original's street entry
  * calls the registry ctor on its first tick), so they are owned here whenever
- * the translated route owns the stage. Under ?nativeStages the interpreter runs
+ * the translated route owns the stage. Under a native stage the interpreter runs
  * the original driver and publishes its own quads, and this one stands down.
  */
 export function streetScreensActive(stageId) {
@@ -454,7 +454,7 @@ export function liveStageObjects(stageId) {
 
 /**
  * Force one id down the MIPS interpreter's registry route instead
- * (`?nativeStages` research path). Only the rockfall oracle uses this, to run
+ * (the native-stage research path). Only the rockfall oracle uses this, to run
  * the original machine code and the translated port side by side; the game
  * itself never calls it, so the two routes cannot both own an id in play.
  */
@@ -588,8 +588,8 @@ function shapeSetMeta(set) {
  * code. This is the adapter's own statement of its execution mode, the same
  * mark every converted screen carries (web/shop-translated.js,
  * web/lab-translated.js). The original overlay's ambience runs only under the
- * explicit ?nativeStages research route, so `nativeOverlay` is false with no
- * flag; tools/verify_translated_field_ambience.mjs refuses any other mark and
+ * explicit native-stage research route, so `nativeOverlay` is false in the
+ * game; tools/verify_translated_field_ambience.mjs refuses any other mark and
  * aborts every assets/native/** request, and
  * tests/stage-ambience-execution-forbidden.test.js bundles the engine modules
  * below it and requires them to reach no interpreter.

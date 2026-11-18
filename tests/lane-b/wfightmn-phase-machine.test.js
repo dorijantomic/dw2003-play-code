@@ -299,15 +299,12 @@ test("the walker ST machine this oracle disagrees with is still the one in web/b
     ["ENEMY_ACT", 6], ["RESULT_MSG", 7], ["WIN", 8], ["LOSE", 9]]) {
     assert.ok(new RegExp(`\\b${name}:\\s*${value},`).test(src), `ST.${name} = ${value}`);
   }
-  // the INTRO->PLAYER_MENU 1.2s timer that phase 0's object build has no counterpart for
-  assert.ok(/if \(b\.timer > 1\.2\) \{\s*b\.state = ST\.PLAYER_MENU/.test(src),
-    "ST.INTRO advances on a 1.2s timer, the disagreement for phase 0");
 });
 
 // Runner hook a later port needs (ADDED by the port, 2026-10-07): `web/battle.js` now
 // exports its opening-machine seam through `peek().opening` — `{ phase, phaseName, lineArmed,
-// introVariant, ... }` (engine/dw3/battle-opening-machine.ts), and carries a `?legacyIntroTimer=1`
-// rollback flag that restores the old flat timer verbatim. This file still pins the ORIGINAL
+// introVariant, ... }` (engine/dw3/battle-opening-machine.ts); the old flat 1.2 s timer is gone.
+// This file still pins the ORIGINAL
 // only; the port is proven to match it by tests/lane-b/battle-opening-machine.test.js, which
 // drives both machines through the same canned state.
 

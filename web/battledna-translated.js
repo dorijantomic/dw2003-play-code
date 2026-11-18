@@ -4,8 +4,7 @@
 // its own seed/answer/diagnostics to web/battle-menu-adapter.js, which runs the
 // open/press/update/draw/close machinery every battle menu shares. It never
 // executes original instructions and never requests an executable asset.
-// `?legacyDnaList=1` keeps the walker's own Switch / DNA DV pane
-// (web/battle.js drawDnaChoice).
+// If the pane cannot load, web/battle.js drawDnaChoice takes over.
 //
 // Same public API as createBattleTagTranslated:
 // open/update/draw/close/press/isOpen/isPending/active/failed/chosen/

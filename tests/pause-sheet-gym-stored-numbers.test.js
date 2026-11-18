@@ -101,11 +101,6 @@ test("the gym HUD's core rows and the sheet print the same numbers", () => {
   assert.deepEqual(hud.core, p.core.slice(), "HUD input -> same six stored halfwords");
   assert.equal(hud.core[0] + gearStr, seeDigivolvePanelStat(p, GEAR, "str", null),
     "the HUD's value plus the same gear is the sheet's value");
-  const gym = readFileSync("web/gym.js", "utf8");
-  assert.match(gym, /drawText\(ctx, String\(stored\.core\[i\] \?\? 0\),/,
-    "the six core rows print storedNumbers' core");
-  assert.doesNotMatch(gym, /String\(st\?\.stats\?\.\[stat\] \?\? prof\?\.\[stat\] \?\? 0\)/,
-    "and no longer rebuild them from stats/profile");
 });
 
 test("the gym-translated seed's own element line is the same numbers (left as card 01 pinned it)", () => {

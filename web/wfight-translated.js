@@ -2,10 +2,8 @@
 // The loader's logic runs in engine/dw3/ui (WfightLoaderSession); this file loads
 // its data, ticks it on the display clock and reports when it has retired. It never
 // executes original instructions and never requests an executable asset.
-// `?nativeWfight=1` keeps the original-code loader as a research reference
-// (web/wfightmn-native.js); `?legacyWfight=1` skips the boot loader entirely.
 //
-// Same public API as createWfightNative: open/update/close/isOpen/isPending/active/
+// Public API: open/update/close/isOpen/isPending/active/
 // isDone/diagnostics.
 import { ui } from "./vendor/engine.js";
 import { fetchBytes, fetchJson } from "./resident-data.js";
@@ -29,7 +27,7 @@ let lastVram = null;
 
 /**
  * The pixels the loader uploaded to exactly this VRAM rectangle, or null when no
- * loader has run this page (`?legacyWfight=1`) or it did not upload that rectangle.
+ * loader has run this page or it did not upload that rectangle.
  */
 export function wfightLoaderRegion(x, y, w, h) {
     return lastVram?.(x, y, w, h) ?? null;

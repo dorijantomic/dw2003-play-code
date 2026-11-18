@@ -13,7 +13,6 @@ const read = (p) => JSON.parse(readFileSync(path.join(ROOT, p), "utf8"));
 global.fetch = async (url) => ({ ok: true, json: async () => JSON.parse(readFileSync(path.join(WEB, String(url)), "utf8")) });
 
 const { gymExtraHallAt, gymExtraTier, gymExtraPlan } = await import("../web/gym-extra.js");
-const { createGym } = await import("../web/gym.js");
 const { gymTrainingResult, gymStatForId } = await import("../web/battle.js");
 const { questGrid } = await import("../web/quest-walk.js");
 const { walkable } = await import("../web/quest-editor-lib.js");
@@ -114,28 +113,3 @@ test("ID card tiers match the disc gate", () => {
   assert.equal(gymExtraHallAt(DATA, "s660", 1101), null);
 });
 
-test("opened hall keeps the game's own drill rows: same gains and prices as the disc menu", async () => {
-  for (const h of DATA.halls) for (const tier of TIERS) {
-    const cards = { none: [], silver: [40], gold: [40, 41], platinum: [40, 41, 42] }[tier];
-    const st = {
-      party: ["p009rena"], partnerStats: { digimonId: 7, level: 15, xp: 0, tp: 70, hp: 99, maxHp: 99, mp: 99, maxMp: 99, stats: {}, elemBonuses: {} },
-      partyStats: [null], digimonNames: {}, inventory: inv(...cards), equipment: [{}, {}, {}],
-    };
-    const plan = gymExtraPlan(DATA, h, st.inventory);
-    assert.equal(plan.tier, tier);
-    const g = createGym(null);
-    await g.open(st, null, plan.group, h.map, plan.drills);
-    assert.deepEqual(g.drills.map((d) => d.drill).sort((a, b) => a - b), [...plan.drills].sort((a, b) => a - b));
-    assert.equal(g.rank, plan.group + 1);
-    for (const e of g.drills) {
-      const disc = PROG.rank_menus[plan.group].find((m) => m.drill === e.drill);
-      assert.deepEqual(e, disc);
-      for (const tp of [0, 1, 2]) {
-        const a = gymTrainingResult(e, tp, false, null, PROG, () => 7);
-        const b = gymTrainingResult(disc, tp, false, null, PROG, () => 7);
-        assert.deepEqual(a, b);
-        assert.equal(a.tpCost, PROG.tp_costs[tp]);
-      }
-    }
-  }
-});

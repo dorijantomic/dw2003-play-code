@@ -5,8 +5,8 @@
 // the same six steps: kick the manifest preload, boot or wait (`_pending`),
 // write the held-key pad word, tick one frame, detect the screen's own finish,
 // and close by reading the RAM back and tearing the host down. The copies had
-// drifted: web/carddeck-native.js and web/cardduel-native.js read the RAM back
-// while `_host` was still set, while web/dri-native.js and web/save-native.js
+// drifted: the card adapters read the RAM back
+// while `_host` was still set, while others
 // cleared it first, so a commit that looked at `this._host` saw two different
 // worlds depending on which screen the player closed.
 //

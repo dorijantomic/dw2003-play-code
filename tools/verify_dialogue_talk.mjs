@@ -88,7 +88,7 @@ await page.waitForTimeout(1200);
 const during = await page.evaluate(() => ({
   facade: window.__textbox.isOpen(),
   translated: window.__dialogueBox.isOpen(),
-  legacyDialogue: (window.__legacyTextbox ?? window.__textbox).dialogue !== null,
+  legacyDialogue: (window.__fallbackTextbox ?? window.__textbox).dialogue !== null,
   diag: window.__dialogueBox.diagnostics(),
 }));
 await page.screenshot({ path: resolve(outDir, legacy ? "talk-legacy.png" : "talk-translated.png") });

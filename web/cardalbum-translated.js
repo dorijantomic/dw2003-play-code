@@ -3,8 +3,7 @@
 // AlbumSession (engine/dw3/ui/album-session.ts) over the already-oracled
 // pro/stcrdabm controllers; this file only loads data-only assets, forwards the
 // pad word, paints the stalbm pack and the resident text widgets. It links no
-// interpreter host; the shipped-overlay reference is web/cardalbum-native.js
-// behind ?nativeAlbum=1.
+// interpreter host.
 //
 // The album is browse-only: it has no commit path, so close returns the walker's
 // collection unchanged. The collection the player has ever obtained seeds the
@@ -12,6 +11,7 @@
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession } from "./native-session.js";
+import { composeWindow } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards } from "./cardstate.js";
 
@@ -110,7 +110,7 @@ export function createCardAlbumTranslated(sfx = null) {
     if (!album._open || !album._session) return;
     ctx.save();
     ctx.scale(viewW / 320, viewW / 320);
-    paintNativeSession(ctx, renderer, album._session);
+    paintNativeSession(ctx, renderer, album._session, { ui: { key: "ui-album", compose: composeWindow } });
     ctx.restore();
   };
   album.close = () => { if (album._open) album._finish(); };

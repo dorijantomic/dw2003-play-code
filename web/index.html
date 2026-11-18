@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:,">
 <title>Digimon World 2003 — Walkabout</title>
+<link rel="stylesheet" href="ui-c/ui-c.css">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="ui-c/fonts/RussoOne-Regular.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="ui-c/fonts/ChakraPetch-SemiBold.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="ui-c/fonts/ChakraPetch-Bold.woff2">
 <style>
   html, body {
     margin: 0; height: 100%;
@@ -57,34 +62,49 @@
   }
   #loading { position: absolute; top: 50%; font-size: 14px; color: #9a9ab8; }
 
+  /* Choose Visual Style: look C (web/ui-c tokens + fonts, design C7). The family C window (4 px edge #2aa8ff, body #000818, chamfer 24
+     top-left / bottom-right) on the C7 stripes; each choice is a C7 button plate (chamfer 14), the focused / hovered one orange on amber. */
   #asset-mode-screen {
     position: absolute; inset: 0; z-index: 30;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(8, 8, 16, 0.96);
+    background: repeating-linear-gradient(135deg, var(--c-c-stripe) 0 24px, var(--c-c-stripe-dark) 24px 72px);
   }
   #asset-mode-screen[hidden] { display: none; }
   .asset-mode-panel {
-    width: min(560px, calc(100% - 36px)); box-sizing: border-box;
-    padding: 28px; border: 2px solid #45456a; border-radius: 10px;
-    background: #1d1d2b; box-shadow: 0 12px 50px #000;
-    text-align: center;
+    --cut: 24px; --e: 4px;
+    position: relative; isolation: isolate;
+    width: min(600px, calc(100% - 32px)); box-sizing: border-box;
+    padding: 30px 32px 28px; text-align: left;
+    background: var(--c-c-edge);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
   }
-  .asset-mode-panel h2 { margin: 0 0 6px; color: #ffd34d; letter-spacing: 2px; }
-  .asset-mode-panel > p { margin: 0 0 20px; color: #aaaac4; }
-  .asset-mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .asset-mode-option {
-    min-height: 116px; padding: 14px; cursor: pointer;
-    color: #e8e8f0; background: #29293d; border: 1px solid #565680;
-    border-radius: 8px; font: inherit;
+  .asset-mode-panel::before {
+    content: ""; position: absolute; inset: var(--e); z-index: -1; background: var(--c-c-body);
+    clip-path: polygon(calc(var(--cut) - 2px) 0, 100% 0, 100% calc(100% - var(--cut) + 2px), calc(100% - var(--cut) + 2px) 100%, 0 100%, 0 calc(var(--cut) - 2px));
   }
-  .asset-mode-option:hover:not(:disabled) { border-color: #ffd34d; background: #32324b; }
+  .asset-mode-panel h2 {
+    margin: 0 0 8px; font: 400 26px/36px var(--f-label); letter-spacing: 2px; color: var(--c-c-title);
+  }
+  .asset-mode-panel > p { margin: 0 0 22px; font: 600 16px/22px var(--f-text); color: var(--c-key-ink); }
+  .asset-mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .asset-mode-option, .asset-mode-close {
+    --cut: 14px; --edge: var(--c-c-edge); --body: var(--c-key-body); --ink: var(--c-ink); --sub: var(--c-key-ink);
+    position: relative; isolation: isolate; cursor: pointer; text-align: left;
+    border: 0; border-radius: 0; color: var(--ink); background: var(--edge);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .asset-mode-option::before, .asset-mode-close::before {
+    content: ""; position: absolute; inset: 3px; z-index: -1; background: var(--body);
+    clip-path: polygon(calc(var(--cut) - 2px) 0, 100% 0, 100% calc(100% - var(--cut) + 2px), calc(100% - var(--cut) + 2px) 100%, 0 100%, 0 calc(var(--cut) - 2px));
+  }
+  .asset-mode-option { min-height: 120px; padding: 16px 18px; font: 600 14px/1.4 var(--f-text); }
+  .asset-mode-option:is(:hover, :focus-visible):not(:disabled),
+  .asset-mode-close:is(:hover, :focus-visible) { --edge: var(--c-orange); --body: var(--c-slot-on); --ink: var(--c-slot-ink); --sub: var(--c-slot-ink); outline: none; }
   .asset-mode-option:disabled { opacity: 0.45; cursor: not-allowed; }
-  .asset-mode-option strong { display: block; color: #ffd34d; font-size: 17px; margin-bottom: 8px; }
-  .asset-mode-option span { display: block; color: #aaaac4; font-size: 12px; line-height: 1.4; }
-  .asset-mode-close {
-    margin-top: 18px; padding: 6px 18px; color: #e8e8f0;
-    background: transparent; border: 1px solid #565680; border-radius: 5px; cursor: pointer;
-  }
+  .asset-mode-option strong { display: block; margin-bottom: 8px; font: 400 18px/26px var(--f-label); letter-spacing: 1px; color: var(--ink); }
+  .asset-mode-option span { display: block; font: 600 13px/1.4 var(--f-text); color: var(--sub); }
+  .asset-mode-close { display: block; margin: 20px 0 0 auto; padding: 8px 26px; font: 400 15px/22px var(--f-label); letter-spacing: 1px; }
+  .asset-mode-close[hidden] { display: none; }
 
   #title-screen {
     position: absolute; inset: 0; z-index: 10;

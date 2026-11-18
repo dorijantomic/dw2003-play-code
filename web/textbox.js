@@ -1,14 +1,13 @@
 // web/textbox.js
 import { drawTalkWindow, drawAdvanceCursor } from "./uiRects.js";
 import { loadPack, packReady, drawClip, drawClipOpaque } from "./screenpack.js";
+import * as uiC from "./ui-c/index.js";
+import { composeTalk } from "./ui-c/message.js";
+
+let boxCount = 0;
 
 const CHARS_PER_SEC = 40;
 const cmfont = loadPack("cmfont");
-
-// `?legacyBalloonTail=1` restores the pre-port hand-drawn chrome triangle, so a
-// capture can show the tail before/after. Default: the decoded CMFONTCS sprite.
-const USE_LEGACY_BALLOON_TAIL = typeof location !== "undefined"
-  && new URLSearchParams(location.search).has("legacyBalloonTail");
 
 // Balloon tail (G23): one CMFONTCS sprite per quadrant mode, drawn by the
 // resident EXE F0x8001c050 from the layout table D0x8004dcf4. `clip` is the
@@ -116,8 +115,24 @@ export function balloonBodyRect(mode, ax, ay, w, h, sc) {
 export function createTextbox(sfx = null) {
   const tb = {
     dialogue: null, pageIdx: 0, shown: 0, onClose: null, t: 0, openT: 0,
-    anchor: null,
+    anchor: null, _key: `textbox${++boxCount}`,
   };
+  // look C (web/ui-c, task T6): this frame's box in native 320x240 units -- the balloon body / name / typed lines / more marker the
+  // overlay draws (web/ui-c/message.js composeTalk). The real clips (tail, band halves) are drawn inside the scope and captured.
+  let scene = null;
+  // the typed lines of the current page as native runs: x / y = the line's left / top (its centre at y + 4.5), only the revealed part
+  const pageRuns = (x, baseline, lineH, s) => {
+    let remaining = Math.floor(tb.shown);
+    const out = [];
+    tb.currentPage().forEach((line, i) => {
+      if (remaining <= 0) return;
+      const text = line.slice(0, remaining);
+      remaining -= line.length;
+      if (text) out.push({ text, x: x / s, y: (baseline + i * lineH) / s - 8.5, kind: 0 });
+    });
+    return out;
+  };
+  const moreBox = (x, y, s) => ({ part: "more", x: x / s - 6, y: y / s - 3, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } });
 
   tb.isOpen = () => tb.dialogue !== null;
   tb.currentPage = () => tb.dialogue.pages[tb.pageIdx];
@@ -192,7 +207,6 @@ export function createTextbox(sfx = null) {
 
   const drawBalloon = (ctx, viewW, viewH, pos) => {
     const mode = pos.mode & 3;
-    const above = mode === 0 || mode === 2;
     const sc = viewH / PS1_H; // decoded offsets are PS1-240p pixels
 
     // Anchor point (fieldstg F0x80088a84): the tail's tip, offset from the
@@ -227,27 +241,21 @@ export function createTextbox(sfx = null) {
     // the sprite's top edge, exactly as the reference capture shows the tail
     // hanging below the balloon's bottom border. Clips/offsets are the decoded
     // numbers (F0x8001c050 + layout table D0x8004dcf4); see BALLOON_TAIL.
-    // `?legacyBalloonTail=1` keeps the old hand-drawn chrome triangle, for the
-    // before/after capture.
-    if (USE_LEGACY_BALLOON_TAIL) {
-      const baseY = above ? y + h : y - nameH;
-      const baseX = Math.min(Math.max(ax, x + 12), x + w - 12);
+    if (uiC.capturing()) {
+      const s = viewW / PS1_W, tail = BALLOON_TAIL[mode];
+      scene = {
+        body: { x: x / s, y: y / s, w: w / s, h: h / s }, name: hasName ? tb.dialogue.name : null,
+        runs: pageRuns(x + BALLOON_TEXT_INSET.x, y + BALLOON_TEXT_INSET.y, lineH, s),
+        more: tb.isPageFullyShown() ? moreBox(x + w - 16, y + h - 20, s) : null,
+      };
       ctx.save();
-      ctx.fillStyle = "rgb(216, 232, 248)";
-      ctx.strokeStyle = "rgb(152, 208, 208)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(baseX - 7, baseY + (above ? -2 : 2));
-      ctx.lineTo(ax, ay + (above ? 8 : -8));
-      ctx.lineTo(baseX + 7, baseY + (above ? -2 : 2));
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      ctx.scale(s, s);
+      if (packReady(cmfont)) drawClipOpaque(ctx, cmfont, tail.clip, ax / s + tail.dx * sc / s, ay / s + tail.dy * sc / s, sc / s);
       ctx.restore();
-    } else {
-      const tail = BALLOON_TAIL[mode];
-      drawClipOpaque(ctx, cmfont, tail.clip, ax + tail.dx * sc, ay + tail.dy * sc, sc);
+      return;
     }
+    const tail = BALLOON_TAIL[mode];
+    drawClipOpaque(ctx, cmfont, tail.clip, ax + tail.dx * sc, ay + tail.dy * sc, sc);
 
     drawTalkWindow(ctx, x, y, w, h, nameW, nameH);
 
@@ -263,6 +271,21 @@ export function createTextbox(sfx = null) {
   // docs/research/ui/dialogue-chrome-decoded-2026-07-01.md.
   tb.draw = (ctx, viewW, viewH) => {
     if (!tb.isOpen()) return;
+    const s = viewW / PS1_W;
+    scene = null;
+    ctx.save();
+    ctx.scale(s, s);
+    uiC.scope(tb._key, ctx, { enable: true, compose: (sc) => composeTalk({ parts: scene?.more ? [...sc.parts, scene.more] : sc.parts, runs: scene?.runs ?? [] },
+      { body: scene?.body, name: scene?.name ?? null }) }, () => {
+      ctx.save();
+      ctx.scale(1 / s, 1 / s);
+      drawBox(ctx, viewW, viewH);
+      ctx.restore();
+    });
+    ctx.restore();
+  };
+
+  const drawBox = (ctx, viewW, viewH) => {
 
     const pos = tb.anchor ? tb.anchor() : null;
     if (pos && pos.mode != null && pos.mode !== 4) {
@@ -301,6 +324,12 @@ export function createTextbox(sfx = null) {
     const nameW = hasName ? 12 + tb.dialogue.name.length * 10 : 0;
     const nameH = hasName ? 22 : 0;
 
+    if (uiC.capturing()) {
+      scene = { body: undefined, name: hasName ? tb.dialogue.name : null, runs: pageRuns(x + pad, y + pad + 14, 24, s),
+        // the more arrow where the game's own band draws its marker (cmfont 10, centre 298 / 211 native): the band is shorter than this old box
+        more: tb.isPageFullyShown() ? { part: "more", x: 292, y: 205, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } } : null };
+      return;
+    }
     drawTalkWindow(ctx, x, y, w, boxH, nameW, nameH);
     if (hasName) drawName(ctx, x, y, nameH);
     drawPageText(ctx, x + pad, y + pad + 14, 24);

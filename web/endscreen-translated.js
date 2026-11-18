@@ -9,9 +9,7 @@
 // call's +0x88), not a screen dim. It never executes original instructions and asks for no
 // executable asset.
 //
-// `?legacyEnd=1` keeps web/endscreen.js, the hand-written stand-in this replaces.
-//
-// What a player sees, and what it means that this is the port and not the stand-in:
+// What a player sees, and what it means that this is the port and not the old hand-written stand-in:
 //   * the fade takes one step per display tick. The stand-in looped until the level ran out, so a
 //     frame that took two display ticks moved the card two steps; this one moves one.
 //   * the wait reads the pad every tick, so a button already down when the wait begins ends it at
@@ -28,11 +26,12 @@
 // rectangle colour (0x1F, 0x1F, 0x1F) where every ordinary menu asks for none, and what that
 // reaches the player as is not settled: see the open question in .bunny-scratch/endcard-report.md
 // section 5.1 and docs/research/ui/boot-gap-2026-09-02.md row D5. So this file paints the same
-// black web/endscreen.js always painted, records the colour the card asked for in diagnostics()
+// black the old hand-written card always painted, records the colour the card asked for in diagnostics()
 // (viewColour), and asserts nothing about what it should look like.
 import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { composeEnd } from "./ui-c/screens.js";
 import { paletteClipId } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
 
@@ -167,7 +166,7 @@ export function createEndCardTranslated(options = {}) {
         ctx.scale(s, s);
         ctx.imageSmoothingEnabled = false;
         paintNativeSession(ctx, card._renderer, { draw: session.drawIntents(), widgets: session },
-            { fade: false });
+            { fade: false, ui: { key: "ui-end", compose: composeEnd } });
         ctx.restore();
     };
 

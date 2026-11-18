@@ -1,0 +1,87 @@
+/* Colours and type from the C9 parts file. Sizes are set from JS in whole page pixels: --u (page px per native px), --e1 (edge),
+   --e2 (under-edge), --sh (drop shadow), --d (page px per design px, u / 3). */
+/* on :root too: the HTML screens outside the overlay (the Choose Visual Style panel, web/index.html) use the same colours */
+:root, #ui-c-root {
+    --uic-ok: 1;              /* sentinel: index.js health() reads it back; empty = this file never applied */
+    --c-edge: #8a8aff;        /* family A edge */
+    --c-body: #000020;        /* family A body */
+    --c-under: #2c2c8a;       /* plate row under-edge */
+    --c-orange: #f89800;      /* active row, tabs */
+    --c-orange-ink: #1a0c00;  /* text on orange */
+    --c-ink: #f2f2ff;         /* label text */
+    --c-body-text: #e8e8f8;
+    --c-num: #ffb21e;
+    --c-mp: #8fd8ff;
+    --c-hot-ink: #ff8a60;
+    --c-dim-label: #9a9aff;
+    --c-track: #1a1a50;
+    --c-hp: #3ee08a;
+    --c-mpbar: #38b8f8;
+    --c-name-body: #14145a;
+    --c-wall: #0a0a3c;
+    --c-slot: #1c1c6e;
+    --c-type: #1c1c66;
+    --c-type-deep: #0c0c44;   /* the faint word inside a list window (C3) */
+    --c-shadow: #000008;
+    --c-wash: rgba(0, 0, 24, .45);
+    --c-stripe: #06144a;
+    --c-stripe-dark: #020c34;
+    --c-cyan: #38d0ff;
+    --c-locked: #0c5a8a;
+    --c-empty-edge: #14144a;  /* empty list slot (C3) */
+    --c-empty-body: #06062a;
+    --c-chip: #10104a;        /* stat / element chip body (C9 6) */
+    --c-el-fire: #f87038;     /* element chip colour caps (C9 6) */
+    --c-el-water: #3898f8;
+    --c-el-ice: #a8e8f8;
+    --c-el-wind: #78e078;
+    --c-el-thunder: #f8e048;
+    --c-el-machine: #b0b0b0;
+    --c-el-dark: #a060f0;
+    --c-bln-body: #e6f0fb;    /* C6 balloon body */
+    --c-bln-edge: #2a5a9a;    /* C6 balloon edge */
+    --c-bln-tab: #0c5a8a;     /* C6 balloon name tab */
+    --c-bln-ink: #0a2a6a;     /* C6 balloon text */
+    --c-bln-name: #e8fbff;    /* C6 balloon name */
+    --c-bln-more: #e07000;    /* C6 balloon more arrow */
+    --c-pc-navy: #0a0a6a;     /* C6b place card bars */
+    --c-pc-blue: #3e3ec8;
+    --c-pc-cyan: #38e0ff;
+    --c-c-edge: #2aa8ff;      /* C7 family C: name entry window edge */
+    --c-c-body: #000818;
+    --c-key-edge: #1c6ab0;    /* C7 key */
+    --c-key-body: #001030;
+    --c-key-ink: #7fd0ff;
+    --c-key-empty-edge: #0a2a4a;
+    --c-key-empty-body: #000a1e;
+    --c-slot-on: #3a2200;     /* C7 focused name slot */
+    --c-slot-ink: #ffd080;
+    --c-c-stripe: #04204a;    /* C7 backdrop stripes */
+    --c-c-stripe-dark: #02122e;
+    --c-c-word: #0a2a66;      /* C7 big faint word */
+    --c-c-title: #46e08a;     /* C7 title green */
+    --c-hud-body: #080840;    /* C8 battle HUD: plate / window body (edge = --c-cyan) */
+    --c-hud-slab: #000028;    /* C8 name slab, key box body */
+    --c-hud-track: #001a3a;   /* C8 HP bar track */
+    --c-hud-well: #000008;    /* C8 DV gauge well */
+    --c-pip-off: #1a6a9a;     /* C8 party marker of a member who is not on the field */
+    --c-pip-hurt: #f8d038;    /* party marker states (the game's cel & 3): hurt, down, afflicted */
+    --c-pip-down: #e04040;
+    --c-pip-sick: #b070f0;
+    --c-gold: #ffd56a;        /* ring: a full DV arc */
+    --c-hot: #ff3d6e;
+    --c-ring-trk: rgba(8, 26, 80, .78);
+    --c-ring-tk: rgba(150, 220, 255, .55);
+    --c-ring-tk2: rgba(150, 220, 255, .28);
+    --c-ring-dvt: rgba(150, 220, 255, .22);
+    --c-hp-a: #1fb86a;
+    --c-hp-b: #7affc0;
+    --c-foe-mid-a: #c88a10;   /* enemy HP bar: yellow below 50 % */
+    --c-foe-mid-b: #ffe36a;
+    --c-foe-low-a: #b81838;   /* red below 25 % */
+    --c-foe-low-b: #ff6a7e;
+    --c-mp-a: #1a78d8;
+    --c-mp-b: #7adcff;
+    --f-label: "Russo One", sans-serif;
+    --f-text: "Chakra Petch", sans-serif;
+}

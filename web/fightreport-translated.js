@@ -4,8 +4,6 @@
 // calls, the text and the closing dim, and commits what the disc's screen itself
 // pays (the BIT and the dropped item) to the walker's state. It never executes
 // original instructions and never requests an executable asset.
-// `?nativeReport=1` keeps the original-code screen as a research reference
-// (web/fightreport-native.js); `?legacyReport=1` keeps the hand-made screen.
 //
 // State contract (who changes what, exactly once):
 //   * EXP, levels, the form ledger, techniques and stats are applied ONCE by
@@ -30,6 +28,7 @@ import { heldCount, itemCountEntries, setHeldCount, setReportOwnedForms, ui, MON
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { paintNativeSession, updateNativeSession } from "./native-session.js";
+import { composeReport } from "./ui-c/screens.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
@@ -238,9 +237,20 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         fitNativeScreen(ctx);
-        paintNativeSession(ctx, renderer, r._session);
+        paintNativeSession(ctx, renderer, r._session, { ui: { key: "ui-report", compose: (sc) => composeReport(sc, { view: reportView() }) } });
         ctx.restore();
     };
+
+    /** Read-only look data for web/ui-c/vic.js: the battle's progress and reward, the partners' names and levels, the session's live rows. */
+    function reportView() {
+        const o = r._opts ?? {}, v = o.view ?? {};
+        let rows = [];
+        try { rows = r._session ? r._session.rows() : []; } catch { rows = []; }
+        return {
+            progress: v.progress ?? [], reward: v.reward ?? null, rows,
+            partners: (o.participants ?? []).map((p) => ({ pos: p.pos ?? 0, name: p.name, level: p.level, preExp: Number(p.preExp) || 0, participated: !!p.participated })),
+        };
+    }
 
     r.close = () => host.close();
 

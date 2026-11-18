@@ -1,7 +1,7 @@
-// The native gym's write-back is the exact inverse of its seed (card
+// The gym's write-back is the exact inverse of its seed (card
 // 08-gym-native-readback).
 //
-// web/gym-native.js seeds the roster record from storedNumbers (stored stats +
+// The (former) original-code gym seeded the roster record from storedNumbers (stored stats +
 // permanent chips; starter base + trained element points) and then reads the
 // trained record back. A straight copy folds the chips into the stored stats
 // and the species base into the trained points, so every visit counted both
@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { storedNumbers, storedFromRecord } from "../web/party.js";
 
 // The record's element halfword order (engine/dw3/effective-stats.ts
-// ELEMENT_KEYS, which is also web/gym-native.js's ELEMENTS).
+// ELEMENT_KEYS).
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const CORE = ["str", "def", "spt", "wis", "spd", "chr"];
 
@@ -83,12 +83,3 @@ test("what the screen does train still lands, on top of the untouched chips and 
     assert.equal(back.elemBonuses.water, 8);
 });
 
-test("gym-native's commit reads the record back through the helper", () => {
-    const src = readFileSync(new URL("../web/gym-native.js", import.meta.url), "utf8");
-    assert.match(src, /import \{[^}]*storedFromRecord[^}]*\} from "\.\/party\.js"/);
-    assert.match(src, /storedFromRecord\(party\[i\], recCore, recElements, ps, tables\?\.digimonById \?\? \{\}\)/);
-    assert.match(src, /ps\.stats = stored\.stats;/);
-    assert.match(src, /ps\.elemBonuses = stored\.elemBonuses;/);
-    assert.doesNotMatch(src, /ps\.stats = core;/, "gym-native still copies the record's core straight back");
-    assert.doesNotMatch(src, /ps\.elemBonuses = elems;/, "gym-native still copies the record's elements straight back");
-});

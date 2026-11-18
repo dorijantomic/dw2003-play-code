@@ -71,9 +71,7 @@ test("the census is non-empty and every member binds the walker state in open()"
   // cardalbum and carddeck seed the collection table from the shared `cards()`
   // object, not from the adapter's state, so they are not members of this family.
   assert.deepEqual(members, [
-    "cardduel-native.js", "cardshop-native.js", "dri-native.js", "fightreport-native.js",
-    "gym-native.js", "nameentry-native.js", "packselect-native.js", "save-native.js",
-    "shop-native.js", "status-native.js",
+    "cardduel-native.js", "dri-native.js",
   ]);
   const unbound = members.filter((f) => !binds(f));
   assert.deepEqual(unbound, [], "adapters that seed from the walker state but never bind it");

@@ -1,0 +1,9 @@
+@font-face { font-family: "Russo One"; font-weight: 400; font-display: block; src: url("fonts/RussoOne-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 500; font-display: block; src: url("fonts/ChakraPetch-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 600; font-display: block; src: url("fonts/ChakraPetch-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 700; font-display: block; src: url("fonts/ChakraPetch-Bold.woff2") format("woff2"); }
+
+#ui-c-root .uic-L, #ui-c-root .uic-N, #ui-c-root .uic-B { position: absolute; white-space: nowrap; margin: 0; padding: 0; }
+#ui-c-root .uic-L { font-family: var(--f-label); color: var(--c-ink); }
+#ui-c-root .uic-N { font-family: var(--f-text); font-weight: 700; color: var(--c-num); font-variant-numeric: tabular-nums; }
+#ui-c-root .uic-B { font-family: var(--f-text); font-weight: 600; color: var(--c-body-text); }

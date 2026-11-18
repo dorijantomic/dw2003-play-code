@@ -119,7 +119,7 @@ test("the hand-in offers exactly two endings, each with a real pay", () => {
     assert.ok((q.verdict.pay[0].bits ?? 0) > (q.verdict.pay[1].bits ?? 0), "keeping the card pays fewer bits");
 });
 
-test("card 315 is Calumon in the catalogue, and the album still addresses only 1..314", () => {
+test("card 315 is Calumon in the catalogue, and the album still addresses only 1..314", async () => {
     const cards = load("web/assets/data/card_catalog.json");
     const list = Array.isArray(cards) ? cards : cards.cards;
     const card = (id) => list.find((c) => c.id === id);
@@ -128,10 +128,8 @@ test("card 315 is Calumon in the catalogue, and the album still addresses only 1
     const engine = readFileSync(ROOT + "engine/systems/card-battle.ts", "utf8");
     assert.match(engine, /CALUMON_CARD_ID = 315/, "the duel rules still name 315 Calumon");
     assert.match(engine, /IMPMON_CARD_ID = 316/, "and 316 Impmon");
-    const album = readFileSync(ROOT + "web/cardalbum-native.js", "utf8");
-    assert.match(album, /314-card collection/, "the album still covers the 314-card collection");
-    assert.match(album, /ids 1\.\.314/, "its grid still addresses 1..314");
-    assert.ok(!album.includes("315"), "the album was not taught about card 315");
+    const { SAVE_CARD_MAX } = await import("../engine/dw3/save-block.ts");
+    assert.equal(SAVE_CARD_MAX, 0x13b, "the album still addresses ids 1..314 (exclusive bound 315)");
 });
 
 test("no card data, album or deck-rule file is in the branch diff", () => {
@@ -139,7 +137,6 @@ test("no card data, album or deck-rule file is in the branch diff", () => {
     for (const f of files) {
         assert.ok(!/^web\/assets\/data\/card_/.test(f), `${f} is card data`);
         assert.ok(!/^web\/assets\//.test(f), `${f} is disc-derived game data`);
-        assert.ok(f !== "web/cardalbum-native.js", "the album module is untouched");
         assert.ok(f !== "web/quest-editor.js" && f !== "web/quest-editor-lib.js" && f !== "web/quest-editor.html",
             `${f} is a quest-editor file`);
         assert.ok(f !== "engine/systems/card-battle.ts", "the duel rules are untouched");

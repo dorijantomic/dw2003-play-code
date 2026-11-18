@@ -5,8 +5,8 @@
 // it does not read a key name, it reads the controller-input record the resident
 // service fills (D0x8004B7D0, `engine/systems/pad-block.ts`). Production already
 // bridges the two: `web/game.js` keeps the held set in `state.keys` and each
-// screen adapter republishes it once per frame (web/shop-native.js:171,
-// web/dri-native.js:242, web/gym-native.js, web/save-native.js:243, ...). The
+// screen adapter republishes it once per frame (web/dri-native.js:242 and the
+// other screen adapters). The
 // native screen LAB had no such bridge at all — web/native-screen-lab.js
 // installed no key listener, so a player could open
 // `native-screen-lab.html`, watch the merchant draw its BUY/SELL menu, and not

@@ -105,11 +105,7 @@ test("no seeding call still hands the bare form to ensureStoredStats or elementV
   const read = (f) => readFileSync(new URL(`../web/${f}`, import.meta.url), "utf8");
   const seeding = [
     ["battle.js", /ensureStoredStats\(ps, digimonDB\?\.\[CHARID_TO_DIGID\[state\?\.party\?\.\[0\]\]\] \?\? prof\)/],
-    ["gym.js", /ensureStoredStats\(ps, driStarterAt\(state, g\.trainSlot, g\.digimonById\) \?\? prof\)/],
-    ["gym-native.js", /ensureStoredStats\(ps, tables\?\.digimonById\?\.\[CHARID_TO_DIGID\[party\[i\]\]\] \?\? profile\)/],
     ["gym-translated.js", /ensureStoredStats\(ps, g\._data\.digimonById\[CHARID_TO_DIGID\[party\[i\]\]\] \?\? profile\)/],
-    ["nameentry-native.js", /ensureStoredStats\(ps, tables\?\.digimonById\?\.\[CHARID_TO_DIGID\[party\[i\]\]\] \?\? profile\)/],
-    ["shop-native.js", /ensureStoredStats\(rec, db\[v\.rookieId\] \?\? v\.profile\)/],
     ["shop-translated.js", /ensureStoredStats\(record, db\[member\.rookieId\] \?\? member\.profile\)/],
   ];
   for (const [file, pattern] of seeding) {

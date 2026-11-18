@@ -163,6 +163,8 @@ export function cardFoldersDraw(mem: PauseMemory, obj: number, host: CardFolders
 /** F0x80084238(obj, ui): open, pick a partner, choose, fade out and hand over. */
 export function cardFoldersTick(mem: PauseMemory, obj: number, ui: number, host: CardFoldersHost): void {
     const r = (off: number) => mem.read32(obj + off) | 0;
+    // No partner (a new game before any is granted) lays the page out like one partner: the state is the count, and 0 is the state that starts the page.
+    const size = () => Math.max(r(0x5c), 1);
     const w = (off: number, v: number) => mem.write32(obj + off, v | 0);
     const at = (off: number) => mem.read32(ui + off) | 0;
     const bit = (bits: number, code: number) => (bits >> host.padBit(0, code)) & 1;
@@ -185,11 +187,11 @@ export function cardFoldersTick(mem: PauseMemory, obj: number, ui: number, host:
     switch (r(0x10)) {
         default:
             start(0x74, 1);
-            if (r(0x5c) === 1) {
+            if (size() === 1) {
                 start(0xb4, 1);
                 start(0xc4, 1);
             }
-            w(0x10, r(0x5c));
+            w(0x10, size());
             return;
         case 1:
             host.foldTick(obj + 0x74);
@@ -270,14 +272,14 @@ export function cardFoldersTick(mem: PauseMemory, obj: number, ui: number, host:
             if ((mem.read32(at(0x9c) + 0xc) | 0) === 2) w(0x10, 0x39);
             return;
         case 0x32:
-            start(r(0x5c) * 0x10 + 0x64, 0);
-            rows(r(0x5c) - 1, 0);
+            start(size() * 0x10 + 0x64, 0);
+            rows(size() - 1, 0);
             start(0xb4, 0);
             hide(0x84);
             hide(0x88);
             start(0xc4, 0);
             cardFoldersChoice(mem, ui, 0, host);
-            w(0x10, r(0x5c) + 0x32);
+            w(0x10, size() + 0x32);
             return;
         case 0x33:
             host.foldTick(obj + 0x74);

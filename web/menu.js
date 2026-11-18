@@ -38,6 +38,9 @@ import { drawText, textWidth, drawCursor, drawIconGlyph } from "./uifont.js";
 import { loadPack, drawClip, drawClipAtPaletteRow } from "./screenpack.js";
 import { digivolveDemoOn, setDigivolveDemo } from "./blast-presentation.js";
 import { createStatusBackdrop } from "./status-backdrop.js";
+import * as uiC from "./ui-c/index.js";
+import { partHook } from "./ui-c/capture.js";
+import { composeDemo } from "./ui-c/screens.js";
 import { drawItemIcon } from "./itemicons.js";
 import { weaponEffectLine } from "./weapon-lab.js";   // F2 -> Extras -> Weapon effects (off by default)
 
@@ -1085,7 +1088,7 @@ export function createMenu(sfx = null) {
       // The disc has no selector for this screen, so its Back has no original
       // answer. The host decides where Back goes (web/game.js sets `backToHome`
       // to the one pause home); standing alone this module returns to its own
-      // hand-written list, which is the ?legacyStatus=1 rollback route.
+      // hand-written list.
       if (key === "cross") { sfx?.play("system01"); m.backToHome?.(); return; }
       if (key === "up") m.demoCursor = moveCursor(m.demoCursor, 0, sfx);
       else if (key === "down") m.demoCursor = moveCursor(m.demoCursor, 1, sfx);
@@ -1530,10 +1533,20 @@ export function createMenu(sfx = null) {
     const s = viewW / NATIVE_W;
     ctx.save();
     ctx.scale(s, s);
+    // Look C (web/ui-c): the Digivolve Demo setup is the one page the game still opens through this module (its Back goes to the
+    // translated pause home, web/game.js backToHome). The other pages here are the hand-written list and stay as they are.
+    const lookC = m.screen === "demosetup" && !!m.digimonDB && !!UI;
+    uiC.scope("ui-menu", ctx, { enable: lookC, texts: true, compose: composeDemo }, () => {
+      if (lookC) partHook(ctx, { part: "backdrop", x: (backdrop.time() * 25) % 96, y: (backdrop.time() * 25) % 96, w: 320, h: 240 });
+      m._drawNative(ctx, viewW, viewH, state);
+    });
+    ctx.restore();
+  };
 
+  /** The page itself, in the 320 x 240 box (m.draw has scaled the canvas). */
+  m._drawNative = (ctx, viewW, viewH, state) => {
     if (!m.digimonDB || !UI) {
       drawText(ctx, "Loading...", 20, 20);
-      ctx.restore();
       return;
     }
 
@@ -1679,7 +1692,6 @@ export function createMenu(sfx = null) {
       const a = Math.min(255, (frames * CARD_FOLDER_FADE_DELTA) >> 8) / 255;
       paintScreenDim(ctx, a * 255, NATIVE_W, 240);
     }
-    ctx.restore();
   };
 
   return m;
@@ -1692,8 +1704,8 @@ const gold = { kind: 3 };
 // Right-anchored value text (the ーー placeholder fields end AT their x —
 // "150/ 150" lines up cur flush against the baked "/" at x=61).
 function valueText(ctx, str, xEnd, y, opts = gold) {
-  const kind = opts.kind ?? 3;
-  drawText(ctx, String(str), xEnd - textWidth(String(str), kind), y, opts);
+  // alignRight: the same pixels (x = xEnd - width), and the run keeps its right edge (look C reads card numbers by it)
+  drawText(ctx, String(str), xEnd, y, { ...opts, kind: opts.kind ?? 3, alignRight: true });
 }
 
 // The status sheet's stat and resistance numbers, and its TP pair, are built in

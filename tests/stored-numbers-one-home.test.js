@@ -64,22 +64,10 @@ test("partyRosterView's core and elements ARE storedNumbers", () => {
 const src = (name) => readFileSync(new URL(`../web/${name}`, import.meta.url), "utf8");
 
 test("the roster screens take their numbers from the one helper", () => {
-    for (const file of ["shop-native.js", "shop-translated.js", "gym-native.js", "nameentry-native.js", "dri.js"]) {
+    for (const file of ["shop-translated.js"]) {
         assert.match(src(file), /storedNumbers/, `${file} must use storedNumbers`);
         assert.doesNotMatch(src(file), /(core|elements):\s*(CORE|ELEMENTS)\.map\(/, `${file} still rebuilds an array`);
         assert.doesNotMatch(src(file), /elementValue\((member|v|rec|ps|record)\.?(profile|stats)/, `${file} still reads the worn form`);
     }
 });
 
-test("name-entry seeds the third core column from spt, not spr", () => {
-    const name = src("nameentry-native.js");
-    assert.doesNotMatch(name, /core\?\.spr/);
-    assert.doesNotMatch(name, /\bspr\b/);
-});
-
-test("the DRI panel draws the stored record, and a form preview keeps its own row", () => {
-    const dri = src("dri.js");
-    assert.match(dri, /storedNumbers\(member\?\.charId, member\?\.stats, d\.digimonById\)/);
-    assert.doesNotMatch(dri, /profile: target \}, key\)/);
-    assert.match(dri, /statValue\(member, key, target\)/);
-});

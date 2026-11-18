@@ -44,7 +44,7 @@ test('old saves migrate once and binding never adds a second stock',()=>{
   assert.deepEqual([...saved.packs],[[91,1]]);
   col.packs.clear(); assert.deepEqual(state.inventory,[{id:43,qty:9}]);
 });
-test('both original-code adapters seed the same stock and commit opening or a reward',()=>{
+test('the original-code duel adapter seeds the stock and commits opening or a reward',()=>{
   const state={inventory:BOOSTER_ITEM_IDS.map(id=>({id,qty:2})).concat({id:43,qty:5})};
   const memory=new Map();
   seedBoosterStock(state,BOOSTER_ITEM_IDS,(addr,n,size)=>{assert.equal(size,1); memory.set(addr,n);});
@@ -52,7 +52,7 @@ test('both original-code adapters seed the same stock and commit opening or a re
   for(const id of BOOSTER_ITEM_IDS) memory.set(BOOSTER_HELD_BASE+id,id===91?3:1);
   commitBoosterStock(state,BOOSTER_ITEM_IDS,(addr,size)=>{assert.equal(size,1);return memory.get(addr);});
   assert.equal(heldCount(state,91),3); assert.equal(heldCount(state,375),1); assert.equal(heldCount(state,43),5);
-  for(const file of ['web/cardshop-native.js','web/cardduel-native.js']) {
+  for(const file of ['web/cardduel-native.js']) {
     const source=readFileSync(file,'utf8');
     assert.match(source,/seedBoosterStock\(state, BOOSTER_ITEM_IDS, write\)/);
     assert.match(source,/commitBoosterStock\(state, BOOSTER_ITEM_IDS/);

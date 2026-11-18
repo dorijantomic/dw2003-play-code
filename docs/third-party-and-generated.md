@@ -141,6 +141,19 @@ classification rather than a removal.
 - `LICENSE`, `README.md`, `PLAYING.md`, `.github/**`, `package*.json`,
   `tsconfig.json`, `install-play.sh`, the root build scripts.
 
+### Third-party fonts (menu look C)
+
+Two fonts are shipped, both under the SIL Open Font License 1.1, as local woff2 files in `web/ui-c/fonts/` with their licence texts beside them
+(`OFL-RussoOne.txt`, `OFL-ChakraPetch.txt`). They are the Google Fonts releases converted from TTF to woff2 with `fontTools`, glyph data unchanged
+and no subsetting (Russo One carries the Reserved Font Name "Russo", so it is not modified or renamed).
+
+| Font | Files | Used for |
+|---|---|---|
+| Russo One (Jovanny Lemonad) | `RussoOne-Regular.woff2` | labels, titles, big faint words |
+| Chakra Petch (Chakra Petch Project Authors) | `ChakraPetch-Medium.woff2`, `-SemiBold.woff2`, `-Bold.woff2` | body text and numbers |
+
+`tests/ui-c-hygiene.test.js` keeps `web/ui-c/` to our own css, js, these fonts and their licences (no image, no data URL, no network URL).
+
 ## 4. Checking the claim
 
 ```sh

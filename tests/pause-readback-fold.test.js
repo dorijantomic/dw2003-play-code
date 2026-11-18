@@ -6,9 +6,9 @@
 // unit-tested there, and here we only prove the ONE place every pause page hands its
 // writes back actually calls it. Since 2026-10-04 that place is the shared close
 // commit (engine/dw3/ui/pause-close-commit.ts `commitPauseClose`), which the
-// translated route (web/status-translated.js) and the original-code reference route
-// (web/status-native.js) both call -- before this they each carried their own copy of
-// the read-back, which is how the two drifted apart once already.
+// translated route (web/status-translated.js) calls -- before this the translated and the
+// original-code reference routes each carried their own copy of the read-back, which is
+// how the two drifted apart once already.
 //
 // The order assertions read the sources rather than loading them, because loading
 // web/status-translated.js needs the browser's fetch for the pause data banks. The
@@ -19,7 +19,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const translated = readFileSync(new URL("../web/status-translated.js", import.meta.url), "utf8");
-const reference = readFileSync(new URL("../web/status-native.js", import.meta.url), "utf8");
 const commit = readFileSync(
   new URL("../engine/dw3/ui/pause-close-commit.ts", import.meta.url), "utf8");
 
@@ -49,26 +48,19 @@ test("the shared commit folds the record's stat groups before it copies them ove
     "an un-evolved member's id comes from rosterSlotDigimonId");
 });
 
-test("both routes hand their page's numbers to that one commit", () => {
-  for (const [name, src] of [["web/status-translated.js", translated], ["web/status-native.js", reference]]) {
-    assert.match(src, /import \{[^}]*commitPauseClose[^}]*\} from "\.\/vendor\/engine\.js"/,
-      `${name} must call the shared commit`);
-    assert.equal(src.split("commitPauseClose(").length - 1, 1, `${name}: one call site`);
-    assert.doesNotMatch(src, /foldRecordStatsIntoBonuses/,
-      `${name} must not fold for itself; the shared commit owns that order`);
-  }
-  // Each route supplies only its own VIEW of one record -- the translated session's
-  // snapshot row, and the save block the original wrote -- which is the whole of what
-  // the two routes may disagree about.
+test("the translated route hands its page's numbers to that one commit", () => {
+  assert.match(translated, /import \{[^}]*commitPauseClose[^}]*\} from "\.\/vendor\/engine\.js"/,
+    "web/status-translated.js must call the shared commit");
+  assert.equal(translated.split("commitPauseClose(").length - 1, 1, "web/status-translated.js: one call site");
+  assert.doesNotMatch(translated, /foldRecordStatsIntoBonuses/,
+    "web/status-translated.js must not fold for itself; the shared commit owns that order");
+  // The route supplies only its own VIEW of one record -- the translated session's snapshot row.
   assert.match(translated, /recordAt: \(rosterSlot\) => snap\.records\[rosterSlot\] \?\? null,/);
-  assert.match(reference, /recordAt: \(rosterSlot\) => \{/);
-  assert.match(reference, /for \(const \[name, off\] of RECORD_EQUIP_OFFSETS\)/,
-    "the reference route reads the six worn halfwords at the original's own offsets");
 });
 
 test("the fold has one home, in the engine", () => {
   assert.match(commit, /import \{ foldRecordStatsIntoBonuses, type StatCarrier \} from "\.\.\/party-context\.ts";/);
-  for (const src of [translated, reference]) {
+  for (const src of [translated]) {
     assert.doesNotMatch(src, /function foldRecordStatsIntoBonuses/,
       "the fold must have one home: engine/dw3/party-context.ts");
   }

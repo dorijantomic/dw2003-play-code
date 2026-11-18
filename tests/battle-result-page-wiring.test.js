@@ -43,12 +43,9 @@ test("a silent arm empties the box instead of leaving the last line up", () => {
     "and the enemy-side commit site");
 });
 
-test("?legacyBattleMsg=1 picks the renderer, not the rules", () => {
-  // Nothing on the chooser's path reads the flag, so the walker's own sentence is computed
+test("the renderer is not chosen by a URL flag", () => {
+  // Nothing on the chooser's path reads the URL, so the walker's own sentence is computed
   // the same way whichever renderer is on.
-  assert.equal(
-    /legacyBattleMsg[^\n]*chooseResultLine|chooseResultLine[\s\S]{0,200}legacyBattleMsg/
-      .test(src),
-    false);
-  assert.match(translated, /new URLSearchParams\(search\)\.has\("legacyBattleMsg"\)/);
+  assert.doesNotMatch(translated, /URLSearchParams/);
+  assert.doesNotMatch(src, /chooseResultLine[\s\S]{0,200}URLSearchParams/);
 });

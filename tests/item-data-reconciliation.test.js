@@ -90,14 +90,12 @@ test("the disc's settled headline values, pinned on all three sides", () => {
   }
 });
 
-test("the Card Album addresses 314 cards even though the raw catalog holds 316", () => {
+test("the Card Album addresses 314 cards even though the raw catalog holds 316", async () => {
   const catalog = readJson("web/assets/data/card_catalog.json");
   assert.equal(catalog.cards.length, 316, "the raw CARDPAK0..4 catalog holds 316 records");
 
-  const album = readFileSync(new URL("web/cardalbum.js", root), "utf8");
-  const m = album.match(/const CARD_COUNT_ABS = (0x[0-9a-fA-F]+|\d+)/);
-  assert.ok(m, "cardalbum.js still declares CARD_COUNT_ABS");
-  const bound = Number(m[1]);
+  const { SAVE_CARD_MAX } = await import("../engine/dw3/save-block.ts");
+  const bound = SAVE_CARD_MAX;
   assert.equal(bound, 0x13b, "the album's own slti bound is 0x13B (id < 315)");
   assert.equal(bound - 1, 314, "so the album addresses ids 1..314 = 314 cards");
 
@@ -108,7 +106,7 @@ test("the Card Album addresses 314 cards even though the raw catalog holds 316",
 
 test("no shipped file or doc labels the collection 315 any more", () => {
   for (const f of [
-    "web/cardalbum.js", "web/cardalbum-native.js", "docs/research/systems-plain/cards.md",
+    "web/cardalbum-translated.js", "docs/research/systems-plain/cards.md",
   ]) {
     const text = readFileSync(new URL(f, root), "utf8");
     assert.equal(/315-card|315 cards|full 315/.test(text), false,

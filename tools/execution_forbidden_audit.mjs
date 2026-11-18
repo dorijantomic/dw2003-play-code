@@ -11,7 +11,7 @@
 //   ours                  ordinary route reaches only data/device modules; no
 //                         interpreter adapter exists for the surface at all;
 //   switch-gated-only     ordinary route is clean, but an interpreter adapter
-//                         survives behind an explicit query switch (?nativeX=1);
+//                         survives behind an explicit research switch;
 //   interpreter-reachable the ordinary route itself reaches the interpreter —
 //                         the original overlay or CPU can execute in normal play.
 //
@@ -78,87 +78,87 @@ export const SURFACES = [
   {
     id: "stitshop", kind: "screen", title: "Item / armory / pawn shop",
     entry: "engine/dw3/ui/shop-root-session.ts",
-    decision: { file: "web/game.js", contains: "USE_NATIVE_SHOP ? createShopNative" },
-    reference: { adapter: "web/shop-native.js", flag: "nativeShop" },
+    decision: { file: "web/game.js", contains: "const shop = shopTranslated;" },
+    reference: null,
     verifier: "tools/verify_translated_shop.mjs",
     expected: "ours",
   },
   {
     id: "stcrdshp", kind: "screen", title: "Card shop",
     entry: "engine/dw3/ui/card-shop-session.ts",
-    decision: { file: "web/game.js", contains: "? cardShopNative : cardShopTranslated" },
-    reference: { adapter: "web/cardshop-native.js", flag: "nativeCardShop" },
+    decision: { file: "web/game.js", contains: "const cardShop = cardShopTranslated;" },
+    reference: null,
     verifier: "tools/verify_translated_cardshop.mjs",
     expected: "ours",
   },
   {
     id: "stgtrain", kind: "screen", title: "Training gym",
     entry: "engine/dw3/ui/gym-session.ts",
-    decision: { file: "web/game.js", contains: "USE_NATIVE_GYM ? (USE_REFERENCE_GYM" },
-    reference: { adapter: "web/gym-native.js", flag: "nativeGym" },
+    decision: { file: "web/game.js", contains: "const gym = createGymTranslated(sfx);" },
+    reference: null,
     verifier: "tools/verify_translated_gym.mjs",
     expected: "ours",
   },
   {
     id: "stgdglab", kind: "screen", title: "Digimon Lab",
     entry: "engine/dw3/ui/lab-session.ts",
-    decision: { file: "web/game.js", contains: "USE_REFERENCE_LAB ? createDriNative(sfx) : createLabTranslated(sfx)" },
-    reference: { adapter: "web/dri-native.js", flag: "nativeLab" },
+    decision: { file: "web/game.js", contains: "const driMenu = createLabTranslated(sfx);" },
+    reference: null,
     verifier: "tools/verify_translated_lab.mjs",
     expected: "ours",
   },
   {
     id: "ststatus", kind: "screen", title: "Pause / STATUS pages",
     entry: "engine/dw3/ui/pause-root-session.ts",
-    decision: { file: "web/game.js", contains: "USE_REFERENCE_STATUS ? createStatusNative" },
-    reference: { adapter: "web/status-native.js", flag: "nativeStatus" },
+    decision: { file: "web/game.js", contains: "const status = createStatusTranslated(sfx, statusOptions);" },
+    reference: null,
     verifier: "tools/verify_translated_pause.mjs",
     expected: "ours",
   },
   {
     id: "stdgname", kind: "screen", title: "Partner naming",
     entry: "engine/dw3/ui/name-root-session.ts",
-    decision: { file: "web/game.js", contains: "const nameEntryNative = USE_REFERENCE_NAME" },
-    reference: { adapter: "web/nameentry-native.js", flag: "nativeName" },
+    decision: { file: "web/game.js", contains: "const nameEntryNative = createNameEntryTranslated(" },
+    reference: null,
     verifier: "tools/verify_translated_naming.mjs",
     expected: "ours",
   },
   {
     id: "stplnmet", kind: "screen", title: "Registration wizard",
     entry: "engine/dw3/ui/wizard-root-session.ts",
-    decision: { file: "web/game.js", contains: "USE_REFERENCE_PACK ? createPackSelectNative(sfx) : createPackSelectTranslated(sfx)" },
-    reference: { adapter: "web/packselect-native.js", flag: "nativePack" },
+    decision: { file: "web/game.js", contains: "const packSelectNative = createPackSelectTranslated(sfx);" },
+    reference: null,
     verifier: "tools/verify_translated_packselect.mjs",
     expected: "ours",
   },
   {
     id: "stdwtitl", kind: "screen", title: "Title screen",
     entry: "engine/dw3/ui/title-session.ts",
-    decision: { file: "web/game.js", contains: "const newTitle = () => USE_NATIVE_TITLE" },
-    reference: { adapter: "web/title-native.js", flag: "nativeTitle" },
+    decision: { file: "web/game.js", contains: "const newTitle = () => createTitleScreen(" },
+    reference: null,
     verifier: "tools/verify_translated_title.mjs",
     expected: "ours",
   },
   {
     id: "stgmcard", kind: "screen", title: "Save / Load memory card",
     entry: "engine/dw3/ui/memcard-session.ts",
-    decision: { file: "web/game.js", contains: "saveScreenNative = USE_REFERENCE_SAVE ? createSaveNative" },
-    reference: { adapter: "web/save-native.js", flag: "nativeSave" },
+    decision: { file: "web/game.js", contains: "const saveScreenNative = createSaveTranslated(sfx);" },
+    reference: null,
     verifier: "tools/verify_translated_save.mjs",
     expected: "ours",
   },
   {
     id: "stfgtrep", kind: "screen", title: "Victory report",
     entry: "engine/dw3/ui/fight-report-session.ts",
-    decision: { file: "web/game.js", contains: "fightReportNative = USE_REFERENCE_REPORT" },
-    reference: { adapter: "web/fightreport-native.js", flag: "nativeReport" },
+    decision: { file: "web/game.js", contains: "const fightReportNative = createFightReportTranslated(" },
+    reference: null,
     verifier: "tools/verify_translated_report.mjs",
     expected: "ours",
   },
   {
     id: "cnty_sel", kind: "screen", title: "Language selection",
     entry: "engine/dw3/ui/country-screen.ts",
-    decision: { file: "web/game.js", contains: "const USE_NATIVE_CNTYSEL = !GYM_PARAMS.has(\"legacyCntysel\")" },
+    decision: { file: "web/game.js", contains: "const cntyselNative = createCntyselNative(sfx, bgm);" },
     reference: null,
     verifier: "tools/verify_translated_language.mjs",
     expected: "ours",
@@ -166,16 +166,16 @@ export const SURFACES = [
   {
     id: "fightstg", kind: "screen", title: "Battle command list",
     entry: "engine/dw3/ui/fight-command-session.ts",
-    decision: { file: "web/battle.js", contains: "const commandNative = USE_REFERENCE_COMMAND" },
-    reference: { adapter: "web/battlecmd-native.js", flag: "nativeBattleCmd" },
+    decision: { file: "web/battle.js", contains: "const commandNative = createBattleCommandTranslated(" },
+    reference: null,
     verifier: "tools/verify_translated_battlecmd.mjs",
     expected: "ours",
   },
   {
     id: "wfightmn", kind: "screen", title: "Battle scene loader",
     entry: "engine/dw3/ui/wfight-loader-session.ts",
-    decision: { file: "web/battle.js", contains: "const wfightNative = USE_REFERENCE_WFIGHT" },
-    reference: { adapter: "web/wfightmn-native.js", flag: "nativeWfight" },
+    decision: { file: "web/battle.js", contains: "const wfightNative = createWfightTranslated(" },
+    reference: null,
     verifier: "tools/verify_translated_wfight.mjs",
     expected: "ours",
   },
@@ -212,13 +212,13 @@ export const SURFACES = [
   {
     id: "battle-msg", kind: "screen", title: "Battle message line",
     entry: "engine/dw3/ui/battle-message-session.ts",
-    decision: { file: "web/battle.js", contains: "const msgSession = USE_TRANSLATED_MSG" },
+    decision: { file: "web/battle.js", contains: "const msgSession = new BattleMessageSession(" },
     reference: null, verifier: null, expected: "ours",
   },
   {
     id: "battle-hud", kind: "screen", title: "Battle HP plate",
     entry: "engine/dw3/ui/native/battle-hud.ts",
-    decision: { file: "web/battle.js", contains: "translatedBattleHudEnabled(location.search)" },
+    decision: { file: "web/battle.js", contains: "const translatedPips = battleHudPartyPips(" },
     reference: null, verifier: null, expected: "ours",
   },
   {
@@ -242,48 +242,46 @@ export const SURFACES = [
   {
     id: "endcard", kind: "screen", title: "END card",
     entry: "engine/dw3/ui/end-card-session.ts",
-    decision: { file: "web/game.js", contains: "const endCard = USE_LEGACY_END" },
+    decision: { file: "web/game.js", contains: "const endCard = createEndCardTranslated(" },
     reference: null, verifier: "tools/verify_endscreen.mjs", expected: "ours",
   },
   {
     id: "placecard", kind: "screen", title: "Place title card",
     entry: "engine/dw3/ui/place-card-session.ts",
-    decision: { file: "web/game.js", contains: "const placeCard = USE_LEGACY_PLACE_CARD" },
+    decision: { file: "web/game.js", contains: "const placeCard = createPlaceCardTranslated();" },
     reference: null, verifier: null, expected: "ours",
   },
   {
     id: "inn", kind: "screen", title: "Inn rest screen",
     entry: "engine/dw3/ui/inn-session.ts",
-    decision: { file: "web/game.js", contains: "const inn = new URLSearchParams(location.search).has(\"legacyInn\")" },
+    decision: { file: "web/game.js", contains: "const inn = createInnTranslated(sfx);" },
     reference: null, verifier: null, expected: "ours",
   },
   // ---- screens whose ordinary route executes the original overlay ---------
   {
     id: "stcrdabm", kind: "screen", title: "Card Album",
     // The album's ordinary route is the translated AlbumSession
-    // (engine/dw3/ui/album-session.ts over the pro/stcrdabm controllers); the
-    // shipped overlay is the ?nativeAlbum=1 research reference.
+    // (engine/dw3/ui/album-session.ts over the pro/stcrdabm controllers).
     entry: "engine/dw3/ui/album-session.ts",
-    decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated" },
-    reference: { adapter: "web/cardalbum-native.js", flag: "nativeAlbum" },
+    decision: { file: "web/game.js", contains: "const cardAlbum = cardAlbumTranslated;" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "stcrddek", kind: "screen", title: "Card folder editor",
     // The folder chooser's ordinary route is the translated FolderSession
     // (engine/dw3/ui/folder-session.ts over the pro/stcrddek folder-list
-    // controllers); the shipped overlay is the ?nativeFolder=1 research
-    // reference. The editor's card grid and name keyboard are not translated
+    // controllers). The editor's card grid and name keyboard are not translated
     // yet and the session names them as such.
     entry: "engine/dw3/ui/folder-session.ts",
-    decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated" },
-    reference: { adapter: "web/carddeck-native.js", flag: "nativeFolder" },
+    decision: { file: "web/game.js", contains: "const cardDeck = cardDeckTranslated;" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "cardgame", kind: "screen", title: "Card duel",
     entry: "engine/native/runtime.ts", nativeDriver: true,
-    decision: { file: "web/game.js", contains: "USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy" },
+    decision: { file: "web/game.js", contains: "const cardDuel = cardDuelNative;" },
     reference: null, verifier: null, expected: "interpreter-reachable",
   },
   {
@@ -314,8 +312,8 @@ export const SURFACES = [
       "engine/systems/field-camera.ts",
       "engine/systems/ordinal-scene-variant.ts",
     ],
-    decision: { file: "web/game.js", contains: "enterNativeStage(mapId, {" },
-    reference: { adapter: "web/native-stage.js", flag: "nativeStages" },
+    decision: { file: "web/game.js", contains: "const falling_objects_load = loadFallingObjects()" },
+    reference: null,
     verifier: "tools/verify_translated_field_ambience.mjs",
     expected: "ours",
   },
@@ -323,8 +321,8 @@ export const SURFACES = [
   {
     id: "system:shops", kind: "system", title: "shops",
     entry: "engine/dw3/ui/shop-root-session.ts",
-    decision: { file: "web/game.js", contains: "USE_NATIVE_SHOP ? createShopNative" },
-    reference: { adapter: "web/shop-native.js", flag: "nativeShop" },
+    decision: { file: "web/game.js", contains: "const shop = shopTranslated;" },
+    reference: null,
     expected: "ours",
   },
   {
@@ -343,25 +341,25 @@ export const SURFACES = [
       "engine/systems/card-view.ts",
       "engine/systems/card-inspect.ts",
     ],
-    decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated" },
+    decision: { file: "web/game.js", contains: "const cardAlbum = cardAlbumTranslated;" },
     expected: "ours",
     components: [
       {
         id: "card-battle:album", kind: "component", title: "Card Album screen",
         entry: "engine/dw3/ui/album-session.ts",
-        decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated" },
+        decision: { file: "web/game.js", contains: "const cardAlbum = cardAlbumTranslated;" },
         expected: "ours",
       },
       {
         id: "card-battle:folder", kind: "component", title: "Card folder editor screen",
         entry: "engine/dw3/ui/folder-session.ts",
-        decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated" },
+        decision: { file: "web/game.js", contains: "const cardDeck = cardDeckTranslated;" },
         expected: "ours",
       },
       {
         id: "card-battle:duel", kind: "component", title: "Card duel screen",
         entry: "web/cardduel-native.js",
-        decision: { file: "web/game.js", contains: "const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy" },
+        decision: { file: "web/game.js", contains: "const cardDuel = cardDuelNative;" },
         expected: "interpreter-reachable",
       },
     ],
@@ -369,35 +367,35 @@ export const SURFACES = [
   {
     id: "system:digivolution", kind: "system", title: "digivolution",
     entry: "engine/dw3/ui/lab-session.ts",
-    decision: { file: "web/game.js", contains: "USE_REFERENCE_LAB ? createDriNative(sfx) : createLabTranslated(sfx)" },
-    reference: { adapter: "web/dri-native.js", flag: "nativeLab" },
+    decision: { file: "web/game.js", contains: "const driMenu = createLabTranslated(sfx);" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "system:gym-training", kind: "system", title: "gym-training",
     entry: "engine/dw3/ui/gym-session.ts",
-    decision: { file: "web/game.js", contains: "USE_NATIVE_GYM ? (USE_REFERENCE_GYM" },
-    reference: { adapter: "web/gym-native.js", flag: "nativeGym" },
+    decision: { file: "web/game.js", contains: "const gym = createGymTranslated(sfx);" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "system:inn", kind: "system", title: "inn",
     entry: "engine/dw3/ui/inn-session.ts",
-    decision: { file: "web/game.js", contains: "const inn = new URLSearchParams(location.search).has(\"legacyInn\")" },
+    decision: { file: "web/game.js", contains: "const inn = createInnTranslated(sfx);" },
     expected: "ours",
   },
   {
     id: "system:battle", kind: "system", title: "battle",
     entry: "engine/dw3/ui/fight-command-session.ts",
-    decision: { file: "web/battle.js", contains: "const commandNative = USE_REFERENCE_COMMAND" },
-    reference: { adapter: "web/battlecmd-native.js", flag: "nativeBattleCmd" },
+    decision: { file: "web/battle.js", contains: "const commandNative = createBattleCommandTranslated(" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "system:save-load", kind: "system", title: "save-load",
     entry: "engine/dw3/ui/memcard-session.ts",
-    decision: { file: "web/game.js", contains: "saveScreenNative = USE_REFERENCE_SAVE ? createSaveNative" },
-    reference: { adapter: "web/save-native.js", flag: "nativeSave" },
+    decision: { file: "web/game.js", contains: "const saveScreenNative = createSaveTranslated(sfx);" },
+    reference: null,
     expected: "ours",
   },
   {
@@ -421,25 +419,25 @@ export const SURFACES = [
       "engine/dw3/ui/place-card-session.ts",
       "engine/dw3/ui/inn-session.ts",
     ],
-    decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated" },
+    decision: { file: "web/game.js", contains: "const cardDeck = cardDeckTranslated;" },
     expected: "ours",
     components: [
       {
         id: "ui-chrome:album", kind: "component", title: "Card Album screen",
         entry: "engine/dw3/ui/album-session.ts",
-        decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeAlbum\") ? cardAlbumNative : cardAlbumTranslated" },
+        decision: { file: "web/game.js", contains: "const cardAlbum = cardAlbumTranslated;" },
         expected: "ours",
       },
       {
         id: "ui-chrome:folder", kind: "component", title: "Card folder editor screen",
         entry: "engine/dw3/ui/folder-session.ts",
-        decision: { file: "web/game.js", contains: "GYM_PARAMS.has(\"nativeFolder\") ? cardDeckNative : cardDeckTranslated" },
+        decision: { file: "web/game.js", contains: "const cardDeck = cardDeckTranslated;" },
         expected: "ours",
       },
       {
         id: "ui-chrome:duel", kind: "component", title: "Card duel screen",
         entry: "web/cardduel-native.js",
-        decision: { file: "web/game.js", contains: "const cardDuel = USE_NATIVE_DUEL ? cardDuelNative : cardDuelLegacy" },
+        decision: { file: "web/game.js", contains: "const cardDuel = cardDuelNative;" },
         expected: "interpreter-reachable",
       },
     ],
@@ -449,22 +447,22 @@ export const SURFACES = [
     // The field's ordinary route is our translated event handlers
     // (engine/systems/native-event-families.ts dispositions 67 of the 69 native
     // events to translated handlers; the other 2 are s810's, whose type-7
-    // layout is open). The stage overlay is entered only on the ?nativeStages
-    // research route: the flag line below is the decision.
+    // layout is open). The stage overlay is never entered
+    // by the game: the stage-object loader line below is the decision.
     entry: [
       "engine/systems/native-event-families.ts",
       "engine/systems/dungeon-switch.ts",
       "engine/systems/trigger-system.ts",
     ],
-    decision: { file: "web/game.js", contains: "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\")" },
-    reference: { adapter: "web/native-stage.js", flag: "nativeStages" },
+    decision: { file: "web/game.js", contains: "const falling_objects_load = loadFallingObjects()" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "system:world-exploration", kind: "system", title: "world-exploration",
     // The field's ordinary route runs our translated maps, actors and ambience
     // (the same module set the field surface bundles); the stage overlay is a
-    // ?nativeStages research route only.
+    // research route only (no game route boots it).
     entry: [
       "engine/systems/point-record-actor.ts",
       "engine/systems/falling-object.ts",
@@ -486,21 +484,21 @@ export const SURFACES = [
       "engine/systems/field-camera.ts",
       "engine/systems/ordinal-scene-variant.ts",
     ],
-    decision: { file: "web/game.js", contains: "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\")" },
-    reference: { adapter: "web/native-stage.js", flag: "nativeStages" },
+    decision: { file: "web/game.js", contains: "const falling_objects_load = loadFallingObjects()" },
+    reference: null,
     expected: "ours",
   },
   {
     id: "system:story-gating", kind: "system", title: "story-gating",
     // The gate logic ships translated (engine/systems/story-command-banks.ts);
     // its ordinary-route host is the field, which runs our code with the
-    // overlay behind the ?nativeStages research switch.
+    // overlay never booted by the game.
     entry: [
       "engine/systems/story-command-banks.ts",
       "engine/systems/trigger-system.ts",
     ],
-    decision: { file: "web/game.js", contains: "const USE_NATIVE_STAGE = new URLSearchParams(location.search).has(\"nativeStages\")" },
-    reference: { adapter: "web/native-stage.js", flag: "nativeStages" },
+    decision: { file: "web/game.js", contains: "const falling_objects_load = loadFallingObjects()" },
+    reference: null,
     expected: "ours",
   },
   {

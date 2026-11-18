@@ -6442,6 +6442,17 @@ void main() {
       const b = side === "enemy" ? eAABBLast : pAABB;
       return b ? b.min[1] : 0;
     },
+    /** Read-only (look C): true while the close-up window is really drawn this frame with a picture in it. */
+    getFaceBoxShown() { return !!faceCamRect && !!faceBoxSubject?.framed; },
+    /** Read-only (for the look-C damage pop): the enemy's head and feet on this frame's screen, 0..1 of the canvas, or null. */
+    getEnemyScreen() {
+      if (!_fxView || !eAABBLast) return null;
+      const { pv, enemyPos } = _fxView, b = eAABBLast;
+      const pr = (y) => { const cx = pv[0]*enemyPos[0] + pv[4]*y + pv[8]*enemyPos[2] + pv[12], cy = pv[1]*enemyPos[0] + pv[5]*y + pv[9]*enemyPos[2] + pv[13], cw = pv[3]*enemyPos[0] + pv[7]*y + pv[11]*enemyPos[2] + pv[15];
+        return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null; };
+      const top = pr(b.max[1]), foot = pr(b.min[1]);
+      return top && foot ? { x: top.x, topY: top.y, footY: foot.y } : null;
+    },
     setGiantCameraFit,
     /** Giant mode part 1: draw one side ("player" | "enemy") at k x its shipped size, clamped
      *  0.1..16; k = 1 draws exactly as shipped. Returns the stored scale. */

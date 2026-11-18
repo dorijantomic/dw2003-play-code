@@ -26,9 +26,9 @@ async function capture(browser, patchOld, mode, name) {
         await page.route("**/textbox.js", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: OLD }));
     await page.addInitScript(() => { try { localStorage.setItem("assetMode", "authentic"); } catch { /* blocked */ } });
     await page.goto(`${ROOT}/?skipTitle=1&noEncounters=1`, { waitUntil: "load", timeout: 60000 });
-    await page.waitForFunction(() => window.__state?.started && window.__legacyTextbox, null, { timeout: 60000 });
+    await page.waitForFunction(() => window.__state?.started && window.__fallbackTextbox, null, { timeout: 60000 });
     await page.evaluate(({ m, sx, sy }) => {
-        window.__legacyTextbox.open(
+        window.__fallbackTextbox.open(
             { name: "Junior", pages: [["What the...?", "Is that a Digimon?!"]] },
             null,
             () => ({ x: sx * 2, y: sy * 2, mode: m }),

@@ -787,7 +787,7 @@ function prepareEffects(stageId, view = null) {
     // Translated display-slot writers (engine/systems/stage-slot-player.ts): a
     // ported stage object that owns a point record writes its live flag and
     // sprite here. Applied after the interpreter rebasing, and only for records
-    // that rebasing left alone, so ?nativeStages still stands down in favour of
+    // that rebasing left alone, so a native stage still stands down in favour of
     // the original's own writes.
     const sw = slotWrites[stageId];
     if (sw) {

@@ -12,6 +12,7 @@ import { loadPack, drawClip, packReady } from "./screenpack.js";
 import { drawText, textWidth } from "./uifont.js";
 import { buildPanelClip, tileFrames } from "./panel-kit.js";
 import { BAND_TEXT_W, fitByWidth, wrapByWidth } from "./text-fit.js";
+import { partHook } from "./ui-c/capture.js";
 
 export const BOX_W = 320;
 export const BOX_H = 240;
@@ -163,6 +164,8 @@ export function barFill(value, max, w) {
 
 /** A flat bar drawn with the frame blue of the pause windows (web/uiRects.js): no new art. */
 export function drawBar(ctx, x, y, w, h, value, max) {
+    // inside a look C scope (web/ui-c/books.js) the bar is a C card bar: the same rect and fill ratio, nothing painted here
+    if (partHook(ctx, { part: "bookBar", x, y, w, h, ratio: w > 0 ? barFill(value, max, w) / w : 0 })) return;
     ctx.fillStyle = "rgb(0, 0, 32)";
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = "rgb(104, 104, 208)";

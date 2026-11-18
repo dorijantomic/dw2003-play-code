@@ -7,7 +7,7 @@
 // code) and it never draws the shop the player sees. The root scene - greeting
 // fade, shop-name/BIT header, BUY/SELL menu - is built by F0x8008c118
 // (docs/research/ui/shop-system-decompiled.md). Production
-// (web/shop-native.js) and the lab both boot the override from here so a lab
+// (the shop adapter, no longer shipped) and the lab both boot the override from here so a lab
 // capture shows the same screen the player gets.
 
 export const NATIVE_ROOT_CTORS = {

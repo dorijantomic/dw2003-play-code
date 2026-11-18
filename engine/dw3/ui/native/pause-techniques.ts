@@ -359,6 +359,8 @@ export function techniquesDraw(mem: PauseMemory, obj: number, host: TechniquesHo
 /** F0x80094FBC(obj, ui): open, pick a member and a technique, choose a target, close. */
 export function techniquesTick(mem: PauseMemory, obj: number, ui: number, host: TechniquesHost): void {
     const r = (off: number) => mem.read32(obj + off) | 0;
+    // No partner (a new game before any is granted) lays the page out like one partner: the state is the count, and 0 is the state that starts the page.
+    const size = () => Math.max(r(0x5c), 1);
     const w = (off: number, v: number) => mem.write32(obj + off, v | 0);
     const at = (off: number) => mem.read32(ui + off) | 0;
     const bank = () => host.languageBank(lang(mem) + 0xb0);
@@ -378,8 +380,8 @@ export function techniquesTick(mem: PauseMemory, obj: number, ui: number, host: 
         default:
             start(0x194, 1);
             start(0x1c4, 1);
-            if (r(0x5c) === 1) start(0x1d4, 1);
-            w(0x10, r(0x5c));
+            if (size() === 1) start(0x1d4, 1);
+            w(0x10, size());
             return;
         case 1:
             host.foldTick(obj + 0x194);
@@ -444,7 +446,7 @@ export function techniquesTick(mem: PauseMemory, obj: number, ui: number, host: 
                 if (r(0x7c) < 0) w(0x7c, 0);
             } else if (pressedOrRepeat(6)) {
                 w(0x7c, r(0x7c) + 1);
-                const last = r(0x5c) - 1;
+                const last = size() - 1;
                 if (last < r(0x7c)) w(0x7c, last);
             }
             if (before !== r(0x7c)) {
@@ -566,7 +568,7 @@ export function techniquesTick(mem: PauseMemory, obj: number, ui: number, host: 
                 if (r(0x84) < 0) w(0x84, 0);
             } else if (pressedOrRepeat(6)) {
                 w(0x84, r(0x84) + 1);
-                const last = r(0x5c) - 1;
+                const last = size() - 1;
                 if (last < r(0x84)) w(0x84, last);
             }
             if (before !== r(0x84)) {
@@ -635,13 +637,13 @@ export function techniquesTick(mem: PauseMemory, obj: number, ui: number, host: 
             hide(0x8c);
             start(0x1d4, 0);
             techniquesMpCostFill(mem, obj, ui, 0, host);
-            host.foldStart(obj + r(0x5c) * 0x10 + 0x184, 0);
-            fill(r(0x5c) - 1, 0);
-            if (r(0x5c) === 1) {
+            host.foldStart(obj + size() * 0x10 + 0x184, 0);
+            fill(size() - 1, 0);
+            if (size() === 1) {
                 hide(0);
                 start(0x1c4, 0);
             }
-            w(0x10, r(0x5c) + 0x32);
+            w(0x10, size() + 0x32);
             return;
         case 0x33:
             host.foldTick(obj + 0x194);

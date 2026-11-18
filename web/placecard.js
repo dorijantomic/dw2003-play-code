@@ -25,6 +25,10 @@ import {
     locationCardActive,
 } from "./vendor/engine.js";
 import { drawText, fontReady } from "./uifont.js";
+import * as uiC from "./ui-c/index.js";
+import { composePlaceCard } from "./ui-c/message.js";
+
+let cardCount = 0;
 
 const DATA_URL = "assets/data/place_card.json";
 /** The framebuffer the card's coordinates are authored in. */
@@ -130,15 +134,22 @@ export function createPlaceCard() {
         ctx.scale(s, s);
         ctx.imageSmoothingEnabled = false;
 
-        for (const b of f.bars) {
-            if (b.w <= 0 || b.h <= 0) continue;
-            ctx.fillStyle = `rgb(${b.color[0]},${b.color[1]},${b.color[2]})`;
-            ctx.fillRect(b.x, b.y, b.w, b.h);
-        }
-        if (fontReady()) {
-            if (f.area.text) drawText(ctx, f.area.text, f.area.x, f.area.y);
-            if (f.place.text) drawText(ctx, f.place.text, f.place.x, f.place.y);
-        }
+        // look C (web/ui-c, task T6): the same C6b card as the translated one -- these bars, these (typed) names, the slit as the clip.
+        const quads = f.bars.map((b) => ({ x: b.x, y: b.y, w: b.w, h: b.h, colour: b.color }));
+        const names = [f.area, f.place].filter((n) => n.text).map((n) => ({ text: n.text, x: n.x, y: n.y }));
+        card._key ??= `placecard${++cardCount}`;
+        uiC.scope(card._key, ctx, { enable: true, clip: f.clip, compose: (sc) => composePlaceCard(sc, { quads, names }) }, () => {
+            if (uiC.capturing()) return;
+            for (const b of f.bars) {
+                if (b.w <= 0 || b.h <= 0) continue;
+                ctx.fillStyle = `rgb(${b.color[0]},${b.color[1]},${b.color[2]})`;
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+            }
+            if (fontReady()) {
+                if (f.area.text) drawText(ctx, f.area.text, f.area.x, f.area.y);
+                if (f.place.text) drawText(ctx, f.place.text, f.place.x, f.place.y);
+            }
+        });
         ctx.restore();
     };
 

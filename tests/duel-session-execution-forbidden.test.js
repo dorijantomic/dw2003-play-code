@@ -14,8 +14,7 @@
 // The ordinary duel route is NOT switched onto this session yet: the match
 // itself (the nine mode updates, the effect-VM step block and the board view's
 // method bodies) is still un-ported, so the session names each as a
-// TranslatedGapError. web/cardduel-native.js therefore stays the ordinary route
-// with no query flag, and this file asserts that residue so a future cutover
+// TranslatedGapError. web/cardduel-native.js therefore stays the ordinary route, and this file asserts that residue so a future cutover
 // flips it deliberately rather than the screen looking converted while it still
 // runs the original.
 import test from "node:test";
@@ -69,6 +68,6 @@ test("the ordinary duel route still boots the shipped overlay through the interp
     // The call itself moved into the factory (card 11).
     assert.match(source, /createNativeAdapter|openNativeScreen/, "the adapter opens an interpreter-backed screen");
     const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-    assert.match(game, /const USE_NATIVE_DUEL = !GYM_PARAMS\.has\("legacyDuel"\)/,
+    assert.match(game, /const cardDuel = cardDuelNative;/,
         "the card duel ordinary route is the native adapter, until the session can run a match");
 });

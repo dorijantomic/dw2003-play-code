@@ -154,7 +154,7 @@ const session = () => new BattleMessageSession({
  * Every line the walker now puts up, with the original's call site it was read from.
  *
  * `walker` is the sentence web/battle.js still keeps in `b.message`, so that
- * `?legacyBattleMsg=1` draws the old rectangle with the old words; `expect` is the two
+ * `peek()` still reads the old words; `expect` is the two
  * lines the original's elements hold.
  */
 const SITES = [
@@ -319,7 +319,7 @@ test("every swapped line draws the original's arm, index and slots", () => {
         if (row.expect.length > 1) {
             assert.equal(lines[1], row.expect[1], `${row.what}: line 2 (${row.site})`);
         }
-        // 3. the walker still carries its own sentence for ?legacyBattleMsg=1
+        // 3. the walker still carries its own sentence for peek()
         assert.equal(typeof row.walker, "string");
         assert.ok(row.walker.length > 0);
     }

@@ -1,0 +1,3 @@
+#ui-c-root .uic-row-edge { position: absolute; }
+#ui-c-root .uic-chevron { position: absolute; }
+#ui-c-root .uic-type { position: absolute; white-space: nowrap; font-family: var(--f-label); color: var(--c-type); }

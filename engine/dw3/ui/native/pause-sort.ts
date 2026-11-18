@@ -99,14 +99,16 @@ export function sortTick(mem: PauseMemory, obj: number, ui: number, host: SortHo
     const done = (fold: number) => host.foldTick(obj + fold) !== 0;
     const start = (fold: number, open: number) => host.foldStart(obj + fold, open);
     const advance = () => w(0x10, r(0x10) + 1);
-    const last = () => r(0x5c) - 1;
+    // No partner (a new game before any is granted) lays the page out like one partner: nothing to pick or swap.
+    const size = () => Math.max(r(0x5c), 1);
+    const last = () => size() - 1;
 
     switch (r(0x10)) {
         default:
-            host.foldTick(obj + (r(0x5c) === 1 ? 0xd4 : 0xc4));
+            host.foldTick(obj + (size() === 1 ? 0xd4 : 0xc4));
             if (done(0x94)) {
                 fill(0, 1);
-                if (r(0x5c) === 1) {
+                if (size() === 1) {
                     w(0x10, 0xf);
                     say(0x88, 0x10);
                     return;
@@ -117,10 +119,10 @@ export function sortTick(mem: PauseMemory, obj: number, ui: number, host: SortHo
             }
             return;
         case 1:
-            if (r(0x5c) === 2) host.foldTick(obj + 0xd4);
+            if (size() === 2) host.foldTick(obj + 0xd4);
             if (done(0xa4)) {
                 fill(1, 1);
-                if (r(0x5c) === 2) {
+                if (size() === 2) {
                     w(0x10, 5);
                     say(0x88, 0xf);
                     return;
@@ -241,7 +243,7 @@ export function sortTick(mem: PauseMemory, obj: number, ui: number, host: SortHo
             if (pressed(0xe)) w(0x10, 0x14);
             return;
         case 0x14:
-            switch (r(0x5c)) {
+            switch (size()) {
                 default:
                     hide(0x88);
                     start(0x94, 0);
@@ -261,7 +263,7 @@ export function sortTick(mem: PauseMemory, obj: number, ui: number, host: SortHo
                     fill(2, 0);
                     break;
             }
-            w(0x10, r(0x5c) + 0x14);
+            w(0x10, size() + 0x14);
             return;
         case 0x15:
             if (done(0x94)) w(0xc, 3);

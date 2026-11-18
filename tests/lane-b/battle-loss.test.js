@@ -40,10 +40,6 @@ import {
 import { RECT_COLOUR, setRectColour } from "../../engine/dw3/display-view.ts";
 import { BattleLossSession } from "../../engine/dw3/ui/battle-loss-session.ts";
 import { frameClock } from "../../engine/systems/frame-clock.ts";
-// The walker's own pre-port loss beat, kept as the ?legacyLoss=1 rollback. The test
-// below drives it against the original's numbers; web/battle.js is imported for that
-// one function.
-import { lossExitFrame } from "../../web/battle.js";
 import {
     LOSS_EFFECT_CHILD_EXTRA, LOSS_EFFECT_CHILD_SIZE, LOSS_EFFECT_CHILD_TICK,
     LOSS_EFFECT_COUNTER, LOSS_EFFECT_EXTRA, LOSS_EFFECT_PHASE2_UNITS,
@@ -744,39 +740,6 @@ test("the shipped overlays carry the tables and routine bodies this port reads",
     // store of that word is in the same slot one instruction earlier.
     assert.equal(mem.read32(0x800a925c) >>> 0, 0x24020053, "`li $v0, 0x53` in the delay slot");
     assert.equal(mem.read32(0x800a9264) >>> 0, 0xae420050, "`sw $v0, 0x50($s2)`, the screen's message word");
-});
-
-test("the walker's old hand-written fade is not this fade, tenth by tenth", () => {
-    // The rollback the port replaced (?legacyLoss=1) computed the beat as a formula:
-    // lossExitFrame(frames) returns fade = (floor(f - 0xF0) + 1) / 10, and the canvas
-    // drew it as Math.round(fade * 255). The original draws the fade's quad with the
-    // level's HIGH BYTE (F0x8008a96c `sra $a0, 0x8`), so its greys are 25, 51, 76 ...
-    // where the formula's are 26, 51, 77 ...: five of the ten ticks are wrong, and the
-    // formula has no exit object, no mode word, no result byte and no message-window
-    // call at all. This test is the "before" half of the port's proof -- it fails if the
-    // rollback is ever mistaken for the original's numbers.
-    const legacyGreys = [];
-    for (let f = 240; f < 250; f++) {
-        legacyGreys.push(Math.round(lossExitFrame(f).fade * 255));
-    }
-    assert.deepEqual(legacyGreys, [26, 51, 77, 102, 128, 153, 179, 204, 230, 255],
-        "what ?legacyLoss=1 draws");
-    const frameClockFed = [];
-    const session = new BattleLossSession(
-        { playSound: () => {}, armDefeatEffect: () => {}, turnDefeatCamera: () => {}, slowMotion: () => {} },
-        { onLaunch: () => {} });
-    const before = frameClock.frameDelta();
-    session.begin();
-    for (let f = 0; f < 260; f++) {
-        frameClock.feedFrame(1);
-        session.tick();
-        frameClockFed.push(session.fadeGrey());
-    }
-    frameClock.feedFrame(before);
-    assert.deepEqual(frameClockFed.slice(240, 250), [25, 51, 76, 102, 127, 153, 178, 204, 229, 255],
-        "what the ported session draws, read off the fade object's own level");
-    const differing = legacyGreys.map((g, i) => (g === frameClockFed[240 + i] ? null : 240 + i)).filter((f) => f !== null);
-    assert.deepEqual(differing, [240, 242, 244, 246, 248], "the five ticks the port fixes");
 });
 
 test("the session the game runs reproduces the original's frames", () => {

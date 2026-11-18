@@ -3,6 +3,7 @@
 
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { paintScreenDim } from "./screendim.js";
+import * as uiC from "./ui-c/index.js";
 
 /**
  * Paint one frame of a translated session: its recorded draw calls, its text widgets and,
@@ -13,12 +14,18 @@ import { paintScreenDim } from "./screendim.js";
  * conversation box, the place card, the help menu and the registration wizard's
  * welcome message — must ask for it; a screen that draws the whole line instead
  * stops at the first pause control code and never advances a page.
+ *
+ * `ui` = { key, compose, enable } puts the screen in the look C capture scope (web/ui-c): the clips it claims and its text become DOM
+ * parts, the rest is drawn as art. The disc's fade stays the canvas subtract; the DOM layer takes the same level as brightness.
  */
-export function paintNativeSession(ctx, renderer, session, { fade = true, revealWindow = false, skipWidget = null } = {}) {
-    renderer.draw(ctx, session.draw.calls, null, [], session.draw.contextMarkers);
-    drawNativeTextWidgets(ctx, session.widgets.textWidgets(), skipWidget ? { revealWindow, skip: skipWidget } : { revealWindow });
-    if (!fade) return;
-    const level = session.fadeLevel();
+export function paintNativeSession(ctx, renderer, session, { fade = true, revealWindow = false, skipWidget = null, ui = null } = {}) {
+    const body = () => {
+        renderer.draw(ctx, session.draw.calls, null, [], session.draw.contextMarkers);
+        drawNativeTextWidgets(ctx, session.widgets.textWidgets(), skipWidget ? { revealWindow, skip: skipWidget } : { revealWindow });
+    };
+    const level = fade ? session.fadeLevel() : 0;
+    if (ui) uiC.scope(ui.key, ctx, { enable: ui.enable !== false, compose: ui.compose, dim: Math.min(1, level / 255) }, body);
+    else body();
     if (level) paintScreenDim(ctx, level, 320, 240);
 }
 

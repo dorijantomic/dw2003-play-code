@@ -21,7 +21,7 @@ import { NativeVblankClock } from "./vendor/engine.js";
 // The interpreter (NativeStageRuntime) is not statically imported: it lives in
 // the research-only bundle web/vendor/engine-native.js and is fetched through
 // this dynamic doorway only when a native stage is actually asked for
-// (?nativeStages, or a research verifier). loadNativeStages() awaits it before
+// (a research verifier). loadNativeStages() awaits it before
 // enterNativeStage can run, so the stage boot stays synchronous.
 import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
 

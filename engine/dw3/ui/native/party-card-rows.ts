@@ -41,8 +41,11 @@ export function partyCardRows(
 ): void {
     const base = (rows + Math.imul(row, PARTY_CARD_ROW_STRIDE)) | 0;
     const w = (off: number): number => mem.read32(base + off) >>> 0;
+    // An empty pedestal (no partner, roster slot -1) has nothing to show: hide the row instead of filling it.
+    // (Asked once, as the disc asks once; a hidden row never asks.)
+    const slot = show !== 0 ? host.rosterSlot(row) | 0 : 0;
+    if (slot < 0) show = 0;
     if (show !== 0) {
-        const slot = host.rosterSlot(row) | 0;
         host.copyStats(slot, stats);
         const record = host.cardRecord(slot) >>> 0;
         host.widgetSetLine0(w(layout.nameSlot), record, -1);

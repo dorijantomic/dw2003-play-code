@@ -59,11 +59,4 @@ test("the sheet, the battle divisor and the gym HUD call the one helper", () => 
   const battle = read("battle.js");
   assert.match(battle, /const pElem = elementPointsWithGear\(ps\.elemBonuses, eb\.elemResists\);/);
   assert.doesNotMatch(battle, /pElem\[el\] = \(pElem\[el\] \?\? 0\) \+ v/);
-
-  const gym = read("gym.js");
-  assert.match(gym, /const v = elementValueWithGear\(starter, st\?\.elemBonuses, worn, res\);/);
-  // The spread that let the gear REPLACE the trained points.
-  assert.doesNotMatch(gym, /elementValue\(prof, \{ \.\.\.\(st\?\.elemBonuses \?\? \{\}\), \.\.\.worn \}, res\)/);
-  // The res rows sit on the starter's base, not the worn form's.
-  assert.match(gym, /const starter = driStarterAt\(state, member\.index \?\? g\.trainSlot, g\.digimonById\) \?\? prof;/);
 });

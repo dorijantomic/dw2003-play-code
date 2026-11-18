@@ -10,7 +10,7 @@ export const UI_FLOWS = [
     // rename keyboard are still original instructions. The album is ours now as well: its
     // ordinary route runs our translated AlbumSession over the already-oracled pro/stcrdabm
     // controllers (web/cardalbum-translated.js), so the row below is OURS and the node badge
-    // follows it; ?nativeAlbum=1 remains the original-code reference. Keep this list with the
+    // follows it. Keep this list with the
     // ownership inventory: a page that moves to a new route has to move here.
     runtime: { default: "mixed", ours: ["field", "home", "map", "items", "bag", "itemTarget", "itemSort",
       "formation", "swap", "techPartner", "techList", "techTarget", "statusPartner", "statusSheet",
@@ -235,7 +235,7 @@ export const UI_FLOWS = [
   },
   {
     id: "opening", title: "Opening and saving", intro: "These screens get a new game started or load an existing one.",
-    source: "web/game.js · web/title-native.js · web/packselect-native.js · web/save-translated.js",
+    source: "web/game.js · web/titlescreen.js · web/packselect-translated.js · web/save-translated.js",
     runtime: { default: "ours", ours: ["field", "language", "title"] },
     ownershipSurfaces: {
       "Boot language selection": ["language"],

@@ -18,8 +18,6 @@ global.fetch = async (url) => {
   return { ok: true, json: async () => JSON.parse(body) };
 };
 
-const { createGym } = await import("../web/gym.js");
-const { createFightReport } = await import("../web/fightreport.js");
 const { FOLD_OPEN_SFX, FOLD_CLOSE_SFX } = await import("../engine/dw3/ui/fold-tween.ts");
 
 function mockSfx() {
@@ -43,23 +41,4 @@ function fakeState(partySize) {
 test("the fold-family constants are the packed open/close cues", () => {
   assert.equal(FOLD_OPEN_SFX, 0x40019);
   assert.equal(FOLD_CLOSE_SFX, 0x4001a);
-});
-
-test("gym window folds play the open cue once per fold start", async () => {
-  const sfx = mockSfx();
-  const g = createGym(sfx);
-  await g.open(fakeState(3));
-  assert.equal(countOf(sfx, "system03"), 1, `open plays=${sfx.plays}`);
-  // Confirming the trainee folds the drill window open: a second start, a second cue.
-  g.selSlot = 0;
-  g.handleKey("circle", g._state);
-  assert.equal(countOf(sfx, "system03"), 2, `after transition plays=${sfx.plays}`);
-});
-
-test("the fight report's chrome fold plays the open cue once", async () => {
-  const sfx = mockSfx();
-  const r = createFightReport(sfx);
-  r.open({ rows: [], pages: [] });
-  assert.equal(countOf(sfx, "system03"), 1, `report plays=${sfx.plays}`);
-  assert.equal(countOf(sfx, "system04"), 0);
 });

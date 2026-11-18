@@ -3,6 +3,7 @@
 import { ui } from './vendor/engine.js';
 import { createNativeScreenRenderer } from './native-screen-render.js';
 import { paintNativeSession } from './native-session.js';
+import { composeWindow } from './ui-c/screens.js';
 import { fetchJson, fetchBytes, loadResidentResources } from './resident-data.js';
 import { cards, persistCollection, loadCatalog, loadBoosters, loadCardPrices,
   loadCardShops, loadCardIcons, drawCardIcon } from './cardstate.js';
@@ -93,7 +94,7 @@ export function createCardShopTranslated(sfx=null,options={}) {
   c.draw=(ctx,width)=>{
     if(!c._open||!c._session)return;
     ctx.save();ctx.scale(width/320,width/320);
-    paintNativeSession(ctx,renderer,c._session);ctx.restore();
+    paintNativeSession(ctx,renderer,c._session,{ui:{key:'ui-cardshop',compose:composeWindow}});ctx.restore();
   };
   c.close=()=>{if(c._open)c._finish();};
   c._finish=()=>{

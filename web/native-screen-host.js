@@ -5,7 +5,7 @@
 // ordinary play: preload, boot through engine/native with the mixed-mode bridge
 // installed, per-frame ticks, pad state, rendering through the existing
 // draw-intent/VRAM/text paths, screen-finish detection, teardown and
-// diagnostics. Screen modules (web/shop-native.js, later the rest) supply only
+// diagnostics. Screen modules (web/cardduel-native.js, web/cntysel-native.js) supply only
 // their state adapter; web/game.js consumes this host and does not duplicate it
 // per screen.
 //
