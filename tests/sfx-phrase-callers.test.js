@@ -35,6 +35,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 
@@ -52,7 +53,7 @@ test("ENCOUNTS is a built phrase, one runtime note per census voice", () => {
 });
 
 test("the field's handoff to a battle cues it, with its citations", () => {
-  const src = fs.readFileSync("web/battle.js", "utf8");
+  const src = readSource("web/battle.js");
   const at = src.indexOf("async function start({");
   assert.ok(at > 0, "battle start() should exist");
   const cue = src.indexOf('sfx?.play("encounts")', at);

@@ -29,6 +29,7 @@ import {
   pauseEquipRowAdmits,
 } from "../web/vendor/engine.js";
 import { poolFrom, itemRecord, slotOptions, legalCombo, bestLoadout } from "../web/quartermaster.js";
+import { readSource } from "./helpers/source.js";
 
 const equipment = JSON.parse(
   readFileSync(new URL("../web/assets/data/equipment.json", import.meta.url), "utf8"),
@@ -270,7 +271,7 @@ test("the same pool in a different order gives the same six slots and refusals",
 });
 
 test("the module's only import is the vendored engine", () => {
-  const src = readFileSync(new URL("../web/quartermaster.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/quartermaster.js", import.meta.url));
   const specifiers = [...src.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(specifiers, ["./vendor/engine.js"]);
 });

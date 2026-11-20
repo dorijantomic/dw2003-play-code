@@ -37,6 +37,7 @@ import {
     GLYPH_TABLE as GLYPH_TABLE_ADDR,
 } from "../engine/dw3/ui/cursor-handler.ts";
 import { spawnUiIcon, UI_ICON_FIELDS } from "../engine/dw3/ui/spawn-ui-icon.ts";
+import { readSource } from "./helpers/source.js";
 
 const row = (screen) => CURSORS.find((r) => r.screen === screen);
 
@@ -152,7 +153,7 @@ test("the other three rows animate at their decoded rates", () => {
 });
 
 test("the F2 switch is off by default and the page is only reachable behind it", () => {
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(ambience, /\["cursorbook", "Cursor almanac \(new\)"\]/, "the F2 Extras row");
 
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
@@ -160,7 +161,7 @@ test("the F2 switch is off by default and the page is only reachable behind it",
     assert.match(experimental[1], /"cursorbook"/, "off until the player switches it on");
 
 
-    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url)), devPanel = readSource(new URL("../web/dev-panel.js", import.meta.url));
     const refs = devModel.split("cursor-almanac.html").length - 1;
     assert.equal(refs, 1, "one reference to the page, no other link into it");
     assert.match(devModel, /cursorbook: P\("cursor-almanac\.html"/, "the Open button's page is in the F2 page model");

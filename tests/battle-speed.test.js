@@ -12,12 +12,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { SPEEDS, battleDelta, battleSpeedOn } from "../web/battle-speed.js";
+import { readSource } from "./helpers/source.js";
 
-const BATTLE_SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-const AMBIENCE_SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-const DEV_SRC = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");   // the F2 page draws the slider row
-const GAME_SRC = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-const SPEED_SRC = readFileSync(new URL("../web/battle-speed.js", import.meta.url), "utf8");
+const BATTLE_SRC = readSource(new URL("../web/battle.js", import.meta.url));
+const AMBIENCE_SRC = readSource(new URL("../web/ambience.js", import.meta.url));
+const DEV_SRC = readSource(new URL("../web/dev-panel.js", import.meta.url));   // the F2 page draws the slider row
+const GAME_SRC = readSource(new URL("../web/game.js", import.meta.url));
+const SPEED_SRC = readSource(new URL("../web/battle-speed.js", import.meta.url));
 
 test("the four speeds are x1, x1.5, x2 and x3", () => {
     assert.deepEqual(SPEEDS, [1, 1.5, 2, 3]);
@@ -67,7 +68,7 @@ test("the field and everything outside the battle keep the game's own dt", () =>
     // game.js's frame loop is the only place the field, cutscenes and menus are
     // stepped; it must never learn about the battle speed.
     assert.doesNotMatch(GAME_SRC, /battleSpeed|battle-speed/, "game.js never scales the field's dt");
-    assert.match(GAME_SRC, /const dt = Math\.min\(\(t - lastT\) \/ 1000, 0\.1\);/,
+    assert.match(GAME_SRC, /const dt = Math\.min\(\(t - (?:S\.)?lastT\) \/ 1000, 0\.1\);/,
         "the frame loop still hands out real elapsed seconds");
 });
 

@@ -3,8 +3,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const src = readSource(new URL("../web/battle.js", import.meta.url));
 
 test("battle.js has no invented braces-to-counter sentence", () => {
   assert.equal(/braces to counter/i.test(src.replace(/\/\/.*$/gm, "")), false);

@@ -24,6 +24,7 @@ import {
   confirmRedirectId,
   NPC_CONFIRM_REDIRECT_TABLE_RAM as ENGINE_TABLE_RAM,
 } from "../web/vendor/engine.js";
+import { readSource } from "./helpers/source.js";
 
 const readText = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const readJson = (p) => JSON.parse(readText(p));
@@ -180,7 +181,7 @@ test("the F2 switch is off by default and gates the row and the page", () => {
   const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
   assert.ok(experimental, "EXPERIMENTAL is still one array literal");
   assert.match(experimental[1], /"redirectview"/, "off until the player switches it on");
-  const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+  const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url)), devPanel = readSource(new URL("../web/dev-panel.js", import.meta.url));
   assert.match(devModel, /redirectview: P\("redirect-lab\.html"/, "the Open button's page is in the F2 page model");
   assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
   assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");

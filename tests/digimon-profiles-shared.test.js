@@ -18,6 +18,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PROFILE_ROWS, PROFILE_SCAN_ROWS } from "../engine/dw3/ui/native/pause-status.ts";
+import { readSource } from "./helpers/source.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const data = join(root, "web/assets/data");
@@ -144,7 +145,7 @@ test("the battle's own DNA rule reads the pane's records under the same name", (
     // the fused form's roster row (dnaFusedForm). That hand-off is a name, not a type,
     // so nothing else in the suites notices when the two sides disagree: renaming the
     // pane's `tables()` key on its own silently stopped the pane opening.
-    const battle = text(join(root, "web/battle.js"));
+    const battle = readSource(join(root, "web/battle.js"));
     assert.ok(battle.includes("dnaTableReader(tables.profiles, tables.techniques)"),
         "battle.js reads the pane's profiles key");
     assert.ok(battle.includes("jogressFused(pairing.resultId, tables.profiles)"),

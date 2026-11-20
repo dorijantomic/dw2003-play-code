@@ -29,6 +29,7 @@ import {
   plannerCursor,
   plannerSelection,
 } from "../web/evolution-planner.js";
+import { readSource } from "./helpers/source.js";
 
 const digimon = JSON.parse(readFileSync("web/assets/data/digimon.json", "utf8"));
 const evolutions = JSON.parse(readFileSync("web/assets/data/evolutions.json", "utf8"));
@@ -212,7 +213,7 @@ test("the runtime merge adds 135 records per line: 179 rows with no code change"
 });
 
 test("the F2 switch is the Extras pair and EXPERIMENTAL, so it starts off", () => {
-  const src = readFileSync("web/ambience.js", "utf8");
+  const src = readSource("web/ambience.js");
   assert.ok(src.includes('["planner", "Next forms planner (new)"]'), "the Extras pair is present");
   const experimental = src.match(/const EXPERIMENTAL = \[([^\]]*)\]/);
   assert.ok(experimental, "EXPERIMENTAL is a literal list");
@@ -220,14 +221,14 @@ test("the F2 switch is the Extras pair and EXPERIMENTAL, so it starts off", () =
 });
 
 test("game.js gates the page on window.__fx?.planner and hooks it like the Codex", () => {
-  const src = readFileSync("web/game.js", "utf8");
+  const src = readSource("web/game.js");
   assert.match(src, /tickPlanner\(window\.__fx\?\.planner === true/);
   assert.match(src, /if \(plannerPress\(k\)\)/);
   assert.match(src, /if \(plannerOpen\(\)\) return;/);
   assert.match(src, /plannerDraw\(ctx/);
   assert.match(src, /window\.__planner/);
   // read-only page: nothing in it or its hook writes a store
-  const planner = readFileSync("web/evolution-planner.js", "utf8");
+  const planner = readSource("web/evolution-planner.js");
   assert.ok(!/localStorage/.test(planner), "the planner stores nothing");
 });
 

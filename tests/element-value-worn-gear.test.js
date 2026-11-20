@@ -11,9 +11,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import { elementPointsWithGear, elementValueWithGear } from "../web/party.js";
+import { readSource } from "./helpers/source.js";
 
 // An invented species row: base 40 fire resist, everything else small.
 const row = { id: 901, name: "TestRow", resistances: { fire: 40, water: 7, ice: 0, wind: 0, thunder: 0, machine: 0, dark: 0 } };
@@ -50,7 +50,7 @@ test("elementValueWithGear: base plus trained plus worn, capped", () => {
 
 // e. Every screen goes through the helper: the three hand-rolled copies are gone.
 test("the sheet, the battle divisor and the gym HUD call the one helper", () => {
-  const read = (f) => readFileSync(new URL(`../web/${f}`, import.meta.url), "utf8");
+  const read = (f) => readSource(new URL(`../web/${f}`, import.meta.url));
 
   const menu = read("menu.js");
   assert.match(menu, /return elementValueWithGear\(p\?\.profile, p\?\.elemBonuses, b\.elemResists, res\);/);

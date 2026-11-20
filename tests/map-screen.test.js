@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { regionOf, buildLinks, buildGraph, regionView, openRegions, layoutNodes, nearestInDirection, createMapScreenModel } from "../web/map-screen-model.js";
 import { createMapScreenBook, MAP_BOX } from "../web/map-screen-book.js";
 import { buildRows, PAGES } from "../web/options-model.js";
+import { readSource } from "./helpers/source.js";
 
 const D = " — ";
 const MAPS = [
@@ -153,14 +154,14 @@ test("OPTIONS has one Map screen row on the GAME page: Classic is the default an
     rows.mapScreen.write(store, 1);
     assert.equal(fx.mapScreen, "new");
     assert.equal(rows.mapScreen.read(store), 1);
-    const amb = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const amb = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(amb, /fx\.mapScreen = "classic";/);
 });
 
 test("the wiring: the pause list's MAP page result opens the book only when the row says New", () => {
-    const st = readFileSync(new URL("../web/status-translated.js", import.meta.url), "utf8");
+    const st = readSource(new URL("../web/status-translated.js", import.meta.url));
     assert.match(st, /result\.page === "map" && opts\.newMapScreen\?\.\(\)/);
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /newMapScreen: \(\) => window\.__fx\?\.mapScreen === "new"/);
     assert.match(game, /mapscreen: \(args\) => createMapScreenBook\(/);
 });

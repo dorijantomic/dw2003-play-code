@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import * as engine from "../engine/dw3/battle-stats.ts";
 import { battleStats, scaledStat as vendorScaledStat } from "../web/vendor/engine.js";
 import * as play from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 // Invented profiles: a starter with real hp/mp rows, and a digivolved form that stores
 // the hp/mp placeholders (1) and has to be scaled from its combat stats.
@@ -37,7 +38,7 @@ test("the source copy and the shipped copy still agree", () => {
 });
 
 test("web/battle.js defines no second body of the four functions", () => {
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   assert.doesNotMatch(src,
     /function\s+(scaledStat|scaledHp|scaledMp|evolvedMaxStats)\s*\(/,
     "the formulas must stay in engine/dw3/battle-stats.ts");

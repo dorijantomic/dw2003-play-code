@@ -2,8 +2,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const src = readFileSync(new URL("../web/mpsocial.js", import.meta.url), "utf8");
+const src = readSource(new URL("../web/mpsocial.js", import.meta.url));
 
 test("the multiplayer import carries peerHere and playingCount", () => {
     assert.match(src, /import \{[^}]*\bpeerHere\b[^}]*\bplayingCount\b[^}]*\} from "\.\/multiplayer\.js";|import \{[^}]*\bplayingCount\b[^}]*\bpeerHere\b[^}]*\} from "\.\/multiplayer\.js";/);

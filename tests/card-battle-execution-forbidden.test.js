@@ -29,6 +29,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+import { readSource } from "./helpers/source.js";
 
 /** The engine/native modules a bundle of these entry points can reach. */
 async function nativeInputs(entryPoints) {
@@ -98,7 +99,7 @@ test("the ordinary-route duel adapter still boots the shipped overlay through th
     }
     // web/game.js selects the native adapter for the duel. The album's and the
     // folder editor's ordinary routes are the translated screens.
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /const cardAlbum = cardAlbumTranslated;/,
         "the Card Album ordinary route is the translated screen");
     assert.match(game, /const cardDeck = cardDeckTranslated;/,

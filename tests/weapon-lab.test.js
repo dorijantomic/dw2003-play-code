@@ -10,14 +10,14 @@
 // into one plain line, and web/menu.js draws it only under F2 -> Extras -> Weapon effects.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import {
   weaponSecondary, weaponCritByte, WEAPON_LADDER_BY_ID, EQUIPMENT,
 } from "../engine/dw3/equipment.ts";
 import * as bundle from "../web/vendor/engine.js";
 import { weaponEffectLine } from "../web/weapon-lab.js";
 
-const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+const read = (rel) => readSource(new URL(rel, import.meta.url));
 const LADDER_IDS = Object.keys(WEAPON_LADDER_BY_ID).map(Number).sort((a, b) => a - b);
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ test("the F2 Extras row and EXPERIMENTAL list are off by default", () => {
 
 test("the equip sheet draws the line as a third footer line only under window.__fx?.weaponlab", () => {
   const src = read("../web/menu.js");
-  assert.match(src, /import \{ weaponEffectLine \} from "\.\/weapon-lab\.js";/, "menu.js uses the lab");
+  assert.match(src, /import \{ weaponEffectLine \} from "\.\.?\/weapon-lab\.js";/, "menu.js uses the lab");
   const gate = src.indexOf("window.__fx?.weaponlab");
   assert.ok(gate >= 0, "menu.js holds the switch");
   const call = src.indexOf("weaponEffectLine(");

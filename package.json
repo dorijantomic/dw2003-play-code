@@ -7,6 +7,7 @@
     "test:translations": "node tools/test_translations.mjs",
     "test:engine": "node --test 'tests/engine/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
+    "build:web": "node tools/rewrite/build-web.mjs",
     "build:engine": "node tools/build_engine_bundles.mjs",
     "build:content": "node tools/engine-convert/convert.ts",
     "autopilot": "node tools/story_autopilot.ts",

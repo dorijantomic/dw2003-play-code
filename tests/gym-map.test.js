@@ -22,6 +22,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { gymRows, rankLadder, groupDrills, groupSizes } from "../web/gym-map.js";
 import { greeterText, placeName, gateText, drillText, mapSummary } from "../web/gym-map-page.js";
+import { readSource } from "./helpers/source.js";
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const RANKS = readJson("web/assets/data/gym_ranks.json");
@@ -107,7 +108,7 @@ test("every gate is an ID card (40, 41 or 42), and an unknown stage has no row",
 
 test("a rung's TP cost is progression's tp_costs, never a literal in the module", () => {
   for (const row of rows) for (const option of row.options) assert.deepEqual(option.tpCost, GYM.tp_costs);
-  const source = readFileSync("web/gym-map.js", "utf8");
+  const source = readSource("web/gym-map.js");
   assert.doesNotMatch(source, /\[\s*1\s*,\s*5\s*,\s*10\s*\]/, "the trio is read, not written");
   assert.doesNotMatch(source, /tpCost\s*[:=]\s*\[/, "tpCost is copied from the table");
   // Data-driven proof: change the table and every rung follows it.
@@ -128,7 +129,7 @@ test("rankLadder(gym) is the greeter's gate ladder, in the file's own order", ()
 });
 
 test("the module is pure: no DOM, no storage, no fetch and no flag write", () => {
-  const source = readFileSync("web/gym-map.js", "utf8");
+  const source = readSource("web/gym-map.js");
   for (const word of ["document", "window", "localStorage", "sessionStorage", "fetch", "XMLHttpRequest", "setFlag", "set_flag", "flag-store"]) {
     assert.ok(!source.includes(word), `web/gym-map.js never names ${word}`);
   }
@@ -154,14 +155,14 @@ test("the page names its greeter and each rung in plain words", () => {
 });
 
 test("the F2 switch is the Extras pair and EXPERIMENTAL, with a button row hidden while off", () => {
-  const ambience = readFileSync("web/ambience.js", "utf8");
+  const ambience = readSource("web/ambience.js");
   assert.ok(ambience.includes('["gymmap", "Gym map (new)"]'), "the Extras row has the pair");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"gymmap"/, "gymmap is off until switched on");
-  const devModel = readFileSync("web/dev-panel-model.js", "utf8"), devPanel = readFileSync("web/dev-panel.js", "utf8");
+  const devModel = readSource("web/dev-panel-model.js"), devPanel = readSource("web/dev-panel.js");
   assert.match(devModel, /gymmap: P\("gym-map\.html"/, "the Open button's page is in the F2 page model");
   assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
   assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");
-  assert.doesNotMatch(readFileSync("web/game.js", "utf8"), /gym-map|gymmap/, "the map is not a game.js hook");
+  assert.doesNotMatch(readSource("web/game.js"), /gym-map|gymmap/, "the map is not a game.js hook");
 });
 
 test("the page exists, imports the module and reads the shipped tables", () => {
@@ -171,7 +172,7 @@ test("the page exists, imports the module and reads the shipped tables", () => {
   assert.match(html, /from "\.\/gym-map-page\.js"/);
   assert.match(html, /id="gyms"/);
   assert.match(html, /Gym map/);
-  const page = readFileSync("web/gym-map-page.js", "utf8");
+  const page = readSource("web/gym-map-page.js");
   for (const file of ["assets/data/gym_ranks.json", "assets/data/progression.json", "assets/data/item_effects.json"]) {
     assert.ok(page.includes(file), `the page reads ${file}`);
   }

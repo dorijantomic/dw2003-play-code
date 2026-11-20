@@ -10,10 +10,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { offersAt, offerLabels, pageCount } from "../web/quest-offers.js";
+import { readSource } from "./helpers/source.js";
 
-const QUESTS = readFileSync(new URL("../web/quests.js", import.meta.url), "utf8");
-const AMBIENCE = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-const OFFERS_SRC = readFileSync(new URL("../web/quest-offers.js", import.meta.url), "utf8");
+const QUESTS = readSource(new URL("../web/quests.js", import.meta.url));
+const AMBIENCE = readSource(new URL("../web/ambience.js", import.meta.url));
+const OFFERS_SRC = readSource(new URL("../web/quest-offers.js", import.meta.url));
 const DATA = JSON.parse(readFileSync(new URL("../web/quests.json", import.meta.url), "utf8"));
 const DEFS = DATA.quests;
 

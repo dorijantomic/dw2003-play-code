@@ -2,6 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { BOOK_LABELS, pauseExtraRows, pauseLabelOk } from "../web/pause-extra-rows.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -39,7 +40,7 @@ test("ambience.js lists both switches in Extras and in EXPERIMENTAL (off at firs
 });
 
 test("game.js hands the rows to the pause list and opens the books from the pause list's own result", () => {
-    const game = read("../web/game.js");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /extraRows: \(\) => pauseExtraRows\(\{ quests: questsPauseRow\(\), fx: window\.__fx, fly: questDone\(FLY_QUEST\) \}\),/);
     assert.match(game, /onBook: \(book, row\) => openBook\(book, row\),/);
     assert.doesNotMatch(game, /extraRow: \(\) => questsPauseRow\(\)/, "the single-row option is gone");

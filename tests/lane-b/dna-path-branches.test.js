@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { NativeStageRuntime } from '../../engine/native/runtime.ts';
 import { DNA_PATH_BRANCHES, dnaAnswerAction, dnaAnswerForm } from '../../engine/dw3/battle-dna-branches.ts';
+import { readSource } from "../helpers/source.js";
 const fight = readFileSync('web/assets/native/screens/pro_fightstg.bin');
 const resident = readFileSync('web/assets/native/screens/resident.bin');
 const word = a => fight.readUInt32LE(a - 0x80082cb0);
@@ -63,9 +64,9 @@ test('full original phase tick agrees with the decode, including dispatch delay 
 });
 
 test('browser consumes pane cancel by reopening the picker in both routes', () => {
-  const source = readFileSync(process.env.DNA_BATTLE_SOURCE || 'web/battle.js', 'utf8');
+  const source = readSource(process.env.DNA_BATTLE_SOURCE || 'web/battle.js');
   const begin = source.indexOf('  function applyDnaAnswer(');
-  const end = source.indexOf('\n  /**', begin);
+  const end = source.indexOf('\n  }\n', begin) + 4;
   assert.ok(begin > 0 && end > begin);
   const ST = { PLAYER_TAG: 11, PLAYER_DNA_CHOICE: 15,
     PLAYER_MENU: 2, PLAYER_ACT: 5 };
@@ -82,9 +83,9 @@ test('browser consumes pane cancel by reopening the picker in both routes', () =
 });
 
 test('forced DNA answer does not invent a Switch commit', () => {
-  const source = readFileSync('web/battle.js', 'utf8');
+  const source = readSource('web/battle.js');
   const begin = source.indexOf('  function applyDnaAnswer(');
-  const end = source.indexOf('\n  /**', begin);
+  const end = source.indexOf('\n  }\n', begin) + 4;
   const apply = new Function('dnaAnswerAction', 'ST', source.slice(begin,end)
     + '\nreturn applyDnaAnswer;')(dnaAnswerAction, { PLAYER_ACT: 5, PLAYER_TAG: 11 });
   const b = { state: 15, pendingAction: null, _dnaChoice: { rosterIndex: 1, formId: 26 } };

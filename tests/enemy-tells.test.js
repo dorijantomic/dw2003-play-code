@@ -15,10 +15,11 @@ import { enemyMoveCondition, pickEnemyAiMove } from "../engine/dw3/battle-formul
 import {
   everyNthRows, turnsUntil, nextTurnNumber, nearestTell, tellText,
 } from "../web/enemy-tells.js";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-const AMB = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-const MODULE = readFileSync(new URL("../web/enemy-tells.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
+const AMB = readSource(new URL("../web/ambience.js", import.meta.url));
+const MODULE = readSource(new URL("../web/enemy-tells.js", import.meta.url));
 const ENEMIES = JSON.parse(
   readFileSync(new URL("../web/assets/data/enemies.json", import.meta.url), "utf8")).enemies;
 
@@ -134,7 +135,7 @@ test("battle.js hands the shifted counter over only under window.__fx?.aishift",
   assert.match(body,
     /if \(window\.__fx\?\.aishift\) en = \{ \.\.\.en, turnCounter: \(en\.turnCounter \?\? 0\) \+ 1 \};/,
     "the switch-off path leaves the enemy record itself: same picks, same RNG draws");
-  assert.match(body, /pickEnemyAiMove\(moves, en, RAND_U16, battle\.player, context\)/,
+  assert.match(body, /pickEnemyAiMove\(moves, en, RAND_U16, B\.battle\.player, context\)/,
     "the engine reads the chosen operand");
   assert.equal((SRC.match(/aishift/g) || []).length, 1,
     "only the AI selection reads the breaker");

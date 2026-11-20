@@ -18,8 +18,9 @@ import {
   FINALE_MSG_BODY, FINALE_MSG_LEARNED, FINALE_HEAD_ATTACK_ID,
   FINALE_TAIL_DEFEAT_BEATS, finaleBattleKind, finaleRecordsTechnique, finaleCopiedAttackSkill,
 } from "../engine/index.ts";
+import { readSource } from "./helpers/source.js";
 
-const battleJs = () => readFileSync("web/battle.js", "utf8");
+const battleJs = () => readSource("web/battle.js");
 const techRows = () => JSON.parse(readFileSync("web/assets/data/fight_tech_table.json", "utf8"));
 const skillRows = () => Object.fromEntries(
   JSON.parse(readFileSync("web/assets/data/digimon.json", "utf8")).skills.map((s) => [s.id, s]));
@@ -206,7 +207,7 @@ test("the beats chain through the result pages, and the latch records the tail-p
 test("the kind word drives the rolls, the counter and the head's attack from the live value", () => {
   const src = battleJs();
   // Setup stamps the live kind instead of a frozen copy of specialMode.
-  assert.ok(src.includes("rec.battleKind = battleKindOf(battle);"));
+  assert.match(src, /rec\.battleKind = battleKindOf\((?:B\.)?battle\);/);
   // The boss04 counter runs only while kind == 6.
   const note = src.slice(src.indexOf("function noteFinalBossPhaseDamage"), src.indexOf("function frozenGateLosesTurn"));
   assert.ok(note.includes("if (battleKindOf(b) !== 6) return;"), "the counter's kind gate");

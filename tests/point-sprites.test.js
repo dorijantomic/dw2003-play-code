@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 // Golden pins for the point-sprite extraction (decode ground truth:
 // docs/research/field/point-sprite-ambient-system.md -- the s420 Seiryu City
@@ -29,9 +30,11 @@ test("s420 Seiryu City: 34 records with the three windmills", () => {
 test("scenery sprites share the map camera phase", () => {
   // Chain posts and railings are a second image set into map cut-outs.
   // Independent dest rounding made the join visible and crawl while walking.
-  const src = readFileSync("web/effects.js", "utf8");
+  const src = readSource("web/effects.js");
+  // drawSprite lives in web/effects/draw.ts after the split; bound it by its own
+  // closing brace (the only "}" at column 0 inside the body).
   const start = src.indexOf("function drawSprite(");
-  const end = src.indexOf("\n// The ordering-table bucket", start);
+  const end = src.indexOf("\n}\n", start);
   assert.ok(start >= 0 && end > start, "drawSprite not found");
   const fn = src.slice(start, end);
   assert.equal(
@@ -39,7 +42,7 @@ test("scenery sprites share the map camera phase", () => {
     false,
     "drawSprite dest must match map (-camX,-camY); rounding desyncs cut-out props",
   );
-  const fieldcom = readFileSync("web/fieldcom.js", "utf8");
+  const fieldcom = readSource("web/fieldcom.js");
   const fcStart = fieldcom.indexOf("export function drawFieldcomIcon(");
   const fcEnd = fieldcom.indexOf("\n// Composed indicator bubble", fcStart);
   assert.ok(fcStart >= 0 && fcEnd > fcStart, "drawFieldcomIcon not found");
@@ -111,7 +114,7 @@ test("the map's layers are emitted into their own buckets around the under-map b
   // ground (7). A split stage draws its two map-tile layers itself — layer 2 at
   // OT[11] before the props, the ground at OT[7] after them — so a bucket-8/10
   // prop is sandwiched between the two layers, exactly as on the console.
-  const src = readFileSync("web/game.js", "utf8");
+  const src = readSource("web/game.js");
   // drawMapPicture = ctx.drawImage, or the HD tiles (HD Remaster) (same place in the order).
   const layer2 = src.indexOf("drawMapPicture(\n            layer2Img,");
   const under = src.indexOf("drawEffectsUnderMap(ctx, m.id");
@@ -188,7 +191,7 @@ test("a layer-2 split ships exactly where the ground hides a prop or an op-5 act
 });
 
 test("both passes route through bucketPass, so they cannot disagree", () => {
-  const src = readFileSync("web/effects.js", "utf8");
+  const src = readSource("web/effects.js");
   const underStart = src.indexOf("export function drawEffectsUnderMap(");
   const overStart = src.indexOf("export function drawEffects(");
   assert.ok(underStart >= 0 && overStart > underStart);

@@ -17,14 +17,17 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stealRatio, stealWeight, stealThreshold } from "../engine/dw3/battle-steal-roll.ts";
 import { enemyStatsIndex, enemyStatsBlock } from "../engine/dw3/battle-enemy-id.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+// web/battle.js is split (web/battle.ts plus web/battle/*.ts): readSource returns all of it.
+const read = (rel) => readSource(join(ROOT, rel));
 
 /** Does `file` import `symbol` from the production bundle? */
 function importsFromEngine(file, symbol) {
   const src = read(file);
-  const re = /import\s*\{([^}]*)\}\s*from\s*["']\.\/vendor\/engine\.js["']/g;
+  // Split parts of web/battle.js sit one folder deeper ("../vendor/engine.js").
+  const re = /import\s*\{([^}]*)\}\s*from\s*["'](?:\.\.?\/)?vendor\/engine\.js["']/g;
   let m;
   while ((m = re.exec(src))) {
     for (let part of m[1].split(",")) {

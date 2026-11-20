@@ -22,6 +22,7 @@ import path from "node:path";
 import * as b3 from "../web/battle3d.js";
 import { ActorAnimator } from "../web/fight/actor-animator.js";
 import { TimelinePlayer } from "../web/fight/timeline-player.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const MODELS = path.join(ROOT, "web/assets/battle/models");
@@ -144,9 +145,9 @@ test("the switch is off by default, reads ?smooth=1 and the F2 store", () => {
   assert.equal(b3.smoothFlagFromUrl("?slerp=1"), false);
   assert.equal(b3.smoothFlagFromUrl(""), false);
   // the F2 panel's Battle group names this key; battle-settings.js and ambience.js must agree
-  const amb = fs.readFileSync(path.join(ROOT, "web/ambience.js"), "utf8");
+  const amb = readSource(path.join(ROOT, "web/ambience.js"));
   assert.match(amb, /\["smoothanim", "Smooth battle animation/);
-  const store = fs.readFileSync(path.join(ROOT, "web/fight/battle-settings.js"), "utf8");
+  const store = readSource(path.join(ROOT, "web/fight/battle-settings.js"));
   assert.match(store, /smoothanim: false/);
   assert.match(store, /\[\"ownclips\", \"dw2motion\", \"smoothanim\"\]|smoothanim/);
   b3.setSmoothAnim(true);

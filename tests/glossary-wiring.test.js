@@ -2,8 +2,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+const game = readSource(new URL("../web/game.js", import.meta.url));
 
 test("the glossary row opens the Digimon screen, not the blank book; OPTIONS is untouched", () => {
     assert.match(game, /glossary: \(args\) => createGlossaryBook\(/);
@@ -29,8 +30,8 @@ test("the stage is made once with the fallback and a transparent renderer, and t
     assert.equal((game.match(/createStage\(/g) || []).length, 1);
     assert.match(game, /createBattle3D\(canvas, null, \{ alpha: true \}\)/);
     assert.match(game, /drawFallback: createPartnerFallback\(\)/);
-    const book = readFileSync(new URL("../web/glossary-book.js", import.meta.url), "utf8");
+    const book = readSource(new URL("../web/glossary-book.js", import.meta.url));
     assert.match(book, /close\(\) \{ stage\?\.close\?\.\(\); \}/);
-    const host = readFileSync(new URL("../web/book-host.js", import.meta.url), "utf8");
+    const host = readSource(new URL("../web/book-host.js", import.meta.url));
     assert.match(host, /book\?\.close\?\.\(\);/);
 });

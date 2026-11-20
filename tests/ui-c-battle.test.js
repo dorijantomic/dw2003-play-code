@@ -5,6 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { composeBattle, BATTLE, joinNumbers } from "../web/ui-c/battlehud.js";
 import { ID, N, HUD, ringFrame } from "../web/ui-c/base.js";
 import { claimFor } from "../web/ui-c/claims.js";
@@ -246,18 +247,18 @@ test("capture: a texts scope takes drawText runs and painted parts with the matr
 
 // ------------------------------------------------------------------------------------------------ owners' wiring
 test("wiring: one top scope round the battle chrome; bar / notice / focus handed over as parts; marker copies and trough skipped in capture", () => {
-    const b = read("web/battle.js");
-    assert.match(b, /uiC\.scope\("ui-battle", ctx, \{[\s\S]{0,200}texts: true, top: true/);
+    const b = readSource(new URL("../web/battle.js", import.meta.url));
+    assert.match(b, /uiC\.scope\("ui-battle", (?:B\.)?ctx, \{[\s\S]{0,200}texts: true, top: true/);
     assert.match(b, /compose: \(sc\) => composeBattle\(sc, \{ view: BATTLE_UI_LAYOUT\.portraitView, stage: sc\.stage \}\)/);
-    assert.match(b, /if \(uiC\.capturing\(\)\) \{[\s\S]{0,900}uiCPart\(ctx, \{ part: "battleData"/);
-    assert.match(b, /uiCPart\(ctx, \{ part: "hpBar"/);
-    assert.match(b, /uiCPart\(ctx, \{ part: "notice", x: 118, y: 194, w: 186, h: 25 \}\)/);
+    assert.match(b, /if \(uiC\.capturing\(\)\) \{[\s\S]{0,900}uiCPart\((?:B\.)?ctx, \{ part: "battleData"/);
+    assert.match(b, /uiCPart\((?:B\.)?ctx, \{ part: "hpBar"/);
+    assert.match(b, /uiCPart\((?:B\.)?ctx, \{ part: "notice", x: 118, y: 194, w: 186, h: 25 \}\)/);
     assert.equal((b.match(/uiC\.hide\("ui-battle"\)/g) ?? []).length, 3, "report, results screen, hosted ending");
     const a = read("web/battle-menu-adapter.js");
     assert.match(a, /if \(uiCCapturing\(\)\) \{\s*for \(const m of target\.moves \?\? \[\]\) if \(m\.dstY < 0x100\) uiCPart\(ctx, \{ part: "focus"/);
     assert.match(a, /\} else paintStripMoves\(ctx, r, target\.moves\);/);
     assert.match(read("web/battlehud-translated.js"), /if \(frame\.backing && !uiCCapturing\(\)\)/);
-    const g = read("web/game.js");
+    const g = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(g, /uiC\.cover\(skipField\)/);
     assert.match(g, /if \(battle\.isActive\(\)\) battle\.draw\(\);\s*\n\s*uiC\.cover\(false\);/);
     assert.match(read("web/uifont.js"), /if \(fontReady\(\) && capturingText\(ctx\)\)/);

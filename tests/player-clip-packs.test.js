@@ -32,6 +32,7 @@ import {
 } from "../engine/systems/fishing.ts";
 import { KICK_POSE_SPRITE, KICK_POSE_CLIP } from "../engine/systems/tree-kick.ts";
 import { SLOPE_CLIP, SLOPE_SPRITE } from "../engine/systems/step-actor-actions.ts";
+import { readSource } from "./helpers/source.js";
 
 const manifest = JSON.parse(readFileSync("web/assets/manifest.json", "utf8"));
 const npcs = new Map(manifest.npcs.map((n) => [n.id, n]));
@@ -157,7 +158,7 @@ test("the walker names no player pack anywhere outside the rule", () => {
     // Guards the shape of the fix: the pack names may appear in the rule and in
     // comments, but the render path must reach them through the table. Any new
     // hard-coded pack in game.js is a special case the table should replace.
-    const src = readFileSync("web/game.js", "utf8");
+    const src = readSource("web/game.js");
     for (const pack of PLAYER_CLIP_PACKS) {
         const live = src.split("\n").filter((l) => l.includes(`"${pack}"`)
             && !l.trimStart().startsWith("//") && !l.includes("*"));
@@ -166,7 +167,7 @@ test("the walker names no player pack anywhere outside the rule", () => {
 });
 
 test("the draw path asks the rule for the pack, not the mode", () => {
-    const src = readFileSync("web/game.js", "utf8");
+    const src = readSource("web/game.js");
     assert.match(src, /playerPackForClip\(latched\.clip\)/,
         "the player's draw path must resolve its pack from the latched clip");
     assert.match(src, /PLAYER_CLIP_PACKS/,

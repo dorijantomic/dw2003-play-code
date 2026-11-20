@@ -14,6 +14,7 @@ import {
 import {
   parseDw2Gltf, measureRig, calibrateGait, gaitFootfalls, clipWalkStats, MOUNT_VIEW, PALETTE, nearestPalette, sampleClipPose,
 } from "../web/mount3d.js";
+import { readSource } from "./helpers/source.js";
 
 // ── a field stub: the same shape game.js passes to installMount ──────────────────────────────
 function fakeWorld({ enabled = true, quest = true, grid = null, asset = true, hasModel = undefined, indoor = false } = {}) {
@@ -127,7 +128,7 @@ test("no riding indoors: the press is used, one line is said, nothing starts; op
 });
 
 test("the game feeds the indoor hook from the ambience layer's open-air list, no list of its own", () => {
-  const g = fs.readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const g = readSource(new URL("../web/game.js", import.meta.url));
   assert.match(g, /indoor: \(\) => \{[^}]*!isOpenAirMapName\(n\)/);
 });
 
@@ -316,7 +317,7 @@ test("field Unimon anim_E1 is a gallop: four hooves each touch the ground and li
 import { shipClass, applyShipDefaults } from "../web/ship-list.js";
 import { EXTRA_GROUPS, SHOWN_EXTRAS, needsMountOnReset } from "../web/options-model.js";
 import { buttonForKey } from "../web/vendor/engine.js";
-const readSrc = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+const readSrc = (p) => readSource(new URL(p, import.meta.url));
 
 test("on by default: 'in' for players, on at the start, not an experimental dev switch, and an OPTIONS row", () => {
   assert.equal(shipClass("mount"), "in");

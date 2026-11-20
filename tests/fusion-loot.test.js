@@ -17,6 +17,7 @@ import {
   fusionDrops, fusionLootRows, rollFusionDrops, dropChanceText,
 } from "../web/fusion-loot.js";
 import { dropPasses } from "../web/tech-record.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const readJSON = (p) => JSON.parse(readFileSync(resolve(ROOT, p), "utf8"));
@@ -115,7 +116,7 @@ test("rollFusionDrops draws once per row: the float roll off, the disc's own wor
 });
 
 test("source gate: the fused branch sits on bossId, pays the other halves, and never re-rolls the body", () => {
-  const battle = readFileSync(resolve(ROOT, "web/battle.js"), "utf8");
+  const battle = readSource(resolve(ROOT, "web/battle.js"));
   const block = battle.match(/function defeatCurrentEnemy\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.ok(block, "defeatCurrentEnemy is still a function");
   // The fused record is the only thing that writes bossId (fuseIntoBoss, 6253) ...
@@ -123,11 +124,11 @@ test("source gate: the fused branch sits on bossId, pays the other halves, and n
   assert.match(battle, /en\.bossId = boss\.id \?\? null;/, "fuseIntoBoss stamps the authored id");
   // ... and the fusion is only reachable with the F2 `fusionbosses` switch on.
   assert.match(block, /fusionOnDefeat\(\{[\s\S]*?fxOn: fusionEnabled\(\)/, "the fusion asks the F2 key");
-  assert.match(block, /if \(fusion\.fuse\) \{\s*fuseIntoBoss\(b, fusion\.boss\);/, "only a won fusion swaps");
+  assert.match(block, /if \(fusion\.fuse\) \{\s*(?:B\.)?fuseIntoBoss\(b, fusion\.boss\);/, "only a won fusion swaps");
   // The loot branch reads the fused record's authored halves/body.
-  assert.match(block, /b\.enemy\?\.bossId \? fusionBossesDB\?\.\[b\.enemy\.bossId\] \?\? null : null/,
+  assert.match(block, /b\.enemy\?\.bossId \? (?:B\.)?fusionBossesDB\?\.\[b\.enemy\.bossId\] \?\? null : null/,
     "the branch sits on bossId + the authored boss table");
-  assert.match(block, /rollFusionDrops\(fusionBoss\.halves, fusionBoss\.body, enemiesDB/,
+  assert.match(block, /rollFusionDrops\(fusionBoss\.halves, fusionBoss\.body, (?:B\.)?enemiesDB/,
     "the fused body rolls the OTHER halves' drops");
   assert.match(block, /enemiesDB, RAND_U16, true\)/, "the stream is the disc roll, always on");
   // The ordinary path is byte-for-byte today's, and it is what the fused body skips.

@@ -42,9 +42,10 @@ import {
 import { fromJSON, moveWithCollision, rectBlocked } from "../engine/core/util/collision.ts";
 import { npcHalfWidth } from "../engine/dw3/npc-sizes.ts";
 import { treeIndexAt, TREE_HIT_RADIUS } from "../engine/systems/tree-kick.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const gameSrc = readFileSync(join(ROOT, "web/game.js"), "utf8");
+const gameSrc = readSource(join(ROOT, "web/game.js"));
 
 test("the foot ring is F0x8008dfec's 16 offset records (RAM 0x80097B88)", () => {
   assert.deepEqual(FIELD_PROBE_OFFSETS, [

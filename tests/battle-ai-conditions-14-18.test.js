@@ -14,8 +14,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { enemySwitchTarget } from "../web/enemy-switch.js";
 import { enemyMoveCondition, pickEnemyAiMove } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
 const at = (v) => () => v;
 const self = (over = {}) => ({ mp: 0, hp: 100, maxHp: 100, ...over });
 
@@ -92,7 +93,8 @@ test("the counter row drives the enemy counter, not a hard-coded basic attack", 
     const calls = SRC.match(/triggerEnemyCounterRow\(b, b\.player, b\.enemy, total, pname, enemyName\)/g) ?? [];
     assert.equal(calls.length, 2, "basic-attack and technique commits both read the row");
     // The player-side counter stays profile +0x1C (phase2-rtarget 2.2).
-    assert.match(SRC, /const basic = skillDB\[defender\.profile\?\.tech_basic\];/,
+    // The closure's module-level tables now hang off the battle context object (B.skillDB).
+    assert.match(SRC, /const basic = (?:[A-Za-z_$][\w$]*\.)?skillDB\[defender\.profile\?\.tech_basic\];/,
         "triggerPlayerCounter still counters with the player's tech_basic");
 });
 

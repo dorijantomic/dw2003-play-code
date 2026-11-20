@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { scaleEnemyStat } from "../web/enemy-stats.js";
 import { buildSpecies, pageTwoLines, rangeText, SCALE_FLOOR } from "../web/glossary-digimon.js";
 import { PAGE2, page2Rows, pageBarWidth } from "../web/glossary-book.js";
+import { readSource } from "./helpers/source.js";
 
 const EL = { fire: 100, water: 100, ice: 100, wind: 100, thunder: 100, machine: 100, dark: 100 };
 const E = (name, extra = {}) => ({ enemy_id: name, digimon_id: name, attack: 1, move_1: 0, move_2: 0, str: 40, def: 30, spt: 20, wis: 10, spd: 50, resistances: EL, status_resist: {}, digimon_type: 4, drop_item: "Null", drop_rate: 0, ai_moves: [], ...extra });
@@ -22,7 +23,7 @@ test("the helper is the battle's rule: integer truncation of stat * scale / 16, 
     assert.equal(scaleEnemyStat(40, 24), 60);
     assert.equal(scaleEnemyStat(45, 17), 47, "47.8 truncates, never rounds up");
     assert.equal(scaleEnemyStat(1, 5), 0, "no lower clamp, exactly as battle.js has it");
-    const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/battle.js", import.meta.url));
     assert.ok(/import \{ scaleEnemyStat \} from "\.\/enemy-stats\.js"/.test(src));
     assert.ok(/scaleEnemyStat\(eStats\[name\], enemyStatScale\)/.test(src), "buildEnemyRecord uses the shared helper");
 });

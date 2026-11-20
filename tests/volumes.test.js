@@ -3,6 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { BASE_GAIN, clampLevel, scaleGain } from "../web/volume-levels.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
@@ -27,7 +28,7 @@ test("a missing, empty or non-numeric level reads as 1 and a stray number is cla
 });
 
 test("audio.js: both players have setVolume, the starting gains are unchanged, jingles follow the music level", () => {
-    const src = read("../web/audio.js");
+    const src = readSource(new URL("../web/audio.js", import.meta.url));
     assert.match(src, /el\.volume = BASE_GAIN\.music;/);
     assert.match(src, /gain\.gain\.value = BASE_GAIN\.effects;/);
     assert.equal((src.match(/player\.setVolume = /g) || []).length, 2, "one on the music player, one on the effects player");

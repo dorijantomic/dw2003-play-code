@@ -14,6 +14,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 import { winEvent, sameEvent } from "../web/mp-credit.js";
 
@@ -59,16 +60,16 @@ test("sameEvent: one fight seen from two machines; another map, other foes or no
 });
 
 // ---------------------------------------------------------------- the sources
-const mpb = () => read("../web/mpbattle.js");
+const mpb = () => readSource(new URL("../web/mpbattle.js", import.meta.url));
 
 test("source: a co-op win emits battleWon once, inside the won-and-not-fled branch, on a real second human", () => {
     const src = mpb();
-    assert.match(src, /import \{ emit \} from "\.\/gameEvents\.js";/, "the game's event bus");
-    assert.match(src, /import \{ winEvent \} from "\.\/mp-credit\.js";/, "the pure event builder");
+    assert.match(src, /import \{ emit \} from "\.\.?\/gameEvents\.js";/, "the game's event bus");
+    assert.match(src, /import \{ winEvent \} from "\.\.?\/mp-credit\.js";/, "the pure event builder");
 
     const wonAt = src.indexOf("if (won && !fled) {");
     const emitAt = src.indexOf('emit("battleWon"');
-    const restoreAt = src.indexOf("if (!won && !fled) A.restore");
+    const restoreAt = src.search(/if \(!won && !fled\) (?:MB\.)?A\.restore/);
     assert.ok(wonAt >= 0, "finish still has its won-and-not-fled branch");
     assert.ok(emitAt > wonAt, "the emit sits inside that branch");
     assert.ok(restoreAt > emitAt, "and before the loss arm");
@@ -82,12 +83,16 @@ test("source: a co-op win emits battleWon once, inside the won-and-not-fled bran
 
 test("source: the host's map rides the setup packet; a guest's begin reads setup.mapId; a guest passes it on", () => {
     const src = mpb();
-    assert.match(src, /mapId: setup\.mapId \?\? A\.mapId\?\.\(\) \?\? null/, "begin keeps the fight's map (fallback: my own map)");
-    assert.match(src, /k: "setup",[^\n]*mapId: F\.mapId/, "the setup packet carries it");
+    assert.match(src, /mapId: setup\.mapId \?\? (?:MB\.)?A\.mapId\?\.\(\) \?\? null/, "begin keeps the fight's map (fallback: my own map)");
+    assert.match(src, /k: "setup",[^\n]*mapId: (?:MB\.)?F\.mapId/, "the setup packet carries it");
     assert.match(src, /mapId: d\.mapId/, "a guest's setup message passes the packet's map to begin");
-    assert.match(src, /mapId: A\.mapId\?\.\(\)/, "the host's fight is stamped with the host's map at mpbHost");
+    assert.match(src, /mapId: (?:MB\.)?A\.mapId\?\.\(\)/, "the host's fight is stamped with the host's map at mpbHost");
     // the guest must never overwrite it with its own current map inside finish
-    assert.doesNotMatch(src.slice(src.indexOf("function finish"), src.indexOf("// ------------------------------------------------------------ install")), /A\.mapId\?\.\(\)/,
+    const finAt = src.indexOf("function finish");
+    const afterFin = src.slice(finAt + "function finish".length);
+    const nextAt = afterFin.search(/\n(?:export )?function |\n\/\/ -{20}/);
+    const finBody = src.slice(finAt, finAt + "function finish".length + (nextAt < 0 ? afterFin.length : nextAt));
+    assert.doesNotMatch(finBody, /A\.mapId\?\.\(\)/,
         "finish reads f.mapId, never the machine's own map");
 });
 

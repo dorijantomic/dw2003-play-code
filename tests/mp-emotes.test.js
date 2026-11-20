@@ -14,11 +14,12 @@ import { readFileSync } from "node:fs";
 import { EMOTE_BUBBLE, bubbleFor, bubbleTick } from "../web/mp-emotes.js";
 import { drawIndicatorBubble, KIND, BALLOON_ANCHOR_LIFT } from "../web/fieldcom.js";
 import { EMOTES, drawGhostLabel } from "../web/multiplayer.js";
+import { readSource } from "./helpers/source.js";
 
-const MP_SRC = readFileSync(new URL("../web/multiplayer.js", import.meta.url), "utf8");
-const GAME_SRC = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-const FC_SRC = readFileSync(new URL("../web/fieldcom.js", import.meta.url), "utf8");
-const AMB_SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const MP_SRC = readSource(new URL("../web/multiplayer.js", import.meta.url));
+const GAME_SRC = readSource(new URL("../web/game.js", import.meta.url));
+const FC_SRC = readSource(new URL("../web/fieldcom.js", import.meta.url));
+const AMB_SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 const MANIFEST = JSON.parse(
   readFileSync(new URL("../web/assets/ui/fieldcom.json", import.meta.url), "utf8"));
 

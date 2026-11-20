@@ -9,10 +9,10 @@ const DIR = new URL("../web/ui-c/", import.meta.url).pathname;
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
 const files = walk(DIR);
 
-test("ui-c holds only .css .js .woff2 .txt files, none over 200 KB", () => {
+test("ui-c holds only .css .js .ts .woff2 .txt files, none over 200 KB", () => {
     assert.ok(files.length >= 14, `${files.length} files`);
     for (const f of files) {
-        assert.ok([".css", ".js", ".woff2", ".txt"].includes(extname(f)), `${f} has a type that is not allowed`);
+        assert.ok([".css", ".js", ".ts", ".woff2", ".txt"].includes(extname(f)), `${f} has a type that is not allowed`);
         assert.ok(statSync(f).size <= 200 * 1024, `${f} is over 200 KB`);
     }
 });

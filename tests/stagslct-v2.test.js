@@ -10,10 +10,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { nextEntryRow, v2Rows, createStagslctMenu } from "../web/stagslct.js";
+import { readSource } from "./helpers/source.js";
 
 const DATA = JSON.parse(readFileSync(new URL("../web/assets/data/stagslct_ui.json", import.meta.url), "utf8"));
-const SOURCE = readFileSync(new URL("../web/stagslct.js", import.meta.url), "utf8");
-const AMBIENCE = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const SOURCE = readSource(new URL("../web/stagslct.js", import.meta.url));
+const AMBIENCE = readSource(new URL("../web/ambience.js", import.meta.url));
 
 function countKinds(rows) {
     const out = { entry: 0, category: 0, heading: 0, separator: 0 };

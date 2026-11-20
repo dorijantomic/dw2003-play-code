@@ -25,6 +25,7 @@ import {
   JPN_OPENING,
   branchesFor,
 } from "../web/language-desk.js";
+import { readSource } from "./helpers/source.js";
 
 const CNTY = "docs/research/ui/cnty_sel-full-decode-2026-08-05.md";
 const TITLE = "docs/research/ui/stdwtitl-title-menu-2026-08-14.md";
@@ -128,10 +129,10 @@ test("every row and branch cites a walker decode under docs/research/ui/", () =>
 });
 
 test("the F2 switch is the Extras pair and EXPERIMENTAL, with a button row that is hidden while off", () => {
-  const ambience = readFileSync("web/ambience.js", "utf8");
+  const ambience = readSource("web/ambience.js");
   assert.ok(ambience.includes('["langdesk", "Language desk (new)"]'), "the Extras row has the pair");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"langdesk"/, "langdesk is off until switched on");
-  const devModel = readFileSync("web/dev-panel-model.js", "utf8"), devPanel = readFileSync("web/dev-panel.js", "utf8");
+  const devModel = readSource("web/dev-panel-model.js"), devPanel = readSource("web/dev-panel.js");
   assert.match(devModel, /langdesk: P\("language-desk\.html"/, "the Open button's page is in the F2 page model");
   assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
   assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");

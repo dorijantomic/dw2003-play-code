@@ -6,8 +6,9 @@ import { readFileSync } from "node:fs";
 import {
     DETAIL_KEYS, DETAIL_LEVELS, DETAIL_OFF, EFFECT_CATEGORIES, EXTRA_GROUPS, F2_ONLY_KEYS, OPTIONS_HOME, PAGES, applyDetail, buildRows, createOptionsModel, detailOf,
 } from "../web/options-model.js";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 /** [group, key] for every pair of FX_GROUPS, read from the source (ambience.js needs a browser to import). */
 const PAIRS = [...SRC.match(/export const FX_GROUPS = \[([\s\S]*?)\n\];/)[1].matchAll(/\["(\w+)", "[^"]*"\]/g)].map((m) => m[1]);
 const EXPERIMENTAL = SRC.match(/const EXPERIMENTAL = \[([^\]]*)\];/)[1].match(/"(\w+)"/g).map((s) => s.slice(1, -1));

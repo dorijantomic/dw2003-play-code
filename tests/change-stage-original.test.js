@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { changeStageRotAt, changeStageMeshMatrix, CHANGE_STAGE_MOTION_FRAMES } from "../engine/systems/blast-presentation.ts";
 import { rotMatrixZYX } from "../engine/dw3/gte-math.ts";
+import { readSource } from "./helpers/source.js";
 
 // MEFT1028 / MEFT1031 ctrl rotation tracks (extractor: tools/extract_arenas.py ROT_KEY_PACKS), keys 0, 1, 1501.
 const MESH0 = [[0, 0, 0, 0], [1, 0, 0, 0], [1501, 8192, 0, -4096]];
@@ -77,7 +78,7 @@ test("known angles: mesh0 end key (8192, 0, -4096) is two turns about X and a tu
 });
 
 test("battle3d draws the change-stage meshes through changeStageMeshMatrix only", () => {
-  const src = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
   assert.match(src, /changeStageMeshMatrix\(keys, frame\)/);
   assert.doesNotMatch(src, /psxRotMat4|rotKeysAt/);
   const vendor = readFileSync(new URL("../web/vendor/engine.js", import.meta.url), "utf8");

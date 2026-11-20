@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 globalThis.fetch = async (url) => ({
   json: async () => JSON.parse(readFileSync(`web/${String(url)}`, "utf8")),
@@ -109,6 +110,6 @@ test("the gym-translated seed's own element line is the same numbers (left as ca
     "storedNumbers' elements are the same numbers the seed builds by hand");
   // The seed still builds them itself: tests/worn-form-starter-row.test.js:128
   // (card 01) pins that exact expression, so it was left alone (see the note).
-  const src = readFileSync("web/gym-translated.js", "utf8");
+  const src = readSource("web/gym-translated.js");
   assert.match(src, /elements: elementValues\(g\._data\.digimonById\[CHARID_TO_DIGID\[party\[i\]\]\] \?\? profile, ps\.elemBonuses\)/);
 });

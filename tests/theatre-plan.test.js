@@ -9,10 +9,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { theatrePlan, theatreCameraModes } from "../web/theatre-plan.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
-const source = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+const source = (p) => readSource(new URL(p, import.meta.url));
 
 const digimon = read("../web/assets/data/digimon.json");
 const modelMap = read("../web/assets/battle/model_map.json");

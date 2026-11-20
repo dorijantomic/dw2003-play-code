@@ -1,0 +1,10 @@
+{
+ "source": "web/audio.ts",
+ "targets": {
+  "web/audio/bgm.ts": [
+   "createExclusiveRegister",
+   "createBgmPlayer"
+  ]
+ },
+ "stateFile": "web/audio/state.ts"
+}

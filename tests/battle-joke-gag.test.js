@@ -47,6 +47,7 @@ import {
   JOKE_GAG_NAME_ID, jokeFlavorMessageId, jokeFlavorPick,
 } from "../engine/dw3/battle-confusion.ts";
 import { MSG_KIND, jokeGagMessageSpec } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bank = JSON.parse(
@@ -198,7 +199,7 @@ test("Circle closes the gag and nothing else does", () => {
 test("web/battle.js asks for that line instead of writing its own sentence", () => {
   // The gag branch of applyPlayerAction must go through the shared panel. Read the source
   // so a future edit that reintroduces a walker-written combined line fails here.
-  const src = readFileSync(join(root, "web/battle.js"), "utf8");
+  const src = readSource(join(root, "web/battle.js"));
   const branch = src.slice(src.indexOf('if (action.type === "confused")'));
   const body = branch.slice(0, branch.indexOf('} else if (action.type === "tag")'));
   assert.match(body, /jokeGagMessageSpec\(/,

@@ -19,6 +19,7 @@ import {
   wrapText,
   cutContentLines,
 } from "../web/cut-content.js";
+import { readSource } from "./helpers/source.js";
 
 test("the gallery has exactly seven exhibits, each with a title, a body and an evidence path", () => {
   assert.equal(CUT_CONTENT.length, 7);
@@ -233,11 +234,11 @@ test("the switch never opens the page; the button does; Cross closes; the switch
 });
 
 test("the F2 row, the EXPERIMENTAL default and the game hook are all in place", () => {
-  const ambience = readFileSync("web/ambience.js", "utf8");
+  const ambience = readSource("web/ambience.js");
   assert.ok(ambience.includes('["cutcontent", "Cut-content gallery (dev)"]'), "the Extras row has the pair");
   assert.match(ambience, /const EXPERIMENTAL = \[[^\]]*"cutcontent"/, "cutcontent is off until switched on");
 
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   assert.match(game, /__fx\?\.cutcontent/, "the game reads the F2 flag");
   assert.match(game, /tickCutContent\(window\.__fx\?\.cutcontent/, "the game ticks the page from the flag");
   assert.match(game, /cutContentPress\(k\)/, "the game gives the page first claim on the pad");

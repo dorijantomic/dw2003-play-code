@@ -23,9 +23,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const B3D = readFileSync(join(ROOT, "web/battle3d.js"), "utf8");
+const B3D = readSource(join(ROOT, "web/battle3d.js"));
 
 /** The arena's own draw branch (from `} else if (arenaActive) {` to the fallback `} else {`). */
 function arenaBranch() {
@@ -61,21 +62,21 @@ test("the arena pass does not leak its depth into the fighters", () => {
   assert.match(branch, /depthWrite/, "…under the tracked decode switch");
   // …and then clears that depth before the frame moves on, so the fighters start from a clean
   // buffer and cannot be rejected by the arena.
-  assert.match(branch, /gl\.clear\(gl\.DEPTH_BUFFER_BIT\)/,
+  assert.match(branch, /B\$\.gl\.clear\(B\$\.gl\.DEPTH_BUFFER_BIT\)/,
     "the arena clears the depth it wrote, so no later draw is rejected by it");
   // The clear has to come AFTER the arena is drawn, or it would erase the depth the sort needs.
   const drawAt = branch.indexOf("drawProjLayerIndexed(");
-  const clearAt = branch.indexOf("gl.clear(gl.DEPTH_BUFFER_BIT)");
+  const clearAt = branch.indexOf("B$.gl.clear(B$.gl.DEPTH_BUFFER_BIT)");
   assert.ok(drawAt >= 0, "the arena groups are drawn in the branch");
   assert.ok(clearAt > drawAt, "the depth clear comes after the arena draw, not before it");
 });
 
 test("the fighters are drawn after the arena and after the clear", () => {
   const arenaAt = B3D.indexOf("} else if (arenaActive) {");
-  const clearAt = B3D.indexOf("gl.clear(gl.DEPTH_BUFFER_BIT)");
+  const clearAt = B3D.indexOf("B$.gl.clear(B$.gl.DEPTH_BUFFER_BIT)");
   const fightersAt = B3D.indexOf("── Digimon rendering");
   assert.ok(clearAt > arenaAt && fightersAt > clearAt,
     "order is: arena draw → depth clear → fighters (so the clear is what saves them)");
   // The live depth-test state the fighters inherit is exactly what makes this necessary.
-  assert.match(B3D, /gl\.depthFunc\(gl\.LEQUAL\)/, "the frame depth-tests with LEQUAL");
+  assert.match(B3D, /B\$\.gl\.depthFunc\(B\$\.gl\.LEQUAL\)/, "the frame depth-tests with LEQUAL");
 });

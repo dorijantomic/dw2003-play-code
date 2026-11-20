@@ -39,8 +39,9 @@ import {
   battleRestorePlanFor, battleAffinityPlanFor, chargeWalkerSentence, clearActionAffinity,
 } from "../web/battle.js";
 import { resolveDamage } from "../web/vendor/engine.js";
+import { readSource } from "./helpers/source.js";
 
-const BATTLE_JS = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE_JS = readSource(new URL("../web/battle.js", import.meta.url));
 const TECH_TABLE = JSON.parse(readFileSync(
   new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
 const DIGIMON = JSON.parse(readFileSync(
@@ -355,6 +356,29 @@ test("a heal between the charge and the blow throws the charge away, BOTH sides"
   }
 });
 
+/**
+ * The whole text of top-level `export function NAME(...) { ... }`, braces matched.
+ * The plan functions live in different split files (web/battle/restore.ts,
+ * web/battle/plans.ts), so a slice between two markers is no longer in source order.
+ */
+function functionBody(src, name) {
+  const start = src.indexOf(`export function ${name}`);
+  assert.ok(start >= 0, `${name} is not declared at top level`);
+  let i = src.indexOf("(", start);
+  let depth = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === "(") depth++;
+    else if (src[i] === ")" && --depth === 0) break;
+  }
+  const open = src.indexOf("{", i);
+  depth = 0;
+  for (let j = open; j < src.length; j++) {
+    if (src[j] === "{") depth++;
+    else if (src[j] === "}" && --depth === 0) return src.slice(start, j + 1);
+  }
+  throw new Error(`${name}: unbalanced braces`);
+}
+
 test("CENSUS: one clear, on the shared no-damage gate, both sides, unconditional", () => {
   // ONE shared rule, not a row per technique: `clearActionAffinity` is the single clear
   // for the categories that compute no damage, and the engine's `consumeAffinity` is the
@@ -365,15 +389,11 @@ test("CENSUS: one clear, on the shared no-damage gate, both sides, unconditional
   const calls = BATTLE_JS.match(/clearActionAffinity\(b, side\)/g) ?? [];
   assert.equal(calls.length, 4, "the one definition plus one call in each no-damage gate and in castFieldTechnique (fightstg.s:13092 has no category test)");
   // The category-4 heal/cure gate and the category-5 charge gate, and nowhere else.
-  const restoreBody = BATTLE_JS.slice(
-    BATTLE_JS.indexOf("export function battleRestorePlanFor"),
-    BATTLE_JS.indexOf("/**\n * THE WHOLE CATEGORY-5 FAMILY"));
+  const restoreBody = functionBody(BATTLE_JS, "battleRestorePlanFor");
   // 2026-10-05: the category-5 entry point is now the WHOLE family
   // (`battleScriptedPlanFor`), and `battleAffinityPlanFor` is the charge-only view over
   // it, so the clear under test is the one inside `battleScriptedPlanFor`.
-  const chargeBody = BATTLE_JS.slice(
-    BATTLE_JS.indexOf("export function battleScriptedPlanFor"),
-    BATTLE_JS.indexOf("export function battleAffinityPlanFor"));
+  const chargeBody = functionBody(BATTLE_JS, "battleScriptedPlanFor");
   for (const [name, src] of [["battleRestorePlanFor", restoreBody],
                              ["battleScriptedPlanFor", chargeBody]]) {
     assert.equal((src.match(/clearActionAffinity\(b, side\)/g) ?? []).length, 1,
@@ -385,9 +405,7 @@ test("CENSUS: one clear, on the shared no-damage gate, both sides, unconditional
   assert.equal((COMBAT.match(/consumeAffinity\(attacker\);/g) ?? []).length, 1);
   // `0x800a4436` can skip the original's clear and nothing sets it, so the walker must not
   // carry a skip: no flag, no category test, no conditional inside the shared clear.
-  const clearBody = BATTLE_JS.slice(
-    BATTLE_JS.indexOf("export function clearActionAffinity"),
-    BATTLE_JS.indexOf("export function battleRestorePlanFor"));
+  const clearBody = functionBody(BATTLE_JS, "clearActionAffinity");
   assert.match(clearBody, /return consumeAffinity\(rec\);/);
   assert.ok(!/\bif\b/.test(clearBody),
     "the clear carries no category test and no flag test — the original's has none either");

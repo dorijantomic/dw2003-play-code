@@ -7,8 +7,9 @@ import {
     DETAIL_KEYS, EFFECT_CATEGORIES, LIST_ROWS, PAGES, applyDetail, buildRows, createOptionsModel, detailOf,
 } from "../web/options-model.js";
 import { SHIP, SHIP_IN } from "../web/ship-list.js";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 const BLOCK = SRC.match(/export const FX_GROUPS = \[([\s\S]*?)\n\];/)[1];
 /** { Terrain: [keys...], ... } read from the source of FX_GROUPS (ambience.js needs a browser to import). */
 const GROUPS = {};

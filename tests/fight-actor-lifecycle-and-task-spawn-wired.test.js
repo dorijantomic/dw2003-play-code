@@ -17,7 +17,7 @@
 //     simulator (the mutation), so a passing port is only as good as what it varies.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -31,7 +31,7 @@ import {
 } from "../engine/dw3/battle-task-spawn.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+const read = (rel) => readSource(join(ROOT, rel));
 
 /** Does `file` import `symbol` from the production bundle? */
 function importsFromEngine(file, symbol) {
@@ -57,14 +57,15 @@ test("web/battle3d.js drives the actor teardown through the port", () => {
   // The per-actor release goes through the PORT, not a hand-written delete+null.
   assert.match(src, /actorTeardown\(\{[\s\S]*?getResource[\s\S]*?\}, \(ptr\) => \{/,
     "battle3d.js does not call actorTeardown with the resource view");
-  assert.match(src, /releaseActorResources\(\[playerTex, playerSkelBufs, playerModel\]\)/,
+  // (the moved state object is `B$`, so the three resource names carry its prefix)
+  assert.match(src, /releaseActorResources\(\[(?:B\$\.)?playerTex, (?:B\$\.)?playerSkelBufs, (?:B\$\.)?playerModel\]\)/,
     "setPlayerDigimon does not release its three resources through the port");
-  assert.match(src, /releaseActorResources\(\[enemyTex, enemySkelBufs, enemyModel\]\)/,
+  assert.match(src, /releaseActorResources\(\[(?:B\$\.)?enemyTex, (?:B\$\.)?enemySkelBufs, (?:B\$\.)?enemyModel\]\)/,
     "setEnemyDigimon does not release its three resources through the port");
   // The literals the port replaces must be gone.
-  assert.doesNotMatch(src, /if \(playerTex\) \{ gl\.deleteTexture\(playerTex\)/,
+  assert.doesNotMatch(src, /if \((?:B\$\.)?playerTex\) \{ (?:B\$\.)?gl\.deleteTexture\((?:B\$\.)?playerTex\)/,
     "the hand-written player-texture free is still there");
-  assert.doesNotMatch(src, /if \(enemyTex\) \{ gl\.deleteTexture\(enemyTex\)/,
+  assert.doesNotMatch(src, /if \((?:B\$\.)?enemyTex\) \{ (?:B\$\.)?gl\.deleteTexture\((?:B\$\.)?enemyTex\)/,
     "the hand-written enemy-texture free is still there");
 });
 
@@ -78,9 +79,9 @@ test("web/battle.js consumes both fight-task spawners", () => {
   assert.match(src, /spawnPlateHud\(\(method, size, flags\) =>/, "the plate HUD is not built through the port");
   assert.match(src, /spawnFightTask\(spawn, side & 0xff, techniqueId \| 0\)/,
     "the fight task is not spawned through the port");
-  assert.match(src, /const basicTechId = spawnFightTaskFor\(0,/,
+  assert.match(src, /const basicTechId = B\.spawnFightTaskFor\(0,/,
     "the plain-attack action does not come off the ported spawner");
-  assert.match(src, /const actionTechId = spawnFightTaskFor\(0, skill\.id \| 0\)/,
+  assert.match(src, /const actionTechId = B\.spawnFightTaskFor\(0, skill\.id \| 0\)/,
     "the technique action does not come off the ported spawner");
 });
 

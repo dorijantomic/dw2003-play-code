@@ -23,23 +23,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/game.js", import.meta.url));
 
 // A battle launch wrapped by the shared handoff.
 const HANDOFF = /startFieldBattle\(\(\)\s*=>\s*[\r\n ]*battle\.(startScreen|startRandom|startParty)\(/g;
 // Any direct battle launch.
 const DIRECT = /battle\.(startScreen|startRandom|startParty)\(/g;
 
+// The `window.__dev` object is the developer toolset, not a battle a player meets.
+// After the split the player-facing code continues in web/game/*.ts, which
+// readSource appends AFTER the entry, so the block is cut out rather than used as
+// an end-of-section marker.
 const playerSection = () => {
     const devIdx = SRC.indexOf("window.__dev = {");
     assert.ok(devIdx > 0, "the window.__dev debug block is present");
-    return SRC.slice(0, devIdx);
+    const devEnd = SRC.indexOf("\n};", devIdx);
+    assert.ok(devEnd > devIdx, "the window.__dev debug block is closed");
+    return SRC.slice(0, devIdx) + SRC.slice(devEnd + 3);
 };
 
 test("startFieldBattle arms the shared A28 checkerboard", () => {
-    // The one shared transition module supplies the checkerboard.
-    assert.match(SRC, /createCheckerboard,/);
+    // The one shared transition module supplies the checkerboard (single-name
+    // import now that startFieldBattle lives in web/game/battle-launch.ts).
+    assert.match(SRC, /import \{[^}]*\bcreateCheckerboard\b[^}]*\} from "\.\.?\/stage-wipe\.js";/);
     assert.match(SRC, /} from "\.\/stage-wipe\.js";/);
     // startFieldBattle arms the wipe and records the battle thunk to run when the
     // schedule is spent — it does not launch the battle itself.

@@ -34,9 +34,10 @@ import {
   terrainGateBlocks,
 } from "../engine/core/util/collision.ts";
 import { npcHalfWidth } from "../engine/dw3/npc-sizes.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const gameSrc = readFileSync(join(ROOT, "web/game.js"), "utf8");
+const gameSrc = readSource(join(ROOT, "web/game.js"));
 
 const b64 = (bytes) => Buffer.from(bytes).toString("base64");
 

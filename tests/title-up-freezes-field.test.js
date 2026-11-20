@@ -4,7 +4,8 @@
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
-const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+import { readSource } from "./helpers/source.js";
+const src = readSource(new URL("../web/game.js", import.meta.url));
 test("play clock only ticks while started", () => {
   assert.match(src, /if \(state\.started\) state\.playSeconds = \(state\.playSeconds \|\| 0\) \+ dt;/);
   assert.doesNotMatch(src, /^\s*state\.playSeconds = \(state\.playSeconds \|\| 0\) \+ dt;/m);

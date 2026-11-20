@@ -1,6 +1,7 @@
 // The client side of multiplayer rejoin (web/multiplayer.js) run in node with a fake WebSocket, localStorage and timers.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readSource } from "./helpers/source.js";
 
 const sockets = [];
 class FakeWS {
@@ -327,7 +328,7 @@ test("page start: a resumed welcome puts me back; err no_room clears the seat", 
 });
 
 test("multiplayerTick makes the page-start try once, after installMultiplayer gave it a name source", () => {
-    const src = readFileSync(new URL("../web/multiplayer.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/multiplayer.js", import.meta.url));
     const tick = src.slice(src.indexOf("export function multiplayerTick"), src.indexOf("function sendPresence"));
     assert.match(tick, /if \(!mp\.autoTried && mp\.defaultName\) \{ mp\.autoTried = true; rejoinSaved\(mp\.defaultName\); \}/);
     assert.match(src, /mp\.defaultName = defaultName;/);

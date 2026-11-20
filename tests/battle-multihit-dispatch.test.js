@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import {
   basicAttackHitCount, multiCrestPlainAttack, resolveDamage,
 } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
 const TECH = JSON.parse(readFileSync(new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
 const SKILLS = JSON.parse(readFileSync(new URL("../web/assets/data/digimon.json", import.meta.url), "utf8")).skills;
@@ -68,7 +69,7 @@ test("the 0.4x scale rides the same gate: plain record + Multi Crest only", () =
 });
 
 test("both story paths call the shared function, never a bare skill.hits", () => {
-  const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const SRC = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(SRC, /const attempts = basicAttackHitCount\(b\.player\.multiAttack, skill\);/,
     "the player's Fight dispatches on its own record");
   assert.match(SRC, /const hits = basicAttackHitCount\(!!en\.multiAttack, skill\);/,
@@ -112,7 +113,7 @@ test("a basic-attack row keeps its own category: only id 440 (the finale head) i
   for (const s of basics) {
     assert.equal(s.attack_category, TECH[String(s.id)].category === 3 ? "magical" : "physical", `skill ${s.id}`);
   }
-  const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const SRC = readSource(new URL("../web/battle.js", import.meta.url));
   assert.ok(!/basicSkill \? \{ \.\.\.basicSkill, attack_category: "physical" \}/.test(SRC),
     "the player's Fight no longer forces physical over the row's own category");
   assert.ok(!/if \(!usesTech && skill\) skill = \{ \.\.\.skill, attack_category: "physical" \};/.test(SRC),

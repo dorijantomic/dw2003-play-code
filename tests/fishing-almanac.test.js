@@ -15,10 +15,10 @@
 // imports it and the field HUD line (web/game.js) reads castsLeft().
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { almanac, cardmonStages, waterIndex, castsLeft, rewardFor } from "../web/fishing-almanac.js";
+import { readSource } from "./helpers/source.js";
 
-const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+const read = (p) => readSource(new URL(p, import.meta.url));
 const fish = JSON.parse(read("../web/assets/data/fishing_spots.json"));
 const encounters = JSON.parse(read("../web/assets/data/field_encounters.json"));
 const progression = JSON.parse(read("../web/assets/data/progression.json"));
@@ -200,7 +200,7 @@ test("the F2 Extras row is off by default and the page opens only behind it", ()
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"anglermap"/, "off until the player switches it on");
-    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url)), devPanel = readSource(new URL("../web/dev-panel.js", import.meta.url));
     const refs = devModel.split("fishing-almanac.html").length - 1;
     assert.equal(refs, 1, "one reference to the page, no other link into it");
     assert.match(devModel, /anglermap: P\("fishing-almanac\.html"/, "the Open button's page is in the F2 page model");

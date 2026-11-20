@@ -2,8 +2,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+const src = readSource(new URL("../web/game.js", import.meta.url));
 
 test("drawPlayerActor skips the leader and re-requests the sheet when it is not loaded", () => {
   const body = src.slice(src.indexOf("function drawPlayerActor()"));

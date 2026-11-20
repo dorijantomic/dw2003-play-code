@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { indexRows, sourcesFor, shopRows, priceWord, nothingLine } from "../web/item-source.js";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const index = read("../web/assets/data/item_obtain_index.json");
@@ -179,7 +180,7 @@ test("priceWord reads the shipped price table, equipment's own field names inclu
 });
 
 test("the module is pure: no page, no storage, no flag write, no fetch", () => {
-    const src = readFileSync(new URL("../web/item-source.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/item-source.js", import.meta.url));
     assert.doesNotMatch(src, /\bdocument\b/);
     assert.doesNotMatch(src, /\bwindow\b/);
     assert.doesNotMatch(src, /\blocalStorage\b/);
@@ -190,7 +191,7 @@ test("the module is pure: no page, no storage, no flag write, no fetch", () => {
 
 test("the page fetches only the four shipped data files it needs", () => {
     const page = readFileSync(new URL("../web/item-source.html", import.meta.url), "utf8");
-    const script = readFileSync(new URL("../web/item-source-page.js", import.meta.url), "utf8");
+    const script = readSource(new URL("../web/item-source-page.js", import.meta.url));
     const files = [...new Set([...(page + script).matchAll(/assets\/data\/[a-z_0-9]+\.json/g)].map((m) => m[0]))].sort();
     assert.deepEqual(files, [
         "assets/data/item_effects.json",
@@ -207,12 +208,12 @@ test("the page fetches only the four shipped data files it needs", () => {
 });
 
 test("the F2 switch is off by default and gates the row, the page and its data", () => {
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(ambience, /\["itemsource", "Item source book \(new\)"\]/, "the F2 Extras row");
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"itemsource"/, "off until the player switches it on");
-    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url)), devPanel = readSource(new URL("../web/dev-panel.js", import.meta.url));
     assert.match(devModel, /itemsource: P\("item-source\.html"/, "the Open button's page is in the F2 page model");
     assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
     assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");

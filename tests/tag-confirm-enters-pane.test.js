@@ -16,15 +16,51 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const source = readFileSync(process.env.TAG_BATTLE_SOURCE || "web/battle.js", "utf8");
+const source = readSource(process.env.TAG_BATTLE_SOURCE || "web/battle.js");
 
+/** The end of a string / template / comment starting at `i`, or `i` when there is none. */
+function skipLiteral(src, i) {
+  const c = src[i];
+  if (c === '"' || c === "'" || c === "`") {
+    let j = i + 1;
+    while (j < src.length) {
+      if (src[j] === "\\") { j += 2; continue; }
+      if (src[j] === c) return j + 1;
+      j++;
+    }
+    return j;
+  }
+  if (c === "/" && src[i + 1] === "/") { const j = src.indexOf("\n", i); return j < 0 ? src.length : j; }
+  if (c === "/" && src[i + 1] === "*") { const j = src.indexOf("*/", i + 2); return j < 0 ? src.length : j + 2; }
+  return i;
+}
+
+// The confirm body is one function in one of the split files now, so the slice ends at its
+// own closing brace rather than at the next doc comment (which may be in another file).
 function sliceFunction(name) {
-  const begin = source.indexOf(`  function ${name}(`);
-  assert.ok(begin > 0, `${name} is defined in web/battle.js`);
-  const end = source.indexOf("\n  /**", begin);
-  assert.ok(end > begin, `${name} has an end boundary`);
-  return source.slice(begin, end);
+  const sig = new RegExp(`(?:export\\s+)?function\\s+${name}\\s*\\(`).exec(source);
+  assert.ok(sig, `${name} is defined in the battle source`);
+  let i = sig.index + sig[0].length;
+  let parens = 1;                                   // inside the parameter list
+  while (i < source.length && parens > 0) {
+    const s = skipLiteral(source, i);
+    if (s > i) { i = s; continue; }
+    if (source[i] === "(") parens++;
+    else if (source[i] === ")") parens--;
+    i++;
+  }
+  while (i < source.length && source[i] !== "{") i++;
+  let body = 0;
+  while (i < source.length) {
+    const s = skipLiteral(source, i);
+    if (s > i) { i = s; continue; }
+    if (source[i] === "{") body++;
+    else if (source[i] === "}") { body--; if (!body) { i++; break; } }
+    i++;
+  }
+  return source.slice(sig.index, i);
 }
 
 /** The real confirmTag, wired to the dependencies it reads. */
@@ -33,10 +69,12 @@ function makeConfirmTag() {
   const formOptionsFor = () => [{ id: 9, name: "Kyubimon" }];
   const dnaChoiceFor = () => null;
   const applyTagAction = () => true;
+  // The shared closure object the moved battle functions read each other through.
+  const B = { formOptionsFor, dnaChoiceFor, applyTagAction };
   const fn = new Function(
-    "ST", "formOptionsFor", "dnaChoiceFor", "applyTagAction",
+    "ST", "B", "formOptionsFor", "dnaChoiceFor", "applyTagAction",
     sliceFunction("confirmTag") + "\nreturn confirmTag;",
-  )(ST, formOptionsFor, dnaChoiceFor, applyTagAction);
+  )(ST, B, formOptionsFor, dnaChoiceFor, applyTagAction);
   return { fn, ST };
 }
 

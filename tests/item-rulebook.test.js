@@ -15,10 +15,11 @@ import { ruleRows, capWords, sellSheet, battleOnly, CAPS } from "../web/item-rul
 import { FIELD_BOOST_CAP_HP_MP, FIELD_BOOST_CAP_STAT } from "../engine/dw3/items.ts";
 import { TP_CAP } from "../engine/dw3/item-effect.ts";
 import { isBattleEffectItem } from "../engine/dw3/battle-items.ts";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const effects = read("../web/assets/data/item_effects.json");
-const src = readFileSync(new URL("../web/item-rulebook.js", import.meta.url), "utf8");
+const src = readSource(new URL("../web/item-rulebook.js", import.meta.url));
 const rows = ruleRows(effects);
 const ids = (list) => list.map((r) => r.id);
 
@@ -186,7 +187,7 @@ test("the module is pure: no page, no storage, no flag write, no fetch", () => {
 
 test("the page renders through the module and fetches only the effect table", () => {
     const page = readFileSync(new URL("../web/item-rulebook.html", import.meta.url), "utf8");
-    const script = readFileSync(new URL("../web/item-rulebook-page.js", import.meta.url), "utf8");
+    const script = readSource(new URL("../web/item-rulebook-page.js", import.meta.url));
     const files = [...new Set([...(page + script).matchAll(/assets\/data\/[a-z_0-9]+\.json/g)].map((m) => m[0]))].sort();
     assert.deepEqual(files, ["assets/data/item_effects.json"], "one table, no second source of truth");
     assert.match(page, /<script type="module" src="\.\/item-rulebook-page\.js"><\/script>/, "the page's own script");
@@ -199,12 +200,12 @@ test("the page renders through the module and fetches only the effect table", ()
 });
 
 test("the F2 switch is off by default and gates the row, the page and its data", () => {
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(ambience, /\["itemrulebook", "Item rulebook \(new\)"\]/, "the F2 Extras row");
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"itemrulebook"/, "off until the player switches it on");
-    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8"), devPanel = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url)), devPanel = readSource(new URL("../web/dev-panel.js", import.meta.url));
     assert.match(devModel, /itemrulebook: P\("item-rulebook\.html"/, "the Open button's page is in the F2 page model");
     assert.match(ambience, /if \(!o \|\| !fx\[key\]\) return;/, "opened only behind the switch (the Open guard)");
     assert.match(devPanel, /b\.disabled = !fx\[/, "the Open button is disabled while the switch is off");

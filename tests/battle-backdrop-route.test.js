@@ -23,8 +23,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readSource } from "./helpers/source.js";
 
-const battle3d = readFileSync(resolve("web/battle3d.js"), "utf8");
+const battle3d = readSource(resolve("web/battle3d.js"));
 const manifest = JSON.parse(
   readFileSync(resolve("web/assets/battle/backdrops/manifest.json"), "utf8"));
 

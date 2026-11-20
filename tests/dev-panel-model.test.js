@@ -6,8 +6,9 @@ import {
     DEV_TABS, DEV_ROWS, DEV_OPEN, DEV_FILTERS, rowFor, rowsOfTab, tabCounts, matchesQuery, selectRows, groupRows,
 } from "../web/dev-panel-model.js";
 import { shipClass, SHIP } from "../web/ship-list.js";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 const BLOCK = SRC.match(/export const FX_GROUPS = \[([\s\S]*?)\n\];/)[1];
 const FX_KEYS = [...BLOCK.matchAll(/\["(\w+)", "[^"]*"\]/g)].map((m) => m[1]);
 
@@ -129,6 +130,6 @@ test("groupRows keeps sub-heading order and splits by tab when searching", () =>
 });
 
 test("the model is pure: no DOM words in the source", () => {
-    const src = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/dev-panel-model.js", import.meta.url));
     assert.ok(!/document\.|window\.|createElement|innerHTML/.test(src));
 });

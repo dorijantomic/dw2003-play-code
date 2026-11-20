@@ -100,3 +100,10 @@ tools/_probe_*
 web/biome/assets/
 # Local agent notes with private paths.
 /CLAUDE.md
+
+# TypeScript rewrite: web/**/*.ts is the source; tools/rewrite/build-web.mjs writes the
+# .js next to it (build_engine.py and npm run build:web). Third-party web/lib3d stays tracked.
+web/**/*.js
+web/**/*.mjs
+!web/lib3d/**
+!web/biome/vendor/**

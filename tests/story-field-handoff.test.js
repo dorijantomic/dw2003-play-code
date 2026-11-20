@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { GameEngine, createScreenRouter, movieReturnScreen, movieRow } from "../engine/index.ts";
 import { MOVIE_DESTINATIONS } from "../engine/dw3/movie-destinations.ts";
+import { readSource } from "./helpers/source.js";
 
 const table = JSON.parse(readFileSync("data/screen_table.json", "utf8"));
 const content = JSON.parse(readFileSync("web/assets/engine-content.json", "utf8"));
@@ -60,7 +61,7 @@ test("the host plays a movie-naming handoff through the shared chain before rout
   // reunion's 0xE03 = row 2 = MOVIED01_STR) plays the row chain through the one
   // field movie adapter and then routes the selector the chain ended on; the
   // finale's ending hand-off runs the same playMovieChain.
-  const src = readFileSync("web/game.js", "utf8");
+  const src = readSource("web/game.js");
   const at = src.indexOf("function doStoryHandoff(");
   assert.ok(at > 0, "doStoryHandoff exists");
   const body = src.slice(at, src.indexOf("function routeStoryHandoff(", at));

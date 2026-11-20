@@ -18,6 +18,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import {
   execPlaybackRecord, isDivePlayback, isStageChangePlayback, launcherRouteWords,
 } from "../engine/systems/scene-step-ops.ts";
+import { readSource } from "./helpers/source.js";
 import { routePairCommit, routePairPredicate, publishesRoutePair }
   from "../engine/systems/route-pair.ts";
 
@@ -150,7 +151,7 @@ test("web/game.js writes the pair only through the ported commit", () => {
   // The commit itself is ported and unit-tested below; what is left to check in the
   // shipped source is that the page has no second, hand-rolled way to set the pair —
   // no `?? 0` clear of its own, and no write outside the one guarded block.
-  const src = readFileSync("web/game.js", "utf8");
+  const src = readSource("web/game.js");
   const writes = src.match(/state\.entryKey\s*=[^=]|state\.entryCompanion\s*=[^=]/g) ?? [];
   assert.equal(writes.length, 2,
     `the two halves, and only inside the one block that a published pair guards: ${writes.length}`);

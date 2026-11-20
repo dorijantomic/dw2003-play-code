@@ -1,8 +1,8 @@
 // The Met / Defeated counter (web/species-log.js): read-through storage, damaged data, event wiring, and the battle payload.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { SPECIES_LOG_KEY, createSpeciesLog, installSpeciesLog } from "../web/species-log.js";
+import { readSource } from "./helpers/source.js";
 
 const memory = (seed = {}) => {
     const m = new Map(Object.entries(seed));
@@ -81,15 +81,15 @@ test("the events feed the log, always (no switch)", () => {
 });
 
 test("the battle sends the enemy names when a fight starts, the same expression the win uses", () => {
-    const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/battle.js", import.meta.url));
     const line = src.split("\n").find((l) => l.includes('emitGameEvent("battleStarted"'));
     assert.ok(line, "the battleStarted event is still sent");
-    assert.match(line, /enemies: \(battle\?\.party \?\? \[\]\)\.map\(\(e\) => e\?\.enemyId\)\.filter\(\(n\) => typeof n === "string"\)/);
-    assert.match(line, /mapId: battle\?\.mapId \?\? null, screenId: battle\?\.screenId \?\? null/);
+    assert.match(line, /enemies: \(B\.battle\?\.party \?\? \[\]\)\.map\(\(e\) => e\?\.enemyId\)\.filter\(\(n\) => typeof n === "string"\)/);
+    assert.match(line, /mapId: B\.battle\?\.mapId \?\? null, screenId: B\.battle\?\.screenId \?\? null/);
 });
 
 test("game.js installs the counter exactly once, on the game event bus", () => {
-    const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/game.js", import.meta.url));
     assert.equal(src.match(/installSpeciesLog\(/g).length, 1);
     assert.match(src, /installSpeciesLog\(\{ on: onGameEvent, log: speciesLog \}\)/);
     assert.match(src, /import \{ on as onGameEvent \} from "\.\/gameEvents\.js"/);
@@ -123,24 +123,24 @@ test("fightSeen / fightBeaten (2 vs 2) and formWorn feed the log", () => {
 });
 
 test("mpbattle sends fightSeen at the start and fightBeaten at every win, outside the quest gate; quests still hear only battleWon", () => {
-    const src = readFileSync(new URL("../web/mpbattle.js", import.meta.url), "utf8");
-    assert.match(src, /emit\("fightSeen", winEvent\(F\.foes/, "seen at the start, same foe names as the quest event");
+    const src = readSource(new URL("../web/mpbattle.js", import.meta.url));
+    assert.match(src, /emit\("fightSeen", winEvent\((?:MB\.)?F\.foes/, "seen at the start, same foe names as the quest event");
     const win = src.slice(src.indexOf("if (won && !fled) {"));
     const gate = win.indexOf("window.__fx?.mpcredit");
     const beaten = win.indexOf("fightBeaten");
     assert.ok(beaten > 0 && beaten < gate, "beaten is sent before, not inside, the mpcredit gate");
     assert.equal(src.match(/emit\("battleWon"/g).length, 1, "battleWon stays the single gated emit");
-    const q = readFileSync(new URL("../web/quests.js", import.meta.url), "utf8");
+    const q = readSource(new URL("../web/quests.js", import.meta.url));
     assert.doesNotMatch(q, /fightSeen|fightBeaten/);
 });
 
 test("a form is announced when the partner digivolves in battle and when the win makes it permanent", () => {
-    const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/battle.js", import.meta.url));
     assert.equal(src.match(/emitGameEvent\("formWorn"/g).length, 2);
 });
 
 test("game.js records the party species as owned on load and on a timer", () => {
-    const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(src, /function noteOwnedSpecies\(\)/);
     assert.match(src, /setInterval\(noteOwnedSpecies/);
 });

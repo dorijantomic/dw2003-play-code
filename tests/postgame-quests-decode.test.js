@@ -49,6 +49,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createFlagStore } from "../web/flag-store.js";
 import { cardDuelCloseWrites, CARD_DUEL_SCREEN_CODE } from "../engine/systems/scene-completion.ts";
+import { readSource } from "./helpers/source.js";
 
 const DDW3_ROOT = process.env.DDW3_DIR || join(homedir(), "ddw3");
 const asmPath = (file) => join(DDW3_ROOT, "asm/dw2003/pro", file);
@@ -549,12 +550,12 @@ test("0x7095 resolves against per-slot levels: the forger spawn gate", () => {
 });
 
 test("the walker wires both halves: the close housekeeping and the level source", () => {
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const game = readSource(new URL("../web/game.js", import.meta.url));
   assert.match(game, /function applyCardDuelCloseHousekeeping\(won\) \{/,
     "the field's housekeeping helper");
   assert.match(game, /applyCardDuelCloseHousekeeping\(cardDuel\.resultWon\?\.\(\) === true\)/,
     "the duel launch passes the close callback that runs it");
   assert.match(game, /partnerLevels: \(\) => \{/, "the per-slot level source is wired");
-  const store = readFileSync(new URL("../web/flag-store.js", import.meta.url), "utf8");
+  const store = readSource(new URL("../web/flag-store.js", import.meta.url));
   assert.match(store, /case "every_owned_at_level": \{/, "the case-7 predicate is handled");
 });

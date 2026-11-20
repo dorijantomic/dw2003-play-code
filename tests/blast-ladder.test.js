@@ -22,6 +22,7 @@ import {
   blastPress, blastReset, tierForLevel, tickBlastLadder, openBlastLadder,
 } from "../web/blast-ladder.js";
 import { levelTier } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const digimon = JSON.parse(read("../web/assets/data/digimon.json"));
@@ -174,7 +175,7 @@ test("blastLoad reads the shipped table through the page's own fetch", async () 
 });
 
 test("web/game.js gates the page on window.__fx?.blastladder and routes the pad and the draw to it", () => {
-  const game = read("../web/game.js");
+  const game = readSource(new URL("../web/game.js", import.meta.url));
   assert.match(game, /window\.__fx\?\.blastladder === true/, "the source gate is the F2 flag");
   assert.match(game, /tickBlastLadder\(window\.__fx\?\.blastladder === true\)/, "the page follows the switch");
   assert.match(game, /if \(blastOpen\(\)\) return;/, "the field is frozen while it is up");

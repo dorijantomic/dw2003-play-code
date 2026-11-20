@@ -19,6 +19,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const MANIFEST = JSON.parse(
   readFileSync(new URL("../web/assets/sfx/manifest.json", import.meta.url), "utf8"),
@@ -147,6 +148,6 @@ test("a field item with no effect plays the refusal cue (0x0004001c)", () => {
 });
 
 test("the copy no longer plays the save jingle on a heal", () => {
-  const src = readFileSync(new URL("../web/menu.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/menu.js", import.meta.url));
   assert.ok(!src.includes('sfx?.play("savedemo")'), "savedemo (0x00040015) is not this screen's cue");
 });

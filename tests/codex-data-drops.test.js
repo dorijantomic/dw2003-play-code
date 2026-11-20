@@ -23,6 +23,7 @@ import {
   enemyStages,
   encounterIndex,
 } from "../web/codex-data.js";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => JSON.parse(readFileSync(p, "utf8"));
 const enemyFile = read("web/assets/data/enemies.json");
@@ -105,5 +106,5 @@ test("all 78 drop names resolve in items.json; an invented item is nothing at al
   assert.deepEqual(dropSearch(drops, "NoSuchItem"), [], "and the finder returns nothing");
   assert.equal(dropSearch(drops, "crimsoncable").length, 1, "an exact name (any case)");
   assert.ok(dropSearch(drops, "Power").length > 1, "a partial name lists the family");
-  assert.ok(!/localStorage/.test(readFileSync("web/codex-data.js", "utf8")), "the data module stores nothing");
+  assert.ok(!/localStorage/.test(readSource("web/codex-data.js")), "the data module stores nothing");
 });

@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { EXTRA_GROUPS, needsPractice2v2Reset } from "../web/options-model.js";
+import { readSource } from "./helpers/source.js";
 
 test("the Battle ideas row does not contain practice2v2", () => {
     const g = EXTRA_GROUPS.find((x) => x.id === "battleideas");
@@ -18,7 +19,7 @@ test("an old save with practice2v2 on is reset once; after the marker it stays a
 });
 
 test("game.js sends pad presses to the 2 vs 2 fight and clears held keys while it is up", () => {
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /if \(mpbVisible\(\)\) \{ mpbKey\(button\); return; \}[^\n]*\n\s*dispatchInput\(button, PAD_EVENT, ""\);/);
     assert.match(game, /gamepad\.tick\(dt\);\n\s*if \(mpbVisible\(\)\) state\.keys\.clear\(\);/);
 });

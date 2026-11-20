@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ARENAS = join(ROOT, "web/assets/battle/arenas");
@@ -57,11 +58,11 @@ test("the arena view's sky is the SFSTDATA colour (record 1 = the captured grass
 });
 
 test("the render path wires the arena: setArenaStage, the draw branch, and the battle.js join", () => {
-  const b3d = readFileSync(join(ROOT, "web/battle3d.js"), "utf8");
+  const b3d = readSource(join(ROOT, "web/battle3d.js"));
   assert.match(b3d, /function setArenaStage\(/, "battle3d exposes setArenaStage");
   assert.match(b3d, /assets\/battle\/arenas\/manifest\.json/, "battle3d loads the arena manifest");
   assert.match(b3d, /arenaActive/, "battle3d draws the arena branch");
-  const battle = readFileSync(join(ROOT, "web/battle.js"), "utf8");
+  const battle = readSource(join(ROOT, "web/battle.js"));
   assert.match(battle, /renderer3d\.setArenaStage\?\.\(b\.mapId, b\.screenId\)/,
     "battle.js hands the arena its area + encounter");
 });

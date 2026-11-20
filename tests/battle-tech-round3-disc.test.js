@@ -15,6 +15,7 @@ import {
 import { Arena } from "../web/mpbattle-rules.js";
 import { castFieldTechnique } from "../web/battle.js";
 import { frozenGateBlocksTurn } from "../web/vendor/engine.js";
+import { readSource } from "./helpers/source.js";
 
 const T = JSON.parse(readFileSync(new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
 const mk = (over = {}) => ({ profile: { name: "x", id: 100, family: 1 }, level: 10, hp: 300, maxHp: 300, mp: 60,
@@ -147,7 +148,7 @@ test("counter trigger: Frozen gate (disc gate 2) and comparator 0 = no counter (
   assert.equal(frozenGateBlocksTurn(frozen, () => 0), true, "Frozen + roll under chance: no reaction");
   assert.equal(frozenGateBlocksTurn(mk(), () => 0), false, "not Frozen: gate open");
   // triggerEnemyCounterRow lives inside createBattle: assert the order of its gates in the shipped source.
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   const at = src.indexOf("function triggerEnemyCounterRow");
   const body = src.slice(at, at + 1800);
   const iDmg = body.indexOf("damage <= 0");

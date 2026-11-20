@@ -21,15 +21,19 @@ import {
   MULTI_HIT_MSG_IDS, MULTI_HIT_SLOTS, multiHitReset,
 } from "../engine/dw3/battle-actor-lifecycle.ts";
 import { DAMAGE_TERM_REPEAT_WORD } from "../engine/dw3/battle-damage-terms.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
 const parse = (rel) => JSON.parse(read(rel));
+// The battle source is the entry file plus every .ts in its split folder: the resolver and
+// its two callers now live in web/battle/core/*.ts, not in web/battle.ts itself.
+const readBattle = () => readSource("web/battle.js");
 
 /** Does `file` import `symbol` from the production bundle? */
 function importsFromEngine(file, symbol) {
-  const src = read(file);
-  const re = /import\s*\{([^}]*)\}\s*from\s*["']\.\/vendor\/engine\.js["']/g;
+  const src = readBattle();
+  const re = /import\s*\{([^}]*)\}\s*from\s*["'][^"']*vendor\/engine\.js["']/g;
   let m;
   while ((m = re.exec(src))) {
     for (let part of m[1].split(",")) {
@@ -47,15 +51,15 @@ test("web/battle.js imports and uses the multi-hit reset port", () => {
     "web/battle.js must import multiHitReset from the engine bundle");
   assert.ok(importsFromEngine("web/battle.js", "DAMAGE_TERM_REPEAT_WORD"),
     "web/battle.js must import the shared dispatch-0x1f word");
-  const src = read("web/battle.js");
+  const src = readBattle();
   assert.match(src, /function resolveRepeatDispatch\(/, "the resolver helper must exist");
   // Both ordinary technique paths (player side 0, enemy side 1) must gate on the record's
   // dispatch byte and hand the action to the port.
   const gateCalls = src.match(/restoreRecord\?\.dispatch === DAMAGE_TERM_REPEAT_WORD/g) ?? [];
   assert.equal(gateCalls.length, 2, "both the player and the enemy technique paths gate on 0x1f");
-  assert.match(src, /resolveRepeatDispatch\(b\.player, b\.enemy, skill, 0, b\.field\)/,
+  assert.match(src, /(?:B\.)?resolveRepeatDispatch\(b\.player, b\.enemy, skill, 0, b\.field\)/,
     "the player path drives the port with side 0");
-  assert.match(src, /resolveRepeatDispatch\(en, b\.player, skill, 1, b\.field\)/,
+  assert.match(src, /(?:B\.)?resolveRepeatDispatch\(en, b\.player, skill, 1, b\.field\)/,
     "the enemy path drives the port with side 1");
 });
 
@@ -64,7 +68,7 @@ test("the repeat-dispatch predicate asks the magical accuracy leaf (F0x800a08c8)
   // two-slot predicate (:28224 `lw $v0, 0xa0($s3)`), never the physical +0x9c.
   assert.ok(importsFromEngine("web/battle.js", "rollMagicHit"),
     "web/battle.js must import the magical accuracy leaf from the engine bundle");
-  const src = read("web/battle.js");
+  const src = readBattle();
   assert.match(src, /predicate:\s*\(\)\s*=>\s*\(rollMagicHit\(/,
     "the repeat-dispatch predicate must use the magical leaf");
 });

@@ -43,6 +43,7 @@ import {
 import {
   applyBattleRestorePlan, battleRestoreParty, battleRestorePlanFor, restoreWalkerSentence,
 } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 const TECH_TABLE = JSON.parse(readFileSync(
   new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
@@ -50,7 +51,7 @@ const ESMFIGHT = JSON.parse(readFileSync(
   new URL("../web/assets/data/battlecmd/esmfight.json", import.meta.url), "utf8")).strings;
 const SKILLS = JSON.parse(readFileSync(
   new URL("../web/assets/data/digimon.json", import.meta.url), "utf8")).skills;
-const BATTLE_JS = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE_JS = readSource(new URL("../web/battle.js", import.meta.url));
 
 /** The sixteen ids the disc's own records put in category 4, read from the data. */
 const CATEGORY4_IDS = damageTermTechniqueIds(TECH_TABLE, 4);

@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createSoundTest, SOUNDTEST_ROWS, soundTestMove, soundTestPlayable, soundTestView } from "../web/soundtest.js";
 import { packedIsMusicStart, packedSampleResolver } from "../web/packed-sound.js";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 
@@ -98,13 +99,13 @@ test("a packed word plays through the extracted sample, but TITLEBGM is a music 
 });
 
 test("the screen ships behind F2 -> Extras -> Sound test and is off by default", () => {
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(ambience, /\["soundtest", "Sound test \(dev\)"\]/);
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"soundtest"/);
 
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /window\.__fx\?\.soundtest/, "the screen opens on the toggle");
     assert.doesNotMatch(game, /soundTestWasOn/, "the switch has no rising edge that opens it");
     assert.match(game, /case "soundtest": if \(!fx\.soundtest\) return false; soundTest\.show\(\)/, "only the F2 button opens it");

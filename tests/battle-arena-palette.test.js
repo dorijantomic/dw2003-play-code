@@ -14,10 +14,11 @@ import { readFileSync, existsSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ARENAS = join(ROOT, "web/assets/battle/arenas");
-const B3D = readFileSync(join(ROOT, "web/battle3d.js"), "utf8");
+const B3D = readSource(join(ROOT, "web/battle3d.js"));
 
 /** Minimal 8-bit RGBA (colour type 6, no interlace) PNG reader — our own extractor's output.
  *  No image dependency exists in this repo, so the test decodes the shipped texture itself so it
@@ -130,7 +131,7 @@ test("the arena render binds the group's own palette texture and records the dec
   assert.match(slice, /arenaTextureFor\(shownArena, g\)/, "each group draws with its own palette texture");
   // The decoded GPU blend is OPAQUE (cmd 0x2C) and is APPLIED (blending disabled).
   assert.match(slice, /NOW APPLIED/, "the branch records the decoded opaque blend as applied");
-  assert.match(slice, /gl\.disable\(gl\.BLEND\)/, "the arena is drawn opaque (blending off)");
+  assert.match(slice, /B\$\.gl\.disable\(B\$\.gl\.BLEND\)/, "the arena is drawn opaque (blending off)");
 });
 
 // ── The back-face cull: the original's own NCLIP MAC0<=0 test, ported to the arena draw ──
@@ -140,7 +141,7 @@ test("the arena draw runs the ported back-face cull on each group", () => {
   assert.match(B3D, /function drawProjLayerIndexed\(/, "culled layers draw through an index buffer");
   const branch = B3D.slice(B3D.indexOf("} else if (arenaActive) {"));
   const slice = branch.slice(0, branch.indexOf("} else {\n      drawQuad"));
-  assert.match(slice, /drawProjLayerIndexed\(gl, texP, gm, g, tex, idx, stageTint\)/,
+  assert.match(slice, /drawProjLayerIndexed\(B\$\.gl, B\$\.texP, gm, g, tex, idx, stageTint\)/,
     "each group is drawn through the cull");
 });
 
@@ -151,7 +152,7 @@ test("the cull is the original's NCLIP MAC0>0 keep rule in PS1 screen space (Y d
   // primitive survives only when MAC0 > 0 — the DECODED convention (results.md: 196/196, 414/414,
   // 487/487, 531/531 surviving arena packets have MAC0 > 0, none <= 0).
   assert.match(body, /const mac0 = x0 \* \(-y1 \+ y2\)/, "NCLIP signed area, screen-Y down");
-  assert.match(body, /mac0 \* arenaCullSign > 0/, "survivor rule: MAC0 > 0");
+  assert.match(body, /mac0 \* S\.arenaCullSign > 0/, "survivor rule: MAC0 > 0");
   // The cull reads each quad's governing triangle from cullRef, so both split triangles share the
   // primitive's facing.
   assert.match(body, /ref\[t\]/, "per-primitive cull grouping");

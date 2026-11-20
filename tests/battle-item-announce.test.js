@@ -27,6 +27,7 @@ import {
 } from "../engine/dw3/ui/native/battle-message-line.ts";
 import { battleMessageCompose } from "../engine/dw3/ui/battle-message-session.ts";
 import { ITEM_NAMES } from "../engine/dw3/item-names.ts";
+import { readSource } from "./helpers/source.js";
 
 const read = (name) => JSON.parse(readFileSync(
   resolve("web/assets/data/battlecmd", `${name}.json`), "utf8"));
@@ -138,12 +139,12 @@ test("the four HP charges and the 25 battle items all announce a real name", () 
 // is not the disc's page: the original puts up kind 14 and waits for Circle. These read
 // web/battle.js the way tests/battle-hit-tint-absent.test.js reads it, because
 // createBattle needs a canvas.
-const battle = readFileSync(resolve("web/battle.js"), "utf8");
+const battle = readSource(resolve("web/battle.js"));
 
 test("both item paths put up the kind-14 announcement instead of a typed sentence", () => {
   assert.equal(battle.includes("sayWalker(b, `Used "), false,
     'a "Used <item>!" sentence is still typed onto an item path in web/battle.js');
-  const calls = battle.match(/sayOriginal\(b, itemAnnouncementSpec\(b, item\), /g) ?? [];
+  const calls = battle.match(/B\.sayOriginal\(b, B\.itemAnnouncementSpec\(b, item\), /g) ?? [];
   assert.equal(calls.length, 2,
     "the ITEM command's action and the target picker's shortcut both open the page");
 });

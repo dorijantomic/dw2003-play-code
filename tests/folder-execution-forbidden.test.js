@@ -16,6 +16,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+import { readSource } from "./helpers/source.js";
 
 const FOLDER_CONTROLLERS = [
   "engine/dw3/ui/folder-session.ts",
@@ -54,14 +55,14 @@ test("the interpreter check detects the interpreter when a graph links one", asy
 });
 
 test("the folder adapter declares translated execution and links no interpreter host", () => {
-  const source = readFileSync(new URL("../web/carddeck-translated.js", import.meta.url), "utf8");
+  const source = readSource(new URL("../web/carddeck-translated.js", import.meta.url));
   assert.match(source, /execution:\s*"translated"/, "carddeck-translated.js declares translated execution");
   assert.doesNotMatch(source, /native-screen-host|native\/runtime|native\/bridge|native\/cpu/,
     "carddeck-translated.js must not link an interpreter host");
 });
 
 test("web/game.js routes the ordinary folder editor at the translated adapter", () => {
-  const source = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const source = readSource(new URL("../web/game.js", import.meta.url));
   assert.match(source, /createCardDeckTranslated\(sfx\)/, "the translated folder adapter is built");
   assert.match(source, /const cardDeck = cardDeckTranslated;/,
     "the ordinary route uses the translated adapter");

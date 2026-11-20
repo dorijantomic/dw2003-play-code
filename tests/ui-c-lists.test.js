@@ -7,6 +7,7 @@ import { LIST, cellRect, pageSlots, findPager, composePager } from "../web/ui-c/
 import { N, ID, rowPlate, cursor, corners, typeWord, badgeText, tokenLine, stripes } from "../web/ui-c/base.js";
 import { CLAIMS, claimFor, isPauseHome } from "../web/ui-c/claims.js";
 import { artPieces, begin, clipHook, end } from "../web/ui-c/capture.js";
+import { readSource } from "./helpers/source.js";
 
 const run = (text, x, y, o = {}) => ({ text, x, y, ...o });
 
@@ -125,13 +126,13 @@ test("isPauseHome: backing out keeps look C -- the diamond backdrop (ststat 29) 
 });
 
 test("pickPauseScreen decides from the frame only: the page the menu was opened on is not a test", () => {
-    const src = readFileSync(new URL("../web/ui-c/screens.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/ui-c/screens.js", import.meta.url));
     assert.match(src, /export function pickPauseScreen\(calls, _entry\)/);
     assert.match(src, /if \(isPauseHome\(calls\)\) return \{ id: "home"/);
 });
 
 test("VRAM pictures (card faces, drill pictures) go through the look C art hook", () => {
-    const src = readFileSync(new URL("../web/native-screen-render.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/native-screen-render.js", import.meta.url));
     assert.match(src, /artHook\(ctx, \(c\) => options\.paintPrim\(c, d\.call\)\)/);
 });
 

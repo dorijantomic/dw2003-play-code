@@ -12,8 +12,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compileScene, validateScene } from "../web/quest-scenes.js";
+import { readSource } from "./helpers/source.js";
 
-const GAME = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+const GAME = readSource(new URL("../web/game.js", import.meta.url));
 const pos = () => ({ x: 0, y: 0 });
 const compile = (steps) => compileScene(steps, { playerId: 2, pos });
 
@@ -31,15 +32,16 @@ function bodyOf(name) {
 }
 
 /**
- * The real `stepSetupBucketTick`, lifted out of web/game.js and wired to a stub field: the tile under the player's
- * feet (or none), the scene's override, and the map-change default. It closes over `stepSetupBucketMap`, which is
- * bound the same way so its "new map resets the bucket" arm is exercised too.
+ * The real `stepSetupBucketTick`, lifted out of web/game.js (now web/game/transitions.ts) and wired to a stub field: the
+ * tile under the player's feet (or none), the scene's override, and the map-change default. It closes over the split
+ * module's own state object `S.stepSetupBucketMap`, which is bound the same way so its "new map resets the bucket" arm
+ * is exercised too.
  */
 function makeBucketTick({ questBucket = null, effect = null } = {}) {
   const state = { _questBucket: questBucket, playerDrawBucket: 1 };
-  const world = { state, map: "s261", effect, stepSetupBucketMap: null };
+  const world = { state, map: "s261", effect, S: { stepSetupBucketMap: null } };
   world.tick = new Function(
-    "state", "currentMap", "stepSetup", "fade", "ENTITY_BUCKET", "stepSetupBucketMap",
+    "state", "currentMap", "stepSetup", "fade", "ENTITY_BUCKET", "S",
     `${bodyOf("stepSetupBucketTick")}\nreturn stepSetupBucketTick;`,
   )(
     state,
@@ -47,7 +49,7 @@ function makeBucketTick({ questBucket = null, effect = null } = {}) {
     () => (world.effect ? { effect: world.effect } : null),
     { dir: 0 },
     4,
-    null,
+    world.S,
   );
   return world;
 }

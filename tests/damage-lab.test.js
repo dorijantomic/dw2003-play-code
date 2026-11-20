@@ -23,6 +23,7 @@ import {
   magicalBase as engineMagicalBase,
   resolveDamage as engineResolveDamage,
 } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
 /** A tiny deterministic 16-bit stream: same seed, same draws, fresh per call. */
 function seeded(seed = 1) {
@@ -389,7 +390,7 @@ test("a heal, stat or field record gets a sentence, not invented damage", async 
 // The F2 switch: the Extras row, the off-by-default list and the game.js hooks.
 // ---------------------------------------------------------------------------
 test("the F2 Extras row and EXPERIMENTAL list are off by default", () => {
-  const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+  const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
   assert.ok(ambience.includes('["damagelab", "Damage Lab (new)"]'), "the Extras pair is present");
   const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
   assert.ok(experimental, "EXPERIMENTAL is still one array literal");
@@ -398,14 +399,19 @@ test("the F2 Extras row and EXPERIMENTAL list are off by default", () => {
 });
 
 test("web/game.js gates the page on window.__fx?.damagelab and hooks it like the Codex", () => {
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(game, /import \{ tickDamageLab, openDamageLab, damageLabPress, damageLabDraw, damageLabOpen \} from "\.\/damage-lab\.js"/);
+  const game = readSource(new URL("../web/game.js", import.meta.url));
+  // The hooks now live in the split modules (web/game/update.ts, input.ts, render.ts), so each one
+  // is imported from the lab by the file that uses it: name by name, all five must be imported.
+  for (const name of ["tickDamageLab", "openDamageLab", "damageLabPress", "damageLabDraw", "damageLabOpen"]) {
+    assert.match(game, new RegExp(`import \\{[^}]*\\b${name}\\b[^}]*\\} from "\\.\\.?\\/damage-lab\\.js"`),
+      `game.js imports ${name} from the lab`);
+  }
   assert.match(game, /tickDamageLab\(window\.__fx\?\.damagelab === true\)/, "the page follows the switch");
   assert.match(game, /if \(damageLabOpen\(\)\) return;/, "the field is frozen while it is up");
   assert.match(game, /if \(damageLabPress\(k\)\)/, "the pad goes to the page");
   assert.match(game, /damageLabDraw\(ctx, VIEW_W, VIEW_H\)/, "the page draws over everything");
   assert.match(game, /fieldFullScreenUiOpen\(\)[\s\S]{0,800}damageLabOpen\(\)/, "a full-screen page covers the wide sides");
   // read-only page: nothing in it writes a store or a battle state
-  const lab = readFileSync(new URL("../web/damage-lab.js", import.meta.url), "utf8");
+  const lab = readSource(new URL("../web/damage-lab.js", import.meta.url));
   assert.ok(!/localStorage/.test(lab), "the lab stores nothing");
 });

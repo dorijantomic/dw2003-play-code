@@ -25,9 +25,10 @@ import {
   battleWinLaunchCode, battleWinJinglePlays,
   movieRow, movieReturnScreen,
 } from "../engine/index.ts";
+import { readSource } from "./helpers/source.js";
 
-const battleJs = () => readFileSync("web/battle.js", "utf8");
-const gameJs = () => readFileSync("web/game.js", "utf8");
+const battleJs = () => readSource("web/battle.js");
+const gameJs = () => readSource("web/game.js");
 const catalog = () => JSON.parse(readFileSync("data/stagslct_catalog.json", "utf8"));
 const screenTable = () => JSON.parse(readFileSync("web/assets/data/screen_table.json", "utf8"));
 const fullwidth = (s) => s.replace(/[\uff01-\uff5e]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
@@ -95,38 +96,38 @@ test("the win commit reads the live kind and gates the jingle and the cue", () =
   const src = battleJs();
   const at = src.indexOf("function defeatCurrentEnemy");
   assert.ok(at > 0);
-  const arm = src.slice(at, src.indexOf("\n  function runFinaleBeat", at));
+  const arm = src.slice(at, src.indexOf("\n    nextEnemy.statusImmunities", at));
   assert.ok(arm.includes("const winKind = battleKindOf(b);"),
     "the win reads the live kind word, not the frozen setup value");
   assert.ok(arm.includes("b._winLaunchCode = battleWinLaunchCode(winKind);"),
     "the exit cue is stored for the pose's exit");
-  assert.ok(arm.includes("if (battleWinJinglePlays(winKind)) sfx?.play(\"w_jingle\");"),
+  assert.ok(arm.includes("if (battleWinJinglePlays(winKind)) B.sfx?.play(\"w_jingle\");"),
     "the jingle sits behind the kind gate");
-  assert.equal((arm.match(/sfx\?\.play\("w_jingle"\)/g) || []).length, 1,
+  assert.equal((arm.match(/B\.sfx\?\.play\("w_jingle"\)/g) || []).length, 1,
     "exactly one jingle call: no unconditional one remains");
 });
 
 test("the pose's exit branches: ending movie vs the ordinary report", () => {
   const src = battleJs();
-  const at = src.indexOf("if (b._victoryPhase === \"pose\")");
+  const at = src.indexOf("if (b._victoryPhase === \"pose\") {\n        b.timer += dt;");
   assert.ok(at > 0);
-  const arm = src.slice(at, src.indexOf("} else if (b._victoryPhase === \"report\")", at));
+  const arm = src.slice(at, src.indexOf("} else if (b._victoryPhase === \"report\"", at));
   assert.ok(arm.includes("if (b._winLaunchCode === FINALE_WIN_ENDING_MOVIE)"),
     "the ending branch is keyed on the exit cue");
   assert.ok(arm.includes("b._victoryPhase = \"ending\";"));
-  assert.ok(arm.includes("b._endingHosted = endingHandoff?.play ? endingHandoff.play(b) === true : false;"));
-  assert.ok(arm.includes("if (!b._endingHosted) endBattle(\"win\");"),
+  assert.ok(arm.includes("b._endingHosted = B.endingHandoff?.play ? B.endingHandoff.play(b) === true : false;"));
+  assert.ok(arm.includes("if (!b._endingHosted) B.endBattle(\"win\");"),
     "with no host the win still finishes instead of stranding");
   // The report path is the other arm and still opens exactly as before.
   assert.ok(arm.includes("b._victoryPhase = \"report\";"));
-  assert.ok(arm.includes("if (reportHandoff?.open) b._reportNative = reportHandoff.open(b) === true;"));
+  assert.ok(arm.includes("if (B.reportHandoff?.open) b._reportNative = B.reportHandoff.open(b) === true;"));
 });
 
 test("the ending exit is a host hand-off with its own finish, and the guards hold", () => {
   const src = battleJs();
-  assert.ok(src.includes("setEndingHandoff: (h) => { endingHandoff = h ?? null; }"),
+  assert.ok(src.includes("setEndingHandoff: (h) => { B.endingHandoff = h ?? null; }"),
     "the host registers the ending chain");
-  assert.ok(src.includes("finishEnding: () => { if (battle) endBattle(\"win\"); }"),
+  assert.ok(src.includes("finishEnding: () => { if (B.battle) endBattle(\"win\"); }"),
     "the chain's end closes the win exactly like the report's");
   // The ending phase swallows keys and the battle stops painting while hosted.
   assert.ok(src.includes("if (b._victoryPhase === \"ending\") {"));

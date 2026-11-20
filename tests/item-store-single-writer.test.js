@@ -10,11 +10,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = new URL("../", import.meta.url);
 const WEB = new URL("web/", ROOT);
 const modules = readdirSync(WEB).filter((name) => name.endsWith(".js"));
-const read = (name) => readFileSync(new URL(name, ROOT), "utf8");
+const read = (name) => readSource(new URL(name, ROOT));
 
 // The shapes a direct edit of the bag takes. Each is one a store call cannot produce:
 // a mutating array method called ON the array, an assignment of a whole new array,

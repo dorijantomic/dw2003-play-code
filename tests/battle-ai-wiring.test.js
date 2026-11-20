@@ -13,15 +13,15 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
 
 test("the enemy move pick goes through the engine's F0x80088564 loop", () => {
     const pick = SRC.match(/function pickEnemyMove\(en\)\s*\{([\s\S]*?)\n  \}/);
     assert.ok(pick, "pickEnemyMove is present");
     const body = pick[1];
-    assert.match(body, /pickEnemyAiMove\(moves, en, RAND_U16, battle\.player, context\)/,
+    assert.match(body, /pickEnemyAiMove\(moves, en, RAND_U16, B\.battle\.player, context\)/,
         "the loop lives in engine/dw3/battle-formulas.ts");
     // The old local walk tested EVERY row including the fourth; the loop's row 3 is
     // the unconditional fallback (`slti $s1, 0x3` exit, fightstg.s:6052-6056).
@@ -31,9 +31,9 @@ test("the enemy move pick goes through the engine's F0x80088564 loop", () => {
 
 test("check_move_cond's operands are supplied from the battle object", () => {
     const pick = SRC.match(/function pickEnemyMove\(en\)\s*\{([\s\S]*?)\n  \}/)[1];
-    assert.match(pick, /partyAilmentByte: battleAilmentByte\(battle\.player\)/,
+    assert.match(pick, /partyAilmentByte: battleAilmentByte\(B\.battle\.player\)/,
         "cond 9 reads the active party member's +0x1c byte, not the enemy's");
-    assert.match(pick, /encounterGateByte: battle\.encounterGateBytes\?\.\[1\]/,
+    assert.match(pick, /encounterGateByte: B\.battle\.encounterGateBytes\?\.\[1\]/,
         "cond 13 reads 0x80042b59 (config byte 1)");
 });
 

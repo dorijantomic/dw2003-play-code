@@ -1,0 +1,20 @@
+{
+  "source": "web/audio.ts",
+  "closure": "createSfxPlayer",
+  "ctx": "P",
+  "targets": {
+    "web/audio/playback.ts": [
+      "loadPhraseTable",
+      "decodePcmWav",
+      "phraseSampleFor",
+      "toFloat32",
+      "phraseNoteAudio",
+      "whenPhraseRow",
+      "bufferFor",
+      "startPhrase",
+      "slotKeyFor",
+      "stopVoice",
+      "startVoice"
+    ]
+  }
+}

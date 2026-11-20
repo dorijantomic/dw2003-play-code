@@ -39,6 +39,8 @@ def main():
          "--outfile=web/vendor/engine.js"])
     run(["node", str(ESBUILD), "engine/native-entry.ts", "--bundle", "--format=esm",
          "--outfile=web/vendor/engine-native.js"])
+    # 1b) web/**/*.ts -> the .js the browser loads (type stripping, tools/rewrite/build-web.mjs)
+    run(["node", "tools/rewrite/build-web.mjs"])
     # 2) convert extracted assets -> the EngineContent blob the browser loads
     run(["node", "tools/engine-convert/convert.ts"])
     print("engine artifacts built: web/vendor/engine.js + web/vendor/engine-native.js + web/assets/engine-content.json")

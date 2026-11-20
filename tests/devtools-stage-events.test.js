@@ -13,8 +13,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const src = readFileSync("web/devtools.js", "utf8");
+const src = readSource("web/devtools.js");
 
 // The body of a top-level `function name(...) {` found by brace matching.
 function functionBody(source, name) {

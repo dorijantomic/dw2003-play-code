@@ -17,6 +17,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+import { readSource } from "./helpers/source.js";
 
 /** The engine/native modules a bundle of these entry points can reach. */
 async function nativeInputs(entryPoints) {
@@ -43,15 +44,15 @@ test("the interpreter check detects the interpreter when a graph links one", asy
 });
 
 test("the album adapter declares translated execution and links no interpreter host", () => {
-  const source = readFileSync(new URL("../web/cardalbum-translated.js", import.meta.url), "utf8");
+  const source = readSource(new URL("../web/cardalbum-translated.js", import.meta.url));
   assert.match(source, /execution:\s*"translated"/, "the album adapter declares translated execution");
   assert.doesNotMatch(source, /native-screen-host|native\/runtime|native\/bridge|native\/cpu/,
     "the album adapter must not link an interpreter host");
 });
 
 test("the album's ordinary route is the translated screen", () => {
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(game, /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\nconst cardAlbum = cardAlbumTranslated;/,
+  const game = readSource(new URL("../web/game.js", import.meta.url));
+  assert.match(game, /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\s*(?:export )?const cardAlbum = cardAlbumTranslated;/,
     "the album route is the translated screen");
   assert.doesNotMatch(game, /cardAlbumNative|cardAlbumLegacy/, "no other album route is built");
 });

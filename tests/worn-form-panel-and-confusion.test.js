@@ -15,8 +15,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { elementValue } from "../engine/dw3/effective-stats.ts";
 import { combatantElements } from "../engine/dw3/battle-combat.ts";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
 
 test("the digivolve panel's own block uses the roster row's base, not the worn form's", () => {
   assert.match(SRC, /elemValue\(rec\?\.savedProfile, rec\?\.elemBonuses, k\)/);

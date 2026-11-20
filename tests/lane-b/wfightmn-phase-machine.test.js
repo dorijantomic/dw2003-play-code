@@ -29,6 +29,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { NativeStageRuntime } from "../../engine/native/runtime.ts";
+import { readSource } from "../helpers/source.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const screens = join(resolve(here, "../.."), "web/assets/native/screens");
@@ -293,7 +294,7 @@ test("the walker ST machine this oracle disagrees with is still the one in web/b
   // pin them at the source. This does not assert the walker is right or wrong — only that
   // the machine the list describes is the one still shipped (it fails loudly if the walker
   // is refactored, so the list is revisited rather than left stale).
-  const src = readFileSync(join(resolve(here, "../.."), "web/battle.js"), "utf8");
+  const src = readSource(join(resolve(here, "../.."), "web/battle.js"));
   assert.ok(/const ST = \{/.test(src), "the walker still declares its ST enum");
   for (const [name, value] of [["INTRO", 1], ["PLAYER_MENU", 2], ["PLAYER_ACT", 5],
     ["ENEMY_ACT", 6], ["RESULT_MSG", 7], ["WIN", 8], ["LOSE", 9]]) {

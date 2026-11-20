@@ -30,10 +30,10 @@
 // after them. `faceBoxScene` is that ordered list, in one place.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const cam = () => import("../web/fight/battle-camera.js");
-const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const read = (p) => readSource(new URL(`../${p}`, import.meta.url));
 
 test("the box's draw list contains the stage: sky, then floor, then the head", async () => {
   const { faceBoxScene } = await cam();
@@ -96,25 +96,25 @@ test("the renderer draws the box's list inside the box window, and reuses the fr
   assert.match(src, /for \(const item of scene\)/);
   assert.match(src, /if \(item\.what === "sky"\)/);
   assert.match(src, /else if \(item\.what === "floor"\)/);
-  assert.match(src, /drawQuad\(gl, texP, mvp, skyBufs,/);
-  assert.match(src, /drawQuad\(gl, texP, mvp, floorBufs, arenaTexture \|\| whiteTex/);
+  assert.match(src, /drawQuad\(B\$\.gl, B\$\.texP, mvp, B\$\.skyBufs,/);
+  assert.match(src, /drawQuad\(B\$\.gl, B\$\.texP, mvp, B\$\.floorBufs, B\$\.arenaTexture \|\| B\$\.whiteTex/);
   // The stage objects are the ones render() already built for the battle view: the sky quad
   // and texture, and the arena floor buffers and texture. Each is built exactly once in the
   // file, at the top of the renderer, so the box cannot be loading its own copy.
-  assert.equal((src.match(/const skyBufs = makeQuadBuffers/g) || []).length, 1,
+  assert.equal((src.match(/B\$\.skyBufs = makeQuadBuffers\(/g) || []).length, 1,
     "the sky quad must be built once, for the battle view, and shared");
-  assert.equal((src.match(/const floorBufs = makeQuadBuffers/g) || []).length, 1,
+  assert.equal((src.match(/B\$\.floorBufs = makeQuadBuffers\(/g) || []).length, 1,
     "the arena floor must be built once, for the battle view, and shared");
-  assert.equal((src.match(/skyTexture = gl\.createTexture\(\)/g) || []).length, 1);
-  assert.equal((src.match(/arenaTexture = gl\.createTexture\(\)/g) || []).length, 1);
+  assert.equal((src.match(/B\$\.skyTexture = B\$\.gl\.createTexture\(\)/g) || []).length, 1);
+  assert.equal((src.match(/B\$\.arenaTexture = B\$\.gl\.createTexture\(\)/g) || []).length, 1);
   // Both are declared before the face-box block, so they are already resident when it runs.
-  assert.ok(src.indexOf("const skyBufs = makeQuadBuffers")
+  assert.ok(src.indexOf("B$.skyBufs = makeQuadBuffers")
          < src.indexOf("// ── Face-cam:"), "the sky quad must exist before the box draws it");
-  assert.ok(src.indexOf("const floorBufs = makeQuadBuffers")
+  assert.ok(src.indexOf("B$.floorBufs = makeQuadBuffers")
          < src.indexOf("// ── Face-cam:"), "the arena floor must exist before the box draws it");
   // And the backdrop only appears once the scissor is on the box window, so it cannot leak
   // into the battle view: the viewport/scissor pair must come before the scene loop.
-  const iWindow = src.indexOf("gl.scissor(fx, glY, fw, fh);");
+  const iWindow = src.indexOf("B$.gl.scissor(fx, glY, fw, fh);");
   const iScene = src.indexOf("for (const item of scene)");
   assert.ok(iWindow > 0 && iScene > iWindow,
     "the box's backdrop must be drawn after the scissor is set to the box window");

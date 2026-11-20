@@ -31,9 +31,10 @@ import {
   ladderClimbPosition,
   ladderDismountEnd,
 } from "../engine/systems/scene-step-ops.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const gameSrc = readFileSync(join(ROOT, "web/game.js"), "utf8");
+const gameSrc = readSource(join(ROOT, "web/game.js"));
 
 /** Every rail of every shipped stage, with the record's own climb height. */
 function rails() {

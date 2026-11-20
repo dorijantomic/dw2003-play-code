@@ -3,6 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { composeBook, composeBookHeader, composeMapLinks, composeMapNode, BOOK, isDimRun, linkQuad, MAP_NODE } from "../web/ui-c/books.js";
 import { composeFooter } from "../web/ui-c/pages.js";
 import { pickPauseScreen, composeBookScreen, composeDemo } from "../web/ui-c/screens.js";
@@ -10,7 +11,7 @@ import { claimFor, CMFONT_DIR, STSTAT_DIR } from "../web/ui-c/claims.js";
 import { PAGE_KEY } from "../web/ui-c/base.js";
 import { IDENTITY, dx } from "../web/ui-c/geometry.js";
 
-const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), "utf8");
+const src = (f) => readSource(new URL(`../${f}`, import.meta.url));
 const run = (text, x, y, o = {}) => ({ text, x, y, kind: 1, clut: 0, right: null, w: text.length * 7, glyphs: [], ...o });
 const part = (name, x, y, w, h, o = {}) => ({ part: name, x, y, w, h, bx: 0, by: 0, rel: IDENTITY, ...o });
 const call = (dir, id) => ({ method: "drawSprite", args: [dir << 16, id] });

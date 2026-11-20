@@ -2,7 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+import { readSource } from "./helpers/source.js";
+const SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 
 test("All on / All off set every FX_DEFS key, no MANUAL exclusion", () => {
     const m = SRC.match(/closest\("\[data-all\]"\)[\s\S]{0,200}?for \(const \[k\] of FX_DEFS\) (.*);/);

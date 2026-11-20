@@ -26,8 +26,9 @@ import { readFileSync } from "node:fs";
 
 import { effStats } from "../engine/dw3/battle-combat.ts";
 import { resolveDamage, critProc, actionTimelineDelay } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
 const DATA = (rel) => JSON.parse(readFileSync(new URL(`../web/assets/data/${rel}`, import.meta.url), "utf8"));
 
 const noCrit = () => 0x7f;   // 127: under no chance this test can reach

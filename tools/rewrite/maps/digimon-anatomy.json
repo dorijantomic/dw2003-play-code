@@ -1,0 +1,27 @@
+{
+  "source": "web/fight/digimon-anatomy.ts",
+  "targets": {
+    "web/fight/digimon-anatomy/anatomy-data.ts": [
+      "ANATOMY",
+      "FOLDERS",
+      "BODY_FAMILY",
+      "MODES",
+      "TECH_MODE_PRIOR",
+      "SIZE_ORDER",
+      "W"
+    ],
+    "web/fight/digimon-anatomy/emitter-data.ts": [
+      "EMITTERS",
+      "SHOTS",
+      "EMITTER_PARTS",
+      "EMITTER_KINDS",
+      "SHOT_MODES"
+    ],
+    "web/fight/digimon-anatomy/arm-data.ts": [
+      "ARM_EQUIP",
+      "ARM_EQUIP_CLASSES",
+      "ARM_ATTACH"
+    ]
+  },
+  "stateFile": "web/fight/digimon-anatomy/state.ts"
+}

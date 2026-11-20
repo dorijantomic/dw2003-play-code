@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 // Every native screen adapter is a state adapter between web/game.js and the
 // screen's RAM contract (web/native-screen-host.js). The ones that read the
@@ -110,7 +111,7 @@ test("a duel opened from the field carries the walker state, so seed cannot read
 });
 
 test("the game's duel adapter is constructed with the walker's own state accessor", () => {
-  const source = readFileSync("web/game.js", "utf8");
+  const source = readSource("web/game.js");
   assert.match(source, /createCardDuelNative\(sfx, bgm, \{ getState: \(\) => state \}\)/);
   // Both launchers pass it too, so the accessor is a backstop rather than the only
   // route. The challenge launcher carries the close callback (the field's screen-

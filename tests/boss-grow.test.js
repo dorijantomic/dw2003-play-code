@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readSource } from "./helpers/source.js";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const { phaseEffects } = await import("../web/boss-phase.js");
@@ -134,7 +135,7 @@ function builderPhases(phases) {
 // ── the battle wiring (source gates; the block is a battle closure, not a pure module) ──
 
 test("battle.js: the grow sits in the phase machine, after the cursor guard, behind its own switch", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   assert.equal((src.match(/window\.__fx\?\.bossgrows === true/g) || []).length, 1,
     "the switch is read in one place");
   const def = src.indexOf("function advanceBossPhase(");
@@ -153,7 +154,7 @@ test("battle.js: the grow sits in the phase machine, after the cursor guard, beh
 });
 
 test("off: the phase machine returns exactly the pages it returns today", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   const def = src.indexOf("function advanceBossPhase(");
   const helper = src.slice(def, src.indexOf("\n  }", def));
   assert.equal(
@@ -164,13 +165,13 @@ test("off: the phase machine returns exactly the pages it returns today", () => 
 
 test("web/battle3d.js is not in the branch's diff — the renderer already knows how to scale", () => {
   // (the glossary stage added setViewerStudio to battle3d.js, so "not in the diff" no longer holds; what matters is below)
-  const renderer = readFileSync(join(here, "web/battle3d.js"), "utf8");
+  const renderer = readSource(join(here, "web/battle3d.js"));
   assert.equal(/bossgrows|bossPhase/.test(renderer), false,
     "no renderer change: the phase layer lives in battle.js");
 });
 
 test("the toggle pair is in ambience.js, off by default", () => {
-  const amb = readFileSync(join(here, "web/ambience.js"), "utf8");
+  const amb = readSource(join(here, "web/ambience.js"));
   assert.match(amb, /\["bossgrows", "The boss grows \(new\)"\]/);
   assert.match(amb, /const EXPERIMENTAL = \[[^\]]*"bossgrows"/);
 });

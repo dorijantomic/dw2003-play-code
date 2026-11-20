@@ -1,10 +1,11 @@
-// How the books are wired into web/game.js. Source checks in this repo's style (tests/battle-speed.test.js): the real game
+// How the books are wired into the game bootstrap. Source checks in this repo's style (tests/battle-speed.test.js): the real game
 // cannot be imported under node.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+// web/game.ts is split into web/game/*.ts; readSource returns the entry plus the folder.
+const read = (p) => readSource(new URL(p, import.meta.url));
 const game = read("../web/game.js");
 
 test("one host, created after the sound players, opened only from the pause list's book result", () => {

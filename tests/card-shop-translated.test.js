@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { CardShopSession } from '../engine/dw3/ui/card-shop-session.ts';
 import { bindCardPacks } from '../engine/dw3/ui/card-pack-store.ts';
 import { createCollection, grantPack } from '../engine/systems/card-battle.ts';
+import { readSource } from "./helpers/source.js";
 
 const bytes=(file)=>new Uint8Array(readFileSync(file));
 const json=(file)=>JSON.parse(readFileSync(file,'utf8'));
@@ -46,7 +47,7 @@ test('three card-shop dispatch populations equal original pointer tables',()=>{
   }
   assert.deepEqual([...boosterItems].sort((a,b)=>a-b),resources.boosters.map((r)=>r.setId).sort((a,b)=>a-b),
     'every resident pack item has a decoded pool record');
-  const source=readFileSync('web/game.js','utf8');
+  const source=readSource('web/game.js');
   assert.match(source,/: cardShopTranslated;/,'ordinary route must run translated shop');
 });
 

@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 
 import { partyRosterView, CHARID_TO_DIGID } from "../web/party.js";
 import { applyLevelUp, seedStoredStats } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 // A manifest lead whose starter row is id 1, wearing form id 900.
 const CHAR = "p003pken";
@@ -95,16 +96,16 @@ test("applyLevelUp: seeds a missing stored block from the growth row", () => {
 
 // d. Source: the online win path and every seeding call read the starter.
 test("applyWin uses the growth row's curve, not the form's", () => {
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(src, /growthProfile\.growth_xp \?\? 8, lu\)/);
   assert.match(src, /applyLevelUp\(ps, prof, oldLevel, newLevel, lu, growthProfile\)/);
   assert.doesNotMatch(src, /levelForExp\(oldLevel, newXp, prof\.growth_xp/);
 });
 
 test("no seeding call still hands the bare form to ensureStoredStats or elementValues", () => {
-  const read = (f) => readFileSync(new URL(`../web/${f}`, import.meta.url), "utf8");
+  const read = (f) => readSource(new URL(`../web/${f}`, import.meta.url));
   const seeding = [
-    ["battle.js", /ensureStoredStats\(ps, digimonDB\?\.\[CHARID_TO_DIGID\[state\?\.party\?\.\[0\]\]\] \?\? prof\)/],
+    ["battle.js", /ensureStoredStats\(ps, B\.digimonDB\?\.\[CHARID_TO_DIGID\[state\?\.party\?\.\[0\]\]\] \?\? prof\)/],
     ["gym-translated.js", /ensureStoredStats\(ps, g\._data\.digimonById\[CHARID_TO_DIGID\[party\[i\]\]\] \?\? profile\)/],
     ["shop-translated.js", /ensureStoredStats\(record, db\[member\.rookieId\] \?\? member\.profile\)/],
   ];

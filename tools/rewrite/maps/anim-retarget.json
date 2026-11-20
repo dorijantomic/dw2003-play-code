@@ -1,0 +1,79 @@
+{
+  "source": "web/fight/anim-retarget.ts",
+  "targets": {
+    "web/fight/anim-retarget/rig-basics.ts": [
+      "TAU",
+      "sample",
+      "mat3Mul",
+      "ps1Mat3",
+      "compose",
+      "applyRot",
+      "restPose",
+      "meshBox",
+      "rolesOf",
+      "normaliseRoots",
+      "buildBoneMap",
+      "shiftPlaylistEntry",
+      "bakeRetargetGeometry"
+    ],
+    "web/fight/anim-retarget/k16-rig.ts": [
+      "K16",
+      "k16mul",
+      "k16tr",
+      "k16mv",
+      "k16dot",
+      "k16sub",
+      "k16scale",
+      "k16norm",
+      "K16_ID",
+      "K16_SX",
+      "k16rz",
+      "k16ry",
+      "k16rx",
+      "k16local",
+      "k16perp",
+      "k16axisAngle",
+      "k16axisOf",
+      "k16clampRot",
+      "k16fromTo",
+      "k16FromCh2",
+      "k16ToCh2",
+      "k16Pose",
+      "k16RigCache",
+      "k16RestCache",
+      "k16Subtrees",
+      "rigOf",
+      "k16Rest",
+      "k16ChainLen",
+      "k16WorstStep",
+      "k16IdleSpan",
+      "roleBoneMap",
+      "k16FiringSide",
+      "shouldMirror",
+      "k16TwoBone"
+    ],
+    "web/fight/anim-retarget/by-role.ts": [
+      "bakeRetargetByRole"
+    ],
+    "web/fight/anim-retarget/world.ts": [
+      "K23",
+      "K23_F",
+      "k23NeutralFrame",
+      "k23Cloud",
+      "bakeRetargetWorld"
+    ],
+    "web/fight/anim-retarget/cast-gate.ts": [
+      "bakeRetarget",
+      "CAST_GATE",
+      "TAU_R",
+      "angOf",
+      "angBetween",
+      "handPoint",
+      "castGate",
+      "applyCastBake",
+      "MOTION_KIT"
+    ]
+  },
+  "stateName": "ST",
+  "stateFile": "web/fight/anim-retarget/state.ts"
+}

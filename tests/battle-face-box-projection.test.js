@@ -54,9 +54,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const cam = () => import("../web/fight/battle-camera.js");
-const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const read = (p) => readSource(p);
 
 const PLACEMENT = JSON.parse(
   readFileSync(new URL("../web/assets/battle/model_placement.json", import.meta.url), "utf8"));
@@ -198,7 +199,8 @@ test("the renderer draws nothing in the window when the distance is not one", ()
   // And the window is not cleared on that path, because the original's box view has no
   // background colour of its own and so leaves the battle view's picture showing through.
   const listAt = src.indexOf("const scene = faceBoxScene(");
-  const clearAt = src.indexOf("gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);", listAt);
+  const clearAt = src.indexOf(
+    "B$.gl.clear(B$.gl.COLOR_BUFFER_BIT | B$.gl.DEPTH_BUFFER_BIT);", listAt);
   assert.ok(listAt > 0 && clearAt > listAt, "the list is decided before the window is cleared");
   const guardAt = src.indexOf("if (scene.length) {", listAt);
   assert.ok(guardAt > listAt && guardAt < clearAt, "the clear is inside the list's guard");

@@ -25,11 +25,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const SFX = "web/assets/sfx";
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
-const battleJs = () => fs.readFileSync("web/battle.js", "utf8");
-const battle3dJs = () => fs.readFileSync("web/battle3d.js", "utf8");
+const battleJs = () => readSource("web/battle.js");
+const battle3dJs = () => readSource("web/battle3d.js");
 
 // ── 1. COMEX102 — the evade substitute ──────────────────────────────────────
 
@@ -58,14 +59,14 @@ test("a contact marker resolves to the substitute only when it evaded", async ()
 
 test("the op10 hook resolves contacts through that substitution, per side", () => {
   const src = battle3dJs();
-  assert.ok(src.includes("resolveContactSoundType(rec.type, contactSoundType[side], contactEvade[side])"),
+  assert.ok(src.includes("resolveContactSoundType(rec.type, B$.contactSoundType[side], B$.contactEvade[side])"),
     "the contact resolution must pass the live evade state");
-  assert.ok(src.includes("contactEvade.player = miss;"),
+  assert.ok(src.includes("B$.contactEvade.player = miss;"),
     "the player attack must carry the miss flag into the contact sound");
-  assert.ok(src.includes("contactEvade.enemy = miss;"),
+  assert.ok(src.includes("B$.contactEvade.enemy = miss;"),
     "the enemy attack must carry the miss flag into the contact sound");
   // ...and a contact marker still plays through the ordinary op10 branch when it lands.
-  assert.ok(src.includes('sfx.playBattle(key, side, rec.words?.[1] ?? 0)'));
+  assert.ok(src.includes('B$.sfx.playBattle(key, side, rec.words?.[1] ?? 0)'));
 });
 
 // ── 2. COMCD103 — the fight-opening cue ─────────────────────────────────────

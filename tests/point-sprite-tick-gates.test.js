@@ -19,6 +19,7 @@ import {
   pointModeGatesFor,
   loadPointRecordActors,
 } from "../web/vendor/engine.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const read = (rel) => JSON.parse(readFileSync(resolve(ROOT, rel), "utf8"));
@@ -212,20 +213,20 @@ test("the gates' edge cases stay dormant in the shipped data", () => {
 
 // ── the wiring ──────────────────────────────────────────────────────────────
 test("web/effects.js routes the tick and the draw through the engine's gates", () => {
-  const src = readFileSync(resolve(ROOT, "web/effects.js"), "utf8");
+  const src = readSource(resolve(ROOT, "web/effects.js"));
   assert.ok(src.includes("tickPointSpriteRecords(records, rt, f)"),
     "the frame tick is the engine's gated step");
   assert.ok(src.includes("pointRecordInView(r, live.x, live.y, f.view)"),
     "the draw applies the same cull");
   assert.ok(src.includes("pointRecordLive(r, rt[i], f, i)"),
     "the draw resolves the same live state");
-  assert.ok(src.includes("applyPointModeGates(s.records, rt, gates, readFlag)"),
+  assert.ok(src.includes("applyPointModeGates(s.records, rt, gates, S.readFlag)"),
     "the stage-entry mode gates run on the ordinary route");
   assert.ok(src.includes("const gates = pointModeGatesFor(stageId);"),
     "the gate rows are looked up per prepared frame, so a retained runtime "
     + "still follows a flag set while the player was away");
   // and the game hands the camera window to both passes (plus the wide overworld pad, web/field-view.js)
-  const game = readFileSync(resolve(ROOT, "web/game.js"), "utf8");
+  const game = readSource(resolve(ROOT, "web/game.js"));
   assert.ok(game.includes("drawEffectsUnderMap(ctx, m.id, camX, camY, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD)"));
   assert.ok(game.includes("drawEffects(ctx, m.id, camX, camY, drawables, VIEW_W / ZOOM, VIEW_H / ZOOM, FIELD_VIEW_PAD)"));
 });

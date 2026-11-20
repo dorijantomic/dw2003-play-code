@@ -7,6 +7,7 @@ import {
     PANEL_COLS, PANEL_FRAMES, PAUSE_PANEL_EXTRA_BASE, buildPanelClip, panelHeight, registerPausePanels, tileFrames,
 } from "../web/panel-kit.js";
 import { PAUSE_PANEL_EXTRA_BASE as ENGINE_BASE, pausePanelClip } from "../engine/dw3/ui/native/pause-list.ts";
+import { readSource } from "./helpers/source.js";
 
 const SHEET = new URL("../web/assets/ui/cmfont_sheet.json", import.meta.url);
 const haveSheet = existsSync(SHEET);
@@ -57,7 +58,7 @@ test("a sheet without the six tiles gets no clips and does not throw", () => {
 });
 
 test("screenpack.js registers the clips when the cmfont sheet loads", () => {
-    const src = readFileSync(new URL("../web/screenpack.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/screenpack.js", import.meta.url));
     assert.match(src, /import \{ registerPausePanels \} from "\.\/panel-kit\.js";/);
     assert.match(src, /p\.ids = j\.ids \?\? j;\s*\n\s*if \(name === "cmfont"\) registerPausePanels\(p\.ids\);/);
 });

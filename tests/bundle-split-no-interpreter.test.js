@@ -20,6 +20,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { build } from "esbuild";
 import { INTERPRETER_MARKERS, containsInterpreterSource, pageStaticGraph } from "../tools/execution_forbidden_audit.mjs";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = process.cwd();
 const PRODUCTION = "web/vendor/engine.js";
@@ -61,7 +62,7 @@ test("the ordinary page's static graph never reaches the interpreter", async () 
 });
 
 test("web/native-runtime.js is the only web importer, and it imports dynamically", () => {
-  const src = readFileSync(join(ROOT, "web/native-runtime.js"), "utf8");
+  const src = readSource(join(ROOT, "web/native-runtime.js"));
   assert.match(src, /import\(\s*["']\.\/vendor\/engine-native\.js["']\s*\)/,
     "web/native-runtime.js must reach the research bundle with a dynamic import()");
   assert.doesNotMatch(src, /from\s+["']\.\/vendor\/engine-native\.js["']/,

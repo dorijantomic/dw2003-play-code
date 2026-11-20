@@ -29,6 +29,7 @@ import {
   replayDraw,
   replayReset,
 } from "../web/replay-theatre.js";
+import { readSource } from "./helpers/source.js";
 
 const wstag = JSON.parse(readFileSync("web/assets/events/wstag_events.json", "utf8"));
 const progress = JSON.parse(readFileSync("web/assets/data/progress_ordinal.json", "utf8"));
@@ -144,7 +145,7 @@ test("replayRefused refuses a native record and each of the four keys, and accep
   assert.equal(replayRefused((wstag.s200 ?? []).find((e) => e.id === 50)), false);
   assert.equal(replayRefused(null), true, "an absent record is never playable");
   // the game's play path consults the rule before the VM
-  const body = fnBody(readFileSync("web/game.js", "utf8"), "function replayScene(ev)");
+  const body = fnBody(readSource("web/game.js"), "function replayScene(ev)");
   const refuse = body.indexOf("replayRefused(ev)");
   const play = body.indexOf("playStoryEvent(ev, () => {})");
   assert.ok(refuse >= 0 && refuse < play, "the refusal comes before the VM call");
@@ -175,7 +176,7 @@ test("every row carries its stage's manifest name, and another room's row is els
 
 // ── the play path has no writes and no routing ──────────────────────────────────────────────
 test("replayScene plays through the VM with a no-op completion and nothing else", () => {
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   const body = fnBody(game, "function replayScene(ev)");
   assert.match(body, /playStoryEvent\(ev, \(\) => \{\}\)/, "the completion argument is a no-op");
   for (const banned of ["engine.completeEvent", "doStoryHandoff", "setFlag", "startTransition", "battle.start"]) {
@@ -189,7 +190,7 @@ test("replayScene plays through the VM with a no-op completion and nothing else"
 });
 
 test("the player-facing list is filtered to currentMap().id and gated on $story.ordinal", () => {
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   const rows = fnBody(game, "function replayRowsNow()");
   assert.match(rows, /currentMap\(\)\.id/, "the list is the room you are standing in");
   assert.match(rows, /replayRows\(/);
@@ -200,12 +201,12 @@ test("the player-facing list is filtered to currentMap().id and gated on $story.
 });
 
 test("the F2 switch is the Extras pair and EXPERIMENTAL, so it starts OFF", () => {
-  const ambience = readFileSync("web/ambience.js", "utf8");
+  const ambience = readSource("web/ambience.js");
   assert.ok(ambience.includes('["replay", "Replay theatre (new)"]'), "the Extras pair is present");
   const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
   assert.ok(experimental, "EXPERIMENTAL is still one array literal");
   assert.ok(/"replay"/.test(experimental[1]), "replay is experimental (off until switched on)");
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   assert.match(game, /tickReplay\(window\.__fx\?\.replay === true/);
 });
 
@@ -214,7 +215,7 @@ test("the fetched ladder is kept in its own field, never the $story.ordinal prox
   // state.progressOrdinal is an accessor over the engine's $story.ordinal (Object.defineProperty
   // later in game.js). Storing the fetched progress_ordinal.json there would write NaN into the
   // story ordinal on every boot — with the theatre switched off, which is not allowed.
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   assert.ok(!/state\.progressOrdinal\s*=\s*po\b/.test(game), "the table is not assigned into the ordinal proxy");
   assert.match(game, /state\.progressTable\s*=\s*po\b/, "the table is kept under its own name");
   const rows = fnBody(game, "function replayRowsNow()");

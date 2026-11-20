@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileScene } from "../web/quest-scenes.js";
 import { questGrid, questStandFree } from "../web/quest-walk.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const load = (p) => JSON.parse(readFileSync(ROOT + p, "utf8"));
@@ -237,9 +238,9 @@ test("the whole arc lives in the quest data behind the F2 Quests switch, and now
         const src = readFileSync(ROOT + "web/" + f, "utf8");
         for (const id of IDS) assert.ok(!src.includes(id), `web/${f} must not special-case ${id}`);
     }
-    assert.match(readFileSync(ROOT + "web/ambience.js", "utf8"), /\["quests", "Quests/,
+    assert.match(readSource(ROOT + "web/ambience.js"), /\["quests", "Quests/,
         "F2 -> Extras -> Quests is still the switch that owns the layer");
-    const questsSrc = readFileSync(ROOT + "web/quests.js", "utf8");
+    const questsSrc = readSource(ROOT + "web/quests.js");
     assert.match(questsSrc, /const enabled = \(\) => !fx \|\| fx\.quests !== false;/,
         "the layer is off when the switch is off");
     assert.match(questsSrc, /questPropsOn\(mapId\) \{\s*\n\s*if \(!enabled\(\)/, "props follow the same switch");

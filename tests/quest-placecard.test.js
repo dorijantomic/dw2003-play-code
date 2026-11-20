@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compileScene, validateScene } from "../web/quest-scenes.js";
 import { createPlaceCard, loadPlaceCard } from "../web/placecard.js";
+import { readSource } from "./helpers/source.js";
 
 const ON = { fx: { questplacecard: true } };
 const pos = () => ({ x: 0, y: 0 });
@@ -133,22 +134,22 @@ test("validateScene checks the shape with the switch off", () => {
 });
 
 test("source: the card draws the caller's names through the field card's own path; the game has the case; F2 carries the pair", () => {
-  const cardSrc = readFileSync(new URL("../web/placecard.js", import.meta.url), "utf8");
+  const cardSrc = readSource(new URL("../web/placecard.js", import.meta.url));
   const beginText = cardSrc.slice(cardSrc.indexOf("card.beginText"));
   assert.ok(beginText.includes("createLocationCard(data.bars, area, place)"),
     "beginText builds the same card as begin(), with the caller's two names");
   assert.ok(!/\.png|extra_fx|assets\/data\/(?!place_card)/.test(beginText),
     "no art of ours and no other data: the card's own bars and font draw it");
-  const transSrc = readFileSync(new URL("../web/placecard-translated.js", import.meta.url), "utf8");
+  const transSrc = readSource(new URL("../web/placecard-translated.js", import.meta.url));
   assert.match(transSrc, /card\.beginText = /, "the card the game runs by default answers beginText too");
-  const sceneSrc = readFileSync(new URL("../web/quest-scenes.js", import.meta.url), "utf8");
+  const sceneSrc = readSource(new URL("../web/quest-scenes.js", import.meta.url));
   const branch = sceneSrc.slice(sceneSrc.indexOf('"placecard" in s'), sceneSrc.indexOf('"face" in s'));
   assert.ok(branch.includes("questplacecard") && branch.includes("event("), "the step is gated and emits one event");
   assert.ok(!/\.png|extra_fx/.test(branch), "opcodes and a data event only: no art");
-  const gameSrc = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const gameSrc = readSource(new URL("../web/game.js", import.meta.url));
   assert.match(gameSrc, /case "placecard":/, "the game performs the event");
   assert.match(gameSrc, /placeCard\.beginText\(ev\.area, ev\.place\)/, "on the game's own card, with the quest's names");
-  const ambSrc = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+  const ambSrc = readSource(new URL("../web/ambience.js", import.meta.url));
   assert.match(ambSrc, /\["questplacecard", "Quest place cards"\]/, "the Extras row carries the pair");
   assert.match(ambSrc, /const EXPERIMENTAL = \[[^\]]*"questplacecard"/, "and the key starts OFF with the experimental switches");
 });

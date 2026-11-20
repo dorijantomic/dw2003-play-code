@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readBack, diffReadback, KINDS } from "../web/quest-readback.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TOOL = fileURLToPath(new URL("../tools/scene_readback.mjs", import.meta.url));
@@ -48,7 +49,7 @@ test("every step kind the shipped quests use reads with no problem, and every kn
   }
   assert.ok(scenes >= 400, `expected the full scene registry, found ${scenes}`);
   for (const kind of met) assert.ok(KINDS.includes(kind), `the reader knows the step kind ${kind}`);
-  const source = readFileSync(new URL("../web/quest-scenes.js", import.meta.url), "utf8");
+  const source = readSource(new URL("../web/quest-scenes.js", import.meta.url));
   for (const kind of KINDS) assert.match(source, new RegExp(`\\b${kind}\\b`), `KINDS names no invented step: ${kind}`);
 });
 
@@ -165,7 +166,7 @@ test("the CLI reads a scene file, diffs two readings and prints JSON", () => {
 });
 
 test("the module stays pure: no DOM, no fs; the tool writes nothing", () => {
-  const mod = readFileSync(new URL("../web/quest-readback.js", import.meta.url), "utf8");
+  const mod = readSource(new URL("../web/quest-readback.js", import.meta.url));
   assert.doesNotMatch(mod, /from\s+["'](node:)?fs["']/);
   assert.doesNotMatch(mod, /\brequire\s*\(/);
   assert.doesNotMatch(mod, /\bdocument\b/);

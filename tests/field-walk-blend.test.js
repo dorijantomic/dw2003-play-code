@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { clipFrame, consumeFieldTicks, FIELD_TICK_SECONDS, FIELD_RUN_CLIP, FIELD_WALK_CLIP } from "../web/vendor/engine.js";
 import { blendWeight, walkBlendNext, WALK_TICK_RATE, WALK_BLEND_FRACTION } from "../web/walk-blend.js";
+import { readSource } from "./helpers/source.js";
 
 const walk = { cols: [10, 11, 12, 13, 14, 15, 16, 17], durations: [4, 4, 4, 4, 4, 4, 4, 4] };
 const clips = { 5: { left: walk, down: walk }, 1: { down: { cols: [3], durations: [30] } },
@@ -97,21 +98,21 @@ for (const [name, id] of [["run", FIELD_RUN_CLIP], ["walk", FIELD_WALK_CLIP]]) {
 }
 
 test("game.js wiring: blend only on moving, no scripted clip; leader/ghost/follower pass a sub-tick number; no flags", () => {
-    const src = fs.readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(src, /walkBlend !== false && isMoving && activeClip == null/);
     assert.match(src, /walkBlendNext\(meta\.clips, clipId, dir, clipTime, walkBlend\)/);
-    assert.match(src, /\(state\._inCutscene \|\| playerStopping\) \? 0 : fieldTickAccumulator/);
-    assert.match(src, /f\.gathering \? 0 : fieldTickAccumulator/);
+    assert.match(src, /\(state\._inCutscene \|\| playerStopping\) \? 0 : S\.fieldTickAccumulator/);
+    assert.match(src, /f\.gathering \? 0 : S\.fieldTickAccumulator/);
     assert.match(src, /FIELD_WALK_CLIP, 0\);/);
     assert.doesNotMatch(src, /walkblend=|__walkBlend/i);
 });
 
 // Followers: every manifest character (leader or partner) has the walk/run clips, and each one blends.
 test("followers: the follower draw call passes the sub-tick arg after the movement clip; every character clip blends", () => {
-    const src = fs.readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const src = readSource(new URL("../web/game.js", import.meta.url));
     const i = src.indexOf("function drawPartyFollower(");
     const body = src.slice(i, src.indexOf("function drawPartyFollowers(", i));
-    assert.match(body, /drawEntitySprite\(\s*pc, ps, state\.clipImgs\[pc\.id\], f\.x, f\.y,[\s\S]*FIELD_RUN_CLIP : FIELD_WALK_CLIP,\s*f\.gathering \? 0 : fieldTickAccumulator,\s*\);/);
+    assert.match(body, /drawEntitySprite\(\s*pc, ps, state\.clipImgs\[pc\.id\], f\.x, f\.y,[\s\S]*FIELD_RUN_CLIP : FIELD_WALK_CLIP,\s*f\.gathering \? 0 : S\.fieldTickAccumulator,\s*\);/);
     const man = JSON.parse(fs.readFileSync(new URL("../web/assets/manifest.json", import.meta.url), "utf8"));
     for (const c of man.characters) for (const id of [FIELD_RUN_CLIP, FIELD_WALK_CLIP]) {
         const pd = c.clips?.[String(id)]?.left;

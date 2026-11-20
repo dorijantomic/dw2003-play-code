@@ -4,9 +4,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { readSource } from "./helpers/source.js";
 
-const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-const b3 = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+const game = readSource(new URL("../web/game.js", import.meta.url));
+const b3 = readSource(new URL("../web/battle3d.js", import.meta.url));
 const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
 
 test("the top-bar Partner, Map, Showcase and Chapter selects sit in their own labels in index.html", () => {
@@ -27,7 +28,7 @@ test("game.js removes the Force encounter button and skips the F9 key in the ins
 });
 
 test("the ?slerp=1 flag is read only when the copy is not installed", () => {
-    assert.match(b3, /if \(!window\.__dwInstalled && slerpFlagFromUrl\(window\.location\.search\)\) _slerpRot = true;/);
+    assert.match(b3, /if \(!window\.__dwInstalled && slerpFlagFromUrl\(window\.location\.search\)\) S\._slerpRot = true;/);
 });
 
 test("run for real: ?slerp=1 switches slerp on for the owner PC and not in the installed copy", () => {

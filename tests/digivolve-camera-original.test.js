@@ -31,12 +31,58 @@ import {
   entranceCameraSchedule, ENTRANCE_ENEMY_LAST_FRAME, ENTRANCE_ENEMY_CAMERA_FADE_END_FRAME, REVERT_SWAP_FRAME, REVERT_SOUND_FRAME,
   BLAST_SWAP_FRAME, BLAST_HEAL_FRAME, BLAST_LAST_FRAME, MANUAL_DV_LAST_FRAME,
 } from "../engine/systems/blast-presentation.ts";
+import { readSource } from "./helpers/source.js";
 
 // Synthetic shots (PS1 camera-record units, y and z already negated as the extractor stores them).
 const SHOT9 = { eye: [300, -900, -4000], target: [50, -400, -4200], H: 520, roll: 0 };
 const ARENA = { eye: [-120, -2500, -9000], target: [10, -600, 3000], H: 410, roll: 0 };
 // The near home slot z: -(0x1400 + standoff), standoff 128.
 const HOME_Z = -(0x1400 + 128);
+
+/**
+ * The source text of ONE function: from `function name(` to its own closing brace.
+ * battle.ts / battle3d.ts are split into folders now, so a slice "from function A to
+ * function B" can run across a file boundary and pick up unrelated text; this keeps every
+ * "only inside A" assertion pinned to A's body.
+ */
+function srcFunction(src, name) {
+  const sig = new RegExp(`(?:export\\s+)?function\\s+${name}\\s*\\(`).exec(src);
+  assert.ok(sig, `${name} is defined in the source`);
+  const skip = (i) => {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < src.length) {
+        if (src[j] === "\\") { j += 2; continue; }
+        if (src[j] === c) return j + 1;
+        j++;
+      }
+      return j;
+    }
+    if (c === "/" && src[i + 1] === "/") { const j = src.indexOf("\n", i); return j < 0 ? src.length : j; }
+    if (c === "/" && src[i + 1] === "*") { const j = src.indexOf("*/", i + 2); return j < 0 ? src.length : j + 2; }
+    return i;
+  };
+  let i = sig.index + sig[0].length;
+  let parens = 1;                                   // inside the parameter list
+  while (i < src.length && parens > 0) {
+    const s = skip(i);
+    if (s > i) { i = s; continue; }
+    if (src[i] === "(") parens++;
+    else if (src[i] === ")") parens--;
+    i++;
+  }
+  while (i < src.length && src[i] !== "{") i++;
+  let body = 0;
+  while (i < src.length) {
+    const s = skip(i);
+    if (s > i) { i = s; continue; }
+    if (src[i] === "{") body++;
+    else if (src[i] === "}") { body--; if (!body) { i++; break; } }
+    i++;
+  }
+  return src.slice(sig.index, i);
+}
 const BATTLE0 = { eye: [-43, -1807, -7019], target: [37, -613, 2029], H: 457, roll: 0 };
 // The new form: its own shot 9 and home slot.
 const NEW_SHOT9 = { eye: [311, -912, -3013], target: [61, -415, -3217], H: 617, roll: 0 };
@@ -303,9 +349,9 @@ test("one camera tick per presentation tick from the task start: the stepper cou
 });
 
 test("play's presentation frame is one 60 Hz tick per 1/60 s: battle.js advances dt * 60", () => {
-  const b = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-  assert.match(b, /const BLAST_CAPTURE_HZ = 60;/);
-  assert.match(b, /else show\.frame \+= dt \* BLAST_CAPTURE_HZ;/);
+  const b = readSource(new URL("../web/battle.js", import.meta.url));
+  assert.match(b, /(?:const BLAST_CAPTURE_HZ|B\.BLAST_CAPTURE_HZ) = 60;/);
+  assert.match(b, /else show\.frame \+= dt \* (?:B\.)?BLAST_CAPTURE_HZ;/);
   assert.match(b, /const frame = Math\.round\(show\.frame\);/);
   assert.equal((b.match(/frame: DV_TASK_START_FRAME,/g) || []).length, 2, "Blast and manual DV start on n0");
   assert.match(b, /swapName: profile\.name, swapped: false/, "manual DV swaps its model on f278, not at commit");
@@ -376,21 +422,21 @@ test("no shot 9 yet: nothing is cut and nothing throws", () => {
 });
 
 test("battle3d: the renderer drives the digivolve and revert cameras, the dolly is gone, the wipe is drawn", () => {
-  const src = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
   assert.match(src, /createDigivolveCamera/);
-  assert.match(src, /stepFormChangeFrame\(camRec, dvCam, dvFrame\)/);
-  assert.match(src, /if \(!dvCam\) camRec\.tick/, "no second camera tick while a form change runs");
+  assert.match(src, /stepFormChangeFrame\(B\$\.camRec, B\$\.dvCam, B\$\.dvFrame\)/);
+  assert.match(src, /if \(!B\$\.dvCam\) B\$\.camRec\.tick/, "no second camera tick while a form change runs");
   assert.match(src, /blastPresentationSet\(state, program, skipped = false, weak = false, entrance = null\)/);
   const ts = readFileSync(new URL("../engine/systems/blast-presentation.ts", import.meta.url), "utf8");
   assert.equal((ts.match(/cameraPush: smooth/g) || []).length, 0, "no cameraPush curve is left");
   assert.match(src, /createRevertCamera/);
   assert.doesNotMatch(src, /blastState\.cameraPush/, "the dolly block is gone");
-  assert.match(src, /setEnemyVisible: setEnemyVisible/, "enemy hide goes through the one setEnemyVisible");
-  assert.match(src, /createDigivolveCamera\(\{[^}]*setEnemyVisible: setEnemyVisible,\s+setMotion: playPlayerMotion, weak/s);
+  assert.match(src, /setEnemyVisible: (?:B\$\.)?setEnemyVisible/, "enemy hide goes through the one setEnemyVisible");
+  assert.match(src, /createDigivolveCamera\(\{[^}]*setEnemyVisible: (?:B\$\.)?setEnemyVisible,\s+setMotion: (?:B\$\.)?playPlayerMotion, weak/s);
   assert.match(src, /blastState\.wipeRow !== undefined/, "the wipe row drives the solid / wireframe clip");
   assert.match(src, /gl\.scissor\(0, H - rowPx, W, rowPx\)/);
   assert.match(src, /gl\.scissor\(0, 0, W, H - rowPx\)/);
-  assert.match(src, /blastState\.voidAlpha > 0 && blastState\.voidAlpha < 1/, "the stage fade darkens the arena");
+  assert.match(src, /blastState\.voidAlpha > 0 && (?:B\$\.)?blastState\.voidAlpha < 1/, "the stage fade darkens the arena");
 });
 
 // ── The revert (de-digivolve): entrance.c FIGHTSTG_updateEntrance, key2 = 0 ──────────────────────
@@ -576,9 +622,9 @@ test("skip without an enemy view still shows the enemy and releases", () => {
 });
 
 test("battle3d + battle.js: the skip frame goes through skipFormChange (introShot, setEnemyVisible)", () => {
-  const src = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
-  assert.match(src, /skipFormChange\(camRec, dvCam, \(\) => introShot\(\), setEnemyVisible\)/);
-  const bj = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
+  assert.match(src, /skipFormChange\(B\$\.camRec, B\$\.dvCam, \(\) => B\$\.introShot\(\), B\$\.setEnemyVisible\)/);
+  const bj = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(bj, /blastPresentationSet\?\.\(s, show\.program, skip[,)]/);
 });
 
@@ -633,9 +679,9 @@ test("revert motions: weak may be a function read at f299, and skipped frames st
 });
 
 test("wiring: battle3d passes setMotion + weak to the revert camera, battle.js passes the low-HP stance", () => {
-  const b3 = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
-  const b = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-  assert.match(b3, /createRevertCamera\(\{[^}]*setMotion: \(m\) => entranceMotionSet\(eSide, entrance\?\.folder, m\), weak/s);
+  const b3 = readSource(new URL("../web/battle3d.js", import.meta.url));
+  const b = readSource(new URL("../web/battle.js", import.meta.url));
+  assert.match(b3, /createRevertCamera\(\{[^}]*setMotion: \(m\) => (?:B\$\.)?entranceMotionSet\(eSide, entrance\?\.folder, m\), weak/s);
   assert.match(b3, /function playPlayerMotion\(motion\)/);
   assert.match(b3, /function playEnemyMotion\(motion\)/);
   assert.match(b, /blastPresentationSet\?\.\(s, show\.program, skip,\s+\(\) => lowHpStance\(show\.entranceSide === 1 \? b\.enemy : b\.player\), show\.entrance \?\? null\)/);
@@ -808,11 +854,11 @@ test("entrance: stop() puts the hidden side back when the window is cut short (e
 });
 
 test("entrance wiring: renderer reads the INCOMING fighter's shot and hides the other side; battle.js commits at the cut", () => {
-  const b3 = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
-  const b = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const b3 = readSource(new URL("../web/battle3d.js", import.meta.url));
+  const b = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(b3, /entranceCameraSchedule\(eSide\)/);
-  assert.match(b3, /shotTen: \(\) => entranceShot\(eSide, entrance\?\.folder, schedule\.shotIndex\)/);
-  assert.match(b3, /setEnemyVisible: eSide \? setPlayerVisible : setEnemyVisible/, "the enemy entrance hides the partner");
+  assert.match(b3, /shotTen: \(\) => (?:B\$\.)?entranceShot\(eSide, entrance\?\.folder, schedule\.shotIndex\)/);
+  assert.match(b3, /setEnemyVisible: eSide \? (?:B\$\.)?setPlayerVisible : (?:B\$\.)?setEnemyVisible/, "the enemy entrance hides the partner");
   assert.match(b3, /FormChangeProgram\.ENTRANCE_ENEMY/);
   // the entering model is drawn the ordinary way (old until the swap, new after); the revert-only draw branch is gone
   assert.doesNotMatch(b3, /The revert \(entrance\.c\): the restored model is on from the cut/);
@@ -822,25 +868,24 @@ test("entrance wiring: renderer reads the INCOMING fighter's shot and hides the 
   assert.match(b, /show\.onSwap\?\.\(\);/, "the record commits in the swap step (the cut)");
   assert.match(b, /show\.onDone\?\.\(\);/);
   // player tag: 0x38 line first, entrance on Circle, commit at the cut, the 0x39-style line after the task
-  const tagAt = b.indexOf("function applyTagAction");
-  const tag = b.slice(tagAt, b.indexOf("function commitTag", tagAt));
+  const tag = srcFunction(b, "applyTagAction");
   assert.ok(!tag.includes("setPlayerVisible(false)"), "the outgoing model is not hidden at once");
   assert.ok(!tag.includes("b.activePlayerIndex = action.rosterIndex"), "the active record is not committed in applyTagAction");
-  assert.match(b, /onSwap: \(\) => commitTag\(b, tag\.action, tag\.spd\)/);
+  assert.match(b, /onSwap: \(\) => (?:B\.)?commitTag\(b, tag\.action, tag\.spd\)/);
   assert.match(b, /side: 0, name: tag\.profile\.name,/);
-  const commit = b.slice(b.indexOf("function commitTag"), b.indexOf("function applyDvAction"));
+  const commit = srcFunction(b, "commitTag");
   assert.ok(commit.includes("b.activePlayerIndex = action.rosterIndex;") && commit.includes('queueAfterAction(b, "player", spd);'));
   assert.ok(!b.includes("tagArrivalComplete") && !b.includes("arrivalFrames"), "the invented arrival timer is gone");
   assert.ok(!/legacyTagSwap|USE_ORIGINAL_TAG_SWAP/.test(b), "no legacyTagSwap URL flag");
   // Blast ending: the model swap moved from the commit to the cut
-  const rv = b.slice(b.indexOf("function revertBlast"), b.indexOf("function startEntrance"));
+  const rv = srcFunction(b, "revertBlast");
   assert.ok(!rv.includes("swapPlayerModel(saved.name)"), "revertBlast no longer swaps the model at commit");
   assert.match(rv, /startEntrance\(b, \{\s+side: 0, name: saved\.name,/);
   // enemy: next enemy after a KO and the finale bodies are the enemy entrance
-  const de = b.slice(b.indexOf("function defeatCurrentEnemy"), b.indexOf("function fuseIntoBoss"));
+  const de = srcFunction(b, "defeatCurrentEnemy");
   assert.match(de, /startEntrance\(b, \{\s+side: 1,/);
   assert.ok(!de.includes("swapEnemyModel("), "no immediate enemy swap in defeatCurrentEnemy");
-  const fin = b.slice(b.indexOf("function runFinaleBeat"), b.indexOf("function recordFinaleTechnique"));
+  const fin = srcFunction(b, "runFinaleBeat");
   assert.match(fin, /startEntrance\(b, \{\s+side: 1, name: nextName,/);
   assert.ok(!fin.includes("swapEnemyModel("), "no immediate enemy swap in the finale beats");
 });

@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { mergeTechRecord, techRecordAccuracy, dropRoll as webDropRoll, dropPasses as webDropPasses } from "../web/tech-record.js";
 import { dropRoll, dropPasses } from "../engine/dw3/item-drop.ts";
 import { rollHit } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "web/assets/data");
@@ -162,7 +163,7 @@ test("tools/hit_table.mjs --json is all 443 techniques, skill 1 first at 110/128
 });
 
 test("source gates: battle.js always uses the disc's merge and drop roll (no F2 key)", () => {
-  const battle = readFileSync(join(ROOT, "web/battle.js"), "utf8");
+  const battle = readSource(join(ROOT, "web/battle.js"));
   assert.match(battle, /mergeTechRecord\(s, rec, \{ useDiscAcc: true \}\)/, "the skill merge always carries the record's accuracy byte");
   assert.match(battle, /rollBattleDrop\(b\._loot\.candidates, RAND_U16\)/, "the drop draw is the disc's one roll per battle");
   assert.doesNotMatch(battle, /function rollDrop\(/, "the per-enemy roll is gone");
@@ -172,7 +173,7 @@ test("source gates: battle.js always uses the disc's merge and drop roll (no F2 
 });
 
 test("the F2 row for discrolls is gone from ambience.js", () => {
-  const amb = readFileSync(join(ROOT, "web/ambience.js"), "utf8");
+  const amb = readSource(join(ROOT, "web/ambience.js"));
   assert.doesNotMatch(amb, /discrolls/);
   assert.doesNotMatch(amb, /Disc-accurate hit & drop rolls/);
 });

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const font = JSON.parse(readFileSync("web/assets/ui/uifont.json", "utf8"));
 
@@ -19,6 +20,6 @@ test("kind-1 CLUT offset 1 is the cyan face and offset 4 is green", () => {
 });
 
 test("drawText accepts a clut offset", () => {
-  const src = readFileSync(new URL("../web/uifont.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/uifont.js", import.meta.url));
   assert.match(src, /sheetForClut\(kind, clut\)/);
 });

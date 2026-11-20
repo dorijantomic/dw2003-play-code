@@ -17,8 +17,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const translated = readFileSync(new URL("../web/status-translated.js", import.meta.url), "utf8");
+const translated = readSource(new URL("../web/status-translated.js", import.meta.url));
 const commit = readFileSync(
   new URL("../engine/dw3/ui/pause-close-commit.ts", import.meta.url), "utf8");
 

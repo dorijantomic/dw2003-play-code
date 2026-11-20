@@ -13,10 +13,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-const translated = readFileSync(
-  new URL("../web/battlemsg-translated.js", import.meta.url), "utf8");
+const src = readSource(new URL("../web/battle.js", import.meta.url));
+const translated = readSource(
+  new URL("../web/battlemsg-translated.js", import.meta.url));
 
 test("all three landed-blow commit sites ask the chooser", () => {
   const calls = src.match(/= chooseResultLine\(\{/g) ?? [];
@@ -37,9 +38,9 @@ test("the KO words are never a page, on either side", () => {
 });
 
 test("a silent arm empties the box instead of leaving the last line up", () => {
-  assert.equal((src.match(/if \(!b\._resultPages\.length\) clearBattleLine\(b\);/g) ?? []).length, 2,
+  assert.equal((src.match(/if \(!b\._resultPages\.length\) B\.clearBattleLine\(b\);/g) ?? []).length, 2,
     "both player-side commit sites");
-  assert.equal(/if \(!pages\.length\) clearBattleLine\(b\);/.test(src), true,
+  assert.equal(/if \(!pages\.length\) B\.clearBattleLine\(b\);/.test(src), true,
     "and the enemy-side commit site");
 });
 

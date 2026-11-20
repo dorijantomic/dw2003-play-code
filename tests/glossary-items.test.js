@@ -6,6 +6,7 @@ import { createGlossaryBook, ITEMS_LAYOUT } from "../web/glossary-book.js";
 import { buildSpecies } from "../web/glossary-digimon.js";
 import { buildItemsData, createItemsModel, heldIn, itemPage, oddsText, whereLines, whereVisible } from "../web/glossary-items.js";
 import { createItemLog } from "../web/item-log.js";
+import { readSource } from "./helpers/source.js";
 
 // ---------------------------------------------------------------- fixtures
 const enemies = { enemies: [
@@ -260,7 +261,7 @@ test("the header marks ITEMS as the active tab and the DIGIMON screen is unchang
 
 // ---------------------------------------------------------------- source checks
 test("game.js wires the provider: the game's item table, the item log and the bag", () => {
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /getItems: glossaryItems/);
     const at = game.indexOf("function glossaryItems()");
     assert.ok(at > 0);
@@ -269,7 +270,7 @@ test("game.js wires the provider: the game's item table, the item log and the ba
 });
 
 test("keys are the shared pad words (keyboard Q/E and the pad's L1/R1 both reach them)", () => {
-    const book = readFileSync(new URL("../web/glossary-book.js", import.meta.url), "utf8");
+    const book = readSource(new URL("../web/glossary-book.js", import.meta.url));
     assert.match(book, /WORD\.prev/);
     assert.match(book, /WORD\.next/);
     const map = readFileSync(new URL("../engine/systems/input-map.ts", import.meta.url), "utf8");

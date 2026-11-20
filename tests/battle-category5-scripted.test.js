@@ -65,8 +65,9 @@ import {
   battleStatusEventAdvance,
 } from "../web/battle.js";
 import { battleAilmentByte } from "../web/battlecmd-translated.js";
+import { readSource } from "./helpers/source.js";
 
-const BATTLE_JS = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE_JS = readSource(new URL("../web/battle.js", import.meta.url));
 const TECH_TABLE = JSON.parse(readFileSync(
   new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
 const ESMFIGHT = JSON.parse(readFileSync(

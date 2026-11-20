@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { compileScene, castOf, validateScene } from "../web/quest-scenes.js";
 import { createCutscene } from "../engine/systems/cutscene-manager.ts";
+import { readSource } from "./helpers/source.js";
 
 const ON = { fx: { questemotes: true } };
 const pos = () => ({ x: 0, y: 0 });
@@ -115,18 +116,18 @@ test("the bubble's actor is scene cast, like a speaker, and validateScene checks
 });
 
 test("source: the compiler emits the three command numbers and reads the F2 key; no art, no game.js edit", () => {
-  const sceneSrc = readFileSync(new URL("../web/quest-scenes.js", import.meta.url), "utf8");
+  const sceneSrc = readSource(new URL("../web/quest-scenes.js", import.meta.url));
   for (const n of ["805", "807", "806"]) assert.ok(sceneSrc.includes(n), `the compiler knows the command ${n}`);
   assert.ok(sceneSrc.includes("803"), "and the story's bubble slot it sends it to");
   assert.ok(sceneSrc.includes("questemotes") && sceneSrc.includes("opts.fx"), "the gate reads opts.fx");
   const branch = sceneSrc.slice(sceneSrc.indexOf('"bubble" in s'), sceneSrc.indexOf('"face" in s'));
   assert.ok(branch.includes("SETANIM") && !/\.png|fieldcom/i.test(branch),
     "the bubble branch is opcodes only: the story's bubble actor draws it, no art of ours");
-  const gameSrc = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  assert.match(gameSrc, /compileScene\(steps, \{ playerId, pos, free, walk, paths: questPaths \}\)/,
+  const gameSrc = readSource(new URL("../web/game.js", import.meta.url));
+  assert.match(gameSrc, /compileScene\(steps, \{ playerId, pos, free, walk, paths: S\.questPaths \}\)/,
     "the game's scene call is untouched");
   assert.ok(!gameSrc.includes("questemotes"), "the switch lives in the compiler, not in game.js");
-  const ambSrc = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+  const ambSrc = readSource(new URL("../web/ambience.js", import.meta.url));
   assert.match(ambSrc, /\["questemotes", "Quest emotes"\]/, "the Extras row carries the pair");
   assert.match(ambSrc, /const EXPERIMENTAL = \[[^\]]*"questemotes"/, "and the key starts OFF with the experimental switches");
 });

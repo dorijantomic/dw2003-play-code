@@ -19,8 +19,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { specialBattleMode, specialModeDamage, specialModeLowHpEscape } from "../engine/index.ts";
+import { readSource } from "./helpers/source.js";
 
-const battleJs = () => readFileSync("web/battle.js", "utf8");
+const battleJs = () => readSource("web/battle.js");
 
 test("specialBattleMode selects mode 2 for the Jungle Grave / Zanbamon encounter", () => {
   // 0x23a is the field screen, 0x00b the battle id — the exact pair WFIGHTMN 0xfdc..0x10a8
@@ -100,7 +101,7 @@ test("web/battle.js runs the mode-1 low-HP escape from the shared advance point"
   );
   assert.match(src, /b\._mode1EscapeShown = true;/, "it fires once");
   assert.match(src, /MSG\.FLEEING/, "it puts up the disc's esmfight[0x5f] \"Fleeing!\" page");
-  assert.match(src, /if \(battle === b\) endBattle\("enemy-fled"\)/,
+  assert.match(src, /if \(B\.battle === b\) B\.endBattle\("enemy-fled"\)/,
     "it closes as the enemy-flee outcome (result 0: back to the field, no rewards)");
   // Never a per-battle case: the rule is keyed on the mode word, not the encounter.
   assert.doesNotMatch(src, /_mode1EscapeShown[^\n]*\bBulbmon\b/);

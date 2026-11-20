@@ -17,12 +17,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { FIELD_CYCLE, nextField, fieldName } from "../web/field-war.js";
 import { elementalFieldAdjustment } from "../engine/dw3/battle-formulas.ts";
+import { readSource } from "./helpers/source.js";
 
 const DATA = new URL("../web/assets/data/", import.meta.url);
 const techTable = JSON.parse(readFileSync(new URL("fight_tech_table.json", DATA), "utf8"));
 const itemTable = JSON.parse(readFileSync(new URL("items.json", DATA), "utf8"));
-const BATTLE_SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
-const AMBIENCE_SRC = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+const BATTLE_SRC = readSource(new URL("../web/battle.js", import.meta.url));
+const AMBIENCE_SRC = readSource(new URL("../web/ambience.js", import.meta.url));
 
 test("the seven field techniques are records 213..219: category 6, elem1 2..8, mp 100, power byte 64", () => {
     const rows = [];
@@ -94,8 +95,9 @@ test("the engine's field adjustment is the real +base*power/128 and -base*power/
 test("battle.js writes the field from the category-6 record, always, with the disc power and timer", () => {
     // F0x800907cc: no switch. The technique's own record writes the field pair.
     assert.doesNotMatch(BATTLE_SRC, /fieldWarEnabled|__fx\?\.fieldwar/, "no fieldwar gate");
-    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 0, restoreRecord, elementNameForElem1\(restoreRecord\.elem1\)\)/);
-    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 1, restoreRecord, elementNameForElem1\(restoreRecord\.elem1\)\)/);
+    // The closure helpers now hang off the battle context object (B.elementNameForElem1).
+    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 0, restoreRecord, (?:[A-Za-z_$][\w$]*\.)?elementNameForElem1\(restoreRecord\.elem1\)\)/);
+    assert.match(BATTLE_SRC, /castFieldTechnique\(b, 1, restoreRecord, (?:[A-Za-z_$][\w$]*\.)?elementNameForElem1\(restoreRecord\.elem1\)\)/);
     assert.match(BATTLE_SRC, /Math\.min\(127, \(record\.crit \| 0\) \+ Math\.trunc\(spt \/ 10\)\)/, "power 64 + SPT/10, cap 127");
     assert.match(BATTLE_SRC, /1000 \+ 12 \* spt/, "duration 1000 + 12*SPT");
 });

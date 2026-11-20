@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = join(ROOT, "web/assets/data/stage_overlay_shapes.json");
@@ -55,7 +56,7 @@ test("the extractor recomputes the committed table (no disc: skipped)", () => {
 });
 
 test("one shared draw runs the table, under the base map", () => {
-    const effects = readFileSync(EFFECTS, "utf8");
+    const effects = readSource(EFFECTS);
     assert.match(effects, /export function drawStageOverlayShapes\(/,
         "effects.js exports the shared draw");
     assert.match(effects, /export function stageOverlayShapeProbe\(/,
@@ -65,7 +66,7 @@ test("one shared draw runs the table, under the base map", () => {
     // the pads and scenery use -- no invented primitive.
     const body = effects.slice(effects.indexOf("export function drawStageOverlayShapes("));
     assert.match(body.slice(0, 900), /drawSprite\(/, "the shapes blit real texels");
-    const game = readFileSync(GAME, "utf8");
+    const game = readSource(GAME);
     // Called before the base map, so the map ground and every entity draw over
     // it -- the console's order for a bucket-12 drawable.
     const call = game.indexOf("drawStageOverlayShapes(ctx, m.id, camX, camY)");
@@ -80,7 +81,7 @@ test("the tree reaction has ONE trigger: the player's action button", () => {
     // manager's mode reaches 2 from the default field handler, on the action
     // button, gated by the TreeBoots flag. There is no scripted/NPC entry, so
     // the walker must not grow a second path either.
-    const game = readFileSync(GAME, "utf8");
+    const game = readSource(GAME);
     const calls = [...game.matchAll(/startTreeKick\(/g)].length;
     assert.equal(calls, 1, "startTreeKick is called from one place (tryTreeKick)");
     const kick = readFileSync(join(ROOT, "engine/systems/tree-kick.ts"), "utf8");

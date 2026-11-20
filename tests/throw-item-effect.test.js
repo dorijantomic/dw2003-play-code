@@ -34,6 +34,7 @@ import { ActorAnimator, clipTableSeq } from "../web/fight/actor-animator.js";
 import {
   THROW_ITEM_BAND, setThrowItemEffects, throwItemEffect, isThrowItem,
 } from "../web/fight/fight-tables.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const JSON_URL = new URL("../web/assets/data/throw_item_effects.json", import.meta.url);
@@ -306,9 +307,9 @@ test("the VM oracle: the typed entry plays the arm's clip and spawns its effect 
 });
 
 test("the wiring: the item branch routes 77-90 to the throw entry, which feeds the actor's fields", () => {
-  const battleJs = readFileSync(join(ROOT, "web/battle.js"), "utf8");
-  const battle3dJs = readFileSync(join(ROOT, "web/battle3d.js"), "utf8");
-  const tablesJs = readFileSync(join(ROOT, "web/fight/fight-tables.js"), "utf8");
+  const battleJs = readSource(join(ROOT, "web/battle.js"));
+  const battle3dJs = readSource(join(ROOT, "web/battle3d.js"));
+  const tablesJs = readSource(join(ROOT, "web/fight/fight-tables.js"));
 
   const branch = battleJs.slice(battleJs.indexOf('action.type === "item"'));
   // The default arm keeps its clip-10 item-use entry for every id outside the band (the

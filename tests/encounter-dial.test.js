@@ -17,11 +17,12 @@ import {
 import {
   DIAL_MODES, dialAllowsFight, dialReset, dialModeFromFx,
 } from "../web/encounter-dial.js";
+import { readSource } from "./helpers/source.js";
 
-const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-const devSrc = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");   // the F2 page draws the select
-const dialSrc = readFileSync(new URL("../web/encounter-dial.js", import.meta.url), "utf8");
+const game = readSource(new URL("../web/game.js", import.meta.url));
+const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
+const devSrc = readSource(new URL("../web/dev-panel.js", import.meta.url));   // the F2 page draws the select
+const dialSrc = readSource(new URL("../web/encounter-dial.js", import.meta.url));
 
 test("the decoded step counter is the one authority and the dial never re-implements it", () => {
   // resetEncounterCounter: r = rand % 0x900; r < 0x100 ? r : (r + 0x100) / 2
@@ -67,7 +68,7 @@ test("the F2 switch off wins over any stored mode", () => {
 });
 
 test("game.js applies the dial at the field-tick call site, never in the engine", () => {
-  assert.match(game, /import \{[^}]*dialModeFromFx[^}]*\} from "\.\/encounter-dial\.js"/s,
+  assert.match(game, /import \{[^}]*dialModeFromFx[^}]*\} from "\.\.?\/encounter-dial\.js"/s,
     "the pure module is imported");
   const block = game.match(/if \(r\.expired\) \{([\s\S]*?)\n                    \}/);
   assert.ok(block, "the driver's expiry block is still there");

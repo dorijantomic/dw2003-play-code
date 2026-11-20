@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const SFX = "web/assets/sfx";
 
@@ -63,21 +64,21 @@ test("op10_map leaves runtime contact markers unmapped", () => {
 });
 
 test("battle3d remaps contact markers through the decoded runtime contact id", () => {
-  const src = fs.readFileSync("web/battle3d.js", "utf8");
+  const src = readSource("web/battle3d.js");
   assert.ok(src.includes("contactSoundTypeFor"), "contact id resolver should be present");
   // The marker gate now lives in resolveContactSoundType (both markers, with the
   // evade substitute — pinned in tests/battle-missing-cues.test.js), and the op10
   // hook resolves through it with the live contact type and evade state.
   assert.ok(src.includes("type !== 98 && type !== 99"),
     "contact marker types should resolve through context +0x70");
-  assert.ok(src.includes("resolveContactSoundType(rec.type, contactSoundType[side], contactEvade[side])"),
+  assert.ok(src.includes("resolveContactSoundType(rec.type, B$.contactSoundType[side], B$.contactEvade[side])"),
     "the op10 hook should resolve contacts through the shared substitution");
   assert.ok(src.includes("tech+0x0f") && src.includes("plain clip-5 basic -> 0x1e"),
     "contact resolver should cite the decoded fightstg source fields");
 });
 
 test("battle op10 playback receives the decoded sound-object duration word", () => {
-  const src = fs.readFileSync("web/battle3d.js", "utf8");
+  const src = readSource("web/battle3d.js");
   assert.ok(src.includes("sfx.playBattle(key, side, rec.words?.[1] ?? 0)"),
     "op10 word[1] must drive direct-vs-timed battle sound playback");
 });
@@ -108,7 +109,7 @@ test("battle step/down sounds are phrase-rendered, distinct WAVs (2026-07-08 seq
 });
 
 test("battle SFX playback prefers the battle-specific tone rate", () => {
-  const src = fs.readFileSync("web/audio.js", "utf8");
+  const src = readSource("web/audio.js");
   assert.ok(src.includes("const rate = meta.battleRate ?? meta.rate"));
 });
 
@@ -118,7 +119,7 @@ test("battle SFX playback prefers the battle-specific tone rate", () => {
 // because another sound shares it (sound-system.md retracted that reading on
 // 2026-07-03b). What the driver really does is keyed off two mechanisms.
 test("packed-sound arbitration is per-slot self-cut, never per-archive", () => {
-  const src = fs.readFileSync("web/audio.js", "utf8");
+  const src = readSource("web/audio.js");
   // No archive-keyed cutting survives anywhere in the module.
   assert.ok(!src.includes("stopCategory"), "the retracted category cut is gone");
   assert.ok(!/meta\.category/.test(src), "meta.category no longer arbitrates");

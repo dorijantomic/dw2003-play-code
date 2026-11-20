@@ -26,6 +26,7 @@ import {
   battleMessagePage,
 } from "../web/vendor/engine.js";
 import { battleMessageCompose } from "../engine/dw3/ui/battle-message-session.ts";
+import { readSource } from "./helpers/source.js";
 
 const ESMFIGHT = JSON.parse(readFileSync(
   new URL("../web/assets/data/battlecmd/esmfight.json", import.meta.url), "utf8")).strings;
@@ -222,7 +223,7 @@ test("the two typed sites now build the original's page, not a walker sentence",
   const drain = battleMessagePage(18, { name: NAME, numbers: [64] });
   assert.deepEqual(render(steal), ["Stole", `${ITEM_NAME}!`]);
   assert.deepEqual(render(drain), [NAME, "64HP healed!"]);
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(src, /battleMessagePage\(17,/,
     "trySteal asks for the original's steal page");
   assert.match(src, /battleMessagePage\(18,/,

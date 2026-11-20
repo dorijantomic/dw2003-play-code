@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { faceBoxHudEvents } from "../web/battle.js";
 import { ui } from "../web/vendor/engine.js";
+import { readSource } from "./helpers/source.js";
 
 // web/battle.js:527 — the battle phase table. Kept as numbers here because ST is module
 // private; PLAYER_MENU is the command menu, PLAYER_ACT an ordinary action beat.
@@ -40,14 +41,14 @@ test("it comes back at the next round's menu, and the finished battle takes it a
 });
 
 test("the renderer draws the box from the rule, not from an always-on switch", () => {
-  const src = readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
   assert.doesNotMatch(src, /faceCamEnabled\s*=\s*true/,
     "the old rule started the box enabled and nothing ever turned it off");
-  assert.match(src, /battleFaceBoxVisible\(faceBox, events\)/,
+  assert.match(src, /battleFaceBoxVisible\((?:B\$\.)?faceBox, events\)/,
     "web/battle3d.js must ask the object rule each frame");
-  assert.match(src, /faceBoxOnScreen && !faceBoxSuppressed/,
+  assert.match(src, /(?:B\$\.)?faceBoxOnScreen && !(?:B\$\.)?faceBoxSuppressed/,
     "the draw gate reads the rule's answer");
-  assert.match(readFileSync(new URL("../web/battle.js", import.meta.url), "utf8"),
-    /syncFaceBox\?\.\(faceBoxHudEvents\(b, msgHoldsTurn\(b\)\)\)/,
+  assert.match(readSource(new URL("../web/battle.js", import.meta.url)),
+    /syncFaceBox\?\.\(faceBoxHudEvents\(b, (?:B\.)?msgHoldsTurn\(b\)\)\)/,
     "the battle loop feeds the rule the same line-up fact the turn is held on");
 });

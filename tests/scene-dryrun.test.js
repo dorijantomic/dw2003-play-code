@@ -20,6 +20,7 @@ import {
 } from "../web/scene-dryrun.js";
 import { compileScene } from "../web/quest-scenes.js";
 import { FIELD_TICK_RATE, FIELD_WALK_MAGNITUDE } from "../engine/systems/field-movement.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const load = (rel) => JSON.parse(readFileSync(join(ROOT, rel), "utf8"));
@@ -252,7 +253,7 @@ test("every shipped scene plays through the VM: the census never fails the test"
 });
 
 test("the module is pure: four imports, no DOM", () => {
-    const source = readFileSync(join(ROOT, "web/scene-dryrun.js"), "utf8");
+    const source = readSource(join(ROOT, "web/scene-dryrun.js"));
     const specifiers = [...source.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)";/gm)].map((m) => m[1]);
     assert.deepEqual(
         [...specifiers].sort(),

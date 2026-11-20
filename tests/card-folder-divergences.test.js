@@ -15,7 +15,8 @@
 // These pins fail if either divergence comes back.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => readFileSync(p, "utf8");
 
@@ -28,12 +29,12 @@ test("no folder screen writes a default name (folders are blank until named)", (
     }
     // The engine's starter grant is the third writer: it leaves every folder
     // unnamed, matching the zero-filled records the original starts from.
-    assert.doesNotMatch(read("engine/systems/card-battle.ts"), /name: `Folder/,
+    assert.doesNotMatch(["engine/systems/card-battle.ts", ...readdirSync("engine/systems/card-battle").filter((f) => f.endsWith(".ts")).sort().map((f) => "engine/systems/card-battle/" + f)].map(read).join("\n"), /name: `Folder/,
         "grantStarterDeck must not name the folders");
 });
 
 test("the card shop's Edit Folder opens the same folder screen as the pause menu", () => {
-    const game = read("web/game.js");
+    const game = readSource("web/game.js");
     const fn = game.match(/function openCardShopFolder\(\) \{[\s\S]*?\n\}/)?.[0];
     assert.ok(fn, "openCardShopFolder() not found in web/game.js");
     // It opens the module's one `cardDeck` binding — the adapter the pause
@@ -58,7 +59,7 @@ test("the card shop's Edit Folder opens the same folder screen as the pause menu
 // so the row showed from boot. Both routes now ask the item store's own
 // predicate; this pin fails if either reverts to the folder-count gate.
 test("the CARD FOLDERS row gates on the Folder Bag item, not on having folders", () => {
-    const game = read("web/game.js");
+    const game = readSource("web/game.js");
     assert.equal((game.match(/carriesFolderBag\(state\)/g) ?? []).length, 2,
         "both the translated seed and the legacy menu must ask carriesFolderBag");
     assert.doesNotMatch(game, /cardFolders?Unlocked\s*[:=][^\n]*folders/,

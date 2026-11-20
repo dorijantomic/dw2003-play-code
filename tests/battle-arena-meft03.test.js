@@ -28,6 +28,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const census = JSON.parse(
   readFileSync(resolve("docs/research/battle/data/battle-arena-meft03-census.json"), "utf8"));
@@ -87,7 +88,7 @@ test("the arena's clear colour stays the fight screen's own black, not a painted
   // pro/wfightmn.s:2120-2139 -- with the setup state word at 2 it takes the arena view (key 0x1000)
   // and calls the view's own colour slot (+0x12C) with a1 = a2 = a3 = 0. The backdrop's base is
   // black; the sky the captures show is geometry on top of it, not the clear colour.
-  const battle3d = readFileSync(resolve("web/battle3d.js"), "utf8");
+  const battle3d = readSource(resolve("web/battle3d.js"));
   assert.match(battle3d, /gl\.clearColor\(0\.04, 0\.04, 0\.08, 1\)/,
     "web/battle3d.js still names its own #0a0a14 clear as the sky gradient's bottom stop; if the " +
     "arena ever gets a decoded backdrop this line is the place its base colour is read from");

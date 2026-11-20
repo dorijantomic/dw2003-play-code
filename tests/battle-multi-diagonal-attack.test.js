@@ -11,13 +11,14 @@ import fs from "node:fs";
 import path from "node:path";
 import * as b3 from "../web/battle3d.js";
 import { ActorAnimator } from "../web/fight/actor-animator.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const MODELS = path.join(ROOT, "web/assets/battle/models");
 const HAVE = fs.existsSync(path.join(MODELS, "m005grey/anim.json")) && fs.existsSync(path.join(MODELS, "m190bolt/anim.json"));
 const skip = HAVE ? false : "model packs are not installed";
 const load = (folder) => { const p = JSON.parse(fs.readFileSync(path.join(MODELS, folder, "anim.json"), "utf8")); p.folder = folder; return p; };
-const B3D = fs.readFileSync(path.join(ROOT, "web/battle3d.js"), "utf8");
+const B3D = readSource(path.join(ROOT, "web/battle3d.js"));
 
 // _layoutExtras at the 1900 floor: lanes +-950, echelon dz = away * (i - 0.5) * 0.45 * 1900 (away = the side's z sign)
 const LANE = 950, ECH = 0.45 * 1900;

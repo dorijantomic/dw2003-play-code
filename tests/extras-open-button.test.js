@@ -11,6 +11,7 @@ import { tickDamageLab, openDamageLab, damageLabOpen, damageLabPress, damageLabR
 import { tickReplay, openReplay, replayOpen, replayPress, replayReset } from "../web/replay-theatre.js";
 import { createSoundTest } from "../web/soundtest.js";
 import { buttonForKey } from "../engine/systems/input-map.ts";
+import { readSource } from "./helpers/source.js";
 
 const noFetch = async () => { throw new Error("offline"); };
 globalThis.fetch = noFetch;   // a button open starts a data load; in node it just fails quietly
@@ -63,9 +64,9 @@ test("Escape is the pad name cross in the game's default (English) layout", () =
 });
 
 test("game.js exposes the opener and the F2 page has one Open button per screen", () => {
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-  const amb = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-  const model = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8");
+  const game = readSource(new URL("../web/game.js", import.meta.url));
+  const amb = readSource(new URL("../web/ambience.js", import.meta.url));
+  const model = readSource(new URL("../web/dev-panel-model.js", import.meta.url));
   assert.match(amb, /window\.__openExtra\?\.\(key\)/, "the F2 page's Open handler calls the opener");
   assert.match(game, /window\.__openExtra = \(name\) =>/);
   for (const n of ["cutcontent", "blastladder", "planner", "damagelab", "replay", "soundtest"]) {
@@ -73,7 +74,7 @@ test("game.js exposes the opener and the F2 page has one Open button per screen"
     assert.match(model, new RegExp(`\\b${n}: X\\(\\)`), `${n} has an Open button (an in-game screen in the F2 page model)`);
   }
   for (const f of ["cut-content", "blast-ladder", "evolution-planner", "damage-lab", "replay-theatre"]) {
-    const src = readFileSync(new URL(`../web/${f}.js`, import.meta.url), "utf8");
+    const src = readSource(new URL(`../web/${f}.js`, import.meta.url));
     assert.doesNotMatch(src, /on && !S\.wasOn|enabled && !S\.wasOn/, `${f} has no rising-edge open`);
   }
 });

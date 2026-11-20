@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { EffectPlayer, effectLayer, drawEffects, spriteGeometry, spriteCorners, effectClip } from "../web/fight/effect-player.js";
 import { drawUnderEffects } from "../web/fight/effect-under-gl.js";
+import { readSource } from "./helpers/source.js";
 
 const rec = { mask: 0, stride: 0, duration: 80, defaults: [10, 0, 0, 0, 4096, 4096, 0, 0, 0], frames: [], clipA: 0, clipB: 0, clipId: 0 };
 const manifestFor = (types) => ({ types: Object.fromEntries(types.map(t => [t, { arch: 3, records: [rec] }])), archives: {} });
@@ -26,12 +27,12 @@ test("effectLayer: a descriptor without an effect type (synthetic presentation s
 });
 
 test("frame draw order: stage/backdrop, then under-sprites, then fighters; getEffectDraw drops them from the 2D pass", () => {
-  const src = fs.readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
   const at = (needle, from = 0) => { const i = src.indexOf(needle, from); assert.ok(i >= 0, needle); return i; };
-  const sky = at("drawQuad(gl, texP, IDENT_MVP, skyBufs");
-  const floor = at("drawQuad(gl, texP, pv, floorBufs", sky);
-  const under = at("drawUnderEffects(gl,", floor);
-  const player = at("drawSkeletalMesh(gl, texP, pv, playerSkelBufs", under);
+  const sky = at("drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs");
+  const floor = at("drawQuad(B$.gl, B$.texP, pv, B$.floorBufs", sky);
+  const under = at("drawUnderEffects(B$.gl,", floor);
+  const player = at("drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs", under);
   assert.ok(sky < floor && floor < under && under < player);
   assert.match(src, /renderList\(\)\.filter\(s => effectLayer\(s\) !== "under"\)/);
   assert.match(src, /renderList\(\)[^\n]*\.filter\(s => effectLayer\(s\) === "under"\)/);
@@ -130,12 +131,12 @@ test("one placement: the GL corners equal where drawEffects puts the image (rota
 });
 
 test("DNA fusion burst 1003 carries its real type: under at z=-1; 1000/1001 (FRONT) stay over; orbs not proven", () => {
-  const src = fs.readFileSync(new URL("../web/battle3d.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle3d.js", import.meta.url));
   // _sampleEffectRecord returns the effect type
   assert.match(src, /type: Number\(type\),[^\n]*\n\s*arch: typeRec\.arch/);
   assert.match(src, /function _dnaSampleSprites\(\)/);
   // the GL under pass includes the samples; the 2D pass drops the under ones
-  assert.match(src, /\[\.\.\.effectPlayer\.renderList\(\), \.\.\._dnaSampleSprites\(\)\]\.filter\(s => effectLayer\(s\) === "under"\)/);
+  assert.match(src, /\[\.\.\.B\$\.effectPlayer\.renderList\(\), \.\.\.B\$\._dnaSampleSprites\(\)\]\.filter\(s => effectLayer\(s\) === "under"\)/);
   assert.match(src, /_dnaSampleSprites\(\)\.filter\(x => effectLayer\(x\) !== "under"\)/);
   const burst = { type: 1003, screen: true, pos: { x: -160, y: -120, z: -1 } };
   assert.equal(effectLayer(burst), "under");

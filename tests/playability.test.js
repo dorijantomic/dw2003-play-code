@@ -25,6 +25,7 @@ import {
 } from "../web/fight/playability.js";
 import { donorRow } from "../web/fight/anim-donor-map.js";
 import { checkPlayability } from "../tools/check_playability.mjs";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const MODELS = path.join(ROOT, "web/assets/battle/models");
@@ -151,7 +152,7 @@ test("the checker on the shipped data exits 0 and prints one screen", { skip }, 
 });
 
 test("the module is pure and the CLI writes nothing", () => {
-  const mod = fs.readFileSync(path.join(ROOT, "web/fight/playability.js"), "utf8");
+  const mod = readSource(path.join(ROOT, "web/fight/playability.js"));
   for (const bad of ["node:fs", "readFile", "fetch(", "document.", "window.", "XMLHttpRequest", "localStorage", "process."]) {
     assert.ok(!mod.includes(bad), `web/fight/playability.js must not use ${bad}`);
   }

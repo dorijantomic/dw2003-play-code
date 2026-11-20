@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { soundtrackRows, stemOfPlayId, playMode } from "../web/soundtrack.js";
 import { packedArchive } from "../web/packed-sound.js";
+import { readSource } from "./helpers/source.js";
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), "utf8"));
 const stems = read("../web/assets/music/index.json");
@@ -185,7 +186,7 @@ function displayFor(css, el) {
 }
 
 test("the gated rows really hide while the F2 switch is off", () => {
-    const dev = readFileSync(new URL("../web/dev-panel.js", import.meta.url), "utf8");
+    const dev = readSource(new URL("../web/dev-panel.js", import.meta.url));
     const style = dev.match(/DEV_PANEL_CSS = `([\s\S]*?)`;/);
     assert.ok(style, "the F2 page still has one style block");
     const css = style[1].split("@media")[0];
@@ -205,13 +206,13 @@ test("the page plays through the game's own bgm player and is only linked from t
     assert.match(page, /playJingle/, "jingles ring through the one-shot path");
     assert.match(page, /playMode/, "the row's own kind picks play or playJingle");
 
-    const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
+    const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
     assert.match(ambience, /\["soundtrack", "Soundtrack room"\]/, "the F2 Extras row");
     const experimental = ambience.match(/const EXPERIMENTAL = \[([^\]]*)\];/);
     assert.ok(experimental, "EXPERIMENTAL is still one array literal");
     assert.match(experimental[1], /"soundtrack"/, "off until the player switches it on");
 
-    const devModel = readFileSync(new URL("../web/dev-panel-model.js", import.meta.url), "utf8");
+    const devModel = readSource(new URL("../web/dev-panel-model.js", import.meta.url));
     const refs = devModel.split("soundtrack.html").length - 1;
     assert.equal(refs, 1, "one reference to the page, no other link into it");
     assert.match(devModel, /soundtrack: P\("soundtrack\.html"/, "the Open button's page is in the F2 page model");

@@ -24,6 +24,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { GameEngine } from "../engine/index.ts";
 import { createEngineBridge } from "../web/engine-bridge.js";
+import { readSource } from "./helpers/source.js";
 
 const content = JSON.parse(readFileSync("web/assets/engine-content.json", "utf8"));
 const grants = JSON.parse(readFileSync("web/assets/data/talk_item_grants.json", "utf8")).grants;
@@ -109,7 +110,7 @@ test("the walker's close arm applies the on_close table and owns the 0x7013 flou
   // routes every on_close entry through applyStoryFlag (the set_flag dispatcher port), and
   // applyStoryFlag carries the op-0x50 arm (F0x80015d4c -> setSub1(3), unconditional) so a
   // talk grant's flourish fires on the close tick, where the disc fires it.
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   assert.match(
     game,
     /for \(const c of dlgState\.on_close \|\| \[\]\)\s*\n\s*applyStoryFlag\(c\.id, c\.expected\);/,

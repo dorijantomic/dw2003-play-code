@@ -21,6 +21,7 @@ import * as gateText from "../web/gate-text.js";
 import { gateWords, gateListWords, liveStateIndex, CHARISMA_THRESHOLDS } from "../web/gate-text.js";
 import { pickDialogueState } from "../engine/dw3/npc-manager.ts";
 import { CHARISMA_THRESHOLDS as ENGINE_CHARISMA_THRESHOLDS } from "../engine/dw3/dw3-config.ts";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const readJson = (rel) => JSON.parse(readFileSync(join(ROOT, rel), "utf8"));
@@ -189,7 +190,7 @@ test("the module has no write path", () => {
 });
 
 test("the module is DOM-free and storage-free", () => {
-  const src = readFileSync(join(ROOT, "web/gate-text.js"), "utf8");
+  const src = readSource(join(ROOT, "web/gate-text.js"));
   for (const word of ["document.", "window.", "localStorage", "sessionStorage"])
     assert.ok(!src.includes(word), `gate-text.js must not reach for ${word}`);
 });

@@ -13,6 +13,7 @@ import {
   nativeEventMembers,
   nativeEventDispositions,
 } from "../engine/systems/native-event-families.ts";
+import { readSource } from "./helpers/source.js";
 
 const events = JSON.parse(readFileSync("web/assets/events/wstag_events.json", "utf8"));
 
@@ -73,8 +74,8 @@ test("the ordinary field route dispatches the darkSwitch events to our handler",
   // The walker's native-event dispatcher (web/game.js playStoryEvent) must reach our module.
   // If this import or the dispatch call is dropped, the six events fall through to the
   // cutscene path (a no-op) — the silent drop this family used to be.
-  const game = readFileSync("web/game.js", "utf8");
-  assert.match(game, /import \{[^}]*dungeonSwitchCommand[^}]*\} from "\.\/vendor\/engine\.js"/,
+  const game = readSource("web/game.js");
+  assert.match(game, /import \{[^}]*dungeonSwitchCommand[^}]*\} from "\.\.?\/vendor\/engine\.js"/,
     "game.js must import the switch resolver from the engine bundle");
   assert.match(game, /function playDungeonSwitchEvent/, "the darkSwitch dispatcher must exist");
   assert.match(game, /if \(!ev\.disasm\?\.length && playDungeonSwitchEvent\(ev, onDone\)\) return;/,
@@ -84,8 +85,8 @@ test("the ordinary field route dispatches the darkSwitch events to our handler",
 test("the ordinary field route dispatches the gunslinger events to our handler", () => {
   // Same rule as darkSwitch: without the import and the dispatch call the two s810
   // events fall through to the cutscene path (a no-op) — the silent drop they were.
-  const game = readFileSync("web/game.js", "utf8");
-  assert.match(game, /import \{[^}]*gunslingerSwitchCommand[^}]*\} from "\.\/gunslinger-switch\.js"/,
+  const game = readSource("web/game.js");
+  assert.match(game, /import \{[^}]*gunslingerSwitchCommand[^}]*\} from "\.\.?\/gunslinger-switch\.js"/,
     "game.js must import the gunslinger switch resolver");
   assert.match(game, /function playGunslingerEvent/, "the gunslinger dispatcher must exist");
   assert.match(game, /if \(!ev\.disasm\?\.length && playGunslingerEvent\(ev, onDone\)\) return;/,

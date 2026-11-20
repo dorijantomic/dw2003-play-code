@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { ITEM_BY_ID, ITEM_BY_NAME } from "../web/vendor/engine.js";
 import { itemForDropName } from "../web/drop-item.js";
 
@@ -33,7 +34,7 @@ test("an exact display name still wins", () => {
 
 test("every drop site uses the resolver, none index ITEM_BY_NAME by a drop name", () => {
   for (const f of ["web/battle.js", "web/game.js"]) {
-    const src = readFileSync(f, "utf8");
+    const src = readSource(f);
     assert.match(src, /itemForDropName/, f);
     assert.doesNotMatch(src, /ITEM_BY_NAME\??\.?\[(dropName|firstDrop|opts\.droppedItem)\]/, f);
     assert.doesNotMatch(src, /itemTable\??\.?\[(firstDrop|name)\]/, f);

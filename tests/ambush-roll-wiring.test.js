@@ -18,8 +18,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const SRC = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const SRC = readSource(new URL("../web/battle.js", import.meta.url));
 
 test("the ambush roll is fed the encounter's own numbers, not constants", () => {
     const helper = SRC.match(/function introLinePendingFor\(b\)\s*\{([\s\S]*?)\n  \}/);

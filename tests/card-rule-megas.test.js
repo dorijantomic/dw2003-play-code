@@ -18,7 +18,7 @@
 // verified (CARD-DUEL-VERIFIED.md §14.5); the catalogue text is the authority.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import {
   DYNAMIC_STAT_MEGAS,
   ENERGY_COLOURS,
@@ -157,10 +157,12 @@ test("a duel recomputes 69 and leaves 68 at its printed 40/42; nothing else move
 
 // ── the record the code keeps ──────────────────────────────────────────────
 
-const source = readFileSync(
-  new URL("../engine/systems/card-battle.ts", import.meta.url),
-  "utf8",
-);
+// card-battle.ts is the barrel; the rules live in engine/systems/card-battle/*.ts (split by tools/rewrite/split.mjs).
+const battleDir = new URL("../engine/systems/card-battle/", import.meta.url);
+const source = [
+  readFileSync(new URL("../engine/systems/card-battle.ts", import.meta.url), "utf8"),
+  ...readdirSync(battleDir).filter((f) => f.endsWith(".ts")).sort().map((f) => readFileSync(new URL(f, battleDir), "utf8")),
+].join("\n");
 
 test("the comment above the list no longer claims the raw table values are the ids", () => {
   const at = source.indexOf("export const DYNAMIC_STAT_MEGAS");

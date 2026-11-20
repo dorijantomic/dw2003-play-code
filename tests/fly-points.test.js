@@ -7,6 +7,7 @@ import {
     mapTwins, mapWorlds, WORLDS, flyCopyFor, flyCopiesOf,
 } from "../web/fly-points.js";
 import { isOpenAirMapName } from "../web/map-open-air.js";
+import { readSource } from "./helpers/source.js";
 import { pauseExtraRows, pauseLabelOk } from "../web/pause-extra-rows.js";
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
@@ -116,10 +117,11 @@ test("the quest zz_fly is authored, shipped and built into web/quests.json, and 
 });
 
 test("wiring: game.js re-checks every rule in flyTo, the row needs the quest, no option row, no URL flag", () => {
-    const g = read("../web/game.js");
+    const g = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(g, /fly: questDone\(FLY_QUEST\)/);
     assert.match(g, /async function flyTo\(id\)/);
-    const body = g.slice(g.indexOf("async function flyTo(id)"), g.indexOf("// Dev / test hooks (nothing in the game reads these): window.__fly"));
+    const start = g.indexOf("async function flyTo(id)");
+    const body = g.slice(start, g.indexOf("\n}\n", start) + 2);
     for (const need of ["FLY_POINTS.includes(id)", "questDone(FLY_QUEST)", "flyFree()", "flyAirNow()", "flySeenAny(id)", "flyCopyFor(", "arrivalSpot(state.scenes, copy.id)"]) assert.ok(body.includes(need), need);
     assert.match(g, /runStageHandoff\(\{ to: mapId, spawnX: spot\.x, spawnY: spot\.y, scripted: true/);
     assert.ok(!/__fx\??\.fly|get\("fly"\)|\?fly=/.test(g), "no switch, no URL flag");

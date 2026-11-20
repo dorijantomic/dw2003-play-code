@@ -52,12 +52,13 @@ import { readFileSync } from "node:fs";
 import {
   winBattleRewards, paidParticipants, BITADAPTER_ID, EXPADAPTER_ID,
 } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 const prog = JSON.parse(readFileSync(new URL("../web/assets/data/progression.json", import.meta.url), "utf8"));
 const BATTLE_262 = 262; // reward record [dvexp 94, exp 2365, bits 5475]
 
 // The source under test: web/battle.js, or a mutated copy for the fail-before run.
-const source = readFileSync(process.env.BITADAPTER_BATTLE_SOURCE || "web/battle.js", "utf8");
+const source = readSource(process.env.BITADAPTER_BATTLE_SOURCE || "web/battle.js");
 
 /** Slice `function name(...) {...}` out of the source by brace balance. */
 function sliceFunction(name) {
@@ -81,12 +82,16 @@ function sliceFunction(name) {
  * The real winRewards, wired to the real reward maths. The battle object is the
  * minimal shape it reads: screenId, the marked set + live records for the share
  * divisor, and the active position (updated on a Tag, never restored).
+ * The closure's live-state hooks now hang off the battle context object (B), so
+ * that object supplies the same getState()/progressionDB the function used to
+ * read from its enclosing scope.
  */
 function makeWinRewards(state) {
+  const B = { getState: () => state, progressionDB: { battle_rewards: prog.battle_rewards } };
   return new Function(
-    "winBattleRewards", "paidParticipants", "getState", "progressionDB",
+    "winBattleRewards", "paidParticipants", "B",
     sliceFunction("winRewards") + "\nreturn winRewards;",
-  )(winBattleRewards, paidParticipants, () => state, { battle_rewards: prog.battle_rewards });
+  )(winBattleRewards, paidParticipants, B);
 }
 
 /** A two-Digimon battle of screen 262: the lead (position 0) KO'd, position 1
@@ -146,7 +151,7 @@ test("the report seeding uses the outcome member too (web/game.js)", () => {
   // The native/translated report writes this value into the workspace +4 itself,
   // so its seed must be the same member the endBattle arm would have written:
   // the active position at the outcome, never a setup-time index.
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const game = readSource(new URL("../web/game.js", import.meta.url));
   // the report is opened by openNativeReport (shared with the multiplayer fight); the hand-off just calls it
   const at = game.indexOf("function openNativeReport(");
   assert.ok(at > 0, "the battle report opener is present");

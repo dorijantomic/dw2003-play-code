@@ -27,6 +27,7 @@ import {
 } from "../engine/dw3/ui/index.ts";
 import { BATTLE_HANDOFF_SELECTOR } from "../engine/dw3/screen-routing.ts";
 import { TITLE_TWINKLES } from "../web/title-twinkle-data.js";
+import { readSource } from "./helpers/source.js";
 
 const layout = {
   promptAt: [79, 166], optionAt: [[79, 154], [79, 174]],
@@ -70,7 +71,7 @@ test("every other language launches 0xE02 without consulting the previous screen
 
 // ── 2. the host's wiring: every route into the title records what it left ────
 
-const gameJs = () => readFileSync("web/game.js", "utf8");
+const gameJs = () => readSource("web/game.js");
 
 test("the movie's return records the movie's own code", () => {
   const src = gameJs();

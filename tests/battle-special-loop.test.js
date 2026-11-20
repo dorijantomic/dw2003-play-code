@@ -19,6 +19,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const SFX = "web/assets/sfx";
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
@@ -89,23 +90,23 @@ test("every element backdrop carries its SFSTDATA sound index", () => {
 });
 
 test("battle3d holds the element loop for exactly the backdrop's lifetime", () => {
-  const src = fs.readFileSync("web/battle3d.js", "utf8");
+  const src = readSource("web/battle3d.js");
   assert.ok(src.includes("assets/sfx/special_loop_map.json"), "loop map not loaded");
   assert.ok(src.includes("function syncSpecialLoop(active)"), "no on/off edge handler");
   assert.ok(src.includes("syncSpecialLoop(dfActive)"), "loop not tied to the backdrop");
-  assert.ok(src.includes("sfx?.playEffectLoop?.(specialLoopKey)"));
-  assert.ok(src.includes("sfx?.stopEffectLoop?.()"));
+  assert.ok(src.includes("B$.sfx?.playEffectLoop?.(B$.specialLoopKey)"));
+  assert.ok(src.includes("B$.sfx?.stopEffectLoop?.()"));
   // sound == -1 must stay silent rather than falling back to some other loop.
-  assert.ok(src.includes("entry.sound >= 0 ? (specialLoopMap[String(entry.sound)] || null) : null"));
+  assert.ok(src.includes("entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null"));
 });
 
 test("the signature whirl is closed by op10 type 91, not by a duration", () => {
-  const src = fs.readFileSync("web/battle3d.js", "utf8");
-  assert.ok(src.includes("const SUSTAINED_LOOP_TYPE = 89;"));
-  assert.ok(src.includes('const SUSTAINED_LOOP_KEY  = "ex_at_lp";'));
-  assert.ok(src.includes("t === 91 && sfx) sfx.stopSustained?.(SUSTAINED_LOOP_KEY)"));
-  assert.ok(src.includes("t === SUSTAINED_LOOP_TYPE && sfx) sfx.playSustained?.(SUSTAINED_LOOP_KEY)"));
-  const audio = fs.readFileSync("web/audio.js", "utf8");
+  const src = readSource("web/battle3d.js");
+  assert.ok(src.includes("B$.SUSTAINED_LOOP_TYPE = 89;"));
+  assert.ok(src.includes('B$.SUSTAINED_LOOP_KEY = "ex_at_lp";'));
+  assert.ok(src.includes("t === 91 && B$.sfx) B$.sfx.stopSustained?.(B$.SUSTAINED_LOOP_KEY)"));
+  assert.ok(src.includes("t === B$.SUSTAINED_LOOP_TYPE && B$.sfx) B$.sfx.playSustained?.(B$.SUSTAINED_LOOP_KEY)"));
+  const audio = readSource("web/audio.js");
   assert.ok(audio.includes("player.playSustained = (name) =>"));
   assert.ok(audio.includes("player.stopSustained = (name) =>"));
 });
@@ -135,12 +136,12 @@ test("the Blast revert plays its captured PLAYER11 cue", () => {
   assert.ok(manifest.player11, "player11 missing from manifest.json");
   assert.equal(manifest.player11.id, "0xa0045ec9");
   assert.ok(fs.existsSync(`${SFX}/player11.wav`));
-  const src = fs.readFileSync("web/battle.js", "utf8");
+  const src = readSource("web/battle.js");
   assert.ok(src.includes('sfx?.play("player11")'), "revert cue not wired");
 });
 
 test("no invented heal cue survives in the battle item path", () => {
-  const src = fs.readFileSync("web/battle.js", "utf8");
+  const src = readSource("web/battle.js");
   assert.ok(!src.includes('sfx?.play("recovery")'),
     "RECOVERY has no call site in the battle overlay and no action script emits op10 type 7");
   const trig = readJson("docs/research/audio/sfx-triggers.json");

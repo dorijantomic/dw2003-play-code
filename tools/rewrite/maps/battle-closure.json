@@ -1,0 +1,222 @@
+{
+ "source": "web/battle.ts",
+ "closure": "createBattle",
+ "ctx": "B",
+ "targets": {
+  "web/battle/core/opening.ts": [
+   "_battleTargetSize",
+   "enterBattleFullscreen",
+   "exitBattleFullscreen",
+   "onBattleResize",
+   "_init3DRenderer",
+   "entryKey",
+   "storyOrdinal",
+   "cardmonBoosterForBattle",
+   "blastReady",
+   "triggerBlast",
+   "advanceBlastPresentation",
+   "revertBlast",
+   "startEntrance",
+   "startEnemySelfTag",
+   "forcedDedigivolve",
+   "tickBlastTurn"
+  ],
+  "web/battle/core/load.ts": [
+   "loadFusionData",
+   "pickEnemy",
+   "encounterRateLevel",
+   "enemyToProfile",
+   "enemyHp",
+   "enemyMp",
+   "getPlayerProfile",
+   "trySteal",
+   "winRewards"
+  ],
+  "web/battle/core/records.ts": [
+   "buildEnemyRecord",
+   "buildPlayerRoster",
+   "buildPlayerRecord",
+   "enemyTeamActive",
+   "enemyTeamRecord",
+   "enemyTeamRecords",
+   "enemyConditionSlots",
+   "profileById",
+   "profileByName",
+   "evoTargets",
+   "partyFormState",
+   "initializePartyStats",
+   "applyEvolution",
+   "partnerInfo",
+   "availableEvolutions"
+  ],
+  "web/battle/core/start.ts": [
+   "swapPlayerModel",
+   "swapEnemyModel",
+   "musicForScreen",
+   "start",
+   "startRandom",
+   "partyForScreen",
+   "triggersForStage",
+   "startScreen",
+   "startParty"
+  ],
+  "web/battle/core/dna.ts": [
+   "playerTechs",
+   "usableItems",
+   "tagMembers",
+   "formOptionsFor",
+   "battleFormLevel",
+   "dnaTableReader",
+   "dnaProfileRecord",
+   "jogressFused",
+   "dnaChoiceFor",
+   "dnaParticipantsFor",
+   "dnaScriptChunks",
+   "startDnaChunk",
+   "applyDnaAction",
+   "commitDnaRestore",
+   "commitDnaImpact"
+  ],
+  "web/battle/core/fusion.ts": [
+   "fuseIntoBoss",
+   "applyTagAction",
+   "commitTag",
+   "applyDvAction"
+  ],
+  "web/battle/core/counter.ts": [
+   "armPendingImpact",
+   "armContactDamage",
+   "queueCounter",
+   "applyCounter",
+   "stepCounter",
+   "commitPendingImpact",
+   "noteFinalBossPhaseDamage",
+   "frozenGateLosesTurn",
+   "statusEventQueueAdvance",
+   "triggerPlayerCounter",
+   "triggerEnemyCounterRow"
+  ],
+  "web/battle/core/flow.ts": [
+   "isActive",
+   "animBusy",
+   "queueAfterAction",
+   "advanceBossPhase",
+   "setResultPages",
+   "showItemPage",
+   "damageSpec",
+   "elementNameForElem1",
+   "slotDamage",
+   "resolveRepeatDispatch",
+   "advanceAfterResult",
+   "advanceDisplayFrames",
+   "tickHudEase"
+  ],
+  "web/battle/core/message.ts": [
+   "tickBattleMessage",
+   "sayOriginal",
+   "sayWalker",
+   "clearBattleLine",
+   "startLossSession",
+   "enterLossState",
+   "attackSpec",
+   "techniqueSpec",
+   "enemyTechniqueSpec",
+   "itemAnnouncementSpec",
+   "evadeSpec",
+   "defeatedSpec",
+   "msgHoldsTurn",
+   "armIntroLine",
+   "introLinePendingFor",
+   "openingPorts",
+   "stepBattleOpening",
+   "hpPlateMembers",
+   "hpPlateOf",
+   "spawnFightTaskFor"
+  ],
+  "web/battle/core/update.ts": [
+   "update"
+  ],
+  "web/battle/core/player-action.ts": [
+   "applyPlayerAction"
+  ],
+  "web/battle/core/enemy-action.ts": [
+   "applyEnemyAction",
+   "applyParticipantProgress",
+   "pickEnemyMove"
+  ],
+  "web/battle/core/finale.ts": [
+   "runFinaleBeat",
+   "finishFinaleBeat",
+   "recordFinaleTechnique"
+  ],
+  "web/battle/core/end.ts": [
+   "endBattle",
+   "mpKitTechs",
+   "mpKit",
+   "rollEncounter",
+   "coopSetEnemyHp",
+   "defeatCurrentEnemy"
+  ],
+  "web/battle/core/menus.ts": [
+   "techListSeed",
+   "itemListSeed",
+   "confirmItem",
+   "confirmTech",
+   "tagListSeed",
+   "confirmTag",
+   "confirmJokePick",
+   "confirmCommand"
+  ],
+  "web/battle/core/forms.ts": [
+   "formListSeed",
+   "partyRosterSlot",
+   "formPanelMemberSeed",
+   "confirmDvForm",
+   "liveFormId",
+   "dnaPaneSeed",
+   "applyDnaAnswer"
+  ],
+  "web/battle/core/input.ts": [
+   "handleKey"
+  ],
+  "web/battle/core/native.ts": [
+   "drawFightPane",
+   "nativeText",
+   "nativePanelPath",
+   "drawNativePanel",
+   "fillHpBar",
+   "drawNativeBar",
+   "drawPips",
+   "chromeReady",
+   "drawChrome",
+   "pDispShown",
+   "paintHpBar",
+   "hudClip"
+  ],
+  "web/battle/core/hud.ts": [
+   "drawBattleHud",
+   "drawMenuNotice",
+   "drawCommandMenu",
+   "drawListSelector",
+   "drawListChrome",
+   "drawDescription",
+   "visibleList",
+   "drawTechMenu",
+   "drawItemMenu",
+   "drawTagMenu",
+   "drawFormMenu",
+   "drawDnaChoice"
+  ],
+  "web/battle/core/report.ts": [
+   "drawFightReportGroup",
+   "drawFightReport"
+  ],
+  "web/battle/core/draw.ts": [
+   "draw",
+   "coversField",
+   "drawSubtractiveFade",
+   "peek",
+   "scriptedScreen"
+  ]
+ }
+}

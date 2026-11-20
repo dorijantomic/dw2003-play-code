@@ -21,6 +21,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+import { readSource } from "./helpers/source.js";
 
 const DUEL_CONTROLLERS = [
     "engine/dw3/ui/card-battle-scene.ts",
@@ -63,11 +64,11 @@ test("the interpreter check detects the interpreter when a graph links one", asy
 });
 
 test("the ordinary duel route still boots the shipped overlay through the interpreter host", () => {
-    const source = readFileSync(new URL("../web/cardduel-native.js", import.meta.url), "utf8");
+    const source = readSource(new URL("../web/cardduel-native.js", import.meta.url));
     assert.match(source, /native-screen-host\.js/, "the adapter boots the overlay through the host");
     // The call itself moved into the factory (card 11).
     assert.match(source, /createNativeAdapter|openNativeScreen/, "the adapter opens an interpreter-backed screen");
-    const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+    const game = readSource(new URL("../web/game.js", import.meta.url));
     assert.match(game, /const cardDuel = cardDuelNative;/,
         "the card duel ordinary route is the native adapter, until the session can run a match");
 });

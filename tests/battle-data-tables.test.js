@@ -13,6 +13,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
 const data = "web/assets/data";
 const screens = "web/assets/native/screens";
@@ -69,7 +70,7 @@ test("no battle screen asks the browser for an executable image", () => {
 });
 
 test("the loaders name the two files this test just checked", () => {
-    assert.match(readFileSync("web/resident-data.js", "utf8"), /fetchBytes\("digimon_profiles\.bin"/,
+    assert.match(readSource("web/resident-data.js"), /fetchBytes\("digimon_profiles\.bin"/,
         "the profile table is the one shared cut (tests/digimon-profiles-shared.test.js)");
-    assert.match(readFileSync("web/battledna-translated.js", "utf8"), /fetchBytes\("battlecmd\/dna-tables\.bin"/);
+    assert.match(readSource("web/battledna-translated.js"), /fetchBytes\("battlecmd\/dna-tables\.bin"/);
 });

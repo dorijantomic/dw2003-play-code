@@ -6,9 +6,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { firstAliveEnemySlot, enemyTeamSlots } from "../web/enemy-switch.js";
+import { readSource } from "./helpers/source.js";
 
 const fieldEnc = JSON.parse(readFileSync(new URL("../web/assets/data/field_encounters.json", import.meta.url), "utf8"));
-const BATTLE = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE = readSource(new URL("../web/battle.js", import.meta.url));
 const party = fieldEnc.screens["3"];
 
 // A record exactly as buildEnemyRecord shapes it: enemyToProfile has name/resistances/family, no id.
@@ -31,5 +32,6 @@ test("slots 0 and 1 down: slot 2; all down: -1", () => {
 
 test("buildEnemyRecord stores the disc id (enemyStatIdByName) as speciesId", () => {
   const fn = BATTLE.slice(BATTLE.indexOf("function buildEnemyRecord"), BATTLE.indexOf("function buildPlayerRoster"));
-  assert.match(fn, /speciesId:\s*enemyStatIdByName\?\.\[/);
+  // Since the battle split the module-level caches live on the state object (S.enemyStatIdByName).
+  assert.match(fn, /speciesId:\s*(?:S\.)?enemyStatIdByName\?\.\[/);
 });

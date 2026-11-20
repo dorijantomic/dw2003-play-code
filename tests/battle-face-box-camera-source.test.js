@@ -17,9 +17,9 @@
 //                               which is the thing this port removed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readSource } from "./helpers/source.js";
 
-const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const read = (p) => readSource(new URL(`../${p}`, import.meta.url));
 
 test("the extractor reads the two face-box groups at the offsets the routine uses", () => {
   const src = read("tools/extract_smdldata.py");
@@ -47,7 +47,7 @@ test("the renderer builds the box camera from the PLAYER's record, never the spe
   const src = read("web/battle3d.js");
   // fightstg.s:17819-17829 — one manager lookup, and its +0x14 and the record itself both
   // come from it. The record is therefore chosen once, by the player.
-  assert.match(src, /faceBoxSource\(placementTable, modelKeyFromFolder\(playerFolder\)/,
+  assert.match(src, /faceBoxSource\(B\$\.placementTable, modelKeyFromFolder\(B\$\.playerFolder\)/,
     "the box's record must be the player's fighter's, from the player's own model key");
   // Nothing may pick the box's record, its buffers or its placement off the enemy.
   assert.doesNotMatch(src, /enemySpeaks \? enemyFolder : playerFolder/,
@@ -57,7 +57,7 @@ test("the renderer builds the box camera from the PLAYER's record, never the spe
   assert.doesNotMatch(src, /boxPos\(tKey\)/,
     "the box's subject is placed from the player's own record, not from a per-side lookup");
   // And the subject it draws is the player's mesh, buffers, texture and bones.
-  assert.match(src, /_updateSkeletalVBOGL\(gl, playerModel, boxBufs, pBwm, boxPos/,
+  assert.match(src, /_updateSkeletalVBOGL\(B\$\.gl, B\$\.playerModel, boxBufs, B\$\.pBwm, boxPos/,
     "the box must draw the player's fighter");
   assert.doesNotMatch(src, /enemySpeaks \? enemyModel : playerModel/);
   assert.match(src, /faceBoxFovY\(faceShot\.H\)/,

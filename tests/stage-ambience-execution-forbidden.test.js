@@ -32,6 +32,7 @@ import {
   pointRecordActorStages,
   hasPointRecordActor,
 } from "../engine/systems/point-record-actor.ts";
+import { readSource } from "./helpers/source.js";
 
 /** The translated ambience modules the ordinary route runs. */
 const AMBIENCE_ENTRIES = [
@@ -75,14 +76,14 @@ test("the interpreter check detects the interpreter when a graph links one", asy
 });
 
 test("the overlay is never booted on the stage-entry path", () => {
-  const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  const game = readSource(new URL("../web/game.js", import.meta.url));
   assert.doesNotMatch(game, /enterNativeStage|loadNativeStages|USE_NATIVE_STAGE/,
     "web/game.js neither loads nor enters a native stage");
   assert.doesNotMatch(game, /nativeStages/, "no URL switch boots the overlay");
 });
 
 test("the ambience adapter declares translated execution and its browser check denies executable assets", () => {
-  const adapter = readFileSync(new URL("../web/stage-objects.js", import.meta.url), "utf8");
+  const adapter = readSource(new URL("../web/stage-objects.js", import.meta.url));
   assert.match(adapter, /execution:\s*"translated"/, "web/stage-objects.js declares translated execution");
   // Its reference to the overlay driver is the stand-down read (`nativeStage`),
   // never a screen host, runtime, bridge or CPU.

@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readSource } from "./helpers/source.js";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const { phaseEffects } = await import("../web/boss-phase.js");
@@ -106,7 +107,7 @@ function builderPhases(phases) {
 // ── the battle wiring (source gates; the block is a battle closure, not a pure module) ──
 
 test("battle.js: the bank write lives in the phase machine, behind its own switch", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   assert.equal((src.match(/b\._battleTrack = effects\.music/g) || []).length, 1,
     "one write of the phase's bank");
   assert.equal((src.match(/window\.__fx\?\.bossmusic === true/g) || []).length, 1,
@@ -126,7 +127,7 @@ test("battle.js: the bank write lives in the phase machine, behind its own switc
 });
 
 test("battle.js: the finale's own boss04 handover is untouched", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   const def = src.indexOf("function noteFinalBossPhaseDamage(");
   assert.ok(def > 0, "the finale's phase function exists");
   const fn = src.slice(def, src.indexOf("\n  }", def));
@@ -141,7 +142,7 @@ test("battle.js: the finale's own boss04 handover is untouched", () => {
 });
 
 test("the toggle pair is in ambience.js, off by default", () => {
-  const amb = readFileSync(join(here, "web/ambience.js"), "utf8");
+  const amb = readSource(join(here, "web/ambience.js"));
   assert.match(amb, /\["bossmusic", "A phase changes the battle music \(new\)"\]/);
   assert.match(amb, /const EXPERIMENTAL = \[[^\]]*"bossmusic"/);
 });

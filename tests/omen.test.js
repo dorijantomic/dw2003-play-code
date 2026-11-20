@@ -15,10 +15,11 @@ import {
 import {
   runsLeft, omenLevel, omenCues, WINDOW_RUNS, OMEN_RATE_TABLE,
 } from "../web/omen.js";
+import { readSource } from "./helpers/source.js";
 
-const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
-const ambience = readFileSync(new URL("../web/ambience.js", import.meta.url), "utf8");
-const omenSrc = readFileSync(new URL("../web/omen.js", import.meta.url), "utf8");
+const game = readSource(new URL("../web/game.js", import.meta.url));
+const ambience = readSource(new URL("../web/ambience.js", import.meta.url));
+const omenSrc = readSource(new URL("../web/omen.js", import.meta.url));
 
 // The number of real driver runs until the counter expires: call the engine's own
 // encounterStepTick until it reports `expired`. This is the number runsLeft must match.
@@ -145,7 +146,7 @@ test("the level mirror sits in the driver block and is initialised to 0", () => 
 });
 
 test("the cue is computed only inside the F2 gate and put on window.__omen", () => {
-  assert.match(game, /omenLevel[^;]*from "\.\/omen\.js"/s, "the module is imported");
+  assert.match(game, /omenLevel[^;]*from "\.\.?\/omen\.js"/s, "the module is imported");
   const block = game.match(/if \(window\.__fx\?\.omen === true\) \{([\s\S]*?)\n    \}/);
   assert.ok(block, "the omen block is behind the switch");
   assert.match(block[1], /window\.__omen = \{/, "the cue goes on window.__omen");

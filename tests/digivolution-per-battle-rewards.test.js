@@ -30,6 +30,7 @@ import {
   markFormTaken, markedEquippedForms, commitBattleFormChange, applyFormLearnPass,
 } from "../web/battle.js";
 import { applyFormTechGates, learnOneTechnique, markOneLoadable } from "../web/form-tech-slots.js";
+import { readSource } from "./helpers/source.js";
 
 const digimon = JSON.parse(readFileSync(
   new URL("../web/assets/data/digimon.json", import.meta.url), "utf8"));
@@ -123,7 +124,7 @@ test("the browser reward path calls the looping pass, not one-shot services", ()
   // The wiring itself: applyParticipantProgress must reach the services through
   // applyFormLearnPass. A one-shot pair here was the 2026-10-14 audit's
   // misreading of the loop (the selector-1 dispatch above).
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   assert.ok(src.includes("applyFormLearnPass(record, formProfile);"),
     "the reward path runs the looping pass");
   assert.ok(!/^\s*learnOneTechnique\(record, formProfile\);\s*$/m.test(src),

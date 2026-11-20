@@ -35,6 +35,7 @@ import {
   silentClips,
   techniqueIds,
 } from "../web/fight/body-loadout.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ASSETS = path.join(ROOT, "web/assets");
@@ -265,7 +266,7 @@ test("moveRows: Meramon's five moves join their clips, names, elements, meshes a
 // ── purity ───────────────────────────────────────────────────────────────────────
 
 test("the module is pure", () => {
-  const src = fs.readFileSync(path.join(ROOT, "web/fight/body-loadout.js"), "utf8");
+  const src = readSource(path.join(ROOT, "web/fight/body-loadout.js"));
   assert.ok(!/fetch\s*\(/.test(src), "no fetch");
   assert.ok(!/node:fs|require\(/.test(src), "no filesystem");
   assert.ok(!/window\.|document\./.test(src), "no DOM");

@@ -49,6 +49,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { createTriggerSystem } from "../engine/systems/trigger-system.ts";
+import { readSource } from "./helpers/source.js";
 
 // The decoded mount rule, written out here so this file also stands on its own: op 2
 // hands the tile's own group to the mount, op 3 hands 5 when the group is exactly 1
@@ -60,7 +61,7 @@ function decodedMountFacing(op, group) {
 
 /** The walker's own ladder mount, as shipped — the one path that arms a ladder. */
 function walkerLadderMount() {
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   const from = game.indexOf("function startLadderClimb(");
   assert.ok(from > 0, "web/game.js still has startLadderClimb");
   return game.slice(from, game.indexOf("\n}\n", from) + 3);
@@ -224,7 +225,7 @@ test("the walker's ladder mount reads that facing instead of guessing it from th
 });
 
 test("letting go of the rails at the foot faces you down, and at the head keeps the mount's facing", () => {
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   const from = game.indexOf("function tickClimb(");
   const tick = game.slice(from, game.indexOf("\n}\n", from) + 3);
   // fieldstg.s:13983 `sw $zr,0x60($s0)` in mode 0x46 (the climb-down completion),
@@ -261,7 +262,7 @@ test("the climb runs on the rail x, the FOOT endpoint's x, whichever end you mou
   assert.doesNotMatch(mount, /x: pt\.x/,
     "the climb no longer pins x to whichever endpoint was mounted");
 
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   const from = game.indexOf("function tickClimb(");
   const tick = game.slice(from, game.indexOf("\n}\n", from) + 3);
   assert.match(tick, /state\.x = c\.x;/,

@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import {
   buildBossList, scriptedScreensByStage, speakersOf, esdmgStagesNeeded, filterBossList, startBossBattle, UNKNOWN,
 } from "../web/devtools-bosslist.js";
+import { readSource } from "./helpers/source.js";
 
 const slots = (...s) => ({ slots: [...s, ...Array(8 - s.length).fill(0)], rate_level: 0 });
 const stageEnc = { stages: {
@@ -85,9 +86,9 @@ test("start passes the screen id and lead:false (whole party) with the current m
 });
 
 test("wiring: the page uses startBossBattle and game.js forwards lead to startScreen", () => {
-  const dt = readFileSync("web/devtools.js", "utf8");
+  const dt = readSource("web/devtools.js");
   assert.match(dt, /startBossBattle\(win\(\)\.__dev, r,/);
-  const game = readFileSync("web/game.js", "utf8");
+  const game = readSource("web/game.js");
   assert.match(game, /startScreenBattle: \(screenId, opts = \{\}\) => battle\.startScreen\([\s\S]{0,260}lead: opts\.lead \?\? true/);
 });
 

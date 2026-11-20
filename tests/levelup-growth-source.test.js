@@ -29,6 +29,7 @@ import { readFileSync } from "node:fs";
 import {
   levelForExp, levelUpThreshold, rollLevelUpGains, applyLevelUp, levelUpGrowthProfile,
 } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
 const digimon = JSON.parse(readFileSync(
   new URL("../web/assets/data/digimon.json", import.meta.url), "utf8")).digimon;
@@ -87,9 +88,9 @@ test("a level-up rolls the starter's growth bytes, not the standing form's", () 
 });
 
 test("the reward path wires the starter row into both the curve and the rolls", () => {
-  const src = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+  const src = readSource(new URL("../web/battle.js", import.meta.url));
   assert.match(src,
-    /const growthProfile = levelUpGrowthProfile\(player, digimonDB\) \?\? prof;/,
+    /const growthProfile = levelUpGrowthProfile\(player, B\.digimonDB\) \?\? prof;/,
     "applyParticipantProgress resolves the growth source from the record's rookieId");
   assert.match(src, /levelForExp\(oldLevel, newXp, growthProfile\.growth_xp \?\? 8, lu\)/,
     "the level curve reads the starter's growth_xp");

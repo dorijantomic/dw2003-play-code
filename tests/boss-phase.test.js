@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readSource } from "./helpers/source.js";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const { phaseFor, phaseRows, phaseEffects } = await import("../web/boss-phase.js");
@@ -149,7 +150,7 @@ function builderPhases(phases) {
 // ── the battle wiring (source gates; the block is a battle closure, not a pure module) ─
 
 test("battle.js: the phase block sits in queueAfterAction behind the toggle", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   assert.equal((src.match(/function advanceBossPhase\(/g) || []).length, 1,
     "one definition");
   assert.equal((src.match(/(?<!function )advanceBossPhase\(b\)/g) || []).length, 1,
@@ -174,16 +175,16 @@ test("battle.js: the phase block sits in queueAfterAction behind the toggle", ()
 });
 
 test("battle.js: only the fuseIntoBoss arm stamps a boss id and phase cursor", () => {
-  const src = readFileSync(join(here, "web/battle.js"), "utf8");
+  const src = readSource(join(here, "web/battle.js"));
   assert.equal((src.match(/en\.bossId = boss\.id/g) || []).length, 1);
   assert.equal((src.match(/en\.bossPhase = -1/g) || []).length, 1);
 });
 
 test("the toggle pair is in ambience.js and battle3d.js is untouched by the feature", () => {
-  const amb = readFileSync(join(here, "web/ambience.js"), "utf8");
+  const amb = readSource(join(here, "web/ambience.js"));
   assert.match(amb, /\["bossphases", "Boss phases \(new\)"\]/);
   assert.match(amb, /const EXPERIMENTAL = \[[^\]]*"bossphases"/);
-  const renderer = readFileSync(join(here, "web/battle3d.js"), "utf8");
+  const renderer = readSource(join(here, "web/battle3d.js"));
   assert.equal(/bossPhase|bossphases/.test(renderer), false,
     "no renderer change: the phase layer lives in battle.js");
 });

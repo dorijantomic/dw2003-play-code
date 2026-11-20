@@ -13,8 +13,9 @@ import { entranceCameraSchedule, formChangeState, FormChangeProgram } from "../e
 import {
   battleScriptedPlanFor, forcedDedigivolveLanded, MSG,
 } from "../web/battle.js";
+import { readSource } from "./helpers/source.js";
 
-const BATTLE = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE = readSource(new URL("../web/battle.js", import.meta.url));
 const TECH_TABLE = JSON.parse(readFileSync(new URL("../web/assets/data/fight_tech_table.json", import.meta.url), "utf8"));
 const ESMFIGHT = JSON.parse(readFileSync(new URL("../web/assets/data/battlecmd/esmfight.json", import.meta.url), "utf8")).strings;
 const slice = (from, to) => { const a = BATTLE.indexOf(from); return BATTLE.slice(a, BATTLE.indexOf(to, a)); };
@@ -64,15 +65,15 @@ test("the player entrance's camera glide (60 frames, a camera task) outlives the
 test("battle.js makes the entrance pages on f301 and draws them over the entrance", () => {
   const adv = slice("function advanceBlastPresentation(b, dt)", "function revertBlast");
   assert.match(adv, /show\.entrance && !show\.taskEnded && frame >= ENTRANCE_TASK_END_FRAME/);
-  assert.match(adv, /if \(show\.endMessage\) sayOriginal\(b, show\.endSpec \?\? null, show\.endMessage\);\s+show\.pageMade/);
+  assert.match(adv, /if \(show\.endMessage\) B\.sayOriginal\(b, show\.endSpec \?\? null, show\.endMessage\);\s+show\.pageMade/);
   assert.match(adv, /show\.onTaskEnd\?\.\(\) === true/);
   // at the end of the window an entrance neither re-says nor clears a page it made
-  assert.match(adv, /if \(show\.entrance\) \{ if \(!show\.endMessage && !show\.pageMade\) clearBattleLine\(b\); \}/);
+  assert.match(adv, /if \(show\.entrance\) \{ if \(!show\.endMessage && !show\.pageMade\) B\.clearBattleLine\(b\); \}/);
   assert.doesNotMatch(BATTLE, /pageAt|onPage|ENEMY_SELFTAG_NAME_FRAME/, "the f115 hack is gone");
   // draw: the message panel is painted over the presentation, entrances only
   const draw = BATTLE.slice(BATTLE.indexOf("The entrance's own page (the next one is made on f301"));
-  assert.match(draw.slice(0, 500), /b\.blastShow\.entrance && msgSession\?\.active && !msgSession\.finished/);
-  assert.match(draw.slice(0, 500), /battleMsgPaint\(ctx, msgSession\.frame\(\)/);
+  assert.match(draw.slice(0, 500), /b\.blastShow\.entrance && B\.msgSession\?\.active && !B\.msgSession\.finished/);
+  assert.match(draw.slice(0, 500), /battleMsgPaint\(B\.ctx, B\.msgSession\.frame\(\)/);
 });
 
 test("the turn delay reads the ACTIVE fighter at the moment it is asked (events.c:224-285): after the swap, the new one", () => {
@@ -80,7 +81,7 @@ test("the turn delay reads the ACTIVE fighter at the moment it is asked (events.
   // self-tag commits active[1] in substate 6 (enemy_turn.c:279) and queues the delay in substate 3 (:260), after it.
   // The walker queues the self-tag turn after the entrance (advanceAfterResult `named`), so it reads the new enemy.
   assert.match(BATTLE, /if \(tag\.stage === "named"\) \{ b\._selfTag = null; queueAfterAction\(b, "enemy"\); \}/);
-  assert.match(BATTLE, /if \(!b\._selfTag\) queueAfterAction\(b, "enemy"\)/);
+  assert.match(BATTLE, /if \(!b\._selfTag\) B\.queueAfterAction\(b, "enemy"\)/);
 });
 
 // ── 2. tech 0x187 = 391 Helter Skelter ───────────────────────────────────────────────────────────────────────────────
@@ -154,18 +155,18 @@ test("battle.js: a landed 391 queues the event first, for both casters, and the 
   const apply = slice("function applyEnemyAction()", "NEW content (F2 -> Extras -> \"Fusion bosses\")");
   assert.ok(apply.length > 0);
   const enemy = BATTLE.slice(BATTLE.indexOf("const scripted = battleScriptedPlanFor(b, 1,"));
-  assert.match(enemy.slice(0, 1800), /forcedDedigivolveLanded\(scripted\)[\s\S]*?clearBattleLine\(b\);\s+b\._dedigivolvePending = true;/);
+  assert.match(enemy.slice(0, 1800), /forcedDedigivolveLanded\(scripted\)[\s\S]*?B\.clearBattleLine\(b\);\s+b\._dedigivolvePending = true;/);
   const player = BATTLE.slice(BATTLE.indexOf("const scripted = battleScriptedPlanFor(b, 0,"));
-  assert.match(player.slice(0, 1500), /forcedDedigivolveLanded\(scripted\)\) \{\s+setResultPages\(b, \[\]\);\s+clearBattleLine\(b\);\s+b\._dedigivolvePending = true;/);
+  assert.match(player.slice(0, 1500), /forcedDedigivolveLanded\(scripted\)\) \{\s+B\.setResultPages\(b, \[\]\);\s+B\.clearBattleLine\(b\);\s+b\._dedigivolvePending = true;/);
   // the event runs from advanceAfterResult, ahead of the status events, the Blast events and the next state
   const after = slice("function advanceAfterResult(b)", "function tickBattleMessage") ;
   const hook = after.indexOf("if (b._dedigivolvePending)");
   assert.ok(hook > 0);
   assert.ok(hook < after.indexOf("if (b._timelinePages"), "before the turn's status pages");
   assert.ok(hook < after.indexOf("if (b._blastPending)"), "before the Blast events");
-  assert.match(after, /b\._dedigivolvePending = false; forcedDedigivolve\(b\);/);
+  assert.match(after, /b\._dedigivolvePending = false; B\.forcedDedigivolve\(b\);/);
   // the ENEMY_ACT tick queues the turn right after applyEnemyAction, i.e. BEFORE the event runs (menu.c:1446-1461)
-  assert.match(BATTLE, /applyEnemyAction\(\);[\s\S]{0,700}if \(!b\._selfTag\) queueAfterAction\(b, "enemy"\);/);
+  assert.match(BATTLE, /applyEnemyAction\(\);[\s\S]{0,700}if \(!b\._selfTag\) B\.queueAfterAction\(b, "enemy"\);/);
 });
 
 // ── 3. player Tag delay and entrance end (last2 play) ────────────────────────────────────────────────────────────────
@@ -175,9 +176,9 @@ test("Tag: the turn delay is read at command time with the OUTGOING fighter (men
   assert.match(apply, /spd: b\._forcedTag \? null : effectiveSpd\(b\.player\)/);
   assert.ok(apply.indexOf("spd: b._forcedTag") < apply.lastIndexOf("sayOriginal"), "captured before the 0x38 page");
   const commit = slice("function commitTag(b, action, spd)", "function applyDvAction");
-  assert.match(commit, /if \(typeof spd === "number"\) queueAfterAction\(b, "player", spd\);/);
+  assert.match(commit, /if \(typeof spd === "number"\) B\.queueAfterAction\(b, "player", spd\);/);
   assert.doesNotMatch(commit, /queueAfterAction\(b, "player"\);/, "never the new fighter any more");
-  assert.match(BATTLE, /onSwap: \(\) => commitTag\(b, tag\.action, tag\.spd\)/);
+  assert.match(BATTLE, /onSwap: \(\) => B\.commitTag\(b, tag\.action, tag\.spd\)/);
   // the speed reaches both clocks: the turn timeline and the status-event pool
   assert.match(BATTLE, /scheduleNextActor\(b\.timeline, acted, playerSpd \?\? effectiveSpd\(b\.player\)/);
   assert.match(BATTLE, /statusEventActionDelay\(playerSpd \?\? effectiveSpd\(b\.player\)/);

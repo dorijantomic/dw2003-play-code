@@ -3,6 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { readSource } from "./helpers/source.js";
 import { composeBattle, dockLayout, DOCK } from "../web/ui-c/battlehud.js";
 import { frac, ringPart, ringTexts, RING, ID } from "../web/ui-c/base.js";
 import { arcDash, RING_SHAPE } from "../web/ui-c/parts.js";
@@ -130,12 +131,12 @@ test("css: the tick layers spin and the full DV arc pulses by CSS keyframes alon
 });
 
 test("wiring: battle.js hands the ring numbers over as one read-only part, only inside a capture, the HP being the game's eased plate value", () => {
-    const b = read("web/battle.js");
+    const b = readSource("web/battle.js");
     const i = b.indexOf('part: "battleData"'), blk = b.slice(b.lastIndexOf("if (uiC.capturing())", i), i + 600);
     assert.ok(i > 0);
     assert.match(blk, /hp: pDisp, maxHp: b\.player\.maxHp, mp: b\.player\.mp, maxMp: b\.player\.maxMp/);
     assert.match(blk, /gauge: normalizeDvGauge\(b\.player\.gauge\), maxGauge: DV_GAUGE_MAX, others/);
-    assert.match(b, /const pDisp = pDispShown\(b\);/);
+    assert.match(b, /const pDisp = B\.pDispShown\(b\);/);
     assert.match(b, /function pDispShown\(cur\) \{\s*return cur\._hpPlate \? hpPlateShown\(cur\._hpPlate, 0\)/);
     assert.equal((b.match(/part: "battleData"/g) ?? []).length, 1);
 });

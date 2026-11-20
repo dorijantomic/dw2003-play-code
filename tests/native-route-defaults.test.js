@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { readSource } from "./helpers/source.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..");
@@ -43,19 +44,19 @@ export const ROUTES = [
     },
     {
         module: "pro/stgmcard", adapter: "web/save-translated.js", proof: "tools/verify_translated_save.mjs",
-        session: /new ui\.MemcardSession\(/, built: /const saveScreenNative = createSaveTranslated\(sfx\);\nconst saveScreen = saveScreenNative;/,
+        session: /new ui\.MemcardSession\(/, built: /const saveScreenNative = createSaveTranslated\(sfx\);\s*(?:export )?const saveScreen = saveScreenNative;/,
     },
     {
         module: "pro/stfgtrep", adapter: "web/fightreport-translated.js", proof: "tools/verify_translated_report.mjs",
-        session: /new ui\.FightReportSession\(/, built: /const fightReportNative = createFightReportTranslated\(sfx, \{ getState: \(\) => state \}\);\nconst fightReport = fightReportNative;/,
+        session: /new ui\.FightReportSession\(/, built: /const fightReportNative = createFightReportTranslated\(sfx, \{ getState: \(\) => state \}\);\s*(?:export )?const fightReport = fightReportNative;/,
     },
     {
         module: "pro/stcrdabm", adapter: "web/cardalbum-translated.js", proof: "tools/verify_translated_album.mjs",
-        session: /new ui\.AlbumSession\(/, built: /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\nconst cardAlbum = cardAlbumTranslated;/,
+        session: /new ui\.AlbumSession\(/, built: /const cardAlbumTranslated = createCardAlbumTranslated\(sfx\);\s*(?:export )?const cardAlbum = cardAlbumTranslated;/,
     },
     {
         module: "pro/stcrddek", adapter: "web/carddeck-translated.js", proof: "tools/verify_translated_folder.mjs",
-        session: /new ui\.FolderSession\(/, built: /const cardDeckTranslated = createCardDeckTranslated\(sfx\);\nconst cardDeck = cardDeckTranslated;/,
+        session: /new ui\.FolderSession\(/, built: /const cardDeckTranslated = createCardDeckTranslated\(sfx\);\s*(?:export )?const cardDeck = cardDeckTranslated;/,
     },
     {
         module: "pro/stcrdshp", adapter: "web/cardshop-translated.js", proof: "tools/verify_translated_cardshop.mjs",
@@ -88,12 +89,12 @@ export const ROUTES = [
     {
         module: "pro/fightstg", adapter: "web/battlecmd-translated.js", proof: "tools/verify_translated_battlecmd.mjs",
         source: "web/battle.js", session: /new ui\.FightCommandSession\(/,
-        built: /const commandNative = createBattleCommandTranslated\(sfx, \{ getState \}\);/,
+        built: /(?:[A-Za-z_$][\w$]*\.)?commandNative = createBattleCommandTranslated\(sfx, \{ getState \}\);/,
     },
     {
         module: "pro/wfightmn", adapter: "web/wfight-translated.js", proof: "tools/verify_translated_wfight.mjs",
         source: "web/battle.js", session: /new ui\.WfightLoaderSession\(/,
-        built: /const wfightNative = createWfightTranslated\(\{ getState \}\);/,
+        built: /(?:[A-Za-z_$][\w$]*\.)?wfightNative = createWfightTranslated\(\{ getState \}\);/,
     },
 ];
 
@@ -104,8 +105,8 @@ export const ROUTES = [
  *  outside the overlay, so the walker's battle keeps owning turns. */
 const DEVELOPER_ONLY = ["pro/stagslct", "pro/soundtst", "pro/shocktst", "pro/wfightts"];
 
-const GAME = read("web/game.js");
-const BATTLE = read("web/battle.js");
+const GAME = readSource(join(repo, "web/game.js"));
+const BATTLE = readSource(join(repo, "web/battle.js"));
 
 test("every in-scope route has a shipped adapter and a focused proof", () => {
     for (const r of ROUTES) {

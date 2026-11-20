@@ -15,8 +15,9 @@ import { pickEnemyAiMove } from "../engine/dw3/battle-formulas.ts";
 import {
   FormChangeProgram, formChangeState, entranceCameraSchedule,
 } from "../engine/systems/blast-presentation.ts";
+import { readSource } from "./helpers/source.js";
 
-const BATTLE = readFileSync(new URL("../web/battle.js", import.meta.url), "utf8");
+const BATTLE = readSource(new URL("../web/battle.js", import.meta.url));
 
 // A rng that records its draws and returns the queued values.
 function rng(...values) {
@@ -152,5 +153,5 @@ test("battle.js wires it: pick -> 0x4D page -> side 1 entrance -> commit at the 
   // KO: the next enemy is the lowest living slot, not index + 1
   assert.match(BATTLE, /firstAliveEnemySlot\(/);
   // the status events of the turn come after the tag finishes (enemy_turn.c substate 3), not before
-  assert.match(BATTLE, /if \(!b\._selfTag\) queueAfterAction\(b, "enemy"\)/);
+  assert.match(BATTLE, /if \(!b\._selfTag\) (?:B\.)?queueAfterAction\(b, "enemy"\)/);
 });

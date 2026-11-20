@@ -23,6 +23,7 @@ import { ActorAnimator } from "../web/fight/actor-animator.js";
 import {
   ITEM_USE_CLIP, setItemUseEffects, itemUseEffect,
 } from "../web/fight/fight-tables.js";
+import { readSource } from "./helpers/source.js";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const JSON_URL = new URL("../web/assets/data/item_use_effects.json", import.meta.url);
@@ -133,8 +134,8 @@ test("the VM oracle: clip 10 spawns the record's effect only when one is set (fa
 });
 
 test("the wiring: the item branch reaches the item entry, and the entry feeds the actor's fields", () => {
-  const battleJs = readFileSync(join(ROOT, "web/battle.js"), "utf8");
-  const battle3dJs = readFileSync(join(ROOT, "web/battle3d.js"), "utf8");
+  const battleJs = readSource(join(ROOT, "web/battle.js"));
+  const battle3dJs = readSource(join(ROOT, "web/battle3d.js"));
 
   const branch = battleJs.slice(battleJs.indexOf('action.type === "item"'));
   assert.match(branch, /renderer3d\?\.playPlayerItemUse\(item\.id\)/,
