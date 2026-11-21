@@ -19,6 +19,7 @@ import { applyRel } from "./geometry.js";
 import { CURSOR_POSES, splitTokens, hasBadge, badgeSvg } from "./icons.js";
 import type { UiDockOpts, UiPart, UiPlateOpts, UiPopOpts, UiRingOpts, UiTextOpts } from "./types.js";
 
+import type { UiRect } from "./types.js";
 export const N = (designPx: number | undefined) => designPx / 3;             // design px (3 per native) -> native units
 export const ID = Object.freeze({ a: 1, d: 1, e: 0, f: 0 });
 
@@ -169,7 +170,7 @@ export const bandLine = (key: string, r: { text: string; x: number; y: number; }
  * The C balloon (C6): one silhouette of body + tail. `body` = native rect, `tail` = { side: "top" | "bottom", b0, b1, tip: [x, y] }
  * (native, or null). The descriptor keeps both relative to its own rect (the bounding box), so the DOM side scales them with the rect.
  */
-export function balloonPart(key: string, body, tail, rel = ID) {
+export function balloonPart(key: string, body: UiRect, tail, rel = ID) {
     let x0 = body.x, y0 = body.y, x1 = body.x + body.w, y1 = body.y + body.h;
     if (tail) { x0 = Math.min(x0, tail.tip[0]); x1 = Math.max(x1, tail.tip[0]); y0 = Math.min(y0, tail.tip[1]); y1 = Math.max(y1, tail.tip[1]); }
     const rect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
@@ -240,7 +241,7 @@ export const keyButton = (key: string, rect, on: boolean, rel = ID) => plate(key
 export const HUD = Object.freeze({ edge: "var(--c-cyan)", body: "var(--c-hud-body)", slab: "var(--c-hud-slab)", track: "var(--c-hud-track)", well: "var(--c-hud-well)" });
 
 /** The C8 key box left of a command row (k shape, 4 dp edge all round, drop shadow 4); `on` = solid orange with the dark bullet. */
-export function keyBox(key: string, rect, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
+export function keyBox(key: string, rect, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out: UiPart[]) {
     out.push(plate(key, "keyBox", rect, rel, { shape: "key", underEdge: "all", edge: on ? "var(--c-orange)" : HUD.edge, body: on ? "var(--c-orange)" : HUD.slab, shadow: 4 }));
     if (on) out.push({ key: `${key}.dot`, kind: "svg", part: "keyDot", layer: "over", vw: 16, vh: 16, d: "M8 1A7 7 0 1 1 7.99 1Z", fill: "var(--c-orange-ink)",
         rect: { x: rect.x + N(12) * rel.a, y: rect.y + rect.h / 2 - N(8) * rel.d, w: N(16) * rel.a, h: N(16) * rel.d }, sx: rel.a, sy: rel.d });
@@ -257,7 +258,7 @@ export const rowChevron = (key: string, x, y, rel = ID, fill = "var(--c-orange-i
  * `hole` (native, inside `rect`), which stays open so whatever is under the overlay (the live 3D face) shows through. Two svg rings with
  * the even-odd rule; the hole gets chamfers just big enough to sit inside the body's inner chamfers.
  */
-export function ringFrame(key: string, rect, hole, rel, out) {
+export function ringFrame(key: string, rect, hole, rel, out: UiPart[]) {
     const W = rect.w, H = rect.h, c = N(24), e = N(4), ci = N(22);
     const hx = hole.x - rect.x, hy = hole.y - rect.y, hw = hole.w, hh = hole.h;
     const need = 2 * e + ci + 1.5;

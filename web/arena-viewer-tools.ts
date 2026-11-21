@@ -189,7 +189,7 @@ export function createTuner(opts) {
     const folders = {};
     const order = ["Light", "Water", "Lake", "Sand", "Sky / clouds", "Spires", "Ground", "Grass blades", "Trees", "Floor cover", "Gulls", "Wind", "Colour pass"];
     list.sort((a, b) => order.indexOf(a.folder) - order.indexOf(b.folder) || a.name.localeCompare(b.name));
-    const folder = (name) => folders[name] ||= gui.addFolder(name).close();
+    const folder = (name: string | undefined) => folders[name] ||= gui.addFolder(name).close();
     // Light: the sky time switch first (the viewer's own sky time: auto / day / night)
     if (opts.setSkyMode) {
       params.skyTime = opts.skyMode();

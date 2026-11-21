@@ -50,7 +50,7 @@ const MUSIC_INDEX_URL = "assets/music/index.json";
  * eight-row window (`scroll = cursor - 7` when it passes the bottom,
  * `scroll = cursor` when it passes the top). Returns the new pair.
  */
-export function soundTestMove(cursor, scroll, delta, count) {
+export function soundTestMove(cursor: number, scroll: number, delta: number, count) {
     if (!(count > 0)) return { cursor: 0, scroll: 0 };
     const c = Math.max(0, Math.min(count - 1, (cursor | 0) + (delta | 0)));
     let s = Math.max(0, scroll | 0);
@@ -65,7 +65,7 @@ export function soundTestMove(cursor, scroll, delta, count) {
  * absolute window, and the clamped cursor. `catalogue` is the built
  * soundtst_catalogue.json; `category` is its index.
  */
-export function soundTestView(catalogue, category, cursor, scroll) {
+export function soundTestView(catalogue, category: number, cursor: number, scroll: number) {
     const cat = catalogue?.categories?.[category];
     if (!cat) return null;
     const sounds = cat.sounds ?? [];
@@ -133,7 +133,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
     let loading = null;
     let failed = false;
 
-    const fetchJson = (url) => (typeof fetch === "undefined"
+    const fetchJson = (url: string) => (typeof fetch === "undefined"
         ? Promise.resolve(null)
         : fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null));
 
@@ -281,7 +281,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
         if (!held?.has?.("circle")) stopPlaying();
     };
 
-    function drawCategories(ctx, H) {
+    function drawCategories(ctx: CanvasRenderingContext2D, H: number) {
         const L = SOUNDTEST_LAYOUT;
         drawText(ctx, "Select the VAB to transfer", L.heading.x, L.heading.y, { kind: 1 });
         for (let i = 0; i < SOUNDTEST_ROWS; i++) {
@@ -298,7 +298,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
         drawText(ctx, "Cross close  Start close", 16, H - 16, { kind: 3 });
     }
 
-    function drawSounds(ctx, H) {
+    function drawSounds(ctx: CanvasRenderingContext2D, H: number) {
         const L = SOUNDTEST_LAYOUT;
         const view = soundTestView(catalogue, d.cursor, d.soundCursor, d.soundScroll);
         if (!view) return;

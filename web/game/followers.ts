@@ -42,7 +42,7 @@ export function activeFollowerCount() {
 }
 
 // The manifest character record a follower renders with (party member, else the lead).
-export function followerChar(i) {
+export function followerChar(i: number) {
     const id =
         Array.isArray(state.party) && state.party[i] != null
             ? state.party[i]

@@ -27,7 +27,7 @@ export const badgeSvg = (tok: string) => (BADGES[tok] ? `<svg aria-hidden="true"
 export const hasBadge = (tok: string) => Object.prototype.hasOwnProperty.call(BADGES, tok);
 
 /** Split a run's text into [{ tok }] and [{ txt }] pieces at the game's bracket tokens ([triangle], [enter]...). */
-export function splitTokens(text) {
+export function splitTokens(text: string) {
     const out = [];
     const re = /\[[A-Za-z0-9-]+\]/g;
     let last = 0, m;

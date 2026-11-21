@@ -385,7 +385,7 @@ function projectileOps(model, donorOps, table: number | null, element: number, l
  * carried none gets them where its strike lands. Used by the borrowed-twin path, whose script is the donor's
  * own and therefore launches from the DONOR's weapon, not this model's emitter bones.
  */
-function reprojectLaunch(model, ops, element, launch: LaunchSpec = {}) {
+function reprojectLaunch(model, ops, element: number, launch: LaunchSpec = {}) {
   const src = ops.find((o) => o.op === 6 && (o.words?.[0] | 0) === 0 && (o.words?.length ?? 0) >= 8);
   const sprite = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? (src ? (src.words[1] | 0) : null);
   const launchPlan = launchPointsFor(model, { tech: launch.tech ?? null, volley: !!launch.volley, tables: launch.tables ?? null });
@@ -637,7 +637,7 @@ function spellFromBasic(model, basic, donorScript, { clip = 9, turn, giant, elem
  *   * the contacts are the technique's own (withHits), so a 1-hit spell fires one strike and a volley fires
  *     its count.
  */
-function castFromDonor(model, clip, gap, { turn, element, hits, launch = {} }) {
+function castFromDonor(model, clip: number, gap, { turn, element, hits, launch = {} }) {
   const bake = model.castBakes?.[Number(clip)];
   const table = bake?.table ?? null;
   const donorOps = turnedOps(gap.script.ops, turn);
@@ -774,7 +774,7 @@ export function scriptIsSelfCast(script) {
  *   table 0 — the idle, for a pack with neither (the pose still breathes).
  * `hold` is null for 44 (play the gesture through) and a frame count for a wind-up.
  */
-function calmBodyTable(model, row) {
+function calmBodyTable(model, row: { m: string; d: string; t: number[]; }) {
   const tail = hasTable(model, 45) ? 45 : null;
   if (hasTable(model, 44)) return { table: 44, tail, hold: null };
   // the row's own body table, the calmest of them: play its EARLY WIND-UP only, never the swing.
@@ -905,7 +905,7 @@ function solvedCastScript(model, clip: number, solved, { turn, element, hits, la
   };
 }
 
-function buildEnemyScript(model, clip, row, gap, element, hits, planted: boolean, turn, launch: LaunchSpec = {}) {
+function buildEnemyScript(model, clip: number, row: { m: string; d: string; t: number[]; }, gap, element: number, hits, planted: boolean, turn: boolean, launch: LaunchSpec = {}) {
   // the model's own body tables for this row, the ones that actually MOVE first (tableMotion)
   const body = byMotion(model, (row.t || []).filter((t: number) => hasTable(model, t)));
   // A12: an ENEMY-targeted technique may never be presented with a SELF-shaped script. The disc writes the
@@ -1102,7 +1102,7 @@ function donorPayload(model, clip: string | number, row) {
  * self-cast script — its own authored script only when that script carries no defender-facing cue,
  * never an attack body and never the Greymon last resort.
  */
-export function resolveClipScript(model, clip, opts = {}) {
+export function resolveClipScript(model: { folder: string | number; }, clip: number, opts = {}) {
   // THE HAND PICKS (dw2-picks.js): only with DW2 motion on. "dw2" plays the DW2 motion even where the
   // body owns this clip (falls through to the rule when the body has no DW2 motion for it); "dw3"
   // keeps every DW2 body away from this clip.

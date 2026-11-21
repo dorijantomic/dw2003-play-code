@@ -172,7 +172,7 @@ void main() {
 function createPipeline(canvas) {
   const gl = canvas.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
   if (!gl) return null;
-  const sh = (type, text) => {
+  const sh = (type, text: string) => {
     const s = gl.createShader(type); gl.shaderSource(s, text); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
     return s;
@@ -193,7 +193,7 @@ function createPipeline(canvas) {
     return t;
   };
   const input = newTex();
-  const scratch = (w, h, slot) => {
+  const scratch = (w: number, h: number, slot: string) => {
     const key = `${slot}:${w}x${h}`;
     if (!texs.has(key)) {
       const t = newTex();
@@ -204,7 +204,7 @@ function createPipeline(canvas) {
   };
   // one pass: read `tex` (w x h), write the `outW x outH` result into `target` (a texture, whole) or,
   // with target null, the part `tile` of it into the canvas
-  const pass = (tex, w, h, rule, outW, outH, target, blend = 0, tile = { x: 0, y: 0, w: outW, h: outH }) => {
+  const pass = (tex, w, h, rule: number, outW, outH, target, blend = 0, tile = { x: 0, y: 0, w: outW, h: outH }) => {
     gl.useProgram(prog);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? fb : null);
     if (target) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target, 0);
@@ -250,7 +250,7 @@ function createPipeline(canvas) {
   return { gl, pass, upload, scratch, filter4, max: gl.getParameter(gl.MAX_TEXTURE_SIZE) };
 }
 
-const makeCanvas = (w, h) => (typeof OffscreenCanvas !== "undefined"
+const makeCanvas = (w: number, h: number) => (typeof OffscreenCanvas !== "undefined"
   ? new OffscreenCanvas(w, h)
   : Object.assign(document.createElement("canvas"), { width: w, height: h }));
 
@@ -295,17 +295,17 @@ function pump() {
 // in sprite-filter-lab.html over the AI sample): the battle's menu, letter and result-screen sheets are drawn from their
 // xBR-blended 4x copy even when the Pixel filter is off. Same shader and cache as the Pixel filter.
 const BATTLE_UI_SHEET = /\/assets\/ui\/(pgfgc00|cmfont|stfrpt)_sheet\.png(\?|$)/;
-function battleUiFilter(image) {
+function battleUiFilter(image: HTMLImageElement) {
   try { if (window.__fx?.uisharp === false) return null; } catch { return null; }
   return BATTLE_UI_SHEET.test(image.src || "") ? "xbrblend" : null;
 }
 /** Another on-screen canvas the native images are filtered for (the many-vs-many fight's menu canvas). */
-export function registerPixelScreen(canvas) { if (canvas) screens.add(canvas); }
+export function registerPixelScreen(canvas: HTMLCanvasElement) { if (canvas) screens.add(canvas); }
 export const pixelFilterStats = new Map();     // sheet src -> filtered draws (headless checks)
 
 /** assets.js's drawImage wrapper: the 4x filtered canvas for a native <img> drawn onto the game canvas
  * in HD Remaster mode, or null (draw it as it is). The first draw queues it and draws native. */
-export function pixelFiltered(image, target) {
+export function pixelFiltered(image: CanvasImageSource, target) {
   if (!screens.has(target) || !imageMode()) return null;
   if (typeof HTMLImageElement === "undefined" || !(image instanceof HTMLImageElement)) return null;
   let name = pixelFilterName();

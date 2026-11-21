@@ -41,7 +41,7 @@ export function createPackSelectTranslated(sfx = null) {
         (directory) => PACKS[directory >>> 16] ?? null);
 
     // The walker's wizard API (web/game.js `state.packSelect`): synthesized presses.
-    const queue = (button) => { p._queue.push(button); return true; };
+    const queue = (button: string) => { p._queue.push(button); return true; };
     p.moveUp = () => queue("up");
     p.moveDown = () => queue("down");
     p.confirm = () => queue("circle");

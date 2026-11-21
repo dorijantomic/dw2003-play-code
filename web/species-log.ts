@@ -38,7 +38,7 @@ export function createSpeciesLog(storage = defaultStorage()) {
     // the `items` part belongs to web/item-log.js: read() leaves it out, write() carries it through untouched
     const keptItems = () => { try { const j = JSON.parse(storage.getItem(SPECIES_LOG_KEY) || "null"); return j && j.v === 1 && j.items && typeof j.items === "object" ? j.items : null; } catch { return null; } };
     const write = (s) => { try { const items = keptItems(); storage.setItem(SPECIES_LOG_KEY, JSON.stringify(items ? { ...s, items } : s)); } catch { /* blocked or full: the count is lost, the game goes on */ } };
-    const note = (names, field) => {
+    const note = (names, field: string) => {
         const list = (Array.isArray(names) ? names : []).filter(validName);
         if (!list.length) return false;
         const s = read();

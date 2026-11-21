@@ -26,6 +26,7 @@ import type { BattleDnaPresentation } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
 
 import type { BattleState } from "../../types/battle.js";
+import type { DigimonRecord } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeDna(B: BattleContext) {
 function playerTechs() {
@@ -150,7 +151,7 @@ function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
    * the row's own `value0` halfword -> the row the species getter [0x8005CCA0]
    * would answer for that form id. One rule for both id spaces.
    */
-  function dnaProfileRecord(reader: { read8: (addr: number) => number; read16: (addr: number) => number; }, profile) {
+  function dnaProfileRecord(reader: { read8: (addr: number) => number; read16: (addr: number) => number; }, profile: DigimonRecord) {
     const row = walkerProfileRow(reader, Number(profile?.id ?? 0));
     return row < 0 ? 0 : (DNA_SPECIES_TABLE + DNA_COMBATANT_STRIDE * row) >>> 0;
   }
@@ -199,7 +200,7 @@ function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
    * mesh is missing; the presentation falls back to the acting form for those three
    * and says nothing different about it.
    */
-  function dnaChoiceFor(rosterIndex: number, partnerProfile) {
+  function dnaChoiceFor(rosterIndex: number, partnerProfile: DigimonRecord | undefined) {
     const b = B.battle;
     const tables = B.dnaNative?.tables?.();
     if (!b || !partnerProfile || !tables) return null;
@@ -239,7 +240,7 @@ function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
    * otherwise, rather than inventing a bit-to-ailment mapping the evidence does
    * not support.
    */
-  function dnaParticipantsFor(b, rosterIndex: number) {
+  function dnaParticipantsFor(b: BattleState, rosterIndex: number) {
     const partner = b.playerRecords?.[rosterIndex];
     return {
       activeMp: Number(b.player?.mp ?? 0),
@@ -293,7 +294,7 @@ function startDnaChunk(b: BattleState, dna: BattleDnaPresentation) {
       },
       // op2 modes 1/2: slot 4 is the ENEMY (hidden for the void sequence, shown again for
       // the result attack's impact); the chunk's own slot controls the on-screen actor.
-      onVisibility: (rec) => {
+      onVisibility: (rec: { slot: number; visible: boolean; }) => {
         if (rec.slot === 4) B.renderer3d?.setEnemyVisible?.(rec.visible);
         else if (rec.slot === c.slot) B.renderer3d?.setPlayerVisible(rec.visible);
       },

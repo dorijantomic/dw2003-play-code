@@ -52,7 +52,7 @@ loadFonts();
 const chromeVersion = () => (typeof navigator !== "undefined" ? navigator.userAgent : "no navigator");
 
 /** The ONE console line when look C does not show (once per page): the exact failing check with its values. */
-function noteOff(reason, values) {
+function noteOff(reason: string, values) {
     lastReason = reason;
     if (offLogged) return;
     offLogged = true;
@@ -85,7 +85,7 @@ function coveredBy(root, rr) {
  * { reason, values }. Checks: root attached, its CSS applied (position, z-index, the --uic-ok sentinel of tokens.css), computed
  * display / visibility / opacity, a nonzero rect, the scope's own layer inside the root.
  */
-function health(key, now) {
+function health(key, now: number) {
     const last = healthAt.get(key);
     if (last !== undefined && now - last < HEALTH_MS) return null;
     healthAt.set(key, now);
@@ -168,7 +168,7 @@ export function scope(key, ctx, opts, fn) {
 export const hide = (key) => { layers.hide(key); reports.delete(key); };
 
 /** The battle covers the whole field this frame (on) or not (off): see the header. Takes the field-level layers away at once. */
-export function cover(on) {
+export function cover(on: boolean) {
     const was = covered;
     covered = !!on;
     if (!covered || was) return;

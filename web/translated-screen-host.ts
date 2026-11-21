@@ -48,7 +48,7 @@ export function createTranslatedScreenHost(owner, options: TranslatedScreenHostO
     const clearSession = options.clearSession !== false;
     const release = options.release ?? null;
 
-    function teardown(session, policy) {
+    function teardown(session, policy: string) {
         if (!session || policy === DISPOSE_NEVER) return;
         if (policy === DISPOSE_UNLESS_FINISHED) {
             if (!session.finished()) session.dispose();
@@ -57,7 +57,7 @@ export function createTranslatedScreenHost(owner, options: TranslatedScreenHostO
         session.dispose();
     }
 
-    function end(policy, notify) {
+    function end(policy: string, notify: boolean) {
         if (!owner._open) return false;
         owner._open = false;
         if (tracksPending) owner._pending = false;
@@ -91,7 +91,7 @@ export function createTranslatedScreenHost(owner, options: TranslatedScreenHostO
         },
 
         /** True while the load that captured `token` is still the newest one. */
-        current(token) {
+        current(token: number) {
             return token === owner._request;
         },
 

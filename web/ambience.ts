@@ -118,7 +118,7 @@ function save(keys = null) {
     for (const k of keys || Object.keys(fx)) if (hostRules.canSave(k)) stored[k] = fx[k];   // a key the host decides is never written to my own save
     try { localStorage.setItem(STORE_KEY, JSON.stringify(stored)); } catch { }
 }
-export function setNum(key, value) {
+export function setNum(key, value: number) {
     fx[key] = value;
     syncLegacyFlags();
     save([key]);
@@ -219,7 +219,7 @@ function scan(img) {
     return { lum: n ? lum / n : 0, grass: n ? grass / n : 0, room: rn ? room / rn : 0 };
 }
 
-function profileOf(map, mapImg) {
+function profileOf(map, mapImg: HTMLImageElement) {
     let p = profiles.get(map.id);
     if (p !== undefined) return p;
     const cls = classSource(map.id, mapImg);
@@ -265,24 +265,24 @@ window.__ambienceProfile = (id) => { const p = profiles.get(id); return p && { .
 window.__ambienceSceneAllows = (kind) => sceneAllows(String(kind));
 
 // ------------------------------------------------------------------ helpers
-function rng(seed) {
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const smooth = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
+const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
 
 // World-anchored particles: each keeps a map-pixel position and is drawn wrapped
 // onto a torus slightly larger than the view (M px margin), so the camera moving
 // never drags them along and the newly uncovered strip is already populated.
 const M = 40, DH = VIEW_H + 2 * M;
 let DW = VIEW_W + 2 * M;
-const wrapX = (x, cam) => (((x - cam + M) % DW) + DW) % DW - M;
-const wrapY = (y, cam) => (((y - cam + M) % DH) + DH) % DH - M;
+const wrapX = (x, cam: number) => (((x - cam + M) % DW) + DW) % DW - M;
+const wrapY = (y, cam: number) => (((y - cam + M) % DH) + DH) % DH - M;
 const MB = 200, DHB = VIEW_H + 2 * MB;
 let DWB = VIEW_W + 2 * MB;       // big soft shapes (dust)
-const wrapXB = (x, cam) => (((x - cam + MB) % DWB) + DWB) % DWB - MB;
-const wrapYB = (y, cam) => (((y - cam + MB) % DHB) + DHB) % DHB - MB;
+const wrapXB = (x, cam: number) => (((x - cam + MB) % DWB) + DWB) % DWB - MB;
+const wrapYB = (y, cam: number) => (((y - cam + MB) % DHB) + DHB) % DHB - MB;
 
 const wrapRange = (v, period, margin) => (((v + margin) % period) + period) % period - margin;
 // The particle tori follow the view width; true when it changed (the particles are then laid out again).
@@ -293,7 +293,7 @@ function syncViewDims() {
     return true;
 }
 // Particle counts are set for the 320 view; a wider view gets the same density.
-const wideCount = (n, big = false) => Math.round(n * (big ? DWB / (320 + 2 * MB) : DW / (320 + 2 * M)));
+const wideCount = (n: number, big = false) => Math.round(n * (big ? DWB / (320 + 2 * MB) : DW / (320 + 2 * M)));
 
 // pixels of the current map's classification picture, read once per map visit
 let pixCache = null;
@@ -339,7 +339,7 @@ const S = {
     onThunder: (ms) => thunder(fx.sound, ms, (Math.random() * 2 - 1) * 0.85),
     onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps, type, vol); },
 };
-function fillS(map, p, L, now, dt, fade, camX, camY, img, fxo = fx) {
+function fillS(map, p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo = fx) {
     S.img = img ?? S.img;
     S.feet = window.__feet || [];
     S.moving = !!(S.feet[0] && S.feet[0].moving); S.dir = S.feet[0]?.dir ?? "down";
@@ -356,7 +356,7 @@ function silenceAll() {
     setAmbience(false, {});
     setMusic(window.__bgm?.el, false, 0, 0);
 }
-function soundTick(p, L, fxo = fx) {
+function soundTick(p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, fxo = fx) {
     if (!p.open && !sceneFx) { silenceAll(); return; }
     const rain = fxo.rain ? L.rain : 0, storm = fxo.snow ? L.blizzard : 0, sandL = fxo.sand ? L.sand : 0;
     const bad = Math.max(rain, storm, sandL);
@@ -476,9 +476,9 @@ const WEIGHTS: Record<string, [string, number][]> = {
 };
 const BUCKET = 40000, FADE = 5000;
 const sessionSalt = (Math.random() * 4e9) >>> 0;
-const mix = (a, b) => (((a >>> 0) ^ Math.imul((b | 0) + 0x9e3779b9, 2654435761)) >>> 0) || 1;
+const mix = (a, b: number) => (((a >>> 0) ^ Math.imul((b | 0) + 0x9e3779b9, 2654435761)) >>> 0) || 1;
 
-function pickState(p, bucket) {
+function pickState(p, bucket: number) {
     const list = p.snowy ? WEIGHTS.snowy : p.sandy ? WEIGHTS.sandy : p.rainy ? WEIGHTS.rainy : null;
     if (!list) return "clear";
     const r = rng(mix(mix(p.seed, bucket), sessionSalt)); r(); r();
@@ -486,12 +486,12 @@ function pickState(p, bucket) {
     for (const [st, w] of list) if ((x -= w) < 0) return st;
     return "clear";
 }
-function leavesOn(p, bucket) {
+function leavesOn(p, bucket: number) {
     const r = rng(mix(mix(p.seed ^ 0x5bd1e995, bucket), sessionSalt)); r(); r();
     return r() < 0.55;
 }
 // How strongly each effect is blowing right now, 0..1, for this map.
-function levels(p, now) {
+function levels(p, now: number) {
     const L = { rain: 0, snow: 0, blizzard: 0, sand: 0, leaves: 0 };
     // A quest scene's own atmosphere (see the block below): exactly what it asked for, however this map is profiled.
     const sc = sceneFx;
@@ -506,7 +506,7 @@ function levels(p, now) {
         else if (w === "leaves" && sceneAllows("leaves")) L.leaves = k;
         return L;
     }
-    const add = (k, w) => { if (k in L) L[k] += w; };
+    const add = (k: string, w: number) => { if (k in L) L[k] += w; };
     const force = window.__weatherForce;
     if (typeof force === "string") {
         for (const s of force.split("+")) add(s, 1);
@@ -545,7 +545,7 @@ let lastSceneRev = -1;
 let flashUntil = 0;          // a cued lightning flash keeps the ambience layer drawing for its 0.6 s
 
 /** True when a scene effect must draw although the map's own profile would not have it. */
-const sceneAllows = (kind) => !!sceneFx && (sceneFx.force || fx[kind] !== false);
+const sceneAllows = (kind: string) => !!sceneFx && (sceneFx.force || fx[kind] !== false);
 const sceneEase = (k) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
 
 /** The map's profile as this frame must read it. The same object when no scene override is on. */
@@ -635,7 +635,7 @@ export function setAmbienceScene(spec) {
 }
 
 /** Advance the scene override's fades (game.js calls this once a frame). */
-export function tickAmbienceScene(dt) {
+export function tickAmbienceScene(dt: number) {
     const sc = sceneFx;
     if (!sc) return;
     const frames = Math.max(0, Number(dt) || 0) * 60;
@@ -702,7 +702,7 @@ window.__battleAtmos = () => {
     const phase = todPhaseNow();
     return { ...lastAtmos, phase, rgb: todColor(phase), thunder: () => thunder(fx.sound, 900, (Math.random() * 2 - 1) * 0.6) };
 };
-export function ambienceFor(map, mapImg, camX, camY) {
+export function ambienceFor(map, mapImg, camX: number, camY: number) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p) return null;
@@ -921,7 +921,7 @@ export function ambienceFor(map, mapImg, camX, camY) {
 
 // ------------------------------------------------- bodies: look, reflection, crowd
 let lastBody = 0;
-function bodyFxTick(map, p, L, now) {
+function bodyFxTick(map, p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number) {
     const dt = Math.min(0.1, lastBody ? (now - lastBody) / 1000 : 0);
     lastBody = now;
     tickWet(fx.rain ? L.rain : 0, dt);
@@ -955,7 +955,7 @@ export function swayFor(map, mapImg) {
 
 // The ground layer (puddles, footprints, dust, ripples): drawn after the map, under the sprites.
 let lastG = 0;
-export function groundFxFor(map, mapImg, camX, camY) {
+export function groundFxFor(map, mapImg, camX: number, camY: number) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     const p = profileOf(map, mapImg);
     if (!p || !p.open) return null;
@@ -1026,13 +1026,13 @@ let photoOn = false, recorder = null, recChunks = [], toastEl = null, toastTimer
 function gameCanvas() {
     return [...document.querySelectorAll<HTMLCanvasElement>("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null && !isBattleLayer(c)) || null;
 }
-function toast(msg, ms = 2600) {
+function toast(msg: string, ms = 2600) {
     if (!toastEl) return;
     toastEl.textContent = msg; toastEl.style.opacity = "1";
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = "0"; }, ms);
 }
 function stamp() { return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19); }
-function download(blob, name) {
+function download(blob: Blob, name: string) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click();
@@ -1072,7 +1072,7 @@ export function toggleRecord() {
     toast("Recording... press F10 to stop", 3500);
     return true;
 }
-function setPhoto(on) {
+function setPhoto(on: boolean) {
     photoOn = on;
     const header = document.querySelector("header");
     if (header) header.style.display = on ? "none" : "";
@@ -1093,7 +1093,7 @@ function refreshPanel() {
     if (!panel || panel.hidden || !dev || !dev.isBuilt()) return;
     dev.sync();
 }
-export function installFxPanel(stageEl) {
+export function installFxPanel(stageEl: HTMLElement | null) {
     if (panel || !stageEl || SHIPPED) return;      // installed copy: no F2 panel, no gear, no F2 / F8-F10 keys
     const css = document.createElement("style");
     css.textContent = `

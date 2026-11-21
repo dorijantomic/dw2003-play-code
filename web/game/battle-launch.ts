@@ -93,7 +93,7 @@ export function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, 
     return true;
 }
 
-async function mpPracticeRandom(mapId, x, y) {
+async function mpPracticeRandom(mapId, x: number, y: number) {
     const a = await battle.rollEncounter(mapId, x, y);
     if (!a) return;
     const b = await battle.rollEncounter(mapId, x, y);
@@ -102,7 +102,7 @@ async function mpPracticeRandom(mapId, x, y) {
 
 // EXPERIMENT (multiplayer co-op): a wild fight while teamed up spawns two Digimon from the same area's pool; the partner is
 // invited to the same fight and the enemy's HP is shared. If the roll finds nothing there is no fight, as usual.
-async function mpCoopRandom(mapId, x, y) {
+async function mpCoopRandom(mapId, x: number, y: number) {
     coopRolling(true);
     try {
         const a = await battle.rollEncounter(mapId, x, y);
@@ -114,7 +114,7 @@ async function mpCoopRandom(mapId, x, y) {
     } finally { coopRolling(false); }
 }
 
-export function triggerRandomEncounter(mapId, x, y) {
+export function triggerRandomEncounter(mapId, x: number, y: number) {
     // EXPERIMENT (mounts): a wild fight always starts on foot.
     mountForceDismount();
     if (

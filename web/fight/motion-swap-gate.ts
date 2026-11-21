@@ -103,7 +103,7 @@ const ROT_STEP = (A: number[], B: number[]) => {
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const unit = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 const angleDeg = (a: number[], b: number[]) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * 180 / Math.PI;
-const pick = (a, n: number) => (a.length <= n ? a.slice() : Array.from({ length: n }, (_, k) => a[Math.round(((a.length - 1) * k) / (n - 1))]));
+const pick = (a: number[], n: number) => (a.length <= n ? a.slice() : Array.from({ length: n }, (_, k) => a[Math.round(((a.length - 1) * k) / (n - 1))]));
 /** The frames a timeline table plays, in order (0x8000+ entries are LOOP markers, not frames). */
 export function playedFrames(model, table: number) {
   const out = [];
@@ -410,12 +410,12 @@ export function swapLadder(target, source, clip, kind, {
 }
 
 // the ladder's default candidates, in the order they are tried
-function bakeRole(target, source, clip, offset, ik, method: string) {
+function bakeRole(target, source, clip, offset: number, ik: boolean, method: string) {
   const bake: RetargetBake = bakeRetargetByRole(target, source, clip, { offset, ik });
   if (bake) { bake.source = source; bake.method = method; bake.ik = ik; }
   return bake;
 }
-function bakeGeometry(target, source, clip, offset, method: string) {
+function bakeGeometry(target, source, clip, offset: number, method: string) {
   const bake: RetargetBake = bakeRetargetGeometry(target, source, clip, { offset });
   if (bake) { bake.source = source; bake.method = method; }
   return bake;

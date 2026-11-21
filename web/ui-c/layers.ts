@@ -65,7 +65,7 @@ const KIND_LAYER = { text: "text", type: "under" };
 export const NO_BLEED = new Set(["text", "type", "chevron", "icon", "bar", "corners", "bracket", "balloon", "ring", "dock", "pop", "node", "svg-nb"]);
 
 /** A page rect (relative to the root) as a CSS inset() over the root's `limit` box. */
-export const clipInset = (c, limit: { width: number; height: number; }) => {
+export const clipInset = (c: { left: number; top: number; right: number; bottom: number; width: number; height: number; }, limit: { width: number; height: number; }) => {
     const r = Math.max(0, limit.width - c.left - c.width), b = Math.max(0, limit.height - c.top - c.height);
     return `inset(${Math.max(0, c.top)}px ${r}px ${b}px ${Math.max(0, c.left)}px)`;
 };

@@ -88,7 +88,7 @@ const skyBall = async () => { const g = new THREE.Group(), m = new THREE.Mesh(ne
 const cat = { sand: "Sand (dry)", wet: "Sand (wet) and shoreline", shelly: "Sand (shelly, gravel)", terr: "Dunes and shore terrain", ocean: "Ocean and surf", dg: "Dune grass", shrub: "Beach shrubs and sea grape",
   succ: "Succulents and ground cover", palm: "Palms", pine: "Coastal pine", drift: "Driftwood", shell: "Shells", weed: "Seaweed and wrack", rock: "Coastal rocks", cliff: "Cliffs and sea stacks",
   pool: "Tide pools", peb: "Pebbles", rtex: "Rock textures", sky: "Sky" };
-const tex = (ids, c: string) => ids.map(([id, n]) => texDisc(id, c, n));
+const tex = (ids: string[][], c: string) => ids.map(([id, n]) => texDisc(id, c, n));
 const prox = (id: string, c: string, name: string | undefined, make, extra = {}) => proc(id, c, name, make, extra);
 const palmEntry = (kind: string | undefined, seed: number | undefined, name: string) => prox(`palm_${kind}_${seed}`, cat.palm, name, async () => part(B.palmParts(kind, seed, 0)), { url: "web/biome/beachproc.js palmParts" });
 const driftPH = (id: string, name: string, t = {}, e = {}) => ph(id, cat.drift, { name, t: { grade: true, tint: [1.28, 1.22, 1.1], ...t }, e });
@@ -194,7 +194,7 @@ function dart(n: number, seed: number, minD: number, ok, xr = [-HALF, HALF], zr 
   return out;
 }
 /** seeded rejection scatter on beachH. prob(x,z) -> 0..1. o: scale [a,b], y offset, tilt (random up to), tiltFix (always), sy (vertical stretch) */
-function bscatter(n: number, seed: number, area, prob, o: ScatterOpts = {}) {
+function bscatter(n: number, seed: number, area: number[], prob, o: ScatterOpts = {}) {
   const r = rng(seed), [cx, cz, hw, hd] = area, out = new Float32Array(n * 16), sc = o.scale || [0.9, 1.2]; let i = 0, tries = 0;
   while (i < n && tries++ < n * 80) {
     const x = cx + (r() * 2 - 1) * hw, z = cz + (r() * 2 - 1) * hd; if (r() > prob(x, z)) continue;
@@ -227,7 +227,7 @@ export async function buildBeach(ctx) {
   note("tide pool water", POOLS.length, null);
 
   // ---- helpers for instanced species
-  const add = (name, parts, n: number, prob, o: SpeciesAddOpts = {}) => {
+  const add = (name: string, parts, n: number, prob, o: SpeciesAddOpts = {}) => {
     const s = bscatter(n, name.length * 31 + n, o.area || [0, 55, HALF, 68], (x: number, z: number) => (nearPool(x, z) ? 0 : prob(x, z)), o);
     const g = o.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name); g.name = name; root.add(g); note(name, s.count, parts);
     if (o.colors) for (const im of g.children) { const r = rng(5); for (let i = 0; i < s.count; i++) im.setColorAt(i, o.colors[Math.floor(r() * o.colors.length)]); im.instanceColor.needsUpdate = true; }

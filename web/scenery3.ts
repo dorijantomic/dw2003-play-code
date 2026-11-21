@@ -11,26 +11,26 @@ import { lampPoints, windowRects } from "./scenery2.js";
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
 const VIEW_H = 240;
 
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const smooth = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
-function rng(seed) {
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
 let id3 = null, r3 = Math.random, built3 = false;
-let nl = null, nlx = null;
+let nl: HTMLCanvasElement | null = null, nlx: CanvasRenderingContext2D | null = null;
 let lens = [], nextLens = 0;
 let rings3 = [], nextRing = 0;
-let frogs = [], lizards = [], gulls = [], bats = [];
+let frogs = [], lizards: { x: number | undefined; y: number | undefined; vx: number; vy: number; until: number; dash: number; face: number; }[] = [], gulls: { cx: number; cy: number; rx: number; ry: number; sp: number; ph: number; flap: number; }[] = [], bats: { x: number; y: number; vx: number; vy: number; ph: number; home: number[]; }[] = [];
 
-export function resetScenery3(map, p) {
+export function resetScenery3(map, p: { seed: number; }) {
     id3 = map.id; built3 = false; r3 = rng(p.seed ^ 0x51ed270b);
     lens = []; rings3 = []; frogs = []; lizards = []; gulls = []; bats = [];
     nextLens = 0; nextRing = 0;
 }
 
-function scatterOn(S, count, test, tries = 90) {
+function scatterOn(S, count: number, test: ((r: number, g: number, b: number) => boolean) | ((r: number, g: number, b: number) => boolean), tries = 90) {
     const px = S.pix();
     if (!px) return [];
     const out = [];
@@ -45,8 +45,8 @@ function build(S) {
     const { p } = S;
     if (!S.pix()) return;
     built3 = true;
-    if (p.swamp) frogs = scatterOn(S, 7, (r, g, b) => g > 70 && g > r * 1.12 && g > b * 1.08 && g < 190).map(([x, y]) => ({ x, y, hx: x, hy: y, hop: 0, until: 0, dir: 1, croak: 0 }));
-    if (p.sandy) lizards = scatterOn(S, 6, (r, g, b) => r > 140 && g > 100 && b < 120 && r > b + 50).map(([x, y]) => ({ x, y, vx: 0, vy: 0, until: 0, dash: 0, face: 1 }));
+    if (p.swamp) frogs = scatterOn(S, 7, (r: number, g: number, b: number) => g > 70 && g > r * 1.12 && g > b * 1.08 && g < 190).map(([x, y]) => ({ x, y, hx: x, hy: y, hop: 0, until: 0, dir: 1, croak: 0 }));
+    if (p.sandy) lizards = scatterOn(S, 6, (r: number, g: number, b: number) => r > 140 && g > 100 && b < 120 && r > b + 50).map(([x, y]) => ({ x, y, vx: 0, vy: 0, until: 0, dash: 0, face: 1 }));
     if (p.coast) {
         const cx = p.w * (0.35 + r3() * 0.3), cy = p.h * (0.35 + r3() * 0.3);
         gulls = Array.from({ length: 3 }, (_, i) => ({ cx, cy, rx: 110 + r3() * 90, ry: 50 + r3() * 40, sp: 0.16 + r3() * 0.08, ph: i * 2.1 + r3(), flap: r3() * 6 }));
@@ -65,7 +65,7 @@ function drawNightLight(ctx, S) {
     nlx.fillStyle = `rgba(5,9,28,${(0.5 * dark * fade).toFixed(3)})`;
     nlx.fillRect(0, 0, VIEW_W, VIEW_H);
     nlx.globalCompositeOperation = "destination-out";
-    const hole = (x, y, rad, a) => {
+    const hole = (x: number, y: number, rad: number, a: number) => {
         const g = nlx.createRadialGradient(x, y, 0, x, y, rad);
         g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.55, `rgba(0,0,0,${(a * 0.6).toFixed(3)})`); g.addColorStop(1, "rgba(0,0,0,0)");
         nlx.fillStyle = g; nlx.fillRect(x - rad, y - rad, rad * 2, rad * 2);

@@ -39,7 +39,7 @@ export function createItemLog(storage = defaultStorage()) {
         return { v: 1, met: {}, beaten: {}, owned: {} };
     };
     const read = () => { const i = readRaw().items; return { owned: cleanSet(i?.owned), seen: cleanSet(i?.seen) }; };
-    const note = (field, ids) => {
+    const note = (field: string, ids) => {
         const list = (Array.isArray(ids) ? ids : []).map(Number).filter(validId);
         if (!list.length) return false;
         const raw = readRaw();

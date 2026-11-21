@@ -127,7 +127,7 @@ export function plan(pctx) {
     return itemsFrom(out);
   }
   const geoRm = (sh) => { const k = 1 / (sh.H0 + sh.HR / 2); return sh.Rm * k; };   // cypressGeometry's userData.Rm
-  const partName = (name, pi) => (pi ? (pi > 1 ? "core" + pi : "core") : name);
+  const partName = (name: string, pi) => (pi ? (pi > 1 ? "core" + pi : "core") : name);
   const ringSlot = (name: string, label: string, items: BuiltSlotItem, colours) => ({
     id: "trees." + name, label, kind: name === "shrub" ? "bush" : "tree", layer: "ring_" + name, parent: group, default: "mod." + (name === "shrub" ? "shrub" : "cypress_" + name),
     items, data: { colours },

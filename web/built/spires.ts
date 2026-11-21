@@ -901,7 +901,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   let nan = null;
   /** Non-finite vertices of a geometry's position (and normal): the numbers that used to slip through unseen.
    *  A NaN in `position` also makes computeBoundingSphere() return NaN, which is what the console reported. */
-  function nanCount(geo) {
+  function nanCount(geo: THREE.BufferGeometry) {
     const a = geo.attributes.position?.array, b = geo.attributes.normal?.array;
     let pos = 0, nor = 0;
     if (a) for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) pos++;

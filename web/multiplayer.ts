@@ -23,6 +23,7 @@ import { createChatQueue } from "./chat-queue.js";
 import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
 import { pickRules } from "./host-rules.js";
+import type { GameState } from "./game/types.js";
 import type { MultiplayerUi, MpListener, MpTimer } from "./types/multiplayer.js";          // the host's battle settings every guest plays by
 
 const PORT = 20031;             // the relay's port on the host's computer
@@ -51,7 +52,7 @@ const mp = {
 const listeners = new Set<MpListener>();
 /** fn(type, data): "status" | "roster" | "chat" {id,name,text,self,mark} | "chatstate" {mark} | "feed" {id,name,kind,text} | "sys" {text} | "trade" {...} */
 export const mpOn = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
-const emit = (type, data = {}) => { for (const f of [...listeners]) { try { f(type, data); } catch (e) { console.warn("[multiplayer]", e); } } };
+const emit = (type: string, data = {}) => { for (const f of [...listeners]) { try { f(type, data); } catch (e) { console.warn("[multiplayer]", e); } } };
 
 export const isOnline = () => mp.status === "online";
 export const myId = () => mp.id;
@@ -71,7 +72,7 @@ export const peerHere = (id) => { const p = mp.peers.get(id); return p && !p.awa
 export const playingCount = () => [...mp.peers.values()].filter((p) => !p.away).length + 1;
 
 /** What a friend typed ("25.1.2.3", "25.1.2.3:20031", "ws://...") -> a WebSocket address, or null. */
-function wsAddress(text) {
+function wsAddress(text: string) {
     let h = String(text ?? "").trim().replace(/^(wss?|https?):\/\//i, "").replace(/\/.*$/, "");
     if (!/^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(h)) return null;
     if (!h.includes(":")) h += ":" + PORT;
@@ -132,7 +133,7 @@ function sendRules() {
     if (sendRaw({ t: "rules", rules })) mp.rulesSent = json;
 }
 
-function setStatus(s, text?: string) { mp.status = s; render(text); emit("status", { status: s }); }
+function setStatus(s: string, text?: string) { mp.status = s; render(text); emit("status", { status: s }); }
 
 /** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE", key?: seat key } */
 export function connect(want) {
@@ -325,7 +326,7 @@ function resetChatQueue() {
     for (const meta of chatQ.reset()) { meta.queued = false; meta.dropped = true; emit("chatstate", { mark: meta }); }
 }
 
-export function sendEmote(i) {
+export function sendEmote(i: number) {
     sendRaw({ t: "emote", e: i });
     mp.me.emote = EMOTES[i] ?? ""; mp.me.emoteIx = i; mp.me.emoteUntil = performance.now() + 2500;
 }
@@ -357,7 +358,7 @@ export const sendLeague = (o) => serverChampOn() ? sendRaw({ t: "lg", ...o }) : 
 
 // ------------------------------------------------------------ every frame
 /** Called from the game's render loop: just remembers where I am. Sending runs on a timer so a hidden window still says "I am here". */
-export function multiplayerTick(mapId, st) {
+export function multiplayerTick(mapId, st: GameState) {
     const now = performance.now();
     const dt = Math.min(0.1, (now - (mp.lastTick || now)) / 1000);
     mp.lastTick = now;
@@ -434,7 +435,7 @@ export function drawGhostLabel(ctx, g, sx, headY) {
 
 // ------------------------------------------------------------ the panel
 let toastEl = null, toastTimer: MpTimer = 0;
-function toast(text) {
+function toast(text: string) {
     if (!toastEl) return;
     toastEl.textContent = text; toastEl.style.opacity = "1";
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = "0"; }, 2200);
@@ -516,7 +517,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     const placeBadge = () => { badge.style.top = (hudEl && hudEl.offsetHeight ? hudEl.offsetTop + hudEl.offsetHeight + 4 : 8) + "px"; };
     if (hudEl && typeof ResizeObserver === "function") new ResizeObserver(placeBadge).observe(hudEl);
     placeBadge();
-    const $ = (id): HTMLElement => panel.querySelector("#" + id) as HTMLElement;
+    const $ = (id: string): HTMLElement => panel.querySelector("#" + id) as HTMLElement;
     mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") } as MultiplayerUi;
     mp.defaultName = defaultName;               // the first multiplayerTick uses it for the page-start rejoin
     EMOTES.forEach((t, i) => {

@@ -39,7 +39,7 @@ export function enemySwitchTarget(kind: number) {
  *   -2/-3/-4: slot 0/1/2, unless its id equals the active slot's id (:17,:25,:33 break), when it has hp;
  *   else (-5): the slots != active with id != 0 and hp != 0; none -> -1, one -> it, two -> found[rand() & 1].
  */
-export function pickEnemySwitch(slots, active: number, target: number, rand: () => number) {
+export function pickEnemySwitch(slots: { id: number; speciesId: number; hp: number; }[], active: number, target: number, rand: () => number) {
   const at = (i: number) => slots?.[i] ?? { id: 0, hp: 0 };
   const named = target === -2 ? 0 : target === -3 ? 1 : target === -4 ? 2 : -1;
   if (named >= 0) {
@@ -66,7 +66,7 @@ export function enemySelfTagPick(move: { action: number; }, slots: { id: number;
 }
 
 /** The slot the next enemy comes from after a KO (menu.c:1088-1096): the lowest with an id and hp, -1 for none. */
-export function firstAliveEnemySlot(slots) {
+export function firstAliveEnemySlot(slots: { id: number; speciesId: number; hp: number; }[]) {
   for (let i = 0; i < 3; i++) {
     if ((slots?.[i]?.id ?? 0) !== 0 && (slots[i].hp ?? 0) !== 0) return i;
   }

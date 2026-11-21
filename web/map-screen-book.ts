@@ -27,7 +27,7 @@ interface MapScreenBookArgs {
 /** `data()` = { maps, scenes, seen(id), currentId } read when the book opens (web/game.js). */
 export function createMapScreenBook({ sfx = null, data }: MapScreenBookArgs = {} as MapScreenBookArgs) {
     const model = createMapScreenModel({ ...data(), box: { w: MAP_BOX.w, h: MAP_BOX.h } });
-    const cue = (result) => { if (result) sfx?.play?.("system02"); };
+    const cue = (result: string | null) => { if (result) sfx?.play?.("system02"); };
     const dirs = ["up", "down", "left", "right"];
     return {
         windows: ["title", "list", "help"],
@@ -50,7 +50,7 @@ export function createMapScreenBook({ sfx = null, data }: MapScreenBookArgs = {}
             const P = MAP_PANEL;
             withFold(ctx, pl, P.pivot[0], P.pivot[1], "x", () => drawPanel(ctx, P.x, P.y, P.cols, P.bands));
             if (pl >= 1) {
-                const at = (id) => { const p = model.position(id); return p ? [MAP_BOX.x + p.x, MAP_BOX.y + p.y] : null; };
+                const at = (id: string) => { const p = model.position(id); return p ? [MAP_BOX.x + p.x, MAP_BOX.y + p.y] : null; };
                 const seenOf = new Map(model.nodes().map((n) => [n.id, n.seen]));
                 const here = model.currentId(), cur = model.cursor();
                 // [x0, y0, x1, y1, both ends seen] per link; inside a look C scope the links and boxes are handed over as parts

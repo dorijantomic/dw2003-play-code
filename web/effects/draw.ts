@@ -220,7 +220,7 @@ function prepareEffects(stageId: string, view = null) {
 /** The cull rect for a draw call's camera: the visible map-pixel window, the
  *  walker's stand-in for the 0x1002 layer's screen rect (ctx+0x128).  No view
  *  dimensions (a caller without a camera) -> null, and nothing is culled. */
-function viewRect(camX: number, camY, viewW: number, viewH: number, pad = 0) {
+function viewRect(camX: number, camY: number, viewW: number, viewH: number, pad = 0) {
     // `pad`: the HD Remaster wide overworld's extra map pixels on each side (web/field-view.js).
     return viewW > 0 && viewH > 0
         ? { x: camX - pad, y: camY, w: viewW + 2 * pad, h: viewH }
@@ -246,7 +246,7 @@ export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageI
 // them. Coordinates are map-space; ctx is already camera-translated by the
 // caller passing camX/camY. Records at UNDER_MAP_BUCKET and above were already
 // painted by drawEffectsUnderMap and are skipped here.
-export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables, viewW: number, viewH: number, pad = 0) {
+export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], viewW: number, viewH: number, pad = 0) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
         : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
@@ -302,7 +302,7 @@ export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX:
 // Walk one prepared frame's live records, handing each one a painter bound to
 // this context and camera. Both passes share it so they cannot disagree about
 // which records are live or where they are.
-function eachRecord(f, ctx, camX: number, camY: number, visit) {
+function eachRecord(f, ctx: CanvasRenderingContext2D | null, camX: number, camY: number, visit) {
     const { s, rt, sheet, semiSheet } = f;
     for (let i = 0; i < s.records.length; i++) {
         const r = s.records[i];
@@ -372,7 +372,7 @@ export function drawFireTrapBursts(ctx: CanvasRenderingContext2D | null, stageId
 // stage atlas the point records use, so a rock is blitted with the same blend
 // handling and y-sorts at its own y exactly as the native drawSprite path did.
 // `entries` are {clip, x, y} in map coordinates.
-export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables, entries) {
+export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], entries) {
     const s = S.data?.[stageId];
     if (!s || !entries?.length) return;
     const sheet = Object.keys(s.sprites).length ? ensureSheet(stageId) : null;
@@ -400,7 +400,7 @@ export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, sta
 //   setScale(-0x1000, ...)  → x-flip until the next drawSprite
 //   drawSprite(sub, spriteId, x, y) → stage-atlas sprite at map coords (x,y)
 // (the s780 cars). Sprites y-sort at their own y so entities walk around them.
-export function drawNativeIntents(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables) {
+export function drawNativeIntents(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     const native = nativeStage(stageId);
     const s = S.data?.[stageId];
     if (!native || !s) return;

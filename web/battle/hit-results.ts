@@ -19,6 +19,7 @@ import { techRecordAccuracy } from "../tech-record.js";
 import { S } from "./state.js";
 import { MSG, MSG_KIND } from "./messages.js";
 
+import type { FightTechRow } from "../types/battle.js";
 // ── Combat resolvers (module-level so they are headless-portable + unit-testable).
 // Closure-independent combat helpers. Ailment application and turn-start lifecycle delegate
 // to engine/dw3/battle-combat.ts so the browser does not carry a second implementation.
@@ -97,7 +98,7 @@ export function chooseResultLine({ record = null, multiHit = false, instantDeath
 }
 
 /** The evasion page: the defender's name on line one, `esmfight[0x1d]` "Evade!" on line two. */
-export function evadePageSpec(name) {
+export function evadePageSpec(name: string | null) {
   return battleMessagePage(MSG_KIND.OUTCOME, { index: MSG.EVADE, name });
 }
 
@@ -112,7 +113,7 @@ export function evadePageSpec(name) {
  * ordinary attack had no plate. Naming is the caller's: the player's confirm passes
  * the player's name, the enemy's action passes the enemy's.
  */
-export function attackPageSpec(name) {
+export function attackPageSpec(name: string) {
   return battleMessagePage(MSG_KIND.OUTCOME, { index: MSG.ATTACK, name });
 }
 
@@ -220,7 +221,7 @@ export const processTurnStart = engineProcessTurnStart;
  * power, element, accuracy byte (+0x06), family and scalar. Category 4 (375, full restore
  * + cure all) is a heal, so `restore` is true and the resolver is never entered.
  */
-export function dnaResultAttack(resultId: number, rec, fallbackTech, elementName: string) {
+export function dnaResultAttack(resultId: number, rec: FightTechRow | null, fallbackTech: { mp: number; power: number; category: number; element: number; clip: number; }, elementName: string) {
   const category = rec?.category ?? fallbackTech?.category;
   return {
     restore: (category | 0) === 4,

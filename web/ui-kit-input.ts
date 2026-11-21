@@ -37,7 +37,7 @@ export function createKitInput() {
             return act;
         },
         /** `dt` seconds of real time: one Set of acting buttons per displayed frame that is due. */
-        advance(dt, held) { return clock.advance(dt).map((frame) => api.step(held, frame.tick)); },
+        advance(dt: number, held: Set<string>) { return clock.advance(dt).map((frame) => api.step(held, frame.tick)); },
     };
     return api;
 }

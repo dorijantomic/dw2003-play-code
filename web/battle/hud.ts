@@ -13,12 +13,14 @@ import { BATTLE_UI_LAYOUT } from "../battle.js";
 import { DV_GAUGE_MAX, normalizeDvGauge } from "./layout.js";
 import type { EnemyBattleRecord } from "../types/battle.js";
 
+import type { BattleState } from "../types/battle.js";
+import type { PlayerRecord } from "../types/battle.js";
 /**
  * The pgfgc00 cel each party pip must draw, straight from the decoded HUD rule
  * (FIGHTSTG_F0x800934f0): the pip picture IS the member's state — cel 0xC+state
  * for the side's active slot, 0x3C+state otherwise. `null` = no member there.
  */
-export function partyPipCels(b) {
+export function partyPipCels(b: BattleState) {
   const records = b?.playerRecords ?? [];
   const active = b?.activePlayerIndex ?? 0;
   const player = [];
@@ -80,7 +82,7 @@ export function enemyMsgName(en: EnemyBattleRecord, fallback = "Enemy") {
   return enemyMessageName(en, record, battleHudNameBankSync(), fallback);
 }
 
-export function battleHudPlateLabelsFor(b) {
+export function battleHudPlateLabelsFor(b: BattleState) {
   const activePlayerIndex = b.activePlayerIndex ?? 0;
   const activeEnemyIndex = b.enemySlot ?? 0;
   const playerName = String(b.playerRoster?.[activePlayerIndex]?.name ?? b.player?.profile?.name ?? "");
@@ -148,7 +150,7 @@ export function commandPhaseWaitsForLine(line, state: number) {
 // the fighter will have after the pending change, then tells the fight stage to latch that
 // fighter's resting pose to the hurt one (1) or the normal one (0). Applies to both sides.
 // See docs/research/fight-3d/original-fight-engine.md.
-export function lowHpStance(c) {
+export function lowHpStance(c: PlayerRecord | EnemyBattleRecord | { hp: number; maxHp: number; }) {
   const max = Number(c?.maxHp ?? 0), hp = Number(c?.hp ?? 0);
   return max > 0 && hp > 0 && hp <= Math.trunc(max / 4);
 }
@@ -161,7 +163,7 @@ export function lowHpStance(c) {
 // HP; every other fighter and phase keeps the quarter-HP rule. Claims
 // wfightmn-endweakness-and-weaken-chain-2026-10-10 (verified), BATTLE-C009,
 // low-hp-resting-stance-threshold-2026-08-19.
-export function fighterBaseStance(b, side: string) {
+export function fighterBaseStance(b: BattleState, side: string) {
   if (side === "enemy" && battleKindOf(b) === 6) return !!b?._bossPhaseDone;
   return lowHpStance(side === "enemy" ? b?.enemy : b?.player);
 }

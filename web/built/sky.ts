@@ -64,7 +64,7 @@ import type { BuiltSkyState } from "./types.js";
 
 const RING_MAX = S.SKY_RING_MAX;   // profile points the shader takes
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const arr = (c) => [c.r, c.g, c.b];
+const arr = (c: THREE.Color) => [c.r, c.g, c.b];
 
 // ---------------- night (PICKED numbers: nothing night-lit is measured yet) ----------------
 export const NIGHT = {
@@ -117,12 +117,12 @@ export function skyMode(rec, force = "auto") {
 }
 
 // ---------------- the star map: one texel per star, the three tiers in R / G / B ----------------
-const starHash = (seed) => {
+const starHash = (seed: number) => {
   let s = (seed >>> 0) || 1;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 };
 /** Texel (i, j) centre -> unit direction: the inverse of the shader's uv (u = atan2(z,x)/2pi + 0.5, v = asin(y)/pi + 0.5). */
-export function starTexelDir(i, j, W, H) {
+export function starTexelDir(i: number, j: number, W: number | undefined, H: number | undefined) {
   const u = (i + 0.5) / W, v = (j + 0.5) / H;
   const az = (u - 0.5) * 2 * Math.PI, el = (v - 0.5) * Math.PI;
   return [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
@@ -130,7 +130,7 @@ export function starTexelDir(i, j, W, H) {
 /** Bake the three tiers into one RGBA8 equirect texture. One star = one texel, unique across tiers. No star is
  *  placed where the moon disc has any light (the moon stands in front of the stars): a texel is skipped when its
  *  centre is within the disc's outer edge (asin(1.06 r), where skyMoon() reaches 0) plus one texel diagonal. */
-function bakeStars(seed, W, H, tiers, moon = null, moonR = 0) {
+function bakeStars(seed: number, W: number | undefined, H: number | undefined, tiers: { n: number; mag: number; tint: number[]; }[], moon = null, moonR = 0) {
   const data = new Uint8Array(W * H * 4), used = new Uint8Array(W * H), rnd = starHash(seed);
   const jMin = Math.ceil((0.5 + NIGHT.STAR_MIN_EL / 180) * H), jMax = H - 2;
   const texDiag = Math.hypot(2 * Math.PI / W, Math.PI / H);
@@ -443,11 +443,11 @@ const CLOUD_FRAG = /* glsl */`
   }`;
 
 // ---------------- STEP 1: the banks ----------------
-const cloudRng = (seed) => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
+const cloudRng = (seed: number) => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 /** The directions the baked sky visibility is measured in: a small fixed cosine-weighted hemisphere — one straight up,
  *  four at 40 deg and four at 72 deg. Fixed, so a bank bakes to the same numbers every time. */
 const AO_DIRS = (() => {
-  const out = [], add = (el, az, w) => out.push([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el), w]);
+  const out = [], add = (el: number, az: number, w: number) => out.push([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el), w]);
   add(Math.PI / 2, 0, 1.7);
   for (let i = 0; i < 4; i++) add(40 * Math.PI / 180, i * Math.PI / 2 + 0.4, 1.0);
   for (let i = 0; i < 4; i++) add(72 * Math.PI / 180, i * Math.PI / 2 + 1.15, 0.55);
@@ -455,15 +455,15 @@ const AO_DIRS = (() => {
 })();
 /** The height at radius rc that stands at the same elevation, seen from the ring's centre, as the ring's own point
  *  at band share f — the same projection the old puffs used, so a bank stands where the ring's cloud band stood. */
-const atR = (sky, f, rc) => { const y = sky.ymin + f * (sky.ymax - sky.ymin); return y * rc / Math.max(ringRJS(y), 1); };
+const atR = (sky, f: number, rc: number) => { const y = sky.ymin + f * (sky.ymax - sky.ymin); return y * rc / Math.max(ringRJS(y), 1); };
 
 /** One bank's lobes, in the bank's own frame (x across the ring, y up from the base plane, z in and out): a heap of
  *  soft puffs — piles of overlapping lobes that narrow as they rise, broad lobes lying ON the base plane, a few small
  *  puffs crowning each pile (the lumpy billowy edge) and shoulders that close the gaps into one mass. */
-function bankLobes(spec, rnd) {
+function bankLobes(spec: { az: number; rc: number; W: number; D: number; H: number; base: number; top: number; wid: number; }, rnd: () => number) {
   const SH = CLOUDS.SHAPE, { W, D, H } = spec, out = [];
-  const jit = (a) => (rnd() - 0.5) * 2 * a;
-  const add = (x, y, z, r) => { if (r > 0) out.push({ x, y, z, r }); };
+  const jit = (a: number) => (rnd() - 0.5) * 2 * a;
+  const add = (x: number, y: number, z: number, r: number) => { if (r > 0) out.push({ x, y, z, r }); };
   const nP = SH.PILES[0] + Math.floor(rnd() * (SH.PILES[1] - SH.PILES[0] + 1));
   for (let j = 0; j < nP; j++) {
     const fx = nP === 1 ? 0 : ((j + 0.5) / nP) * 2 - 1;           // -1..1 across the bank
@@ -509,8 +509,8 @@ function bankLobes(spec, rnd) {
 
 /** Three separable [1,2,1] passes over the grid: the bake grid's staircase and any single-cell spike go, the shape
  *  (and the flat base, to within a cell) stays. */
-function blur3(F, nx, ny, nz) {
-  const n = F.length, T = new Float32Array(n), at = (i, j, k) => (k * ny + j) * nx + i;
+function blur3(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: number) {
+  const n = F.length, T = new Float32Array(n), at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
     T[at(i, j, k)] = (F[at(Math.max(0, i - 1), j, k)] + 2 * F[at(i, j, k)] + F[at(Math.min(nx - 1, i + 1), j, k)]) * 0.25;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
@@ -524,7 +524,7 @@ function blur3(F, nx, ny, nz) {
  *  -gradient normals are the ones the rest of this file already agrees with), unioned with a smooth maximum so two
  *  lobes flow into one another with a fillet instead of meeting in a crease, plus one low-frequency warp, then cut by
  *  the FLAT BASE plane. Nothing here can make a thin finger: a lobe is a lobe. */
-function bankField(spec, rnd) {
+function bankField(spec: { az: number; rc: number; W: number; D: number; H: number; base: number; top: number; wid: number; }, rnd: () => number) {
   const V = CLOUDS.VOXEL, { H } = spec, SH = CLOUDS.SHAPE, Wp = CLOUDS.WARP;
   const lobes = bankLobes(spec, rnd);
   // the bank must stay inside the ring's measured band: if a crown puff pokes above the bank's own top, sink the lot
@@ -538,9 +538,9 @@ function bankField(spec, rnd) {
   const pad = 2 * V, cut = 0.35 * V, gx0 = x0 - pad, gy0 = 0, gz0 = z0 - pad;
   const nx = Math.ceil((x1 - x0 + 2 * pad) / V) + 1, nz = Math.ceil((z1 - z0 + 2 * pad) / V) + 1;
   const ny = Math.ceil((H + pad) / V) + 1;
-  const F = new Float32Array(nx * ny * nz).fill(-1e9), at = (i, j, k) => (k * ny + j) * nx + i;
+  const F = new Float32Array(nx * ny * nz).fill(-1e9), at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   // Inigo Quilez's polynomial smooth minimum, mirrored into a smooth MAXIMUM: a fillet of width k where two lobes meet
-  const smax = (a, b, k) => { const h = Math.min(1, Math.max(0, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
+  const smax = (a: number | undefined, b: number, k: number) => { const h = Math.min(1, Math.max(0, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
   for (const L of lobes) {
     const k = L.r * SH.SMELL, R = L.r + k;
     const i0 = Math.max(0, Math.floor((L.x - R - gx0) / V)), i1 = Math.min(nx - 1, Math.ceil((L.x + R - gx0) / V));
@@ -579,8 +579,8 @@ function bankField(spec, rnd) {
 }
 
 /** Trilinear sample of a grid, clamped at its edges. */
-function gridSampler(F, nx, ny, nz, x0, y0, z0, V) {
-  const at = (i, j, k) => (k * ny + j) * nx + i;
+function gridSampler(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: number, x0: number, y0: number, z0: number, V: number) {
+  const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   return (x, y, z) => {
     let fx = (x - x0) / V, fy = (y - y0) / V, fz = (z - z0) / V;
     let i = Math.floor(fx), j = Math.floor(fy), k = Math.floor(fz);
@@ -590,7 +590,7 @@ function gridSampler(F, nx, ny, nz, x0, y0, z0, V) {
     const k0 = Math.min(Math.max(k, 0), nz - 1), k1 = Math.min(k + 1, nz - 1);
     const a = at(i0, j0, k0), b = at(i1, j0, k0), c = at(i0, j1, k0), d = at(i1, j1, k0);
     const e = at(i0, j0, k1), f = at(i1, j0, k1), g = at(i0, j1, k1), h = at(i1, j1, k1);
-    const s = (p, q, t) => p + (q - p) * t;
+    const s = (p, q, t: number) => p + (q - p) * t;
     return s(s(s(F[a], F[b], fx), s(F[c], F[d], fx), fy), s(s(F[e], F[f], fx), s(F[g], F[h], fx), fy), fz);
   };
 }
@@ -603,7 +603,7 @@ function bankSurface(f) {
   const { F, nx, ny, nz, x0, y0, z0, V } = f, ISO = 0;
   const cnx = nx - 1, cny = ny - 1, cnz = nz - 1;
   const cellV = new Int32Array(cnx * cny * cnz).fill(-1);
-  const cAt = (i, j, k) => (k * cny + j) * cnx + i;
+  const cAt = (i: number, j: number, k: number) => (k * cny + j) * cnx + i;
   const pos = [], idx = [];
   const EX = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
   const V8 = new Float32Array(8);
@@ -626,7 +626,7 @@ function bankSurface(f) {
     cellV[cAt(i, j, k)] = pos.length / 3;
     pos.push(x0 + (i + sx / n) * V, y0 + (j + sy / n) * V, z0 + (k + sz / n) * V);
   }
-  const quad = (a, b, c, d, flip) => {
+  const quad = (a: number | undefined, b: number | undefined, c: number | undefined, d: number | undefined, flip: boolean) => {
     if (a < 0 || b < 0 || c < 0 || d < 0) return;
     if (flip) { const t = b; b = d; d = t; }   // [a,b,c,d] -> [a,d,c,b]: the SAME quad, wound the other way
     idx.push(a, b, c, a, c, d);
@@ -670,7 +670,7 @@ export function buildCloudBanks(sky) {
     // and count how much of the sky the cloud's own mass covers. This is the whole of the cloud's self-shadowing —
     // the crease between two lobes and the underside of a tower go dark, an outer lobe stays open to the sky.
     const reach = CLOUDS.AO.LEN * spec.H * CLOUDS.SHAPE.R_PUFF;   // how far the sky is sampled: a puff radius and a half
-    const ao = (x, y, z, nx, ny, nz) => {
+    const ao = (x, y, z, nx: number, ny: number, nz: number) => {
       // a frame with +z along the normal (any up will do: pick the world axis the normal is least aligned with)
       let ux, uy, uz;
       if (Math.abs(ny) < 0.9) { ux = -nz; uy = 0; uz = nx; } else { ux = 1; uy = 0; uz = 0; }
@@ -738,7 +738,7 @@ function createClouds(scene, sky, c, worldScale) {
   // how far the picked blue-greys follow this arena's own sky hue (the ring's measured bottom colour, unit brightness)
   const ringC = S.srgb(c.bottom || c.all), ringL = Math.max(0.2126 * ringC.r + 0.7152 * ringC.g + 0.0722 * ringC.b, 1e-4);
   const hue = [ringC.r / ringL, ringC.g / ringL, ringC.b / ringL].map((v) => Math.min(1.9, Math.max(0.55, v)));
-  const mixHue = (col) => {
+  const mixHue = (col: number[]) => {
     const s = S.srgb(col.map((v) => Math.round(v * 255)));
     return new THREE.Color(s.r * (1 + (hue[0] - 1) * L.SKY_TINT), s.g * (1 + (hue[1] - 1) * L.SKY_TINT),
                            s.b * (1 + (hue[2] - 1) * L.SKY_TINT));
@@ -760,7 +760,7 @@ function createClouds(scene, sky, c, worldScale) {
   // the ring is in recipe units: follow the arena group's scale (set before this frame's draw, as the dome's eye is)
   mesh.onBeforeRender = () => { const s = worldScale() || 1; if (mesh.scale.x !== s) { mesh.scale.setScalar(s); mesh.updateMatrixWorld(); } };
   scene.add(mesh);
-  const s8 = (col) => col.clone().convertLinearToSRGB().toArray().map((v) => Math.round(v * 255));
+  const s8 = (col: THREE.Color) => col.clone().convertLinearToSRGB().toArray().map((v) => Math.round(v * 255));
   return { mesh, material: mat, info: {
     banks: M.banks.length, triangles: M.tris, vertices: M.verts, list: M.banks,
     lobes: M.banks.reduce((a, b) => a + b.lobes, 0), meshes: 1,
@@ -772,9 +772,9 @@ function createClouds(scene, sky, c, worldScale) {
 
 // ---------------- JS twins (same maths as the GLSL above) ----------------
 const U = S.U;
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const lumaA = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smooth = (a: number, b: number, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const lumaA = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 const n2 = (x, z) => { const L = Math.hypot(x, z); return [x / L, z / L]; };
 /** sakura skyGradient(), linear RGB [r, g, b], for a unit direction [x, y, z]. */
 export function skyGradientJS(rd) {
@@ -868,7 +868,7 @@ export function ringRJS(y) {
   return a.y;
 }
 export function ringHitYJS(d, eye = SKY_U.uRingEye.value) {
-  const g = (t) => Math.hypot(eye.x + t * d[0], eye.z + t * d[2]) - ringRJS(eye.y + t * d[1]);
+  const g = (t: number) => Math.hypot(eye.x + t * d[0], eye.z + t * d[2]) - ringRJS(eye.y + t * d[1]);
   const T = SKY_U.uRingT.value;
   if (g(0) >= 0 || g(T) < 0) return -1e9;
   let lo = 0, hi = T;
@@ -878,7 +878,7 @@ export function ringHitYJS(d, eye = SKY_U.uRingEye.value) {
 
 // ---------------- colours: measured, then the two stops solved so the finished sky gives them ----------------
 /** Solve uHorizon / uZenith so skyRadiance(horizon dir) = horizon target and skyRadiance(up) = zenith target. */
-function calibrate(tH, tZ, dirH) {
+function calibrate(tH, tZ, dirH: (number | undefined)[]) {
   const H = SKY_U.uHorizon.value, Z = SKY_U.uZenith.value;
   H.setRGB(tH[0], tH[1], tH[2]); Z.setRGB(tZ[0], tZ[1], tZ[2]);
   for (let i = 0; i < 60; i++) {
@@ -891,16 +891,16 @@ function calibrate(tH, tZ, dirH) {
 }
 
 // ---------------- baked tiling noise (sakura's layout: R height, GB gradient of a blurred copy, A warp) ----------------
-function bakeNoise(seed, N, billow) {
-  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+function bakeNoise(seed: number, N: number, billow: boolean) {
+  const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
   const perms = Array.from({ length: 12 }, (_, k) => S.makePerm(seed * 31 + k + 1));
-  const val = (u, v, p, perm) => {   // value noise, period p cells over the tile (u, v in [0, 1))
+  const val = (u: number, v: number, p: number, perm: Uint8Array<ArrayBuffer> | undefined) => {   // value noise, period p cells over the tile (u, v in [0, 1))
     const x = u * p, y = v * p, ix = Math.floor(x), iy = Math.floor(y), fx = fade(x - ix), fy = fade(y - iy);
-    const h = (i, j) => perm[(perm[((i % p) + p) % p] + (((j % p) + p) % p)) & 255] / 255;
+    const h = (i: number, j: number) => perm[(perm[((i % p) + p) % p] + (((j % p) + p) % p)) & 255] / 255;
     const a = h(ix, iy), b = h(ix + 1, iy), c = h(ix, iy + 1), d = h(ix + 1, iy + 1);
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
   };
-  const fbm = (u, v, p0, oct, o0, bil) => {
+  const fbm = (u: number, v: number, p0: number, oct: number, o0: number, bil: boolean) => {
     let s = 0, a = 0.5, n = 0;
     for (let k = 0; k < oct; k++) { const q = val(u, v, p0 << k, perms[o0 + k]); s += a * (bil ? Math.abs(2 * q - 1) : q); n += a; a *= 0.5; }
     return s / n;
@@ -933,7 +933,7 @@ function bakeNoise(seed, N, billow) {
     gy[j * N + i] = (B[((j + 1) % N) * N + i] - B[((j - 1 + N) % N) * N + i]) * N / 2;
     G = Math.max(G, Math.abs(gx[j * N + i]), Math.abs(gy[j * N + i]));
   }
-  const px = new Uint8Array(N * N * 4), b8 = (x) => Math.max(0, Math.min(255, Math.round(x * 255)));
+  const px = new Uint8Array(N * N * 4), b8 = (x: number | undefined) => Math.max(0, Math.min(255, Math.round(x * 255)));
   for (let k = 0; k < N * N; k++) {
     px[k * 4] = b8(He[k]); px[k * 4 + 1] = b8(0.5 + gx[k] / (2 * G)); px[k * 4 + 2] = b8(0.5 + gy[k] / (2 * G)); px[k * 4 + 3] = b8(Ae[k]);
   }
@@ -1022,8 +1022,8 @@ export function buildSky(slot, ctx) {
     SKY_U.uBandFade.value = BAND.FADE_SHARE * (sky.ymax - sky.ymin);
     SKY_U.uBandGlowK.value = night.mode === "night" ? 1 : BAND.GLOW_K;   // at night the halo is the moon's (picked)
     for (const [k, v] of Object.entries(BAND.CLOUDS)) SKY_U[k].value = v;
-    const err = (h, t) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]))); };
-    const y = (f) => sky.ymin + f * (sky.ymax - sky.ymin);
+    const err = (h, t: number[]) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]))); };
+    const y = (f: number) => sky.ymin + f * (sky.ymax - sky.ymin);
     residual = Math.max(err(y(S.BAND_BOTTOM_SHARE), tH), err(y(0.5), tM), err(y(0.875), tT));
   } else {
     SKY_U.uBandMix.value = 0; SKY_U.uSkyClAmt.value = 0; SKY_U.uBandGlowK.value = 0;

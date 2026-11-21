@@ -25,6 +25,7 @@ import type { BattlePartyEntry } from "./types.js";
 
 import type { GameState } from "../../game/types.js";
 import type { RosterMember, BattleState } from "../../types/battle.js";
+import type { DigimonRecord } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeRecords(B: BattleContext) {
 // Build one enemy combat record from an encounter entry (enemyId name/id, level, and the
@@ -397,9 +398,9 @@ function applyEvolution(toName: string | number, state = B.getState(), rosterInd
   function availableEvolutions(state: GameState, rosterIndex: number = 0) {
     const member = partyFormState(state, rosterIndex);
     if (!member?.stats) return [];
-    const out = [];
+    const out: { to: string; formId: number; equipped: boolean; }[] = [];
     const seen = new Set();
-    const add = (prof, entry: { to: null; equipped: boolean; }) => {
+    const add = (prof: DigimonRecord | null | undefined, entry: { to: null; equipped: boolean; }) => {
       if (!prof || seen.has(prof.id) || out.length >= 3) return;
       seen.add(prof.id);
       out.push({ ...entry, to: prof.name, formId: prof.id });

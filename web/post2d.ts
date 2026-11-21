@@ -66,7 +66,7 @@ export function installPost2d(stageEl, gameCanvas) {
     function init() {
         gl = ov.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false });
         if (!gl) { failed = true; return false; }
-        const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        const sh = (type: number, src: string) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
         try {
             prog = gl.createProgram();
             gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));

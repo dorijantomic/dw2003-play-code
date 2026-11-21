@@ -55,7 +55,7 @@ export async function loadPlaceCardTranslated() {
 }
 
 /** The scene id the shipped table gives a walker map id, or null. */
-export function placeCardScene(mapId) {
+export function placeCardScene(mapId: string) {
     return data?.stages?.[mapId]?.scene ?? null;
 }
 

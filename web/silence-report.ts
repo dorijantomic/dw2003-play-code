@@ -34,6 +34,7 @@
 import { packedIsMusicStart, packedKey } from "./packed-sound.js";
 import type { CoverageTables } from "./types/silence-report.js";
 
+import type { SfxManifest } from "./types/silence-report.js";
 /** Music-start words whose stem is named after the record (build_music.py's jingles). */
 export const START_WORDS = Object.freeze({
     "0x60040002": "demo_bgm",   // common SEP seq 2, DEMO_BGM
@@ -73,7 +74,7 @@ function wordOf(id: string) {
 }
 
 /** The packed ids a built manifest holds, lowercased, so a catalogue row can ask it. */
-function idsOf(rows) {
+function idsOf(rows: SfxManifest | undefined) {
     const out = new Set();
     for (const meta of Object.values(rows ?? {}) as any[]) if (meta?.id) out.add(lower(meta.id));
     return out;

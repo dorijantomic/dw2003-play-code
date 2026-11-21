@@ -65,7 +65,7 @@ export function createChoice(sfx = null) {
   };
 
   // The move branch: set the cursor, and blip only when the value moved.
-  const move = (next) => {
+  const move = (next: number) => {
     if (!ch.isOpen()) return;
     const target = Math.max(0, Math.min(ch.options.length - 1, next));
     if (target === ch.cursorIdx) return; // clamped: no sound, no reposition

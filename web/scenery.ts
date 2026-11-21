@@ -10,17 +10,18 @@
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+import type { AmbienceSettings } from "./types/ambience.js";
 const VIEW_H = 240;
 
 // ------------------------------------------------------------------ helpers
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const smooth = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
-function rng(seed) {
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
-const isGrassPx = (r, g, b) => g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
-const isWaterPx = (r, g, b) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
+const isGrassPx = (r: number, g: number, b: number) => g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
+const isWaterPx = (r: number, g: number, b: number) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
 
 // ------------------------------------------------------------- time of day
 // Keyframes over one cycle: [phase, rgb]. Drawn as a multiply layer, so white = no change.
@@ -29,12 +30,12 @@ const TOD: [number, number[]][] = [
     [0.64, [255, 150, 86]], [0.77, [150, 132, 196]], [0.89, [255, 196, 148]], [1.00, [255, 255, 255]],
 ];
 const TOD_SECONDS = 240;
-export function todColor(phase) {
+export function todColor(phase: number) {
     for (let i = 1; i < TOD.length; i++) {
         if (phase <= TOD[i][0]) {
             const [p0, c0] = TOD[i - 1], [p1, c1] = TOD[i];
             const k = smooth((phase - p0) / (p1 - p0));
-            return c0.map((v, j) => Math.round(v + (c1[j] - v) * k));
+            return c0.map((v: number, j: string | number) => Math.round(v + (c1[j] - v) * k));
         }
     }
     return [255, 255, 255];
@@ -46,7 +47,7 @@ export function cueBolt(now = performance.now()) { bolt = { t0: now }; }
 
 // --------------------------------------------------------------- per-map state
 let sc = null;               // state of the map being shown
-let tmp = null;              // scratch canvas for the heat shimmer
+let tmp: HTMLCanvasElement | null = null;              // scratch canvas for the heat shimmer
 let flock = null, nextFlock = 0;
 let nextBolt = 0, bolt = null;
 let wet = 0;                 // how soaked the ground is, 0..1
@@ -54,7 +55,7 @@ let todLight = 1;            // 1 in daylight, lower toward dusk
 let steps = [], puffs = [], ripples = [];
 let lastStep = null, nextPuff = 0, stepSide = 1;
 
-export function resetScenery(map, p, S) {
+export function resetScenery(map, p: { seed: number; }, S) {
     const r = rng(p.seed ^ 0x2545f491);
     sc = { id: map.id, built: false };
     const W = S.DWB, H = S.DHB;
@@ -74,7 +75,7 @@ export function resetScenery(map, p, S) {
 
 // positions that need a pixel look-up (butterflies, sparkles, puddles) are built
 // the first frame the map's pixels are readable
-function scatter(S, count, test, tries = 80) {
+function scatter(S, count: number, test, tries = 80) {
     const px = S.pix();
     if (!px) return [];
     const out = [];
@@ -92,22 +93,22 @@ function build(S) {
     sc.built = true;
     const r = sc.rand;
     sc.flies = p.butterflies
-        ? scatter(S, 26, (R, G, B) => isGrassPx(R, G, B)).map(([x, y]) => ({
+        ? scatter(S, 26, (R: number, G: number, B: number) => isGrassPx(R, G, B)).map(([x, y]) => ({
             x, y, ax: 25 + r() * 45, ay: 14 + r() * 26, fx: 0.25 + r() * 0.35, fy: 0.3 + r() * 0.4, ph: r() * 6.28,
             col: ["#ff9a3c", "#fff2c2", "#6fb7ff", "#ffd23f", "#f78fb3"][(r() * 5) | 0],
         })) : [];
     sc.sparkles = p.snowy
-        ? scatter(S, 340, (R, G, B) => R > 170 && G > 195 && B > 210).map(([x, y]) => ({ x, y, ph: r(), sp: 0.25 + r() * 0.5 })) : [];
+        ? scatter(S, 340, (R: number, G: number, B: number) => R > 170 && G > 195 && B > 210).map(([x, y]) => ({ x, y, ph: r(), sp: 0.25 + r() * 0.5 })) : [];
     sc.puddlesDone = false; sc.iceDone = false;
 }
-function buildPuddles(S, grid) {
+function buildPuddles(S, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
     sc.puddlesDone = true;
     const r = sc.rand;
-    const walk = (x, y) => {
+    const walk = (x: number, y: number) => {
         const c = (x / grid.cell) | 0, rr = (y / grid.cell) | 0;
         return c >= 0 && rr >= 0 && c < grid.cols && rr < grid.rows && grid.cells[rr * grid.cols + c] === 0;
     };
-    sc.puddles = scatter(S, 46, (R, G, B, x, y) => !isGrassPx(R, G, B) && !isWaterPx(R, G, B) && walk(x, y))
+    sc.puddles = scatter(S, 46, (R: number, G: number, B: number, x: number, y: number) => !isGrassPx(R, G, B) && !isWaterPx(R, G, B) && walk(x, y))
         .map(([x, y]) => ({ x, y, rx: 6 + r() * 12, ph: r() * 6.28 }));
 }
 
@@ -117,7 +118,7 @@ function buildPuddles(S, grid) {
 // themselves (a lamp lights the wall, instead of adding white on top of the night tint).
 let revealer = null;
 export const setReveal = (r) => { revealer = r; };
-let snapC = null;
+let snapC: HTMLCanvasElement | null = null;
 function takeSnap(ctx) {
     const cv = ctx.canvas;
     if (!snapC || snapC.width !== cv.width || snapC.height !== cv.height) { snapC = document.createElement("canvas"); snapC.width = cv.width; snapC.height = cv.height; }
@@ -133,7 +134,7 @@ function drawIndoorMood(ctx, S) {
     const snap = revealer && revealer.wants(S) ? takeSnap(ctx) : null;
     ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = fade;
     // full mood in a dark room, fading to nothing as the room gets brighter (see indoorK in ambience.js)
-    const d = 1 - 0.33 * S.p.indoorK, c = (v) => Math.round(255 * Math.max(0, Math.min(1, v)));
+    const d = 1 - 0.33 * S.p.indoorK, c = (v: number) => Math.round(255 * Math.max(0, Math.min(1, v)));
     ctx.fillStyle = `rgb(${c(d + 0.005)},${c(d - 0.011)},${c(d + 0.09)})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     const vg = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.7);
     vg.addColorStop(0, "rgba(14,10,36,0)"); vg.addColorStop(1, `rgba(14,10,36,${(0.35 * S.p.indoorK).toFixed(3)})`);
@@ -328,7 +329,7 @@ export function drawScenery(ctx, S) {
 const ents = new Map();          // body id -> { last, side, nextPuff, nextFoot }
 let splashDrops = [];
 
-function groundType(S, f, puddle, inWater) {
+function groundType(S, f: { y: number; x: number; }, puddle, inWater) {
     if (inWater) return "water";
     if (puddle) return "puddle";
     const { p } = S;
@@ -347,14 +348,14 @@ function groundType(S, f, puddle, inWater) {
     return "stone";
 }
 
-function buildIce(S, grid) {
+function buildIce(S, grid: { cell: number; cols: number; rows: number; cells: number[]; }) {
     sc.iceDone = true;
     const r = sc.rand;
-    const walk = (x, y) => {
+    const walk = (x: number, y: number) => {
         const c = (x / grid.cell) | 0, rr = (y / grid.cell) | 0;
         return c >= 0 && rr >= 0 && c < grid.cols && rr < grid.rows && grid.cells[rr * grid.cols + c] === 0;
     };
-    sc.ice = scatter(S, 30, (R, G, B, x, y) => R > 150 && G > 175 && B > 195 && walk(x, y))
+    sc.ice = scatter(S, 30, (R: number, G: number, B: number, x: number, y: number) => R > 150 && G > 175 && B > 195 && walk(x, y))
         .map(([x, y]) => ({ x, y, rx: 8 + r() * 14, ph: r() * 6.28, rot: (r() - 0.5) * 0.4 }));
 }
 
@@ -497,5 +498,5 @@ export function darkness(p, fx, now) {
 }
 
 // how soaked the ground and everyone on it is, 0..1: rain wets it, it dries slowly
-export function tickWet(rain, dt) { wet = clamp01(wet + (rain > 0.15 ? rain * dt / 14 : -dt / 75)); }
+export function tickWet(rain: number, dt: number) { wet = clamp01(wet + (rain > 0.15 ? rain * dt / 14 : -dt / 75)); }
 export const wetLevel = () => wet;

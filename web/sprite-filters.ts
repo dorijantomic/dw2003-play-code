@@ -25,11 +25,11 @@ export function nearest4(src) {
 }
 
 // generic 2x pass over packed RGBA (Uint32), clamp-to-edge neighbours
-function pass2x(src, rule) {
+function pass2x(src: ImageData, rule) {
   const w = src.width, h = src.height;
   const px = new Uint32Array(src.data.buffer.slice(0));
   const out = new ImageData(w * 2, h * 2), o = new Uint32Array(out.data.buffer);
-  const at = (x, y) => px[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+  const at = (x: number, y: number) => px[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const [j, k, l, m] = rule(at, x, y);
     o[(2 * y) * 2 * w + 2 * x] = j; o[(2 * y) * 2 * w + 2 * x + 1] = k;
@@ -39,7 +39,7 @@ function pass2x(src, rule) {
 }
 
 // Scale2x / EPX (A. Mazzoleni): the classic edge rule
-function epxRule(at, x, y) {
+function epxRule(at, x: number, y: number) {
   const B = at(x, y - 1), D = at(x - 1, y), E = at(x, y), F = at(x + 1, y), H = at(x, y + 1);
   if (B !== H && D !== F) {
     return [D === B ? D : E, B === F ? F : E, D === H ? D : E, H === F ? F : E];
@@ -50,8 +50,8 @@ function epxRule(at, x, y) {
 // MMPX (McGuire & Gagiu 2021, MIT), ported from the Rust port (mmpx crate 0.2.0, MIT) with every
 // neighbour read per pixel (the port reads P and S once per row).  luma = Rec.709 like the port, in integers
 // (x10000) so gpu-pixel-filter.js makes exactly the same comparisons.
-function luma(c) { return 2126 * (c & 255) + 7152 * ((c >>> 8) & 255) + 722 * ((c >>> 16) & 255); }
-function mmpxRule(at, x, y) {
+function luma(c: number) { return 2126 * (c & 255) + 7152 * ((c >>> 8) & 255) + 722 * ((c >>> 16) & 255); }
+function mmpxRule(at, x: number, y: number) {
   const A = at(x - 1, y - 1), B = at(x, y - 1), C = at(x + 1, y - 1);
   const D = at(x - 1, y), E = at(x, y), F = at(x + 1, y);
   const G = at(x - 1, y + 1), H = at(x, y + 1), I = at(x + 1, y + 1);
@@ -109,14 +109,14 @@ export async function ensureXbr() {
   if (!xbr4x) xbr4x = (await import("https://cdn.jsdelivr.net/npm/xbr-js@2.0.1/dist/xBRjs.esm.js" as string)).xbr4x;
   return xbr4x;
 }
-export function xbr(src, blendColors) {
+export function xbr(src: ImageData, blendColors: boolean) {
   const view = new Uint32Array(src.data.buffer.slice(0));
   const outPx = xbr4x(view, src.width, src.height, { blendColors, scaleAlpha: true });
   return new ImageData(new Uint8ClampedArray(outPx.buffer), src.width * 4, src.height * 4);
 }
 
-export const epx4 = (s) => pass2x(pass2x(s, epxRule), epxRule);
-export const mmpx4 = (s) => pass2x(pass2x(s, mmpxRule), mmpxRule);
+export const epx4 = (s: ImageData) => pass2x(pass2x(s, epxRule), epxRule);
+export const mmpx4 = (s: ImageData) => pass2x(pass2x(s, mmpxRule), mmpxRule);
 
 // ── game side: a loaded native sheet -> a 4x Image, cached per sheet and filter ─────────────────
 const cache = new WeakMap();          // native image -> Map(filter -> Promise<Image>)

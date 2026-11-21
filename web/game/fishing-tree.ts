@@ -154,7 +154,7 @@ export function fishingSpriteMeta() {
  * latches a clip asks here, so the fishing cast, the ladder, the slope step and
  * the tree kick all reach their pack by the same table instead of by name.
  */
-export function playerPackMeta(packId) {
+export function playerPackMeta(packId: string) {
     return state.manifest.npcs?.find((n) => n.id === packId);
 }
 
@@ -240,7 +240,7 @@ function fieldPointOccupied(m, px, py) {
  * band (`terrainGateBlocks`; only Submarimon carries a height, actor+0x64).
  * Returns the vector to SUBTRACT (F0x8008de0c's arg3/arg4).
  */
-export function fieldStepObstaclePush(m, grid, x, y, magnitudeFixed, heightFixed) {
+export function fieldStepObstaclePush(m, grid, x: number, y: number, magnitudeFixed, heightFixed) {
     return fieldProbePushback(
         fieldDirectionIndex(state.dir),
         magnitudeFixed,
@@ -299,7 +299,7 @@ export function tryTreeKick() {
  * 0x49 owns his input for exactly as long as clip 8 runs (31 ticks authored;
  * see the unresolved 31/28/27 note in engine/systems/tree-kick.ts).
  */
-export function advanceTreeKick(ticks) {
+export function advanceTreeKick(ticks: number) {
     const mapId = currentMap().id;
     const stage = treeStage(mapId);
     for (let t = 0; t < ticks; t++) {

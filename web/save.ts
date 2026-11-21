@@ -248,7 +248,7 @@ export function buildRecord(state, opts: SaveRecordOpts = {}) {
   // ("Central Sector  Asuka City" -- both "Central Sector" and "Asuka City"
   // are esstarea entries). An exact hit wins; otherwise the LAST contained
   // entry wins, which picks the trailing, more specific component.
-  const bankIndex = (bank, name) => {
+  const bankIndex = (bank, name: string | undefined) => {
     if (!name) return 0;
     const entries = bank ?? [];
     const exact = entries.indexOf(name);

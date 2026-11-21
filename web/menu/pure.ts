@@ -67,7 +67,7 @@ export function mapHoldSpeed(framesHeld: number | undefined, C = { speed_initial
 }
 
 /** A walker map id ("s205", 205) as the key the decoded walker_map table uses. */
-const stageKey = (stage) => String(Number(String(stage ?? "").replace(/\D/g, "")) || 0);
+const stageKey = (stage: string) => String(Number(String(stage ?? "").replace(/\D/g, "")) || 0);
 
 export function mapPs1Id(state: GameState, ui = MS.UI) {
   const walkerStage = stageKey(state?.manifest?.maps?.[state?.mapIdx]?.id);
@@ -87,7 +87,7 @@ export const mapSeenFlag = (ps1: number | undefined) => 0x2000 | (ps1 & 0xff);
  *  engine's banked store — the same store the field entry writes. Without one (the
  *  ui-lab and the unit tests, where no engine exists) the old saved list is read
  *  instead; nothing writes that list any more, so it only ever holds an old save. */
-export function visitedPs1Stages(state, ui = MS.UI, hasFlag = null) {
+export function visitedPs1Stages(state: GameState, ui = MS.UI, hasFlag = null) {
   const walker = ui?.screens?.map?.walker_map ?? {};
   const seen = new Set();
   if (hasFlag) {

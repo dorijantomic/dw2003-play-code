@@ -179,7 +179,7 @@ export function applyStoryCommand(command) {
 // 17/16 and their close lists clear the pair, which is what makes a challenge
 // one-shot: without these writes the challenge state stays the only reachable
 // one and the NPC re-challenges forever (the walker's pre-fix behaviour).
-export function applyCardDuelCloseHousekeeping(won) {
+export function applyCardDuelCloseHousekeeping(won: boolean) {
     for (const write of cardDuelCloseWrites(won === true)) storyFlags.set(write.id, write.value);
 }
 
@@ -226,7 +226,7 @@ export function buildScriptedBattleIndex(content) {
     const idx = {};
     for (const st of content.stages || []) {
         const mid = st.mapId;
-        const eventOf = (id) => (st.events || []).find((e) => e.id === id);
+        const eventOf = (id: string) => (st.events || []).find((e) => e.id === id);
         const scriptOf = (id) => (st.scripts || []).find((s) => s.id === id);
         for (const be of st.events || []) {
             if (!/\.sb\.battle(\.|$)/.test(be.id)) continue;

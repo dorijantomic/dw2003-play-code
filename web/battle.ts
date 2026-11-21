@@ -236,6 +236,8 @@ import { makeHud } from "./battle/core/hud.js";
 import { makeReport } from "./battle/core/report.js";
 import { makeDraw } from "./battle/core/draw.js";
 import type { BattleContext } from "./types/battle.js";
+import type { GameState } from "./game/types.js";
+import type { BattleState } from "./types/battle.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export {
   BATTLE_COMMANDS,
@@ -456,7 +458,7 @@ export { scaledStat, scaledHp, scaledMp, evolvedMaxStats };
 export { damageTermCategory4Arm as category4ArmFor };
 
 export { AILMENT_INFLICT };
-export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
+export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D | null, getState: () => GameState, sfx = null, bgm = null) {
   const B = {} as BattleContext;
   B.canvas = canvas;
   B.ctx = ctx;
@@ -839,7 +841,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
  * shared point the three player→enemy damage sites now call — never a per-battle special
  * case. Its regression test is tests/battle-special-mode.test.js.
  */
-export function finalizePlayerDamage(b, total) {
+export function finalizePlayerDamage(b: BattleState, total) {
   const mode = b.specialMode ?? 0;
   if (!mode) return total;
   return specialModeDamage(mode, true, b.enemy.hp, b.enemy.maxHp, total, 1);

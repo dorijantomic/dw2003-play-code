@@ -20,7 +20,7 @@ import { MAX_DESC_LINES, createItemsModel, itemPage, whereVisible } from "./glos
 import { drawItemIcon } from "./itemicons.js";
 import { artHook } from "./ui-c/capture.js";
 
-const rect = (x, y, cols, bands) => ({ x, y, w: cols * 40, h: panelPixelHeight(bands), cols, bands });
+const rect = (x: number, y: number, cols: number, bands: number) => ({ x, y, w: cols * 40, h: panelPixelHeight(bands), cols, bands });
 export const GLOSSARY_LAYOUT = Object.freeze({
     list: rect(0, 40, 4, 7),            // 160 x 140: the counts line, then 8 species rows
     model: rect(164, 40, 4, 3),         // 160 x 84 (to y 124)
@@ -41,7 +41,7 @@ export const PAGE2 = Object.freeze({
 });
 const ELEMENT_LABELS = new Set(["Resists", "Weak to"]);
 const ICON_ELEMENTS = new Set(["fire", "water", "ice", "wind", "thunder", "machine", "dark"]);
-const iconsWidth = (n) => n * PAGE2.iconPitch - (PAGE2.iconPitch - PAGE2.iconW);
+const iconsWidth = (n: number) => n * PAGE2.iconPitch - (PAGE2.iconPitch - PAGE2.iconW);
 
 /**
  * Lines (glossary-digimon pageTwoLines) to drawable rows. A bar is one row (a long label is split into the bar label and a note
@@ -92,14 +92,14 @@ const TABS = ["DIGIMON", "ITEMS", "PLACES"];
 const HINT = "R1 Strength";
 
 /** The counts line fitted to `maxW` px: the double space first gives way to one, and only then is the text cut. */
-export function fitCounts(text, widthOf, maxW) {
+export function fitCounts(text: string, widthOf, maxW: number) {
     if (widthOf(text) <= maxW) return text;
     const tight = text.replace(/ {2,}/g, " ");
     return widthOf(tight) <= maxW ? tight : fitByWidth(tight, widthOf, maxW);
 }
 
 /** Card text lines for page 1: title, the level line (when there is one), then the record wrapped over the rows left. */
-export function cardLines({ title, row1, record }, widthOf, maxW, rows) {
+export function cardLines({ title, row1, record }, widthOf, maxW: number, rows: number) {
     const out = [fitByWidth(title, widthOf, maxW)];
     if (row1) out.push(fitByWidth(row1, widthOf, maxW));
     const left = rows - out.length;
@@ -142,7 +142,7 @@ export function createGlossaryBook({ sfx = null, getSpecies, getLog, getPartners
     const cue = (ok) => { if (ok) sfx?.play?.("system02"); return ok; };
     // ---- ITEMS section
     const plain = (s) => textWidth(s);
-    const descOf = (text) => (text ? wrapToLines(text, plain, ITEMS_LAYOUT.textRight - ITEMS_LAYOUT.textX, MAX_DESC_LINES) : []);
+    const descOf = (text: string) => (text ? wrapToLines(text, plain, ITEMS_LAYOUT.textRight - ITEMS_LAYOUT.textX, MAX_DESC_LINES) : []);
     const itemIds = (it) => { try { return it.ids(); } catch { return []; } };
     function actItems(buttons) {
         if (buttons.has(WORD.prev)) { section = SECTION_DIGIMON; sfx?.playPacked?.(SFX_CLOSE); const d = data(); if (d && model) show(d); return; }

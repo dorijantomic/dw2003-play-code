@@ -27,7 +27,7 @@ const isRealDrop = (item) => typeof item === "string" && item.length > 0 && item
  * built by web/battle.js from data/enemies.json); the raw parsed data file (`{enemies:
  * [...]}`) and a bare row array are accepted too, so a checker can hand over either.
  */
-function rowFor(enemies, name: string | number) {
+function rowFor(enemies: { [k: string]: EnemyRecord; }, name: string | number) {
   if (!enemies || typeof name !== "string" || !name) return null;
   if (Array.isArray(enemies)) return enemies.find((row) => row?.enemy_id === name) ?? null;
   const direct = enemies[name];

@@ -134,10 +134,10 @@ const lookAlong = (vx: number, vy: number) => [6, 7, 0, 1, 2, 3, 4, 5][(Math.rou
  * Where a character and the player can walk side by side from here: up to `dist` px along one of the eight directions, both
  * on free ground the whole way (opts.free(x, y) is true on walkable ground). Prefers carrying on away from the character.
  */
-function planTogether(p, w, dist: number, free: ((x: number, y: number) => boolean) | undefined) {
+function planTogether(p: { x: number; y: number; }, w: { x: number; y: number; }, dist: number, free: ((x: number, y: number) => boolean) | undefined) {
     if (!free) return null;
     const away = Math.hypot(p.x - w.x, p.y - w.y) < 4 ? Math.PI / 2 : Math.atan2(p.y - w.y, p.x - w.x);
-    const line = (a: { x: number; y: number; }, b) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8); for (let i = 1; i <= n; i++) if (!free(a.x + ((b.x - a.x) * i) / n, a.y + ((b.y - a.y) * i) / n)) return false; return true; };
+    const line = (a: { x: number; y: number; }, b: { x: number; y: number; } | { x: number; y: number; }) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8); for (let i = 1; i <= n; i++) if (!free(a.x + ((b.x - a.x) * i) / n, a.y + ((b.y - a.y) * i) / n)) return false; return true; };
     const SIDE = 38;                                          // wide enough that two sprites never overlap
     let best = null;
     for (let i = 0; i < 8; i++) {

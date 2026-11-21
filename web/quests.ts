@@ -225,7 +225,7 @@ function markVisited(mapId) {
     if (changed) saveState();
 }
 
-function bump(type, match) {
+function bump(type: string, match) {
     if (!enabled()) return;
     let changed = false;
     for (const id of Object.keys(st.active)) {
@@ -248,7 +248,7 @@ on("battleWon", (e) => {
     for (const sp of e.enemies ?? []) bump("defeat", (o) => o.species.includes(sp) && (!o.maps || o.maps.some((m) => sameMap(m, e.mapId))));
 });
 const near = (p, r) => Math.hypot(lastX - p.x, lastY - p.y) <= p.r;
-function resetRoutes(why, onlyMap) {
+function resetRoutes(why: string, onlyMap) {
     let changed = false;
     for (const id of Object.keys(st.active)) {
         const d = defOf(id), a = st.active[id];
@@ -314,7 +314,7 @@ async function scanForms() {
         });
     }
 }
-export function questsTick(mapId, x, y) {
+export function questsTick(mapId, x: number, y: number) {
     const prevX = lastX, prevY = lastY, prevMap = lastMap;   // walk-in triggers need the previous tick's place
     lastX = x ?? lastX; lastY = y ?? lastY;
     if (++metTick % 45 === 0) scanMet(mapId);
@@ -481,9 +481,9 @@ async function loadRoam() {
         }
     } catch (e) { console.warn("[quests] bounty tables unavailable:", e); roam = null; }
 }
-function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const round10 = (v) => Math.round(v / 10) * 10;
+function rng(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const round10 = (v: number) => Math.round(v / 10) * 10;
 /** Pure: builds the next wanted-board job from where you have been and how strong your party is. */
 export function generateBounty(visited, level, n, table) {
     const places = visited.filter((m) => table[m] && table[m].length);
@@ -524,7 +524,7 @@ function ensureGenerated() {
 // ------------------------------------------------------------ UI
 // Nothing here draws its own windows. Speech is the game's conversation box, the list and the yes/no questions are the
 // game's choice widget, and the log is a list of those plus system-window pages. Only the small notice (toast) is ours.
-function toast(msg) {
+function toast(msg: string) {
     if (!toastEl) return;
     toastEl.textContent = msg; toastEl.style.opacity = "1";
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = "0"; }, 4200);
@@ -544,10 +544,10 @@ function objectiveText(d, i) {
     return "?";
 }
 const MARK = { ready: "!", active: ">", available: "*", done: "x" };
-const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "." : s);
+const clip = (s, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 const logEntries = () => ["ready", "active", "available", "done"].flatMap((s) => allDefs().filter((d) => statusOf(d) === s).map((d) => ({ d, s })));
 
-function detailText(d, s) {
+function detailText(d, s: string) {
     const ref = turnInRef(d);
     const rw = [d.reward?.bits ? `${d.reward.bits} BIT` : "", ...(d.reward?.items ?? []).map((it) => `${it.count ?? 1} x ${it.name}`)].filter(Boolean).join(", ");
     const goals = d.objectives.map((_, i) => "- " + objectiveText(d, i)).join("\n");
@@ -598,7 +598,7 @@ export async function openLog() {
         for (;;) {
             const all = logEntries();
             if (!all.length) { await say("Quests", "No quests yet.\n\nExplore, fight and talk to people: quests unlock as you play."); return true; }
-            const by = (k) => all.filter((e) => e.s === k).map((e) => e.d);
+            const by = (k: string) => all.filter((e) => e.s === k).map((e) => e.d);
             const avail = by("available");
             const buckets = [["Ready to claim", by("ready")], ["Open quests", by("active")], ["New here", avail.filter(isHere)], ["Elsewhere", avail.filter((d) => !isHere(d))], ["Finished", by("done")]].filter(([, l]) => l.length);
             const options = [...buckets.map(([n, l]) => `${n} (${l.length})`), "Reset quests", "Close"];

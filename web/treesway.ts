@@ -22,7 +22,7 @@ const stages = new Map();    // stageId -> built data | null (nothing to sway)
 
 const isFoliage = (r: number | undefined, g: number | undefined, b: number | undefined) => g > 40 && g > r * 1.06 && g > b * 1.06;
 
-function pixels(img) {
+function pixels(img: HTMLImageElement) {
     const cv = document.createElement("canvas");
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const cx = cv.getContext("2d", { willReadFrequently: true });

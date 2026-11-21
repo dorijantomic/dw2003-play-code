@@ -36,8 +36,8 @@ export function computeCanvasBacking({
 
 /** Convert a pointer in CSS pixels into the fixed field layout coordinate space. */
 export function canvasEventToLogical(
-  canvas,
-  event,
+  canvas: HTMLCanvasElement,
+  event: MouseEvent,
   logicalWidth = FIELD_LOGICAL_WIDTH,
   logicalHeight = FIELD_LOGICAL_HEIGHT,
 ) {
@@ -65,7 +65,7 @@ export function canvasEventToLogical(
 export const NATIVE_SCREEN_W = 320;
 export const NATIVE_SCREEN_H = 240;
 
-export function fitNativeScreen(ctx, nativeW = NATIVE_SCREEN_W, nativeH = NATIVE_SCREEN_H) {
+export function fitNativeScreen(ctx: CanvasRenderingContext2D, nativeW = NATIVE_SCREEN_W, nativeH = NATIVE_SCREEN_H) {
   const canvas = ctx && ctx.canvas;
   const w = canvas && canvas.width ? canvas.width : nativeW;
   const h = canvas && canvas.height ? canvas.height : nativeH;
@@ -77,8 +77,8 @@ export function fitNativeScreen(ctx, nativeW = NATIVE_SCREEN_W, nativeH = NATIVE
 }
 
 export function createCanvasResolutionController(
-  canvas,
-  ctx,
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D | null,
   {
     logicalWidth = FIELD_LOGICAL_WIDTH,
     logicalHeight = FIELD_LOGICAL_HEIGHT,
@@ -110,7 +110,7 @@ export function createCanvasResolutionController(
   // (logicalWidth + 2 padX) x logicalHeight, sized from the STAGE height (the canvas's own CSS size
   // follows its backing shape, so reading it would only repeat last frame's shape), and the
   // transform puts the box's (0,0) padX in from the left edge.
-  function beginFrame(hd, wide = null) {
+  function beginFrame(hd: boolean, wide = null) {
     const padX = hd && wide?.padX > 0 ? wide.padX : 0;
     const fullWidth = logicalWidth + 2 * padX;
     if (

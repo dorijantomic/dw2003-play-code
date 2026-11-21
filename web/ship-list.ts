@@ -39,11 +39,11 @@ export const SHIP_AUTO = Object.freeze([...AUTO]);
 export const SHIP_OUT = Object.freeze([...OUT]);
 
 /** "in" | "auto" | "out" for a switch key, or null for anything else (sliders, modes...). */
-export function shipClass(key) {
+export function shipClass(key: string) {
     return Object.prototype.hasOwnProperty.call(SHIP, key) ? SHIP[key] : null;
 }
 /** What the installed copy forces for a key: true (auto), false (out), or null (in / not a switch: the player decides). */
-export function shipForced(key) {
+export function shipForced(key: string) {
     const c = shipClass(key);
     return c === "auto" ? true : c === "out" ? false : null;
 }

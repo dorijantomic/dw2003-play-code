@@ -85,7 +85,7 @@ export function evaluatePlayerCharOne(stageId) {
     return lists.some((list) => list.every((c) => storyFlags.matches(c.id, c.expected)));
 }
 
-export function manifestIndexOf(charId) {
+export function manifestIndexOf(charId: string | null | undefined) {
     return state.manifest.characters.findIndex((c) => c.id === charId);
 }
 

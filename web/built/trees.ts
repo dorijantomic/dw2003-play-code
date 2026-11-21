@@ -293,8 +293,8 @@ export function pineGeometry(THREE, seed: number) {
   // a flat-diamond ring: corners +side, +up, -side, -up. v = across (1 at the side corners, 0 on the ridge / keel)
   const ring = (c, s: number[] | undefined, u: number[] | undefined, w: number, th: number, uu: number, h: number) => [
     V(add(c, s, w), uu, 1, h, 0), V(add(c, u, th), uu, 0, h, 0), V(add(c, s, -w), uu, -1, h, 0), V(add(c, u, -th), uu, 0, h, 0)];
-  const join = (A, B) => { for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; idx.push(A[i], A[j], B[j], A[i], B[j], B[i]); } };
-  const cap = (A, tip: number) => { for (let i = 0; i < 4; i++) idx.push(A[i], A[(i + 1) % 4], tip); };
+  const join = (A: number[], B: number[]) => { for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; idx.push(A[i], A[j], B[j], A[i], B[j], B[i]); } };
+  const cap = (A: number[], tip: number) => { for (let i = 0; i < 4; i++) idx.push(A[i], A[(i + 1) % 4], tip); };
   const limb = (t: number, az: number, reach: number, k: number) => {
     const o = [Math.sin(az), 0, Math.cos(az)], L = reach / 0.8;
     const c0 = ctr(t), P0 = [c0[0] + o[0] * 0.004, t, c0[1] + o[2] * 0.004];

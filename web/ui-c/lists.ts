@@ -99,7 +99,7 @@ export function composeItemCells(lines, runs, used, out, o: { pagerY?: number | 
 }
 
 /** The icon highlight the game draws around the cursor row's icon: thin corner brackets, dark on the orange row, orange elsewhere. */
-export function composeIconHl(p, i, ons, out) {
+export function composeIconHl(p, i, ons: { x: number; y: number; w: number; h: 12; }[], out) {
     const r = clipRect(p), inOn = ons.some((c) => r.x + r.w / 2 >= c.x && r.x + r.w / 2 < c.x + c.w && r.y + r.h / 2 >= c.y - 2 && r.y + r.h / 2 < c.y + c.h + 2);
     out.push(corners(`ihl${i}`, r, inOn ? "var(--c-orange-ink)" : "var(--c-orange)", p.rel, "iconHl"));
 }

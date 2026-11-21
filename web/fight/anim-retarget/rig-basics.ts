@@ -295,7 +295,7 @@ export function buildBoneMap(target, source) {
  * the rest of the cast, and a mesh the idle keeps scaled to 0 (Boltmon's thrown second axe) popped
  * back at full size. That is the operator's "reset to a flat pose" + "a second axe" report.
  */
-export function shiftPlaylistEntry(e, offset) {
+export function shiftPlaylistEntry(e, offset: number) {
   const v = e.value | 0;
   const out = { ...e } as RigSampleOut;
   const loopIndex = v === 0x8000;                 // a playhead index, not a frame

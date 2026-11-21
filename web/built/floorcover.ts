@@ -54,7 +54,7 @@ export const MEAS = {
   shares: { brown: 48.5, light: 6.6, green: 10.2, neutral: 34.7 },
 };
 
-function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function rng(seed: number) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const pickW = (list, u) => { let tot = 0; for (const c of list) tot += c[3]; let a = u * tot; for (const c of list) { a -= c[3]; if (a <= 0) return c; } return list[list.length - 1]; };
 
 // ---------------------------------------------------------------- geometry builders
@@ -66,7 +66,7 @@ class Soup {
   declare p: any[];
   declare t: any[];
   constructor() { this.p = []; this.n = []; this.t = []; this.l = []; }
-  tri(a, b, c, ta, tb, tc, la = 1, lb = 1, lc = 1) {
+  tri(a, b, c, ta, tb, tc: number, la = 1, lb = 1, lc = 1) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
@@ -74,7 +74,7 @@ class Soup {
     const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
     for (const [q, tt, ll] of [[a, ta, la], [b, tb, lb], [c, tc, lc]]) { this.p.push(q[0], q[1], q[2]); this.n.push(nx, ny, nz); this.t.push(tt); this.l.push(ll); }
   }
-  quad(a, b, c, d, ta, tb, tc, td, la, lb, lc, ld) { this.tri(a, b, c, ta, tb, tc, la, lb, lc); this.tri(a, c, d, ta, tc, td, la, lc, ld); }
+  quad(a, b, c, d, ta, tb, tc: number, td: number, la: number, lb: number, lc: number, ld: number) { this.tri(a, b, c, ta, tb, tc, la, lb, lc); this.tri(a, c, d, ta, tc, td, la, lc, ld); }
   /** scale so the tallest point is y = 1 (object units = plant heights, what builtWind() expects) */
   normalize(by = null) {
     let hy = 0; for (let i = 1; i < this.p.length; i += 3) hy = Math.max(hy, this.p[i]);
@@ -93,12 +93,12 @@ class Soup {
     return g;
   }
 }
-const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+const add3 = (a, b: number[], k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
 const norm3 = (a) => { const L = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / L, a[1] / L, a[2] / L]; };
 
 /** Fern: 7 arching fronds round a crown. near = rachis ribbon + 6 leaflet pairs a frond (diamond leaflets);
  *  far = one tapered ribbon a frond. Height normalised to 1. */
-export function fernGeometry(near) {
+export function fernGeometry(near: boolean) {
   const so = new Soup(), r = rng(near ? 11 : 12), NF = 7, SEG = near ? 8 : 5;
   for (let f = 0; f < NF; f++) {
     const yaw = (f + (r() - 0.5) * 0.5) / NF * Math.PI * 2, len = 0.85 + 0.3 * r();
@@ -186,7 +186,7 @@ export function leafGeometry() {
 export function twigGeometry() {
   const so = new Soup();
   const pts = [[-0.5, 0.02, 0, 0.026], [-0.05, 0.03, 0.05, 0.020], [0.5, 0.02, -0.03, 0.006]];
-  const ring = (p) => [0, 1, 2].map((k) => { const a = k / 3 * Math.PI * 2 + 0.5; return [p[0], p[1] + Math.sin(a) * p[3], p[2] + Math.cos(a) * p[3]]; });
+  const ring = (p: number[] | undefined) => [0, 1, 2].map((k) => { const a = k / 3 * Math.PI * 2 + 0.5; return [p[0], p[1] + Math.sin(a) * p[3], p[2] + Math.cos(a) * p[3]]; });
   for (let i = 0; i < 2; i++) {
     const A = ring(pts[i]), B = ring(pts[i + 1]);
     for (let k = 0; k < 3; k++) { const k2 = (k + 1) % 3; so.quad(A[k], A[k2], B[k2], B[k], i / 2, i / 2, (i + 1) / 2, (i + 1) / 2, 0, 0, 0, 0); }
@@ -247,7 +247,7 @@ const FC_FS = /* glsl */`
     #include <colorspace_fragment>
   }`;
 
-export function coverMaterial(shared, densName, name) {
+export function coverMaterial(shared, densName, name: string) {
   const m = new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ ...shared, [densName]: { value: 1.0 } }),
     vertexShader: FC_VS(densName), fragmentShader: FC_FS, side: THREE.DoubleSide,
@@ -265,7 +265,7 @@ export function coverUniforms() {
            uFcGain: { value: 1.0 }, uFcRootK: { value: 0.72 }, uFcTipK: { value: 1.18 }, uFcDim: { value: 1.0 } };
 }
 /** one cover type as an asset: { parts, lod? (ferns: near / far geometry), update (night dim) } */
-export function coverAsset(kind, shared) {
+export function coverAsset(kind: string, shared) {
   const mat = coverMaterial(shared, DENS[kind], `builtFloorcover_${kind}`);
   const update = () => { const night = S.light.mode === "night" ? 0.45 : 1.0; if (shared.uFcDim.value !== night) shared.uFcDim.value = night; };
   if (kind === "fern") {

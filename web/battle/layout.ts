@@ -2,6 +2,7 @@ import { shuffleJokeMenu, RAND_U16 } from "../vendor/engine.js";
 import { BATTLE_UI_LAYOUT } from "../battle.js";
 import type { BattleDnaPresentation } from "./core/types.js";
 
+import type { BattleState } from "../types/battle.js";
 // Atlas source rects = PGFGTC00.BIN frame u,v,w,h (LBA 1109/1110). Cel 0xA is
 // the 104×64 face bezel (frame 4); cel 0x22 is the command row (frames 1+2).
 export const FIGHT_UI_CLIPS = Object.freeze({
@@ -85,13 +86,13 @@ export function battleTechWords({
 // say and hands the shuffle to it.
 
 /** The six shuffled joke rows for this decision, built once, or null. */
-export function jokeMenuRows(b) {
+export function jokeMenuRows(b: BattleState) {
   if (!b?.player?.ailments?.confuse) { b.confusedMenu = null; return null; }
   if (b.confusedMenu?.length !== 6) b.confusedMenu = shuffleJokeMenu(RAND_U16);
   return b.confusedMenu;
 }
 
-export function currentMenuItems(b) {
+export function currentMenuItems(b: BattleState) {
   const joke = jokeMenuRows(b);
   if (joke) return joke.map((j) => j.label);
   return MENU_ITEMS;

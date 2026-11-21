@@ -54,7 +54,7 @@ export const SHARED_SHOT = Object.freeze({
 const P90 = 0.9;
 const P95 = 0.95;
 
-function percentile(sorted, q) {
+function percentile(sorted: number[], q: number) {
   if (!sorted.length) return 0;
   const i = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * q)));
   return sorted[i];
@@ -241,9 +241,9 @@ export function poseCollider(col, pose) {
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const add = (a, b: number[]) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
-const len = (a) => Math.hypot(a[0], a[1], a[2]);
+const len = (a: number[]) => Math.hypot(a[0], a[1], a[2]);
 
 /**
  * Closest points between two segments (Ericson, Real-Time Collision Detection 5.1.9) plus the

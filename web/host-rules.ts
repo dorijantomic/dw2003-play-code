@@ -20,7 +20,7 @@ export const HOST_RULES = Object.freeze({
 });
 export const HOST_RULE_KEYS = Object.freeze(Object.keys(HOST_RULES));
 
-function cleanValue(kind, v) {
+function cleanValue(kind: string, v) {
     if (kind === "bool") return typeof v === "boolean" ? v : undefined;
     if (kind === "dial") return DIAL_MODES.includes(v) ? v : undefined;
     if (kind === "speed") return typeof v === "number" && Number.isFinite(v) ? Math.min(3, Math.max(1, Math.round(v * 4) / 4)) : undefined;
@@ -58,7 +58,7 @@ export function pickRules(fx) {
 export function createRuleOverride(fx: AmbienceSettings) {
     const own = new Map();       // key -> the player's own value, taken the moment the key was locked
     const host = new Map();      // key -> the host's value
-    const unlock = (k) => { fx[k] = own.get(k); own.delete(k); host.delete(k); };
+    const unlock = (k: string | number) => { fx[k] = own.get(k); own.delete(k); host.delete(k); };
     return {
         apply(rules) {
             const next = cleanRules(rules);
@@ -72,7 +72,7 @@ export function createRuleOverride(fx: AmbienceSettings) {
         reimpose() { for (const [k, v] of host) fx[k] = v; },
         clear() { for (const k of [...host.keys()]) unlock(k); },
         locked: (k) => host.has(k),
-        canSave: (k) => !host.has(k),
+        canSave: (k: string) => !host.has(k),
         keys: () => [...host.keys()],
     };
 }

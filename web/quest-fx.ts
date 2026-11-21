@@ -81,7 +81,7 @@ export async function loadQuestFxSheets(names) {
     return sheets;
 }
 
-function loadSheetImage(url) {
+function loadSheetImage(url: string) {
     return new Promise((resolve) => {
         if (typeof Image === "undefined") return resolve(null);   // headless tests: no art, no crash
         const img = new Image();
@@ -92,7 +92,7 @@ function loadSheetImage(url) {
 }
 
 /** What a sheet says its cells are, for a verifier or the lab. */
-export function questFxSheetInfo(name) {
+export function questFxSheetInfo(name: string) {
     const s = sheets.get(name);
     return s ? { frame: [s.fw, s.fh], clips: Object.keys(s.def.clips ?? {}) } : null;
 }
@@ -155,7 +155,7 @@ export function questFxSpawn(spec) {
 }
 
 /** One fx object from a spec: the sheet it draws, its place, its layer and its first clip. Shared with the props. */
-function makeFx(spec, name) {
+function makeFx(spec, name: string) {
     const sheetName = String(spec.sheet ?? name);
     const sheet = sheets.get(sheetName);
     if (!sheet) return null;
@@ -459,7 +459,7 @@ function stepBlank() {
  * Advance the effects, the player drive and the screen fade by `dt` seconds. Effects move in whole field blanks (60 a
  * second), like the stage objects they copy; the fade runs on real time so it finishes on the frame the scene asks for.
  */
-export function questFxTick(dt) {
+export function questFxTick(dt: number) {
     const step = Math.max(0, Number(dt) || 0);
     blankAccumulator += step * FIELDS_PER_SECOND;
     let blanks = Math.floor(blankAccumulator);
@@ -505,7 +505,7 @@ export function questFxTick(dt) {
  * The draw list entries for this frame, in the field's own ordering list (sortDrawables y-sorts them with the people).
  * `camX`/`camY` are the frame's camera, the same numbers drawSprite subtracts.
  */
-export function questFxDrawables(camX, camY) {
+export function questFxDrawables(camX: number, camY: number) {
     const out = [];
     for (const fx of live.values()) {
         if (fx.layer === "front") continue;          // drawn after every entity instead (questFxDrawOver)
@@ -515,11 +515,11 @@ export function questFxDrawables(camX, camY) {
 }
 
 /** The "front" layer: effects that must cover every person on the map. */
-export function questFxDrawOver(ctx, camX, camY) {
+export function questFxDrawOver(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
     for (const fx of live.values()) if (fx.layer === "front") drawFx(fx, camX, camY, ctx);
 }
 
-function drawFx(fx, camX, camY, ctx2 = null) {
+function drawFx(fx, camX: number, camY: number, ctx2 = null) {
     const g = ctx2 ?? drawContext;
     if (!g) return;
     const ax = Array.isArray(fx.sheet.def.anchor) ? Number(fx.sheet.def.anchor[0]) : 0.5;
@@ -538,12 +538,12 @@ function drawFx(fx, camX, camY, ctx2 = null) {
 
 /** The host installs the field's 2D context here, so a drawable closure does not need it passed down the list. */
 let drawContext = null;
-export function installQuestFxCanvas(ctx) {
+export function installQuestFxCanvas(ctx: CanvasRenderingContext2D | null) {
     drawContext = ctx;
 }
 
 /** The screen fade, drawn last: a black quad over the finished frame, at the field's scale (640x480 device pixels). */
-export function questFxDrawFade(ctx, viewW, viewH) {
+export function questFxDrawFade(ctx: CanvasRenderingContext2D | null, viewW: number, viewH: number) {
     if (fade.alpha <= 0) return;
     ctx.save();
     if (typeof ctx.setTransform === "function") ctx.setTransform(1, 0, 0, 1, 0, 0);

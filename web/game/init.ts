@@ -825,7 +825,7 @@ export async function init() {
         ...movie.diagnostics(),
         destination: "0x" + movieDestination.toString(16),
     });
-    const startMovie = (code) => {
+    const startMovie = (code: number) => {
         title.hidden = false;
         titleNative = true;
         title.classList.add("native");

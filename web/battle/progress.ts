@@ -64,7 +64,7 @@ export function paidParticipants(b: BattleEndContext) {
 // own ledger, level and stats are the gates. Returns [{ record, index, toName }]
 // in table order; a record already in the member's form ledger is left out, exactly
 // as the routine's `bgez` skip does.
-export function treeCandidatesFor(evolutionTrees, digimonDB, member) {
+export function treeCandidatesFor(evolutionTrees, digimonDB: { [k: string]: DigimonRecord; }, member) {
   if (!member?.stats || !evolutionTrees) return [];
   const stats = member.stats;
   const formLevels = Object.fromEntries((stats.formLedger ?? [])
@@ -294,7 +294,7 @@ export function applyLevelUpGains(ps: PartnerStats, gains, lu: { hpmp_cap: numbe
 // `growthProfile` is the row the disc's rolls read: the member's STARTER species'
 // (levelUpGrowthProfile), never the active form's. `prof` stays the active form only
 // for the no-progression-table branch, which has no disc counterpart.
-export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel: number, lu, growthProfile = prof) {
+export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel: number, lu: { exp_tier_bounds: number[]; exp_tier_const: number[]; hpmp_tier_adj: number[]; hpmp_rand9: number[]; core_tier_bounds: number[]; core_table: number[][]; elem_level_limit: number; elem_table: number[]; exp_cap: number; level_cap: number; hpmp_cap: number; stat_cap: number; tp_per_level: number; tp_cap: number; dvexp_cap?: number; } | undefined, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
     ensureStoredStats(ps, growthProfile);
@@ -326,7 +326,7 @@ export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel:
 // partner fighting as a digivolution therefore keeps the starter's curve and rolls:
 // the slot1_ram RAM dump (slot0 standing in Dinohumon, exp 2985 -> level 15) only
 // fits the starter's growth_xp 8, not the form's 1.
-export function levelUpGrowthProfile(player, profiles) {
+export function levelUpGrowthProfile(player, profiles: { [k: string]: DigimonRecord; }) {
   const rookie = profiles?.[Number(player?.rookieId)];
   return rookie ?? player?.profile ?? null;
 }
@@ -365,7 +365,7 @@ export function bankFormDvexp(record: { formLevel: number; dvexp: number; }, gai
 // passes that count (file 0x1368 `lw $a3, 0x70($v1)`, v1 = the row's +0x50 parent).
 // A form taken mid-battle is a second mark on the same row, so it enlarges the
 // divisor: a solo lead that DV'd once splits its DVEXP two ways (60% each), not 100%.
-export function dvexpShareCount(formFlags, indices: number[]) {
+export function dvexpShareCount(formFlags: number[][] | undefined, indices: number[]) {
   let marks = 0;
   for (const index of indices ?? []) {
     const flags = formFlags?.[index];

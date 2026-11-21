@@ -17,6 +17,7 @@
 import type { WithImplicitCoercion } from "node:buffer";
 import type { Dw2LoadedModel, Dw2Pose, PoseBounds } from "./types/anim-viewer-dw2.js";
 
+import type { Dw2Accessor } from "./types/anim-viewer-dw2.js";
 export const DW2_DEFAULT_ROOT = "dw2-models";
 
 // ── the local index ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export function buildDw2Index(inv, { root = null } = {}) {
       anims: Array.isArray(m.anims) ? m.anims.slice() : [],
       durs: Array.isArray(m.durs) ? m.durs.slice() : [],
     }))
-    .sort((a: { stage: string; name: string; path: string; }, b) => a.stage.localeCompare(b.stage) || a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
+    .sort((a: { stage: string; name: string; path: string; }, b: { stage: string; name: string; path: string; }) => a.stage.localeCompare(b.stage) || a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
   const stages = {};
   for (const m of models) stages[m.stage] = (stages[m.stage] || 0) + 1;
   return { root: root || inv?.root || "extract", count: models.length, stages, models };
@@ -72,7 +73,7 @@ const COMPONENT = {
 };
 
 /** base64 → bytes, in a browser or in node (unit tests). */
-export function decodeBase64(b64) {
+export function decodeBase64(b64: string | undefined) {
   if (typeof atob === "function") {
     const s = atob(b64);
     const out = new Uint8Array(s.length);
@@ -279,7 +280,7 @@ const point = (m: number[], x: number, y: number, z: number) => [
 ];
 
 /** The bind pose (no clip): every node's own TRS from the file. */
-export function bindPose(model) {
+export function bindPose(model: { json: { nodes: { translation: number[]; rotation: number[]; scale: number[]; }[]; }; }) {
   const n = model.json.nodes.length;
   const pose = { model, t: new Float32Array(n * 3), r: new Float32Array(n * 4), s: new Float32Array(n * 3), n } as Dw2Pose;
   model.json.nodes.forEach((node: { translation: number[]; rotation: number[]; scale: number[]; }, i: number) => {
@@ -491,7 +492,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
   };
   const blank = { pos: new Float32Array(3), nrm: new Float32Array([0, 0, 1]), uv: new Float32Array(2) };
 
-  const upload = (data, target, usage) => {
+  const upload = (data: Dw2Accessor, target, usage) => {
     const b = gl.createBuffer();
     gl.bindBuffer(target, b);
     gl.bufferData(target, data, usage);
@@ -608,7 +609,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
         gl.depthMask(false);
         // back-to-front, measured from the eye at the matrix's translation
         const eye = [viewProj[12], viewProj[13], viewProj[14]];
-        blended.sort((a, b) => depthOf(pose, b, eye) - depthOf(pose, a, eye));
+        blended.sort((a: { node: number; }, b: { node: number; }) => depthOf(pose, b, eye) - depthOf(pose, a, eye));
         for (const d of blended) drawOne(d);
         gl.depthMask(true);
         gl.disable(gl.BLEND);

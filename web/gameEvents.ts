@@ -2,7 +2,7 @@
 // without the game depending on them. Emitting with no listener costs nothing and changes nothing.
 const listeners = new Map();
 
-export function on(name, fn) {
+export function on(name: string, fn) {
     if (!listeners.has(name)) listeners.set(name, new Set());
     listeners.get(name).add(fn);
     return () => listeners.get(name).delete(fn);

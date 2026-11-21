@@ -39,12 +39,12 @@ export const BOULDERS = {
   GRAIN: 1.15,      // noise scale of the stone grain, per metre (PICKED)
 };
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 /** One cobble: an icosphere (detail DETAIL, 320 triangles) with a seeded low-frequency lump, normalised to width 1,
  *  height 1, bottom at y 0, centred on x = z = 0. Normals are the SMOOTH ellipsoid normals (a river cobble is
  *  round; the facet edges must not show in the light). Non-indexed. */
-export function cobbleMesh(seed) {
+export function cobbleMesh(seed: number) {
   const ico = new THREE.IcosahedronGeometry(1, BOULDERS.DETAIL).toNonIndexed();
   const P = ico.attributes.position.array, r = rng(seed);
   const f = [1 + r() * 2.5, 1 + r() * 2.5, 1 + r() * 2.5], ph = [r() * 6.3, r() * 6.3, r() * 6.3];
@@ -73,7 +73,7 @@ export function cobbleMesh(seed) {
  *  w and height h): `layers` rows stacked as a pyramid pack -- each row narrower than the one below, its cobbles
  *  resting in the gaps of the row under them -- in two staggered depth rows, plus one dark core filling the middle.
  *  PICKED, but the whole silhouette is then fitted to exactly the card's measured width and height. */
-function pileLumps(w, h, layers, seed) {
+function pileLumps(w: number, h: number, layers: number, seed: number) {
   const r = rng(seed), out = [];
   const d = BOULDERS.STONE_D, hd = h / (1 + (layers - 1) * 0.62 * 1.18);       // cobble diameter so that `layers` rows reach h
   const dd = Math.min(d, hd * 1.15);
@@ -100,7 +100,7 @@ function pileLumps(w, h, layers, seed) {
 
 /** Both piles merged into ONE non-indexed geometry: position, normal, aTint (0..1 stone tone), aAO (baked occlusion).
  *  Each pile is normalised so its silhouette is exactly the card's measured width and height. */
-function pilesGeometry(THREE_, pieces, cols) {
+function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color; hi: THREE.Color; }) {
   const pos = [], nor = [], tint = [], ao = [], hue = [], piles = [];
   const hulls = Array.from({ length: 8 }, (_, i) => cobbleMesh(7000 + i * 13));   // 8 cobble shapes, scaled and turned per stone
   for (const [pi, card] of pieces.entries()) {
@@ -135,7 +135,7 @@ function pilesGeometry(THREE_, pieces, cols) {
     const fx = w / Math.max(1e-6, hi[0] - lo[0]), fz = BOULDERS.DEPTH_K * w / Math.max(1e-6, hi[2] - lo[2]),
           fy = h / Math.max(1e-6, hi[1] - lo[1]);
     const cx = (lo[0] + hi[0]) / 2, cz = (lo[2] + hi[2]) / 2;
-    const toPile = (p) => {
+    const toPile = (p: (number | undefined)[]) => {
       const lx = (p[0] - cx) * fx, lz = (p[2] - cz) * fz, y = (p[1] - lo[1]) * fy;
       return [card.base[0] + dx * lx + nx * lz, y, card.base[2] + dz * lx + nz * lz];
     };
@@ -182,7 +182,7 @@ function pilesGeometry(THREE_, pieces, cols) {
 
 // warm red-brown stone, no moss (the piece is 0 % green): the measured p10 / median / p90 as the three tones, the
 // shared noise for the grain, the baked AO for the crevices, the shared toon light and aerial haze
-export function boulderMaterial(cols) {
+export function boulderMaterial(cols: { lo: THREE.Color; mid: THREE.Color; hi: THREE.Color; } | { lo: THREE.Color; mid: THREE.Color; hi: THREE.Color; }) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({
       uRockLo: { value: cols.lo }, uRockMid: { value: cols.mid }, uRockHi: { value: cols.hi },
@@ -279,7 +279,7 @@ export function buildBoulders(slot, env) {
 
 /** the same rock as an instanced part (one cobble in the piles' own shader): what mod.boulder_piles draws in any other slot */
 export function boulderPart(env, colours = null) {
-  const lin = (c) => S.srgb(c);
+  const lin = (c: number[]) => S.srgb(c);
   const c = colours || { p10: [44, 38, 34], all: [112, 100, 90], p90: [176, 164, 150] };   // a neutral stone when the slot has no colours of its own
   const mat = boulderMaterial({ lo: lin(c.p10 || c.all), mid: lin(c.all), hi: lin(c.p90 || c.top || c.all) }); mat.name = "builtBouldersMaterial";
   return { geo: cobbleMesh(7000), mat, attrs: { aTint: [1, 0.5], aAO: [1, 1], aHue: [1, 0] } };

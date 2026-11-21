@@ -67,7 +67,7 @@ export function partyCard(i: number, part, namePart, card, out, v = CARD_VARIANT
     }
 }
 
-const composeCard = (i: number, part, namePart, runs, out) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
+const composeCard = (i: number, part: { y: number; }, namePart, runs, out) => partyCard(i, part, namePart, readCardRuns(runs, part.y), out);
 
 function composeHeader(part, runs, out) {
     const rel = part.rel, ox = part.x - STD.header.x, oy = part.y - STD.header.y, f = at(rel, ox, oy);

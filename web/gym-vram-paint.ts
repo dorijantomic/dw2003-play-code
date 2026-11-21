@@ -64,7 +64,7 @@ export function createGymPrimPainter(getVram) {
      * Fill the device rectangle of a logical box. `sample(lx, ly)` -> colour half or -1 for a
      * transparent / missing texel. `semi` blends the stp-flagged texels with mode `abr`.
      */
-    function fill(ctx, box, semi: boolean, abr: number, sample) {
+    function fill(ctx, box, semi: boolean, abr: number, sample: ((lx: number, ly: number) => number) | ((lx: number, ly: number) => number)) {
         const m = ctx.getTransform();
         const sx = m.a, sy = m.d, tx = m.e, ty = m.f;
         const canvas = ctx.canvas;

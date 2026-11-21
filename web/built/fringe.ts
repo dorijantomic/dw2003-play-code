@@ -49,7 +49,7 @@ export const FRINGE = {
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 // the one place a fringe vertex's sway is made (the material and the checker's JS probe both call this)
-const f = (x) => x.toFixed(4);
+const f = (x: number) => x.toFixed(4);
 export const FRINGE_GLSL = /* glsl */`
   // p: the vertex (render units, |y| <= H), anchor: the blade's foot on the water line, t: 0 at the root .. 1 at the
   // tip, H: the blade's own height (render units), refl: 1 for the mirrored reflection vertex.
@@ -135,7 +135,7 @@ export function buildFringe(slot, env) {
   const { S = S0 } = env;
   const t0 = performance.now();
   const c0 = slot.data.colours || {};
-  const lin = (c, k = 1) => S.srgb(c || [10, 41, 21], k);
+  const lin = (c: number[], k = 1) => S.srgb(c || [10, 41, 21], k);
 
   const mid = FRINGE.MID, tipc = FRINGE.TIP;   // measured stops (the recipe's piece colours mix in the reflection half)
   const uni = {
@@ -150,7 +150,7 @@ export function buildFringe(slot, env) {
   // ---- 2. emit: every above-water blade first, then every reflection (two contiguous index ranges) ----
   const rows = [0, 0.35, 0.68, 0.90];   // ribbon rows + a tip vertex
   const P = [], NRM = [], AN = [], AT = [], AH = [], AR = [], ATI = [], IDX = [];
-  const push = (c, n, anchor, t, H, ref, tint) => {
+  const push = (c, n: number[], anchor, t: number, H, ref: number, tint) => {
     P.push(c[0], c[1], c[2]); NRM.push(n[0], n[1], n[2]); AN.push(anchor[0], anchor[1], anchor[2]);
     AT.push(t); AH.push(H); AR.push(ref); ATI.push(tint); return P.length / 3 - 1;
   };

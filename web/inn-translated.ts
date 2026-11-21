@@ -209,7 +209,7 @@ interface InnOpenArgs {
     // foreground: every channel loses L, clamped at 0. Canvas has no subtract mode, so it is built
     // exactly from difference and add: 255 - min(255, (255 - dst) + L) = max(0, dst - L).
     // GUESS: the quad sits over the inn windows (it is in the same layer at depth 0, the windows at 1).
-    function drawFade(ctx, fade, viewW, viewH) {
+    function drawFade(ctx: CanvasRenderingContext2D, fade, viewW: number, viewH: number) {
         if (!fade || fade.level <= 0) return;
         const L = fade.level & 0xff;
         ctx.save();

@@ -38,7 +38,7 @@ let questsGate = null;
 const tintCache = new WeakMap();
 const TINT_CACHE_PER_IMAGE = 96;
 
-const clamp01 = (v) => Math.max(0, Math.min(1, Number(v)));
+const clamp01 = (v: number) => Math.max(0, Math.min(1, Number(v)));
 
 /** The actor key the renderer uses: "player", or the numeric NPC id. */
 function actorKey(who) {
@@ -87,7 +87,7 @@ export const questGhostMap = () => ghosts;
  * One actor's whole draw closure. A ghosted actor is drawn at its alpha -- sprite AND drop shadow, because the alpha is
  * set around the closure rather than around the sprite call. `key` is "player" or the NPC id.
  */
-export function questGhostActor(ctx, key, draw) {
+export function questGhostActor(ctx: CanvasRenderingContext2D | null, key, draw) {
     // F2 -> Extras -> Quests switched off mid-scene: the ghosts come off on the next frame drawn, exactly as if the
     // scene had ended. (The quest layer's own switch; the scene itself is the game's cutscene and runs on.)
     if (ghosts.size && !ghostsAllowed()) questGhostClear();
@@ -111,7 +111,7 @@ export function questGhostActor(ctx, key, draw) {
  * frame is composited through a cached offscreen copy; every other actor (and every actor while no ghost is on) is the
  * plain call, so the ordinary field costs one comparison.
  */
-export function questGhostImage(ctx, img, sx, sy, sw, sh, dx, dy) {
+export function questGhostImage(ctx: CanvasRenderingContext2D | null, img, sx: number, sy: number, sw, sh, dx: number, dy) {
     const tint = current?.tint;
     if (!tint) {
         ctx.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
@@ -121,7 +121,7 @@ export function questGhostImage(ctx, img, sx, sy, sw, sh, dx, dy) {
 }
 
 /** The frame, washed with `tint` and cached: at most TINT_CACHE_PER_IMAGE frames per image, oldest out first. */
-function tintedFrame(img, sx, sy, sw, sh, tint) {
+function tintedFrame(img, sx: number, sy: number, sw, sh, tint) {
     let byKey = tintCache.get(img);
     if (!byKey) { byKey = new Map(); tintCache.set(img, byKey); }
     const key = `${sx},${sy},${sw},${sh}|${tint}`;
@@ -155,7 +155,7 @@ export function installQuestGhostCamera(fn) {
  * Install the host's reader for the quest layer's own switch (F2 -> Extras -> Quests), once. With it off no actor is
  * drawn as a ghost, and one already on screen is cleared on the next frame.
  */
-export function installQuestGhostGate(fn) {
+export function installQuestGhostGate(fn: () => boolean) {
     questsGate = typeof fn === "function" ? fn : null;
 }
 

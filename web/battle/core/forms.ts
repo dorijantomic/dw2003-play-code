@@ -27,7 +27,7 @@ export function makeForms(B: BattleContext) {
    * +0x0E.. seven) into the six core and seven elemental slots, and prints those
    * thirteen numbers.
    */
-  function formListSeed(b) {
+  function formListSeed(b: BattleState) {
     const index = b.activePlayerIndex | 0;
     const rec = b.playerRecords?.[index] ?? b.player;
     const panel = formPanelMemberSeed(b, index, rec);
@@ -71,7 +71,7 @@ export function makeForms(B: BattleContext) {
    * 22 stat halfwords. F0x800953E4 opens the SAME panel in both screens, so the
    * data is built once here rather than per screen.
    */
-  function formPanelMemberSeed(b, index: number, rec) {
+  function formPanelMemberSeed(b: BattleState, index: number, rec) {
     const forms = B.formOptionsFor(index, b);
     const elems = B.FORM_ELEMENTS;
     // The panel's own seven numbers are the F0x80017174 scratch's +0x18..+0x24:

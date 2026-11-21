@@ -32,7 +32,7 @@ function nameOf(who, opts) {
     if (v && typeof v === "object") v = v.name;
     return typeof v === "string" && v.trim() ? v.trim() : `npc ${who}`;
 }
-const actorOf = (who, opts: QuestReadbackOpts) => cap(nameOf(who, opts));
+const actorOf = (who: string | number, opts: QuestReadbackOpts) => cap(nameOf(who, opts));
 
 /** The sheet a step names (its `sheet`, else the instance name), looked up in opts.sheets. */
 const sheetOf = (s, opts) => {

@@ -6,6 +6,7 @@ import { MS } from "./state.js";
 import { gold } from "./draw-common.js";
 import type { MapSeenRow, MenuState } from "./types.js";
 
+import type { GameState } from "../game/types.js";
 // ── the world MAP screen (draw F0x80098b84, decoded + rig-verified 2026-07-11) ──
 // Full-screen: dark base map (stwmp sub 0) + revealed-terrain patches per area
 // in the ordinal-tier list (sub 1, clip = area-1 at map.area_positions[area]) +
@@ -17,7 +18,7 @@ import type { MapSeenRow, MenuState } from "./types.js";
 // until it crosses the screen-centre pan pivot; ON the pivot the map scrolls
 // instead, and hitting the scroll limit nudges the cursor past the pivot so
 // it resumes free movement.
-export function _mapMove(m: MenuState, C, dx, dy) {
+export function _mapMove(m: MenuState, C, dx: number | undefined, dy: number | undefined) {
   const s = m.mapSpd;
   if (dx < 0) {
     if (m.mapCX > C.pan_x) m.mapCX = Math.max(C.pan_x, m.mapCX - s);
@@ -39,7 +40,7 @@ export function _mapMove(m: MenuState, C, dx, dy) {
   }
 }
 
-export function _stepHeldLists(m: MenuState, state, sfx: { play: (arg0: string) => void; } | null) {
+export function _stepHeldLists(m: MenuState, state: GameState, sfx: { play: (arg0: string) => void; } | null) {
   const keys = state.keys;
   if (!keys) return;
   const vsync = 1 / VSYNC;
@@ -84,7 +85,7 @@ export function _stepHeldLists(m: MenuState, state, sfx: { play: (arg0: string) 
 
 // F0x800986c0, called every vsync from the map root: poll held left/right
 // and up/down separately, 2 then 4 after MAP_HOLD_FRAMES, 0 on release.
-function _stepMapHeld(m: MenuState, C, state) {
+function _stepMapHeld(m: MenuState, C, state: GameState) {
   const keys = state.keys;
   if (!keys) return;
   const vsync = 1 / VSYNC;
@@ -112,7 +113,7 @@ function _stepMapHeld(m: MenuState, C, state) {
   }
 }
 
-export function _drawMapPane(ctx: CanvasRenderingContext2D, state, m: MenuState, t: number, sfx = null) {
+export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m: MenuState, t: number, sfx = null) {
   const M = MS.UI.screens.map;
   const C = M.cursor;
   // walker map id -> {ps1, server, loc} (composed through screen_table).
@@ -191,7 +192,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state, m: MenuState,
     const bottom = m.mapHoverY < 0x78;
     drawClip(ctx, ststat, HV.window.clip, 0, bottom ? HV.window.y_bottom : HV.window.y_top);
     const name = M.location_names[server ? "amaterasu" : "asuka"][hov.loc] ?? "";
-    name.split("\\n").forEach((line, i: number) =>
+    name.split("\\n").forEach((line: string | undefined, i: number) =>
       drawText(ctx, line, HV.text.x, (bottom ? HV.text.y_bottom : HV.text.y_top) + i * 11));
   }
 }
@@ -204,7 +205,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state, m: MenuState,
 // slots; the species' own list is NOT what the original reads). A Digimon that
 // knows none gets the real "Hasn't learned a technique." line, not a blank
 // window.
-export function _drawTechniques(ctx: CanvasRenderingContext2D, rows, m: MenuState, t: number) {
+export function _drawTechniques(ctx: CanvasRenderingContext2D, rows: number[], m: MenuState, t: number) {
   const T = MS.UI.screens.techniques;
   // The window RESIZES with the row count: F0x800946bc picks its clip from the
   // 0x8009a950 table indexed by (rows - 1), so one to five heals get five

@@ -9,7 +9,7 @@ const LW = 640, LH = 480;
 const hud = document.getElementById("hud");
 const say = (t: string | null) => { hud.textContent = t; };
 
-function browserName(ua) {
+function browserName(ua: string) {
     if (/Firefox\//.test(ua)) return "firefox";
     if (/Edg\//.test(ua)) return "edge";
     if (/Chrome\//.test(ua)) return "chrome";
@@ -30,7 +30,7 @@ function glInfo() {
     return out;
 }
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
-function pct(sorted, p: number) { const n = sorted.length; return n ? sorted[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] : null; }
+function pct(sorted: number[], p: number) { const n = sorted.length; return n ? sorted[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] : null; }
 
 // ---- sources
 function makeSource() {

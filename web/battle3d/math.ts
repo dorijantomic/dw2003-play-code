@@ -7,7 +7,7 @@ import { patchCopyRect } from "../vendor/engine.js";
 // ./fight/proj-layers.js alongside the op6 layer solver that needs them, so the matrix
 // convention is stated once. Same column-major layout as before.
 
-export function mat4Perspective(fovY, aspect, near, far) {
+export function mat4Perspective(fovY: number, aspect: number, near: number, far: number) {
   const f = 1.0 / Math.tan(fovY * 0.5);
   const nf = 1.0 / (near - far);
   const m = new Float32Array(16);
@@ -30,7 +30,7 @@ export function mat4LookAt(eye, center, up) {
 }
 
 // Rotation about the Y axis (radians). Column-major, matching mat4Mul's convention.
-export function mat4RotateY(a) {
+export function mat4RotateY(a: number) {
   const c = Math.cos(a), s = Math.sin(a);
   const m = mat4Identity();
   m[0]=c; m[2]=-s; m[8]=s; m[10]=c;
@@ -46,14 +46,14 @@ export function centroid3(pts) {
 
 export function sub3(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
 
-export function cross3(a, b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+export function cross3(a, b: number[]) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
 
 export function dot3(a, b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 
 export function normalize(v) { const l = Math.sqrt(dot3(v,v)); return l<1e-6?[0,0,0]:[v[0]/l,v[1]/l,v[2]/l]; }
 
 // mat3 multiply (column-major 9-element Float32Array)
-function mat3Mul(a, b) {
+function mat3Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
   const o = new Float32Array(9);
   for (let r = 0; r < 3; r++)
     for (let c = 0; c < 3; c++)
@@ -147,7 +147,7 @@ export const TEXELS_PER_PATCH_UNIT = 4;
  * strip-relative, so the copy's VRAM strip origin is zero; the port's rect is then scaled from
  * VRAM units into the page's texels (four texels across per unit, one row down).
  */
-export function texturePatchRect(entry, scale) {
+export function texturePatchRect(entry, scale: number) {
   const u = TEXELS_PER_PATCH_UNIT * scale;
   const variant = entry.src[entry.variant] ? entry.variant : 0;
   const r = patchCopyRect(entry, variant, 0, 0);

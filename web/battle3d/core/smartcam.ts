@@ -1,6 +1,7 @@
 import { MODEL_SCALE } from "../math.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
 
+import type { Battle3dFighter } from "./types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeSmartcam(B$: Battle3DContext) {
 function _smartApply(base, p) {
@@ -10,8 +11,8 @@ function _smartApply(base, p) {
   }
 // one camera spot's numbers (all 0..1)
   function _smartScore(groups, scale, cam, fs, aspect) {
-    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2], 0, fwd[0]]);
     const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
     const t = Math.tan(cam.fov / 2), GW = 100, GH = 36, k = MODEL_SCALE * scale;
@@ -71,12 +72,12 @@ function _smartApply(base, p) {
     for (let i = 0; i < hit.length; i++) { n += hit[i]; if (boxes[i]) { nb++; nbh += hit[i]; } }
     return { cover: n / hit.length, onFighters: nb ? nbh / nb : 0, offscreen: off / Math.max(1, corners) };
   }
-function _smartTotal(m, p) {
+function _smartTotal(m: { cover: number; onFighters: number; offscreen: number; }, p) {
     return 8 * m.onFighters + 4 * m.cover + 6 * m.offscreen
       + 0.004 * Math.abs(p.yaw) + 0.5 * Math.abs(Math.log(p.h)) + 0.6 * Math.abs(Math.log(p.d));
   }
 // scores `n` more candidates of a job; returns true when the job is finished
-  function _smartStep(job, n) {
+  function _smartStep(job, n: number) {
     const t0 = performance.now();
     for (; n > 0 && job.i < B$.SMART_CANDS.length; n--, job.i++) {
       const p = B$.SMART_CANDS[job.i], m = _smartScore(job.groups, job.scale, _smartApply(job.base, p), job.fs, job.aspect), s = _smartTotal(m, p);
@@ -86,7 +87,7 @@ function _smartTotal(m, p) {
     job.ms += performance.now() - t0;
     return job.i >= B$.SMART_CANDS.length;
   }
-function _smartJob(base, fs, pk = B$.activeArena, scale = B$.arenaScale) {
+function _smartJob(base: { eye: number[]; look: number[]; fov: number; }, fs: Battle3dFighter[], pk = B$.activeArena, scale = B$.arenaScale) {
     const groups = pk?.groups; if (!groups?.length) return null;
     return { base, fs, groups, scale, aspect: B$.canvas.width / Math.max(1, B$.canvas.height), name: pk.name, i: 0, ms: 0, def: null, best: null };
   }
@@ -122,7 +123,7 @@ function _smartCameraShot() {
     const fs = [...B$.extras.values()].filter((f) => f.model && f.visible && f.aabb);
     if (!fs.length) return null;
     const near = fs.filter((f) => f.side === "player"), far = fs.filter((f) => f.side === "enemy");
-    const avg = (list) => list.length ? [list.reduce((s, f) => s + f.pos[0], 0) / list.length, list.reduce((s, f) => s + f.pos[2], 0) / list.length] : null;
+    const avg = (list: Battle3dFighter[]) => list.length ? [list.reduce((s, f) => s + f.pos[0], 0) / list.length, list.reduce((s, f) => s + f.pos[2], 0) / list.length] : null;
     const nc = avg(near) ?? avg(far), fc = avg(far) ?? avg(near);
     let minX = Infinity, maxX = -Infinity, tall = 60;
     // framed by each fighter's RESTING size (restW / restH, measured while it idles), not this frame's pose box: the box
@@ -147,7 +148,7 @@ function _smartCameraShot() {
     return { eye, look, fov: Math.PI / 3.6 };
   }
 function _projectExtras(pv, W, H) {
-    const proj = (x, y, z) => {
+    const proj = (x: number, y: number | undefined, z: number) => {
       const cx = pv[0] * x + pv[4] * y + pv[8] * z + pv[12], cy = pv[1] * x + pv[5] * y + pv[9] * z + pv[13], cw = pv[3] * x + pv[7] * y + pv[11] * z + pv[15];
       return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null;
     };

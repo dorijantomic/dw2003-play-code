@@ -54,8 +54,8 @@ const TURN = 4096;                              // PS1 angle units in one full t
  * With rx = ry = 0 this reduces to the plain spin the renderer already applied, so an
  * untipped/unturned sprite draws exactly as before.
  */
-export function spriteMatrix2x2(rx, ry, rz) {
-  const rad = (v) => ((v | 0) / TURN) * Math.PI * 2;
+export function spriteMatrix2x2(rx: number, ry: number, rz: number) {
+  const rad = (v: number) => ((v | 0) / TURN) * Math.PI * 2;
   const sx = Math.sin(rad(rx)), cx = Math.cos(rad(rx));
   const sy = Math.sin(rad(ry)), cy = Math.cos(rad(ry));
   const sz = Math.sin(rad(rz)), cz = Math.cos(rad(rz));
@@ -83,7 +83,7 @@ export class EffectPlayer {
   /** The op10 sound table (@0x800a368c): op10 effect type → packed sound id (sound-system.md). */
   op10Sound(type) { return this.manifest.op10_sounds?.[String(type)] ?? 0; }
 
-  hasType(type) { return !!this.manifest.types?.[String(type)]; }
+  hasType(type: number) { return !!this.manifest.types?.[String(type)]; }
 
   /**
    * op3 sub=0: spawn every sub-record of the type's program bin.

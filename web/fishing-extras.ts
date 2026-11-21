@@ -50,7 +50,7 @@ export function totalPercent(table) {
  * `rand` returns a number in [0, 1). The entries sit one after the other on a
  * 0..100 line, each as wide as its percent; anything past the last is no extra.
  */
-export function rollExtra(data, stage, rand) {
+export function rollExtra(data, stage, rand: () => number) {
     const table = tableFor(data, stage);
     if (!table.length) return null;
     const point = rand() * 100;
@@ -63,7 +63,7 @@ export function rollExtra(data, stage, rand) {
 }
 
 /** The area record of a stage, or null. */
-export function areaOf(data, stage) {
+export function areaOf(data, stage: string) {
     const rec = data?.stages?.[stage];
     return rec ? (data.areas ?? []).find((a) => a.id === rec.area) ?? null : null;
 }

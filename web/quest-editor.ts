@@ -4,6 +4,7 @@
 import { DIRS, PATH_NAME, questGrid, walkable, snapPoint, pathLegs, questCellFree } from "./quest-editor-lib.js";
 import type { QuestEditorWork, QuestWalkGrid, QuestEditorLoaded, QuestEditorSaveReply, QuestEditorPick, QuestEditorDrag, QuestResident } from "./types/quest-editor.js";
 
+import type { QuestCharacter } from "./types/quest-editor.js";
 const HELPER = `http://${location.hostname}:8091`;
 const $ = (id: string): any => document.getElementById(id);
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -25,7 +26,7 @@ const say = (text: string, kind = "note") => { const m = $("msg"); m.textContent
 const isDirty = () => !!work && JSON.stringify(work) !== saved;
 const refreshDirty = () => { $("dirty").textContent = isDirty() ? "(unsaved changes)" : ""; };
 const charOf = (id: number | null) => work.characters.find((c) => c.npc_id === id);
-const residentOn = (ch, map: string) => ch.residents.find((r: { map: string; }) => r.map === map);
+const residentOn = (ch: QuestCharacter | undefined, map: string) => ch.residents.find((r: { map: string; }) => r.map === map);
 
 // ---------------------------------------------------------------------------------------------------- loading
 async function fetchGrid(id: string) {

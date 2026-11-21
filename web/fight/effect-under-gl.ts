@@ -26,7 +26,7 @@ const perGl = new WeakMap();     // gl -> { prog, aP, aT, uTex, buf, tex: WeakMa
 function resources(gl) {
   let r = perGl.get(gl);
   if (r) return r;
-  const sh = (type, src) => {
+  const sh = (type, src: string) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, src);
     gl.compileShader(s);

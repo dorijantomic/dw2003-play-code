@@ -1,4 +1,5 @@
-// web/enemy-tells.js — the every-Nth countdown and the pattern breaker.
+
+import type { EnemyAiMove } from "./types/battle.js";// web/enemy-tells.js — the every-Nth countdown and the pattern breaker.
 //
 // 27 shipped enemy AI rows (web/assets/data/enemies.json) sit on condition 18:
 // engine/dw3/battle-formulas.ts::enemyMoveCondition reads
@@ -16,8 +17,8 @@
 export const EVERY_NTH = 18;   // engine/dw3/battle-formulas.ts case 18
 
 /** The rows that fire on an every-Nth turn: comparator 18, each with its index. */
-export function everyNthRows(rows) {
-  const out = [];
+export function everyNthRows(rows: EnemyAiMove[] | undefined) {
+  const out: { rowIndex: number; value: number; action: number; }[] = [];
   (rows ?? []).forEach((row, rowIndex) => {
     if (!row || row.comparator !== EVERY_NTH) return;
     out.push({ rowIndex, value: row.value, action: row.action });
@@ -49,7 +50,7 @@ export function nextTurnNumber(turnCounter: number) {
  * evaluated (pickEnemyAiMove), so a cond-18 row there is not a promise the game
  * can keep and is skipped.
  */
-export function nearestTell(rows, turnCounter: number) {
+export function nearestTell(rows: EnemyAiMove[] | undefined, turnCounter: number) {
   const next = nextTurnNumber(turnCounter);
   let best = null;
   for (const row of everyNthRows(rows)) {
@@ -68,7 +69,7 @@ export function nearestTell(rows, turnCounter: number) {
  * coming turn is the firing turn. The game's own uifont has 344 glyphs and the
  * plain hyphen is one of them; an em dash is not, so the line uses "-".
  */
-export function tellText(tell) {
+export function tellText(tell: { rowIndex: number; value: number; action: number; turns: number; }) {
   if (!tell) return "";
   return tell.turns === 0
     ? `special on turn ${tell.value} - now`

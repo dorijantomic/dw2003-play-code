@@ -20,7 +20,7 @@ const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };
 
 const DATA_LABEL = "Merchant data";
-const readJson = (path) => fetchJson(path, DATA_LABEL);
+const readJson = (path: string) => fetchJson(path, DATA_LABEL);
 const readBytes = (path) => fetchBytes(path, DATA_LABEL);
 
 let catalogPromise = null;

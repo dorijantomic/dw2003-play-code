@@ -10,7 +10,7 @@ const cache = new Map();
 export const loadStats = { requested: 0, loaded: 0, failed: [] };
 
 /** Load a GLB once; returns {parts:[{geo, src(material)}], box:Box3, size:Vector3}. Geometry is baked to world of the scene root. */
-export function loadRaw(url, color = false) {   // color = keep COLOR_0 (opt-in, own objects only); the cache is per url
+export function loadRaw(url: string, color = false) {   // color = keep COLOR_0 (opt-in, own objects only); the cache is per url
   if (cache.has(url)) return cache.get(url);
   loadStats.requested++;
   const p = new Promise((res, rej) => {

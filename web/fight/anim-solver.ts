@@ -209,9 +209,9 @@ export function solverGroup(model, { tech = null } = {}) {
 const K19F_DEBUG = typeof process !== "undefined" && !!process.env?.K19F_DEBUG;   // Node diagnostics only: the
 // module runs in the BROWSER too, where `process` does not exist and the old unguarded `process.env.K19F_DEBUG`
 // threw inside the per-tick bake (K19f item 9: the solver had never run in the real game, only in node tools).
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const smooth = (u) => { const t = clamp(u, 0, 1); return t * t * (3 - 2 * t); };
-const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+const clamp = (v, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const smooth = (u: number) => { const t = clamp(u, 0, 1); return t * t * (3 - 2 * t); };
+const lerp3 = (a, b, u: number) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
 
 /** The renderer's ch1/ch2 sampler (anim-retarget sample(), duplicated here: that module keeps it private). */
 function chan(ch, frame) {
@@ -285,7 +285,7 @@ export function headScheduleFrom(cell, { windup = 41 } = {}) {
  * actor returns to), the cell's measured lift at the peak, level again before the release: that is the
  * disc's own shape (K20a: peak +24 deg median, at 40% of the wind-up, release pitch +1.2 deg median).
  */
-export function headCastSchedule(h, t, ticks = Infinity) {
+export function headCastSchedule(h, t: number, ticks = Infinity) {
   if (!h || !(h.lift > 0) || t <= 0 || t >= ticks - 1) return 0;
   if (t < h.rise) return h.lift * smooth(t / Math.max(1, h.rise));
   const peakEnd = h.rise + h.hold;
@@ -535,7 +535,7 @@ const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const len3 = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit3 = (a) => { const l = len3(a); return l > 1e-9 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0]; };
 const ID3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-const rx = (t) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
+const rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
 const fromTo = (u, v) => {
   const a = unit3(u), b = unit3(v);
   if (!len3(a) || !len3(b)) return ID3;
@@ -564,7 +564,7 @@ const axisOf = (M) => {
 };
 const clampRot = (M, max) => { const { axis, ang } = axisOf(M); return ang <= max ? M : axisAngle(axis, max); };
 /** The same rotation, scaled to `k` of its angle — the aim's fade in/out over the cast. */
-const scaleRot = (M, k) => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
+const scaleRot = (M, k: number) => { if (!(k < 1)) return M; const { axis, ang } = axisOf(M); return ang < 1e-9 ? M : axisAngle(axis, ang * k); };
 const localOf = (c0, c1, c2) => {
   const Rz = [[Math.cos(c2 * TAU), -Math.sin(c2 * TAU), 0], [Math.sin(c2 * TAU), Math.cos(c2 * TAU), 0], [0, 0, 1]];
   const Ry = [[Math.cos(c1 * TAU), 0, Math.sin(c1 * TAU)], [0, 1, 0], [-Math.sin(c1 * TAU), 0, Math.cos(c1 * TAU)]];
@@ -579,13 +579,13 @@ function toCh2(M, prev = null) {
   else { c1 = Math.atan2(-M[2][0], cb); c2 = Math.atan2(-M[0][1], M[1][1]); c0 = 0; }
   let t = [c0 / TAU, c1 / TAU, c2 / TAU];
   if (prev) {
-    const wrap = (x, p) => { let d = x - p; d = ((d % 4096) + 4096) % 4096; if (d > 2048) d -= 4096; return p + d; };
+    const wrap = (x: number, p) => { let d = x - p; d = ((d % 4096) + 4096) % 4096; if (d > 2048) d -= 4096; return p + d; };
     const alt = [t[0] + 2048, 2048 - t[1], t[2] + 2048];
     const cost = (v) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
     const a = t.map((x, i) => wrap(x, prev[i])), b = alt.map((x, i) => wrap(x, prev[i]));
     t = cost(a) <= cost(b) ? a : b;
   }
-  const norm = (x) => { let r = Math.round(x) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
+  const norm = (x: number | undefined) => { let r = Math.round(x) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
   return [norm(t[0]), norm(t[1]), norm(t[2])];
 }
 
@@ -623,7 +623,7 @@ function rigTopology(model) {
  * technique's launch bytes (K19e §1: m094icem Ice Blow's op6 573 -> 767). With it, every frame outside the
  * baked window samples exactly what it sampled before the bake.
  */
-function withHold(own, added, holdAt) {
+function withHold(own, added, holdAt: number) {
   const out = Array.isArray(own) ? own.filter((r) => r[3] !== 30000).map((r) => r.slice()) : [];
   if (out.length && out[out.length - 1][3] < holdAt) {
     const v = out[out.length - 1];
@@ -771,7 +771,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // negates x and z). So a world-space rotation R applied to a bone's matrix rotates the DRAWN geometry
     // by S·R·S. Both the measured axis and the wanted direction therefore go through S before the
     // rotation is computed — otherwise the limb turns about a mirrored axis and never lands on the aim.
-    const num = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const num = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     const toMat = (v) => [-v[0], v[1], -v[2]];
     /**
      * The rotation to apply to a bone so that the DRAWN geometry turns `u` onto `v`. The drawn geometry is
@@ -780,7 +780,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
      * unmirrored vectors (what the position passes used to do) swings the limb through the MIRRORED arc in
      * x/z: it drove Piedmon's wrist 0.18 h the wrong way instead of onto a point well inside its reach.
      */
-    const fromToDraw = (u, v) => fromTo(toMat(u), toMat(v));
+    const fromToDraw = (u: number[], v: number[]) => fromTo(toMat(u), toMat(v));
     const measure = (site, aimPoint) => {
       const poseNow = { rot: W.map(flatOf), pos: P.map((p) => p.slice()) };
       const fa = firingAxis(target, folder, site.id, poseNow, { rest });
@@ -801,7 +801,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
      * at the target from frame 0 is not its rest pose — that turn alone buried Piedmon's upper arm 0.036 h
      * inside his own thigh at both ends of the cast.
      */
-    const turnTo = (bone, site, aimPoint, eps, maxAng = Infinity, blend = 1) => {
+    const turnTo = (bone, site, aimPoint, eps: number, maxAng = Infinity, blend = 1) => {
       let best = measure(site, aimPoint);
       if (!best) return false;
       let applied = 0;
@@ -896,7 +896,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
         // point (each joint bounded by K16.maxIk), then the AIM is distributed from the wrist inward (R1).
         // CCD needs no elbow/split guess: it works for a 2-bone chibi arm and a 5-bone knight's arm alike,
         // and it straightens the arm when the target is at the edge of reach instead of folding it.
-        const ccd = (target, passes) => {
+        const ccd = (target, passes: number) => {
           for (let pass = 0; pass < passes; pass++) {
             for (let k = chain.length - 2; k >= 0; k--) {
               const j = chain[k];
@@ -921,7 +921,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
         const mt = plan.muzzleTargets?.[idx] ?? null;
         const rt = plan.targets[idx] ?? null;
         const effOff = mt && rt ? [mt[0] - rt[0], mt[1] - rt[1], mt[2] - rt[2]] : [0, 0, 0];
-        const ccdEff = (aimScale, passes) => {
+        const ccdEff = (aimScale: number, passes: number) => {
           for (let pass = 0; pass < passes; pass++) {
             for (let k = chain.length - 2; k >= 0; k--) {
               const j = chain[k];
@@ -1101,7 +1101,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
 // ── the entry point: solve, verify, and (on pass) write into the live model ─────────────────────────
 
 /** The point an emitter's axis is aimed at: the opponent's mid-body, on its own line, in model space. */
-function targetPoint(model, plan) {
+function targetPoint(model, plan: FightPlan) {
   const H = plan.H;
   return [0, plan.floorY - H * 0.5, plan.torso[2] + SOLVER.aimDistance];
 }
@@ -1123,7 +1123,7 @@ function tipAt(pose, model, folder, s) {
  *              least SOLVER.driveFloor of it (R2 — no more aiming by standing still)
  *   reachable  the wrist gets to the planned point without stretching past the arm
  */
-export function verifyBake(model, plan, bake, group) {
+export function verifyBake(model, plan: FightPlan, bake, group) {
   const folder = model.folder;
   const off = bake.offset;
   const neutral = poseFromChannels(bake.model, plan.baseFrame ?? 0);
@@ -1398,7 +1398,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
   // the class's median hand point, the swing widened, the class's own upper quantiles, then a forward push
   // with a damped lean. The first rung that passes the gate is kept; the best (fewest failing rules) is
   // the one reported when none does, and the pair is then refused (the caller plays its existing build).
-  const makePlan = (quantile) => {
+  const makePlan = (quantile: number) => {
     const p = planCast(model, group, { quantile });
     if (!p.ok) return null;
     p.aimPoint = targetPoint(model, p);

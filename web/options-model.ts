@@ -39,9 +39,9 @@ export const EXTRA_GROUPS = Object.freeze([
     { id: "online", label: "Online", keys: ["serverchamp", "mpbubbles", "mpcredit"], help: "League nights, reaction bubbles, and co-op wins that count for quests." },
 ]);
 /** One-time reset: older builds let the Battle ideas row switch practice2v2 on, which made every wild fight 2 vs 2. Returns true when practice2v2 must be turned off once (done = the stored marker). */
-export function needsPractice2v2Reset(fx: AmbienceSettings, done) { return !done && !!fx?.practice2v2; }
+export function needsPractice2v2Reset(fx: AmbienceSettings, done: string | null) { return !done && !!fx?.practice2v2; }
 /** One-time reset: the Mount switch started out off (a dev switch); it is a game feature now and starts on. Returns true when an old save that holds it off must turn it on once (done = the stored marker). The player may switch it off again in OPTIONS and it stays off. */
-export function needsMountOnReset(fx: AmbienceSettings, done) { return !done && fx?.mount !== true; }
+export function needsMountOnReset(fx: AmbienceSettings, done: string | null) { return !done && fx?.mount !== true; }
 export const SHOWN_EXTRAS = Object.freeze(["quests", "mount"]);
 const WIDE_KEYS = Object.freeze(["widefield", "battlewide"]);
 const TOON_KEYS = Object.freeze(["toonoutline", "toonshade"]);
@@ -124,20 +124,20 @@ export const OPTIONS_HOME = (() => {
 })();
 
 // ---------------------------------------------------------------- reading and writing the store
-const on = (store, keys) => keys.some((k) => store.get(k) === true);
-const setAll = (store, keys, value) => store.setMany(Object.fromEntries(keys.map((k) => [k, value])));
+const on = (store: { get: (arg0: string) => boolean; }, keys: string[]) => keys.some((k) => store.get(k) === true);
+const setAll = (store, keys: string[], value: boolean) => store.setMany(Object.fromEntries(keys.map((k) => [k, value])));
 
 /** The Detail keys a player can change. The "auto" and "out" ones (uisharp, devils) have no switch in the installed copy, so they never decide what Detail reads. */
 const DETAIL_PLAYER_KEYS = Object.freeze(DETAIL_KEYS.filter((k) => shipClass(k) === "in"));
 /** "original" | "low" | "medium" | "high", or "custom" when F2 or the EFFECTS page has put the player's Detail keys somewhere between. */
-export function detailOf(store) {
+export function detailOf(store: { get: (arg0: string) => boolean; }) {
     for (const level of [...DETAIL_LEVELS].reverse()) {
         const off = new Set(DETAIL_OFF[level]);
         if (DETAIL_PLAYER_KEYS.every((k) => (store.get(k) === true) === !off.has(k)) && store.get("quality") === DETAIL_QUALITY[level]) return level;
     }
     return "custom";
 }
-export function applyDetail(store, level) {
+export function applyDetail(store, level: string | undefined) {
     const off = new Set(DETAIL_OFF[level]);
     store.setMany({ ...Object.fromEntries(DETAIL_KEYS.map((k) => [k, !off.has(k)])), quality: DETAIL_QUALITY[level] });
 }
@@ -148,18 +148,18 @@ const WEATHERS = Object.freeze(["auto", "always", "storm", "clear"]);   // web/a
 const MAP_SCREENS = Object.freeze(["classic", "new"]);   // web/map-screen-book.js; classic = the game's own MAP page
 const VOLUMES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);   // tenths; 10 = today's gain
 
-const toggleRow = (id, label, help, keys) => ({
+const toggleRow = (id: string, label: string, help: string, keys: string[]) => ({
     id, label, help, keys, choices: ["Off", "On"],
-    read: (s) => (on(s, keys) ? 1 : 0), write: (s, i) => setAll(s, keys, i === 1),
+    read: (s: { get: (arg0: string) => boolean; }) => (on(s, keys) ? 1 : 0), write: (s, i: number) => setAll(s, keys, i === 1),
 });
-const valueRow = (id, label, help, key, values, labels) => ({
+const valueRow = (id: string, label: string, help: string, key: string, values: readonly string[] | (string | undefined)[], labels: string[] | (string | undefined)[]) => ({
     id, label, help, choices: labels,
-    read: (s) => Math.max(0, values.indexOf(s.get(key))), write: (s, i) => s.setMany({ [key]: values[i] }),
+    read: (s: { get: (arg0: string) => string; }) => Math.max(0, values.indexOf(s.get(key))), write: (s, i: string | number) => s.setMany({ [key]: values[i] }),
 });
-const volumeRow = (id, label, help, key) => ({
+const volumeRow = (id: string, label: string, help: string, key: string) => ({
     id, label, help, numeric: true, choices: VOLUMES.map((v) => String(v * 10)),
     read: (s) => { const v = Number(s.get(key)); return Number.isFinite(v) ? Math.min(10, Math.max(0, Math.round(v * 10))) : 10; },
-    write: (s, i) => s.setMany({ [key]: VOLUMES[i] / 10 }),
+    write: (s, i: string | number) => s.setMany({ [key]: VOLUMES[i] / 10 }),
 });
 
 /** Every row, by id. `pixelFilters` = [[id, label], ...] (web/sprite-filters.js SPRITE_FILTERS limited to the GPU ones). */
@@ -168,26 +168,26 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
         battleSpeed: {
             id: "battleSpeed", label: "Battle speed", keys: ["battlespeed", "battleSpeed"], numeric: true, choices: SPEEDS.map((v) => `x${v}`),
             help: "How fast battles play. x1 is the speed of the original game.",
-            read: (s) => {
+            read: (s: { get: (arg0: string) => boolean; }) => {
                 if (s.get("battlespeed") !== true) return 0;                       // the switch is off: the game really runs x1
                 const v = Number(s.get("battleSpeed"));
                 const want = Number.isFinite(v) ? v : 2;
                 return SPEEDS.reduce((best, sp, k) => (Math.abs(sp - want) < Math.abs(SPEEDS[best] - want) ? k : best), 0);
             },
-            write: (s, i) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
+            write: (s, i: string | number) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
         },
         randomFights: {
             id: "randomFights", label: "Random fights", keys: ["encounterdial", "encounterDialMode"], choices: ["Fewer", "Normal", "More"],
             help: "How often wild Digimon attack you while you walk.",
             read: (s) => (s.get("encounterdial") === true ? DIAL.indexOf(s.get("encounterDialMode")) : 1),   // -1 = "none" set in F2
             customLabel: () => "Never",
-            write: (s, i) => (DIAL[i] === "normal" ? s.setMany({ encounterdial: false, encounterDialMode: "normal" }) : s.setMany({ encounterdial: true, encounterDialMode: DIAL[i] })),
+            write: (s, i: string | number) => (DIAL[i] === "normal" ? s.setMany({ encounterdial: false, encounterDialMode: "normal" }) : s.setMany({ encounterdial: true, encounterDialMode: DIAL[i] })),
         },
         detail: {
             id: "detail", label: "Detail", choices: DETAIL_LABELS,
             help: "Small map effects. Original = exactly like the PlayStation game.",
-            read: (s) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
-            write: (s, i) => applyDetail(s, DETAIL_LEVELS[i]),
+            read: (s: { get: (arg0: string) => boolean; }) => DETAIL_LEVELS.indexOf(detailOf(s)), customLabel: () => "Custom",
+            write: (s, i: string | number) => applyDetail(s, DETAIL_LEVELS[i]),
         },
         timeOfDay: valueRow("timeOfDay", "Time of day", "Keep the map at one time of day, or let it change by itself.", "todMode", TODS, ["Auto", "Day", "Golden", "Dusk", "Night"]),
         weather: valueRow("weather", "Weather", "Random weather, weather all the time, storms only, or clear skies.", "weatherMode", WEATHERS, ["Random", "Always", "Storms", "Clear"]),
@@ -200,7 +200,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
         const keys = c.items.map((i) => i.key);
         rows[`cat:${c.id}`] = {
             id: `cat:${c.id}`, label: c.label, help: c.help, menu: true, choices: ["All", "Some", "None"],
-            read: (s) => (keys.every((k) => s.get(k) === true) ? 0 : on(s, keys) ? 1 : 2), write: () => { },
+            read: (s: { get: (arg0: string) => boolean; }) => (keys.every((k) => s.get(k) === true) ? 0 : on(s, keys) ? 1 : 2), write: () => { },
         };
     }
     for (const g of EXTRA_GROUPS.filter((x) => SHOWN_EXTRAS.includes(x.id))) rows[`extra:${g.id}`] = toggleRow(`extra:${g.id}`, g.label, g.help, g.keys);
@@ -228,7 +228,7 @@ export function createOptionsModel(store, pixelFilters) {
     const lockedRow = (r) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
     const backRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
     let page = 0, row = 0, top = 0, open = null;          // open = the EFFECTS category that is showing its switches, or null
-    const switchRows = (c) => [...c.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
+    const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
     const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page].rows.map((id) => rows[id]));
     const here = () => pageRows()[row];
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };
@@ -254,18 +254,18 @@ export function createOptionsModel(store, pixelFilters) {
             });
         },
         help: () => (lockedRow(here()) ? HOST_NOTE : here().help),
-        switchPage(d) {
+        switchPage(d: number) {
             const next = Math.min(PAGES.length - 1, Math.max(0, page + d));
             if (next === page) return null;
             open = null; page = next; row = 0; top = 0; return "move";
         },
-        moveRow(d) {
+        moveRow(d: number) {
             const next = Math.min(pageRows().length - 1, Math.max(0, row + d));
             if (next === row) return null;
             row = next; clampTop(); return "move";
         },
         /** d = -1 / +1. From a custom value, right picks the first choice and left the last. On a category row, right opens it. */
-        change(d) {
+        change(d: number) {
             const r = here();
             if (r.menu) return d > 0 ? this.select() : null;
             if (r.back || lockedRow(r)) return null;

@@ -149,7 +149,7 @@ export function closeCutContent() {
  * opens it (not on page load, not on ticking the switch). The F2 button "Open the cut-content gallery"
  * opens it (openCutContent); Cross closes it; switching the setting off closes it.
  */
-export function tickCutContent(enabled) {
+export function tickCutContent(enabled: boolean) {
   const on = enabled === true;
   if (!on && S.open) closeCutContent();
   S.wasOn = on;
@@ -170,7 +170,7 @@ export function cutContentPress(k) {
 }
 
 /** Break text into lines no longer than `cols` characters, on spaces (a long token keeps its own line). */
-export function wrapText(text, cols) {
+export function wrapText(text: string, cols: number) {
   const out = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {

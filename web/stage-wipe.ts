@@ -67,14 +67,14 @@ export const WIPE_CELL_OVERLAY = 8;
 export const WIPE_SEAM_RGB = [16, 24, 48];
 
 // The 0..255 darkness one cover level paints.
-export function coverLevel(level) {
+export function coverLevel(level: number) {
     return Math.min(255, ((level >> 8) & 0xff) * WIPE_CELL_OVERLAY);
 }
 
 // One close frame, counted from 1 the way the original counts it: the tick that
 // initialises the object (w=0x140, h=0xF0, level=0) is also the tick that
 // subtracts the first step, and it draws the cover at level 0.
-export function closeFrame(frame) {
+export function closeFrame(frame: number) {
     const n = Math.max(0, Math.floor(frame));
     return {
         w: Math.max(0, WIPE_W - WIPE_CLOSE_STEP_W * n),
@@ -91,10 +91,10 @@ export function closeFrame(frame) {
 // centre (the player entity's screen position, or 160/120 with no player),
 // subtracts half the width and half the height with the truncating-toward-zero
 // divide, clamps the origin at 0 and then clips the size to the screen.
-export function closeWindow(frame, centerX, centerY) {
+export function closeWindow(frame: number, centerX: number | undefined, centerY: number | undefined) {
     const { w, h } = closeFrame(frame);
     // `(v + ((u32)v >> 31)) >> 1`: a rounding-toward-zero halving.
-    const half = (v) => (v + (v < 0 ? -1 : 0)) >> 1;
+    const half = (v: number) => (v + (v < 0 ? -1 : 0)) >> 1;
     const cx = centerX == null ? WIPE_CENTER_X : centerX;
     const cy = centerY == null ? WIPE_CENTER_Y : centerY;
     const x = Math.max(0, cx - half(w));
@@ -157,7 +157,7 @@ export function createWipeClock() {
     return { phase: null, t: 0, frame: 0 };
 }
 
-export function stepWipeClock(clock, dir, dt) {
+export function stepWipeClock(clock: { phase: number; t: number; frame: number; }, dir: number, dt: number) {
     if (dir !== clock.phase) {
         clock.phase = dir;
         clock.t = 0;
@@ -173,7 +173,7 @@ export function stepWipeClock(clock, dir, dt) {
 // The progress the shared fade runs on: 0 -> 1 across the close, 1 -> 0 across
 // the open, so the stage swap still lands on `alpha >= 1` exactly when the
 // window reaches zero.
-export function wipeProgress(clock) {
+export function wipeProgress(clock: { phase: number; t: number; frame: number; }) {
     if (clock.phase === 1) return clock.frame / WIPE_CLOSE_FRAMES;
     if (clock.phase === -1) return 1 - clock.frame / WIPE_OPEN_FRAMES;
     return 0;
@@ -260,7 +260,7 @@ export const WIPE_SCHEDULE = [
 ];
 
 // cell(col,row) = (col*64, row*40); index = col*6 + row (column-major).
-export function checkerboardCell(i) {
+export function checkerboardCell(i: number) {
     const col = Math.floor(i / WIPE_A28_ROWS);
     const row = i % WIPE_A28_ROWS;
     return { col, row, x: col * WIPE_A28_CELL_W, y: row * WIPE_A28_CELL_H };
@@ -271,7 +271,7 @@ export function checkerboardCell(i) {
 export function checkerboardWordIndex(ptr) {
     return (ptr - WIPE_A28_GRID_BASE) / 4;
 }
-export function checkerboardRecordCell(rec) {
+export function checkerboardRecordCell(rec: { ptr: number; mode: number; limit: number; } | undefined) {
     return Math.floor(checkerboardWordIndex(rec.ptr) / 2);
 }
 export function checkerboardRecordAxis(rec) {

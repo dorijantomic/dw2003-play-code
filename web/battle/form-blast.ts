@@ -11,6 +11,7 @@ import {
 import { normalizeDvGauge } from "./layout.js";
 import type { BattlePartyEntry } from "./core/types.js";
 
+import type { DigimonRecord, BattleState } from "../types/battle.js";
 /**
  * The disc's per-form learn/load pass, one battle's worth: F0x8008670C until it
  * answers 0, then F0x80086844 until it answers 0. Each service fills ONE slot,
@@ -64,7 +65,7 @@ export function partyEntriesWithSize(entries, fxOn: boolean, k = 1) {
  * shipped MODEL_SCALE. ON: our side takes `playerK` (part 2's slider; 1 until it exists) and
  * the enemy takes the current party entry's `size` (1 when it carries none).
  */
-export function applyGiantScales(renderer: { setFighterScale: (arg0: string, arg1: number) => void; }, entry, fxOn: boolean, playerK = 1) {
+export function applyGiantScales(renderer: { setFighterScale: (arg0: string, arg1: number) => void; }, entry: BattlePartyEntry | undefined, fxOn: boolean, playerK = 1) {
   if (!renderer || typeof renderer.setFighterScale !== "function") return false;
   if (!fxOn) return false;
   renderer.setFighterScale("player", clampFighterScale(playerK));
@@ -106,7 +107,7 @@ export function finalBossPhaseSwitchesTrack(specialMode: number, battleKind: num
 // field_encounters, e.g. boss screens carry boss-specific hp / 9999 mp) over the walker's
 // computed fallback. A non-positive/absent real value (0 or undefined) means "not in the
 // data" → use the fallback. Pure.
-export function enemyVitals(real, fallback) {
+export function enemyVitals(real: { hp: number | undefined; mp: number | undefined; }, fallback) {
   return {
     hp: real?.hp > 0 ? real.hp : fallback.hp,
     mp: real?.mp > 0 ? real.mp : fallback.mp,
@@ -128,7 +129,7 @@ export function setLiveBattleForm(record, profile) {
  * fight's `mpKit.blastForm` both call it. The profile table is handed in, since
  * the page's `digimonDB` is a closure of its own.
  */
-export function blastTargetProfile(rec, db) {
+export function blastTargetProfile(rec, db: { [k: string]: DigimonRecord; }) {
   const rookie = db?.[rec?.rookieId];
   const id = blastTargetId(rookie?.blasts, rec?.level ?? 1);
   return id ? (db?.[id] ?? null) : null;
@@ -244,7 +245,7 @@ function formChangeView(b, position: number, profile = null) {
  * Tag commit; the report then pays DVEXP and the form-level ladder, and tries
  * one learn and one loadable, per marked row.
  */
-export function markFormTaken(b, position, speciesId) {
+export function markFormTaken(b, position: number, speciesId: number) {
   if (!b?.playerRecords?.[position]) return;
   engineMarkEquippedFormFlags(formChangeView(b, position), Number(speciesId));
 }
@@ -283,7 +284,7 @@ export function markedEquippedForms(flags, equipped) {
  * @param profile the profile the Digimon takes (its id is what the record carries)
  * @param position the party position that changes (the acting one for a Digivolve)
  */
-export function commitBattleFormChange(b, profile, position = b?.activePlayerIndex ?? 0) {
+export function commitBattleFormChange(b: BattleState, profile: DigimonRecord, position = b?.activePlayerIndex ?? 0) {
   const record = b?.playerRecords?.[position];
   if (!record) return null;
   engineCommitManualDigivolve(formChangeView(b, position, profile), Number(profile?.id));
@@ -355,7 +356,7 @@ export function releaseReservedSecondForm(b, persist = true) {
  * Exported so a headless check can pin the rule with the very call `endBattle`
  * makes. Returns true when the release ran.
  */
-export function battleOutcomeRelease(b, result: string) {
+export function battleOutcomeRelease(b: BattleState, result: string) {
   if (!b?.blast?.active) return false;
   return releaseReservedSecondForm(b, result !== "lose");
 }

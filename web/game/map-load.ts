@@ -110,7 +110,7 @@ export function setCharacter(i) {
     updateHud();
 }
 
-function findFreeSpot(grid, x, y) {
+function findFreeSpot(grid, x: number, y: number) {
     if (!grid) return { x, y };
     for (let radius = 0; radius < 600; radius += 8) {
         for (let a = 0; a < 16; a++) {
@@ -206,7 +206,7 @@ function loadMapPicture(url) {
 }
 
 // HD full picture (no tiles): the terrain effects get a native copy (state.mapNativeImgs).
-function keepNativeCopy(id, part, url, img) {
+function keepNativeCopy(id, part: string, url, img) {
     if (!HD_MAPS || assetImageScale(img) <= 1) return;
     loadNativeImage(url).then((n) => {
         if (retainedStageIds.has(id)) (state.mapNativeImgs[id] ??= {})[part] = n;
@@ -220,7 +220,7 @@ export function effectsMapImg(id, part = "base") {
     return state.mapNativeImgs[id]?.[part] ?? null;
 }
 
-export function drawMapPicture(img, tm, kind, ox, oy) {
+export function drawMapPicture(img, tm, kind: string | null, ox: number, oy: number) {
     if (!tm) { ctx.drawImage(img, ox, oy); return; }
     const key = `${tm.name}:${kind}`;
     if (!tilesComplete.get(key)) ctx.drawImage(img, ox, oy);
@@ -663,7 +663,7 @@ export function setMap(i, spawn = null) {
     queueMicrotask(() => activateStageNeighborhood(m.id));
 }
 
-export function addEntranceReturn(destId, arriveX, arriveY, fromId, fromPos) {
+export function addEntranceReturn(destId, arriveX, arriveY, fromId, fromPos: { x: number; y: number; dir: string; }) {
     const scene = state.scenes[destId];
     if (!scene) return;
     scene.exits = scene.exits ?? [];

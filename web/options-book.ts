@@ -36,7 +36,7 @@ export const OPTIONS_WINDOW = Object.freeze({
 });
 
 /** Header: "OPTIONS", then L1, the page tabs and R1 in one row, each measured so no two touch. Boxes are [x0, x1]. */
-export function headerLayout(widthOf, title, tabs, hintW = widthOf("L1")) {
+export function headerLayout(widthOf, title: string, tabs: string[], hintW = widthOf("L1")) {
     const titleX = 44, l1 = titleX + widthOf(title) + 8, tabStart = l1 + hintW + 8, tabGap = 8;
     const xs = layoutTabs(tabs, widthOf, tabStart, tabGap);
     const tabBoxes = tabs.map((t, i) => [xs[i], xs[i] + widthOf(t)]);
@@ -56,7 +56,7 @@ export function rowLayout(widthOf, r, win = OPTIONS_WINDOW) {
 export function createOptionsBook({ sfx = null, fx = () => (typeof window !== "undefined" ? window.__fx : null), setFxMany = (o) => window.__setFxMany?.(o), locked = (k) => !!(typeof window !== "undefined" && window.__hostRules?.locked(k)) } = {}) {
     const store = { get: (k) => fx()?.[k], setMany: (o) => setFxMany(o), locked: (k) => locked(k) };
     const model = createOptionsModel(store, pixelFilterChoices());
-    const cue = (result) => { if (result) sfx?.play?.("system02"); };
+    const cue = (result: string | null) => { if (result) sfx?.play?.("system02"); };
     return {
         windows: ["title", "list", "help"],
         wall: false,

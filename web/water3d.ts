@@ -147,7 +147,7 @@ const WATER_STAGES = new Set([
 // on forest shadows elsewhere (e.g. Wind Prairie), so it is opt-in per stage.
 const GREEN_WATER_STAGES = new Set(["s380", "s381"]); // Divermon's Lake
 
-function isWater(r, g, b, greenMode) {
+function isWater(r, g, b, greenMode: boolean) {
     if (b >= 62 && b > r + 28 && b > g + 6 && r < 150) return true;
     return greenMode && g >= 45 && g <= 150 && g > r + 18
         && b >= g * 0.4 && b <= g * 0.97 && g - b <= 60 && b >= 20;
@@ -161,7 +161,7 @@ export function waterPixelTest(stageId) {
     return (r, g, b) => isWater(r, g, b, greenMode);
 }
 
-function boxBlur(src, W, H, rad) {
+function boxBlur(src: Uint8Array<ArrayBuffer>, W: number, H: number, rad: number) {
     const tmp = new Float32Array(W * H);
     const out = new Uint8Array(W * H);
     const win = rad * 2 + 1;
@@ -187,7 +187,7 @@ function boxBlur(src, W, H, rad) {
 
 // clsImg decides WHERE the water is (the base map for a day/night variant);
 // the shader draws it over mapImg, the map on screen, so it keeps that palette.
-function buildStage(stageId, mapImg, clsImg) {
+function buildStage(stageId, mapImg: HTMLImageElement, clsImg) {
     const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
@@ -232,7 +232,7 @@ function buildStage(stageId, mapImg, clsImg) {
 }
 
 // Returns the hidden canvas (VIEW_W*PX by VIEW_H*PX, camera-relative) or null.
-export function renderWater(stageId, mapImg, camX, camY, timeSec) {
+export function renderWater(stageId, mapImg, camX: number, camY: number, timeSec: number) {
     if (!WATER_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;

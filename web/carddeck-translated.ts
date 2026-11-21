@@ -28,7 +28,7 @@ const BANK_SOURCES = [
 ];
 
 let dataPromise = null;
-function loadData(language) {
+function loadData(language: number | undefined) {
   dataPromise ??= loadAll(language).catch((error) => { dataPromise = null; throw error; });
   return dataPromise;
 }

@@ -103,7 +103,7 @@ export function mat4RotPSX(ax: number, ay: number, az: number) {
  * held past the last one. Tracks terminate with a frame-30000 sentinel that repeats the
  * final value, so holding and interpolating into the sentinel agree.
  */
-export function sampleTrack(keys, t, dflt) {
+export function sampleTrack(keys, t: number, dflt: number[]) {
   if (!keys || !keys.length) return dflt;
   let prev = keys[0];
   if (t <= prev[0]) return [prev[1], prev[2], prev[3]];
@@ -244,7 +244,7 @@ export function clipFrameAt(clip, t: number) {
   return clipEntry(clip, i);
 }
 
-function localMatrix(layer, t) {
+function localMatrix(layer, t: number) {
   const tr = layer.tracks || {};
   const sc = sampleTrack(tr.s, t, [0x1000, 0x1000, 0x1000]);
   const tl = sampleTrack(tr.t, t, [0, 0, 0]);

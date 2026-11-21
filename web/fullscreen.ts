@@ -1,6 +1,6 @@
 // Browser-fullscreen toggle shared by the title gesture and the in-game F key.
 // Keep the API wrapper DOM-light so its enter/exit behavior is unit-testable.
-export async function toggleGameFullscreen(doc, stage) {
+export async function toggleGameFullscreen(doc: Document, stage: HTMLElement) {
   if (!doc || !stage) return false;
   try {
     if (doc.fullscreenElement) {
@@ -21,21 +21,21 @@ export async function toggleGameFullscreen(doc, stage) {
 // browser fullscreen. Remembered across reloads.
 const FILL_KEY = "dw2003.windowFill";
 
-export function setWindowFill(doc, on) {
+export function setWindowFill(doc: Document, on: boolean) {
   doc?.documentElement?.classList.toggle("window-fill", !!on);
   try { localStorage.setItem(FILL_KEY, on ? "1" : "0"); } catch { }
   // The battle canvas and the backing-size code resize on window resize.
   doc?.defaultView?.dispatchEvent?.(new Event("resize"));
 }
 
-export function restoreWindowFill(doc) {
+export function restoreWindowFill(doc: Document) {
   let on = false;
   try { on = localStorage.getItem(FILL_KEY) === "1"; } catch { }
   if (on) setWindowFill(doc, true);
 }
 
 // The F key: normal -> fill window -> browser fullscreen -> normal.
-export async function cycleGameScreen(doc, stage) {
+export async function cycleGameScreen(doc: Document, stage: HTMLElement | null) {
   if (!doc || !stage) return;
   const fill = doc.documentElement.classList.contains("window-fill");
   if (doc.fullscreenElement) {

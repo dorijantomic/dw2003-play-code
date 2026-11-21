@@ -447,7 +447,7 @@ void main(){
   });
 }
 /** sea spray / surf mist: n soft billboard puffs pulsing along the waterline */
-export function seaSpray(xs, seed = 3, zOf = (x: number | undefined) => shoreZ(x) - 0.4) {
+export function seaSpray(xs: number[], seed = 3, zOf = (x: number | undefined) => shoreZ(x) - 0.4) {
   const r = rng(seed), n = xs.length, m = new THREE.Matrix4();
   const geo = new THREE.PlaneGeometry(1, 1);
   const mat = new THREE.ShaderMaterial({

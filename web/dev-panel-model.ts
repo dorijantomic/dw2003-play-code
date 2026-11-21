@@ -19,7 +19,7 @@ export const DEV_FILTERS = Object.freeze([
     { id: "all", name: "All" }, { id: "in", name: "In" }, { id: "auto", name: "Auto" }, { id: "out", name: "Out" },
 ]);
 
-const R = (tab, sub, key, name, why) => Object.freeze({ key, tab, sub, name, why });
+const R = (tab: string, sub: string, key: string, name: string, why: string) => Object.freeze({ key, tab, sub, name, why });
 
 export const DEV_ROWS = Object.freeze([
     // ---- World
@@ -132,7 +132,7 @@ export const DEV_ROWS = Object.freeze([
 
 // Keys that have a page or screen to open. `extra` = an in-game screen (the open-extra hook in web/game.js);
 // otherwise `href` opens in a new tab. Opening needs the key's own switch on.
-const P = (href, noopener = true) => Object.freeze({ href, noopener });
+const P = (href: string, noopener = true) => Object.freeze({ href, noopener });
 const X = () => Object.freeze({ extra: true });
 export const DEV_OPEN = Object.freeze({
     cutcontent: X(), blastladder: X(), planner: X(), damagelab: X(), replay: X(), soundtest: X(),
@@ -145,8 +145,8 @@ export const DEV_OPEN = Object.freeze({
 });
 
 const BY_KEY = new Map(DEV_ROWS.map((r) => [r.key, r]));
-export const rowFor = (key) => BY_KEY.get(key) || null;
-export const rowsOfTab = (tab) => DEV_ROWS.filter((r) => r.tab === tab);
+export const rowFor = (key: string) => BY_KEY.get(key) || null;
+export const rowsOfTab = (tab: string) => DEV_ROWS.filter((r) => r.tab === tab);
 
 /** { tabId: { on, total } }: switches on per tab (a missing or false value is off). */
 export function tabCounts(fx) {
@@ -157,7 +157,7 @@ export function tabCounts(fx) {
 }
 
 /** Does this row match the typed words? Every word must appear in the name or the explanation (any case). */
-export function matchesQuery(row, query) {
+export function matchesQuery(row: Readonly<{ key: string; tab: string; sub: string; name: string; why: string; }>, query: string) {
     const words = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
     if (!words.length) return true;
     const hay = (row.name + " " + row.why).toLowerCase();
@@ -165,7 +165,7 @@ export function matchesQuery(row, query) {
 }
 
 /** Does this row pass the In / Auto / Out filter? ("all" passes everything.) */
-export function matchesFilter(row, filter, shipOf = shipClass) {
+export function matchesFilter(row: Readonly<{ key: string; tab: string; sub: string; name: string; why: string; }>, filter: string, shipOf = shipClass) {
     return !filter || filter === "all" || shipOf(row.key) === filter;
 }
 
@@ -179,7 +179,7 @@ export function selectRows({ tab = "world", query = "", filter = "all" } = {}, s
 }
 
 /** Group consecutive rows under their sub-heading: [{ tab, sub, rows }]. */
-export function groupRows(rows) {
+export function groupRows(rows: Readonly<{ key: string; tab: string; sub: string; name: string; why: string; }>[]) {
     const groups = [];
     for (const r of rows) {
         const g = groups[groups.length - 1];

@@ -7,11 +7,11 @@
 import { canvasEventToLogical } from "./canvas-resolution.js";
 import type { SceneEditorState } from "./types/sceneEditor.js";
 
-export function createSceneEditor(canvas, getCtx) {
+export function createSceneEditor(canvas: HTMLCanvasElement, getCtx) {
   // getCtx: () => ({ scene, mapId, camX, camY, zoom })
   const ed = { armed: null, dragStart: null, lastMouse: null } as SceneEditorState;
 
-  const toMap = (e) => {
+  const toMap = (e: MouseEvent) => {
     const { camX, camY, zoom } = getCtx();
     const logical = canvasEventToLogical(canvas, e);
     return {
@@ -39,7 +39,7 @@ export function createSceneEditor(canvas, getCtx) {
     finishRect(e, kind);
   });
 
-  function placeNpc(e) {
+  function placeNpc(e: MouseEvent) {
     const { scene } = getCtx();
     const p = toMap(e);
     const sprite = window.prompt("sprite id (e.g. p020rdsz):");
@@ -54,7 +54,7 @@ export function createSceneEditor(canvas, getCtx) {
     });
   }
 
-  function finishRect(e, kind) {
+  function finishRect(e: MouseEvent, kind) {
     const a = ed.dragStart, b = toMap(e);
     ed.dragStart = null;
     const rect = {

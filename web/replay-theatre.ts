@@ -103,7 +103,7 @@ const firstSayOf = (ev) => (ev?.disasm ?? []).find((line) => typeof line === "st
  *   elsewhere true for a reached room they must walk to (its Play returns false)
  * Rows come in ladder order (the disc's own play order), then by event id.
  */
-export function replayRows(mapId, wstag, ladder, ordinal) {
+export function replayRows(mapId, wstag, ladder, ordinal: number) {
   const { byStage, names } = ladderParts(ladder);
   const reached = Number(ordinal) || 0;
   const rows = [];
@@ -123,7 +123,7 @@ export function replayRows(mapId, wstag, ladder, ordinal) {
       });
     }
   }
-  const beatOf = (stageId) => byStage[stageId]?.[0] ?? Number.MAX_SAFE_INTEGER;
+  const beatOf = (stageId: string) => byStage[stageId]?.[0] ?? Number.MAX_SAFE_INTEGER;
   rows.sort((a, b) => (beatOf(a.mapId) - beatOf(b.mapId)) || a.mapId.localeCompare(b.mapId) || a.eventId - b.eventId);
   return rows;
 }
@@ -195,7 +195,7 @@ export function closeReplay() {
  * Switching the switch off closes it; Start or Cross close it too. `rowsNow` and `free` are kept so the
  * call shape is unchanged; nothing is built here.
  */
-export function tickReplay(enabled, rowsNow, free = true) {
+export function tickReplay(enabled: boolean, rowsNow, free = true) {
   const on = enabled === true;
   if (!on && S.open) closeReplay();
   S.wasOn = on;

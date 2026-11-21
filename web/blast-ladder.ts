@@ -62,7 +62,7 @@ export const tierForLevel = levelTier;
 /**
  * The ladder text for a tier: "level 1-3", "level 4-18", ... Pure.
  */
-export function bracketLabel(tier) {
+export function bracketLabel(tier: number) {
   const [min, max] = BLAST_BRACKETS[tier] ?? BLAST_BRACKETS[0];
   return `level ${min}-${max}`;
 }
@@ -186,7 +186,7 @@ export function openBlastLadder() {
  * Cross closes it; switching the switch off closes it. With the switch off nothing is
  * fetched and nothing exists.
  */
-export function tickBlastLadder(on) {
+export function tickBlastLadder(on: boolean) {
   const enabled = on === true;
   if (!enabled && S.open) S.open = false;
   S.wasOn = enabled;
@@ -210,7 +210,7 @@ export function blastPress(button) {
 }
 
 /** Break text into lines no longer than `cols` characters, on spaces. */
-function wrapText(text, cols) {
+function wrapText(text: string, cols: number) {
   const out = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
@@ -238,7 +238,7 @@ export const BLAST_NOTES = [
   "The form itself is the starter's own blasts[tier] (profile byte +0x50+tier).",
 ];
 
-function drawMessage(ctx, W, H, message) {
+function drawMessage(ctx, W: number, H: number, message: string) {
   ctx.save();
   ctx.fillStyle = "rgba(4,6,12,0.96)";
   ctx.fillRect(0, 0, W, H);

@@ -46,13 +46,13 @@ const HALF = 70;
 /** Shared meadow scene: all shared assets together. */
 export async function buildShared(ctx) {
   const root = new THREE.Group(), info = { species: [] };
-  const note = (name, n: number, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0) : 0 });
+  const note = (name: string, n: number, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0) : 0 });
   const tex = await Promise.all(["grass_path_2", "rocky_terrain", "gravel_ground_01", "sand_01"].map((n) => loadTex(`${ASSETS}polyhaven/tex/${n}_diff_1k.jpg`)));
   const gg = new THREE.PlaneGeometry(HALF * 2.6, HALF * 2.6, 100, 100); gg.rotateX(-Math.PI / 2);
   const gp = gg.attributes.position; for (let i = 0; i < gp.count; i++) gp.setY(i, terrainH(gp.getX(i), gp.getZ(i), 1.6)); gg.computeVertexNormals();
   root.add(new THREE.Mesh(gg, groundMaterial(tex, { tile: 3.2, tints: [[0.85, 1.12, 0.65], [1, 1, 1], [1, 1, 1], [1, 1, 1]], splat: [0.5, 0.6, 0.55, 0.55] })));
   const area = [0, 0, HALF, HALF], FD = [30, 55];
-  const add = async (name, parts, n: number, dens, sc: number[]) => { const s = scatter(n, name.length * 13 + n, area, dens, { scale: sc }); const g = instancedParts(parts, s.mats, s.count, name); root.add(g); note(name, s.count, parts); };
+  const add = async (name: string, parts, n: number, dens, sc: number[]) => { const s = scatter(n, name.length * 13 + n, area, dens, { scale: sc }); const g = instancedParts(parts, s.mats, s.count, name); root.add(g); note(name, s.count, parts); };
   const vn = (x: number, z: number, f: number, s: number) => 0.5 + 0.5 * Math.sin(x * f + s) * Math.cos(z * f * 1.3 + s * 2);
   await add("grass blades", P.grassClumpParts({ seed: 7, blades: 4, segs: 3, h: [0.3, 0.6], tipCol: [0.62, 0.82, 0.25], fade: [26, 50] }), 22000, (x: number, z: number) => 0.55 + 0.45 * vn(x, z, 0.09, 1), [0.8, 1.5]);
   await add("grass tall", P.grassClumpParts({ seed: 11, blades: 4, segs: 3, h: [0.6, 1.1], w: 0.045, fade: [26, 50] }), 3500, (x: number, z: number) => vn(x, z, 0.06, 5) > 0.55 ? 1 : 0.1, [0.9, 1.5]);

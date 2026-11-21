@@ -68,6 +68,7 @@ import { _drawEquip, _drawItems } from "./draw-items.js";
 import { _drawDetail, _drawSeeDigivolve } from "./draw-digivolve.js";
 import type { MenuState } from "./types.js";
 
+import type { GameState } from "../game/types.js";
 export function createMenu(sfx = null) {
   const backdrop = createStatusBackdrop();
   const m = {
@@ -287,7 +288,7 @@ export function createMenu(sfx = null) {
 
   // Seed real base stats for non-lead party members the first time we need them
   // (lazy — game.js only allocates null placeholders at grant time).
-  function ensurePartyStats(state) {
+  function ensurePartyStats(state: GameState) {
     if (!Array.isArray(state.party)) return;
     if (!Array.isArray(state.partyStats) || state.partyStats.length !== state.party.length) {
       state.partyStats = state.party.map(() => null);
@@ -304,19 +305,19 @@ export function createMenu(sfx = null) {
     if (changed) localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
   }
 
-  function roster(state) {
+  function roster(state: GameState) {
     ensurePartyStats(state);
     return partyRosterView(state.party, state.partnerStats, state.partyStats, m.digimonDB ?? {}, state.digimonNames);
   }
 
   // The LIVE stat block behind roster index i (the roster view is a copy).
   // Index 0 is the battle-tracked lead; the rest have their own persisted slot.
-  function statBlock(state, i: number) {
+  function statBlock(state: GameState, i: number) {
     ensurePartyStats(state);
     return i === 0 ? state.partnerStats : state.partyStats?.[i];
   }
 
-  function persistStats(state, i: number) {
+  function persistStats(state: GameState, i: number) {
     if (i === 0) localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
     localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));
   }

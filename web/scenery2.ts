@@ -7,19 +7,20 @@ import { darkness, setReveal } from "./scenery.js";
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+import type { AmbienceSettings } from "./types/ambience.js";
 const VIEW_H = 240;
 
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
-const smooth = (v) => { v = clamp01(v); return v * v * (3 - 2 * v); };
-function rng(seed) {
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const smooth = (v: number) => { v = clamp01(v); return v * v * (3 - 2 * v); };
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
-const isGrassPx = (r, g, b) => g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
-const isWaterPx = (r, g, b) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
+const isGrassPx = (r: number, g: number, b: number) => g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
+const isWaterPx = (r: number, g: number, b: number) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
 
 let sc2 = null;
-let frost = null;                       // pre-rendered frost canvas (made once)
+let frost: HTMLCanvasElement | null = null;                       // pre-rendered frost canvas (made once)
 let breath = [], rings = [], fishes = [], critters = [], glints = [];
 let gust = null, nextGust = 0;
 let devil = null, nextDevil = 0, weed = null, nextWeed = 0;
@@ -29,7 +30,7 @@ let nextFish = 0, nextCritter = 0, wasMoving = false, nextBreath = [0, 0, 0, 0, 
 let stageLights = null;
 fetch("assets/data/lights.json").then((r) => r.json()).then((j) => { stageLights = j; }).catch(() => { stageLights = {}; });
 const imgs = {};
-function loadImg(src) {
+function loadImg(src: string) {
     if (!imgs[src]) { const i = new Image(); i.src = src; imgs[src] = i; }
     return imgs[src];
 }
@@ -37,7 +38,7 @@ function loadImg(src) {
 // full brightness, the additive layer on top (its real palette variants cycle like the game's), and
 // a blurred copy of that same picture as the bloom. Nothing here is invented colour.
 const bloomCache = new Map();
-function bloomFor(sc, key, layers) {
+function bloomFor(sc, key: string, layers) {
     let c = bloomCache.get(key);
     if (c) return c;
     const K = 3, pad = 10;
@@ -69,7 +70,7 @@ function bloomFor(sc, key, layers) {
     return c;
 }
 const poolSprites = new Map();
-function poolSprite(r, g, b) {
+function poolSprite(r: number, g: number, b: number) {
     const k = (r << 16) | (g << 8) | b;
     let c = poolSprites.get(k);
     if (c) return c;
@@ -80,7 +81,7 @@ function poolSprite(r, g, b) {
     poolSprites.set(k, c);
     return c;
 }
-function drawGameLight(ctx, sc, m, camX, camY, a, now, fxo) {
+function drawGameLight(ctx, sc, m, camX: number, camY: number, a: number, now: number, fxo) {
     if (!(sc.sheetP.complete && sc.sheetP.naturalWidth && sc.sheetS.complete && sc.sheetS.naturalWidth)) return;
     const vi = ((now / 1000 * 60 / m.per) | 0) % m.v.length, layers = m.v[vi];
     const bx = Math.round(m.ox - camX), by = Math.round(m.oy - camY);
@@ -107,7 +108,7 @@ function drawGameLight(ctx, sc, m, camX, camY, a, now, fxo) {
 
 // Put the real, untinted colours back around each light. The mask is the same flattened ellipse as the
 // pool; the snapshot is the frame as drawn just before the night tint.
-let rvMask = null, rvTmp = null, rvSprite = null;
+let rvMask: HTMLCanvasElement | null = null, rvTmp = null, rvSprite: HTMLCanvasElement | null = null;
 function revealSprite() {
     if (rvSprite) return rvSprite;
     rvSprite = document.createElement("canvas"); rvSprite.width = rvSprite.height = 64;
@@ -146,9 +147,9 @@ setReveal({
     },
 });
 
-export const hasLights = (id) => !!(stageLights && stageLights[id]);
+export const hasLights = (id: string | number) => !!(stageLights && stageLights[id]);
 
-export function resetScenery2(map, p, S) {
+export function resetScenery2(map, p: { seed: number; }, S) {
     const r = rng(p.seed ^ 0x7f4a7c15);
     sc2 = { id: map.id, rand: r, built: false };
     const W = S.DWB, H = S.DHB;
@@ -167,7 +168,7 @@ export function resetScenery2(map, p, S) {
 }
 
 // ----------------------------------------------------------------- scatter
-function scatterOn(S, count, test, tries = 80) {
+function scatterOn(S, count: number, test, tries = 80) {
     const px = S.pix();
     if (!px) return [];
     const out = [], r = sc2.rand;
@@ -256,7 +257,7 @@ function makeFrost() {
     vg.addColorStop(0, "rgba(225,240,255,0)"); vg.addColorStop(0.65, "rgba(225,240,255,0.14)"); vg.addColorStop(1, "rgba(235,246,255,0.55)");
     g.fillStyle = vg; g.fillRect(0, 0, VIEW_W, VIEW_H);
     g.strokeStyle = "rgba(247,252,255,0.75)"; g.lineCap = "round";
-    const branch = (x, y, a, len, w, depth) => {
+    const branch = (x: number, y: number, a: number, len: number, w: number, depth: number) => {
         if (depth > 3 || len < 3) return;
         g.lineWidth = w; g.beginPath(); g.moveTo(x, y);
         const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;

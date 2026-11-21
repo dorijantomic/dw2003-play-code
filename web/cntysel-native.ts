@@ -67,7 +67,7 @@ export function createCntyselNative(sfx = null, music = null) {
             if (music?.current === "bgm031") music.play(restoreMusic);
         },
     };
-    const finish = (confirmed) => {
+    const finish = (confirmed: boolean) => {
         if (!open) return;
         open = pending = false;
         generation++;
@@ -116,7 +116,7 @@ export function createCntyselNative(sfx = null, music = null) {
             if (mask && open) queue.push(mask);
             if (queue.length > 16) queue.shift();
         },
-        update(dt, keys) {
+        update(dt: number, keys: Set<string>) {
             if (!open || !data || !renderer.ready()) return;
             if (!screen) countryScreenStartupTick(startup, startupHost);
             if (!screen) return;

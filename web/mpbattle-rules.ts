@@ -99,7 +99,7 @@ export class Arena {
         this.#seatWave();
     }
 
-    #seat(rec, sideByte, slot) {
+    #seat(rec, sideByte: number, slot) {
         rec.sideByte = sideByte; rec.slot = slot; rec.statusEvents = this.pool; rec.ailments ??= {};
         return rec;
     }
@@ -287,7 +287,7 @@ export class Arena {
         return { hit: true, dmg, lines, instantDeath: !!inflicted.text, stolen };
     }
 
-    #row(entry, dmg: number, hit) { return [entry.key, dmg | 0, hit ? 1 : 0, entry.rec.hp <= 0 ? 1 : 0]; }
+    #row(entry, dmg: number, hit: boolean) { return [entry.key, dmg | 0, hit ? 1 : 0, entry.rec.hp <= 0 ? 1 : 0]; }
     #koLine(entry) { return `${entry.name}: ${T(entry.key[0] === "e" ? MSG.DEFEATED : MSG.KO)}`; }
 
     /** A pseudo battle object holding exactly what the game's party-wide helpers read (they were written for one pair). */

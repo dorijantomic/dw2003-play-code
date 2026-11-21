@@ -89,7 +89,7 @@ export function createTitleMoviePlayer(onEnd, onError = console.error, createVid
     retry() {
       if (active && blocked) video.play().then(() => { blocked = false; }).catch(() => {});
     },
-    draw(ctx, viewW, viewH, muted = false) {
+    draw(ctx: CanvasRenderingContext2D, viewW: number, viewH: number, muted = false) {
       if (!active) return false;
       if (lastPictureShown()) finish("last-picture");
       video.muted = muted;

@@ -15,7 +15,7 @@ const SHADOW = [0, 0, 0, 1];                          // a ???: the model drawn 
 const PITCH_DEG = 8;                                  // the viewer's "front" preset pitch (anim-viewer-camera.js PRESETS)
 
 /** Screen position of a world point for a view {eye, look, up, fovDeg}: x, y in -1..1 (y up), and the depth. */
-export function projectPoint(view, p, aspect) {
+export function projectPoint(view, p, aspect: number) {
     const f = [view.look[0] - view.eye[0], view.look[1] - view.eye[1], view.look[2] - view.eye[2]];
     const fl = Math.hypot(...f) || 1; f[0] /= fl; f[1] /= fl; f[2] /= fl;
     const rx = f[1] * view.up[2] - f[2] * view.up[1], ry = f[2] * view.up[0] - f[0] * view.up[2], rz = f[0] * view.up[1] - f[1] * view.up[0];

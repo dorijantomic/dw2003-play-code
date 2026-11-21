@@ -43,7 +43,7 @@ const CUT_LABELS = {
 const SWEEP_WARM_MS = 1500, SWEEP_MEASURE_MS = 5000;   // shorter window for the sweep scenes (no canvas-call probe)
 const CLOSE = /(^|[#&,])close($|[&,=])/.test(location.hash);   // #close: close the window when the run is done (test profile sets dom.allow_scripts_to_close_windows)
 const BACKUP_KEY = "perfTestBackup";
-const GAME_URL = (map) => `index.html?skipTitle=1&noEncounters=1&map=${map}`;
+const GAME_URL = (map: string) => `index.html?skipTitle=1&noEncounters=1&map=${map}`;
 
 // ---- what to run. "set" names are applied by apply() below and undone by undo().
 const FIELD_A = {   // Central Park: 28.8% grass pixels, 27.9% water pixels, open air, canopies, RAINY (rain draws), 1664x1280 map
@@ -114,7 +114,7 @@ async function waitFor(fn, ms: number, what: string) {
         await sleep(100);
     }
 }
-function stats(arr) {
+function stats(arr: number[]) {
     const n = arr.length;
     if (!n) return { n: 0 };
     const s = Float64Array.from(arr).sort();
@@ -216,7 +216,7 @@ function guardStart(label: string) {
     run.guard = g;
     return g;
 }
-function guardStop(g) { clearInterval(g.timer); if (run.guard === g) run.guard = null; }
+function guardStop(g: { label: string; stalled: boolean; reason: null; t0: number; timer: null; }) { clearInterval(g.timer); if (run.guard === g) run.guard = null; }
 // wait until rAF runs at >= FLOW_FPS for FLOW_MS (a window that is hidden may never come back: gives up after FLOW_GIVEUP_MS)
 async function waitForFlow(why: string) {
     if (QUICK) return;

@@ -172,7 +172,7 @@ export function fieldStageFilled() {
  * world position, native 0..7 facing, actor id, projector to the 320x240 screen); anything else, or a
  * failed load, uses web/textbox.js with `legacyAnchor`.
  */
-export function openTalkLine(ref, onClose, npc, legacyAnchor) {
+export function openTalkLine(ref, onClose, npc, legacyAnchor: () => { x: number; y: number; mode: number; }) {
     const legacy = () => textbox.open(getDialogue(ref), onClose, legacyAnchor);
     if (!npc || !/^estalk0\d$/.test(ref?.file ?? "")) return legacy();
     const project = (x, y) => ({
@@ -417,7 +417,7 @@ function startQuestChase(ev, done) {
 }
 
 /** One frame of a running chase: move the target, judge the gap, and let it blink when it is about to be lost. */
-export function tickQuestChase(dt) {
+export function tickQuestChase(dt: number) {
     const c = S.questChase;
     if (!c) return;
     const s = c.machine.tick(state.x, state.y, dt);

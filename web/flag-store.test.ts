@@ -8,7 +8,7 @@ function makeBackend(initial = {}) {
   const bits = { ...initial };
   return {
     get: (id: string | number) => (bits[id] ? 1 : 0),
-    set: (id: string | number, val) => { bits[id] = val ? 1 : 0; },
+    set: (id: string | number, val: number) => { bits[id] = val ? 1 : 0; },
     _bits: bits,
   };
 }

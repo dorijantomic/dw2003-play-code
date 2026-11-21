@@ -10,17 +10,17 @@
 //     ground, and they are removed during cutscenes, textboxes and battles.
 const MAX_PER_MAP = 4;
 
-function walkable(grid, x, y) {
+function walkable(grid: { cell: number; cols: number; rows: number; cells: number[]; }, x: number, y: number) {
     const c = (x / grid.cell) | 0, r = (y / grid.cell) | 0;
     return c >= 0 && r >= 0 && c < grid.cols && r < grid.rows && grid.cells[r * grid.cols + c] === 0;
 }
-function clearLine(grid, a, b) {
+function clearLine(grid: { cell: number; cols: number; rows: number; cells: number[]; }, a: number[], b) {
     const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4));
     for (let i = 0; i <= n; i++) if (!walkable(grid, a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n)) return false;
     return true;
 }
 // a closed loop of 3-5 waypoints around a start point, every leg on walkable ground
-function makeLoop(grid, start, rand) {
+function makeLoop(grid: { cell: number; cols: number; rows: number; cells: number[]; }, start, rand: () => number) {
     for (let attempt = 0; attempt < 30; attempt++) {
         const pts = [start], n = 3 + ((rand() * 3) | 0);
         let ok = true;
@@ -38,7 +38,7 @@ function makeLoop(grid, start, rand) {
     }
     return null;
 }
-function rng(seed) {
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
@@ -47,7 +47,7 @@ const placed = new Map();   // stageId -> [npc objects we added]
 
 export function villagersActive(stageId) { return (placed.get(stageId) || []).length; }
 
-export function removeVillagers(stageId, state) {
+export function removeVillagers(stageId: string | number, state) {
     const list = placed.get(stageId);
     if (!list || !list.length) return;
     const scene = state.scenes?.[stageId];
@@ -59,7 +59,7 @@ export function removeVillagers(stageId, state) {
 }
 
 // Called every frame with the game state; adds or removes the villagers as needed.
-export function syncVillagers(on, map, profile, state) {
+export function syncVillagers(on: boolean | undefined, map, profile, state) {
     const id = map.id;
     const scene = state.scenes?.[id];
     const busy = !!(state._inCutscene || state.battleActive || state.textboxOpen);

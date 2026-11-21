@@ -17,6 +17,7 @@ import { MS } from "./state.js";
 import { GREY } from "./draw-items.js";
 import type { MenuState } from "./types.js";
 
+import type { GameState } from "../game/types.js";
 // ── native drawing helpers (coordinates from status_ui.json / the decompile) ──
 
 export const gold = { kind: 3 };
@@ -165,7 +166,7 @@ export function _drawHeader(ctx: CanvasRenderingContext2D, text: string, fold = 
 // BIT count right-anchored before the "BIT" label at (300,212), and the
 // CLUT-blinking page arrow (cmfont 0x0a) at (291,214). Overlay SORT /
 // TECHNIQUES / STATUS-pick have no footer BIT (pause-sort-who-2026-08-20).
-export function _drawFooter(ctx: CanvasRenderingContext2D, state, t: number, line1: string | undefined, line2: string | null, fold = null, opts = null) {
+export function _drawFooter(ctx: CanvasRenderingContext2D, state: GameState, t: number, line1: string | undefined, line2: string | null, fold = null, opts = null) {
   const sh = MS.UI.screens.shared;
   const [fpx, fpy] = sh.footer.pivot ?? [0, 0xD3];
   const p = fold
@@ -185,7 +186,7 @@ export function _drawFooter(ctx: CanvasRenderingContext2D, state, t: number, lin
 
 // Resident/overlay home BIT sits at the foot of the card stack
 // (status_ui.json topmenu.bit_*; rig d2_home.png / s6_home.png).
-export function _drawHomeBit(ctx: CanvasRenderingContext2D, state) {
+export function _drawHomeBit(ctx: CanvasRenderingContext2D, state: GameState) {
   const TM = MS.UI.screens.topmenu;
   if (!TM?.bit_value) return;
   valueText(ctx, state.bits ?? 0, TM.bit_value.x, TM.bit_value.y);

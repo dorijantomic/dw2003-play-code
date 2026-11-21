@@ -101,7 +101,7 @@ export function ownedSlots(state, { includeParty = false } = {}) {
 /** The walker's stats object for a roster slot: the deployed party's live
  *  block, or the reserve store keyed by character id. Shared with web/game.js
  *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
-export function slotStats(state: GameState, slot) {
+export function slotStats(state: GameState, slot: number) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId);
     if (pos === 0) return state.partnerStats ?? null;
@@ -109,7 +109,7 @@ export function slotStats(state: GameState, slot) {
     return state.reserveStats?.[charId] ?? null;
 }
 
-function slotEquipment(state, slot) {
+function slotEquipment(state, slot: number) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId);
     if (pos >= 0) return state.equipment?.[pos] ?? null;
@@ -152,7 +152,7 @@ export function createDriNative(sfx = null) {
     function seed(read, write, state) {
         const db = TABLES?.digimonById ?? {};
         const { v0ById } = profileMaps(read);
-        const w16 = (addr, v) => write(addr, (Number(v) || 0) & 0xffff, 2);
+        const w16 = (addr: number, v) => write(addr, (Number(v) || 0) & 0xffff, 2);
         const party = Array.isArray(state.party) ? state.party : [];
         for (let i = 0; i < 3; i++) {
             const slot = party[i] ? rosterSlotFor(party[i]) : EMPTY_SLOT;

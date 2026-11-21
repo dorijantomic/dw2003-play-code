@@ -27,7 +27,7 @@ const loadShared = () => {
 };
 
 /** The game's own letter codes: 0x04..0x0D digits, 0x0E..0x27 A-Z, 0x28..0x51 a-z. */
-export function encodeGameName(text, limit) {
+export function encodeGameName(text: string, limit: number) {
     const out = [];
     for (const ch of String(text ?? "")) {
         const code = ch.charCodeAt(0);

@@ -145,7 +145,7 @@ export function seedNativeScreenParty(seed: NativePartySeed = {}) {
     }
     for (const s of seed.stats ?? []) {
         const r = REC + (s.slot ?? 0) * ROSTER_STRIDE;
-        const w16 = (off, v) => { if (v !== undefined && v !== null) mem.write16(r + off, v & 0xffff); };
+        const w16 = (off: number, v: number | undefined) => { if (v !== undefined && v !== null) mem.write16(r + off, v & 0xffff); };
         mem.write32(r + 0x00, ((s.starterSlot ?? s.slot ?? 0) + 3) >>> 0);
         if (s.forms) ui.seedRosterForms(mem, r, s.forms);
         if (s.exp !== undefined) mem.write32(r + 0x20, s.exp >>> 0);
@@ -379,7 +379,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
  * it. A caller with its own held set (the lab, web/native-screen-pad.js) passes
  * it; a caller that already called setNativeScreenPad passes nothing.
  */
-export function tickNativeScreen(padWord, delta = 1) {
+export function tickNativeScreen(padWord: number | undefined, delta = 1) {
     const cur = state.current;
     if (!cur || !cur.booted) return null;
     if (typeof padWord === "number") setNativeScreenPad(padWord, 0);
@@ -490,7 +490,7 @@ export function nativeTextWidgets() {
  * routine F0x80016E2C for each id (fixture only - a real run obtains them by
  * playing). Returns the number of ids granted.
  */
-export function grantNativeScreenCards(ids) {
+export function grantNativeScreenCards(ids: number[]) {
     const cur = state.current;
     if (!cur || !cur.rt) return 0;
     let granted = 0;

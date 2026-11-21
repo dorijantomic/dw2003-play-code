@@ -231,7 +231,7 @@ function fabrik(J, l: number[], T, H: number) {
   return J;
 }
 
-function solve(ctx, spec: Spec, stats) {
+function solve(ctx, spec: Spec, stats: { ikErr: number; maxStep: number; }) {
   const { n, ep, order, Wr, Pr, H } = ctx;
   const Wn = new Array(n), Pn = new Array(n), Dn = new Array(n), done = new Array(n).fill(false);
   const ik = new Map();

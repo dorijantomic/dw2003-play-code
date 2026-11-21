@@ -42,7 +42,7 @@ const TALK = {
   chamfer: 10,
 };
 
-function roundedChamferedPath(ctx, x: number, y: number, w: number, h: number, chamfer: number) {
+function roundedChamferedPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, chamfer: number) {
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.lineTo(x + w, y);
@@ -54,7 +54,7 @@ function roundedChamferedPath(ctx, x: number, y: number, w: number, h: number, c
 
 // x,y,w,h describe the body box; nameW/nameH describe the name tab sitting on top
 // (nameW <= w). Pass nameH=0 to draw a plain chamfered box (used for smaller popups).
-export function drawTalkWindow(ctx, x: number, y: number, w: number, h: number, nameW = 0, nameH = 0) {
+export function drawTalkWindow(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, nameW = 0, nameH = 0) {
   ctx.save();
 
   // Drop shadow first (offset down+right, solid).
@@ -112,7 +112,7 @@ export function drawTalkWindow(ctx, x: number, y: number, w: number, h: number, 
 
 // The blinking "advance" chevron indicator, bottom-right of a talk box (sampled: solid
 // orange, stacked downward chevrons).
-export function drawAdvanceCursor(ctx, x: number, y: number, t = 0) {
+export function drawAdvanceCursor(ctx: CanvasRenderingContext2D, x: number, y: number, t = 0) {
   ctx.save();
   ctx.fillStyle = "rgb(230, 140, 20)";
   const bob = Math.sin(t * 6) * 2;

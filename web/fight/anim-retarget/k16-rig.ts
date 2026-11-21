@@ -65,11 +65,11 @@ export const k16tr = (A) => A[0].map((_, j) => A.map((r) => r[j]));
 
 export const k16mv = (A, v) => A.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
 
-export const k16dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+export const k16dot = (a, b: number[] | (number | undefined)[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 export const k16sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
-export const k16scale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+export const k16scale = (a, s: number) => [a[0] * s, a[1] * s, a[2] * s];
 
 export const k16norm = (a) => Math.hypot(a[0], a[1], a[2]);
 
@@ -77,15 +77,15 @@ export const K16_ID = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 
 export const K16_SX = [[-1, 0, 0], [0, 1, 0], [0, 0, 1]];
 
-const k16rz = (t) => [[Math.cos(t), -Math.sin(t), 0], [Math.sin(t), Math.cos(t), 0], [0, 0, 1]];
+const k16rz = (t: number) => [[Math.cos(t), -Math.sin(t), 0], [Math.sin(t), Math.cos(t), 0], [0, 0, 1]];
 
-const k16ry = (t) => [[Math.cos(t), 0, Math.sin(t)], [0, 1, 0], [-Math.sin(t), 0, Math.cos(t)]];
+const k16ry = (t: number) => [[Math.cos(t), 0, Math.sin(t)], [0, 1, 0], [-Math.sin(t), 0, Math.cos(t)]];
 
-const k16rx = (t) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
+const k16rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.sin(t), Math.cos(t)]];
 
-const k16local = (c0, c1, c2) => k16mul(k16rz(c2), k16mul(k16ry(c1), k16rx(c0)));
+const k16local = (c0: number, c1: number, c2: number) => k16mul(k16rz(c2), k16mul(k16ry(c1), k16rx(c0)));
 
-export const k16perp = (a) => {
+export const k16perp = (a: number[]) => {
   const t = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const p = [a[1] * t[2] - a[2] * t[1], a[2] * t[0] - a[0] * t[2], a[0] * t[1] - a[1] * t[0]];
   const n = k16norm(p);
@@ -118,7 +118,7 @@ export function k16axisOf(M) {
 }
 
 /** Clamp a rotation's angle to `max` (a joint limit applied in the joint's own frame). */
-export function k16clampRot(M, max) {
+export function k16clampRot(M, max: number) {
   const { axis, ang } = k16axisOf(M);
   if (ang <= max) return M;
   return k16axisAngle(axis, max);
@@ -160,7 +160,7 @@ export function k16ToCh2(M, prev = null) {
   }
   let t = [c0 / TAU, c1 / TAU, c2 / TAU];
   if (prev) {
-    const wrapNear = (x, p) => {
+    const wrapNear = (x: number, p) => {
       let d = x - p;
       d = ((d % 4096) + 4096) % 4096;
       if (d > 2048) d -= 4096;
@@ -172,7 +172,7 @@ export function k16ToCh2(M, prev = null) {
     const b = alt.map((x, i) => wrapNear(x, prev[i]));
     t = cost(a) <= cost(b) ? a : b;
   }
-  const norm = (x) => {
+  const norm = (x: number | undefined) => {
     let r = Math.round(x) % 4096;
     if (r < 0) r += 4096;
     return r >= 2048 ? r - 4096 : r;
@@ -181,10 +181,10 @@ export function k16ToCh2(M, prev = null) {
 }
 
 /** Every bone's world rotation and world position at `frame` (the renderer's own arithmetic). */
-export function k16Pose(model, frame) {
+export function k16Pose(model, frame: number) {
   const n = model.num_bones ?? model.bones.length;
   const W = new Array(n).fill(null), P = new Array(n).fill(null);
-  const go = (i) => {
+  const go = (i: number) => {
     const c2 = sample(model.bones[i]?.anim?.ch2, frame);
     const L = k16FromCh2(c2);
     const p = (model.bones[i]?.parent_slot ?? 0) - 1;
@@ -366,7 +366,7 @@ export function roleBoneMap(T, S, { mirror = false } = {}) {
 }
 
 /** Which arm the donor's clip actually fires with: the arm whose tip travels most over the clip. */
-function k16FiringSide(S, source, lo, hi) {
+function k16FiringSide(S, source, lo: number, hi: number) {
   const a = k16Pose(source, lo), b = k16Pose(source, hi);
   const travel: Record<string, number> = {};
   for (const arm of S.arms.filter((x) => x.ordinal === 0)) {
@@ -385,7 +385,7 @@ function k16FiringSide(S, source, lo, hi) {
  * Mirror the arm motion? Only when both models are side-CONFIDENT and the donor's firing arm is the
  * other side from the target's own weapon side. A LOW-confidence target never mirrors (mirror-safe).
  */
-export function shouldMirror(T, S, source, clip, lo, hi) {
+export function shouldMirror(T, S, source, clip, lo: number, hi: number) {
   if (T.sc === "low" || S.sc === "low") return false;
   const td = T.dom;
   if (td !== "left" && td !== "right") return false;

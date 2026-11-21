@@ -34,6 +34,7 @@ import { currentMap } from "./session.js";
 import { activeFollowerCount } from "./followers.js";
 import { gameOverToTitle, presentVictory, startFieldBattle } from "./battle-launch.js";
 
+import type { FlagStore } from "./types.js";
 // The rail the PLAYBACK executor's record names. The op-2/op-3 handler passes
 // params[0] (the ladder id) and the endpoint cell params[1]/params[2] straight to
 // the player actor (fieldstg.s:5a80/:5ac0), so the record — not a radius test — is
@@ -301,7 +302,7 @@ export async function flushStoryBattle() {
 
 // The raw type-7 trigger byte at map position (x,y), or null off the grid. Low 5
 // bits = step index, top 3 = required approach-facing group (step-load 0x80088288).
-export function storyGridCellAt(x, y) {
+export function storyGridCellAt(x: number, y: number) {
     const g = state.storyGrids?.[currentMap().id.replace(/^s/, "")];
     if (!g) return null;
     if (g.uniform != null) return g.uniform;
@@ -318,7 +319,7 @@ export function storyGridCellAt(x, y) {
 // bottom = clip 0x1f). The step-off's landing shift is applied on ITS
 // completion, not at its start — the clip's own art carries the visual move.
 // Returns true while mounted.
-export function tickClimb(dt) {
+export function tickClimb(dt: number) {
     const c = state.climb;
     if (!c) return false;
     state.moving = false;
@@ -408,7 +409,7 @@ export function tickClimb(dt) {
 
 // Bug-maze trap pads: returns the reset point {x,y,dir} if (x,y) is on a bugged
 // floor cell, else null. `pads` is the scene's trapPads block (cell-grid mask).
-export function hitTrapPad(pads, x, y) {
+export function hitTrapPad(pads, x: number, y: number) {
     if (!pads) return null;
     const c = Math.floor(x / pads.cell),
         r = Math.floor(y / pads.cell);
@@ -420,7 +421,7 @@ export function hitTrapPad(pads, x, y) {
 // `iceSlide` block (gen_scenes.ice_slide_regions -- the type-7 trigger cells whose
 // step record is op 11 / op 12). Returns {start:dirIndex} on a glide-entry cell,
 // {stop:true} on a stop cell, else null. See engine/systems/ice-slide.ts.
-export function iceSlideCellAt(slide, x, y) {
+export function iceSlideCellAt(slide, x: number, y: number) {
     if (!slide) return null;
     const c = Math.floor(x / slide.cell),
         r = Math.floor(y / slide.cell);
@@ -434,6 +435,6 @@ export function iceSlideCellAt(slide, x, y) {
 // as estalk00[id]; its `on_close` set_flags are applied when the box closes (advancing the
 // NPC's state). Manual/ifFlag NPCs (hand-authored `dialogue`, no states) fall back.
 // Returns a state-shaped object { dialogue, on_close? } or null (non-speaking variant).
-export function pickDialogueFor(npc, flags) {
+export function pickDialogueFor(npc, flags: FlagStore) {
     return selectNpcDialogue(npc, storyFlags.get, flags);
 }

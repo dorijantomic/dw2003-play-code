@@ -47,7 +47,7 @@ const ROW_H = 14;                 // one list line, in the page's own pixels
 const asProfiles = (digimon) => (Array.isArray(digimon) ? digimon : digimon?.digimon ?? []);
 
 /** A form's ledger level, from a plain object or a Map. undefined = not learned. */
-function formLevelOf(formLevels, id) {
+function formLevelOf(formLevels, id: number) {
   if (formLevels instanceof Map) return formLevels.get(Number(id));
   return formLevels?.[Number(id)];
 }
@@ -310,7 +310,7 @@ export function openPlanner() {
  * reader: () => ({ members: [{ slot, name, live }] }). With the switch off nothing is
  * fetched and the snapshot is never called.
  */
-export function tickPlanner(enabled, snapshot = null) {
+export function tickPlanner(enabled: boolean, snapshot = null) {
   const on = enabled === true;
   if (!on && S.open) S.open = false;
   S.wasOn = on;
@@ -372,7 +372,7 @@ export function plannerPress(button) {
 }
 
 /** Break text into lines no longer than `cols` characters, on spaces. */
-function wrapText(text, cols) {
+function wrapText(text, cols: number) {
   const out = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
@@ -388,7 +388,7 @@ function wrapText(text, cols) {
   return out;
 }
 
-function drawPage(ctx, W, H, message) {
+function drawPage(ctx, W: number, H: number, message: string) {
   ctx.save();
   ctx.fillStyle = "rgba(4,6,12,0.96)";
   ctx.fillRect(0, 0, W, H);

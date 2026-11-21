@@ -14,6 +14,7 @@ import {
 import { syncLeadEquipBonuses, elementValueWithGear } from "../party.js";
 import { EQUIP_SLOT_KEYS, RES_ROWS, STAT_ROWS } from "./pure.js";
 
+import type { GameState } from "../game/types.js";
 export function clampIndex(i: number, n: number) {
   if (n <= 0) return 0;
   return Math.max(0, Math.min(n - 1, i));
@@ -98,7 +99,7 @@ export function useMessage(item, before, after, result) {
 
 // SORT = real formation change: swap two party slots everywhere index-aligned
 // state lives (party, partyStats incl. the lead's live partnerStats, equipment).
-export function swapFormation(state, a: number, b: number) {
+export function swapFormation(state: GameState, a: number, b: number) {
   const swap = (arr) => { if (Array.isArray(arr)) { const t = arr[a]; arr[a] = arr[b]; arr[b] = t; } };
   // materialize the lead's live stats into the array view before swapping
   if (state.partyStats) state.partyStats[0] = state.partnerStats ?? state.partyStats[0];
@@ -106,7 +107,7 @@ export function swapFormation(state, a: number, b: number) {
   if (a === 0 || b === 0) {
     state.partnerStats = state.partyStats?.[0] ?? state.partnerStats;
     state.charId = state.party?.[0] ?? state.charId;
-    const nextIndex = state.manifest?.characters?.findIndex((c) => c.id === state.charId) ?? -1;
+    const nextIndex = state.manifest?.characters?.findIndex((c: { id: string | null; }) => c.id === state.charId) ?? -1;
     if (nextIndex >= 0) state.charIdx = nextIndex;
     const select = typeof document !== "undefined" ? document.getElementById("charSelect") as HTMLSelectElement | null : null;
     if (select && nextIndex >= 0) select.selectedIndex = nextIndex;
@@ -195,12 +196,12 @@ export function wieldNameFor(eq, names) {
   return names[idx - 1] ?? null;
 }
 
-export function equippedCountOf(state, itemId: number) {
+export function equippedCountOf(state: GameState, itemId: number) {
   ensureEquipment(state);
   return wornCount(state, Number(itemId));
 }
 
-export function ensureEquipment(state) {
+export function ensureEquipment(state: GameState) {
   if (!Array.isArray(state.equipment) || state.equipment.length !== (state.party?.length ?? 0)) {
     state.equipment = (state.party ?? []).map((_, i: string | number) => state.equipment?.[i] ?? {});
     // The wearer record was replaced wholesale, so the stored worn byte array is
@@ -212,7 +213,7 @@ export function ensureEquipment(state) {
 // Only the lead (index 0) has battle-tracked stats in this engine (state.partnerStats),
 // so only the lead's equip bonuses actually affect combat maths (battle.js reads
 // ps.equipBonuses alongside the permanent chip ps.bonuses).
-export function syncEquipBonuses(state, idx: number) {
+export function syncEquipBonuses(state: GameState, idx: number) {
   if (idx !== 0) return;
   syncLeadEquipBonuses(state);
 }
@@ -237,7 +238,7 @@ export function syncEquipBonuses(state, idx: number) {
 //     rows come after the accepted ones rather than being dropped;
 //   * the take-off row is the FIRST row of every list, and it is there even when
 //     the slot is empty (`sh $v0, 0x78($s3)` with `li $v0, -1`, unconditional).
-export function equipPickOptions(state, partyIdx: number, slotKey: string | undefined) {
+export function equipPickOptions(state: GameState, partyIdx: number, slotKey: string | undefined) {
   ensureEquipment(state);
   const row = EQUIP_ROW_SLOTS.indexOf(slotKey);
   const line = rosterSlotOfCharId(state.party?.[partyIdx] ?? "");
@@ -252,7 +253,7 @@ export function equipPickOptions(state, partyIdx: number, slotKey: string | unde
   ));
 }
 
-export function previewEquipment(state, m: { detailIdx: string | number; equipCursor: string | number; equipFocus: string; }) {
+export function previewEquipment(state: GameState, m: { detailIdx: string | number; equipCursor: string | number; equipFocus: string; }) {
   const equipped = { ...(state.equipment[m.detailIdx] ?? {}) };
   const slotKey = EQUIP_SLOT_KEYS[m.equipCursor];
   const snapshot = { ...equipped };
@@ -261,7 +262,7 @@ export function previewEquipment(state, m: { detailIdx: string | number; equipCu
   return { snapshot, preview };
 }
 
-export function sheetStatValue(p, slots, stat: string, rosterSlot = null) {
+export function sheetStatValue(p, slots: Record<string, number>, stat: string, rosterSlot = null) {
   // The total the original's roster record would hold: stored + the permanent
   // chip rise (the walker keeps chips in `bonuses` — engine/dw3/items.ts writes
   // the rise there — and the record itself already carries them on the disc),
@@ -289,7 +290,7 @@ export function sheetStatValue(p, slots, stat: string, rosterSlot = null) {
  * elementValue) so the sheet, the shop, the gym and the battle divisor cannot
  * drift apart. The sheet never floors, because F0x8008C1C0 only caps.
  */
-export function sheetResValue(p, slots, res: string) {
+export function sheetResValue(p, slots: Record<string, number>, res: string) {
   const b = equipmentBonuses(slots);
   const i = RES_ROWS.indexOf(res);
   // The base is the record's own halfword — partyRosterView's `elements`, i.e.
@@ -313,10 +314,10 @@ export function sheetResValue(p, slots, res: string) {
 // onward) and per-resistance field (+0xe onward), clamping the sum at 999. With
 // no candidate the species part is simply absent. These two helpers exist so the
 // fold cannot drift from the sheet's: they call the sheet's own readers.
-export function seeDigivolvePanelStat(p, slots, stat: string, rosterSlot: number | null | undefined, formProfile = null) {
+export function seeDigivolvePanelStat(p, slots: Record<string, number>, stat: string, rosterSlot: number | null | undefined, formProfile = null) {
   return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot) + Number(formProfile?.[stat] ?? 0));
 }
 
-export function seeDigivolvePanelRes(p, slots, res: string, formProfile = null) {
+export function seeDigivolvePanelRes(p, slots: Record<string, number>, res: string, formProfile = null) {
   return Math.min(999, sheetResValue(p, slots, res) + Number(formProfile?.resistances?.[res] ?? 0));
 }

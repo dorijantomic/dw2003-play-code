@@ -1,4 +1,5 @@
 import type { BattlefieldsInput, TechniqueTableEntry } from "./types/battlefields.js";
+import type { ArenaManifest, BattlefieldMapRecord } from "./types/battlefields.js";
 // web/battlefields.js — the Battlefields table: where a stage fights and
 // which technique changes the world. Pure: no DOM, no fetch, no state.
 //
@@ -40,14 +41,14 @@ function mapList(value) {
 }
 
 /** The arena manifest's `byStage` table (the whole manifest or the table). */
-function stageTable(arenas) {
+function stageTable(arenas: ArenaManifest | undefined) {
   if (!arenas || typeof arenas !== "object" || Array.isArray(arenas)) return {};
   const byStage = arenas.byStage;
   return byStage && typeof byStage === "object" && !Array.isArray(byStage) ? byStage : {};
 }
 
 /** One map id's own name, or null (never a made-up name). */
-function nameByMapId(maps) {
+function nameByMapId(maps: BattlefieldMapRecord[] | undefined) {
   const names = new Map();
   for (const map of mapList(maps)) {
     if (map && typeof map.id === "string") names.set(map.id, typeof map.name === "string" ? map.name : null);

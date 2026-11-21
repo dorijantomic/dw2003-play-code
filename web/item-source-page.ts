@@ -61,7 +61,7 @@ if (!index || !index.items) {
         detailEl.innerHTML = html;
     }
 
-    function show(index) {
+    function show(index: number) {
         if (!shown.length) { cursor = -1; drawDetail(null); return; }
         cursor = Math.max(0, Math.min(index, shown.length - 1));
         for (let i = 0; i < elements.length; i++) elements[i].classList.toggle("sel", i === cursor);

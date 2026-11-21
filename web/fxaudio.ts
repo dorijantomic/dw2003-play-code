@@ -7,14 +7,14 @@ let armed = false;
 let level = 1;                 // the OPTIONS sound volume (web/volume-levels.js); 1 = the game's own 0.55
 window.__fxaudioVer = "no-wind-2";
 
-function noiseBuffer(ctx, seconds = 2) {
+function noiseBuffer(ctx: AudioContext, seconds = 2) {
     const buf = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
     const d = buf.getChannelData(0);
     let last = 0;
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = (w * 0.6 + last * 6) * 0.5; }
     return buf;
 }
-function loopNoise(ctx, buf, type, freq, q) {
+function loopNoise(ctx, buf: AudioBuffer, type: string, freq: number, q: number) {
     const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = ctx.createGain(); g.gain.value = 0;
@@ -52,13 +52,13 @@ function arm() {
 }
 arm();
 
-const ease = (param, v, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
+const ease = (param, v: number, ctx, tc = 0.4) => param.setTargetAtTime(v, ctx.currentTime, tc);
 
 /** OPTIONS sound volume, 0..1 (1 = today). Takes effect on the next setSound call, which runs every frame. */
-export function setWeatherVolume(v) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }
+export function setWeatherVolume(v: number | undefined) { const n = Number(v); level = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 1; }
 
 // levels: { rain, wind (0..1), sand, night } ; on = the Sound switch
-export function setSound(on, lv) {
+export function setSound(on: boolean | undefined, lv) {
     if (!ac) return;
     ease(master.gain, on ? 0.55 * level : 0, ac, 0.2);
     ease(rain.g.gain, on ? lv.rain * 0.16 : 0, ac);
@@ -66,7 +66,7 @@ export function setSound(on, lv) {
     ease(sand.g.gain, 0, ac);   // sandstorm hiss removed (sounded like wind gusts)
     ease(crickets.out.gain, on ? lv.night * 0.07 : 0, ac, 1.2);
 }
-export function thunder(on, delayMs, pan = 0) {
+export function thunder(on: boolean | undefined, delayMs: number | undefined, pan = 0) {
     if (!ac || !on || ac.state !== "running") return;
     setTimeout(() => {
         if (!ac) return;
@@ -83,10 +83,10 @@ export function thunder(on, delayMs, pan = 0) {
 
 // Footsteps by ground type: grass, sand, snow, stone, puddle, water. Short filtered noise
 // bursts (plus a low thump on stone); `vol` lets background bodies step quietly.
-export function footstep(on, type, vol = 1) {
+export function footstep(on: boolean | undefined, type: string, vol = 1) {
     if (!on || !ac || ac.state !== "running") return;
     const t0 = ac.currentTime, buf = noiseBuffer(ac, 1);
-    const burst = (kind, freq, q, peak, dur, delay = 0) => {
+    const burst = (kind: string, freq: number, q: number, peak: number, dur: number, delay = 0) => {
         const src = ac.createBufferSource(); src.buffer = buf;
         const f = ac.createBiquadFilter(); f.type = kind; f.frequency.value = freq; f.Q.value = q;
         const g = ac.createGain(); const a = t0 + delay;
@@ -159,7 +159,7 @@ function birdLoop() {
     birdTimer = setTimeout(birdLoop, 900 + Math.random() * 3200);
 }
 // lv = { water, forest, city, birds }
-export function setAmbience(on, lv) {
+export function setAmbience(on: boolean | undefined, lv) {
     if (!ac || !buildPlace()) return;
     ease(pa.lap.g.gain, on ? (lv.water || 0) * 0.17 : 0, ac, 1.2);
     ease(pa.rustle.g.gain, 0, ac, 1.5);   // rustle removed with the wind
@@ -180,11 +180,11 @@ let musLevel = 1;              // the OPTIONS music volume. Once the element is 
 let musOn = false, musDuck = 0;
 const musicGainTarget = () => musLevel * (musOn ? 1 - 0.42 * musDuck : 1);
 /** OPTIONS music volume, 0..1. Not routed: audio.js scales el.volume. Routed: the gain node below does. */
-export function setMusicVolume(v) {
+export function setMusicVolume(v: string | number | null | undefined) {
     const n = Number(v); musLevel = v === undefined || v === null || v === "" || !Number.isFinite(n) ? 1 : Math.min(1, Math.max(0, n));
     if (mus && ac) ease(mus.g.gain, musicGainTarget(), ac, 0.05);
 }
-export function setMusic(el, on, duck, muffle) {
+export function setMusic(el, on: boolean | undefined, duck: number, muffle: number) {
     if (!ac || ac.state !== "running" || !el) return;
     if (!mus) {
         if (!on) return;

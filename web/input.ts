@@ -37,7 +37,7 @@ export { isPadButton };
  * raw key it stands for ("enter"). A key with no pad button — a name-entry
  * letter, a dev-tool key — passes through lowercased and unchanged.
  */
-export function asButton(k) {
+export function asButton(k: string) {
   if (k == null) return "";
   const raw = String(k).toLowerCase();
   return buttonForKey(raw) ?? raw;
@@ -133,7 +133,7 @@ export function attachGamepad({ onPress, heldKeys, nav, win }: { onPress: (butto
 
   return {
     /** Call once per frame from the render loop, with the frame's dt in seconds. */
-    tick(dt) {
+    tick(dt: number) {
       const { pressed, released } = reader.poll(dt);
       for (const button of released) heldKeys?.delete(button);
       // The press is dispatched BEFORE the button joins the held set, which is

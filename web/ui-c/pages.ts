@@ -88,7 +88,7 @@ export function composeDetail(p, runs, used: Set<unknown>, out) {
  * the cell labels ("Equip", "Items") dim Russo 18, the item name Russo 22; all centred on `mid` (native). `isCellLabel(run)` says which
  * plain runs are cell labels (the rest is the name).
  */
-export function detailTexts(mine, mid: number, rel, out, k: string, isCellLabel) {
+export function detailTexts(mine, mid: number, rel, out, k: string, isCellLabel: ((m: { x: number; }) => boolean) | ((m: { x: number; }) => boolean)) {
     for (const m of [...mine].sort((a, b) => a.x - b.x)) {
         const isNum = m.right != null || /^[0-9]+$/.test(m.text);
         if (isNum) {

@@ -63,7 +63,7 @@ export function streetGlowProbe(stageId) {
 }
 
 /** One clip at one map pixel, on the shared point-sprite sheet. */
-function drawClip(ctx, sheet: HTMLImageElement, semiSheet, layers, x: number, y: number) {
+function drawClip(ctx: CanvasRenderingContext2D | null, sheet: HTMLImageElement, semiSheet, layers, x: number, y: number) {
     drawSprite(ctx, sheet, layers, x, y, semiSheet);
 }
 

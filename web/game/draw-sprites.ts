@@ -103,7 +103,7 @@ export function drawActorShadow(x, y, kind, clipId, actorHeightFixed = 0, ground
 // `bottom` is the frame's vertical registration (the same shift `spriteBottomShift` applies
 // to the sheet path); the original's Y math has no mirror branch, so it is the same number
 // whichever way the sprite faces.
-function drawClipFrame(meta, clipImg, x, y, col, mirror, bottom = 0, alpha = 1) {
+function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, alpha = 1) {
     const sx = col * meta.clipFrameW;
     const drawY = Math.round(y - lastCam.y - meta.clipFrameH) + bottom;
     // alpha < 1 = the walk blend's fading-in next frame (web/walk-blend.js): same pixels, partial opacity.
@@ -158,7 +158,7 @@ function _idleClipId(meta) {
 // can never show a mode that doesn't match the screen.
 // EXPERIMENT (ambience): the wet / dusty look and the reflection on water are applied here, so every
 // body that goes through this function (leader, partners, NPCs, ambient villagers) gets them.
-export function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest: SpriteFrameArgs) {
+export function drawEntitySprite(meta, sheet, clipImg: HTMLImageElement | undefined, x, y, ...rest: SpriteFrameArgs) {
     const bf = window.__bodyFx;
     if (!bf) return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
     if (bf.reflect) {

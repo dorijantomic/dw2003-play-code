@@ -10,6 +10,7 @@ import {
   AILMENT_MARKER_Y,
 } from "../vendor/engine.js";
 
+import type { DigimonRecord } from "../types/battle.js";
 // ---------------------------------------------------------------------------
 // The battle message line's own words.
 //
@@ -184,7 +185,7 @@ export function canonicalProfileName(name: string | number) { return PROFILE_NAM
 // `.L0x8008bac0`, `[+0x184](manager, slot, model, 0)`). The anchor is action 374:
 // Stingmon's copy decodes op-for-op onto the 94 operations captured from RAM
 // (docs/research/battle/captures/dna-2026-07-14/clip12-full-script.md).
-export function dnaFusedForm(scripts, profiles, actionId: number, digimon) {
+export function dnaFusedForm(scripts, profiles, actionId: number, digimon: { [k: string]: DigimonRecord; }) {
   const row = scripts?.actions?.[String(actionId)];
   if (!row) return null;
   let profile = null;

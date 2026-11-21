@@ -41,7 +41,7 @@ function addBlob(gb: GB, detail: number, c0, rad: number[], fn, rotY = 0, tiltX 
 function leaf(gb: GB, p0: { x: number; y: number; z: number; }, yaw: number, len: number, hw: number, lift: number, droop: number, c0: number[], c1, segs = 3) {
   const P = [], S = [], dx = Math.cos(yaw), dz = Math.sin(yaw);
   for (let i = 0; i <= segs; i++) { const u = i / segs; P.push(V(p0.x + dx * len * u * 0.9, p0.y + len * (lift * u - droop * u * u), p0.z + dz * len * u * 0.9)); S.push(V(-dz, 0, dx)); }
-  ribbon(gb, P, S, (t: number) => hw * (1 - 0.85 * Math.pow(t, 1.4)) + 0.0006, (t) => mixc(c0, c1, t));
+  ribbon(gb, P, S, (t: number) => hw * (1 - 0.85 * Math.pow(t, 1.4)) + 0.0006, (t: number) => mixc(c0, c1, t));
 }
 const arc = (ox: number, oz: number, a: number, H: number, lean: number, n = 5) => { const P = []; for (let i = 0; i < n; i++) { const t = i / (n - 1); P.push(V(ox + Math.cos(a) * lean * H * t * t, H * t, oz + Math.sin(a) * lean * H * t * t)); } return P; };
 
@@ -257,9 +257,9 @@ void main(){ float t = fract(uTime * 0.45 + aPh), a = aPh * 6.283; vec3 p = posi
 }
 
 // ------------------------------------------------------------------ DISTANT RANGES: layered silhouette bands with aerial haze (cheap: 3 layers x ~2k tris, follow the camera)
-export function rangeLayer(i, n = 3, fogCol = new THREE.Color(0xc9dcec)) {
+export function rangeLayer(i: number, n = 3, fogCol = new THREE.Color(0xc9dcec)) {
   const R = 318 + i * 22, seg = 240, rows = [-70, 0, 1], pos = [], idx = [], hs = [];
-  const prof = (t) => { const a = t * 6.2832; return (1 - i * 0.18) * (46 + 38 * vnoise(Math.cos(a) * 5, Math.sin(a) * 5, 1, 40 + i) + 30 * Math.pow(1 - Math.abs(2 * vnoise(Math.cos(a) * 11, Math.sin(a) * 11, 1, 50 + i) - 1), 2) + 12 * vnoise(Math.cos(a) * 29, Math.sin(a) * 29, 1, 60 + i)); };
+  const prof = (t: number) => { const a = t * 6.2832; return (1 - i * 0.18) * (46 + 38 * vnoise(Math.cos(a) * 5, Math.sin(a) * 5, 1, 40 + i) + 30 * Math.pow(1 - Math.abs(2 * vnoise(Math.cos(a) * 11, Math.sin(a) * 11, 1, 50 + i) - 1), 2) + 12 * vnoise(Math.cos(a) * 29, Math.sin(a) * 29, 1, 60 + i)); };
   for (let s = 0; s <= seg; s++) { const t = s / seg, a = t * 6.2832, x = Math.cos(a) * R, z = Math.sin(a) * R, H = prof(t % 1); for (let r = 0; r < 3; r++) { const y = r === 0 ? -70 : r === 1 ? H * 0.6 : H; pos.push(x, y, z); hs.push(y); } }
   for (let s = 0; s < seg; s++) for (let r = 0; r < 2; r++) { const a = s * 3 + r, b = a + 3; idx.push(a, a + 1, b, b, a + 1, b + 1); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
@@ -349,7 +349,7 @@ const strataCol = (band: number, f: number, y: number) => { const k = hash1(band
 const ridged = (x: number, y: number, z: number, f: number, s: number | undefined) => 1 - Math.abs(2 * vnoise(x * f + y * f * 0.7, z * f - y * f * 0.9, 1, s) - 1);
 export function cragParts(seed = 1, o: { h?: number; w?: number; detail?: number } = {}) {
   const r = rng(seed * 71 + 5), H = o.h ?? (4.5 + 3 * r()), W = o.w ?? (1.1 + 0.6 * r()), lean = (r() - 0.5) * 0.5, gb = new GB(), sd = seed * 13;
-  addBlob(gb, o.detail ?? 4, V(0, H * 0.5, 0), [W, H * 0.5, W * (0.8 + 0.3 * r())], (x, y: number, z) => {
+  addBlob(gb, o.detail ?? 4, V(0, H * 0.5, 0), [W, H * 0.5, W * (0.8 + 0.3 * r())], (x: number, y: number, z: number) => {
     const yn = (y + 1) / 2, taper = 1 - 0.55 * Math.pow(yn, 1.25);
     const s = (y * H * 0.5 + H * 0.5) / (0.9 + 0.5 * hash1(sd)), f = fr(s), band = Math.floor(s);
     const ledge = 1 + 0.07 * (1 - sstep(0.05, 0.5, f)), rid = 1 + 0.3 * ridged(x, y, z, 1.7, sd + 1) + 0.12 * ridged(x, y, z, 4.1, sd + 2) - 0.2;

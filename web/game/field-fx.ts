@@ -68,7 +68,7 @@ export function activeTriggerStep() {
     return ts.indicator(currentMap().id, state.x, state.y, fieldDirectionIndex(state.dir));
 }
 
-export function drawFishing(ctx, camX, camY) {
+export function drawFishing(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
     const f = state.fishing;
     if (!f) return;
 
@@ -125,7 +125,7 @@ export function drawFishing(ctx, camX, camY) {
  * close and twelve when it is far. Those ten rows ship as "id@row" clips
  * (tools/extract_fieldcom.py CLUT_CYCLE).
  */
-export function drawTreeRadar(ctx) {
+export function drawTreeRadar(ctx: CanvasRenderingContext2D | null) {
     const r = state.treeRadar;
     if (!r || !fieldcomReady()) return;
     drawFieldcomIcon(ctx, 1, RADAR_FRAME, RADAR_X, RADAR_Y);
@@ -144,7 +144,7 @@ export function drawTreeRadar(ctx) {
 //      starts while the field is still fully visible and keeps drawing on top
 //      of the demo afterwards.
 //   4. The blackout, which covers the fade out, the load gap and the fade in.
-export function drawDiveTransition(ctx, camX, camY) {
+export function drawDiveTransition(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
     const d = state.diveDemo;
     if (!d) return;
     const f = diveDemoFrame(d.mode, d.frame);

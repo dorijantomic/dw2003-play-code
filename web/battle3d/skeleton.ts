@@ -4,7 +4,7 @@ import { prepareModelDonors } from "../fight/clip-fallback.js";
 
 const _skelCache = new Map(); // folder → Promise<model|null>
 
-export async function loadSkeletalModel(folder) {
+export async function loadSkeletalModel(folder: string) {
   if (!folder) return null;
   if (_skelCache.has(folder)) return _skelCache.get(folder);
   const base = `assets/battle/models/${folder}`;
@@ -105,7 +105,7 @@ export function buildSkeletalGLBuffers(gl, model) {
 // Signature matches what index.html expects: (model, frame, bwm, positions).
 // Emits one position per face corner (3 per face) to match buildSkeletalGLBuffers layout.
 // bwm = { mats, worldTrans } from buildBoneWorldMatrices.
-export function posedVertex(bone, vertexIndex, boneIndex, mats) {
+export function posedVertex(bone, vertexIndex, boneIndex: number, mats) {
   const influences = bone.skin?.[vertexIndex];
   if (!influences) {
     const [lx, ly, lz] = bone.verts[vertexIndex] || [0, 0, 0];

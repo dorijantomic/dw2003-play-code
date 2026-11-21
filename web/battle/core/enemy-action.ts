@@ -51,6 +51,7 @@ import {
 import type { BattleContext } from "../../types/battle.js";
 import type { BattleEndContext } from "./types.js";
 
+import type { EnemyBattleRecord } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeEnemyAction(B: BattleContext) {
 function applyEnemyAction() {
@@ -329,7 +330,7 @@ function applyEnemyAction() {
       B.renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, { miss: true });
     }
   }
-function applyParticipantProgress(b, rosterIndex: number | undefined) {
+function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | undefined) {
     const player = b.playerRecords[rosterIndex];
     const ps = player.statsRecord;
     const prof = player.profile;
@@ -481,7 +482,7 @@ function applyParticipantProgress(b, rosterIndex: number | undefined) {
   // (fightstg.s:6050-6056). Conditions 0-8, 9, 10-13 are wired, and 14-18 read the
   // acting record's own live halfwords — +0x0e affinity, +0x10/+0x12/+0x14 the three stat
   // modifiers, +0x04 the per-slot action-turn counter the turn handler bumps above.
-  function pickEnemyMove(en) {
+  function pickEnemyMove(en: EnemyBattleRecord) {
     const moves = en.eStats?.ai_moves;
     if (!moves || !moves.length) return { action: 1 };
     // check_move_cond operands: the active party form (0x800a4468 record +0x00

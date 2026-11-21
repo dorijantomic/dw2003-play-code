@@ -15,13 +15,14 @@ import {
 } from "../vendor/engine.js";
 import type { ShotNode } from "./types.js";
 
+import type { PlacementTable } from "../types/battle3d.js";
 // camera_view_matrix ledger: F0x8002a1ac builds a STANDARD look-at view matrix (data-confirmed
 // to ~0.3 deg), with the eye/target/H living in the live cam struct D0x800a46d8. buildView here
 // reproduces that look-at exactly (== battle3d.mat4LookAt at roll=0), plus an optional roll.
 
 const sub3   = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
 const cross3 = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-const dot3   = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const dot3   = (a: number[], b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 const norm3  = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
 
 // Right-handed, column-major view matrix (identical convention to battle3d.mat4LookAt).
@@ -187,7 +188,7 @@ export const FACE_BOX_GROUPS = { player: PORT_FACE_BOX_GROUPS.player, enemy: POR
  * Nothing here decides whether the shot produces a picture — that is `faceBoxDraws`, and it is
  * the console's own arithmetic, not a judgement about the record.
  */
-export function faceBoxShot(record, side) {
+export function faceBoxShot(record, side: string) {
   // The group rule and the shot read are the port's (engine/dw3/battle-camera.ts,
   // FIGHTSTG_F0x80091c1c / faceBoxShotFromRows): this adapter only hands the parsed
   // placement rows over, so no caller can pick a different group.
@@ -234,7 +235,7 @@ export function faceBoxDraws(shot) {
  * `playerModelKey` is the model key of the player's active Digimon — the numeric prefix of
  * its pack folder, the number `modelKeyFromFolder` returns. `side` is the speaker's side.
  */
-export function faceBoxSource(placementTable, playerModelKey, side) {
+export function faceBoxSource(placementTable: PlacementTable | null | undefined, playerModelKey: string | null | undefined, side: string) {
   const s = side === "enemy" ? "enemy" : "player";
   const key = playerModelKey == null ? null : String(playerModelKey);
   const record = (key != null && placementTable) ? (placementTable[key] ?? null) : null;
@@ -347,7 +348,7 @@ const s16 = (v) => ((v | 0) << 16) >> 16;          // the record stores the angl
                                                     // and RotMatrix reads them back with `lh`.
 /** The `lhu`/`subu`/`sh`/`lhu` round trip of the interpolator: every field is 16 bits wide and
  *  the subtraction wraps before it is read back signed. */
-const wrap16 = (v) => (v << 16) >> 16;
+const wrap16 = (v: number) => (v << 16) >> 16;
 
 /**
  * R = Ry(vy) . Rx(vx) . Rz(vz), row-major 3x3 — the exact matrix F0x8002b65c writes.
@@ -405,7 +406,7 @@ export const PS1_UP = [0, -1, 0];
 export const ROLL_IS_DEGREES = true;
 
 /** Rodrigues: turn `v` about unit-ish `axis` by `rad` (right-hand rule). */
-export function rotateAboutAxis(v, axis, rad) {
+export function rotateAboutAxis(v, axis: number[], rad: number) {
   const k = norm3(axis), c = Math.cos(rad), s = Math.sin(rad);
   const kv = dot3(k, v), kxv = cross3(k, v);
   return [
@@ -420,7 +421,7 @@ export function rotateAboutAxis(v, axis, rad) {
  * backward axis eye-target by MINUS the roll, per the sign derivation above. rollDeg = 0 returns
  * `up` untouched, so every shot that authors no roll is bit-identical to before.
  */
-export function applyScreenRoll(up, eye, target, rollDeg) {
+export function applyScreenRoll(up: number[] | undefined, eye, target, rollDeg: number) {
   if (!rollDeg) return up;
   return rotateAboutAxis(up, sub3(eye, target), -rollRadians(rollDeg));
 }
@@ -496,7 +497,7 @@ export function composeShot(fields) {
  * `t` runs 0..1 here (the original's 0..0x1000 accumulator); it is taken back to that integer
  * scale, which is exact for every caller that divides the accumulator by 0x1000.
  */
-export function lerpFields(from, to, t) {
+export function lerpFields(from, to, t: number) {
   const acc = Math.round(t * 0x1000);
   const out = new Array(14);
   for (let i = 0; i < 14; i++) {
@@ -712,7 +713,7 @@ export function createCameraRecord(resolvePreset) {
 
     // F0x80091df4's per-frame step, on the RAW delta through 0x8004df9c. It advances the move's
     // accumulator AND a preset glide's — both are the same [0xfc] move on the console.
-    tick(delta) {
+    tick(delta: number) {
       if (rec?.duration && rec.progress < 0x1000) {
         rec.progress = op5GlideT(rec.progress, rec.rate, delta);
         // The clip's playback moves on: the next authored op5 arms from the shot just reached.

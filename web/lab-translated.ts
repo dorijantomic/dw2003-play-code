@@ -127,7 +127,7 @@ export function createLabTranslated(sfx = null) {
     const ownedSlots = (state) => walkerOwnedSlots(state, { includeParty: true });
     /** The walker's stats object for a roster slot: the deployed party's live block, or the reserve store. */
     const slotStats = walkerSlotStats;
-    const slotEquipment = (state, slot) => {
+    const slotEquipment = (state, slot: number) => {
         const charId = ROSTER_SLOT_CHARIDS[slot];
         const pos = (state.party ?? []).indexOf(charId);
         if (pos >= 0) return state.equipment?.[pos] ?? null;
@@ -322,7 +322,7 @@ export function createLabTranslated(sfx = null) {
     };
 
     /** Show the next / previous page of a ledger longer than the screen's 44 cells: keep the edits, rebuild the screen. */
-    function flipLedgerPage(dir) {
+    function flipLedgerPage(dir: number) {
         const now = ui.getLedgerPage();
         const next = Math.max(0, Math.min(g._ledgerPages - 1, now + dir));
         if (next === now) return;

@@ -68,7 +68,7 @@ export function presentClips(present, folder: string | number) {
 }
 
 /** The donor row for (folder, clip) from a lookup function (donorRow) or a plain table, or null. */
-export function donorOf(donors, folder: string | number, clip) {
+export function donorOf(donors, folder: string | number, clip: number | null) {
   if (!donors || !folder || !Number.isInteger(clip)) return null;
   let row = null;
   try {

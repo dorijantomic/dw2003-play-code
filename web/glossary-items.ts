@@ -18,7 +18,7 @@ export const ITEM_ROWS = 9;
 export const MAX_DESC_LINES = 2;
 
 /** Where lines that fit under the name row, both heads and `descLines` description lines. */
-export const whereVisible = (descLines) => ITEM_ROWS - (descLines > 0 ? 3 + descLines : 2);
+export const whereVisible = (descLines: number) => ITEM_ROWS - (descLines > 0 ? 3 + descLines : 2);
 
 /** "12.6%": the odds of one drop as the DIGIMON page prints them. */
 export const oddsText = (n) => `${Math.round((n / 1024) * 1000) / 10}%`;
@@ -116,7 +116,7 @@ export function createItemsModel() {
         /** Current item id for this list (the first one when the remembered item is not in it); null for an empty list. */
         current(ids) { if (!ids.length) return null; if (!ids.includes(id)) { id = ids[0]; line = 0; } return id; },
         index: (ids) => indexIn(ids),
-        move(ids, d) {
+        move(ids, d: number) {
             if (!ids.length) return false;
             const from = indexIn(ids), to = Math.max(0, Math.min(ids.length - 1, from + d));
             if (to === from) return false;
@@ -124,7 +124,7 @@ export function createItemsModel() {
             return true;
         },
         line: () => line,
-        scroll(d, total, visible) {
+        scroll(d: number, total: number, visible: number) {
             const t = Math.max(0, Math.min(Math.max(0, total - visible), line + d));
             if (t === line) return false;
             line = t;

@@ -244,7 +244,7 @@ function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
  * `tech` is the technique's NAME, the key the animator has (techName) and the anatomy's tables use; the
  * skills row is found by that name and narrowed by the clip when one name covers several rows.
  */
-export function moveKind(model, clip, tech) {
+export function moveKind(model, clip: number, tech) {
   const rows = (tech ? skillRowsForName(tech) : []).filter((r: { clip: number; }) => clip == null || (r.clip | 0) === (clip | 0));
   const cats = new Set(rows.map((r) => String(r.attack_category || "")));
   const cat = cats.size === 1 ? [...cats][0] : null;
@@ -266,7 +266,7 @@ export function pickOwnClip(model, kind: string) {
   const list = Object.values(inv.slots).filter((r) => (kind === "shoot" ? r.launches.length > 0 : r.contacts.length > 0));
   if (!list.length) return null;
   const travels = (r) => r.ramp4 > 0 || r.leap3 > 0 || r.dash8 > 0 || Math.abs(r.rootTravel) > TRAVEL_SHARE * inv.height;
-  const rank = (r) => {
+  const rank = (r: OwnClipRec) => {
     const fit = kind === "shoot" ? (CAST_CLIPS.has(r.slot) ? 0 : r.slot === 5 ? 1 : 2) : (r.slot === 5 ? 0 : 1);
     return fit * 1000 + (travels(r) ? 0 : 100) + r.slot;
   };
@@ -280,7 +280,7 @@ export function pickOwnClip(model, kind: string) {
  * heal/support move is never planned (its calm self cast is the right shape), an item is not a
  * technique (the animator passes no tech for it) and an unknown move kind is not guessed.
  */
-export function ownClipPlan(model, clip, { tech = null, target = "enemy" } = {}) {
+export function ownClipPlan(model, clip: number, { tech = null, target = "enemy" } = {}) {
   if (!ownClipsEnabled() || !model || clip == null || !tech) return null;
   if (target === "self") return null;
   if (hasOps(model.actions?.[clip])) return null;

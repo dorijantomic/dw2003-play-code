@@ -29,6 +29,7 @@ import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } fro
 import { composeWindow } from "./ui-c/screens.js";
 import type { GymScreen } from "./types/gym-translated.js";
 
+import type { InventoryRow } from "./game/types.js";
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
 const PACK_NAMES = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -59,7 +60,7 @@ const loadShared = () => {
     return sharedPromise;
 };
 const banksByLanguage = new Map();
-const loadBank = (language) => {
+const loadBank = (language: number | undefined) => {
     const id = 0x10b + language;
     if (!banksByLanguage.has(id)) {
         banksByLanguage.set(id, fetchBytes(`gym/${id}.bin`, DATA_LABEL).catch((error) => { banksByLanguage.delete(id); throw error; }));
@@ -68,7 +69,7 @@ const loadBank = (language) => {
 };
 
 /** The rank group a greeter's ID-card gates give (GYM-C010), for the lab path that has no greeter. */
-export function gymGroupForStage(stage, inventory, ranks) {
+export function gymGroupForStage(stage: number, inventory: InventoryRow[], ranks) {
     const has = (id) => !!inventory?.some((s) => s.id === id && s.qty > 0);
     const gym = ranks?.gyms?.find((g) => g.stage === stage);
     if (!gym) return null;
@@ -156,7 +157,7 @@ export function createGymTranslated(sfx = null) {
         console.error("Translated gym failed", error);
     }
 
-    function startSession(bank) {
+    function startSession(bank: Uint8Array<ArrayBufferLike> | null | undefined) {
         const selected = g._state?.languageByte;
         const language = Number.isInteger(selected) ? selected : 2;
         const data = g._data;

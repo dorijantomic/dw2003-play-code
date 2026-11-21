@@ -22,7 +22,7 @@ export { syncLeadEquipBonuses } from "./vendor/engine.js";
 
 // Grant every member of the chosen pack, moving the picked lead to the front.
 // packMembers: array of manifest character ids; leadIdx: which one the player chose.
-export function grantPack(packMembers, leadIdx) {
+export function grantPack(packMembers: string[], leadIdx: number) {
   const lead = packMembers[leadIdx];
   const rest = packMembers.filter((_, i) => i !== leadIdx);
   return { party: [lead, ...rest], leadIdx: 0 };
@@ -30,7 +30,7 @@ export function grantPack(packMembers, leadIdx) {
 
 // The download scene is the ownership boundary. A selected manifest character
 // or stale charIdx is not a party and must never create followers/encounters.
-export function fieldPartySize(party, cap = 3) {
+export function fieldPartySize(party: (string | null)[], cap = 3) {
   return Array.isArray(party) ? Math.min(party.length, cap) : 0;
 }
 
@@ -118,7 +118,7 @@ export function elementPointsWithGear(elemBonuses, elemResists) {
   return points;
 }
 
-export function elementValueWithGear(profile, elemBonuses, elemResists, element) {
+export function elementValueWithGear(profile, elemBonuses, elemResists, element: string) {
   return elementValue(profile, elementPointsWithGear(elemBonuses, elemResists), element);
 }
 

@@ -237,7 +237,7 @@ installSocial({
                 return max > 0 ? Math.max(0, Math.min(1, rows.reduce((n, r) => n + Math.max(0, r.hp | 0), 0) / max)) : 0;
             };
             let over = false;
-            const finish = (won) => {
+            const finish = (won: boolean) => {
                 if (over) return; over = true;
                 const hp = won ? share() : 0;
                 state.inventory = JSON.parse(snap.inv); state.bits = snap.bits;
@@ -777,7 +777,7 @@ window.__labOpen = (name, arg) => {
         state.party = ["p003pken", "p009rena", "p010pata"];
         state.packId = "A";
         state.charId = "p003pken";
-        const block = (digimonId, hp, mp) => ({
+        const block = (digimonId: number, hp: number, mp: number) => ({
             digimonId, level: 1, xp: 0, tp: 0,
             hp, maxHp: hp, mp, maxMp: mp,
             bonuses: {}, elemBonuses: {},

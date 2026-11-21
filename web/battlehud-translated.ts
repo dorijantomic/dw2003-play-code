@@ -29,6 +29,7 @@ import { fetchBytes } from "./resident-data.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import type { BattleHudPipsOptions, RecordMemory } from "./types/battlehud-translated.js";
 
+import type { BattleState } from "./types/battle.js";
 const {
   BATTLE_HUD_ACTIVE_SLOT, BATTLE_HUD_BANK_SEPARATOR, BATTLE_HUD_DV_FILL_CEL_FILLING,
   BATTLE_HUD_DV_FILL_CEL_FULL, BATTLE_HUD_DV_FRAME_CEL_INNER, BATTLE_HUD_DV_FRAME_CEL_OUTER,
@@ -64,7 +65,7 @@ function recordStore() {
         read8(addr) { return (mem.read16(addr) & 0xff) | 0; },
         read16(addr) { return half.get(addr & ~1) | 0; },
         read32(addr) { return (mem.read16(addr) | (mem.read16(addr + 2) << 16)) | 0; },
-        write16(addr, value) { half.set(addr & ~1, value & 0xffff); },
+        write16(addr, value: number) { half.set(addr & ~1, value & 0xffff); },
         write32(addr, value) { mem.write16(addr, value & 0xffff); mem.write16(addr + 2, (value >>> 16) & 0xffff); },
     };
     return mem;
@@ -74,7 +75,7 @@ function recordStore() {
 // `lbu $v0, 0x1c($s1)` / `bnez $v0` / `li $a1, 0x3`, fightstg.fns.s:17473-17476), which
 // is the same byte the command rows use, so this builds it with battleAilmentByte.
 
-function writeRecord(mem, sideIndex, slot, member) {
+function writeRecord(mem: RecordMemory, sideIndex: number, slot, member) {
     if (!member) return;
     const rec = BATTLE_HUD_RECORDS + sideIndex * BATTLE_HUD_SIDE_STRIDE + slot * 0x20;
     mem.write16(rec + 0x00, 1);
@@ -104,7 +105,7 @@ export function battleHudPartyPips(players, enemies, options: BattleHudPipsOptio
 }
 
 /** The three party members as the original's records see them (a missing member is absent). */
-export function battleHudPlayerRecords(b) {
+export function battleHudPlayerRecords(b: BattleState) {
     // The three live combat records, NOT the roster. `playerRoster[i]` is the
     // persistent character (species, name, saved stats) and carries no hp at all, so
     // reading it here gave every party member hp 0 -- which the decoded marker rule
@@ -131,7 +132,7 @@ export function battleHudPlayerRecords(b) {
  * is drawn). With `team` (an array of up to three slot records, in slot order, null for
  * an empty slot) every present member is returned, a knocked-out one with hp 0.
  */
-export function battleHudEnemyRecords(b, team = null) {
+export function battleHudEnemyRecords(b: BattleState, team = null) {
     const rec = (e) => (e ? { hp: Number(e.hp ?? 0), maxHp: Number(e.maxHp ?? 0),
         ailments: e.ailments, statusBits: e.statusBits } : null);
     if (Array.isArray(team) && team.length > 0) return [0, 1, 2].map((i) => rec(team[i]));
@@ -147,7 +148,7 @@ export { battleHudHpBarLength };
  * enemy's, whose quad lists vertex 0 on the right, so its ramp runs the other way.
  * @returns {readonly [string, string]}
  */
-export function battleHudBarColors(shownHp, maxHp, side = 0) {
+export function battleHudBarColors(shownHp: number, maxHp: number, side = 0) {
     const table = battleHudHpGradient(shownHp, maxHp);
     const v0 = battleHudGradientRgb(table, 0);
     const v1 = battleHudGradientRgb(table, 1);
@@ -249,7 +250,7 @@ export const BATTLE_HUD_DV_PAINT_INNER_FRAME = false;
  * clips the source rectangle to `gauge/25` native pixels, which is what the walker
  * already did.
  */
-export function battleHudDvPaint(ctx, frame, packs) {
+export function battleHudDvPaint(ctx: CanvasRenderingContext2D | undefined, frame, packs) {
     const pack = packs?.pgfgc00 ?? null;
     const ready = !!pack && packReady(pack);
     if (ready) drawClip(ctx, pack, String(frame.outer.cel), frame.outer.x, frame.outer.y);
@@ -338,7 +339,7 @@ battleHudNameBank().then(battleHudSetNameBank).catch(() => {});
 export function battleHudNameBankSync() { return loadedNameBank; }
 
 /** The synthetic resident address one bank id resolves to, mirroring ScreenTextBanks. */
-export function battleHudBankBase(id) {
+export function battleHudBankBase(id: number) {
     const key = id | 0;
     if (!BANK_BASES.has(key)) {
         const at = (BANK_BASE + BANK_BASES.size * BANK_STRIDE) >>> 0;

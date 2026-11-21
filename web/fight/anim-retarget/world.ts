@@ -101,7 +101,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const pt = ct.parts.map((p) => (p ? norm(ct, p) : null));
   const ps = cs.parts.map((p) => (p ? norm(cs, p) : null));
   const Qs = { 0: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 180: [[-1, 0, 0], [0, 1, 0], [0, 0, -1]] };
-  const yawOf = (deg, p) => (deg === 180 ? [-p[0], p[1], -p[2]] : p);
+  const yawOf = (deg: number, p) => (deg === 180 ? [-p[0], p[1], -p[2]] : p);
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   // the SIZE of a part (its three bounding extents, sorted, in body heights): a part is not a point, and two
   // parts at nearly the same place (a tail fan and a torso) are told apart by how big they are
@@ -120,7 +120,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   // the root end. That keeps a leg's hip with a leg's hip and a head chain in order.
   const chainsOf = (model) => {
     const m = model.bones.length;
-    const par = (i) => { const q = (model.bones[i]?.parent_slot ?? 0) - 1; return q >= 0 && q < m ? q : -1; };
+    const par = (i: number) => { const q = (model.bones[i]?.parent_slot ?? 0) - 1; return q >= 0 && q < m ? q : -1; };
     const kids = Array.from({ length: m }, () => []);
     for (let i = 0; i < m; i++) { const q = par(i); if (q >= 0) kids[q].push(i); }
     const out = [];
@@ -135,7 +135,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     return out;
   };
   const chT = chainsOf(target), chS = chainsOf(source);
-  const featOf = (chain, c, P, Z, D, deg?: number) => {
+  const featOf = (chain, c, P: (number[] | null)[], Z, D, deg?: number) => {
     const pts = chain.filter((i) => P[i]);
     if (!pts.length) return null;
     const cen = [0, 0, 0], lo3 = [Infinity, Infinity, Infinity], hi3 = [-Infinity, -Infinity, -Infinity];
@@ -147,7 +147,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     for (let k = 0; k < 3; k++) cen[k] /= pts.length;
     return { cen, ext: [hi3[0] - lo3[0], hi3[1] - lo3[1], hi3[2] - lo3[2]], len: pts.length, depth: D[chain[0]], tip: P[pts[pts.length - 1]] };
   };
-  const pair = (deg) => {
+  const pair = (deg: number) => {
     const fT = chT.map((ch) => featOf(ch, ct, pt, zt, dT)), fS = chS.map((ch) => featOf(ch, cs, ps, zs, dS, deg));
     const cand = [];
     for (let a = 0; a < chT.length; a++) if (fT[a]) for (let b = 0; b < chS.length; b++) if (fS[b]) {
@@ -190,7 +190,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   }
   const sTorso = tTorso >= 0 ? map[tTorso] : -1;
 
-  const parentOf = (i) => { const p = (target.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
+  const parentOf = (i: number) => { const p = (target.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
   const order = [];
   {
     const kids = Array.from({ length: n }, () => []);
@@ -205,7 +205,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const keys2 = new Map(), keys1 = new Map(), prev = new Map();
   let travelMax = 0;
   // the middle of each part's mass in its OWN frame (null when it sits on the origin: then it has no direction)
-  const centreOf = (model, H) => model.bones.map((b) => {
+  const centreOf = (model, H: number) => model.bones.map((b) => {
     const vs = b.verts || [];
     if (!vs.length) return null;
     const c = [0, 0, 0];
@@ -218,9 +218,9 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   // and last `ramp` ticks, so the cast leaves the idle and returns to it with no snap
   const nF = hi - lo + 1;
   const ramp = Math.max(6, Math.round(K23.rampShare * nF));
-  const weight = (s) => { const x = Math.max(0, Math.min(1, Math.min((s - lo) / ramp, (hi - s) / ramp))); return x * x * (3 - 2 * x); };
+  const weight = (s: number) => { const x = Math.max(0, Math.min(1, Math.min((s - lo) / ramp, (hi - s) / ramp))); return x * x * (3 - 2 * x); };
   /** the rotation `Wtarget`, reached `w` of the way from the rest rotation `Wrest` (along the shortest turn) */
-  const blendRot = (Wrest, Wtarget, w) => {
+  const blendRot = (Wrest, Wtarget, w: number) => {
     if (w >= 1) return Wtarget;
     const { axis, ang } = k16axisOf(k16mul(k16tr(Wrest), Wtarget));
     return k16mul(Wrest, k16axisAngle(axis, ang * w));
@@ -229,7 +229,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   // direction. The shortest turn from rest has an ill-conditioned axis when a limb goes from hanging to raised (it swings
   // sideways and rolls, shoulders merge, arms cross); small steps of a planar path add no roll. Off by default.
   const tstate = new Map();
-  const aimR = (key, u, dv) => {
+  const aimR = (key: string, u, dv) => {
     if (!transport) return k16fromTo(u, dv);
     const st = tstate.get(key) || { d: u, R: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
     const R = k16mul(k16fromTo(st.d, dv), st.R);

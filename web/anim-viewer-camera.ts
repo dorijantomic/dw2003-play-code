@@ -21,10 +21,10 @@ import type { AnimViewerCamera, FreeCameraOptions } from "./types/anim-viewer-ca
 export const DEG = Math.PI / 180;
 const EPS = 1e-9;
 
-const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+const lerp = (a, b, t: number) => a + (b - a) * t;
 // Frame-rate independent exponential damping: fraction of the remaining distance per second.
-const damp = (cur, target, rate, dt) => (rate <= 0 || dt <= 0 ? target : lerp(cur, target, 1 - Math.exp(-rate * dt)));
+const damp = (cur: number | undefined, target: number | undefined, rate: number, dt) => (rate <= 0 || dt <= 0 ? target : lerp(cur, target, 1 - Math.exp(-rate * dt)));
 
 export const PITCH_LIMIT = 89 * DEG;        // default clamp: never exactly vertical (avoids a degenerate up)
 export const PITCH_LIMIT_FULL = 89.95 * DEG; // "allow full pitch" toggle
@@ -76,7 +76,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
 
   const maxPitch = () => (cam.allowFullPitch ? PITCH_LIMIT_FULL : PITCH_LIMIT);
 
-  function clampPitch(p) {
+  function clampPitch(p: number) {
     const m = maxPitch();
     return clamp(p, -m, m);
   }
@@ -107,7 +107,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   function look() { return [cam.pivot[0], cam.pivot[1], cam.pivot[2]]; }
 
   /** Orbit the target by degrees (sign: positive = camera moves counter-clockwise seen from above). */
-  function orbitBy(dYawDeg, dPitchDeg = 0, { immediate = false } = {}) {
+  function orbitBy(dYawDeg: number, dPitchDeg = 0, { immediate = false } = {}) {
     cam.targetYaw += dYawDeg * DEG;
     cam._lastAzimuthDelta = dYawDeg;
     cam.targetPitch = clampPitch(cam.targetPitch + dPitchDeg * DEG);
@@ -231,7 +231,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     return frameBounds({ min, max }, aspect, opts);
   }
 
-  function setPreset(name, { immediate = false } = {}) {
+  function setPreset(name: string, { immediate = false } = {}) {
     const p = PRESETS[name];
     if (!p) return false;
     cam.targetYaw = p.yaw * DEG;
@@ -268,7 +268,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     flatF[0] /= fl; flatF[2] /= fl;
     const speed = cam.dist * 0.9 * cam.flySpeed * dt;   // relative speed: consistent at any zoom
     const move = [0, 0, 0];
-    const add = (v, k) => { move[0] += v[0] * k; move[1] += v[1] * k; move[2] += v[2] * k; };
+    const add = (v: number[] | (number | undefined)[], k: number) => { move[0] += v[0] * k; move[1] += v[1] * k; move[2] += v[2] * k; };
     if (keys.w) add(flatF, speed);
     if (keys.s) add(flatF, -speed);
     if (keys.d) add(right, speed);
@@ -322,14 +322,14 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
       -(zx * eyeP[0] + zy * eyeP[1] + zz * eyeP[2]), 1,
     ]);
   }
-  function mat4Perspective(fovy, aspect, near, far) {
+  function mat4Perspective(fovy: number, aspect: number, near: number, far: number) {
     const f = 1 / Math.tan(fovy / 2);
     return new Float32Array([
       f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1,
       0, 0, (2 * far * near) / (near - far), 0,
     ]);
   }
-  function mat4Ortho(halfH, aspect, near, far) {
+  function mat4Ortho(halfH: number, aspect: number, near: number, far: number) {
     const halfW = halfH * aspect;
     return new Float32Array([
       1 / halfW, 0, 0, 0, 0, 1 / halfH, 0, 0, 0, 0, -2 / (far - near), 0,
@@ -348,7 +348,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   function viewMatrix() { return mat4LookAt(eye(), look(), basis().up); }
   function viewProjection(aspect) { return mat4Mul(projection(aspect), viewMatrix()); }
 
-  function mat4Mul(a, b) {
+  function mat4Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
     const o = new Float32Array(16);
     for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
       let s = 0;
@@ -357,7 +357,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     }
     return o;
   }
-  function transform(m, p) {
+  function transform(m: Float32Array<ArrayBuffer>, p) {
     const x = p[0], y = p[1], z = p[2];
     const w = m[3] * x + m[7] * y + m[11] * z + m[15];
     return [(m[0] * x + m[4] * y + m[8] * z + m[12]) / w,
@@ -419,7 +419,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
 
   /** URL state: everything needed to reproduce this exact view. */
   function state() {
-    const r = (v, n = 4) => +v.toFixed(n);
+    const r = (v: number | undefined, n = 4) => +v.toFixed(n);
     return {
       yaw: r(cam.yaw / DEG, 2), pitch: r(cam.pitch / DEG, 2), dist: r(cam.dist, 1),
       px: r(cam.pivot[0], 1), py: r(cam.pivot[1], 1), pz: r(cam.pivot[2], 1),

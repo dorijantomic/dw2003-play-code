@@ -8,18 +8,19 @@ import { heldCount, ITEMS, storeAddItem } from "./vendor/engine.js";
 import { scaledStat } from "./battle.js";
 import type { DebugPanelState } from "./types/debugPanel.js";
 
+import type { GameState } from "./game/types.js";
 const FISHING_POLE_ID = 5;
 const TREE_BOOTS_ID = 4;
 
 /** Grant the collection item that makes the fishing-spot predicate 0x8005 true. */
-export function grantFishingPole(state) {
+export function grantFishingPole(state: GameState) {
   if (heldCount(state, FISHING_POLE_ID) > 0) return false;
   storeAddItem(state, FISHING_POLE_ID, 1);
   return true;
 }
 
 /** Grant the collection item that makes the tree-kick predicate 0x8004 true. */
-export function grantTreeBoots(state) {
+export function grantTreeBoots(state: GameState) {
   if (heldCount(state, TREE_BOOTS_ID) > 0) return false;
   storeAddItem(state, TREE_BOOTS_ID, 1);
   return true;
@@ -30,18 +31,18 @@ export function createDebugPanel() {
 
   // Evolution targets the partner currently qualifies for (level/form/stat-gated). Recomputed
   // live so editing Level/stats above immediately changes what's offered here.
-  const evosFor = (state) => window.__battle?.availableEvolutions?.(state) ?? [];
+  const evosFor = (state: GameState) => window.__battle?.availableEvolutions?.(state) ?? [];
 
   // Field model. Each numeric field reads/writes a number; `set` clamps + persists.
   // Level changes recompute max HP/MP from the partner profile (same formula as a real
   // level-up) so the visible scaled stats track the new level.
-  function persist(state) {
+  function persist(state: GameState) {
     localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
     localStorage.setItem("inventory", JSON.stringify(state.inventory));
     localStorage.setItem("bits", String(state.bits ?? 0));
   }
 
-  function recomputeMax(state) {
+  function recomputeMax(state: GameState) {
     const ps = state.partnerStats;
     const prof = window.__battle?.getPlayerProfile?.(state);
     if (!prof) return;
@@ -53,7 +54,7 @@ export function createDebugPanel() {
   }
 
   // bonus(stat) accessors live under ps.bonuses[stat] (added on top of the scaled base).
-  const bonus = (stat) => ({
+  const bonus = (stat: string) => ({
     label: `+${stat.toUpperCase()}`, step: 1, min: 0,
     get: (ps) => ps.bonuses?.[stat] ?? 0,
     set: (ps, v) => { ps.bonuses = ps.bonuses ?? {}; ps.bonuses[stat] = Math.max(0, v); },
@@ -61,7 +62,7 @@ export function createDebugPanel() {
 
   const FIELDS = [
     { label: "Level", step: 1, min: 1, get: (ps) => ps.level ?? 1,
-      set: (ps, v, state) => { ps.level = Math.max(1, v); recomputeMax(state); } },
+      set: (ps, v, state: GameState) => { ps.level = Math.max(1, v); recomputeMax(state); } },
     { label: "EXP", step: 10, min: 0, get: (ps) => ps.xp ?? 0, set: (ps, v) => { ps.xp = Math.max(0, v); } },
     { label: "TP", step: 1, min: 0, get: (ps) => ps.tp ?? 0, set: (ps, v) => { ps.tp = Math.max(0, Math.min(99, v)); } },
     { label: "HP", step: 10, min: 0, get: (ps) => ps.hp, set: (ps, v) => { ps.hp = Math.max(0, Math.min(v, ps.maxHp)); } },
@@ -90,7 +91,7 @@ export function createDebugPanel() {
   const DIVE_ITEMS = [16, 17];
   const DIVE_ORDINAL = 30;
 
-  function grantDiveAccess(state) {
+  function grantDiveAccess(state: GameState) {
     for (const id of DIVE_ITEMS) {
       if (heldCount(state, id) === 0) storeAddItem(state, id, 1);
     }
@@ -210,7 +211,7 @@ export function createDebugPanel() {
 
     if (!ps) { ctx.fillStyle = "#f88"; ctx.fillText("No partner yet.", x + 8, y + 8 + lh * 2); ctx.restore(); return; }
     let row = 0;
-    const line = (label, val, idx) => {
+    const line = (label: string, val, idx: number) => {
       const yy = y + 14 + lh * (2 + row++);
       ctx.fillStyle = idx === d.sel ? "#ffe000" : "#cde";
       ctx.fillText(`${idx === d.sel ? "▶ " : "  "}${label}`, x + 8, yy);
@@ -224,7 +225,7 @@ export function createDebugPanel() {
     const evoName = evos.length ? (evos[Math.min(d.evoIdx, evos.length - 1)]?.to ?? "-") : "(none)";
     line(`Evolve ◀ ${evoName} ▶`, "[⏎]", EVO_ROW);
     const ord = Number(window.__engine?.state.vars.get("$story.ordinal") ?? 0);
-    const have = (id) => heldCount(state, id) > 0;
+    const have = (id: number) => heldCount(state, id) > 0;
     const diveState = `${have(16) && ord >= 15 ? "water" : "-"}/${have(17) && ord >= 30 ? "hole" : "-"}`;
     line(`Dive access (${diveState})`, "[⏎]", DIVE_ROW);
     line(`Fishing access (${have(FISHING_POLE_ID) ? "ready" : "locked"})`, "[⏎]", FISH_ROW);

@@ -60,7 +60,7 @@ const v2On = () => typeof window !== "undefined" && window.__fx?.stageselect ===
 // The full mover is ported in engine/dw3/ui/native/stage-select.ts
 // (`stageSelectMoveCursor`) and proved against the original by
 // tests/lane-b/stage-select-move-cursor.test.js.
-export function cursorStep(cursor, count, delta) {
+export function cursorStep(cursor: number, count, delta: number) {
   if (!(count > 0)) return 0;
   return Math.max(0, Math.min(count - 1, (cursor | 0) + (delta | 0)));
 }
@@ -110,7 +110,7 @@ export function v2Rows(data) {
  * cursor goes above the window, down one entry at a time when it leaves the
  * bottom, so cursor 40 in a 14-row window sits on scroll 27.
  */
-export function clampScroll(cursor, scroll, rows = VISIBLE_ROWS) {
+export function clampScroll(cursor: number, scroll: number, rows = VISIBLE_ROWS) {
   if (!(rows > 0)) return 0;
   const c = Math.max(0, Math.trunc(cursor) || 0);
   let s = Math.max(0, Math.min(Math.trunc(scroll) || 0, c));
@@ -221,7 +221,7 @@ export function createStagslctMenu(data = null) {
   };
 
   // ── the old rendering (unchanged; the F2 switch selects v2 instead) ──────
-  function drawV1(ctx, W, H) {
+  function drawV1(ctx: CanvasRenderingContext2D, W: number, H: number) {
     if (!d.open) return;
     ctx.save();
     // The original draws plain text over whatever is already on screen: this
@@ -272,7 +272,7 @@ export function createStagslctMenu(data = null) {
   }
 
   // ── v2: the developers' 328-row table as the August decode reads it ──────
-  function drawV2(ctx, W, H) {
+  function drawV2(ctx: CanvasRenderingContext2D, W: number, H: number) {
     if (!d.open) return;
     ctx.save();
     ctx.fillStyle = "rgba(8,12,24,0.92)";

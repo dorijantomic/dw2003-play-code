@@ -32,7 +32,7 @@ async function loadPackData() {
 export async function bindCardShopInventory(state: GameState) {
   const data=await loadPackData();ui.bindCardPacks(cards(),state,data.boosterItems);
 }
-async function loadData(language) {
+async function loadData(language: number | undefined) {
   dataPromise ??= Promise.all([
     fetchJson('card_shops.json','Card shop'), fetchJson('card_prices.json','Card shop'),
     fetchJson('card_boosters.json','Card shop'), fetchJson('card_catalog.json','Card shop'),

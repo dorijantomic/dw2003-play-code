@@ -76,7 +76,7 @@ export const LANGUAGE_ENGLISH = 2;
 function layout() {
   const t = UI?.title_menu;
   if (!t) return FALLBACK;
-  const clip = (k) => t.clips?.[k] ?? {};
+  const clip = (k: string) => t.clips?.[k] ?? {};
   const j = t.jpn_layout ?? {};
   return {
     promptAt: t.split?.from ?? FALLBACK.promptAt,

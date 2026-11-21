@@ -56,7 +56,7 @@ export function createFieldMoviePlayer(onEnd, onError = console.error, createVid
     return response.json();
   });
 
-  const finish = (why) => {
+  const finish = (why: string | null) => {
     if (!active) return;
     active = false;
     generation++;
@@ -78,7 +78,7 @@ export function createFieldMoviePlayer(onEnd, onError = console.error, createVid
      *  names the asset. The engine player opens synchronously (so START can end
      *  the movie even while the stream is still loading); the media load is
      *  async and hands back through `onEnd` either way. */
-    async open(launchCode) {
+    async open(launchCode: number) {
       const token = ++generation;
       const row = player.open(launchCode, languageByte());
       active = row !== null;
@@ -119,7 +119,7 @@ export function createFieldMoviePlayer(onEnd, onError = console.error, createVid
     /** The console's blanks the browser time is worth, shared with the field's
      *  own conversion (`consumeFieldTicks`): the movie runs on the same cadence
      *  every other screen of ours runs on. */
-    update(dt) {
+    update(dt: number) {
       if (!active) return;
       const due = consumeFieldTicks(accumulator, dt);
       accumulator = due.accumulator;

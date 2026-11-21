@@ -1,7 +1,8 @@
-// Materialize the persistent three-row fight report. The native screen shows
+
+import type { DigimonRecord } from "../types/battle.js";// Materialize the persistent three-row fight report. The native screen shows
 // the whole pack (not only Digimon that were tagged into the fight), while EXP
 // is added only to the participants selected by the reward resolver.
-export function buildFightReportRows(roster, records, profiles, rewardXpByIndex = {}) {
+export function buildFightReportRows(roster, records, profiles: { [k: string]: DigimonRecord; }, rewardXpByIndex = {}) {
   return (roster ?? []).slice(0, 3).map((member, index: string | number) => {
     const stats = member?.stats ?? records?.[index]?.statsRecord ?? {};
     const rookieId = Number(member?.rookieId ?? records?.[index]?.rookieId ?? 0);

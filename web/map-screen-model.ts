@@ -14,7 +14,7 @@ export function regionOf(name: string | undefined) {
 }
 
 /** Every link between two manifest maps, as a Set of "a|b" keys (a < b), from the scenes' exits and warps. Self links and unknown ids are dropped. */
-export function buildLinks(maps, scenes) {
+export function buildLinks(maps: MapScreenRecord[], scenes) {
     const known = new Set(maps.map((m) => m.id));
     const links = new Set<string>();
     for (const m of maps) {
@@ -45,7 +45,7 @@ export function buildGraph(maps: MapScreenRecord[], scenes) {
     }
     return {
         regions,
-        regionIndex: (id) => regionOfId.get(id) ?? -1,
+        regionIndex: (id: string | null) => regionOfId.get(id) ?? -1,
         nameOf: (id) => names.get(id) ?? "",
         neighbours: (id) => adj.get(id) ?? [],
     };
@@ -55,7 +55,7 @@ export function buildGraph(maps: MapScreenRecord[], scenes) {
  * What one region shows: `nodes` = [{ id, seen }] (visited first, then the "???" ones beside them) and `edges` = [[a, b]],
  * both only among the shown nodes. `seen(id)` = the flag question; the current map always counts as visited.
  */
-export function regionView(graph, regionIdx: string | number, seen, currentId: string | null) {
+export function regionView(graph, regionIdx: string | number, seen: (id: string) => boolean, currentId: string | null) {
     const region = graph.regions[regionIdx];
     if (!region) return { nodes: [], edges: [], visited: 0, total: 0 };
     const isSeen = (id: string | null) => id === currentId || !!seen(id);
@@ -74,7 +74,7 @@ export function regionView(graph, regionIdx: string | number, seen, currentId: s
 }
 
 /** The regions with at least one visited area, as indexes into graph.regions (the list the L1 / R1 buttons walk). */
-export function openRegions(graph, seen, currentId: string | null) {
+export function openRegions(graph, seen: (id: string) => boolean, currentId: string | null) {
     const out = [];
     graph.regions.forEach((r: { ids: (string | null)[]; }, i) => { if (r.ids.some((id: string | null) => id === currentId || seen(id))) out.push(i); });
     return out;
@@ -174,7 +174,7 @@ export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w:
         progress: () => (listed.length ? { visited: view.visited, total: view.total } : { visited: 0, total: 0 }),
         nodes: () => (view ? view.nodes : []),
         edges: () => (view ? view.edges : []),
-        position: (id) => pos?.get(id) ?? null,
+        position: (id: string) => pos?.get(id) ?? null,
         cursor: () => cursor,
         currentId: () => currentId,
         /** The area under the cursor: its name stays "???" until it has been visited. */

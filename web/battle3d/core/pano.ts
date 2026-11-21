@@ -14,7 +14,7 @@ import type { Battle3DContext, PanoProjectOptions, PanoState } from "../../types
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePano(B$: Battle3DContext) {
-function _panoTex(px, repeat: boolean) {
+function _panoTex(px: { data: ImageDataArray; width: number; height: number; scale: number; }, repeat: boolean) {
     const tex = B$.gl.createTexture();
     B$.gl.bindTexture(B$.gl.TEXTURE_2D, tex);
     B$.gl.texImage2D(B$.gl.TEXTURE_2D, 0, B$.gl.RGBA, px.width, px.height, 0, B$.gl.RGBA, B$.gl.UNSIGNED_BYTE, new Uint8Array(px.data.buffer, px.data.byteOffset, px.data.length));
@@ -133,7 +133,7 @@ void main() {
     B$.gl.enable(B$.gl.BLEND); B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
     B$.panoLog.paint = { floorTris, otherTris };
   }
-function _panoBufs(pos: number[], uv: number[], idx) {
+function _panoBufs(pos: number[], uv: number[], idx: number[]) {
     const vbo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, vbo); B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(pos), B$.gl.STATIC_DRAW);
     const ubo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, ubo); B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(uv), B$.gl.STATIC_DRAW);
     const ibo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ELEMENT_ARRAY_BUFFER, ibo); B$.gl.bufferData(B$.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), B$.gl.STATIC_DRAW);

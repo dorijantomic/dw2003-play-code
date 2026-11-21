@@ -213,14 +213,14 @@ function fpsTick(t) {
 // lifecycle here is: play on the first thrust tick, stop on release, on the
 // Circle interact, and on form loss. See
 // docs/research/field/submarimon-buoyancy-decoded-2026-07-28.md SUB-Q003.
-export function syncSubThrustSound(thrusting) {
+export function syncSubThrustSound(thrusting: boolean) {
     if (thrusting === !!state._subThrustSound) return;
     state._subThrustSound = thrusting;
     if (thrusting) sfx.playSustained("sub_move");
     else sfx.stopSustained("sub_move");
 }
 
-function update(dt) {
+function update(dt: number) {
     // GLOSSARY / OPTIONS (web/book-host.js): while a book is up the field is frozen and the book reads the held pad.
     books.update(dt, state.keys);
     if (books.isOpen()) return;

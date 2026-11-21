@@ -3,11 +3,11 @@ import { CELL, setBlocked, toJSON } from "./vendor/engine.js";
 import { canvasEventToLogical } from "./canvas-resolution.js";
 import type { EditorState } from "./types/editor.js";
 
-export function createEditor(canvas, getCtx) {
+export function createEditor(canvas: HTMLCanvasElement, getCtx) {
   // getCtx: () => ({ grid, mapId, camX, camY, zoom })
   const ed = { enabled: false, painting: 0 } as EditorState;
 
-  function cellAt(e) {
+  function cellAt(e: MouseEvent) {
     const { grid, camX, camY, zoom } = getCtx();
     const cell = grid.cell ?? CELL;
     const logical = canvasEventToLogical(canvas, e);
@@ -16,7 +16,7 @@ export function createEditor(canvas, getCtx) {
     return { cx: Math.floor(px / cell), cy: Math.floor(py / cell) };
   }
 
-  function paint(e) {
+  function paint(e: MouseEvent) {
     const { grid, mapId } = getCtx();
     const { cx, cy } = cellAt(e);
     setBlocked(grid, cx, cy, ed.painting === 1);

@@ -244,7 +244,7 @@ export async function buildForest(ctx) {
     underTree: (x: number, z: number) => (nearTree(x, z, 3.2) ? 1 : 0.12),
     nearTrunk: (x: number, z: number) => (nearTree(x, z, 1.8) ? 1 : 0),
   };
-  const add = async (name, loader, n: number, density, sc: number[], extra: SpeciesAddOpts = {}) => {
+  const add = async (name: string, loader, n: number, density, sc: number[], extra: SpeciesAddOpts = {}) => {
     const parts = Array.isArray(loader) ? loader : (await loader).parts;
     const s = scatter(n, name.length * 31 + n, area, (x: number, z: number) => (Math.hypot(x, z) < 1.2 ? 0 : density(x, z)), { scale: sc, tilt: extra.tilt || 0, yOffset: extra.y || 0 });
     const g = extra.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name); g.name = name; root.add(g); note(name, s.count, parts);

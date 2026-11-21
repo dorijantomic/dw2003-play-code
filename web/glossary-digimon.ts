@@ -345,7 +345,7 @@ export function formPartner(sp, lead, world) {
     return { name: displayName(profile.name), elements: Object.fromEntries(ELEMENTS.map((e) => [e, elementValue(profile, points, e)])) };
 }
 
-export function pageTwoLines(sp, state, partner, world, maxima, wildMaxima = maxima, lead = null) {
+export function pageTwoLines(sp, state: string, partner, world, maxima, wildMaxima = maxima, lead = null) {
     if (state !== "known") return [{ kind: "text", label: "Locked", text: state === "met" ? "Defeat it once to see its strength." : "Meet it first." }];
     const out = [];
     const scale = sp.partner ? maxima : wildMaxima;
@@ -367,7 +367,7 @@ export function pageTwoLines(sp, state, partner, world, maxima, wildMaxima = max
     // a form's elements are the partner's own number plus the form's (engine/dw3/battle-form-change.ts formChangeValues); with no
     // partner whose line reaches the form there is nothing to add to, so no line
     const base = form ? formPartner(sp, lead, world) : null;
-    const total = (e) => (form ? (base?.elements[e] ?? 0) + (sp.resists?.[e] ?? 0) : (sp.resists?.[e] ?? 100));
+    const total = (e: string) => (form ? (base?.elements[e] ?? 0) + (sp.resists?.[e] ?? 0) : (sp.resists?.[e] ?? 100));
     if (!form || base) {
         if (form) out.push({ kind: "head", label: `On ${base.name}` });
         const strong = ELEMENTS.filter((e) => total(e) > 100).map(cap);

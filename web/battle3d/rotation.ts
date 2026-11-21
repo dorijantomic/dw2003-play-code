@@ -45,7 +45,7 @@ export function quatSlerp(a, b, t) {
 }
 
 /** Quaternion -> column-major mat3, the same storage convention as ps1AnglesToMat3. */
-export function quatToMat3(q) {
+export function quatToMat3(q: number[]) {
   const [x, y, z, w] = quatNormalize(q);
   const xx = x*x, yy = y*y, zz = z*z;
   const xy = x*y, xz = x*z, yz = y*z;
@@ -118,7 +118,7 @@ export function ch2AuthoredTurnDeg(a, b) {
 
 /** The authored rotation at t in [0,1] along the lo->hi span, as a quaternion: the per-component
  *  ramp cut into substeps, slerped inside a substep. Endpoints are the keys themselves. */
-export function ch2QuatAlongSpan(lo, hi, t) {
+export function ch2QuatAlongSpan(lo, hi, t: number) {
   if (t <= 0) return ch2ToQuat(lo[0], lo[1], lo[2]);
   if (t >= 1) return ch2ToQuat(hi[0], hi[1], hi[2]);
   const d0 = hi[0] - lo[0], d1 = hi[1] - lo[1], d2 = hi[2] - lo[2];
@@ -150,7 +150,7 @@ function spanIndexAt(channel, frame) {
 // channels are static arrays read every drawn frame.
 const _spanSpeedCache = new WeakMap();
 
-function channelSpanSpeeds(channel, angle) {
+function channelSpanSpeeds(channel, angle: boolean) {
   const key = angle ? "a" : "v";
   const hit = _spanSpeedCache.get(channel);
   if (hit && hit[key]) return hit[key];
@@ -173,12 +173,12 @@ function channelSpanSpeeds(channel, angle) {
 /** Monotone cubic re-timing of t in [0,1] inside span `i`: u(0)=0, u(1)=1, u'(0)=prev/this speed,
  *  u'(1)=next/this speed (clamped to keep the cubic monotone). Keys stay exact, the path is untouched
  *  (u never leaves [0,1]), only the speed along it changes. */
-export function smoothTimeWarp(channel, i, t, angle = false) {
+export function smoothTimeWarp(channel, i: number, t: number, angle = false) {
   if (!(t > 0) || !(t < 1)) return t;
   const sp = channelSpanSpeeds(channel, angle);
   const cur = sp[i];
   if (!(cur > 1e-9)) return t;
-  const clampS = (v) => (v < SMOOTH_SLOPE_MIN ? SMOOTH_SLOPE_MIN : v > SMOOTH_SLOPE_MAX ? SMOOTH_SLOPE_MAX : v);
+  const clampS = (v: number) => (v < SMOOTH_SLOPE_MIN ? SMOOTH_SLOPE_MIN : v > SMOOTH_SLOPE_MAX ? SMOOTH_SLOPE_MAX : v);
   const m0 = i > 0 && sp[i - 1] > 0 ? clampS(sp[i - 1] / cur) : 1;
   const m1 = i + 1 < sp.length && sp[i + 1] > 0 ? clampS(sp[i + 1] / cur) : 1;
   if (m0 === 1 && m1 === 1) return t;
@@ -306,7 +306,7 @@ export function buildBoneWorldMatrices(model, frame, blend = null, hide = null) 
         ];
     }
 
-    function composeRot3x3(a, b) {
+    function composeRot3x3(a, b: Float32Array<ArrayBuffer>) {
         const out = new Float32Array(9);
         for (let i = 0; i < 3; i++)
             for (let j = 0; j < 3; j++)
@@ -353,7 +353,7 @@ export function buildBoneWorldMatrices(model, frame, blend = null, hide = null) 
         return quatToMat3(quatSlerp(b.q, a.q, t));
     };
 
-    function processBone(i) {
+    function processBone(i: number) {
         const bone = model.bones[i];
         if (!bone || !bone.anim) {
             worldRot[i] = ps1AnglesToMat3(0, 0, 0);

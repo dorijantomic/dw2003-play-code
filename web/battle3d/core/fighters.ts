@@ -11,6 +11,7 @@ import type { AttackOptions, Battle3DContext } from "../../types/battle3d.js";
 
 import type { ArenaGroupBuf, ArenaPack } from "../../types/battle3d.js";
 import type { BattleSide } from "../../types/audio.js";
+import type { AnimHooks } from "../../types/battle3d.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeFighters(B$: Battle3DContext) {
 function _layoutExtras() {
@@ -23,7 +24,7 @@ function _layoutExtras() {
       const gap = Math.max(B$.MULTI_GAP_MIN, maxW * B$.MULTI_GAP_FRAC);
       const w = list.map((f) => f.restW || maxW);
       // centre to centre: half of each width + the gap, never less than the old fixed lane (1900)
-      const step = (i) => Math.max(B$.MULTI_LANE_MIN, w[i] / 2 + w[i + 1] / 2 + gap);
+      const step = (i: number) => Math.max(B$.MULTI_LANE_MIN, w[i] / 2 + w[i + 1] / 2 + gap);
       let c = 0; const cx = [0];
       for (let i = 0; i + 1 < list.length; i++) cx.push(c += step(i));
       const span = c + w[0] / 2 + w[list.length - 1] / 2;
@@ -39,8 +40,8 @@ function _layoutExtras() {
     B$.arenaScale = window.__fx?.smartcam ? Math.min(B$.MULTI_ARENA_MAX, scale) : _arenaScaleClear(Math.min(B$.MULTI_ARENA_MAX, scale));
   }
 function _rockCover(groups: ArenaGroupBuf[], s: number, cam, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) {
-    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-    const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+    const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const nrm = (a: number[] | (number | undefined)[]) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2], 0, fwd[0]]);
     const up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
     const t = Math.tan(cam.fovDeg * Math.PI / 360);
@@ -183,9 +184,9 @@ function fighterVictory(id: string) {
     // the way in is the straight line from its own place to the target's; a clip that stays put (a cast) slides over first
     const nearX = () => (A.follow ? A.dx + A.lat : aLane), nearZ = () => (A.follow ? A.dz + A.latz : aDz);
     // an effect whose z is on the defender's side of the arena is at the defender; otherwise it is at the attacker
-    const atDefender = (z, defSide) => (defSide === "enemy" ? z > 0 : z < 0);
-    const val = (v) => (typeof v === "function" ? v() : v);
-    const shiftFx = (h, laneNear, laneFar, defSide, zNear, zFar) => ({
+    const atDefender = (z: number, defSide: string) => (defSide === "enemy" ? z > 0 : z < 0);
+    const val = (v: number | (() => number) | (() => number)) => (typeof v === "function" ? v() : v);
+    const shiftFx = (h: AnimHooks, laneNear: number | (() => number), laneFar: number, defSide: string, zNear: number | (() => number), zFar: number) => ({
       ...h,
       onEffect: (rec) => h.onEffect?.({ ...rec, x: (rec.x | 0) + val(atDefender(rec.z | 0, defSide) ? laneFar : laneNear), z: (rec.z | 0) + val(atDefender(rec.z | 0, defSide) ? zFar : zNear) }),
       setLunge: (l) => h.setLunge?.(l && l.sub === 0 && l.from ? { ...l, from: [l.from[0] + val(laneNear), ...l.from.slice(1)] } : l),

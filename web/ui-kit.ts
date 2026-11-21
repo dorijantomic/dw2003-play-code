@@ -87,7 +87,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
 }
 
 /** Run `draw` with the window folded to `progress` (0..1) about (px, py). axis "x" squeezes sideways, "y" up and down. Draws nothing at 0. */
-export function withFold(ctx, progress, px, py, axis, draw) {
+export function withFold(ctx, progress, px: number | undefined, py: number | undefined, axis: string, draw) {
     if (!(progress > 0)) return false;
     if (progress >= 1) { draw(); return true; }
     ctx.save();
@@ -109,10 +109,10 @@ export const FOOTER = Object.freeze({ clip: 32, x: 0, y: 194, pivot: [0, 211], t
 export const TILE_W = 40;
 
 /** Height in pixels of a panel with `bands` middle bands: 22 on top, 14 a band, 20 at the bottom. */
-export const panelPixelHeight = (bands) => 22 + 14 * bands + 20;
+export const panelPixelHeight = (bands: number) => 22 + 14 * bands + 20;
 
 /** Register (once) and return the id of a `cols` x `bands` panel clip in the cmfont pack, or null while the sheet is not loaded. */
-export function panelClipId(pack, cols, bands) {
+export function panelClipId(pack, cols: number, bands: number) {
     const id = `kit-${cols}x${bands}`;
     if (!pack.ids?.[id]) {
         const frames = tileFrames(pack.ids);
@@ -123,7 +123,7 @@ export function panelClipId(pack, cols, bands) {
 }
 
 /** Draw a panel of `cols` 40 px columns and `bands` middle bands with its top-left at (x, y). False until the sheet has loaded. */
-export function drawPanel(ctx, x, y, cols, bands, pack = cmfont) {
+export function drawPanel(ctx, x: number, y: number, cols: number, bands: number, pack = cmfont) {
     if (!packReady(pack)) return false;
     const id = panelClipId(pack, cols, bands);
     return id ? drawClip(ctx, pack, id, x, y) : false;
@@ -174,7 +174,7 @@ export function drawBar(ctx: CanvasRenderingContext2D | undefined, x: number, y:
 }
 
 /** The field behind a book, dimmed. `padL` is the wide-screen pad on each side (web/game.js wideField.padL), in canvas pixels. */
-export function dimField(ctx, viewW: number, viewH, padL = 0, alpha = 0.5) {
+export function dimField(ctx: CanvasRenderingContext2D | null, viewW: number, viewH: number, padL = 0, alpha = 0.5) {
     ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
     ctx.fillRect(0 - padL, 0, viewW + 2 * padL, viewH);
 }
@@ -188,7 +188,7 @@ export const LIST_WINDOW = Object.freeze({ clip: 36, x: 168, y: 40, w: 160, pivo
 export const LIST_VALUE_RIGHT = 306;
 
 /** The list window for `rows` rows: the disc's 0x24 panel up to eight rows, the same tiles with more bands above that. */
-export function drawListWindow(ctx, progress, rows) {
+export function drawListWindow(ctx, progress, rows: number) {
     withFold(ctx, progress, LIST_WINDOW.pivot[0], LIST_WINDOW.pivot[1], "x", () => {
         if (rows <= LIST_WINDOW.maxRows) drawClip(ctx, cmfont, LIST_WINDOW.clip, LIST_WINDOW.x, LIST_WINDOW.y);
         else drawPanel(ctx, LIST_WINDOW.x, LIST_WINDOW.y, 4, rows - 2);

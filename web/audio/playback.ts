@@ -40,7 +40,7 @@ function phraseSampleFor(vag: string) {
     return P.phraseSamples.get(vag);
   }
 /** Web Audio's buffers hold -1..1 floats; a rendered note is 16-bit PCM. */
-  function toFloat32(pcm) {
+  function toFloat32(pcm: Int16Array<ArrayBuffer>) {
     const out = new Float32Array(pcm.length);
     for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] / 32768;
     return out;

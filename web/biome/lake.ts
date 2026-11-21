@@ -68,7 +68,7 @@ const cat = { water: "Lake water", shore: "Shore: mud, pebbles, wet bank", terr:
   ferns: "Ferns and bank plants", lily: "Water lilies, lotus, floating mats", sub: "Submerged plants", willow: "Willow (weeping)", trees: "Alder, birch and bank trees", over: "Overhanging branches",
   logs: "Fallen logs, stumps, roots", rocks: "Rocks (half-submerged, moss)", steps: "Stepping stones", peb: "Pebbles", pier: "Pier", air: "Mist, light motes, sky" };
 const lp = (id: string, c: string, name: string, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/lakeproc.js", ...extra });
-const tex = (ids, c: string) => ids.map(([id, n]) => texDisc(id, c, n));
+const tex = (ids: string[][], c: string) => ids.map(([id, n]) => texDisc(id, c, n));
 const phw = (id: string, c: string, name: string, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "phw_" + id, cat: c, name, source: PS + " + our waterline shader", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false,
   make: async () => sunk(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.frac ?? 0.3, o.moss ?? 0.8) });
 const qw = (id: string, c: string, name: string, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "qw_" + id, cat: c, name, source: "Quaternius Stylized Nature MegaKit (Standard) + our waterline shader", licence: CC0, url: "https://quaternius.com/packs/stylizednaturemegakit.html", noSpin: false,
@@ -252,7 +252,7 @@ export async function buildLake(ctx) {
     }
     return { mats: out.subarray(0, i * 16), count: i };
   }
-  const add = (name, parts, n: number, o) => {
+  const add = (name: string, parts, n: number, o) => {
     const s = lscatter(n, name.length * 31 + n, o);
     const g = o.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name);
     g.name = name; root.add(g); note(name, s.count, parts); if (o.refl) refl(g);
@@ -311,7 +311,7 @@ export async function buildLake(ctx) {
   await add("pondweed", L.pondweedParts(1), N(150), { e: [-8, -1.2], prob: (x, z) => patch(x, z, 39, 0.07), scale: [0.9, 1.4], beach: 1 });
 
   // ---- rocks (half-submerged, moss, waterline), logs, stumps, roots, pebbles
-  const rock = async (name, res, n: number, e: number[], sc: number[], refl_: boolean) => add(name, wl(res).parts, N(n), { e, prob: (x, z) => 0.1 + 0.9 * patch(x, z, name.length + 40, 0.04), scale: sc, y: -0.12, beach: 1, refl: refl_ });
+  const rock = async (name: string, res, n: number, e: number[], sc: number[], refl_: boolean) => add(name, wl(res).parts, N(n), { e, prob: (x, z) => 0.1 + 0.9 * patch(x, z, name.length + 40, 0.04), scale: sc, y: -0.12, beach: 1, refl: refl_ });
   await rock("boulder_01", await H("boulder_01", { grade: true, fade: [90, 130] }), 2, [-1.5, 3], [0.9, 1.4], true);   // 54k tris asset (from the forest set): two only
   await rock("rock_07", await H("rock_07", { grade: true, fade: FDS }), 8, [-1.5, 4], [0.8, 1.5], true);
   await rock("rock_09", await H("rock_09", { grade: true, fade: FDS }), 8, [-1.5, 4], [0.8, 1.5], true);
@@ -321,7 +321,7 @@ export async function buildLake(ctx) {
   for (const id of ["02", "03", "04"]) await rock("namaqualand_boulder_" + id, await H("namaqualand_boulder_" + id, { grade: true, fade: [90, 130] }), 6, [-1.8, 3], [0.9, 1.7], true);
   await rock("namaqualand_stones_01", await H("namaqualand_stones_01", { grade: true, fade: FDS }), 18, [-2, 2.5], [0.9, 1.6], false);
   for (let i = 1; i <= 3; i++) await rock("Rock_Medium_" + i, await loadToon(`${ASSETS}quaternius/Rock_Medium_${i}.glb`, { fade: [90, 130] }), 8, [-1.5, 5], [0.5, 1.1], true);
-  const log = async (name, res, n: number, sc: number[]) => add(name, wl(res, 0, 0.8).parts, N(n), { e: [-2.6, 0.6], prob: (x, z) => 0.2 + 0.8 * patch(x, z, name.length + 50, 0.05), scale: sc, y: -0.08, tilt: 0.04, beach: 0.7, refl: true });
+  const log = async (name: string, res, n: number, sc: number[]) => add(name, wl(res, 0, 0.8).parts, N(n), { e: [-2.6, 0.6], prob: (x, z) => 0.2 + 0.8 * patch(x, z, name.length + 50, 0.05), scale: sc, y: -0.08, tilt: 0.04, beach: 0.7, refl: true });
   await log("fallen log A (Poly Haven)", await H("dead_tree_trunk", { grade: true, fade: [90, 130] }), 3, [0.9, 1.4]);
   await log("fallen log B (Poly Haven)", await H("dead_tree_trunk_02", { grade: true, fade: [90, 130] }), 3, [0.9, 1.4]);
   for (let s = 1; s <= 3; s++) { const parts = L.logParts(s); L.waterlineify(parts); for (const p of parts) p.mat.userData.toon.fade = [90, 130]; await add("fallen log " + "ABC"[s - 1] + " (procedural)", parts, N(2), { e: [-2.4, 0.4], scale: [0.9, 1.4], y: 0.12, beach: 0.7, refl: true }); }
@@ -349,7 +349,7 @@ export async function buildLake(ctx) {
   }
 
   // ---- trees by LOD species: willow (hero + bank), birch, alder, bank trees; impostor atlas shared with a layer-1 reflection set
-  const species = (name, l0: any, l1: any, pos: any[], o: SpeciesLODOpts = {}) => {
+  const species = (name: string, l0: any, l1: any, pos: any[], o: SpeciesLODOpts = {}) => {
     if (!pos.length) return;
     const imp = bakeImpostor(renderer, partsGroup(l0), 8, 256), r = rng(name.length * 977 + pos.length), mats = new Float32Array(pos.length * 16), sc = o.scale || [0.85, 1.25];
     pos.forEach((p, i) => composeTRS(mats, i, p[0], lakeH(p[0], p[1]) - 0.05, p[1], r() * 6.28, (p[4] ?? (sc[0] + (sc[1] - sc[0]) * r())), 0.02 * r(), r() * 6.28));

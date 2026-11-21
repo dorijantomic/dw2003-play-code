@@ -65,7 +65,7 @@ export function profileLoadLevels(profile) {
  * marked loadable in a fight. Battle rewards use learnOneTechnique /
  * markOneLoadable below.
  */
-export function applyFormTechGates(record, profile, formLevel: number) {
+export function applyFormTechGates(record: { id: number; formLevel: number; dvexp: number; techSlots: number[]; }, profile, formLevel: number) {
   const slots = profileTechSlots(profile);
   const learn = profileLearnLevels(profile);
   const load = profileLoadLevels(profile);

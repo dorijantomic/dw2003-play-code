@@ -30,6 +30,7 @@ import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from 
 import { smoothAnimEnabled } from "./smooth-anim.js";
 import type { FightActionHooks, FightMoveRec } from "./types.js";
 
+import type { DnaScriptOp } from "../battle/core/types.js";
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
 // Real motion advances ~1–4 frames/tick (the vsync delta); phase cuts jump by hundreds. 16 cleanly
 // separates the two so a phase boundary or loop-back snaps instead of sweeping through dead frames.
@@ -430,7 +431,7 @@ export class ActorAnimator {
   /** Run a verified external action stream against this model.  DNA/Jogress
    *  result clip 12 is supplied by the battle presentation actor rather than
    *  the result model's own action directory; op4 motion 30 selects table 30. */
-  setScript(script, hooks: FightActionHooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
+  setScript(script: { ops: DnaScriptOp[]; }, hooks: FightActionHooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
     if (!script || !Array.isArray(script.ops) || !script.ops.length) return false;
     this._clip = -1;
     this._hidden = null;

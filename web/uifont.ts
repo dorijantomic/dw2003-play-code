@@ -121,7 +121,7 @@ function sheetForClut(kind: number | undefined, clut: number | undefined) {
   return clutSheets[key];
 }
 
-function sheetFor(color) {
+function sheetFor(color: string | undefined) {
   if (!color) return img;
   if (!tinted[color]) {
     const c = document.createElement("canvas");
@@ -244,7 +244,7 @@ export function drawText(ctx: CanvasRenderingContext2D | null | undefined, text:
  * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The look C overlay (web/ui-c) places one smooth glyph at
  * each of these pens, so its spacing is the game's own. [] until the font has loaded.
  */
-export function layoutGlyphs(text: string | undefined, x, opts: UiTextDrawOpts = {}) {
+export function layoutGlyphs(text: string | undefined, x: number, opts: UiTextDrawOpts = {}) {
   if (!fontReady()) return [];
   const { kind = 1, scale = 1, cellWidth = null, glyphMetrics = null } = opts;
   const out = [];
@@ -268,7 +268,7 @@ export function drawIconGlyph(ctx: CanvasRenderingContext2D | undefined, name: s
   if (!fontReady()) return false;
   const r = map.icons?.[name];
   if (!r) return false;
-  const paint = (c) => { c.imageSmoothingEnabled = false; c.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
+  const paint = (c: CanvasRenderingContext2D | undefined) => { c.imageSmoothingEnabled = false; c.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
   // a look C scope (web/ui-c) keeps the icon as a picture on its art canvas, over the C plates
   if (!artHook(ctx, paint)) paint(ctx);
   return true;
@@ -303,6 +303,6 @@ export function cursorFrame(vsyncs: number) {
 }
 
 /** Draw the animated list cursor. `vsyncs` is the screen clock in vsyncs. */
-export function drawCursor(ctx, vsyncs: number, x: number, y: number, opts = {}) {
+export function drawCursor(ctx: CanvasRenderingContext2D | null | undefined, vsyncs: number, x: number, y: number, opts = {}) {
   return drawText(ctx, cursorFrame(vsyncs), x, y, opts);
 }

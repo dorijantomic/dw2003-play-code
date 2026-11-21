@@ -56,7 +56,7 @@ export function fieldcomReady() {
 // gives exact matches for 0/1/3; mode 2 (subtractive) has no canvas composite
 // op and no FIELDCOM clip uses it, so it falls back to the plain draw rather
 // than to a look-alike blend.
-function applyAbr(ctx, mode) {
+function applyAbr(ctx, mode: number) {
     if (mode === 1) { ctx.globalCompositeOperation = "lighter"; return true; }
     if (mode === 3) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.25; return true; }
     if (mode === 0) { ctx.globalAlpha = 0.5; return true; }
@@ -65,7 +65,7 @@ function applyAbr(ctx, mode) {
 
 // Dest is not rounded: point-sprite records that draw FIELDCOM clips fill map
 // cut-outs and must share the map's camera phase (same as web/effects.js).
-export function drawFieldcomIcon(ctx, dir, id, x, y, clutRow = 0) {
+export function drawFieldcomIcon(ctx, dir: number, id, x: number, y, clutRow = 0) {
     if (!manifest) return;
     const d = manifest[`dir${dir}`];
     const entry = (clutRow ? d?.[`${id}@${clutRow}`] : null) ?? d?.[String(id)];
@@ -153,11 +153,11 @@ export const balloonAnchorY = engineBalloonAnchorY;
 const ORB_CYCLE = [0x23, 0x24, 0x25, 0x26];
 const ORB_FRAMES = 6;
 
-export function partyIndicatorFrame(tick) {
+export function partyIndicatorFrame(tick: number) {
     return ORB_CYCLE[Math.floor(tick / ORB_FRAMES) % ORB_CYCLE.length];
 }
 
-function programStep(program, tick) {
+function programStep(program, tick: number) {
     const total = program.reduce((s, p) => s + Math.max(1, Math.round(p.delay / TICKS_PER_FRAME)), 0);
     let t = tick % total;
     for (const p of program) {
@@ -167,7 +167,7 @@ function programStep(program, tick) {
     return program[0].id;
 }
 
-export function drawIndicatorBubble(ctx, x, y, kind, tick) {
+export function drawIndicatorBubble(ctx, x: number, y, kind, tick: number) {
     const program = manifest?.programs?.[kind];
     if (!program?.length) return;
     drawFieldcomIcon(ctx, 0, BALLOON, x, y);
@@ -183,12 +183,12 @@ export function drawIndicatorBubble(ctx, x, y, kind, tick) {
 // `c > gone`, not `>=`. The open arm (0x53f4-0x5414) and the close arm
 // (0x543c-0x545c) add the same frame delta, so both share BALLOON_UNIT_FRAMES.
 // Ledger: fieldcom-balloon-draws-last-cel-before-state-3-2026-10-02.
-export function storyBubbleFrame(openFrames, closeFrames) {
+export function storyBubbleFrame(openFrames: number, closeFrames: number | null) {
     return balloonFace(BALLOON_SET_0, openFrames, closeFrames);
 }
 
 // Draw a story bubble; returns false when there is nothing left to draw.
-export function drawStoryBubble(ctx, x, y, row, openFrames, closeFrames, tick) {
+export function drawStoryBubble(ctx: CanvasRenderingContext2D | null, x: number, y: number, row, openFrames: number, closeFrames: number | null, tick: number) {
     const f = storyBubbleFrame(openFrames, closeFrames);
     if (!f) return false;
     drawFieldcomIcon(ctx, 0, f.cel, x, y);
@@ -238,7 +238,7 @@ const SPARKLE_UNIT_FRAMES = ORB_FRAMES / 8;
 // its loop; `0xff` is only a jump, so no program can terminate, and no code in
 // the EXE or any pro overlay ever sets the actor's state +0xc to 2/3 or suspends
 // it.
-export function sparkleActorFrame(frames) {
+export function sparkleActorFrame(frames: number) {
     let t = frames;
     for (const [id, dur] of SPARKLE_FLOURISH) {
         const n = Math.max(1, Math.round(dur * SPARKLE_UNIT_FRAMES));
@@ -277,7 +277,7 @@ export const SPARKLE_PROGRAMS = {
 };
 
 /** The sprite id of a jump-resolved sparkle script at `frames`, or null. */
-export function sparkleProgramFrame(program, frames) {
+export function sparkleProgramFrame(program, frames: number) {
     let cursor = 0, t = Math.max(0, frames);
     for (let guard = 0; guard < 10000; guard++) {
         const step = program[cursor];
@@ -302,7 +302,7 @@ export function sparkleProgramFrame(program, frames) {
 // elapsed frames since the program was armed, or null when none is running;
 // `program` selects the script (3 = the acquisition flare, 1/2 the other two).
 // Returns true while an actor is still playing.
-export function drawSparkleActor(ctx, x, y, tick, flareFrames, program = 3) {
+export function drawSparkleActor(ctx: CanvasRenderingContext2D | null, x: number, y: number, tick: number, flareFrames: number | null, program = 3) {
     const script = SPARKLE_PROGRAMS[program];
     if (script) {
         const id = sparkleProgramFrame(script, flareFrames ?? 0);
@@ -333,7 +333,7 @@ export function drawGroundShadow(ctx, cx, cy, w, h, alpha = 1) {
     return true;
 }
 
-export function drawFieldShadow(ctx, input) {
+export function drawFieldShadow(ctx: CanvasRenderingContext2D | null, input: { screenX: number; actorScreenY: number; actorHeightFixed: number; groundOffsetFixed: number; }) {
     if (!shadowImg) return false;
     const r = fieldShadowRect(input);
     ctx.drawImage(shadowImg, r.x, r.y, r.w, r.h);

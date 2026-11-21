@@ -67,7 +67,7 @@ const SHAFT_COUNT = 4;
 const shaftBase = new Float32Array(SHAFT_COUNT);
 
 // Floor relief by x,z (also places the rocks on it).
-function floorHeight(x, z, amp) {
+function floorHeight(x, z, amp: number) {
     return amp * (Math.sin(x * 0.5) * Math.cos(z * 0.4) + 0.5 * Math.sin(x * 1.3 + z * 0.9));
 }
 
@@ -288,7 +288,7 @@ function makeRenderer() {
 // ---- theme ------------------------------------------------------------------------------
 let appliedTheme = "";
 
-function applyTheme(id) {
+function applyTheme(id: string) {
     if (id === appliedTheme) return;
     appliedTheme = id;
     const t = THEMES[id];
@@ -317,7 +317,7 @@ let fx = -8, fy = 0, fz = -1, fyaw = 0, fsize = 0.8;
 let lureX = LURE_X, lureY = SURFACE_Y;
 let lastInfoPhase = "idle";
 
-const sstep = (e0, e1, x) => { const t = x < e0 ? 0 : x > e1 ? 1 : (x - e0) / (e1 - e0); return t * t * (3 - 2 * t); };
+const sstep = (e0: number, e1: number, x: number) => { const t = x < e0 ? 0 : x > e1 ? 1 : (x - e0) / (e1 - e0); return t * t * (3 - 2 * t); };
 
 // Theme lookup cache (the extras table never changes during a session).
 let cacheMap = null, cacheData = null, cacheTheme = DEFAULT_THEME;
@@ -332,7 +332,7 @@ function themeOf(extrasData, mapId) {
  * Draw one frame of the underwater scene for the live fishing state `f` (state.fishing) and
  * return the canvas, or null (idle / page hidden / no GPU WebGL). Read-only on `f`.
  */
-export function renderUnderwater(f, mapId, extrasData, nowSec) {
+export function renderUnderwater(f, mapId, extrasData, nowSec: number) {
     if (typeof document !== "undefined" && document.hidden) return null;
     const phase = phaseFor(f);
     if (phase === "idle") { lastInfoPhase = "idle"; return null; }

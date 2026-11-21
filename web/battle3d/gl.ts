@@ -35,7 +35,7 @@ export const FIGHTER_TINT = [1, 1, 1, 1];
 const FIGHTER_TINTS = { player: FIGHTER_TINT, enemy: FIGHTER_TINT, extra: FIGHTER_TINT };
 
 /** The tint a side draws with: the game's own FIGHTER_TINT unless a fusion set one. */
-export function fighterTint(side) {
+export function fighterTint(side: string) {
   return FIGHTER_TINTS[side] ?? FIGHTER_TINT;
 }
 

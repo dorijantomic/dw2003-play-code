@@ -36,7 +36,7 @@ export const NO_FREE_LINE = "Not now.";
 export const NO_PLACE_LINE = "No place to fly to yet. Walk somewhere first.";
 
 /** "Central Sector — Asuka City" -> "Asuka City". */
-export function flyLabel(name) {
+export function flyLabel(name: string | undefined) {
     const s = String(name ?? "");
     const i = s.indexOf(" — ");
     return (i > 0 ? s.slice(i + 3) : s).trim();
@@ -99,7 +99,7 @@ export function mapWorlds(maps: FlyMap[], scenes: FlyScenes | null) {
         if (w >= 0) worlds.set(id, w);
     }
     const adj = new Map();
-    const link = (a, b) => { if (air.has(a) && air.has(b)) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); } };
+    const link = (a: string, b: string) => { if (air.has(a) && air.has(b)) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a).add(b); } };
     for (const [from, sc] of Object.entries(scenes ?? {})) for (const e of sc?.exits ?? []) if (e?.to) { link(from, e.to); link(e.to, from); }
     for (let changed = true; changed;) {
         changed = false;
@@ -187,13 +187,13 @@ export function flyBlock({ openAir, free }) {
 }
 
 /** Cursor over a list of places: up / down wrap. */
-export function createFlyModel(places) {
+export function createFlyModel(places: FlyPlace[]) {
     let at = 0;
     return {
         count: () => places.length,
         places: () => places,
         index: () => at,
         current: () => places[at] ?? null,
-        move(delta) { if (places.length < 2) return false; at = (at + delta + places.length) % places.length; return true; },
+        move(delta: number) { if (places.length < 2) return false; at = (at + delta + places.length) % places.length; return true; },
     };
 }

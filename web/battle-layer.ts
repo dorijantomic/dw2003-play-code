@@ -24,7 +24,7 @@ export function takeBackdropBlends() { const n = blends; blends = 0; return n; }
 
 const flatReaders = new Set();
 /** A reader of the finished game frame is on (true) or off (false). The battle draws flat frames while any is on. */
-export function setFlatReader(name, on) { if (on) flatReaders.add(name); else flatReaders.delete(name); }
+export function setFlatReader(name: string, on: boolean) { if (on) flatReaders.add(name); else flatReaders.delete(name); }
 /** True while something needs the 3D picture inside the 2D game canvas. */
 export function flatFrameWanted() {
   return flatReaders.size > 0 || (typeof window !== "undefined" && !!(window.__flatFrame || window.__frameCopy));
@@ -35,11 +35,11 @@ export function flatFrameWanted() {
  * pixels under it: one did last frame (`blendedBefore`, from takeBackdropBlends), or one is certain this
  * frame (`certain`: the effect list holds a blended sprite, the defeat fade is up); or a reader needs a flat frame.
  */
-export function layerFrameOk(blendedBefore, certain, flatWanted = flatFrameWanted()) {
+export function layerFrameOk(blendedBefore: boolean, certain: boolean, flatWanted = flatFrameWanted()) {
   return !(blendedBefore || certain || flatWanted);
 }
 
-let layer = null;   // { canvas, game, parent, parentPosition, shown, gamePosition, gameBackground }
+let layer: { canvas: HTMLCanvasElement; game: HTMLCanvasElement; parent: HTMLElement; parentPosition: string | null; shown: boolean; gamePosition: string; gameBackground: string; } | null = null;   // { canvas, game, parent, parentPosition, shown, gamePosition, gameBackground }
 
 /** Remove the layer and give the game canvas its own style back. Safe to call any time. */
 export function releaseBattleLayer() {
@@ -56,7 +56,7 @@ export function releaseBattleLayer() {
  * Make a fresh WebGL canvas under `game` (same parent, same size, hidden until shown). A new canvas per
  * battle: a canvas keeps its first WebGL context. Returns null when there is no page to put it in.
  */
-export function createBattleLayer(game) {
+export function createBattleLayer(game: HTMLCanvasElement | undefined) {
   releaseBattleLayer();
   const parent = game?.parentElement;
   if (!parent || typeof document === "undefined") return null;
@@ -76,7 +76,7 @@ export function createBattleLayer(game) {
 }
 
 /** Show or hide the 3D layer (and make the game canvas see-through or opaque to match). False = no layer. */
-export function showBattleLayer(on) {
+export function showBattleLayer(on: boolean) {
   const l = layer;
   if (!l) return false;
   if (l.shown !== on) {
@@ -88,4 +88,4 @@ export function showBattleLayer(on) {
 }
 
 /** True for the layer canvas (lets "find the game canvas" code skip it). */
-export function isBattleLayer(el) { return !!el?.dataset?.battleLayer; }
+export function isBattleLayer(el: HTMLCanvasElement) { return !!el?.dataset?.battleLayer; }

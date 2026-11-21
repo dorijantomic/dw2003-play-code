@@ -25,7 +25,7 @@ export let FIELD_VIEW_PAD = 0;
 /** Native width of the whole field view: 320 + 2 * pad. */
 export let FIELD_VIEW_W = NATIVE_VIEW_W;
 
-export function setFieldViewPad(pad) {
+export function setFieldViewPad(pad: number) {
     const p = Math.max(0, Math.floor(Number(pad) || 0));
     FIELD_VIEW_PAD = p;
     FIELD_VIEW_W = NATIVE_VIEW_W + 2 * p;
@@ -34,7 +34,7 @@ export function setFieldViewPad(pad) {
 
 /** The pad for a stage of this CSS size: the view is 240 lines tall and as wide as the stage's shape,
  *  never narrower than 4:3 and never wider than MAX_WIDE_ASPECT. */
-export function widePadFor(stageW, stageH, maxAspect = MAX_WIDE_ASPECT) {
+export function widePadFor(stageW: number, stageH: number, maxAspect = MAX_WIDE_ASPECT) {
     if (!(stageW > 0) || !(stageH > 0)) return 0;
     const aspect = Math.min(Math.max(stageW / stageH, NATIVE_VIEW_W / NATIVE_VIEW_H), maxAspect);
     const w = Math.round(NATIVE_VIEW_H * aspect);
@@ -51,7 +51,7 @@ export function mapFitsWide(mapW, pad) {
  *  centred on the target exactly as the original centres its 320 view (target - 160), then clamped
  *  inside the map, and the box is the wide view's middle. Same low-then-ceiling clamp as F0x8008D788.
  *  Returns null when the map is narrower than the wide view. */
-export function wideBoxCameraX(targetX, mapW, pad) {
+export function wideBoxCameraX(targetX: number, mapW, pad: number) {
     if (!mapFitsWide(mapW, pad)) return null;
     const left = Math.min(Math.max(targetX - NATIVE_CENTRE_X - pad, 0), mapW - NATIVE_VIEW_W - 2 * pad);
     return left + pad;
@@ -101,7 +101,7 @@ export function wideMenuSides({ fullScreenUi = false, dimmableUi = false }) {
 }
 
 /** Ease a 0..1 level toward a target at `rate` per second (the side covers and the camera blend). */
-export function easeLevel(level, target, dt, rate = 6) {
+export function easeLevel(level: number, target: number, dt: number, rate = 6) {
     const step = Math.max(0, dt) * rate;
     if (level < target) return Math.min(target, level + step);
     if (level > target) return Math.max(target, level - step);

@@ -75,7 +75,7 @@ export function charismaMemberFor(entry, slots) {
  * walker's standing rule for a predicate it cannot answer. Returning 0 would actively
  * assert "below every threshold" and make tamers refuse for the wrong reason.
  */
-export function partyCharismaFrom(view, equipment) {
+export function partyCharismaFrom(view, equipment: Record<string, number>[]) {
   if (!view?.length) return null;
   return partyCharismaTotal(view.map((m, i) => charismaMemberFor(m, equipment?.[i])));
 }

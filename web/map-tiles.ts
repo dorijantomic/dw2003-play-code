@@ -44,7 +44,7 @@ export function loadTileIndex(fetchJson = () => fetch(INDEX_URL, { cache: "no-st
 export function tileIndexReady() { return index !== null; }
 
 /** The tiled HD copy of assets/maps/<name>.png, or null (no index, or this map was not tiled). */
-export function tiledMap(name) {
+export function tiledMap(name: string | null | undefined) {
   if (!index || !index.maps || !index.maps[name]) return null;
   let t = maps.get(name);
   if (!t) maps.set(name, t = new TiledMap(name, index.maps[name], index.tile, index.gutter, index.scale));
@@ -121,9 +121,9 @@ export class TiledMap {
     for (const e of cache.values()) if (e.map === this.name) e.split = {};
   }
 
-  url(c, r) { return `assets-hd/map-tiles/${this.name}/${c}_${r}.webp`; }
+  url(c: number, r: number) { return `assets-hd/map-tiles/${this.name}/${c}_${r}.webp`; }
 
-  entry(c, r, want) {
+  entry(c: number, r: number, want: boolean) {
     const key = `${this.name}/${c}_${r}`;
     let e = cache.get(key);
     if (!e) {
@@ -139,7 +139,7 @@ export class TiledMap {
 
   // The tile with the split applied (kind "ground" erases the layer-2-only pixels, "layer2" keeps
   // only them), built once per tile from the native mask scaled up with no smoothing.
-  splitTile(e, c, r, kind) {
+  splitTile(e, c: number, r: number, kind) {
     if (!kind) return e.bmp;
     if (!this.splitMask) return null;
     if (e.split[kind]) return e.split[kind];

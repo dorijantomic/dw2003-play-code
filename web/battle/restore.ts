@@ -22,6 +22,7 @@ import { activeSlotOf, encounterGateBytes, setStatModifier, statModifier, statVa
 import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
 import type { FightTechRow } from "../types/battle.js";
 
+import type { BattleState } from "../types/battle.js";
 export function battleRestoreParty(b, side: number) {
   if ((side | 0) < 1) {
     const records = b?.playerRecords ?? [];
@@ -159,7 +160,7 @@ function startAutoRecover(b: { statusEvents: { code: number; time: number; side:
  * (clamped 0x7fff) that zeroes both words (`:14068`-`:14074`; consumer wfightmn.s:2469-2498).
  * A new field tech replaces the field and rewrites the timer.
  */
-export function castFieldTechnique(b, side: number, record: { crit: number; }, _techElementName: string) {
+export function castFieldTechnique(b: BattleState, side: number, record: { crit: number; }, _techElementName: string) {
   // The stored element is record byte +0x04 (the category, 6 for every field tech), NOT the tech own
   // element (+0x07, which only picks the message page): measured in the game, rig-field-and-scale.md.
   // Element id 6 is "thunder" in the engine table (battle-formulas.ts ELEMENT_ID).

@@ -36,11 +36,11 @@ export function panelHeight(frames, bands) {
 }
 
 /** A clip (the sheet's own record shape) with `cols` tile columns and `bands` middle bands. */
-export function buildPanelClip(frames, cols, bands) {
+export function buildPanelClip(frames, cols: number, bands: number) {
     const F = PANEL_FRAMES;
     const tileW = frames[F.topLeft].w;
     const layers = [];
-    const put = (frame, col, dy) => {
+    const put = (frame: number, col: number, dy: number) => {
         const f = frames[frame];
         layers.push({ frame: f.frame, x: f.x, y: f.y, w: f.w, h: f.h, dx: col * tileW, dy });
     };

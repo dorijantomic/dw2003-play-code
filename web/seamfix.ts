@@ -24,7 +24,7 @@ export function seamPatchFor(stageId, img: HTMLImageElement) {
     return p;
 }
 
-function build(img) {
+function build(img: HTMLImageElement) {
     const W = img.naturalWidth, H = img.naturalHeight;
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;

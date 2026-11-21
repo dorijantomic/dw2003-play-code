@@ -108,7 +108,7 @@ export function bracketPath(W, H, u, arrows) {
 export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "var(--c-stripe-dark)") {
     const P = 72 * d, L = 24 * d, o = scroll * 3 * d * Math.SQRT2;
     const ph = ((o % P) + P) % P;                     // where the light stripe starts, 0..P
-    const f = (n) => `${+n.toFixed(2)}px`;
+    const f = (n: number) => `${+n.toFixed(2)}px`;
     // one period from 0 to P: light from ph to ph + L (wrapping past P), dark elsewhere
     if (ph + L <= P) return `repeating-linear-gradient(135deg, ${dark} 0 ${f(ph)}, ${light} ${f(ph)} ${f(ph + L)}, ${dark} ${f(ph + L)} ${f(P)})`;
     return `repeating-linear-gradient(135deg, ${light} 0 ${f(ph + L - P)}, ${dark} ${f(ph + L - P)} ${f(ph)}, ${light} ${f(ph)} ${f(P)})`;
@@ -117,7 +117,7 @@ export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "va
 // ------------------------------------------------------------------------------------------------ the C balloon (C6)
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 /** The line p + t * d moved by `e` along its normal towards `inside`: returns [point, dir]. */
-function offsetLine(p, q, inside, e): [number[], number[]] {
+function offsetLine(p, q, inside: number[], e): [number[], number[]] {
     const d = sub(q, p), len = Math.hypot(d[0], d[1]) || 1;
     let n = [-d[1] / len, d[0] / len];
     const m = sub(inside, p);
@@ -137,7 +137,7 @@ const atY = ([p, d], y) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * 
  * `e` px, and an optional tail { side, b0, b1, tip } on the top or bottom edge. Returns { outer, inner } as point lists. The inner line runs
  * `e` px inside the outer one everywhere, the tail too (its sides are offset along their normals, so a slanted tail keeps the same edge).
  */
-export function balloonShape(b, tail, e, c) {
+export function balloonShape(b: { l: number; t: number; w: number; h: number; }, tail, e, c: number) {
     const { l, t, w, h } = b, r = l + w, bo = t + h;
     const ci = c - e / 2;   // the inner chamfer (C6: 24 outer, the inner diagonal 22 + 4 down / right)
     const outer = [], inner = [];
@@ -174,7 +174,7 @@ export function balloonShape(b, tail, e, c) {
 export const barFill = (ratio, w) => Math.max(0, Math.min(w, Math.round(w * Math.max(0, Math.min(1, ratio)))));
 
 // ------------------------------------------------------------------------------------------------ DOM
-const el = (cls, parent?: Element, tag = "div"): HTMLElement => {
+const el = (cls: string, parent?: Element, tag = "div"): HTMLElement => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     if (parent) parent.appendChild(e);
@@ -210,10 +210,10 @@ function fillRing(root, desc, g) {
     root.style.position = "absolute"; setBox(root, r);
     if (root.dataset.uicRingV !== desc.variant) {
         const circ = (cls, rad, w, extra = "") => `<circle class="${cls}" cx="${c}" cy="${c}" r="${rad}" stroke-width="${w}" fill="none" ${extra}/>`;
-        const arc = (cls, rad, w, grad?) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
+        const arc = (cls: string, rad, w, grad?: string) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
         const ticks = (list) => list.map(([rad, w, da, cls]) => circ(cls, rad, w, `pathLength="360" stroke-dasharray="${da}"${cls === "scan" ? ` stroke="url(#${id}s)"` : ""}`)).join("");
         const svg = (inner, cls = "") => `<svg ${SVGNS} class="${cls}" viewBox="0 0 ${sh.vb} ${sh.vb}" aria-hidden="true">${inner}</svg>`;
-        const stop = (o, v) => `<stop offset="${o}" style="stop-color:${v}"/>`;
+        const stop = (o: number, v: string) => `<stop offset="${o}" style="stop-color:${v}"/>`;
         const defs = `<defs><linearGradient id="${id}h" x1="0" y1="0" x2="1" y2="1">${stop(0, "var(--c-hp-a)")}${stop(1, "var(--c-hp-b)")}</linearGradient>`
             + `<linearGradient id="${id}m" x1="0" y1="0" x2="1" y2="1">${stop(0, "var(--c-mp-a)")}${stop(1, "var(--c-mp-b)")}</linearGradient>`
             + `<linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:var(--c-cyan);stop-opacity:0"/>${stop(1, "#bff0ff")}</linearGradient>`
@@ -233,7 +233,7 @@ function fillRing(root, desc, g) {
     // the command menu closing (a command was confirmed) = one pulse out of the ring; the menu opening does nothing
     if (desc.variant === "main" && root.dataset.uicMenu === "1" && !desc.menu) root.dataset.pulse = root.dataset.pulse === "a" ? "b" : "a";
     root.dataset.uicMenu = desc.menu ? "1" : "0";
-    const set = (cls, f) => { const e = root.querySelector(`.${cls}`); if (e) e.style.strokeDasharray = arcDash(f); };
+    const set = (cls: string, f) => { const e = root.querySelector(`.${cls}`); if (e) e.style.strokeDasharray = arcDash(f); };
     // the real HP the game holds (read-only): a drop is remembered for the damage number that pops when the game's line appears
     if (desc.variant === "main" && desc.real != null) {
         const now = performance.now(), pr = root.dataset.uicReal === undefined ? null : Number(root.dataset.uicReal), pe = root.dataset.uicEReal === undefined ? null : Number(root.dataset.uicEReal);
@@ -276,9 +276,9 @@ function fillDock(root, desc, g) {
         const [hx, hy] = rel(desc.hub.x, desc.hub.y), k = desc.k ?? 1, V = (D.arc + 10) * 2;
         const gd = el("dk-gd", root);
         gd.style.cssText = `left:${hx - V / 2 * d * k}px;top:${hy - V / 2 * d * k}px;width:${V * d * k}px;height:${V * d * k}px`;
-        const ring = (cls, rad, w, extra = "") => `<svg class="${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${V} ${V}" aria-hidden="true"><circle cx="${V / 2}" cy="${V / 2}" r="${rad}" fill="none" stroke-width="${w}" ${extra}/></svg>`;
+        const ring = (cls: string, rad: number, w: number, extra = "") => `<svg class="${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${V} ${V}" aria-hidden="true"><circle cx="${V / 2}" cy="${V / 2}" r="${rad}" fill="none" stroke-width="${w}" ${extra}/></svg>`;
         gd.innerHTML = ring("dk-line", D.arc, 1.2) + `<div class="dk-spin">${ring("dk-ticks", D.arc, 5, 'pathLength="360" stroke-dasharray=".35 4.65"')}${ring("dk-ticks dk-major", D.arc, 9, 'pathLength="360" stroke-dasharray=".8 29.2"')}</div>` + ring("dk-flash", D.arc, 3);
-        const pt = (a, rad) => `${V / 2 + rad * Math.cos(a * Math.PI / 180)} ${V / 2 + rad * Math.sin(a * Math.PI / 180)}`;
+        const pt = (a: number | undefined, rad: number) => `${V / 2 + rad * Math.cos(a * Math.PI / 180)} ${V / 2 + rad * Math.sin(a * Math.PI / 180)}`;
         const dk = el("dk-dkarc", root);
         dk.style.cssText = gd.style.cssText;
         const dR = (desc.dockR ?? 205) / k, arc = `M${pt(D.dockArc[0], dR)} A${dR} ${dR} 0 0 1 ${pt(D.dockArc[1], dR)}`;
@@ -439,7 +439,7 @@ export function fillPart(root, desc, g) {
             root.className = "uic-part uic-box uic-band"; setBox(root, r);
             if (desc.shadow) { root.classList.add("uic-shadowed"); root.style.setProperty("--sx", "0px"); root.style.setProperty("--sy", px(desc.shadow * ed.d)); }
             const e = ed.e1, h = r.height;
-            const add = (css) => { const d = el("uic-fill", root); d.style.cssText = css; return d; };
+            const add = (css: string) => { const d = el("uic-fill", root); d.style.cssText = css; return d; };
             add(`left:0;top:0;width:${px(r.width)};height:${px(h)};background:${desc.edge}`);
             add(`left:0;top:${px(e)};width:${px(r.width)};height:${px(h - 2 * e)};background:${desc.body}`);
             if (desc.tabW) add(`left:0;top:0;width:${px(desc.tabW * ed.u)};height:${px(e)};background:var(--c-orange)`);
@@ -450,7 +450,7 @@ export function fillPart(root, desc, g) {
             // four corner brackets around a plate (the selected / locked portrait): bracket length 5 native, edge thick
             root.className = "uic-part uic-corners"; setBox(root, r);
             const t = ed.e1, len = Math.round(5 * ed.u), w = r.width, h = r.height;
-            const add = (css) => { const d = el("uic-fill", root); d.style.cssText = `background:${desc.color};${css}`; };
+            const add = (css: string) => { const d = el("uic-fill", root); d.style.cssText = `background:${desc.color};${css}`; };
             for (const [l, tp] of [[0, 0], [w - len, 0], [0, h - t], [w - len, h - t]]) add(`left:${px(l)};top:${px(tp)};width:${px(len)};height:${px(t)}`);
             for (const [l, tp] of [[0, 0], [w - t, 0], [0, h - len], [w - t, h - len]]) add(`left:${px(l)};top:${px(tp)};width:${px(t)};height:${px(len)}`);
             break;
@@ -516,7 +516,7 @@ export function fillPart(root, desc, g) {
             let size = desc.sizeDp * ed.d * Math.abs(g.sy), sp = (desc.spacingDp ?? 0) * ed.d;
             if (desc.fit && !desc.vertical) {
                 // a watermark that must stay inside its box (the home wall): shrink size and spacing (down to half) until it fits the rect width
-                const wide = (sz, sg) => measureText(desc.text, FACE.label, 400, sz, sg);
+                const wide = (sz: number, sg: number) => measureText(desc.text, FACE.label, 400, sz, sg);
                 let k = 1;
                 while (k > 0.5 && wide(size * k, sp * k) > r.width) k -= 0.02;
                 size *= k; sp *= k;

@@ -356,7 +356,7 @@ export class ActionVM {
   // VM's hooks — the browser supplies data, the port owns the control flow. The VM's
   // own record cursor already encodes each handler's operand count (the decoder), so
   // the port's returned IP is not used here.
-  _portMem(rec) {
+  _portMem(rec: { words: number[]; } | { words: number[]; } | { words: number[]; }) {
     const OP = 0x30000000, ACT = 0x30010000, CTX = 0x30020000;
     const ops = rec.words, actor = this._pActor, ctx = this._pCtx;
     const arr = (a: number) => (a >= ACT && a < CTX ? actor : ctx);

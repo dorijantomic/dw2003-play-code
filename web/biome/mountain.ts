@@ -190,7 +190,7 @@ export async function buildMountain(ctx) {
   const crests: number[][] = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0] - x, c[2] - z) > 45)) crests.push([x, h + 1, z]); } }
   if (crests.length) { root.add(MP.snowPoints("spindrift", { n: crests.length * 220, crests, speed: 3.2, life: 8, seed: 12, scale: 620 })); note("spindrift plumes off the crests", crests.length * 220, null); }
 
-  const add = (name: string | undefined, parts, pts, o: SpeciesAddOpts = {}) => {
+  const add = (name: string | undefined, parts, pts: { x: number; z: number; s: number; yaw: number; h: number; ny: number; }[], o: SpeciesAddOpts = {}) => {
     if (!pts.length) return;
     const mats = toMats(pts, o), g = cull.add(parts, mats, pts.length, name, o.cell || 16); g.name = name; root.add(g); note(name, pts.length, parts); return g;
   };
@@ -232,7 +232,7 @@ export async function buildMountain(ctx) {
   add("scree shards B", MP.screeParts(2), scatterPts(N(2200), 41, AREA, scr, { scale: [1.0, 2.2] }), { y: -0.02 });
   for (const id of ["Pebble_Square_1", "Pebble_Square_3", "Pebble_Square_5", "Pebble_Round_2"]) add(id, (await Lq(id, { h: 0.14, tint: [1, 1, 1.05], fade: [28, 50] })).parts, scatterPts(N(500), 42 + id.length, AREA, scr, { scale: [0.8, 2.0] }), { y: -0.01 });
   const rk = (x: number, z: number, h: number, ny: number) => (ny > 0.55 && h > 4 && h < 140 ? (0.1 + 0.9 * patch(x, z, 50, 0.04)) * wd(x, z) * valleyClear(x, z) : 0);
-  const rockSp = async (name, res, n: number, sc: number[], y = -0.15, fade?: number[]) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
+  const rockSp = async (name: string, res, n: number, sc: number[], y = -0.15, fade?: number[]) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
   const alt = (h) => M.SNOWLINE - 12;                                                                              // snow dust from just below the snowline
   const RW = { lichen: 0.7, snow: 0.55, snowAlt: M.SNOWLINE - 18 };
   await rockSp("boulder_01", wx(await H("boulder_01", { grade: true, fade: [100, 150] }), RW), 8, [1.2, 2.2]);
@@ -258,7 +258,7 @@ export async function buildMountain(ctx) {
     add("glacier tongues", g, gp, { y: -0.1, cell: 64 }); }
 
   // ---- trees by LOD species with impostor atlas: spruce, larch, fir, pines (some snow-dusted), krummholz, snags
-  const species = (name, l0: any, l1: any, pts: any[], o: SpeciesLODOpts = {}) => {
+  const species = (name: string, l0: any, l1: any, pts: any[], o: SpeciesLODOpts = {}) => {
     if (!pts.length) return;
     const imp = bakeImpostor(renderer, partsGroup(l0), 8, 256), mats = toMats(pts, { seed: name.length });
     const levels: LODLevel[] = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });

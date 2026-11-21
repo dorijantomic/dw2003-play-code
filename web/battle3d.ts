@@ -230,7 +230,7 @@ export { ARENA_BASE_Z };
  * hook calls it with the live contact state.
  */
 export const CONTACT_EVADE_TYPE = 56;   // 0x38, COMEX102 0x8004413e
-export function resolveContactSoundType(type, contactType, evaded) {
+export function resolveContactSoundType(type, contactType: number | null, evaded: boolean) {
   if (type !== 98 && type !== 99) return type;
   return evaded ? CONTACT_EVADE_TYPE : contactType;
 }
@@ -1278,7 +1278,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
         // signed volume (divergence theorem): > 0 when the normals point out of the closed surface, whatever its shape;
         // per bone piece too (each piece about its own centre), so a mixed winding would show
         const model = bufs === B$.playerSkelBufs ? B$.playerModel : B$.enemyModel;
-        const vol = (a0, a1) => {
+        const vol = (a0: number, a1: number) => {
           let qx = 0, qy = 0, qz = 0; const nv = (a1 - a0) / 3; if (nv < 3) return 0;
           for (let i = a0; i < a1; i += 3) { qx += p[i]; qy += p[i + 1]; qz += p[i + 2]; }
           qx /= nv; qy /= nv; qz /= nv;
@@ -1322,7 +1322,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     getEnemyScreen() {
       if (!B$._fxView || !B$.eAABBLast) return null;
       const { pv, enemyPos } = B$._fxView, b = B$.eAABBLast;
-      const pr = (y) => { const cx = pv[0]*enemyPos[0] + pv[4]*y + pv[8]*enemyPos[2] + pv[12], cy = pv[1]*enemyPos[0] + pv[5]*y + pv[9]*enemyPos[2] + pv[13], cw = pv[3]*enemyPos[0] + pv[7]*y + pv[11]*enemyPos[2] + pv[15];
+      const pr = (y: number | undefined) => { const cx = pv[0]*enemyPos[0] + pv[4]*y + pv[8]*enemyPos[2] + pv[12], cy = pv[1]*enemyPos[0] + pv[5]*y + pv[9]*enemyPos[2] + pv[13], cw = pv[3]*enemyPos[0] + pv[7]*y + pv[11]*enemyPos[2] + pv[15];
         return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null; };
       const top = pr(b.max[1]), foot = pr(b.min[1]);
       return top && foot ? { x: top.x, topY: top.y, footY: foot.y } : null;
@@ -1330,7 +1330,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     setGiantCameraFit,
     /** Giant mode part 1: draw one side ("player" | "enemy") at k x its shipped size, clamped
      *  0.1..16; k = 1 draws exactly as shipped. Returns the stored scale. */
-    setFighterScale: (side, k) => B$.fighterScale.setFighterScale(side, k),
+    setFighterScale: (side: string, k: number) => B$.fighterScale.setFighterScale(side, k),
     /** The scale that side is drawn at now (1 = MODEL_SCALE). */
     getFighterScale: (side) => B$.fighterScale.fighterScale(side),
     setSlowMotion,

@@ -41,7 +41,7 @@ const COMPONENT = {
   5126: { Ctor: Float32Array, get: "getFloat32", size: 4, norm: 0 },
 };
 
-function decodeBase64(b64) {
+function decodeBase64(b64: string | undefined) {
   if (typeof atob === "function") {
     const s = atob(b64);
     const out = new Uint8Array(s.length);
@@ -202,7 +202,7 @@ export function composeTRS(t, r, s, out = new Float32Array(16)) {
   return out;
 }
 
-export function mat4Mul(a, b, out = new Float32Array(16)) {
+export function mat4Mul(a, b: Float32Array<ArrayBuffer>, out = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
     for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
@@ -224,7 +224,7 @@ export function updateWorld(pose) {
 }
 
 /** Sample a clip onto a fresh bind pose (a channel only touches its own node). */
-export function sampleClipPose(model, clipIndex, timeSec) {
+export function sampleClipPose(model, clipIndex, timeSec: number) {
   const pose = bindPose(model);
   const clip = model.anims[clipIndex];
   if (clip) {
@@ -234,13 +234,13 @@ export function sampleClipPose(model, clipIndex, timeSec) {
   return pose;
 }
 
-function applyChannel(pose, ch, time) {
+function applyChannel(pose, ch, time: number) {
   const { times, values, comps } = ch;
   const n = times.length;
   if (!n) return;
   const dst = ch.path === "rotation" ? pose.r : ch.path === "translation" ? pose.t : pose.s;
   const off = ch.node * comps;
-  const put = (i) => { for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c]; };
+  const put = (i: number) => { for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c]; };
   if (n === 1 || time <= times[0]) return put(0);
   if (time >= times[n - 1]) return put(n - 1);
   let lo = 0, hi = n - 1;
@@ -404,7 +404,7 @@ function worldVecToLocal(m, v) {
   ];
 }
 
-function rotateJoint(pose, node, axis, angle) {
+function rotateJoint(pose, node, axis, angle: number) {
   const q = quatFromAxis(axis, angle);
   const off = node * 4;
   const b = [pose.r[off], pose.r[off + 1], pose.r[off + 2], pose.r[off + 3]];
@@ -412,7 +412,7 @@ function rotateJoint(pose, node, axis, angle) {
   pose.r[off] = r[0]; pose.r[off + 1] = r[1]; pose.r[off + 2] = r[2]; pose.r[off + 3] = r[3];
 }
 
-export function quatFromAxis(axis, angle) {
+export function quatFromAxis(axis, angle: number) {
   const len = Math.hypot(axis[0], axis[1], axis[2]) || 1;
   const s = Math.sin(angle / 2);
   return [(axis[0] / len) * s, (axis[1] / len) * s, (axis[2] / len) * s, Math.cos(angle / 2)];
@@ -432,7 +432,7 @@ export function quatMul(a, b) {
  * the hip swinging ±swing and the knee bending while the leg is in the air, plus the body's own bob.
  * `phase` is 0..1 of the cycle. Pure: no three.js, no clock, unit-testable.
  */
-export function applyGait(pose, rig, legs, phase, { swing = 0.28, lift = 0.45, bob = 0.02 } = {}) {
+export function applyGait(pose, rig, legs, phase: number, { swing = 0.28, lift = 0.45, bob = 0.02 } = {}) {
   const order = [0, 0.5, 0.25, 0.75];            // the phases of the four legs, front pair first
   legs.forEach((L, i) => {
     const p = (phase + (order[i] ?? i / 4)) % 1;
@@ -601,13 +601,13 @@ async function imageFrom(uri) {
  * file is not there, so the mount feature hides itself and nothing else breaks.
  */
 const loading = new Map();       // key -> the in-flight load, so two callers share one copy
-export function loadMountAsset(key, url) {
+export function loadMountAsset(key: string, url: string) {
   if (loaded.has(key)) return Promise.resolve(loaded.get(key));
   if (!loading.has(key)) loading.set(key, loadMountAssetOnce(key, url).finally(() => loading.delete(key)));
   return loading.get(key);
 }
 
-async function loadMountAssetOnce(key, url) {
+async function loadMountAssetOnce(key: string, url: string) {
   let asset = null;
   try {
     const res = await fetch(url);
@@ -799,7 +799,7 @@ function splitAtSeat(asset, pix, seat) {
   const near = rc.getImageData(0, 0, w, h).data;
   const src = pix.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h);
   const s = src.data;
-  const isNear = (p) => near[p * 4 + 3] >= 40;     // the same solid test as pixelate()
+  const isNear = (p: number) => near[p * 4 + 3] >= 40;     // the same solid test as pixelate()
   const front = new ImageData(w, h), back = new ImageData(w, h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const p = y * w + x, i = p * 4;
@@ -957,7 +957,7 @@ export function pixelate(srcCanvas) {
 }
 
 /** The palette index nearest to an RGB triple (Euclidean in RGB; the palette is small and spread out). */
-export function nearestPalette(r, g, b) {
+export function nearestPalette(r: number | undefined, g: number | undefined, b: number | undefined) {
   let best = 0, bestD = Infinity;
   for (let i = 0; i < PALETTE.length; i++) {
     const p = PALETTE[i];

@@ -14,7 +14,7 @@ export function createStatusBackdrop() {
   let time = 0;
 
   return {
-    update(dt) {
+    update(dt: number) {
       if (Number.isFinite(dt) && dt > 0) time += dt;
     },
     reset() { time = 0; },

@@ -45,7 +45,7 @@ export function mpCard() {
 // The ordinary map change to a spot beside (x, y) on `mapId` (runStageHandoff scripted:true: the same wipe and load as an exit; setMap
 // then gathers my followers on me). Used by the online "Go to" (warpNear) and by FLY (flyTo). `idle()` is asked before and after the
 // collision loads. The spot comes from pickSpotNear on that map's own collision grid, so never a wall. Resolves "ok", "busy", "nomap" or "noroom".
-export async function warpToMap(mapId, x, y, idle, dir = null) {
+export async function warpToMap(mapId, x, y, idle: (() => boolean) | (() => boolean), dir = null) {
     const idx = state.manifest?.maps?.findIndex((m) => m.id === mapId) ?? -1;
     if (idx < 0) return "nomap";
     if (!idle()) return "busy";
@@ -83,7 +83,7 @@ export function mpBalloonSay(id, name, text) {
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 
-function mpBalloonTick(dt) {
+function mpBalloonTick(dt: number) {
     if (!mpBalloons.size) return;
     const ghosts = new Map(multiplayerGhosts(currentMap().id).map((g) => [g.id, g]));
     for (const [id, b] of mpBalloons) {
@@ -104,7 +104,7 @@ function mpBalloonTick(dt) {
     }
 }
 
-export function chatTick(dt) {
+export function chatTick(dt: number) {
     mpBalloonTick(dt);
     if (!chatBox.isOpen()) return;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
@@ -122,7 +122,7 @@ export function chatTick(dt) {
     }
 }
 
-export function tickFootstep(holder: GameState, dt) {
+export function tickFootstep(holder: GameState, dt: number) {
     const form = state.diveForm;
     const isDigmon = form?.spriteId === DIGMON_SPRITE_ID;
     const interval = (isDigmon ? 32 : 8) * FIELD_TICK_SECONDS;

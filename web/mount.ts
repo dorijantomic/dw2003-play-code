@@ -144,7 +144,7 @@ export function mountActorHidden(npc) {
 }
 
 const actorAssets = new Map();   // url -> asset | null (loading or missing)
-function actorAsset(key, url) {
+function actorAsset(key: string, url: string) {
   if (actorAssets.has(url)) return actorAssets.get(url);
   actorAssets.set(url, null);
   loadMountAsset(key, url).then((a) => actorAssets.set(url, a)).catch(() => {});
@@ -153,7 +153,7 @@ function actorAsset(key, url) {
 
 /** Draw a mount's quest character at its post: hurt before its quest is done, standing after. Draws nothing while
  * the model is loading or missing. Renders and paints in one go (the renderer's canvas is shared). */
-export function mountActorDraw(ctx, npc, camX, camY, timeSec = 0) {
+export function mountActorDraw(ctx: CanvasRenderingContext2D | null, npc, camX: number, camY: number, timeSec = 0) {
   const def = mountActorDef(npc?.npc_id);
   if (!def || mountActorHidden(npc)) return false;
   const healed = !!host?.questDone?.(def.unlock);
@@ -213,7 +213,7 @@ export function loadSeats(url = "mount-seats.json") {
   return fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
     .then((j: any) => { seatFile = j && typeof j === "object" ? j.seats ?? j : {}; return seatFile; });
 }
-export function seatSettings(id, dir) {
+export function seatSettings(id, dir: string) {
   let local = null;
   try { local = JSON.parse(localStorage.getItem(SEAT_STORE) || "null"); } catch { local = null; }
   return { ...seatDefault(), ...(seatFile[id]?.[dir] ?? {}), ...(local?.[id]?.[dir] ?? {}) };
@@ -271,14 +271,14 @@ export function mountPlayerLatch() {
  * How many sub-steps a move of (dx,dy) needs so no wall thinner than one cell can be crossed: one step of
  * the BASE magnitude at a time, the speed factor comes from repeating the step, never from a longer step.
  */
-export function mountSubSteps(dx, dy, baseStep) {
+export function mountSubSteps(dx: number, dy: number, baseStep: number) {
   const len = Math.hypot(dx, dy);
   if (!(baseStep > 0) || !(len > baseStep)) return 1;
   return Math.ceil(len / baseStep);
 }
 
 /** Move through `n` sub-steps of a collision mover, so a 3x step cannot tunnel a 16 px wall. */
-export function moveWithSubSteps(moveFn, x, y, dx, dy, baseStep) {
+export function moveWithSubSteps(moveFn, x: number, y: number, dx: number, dy: number, baseStep: number) {
   if (typeof moveFn !== "function") return { x, y };
   const n = mountSubSteps(dx, dy, baseStep);
   let px = x, py = y;
@@ -294,7 +294,7 @@ export function moveWithSubSteps(moveFn, x, y, dx, dy, baseStep) {
  * The first spot around (x,y) a 12x8 foot box can stand on, searching a ring of 4-24 px. Returns null when
  * the mount is standing somewhere with no free cell at all (then the player stays where they are).
  */
-export function findDismountSpot(canStand, x, y, { ring = 24, step = 4 } = {}) {
+export function findDismountSpot(canStand, x: number, y: number, { ring = 24, step = 4 } = {}) {
   if (typeof canStand !== "function") return null;
   if (canStand(x, y)) return { x, y };
   for (let r = step; r <= ring; r += step) {
@@ -309,7 +309,7 @@ export function findDismountSpot(canStand, x, y, { ring = 24, step = 4 } = {}) {
 }
 
 /** Up to `n` free spots behind the player for the party, nearest first (they are placed, never snapped). */
-export function followerSpots(canStand, x, y, n = 3, { ring = 28, step = 5 } = {}) {
+export function followerSpots(canStand, x: number, y: number, n = 3, { ring = 28, step = 5 } = {}) {
   const out = [];
   if (typeof canStand !== "function") return out;
   for (let r = step; r <= ring && out.length < n; r += step) {
@@ -395,7 +395,7 @@ export function mountPress(state: GameState) {
  * Per-frame step. Returns true when the field's own input must be frozen for this frame (the climb on /
  * step off animation); false while riding, because the player keeps walking (faster) and the mount follows.
  */
-export function mountTick(dt, state: GameState, { mapId = null } = {}) {
+export function mountTick(dt: number, state: GameState, { mapId = null } = {}) {
   if (!enabled()) {
     if (S.mode !== "idle") mountForceDismount();
     return false;
@@ -503,7 +503,7 @@ interface SpriteStatsOpts { dir?: string; moving?: boolean; phaseA?: number; pha
 
 function spriteStats(opts: SpriteStatsOpts = {}) {
   if (!S.asset) return null;
-  const draw = (phase) => renderMount(S.asset, {
+  const draw = (phase: number) => renderMount(S.asset, {
     x: MOUNT_VIEW.w / 2, y: MOUNT_VIEW.h - 10, dir: opts.dir ?? "down", phase,
     moving: opts.moving ?? true, size: S.def?.size ?? 68, timeSec: 0, walk: S.def?.walk ?? null,
   });

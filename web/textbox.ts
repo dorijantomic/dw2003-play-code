@@ -5,6 +5,7 @@ import * as uiC from "./ui-c/index.js";
 import { composeTalk } from "./ui-c/message.js";
 import type { TextboxState } from "./types/textbox.js";
 
+import type { TextboxAnchor } from "./types/textbox.js";
 let boxCount = 0;
 
 const CHARS_PER_SEC = 40;
@@ -71,7 +72,7 @@ export const BALLOON_TEXT_INSET = { x: 14, y: 22 };
 // left/right is the side of the anchor the BODY lies on (verified against the
 // original in tests/lane-b/dialogue-controller.test.js: R/M->0 R/T->1 L/M->2
 // L/T->3 for the down facings; R/M->1 L/M->3 R/B->0 L/B->2 for the up facings).
-export function autoBalloonMode(dirStr, sx, sy, viewW, viewH) {
+export function autoBalloonMode(dirStr, sx: number, sy: number, viewW: number, viewH: number) {
   const below = /^up/.test(dirStr ?? "");
   const right = sx < viewW / 2; // speaker on the left half -> balloon on its right
   let mode = below ? (right ? 3 : 1) : (right ? 2 : 0);
@@ -85,7 +86,7 @@ export function autoBalloonMode(dirStr, sx, sy, viewW, viewH) {
 // dx is +11 for modes 0/1 and -11 for 2/3, dy is -19 above (modes 0/2) and -7
 // below (1/3). Verified against the original in
 // tests/lane-b/dialogue-controller.test.js (`anchor: modes, the 0xD6 quirk`).
-export function balloonAnchor(mode, sx, sy, sc) {
+export function balloonAnchor(mode: number, sx: number, sy: number, sc: number) {
   const above = mode === 0 || mode === 2;
   return {
     ax: sx + (mode < 2 ? 11 : -11) * sc,
@@ -104,7 +105,7 @@ export function balloonAnchor(mode, sx, sy, sc) {
 // upward, exactly as the fixed-height PS1 body does. w/h are canvas px, sc the
 // native-240p -> canvas scale. No value here is invented: all come from the
 // tables (see docs/research/ui/dialogue-window-placement-decoded-2026-07-02.md).
-export function balloonBodyRect(mode, ax, ay, w, h, sc) {
+export function balloonBodyRect(mode: number, ax: number, ay: number, w: number, h: number, sc: number) {
   const above = mode === 0 || mode === 2;
   const leftBody = mode === 0 || mode === 1;
   return {
@@ -122,7 +123,7 @@ export function createTextbox(sfx = null) {
   // overlay draws (web/ui-c/message.js composeTalk). The real clips (tail, band halves) are drawn inside the scope and captured.
   let scene = null;
   // the typed lines of the current page as native runs: x / y = the line's left / top (its centre at y + 4.5), only the revealed part
-  const pageRuns = (x, baseline, lineH, s) => {
+  const pageRuns = (x: number, baseline: number, lineH: number, s: number) => {
     let remaining = Math.floor(tb.shown);
     const out = [];
     tb.currentPage().forEach((line, i) => {
@@ -133,7 +134,7 @@ export function createTextbox(sfx = null) {
     });
     return out;
   };
-  const moreBox = (x, y, s) => ({ part: "more", x: x / s - 6, y: y / s - 3, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } });
+  const moreBox = (x: number, y: number, s: number) => ({ part: "more", x: x / s - 6, y: y / s - 3, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } });
 
   tb.isOpen = () => tb.dialogue !== null;
   tb.currentPage = () => tb.dialogue.pages[tb.pageIdx];
@@ -182,7 +183,7 @@ export function createTextbox(sfx = null) {
     if (tb.isOpen() && !tb.isPageFullyShown()) tb.shown += dt * CHARS_PER_SEC;
   };
 
-  const drawPageText = (ctx, x, y, lineH) => {
+  const drawPageText = (ctx: CanvasRenderingContext2D, x: number, y: number, lineH: number) => {
     ctx.font = "bold 16px monospace";
     let remaining = Math.floor(tb.shown);
     tb.currentPage().forEach((line, i) => {
@@ -197,7 +198,7 @@ export function createTextbox(sfx = null) {
     });
   };
 
-  const drawName = (ctx, x, y, nameH) => {
+  const drawName = (ctx: CanvasRenderingContext2D, x: number, y: number, nameH: number) => {
     const grad = ctx.createLinearGradient(x + 8, y - nameH, x + 120, y);
     grad.addColorStop(0, "#0a8070");
     grad.addColorStop(1, "#3050b0");
@@ -206,7 +207,7 @@ export function createTextbox(sfx = null) {
     ctx.fillText(tb.dialogue.name, x + 10, y - 6);
   };
 
-  const drawBalloon = (ctx, viewW, viewH, pos) => {
+  const drawBalloon = (ctx: CanvasRenderingContext2D, viewW: number, viewH: number, pos: TextboxAnchor) => {
     const mode = pos.mode & 3;
     const sc = viewH / PS1_H; // decoded offsets are PS1-240p pixels
 
@@ -286,7 +287,7 @@ export function createTextbox(sfx = null) {
     ctx.restore();
   };
 
-  const drawBox = (ctx, viewW, viewH) => {
+  const drawBox = (ctx: CanvasRenderingContext2D, viewW: number, viewH: number) => {
 
     const pos = tb.anchor ? tb.anchor() : null;
     if (pos && pos.mode != null && pos.mode !== 4) {

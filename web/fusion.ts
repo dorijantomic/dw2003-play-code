@@ -14,6 +14,7 @@
 import type { FusionDefeatArgs } from "./battle/core/types.js";
 import type { BattleSkill } from "./types/battle.js";
 
+import type { EnemyBattleRecord } from "./types/battle.js";
 /** The five primary stats every blend covers. */
 export const FUSION_STATS = Object.freeze(["str", "def", "spt", "wis", "spd"]);
 
@@ -202,7 +203,7 @@ export function fusionOnDefeat({ party, partyIndex = 0, fxOn = false, bosses = n
  * one (the fused body is still drawn and stored as Kimeramon), else the species name the
  * enemy table carries, else the profile's own name.
  */
-export function enemyDisplayName(en) {
+export function enemyDisplayName(en: EnemyBattleRecord) {
   return String(en?.displayName ?? en?.eStats?.digimon_id ?? en?.profile?.name ?? "");
 }
 
@@ -212,7 +213,7 @@ export function enemyDisplayName(en) {
  * same line the HUD plate reads), else the enemy table's species key. The numbered
  * records (Goburimon2, Cardmon3, ...) carry the plain species line on the disc.
  */
-export function enemyMessageName(en, record: { nameId: number | null; }, nameBank, fallback = "") {
+export function enemyMessageName(en: EnemyBattleRecord, record: { nameId: number | null; }, nameBank, fallback = "") {
   if (en?.displayName != null) return String(en.displayName);
   const line = record?.nameId == null ? null : nameBank?.[record.nameId | 0];
   if (typeof line === "string" && line !== "") return line;

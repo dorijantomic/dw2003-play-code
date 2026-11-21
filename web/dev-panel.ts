@@ -122,7 +122,7 @@ export function createDevView(panel, api) {
             main.innerHTML = CONTROLS_HTML(api.spriteFilters);
         } else {
             const rows = selectRows({ tab: st.tab, query: st.query, filter: st.filter }, shipOf);
-            const tabName = (id) => DEV_TABS.find((t) => t.id === id).name;
+            const tabName = (id: string) => DEV_TABS.find((t) => t.id === id).name;
             let html = searching ? `<div class="hint">${rows.length} found across all tabs.</div>` : "";
             if (!searching && st.tab === "quests" && st.note) html += `<div class="hint">${st.note}</div>`;
             for (const g of groupRows(rows)) {
@@ -151,7 +151,7 @@ export function createDevView(panel, api) {
             if (el && c[t.id].total) el.textContent = `${c[t.id].on}/${c[t.id].total}`;
             total += c[t.id].total; on += c[t.id].on;
         }
-        const set = (sel, fn) => { const el = main.querySelector(sel); if (el) fn(el); };
+        const set = (sel: string, fn) => { const el = main.querySelector(sel); if (el) fn(el); };
         set("[data-mode]", (e) => { e.value = fx.weatherMode; });
         set("[data-quality]", (e) => { e.value = fx.quality; });
         set("[data-tod]", (e) => { e.value = fx.todMode; });

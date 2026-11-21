@@ -49,7 +49,7 @@ function planType(kind: string, spec: { n: number; tMin: number; p: number; h: n
   }
   return { items: out, tries };
 }
-function colourFor(kind: string, it, u2: number) {
+function colourFor(kind: string, it: { x: number; z: number; yaw: number; s: number; lean: number; t: number; u: number; }, u2: number) {
   if (kind === "fern" || kind === "clover" || kind === "tuft") {
     const g = MEAS.green[0], k = 0.9 + 0.35 * u2;
     return [g[0] * k, g[1] * k, g[2] * k];

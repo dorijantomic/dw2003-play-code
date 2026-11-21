@@ -9,6 +9,7 @@ import { clipRect, restOfRuns } from "./generic.js";
 import { isCursorToken } from "./icons.js";
 import type { PlaceCardScene, TalkOpts } from "./types.js";
 
+import type { UiRect, PlaceCardQuad } from "./types.js";
 /** The four tail clips (one per balloon quadrant): which edge of the body they hang from and on which side their tip lies. */
 export const TAILS = Object.freeze({
     3: Object.freeze({ side: "bottom", tip: "left" }), 4: Object.freeze({ side: "bottom", tip: "right" }),
@@ -19,7 +20,7 @@ export const TAILS = Object.freeze({
  * The C tail for tail clip `id` drawn at native rect `r`: the tip where the clip's tip is (3 px in from its tip side, on its far edge), the
  * base along the body edge over the clip's wide part, widened MSG.tailWiden each side (C6 draws a fuller tail than the 10 px pixel one).
  */
-export function tailGeometry(id: string | number, r, body) {
+export function tailGeometry(id: string | number, r, body: UiRect) {
     const d = TAILS[id];
     if (!d || !body || !r) return null;
     const left = d.tip === "left";
@@ -57,14 +58,14 @@ export function balloonBody(parts) {
 }
 
 /** The name tab over the balloon's top edge (left end; at the right end when a top tail would sit under it). */
-export function nameTab(body, tail, nameW: number) {
+export function nameTab(body: UiRect, tail, nameW: number) {
     const w = Math.max(MSG.tabMinW, nameW * 1.15 + 18);
     let x = body.x + MSG.tabIn;
     if (tail?.side === "top" && Math.min(tail.b0, tail.tip[0]) < x + w + 4 && Math.max(tail.b1, tail.tip[0]) > x - 4) x = body.x + body.w - w - MSG.tabIn;
     return { x, y: body.y - MSG.tabUp, w, h: MSG.tabH14 };
 }
 
-function pushName(key: string, text: string, tab, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
+function pushName(key: string, text: string, tab: { x: number; y: number; w: number; h: 14; } | { x: number; y: number; w: number; h: 14; }, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
     out.push(tabPlate(`${key}.tab`, tab, rel, { edge: "var(--c-bln-tab)", part: "nameTab" }));
     const w = tab.w - MSG.nameIn - 8;
     out.push(textPart(`${key}.name`, "label", text, { x: tab.x + MSG.nameIn, y: tab.y + (tab.h - N(MSG.nameLineDp)) / 2, w, h: N(MSG.nameLineDp) },
@@ -153,7 +154,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
  * drop shadow, a navy plate (the area plate) chamfered, the 1-2 px lines thickened to 8 dp about their centre (4 dp inside a bar
  * narrower than 10 native, as C6b draws the line in the left blue bar; always kept inside the bar they sit in), the orange tab where the left blue bar crosses the band (C6b).
  */
-export function placeCardBars(quads, out = []) {
+export function placeCardBars(quads: PlaceCardQuad[], out = []) {
     const qs = quads.filter((q: { w: number; h: number; }) => q.w > 0 && q.h > 0).map((q) => ({ x: q.x, y: q.y, w: q.w, h: q.h, c: q.colour ?? q.color ?? [0, 0, 0] }));
     qs.forEach((q, i) => {
         let r = { x: q.x, y: q.y, w: q.w, h: q.h };

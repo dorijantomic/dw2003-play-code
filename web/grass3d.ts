@@ -164,7 +164,7 @@ function isGrassStrict(r: number, g: number, b: number) {
 const WET_R = 15;            // grass in a patch mostly surrounded by water is a reed bed
 const WET_MAX = 0.3;
 
-function pixelsOf(img) {
+function pixelsOf(img: HTMLImageElement) {
     const cv = document.createElement("canvas");
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const cx = cv.getContext("2d", { willReadFrequently: true });

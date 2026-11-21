@@ -21,7 +21,7 @@ function wiringFor(sid, idx) {
   return state.wiring[sid]?.[idx] ?? null;
 }
 
-function stageName(sid) {
+function stageName(sid: string) {
   return state.maps[sid] ? `${sid} — ${state.maps[sid].name}` : sid;
 }
 

@@ -133,7 +133,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
 
   // ---------------- the instancer (every parts asset, any slot) ----------------
   const _M = new THREE.Matrix4(), _Q = new THREE.Quaternion(), _P = new THREE.Vector3(), _S = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
-  const nativeOf = (s, asset) => s.native || { h: asset.h, r: asset.r };
+  const nativeOf = (s, asset: { h: number; r: number; }) => s.native || { h: asset.h, r: asset.r };
   /** a foreign asset's scale at the slot's native size (per item it is (h / native h) x this) */
   const fitOf = (s, asset: { h: number; r: number; }) => { const N = nativeOf(s, asset); return Math.min(N.h / asset.h, FIT_R * N.r / asset.r); };
   const useNative = (asset, items) => !!(asset.native && items.m);

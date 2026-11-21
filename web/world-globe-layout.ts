@@ -352,20 +352,20 @@ export function buildWorld({ maps, scenes, variants = {} }) {
 }
 
 /** How the world fits a texW x texH canvas: uniform scale (never above 1), centred, with a margin. */
-export function fitWorld(bounds, texW: number, texH: number, margin = 0.04) {
+export function fitWorld(bounds: { x: number; y: number; w: number; h: number; }, texW: number, texH: number, margin = 0.04) {
     const scale = Math.min(1, (texW * (1 - 2 * margin)) / bounds.w, (texH * (1 - 2 * margin)) / bounds.h);
     return { scale, ox: (texW - bounds.w * scale) / 2 - bounds.x * scale, oy: (texH - bounds.h * scale) / 2 - bounds.y * scale, texW, texH };
 }
 
 /** Smallest 2:1 power-of-two canvas (width capped at maxW) that keeps the world at scale 1, else maxW x maxW/2. */
-export function textureSize(bounds, maxW = 8192, margin = 0.04) {
+export function textureSize(bounds: { x: number; y: number; w: number; h: number; }, maxW = 8192, margin = 0.04) {
     let w = 1024;
     while (w < maxW && (w * (1 - 2 * margin) < bounds.w || (w / 2) * (1 - 2 * margin) < bounds.h)) w *= 2;
     return { w, h: w / 2 };
 }
 
-export function worldToTex(fit, wx: number, wy: number) { return { x: wx * fit.scale + fit.ox, y: wy * fit.scale + fit.oy }; }
-export function texToWorld(fit, tx: number, ty: number) { return { x: (tx - fit.ox) / fit.scale, y: (ty - fit.oy) / fit.scale }; }
+export function worldToTex(fit: { scale: number; ox: number; oy: number; texW: number; texH: number; }, wx: number, wy: number) { return { x: wx * fit.scale + fit.ox, y: wy * fit.scale + fit.oy }; }
+export function texToWorld(fit: { scale: number; ox: number; oy: number; texW: number; texH: number; }, tx: number, ty: number) { return { x: (tx - fit.ox) / fit.scale, y: (ty - fit.oy) / fit.scale }; }
 
 /** What is at world point (x, y): { place, pin } (pin = nearest pin within `pinRadius` world px, on top of the place). */
 export function hitTest(world, x: number, y: number, pinRadius = 12) {

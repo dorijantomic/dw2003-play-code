@@ -143,7 +143,7 @@ export function setStageObjectSound(fn) {
  * entry only builds the traffic-light corner in its ordinal-0x1B arm, so the
  * engine needs the same number the story engine holds.
  */
-export function setStageObjectOrdinal(fn) {
+export function setStageObjectOrdinal(fn: () => number) {
     readOrdinal = typeof fn === "function" ? fn : () => 0;
 }
 
@@ -418,7 +418,7 @@ export function tickStageObjects(stageId, delta = 1, camX = 0, camY = 0, pad = 0
  * returned for this frame (the render loop reads it once and hands the same
  * list to the native stage runtime). Returns the number of blanks run.
  */
-export function paceStageObjects(stageId, deltas, camX = 0, camY = 0, pad = 0) {
+export function paceStageObjects(stageId, deltas: number[], camX = 0, camY = 0, pad = 0) {
     for (const delta of deltas) tickStageObjects(stageId, delta, camX, camY, pad);
     return deltas.length;
 }
@@ -507,7 +507,7 @@ export function clearStageObjects(stageId) {
  * rectangles from the same per-stage sheet the scenery and the launch pads use.
  * Decode: docs/research/field/draw-context-service-2026-10-04.md
  */
-export function setAnnotatorRandom(fn) {
+export function setAnnotatorRandom(fn: () => number) {
     annotatorRandom = fn ?? (() => 1);
 }
 

@@ -24,7 +24,7 @@ import type { RetargetBake } from "./types.js";
  * ever used when its own numbers pass. When none passes, the first candidate is returned and the caller
  * keeps the planted cast, exactly as before.
  */
-export function bakeRetarget(target, source, clip, { offset = 6000, mirror = null, ...opts } = {}) {
+export function bakeRetarget(target, source, clip: number, { offset = 6000, mirror = null, ...opts } = {}) {
   // A/B switch used by the K16 measurements (tools/check_cast_contract.mjs --geometry) and nothing else:
   // it reproduces the pre-K16 bake without touching any other module.
   if (typeof process !== "undefined" && process.env?.K16_MODE === "geometry") {

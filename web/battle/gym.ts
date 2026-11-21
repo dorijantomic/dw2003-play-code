@@ -28,7 +28,7 @@ export function gymStatForId(id: number) {
 //   tpChoice   = 0/1/2 (TP 1 / TP 5 / TP10), ultra = "Ultra Training Chance" challenge won
 //   dig        = { elemGrowth: {fire:1..5,...}, elemCur: {fire:0..999,...} } for brackets
 // Returns { tpCost, effects: [{ stat, delta }] } (negative delta = loss; "maxHp"/"maxMp").
-export function gymTrainingResult(drillEntry, tpChoice, ultra, dig, gym, rng = RAND_U16) {
+export function gymTrainingResult(drillEntry, tpChoice, ultra: boolean, dig, gym, rng = RAND_U16) {
   const roll = ([base, range]) => base + (range ? rng() % range : 0);
   const superDrill = drillEntry.drill >= 13;
   const variant = !ultra ? 0 : superDrill ? 2 : 1; // elem/hpmp row variant

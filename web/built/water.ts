@@ -269,7 +269,7 @@ function edt1d(f, n: number, d, v, z: number[] | Float64Array<ArrayBuffer>) {
   k = 0;
   for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
 }
-function edt2d(zero, size: number) {
+function edt2d(zero: Uint8Array<ArrayBuffer>, size: number) {
   const g = new Float32Array(size * size);
   const INF = 1e20;
   for (let i = 0; i < size * size; i++) g[i] = zero[i] ? 0 : INF;
@@ -1046,7 +1046,7 @@ export function createPlanarReflection(P, { hide = () => [] }: { hide?: (scene: 
 }
 
 // the lake's surface shader: the ocean's GLSL libraries (shore field, depth-graded body, light, haze, sky) with a calm main
-function lakeMaterial(field, P, A, nmaps, refl: BuiltWaterReflection) {
+function lakeMaterial(field, P, A, nmaps: BuiltWaterAssets, refl: BuiltWaterReflection) {
   const uniforms = S.uniformsWith({
     ...shoreUniforms(field, P),
     uRamp: { value: A.ramp.map((c) => S.srgb(c)) }, uRampM: { value: rampTangents(A.ramp.map((c) => S.srgb(c))) },

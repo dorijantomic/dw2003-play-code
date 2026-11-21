@@ -316,7 +316,7 @@ export function createGeminiSpires(ctx, groups) {
     return out;
   }
 
-  function clump(mesh, n: number, anchorW: THREE.Vector3, nor, cr: number, rnd: { (): number; (): number; }, ledge, tint?: any) {
+  function clump(mesh, n: number, anchorW: THREE.Vector3, nor: THREE.Vector3, cr: number, rnd: { (): number; (): number; }, ledge, tint?: any) {
     const Cc = anchorW.clone().addScaledVector(nor, 0.35 * cr);
     T1.set(nor.y, -nor.x, 0); if (T1.lengthSq() < 1e-4) T1.set(0, nor.z, -nor.y); T1.normalize();
     T2.crossVectors(nor, T1);

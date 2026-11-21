@@ -167,7 +167,7 @@ export function runStageHandoff(exit) {
 
 // Wide overworld (web/field-view.js): black over the two side strips, as much as the frame rule says
 // they are covered (1 - wideField.sides). Box coordinates; the strips are padL wide outside the box.
-export function drawWideSideCovers(ctx) {
+export function drawWideSideCovers(ctx: CanvasRenderingContext2D | null) {
     const padL = wideField.padL;
     // Covered = black; shown with a menu open (wide overworld) = dimmed by wideField.dim.
     const a = (1 - wideField.sides) + wideField.sides * wideField.dim;
@@ -217,7 +217,7 @@ export function drawCheckerboardWipe(ctx) {
 //
 // Native coordinates: the state, the geometry and the tile size are all 320x240
 // (VIEW_W/VIEW_H are the device buffer), so everything is scaled by ZOOM here.
-export function drawTransitionWipe(ctx, camX, camY) {
+export function drawTransitionWipe(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
     const clock = state.wipe;
     if (clock.phase !== 1 && clock.phase !== -1) return;
 
@@ -266,7 +266,7 @@ export function drawTransitionWipe(ctx, camX, camY) {
 
 // One frame of the close: the 64x64 lattice, darkened by the level, clipped to
 // the screen AROUND the window the field still shows through.
-function paintWipeCoverAround(ctx, level, clear) {
+function paintWipeCoverAround(ctx, level: number, clear: { x: number; y: number; w: number; h: number; }) {
     const cx = clear.x * ZOOM, cy = clear.y * ZOOM;
     const cw = clear.w * ZOOM, ch = clear.h * ZOOM;
     // Four bands around the window, which is what the original's frame draws:
@@ -289,7 +289,7 @@ function paintWipeCoverAround(ctx, level, clear) {
 
 // One frame of the open: the same lattice and level, clipped to the INSIDE of
 // the band, so the two screen edges show the field that just arrived.
-function paintWipeCoverBand(ctx, level, f) {
+function paintWipeCoverBand(ctx, level: number, f: { w: number; bandX: number; bandW: number; bandH: number; level: number; done: boolean; }) {
     const bx = f.bandX * ZOOM, bw = f.bandW * ZOOM, bh = f.bandH * ZOOM;
     // The subtraction is scoped to the band itself: `subtractLayer` subtracts
     // everything the painter leaves non-black, so filling the whole screen and

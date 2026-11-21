@@ -68,7 +68,7 @@ export function gunslingerSwitchCommand(stage: string, eventId: number) {
  * which layout does it install. Mirrors the branch and the two stores exactly; a
  * gate that fails is the body's own early return — it registers nothing.
  */
-export function applyGunslingerSwitch(latch: number, cmd) {
+export function applyGunslingerSwitch(latch: number, cmd: { stage: string; eventId: number; needsLatchNonZero: boolean; layout: number; latchAfter: number; }) {
     const acts = cmd.needsLatchNonZero ? latch !== 0 : latch === 0;
     if (!acts) return { fires: false, latch, layout: null };
     return { fires: true, latch: cmd.latchAfter, layout: cmd.layout };

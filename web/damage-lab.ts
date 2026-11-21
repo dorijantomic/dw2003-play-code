@@ -489,7 +489,7 @@ function recompute() {
 }
 
 /** How many values one picker has. */
-function optionLength(key) {
+function optionLength(key: string | undefined) {
   switch (key) {
     case "form": return S.forms.length;
     case "enemy": return S.enemies.length;
@@ -502,7 +502,7 @@ function optionLength(key) {
   }
 }
 
-function changePick(key, delta) {
+function changePick(key: string | undefined, delta: number) {
   const n = optionLength(key);
   if (n <= 0) return;
   S.pick[key] = ((S.pick[key] + delta) % n + n) % n;
@@ -541,7 +541,7 @@ export function openDamageLab() {
 /** Follow F2 -> Extras -> "Damage Lab (new)": the switch only ENABLES the page, it never opens
  *  it (openDamageLab does, from the F2 button); it closes when the switch goes off. Off means
  *  no page, no data fetch and no key handling. */
-export function tickDamageLab(enabled) {
+export function tickDamageLab(enabled: boolean) {
   const on = enabled === true;
   if (!on && S.open) S.open = false;
   S.wasOn = on;
@@ -596,13 +596,13 @@ export function damageLabOptions() {
 }
 
 /** Cut a note to what one line of the page can hold. */
-function shorten(text, max) {
+function shorten(text, max: number) {
   const s = String(text);
   return s.length > max ? `${s.slice(0, max - 3)}...` : s;
 }
 
 /** Break a sentence into lines no longer than `cols`, on spaces. */
-function wrapText(text, cols) {
+function wrapText(text, cols: number) {
   const out = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {

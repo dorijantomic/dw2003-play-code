@@ -16,10 +16,11 @@
 // The two drop helpers below are the browser's copy of engine/dw3/item-drop.ts (the page
 // is served as plain ES modules and cannot load a .ts file). tests/disc-rolls.test.js
 // pins the pair against the engine leaf so the two cannot drift.
+import type { FightTechRow } from "./types/battle.js";
 import type { TechRecordMerged } from "./types/tech-record.js";
 
 /** The record's +0x06 accuracy byte; a missing record falls back to today's 100. */
-export function techRecordAccuracy(rec) {
+export function techRecordAccuracy(rec: FightTechRow | null) {
   return rec?.elemCtx ?? 100;
 }
 
@@ -28,7 +29,7 @@ export function techRecordAccuracy(rec) {
  * `useDiscAcc` off -> exactly today's `{...skill, effect_id, effect_power}` (no base_acc key).
  * `useDiscAcc` on  -> also carries `base_acc`, the record's own +0x06 byte.
  */
-export function mergeTechRecord(skill: TechRecordMerged, rec, { useDiscAcc = false } = {}) {
+export function mergeTechRecord(skill: TechRecordMerged, rec: FightTechRow | null, { useDiscAcc = false } = {}) {
   if (!rec) return skill;
   const merged = { ...skill, effect_id: rec.dispatch, effect_power: rec.crit } as TechRecordMerged;
   if (useDiscAcc) merged.base_acc = techRecordAccuracy(rec);

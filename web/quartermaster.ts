@@ -306,7 +306,7 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
       pushHands(right, left);
     }
   }
-  const handScore = (pair) => weigh(lookup.get(pair.right)) + weigh(lookup.get(pair.left));
+  const handScore = (pair: { right: number; left: number; }) => weigh(lookup.get(pair.right)) + weigh(lookup.get(pair.left));
   hands.sort((a, b) => handScore(b) - handScore(a));
   const bestHands = hands[0] ?? { right: 0, left: 0 };
   pick.right = bestHands.right;
