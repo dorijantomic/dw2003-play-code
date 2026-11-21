@@ -21,8 +21,8 @@ const PITCH = (50 * Math.PI) / 180; // must match grass3d.js
 const SIN = Math.sin(PITCH);
 
 let renderer = null;
-let scene = null;
-let camera = null;
+let scene: THREE.Scene | null = null;
+let camera: THREE.OrthographicCamera | null = null;
 let quad = null;
 const uniforms = {
     uMap: { value: null },

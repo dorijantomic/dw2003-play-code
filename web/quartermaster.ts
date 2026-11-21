@@ -227,7 +227,7 @@ function foldContributions(list) {
 
 /** chosen minus worn as `{stat: amount}`, zeros dropped, keys sorted. */
 function contributionDelta(chosen, worn) {
-  const out = {};
+  const out: Record<string, number> = {};
   const keys = [...new Set([...chosen.keys(), ...worn.keys()])].sort();
   for (const key of keys) {
     const value = (chosen.get(key) ?? 0) - (worn.get(key) ?? 0);
@@ -324,7 +324,7 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
 
   // Per-slot deltas against what is worn now (a two-hander read once).
   const worn = wornSlots(member, lookup);
-  const deltas = {};
+  const deltas: Record<string, Record<string, number>> = {};
   for (const slot of EQUIP_SLOTS) {
     deltas[slot] = contributionDelta(
       foldContributions(contributionsOf(lookup.get(pick[slot]))),

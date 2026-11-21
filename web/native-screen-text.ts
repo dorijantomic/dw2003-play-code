@@ -26,8 +26,8 @@ const FONT_BANK_BASE = 0x8004dd74; // *(0x8004de00); kind stride 0x18
 // t==="b" for basic), built from the same asset uifont.js reads. The decoder
 // returns a basic code 0x04..0xE9 or an extended code 0x01..0x72; the stepper
 // maps them to basic index code-4 and extended index code-1.
-const extTokens = {};
-const basicTokens = {};
+const extTokens: Record<string, string> = {};
+const basicTokens: Record<string, string> = {};
 fetch("assets/ui/uifont.json")
     .then((r) => r.json())
     .then((j) => {
@@ -109,7 +109,7 @@ export function decodeNativeText(bytes, slots = []) {
  */
 export function decodeConvertedText(reader, ptr, font, slots = [], limit = Infinity) {
     let out = "";
-    const unknown = [];
+    const unknown: number[] = [];
     let cursor = ptr;
     for (let guard = 0; guard < 4096; guard++) {
         if (cursor - ptr >= limit) break;

@@ -28,7 +28,7 @@ if (!index || !index.items) {
     countEl!.textContent = `${rows.length} items — ${sourceLess} with no source anywhere`;
     let shown = rows;
     let cursor = -1;
-    let elements = [];
+    let elements: HTMLDivElement[] = [];
 
     const GROUPS = [
         ["shops that sell it", "shops"],

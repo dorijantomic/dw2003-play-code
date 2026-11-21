@@ -17,7 +17,7 @@ import type { AudioPlayer, RoutedAudio } from "./types.js";
 // the results screen (the field track's start) end W_JINGLE, and what a
 // digivolution's EVOLUTIO start does to the battle track.
 export function createExclusiveRegister() {
-  let held = null; // { key, name, stop }
+  let held: null | ({ key: string; name: string; stop: () => void; }) | null = null; // { key, name, stop }
   return {
     /**
      * A bit-30 start.  `false` when this exact id already holds the register

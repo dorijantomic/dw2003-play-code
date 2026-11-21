@@ -146,7 +146,7 @@ export function connect(want) {
     let sentKey = null;
     if (want.create) q.set("create", "1");
     else { q.set("room", want.room); sentKey = want.key ?? seatKeyFor(base, want.room); if (sentKey) q.set("key", sentKey); }
-    let ws;
+    let ws: WebSocket | undefined;
     try { ws = new WebSocket(`${base}/?${q}`); } catch { setStatus("off", "Could not open a connection."); return; }
     mp.ws = ws;
     setStatus("connecting", "Connecting...");
@@ -434,7 +434,7 @@ export function drawGhostLabel(ctx, g, sx, headY) {
 }
 
 // ------------------------------------------------------------ the panel
-let toastEl = null, toastTimer: MpTimer = 0;
+let toastEl: HTMLDivElement | null = null, toastTimer: MpTimer = 0;
 function toast(text: string) {
     if (!toastEl) return;
     toastEl.textContent = text; toastEl.style.opacity = "1";

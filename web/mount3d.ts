@@ -612,7 +612,7 @@ const FRAG = `
     gl_FragColor = vec4(rgb, 1.0);
   }`;
 
-let renderer = null, scene = null, camera = null;
+let renderer = null, scene: THREE.Scene | null = null, camera = null;
 const loaded = new Map();        // model path -> { model, rig, legs, group, meshes, texture } | null
 
 function ensureRenderer() {
@@ -666,7 +666,7 @@ async function loadMountAssetOnce(key: string, url: string) {
     const legs = calibrateGait(model, rig);
     if (!ensureRenderer()) throw new Error("no WebGL");
     const group = new THREE.Group();
-    const meshes = [];
+    const meshes: THREE.Mesh[] = [];
     const material = new THREE.ShaderMaterial({
       uniforms: { uTex: { value: null }, uAlphaCut: { value: 0.5 }, uCut: { value: new THREE.Vector4(0, 0, 0, 1) } },
       vertexShader: VERT,
@@ -809,7 +809,7 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
 const _seat = new THREE.Vector3(), _view = new THREE.Vector3();
 const splitCanvases = typeof document !== "undefined"
   ? { back: document.createElement("canvas"), front: document.createElement("canvas"), read: document.createElement("canvas") } : null;
-let lastSplit = null;
+let lastSplit: { back: HTMLCanvasElement; front: HTMLCanvasElement; seatX: number; seatY: number; } | null | null = null;
 
 /** The last renderMount's split (null when it was rendered without `seat`): { back, front, seatX, seatY }. */
 export function mountSplit() { return lastSplit; }
@@ -969,7 +969,7 @@ function boneObjects(asset) {
 
 // ── palette + outline (the pixel look) ───────────────────────────────────────────────────────────
 const scratch = typeof document !== "undefined" ? document.createElement("canvas") : null;
-let lastSolid = null;            // the last pixelate()'s body mask (1 = a rendered surface, 0 = empty or outline)
+let lastSolid: Uint8Array<ArrayBuffer> | null = null;            // the last pixelate()'s body mask (1 = a rendered surface, 0 = empty or outline)
 
 /** Map the render to the fixed palette and add a 1 px outline around the silhouette. */
 export function pixelate(srcCanvas) {

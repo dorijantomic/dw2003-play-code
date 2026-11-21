@@ -130,7 +130,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
     let playable = null;
     let resolvePacked = null;
     const musicTracks = new Set();
-    let loading = null;
+    let loading: Promise<void> | null = null;
     let failed = false;
 
     const fetchJson = (url: string) => (typeof fetch === "undefined"

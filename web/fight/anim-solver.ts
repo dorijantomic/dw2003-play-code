@@ -449,7 +449,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
   // The frame path is REBUILT from the plan's points, never aliased into them: a frame that held the apex
   // array itself was shifted once per attempt by the clearance adjustment, so the wind-up ramp grew a
   // little every attempt until the arms were flung five body heights sideways (K19f item 4's real cause).
-  const frames = [];
+  const frames: FightAimOffsets[] = [];
   const buildFrames = () => {
     frames.length = 0;
     for (let t = 0; t < ticks; t++) {
@@ -491,7 +491,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
       // the body: a lean into the shot and a settle back
       //   t=0 neutral -> the wind-up leans AWAY (negative) -> +1 at release -> 0.5 through the follow-through
       //   -> back to 0 as the body returns. A body cast (mouth/chest) leans further: the torso IS the shot.
-      let lean01;
+      let lean01: number | undefined;
       if (t <= windup) lean01 = -0.25 * smooth(t / Math.max(1, windup));
       else if (t <= release) lean01 = -0.25 + 1.25 * (1 - Math.pow(1 - (t - windup) / Math.max(1, drive), 2));
       else if (t <= release + follow) lean01 = 1 - 0.5 * smooth((t - release) / Math.max(1, follow));
@@ -574,7 +574,7 @@ const localOf = (c0, c1, c2) => {
 /** A real local rotation -> a ch2 triple, nearest the previous key (the K16 branch rule). */
 function toCh2(M, prev = null) {
   const cb = Math.hypot(M[0][0], M[1][0]);
-  let c0, c1, c2;
+  let c0: number | undefined, c1: number | undefined, c2: number | undefined;
   if (cb > 1e-7) { c1 = Math.atan2(-M[2][0], cb); c2 = Math.atan2(M[1][0], M[0][0]); c0 = Math.atan2(M[2][1], M[2][2]); }
   else { c1 = Math.atan2(-M[2][0], cb); c2 = Math.atan2(-M[0][1], M[1][1]); c0 = 0; }
   let t = [c0 / TAU, c1 / TAU, c2 / TAU];
@@ -593,13 +593,13 @@ function toCh2(M, prev = null) {
 function rigTopology(model) {
   const n = model.num_bones ?? model.bones.length;
   const kids = Array.from({ length: n }, () => []);
-  const roots = [];
+  const roots: number[] = [];
   const parent = Array.from({ length: n }, (_, i) => (model.bones[i]?.parent_slot ?? 0) - 1);
   for (let i = 0; i < n; i++) {
     const p = parent[i];
     if (p! >= 0 && p! < n) kids[p].push(i); else roots.push(i);
   }
-  const order = [];
+  const order: (number | undefined)[] = [];
   const stack = roots.slice().reverse();
   while (stack.length) {
     const i = stack.pop();
@@ -746,7 +746,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // 1. the body: a lean about the torso, the counter-move on the non-firing arm happens below
     if (frame.lean && rig.torso != null) { rotateSubtree(rig.torso, rx(frame.lean * (plan.leanScale ?? 1))); rebuild(); }
     if (K19F_DEBUG && t === 0) {
-      const bad = [];
+      const bad: string[] = [];
       for (let i = 0; i < n; i++) {
         const d = Math.hypot(P[i][0] - rest.pos[i][0], P[i][1] - rest.pos[i][1], P[i][2] - rest.pos[i][2]);
         if (d > 0.5) bad.push(`${i}:${d.toFixed(0)} P=${P[i].map(Math.round)} rest=${rest.pos[i].map(Math.round)}`);
@@ -827,7 +827,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // is the firing TIP (launch-plan's own tip arithmetic), not the bone head.
     const tipPrev = new Map(plan.sites.map((s) => [s.bone, chainPrevBone(folder, s.id, s.bone)]));
     const driveChainOf = (bone) => {
-      const chain = [];
+      const chain: (number | undefined)[] = [];
       let p = parent[bone], guard = 0;
       while (p! >= 0 && p! < n && guard++ < n) { chain.push(p); p = parent[p]; }
       chain.reverse();
@@ -1164,7 +1164,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const restClear = new Map();
   const idleColliders = rigC ? idleSample.map((pose) => rigC.colliders.map((c) => poseCollider(c, pose))) : [];
   for (const [i, j] of rigC ? allowedPairs(rigC) : []) {
-    let best = null;
+    let best: number | null = null;
     for (const pc of idleColliders) {
       const a = pc[i], b = pc[j];
       if (!a || !b) continue;
@@ -1204,7 +1204,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   // ── the whole cast, sampled ────────────────────────────────────────────────────────────────────────
   const clasp = plan.mode === "combined" && plan.sites.length > 1;
   const step = Math.max(1, Math.floor(plan.ticks / 24));
-  const at = [];
+  const at: number[] = [];
   for (let t = 0; t < plan.ticks; t += step) at.push(t);
   if (!at.includes(plan.release)) at.push(plan.release);
   at.sort((a, b) => a - b);
@@ -1215,7 +1215,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   const idleFloorAt = (t) => lowestVertex(bake.model, poseFromChannels(bake.model, idleFramesB[t % idleFramesB.length])).y;
   const orig = (pose, s) => firingAxis(bake.model, folder, s.id, pose)?.origin ?? null;
   const t0 = plan.sites.map((s) => orig(neutral, s));
-  let travel = 0, groundWorst = 0, groundTick = null, penTicks = 0, worstPen = null, gapMin = Infinity;
+  let travel = 0, groundWorst = 0, groundTick: number | null = null, penTicks = 0, worstPen = null, gapMin = Infinity;
   for (const t of at) {
     const pose = poseFromChannels(bake.model, off + t);
     const pen = penetration(bake.model, pose, { folder, clasp, tolerance: { pairFloor: allowed } });
@@ -1245,7 +1245,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
   //              cast enters and leaves the idle without a pop (K20b item 3, C13).
   //   body       the root's own travel, capped at the disc's measured root travel for a head cast
   //              (K20a rootTravelH p50 = 0.13 H): a head cast may not slide further than the disc does.
-  let headGate = null, rootTravel = 0, idlePop = null, releaseTravel = 0;
+  let headGate = null, rootTravel = 0, idlePop: { start: number; end: number; ownJitter: number; } | null = null, releaseTravel = 0;
   {
     const rigB = rigOf(bake.model);
     const rNow = (f) => chan(bake.model.bones[rigB.root]?.anim?.ch1, f);
@@ -1296,7 +1296,7 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
         const D = [0, 1, 2].map((r) => [0, 1, 2].map((c) => W[r]![0] * W0[c]![0] + W[r]![1] * W0[c]![1] + W[r]![2] * W0[c]![2]));
         return Math.atan2(D[2]![1]! - D[1]![2]!, D[1]![1]! + D[2]![2]!) * 180 / Math.PI;
       };
-      const series = [];
+      const series: number[] = [];
       for (let t = 0; t < plan.ticks; t++) {
         const p = pitchAt(off + t);
         if (p != null) series.push(p);

@@ -150,7 +150,7 @@ export const rowsOfTab = (tab: string) => DEV_ROWS.filter((r) => r.tab === tab);
 
 /** { tabId: { on, total } }: switches on per tab (a missing or false value is off). */
 export function tabCounts(fx) {
-    const out = {};
+    const out: Record<string, { on: number; total: number; }> = {};
     for (const t of DEV_TABS) out[t.id] = { on: 0, total: 0 };
     for (const r of DEV_ROWS) { out[r.tab].total++; if (fx && fx[r.key]) out[r.tab].on++; }
     return out;
@@ -180,7 +180,7 @@ export function selectRows({ tab = "world", query = "", filter = "all" } = {}, s
 
 /** Group consecutive rows under their sub-heading: [{ tab, sub, rows }]. */
 export function groupRows(rows: Readonly<{ key: string; tab: string; sub: string; name: string; why: string; }>[]) {
-    const groups = [];
+    const groups: { tab: string; sub: string; rows: Readonly<{ key: string; tab: string; sub: string; name: string; why: string; }>[]; }[] = [];
     for (const r of rows) {
         const g = groups[groups.length - 1];
         if (g && g.tab === r.tab && g.sub === r.sub) g.rows.push(r);

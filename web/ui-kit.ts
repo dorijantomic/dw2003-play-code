@@ -87,7 +87,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
 }
 
 /** Run `draw` with the window folded to `progress` (0..1) about (px, py). axis "x" squeezes sideways, "y" up and down. Draws nothing at 0. */
-export function withFold(ctx, progress, px: number | undefined, py: number | undefined, axis: string, draw) {
+export function withFold(ctx, progress, px: number | undefined, py: number | undefined, axis: string, draw: () => void) {
     if (!(progress > 0)) return false;
     if (progress >= 1) { draw(); return true; }
     ctx.save();

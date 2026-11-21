@@ -53,7 +53,7 @@ export function catalogReady() { return !!CATALOG; }
 
 // The card icons are each record's own 8bpp TIM at +0x0C, decoded to a 32x32
 // atlas by tools/extract_card_catalog.py. Cell index = card id - 1.
-let ICONS = null;
+let ICONS: HTMLImageElement | null = null;
 let iconsReady = false;
 export function loadCardIcons() {
   if (ICONS) return ICONS;
@@ -129,7 +129,7 @@ export function resetCollection() {
 
 export function cards() { return collection; }
 
-let inventoryState = null;
+let inventoryState: GameState | null = null;
 function persistInventory() {
   if (inventoryState && typeof localStorage !== "undefined")
     localStorage.setItem("inventory", JSON.stringify(inventoryState.inventory));

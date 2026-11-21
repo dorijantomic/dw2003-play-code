@@ -647,7 +647,7 @@ export async function init() {
     const contEl = document.getElementById("title-continue");
     if (!contEl) return; // defensive: element missing
 
-    const closeTitle = (then) => {
+    const closeTitle = (then: () => void) => {
         if (title!.classList.contains("fade-out")) return; // already closing
         bgm.unlock!(); sfx.unlock!();
         title!.classList.add("fade-out");

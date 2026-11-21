@@ -15,7 +15,7 @@ import { assignAssetImage } from "./assets.js";
 // shared props (punching bag/chain/mount/dust for Punch; per-drill props for
 // the others). Clips carry their native scene draw offsets (ox,oy); anim
 // script 0 is the looping workout cycle, durations in vsyncs.
-const TRANIN_CACHE = {};
+const TRANIN_CACHE: Record<string, { img: HTMLImageElement; meta: null; }> = {};
 export function traninEntry(key: string | number) {
   let e = TRANIN_CACHE[key];
   if (e) return e;

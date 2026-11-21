@@ -125,7 +125,7 @@ export function createTextbox(sfx = null) {
   // the typed lines of the current page as native runs: x / y = the line's left / top (its centre at y + 4.5), only the revealed part
   const pageRuns = (x: number, baseline: number, lineH: number, s: number) => {
     let remaining = Math.floor(tb.shown);
-    const out = [];
+    const out: { text: string; x: number; y: number; kind: number; }[] = [];
     tb.currentPage!().forEach((line, i) => {
       if (remaining <= 0) return;
       const text = line.slice(0, remaining);

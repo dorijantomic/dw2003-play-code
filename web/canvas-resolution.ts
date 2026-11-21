@@ -87,7 +87,7 @@ export function createCanvasResolutionController(
 ) {
   const view = canvas.ownerDocument?.defaultView ?? globalThis;
   let dirty = true;
-  let lastHd = null;
+  let lastHd: boolean | null = null;
   let current = ({
     width: canvas.width,
     height: canvas.height,
@@ -120,7 +120,7 @@ export function createCanvasResolutionController(
       || canvas.width !== current.width
       || canvas.height !== current.height
     ) {
-      let target;
+      let target: { width: number; height: number; } | undefined;
       if (padX > 0) {
         const dpr = Math.max(1, Number(view.devicePixelRatio) || 1);
         let height = Math.max(logicalHeight, Math.round((wide!.stageHeight || logicalHeight) * dpr));

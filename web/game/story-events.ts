@@ -426,7 +426,7 @@ function playHelpMenuEvent(ev, onDone) {
 // only on a real state change and writes the arm word, exactly as wstag745 0x244/0x2c4/0x344
 // do. The pad's second-layout tile GEOMETRY is not decoded, so this arms the maze latch
 // rather than drawing a second mask; that gap is named in the module header, not filled.
-function playDungeonSwitchEvent(ev, onDone) {
+function playDungeonSwitchEvent(ev, onDone: () => void) {
     const mapId = currentMap().id;
     const cmd = dungeonSwitchCommand(mapId, ev.id);
     if (!cmd) return false;
@@ -450,7 +450,7 @@ function playDungeonSwitchEvent(ev, onDone) {
 // (tools/extract_stage_layout_variants.py). The rooms are reachable because each
 // layout's grid carries a cell whose step index is the layout's own op-8
 // start_event — layout 0 byte 0x1f -> 9001, layout 1 byte 0xb5 -> 9000.
-function playGunslingerEvent(ev, onDone) {
+function playGunslingerEvent(ev, onDone: () => void) {
     const mapId = currentMap().id;
     const cmd = gunslingerSwitchCommand(mapId, ev.id);
     if (!cmd) return false;

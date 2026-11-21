@@ -72,7 +72,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   let built = null, world = null, pack = null, data: ArenaPlacements = null, rebuilds = null, loading: Promise<void> | null = null;
   let orig = new Map();          // "<path>|inst" -> the matrix before any edit (to reset / un-hide)
   let addedObjs = new Map();     // added id -> its mesh
-  let ui = null, tc = null, sel = null, pickGround = false, gen = 0, picker = null;
+  let ui = null, tc: null | TransformControls | null = null, sel = null, pickGround = false, gen = 0, picker = null;
   const ray = new (THREE.Raycaster as any)();   // vendored three (lib3d is outside the tsconfig): its members are attached at runtime, so they do not type
 
   const empty = () => ({ version: 1, pack, savedAt: 0, edits: {}, added: [] });

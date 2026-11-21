@@ -32,7 +32,7 @@ let current = null;
 let cameraToPlayer = null;
 
 /** Host reader: is the quest layer switched on (F2 -> Extras -> Quests)? Installed once by web/game.js. */
-let questsGate = null;
+let questsGate: (() => boolean) | null | null = null;
 
 /** Cache of tinted frames: image -> Map("sx,sy,sw,sh|#rrggbb" -> canvas). Bounded per image; a ghost is a few frames. */
 const tintCache = new WeakMap();

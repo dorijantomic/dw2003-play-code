@@ -25,9 +25,9 @@ function screenData() {
 
 export function createCntyselNative(sfx = null, music = null) {
     let open = false, pending = false, screen = null, onPick = null;
-    let row = 0, language = 0, frames = 0, generation = 0, diagnostic = null;
+    let row = 0, language = 0, frames = 0, generation = 0, diagnostic: null | string | null = null;
     let pad = new MenuPadWords(), release = false;
-    const queue = [], draws = [], contexts = [];
+    const queue: number[] = [], draws = [], contexts: number[] = [];
     let fade = 0;
     let clock = new MenuDisplayClock();
     let data = null, setup = null, startup = createTaskState();

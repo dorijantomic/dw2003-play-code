@@ -71,7 +71,7 @@ const RECTS = Array.from({ length: 20 }, () => ({ x: lrnd() * (LW - 260), y: lrn
 const SPOS = Array.from({ length: 150 }, () => ({ x: lrnd() * (LW - 32), y: lrnd() * (LH - 32) }));
 const APOS = Array.from({ length: 60 }, () => ({ x: 3 + lrnd() * (LW - 6), y: 3 + lrnd() * (LH - 6) }));
 
-let src: HTMLCanvasElement, sprite: HTMLCanvasElement, strips: HTMLCanvasElement, glc, glFrame = 0;
+let src: HTMLCanvasElement, sprite: HTMLCanvasElement, strips: HTMLCanvasElement, glc: { c: HTMLCanvasElement; gl: WebGLRenderingContext | WebGL2RenderingContext | null; } | undefined, glFrame = 0;
 
 function big(ctx) { ctx.imageSmoothingEnabled = true; ctx.drawImage(src, 0, 0, LW, LH); }
 function radials(ctx) {

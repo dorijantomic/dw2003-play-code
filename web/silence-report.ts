@@ -230,7 +230,7 @@ export function movieGaps(rows, shipped) {
 export function altGaps(archives, catalogue: any = [], stems = []) {
     const have = new Set((stems ?? []).map(lower));
     const cats = Array.isArray(catalogue) ? catalogue : catalogue?.categories ?? [];
-    const bankOf = {};
+    const bankOf: Record<string, string> = {};
     for (const c of cats) bankOf[c.archive_id] = lower(c.name);
     const rows = [];
     for (const [stage, rec] of Object.entries(archives ?? {}) as [string, any][]) {

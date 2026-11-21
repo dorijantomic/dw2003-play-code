@@ -166,7 +166,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
         const name = partner ? partner.name : wild.name;
         const rows = enc.bySpecies.get(key) ?? [];
         const lv = rows.map((r) => r.level).filter((n) => n > 0);
-        const lives = [];
+        const lives: string[] = [];
         for (const r of [...rows].sort((a, b) => a.stage - b.stage)) {
             const label = mapLabel(r.stageName) || `Stage ${r.stage}`;
             if (!lives.includes(label)) lives.push(label);
@@ -180,7 +180,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
             if (!dropBy.has(w.drop) || k > dropBy.get(w.drop)) dropBy.set(w.drop, k);
         }
         const drops = [...dropBy].map(([item, k]) => ({ item, n: k, of: 1024, percent: Math.round((k / 1024) * 1000) / 10 })).sort((a, b) => b.n - a.n);
-        let from = null, into = [];
+        let from: string | null | null = null, into = [];
         if (profileId != null) {
             if (idx.rootSlot.has(profileId)) {
                 into = lineTargets(evolutions, idx.rootSlot.get(profileId), profiles);   // a starter: its line's forms

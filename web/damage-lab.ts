@@ -69,7 +69,7 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
   const power = num(S.power);
   const magical = !!S.magical;
   const base = magical ? magicalBase(A, D, power) : physicalBase(A, D, power);
-  const stages = [];
+  const stages: { name: string; value: number; note: string; }[] = [];
   let running = base;
 
   // 1 — base
@@ -92,7 +92,7 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
   // 2 — field
   const fieldAdj = elementalFieldAdjustment(base, S.element, field);
   running += fieldAdj;
-  let fieldNote;
+  let fieldNote: string | undefined;
   const element = S.element && S.element !== "normal" ? S.element : null;
   if (!field || num(field.power) <= 0) {
     fieldNote = "no elemental field: the base is unchanged";
@@ -110,12 +110,12 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
   // 3 — family (physical). The magical arm's bonus lands after the element stage
   // (the engine's own order), so here it only explains itself.
   const familyBefore = running;
-  let familyNote;
+  let familyNote: string | undefined;
   if (magical) {
     familyNote = "a magical technique takes its family bonus after the element stage";
   } else {
     const targetFamily = num(S.target_family);
-    let arm = null;
+    let arm: { kind: string; tag: number; } | null = null;
     if (targetFamily >= 2) {
       if (targetFamily === num(D.family)) arm = { kind: "technique", tag: targetFamily };
     } else {
@@ -158,7 +158,7 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
 
   // 5 — element
   const elementBefore = running;
-  let elementNote;
+  let elementNote: string | undefined;
   if (!element) {
     elementNote = "a normal technique carries no element stage";
   } else if (magical) {
@@ -211,14 +211,14 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
 
   // 7 — crit (the disc's own roll; a forced stream can land or miss it)
   const critBefore = running;
-  let critRoll = null;
+  let critRoll: number | null = null;
   const capture = () => {
     const value = rng();
     if (critRoll === null) critRoll = value;
     return value;
   };
   const critical = magical ? magicalCritProc(A, D, S, capture) : critProc(A, D, S, capture);
-  let critNote;
+  let critNote: string | undefined;
   if (critical) {
     // physical leaf: (RAND & 0x3f) + 0x20; magical leaf (0x8009fd54-0x8009fda4): RAND % 65 + 0x20
     const r = (magical ? rng() % 65 : rng() & 0x3f) + 0x20;
@@ -603,7 +603,7 @@ function shorten(text, max: number) {
 
 /** Break a sentence into lines no longer than `cols`, on spaces. */
 function wrapText(text, cols: number) {
-  const out = [];
+  const out: string[] = [];
   let line = "";
   for (const word of String(text).split(/\s+/)) {
     if (!word) continue;

@@ -15,7 +15,7 @@ import { titleViewTransform } from "./titlescreen.js";
 const LAYOUT_URL = "assets/data/stdwtitl_ui.json";
 const MOVIE_DIR = "assets/movie/";
 
-export function createTitleMoviePlayer(onEnd, onError = console.error, createVideo = null) {
+export function createTitleMoviePlayer(onEnd: (finishedCode: number) => void, onError = console.error, createVideo = null) {
   const video = createVideo ? createVideo() : document.createElement("video");
   video.playsInline = true;
   video.preload = "auto";

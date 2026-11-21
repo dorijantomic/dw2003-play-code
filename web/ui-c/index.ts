@@ -131,7 +131,7 @@ const toM = (t) => ({ a: t.a, d: t.d, e: t.e, f: t.f });
  * Run `fn` (a screen's own painting) and show it as look C. Returns true when the overlay drew it. When `opts.enable` is false or the kit
  * is not ready, `fn` runs unchanged and the old pixels are drawn.
  */
-export function scope(key, ctx, opts, fn) {
+export function scope(key, ctx, opts, fn: () => void) {
     const canvas = ctx?.canvas;
     if (!opts?.enable || !available() || !canvas || !canvas.isConnected || (covered && !opts.top)) { layers.hide(key); reports.delete(key); fn(); return false; }
     if (opts.top) topKeys.add(key);

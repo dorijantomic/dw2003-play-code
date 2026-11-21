@@ -3,7 +3,7 @@
 // Esc cancels. Purely visual: it never touches the story, dialogue or save state.
 import type { ChatPacket } from "./types/chat.js";
 const MAX_CHARS = 160;
-let box = null, input = null, hooks = null;
+let box: HTMLDivElement | null = null, input: HTMLInputElement | null = null, hooks = null;
 
 export function chatOpen() { return !!box && box.style.display !== "none"; }
 

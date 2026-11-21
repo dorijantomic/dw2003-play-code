@@ -44,7 +44,7 @@ const missingSheet = (sheet) => `The sheet '${sheet}' is not in web/extra_fx, so
 /** How far dx/dy put a spot from someone, in words ("20 px right and 10 px below you"). */
 function offsetText(v, opts) {
     const who = v.near === "player" ? opts.playerLabel ?? "you" : nameOf(v.near, opts);
-    const dx = num(v.dx, 0), dy = num(v.dy, 0), parts = [];
+    const dx = num(v.dx, 0), dy = num(v.dy, 0), parts: string[] = [];
     if (dx) parts.push(`${Math.abs(dx)} px ${dx > 0 ? "right" : "left"}`);
     if (dy) parts.push(`${Math.abs(dy)} px ${dy > 0 ? "below" : "above"}`);
     return parts.length ? `a spot ${parts.join(" and ")} ${who}` : `where ${who} ${who === "you" ? "stand" : "stands"}`;
@@ -66,7 +66,7 @@ function placeText(at, opts) {
     if (Array.isArray(at)) return `at (${num(at[0])}, ${num(at[1])})`;
     if (at && typeof at === "object" && "near" in at) {
         const who = at.near === "player" ? opts.playerLabel ?? "you" : nameOf(at.near, opts);
-        const dx = num(at.dx, 0), dy = num(at.dy, 0), parts = [];
+        const dx = num(at.dx, 0), dy = num(at.dy, 0), parts: string[] = [];
         if (dx) parts.push(`${Math.abs(dx)} px ${dx > 0 ? "right" : "left"}`);
         if (dy) parts.push(`${Math.abs(dy)} px ${dy > 0 ? "below" : "above"}`);
         return parts.length ? `at a spot ${parts.join(" and ")} ${who}` : `next to ${who}`;
@@ -114,7 +114,7 @@ const WEATHER_WORDS = {
 export function readBack(steps, opts: QuestReadbackOpts = {}) {
     const o = opts ?? {};
     const title = `## ${o.mapName ?? o.maps?.[o.mapId] ?? o.mapId ?? "unknown map"}`;
-    const blocks = [], problems: string[] = [];
+    const blocks: { step: number; kind: string; text: string; }[] = [], problems: string[] = [];
     if (!Array.isArray(steps) || !steps.length) {
         problems.push("a scene needs at least one step");
         return { title, blocks, problems };
@@ -129,7 +129,7 @@ export function readBack(steps, opts: QuestReadbackOpts = {}) {
         }
         const actor = (who: string | number) => actorOf(who, o);
         if ("walk" in s) {
-            let text;
+            let text: string | undefined;
             if (s.path != null && s.to == null) {
                 text = `${actor(s.walk)} walks the named path "${s.path}"`;
             } else if (s.to === "origin") {

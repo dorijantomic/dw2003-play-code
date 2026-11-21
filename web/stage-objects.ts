@@ -91,7 +91,7 @@ let readOrdinal = () => 0; // () => master story ordinal
 // hands this over while this module is still initialising. A `let` is in its
 // temporal dead zone at that point and the hand-over throws.
 var poleRecords = null; // stageId -> [{type, size}], handed over by effects.js
-const claimed = {}; // stageId -> the pole records have gone to the writer
+const claimed: Record<string, boolean> = {}; // stageId -> the pole records have gone to the writer
 
 /**
  * Remember that this stage's records have already reached the traffic-light

@@ -40,7 +40,7 @@ function showCast(def) {
   return here;
 }
 
-function go(def, say) {
+function go(def, say: (a0: string) => void) {
   const q = window.__quests, st = window.__state;
   const giver = def.offer ?? def.objectives.find((o) => o.type === "talk") ?? null;
   const where = q.where().lastMap;

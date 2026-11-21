@@ -226,7 +226,7 @@ export function mergeMotion(model, letter: string, motion: Dw2Motion, table: num
  */
 export function buildClone(raw, data: Dw2SwapData) {
   const model = JSON.parse(JSON.stringify(raw || {}));
-  const tables = {}, failed = {}, filled: string[] = [], taken = new Set();
+  const tables: Record<string, number | undefined> = {}, failed = {}, filled: string[] = [], taken = new Set();
   if (!model || !data?.motions) return { model, tables, failed, filled };
   for (const [letter, m] of Object.entries(data.motions)) {
     if (!m?.used) { failed[letter] = { keys: refusalForLetter(data, letter) }; continue; }

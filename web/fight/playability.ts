@@ -49,7 +49,7 @@ export function modelFolderFor(species, modelMap) {
  * has the same clip, so it is one row.
  */
 export function kitTechIds(species, dedupe = true) {
-  const ids = [];
+  const ids: number[] = [];
   const add = (t) => {
     const n = Number(t);
     if (Number.isInteger(n) && n > 0) ids.push(n);

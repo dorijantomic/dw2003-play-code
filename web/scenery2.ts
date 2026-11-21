@@ -29,7 +29,7 @@ let nextFish = 0, nextCritter = 0, wasMoving = false, nextBreath = [0, 0, 0, 0, 
 // light sources read from the game own ambient-prop records (tools/gen_lights.py)
 let stageLights = null;
 fetch("assets/data/lights.json").then((r) => r.json()).then((j) => { stageLights = j; }).catch(() => { stageLights = {}; });
-const imgs = {};
+const imgs: Record<string, HTMLImageElement> = {};
 function loadImg(src: string) {
     if (!imgs[src]) { const i = new Image(); i.src = src; imgs[src] = i; }
     return imgs[src];

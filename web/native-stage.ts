@@ -27,8 +27,8 @@ import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
 
 let manifest = null; // assets/native/manifest.json (null until loaded)
 let exeTables = null;
-let fieldstg = null; // the resident field-engine image (registry + tables + code)
-const overlays = {}; // stageId -> Uint8Array
+let fieldstg: Uint8Array<ArrayBuffer> | null = null; // the resident field-engine image (registry + tables + code)
+const overlays: Record<string, Uint8Array<ArrayBuffer>> = {}; // stageId -> Uint8Array
 let current = null; // { stageId, rt, pointTable }
 
 /** The console's vertical blanks, through the same clock the screen host steps

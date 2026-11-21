@@ -270,7 +270,7 @@ export function makePalette(rec) {
 // (SKY_U.uMoonDir, placed by sky.js). Hues from sakura-idle (github.com/danmana/sakura-idle, MIT, as quoted in
 // ~/dw3-knowledge/research/r1/sky.md 6.2): moon 0x9fb6e8, night shadow tint 0x6e76a8, night fog 0x1b2440.
 // Every strength below is PICKED (nothing night-lit is measured on this arena).
-let DAY_PAL = null;   // the palette's measured day colours (makePalette), so night -> day restores them
+let DAY_PAL: { shadowTint: THREE.Color; skyFill: THREE.Color; haze: THREE.Color; skyZenith: THREE.Color; skyHorizon: THREE.Color; } | null = null;   // the palette's measured day colours (makePalette), so night -> day restores them
 export const NIGHT_LIGHT = {
   KEY_HUE: [0x9f, 0xb6, 0xe8],   // sRGB, sakura moon
   KEY_K: 0.45,                    // PICKED: moon key strength (linear), the sun's is 1

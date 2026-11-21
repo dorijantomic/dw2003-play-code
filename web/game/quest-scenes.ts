@@ -253,7 +253,7 @@ export async function playQuestScene(steps) {
         let answer = null;
         for (const [n, s] of Object.entries(speech) as [string, SpeechBeat][]) {
             hooks.afterSay[n] = s.ask
-                ? (resume) => choice.open!(s.ask!, s.options!, (i) => { answer = i; resume(); })
+                ? (resume: () => void) => choice.open!(s.ask!, s.options!, (i) => { answer = i; resume(); })
                 : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
         }
         S.cutsceneEsdmgRef = null;

@@ -66,7 +66,7 @@ export function createSaveTranslated(sfx = null) {
             if (!slot?.record) return null;
             return { record: slot.record, image: Array.isArray(slot.image) ? Uint8Array.from(slot.image) : null };
         });
-        const saved = [];
+        const saved: { slot: number; image: Uint8Array<ArrayBuffer>; playSeconds: number; }[] = [];
         return {
             slots, saved,
             present: () => true,
@@ -141,7 +141,7 @@ export function createSaveTranslated(sfx = null) {
         // The card's block describes the last-saved slot (the disc stamps it at
         // save time and reads it back on every open), so the chooser opens on
         // the file the player last wrote. writeSlot records it on every save.
-        let lastSlot;
+        let lastSlot: number | undefined;
         try {
             const v = Number(localStorage.getItem("mcardLastSlot"));
             if (Number.isInteger(v) && v >= 0 && v <= 2) lastSlot = v;

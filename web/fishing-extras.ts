@@ -91,7 +91,7 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
         try {
             const j = JSON.parse(storage.getItem(FISH_FINDS_KEY) || "null");
             if (j && typeof j === "object" && !Array.isArray(j)) {
-                const out = {};
+                const out: Record<string, number> = {};
                 for (const k of Object.keys(j)) if (j[k]) out[k] = 1;
                 return out;
             }

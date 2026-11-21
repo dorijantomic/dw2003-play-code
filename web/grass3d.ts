@@ -42,7 +42,7 @@ let uTime = { value: 0 };
 // feet (x, z, radius, strength) that blades part around, and the wind-gust front (world x, strength)
 const uFeet = { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) };
 const uGust = { value: new THREE.Vector2(0, 0) };
-let material = null;
+let material: THREE.ShaderMaterial | null = null;
 const stages = new Map();    // stageId -> { bands: [{mesh, y0, y1}], count } | null
 
 function ensureRenderer() {

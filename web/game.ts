@@ -226,7 +226,7 @@ installSocial({
         }),
         // A friendly duel: fight a copy of the other player's team (from their card), then put everything back as it was
         // (EXP, level ups, drops, BIT). cb({ won, hp }) where hp is the share of my team's HP left after a win.
-        startDuel: (card, cb) => {
+        startDuel: (card, cb: (a0: { won: boolean; hp: number; }) => void) => {
             const foes = (card?.party ?? []).filter((d) => menu.digimonDB?.[d.id]).slice(0, 3)
                 .map((d) => ({ name: d.f, digimonId: d.id, level: Math.max(1, d.lv | 0), hp: Math.max(1, d.mhp | 0), mp: d.mmp | 0, stat_scale: 16 }));
             if (!foes.length) return false;

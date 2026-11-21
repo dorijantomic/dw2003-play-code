@@ -52,7 +52,7 @@ const CONFIRM_BOX = { y: 50, h: 48, textX: 28, textY: 55, lineH: 14, markX: 14 }
 const FLIGHT_FRAMES = 12;
 
 let UI = null, catalog = null, starter = null, EFFECTS = new Map();
-let card = null, board = null, icons = null;
+let card = null, board = null, icons: HTMLImageElement | null = null;
 let duel = null;
 
 let ticks = 0, intro = true, auto = false;

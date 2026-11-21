@@ -43,7 +43,7 @@ export function blendValues(values) {
  */
 export function blendStats(...rows) {
   const list = Array.isArray(rows[0]) ? rows[0] : rows;
-  const out = {};
+  const out: Record<string, number> = {};
   for (const key of FUSION_STATS) out[key] = blendValues(list.map((r) => r?.[key]));
   return out;
 }
@@ -128,7 +128,7 @@ export function fusedRecord({ halves = [], body = null, level = 1, hp = 0, statS
   const a = halves[0];
   const blend = blendStats(halves);
   const scale = Math.max(1, Number(statScale) || 16);
-  const stats = {};
+  const stats: Record<string, number> = {};
   for (const key of FUSION_STATS) stats[key] = Math.round((blend[key] * scale) / 16);
   const [attack = 0, move1 = 0, move2 = 0] = moves;
   const mp = blendValues(halves.map((row) => enemyMpFor(row, level)));

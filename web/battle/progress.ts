@@ -40,7 +40,7 @@ import type { PartnerStats } from "../game/types.js";
 export function paidParticipants(b: BattleEndContext) {
   const marked = b?.participantIndices;
   if (!marked?.size) return [];
-  const out = [];
+  const out: number[] = [];
   for (const index of marked) {
     const record = b?.playerRecords?.[index];
     const hp = Number(record?.hp);
@@ -253,7 +253,7 @@ export const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];
 // Profile-derived baseline for the core block — used to migrate old saves and to reseed
 // on evolution (form change swaps the whole stat body in the walker's model).
 export function seedStoredStats(profile: DigimonRecord | undefined, level: number) {
-  const s = {};
+  const s: Record<string, number> = {};
   for (const k of CORE_STATS) s[k] = scaledStat(profile, k, level);
   return s;
 }

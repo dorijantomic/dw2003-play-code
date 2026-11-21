@@ -122,7 +122,7 @@ export function shotNineWithHomeOffset(shot, homeZ: number) {
 export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule, modelKey = () => null,
   setEnemyVisible = null, setMotion = null, weak = false as boolean | (() => boolean) }) {
   let last = -1;
-  let keyAtCut = null;   // the model the last shot-9 cut was made for
+  let keyAtCut: null | null = null;   // the model the last shot-9 cut was made for
   let started = false;
   let returned = false;
   let faded = false;

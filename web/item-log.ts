@@ -16,7 +16,7 @@ export const ITEM_MAX_ID = ITEM_ID_MAX;    // the shipped item catalogue ends at
 
 const validId = (n) => Number.isInteger(n) && n >= 1 && n <= ITEM_MAX_ID;
 const cleanSet = (o) => {
-    const out = {};
+    const out: Record<string, number> = {};
     if (!o || typeof o !== "object" || Array.isArray(o)) return out;
     for (const k of Object.keys(o)) {
         const id = Number(k);

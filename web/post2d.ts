@@ -61,7 +61,7 @@ export function installPost2d(stageEl, gameCanvas) {
     ov.id = "post2d";
     ov.style.cssText = "position:absolute;pointer-events:none;display:none;image-rendering:pixelated;border:none;border-radius:0;background:transparent;max-width:none;max-height:none;z-index:2";
     stageEl.appendChild(ov);
-    let gl = null, prog = null, tex = null, loc = null, failed = false;
+    let gl = null, prog = null, tex: WebGLTexture | null = null, loc = null, failed = false;
 
     function init() {
         gl = ov.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false });

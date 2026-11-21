@@ -175,7 +175,7 @@ function enabled() { return !!host?.enabled?.() && MOUNTS.some(mountModelReady);
 
 /** The mount ids the player has unlocked (their quest is done), in table order. */
 export function unlockedIds() {
-  const out = [];
+  const out: string[] = [];
   for (const m of MOUNTS) if (m.unlock && mountModelReady(m) && host?.questDone?.(m.unlock)) out.push(m.id);
   return out;
 }
@@ -310,7 +310,7 @@ export function findDismountSpot(canStand, x: number, y: number, { ring = 24, st
 
 /** Up to `n` free spots behind the player for the party, nearest first (they are placed, never snapped). */
 export function followerSpots(canStand, x: number, y: number, n = 3, { ring = 28, step = 5 } = {}) {
-  const out = [];
+  const out: { x: number; y: number; }[] = [];
   if (typeof canStand !== "function") return out;
   for (let r = step; r <= ring && out.length < n; r += step) {
     for (let a = 0; a < 8 && out.length < n; a++) {

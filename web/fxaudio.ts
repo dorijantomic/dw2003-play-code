@@ -2,7 +2,7 @@
 // rain, wind, blizzard howl, sandstorm hiss, night crickets and thunder.
 // One AudioContext of its own, created on the first key press or click (browsers
 // block sound before a gesture) and driven every frame by the ambience layer.
-let ac = null, master = null, rain = null, wind = null, sand = null, crickets = null, gust = null;
+let ac = null, master: GainNode | null = null, rain = null, wind = null, sand = null, crickets: { out: GainNode; } | null = null, gust = null;
 let armed = false;
 let level = 1;                 // the OPTIONS sound volume (web/volume-levels.js); 1 = the game's own 0.55
 window.__fxaudioVer = "no-wind-2";

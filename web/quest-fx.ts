@@ -537,7 +537,7 @@ function drawFx(fx, camX: number, camY: number, ctx2 = null) {
 }
 
 /** The host installs the field's 2D context here, so a drawable closure does not need it passed down the list. */
-let drawContext = null;
+let drawContext: CanvasRenderingContext2D | null | null = null;
 export function installQuestFxCanvas(ctx: CanvasRenderingContext2D | null) {
     drawContext = ctx;
 }

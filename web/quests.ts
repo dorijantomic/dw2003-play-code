@@ -56,7 +56,7 @@ let triggerRunner = null;                                    // walk-in quest tr
 let variants = {};
 let mapNames = {};
 let lastMap = null, lastX = 0, lastY = 0;
-let toastEl = null, toastTimer: number | ReturnType<typeof setTimeout> = 0;
+let toastEl: HTMLDivElement | null = null, toastTimer: number | ReturnType<typeof setTimeout> = 0;
 
 function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, triggers: {}, gen: { n: 0, def: null } }; }
 function loadState() {

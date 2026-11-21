@@ -42,7 +42,7 @@ function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525
 
 // one gull, unit half span, forward +Z, up +Y, span along X. aSeg: 0 body/tail, 1 inner wing, 2 outer wing.
 export function gullGeometry() {
-  const pos = [], seg = [];
+  const pos = [], seg: number[] = [];
   const tri = (a: number[], b: number[], c: number[], s: number) => { pos.push(...a, ...b, ...c); seg.push(s, s, s); };
   const nose = [0, 0, 0.30], tail = [0, 0.01, -0.30];
   const R = [0.065, 0, 0.04], L = [-0.065, 0, 0.04], Up = [0, 0.055, 0.04], Dn = [0, -0.05, 0.04];

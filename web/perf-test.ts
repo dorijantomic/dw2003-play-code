@@ -147,7 +147,7 @@ function glInfo() {
 
 // ---- localStorage safety
 function takeBackup() {
-    const all = {};
+    const all: Record<string, string | null> = {};
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); all[k] = localStorage.getItem(k!); }
     sessionStorage.setItem(BACKUP_KEY, JSON.stringify(all));
     return all;
@@ -208,7 +208,7 @@ function guardStart(label: string) {
         if (g.stalled || QUICK) return;   // quick run: a slow game is the measurement, not a stall
         const now = performance.now();
         const since = now - Math.max(run.lastRafAt, g.t0);
-        let why = null;
+        let why: string | null = null;
         if (since > STALL_GAP_MS) why = "rAF gap " + Math.round(since) + " ms (> " + STALL_GAP_MS + ")";
         else if (now - g.t0 >= 1000 && rafFpsOver(1000) < STALL_FPS) why = "rAF fps " + Math.round(rafFpsOver(1000)) + " (< " + STALL_FPS + ") over 1 s";
         if (why) { g.stalled = true; g.reason = why; }
@@ -368,10 +368,10 @@ async function probeCalls(iw) {
     const secs = (performance.now() - t0) / 1000;
     for (const n of names) proto[n] = orig[n];
     if (fdesc) Object.defineProperty(proto, "filter", fdesc);
-    const per = {};
+    const per: Record<string, number | null> = {};
     for (const n of Object.keys(counts)) per[n + "_perGameFrame"] = frames ? Math.round(counts[n] / frames * 10) / 10 : null;
     const r2 = (x: number) => Math.round(x * 100) / 100;
-    const msPer = {};
+    const msPer: Record<string, number | null> = {};
     for (const n of names) msPer[n + "_msPerGameFrame"] = frames ? r2(ms[n]! / frames) : null;
     const drawImageBySource = Object.entries(bySrc).map(([k, b]) => ({ source: k, callsPerGameFrame: frames ? r2(b.calls / frames) : null, msPerGameFrame: frames ? r2(b.ms / frames) : null }))
         .sort((a, b) => (b.msPerGameFrame || 0) - (a.msPerGameFrame || 0)).slice(0, 25);
@@ -708,7 +708,7 @@ async function main() {
                         stopWalking(iw);
                     }
                 }
-                let bf = null;
+                let bf: { battleMenuReached: boolean; secondsToMenu: number; } | null = null;
                 for (let a = 1; a <= MAX_TRIES && !bf && G.battles.length; a++) {
                     await waitForFlow("before battle on " + G.map);
                     try { bf = await startBattle(iw, G.battles[0]!.mapId); } catch (e) {

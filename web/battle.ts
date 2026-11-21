@@ -393,7 +393,7 @@ fetch("assets/data/stfgtrep_ui.json").then((r) => r.json()).then((j) => { REPORT
 // Original 4bpp fight UI texture page decoded from the true GPU VRAM in
 // visible Redux slot 7: tpage (512,0), CLUT (512,250). Every frame below is a
 // source rectangle from this raw PS1 atlas; none are framebuffer screenshots.
-export let fightUiAtlas = null;
+export let fightUiAtlas: HTMLImageElement | null = null;
 if (typeof Image !== "undefined") {
   const im = new Image();
   im.onload = () => { fightUiAtlas = im; };
@@ -693,7 +693,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     // holds the authoritative `enemy_id.rs` id per name (one id per name across all its
     // pools); where a name is not in a pool the id falls back to the record at the same
     // enemies.json index, so no name loses its id and the resolver never regresses.
-    const nameToId = {};
+    const nameToId: Record<string, number> = {};
     for (const party of Object.values(fej?.screens ?? {}) as any[]) {
       for (const e of party ?? []) if (e?.name != null && e.id != null) nameToId[e.name] = e.id | 0;
     }

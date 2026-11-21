@@ -293,7 +293,7 @@ export function createPost(width: number, height: number, opts: BuiltPostOpts = 
   target.texture.generateMipmaps = false;
 
   // ---- bloom: one bright level then the downsample chain, each level own blur scratch ----
-  const levels = [];
+  const levels: { rt: THREE.WebGLRenderTarget; tmp: THREE.WebGLRenderTarget; w: number; h: number; }[] = [];
   for (let i = 0; i < S.bloom.levels; i++) {
     const w = Math.max(1, Math.round(width / 2 ** (i + 1))), h = Math.max(1, Math.round(height / 2 ** (i + 1)));
     const mk = () => { const t = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, format: THREE.RGBAFormat,

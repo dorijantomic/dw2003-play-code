@@ -149,7 +149,7 @@ export function buildFringe(slot, env) {
 
   // ---- 2. emit: every above-water blade first, then every reflection (two contiguous index ranges) ----
   const rows = [0, 0.35, 0.68, 0.90];   // ribbon rows + a tip vertex
-  const P = [], NRM = [], AN = [], AT = [], AH = [], AR = [], ATI = [], IDX = [];
+  const P = [], NRM: (number | undefined)[] = [], AN = [], AT: number[] = [], AH = [], AR: number[] = [], ATI = [], IDX: (number | undefined)[] = [];
   const push = (c, n: number[], anchor, t: number, H, ref: number, tint) => {
     P.push(c[0], c[1], c[2]); NRM.push(n[0], n[1], n[2]); AN.push(anchor[0], anchor[1], anchor[2]);
     AT.push(t); AH.push(H); AR.push(ref); ATI.push(tint); return P.length / 3 - 1;
@@ -163,7 +163,7 @@ export function buildFringe(slot, env) {
           const nrm = [-wz, 0, wx];                                     // its normal stays horizontal
           const bx = -Math.sin(a), bz = Math.cos(a);                    // where the bow leans
           const [fx, , fz] = bl.foot, flip = ref ? -1 : 1;
-          const ids = [];
+          const ids: number[] = [];
           for (const t of rows) {
             const y = bl.H * t, hw = bl.bw * 0.5 * (1 - 0.82 * Math.pow(t, 1.15));
             const ox = bx * bl.bow * t * t, oz = bz * bl.bow * t * t;

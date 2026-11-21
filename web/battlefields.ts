@@ -77,7 +77,7 @@ export function stageRows({ arenas, maps }: BattlefieldsInput = {}) {
     .sort((a, b) => a - b)
     .map((n) => {
       const record = byStage[String(n)] ?? {};
-      const screens = {};
+      const screens: Record<number, number> = {};
       for (const [key, value] of Object.entries(record)) {
         if (key === "_default") continue;
         const screen = Number(key);

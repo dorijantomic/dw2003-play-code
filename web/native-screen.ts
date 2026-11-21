@@ -73,7 +73,7 @@ export async function loadNativeScreens() {
     await loadNativeRuntime();
     const manifest: NativeScreenManifest = await (await fetch(`${BASE}/manifest.json`)).json();
     const resident = new Uint8Array(await (await fetch(`${BASE}/resident.bin`)).arrayBuffer());
-    const overlays = {};
+    const overlays: Record<string, Uint8Array<ArrayBuffer>> = {};
     await Promise.all(
         Object.entries(manifest.screens).map(async ([id, entry]) => {
             overlays[id] = new Uint8Array(await (await fetch(`${BASE}/${entry.file}`)).arrayBuffer());

@@ -29,7 +29,7 @@ export function __setClock(f) { perfNow = f; }
 export function __resetForTest() { budget = createBudgetGuard(30, 4); renderer = null; failed = false; scene = null; lastNow = -1; lastPhase = ""; appliedTheme = ""; }
 let scene = null;
 let camera = null;
-let fog = null;
+let fog: THREE.FogExp2 | null = null;
 
 // ---- shared uniforms ---------------------------------------------------------------------
 const uTime = { value: 0 };
@@ -44,18 +44,18 @@ const uShafts = { value: 0.5 };
 
 // ---- scene objects (built once) ---------------------------------------------------------
 let floorMesh = null;
-let floorPos = null;
-let rocks = null;
-let rockMat = null;
-let ambient = null;
+let floorPos: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | undefined | null = null;
+let rocks: THREE.InstancedMesh | null = null;
+let rockMat: THREE.MeshLambertMaterial | null = null;
+let ambient: THREE.AmbientLight | null = null;
 let sun = null;
 let shafts = null;
 let lureGroup = null;
 let floatMesh = null;
-let lineAttr = null;
+let lineAttr: THREE.BufferAttribute | null = null;
 let fishGroup = null;
 let tailPivot = null;
-let fishMat = null;
+let fishMat: THREE.MeshBasicMaterial | null = null;
 let eyeMesh = null;
 
 const FLOOR_Y = -2.6;

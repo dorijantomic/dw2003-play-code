@@ -131,7 +131,7 @@ function buildCtx(model) {
   // spine: tail, else the longest descending chain (greedy by subtree depth)
   const depth = new Array(n).fill(1);
   for (let k = order.length - 1; k >= 0; k--) { const i = order[k]; for (const c of kids[i]!) depth[i] = Math.max(depth[i], 1 + depth[c]); }
-  let spine = [];
+  let spine: number[] = [];
   for (const r of roots) {
     const ch = [r]; let c = r;
     while (kids[c]!.length) { c = kids[c]!.reduce((a, b) => (depth[b] > depth[a] ? b : a)); ch.push(c); }

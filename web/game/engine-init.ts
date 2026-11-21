@@ -236,7 +236,7 @@ export async function initEngine() {
             state.flags["evt_" + fk] = true;
             localStorage.setItem("flags", JSON.stringify(state.flags));
         },
-        playEvent: (ev, onDone) =>
+        playEvent: (ev, onDone: () => void) =>
             playStoryEvent(ev, (handoff) => {
                 // The event's OWN on_complete, through the engine: it runs
                 // `<stage>.event.<id>.oncomplete` (the flag writes read out of that
