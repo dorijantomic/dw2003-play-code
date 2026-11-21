@@ -22,37 +22,37 @@ await page.waitForSelector("#playerSel option:nth-child(2)", { timeout: 15000 })
 
 // Select Renamon as player (should be in the list)
 const playerSel = await page.$("#playerSel");
-const options = await playerSel.$$("option");
+const options = await playerSel!.$$("option");
 let renamonIdx = 0;
 for (let i = 0; i < options.length; i++) {
-  const text = await options[i].textContent();
-  if (text.toLowerCase().includes("renamon")) {
+  const text = await options[i]!.textContent();
+  if (text!.toLowerCase().includes("renamon")) {
     renamonIdx = i;
     break;
   }
 }
 await page.evaluate((idx) => {
-  document.querySelector<HTMLSelectElement>("#playerSel").selectedIndex = idx;
+  document.querySelector<HTMLSelectElement>("#playerSel")!.selectedIndex = idx;
 }, renamonIdx);
 
 // Trigger form refresh
 await page.evaluate(() => {
-  document.querySelector("#formSel").dispatchEvent(new Event("change"));
+  document.querySelector("#formSel")!.dispatchEvent(new Event("change"));
 });
 
 // Select enemy (Agumon)
 const enemySel = await page.$("#enemySel");
-const eOptions = await enemySel.$$("option");
+const eOptions = await enemySel!.$$("option");
 let agumonIdx = 0;
 for (let i = 0; i < eOptions.length; i++) {
-  const text = await eOptions[i].textContent();
-  if (text.toLowerCase().includes("agumon")) {
+  const text = await eOptions[i]!.textContent();
+  if (text!.toLowerCase().includes("agumon")) {
     agumonIdx = i;
     break;
   }
 }
 await page.evaluate((idx) => {
-  document.querySelector<HTMLSelectElement>("#enemySel").selectedIndex = idx;
+  document.querySelector<HTMLSelectElement>("#enemySel")!.selectedIndex = idx;
 }, agumonIdx);
 
 // Click Start Battle

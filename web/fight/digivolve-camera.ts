@@ -64,7 +64,7 @@ export function skipFormChange(camRec, cam: { stop: () => void; }, arena, setEne
   cam?.stop();
   const target = arena();
   if (target) camRec.cut(fieldsFromShot(target), { issuer: DV_ISSUER });
-  setEnemyVisible(true);
+  setEnemyVisible!(true);
 }
 
 /**
@@ -99,8 +99,8 @@ export const DV_ISSUER = "digivolve";
 export function shotNineWithHomeOffset(shot, homeZ: number) {
   const fields = fieldsFromShot(shot);
   const z = -(homeZ | 0);
-  fields[2] += z;   // vpz
-  fields[5] += z;   // vrz
+  fields[2]! += z;   // vpz
+  fields[5]! += z;   // vrz
   return fields;
 }
 

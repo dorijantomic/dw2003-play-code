@@ -61,5 +61,5 @@ export function partsGroup(parts) {
 }
 export const texLoader = new THREE.TextureLoader();
 export function loadTex(url: string | undefined, srgb = true, anis = 8) {
-  return new Promise((res, rej) => texLoader.load(url, (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = anis; res(t); }, undefined, () => { loadStats.failed.push(url); rej(new Error(url)); }));
+  return new Promise((res, rej) => texLoader.load(url, (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = anis; res(t); }, undefined, () => { loadStats.failed.push(url!); rej(new Error(url)); }));
 }

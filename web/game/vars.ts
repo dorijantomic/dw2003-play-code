@@ -167,7 +167,7 @@ export const NO_WATER3D = new URLSearchParams(location.search).has("nowater3d");
 //   4x one (their map coordinates are native pixels; an HD picture is 4x as wide).
 export const HD_MAPS = assetMode() === ASSET_MODE_HD;
 
-export const mpIdle = () => state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
+export const mpIdle = () => state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
 
 // The bubble itself is a second instance of the game's own conversation box, so it has the real
 // balloon chrome, tail and font, but the game never sees it open: nothing is blocked while it shows.
@@ -180,7 +180,7 @@ let chatHold = 10;
 // Multiplayer speech: every speaker gets their own instance of the same game balloon, over their own character.
 export const mpBalloons = new Map();   // player id -> { box, actor, at }
 
-export const endCard = createEndCardTranslated({ stopSound: () => sfx.stopAll() });
+export const endCard = createEndCardTranslated({ stopSound: () => sfx.stopAll!() });
 
 // The end-of-cast fishing balloon before its pop was decoded: one static cel
 // 0x35 with the row-1 glyph, drawn from the opening frame. The decoded balloon
@@ -256,7 +256,7 @@ export const dialogueBox = createDialogueTranslated(sfx);
 // started runs, that event's own boxes must be free to open.
 export const yesNoBox = createYesNoTranslated(sfx);
 
-export const yesNoWindowUp = () => yesNoBox.isOpen() && !S.yesNoAwaitingChild;
+export const yesNoWindowUp = () => yesNoBox.isOpen!() && !S.yesNoAwaitingChild;
 
 // The five NPC help counters (s210 event 8; s924 events 1602/1604; s935 events 1616/1618): the
 // counter says its line, then eight topics and a cursor take the screen (engine/dw3/ui/help-menu-session.ts,
@@ -264,18 +264,18 @@ export const yesNoWindowUp = () => yesNoBox.isOpen() && !S.yesNoAwaitingChild;
 // simply continues when it closes.
 export const helpMenuBox = createHelpMenuTranslated(sfx);
 
-export const helpMenuWindowUp = () => helpMenuBox.isOpen();
+export const helpMenuWindowUp = () => helpMenuBox.isOpen!();
 
 export const textbox = new Proxy(fallbackTextbox, {
     get(target, prop) {
-        if (prop === "dialogue" && dialogueBox.isOpen()) return S.translatedDialogueText;
+        if (prop === "dialogue" && dialogueBox.isOpen!()) return S.translatedDialogueText;
         if (prop === "isOpen") return () =>
-            target.isOpen() || dialogueBox.isOpen() || yesNoWindowUp() || helpMenuWindowUp();
+            target.isOpen!() || dialogueBox.isOpen!() || yesNoWindowUp() || helpMenuWindowUp();
         if (prop === "advance") return () => {
             if (yesNoWindowUp() || helpMenuWindowUp()) return; // these boxes read the pad themselves
-            return dialogueBox.isOpen() ? dialogueBox.pressConfirm() : target.advance();
+            return dialogueBox.isOpen!() ? dialogueBox.pressConfirm!() : target.advance!();
         };
-        if (prop === "close") return () => { if (dialogueBox.isOpen()) dialogueBox.close(); (target as Closeable).close?.(); };
+        if (prop === "close") return () => { if (dialogueBox.isOpen!()) dialogueBox.close!(); (target as Closeable).close?.(); };
         return target[prop];
     },
     set(target, prop, value) { target[prop] = value; return true; },
@@ -442,7 +442,7 @@ const openBook = (book, row) => {
 
 // FLY (web/fly-points.js): the pause row exists only once quest zz_fly is done. Flying needs open air and a free field; the book lists the
 // visited fly points; the chosen one is reached by the game's own map change (warpToMap) once the book has shut and the pause is over.
-export const flyFree = () => !!state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+export const flyFree = () => !!state.started && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!()
     && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry && !mpbVisible() && !state.handoffHold && !state.launch
     && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm && !state._questScene;
 
@@ -541,7 +541,7 @@ export const stagslctMenu = createStagslctMenu();
 // (sfx.playBankSound) and the title theme through the music player.
 export const soundTest = createSoundTest({
     sfx,
-    music: { play: (track) => bgm.play(track), stop: () => bgm.play(null) },
+    music: { play: (track) => bgm.play!(track), stop: () => bgm.play!(null) },
 });
 
 // Fully translated language screen; the adapter retains its historical name.
@@ -803,7 +803,7 @@ export const getNpcResolver = (actorId) => {
 };
 
 const cutsceneTextbox = {
-    isOpen: () => textbox.isOpen(),
+    isOpen: () => textbox.isOpen!(),
     open: (parsed, onClose) => {
         const spk = cutscene.speakingActor;
         const mode = cutscene.speakingMode;
@@ -822,7 +822,7 @@ const cutsceneTextbox = {
         const e = spk == null || mode == null ? null : cutscene.entity(spk);
         if (spk != null && mode != null && !e) storyDbg("SAY speaker not found", spk, "line", line, "→ no window");
         const legacy = () =>
-            fallbackTextbox.open(parsed, onClose, () =>
+            fallbackTextbox.open!(parsed, onClose, () =>
                 // textbox draws post-zoom in screen px — scale world coords up.
                 e ? { x: (e.x - lastCam.x) * ZOOM, y: (e.y - lastCam.y) * ZOOM, mode } : null);
         if (!S.cutsceneEsdmgRef || line == null) return legacy();
@@ -832,7 +832,7 @@ const cutsceneTextbox = {
         });
         const plain = mode == null || mode === 4;
         S.translatedDialogueText = parsed;
-        dialogueBox.open(
+        dialogueBox.open!(
             { esdmg: S.cutsceneEsdmgRef.file, entry: S.cutsceneEsdmgRef.entry, index: line },
             {
                 kind: "say", plain, balloonMode: mode ?? 0,
@@ -890,7 +890,7 @@ export const cutscene = createCutscene(cutsceneTextbox, () => state, getNpcResol
     spawnActor: (actorId) => {
         const scene = state.scenes[currentMap().id];
         if (!scene) return null;
-        const pid = state.npcSprites[actorId];
+        const pid = state.npcSprites![actorId];
         if (!pid) return null;
         const spr =
             state.manifest.npcs?.find((n) => n.id === pid) ??
@@ -1157,7 +1157,7 @@ const PAD_EVENT = { preventDefault() {}, repeat: false, code: "", key: "", shift
 export const gamepad = attachGamepad({
     heldKeys: state.keys,
     onPress: (button) => {
-        bgm.unlock(); sfx.unlock();
+        bgm.unlock!(); sfx.unlock!();
         if (S.titleInput) { S.titleInput(button); return; }
         if (!state.started) return;
         if (mpbVisible()) { mpbKey(button); return; }   // the 2 vs 2 fight owns the pad: it drives the battle cursor, not the overworld

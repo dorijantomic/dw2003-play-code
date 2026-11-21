@@ -94,15 +94,15 @@ export function questGhostActor(ctx: CanvasRenderingContext2D | null, key, draw)
     const g = questGhostOf(key);
     if (!g) return draw();
     const prev = current;
-    const outerAlpha = ctx.globalAlpha;
-    ctx.save();
-    ctx.globalAlpha = outerAlpha * g.alpha;
+    const outerAlpha = ctx!.globalAlpha;
+    ctx!.save();
+    ctx!.globalAlpha = outerAlpha * g.alpha;
     current = { key: actorKey(key), tint: g.tint };
     try {
         return draw();
     } finally {
         current = prev;
-        ctx.restore();
+        ctx!.restore();
     }
 }
 
@@ -114,10 +114,10 @@ export function questGhostActor(ctx: CanvasRenderingContext2D | null, key, draw)
 export function questGhostImage(ctx: CanvasRenderingContext2D | null, img, sx: number, sy: number, sw, sh, dx: number, dy) {
     const tint = current?.tint;
     if (!tint) {
-        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
+        ctx!.drawImage(img, sx, sy, sw, sh, dx, dy, sw, sh);
         return;
     }
-    ctx.drawImage(tintedFrame(img, sx, sy, sw, sh, tint), 0, 0, sw, sh, dx, dy, sw, sh);
+    ctx!.drawImage(tintedFrame(img, sx, sy, sw, sh, tint), 0, 0, sw, sh, dx, dy, sw, sh);
 }
 
 /** The frame, washed with `tint` and cached: at most TINT_CACHE_PER_IMAGE frames per image, oldest out first. */
@@ -131,13 +131,13 @@ function tintedFrame(img, sx: number, sy: number, sw, sh, tint) {
     cv.width = Math.max(1, Math.round(sw));
     cv.height = Math.max(1, Math.round(sh));
     const g = cv.getContext("2d");
-    g.imageSmoothingEnabled = false;      // pixel art: the field's own setting, so the copy cannot blur
-    g.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    g!.imageSmoothingEnabled = false;      // pixel art: the field's own setting, so the copy cannot blur
+    g!.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
     // Keep the frame's own shading: a 60% wash of the tint over its pixels, never a flat silhouette.
-    g.globalCompositeOperation = "source-atop";
-    g.globalAlpha = 0.6;
-    g.fillStyle = tint;
-    g.fillRect(0, 0, cv.width, cv.height);
+    g!.globalCompositeOperation = "source-atop";
+    g!.globalAlpha = 0.6;
+    g!.fillStyle = tint;
+    g!.fillRect(0, 0, cv.width, cv.height);
     if (byKey.size >= TINT_CACHE_PER_IMAGE) byKey.delete(byKey.keys().next().value);
     byKey.set(key, cv);
     return cv;

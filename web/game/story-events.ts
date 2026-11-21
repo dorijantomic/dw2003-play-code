@@ -53,7 +53,7 @@ export function applyStoryCommand(command) {
         if (command.kind === "item_shop" || command.kind === "card_shop" || command.kind === "inn") {
             const index = command.index;
             const rec = state.shops?.[index];
-            if (command.kind === "item_shop") { itemLog.noteSeen(rec?.items ?? []); shop.open(rec?.items ?? [], null, { name: rec?.name, state, shopId: index }); }
+            if (command.kind === "item_shop") { itemLog.noteSeen(rec?.items ?? []); shop.open!(rec?.items ?? [], null, { name: rec?.name, state, shopId: index }); }
             // CARD SHOP — CORRECTED 2026-08-08. The card shop is 0x31..0x43 and
             // 0x46..0x4A, not 0x1e..0x30: set_flag routes those to
             // launch_ui(0x1300, index), 0x1300 is STCRDSHP, and `index` is the
@@ -65,7 +65,7 @@ export function applyStoryCommand(command) {
             // The walker used to open the shop for 0x1e..0x30 with no id, which
             // was the wrong range AND lost the stock selection.
             else if (command.kind === "card_shop") {
-                cardShop.open(state, null, openCardShopFolder, index);
+                cardShop.open!(state, null, openCardShopFolder, index);
             }
             // THE INN — DECODED 2026-08-13. Everything that is not `< 0x1e` and
             // not a card-shop index falls through to `jal D0x8008c000`, which
@@ -143,7 +143,7 @@ export function applyStoryCommand(command) {
             if (index === 0) {
                 // The DRI desk owns the complete stgdglab flow: root,
                 // Switch, Digivolve and the four-page Digivolve Chart.
-                driMenu.open(state, null);
+                driMenu.open!(state, null);
             } else if (index === 1 && state.party?.length) {
                 state.nameEntry = openNameEntry({});
                 state.nameEntryDone = () => {
@@ -186,7 +186,7 @@ export function applyCardDuelCloseHousekeeping(won: boolean) {
 /** Open the naming screen (pro/stdgname). The screen reads the pad
  *  from `state.keys` each frame, so the returned object needs no per-key calls. */
 export function openNameEntry(opts: NameEntryOptions = {}) {
-    nameEntryNative.open({ initial: opts.initial ?? "", state });
+    nameEntryNative.open!({ initial: opts.initial ?? "", state });
     return nameEntryNative;
 }
 
@@ -340,7 +340,7 @@ function playTalkEvent(bit) {
         // the story step that event's routine stores — and only that event's. The old
         // advanceOrdinal() here moved the story on ANY completed event of the stage, which
         // is how a walker's mid-scene could jump the step.
-        S.engine.completeEvent(eventId);
+        S.engine!.completeEvent(eventId);
         // The event's own completion writes (same list the OnStep path applies).
         for (const [fid, val] of erec.sets || []) storyFlags.set(fid, val ? 1 : 0);
         // HANDOFF IS A SCREEN TRANSITION, wherever in the script it sits: op 3.4 is
@@ -383,20 +383,20 @@ function playYesNoEvent(ev, onDone) {
     if (!row) return false;
     S.yesNoAwaitingChild = false;
     let childHandoff = null;
-    yesNoBox.open(row, null, {
+    yesNoBox.open!(row, null, {
         onStartEvent: (id) => {
             S.yesNoAwaitingChild = true;
             const child = (state.wstag[mapId] || []).find((e) => e.id === id);
             if (!child) {
                 storyDbg("YESNO child", id, "missing on", mapId);
-                yesNoBox.childDone();
+                yesNoBox.childDone!();
                 return;
             }
             // The child's own HANDOFF (e.g. s210 Yes -> event 13 -> s212) is the
             // parent's result: the caller handles it as it would the child's.
             playStoryEvent(child, (handoff) => {
                 childHandoff = handoff ? { ...handoff, yesNoChild: child } : null;
-                yesNoBox.childDone();
+                yesNoBox.childDone!();
             });
         },
         onClose: () => {
@@ -416,7 +416,7 @@ function playHelpMenuEvent(ev, onDone) {
     const row = engineUi?.helpMenuFor?.(Number(mapId.replace(/^s/, "")), ev.id);
     if (!row) return false;
     storyDbg("HELP MENU", row.module, "event", ev.id, "text", "0x" + row.textHandle.toString(16));
-    helpMenuBox.open(row, null, { onClose: () => onDone?.() });
+    helpMenuBox.open!(row, null, { onClose: () => onDone?.() });
     return true;
 }
 
@@ -432,11 +432,11 @@ function playDungeonSwitchEvent(ev, onDone) {
     if (!cmd) return false;
     const object = state.padSwitch ?? (state.padSwitch = newPadSwitchObject());
     const res = applyDungeonSwitchCommand(object, cmd);
-    state.padSwitch = res.object;
+    state.padSwitch = res!.object;
     // The object's own tick leaves the maze's live-layout latch (obj stays in the state the
     // command set until its pending sub-state flips it; the latch is written by the tick).
     state.padLayoutLatch = cmd.state === 2 ? 1 : 0;
-    if (res.playSwitch) sfx.play("switch02");
+    if (res!.playSwitch) sfx.play!("switch02");
     storyDbg("DUNGEON SWITCH", mapId, "event", ev.id, "→ state", cmd.state, "arm", cmd.arm);
     onDone?.();
     return true;
@@ -581,7 +581,7 @@ export function doStoryHandoff(ev, handoff) {
         : null;
     if (spSlot != null) {
         const sp = savePointBySlot(spSlot);
-        openMemoryCard("save", null, sp);
+        openMemoryCard("save", null, sp!);
         return;
     }
 
@@ -672,7 +672,7 @@ function routeStoryHandoff(ev, handoff, screenId) {
             state.packSelectDone = () => {
                 const packIdx = state.packSelect.sel();
                 state.playerName = state.packSelect.accountName();
-                const memberIds = PACKS[packIdx].members.map((m) => m.charId);
+                const memberIds = PACKS[packIdx]!.members.map((m) => m.charId);
                 state.pendingParty = grantPack(memberIds, 0).party;
                 state.packId = "ABC"[packIdx];
                 S.engine?.state.vars.set("$party.pack", packIdx);

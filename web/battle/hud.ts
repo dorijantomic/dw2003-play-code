@@ -73,7 +73,7 @@ function enemyStatIndexForName(name: string) {
  */
 export function enemyStatRecordFor(name: string) {
   const i = enemyStatIndexForName(name);
-  return i >= 0 ? S.enemyStatRecords[i] : null;
+  return i >= 0 ? S.enemyStatRecords![i] : null;
 }
 
 /** Enemy name for battle messages: the disc name line the HUD plate reads (see fusion.js). */

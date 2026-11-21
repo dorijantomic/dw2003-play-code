@@ -32,7 +32,7 @@ const TOD: [number, number[]][] = [
 const TOD_SECONDS = 240;
 export function todColor(phase: number) {
     for (let i = 1; i < TOD.length; i++) {
-        if (phase <= TOD[i][0]) {
+        if (phase <= TOD[i]![0]) {
             const [p0, c0] = TOD[i - 1], [p1, c1] = TOD[i];
             const k = smooth((phase - p0) / (p1 - p0));
             return c0.map((v: number, j: string | number) => Math.round(v + (c1[j] - v) * k));
@@ -175,7 +175,7 @@ export function drawScenery(ctx: CanvasRenderingContext2D, S) {
     if (fx.heat && p.heat) {
         const cv = ctx.canvas;
         if (!tmp || tmp.width !== cv.width || tmp.height !== cv.height) { tmp = document.createElement("canvas"); tmp.width = cv.width; tmp.height = cv.height; }
-        tmp.getContext("2d").drawImage(cv, 0, 0);
+        tmp.getContext("2d")!.drawImage(cv, 0, 0);
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         const amp = 1.7 * (0.65 + 0.35 * Math.sin(t * 0.6)) * fade, STEP = 3;

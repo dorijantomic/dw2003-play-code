@@ -105,16 +105,16 @@ export function drawBlastCurtain(ctx: CanvasRenderingContext2D | undefined, s, w
 
 export function drawBlastFlash(ctx: CanvasRenderingContext2D | undefined, s: { flashAlpha: number; flashLevel: undefined; }, w: number, h: number) {
   if (!s || s.flashAlpha <= 0) return;
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx!.save();
+  ctx!.setTransform(1, 0, 0, 1, 0, 0);
   if (s.flashLevel !== undefined) {
     // The change task and the revert: FIGHTSTG_drawWhiteFlash, a quad r=g=b=level, code 0x2A + tpage 0xA0 = ADDED to the screen.
-    ctx.globalCompositeOperation = "lighter";
-    ctx.fillStyle = `rgb(${s.flashLevel},${s.flashLevel},${s.flashLevel})`;
+    ctx!.globalCompositeOperation = "lighter";
+    ctx!.fillStyle = `rgb(${s.flashLevel},${s.flashLevel},${s.flashLevel})`;
   } else {
-    ctx.globalAlpha = s.flashAlpha;
-    ctx.fillStyle = "#fff";
+    ctx!.globalAlpha = s.flashAlpha;
+    ctx!.fillStyle = "#fff";
   }
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
+  ctx!.fillRect(0, 0, w, h);
+  ctx!.restore();
 }

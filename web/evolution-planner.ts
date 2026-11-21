@@ -464,13 +464,13 @@ export function plannerDraw(ctx, W = 640, H = 480) {
   // the selected partner: its roster slot is the line the unlock scans
   ctx.font = "bold 14px monospace";
   ctx.fillStyle = "#ffe9a8";
-  ctx.fillText(`${member.name}`, left, y + 34);
+  ctx.fillText(`${member!.name}`, left, y + 34);
   ctx.font = "10px monospace";
   ctx.fillStyle = "#8a93a8";
-  const form = member.live?.stats?.digimonId != null
-    ? S.profiles.find((p) => Number(p.id) === Number(member.live.stats.digimonId))?.name ?? ""
+  const form = member!.live?.stats?.digimonId != null
+    ? S.profiles.find((p) => Number(p.id) === Number(member!.live.stats.digimonId))?.name ?? ""
     : "";
-  ctx.fillText(`roster slot ${member.slot}  ·  Lv ${member.live?.level ?? 1}${form ? `  ·  ${form}` : ""}  ·  ${S.rows.length} forms left`, left, y + 53);
+  ctx.fillText(`roster slot ${member!.slot}  ·  Lv ${member!.live?.level ?? 1}${form ? `  ·  ${form}` : ""}  ·  ${S.rows.length} forms left`, left, y + 53);
 
   const top = y + 70;
   const bottom = y + h - 28;
@@ -497,9 +497,9 @@ export function plannerDraw(ctx, W = 640, H = 480) {
       }
       ctx.font = "10px monospace";
       ctx.textAlign = "left";
-      ctx.fillStyle = hit ? "#ffe9a8" : r.ready ? "#9ad0a8" : "#c8d2e2";
-      ctx.fillText(`${hit ? ">" : " "} ${r.name}`, listX, at);
-      if (r.ready) {
+      ctx.fillStyle = hit ? "#ffe9a8" : r!.ready ? "#9ad0a8" : "#c8d2e2";
+      ctx.fillText(`${hit ? ">" : " "} ${r!.name}`, listX, at);
+      if (r!.ready) {
         ctx.fillStyle = "#6fe08a";
         ctx.textAlign = "right";
         ctx.fillText("READY", listX + listW - 8, at);

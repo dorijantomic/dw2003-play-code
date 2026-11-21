@@ -54,5 +54,5 @@ export function createIdleDirector(opts = {}) {
 /** The record the director cuts this tick, or null while the director does not exist. */
 export function idleDirectorTick(director, clock: { tick(dt: number): number; readonly frames: number; reset(): void; } | undefined, dt: number, exists: boolean) {
   if (!exists) return null;
-  return director.update(clock.tick(dt)).fields;
+  return director.update(clock!.tick(dt)).fields;
 }

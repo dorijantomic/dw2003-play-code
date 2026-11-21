@@ -145,7 +145,7 @@ export function slotOptions(member, pool, items, rules: { lineSlot?: number; } |
       const at = SLOT_ROW.get(slot);
       if (at === undefined) continue;
       if (!pauseEquipRowAdmits(lineSlot, at, id)) continue;
-      out[slot].push(id);
+      out[slot]!.push(id);
     }
   }
   return out;
@@ -297,11 +297,11 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
     hands.push({ right, left });
   };
   pushHands(0, 0);
-  for (const id of options.right) pushHands(id, 0);
-  for (const id of options.left) if (!isTwoHanded(lookup.get(id))) pushHands(0, id);
-  for (const right of options.right) {
+  for (const id of options.right!) pushHands(id, 0);
+  for (const id of options.left!) if (!isTwoHanded(lookup.get(id))) pushHands(0, id);
+  for (const right of options.right!) {
     if (isTwoHanded(lookup.get(right))) continue;
-    for (const left of options.left) {
+    for (const left of options.left!) {
       if (right === left || isTwoHanded(lookup.get(left))) continue;
       pushHands(right, left);
     }
@@ -316,9 +316,9 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
   // pair. Both rows admit the same classes, so the best legal pair is just the
   // two best different copies.
   const byScore = (a: number, b: number) => weigh(lookup.get(b)) - weigh(lookup.get(a)) || a - b;
-  const first = options.acc0.slice().sort(byScore)[0] ?? 0;
+  const first = options.acc0!.slice().sort(byScore)[0] ?? 0;
   pick.acc0 = first;
-  pick.acc1 = options.acc1
+  pick.acc1 = options.acc1!
     .filter((id) => id !== first && legalCombo({ acc0: first, acc1: id }, items, at))
     .sort(byScore)[0] ?? 0;
 
@@ -337,7 +337,7 @@ export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } |
   const refusals = [];
   for (const slot of EQUIP_SLOTS) {
     const other = slot === "left" ? pick.right : slot === "right" ? pick.left : 0;
-    for (const id of options[slot]) {
+    for (const id of options[slot]!) {
       if (id === pick[slot]) continue;
       const item = lookup.get(id);
       let reason = "outranked";

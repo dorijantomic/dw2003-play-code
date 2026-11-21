@@ -43,7 +43,7 @@ function loadData(language) {
         ]).then(([manifest, tables, resident, profiles, ...banks]) => ({
             tables, font: resident.font, cursorGlyphs: resident.cursorGlyphs, profiles,
             textButtons: Uint8Array.from(manifest.textButtons.bytes),
-            banks: new Map(banks.map((data, i) => [BANKS[i][0] + language, data])),
+            banks: new Map(banks.map((data, i) => [BANKS[i]![0] + language, data])),
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
     return dataByLanguage.get(language);
@@ -125,7 +125,7 @@ export function createSaveTranslated(sfx = null) {
             const st = state.reserveStats?.[id];
             if (!st && !(state.rosterOwned & (1 << slot))) continue;
             const rec = st ?? {};
-            const shown = r._opts.reserveRoster?.(id, rec) ?? rec;
+            const shown = r._opts.reserveRoster?.(id!, rec) ?? rec;
             reserves.push({ position: -1, rosterSlot: slot, nameBytes: encodeNativeScreenText(state.digimonNames?.[id] ?? shown.name),
                 exp: rec.xp ?? 0, level: rec.level ?? 1, lastUltraDrill: rec.lastUltraDrill, tp: rec.tp, hp: rec.hp, maxHp: rec.maxHp, mp: rec.mp, maxMp: rec.maxMp,
                 core: shown.core, elements: shown.elements, equipment: state.reserveEquipment?.[id],

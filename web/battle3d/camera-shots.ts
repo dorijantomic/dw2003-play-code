@@ -64,7 +64,7 @@ export function attackReachZ(ops, homeZ = 0, mirrored = false) {
 
 /** 0..1: the share of its run an attacker has made, from its forward travel (moveDelta z) over the clip's reach. */
 export function attackLateralFraction(moveZ: number | undefined, reach: number) {
-  return reach > 0 ? Math.min(1, Math.abs(moveZ) / reach) : 0;
+  return reach > 0 ? Math.min(1, Math.abs(moveZ!) / reach) : 0;
 }
 
 /**
@@ -221,7 +221,7 @@ export function slowMoStep(level: number, delta: number, acc = 0) {
  * the orbit has been given, so at full speed a frame's worth is one.
  */
 export function lossCamYawUnits(gameDelta: number | undefined) {
-  const n = (gameDelta | 0) * LOSS_CAM.yawUnitsPerDelta;
+  const n = (gameDelta! | 0) * LOSS_CAM.yawUnitsPerDelta;
   return ((n % LOSS_CAM.turnUnits) + LOSS_CAM.turnUnits) % LOSS_CAM.turnUnits;
 }
 
@@ -239,8 +239,8 @@ export function rotateShotYaw(eye, target, yawUnits: number) {
  *  placement (engine/dw3/battle-presentation.ts `arenaPlacement`), not a second copy: the
  *  near slot id 0 and the far slot id 0x10 select the two sides. */
 export function arenaSlot(record: PlacementRecord | null, side: string) {
-  const standoff = record?.standoff | 0;
-  const hover = record?.hover | 0;
+  const standoff = record?.standoff! | 0;
+  const hover = record?.hover! | 0;
   const far = side === "enemy";
   const p = arenaPlacement(hover, standoff, far ? 0x10 : 0);
   return { x: p.x, y: p.y, z: p.z, side: far ? "enemy" : "player" };

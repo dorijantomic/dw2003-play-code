@@ -21,10 +21,10 @@ function contactSoundTypeFor(techId: number) {
     return (rec.effect === 0 && rec.clip === 5) ? 30 : rec.motion;
   }
 function loadProjMesh(id: number) {
-    if (B$.projCache.has(id)) return;
-    B$.projCache.set(id, "loading");
+    if (B$.projCache!.has(id)) return;
+    B$.projCache!.set(id, "loading");
     fetch(`${B$.PROJ_BASE}/${id}.json`).then(r => (r.ok ? r.json() : null)).then(def => {
-      if (!def) { B$.projCache.set(id, null); return; }
+      if (!def) { B$.projCache!.set(id, null); return; }
       const [tw, th] = def.tex_size || [256, 256];      // 4bpp indexed VRAM page
       const layers = [];
       for (const L of def.layers) {
@@ -45,7 +45,7 @@ function loadProjMesh(id: number) {
           const clut = pr.clut ? `${pr.clut[0]}_${pr.clut[1]}` : "";
           // The extracted `abr` is the RAW `0xEn` nibble, a ONE-BASED selector; meshAbrMode
           // turns it into the hardware mode, or null when the primitive is opaque.
-          const abr = meshAbrMode(dlStates && dlStates[pi] ? dlStates[pi].abr : (pr.abr ?? 2));
+          const abr = meshAbrMode(dlStates && dlStates[pi] ? dlStates[pi]!.abr : (pr.abr ?? 2));
           const key = `${clut}|${abr}`;
           let g = groups.get(key);
           if (!g) {
@@ -63,12 +63,12 @@ function loadProjMesh(id: number) {
         let total = 0;
         for (const g of groups.values()) {
           if (!g.pos.length) continue;
-          const vbo = B$.gl.createBuffer();
-          B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, vbo);
-          B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl.STATIC_DRAW);
-          const ubo = B$.gl.createBuffer();
-          B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, ubo);
-          B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl.STATIC_DRAW);
+          const vbo = B$.gl!.createBuffer();
+          B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, vbo);
+          B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl!.STATIC_DRAW);
+          const ubo = B$.gl!.createBuffer();
+          B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, ubo);
+          B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl!.STATIC_DRAW);
           const rec = { vbo, ubo, count: g.pos.length / 3, abr: g.abr,
                         texReady: !g.tex, tex: null };
           // `texReady` exists only so a headless capture can wait for the atlas: loadTexture
@@ -92,8 +92,8 @@ function loadProjMesh(id: number) {
       // The pack's playback clip decides which authored frame each tick samples, and how
       // long the flight lives. Null for a pack whose clip did not decode; clipFrameAt then
       // falls back to using the tick directly.
-      B$.projCache.set(id, { layers, clip: def.clip || null });
-    }).catch(() => B$.projCache.set(id, null));
+      B$.projCache!.set(id, { layers, clip: def.clip || null });
+    }).catch(() => B$.projCache!.set(id, null));
   }
 // Warm the projectile-mesh cache for one model's actions so the bullet is ready at the
   // muzzle-exit frame (no async-load gap). Called when a model's anim.json actions load.
@@ -125,7 +125,7 @@ function loadProjMesh(id: number) {
         // Mapped op10s play common-bank sound table[type] (0x800a368c). Contact
         // markers 98/99 first resolve through the attack context's +0x70 value —
         // or through COMEX102 when the contact evaded (F0x8008c454, result 3).
-        const t = resolveContactSoundType(rec.type, B$.contactSoundType[side], B$.contactEvade[side]);
+        const t = resolveContactSoundType(rec.type, B$.contactSoundType![side], B$.contactEvade![side]);
         const key = (t != null) ? B$.op10Map[String(t)] : null;
         // ExVeemon/Stingmon Jogress clip 12 emits op10 type 66.  The original
         // table entry is packed 0x41180000: area bank jog_00, JOGRESSE sample.
@@ -138,9 +138,9 @@ function loadProjMesh(id: number) {
         // inside fightstg is one stage-specific case (F0x80086a00, 0x80086ea0),
         // so what it holds during a Jogress is not established and nothing is
         // wired for it. Do not guess a track here.
-        else if (t === 91 && B$.sfx) B$.sfx.stopSustained?.(B$.SUSTAINED_LOOP_KEY);
-        else if (t === B$.SUSTAINED_LOOP_TYPE && B$.sfx) B$.sfx.playSustained?.(B$.SUSTAINED_LOOP_KEY);
-        else if (key && B$.sfx) B$.sfx.playBattle(key, side, rec.words?.[1] ?? 0);
+        else if (t === 91 && B$.sfx) B$.sfx.stopSustained?.(B$.SUSTAINED_LOOP_KEY!);
+        else if (t === B$.SUSTAINED_LOOP_TYPE && B$.sfx) B$.sfx.playSustained?.(B$.SUSTAINED_LOOP_KEY!);
+        else if (key && B$.sfx) B$.sfx.playBattle!(key, side, rec.words?.[1] ?? 0);
         e.onHit?.(rec);
       },
       // op6 = projectile flight (registry @0x800a2550 -> MEFT00xx mesh packs). sub=1 is
@@ -158,9 +158,9 @@ function loadProjMesh(id: number) {
   }
 function freeSkelBufs(bufs: SkelBufs) {
     if (!bufs) return;
-    if (bufs.ibo) B$.gl.deleteBuffer(bufs.ibo);
-    if (bufs.ubo) B$.gl.deleteBuffer(bufs.ubo);
-    if (bufs.vbo) B$.gl.deleteBuffer(bufs.vbo);
+    if (bufs.ibo) B$.gl!.deleteBuffer(bufs.ibo);
+    if (bufs.ubo) B$.gl!.deleteBuffer(bufs.ubo);
+    if (bufs.vbo) B$.gl!.deleteBuffer(bufs.vbo);
   }
 // FIGHTSTG_F0x8008606c, the actor teardown, ported (engine/dw3/battle-actor-lifecycle.ts).
   // A fightstg fighter actor holds three resource words at +0x78/+0x7c/+0x80; the original's
@@ -179,7 +179,7 @@ function freeSkelBufs(bufs: SkelBufs) {
       const i = slots.indexOf(ptr);
       if (i < 0) return;
       slots[i] = 0;
-      if (i === 0) B$.gl.deleteTexture(ptr);   // actor +0x78: the texture
+      if (i === 0) B$.gl!.deleteTexture(ptr);   // actor +0x78: the texture
       else if (i === 1) freeSkelBufs(ptr);   // actor +0x7c: the skeleton GL buffers
       // i === 2: actor +0x80 is plain JS model data — dropping the reference frees it.
     });
@@ -198,8 +198,8 @@ function setPlayerDigimon(folder: string | null | undefined) {
     // The actor teardown, ported: free the three resource words through FIGHTSTG_F0x8008606c.
     releaseActorResources([B$.playerTex, B$.playerSkelBufs, B$.playerModel]);
     B$.playerTex = null; B$.playerSkelBufs = null; B$.playerModel = null;
-    B$._freeFaceBoxBuffers(B$.gl);
-    B$.playerAnim8r = null; B$.coordinator.player = null;
+    B$._freeFaceBoxBuffers(B$.gl!);
+    B$.playerAnim8r = null; B$.coordinator!.player = null;
     if (!folder) return Promise.resolve(true);
     B$.playerTex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
     B$.setupTexturePatches("player", folder);
@@ -212,7 +212,7 @@ function setPlayerDigimon(folder: string | null | undefined) {
         // (ActionVM over model.actions[clip]). Models without a timeline fall back to advanceFrame.
         B$.playerAnim8r = new ActorAnimator(m);
         B$.playerAnim8r.resetSlotPlacement(arenaSlotFor(folder, "player", B$.placementTable));
-        B$.coordinator.player = B$.playerAnim8r;
+        B$.coordinator!.player = B$.playerAnim8r;
         preloadModelProjectiles(m.actions);
         return true;
       }
@@ -226,8 +226,8 @@ function setEnemyDigimon(folder: string | null | undefined) {
     // The actor teardown, ported: free the three resource words through FIGHTSTG_F0x8008606c.
     releaseActorResources([B$.enemyTex, B$.enemySkelBufs, B$.enemyModel]);
     B$.enemyTex = null; B$.enemySkelBufs = null; B$.enemyModel = null;
-    B$._freeFaceBoxBuffers(B$.gl);
-    B$.enemyAnim8r = null; B$.coordinator.enemy = null;
+    B$._freeFaceBoxBuffers(B$.gl!);
+    B$.enemyAnim8r = null; B$.coordinator!.enemy = null;
     if (!folder) return;
     B$.enemyTex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
     B$.setupTexturePatches("enemy", folder);
@@ -238,7 +238,7 @@ function setEnemyDigimon(folder: string | null | undefined) {
         B$.enemyFrame = m.clips?.[0]?.start_frame ?? 0;
         B$.enemyAnim8r = new ActorAnimator(m);
         B$.enemyAnim8r.resetSlotPlacement(arenaSlotFor(folder, "enemy", B$.placementTable));
-        B$.coordinator.enemy = B$.enemyAnim8r;
+        B$.coordinator!.enemy = B$.enemyAnim8r;
         preloadModelProjectiles(m.actions);
       }
     });

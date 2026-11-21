@@ -8,7 +8,7 @@ import { grassClumpParts } from "./procedural.js";
 import type { GroundDetailOpts } from "./types.js";
 
 // ------------------------------------------------------------------ shore law (JS) + same in GLSL
-export const shoreZ = (x: number | undefined) => -12 + 3.0 * Math.sin(x * 0.031 + 0.7) + 1.4 * Math.sin(x * 0.083 + 2.1);
+export const shoreZ = (x: number | undefined) => -12 + 3.0 * Math.sin(x! * 0.031 + 0.7) + 1.4 * Math.sin(x! * 0.083 + 2.1);
 export const seaDepth = (e: number) => Math.min(0.07 * e + 0.0018 * e * e, 14);
 export const GLSL_SHORE = /* glsl */`
 float bShoreZ(float x){ return -12.0 + 3.0 * sin(x * 0.031 + 0.7) + 1.4 * sin(x * 0.083 + 2.1); }
@@ -23,7 +23,7 @@ function vnoise(x: number, z: number, f: number, s = 0) {
 }
 export { vnoise, sstep };
 /** tide pools: [x, z, radius] (placed on the right rock shelf) */
-export const POOLS = [[50, 0, 2.3], [58.5, 4.5, 1.9], [45, 6.5, 1.6]].map(([x, dd, r]) => [x, shoreZ(x) + 7 + dd, r]);
+export const POOLS = [[50, 0, 2.3], [58.5, 4.5, 1.9], [45, 6.5, 1.6]].map(([x, dd, r]) => [x, shoreZ(x) + 7 + dd!, r]);
 /** terrain height (m). Sea level is y = 0. */
 export function beachH(x: number, z: number) {
   const d = z - shoreZ(x);
@@ -35,7 +35,7 @@ export function beachH(x: number, z: number) {
     const rid = 1 - Math.abs(2 * vnoise(u, v, 0.012, 3) - 1), rid2 = 1 - Math.abs(2 * vnoise(u * 2.3, v * 2.3, 0.02, 5) - 1);
     h += dn * (0.9 + 3.6 * rid * rid + 0.9 * rid2 * rid2 + 0.8 * vnoise(x, z, 0.06, 1));
   }
-  for (const [px, pz, r] of POOLS) { const q = Math.hypot(x - px, z - pz); if (q < r * 1.8) h -= 0.55 * (1 - sstep(r * 0.55, r * 1.25, q)); }
+  for (const [px, pz, r] of POOLS) { const q = Math.hypot(x - px!, z - pz!); if (q < r! * 1.8) h -= 0.55 * (1 - sstep(r! * 0.55, r! * 1.25, q)); }
   return h;
 }
 
@@ -73,12 +73,12 @@ function tube(gb: GB, P, R: number[], sides: number, colFn, caps = [true, true])
     const B = new THREE.Vector3().crossVectors(T, N), ring = [];
     for (let j = 0; j < sides; j++) {
       const a = (j / sides) * Math.PI * 2, c = colFn ? colFn(i, j / sides, a) : [1, 1, 1];
-      ring.push(gb.v(P[i].x + (N.x * Math.cos(a) + B.x * Math.sin(a)) * R[i], P[i].y + (N.y * Math.cos(a) + B.y * Math.sin(a)) * R[i], P[i].z + (N.z * Math.cos(a) + B.z * Math.sin(a)) * R[i], c[0], c[1], c[2]));
+      ring.push(gb.v(P[i].x + (N.x * Math.cos(a) + B.x * Math.sin(a)) * R[i]!, P[i].y + (N.y * Math.cos(a) + B.y * Math.sin(a)) * R[i]!, P[i].z + (N.z * Math.cos(a) + B.z * Math.sin(a)) * R[i]!, c[0], c[1], c[2]));
     }
     rings.push({ ring, T });
   }
-  for (let i = 0; i < n - 1; i++) for (let j = 0; j < sides; j++) { const a = rings[i].ring[j], b = rings[i].ring[(j + 1) % sides], c = rings[i + 1].ring[(j + 1) % sides], d = rings[i + 1].ring[j]; gb.quad(a, d, c, b); }
-  const cap = (k: number, dir: number) => { const e = rings[k], c = colFn ? colFn(k, 0, 0) : [1, 1, 1], ap = gb.v(P[k].x + e.T.x * R[k] * 0.35 * dir, P[k].y + e.T.y * R[k] * 0.35 * dir, P[k].z + e.T.z * R[k] * 0.35 * dir, c[0] * 0.8, c[1] * 0.8, c[2] * 0.8);
+  for (let i = 0; i < n - 1; i++) for (let j = 0; j < sides; j++) { const a = rings[i]!.ring[j], b = rings[i]!.ring[(j + 1) % sides], c = rings[i + 1]!.ring[(j + 1) % sides], d = rings[i + 1]!.ring[j]; gb.quad(a, d, c, b); }
+  const cap = (k: number, dir: number) => { const e = rings[k], c = colFn ? colFn(k, 0, 0) : [1, 1, 1], ap = gb.v(P[k].x + e.T.x * R[k]! * 0.35 * dir, P[k].y + e.T.y * R[k]! * 0.35 * dir, P[k].z + e.T.z * R[k]! * 0.35 * dir, c[0] * 0.8, c[1] * 0.8, c[2] * 0.8);
     for (let j = 0; j < sides; j++) { const a = e.ring[j], b = e.ring[(j + 1) % sides]; if (dir > 0) gb.tri(a, ap, b); else gb.tri(a, b, ap); } };
   if (caps[0]) cap(0, -1); if (caps[1]) cap(n - 1, 1);
 }
@@ -89,13 +89,13 @@ function ribbon(gb: GB, P, S, hw, colFn) {
     const w = hw(i / (n - 1)), c = colFn(i / (n - 1));
     ids.push([gb.v(P[i].x - S[i].x * w, P[i].y - S[i].y * w, P[i].z - S[i].z * w, c[0], c[1], c[2]), gb.v(P[i].x + S[i].x * w, P[i].y + S[i].y * w, P[i].z + S[i].z * w, c[0], c[1], c[2])]);
   }
-  for (let i = 0; i < n - 1; i++) gb.quad(ids[i][0], ids[i][1], ids[i + 1][1], ids[i + 1][0]);
+  for (let i = 0; i < n - 1; i++) gb.quad(ids[i]![0], ids[i]![1], ids[i + 1]![1], ids[i + 1]![0]);
 }
 const canvasTex = (w: number, h: number, draw) => {
   const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); draw(g, w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 };
-const mixc = (a, b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const mixc = (a, b: number[], t: number) => [a[0] + (b[0]! - a[0]) * t, a[1] + (b[1]! - a[1]) * t, a[2] + (b[2]! - a[2]) * t];
 
 // ------------------------------------------------------------------ PALMS
 let _frondTex = null, _fanTex = null, _leafTex = null;
@@ -147,7 +147,7 @@ function frondGeo(gb: GB, o) {
     for (const m of xs) row.push(gb.v(x + sx * hw * m, y - (fan ? 0.5 : 1) * fold * hw * Math.abs(m) * (fan ? 0.6 : 1), z + sz * hw * m, 1, 1, 1, (m + 1) / 2, s));
     rows.push(row);
   }
-  for (let k = 0; k < segs; k++) for (let m = 0; m < rows[k].length - 1; m++) gb.quad(rows[k][m], rows[k][m + 1], rows[k + 1][m + 1], rows[k + 1][m]);
+  for (let k = 0; k < segs; k++) for (let m = 0; m < rows[k]!.length - 1; m++) gb.quad(rows[k]![m], rows[k]![m + 1], rows[k + 1]![m + 1], rows[k + 1]![m]);
 }
 const PALM = {
   coconut: { H: 7.4, r0: 0.27, r1: 0.15, bend: 0.12, S: 0.05, fr: 15, L: 3.4, W: 1.15, pitch: [1.15, -0.55], nuts: 6 },
@@ -266,14 +266,14 @@ export function driftwoodParts(seed = 1, kind = 0) {
   const L = [1.8, 2.5, 1.2][kind % 3], R0 = [0.09, 0.075, 0.13][kind % 3], n = 9;
   const col = (i: number, f: number, a: number) => { const g = 0.88 + 0.12 * Math.sin(a * 4 + i * 0.9) * Math.cos(i * 0.5), b = [0.74, 0.68, 0.58]; return b.map((v) => v * g * (0.92 + 0.14 * ((i * 7 + Math.floor(f * 8)) % 3) / 2)); };
   const P = [], Rr = [], wob = r() * 6;
-  for (let i = 0; i < n; i++) { const t = i / (n - 1); P.push(V((t - 0.5) * L, 0.07 + 0.09 * Math.sin(t * 3 + wob) + 0.03 * r(), 0.12 * Math.sin(t * 4 + wob * 2))); Rr.push(R0 * (1.15 - 0.45 * t) * (0.88 + 0.28 * r()) * (i === 3 ? 1.25 : 1)); }
+  for (let i = 0; i < n; i++) { const t = i / (n - 1); P.push(V((t - 0.5) * L!, 0.07 + 0.09 * Math.sin(t * 3 + wob) + 0.03 * r(), 0.12 * Math.sin(t * 4 + wob * 2))); Rr.push(R0! * (1.15 - 0.45 * t) * (0.88 + 0.28 * r()) * (i === 3 ? 1.25 : 1)); }
   tube(gb, P, Rr, 7, col, [true, true]);
   for (let k = 0; k < 4; k++) {   // root stubs at the thick end
     const a = (k / 4) * 6.28 + r(), q = [P[0], P[0].clone().add(V(-0.1 - 0.1 * r(), 0.08 * Math.cos(a), 0.14 * Math.sin(a))), P[0].clone().add(V(-0.28 - 0.2 * r(), 0.18 * Math.cos(a) + 0.04, 0.3 * Math.sin(a)))];
-    tube(gb, q, [R0 * 0.55, R0 * 0.4, R0 * 0.14], 5, col, [false, true]);
+    tube(gb, q, [R0! * 0.55, R0! * 0.4, R0! * 0.14], 5, col, [false, true]);
   }
   const f0 = P[4], fk = [f0, f0.clone().add(V(0.08, 0.16, 0.12)), f0.clone().add(V(0.2, 0.34, 0.3))];
-  tube(gb, fk, [Rr[4] * 0.55, Rr[4] * 0.42, Rr[4] * 0.16], 6, col, [false, true]);
+  tube(gb, fk, [Rr[4]! * 0.55, Rr[4]! * 0.42, Rr[4]! * 0.16], 6, col, [false, true]);
   const m = new THREE.MeshLambertMaterial({ vertexColors: true }); m.userData.tag = "drift";
   return [{ geo: gb.geo(true), mat: toonify(m, { fade: [45, 80], shadeK: 0.74, rim: 0.1, height: 0.5 }) }];
 }
@@ -287,7 +287,7 @@ export function shellParts(kind = "scallop", seed = 1) {
       const th = (-1 + (2 * it) / nt) * 1.15, rr = u * W, rib = 0.007 * Math.cos(th * 9) * u, cup = 0.026 * (1 - Math.pow(u * 1.25 - 0.5, 2) * 3.3) * Math.cos(th * 0.8);
       const c = mixc([0.96, 0.9, 0.8], [0.9, 0.55, 0.45], u * 0.9); const k = Math.cos(th * 9) > 0 ? 1 : 0.86;
       row.push(gb.v(rr * Math.sin(th), Math.max(0, cup + rib), rr * Math.cos(th), c[0] * k, c[1] * k, c[2] * k)); } ids.push(row); }
-    for (let ir = 0; ir < nr; ir++) for (let it = 0; it < nt; it++) gb.quad(ids[ir][it], ids[ir][it + 1], ids[ir + 1][it + 1], ids[ir + 1][it]);
+    for (let ir = 0; ir < nr; ir++) for (let it = 0; it < nt; it++) gb.quad(ids[ir]![it], ids[ir]![it + 1], ids[ir + 1]![it + 1], ids[ir + 1]![it]);
   } else if (kind === "conch" || kind === "whelk") {
     const M = 24, sides = 7, rings = [], turns = kind === "conch" ? 3.4 : 4.6, hgt = kind === "conch" ? 0.11 : 0.15;
     for (let i = 0; i <= M; i++) {
@@ -295,7 +295,7 @@ export function shellParts(kind = "scallop", seed = 1) {
       const row = []; for (let j = 0; j < sides; j++) { const a = (j / sides) * 6.283, c = mixc([0.96, 0.86, 0.72], [0.82, 0.5, 0.32], 0.5 + 0.5 * Math.sin(phi * 1.5 + a));
         row.push(gb.v(Math.cos(phi) * (rh + Math.cos(a) * rt), cy + Math.sin(a) * rt * 0.9, Math.sin(phi) * (rh + Math.cos(a) * rt), c[0] * band, c[1] * band, c[2] * band)); } rings.push(row);
     }
-    for (let i = 0; i < M; i++) for (let j = 0; j < sides; j++) gb.quad(rings[i][j], rings[i + 1][j], rings[i + 1][(j + 1) % sides], rings[i][(j + 1) % sides]);
+    for (let i = 0; i < M; i++) for (let j = 0; j < sides; j++) gb.quad(rings[i]![j], rings[i + 1]![j], rings[i + 1]![(j + 1) % sides], rings[i]![(j + 1) % sides]);
   } else if (kind === "clam") {
     for (const side of [0, 1]) {
       const sp = new THREE.SphereGeometry(0.5, 12, 6, 0, 2 * Math.PI, 0, Math.PI / 2), P = sp.attributes.position;
@@ -322,7 +322,7 @@ export function wrackParts(seed = 1) {
     const yaw = r() * 6.28, len = 0.35 + 0.5 * r(), ox = (r() - 0.5) * 0.35, oz = (r() - 0.5) * 0.35, ph = r() * 6, P = [], S = [];
     for (let i = 0; i < 9; i++) { const t = i / 8, x = t * len, z = 0.07 * Math.sin(t * 9 + ph) * len * 3; P.push(V(ox + Math.cos(yaw) * x - Math.sin(yaw) * z, 0.012 + 0.012 * Math.sin(t * 6 + ph) + 0.015 * s / n, oz + Math.sin(yaw) * x + Math.cos(yaw) * z)); S.push(V(-Math.sin(yaw + 1.57) * 0, 0.0, 0).set(Math.sin(yaw), 0, -Math.cos(yaw))); }
     const kind = s % 3, base = kind === 0 ? [0.34, 0.3, 0.1] : kind === 1 ? [0.2, 0.32, 0.12] : [0.4, 0.22, 0.1];
-    ribbon(gb, P, S, (t: number) => 0.022 * (1 + 0.5 * Math.sin(t * 22 + ph)) * (1 - 0.5 * t) + 0.004, (t: number) => mixc(base, [base[0] * 0.55, base[1] * 0.6, base[2] * 0.5], t));
+    ribbon(gb, P, S, (t: number) => 0.022 * (1 + 0.5 * Math.sin(t * 22 + ph)) * (1 - 0.5 * t) + 0.004, (t: number) => mixc(base, [base[0]! * 0.55, base[1]! * 0.6, base[2]! * 0.5], t));
     if (kind === 0) for (let b = 0; b < 3; b++) { const p = P[2 + b * 2]; addGeo(gb, new THREE.IcosahedronGeometry(0.018, 0), new THREE.Matrix4().makeTranslation(p.x, p.y + 0.012, p.z), () => [0.5, 0.42, 0.12]); }
   }
   for (let s = 0; s < 2; s++) {   // sea lettuce sheet
@@ -352,15 +352,15 @@ export function seaStackParts(seed = 1, H = 12, R = 3) {
     const t = i / rows, row = []; const band = strata[Math.floor(i * 0.5 + seed) % strata.length];
     const prof = (1 + 0.55 * Math.exp(-t * 5)) * (0.78 + 0.22 * Math.cos(t * 1.4)) * (1 - 0.35 * Math.pow(t, 3)) * (i % 4 === 0 ? 1.1 : 1);
     for (let j = 0; j < cols; j++) {
-      const a = (j / cols) * 6.283, k = 1 + 0.18 * Math.sin(a * 3 + nz[0] + t * 2) + 0.1 * Math.sin(a * 7 + nz[1] + t * 5) + 0.05 * Math.sin(a * 13 + nz[2]);
+      const a = (j / cols) * 6.283, k = 1 + 0.18 * Math.sin(a * 3 + nz[0]! + t * 2) + 0.1 * Math.sin(a * 7 + nz[1]! + t * 5) + 0.05 * Math.sin(a * 13 + nz[2]!);
       const rr = R * prof * k, top = i === rows ? 0.6 : 1;
       const cap = t > 0.97 ? [0.35, 0.5, 0.2] : band, sh = 0.88 + 0.12 * Math.sin(a * 5 + t * 9);
-      row.push(gb.v(Math.cos(a) * rr * top, t * H - 1.0 + (i === rows ? 0.6 * Math.sin(a * 2 + nz[0]) : 0), Math.sin(a) * rr * top, cap[0] * sh, cap[1] * sh, cap[2] * sh));
+      row.push(gb.v(Math.cos(a) * rr * top, t * H - 1.0 + (i === rows ? 0.6 * Math.sin(a * 2 + nz[0]!) : 0), Math.sin(a) * rr * top, cap![0]! * sh, cap![1]! * sh, cap![2]! * sh));
     }
     ids.push(row);
   }
-  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) gb.quad(ids[i][j], ids[i][(j + 1) % cols], ids[i + 1][(j + 1) % cols], ids[i + 1][j]);
-  const topc = gb.v(0, H - 1.0 + 0.2, 0, 0.35, 0.5, 0.2); for (let j = 0; j < cols; j++) gb.tri(ids[rows][j], topc, ids[rows][(j + 1) % cols]);
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) gb.quad(ids[i]![j], ids[i]![(j + 1) % cols], ids[i + 1]![(j + 1) % cols], ids[i + 1]![j]);
+  const topc = gb.v(0, H - 1.0 + 0.2, 0, 0.35, 0.5, 0.2); for (let j = 0; j < cols; j++) gb.tri(ids[rows]![j], topc, ids[rows]![(j + 1) % cols]);
   const m = new THREE.MeshLambertMaterial({ vertexColors: true }); m.userData.tag = "stack";
   return [{ geo: gb.geo(true), mat: toonify(m, { shadeK: 0.7, rim: 0.12, height: H, moss: 0.0 }) }];
 }
@@ -468,7 +468,7 @@ void main(){ float rr = length(vUv - 0.5) * 2.0; float n = texture2D(uNoise, vUv
 }`,
   });
   const im = new THREE.InstancedMesh(geo, mat, n);
-  for (let i = 0; i < n; i++) { const x = xs[i], z = zOf(x) - r() * 1.4, s = 1.4 + r() * 1.6; m.compose(V(x, 0.05, z), new THREE.Quaternion(), V(s, s, s)); im.setMatrixAt(i, m); }
+  for (let i = 0; i < n; i++) { const x = xs[i], z = zOf(x) - r() * 1.4, s = 1.4 + r() * 1.6; m.compose(V(x!, 0.05, z), new THREE.Quaternion(), V(s, s, s)); im.setMatrixAt(i, m); }
   im.frustumCulled = false; im.renderOrder = 45; im.name = "spray"; return im;
 }
 

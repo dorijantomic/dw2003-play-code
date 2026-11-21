@@ -31,7 +31,7 @@ class SimplexNoise {
       [this.p[i], this.p[n]] = [this.p[n], this.p[i]];
     }
     this.perm = new Uint8Array(512); this.permMod12 = new Uint8Array(512);
-    for (let i = 0; i < 512; i++) { this.perm[i] = this.p[i & 255]; this.permMod12[i] = this.perm[i] % 12; }
+    for (let i = 0; i < 512; i++) { this.perm[i] = this.p[i & 255]; this.permMod12[i] = this.perm[i]! % 12; }
     this.grad3 = new Float32Array([1,1,0, -1,1,0, 1,-1,0, -1,-1,0, 1,0,1, -1,0,1, 1,0,-1, -1,0,-1, 0,1,1, 0,-1,1, 0,1,-1, 0,-1,-1]);
   }
   noise3D(xin: number, yin: number, zin: number) {
@@ -55,13 +55,13 @@ class SimplexNoise {
     const x3 = x0 - 1 + 3 * G3, y3 = y0 - 1 + 3 * G3, z3 = z0 - 1 + 3 * G3;
     const ii = i & 255, jj = j & 255, kk = k & 255, g = this.grad3, pm = this.permMod12, pr = this.perm;
     let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
-    if (t0 < 0) n0 = 0; else { const a = pm[ii + pr[jj + pr[kk]]] * 3; t0 *= t0; n0 = t0 * t0 * (g[a]*x0 + g[a+1]*y0 + g[a+2]*z0); }
+    if (t0 < 0) n0 = 0; else { const a = pm[ii + pr[jj + pr[kk]!]!]! * 3; t0 *= t0; n0 = t0 * t0 * (g[a]!*x0 + g[a+1]!*y0 + g[a+2]!*z0); }
     let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
-    if (t1 < 0) n1 = 0; else { const a = pm[ii + i1 + pr[jj + j1 + pr[kk + k1]]] * 3; t1 *= t1; n1 = t1 * t1 * (g[a]*x1 + g[a+1]*y1 + g[a+2]*z1); }
+    if (t1 < 0) n1 = 0; else { const a = pm[ii + i1 + pr[jj + j1 + pr[kk + k1]!]!]! * 3; t1 *= t1; n1 = t1 * t1 * (g[a]!*x1 + g[a+1]!*y1 + g[a+2]!*z1); }
     let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
-    if (t2 < 0) n2 = 0; else { const a = pm[ii + i2 + pr[jj + j2 + pr[kk + k2]]] * 3; t2 *= t2; n2 = t2 * t2 * (g[a]*x2 + g[a+1]*y2 + g[a+2]*z2); }
+    if (t2 < 0) n2 = 0; else { const a = pm[ii + i2 + pr[jj + j2 + pr[kk + k2]!]!]! * 3; t2 *= t2; n2 = t2 * t2 * (g[a]!*x2 + g[a+1]!*y2 + g[a+2]!*z2); }
     let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
-    if (t3 < 0) n3 = 0; else { const a = pm[ii + 1 + pr[jj + 1 + pr[kk + 1]]] * 3; t3 *= t3; n3 = t3 * t3 * (g[a]*x3 + g[a+1]*y3 + g[a+2]*z3); }
+    if (t3 < 0) n3 = 0; else { const a = pm[ii + 1 + pr[jj + 1 + pr[kk + 1]!]!]! * 3; t3 *= t3; n3 = t3 * t3 * (g[a]!*x3 + g[a+1]!*y3 + g[a+2]!*z3); }
     return 32 * (n0 + n1 + n2 + n3);
   }
   fbm(x: number, y: number, z: number, octaves = 4) {
@@ -78,16 +78,16 @@ const mulberry = (a: number) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = 
 function createRockTexture(size = 1024) {
   const canvas = document.createElement("canvas"); canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#dbd6e8"; ctx.fillRect(0, 0, size, size);
-  const img = ctx.getImageData(0, 0, size, size), d = img.data, k = 1024 / size;
+  ctx!.fillStyle = "#dbd6e8"; ctx!.fillRect(0, 0, size, size);
+  const img = ctx!.getImageData(0, 0, size, size), d = img.data, k = 1024 / size;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const idx = (y * size + x) * 4, X = x * k, Y = y * k;
     const val = Math.sin(X * 0.09) * 16 + noise.fbm(X * 0.018, Y * 0.005, 0.1, 4) * 26 + (noise.fbm(X * 0.05, Y * 0.05, 2.5, 2) < -0.3 ? -35 : 0);
-    d[idx] = Math.min(255, Math.max(0, d[idx] + val));
-    d[idx + 1] = Math.min(255, Math.max(0, d[idx + 1] + val * 0.95));
-    d[idx + 2] = Math.min(255, Math.max(0, d[idx + 2] + val * 1.08));
+    d[idx] = Math.min(255, Math.max(0, d[idx]! + val));
+    d[idx + 1] = Math.min(255, Math.max(0, d[idx + 1]! + val * 0.95));
+    d[idx + 2] = Math.min(255, Math.max(0, d[idx + 2]! + val * 1.08));
   }
-  ctx.putImageData(img, 0, 0);
+  ctx!.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   return tex;
@@ -96,12 +96,12 @@ function createRockTexture(size = 1024) {
 // ---------------------------------------------------------------- 3. the fluted spire (reference geometry, base at y 0)
 function createSpire(height: number, radiusBottom: number, flutes: number, segR: number, segH: number, seed: number) {
   const geo = new THREE.CylinderGeometry(0.12, radiusBottom, height, segR, segH, true);
-  const pos = geo.attributes.position, n = pos.count;
+  const pos = geo.attributes.position, n = pos!.count;
   const ao = new Float32Array(n), rnd = mulberry(seed);
   const summit = [], crevice = [];
   let rSum = 0, rCnt = 0;
   for (let i = 0; i < n; i++) {
-    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    let x = pos!.getX(i), y = pos!.getY(i), z = pos!.getZ(i);
     const normY = (y + height / 2) / height;
     const angle = Math.atan2(z, x);
     const fluteShape = Math.abs(Math.sin(angle * (flutes / 2))) * 1.45;
@@ -111,7 +111,7 @@ function createSpire(height: number, radiusBottom: number, flutes: number, segR:
     x += Math.cos(angle) * disp; z += Math.sin(angle) * disp;
     x += Math.sin(normY * Math.PI) * 0.6;
     y += height / 2;                                   // base at 0
-    pos.setXYZ(i, x, y, z);
+    pos!.setXYZ(i, x, y, z);
     ao[i] = Math.min(1, Math.max(0, 0.42 + 0.58 * (fluteShape / 1.45) + crags * 0.12));   // dark in the flute valleys
     if (normY < 0.02) { rSum += Math.hypot(x, z); rCnt++; }
     if (normY > 0.84 && normY < 0.94 && rnd() < 0.09) summit.push({ p: [x, y, z], n: [0.15, 1, 0.1] });
@@ -122,11 +122,11 @@ function createSpire(height: number, radiusBottom: number, flutes: number, segR:
   const nor = geo.attributes.normal, rowLen = segR + 1;       // weld the seam normals (vertex 0 and vertex segR of each ring)
   for (let r = 0; r <= segH; r++) {
     const a = r * rowLen, b = a + segR;
-    const x = nor.getX(a) + nor.getX(b), y = nor.getY(a) + nor.getY(b), z = nor.getZ(a) + nor.getZ(b), L = Math.hypot(x, y, z) || 1;
-    nor.setXYZ(a, x / L, y / L, z / L); nor.setXYZ(b, x / L, y / L, z / L);
+    const x = nor!.getX(a) + nor!.getX(b), y = nor!.getY(a) + nor!.getY(b), z = nor!.getZ(a) + nor!.getZ(b), L = Math.hypot(x, y, z) || 1;
+    nor!.setXYZ(a, x / L, y / L, z / L); nor!.setXYZ(b, x / L, y / L, z / L);
   }
   geo.setAttribute("aAO", new THREE.BufferAttribute(ao, 1));
-  geo.userData = { height, rMean: rSum / Math.max(1, rCnt), tris: geo.index.count / 3, verts: n, summit, crevice };
+  geo.userData = { height, rMean: rSum / Math.max(1, rCnt), tris: geo.index!.count / 3, verts: n, summit, crevice };
   return geo;
 }
 
@@ -183,12 +183,12 @@ function drawLeafAtlas() {          // 2 x 2 cells, each one pointed leaf with a
   const x = c.getContext("2d"), rnd = mulberry(5);
   for (let cell = 0; cell < 4; cell++) {
     const ox = (cell % 2) * 64, oy = Math.floor(cell / 2) * 64;
-    x.save(); x.translate(ox + 32, oy + 32); x.rotate((rnd() - 0.5) * 0.5);
+    x!.save(); x!.translate(ox + 32, oy + 32); x!.rotate((rnd() - 0.5) * 0.5);
     const wd = 12 + rnd() * 6, ln = 27 + rnd() * 3;
-    x.beginPath(); x.moveTo(0, ln); x.quadraticCurveTo(wd, ln * 0.2, 0, -ln); x.quadraticCurveTo(-wd, ln * 0.2, 0, ln); x.closePath();
-    x.fillStyle = "#d8d8d8"; x.fill();
-    x.strokeStyle = "#ffffff"; x.lineWidth = 2; x.beginPath(); x.moveTo(0, ln); x.lineTo(0, -ln * 0.8); x.stroke();
-    x.restore();
+    x!.beginPath(); x!.moveTo(0, ln); x!.quadraticCurveTo(wd, ln * 0.2, 0, -ln); x!.quadraticCurveTo(-wd, ln * 0.2, 0, ln); x!.closePath();
+    x!.fillStyle = "#d8d8d8"; x!.fill();
+    x!.strokeStyle = "#ffffff"; x!.lineWidth = 2; x!.beginPath(); x!.moveTo(0, ln); x!.lineTo(0, -ln * 0.8); x!.stroke();
+    x!.restore();
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.generateMipmaps = true; t.anisotropy = 2;
   return t;
@@ -257,8 +257,8 @@ export function createGeminiSpires(ctx, groups) {
   const tex = createRockTexture(1024), texMs = performance.now() - t0;
   const rockMat = rockMaterial(S, tex), leafMat = shrubMaterial(S, drawLeafAtlas());
   ctx.materials?.push(rockMat, leafMat);
-  const front = G.FRONT.map(([r, h, f], i) => createSpire(G.H, G.RB, f, r, h, 11 + i * 17));
-  const back = G.BACK.map(([r, h, f], i) => createSpire(G.H, G.RB, f, r, h, 71 + i * 13));
+  const front = G.FRONT.map(([r, h, f], i) => createSpire(G.H, G.RB, f!, r!, h!, 11 + i * 17));
+  const back = G.BACK.map(([r, h, f], i) => createSpire(G.H, G.RB, f!, r!, h!, 71 + i * 13));
   // instance counts
   const pillarsOf = (g) => g.parts.filter((p: { type: string; }) => p.type === "pillar");
   let nFront = 0, nBack = 0;
@@ -303,7 +303,7 @@ export function createGeminiSpires(ctx, groups) {
     }
     const phi = ((p.vvar * 12.9898) % 6.28318);
     const c = Math.cos(phi), s = Math.sin(phi);
-    const sy = (H + p.skirt) / tpl.userData.height, sx = sxz / tpl.userData.rMean;
+    const sy = (H + p.skirt) / tpl!.userData.height, sx = sxz / tpl!.userData.rMean;
     const lean = p.lean * sy;
     // columns: local X, Y, Z (yawed by phi) mapped to wall tangent / up(+lean) / radial
     const Xc = [sx * (c * tx - s * ax), 0, sx * (c * tz - s * az)];
@@ -356,13 +356,13 @@ export function createGeminiSpires(ctx, groups) {
           const vi = (g.id + k) % front.length, tpl = front[vi];
           const sxz = p.R;
           instanceMatrix(p, g, p.H, sxz, tpl, false, PM);
-          fMesh[vi].setMatrixAt(cf[vi], PM);
-          fMesh[vi].setColorAt(cf[vi], C.setScalar(0.92 + rnd() * 0.16));
+          fMesh[vi]!.setMatrixAt(cf[vi]!, PM);
+          fMesh[vi]!.setColorAt(cf[vi]!, C.setScalar(0.92 + rnd() * 0.16));
           cf[vi]++;
           // shrubs: the pillar's own summit / crevice anchors
           NM.getNormalMatrix(PM);
           const pick = (arr, cnt: number) => { const out = [], used = new Set(); for (let i = 0; i < cnt && arr.length; i++) { let j = Math.floor(rnd() * arr.length), tr = 0; while (used.has(j) && tr++ < 8) j = Math.floor(rnd() * arr.length); used.add(j); out.push(arr[j]); } return out; };
-          const jobs = [...pick(tpl.userData.summit, G.CLUMP_SUMMIT).map((a) => [a, false]), ...pick(tpl.userData.crevice, G.CLUMP_CREVICE).map((a) => [a, true])];
+          const jobs = [...pick(tpl!.userData.summit, G.CLUMP_SUMMIT).map((a) => [a, false]), ...pick(tpl!.userData.crevice, G.CLUMP_CREVICE).map((a) => [a, true])];
           for (const [a, ledge] of jobs) {
             V.fromArray(a.p).applyMatrix4(PM);
             const nw = new THREE.Vector3().fromArray(a.n).applyMatrix3(NM).normalize();
@@ -371,8 +371,8 @@ export function createGeminiSpires(ctx, groups) {
           if (g.kind === "wall") {
             const bi = (g.id + k) % back.length, btpl = back[bi];
             instanceMatrix(p, g, p.H * G.BACK_K, p.R, btpl, true, M);
-            bMesh[bi].setMatrixAt(cb[bi], M);
-            bMesh[bi].setColorAt(cb[bi], C.setScalar(G.BACK_TONE * (0.9 + rnd() * 0.2)));
+            bMesh[bi]!.setMatrixAt(cb[bi]!, M);
+            bMesh[bi]!.setColorAt(cb[bi]!, C.setScalar(G.BACK_TONE * (0.9 + rnd() * 0.2)));
             cb[bi]++;
           }
         });
@@ -383,16 +383,16 @@ export function createGeminiSpires(ctx, groups) {
       if (n) sh.computeBoundingSphere();
       sh.visible = n > 0;
     });
-    fMesh.forEach((m, i) => { m.count = cf[i]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); m.visible = cf[i] > 0; });
-    bMesh.forEach((m, i) => { m.count = cb[i]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); m.visible = cb[i] > 0; });
+    fMesh.forEach((m, i) => { m.count = cf[i]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); m.visible = cf[i]! > 0; });
+    bMesh.forEach((m, i) => { m.count = cb[i]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; m.computeBoundingSphere(); m.visible = cb[i]! > 0; });
     stat.leaves = leaves; stat.pillars = pillars; stat.layouts++; stat.layoutMs = Math.round(performance.now() - t);
     stat.frontInstances = cf.reduce((a, b) => a + b, 0); stat.backInstances = cb.reduce((a, b) => a + b, 0);
-    stat.tris = stat.frontInstances * front[0].userData.tris + stat.backInstances * back[0].userData.tris + leaves * 2;
+    stat.tris = stat.frontInstances * front[0]!.userData.tris + stat.backInstances * back[0]!.userData.tris + leaves * 2;
     stat.drawCalls = fMesh.filter((m) => m.visible).length + bMesh.filter((m) => m.visible).length + shrubs.filter((m) => m.visible).length;
   }
   layout();
   stat.buildMs = Math.round(performance.now() - t0); stat.textureMs = Math.round(texMs);
-  stat.spireTris = { front: front[0].userData.tris, back: back[0].userData.tris, verts: front[0].userData.verts };
+  stat.spireTris = { front: front[0]!.userData.tris, back: back[0]!.userData.tris, verts: front[0]!.userData.verts };
   stat.anchors = front.map((g) => [g.userData.summit.length, g.userData.crevice.length]);
   return { root, layout, stat, materials: [rockMat, leafMat], meshes: [...fMesh, ...bMesh, ...shrubs] };
 }

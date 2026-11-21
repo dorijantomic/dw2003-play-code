@@ -23,7 +23,7 @@ export function glossarySpecies() {             // null until the tables are in
 export function glossaryItems() {
     S.glossaryItemLoader ??= createRetryLoader(() => loadItemsData(undefined, battleHudNameBank));
     return {
-        data: S.glossaryItemLoader.get(),
+        data: S.glossaryItemLoader!.get(),
         info: (id) => ITEM_BY_ID[id] ?? null,                 // the real name and description the shop and the equip footer show
         ids: () => itemLog.knownIds(),
         held: (id) => heldCount(state, id),
@@ -79,13 +79,13 @@ export function placeFollowersAt(spots) {
     for (let i = 0; i < followers.length; i++) {
         const s = spots?.[i];
         if (!s) continue;
-        followers[i].x = s.x;
-        followers[i].y = s.y;
-        followers[i].parked = false;
-        followers[i].gathering = false;
-        followers[i].animTime = 0;
-        followers[i].stopping = false;
-        followers[i].stopTime = 0;
+        followers[i]!.x = s.x;
+        followers[i]!.y = s.y;
+        followers[i]!.parked = false;
+        followers[i]!.gathering = false;
+        followers[i]!.animTime = 0;
+        followers[i]!.stopping = false;
+        followers[i]!.stopTime = 0;
     }
     partnerHistory.splice(
         0,

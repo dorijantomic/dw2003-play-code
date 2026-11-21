@@ -157,22 +157,22 @@ export function createShop(sfx = null) {
 
   // per-window fold-anim start times ("never started" = already open)
   sh._anim = {};
-  sh._animStart = (...keys) => { for (const k of keys) sh._anim[k] = sh.time; };
+  sh._animStart = (...keys) => { for (const k of keys) sh._anim![k] = sh.time; };
   // Progress now comes from the shared fold class (engine/dw3/ui/fold-tween.ts),
   // not a local formula. `null` start = never animated = already open.
   sh._animP = (key) =>
-    ui.foldTransformAtTime(sh.time, sh._anim[key] ?? null, 0, 0, "x", ANIM_T).progress;
+    ui.foldTransformAtTime(sh.time, sh._anim![key] ?? null, 0, 0, "x", ANIM_T).progress;
 
   // Backing out of a plate state returns to the list and re-runs the list
   // window's fold-open; the overlay's qty-cancel path starts that animation
   // before the cursor comes back (F0x80083eb0 states 9/10 call the list
   // window's open method on arg0+0x88).
-  const backToList = () => { sh.screen = "list"; sh._animStart("list"); };
+  const backToList = () => { sh.screen = "list"; sh._animStart!("list"); };
 
   sh.open = (stock, onClose = null, opts: ShopOpenOpts = {}) => {
     sh._open = true;
     sh._anim = {};
-    sh._animStart("rootName", "rootBit", "rootMenu", "rootFooter");
+    sh._animStart!("rootName", "rootBit", "rootMenu", "rootFooter");
     sh.stock = stock;
     sh.name = opts.name ?? "";
     sh.screen = "root";
@@ -242,7 +242,7 @@ export function createShop(sfx = null) {
       // (`exe/f3.s`), so a piece that is only on a partner's hand is NOT on this
       // shelf. Take it off first (the merchant's equip-apply, 0x8008C880) and it
       // becomes sellable, which is the original's order of operations.
-      return shopLayout.sell_catalog[sh.catIdx]
+      return shopLayout.sell_catalog[sh.catIdx]!
         .filter((id) => heldCount(state, id) > 0 && sellUnit(ITEM_BY_ID[id]) > 0)
         .map((id) => ({ id, qty: null }));
     }
@@ -250,7 +250,7 @@ export function createShop(sfx = null) {
   };
 
   sh._selected = (state) => {
-    const list = sh._currentList(state);
+    const list = sh._currentList!(state);
     return list[sh.cursor] ?? null;
   };
 
@@ -277,7 +277,7 @@ export function createShop(sfx = null) {
         if (sh.feedbackNext === "list") {
           sh.infoView = "desc";
           backToList();
-          sh._animStart("desc");
+          sh._animStart!("desc");
         }
         sh.feedbackNext = null;
       }
@@ -298,12 +298,12 @@ export function createShop(sfx = null) {
         if (sh.mode === 1) {
           // Fresh SELL entry resets the category cursor (rig: full36).
           sh.screen = "sellcat"; sh.catIdx = 0;
-          sh._animStart("sellcat");
+          sh._animStart!("sellcat");
         } else {
           sh.screen = "list";
           sh.cursor = 0; sh.page = 0;
           sfx?.play("system03"); // list + band fold open
-          sh._animStart("list", "band", "desc", "prompt");
+          sh._animStart!("list", "band", "desc", "prompt");
         }
         return;
       } else if (key === "cross") { sfx?.play("system01"); requestLeave(); return; }
@@ -316,22 +316,22 @@ export function createShop(sfx = null) {
       if (key === "up") sh.catIdx = Math.max(0, sh.catIdx - 1);
       else if (key === "down") sh.catIdx = Math.min(SELL_CATS.length - 1, sh.catIdx + 1);
       else if (key === "circle") {
-        const stock = sh._currentList(state);
+        const stock = sh._currentList!(state);
         if (stock.length === 0) {
           // Empty shelf: "Don't have {X}." over the category menu.
-          sh._feedback(`Don't have ${SELL_CATS[sh.catIdx]}.`);
+          sh._feedback!(`Don't have ${SELL_CATS[sh.catIdx]}.`);
           return;
         }
         sfx?.play("system00");
         sh.screen = "list";
         sh.cursor = 0; sh.page = 0;
         sfx?.play("system03"); // list + band fold open
-        sh._animStart("list", "band", "desc", "prompt");
+        sh._animStart!("list", "band", "desc", "prompt");
         return;
       } else if (key === "cross") {
         sfx?.play("system01");
         sh.screen = "root";
-        sh._animStart("rootMenu");
+        sh._animStart!("rootMenu");
         return;
       }
       if (sh.catIdx !== cur) sfx?.play("system02");
@@ -354,18 +354,18 @@ export function createShop(sfx = null) {
     if (key === "triangle") {
       // Effects cards exist only on the BUY side (the SELL band object never
       // instantiates the cards fn — decoded F0x8008af50 mode split).
-      const item = ITEM_BY_ID[sh._selected(state)?.id];
+      const item = ITEM_BY_ID[sh._selected!(state)?.id];
       if (sh.mode === 0 && ["list", "qty", "confirm"].includes(sh.screen)
         && item && EQUIPMENT_BY_ID[item.id]) {
         sh.infoView = sh.infoView === "desc" ? "effects" : "desc";
-        sh._animStart(sh.infoView === "effects" ? "cards" : "desc");
+        sh._animStart!(sh.infoView === "effects" ? "cards" : "desc");
       }
       return;
     }
 
     if (sh.screen === "qty") {
-      const item = ITEM_BY_ID[sh._selected(state)?.id];
-      const max = sh._maxQty(state, item);
+      const item = ITEM_BY_ID[sh._selected!(state)?.id];
+      const max = sh._maxQty!(state, item);
       const q = sh.qty;
       // F0x80083eb0 case 8 / sell case 0x17: up/down ±1, left −10 (floor 1),
       // right +10 (clamp ceiling). Every change ticks system06.
@@ -375,7 +375,7 @@ export function createShop(sfx = null) {
       else if (key === "right") sh.qty = Math.min(max, sh.qty + 10);
       else if (key === "circle") {
         sfx?.play("system07"); sh.screen = "confirm"; sh.confirmIdx = 0;
-        sh._animStart("cfmPlate", "cfm");
+        sh._animStart!("cfmPlate", "cfm");
         return;
       }
       else if (key === "cross") { sfx?.play("system01"); sh.qty = 1; backToList(); return; }
@@ -389,7 +389,7 @@ export function createShop(sfx = null) {
       else if (key === "down") sh.confirmIdx = 1;
       else if (key === "circle") {
         sfx?.play("system00");
-        if (sh.confirmIdx === 0) sh._commit(state);
+        if (sh.confirmIdx === 0) sh._commit!(state);
         else { sh.qty = 1; backToList(); }
         return;
       } else if (key === "cross") { sfx?.play("system01"); sh.qty = 1; backToList(); return; }
@@ -399,7 +399,7 @@ export function createShop(sfx = null) {
 
     // Both lists use two columns; BUY has four rows, SELL has seven.
     if (sh.screen === "list") {
-    const list = sh._currentList(state);
+    const list = sh._currentList!(state);
     const cur = sh.cursor, pg = sh.page;
     const last = Math.max(0, list.length - 1);
     const step = GRID_COLS;
@@ -418,20 +418,20 @@ export function createShop(sfx = null) {
           const sel = ITEM_BY_ID[list[sh.cursor]?.id];
           const held = heldCount(state, sel?.id ?? 0);
           const refusal = shopBuyRefusal(held, state.bits ?? 0, sel?.price ?? 0);
-          if (refusal === "too-many") { sh._feedback(STR_TOO_MANY); return; }
-          if (refusal === "not-enough") { sh._feedback(STR_NO_BIT); return; }
+          if (refusal === "too-many") { sh._feedback!(STR_TOO_MANY); return; }
+          if (refusal === "not-enough") { sh._feedback!(STR_NO_BIT); return; }
         } else {
           sfx?.play("system00");
         }
         sh.screen = "qty"; sh.qty = 1;
-        sh._animStart("qty", "qtySpin");
+        sh._animStart!("qty", "qtySpin");
       }
       return;
     } else if (key === "cross") {
       sfx?.play("system01");
       // BUY triangles to the root; SELL triangles back to the category menu.
       sh.screen = sh.mode === 0 ? "root" : "sellcat";
-      sh._animStart("rootMenu");
+      sh._animStart!("rootMenu");
       return;
     }
     if (sh.page !== pg) sh.cursor = Math.min(last, sh.page * pageSize(sh.mode));
@@ -448,10 +448,10 @@ export function createShop(sfx = null) {
     else if (key === "circle") {
       if (sh.equipIdx === 0) {
         sfx?.play("system00");
-        const first = sh._equipCards(state).findIndex((card) => card.preview?.slot && card.accessible);
+        const first = sh._equipCards!(state).findIndex((card) => card.preview?.slot && card.accessible);
         if (first < 0) { backToList(); return; }
         sh.screen = "equipwho"; sh.equipWhoIdx = first;
-        sh._animStart("cfm");
+        sh._animStart!("cfm");
       } else {
         // Live: No returns to the list with the cursor kept.
         sfx?.play("system01"); backToList();
@@ -467,7 +467,7 @@ export function createShop(sfx = null) {
     // members who cannot wear the item; moves onto a valid member tick
     // system06, dead moves are silent; X assigns with system07 and shows
     // "Equipped.", then offers the next member; TRIANGLE cancels to the list.
-    const cards = sh._equipCards(state);
+    const cards = sh._equipCards!(state);
     const canWear = (i: number) => !!cards[i]?.preview?.slot && !!cards[i]?.accessible;
     const cur = sh.equipWhoIdx;
     if (key === "left" || key === "right") {
@@ -481,12 +481,12 @@ export function createShop(sfx = null) {
       }
       sh.equipWhoIdx = canWear(i) ? i : cur;
     } else if (key === "circle") {
-      if (canWear(sh.equipWhoIdx) && sh._equipOn(state, sh.equipWhoIdx)) {
+      if (canWear(sh.equipWhoIdx) && sh._equipOn!(state, sh.equipWhoIdx)) {
         sfx?.play("system07");
-        sh._feedback(STR_EQUIPPED);
+        sh._feedback!(STR_EQUIPPED);
         // BUY state 40 returns to the list if the last copy was equipped;
         // otherwise the member picker stays open for another copy.
-        const held = heldCount(state, sh._selected(state)?.id ?? 0);
+        const held = heldCount(state, sh._selected!(state)?.id ?? 0);
         sh.feedbackNext = shopBuyAfterEquip(held);
       }
       return;
@@ -497,7 +497,7 @@ export function createShop(sfx = null) {
 };
 
   sh._commit = (state) => {
-    const slot = sh._selected(state);
+    const slot = sh._selected!(state);
     if (!slot) { backToList(); return; }
     const item = ITEM_BY_ID[slot.id];
     if (!item) { backToList(); return; }
@@ -527,11 +527,11 @@ export function createShop(sfx = null) {
         // only when at least one present member can wear the item. A wear-mask
         // miss (e.g. LeatherGlove, Kumamon-only) returns straight to the list
         // with the item in the bag.
-        const wearable = sh._equipCards(state).some((c) => c.preview?.slot && c.accessible);
+        const wearable = sh._equipCards!(state).some((c) => c.preview?.slot && c.accessible);
         if (!wearable) { backToList(); return; }
         sh.screen = "equip"; sh.equipIdx = 0;
         sh.infoView = "effects";
-        sh._animStart("cfm", "cards");
+        sh._animStart!("cfm", "cards");
       } else {
         backToList();
       }
@@ -546,7 +546,7 @@ export function createShop(sfx = null) {
       sh.qty = 1;
       // The SELL controller rebuilds the held-item list after a sale. It
       // returns to the category choices only when that list is now empty.
-      const remaining = sh._currentList(state);
+      const remaining = sh._currentList!(state);
       if (remaining.length > 0) {
         sh.cursor = Math.min(sh.cursor, remaining.length - 1);
         sh.page = Math.floor(sh.cursor / pageSize(sh.mode));
@@ -554,7 +554,7 @@ export function createShop(sfx = null) {
       } else {
         sh.screen = "sellcat";
         sh.cursor = 0; sh.page = 0;
-        sh._animStart("sellcat");
+        sh._animStart!("sellcat");
       }
     }
     if (typeof localStorage !== "undefined") {
@@ -566,7 +566,7 @@ export function createShop(sfx = null) {
   // Equip the selected equipment on party member `mi` (Equip-who confirm):
   // bag −1, replaced unit back to the bag, slot filled (F0x8008c800).
   sh._equipOn = (state, mi) => {
-    const slot = sh._selected(state);
+    const slot = sh._selected!(state);
     const item = slot && ITEM_BY_ID[slot.id];
     if (!item || !EQUIPMENT_BY_ID[item.id]) return false;
     const members = state.party ?? [];
@@ -614,7 +614,7 @@ export function createShop(sfx = null) {
 
   // Party member cards for the Equip screens (null = cannot wear selected).
   sh._equipCards = (state) => {
-    const slot = sh._selected(state);
+    const slot = sh._selected!(state);
     const item = slot && ITEM_BY_ID[slot.id];
     if (!item) return [];
     const cards = partyRosterView(
@@ -641,7 +641,7 @@ export function createShop(sfx = null) {
     // dismissing one plays the apply tick (SYSTEM07) — see handleKey.
     sfx?.play("system03");
     sh.feedbackMsg = msg;
-    sh._animStart("msg");
+    sh._animStart!("msg");
   };
 
   sh.update = (dt) => {
@@ -649,7 +649,7 @@ export function createShop(sfx = null) {
     sh.time += dt;
     if (sh.fadeLeaving) {
       const frames = leaveFadeFrames(sh.time, sh.fadeT0 + LEAVE_FOLD_FRAMES * VSYNC_S);
-      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) sh.close();
+      if (leaveFadeDone(frames, LEAVE_FADE_DELTA)) sh.close!();
     }
   };
 
@@ -686,7 +686,7 @@ export function createShop(sfx = null) {
     const fold = (key: string, px: number, py: number, axis: string, fn: { (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): void; }) => {
       const start = leaving
         ? sh.time - (1 - leaveFoldP()) * ANIM_T
-        : (sh._anim[key] ?? null);
+        : (sh._anim![key] ?? null);
       const tr = ui.foldTransformAtTime(sh.time, start, px, py, axis, ANIM_T);
       if (tr.progress <= 0) return 0;
       if (tr.ready) { fn(); return 1; }
@@ -776,7 +776,7 @@ export function createShop(sfx = null) {
     // ── list grid (drawn with the list window; the native adds the cells
     // once the window anim hits 0x1000) ──
     // Both lists have two columns; SELL has seven rows and no Effects prompt.
-    const list = sh._currentList(state);
+    const list = sh._currentList!(state);
     const perPage = pageSize(sh.mode);
     const start = sh.page * perPage;
     const pages = Math.max(1, Math.ceil(list.length / perPage));
@@ -814,9 +814,9 @@ export function createShop(sfx = null) {
     // ── info band: clip 14 @ (15, 108+42m) — right section = price plate ──
     const bandP = fold("band", 0x140, 0x81 + m40, "x",
       () => drawClip(ctx, stshop, 14, 0x0F, 0x6C + m42));
-    const selItem = ITEM_BY_ID[sh._selected(state)?.id];
+    const selItem = ITEM_BY_ID[sh._selected!(state)?.id];
     if (bandP >= 1 && selItem) {
-      const { equip, bag } = sh._counts(state, selItem.id);
+      const { equip, bag } = sh._counts!(state, selItem.id);
       drawItemIcon(ctx, selItem.id, 0x16, 0x73 + m42);
       text(selItem.name, 0x25, 0x74 + m42);
       text(STR_EQUIP, 0xA1, 0x75 + m42);
@@ -828,7 +828,7 @@ export function createShop(sfx = null) {
       // F0x80089E2C fills widget +0x18 with price x quantity (band+0x1E8): the
       // running total, recomputed on every dial, never the bare unit price once
       // a quantity is up. At qty 1 the two coincide, which is the list view.
-      const pd = String(sh._unitPrice(selItem) * sh.qty);
+      const pd = String(sh._unitPrice!(selItem) * sh.qty);
       text(pd, 0x117 - textWidth(pd, 3), 0x8B + m42, true);
       text("BIT", 0x11A, 0x8B + m42, true);
     }
@@ -888,9 +888,9 @@ export function createShop(sfx = null) {
           // with an arrow between a before at 57 and an after at 90, and rows
           // 2 and 3 with no arrow and an after at 99. All + 99 per member.
           const row = CARD_STAT_ROWS[ri];
-          const y = row.y;
-          const bx = row.beforeX + 0x63 * i;
-          const ax = row.afterX + 0x63 * i;
+          const y = row!.y;
+          const bx = row!.beforeX + 0x63 * i;
+          const ax = row!.afterX + 0x63 * i;
           drawIconGlyph(ctx, iconNameFor(r.stat), x0 + 10, y);
           if (r.after < r.before) {
             // decrease: just the after-value in red, no arrow (rig-verified)
@@ -898,7 +898,7 @@ export function createShop(sfx = null) {
             return;
           }
           text(String(r.before), bx - textWidth(String(r.before), 1), y);
-          if (row.arrowX != null) text("[arrow-right]", row.arrowX + 0x63 * i, y);
+          if (row!.arrowX != null) text("[arrow-right]", row!.arrowX + 0x63 * i, y);
           const after = String(r.after);
           if (r.after > r.before) drawText(ctx, after, ax - textWidth(after, 1), y, { kind: 1, color: COL_UP });
           else text(after, ax - textWidth(after, 1), y);
@@ -947,15 +947,15 @@ export function createShop(sfx = null) {
         text(STR_QTY_MARK, 0x103, 0x54);
         const qs = String(sh.qty);
         text(qs, 0x11E - textWidth(qs, 1), 0x54);
-        const item = ITEM_BY_ID[sh._selected(state)?.id];
-        if (sh.qty < sh._maxQty(state, item)) drawClip(ctx, stshop, 18, 0x122, 0x51);
+        const item = ITEM_BY_ID[sh._selected!(state)?.id];
+        if (sh.qty < sh._maxQty!(state, item)) drawClip(ctx, stshop, 18, 0x122, 0x51);
         if (sh.qty > 1) drawClip(ctx, stshop, 19, 0x122, 0x5B);
       }
     } else if (sh.screen === "confirm") {
       // total plate clip 21 @ (123,38) + Buy/No window clip 12 @ (175,67)
-      const item = ITEM_BY_ID[sh._selected(state)?.id];
+      const item = ITEM_BY_ID[sh._selected!(state)?.id];
       if (fold("cfmPlate", 0x140, 0x32, "x", () => drawClip(ctx, stshop, 21, 0x7B, 0x26)) >= 1) {
-        const totalStr = `${sh._unitPrice(item) * sh.qty} BIT`;  // "{1} BIT" (plain digits)
+        const totalStr = `${sh._unitPrice!(item) * sh.qty} BIT`;  // "{1} BIT" (plain digits)
         text(totalStr, 0x140 - textWidth(totalStr, 3), 0x2D, true);
       }
       if (fold("cfm", 0x140, 0x57, "x", () => drawClip(ctx, stshop, 12, 0xAF, 0x43)) >= 1) {

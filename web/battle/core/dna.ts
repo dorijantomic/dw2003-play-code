@@ -86,11 +86,11 @@ function tagMembers() {
       .map((index) => ({
         ...B.battle.playerRoster[index],
         stats: {
-          ...B.battle.playerRoster[index].stats,
-          hp: B.battle.playerRecords[index].hp,
-          maxHp: B.battle.playerRecords[index].maxHp,
-          mp: B.battle.playerRecords[index].mp,
-          maxMp: B.battle.playerRecords[index].maxMp,
+          ...B.battle.playerRoster[index]!.stats,
+          hp: B.battle.playerRecords[index]!.hp,
+          maxHp: B.battle.playerRecords[index]!.maxHp,
+          mp: B.battle.playerRecords[index]!.mp,
+          maxMp: B.battle.playerRecords[index]!.maxMp,
         },
         rosterIndex: index,
       }));
@@ -255,7 +255,7 @@ function dnaScriptChunks(dna: BattleDnaPresentation) {
     return dnaClip12Chunks(B.dnaResultScript?.fullScript?.segments, dna);
   }
 function startDnaChunk(b: BattleState, dna: BattleDnaPresentation) {
-    const c = dna.chunks[dna.chunk];
+    const c = dna.chunks![dna.chunk];
     if (!c || !B.renderer3d) return;
     if (c.show) B.renderer3d.setPlayerVisible(true);   // seg 4: the original actor returns
     if (dna.chunk === 3) {
@@ -337,7 +337,7 @@ function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
       // The game's own name for the fusion, which the announcement line uses even
       // when the mesh for it is not in web/assets/battle/models.
       fusedName: choice.fusedName,
-      partnerName: partnerProfile.name,
+      partnerName: partnerProfile!.name,
       damage: hit.hit ? hit.dmg : 0,
       hit: hit.hit,
       lethal: hit.hit && hit.dmg >= b.enemy.hp,
@@ -355,7 +355,7 @@ function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
     // (parent clip + segment-2 tail) when fullScript is absent from dna_clip12.json.
     // Warm every model the presentation will swap to, so the chunk boundaries
     // don't stall on network fetches mid-show.
-    for (const name of [partnerProfile.name, choice.resultProfile.name]) {
+    for (const name of [partnerProfile!.name, choice.resultProfile.name]) {
       resolveModelFolder(name).then((f) => f && B.renderer3d?.preloadDigimon?.(f)).catch(() => {});
     }
     const chunks = dnaScriptChunks(b._dnaPresentation);
@@ -367,7 +367,7 @@ function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
     } else {
       B.renderer3d?.playPlayerActionClip(DNA_PARENT_CLIP);
     }
-    b.message = `${originalProfile.name} + ${partnerProfile.name}\nDNA Digivolve!`;
+    b.message = `${originalProfile.name} + ${partnerProfile!.name}\nDNA Digivolve!`;
     return true;
   }
 /** A category-4 DNA result (375): the record machine's restore arm on the player's own party, no hit. */

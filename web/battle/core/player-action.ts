@@ -192,7 +192,7 @@ function applyPlayerAction() {
           if (!b._resultPages.length) B.clearBattleLine(b);
         };
         B.armPendingImpact(b, commitImpact);
-        const started = B.renderer3d?.playerAttack(b.player.profile.tech_basic, {
+        const started = B.renderer3d?.playerAttack(b.player.profile.tech_basic!, {
           lethal,
           onHit: B.contactOnHit(contact, commitImpact),
         });
@@ -204,8 +204,8 @@ function applyPlayerAction() {
         // / `:14673` (`li $a1, 0x2`) / `:14674` (`lw $v0, 0xac($a0)`) -- so this is the
         // disc's word under the defender's name and never the walker's sentence.
         B.recordFinaleTechnique(b, basicTechId);   // a miss still reaches the latch (wfightmn.s:4ae8 -> 4b5c -> 4b7c)
-        B.sayOriginal(b, B.evadeSpec(b, enemyName), `${enemyName} evaded!`);
-        B.renderer3d?.playerAttack(b.player.profile.tech_basic, { miss: true });
+        B.sayOriginal(b, B.evadeSpec(b, enemyName)!, `${enemyName} evaded!`);
+        B.renderer3d?.playerAttack(b.player.profile.tech_basic!, { miss: true });
       }
     } else if (action.type === "tech") {
       const skill = action.skill;
@@ -255,7 +255,7 @@ function applyPlayerAction() {
       // only writes the slot byte -- no accuracy roll, no damage, no status, no post-hit dispatch, and the
       // action task skips the technique's animation (fightstg.s:28425-28461, :27745-27760, :13067-13096). The
       // MP above stays debited: the disc's charge for an unused technique is not read.
-      if ((restoreRecord?.dispatch | 0) === 10) {
+      if ((restoreRecord?.dispatch! | 0) === 10) {
         B.setResultPages(b, []);
         B.clearBattleLine(b);
         b.pendingAction = null;
@@ -288,7 +288,7 @@ function applyPlayerAction() {
         b.pendingAction = null;
         return false;
       }
-      const restore = battleRestorePlanFor(b, 0, restoreRecord, skill.id, { name: pname });
+      const restore = battleRestorePlanFor(b, 0, restoreRecord!, skill.id, { name: pname });
       if (restore) {
         const spec = restore.page
           ? { kind: restore.page.kind, payload: restore.page.payload,
@@ -367,7 +367,7 @@ function applyPlayerAction() {
             applyPostHitDispatch(b, restoreRecord, { lockRecord: B.fightTechDB?.[String(DAMAGE_TERM_FLEE_LOCK_RECORD)], playerName: pname, enemyName }),
             applyStatDebuffDispatch(b, 0, restoreRecord, { player: pname, enemy: enemyName }),
           ].map((r) => (r as { page?: any })?.page ?? null);
-          if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._enemyFled = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c) — here the target is the enemy
+          if ((restoreRecord?.dispatch! | 0) === RESULT_QUEUE.CROSS_SLASH) b._enemyFled = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c) — here the target is the enemy
           message += after.text;
           extra += after.text + weapon.text + stolen.text
                       + B.triggerEnemyCounterRow(b, b.player, b.enemy, total, pname, enemyName);
@@ -500,7 +500,7 @@ function applyPlayerAction() {
         // Every handler in the band ends by asking the shared battle message box for its
         // own page(s); `r.pages` is that call verbatim (message id + kind + payload), so
         // the words on screen are the disc's own and not this file's sentences.
-        B.showItemPage(b, prefix, `Used ${item.name}!`, r.pages);
+        B.showItemPage(b, prefix, `Used ${item.name}!`, r.pages!!!!!!);
         if (item.id === 76) persistPlayerGauge(b);
         if (!r.ok) {
           // "No effect!" / "Evade!" — the original still consumes the item (state-2 bag

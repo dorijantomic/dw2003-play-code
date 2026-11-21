@@ -53,7 +53,7 @@ export function payoutStats(rewards) {
     });
     const sorted = paid.map((r) => r.bits).sort((a, b) => a - b);
     const mid = sorted.length >> 1;
-    const median = !sorted.length ? 0 : sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    const median = !sorted.length ? 0 : sorted.length % 2 ? sorted[mid] : (sorted[mid - 1]! + sorted[mid]!) / 2;
     return {
         count: paid.length,
         min: sorted.length ? sorted[0] : 0,

@@ -137,7 +137,7 @@ function ownClipShowsPart(model, clip: string | number, bone: string | number) {
 export function hiddenPartsFor(model, clip: string | number | null) {
   const hid = idleHiddenParts(model);
   if (!hid.length) return null;
-  const out = hid.filter((b: string | number) => !ownClipShowsPart(model, clip, b));
+  const out = hid.filter((b: string | number) => !ownClipShowsPart(model, clip!, b));
   return out.length ? out : null;
 }
 
@@ -316,7 +316,7 @@ export class ActorAnimator {
   // blends from the previous pose instead of snapping at the boundary (see TimelinePlayer ctor). On
   // the first bind there's no outgoing player (vm.player null) -> no carry, which is correct.
   _playerForTable(i: number | undefined) {
-    this._timelineTable = i | 0;
+    this._timelineTable = i! | 0;
     const tl = this.model?.timeline;
     // Carry the outgoing pose: an op2 rebind eases from the previous table's frame; the FIRST table of
     // an action (no vm.player yet) eases from the current idle frame, so the windup blends in from idle
@@ -483,7 +483,7 @@ export class ActorAnimator {
   // techEffectType applies the F0x8008ee84 fallback (a zero +0x0e on a clip-5 basic plays
   // the fixed 0x2e effect).
   setAnimByTech(techId: number | null, hooks = {}) {
-    const rec = techRecord(techId);
+    const rec = techRecord(techId!);
     // The technique's own hit count: the record's +0x0A dispatch byte over the SKILLS row, which is the
     // row that carries `hits` (digimon.json "skills"). Feeding the extracted table row alone read its
     // numeric `effect` column as "dispatch 2" and answered 1 for every dispatch-9 technique (Triple Fire,
@@ -492,8 +492,8 @@ export class ActorAnimator {
     const hits = (sk || rec)
       ? basicAttackHitCount(false, { effect_id: rec?.dispatch ?? 2, hits: sk?.hits ?? rec?.hits ?? 1 })
       : null;
-    return this.setAction(techToClip(techId), hooks, {
-      currentEffect: techEffectType(rec), element: rec?.elem1 ?? 1, target: techTargetClass(techId),
+    return this.setAction(techToClip(techId!), hooks, {
+      currentEffect: techEffectType(rec), element: rec?.elem1 ?? 1, target: techTargetClass(techId!),
       // the technique's own hit count (the one dispatch rule the damage applier uses), so a built cast
       // fires exactly as many contacts as the record's hits
       hits,
@@ -600,7 +600,7 @@ export class ActorAnimator {
         this.frame = la.frame + (la.next - la.frame) * (1 / la.run);
       }
     }
-    d = this.frame - pf;
+    d = this.frame - pf!;
     // 2. A hard cut with nothing authored: crossfade the pose that was on screen into the new one.
     if (this._cut) {
       this._cut.k += 1;

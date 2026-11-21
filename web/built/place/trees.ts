@@ -27,7 +27,7 @@ export function planRing(pieces) {
   for (const [ci, cd] of cards.entries()) {
     const r = Math.hypot(cd.c[0], cd.c[1]) || 1, u = [cd.c[0] / r, cd.c[1] / r];
     const R = rng(1008 + ci * 131);
-    const at = (t: number, dr: number) => [cd.c[0] + cd.dir[0] * t * cd.w + u[0] * dr * M, cd.c[1] + cd.dir[1] * t * cd.w + u[1] * dr * M];
+    const at = (t: number, dr: number) => [cd.c[0] + cd.dir[0] * t * cd.w + u[0]! * dr * M, cd.c[1] + cd.dir[1] * t * cd.w + u[1]! * dr * M];
     const wM = cd.w / M;
     if (cd.kind === "cypress_wall") {
       const S = WALL, n = Math.max(1, Math.round(wM / S.spacing));
@@ -64,7 +64,7 @@ export function farTop(az: number, S) {
 export function planFar(piece, S) {
   const cards = piece.cards || [];
   const hasRing = piece.rmax != null && piece.ymax != null;
-  const R = hasRing ? piece.rmax : Math.max(...cards.map((c: { base: number[]; }) => Math.hypot(c.base[0], c.base[2])));
+  const R = hasRing ? piece.rmax : Math.max(...cards.map((c: { base: number[]; }) => Math.hypot(c.base[0]!, c.base[2]!)));
   const Rm = R / 400;
   const rows = (piece.rows || []).map((r) => (r ? r.rgb : null));   // top first: 0 sky .. 2 lit tips .. 6 darkest .. 7 foot
   const greens = rows.length >= 8 && rows[2] && rows[4] && rows[6]
@@ -114,14 +114,14 @@ export function plan(pctx) {
   /** items of one species: by 90 deg sector, the exact transform made for the default asset's geometry */
   function ringItems(name: string, list, base, geoRm: number, inst = [name]) {
     const sectors = [[], [], [], []];
-    for (const it of list) sectors[sectorOf(it.xz[0], it.xz[1])].push(it);
+    for (const it of list) sectors[sectorOf(it.xz[0], it.xz[1])]!.push(it);
     const out = [];
     for (const [si, L] of sectors.entries()) for (const it of L) {
       const r = rng(Math.round(it.xz[0] * 7 + it.xz[1] * 13) >>> 0);
       const yaw = r() * Math.PI * 2, H = it.H * M;
       const sxz = geoRm ? it.Rm * M / geoRm : H;   // cypress: radius from the geometry's own Rm; shrub: uniform
       const ra = ratio(byPiece[it.piece], base), v = 0.93 + r() * 0.14;
-      out.push({ p: [it.xz[0], 0, it.xz[1]], yaw, h: H, rad: it.Rm * M, grp: si, m: composeYaw([it.xz[0], 0, it.xz[1]], yaw, sxz, H, sxz), col: [ra[0] * v, ra[1] * v, ra[2] * v] });
+      out.push({ p: [it.xz[0], 0, it.xz[1]], yaw, h: H, rad: it.Rm * M, grp: si, m: composeYaw([it.xz[0], 0, it.xz[1]], yaw, sxz, H, sxz), col: [ra[0]! * v, ra[1]! * v, ra[2]! * v] });
     }
     for (const nm of inst) for (const [si, L] of sectors.entries()) for (const it of L) instances.push({ species: nm, piece: it.piece, card: it.card, x: it.xz[0], z: it.xz[1], H: it.H, Rm: it.Rm, sector: si });
     return itemsFrom(out);
@@ -167,7 +167,7 @@ export function plan(pctx) {
     // for the lake reflection: the SAME geometry, material and instance matrices of what is bound now
     get reflection() {
       const fm = farMeshes();
-      return { group, meshes: ringMeshes().map(refl), far: fm.length ? { meshes: fm.map((m) => { const { species, ...q } = refl(m); return q; }), radiusM: +fplan.Rm.toFixed(3) } : null };
+      return { group, meshes: ringMeshes().map(refl), far: fm.length ? { meshes: fm.map((m) => { const { species, ...q } = refl(m); return q; }), radiusM: +fplan!.Rm.toFixed(3) } : null };
     },
     place(state) {   // report only: does any ring plant touch the fight radius or a view cone seen so far?
       let rejected = 0;

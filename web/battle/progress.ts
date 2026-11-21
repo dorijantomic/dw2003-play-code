@@ -210,7 +210,7 @@ export function dvexpGain(base: number, partnerLevel: number, participants: numb
 export function rollLevelUpGains(profile, newLevel: number, lu, rng = RAND_U16) {
   const g = profile.growth ?? {};
   const tier4 = newLevel < 5 ? 0 : newLevel < 20 ? 1 : newLevel < 40 ? 2 : 3;
-  const hpmp = (growth: number) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng() % 9];
+  const hpmp = (growth: number) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng()! % 9];
   const bounds = lu.core_tier_bounds; // [5, 20, 40, 60, 80]
   let tier6 = bounds.length;
   for (let i = 0; i < bounds.length; i++) if (newLevel < bounds[i]) { tier6 = i; break; }
@@ -229,11 +229,11 @@ export function rollLevelUpGains(profile, newLevel: number, lu, rng = RAND_U16) 
   const block = coreRows.concat(lu.elem_table ?? []);
   const core = {};
   for (const k of ["str", "def", "spt", "wis", "spd", "chr"])
-    core[k] = block[tier6 * stride + (g[k] ?? 0) + rng() % 5] ?? 0;
+    core[k] = block[tier6 * stride + (g[k] ?? 0) + rng()! % 5] ?? 0;
   const elems = {};
   if (newLevel < (lu.elem_level_limit ?? 41)) {
     for (const k of ["fire", "water", "ice", "wind", "thunder", "machine", "dark"]) {
-      const idx = coreRows.length + (profile.resistance_growth?.[k] ?? 0) + rng() % 4;
+      const idx = coreRows.length + (profile.resistance_growth?.[k] ?? 0) + rng()! % 4;
       elems[k] = block[idx] ?? 0;
     }
   }

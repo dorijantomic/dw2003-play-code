@@ -39,5 +39,5 @@ export function dialReset(decoded: number, mode: string) {
  */
 export function dialModeFromFx(fx: AmbienceSettings) {
     if (!fx || fx.encounterdial !== true) return "normal";
-    return DIAL_MODES.includes(fx.encounterDialMode) ? fx.encounterDialMode : "normal";
+    return DIAL_MODES.includes(fx.encounterDialMode!) ? fx.encounterDialMode : "normal";
 }

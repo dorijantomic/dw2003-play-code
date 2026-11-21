@@ -233,7 +233,7 @@ function hud() {
 
 // ------------------------------------------------------------------ test API (tools/verify_biome_gallery.mjs)
 const VIEWS = [
-  (t: { view: number[]; }) => { camera.position.set(0, t.view[1] + 2.2, t.view[0]); controls.target.set(0, t.view[1] * 0.7, 0); },
+  (t: { view: number[]; }) => { camera.position.set(0, t.view[1]! + 2.2, t.view[0]); controls.target.set(0, t.view[1]! * 0.7, 0); },
   (t) => { camera.position.set(9, 1.5, -8); controls.target.set(-6, 3.5, 12); },
   (t) => { camera.position.set(-24, 26, 24); controls.target.set(0, 0, 0); },
 ];
@@ -268,7 +268,7 @@ window.__gallery = {
     const s = [...finishMs].sort((a, b) => a - b), mean = s.reduce((a, b) => a + b, 0) / Math.max(1, s.length);
     const info = renderer.info.render;
     return { finishMeanMs: +mean.toFixed(3), finishP50Ms: +(s[Math.floor(s.length / 2)] || 0).toFixed(3), finishP95Ms: +(s[Math.floor(s.length * 0.95)] || 0).toFixed(3),
-      gpuMs: timer.gpuMs() == null ? null : +timer.gpuMs().toFixed(3), gpuTimerSupported: timer.supported, cpuSubmitMs: +(timer.cpuMs() || 0).toFixed(3), draws: info.calls, tris: info.triangles, frames: finishMs.length };
+      gpuMs: timer.gpuMs() == null ? null : +timer.gpuMs()!.toFixed(3), gpuTimerSupported: timer.supported, cpuSubmitMs: +(timer.cpuMs() || 0).toFixed(3), draws: info.calls, tris: info.triangles, frames: finishMs.length };
   },
   rendererInfo() { const gl = renderer.getContext(), d = gl.getExtension("WEBGL_debug_renderer_info"); return { renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : "?", size: [renderer.domElement.width, renderer.domElement.height], textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, programs: renderer.info.programs.length }; },
   /** render once and read the canvas back: coarse colour statistics (numbers only) */
@@ -278,12 +278,12 @@ window.__gallery = {
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
     const band = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], cnt = [0, 0, 0]; let ls = 0, ls2 = 0, n = 0, dark = 0;
     for (let y = 0; y < h; y += 6) for (let x = 0; x < w; x += 6) {
-      const i = (y * w + x) * 4, r = px[i], g = px[i + 1], b = px[i + 2], b3 = Math.min(2, Math.floor((h - 1 - y) / h * 3)), L = 0.299 * r + 0.587 * g + 0.114 * b;
-      band[b3][0] += r; band[b3][1] += g; band[b3][2] += b; cnt[b3]++; ls += L; ls2 += L * L; n++; if (L < 8) dark++;
+      const i = (y * w + x) * 4, r = px[i], g = px[i + 1], b = px[i + 2], b3 = Math.min(2, Math.floor((h - 1 - y) / h * 3)), L = 0.299 * r! + 0.587 * g! + 0.114 * b!;
+      band[b3]![0]! += r!; band[b3]![1]! += g!; band[b3]![2]! += b!; cnt[b3]++; ls += L; ls2 += L * L; n++; if (L < 8) dark++;
     }
     const m = ls / n;
     return { meanLuma: +m.toFixed(1), stdLuma: +Math.sqrt(ls2 / n - m * m).toFixed(1), nearBlack: +(dark / n).toFixed(3),
-      topRGB: band[0].slice(0, 3).map((v) => Math.round(v / cnt[0])), midRGB: band[1].slice(0, 3).map((v) => Math.round(v / cnt[1])), bottomRGB: band[2].slice(0, 3).map((v) => Math.round(v / cnt[2])) };
+      topRGB: band[0]!.slice(0, 3).map((v) => Math.round(v / cnt[0]!)), midRGB: band[1]!.slice(0, 3).map((v) => Math.round(v / cnt[1]!)), bottomRGB: band[2]!.slice(0, 3).map((v) => Math.round(v / cnt[2]!)) };
   },
   biomeInfo() { return biome ? { species: biome.info.species, impostors: biome.info.impostors, lod: biome.lodCounts ? biome.lodCounts() : null } : null; },
   stats: () => ({ ...renderer.info.render }),

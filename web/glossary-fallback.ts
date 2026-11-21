@@ -15,7 +15,7 @@ export function createPartnerFallback({ partners = newPartnerList, draw = drawPa
         const p = partners().find((q) => q && q.id === who.partnerId);
         if (!p) return false;
         const frame = STEPS[Math.floor(now() / STEP_MS) % STEPS.length];
-        const id = BASE + (p.slot - 8) * 0x10 + frame;
+        const id = BASE + (p.slot - 8) * 0x10 + frame!;
         const k = 2, px = Math.round(x + (w - 32 * k) / 2), py = Math.round(y + (h - 32 * k) / 2);
         ctx.save();
         ctx.translate(px, py); ctx.scale(k, k);

@@ -75,10 +75,10 @@ export function drawFishing(ctx: CanvasRenderingContext2D | null, camX: number, 
     // The underwater inset (three.js, GPU). Read-only on `f`; null (no WebGL, page hidden) = nothing drawn.
     const uw = renderUnderwater(f, currentMap().id, state.fishingExtras, performance.now() / 1000);
     if (uw) {
-        ctx.drawImage(uw, 0, uw.height - UW_H, UW_W, UW_H, 6, 6, UW_W, UW_H);   // the inset lives in the shared canvas bottom-left corner
-        ctx.strokeStyle = "#0a2a3a";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(5, 5, 130, 98);
+        ctx!.drawImage(uw, 0, uw.height - UW_H, UW_W, UW_H, 6, 6, UW_W, UW_H);   // the inset lives in the shared canvas bottom-left corner
+        ctx!.strokeStyle = "#0a2a3a";
+        ctx!.lineWidth = 2;
+        ctx!.strokeRect(5, 5, 130, 98);
     }
 
     // Nothing is drawn during the settle: the original's draw block sits after
@@ -151,8 +151,8 @@ export function drawDiveTransition(ctx: CanvasRenderingContext2D | null, camX: n
     const viewW = VIEW_W / ZOOM, viewH = VIEW_H / ZOOM;
 
     if (d.frame >= DIVE_DEMO_START) {
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, viewW, viewH);
+        ctx!.fillStyle = "#000";
+        ctx!.fillRect(0, 0, viewW, viewH);
     }
     if (f.demoCells) drawDiveDemoCells(ctx, d.mode, f.demoCells, viewW, viewH);
     if (f.particleCells.length && fieldcomReady()) {
@@ -165,33 +165,33 @@ export function drawDiveTransition(ctx: CanvasRenderingContext2D | null, camX: n
         // The field's blackout is the same subtractive wash every menu uses
         // (fieldstg F0x80089f7c is a copy of the shared dim quad), so it goes
         // through the shared painter rather than an alpha fill.
-        paintScreenDim(ctx, Math.min(f.blackout, 1) * 255, viewW, viewH);
+        paintScreenDim(ctx!, Math.min(f.blackout, 1) * 255, viewW, viewH);
     }
 }
 
 export function drawAnimDebug(entries) {
-    ctx.save();
-    ctx.font = "9px monospace";
-    ctx.textAlign = "center";
+    ctx!.save();
+    ctx!.font = "9px monospace";
+    ctx!.textAlign = "center";
     for (const { x, y, label, info } of entries) {
         const sx = Math.round(x - lastCam.x);
         const sy = Math.round(y - lastCam.y);
         const [vx, vy] = _DIR8_VEC[info.dir] ?? [0, 1];
-        ctx.strokeStyle = "#0f0";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - 6);
-        ctx.lineTo(sx + vx * 16, sy - 6 + vy * 16);
-        ctx.stroke();
+        ctx!.strokeStyle = "#0f0";
+        ctx!.lineWidth = 1;
+        ctx!.beginPath();
+        ctx!.moveTo(sx, sy - 6);
+        ctx!.lineTo(sx + vx * 16, sy - 6 + vy * 16);
+        ctx!.stroke();
         const modeTxt =
             info.mode === "clip" ? `clip:${info.clipId}`
             : info.mode === "idle" ? `idle:${info.clipId}`
             : info.mode;
         const text = `${label} ${info.dir} ${modeTxt} f${info.frame}`;
-        ctx.fillStyle = "#000";
-        ctx.fillText(text, sx + 1, sy - 33);
-        ctx.fillStyle = "#0f0";
-        ctx.fillText(text, sx, sy - 34);
+        ctx!.fillStyle = "#000";
+        ctx!.fillText(text, sx + 1, sy - 33);
+        ctx!.fillStyle = "#0f0";
+        ctx!.fillText(text, sx, sy - 34);
     }
-    ctx.restore();
+    ctx!.restore();
 }

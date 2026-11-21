@@ -142,7 +142,7 @@ export function applyBattleRestorePlan(b, side: number, plan) {
  * the per-action tick and is paused while Auto Recover runs.
  */
 /** The pool stagers take a draw in [0,1) (they scale it to 16 bits); RAND_U16 is the integer draw itself (battle-combat.ts:637 wraps it the same way). */
-export const RAND_FRAC = () => (RAND_U16() % 0x10000) / 0x10000;
+export const RAND_FRAC = () => (RAND_U16()! % 0x10000) / 0x10000;
 
 function startAutoRecover(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, side: number, rec: { autoRecover: boolean; }) {
   if (!rec) return;
@@ -192,7 +192,7 @@ export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time:
   if (!rec || !damageTermStatApplies(rec.profile?.id ?? 1, rec.hp | 0)) return null;
   const before = statModifier(rec, stat);
   const effective = statValue(rec, stat) - before;
-  const modifier = damageTermStatModifier(effective, before, -(record.crit | 0));
+  const modifier = damageTermStatModifier(effective, before, -(record!.crit | 0));
   setStatModifier(rec, stat, modifier);
   const pool = b.statusEvents ?? (b.statusEvents = emptyStatusEventPool());
   stageStatusEventStat(pool, targetSide < 1 ? 0 : 0x10, slot, stat, engineEffStats(rec).spt | 0, RAND_FRAC);

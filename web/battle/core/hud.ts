@@ -57,17 +57,17 @@ function drawBattleHud(b: BattleState) {
     // original's own x table and y, and picks the cel from the member's own state.
     const hudTeam = B.enemyTeamActive(b) ? B.enemyTeamRecords(b) : null;
     const translatedPips = battleHudPartyPips(
-      battleHudPlayerRecords(b), battleHudEnemyRecords(b, hudTeam),
+      battleHudPlayerRecords(b), battleHudEnemyRecords(b, hudTeam!),
       { activePlayerIndex: b.activePlayerIndex ?? 0, activeEnemyIndex: hudTeam ? (b.partyIndex ?? 0) : 0,
         mode: battleKindOf(b) });
     const pipReady = packReady(pgfgc00);
     const drawPip = (cel: number | null | undefined, x: number, y: number) => {
       if (pipReady && cel != null) { B.hudClip(cel, x, y); return; }
       if (originalChrome) { B.drawChrome("square", x, y, 12, 9); return; }
-      B.ctx.fillStyle = "#061139";
-      B.ctx.fillRect(x, y, 12, 9);
-      B.ctx.strokeStyle = "#9dfcff";
-      B.ctx.strokeRect(x + 0.5, y + 0.5, 11, 8);
+      B.ctx!.fillStyle = "#061139";
+      B.ctx!.fillRect(x, y, 12, 9);
+      B.ctx!.strokeStyle = "#9dfcff";
+      B.ctx!.strokeRect(x + 0.5, y + 0.5, 11, 8);
     };
     if (translatedPips) {
       for (const pip of translatedPips) drawPip(pip.cel, pip.x, pip.y);
@@ -77,11 +77,11 @@ function drawBattleHud(b: BattleState) {
         drawPip(pips.player[i], L.playerPips.x + i * L.playerPips.step, L.playerPips.y);
     }
     if (!pipReady && !translatedPips) {
-      B.ctx.fillStyle = "#15e0d5";
-      B.ctx.fillRect(L.enemyPips.x + 3, L.enemyPips.y + 3, 6, 3);
+      B.ctx!.fillStyle = "#15e0d5";
+      B.ctx!.fillRect(L.enemyPips.x + 3, L.enemyPips.y + 3, 6, 3);
       for (let i = 0; i < L.playerPips.count; i++) {
-        B.ctx.fillStyle = i === (b.activePlayerIndex ?? 0) ? "#15e0d5" : "#f1f4f2";
-        B.ctx.fillRect(L.playerPips.x + i * L.playerPips.step + 3, L.playerPips.y + 3, 6, 3);
+        B.ctx!.fillStyle = i === (b.activePlayerIndex ?? 0) ? "#15e0d5" : "#f1f4f2";
+        B.ctx!.fillRect(L.playerPips.x + i * L.playerPips.step + 3, L.playerPips.y + 3, 6, 3);
       }
     }
     // The gauge's own frames are the chrome pack's cels 0x1e and 0x0b, which the
@@ -170,8 +170,8 @@ function drawBattleHud(b: BattleState) {
       // crosses the quarter slumps the fighter immediately while the bar is
       // still sliding through green.
       for (const [plate, cur, max] of [[enemy, eDisp, b.enemy.maxHp], [player, pDisp, b.player.maxHp]]) {
-        B.ctx.fillStyle = "#05060a";
-        B.ctx.fillRect(plate.barX + 3, plate.barY + 3, plate.barW - 6, plate.barH - 6);
+        B.ctx!.fillStyle = "#05060a";
+        B.ctx!.fillRect(plate.barX + 3, plate.barY + 3, plate.barW - 6, plate.barH - 6);
         B.fillHpBar(plate.barX + 3, plate.barY + 3, plate.barW - 6, plate.barH - 6, cur, max);
       }
     } else {
@@ -196,14 +196,14 @@ function drawBattleHud(b: BattleState) {
       if (battleHudDvPaint(B.ctx, frame, { pgfgc00 })) {
         // The chrome pack drew all four pieces.
       } else {
-        B.ctx.fillStyle = "#05060a";
-        B.ctx.fillRect(frame.trough.x, frame.trough.y, frame.trough.w, frame.trough.h);
+        B.ctx!.fillStyle = "#05060a";
+        B.ctx!.fillRect(frame.trough.x, frame.trough.y, frame.trough.w, frame.trough.h);
         const level = dvGaugeLength(b.player.gauge);
         const dvFills = level >= 10
           ? ["#ffd56a", "#ffe08a", "#ffc83c", "#ffb52c"]
           : ["#ffb52c", "#ffa018", "#ffb52c", "#e09a20"];
-        B.ctx.fillStyle = dvFills[frame.phase];
-        B.ctx.fillRect(dv.x + 3, dv.y + 3, Math.round((dv.w - 6) * level / 10), Math.max(1, dv.h - 6));
+        B.ctx!.fillStyle = dvFills[frame.phase];
+        B.ctx!.fillRect(dv.x + 3, dv.y + 3, Math.round((dv.w - 6) * level / 10), Math.max(1, dv.h - 6));
       }
     }
 
@@ -214,11 +214,11 @@ function drawBattleHud(b: BattleState) {
       return;
     }
     // Cel 0xA is a filled 104×64 plate; clip the inner 100×60 so the 3D face shows.
-    B.ctx.save();
-    B.ctx.beginPath();
-    B.ctx.rect(pr.x, pr.y, pr.w, pr.h);
-    B.ctx.rect(pv.x, pv.y, pv.w, pv.h);
-    B.ctx.clip("evenodd");
+    B.ctx!.save();
+    B.ctx!.beginPath();
+    B.ctx!.rect(pr.x, pr.y, pr.w, pr.h);
+    B.ctx!.rect(pv.x, pv.y, pv.w, pv.h);
+    B.ctx!.clip("evenodd");
     // The draw the original builds in FIGHTSTG_F0x80093fec: layer 0x1005, origin 0x200,
     // pack PGFGTC00, cel 0xA at (246, 74). `faceBezelCelDraw()` is the port of that
     // draw request — the cel and its place come from it, not from a literal here.
@@ -226,14 +226,14 @@ function drawBattleHud(b: BattleState) {
     const bezel = packReady(pgfgc00)
       ? B.hudClip(bezelDraw.cel, bezelDraw.x, bezelDraw.y)
       : B.drawChrome("portraitFrame", pr.x, pr.y);
-    B.ctx.restore();
+    B.ctx!.restore();
     if (!bezel) {
-      B.ctx.strokeStyle = "#20283d";
-      B.ctx.lineWidth = 4;
-      B.ctx.strokeRect(pr.x, pr.y, pr.w, pr.h);
-      B.ctx.strokeStyle = "#aeb7c9";
-      B.ctx.lineWidth = 1;
-      B.ctx.strokeRect(pr.x + 1.5, pr.y + 1.5, pr.w - 3, pr.h - 3);
+      B.ctx!.strokeStyle = "#20283d";
+      B.ctx!.lineWidth = 4;
+      B.ctx!.strokeRect(pr.x, pr.y, pr.w, pr.h);
+      B.ctx!.strokeStyle = "#aeb7c9";
+      B.ctx!.lineWidth = 1;
+      B.ctx!.strokeRect(pr.x + 1.5, pr.y + 1.5, pr.w - 3, pr.h - 3);
     }
   }
 /** The "No techs!" / "Cannot digivolve." notice over whichever list is up. */
@@ -260,23 +260,23 @@ function drawCommandMenu(b: BattleState) {
         B.drawChrome("commandPlate", C.plateX, y + C.plateYOff);
         B.nativeText(items[i], C.boxX, y, { kind: 1 });
         if (selected) {
-          B.ctx.strokeStyle = "#eaffff";
-          B.ctx.lineWidth = 1;
-          B.ctx.beginPath();
-          B.ctx.arc(C.iconX + C.iconSize / 2, y + C.iconSize / 2, 3, 0, Math.PI * 2);
-          B.ctx.stroke();
+          B.ctx!.strokeStyle = "#eaffff";
+          B.ctx!.lineWidth = 1;
+          B.ctx!.beginPath();
+          B.ctx!.arc(C.iconX + C.iconSize / 2, y + C.iconSize / 2, 3, 0, Math.PI * 2);
+          B.ctx!.stroke();
         }
       } else {
-        B.ctx.fillStyle = "rgba(0,5,48,0.94)";
-        B.ctx.fillRect(C.iconX, y + 1, C.iconSize, C.iconSize);
-        B.ctx.strokeStyle = selected ? "#a8ffff" : "#00a8ff";
-        B.ctx.lineWidth = 1;
-        B.ctx.strokeRect(C.iconX + 0.5, y + 1.5, C.iconSize - 1, C.iconSize - 1);
+        B.ctx!.fillStyle = "rgba(0,5,48,0.94)";
+        B.ctx!.fillRect(C.iconX, y + 1, C.iconSize, C.iconSize);
+        B.ctx!.strokeStyle = selected ? "#a8ffff" : "#00a8ff";
+        B.ctx!.lineWidth = 1;
+        B.ctx!.strokeRect(C.iconX + 0.5, y + 1.5, C.iconSize - 1, C.iconSize - 1);
         if (selected) {
-          B.ctx.strokeStyle = "#ecffff";
-          B.ctx.beginPath();
-          B.ctx.arc(C.iconX + C.iconSize / 2, y + 1 + C.iconSize / 2, 3, 0, Math.PI * 2);
-          B.ctx.stroke();
+          B.ctx!.strokeStyle = "#ecffff";
+          B.ctx!.beginPath();
+          B.ctx!.arc(C.iconX + C.iconSize / 2, y + 1 + C.iconSize / 2, 3, 0, Math.PI * 2);
+          B.ctx!.stroke();
         }
         B.drawNativePanel(C.boxX, y, C.boxW, C.boxH, "rgba(0,8,69,0.94)");
         B.nativeText(items[i], C.boxX, y, { kind: 1 });
@@ -286,17 +286,17 @@ function drawCommandMenu(b: BattleState) {
   }
 function drawListSelector(x: number, y: number, selected: boolean) {
     if (!B.drawChrome("square", x, y, 13, 13)) {
-      B.ctx.fillStyle = "#050638";
-      B.ctx.fillRect(x, y, 13, 13);
-      B.ctx.strokeStyle = "#00c0f8";
-      B.ctx.strokeRect(x + 0.5, y + 0.5, 12, 12);
+      B.ctx!.fillStyle = "#050638";
+      B.ctx!.fillRect(x, y, 13, 13);
+      B.ctx!.strokeStyle = "#00c0f8";
+      B.ctx!.strokeRect(x + 0.5, y + 0.5, 12, 12);
     }
     if (selected) {
-      B.ctx.strokeStyle = "#efffff";
-      B.ctx.lineWidth = 1;
-      B.ctx.beginPath();
-      B.ctx.arc(x + 6.5, y + 6.5, 3, 0, Math.PI * 2);
-      B.ctx.stroke();
+      B.ctx!.strokeStyle = "#efffff";
+      B.ctx!.lineWidth = 1;
+      B.ctx!.beginPath();
+      B.ctx!.arc(x + 6.5, y + 6.5, 3, 0, Math.PI * 2);
+      B.ctx!.stroke();
     }
   }
 // The one list chrome every in-battle list draws: the window plus its two

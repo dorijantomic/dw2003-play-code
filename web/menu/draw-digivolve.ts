@@ -65,7 +65,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
   // screen draws only its own name plate over the sheet's closed name tab.
   win("dvName", S.name_plate, "x",
     () => drawClip(ctx, cmfont, S.name_plate.clip, S.name_plate.x, S.name_plate.y));
-  if (m._foldReady("dvName") && m._isOpen("dvName")) {
+  if (m._foldReady!("dvName") && m._isOpen!("dvName")) {
     drawText(ctx, "Choose digivolve", S.header.x, S.header.y);
   }
 
@@ -135,7 +135,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
   // The candidate list window (clip 0x24).
   if (win("dvList", S.window, "x",
       () => drawClip(ctx, ststat, S.window.clip, S.window.x, S.window.y)) >= 1
-      && m._isOpen("dvList")) {
+      && m._isOpen!("dvList")) {
     evos.slice(0, S.list_rows.n).forEach((e, i: number) => {
       const y = S.list_rows.y_base + i * S.list_rows.pitch;
       if (!m.dvHome && i === m.detailSel) drawCursor(ctx, t * VSYNC, S.list_rows.cursor_x, y, gold);
@@ -160,7 +160,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
   // same corner, with the highlighted candidate's name over it.
   if (win("dvAct", S.window_alt, "x",
       () => drawClip(ctx, ststat, S.window_alt.clip, S.window_alt.x, S.window_alt.y)) >= 1
-      && m._isOpen("dvAct")) {
+      && m._isOpen!("dvAct")) {
     const target = evos[m.detailSel];
     if (target) {
       drawText(ctx, target.to ?? "", S.form_name.x, S.form_name.y);
@@ -178,7 +178,7 @@ export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState
   // records +0x90, +0x9c and +0xa8).
   if (win("dvFoot", S.footer_bar, "x",
       () => drawClip(ctx, ststat, S.footer_bar.clip, S.footer_bar.x, S.footer_bar.y)) >= 1
-      && m._isOpen("dvFoot")) {
+      && m._isOpen!("dvFoot")) {
     if (step === "dvmessage" && m.dvMessage) {
       drawText(ctx, m.dvMessage, S.explanation.x, S.explanation.y);
     } else if (step === "techinfo") {
@@ -252,7 +252,7 @@ export function _drawDetail(ctx: CanvasRenderingContext2D, p, m: MenuState, stat
     // fallback before any battle stats exist.
     // Right-anchored in the number font, as the original draws them: each value
     // ENDS at the decoded x so it never runs into the next baked icon column.
-    valueText(ctx, String(sheetStatValue(p, wornSlots, stat, wornSlot)), D.stat_values.x, y, white);
+    valueText(ctx, String(sheetStatValue(p, wornSlots, stat, wornSlot!)), D.stat_values.x, y, white);
   });
   RES_ROWS.forEach((res, i) => {
     const y = D.res_values.y_base + i * D.res_values.pitch;
@@ -304,7 +304,7 @@ export function _drawDetail(ctx: CanvasRenderingContext2D, p, m: MenuState, stat
   // The sheet's own two-row prompt (F0x8008bd70 / F0x8008d684 state 5): rows at
   // (172, 19+14i), cursor at (152, 19+14i). It is filled once the Digivolve
   // panel is up and hidden the moment the sheet starts to shut.
-  if (m.detailStep === "prompt" && D.prompt && m._foldReady("shDv")) {
+  if (m.detailStep === "prompt" && D.prompt && m._foldReady!("shDv")) {
     D.prompt.rows.forEach((label: string | undefined, i: number) => {
       const y = D.prompt.y_base + i * D.prompt.pitch;
       if (i === m.detailFocus) drawCursor(ctx, t * VSYNC, D.prompt.cursor_x, y, gold);

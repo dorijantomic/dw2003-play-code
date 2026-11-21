@@ -20,7 +20,7 @@ import { CURSOR_POSES, splitTokens, hasBadge, badgeSvg } from "./icons.js";
 import type { UiDockOpts, UiPart, UiPlateOpts, UiPopOpts, UiRingOpts, UiTextOpts } from "./types.js";
 
 import type { UiRect } from "./types.js";
-export const N = (designPx: number | undefined) => designPx / 3;             // design px (3 per native) -> native units
+export const N = (designPx: number | undefined) => designPx! / 3;             // design px (3 per native) -> native units
 export const ID = Object.freeze({ a: 1, d: 1, e: 0, f: 0 });
 
 /** A text run. `o` = { color, align, spacing, maxDp, rel }. Labels get 2 dp letter spacing by default. */
@@ -155,10 +155,10 @@ export const moreArrow = (key: string, box, rel = ID, fill = "var(--c-orange)") 
  * starts at the left screen edge also gets the orange tab on its top edge and the slanted slab left of the text (both bleed left).
  */
 export function messageBand(key: string, rect, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
-    out.push({ key, kind: "band", part: "msgBand", layer: "under", rect, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
+    out.push({ key, kind: "band", part: "msgBand", layer: "under", rect, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel!.a, sy: rel!.d });
     if (rect.x > 0.5 || rect.w < 1) return;
-    out.push(plate(`${key}.slab`, "msgSlab", { x: 0, y: rect.y + MSG.slabTop * rel.d, w: 0, h: Math.max(0, Math.min(MSG.slabH * rel.d, rect.h - 2 * MSG.slabTop * rel.d)) }, rel, { shape: "sr", edge: "var(--c-wall)", body: null, shadow: 0 }));
-    out.push(rule(`${key}.tab`, { x: 0, y: rect.y, w: Math.min(MSG.tabEnd, rect.w), h: MSG.tabH * rel.d }, "var(--c-orange)", rel, "under", "msgTab"));
+    out.push(plate(`${key}.slab`, "msgSlab", { x: 0, y: rect.y + MSG.slabTop * rel!.d, w: 0, h: Math.max(0, Math.min(MSG.slabH * rel!.d, rect.h - 2 * MSG.slabTop * rel!.d)) }, rel, { shape: "sr", edge: "var(--c-wall)", body: null, shadow: 0 }));
+    out.push(rule(`${key}.tab`, { x: 0, y: rect.y, w: Math.min(MSG.tabEnd, rect.w), h: MSG.tabH * rel!.d }, "var(--c-orange)", rel, "under", "msgTab"));
 }
 
 /** A band text line: the game's run at its own pen, Chakra Petch 600 32 / 42, never wider than the band (`right` native). */
@@ -244,7 +244,7 @@ export const HUD = Object.freeze({ edge: "var(--c-cyan)", body: "var(--c-hud-bod
 export function keyBox(key: string, rect, on: boolean, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out: UiPart[]) {
     out.push(plate(key, "keyBox", rect, rel, { shape: "key", underEdge: "all", edge: on ? "var(--c-orange)" : HUD.edge, body: on ? "var(--c-orange)" : HUD.slab, shadow: 4 }));
     if (on) out.push({ key: `${key}.dot`, kind: "svg", part: "keyDot", layer: "over", vw: 16, vh: 16, d: "M8 1A7 7 0 1 1 7.99 1Z", fill: "var(--c-orange-ink)",
-        rect: { x: rect.x + N(12) * rel.a, y: rect.y + rect.h / 2 - N(8) * rel.d, w: N(16) * rel.a, h: N(16) * rel.d }, sx: rel.a, sy: rel.d });
+        rect: { x: rect.x + N(12) * rel!.a, y: rect.y + rect.h / 2 - N(8) * rel!.d, w: N(16) * rel!.a, h: N(16) * rel!.d }, sx: rel!.a, sy: rel!.d });
 }
 
 /** The C8 row chevron (30 x 20 dp, two right-pointing chevrons) with its top-left at (x, y) native. */
@@ -355,7 +355,7 @@ export const dockPart = (key: string, stage: { x0: number; y0: number; x1: numbe
     const S = stage ?? { x0: 0, y0: 0, x1: 320, y1: 240 }, a = dockArc(hub, S, labels.length, !!o.rows);
     const rows = o.rows;
     return { key, kind: "dock", part: "dock", layer: "over", rect: { x: S.x0, y: S.y0, w: S.x1 - S.x0, h: S.y1 - S.y0 }, hub: a.hub, k: a.k, R: a.R, dockR: a.dockR, dock: a.dock,
-        words: a.words.map((w, i) => ({ t: String(labels[i]), x: w.x, y: w.y, maxDp: w.maxDp, ...(rows ? { chip: rows[i].chip ?? "", el: rows[i].el ?? "", r: rows[i].r ?? "", dis: !!rows[i].dis } : {}) })),
+        words: a.words.map((w, i) => ({ t: String(labels[i]), x: w.x, y: w.y, maxDp: w.maxDp, ...(rows ? { chip: rows[i]!.chip ?? "", el: rows[i]!.el ?? "", r: rows[i]!.r ?? "", dis: !!rows[i]!.dis } : {}) })),
         on, ...(rows ? { list: true, scale: a.scale, title: o.title ?? "", pager: !!o.pager } : {}), sx: 1, sy: 1 };
 };
 /** The damage number that pops at a hit: shown while the game's own "N damage!" line is up; `side` = who was hit. The DOM plays the CSS pop once per element. */

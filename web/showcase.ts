@@ -35,7 +35,7 @@ export function installShowcase(h) {
     SCENES.forEach((s, i) => sel.add(new Option(s.name, String(i))));
     sel.add(new Option("▶ Tour all scenes", "tour"));
     let timer: number | ReturnType<typeof setTimeout> = 0, tourIdx = 0;
-    const show = (i: number) => { const s = SCENES[i]; h.apply(s); h.goTo(s.id); };
+    const show = (i: number) => { const s = SCENES[i]; h.apply(s); h.goTo(s!.id); };
     const stop = () => { clearInterval(timer); timer = 0; };
     sel.onchange = () => {
         stop();

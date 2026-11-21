@@ -89,10 +89,10 @@ export function createHelpMenuTranslated(sfx = null) {
         let held = 0;
         for (const [key, bit] of KEY_BITS) if (keys?.has(key)) held |= bit;
         // The press that opened the menu is still down: it is not a new press.
-        if (!g._primed) { g._primed = true; g._pad.update(held, 0); }
+        if (!g._primed) { g._primed = true; g._pad!.update(held, 0); }
         try {
-            for (const frame of g._clock.advance(dt)) {
-                const { pressed, repeated } = g._pad.update(held, frame.tick);
+            for (const frame of g._clock!.advance(dt)) {
+                const { pressed, repeated } = g._pad!.update(held, frame.tick);
                 const session = g._session;
                 session.tick({ pressed, repeat: repeated });
                 g._ticks++;
@@ -114,8 +114,8 @@ export function createHelpMenuTranslated(sfx = null) {
             renderer.draw(ctx, calls, null, [], contextMarkers, []);
             // The eight titles are set whole; the page is the typewriter, so only its revealed run
             // is painted (the same split dialogue-translated.js makes for the conversation box).
-            const page = g._session.pageAddress();
-            const widgets = g._session.textWidgets();
+            const page = g._session!.pageAddress();
+            const widgets = g._session!.textWidgets();
             g._painted = [
                 ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr !== page)).texts,
                 ...drawNativeTextWidgets(ctx, widgets.filter((w) => w.addr === page), { revealWindow: true }).texts,

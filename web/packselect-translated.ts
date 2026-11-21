@@ -70,9 +70,9 @@ export function createPackSelectTranslated(sfx = null) {
         loadShared().then(async (shared) => {
             const selected = p._state?.languageByte;
             const language = Number.isInteger(selected) ? selected : 2;
-            if (language < 0 || language > 6) throw new Error("Wizard language index is invalid");
+            if (language! < 0 || language! > 6) throw new Error("Wizard language index is invalid");
             const banks = new Map(await Promise.all(BANKS.map(async (offset) =>
-                [offset + language, await fetchBytes(`wizard/${offset + language}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
+                [offset + language!, await fetchBytes(`wizard/${offset + language!}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
             if (!p._open || request !== p._request) return;
             p._session = new ui.WizardRootSession(language,
                 encodeGameName(p._accountName, language === 0 ? 5 : 8),
@@ -89,7 +89,7 @@ export function createPackSelectTranslated(sfx = null) {
     p.update = (dt, state) => {
         if (state) p._state = state;
         if (!p._open) return;
-        if (p._error) { p._finish(); return; }
+        if (p._error) { p._finish!(); return; }
         if (!p._session) return;
         for (const frame of p._clock.advance(dt)) {
             if (p._hold <= 0 && p._queue.length) {
@@ -101,7 +101,7 @@ export function createPackSelectTranslated(sfx = null) {
             // A synthesized press wins over the held keys while it lasts, so one
             // key event never counts twice.
             p._session.tick(p._press ? [p._press] : (p._state?.keys ?? []), frame.tick);
-            if (p._session.finished()) { p._finish(); break; }
+            if (p._session.finished()) { p._finish!(); break; }
         }
     };
     p.advance = p.update;
@@ -120,7 +120,7 @@ export function createPackSelectTranslated(sfx = null) {
         return true;
     };
 
-    p.close = () => { if (p._open) p._finish(); };
+    p.close = () => { if (p._open) p._finish!(); };
 
     p._finish = () => {
         if (!p._open) return;

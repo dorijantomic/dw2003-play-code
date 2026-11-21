@@ -260,7 +260,7 @@ export function silentClips(folders, present) {
       if (!list[i]?.present) continue;
       const ops = acts[i]?.ops ?? [];
       if (!ops.length) continue;
-      const strike = ops.some((o: { op: number; words: number[]; }) => o?.op === 10 && (num(o.words?.[0]) === 98 || num(o.words?.[0]) === 99));
+      const strike = ops.some((o: { op: number; words: number[]; }) => o?.op === 10 && (num(o.words?.[0]!) === 98 || num(o.words?.[0]!) === 99));
       if (!strike) clips.push({ folder, clip: i, cast: i === 9 || i === 11, kind: clipKind(i) });
     }
   }

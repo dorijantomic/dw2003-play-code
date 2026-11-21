@@ -58,8 +58,8 @@ export function createSceneEditor(canvas: HTMLCanvasElement, getCtx) {
     const a = ed.dragStart, b = toMap(e);
     ed.dragStart = null;
     const rect = {
-      x: Math.round(Math.min(a.x, b.x)), y: Math.round(Math.min(a.y, b.y)),
-      w: Math.round(Math.abs(b.x - a.x)), h: Math.round(Math.abs(b.y - a.y)),
+      x: Math.round(Math.min(a!.x, b.x)), y: Math.round(Math.min(a!.y, b.y)),
+      w: Math.round(Math.abs(b.x - a!.x)), h: Math.round(Math.abs(b.y - a!.y)),
     };
     if (rect.w < 4 || rect.h < 4) return; // accidental click
     const { scene } = getCtx();

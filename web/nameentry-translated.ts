@@ -132,11 +132,11 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
 
     n.update = (dt, state) => {
         if (state) n._state = state;
-        if (!n._open || n._error) { if (n._error && n._open) n._finish(); return; }
+        if (!n._open || n._error) { if (n._error && n._open) n._finish!(); return; }
         if (!n._session) return;
         for (const frame of n._clock.advance(dt)) {
             n._session.tick(n._state?.keys ?? [], frame.tick);
-            if (n._session.finished()) { n._finish(); break; }
+            if (n._session.finished()) { n._finish!(); break; }
         }
     };
 
@@ -148,7 +148,7 @@ export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () 
         ctx.restore();
     };
 
-    n.close = () => { if (n._open) n._finish(false); };
+    n.close = () => { if (n._open) n._finish!(false); };
 
     n._finish = (commit = true) => {
         if (!n._open) return;

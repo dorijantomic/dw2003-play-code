@@ -17,15 +17,15 @@ const PITCH_DEG = 8;                                  // the viewer's "front" pr
 /** Screen position of a world point for a view {eye, look, up, fovDeg}: x, y in -1..1 (y up), and the depth. */
 export function projectPoint(view, p, aspect: number) {
     const f = [view.look[0] - view.eye[0], view.look[1] - view.eye[1], view.look[2] - view.eye[2]];
-    const fl = Math.hypot(...f) || 1; f[0] /= fl; f[1] /= fl; f[2] /= fl;
-    const rx = f[1] * view.up[2] - f[2] * view.up[1], ry = f[2] * view.up[0] - f[0] * view.up[2], rz = f[0] * view.up[1] - f[1] * view.up[0];
+    const fl = Math.hypot(...f) || 1; f[0]! /= fl; f[1]! /= fl; f[2]! /= fl;
+    const rx = f[1]! * view.up[2] - f[2]! * view.up[1], ry = f[2]! * view.up[0] - f[0]! * view.up[2], rz = f[0]! * view.up[1] - f[1]! * view.up[0];
     const rl = Math.hypot(rx, ry, rz) || 1;
     const r = [rx / rl, ry / rl, rz / rl];
-    const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const u = [r[1]! * f[2]! - r[2]! * f[1]!, r[2]! * f[0]! - r[0]! * f[2]!, r[0]! * f[1]! - r[1]! * f[0]!];
     const v = [p[0] - view.eye[0], p[1] - view.eye[1], p[2] - view.eye[2]];
-    const depth = v[0] * f[0] + v[1] * f[1] + v[2] * f[2];
+    const depth = v[0]! * f[0]! + v[1]! * f[1]! + v[2]! * f[2]!;
     const th = Math.tan(view.fovDeg * Math.PI / 360);
-    return { x: (v[0] * r[0] + v[1] * r[1] + v[2] * r[2]) / (depth * th * aspect), y: (v[0] * u[0] + v[1] * u[1] + v[2] * u[2]) / (depth * th), depth };
+    return { x: (v[0]! * r[0]! + v[1]! * r[1]! + v[2]! * r[2]!) / (depth * th * aspect), y: (v[0]! * u[0]! + v[1]! * u[1]! + v[2]! * u[2]!) / (depth * th), depth };
 }
 
 export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, size = CANVAS_SIZE, canvasFactory = null, drawFallback = null }) {
@@ -38,7 +38,7 @@ export function createStage({ makeRenderer, makeCamera, resolveFolder, setTint, 
         if (r || failed) return !!r;
         try {
             canvas = canvasFactory ? canvasFactory(size[0], size[1])
-                : (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(size[0], size[1]) : null);
+                : (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(size[0]!, size[1]!) : null);
             r = canvas ? makeRenderer(canvas) : null;
         } catch { r = null; }
         if (!r) { failed = true; return false; }

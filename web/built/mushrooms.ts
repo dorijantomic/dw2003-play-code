@@ -115,7 +115,7 @@ export function mushroomMaterial(S, col, uni) {
       void main() {
         vec3 N = normalize(vN), V = normalize(cameraPosition - vW);
         if (!gl_FrontFacing) N = -N;
-        float cap = smoothstep(${f(MUSH.CAP_Y[0])}, ${f(MUSH.CAP_Y[1])}, vY);
+        float cap = smoothstep(${f(MUSH.CAP_Y[0]!)}, ${f(MUSH.CAP_Y[1]!)}, vY);
         vec3 base = mix(uStemCol, uCapCol, cap);
         vec3 col = toonLight(base, N, V, vW, 1.0, ${f(MUSH.RIM)});   // clamps to 0.97: emission goes OUTSIDE this
         // ---- gills: radial lines on the underside, faded to their mean where a stripe is under ~2 px ----
@@ -289,7 +289,7 @@ export function buildMushrooms(slot, env) {
   halos.name = "builtMushroomHalos"; halos.userData.kind = "mushroom"; halos.frustumCulled = false;
   halos.renderOrder = 2;
   stems.forEach((st: { c: number[]; h: number; }, i: number) => {
-    halos.setMatrixAt(i, Mx.makeTranslation(st.c[0], st.h * 0.80, st.c[2]));
+    halos.setMatrixAt(i, Mx.makeTranslation(st.c[0]!, st.h * 0.80, st.c[2]!));
   });
   halos.instanceMatrix.needsUpdate = true;
 
@@ -303,7 +303,7 @@ export function buildMushrooms(slot, env) {
   pools.renderOrder = 1;
   clusters.forEach((cl: { w: number; c: number[]; }, i: number) => {
     const R = MUSH.POOL_R * cl.w;
-    pools.setMatrixAt(i, Mx.compose(Pv.set(cl.c[0], MUSH.POOL_Y, cl.c[2]), Q.identity(), Sv.set(R * 2, 1, R * 2)));
+    pools.setMatrixAt(i, Mx.compose(Pv.set(cl.c[0]!, MUSH.POOL_Y, cl.c[2]!), Q.identity(), Sv.set(R * 2, 1, R * 2)));
   });
   pools.instanceMatrix.needsUpdate = true;
 
@@ -342,7 +342,7 @@ export function buildMushrooms(slot, env) {
         const d = Math.hypot(cl.c[0] - eye.x, cl.c[2] - eye.z) / (M * R);
         // the 10 m pass-by guard: no emission closer than 5 m (a cap 1-2 m from the eye is a pale wall), full glow
         // from 9 m out — which is where the fight camera's chords sit (10.9-22.5 m, mushrooms.md §1.4)
-        cl.fade = smooth(MUSH.NEAR[0], MUSH.NEAR[1], d);
+        cl.fade = smooth(MUSH.NEAR[0]!, MUSH.NEAR[1]!, d);
       }
       stems.forEach((st: { fade: number; cluster: string | number; }, i: string | number) => { st.fade = clusters[st.cluster].fade; fadeA[i] = st.fade; });
       fadeAttr.needsUpdate = true;
@@ -350,7 +350,7 @@ export function buildMushrooms(slot, env) {
   }
   const tris = stems.length * (geo.index ? geo.index.count / 3 : 0);
   const info2 = {
-    clusters: clusters.length, stems: stems.length, trisPerStem: geo.index.count / 3, tris,
+    clusters: clusters.length, stems: stems.length, trisPerStem: geo.index!.count / 3, tris,
     calls: 4, halos: stems.length, pools: clusters.length, spores: nSp,
     glowK: MUSH.GLOW_K, glowDay: MUSH.GLOW_DAY, profile: PROFILE, segments: MUSH.SEGMENTS,
     band: { r: [Math.min(...clusters.map((c) => c.r)), Math.max(...clusters.map((c) => c.r))],

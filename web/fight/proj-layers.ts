@@ -46,7 +46,7 @@ export function mat4Mul(a: number[] | Float32Array<ArrayBuffer>, b: number[] | F
   for (let r = 0; r < 4; r++)
     for (let c = 0; c < 4; c++)
       for (let k = 0; k < 4; k++)
-        out[c*4+r] += a[k*4+r] * b[c*4+k];
+        out[c*4+r]! += a[k*4+r]! * b[c*4+k]!;
   return out;
 }
 
@@ -127,7 +127,7 @@ export function sampleTrack(keys, t: number, dflt: number[]) {
  * visible flag at +0x0c and jumps past the whole matrix build.
  */
 export function layerVisible(scale: number[]) {
-  return (((scale[0] | 0) | (scale[1] | 0) | (scale[2] | 0)) >= 0x31);
+  return (((scale[0]! | 0) | (scale[1]! | 0) | (scale[2]! | 0)) >= 0x31);
 }
 
 /**

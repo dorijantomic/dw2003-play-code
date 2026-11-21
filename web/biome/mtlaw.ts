@@ -82,7 +82,7 @@ export function mtInfo(x: number, z: number) {
   if (fx < 1 || fz < 1 || fx > N - 2 || fz > N - 2) { const h = mtH(x, z); return { h, ny: 1 }; }
   const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
   const a = G[j * N + i], b = G[j * N + i + 1], c = G[(j + 1) * N + i], d = G[(j + 1) * N + i + 1];
-  const h = (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v, gx = ((b - a) * (1 - v) + (d - c) * v) / CELL, gz = ((c - a) * (1 - u) + (d - b) * u) / CELL;
+  const h = (a! * (1 - u) + b! * u) * (1 - v) + (c! * (1 - u) + d! * u) * v, gx = ((b! - a!) * (1 - v) + (d! - c!) * v) / CELL, gz = ((c! - a!) * (1 - u) + (d! - b!) * u) / CELL;
   return { h, ny: 1 / Math.hypot(gx, 1, gz) };
 }
 /** distance (metres) from (x,z) to the nearest water of the stream or the tarn: > 0 outside; used to keep plants and trees out of the water */

@@ -18,7 +18,7 @@ function handleKey(rawKey: string) {
     // docs/research/ui/exclamation-indicator-decoded-2026-07-02.md:131): the line
     // waits for the press and has no timeout. Latch it here, before any state branch
     // returns, so every Circle press reaches the line.
-    if (k === "circle" && B.msgSession) B.msgPadWords |= BATTLE_MESSAGE_CLOSE_BIT;
+    if (k === "circle" && B.msgSession) B.msgPadWords! |= BATTLE_MESSAGE_CLOSE_BIT;
 
     if (b.state === ST.RESULT_MSG && b._resultPages?.length) {
       if (!b._resultReady) return true;

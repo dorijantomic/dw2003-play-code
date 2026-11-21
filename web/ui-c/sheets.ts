@@ -309,7 +309,7 @@ export function composeVictory({ parts, runs, stage }, cfg) {
             return { name: String(p.name ?? ""), lv: pr?.oldLevel ?? p.level ?? 1, lvTo: pr?.newLevel ?? p.level ?? 1, a: pr?.ringA ?? 0, b: pr?.ringB ?? 0, gain: rows[i]?.target > 0 ? Math.max(0, rows[i].target - (p.preExp ?? 0)) : (pr?.xp ?? 0), up,
                 learned: names(pr?.learnedTechs), digi: names(pr?.unlocked) };
         });
-        d.up = d.rings.some((r) => r.up);
+        d.up = d.rings!.some((r) => r.up);
     } else if (/bit/i.test(head)) {
         d.page = "bit"; d.num = num(rest || head);
         const dr = v.reward?.droppedItem;
@@ -342,7 +342,7 @@ export function composeReport({ parts, runs, stage }, cfg: { view?: UiRect; puls
             default: break;
         }
     });
-    parts.forEach((p: { part: string; }, i) => { if (p.part === "reportHl") composeReportHl(p, i, out, cfg.pulse); });
+    parts.forEach((p: { part: string; }, i) => { if (p.part === "reportHl") composeReportHl(p, i, out, cfg.pulse!); });
     restOfRuns(runs, used, ID, out, "rp");
     return out;
 }

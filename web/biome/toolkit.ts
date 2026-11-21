@@ -215,7 +215,7 @@ export function scatter(n: number, seed, area, density, opts: ScatterOpts = {}) 
   while (i < n && tries++ < n * 40) {
     const x = cx + (r() * 2 - 1) * hw, z = cz + (r() * 2 - 1) * hd;
     if (density && r() > density(x, z)) continue;
-    const s = sc[0] + (sc[1] - sc[0]) * r();
+    const s = sc[0]! + (sc[1]! - sc[0]!) * r();
     composeTRS(out, i, x, terrainH(x, z) + (opts.yOffset || 0), z, r() * Math.PI * 2, s, tilt * r(), r() * 6.28);
     pos.push(x, z); i++;
   }
@@ -330,7 +330,7 @@ export class LODSpecies {
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, L = this.levels.length, cnt = new Array(L).fill(0);
     const d0 = this.dist[0] ** 2, d1 = (this.dist[1] ?? 1e9) ** 2;
     for (let i = 0; i < this.n; i++) {
-      const dx = this._pos[i * 3] - cx, dy = this._pos[i * 3 + 1] - cy, dz = this._pos[i * 3 + 2] - cz, d = dx * dx + dy * dy + dz * dz;
+      const dx = this._pos[i * 3]! - cx, dy = this._pos[i * 3 + 1]! - cy, dz = this._pos[i * 3 + 2]! - cz, d = dx * dx + dy * dy + dz * dz;
       let l = d < d0 ? 0 : d < d1 ? 1 : 2; if (l >= L) l = L - 1;
       const dst = l; this.idx[dst][cnt[dst]++] = i;
     }

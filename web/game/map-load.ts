@@ -66,19 +66,19 @@ import { applyStoryCommand } from "./story-events.js";
 function updateHud() {
     const hud = document.getElementById("hud");
     if (!hud) return;
-    document.getElementById("hud-map").textContent = currentMap().name || "";
+    document.getElementById("hud-map")!.textContent = currentMap().name || "";
     const partnerRow = document.getElementById("hud-partner");
     if (fieldPartySize(state.party) > 0 && state.charIdx > 0) {
         const pc = state.manifest.characters[state.charIdx];
         const sheet = state.charImgs[pc.id];
-        partnerRow.style.display = "flex";
-        document.getElementById("hud-partner-name").textContent = pc.name;
+        partnerRow!.style.display = "flex";
+        document.getElementById("hud-partner-name")!.textContent = pc.name;
         const icon = document.getElementById("hud-icon") as HTMLCanvasElement;
         const ictx = icon.getContext("2d");
-        ictx.imageSmoothingEnabled = false;
-        ictx.clearRect(0, 0, 32, 32);
+        ictx!.imageSmoothingEnabled = false;
+        ictx!.clearRect(0, 0, 32, 32);
         if (sheet) {
-            ictx.drawImage(
+            ictx!.drawImage(
                 sheet,
                 0,
                 0,
@@ -91,7 +91,7 @@ function updateHud() {
             );
         }
     } else {
-        partnerRow.style.display = "none";
+        partnerRow!.style.display = "none";
     }
 }
 
@@ -221,9 +221,9 @@ export function effectsMapImg(id, part = "base") {
 }
 
 export function drawMapPicture(img, tm, kind: string | null, ox: number, oy: number) {
-    if (!tm) { ctx.drawImage(img, ox, oy); return; }
+    if (!tm) { ctx!.drawImage(img, ox, oy); return; }
     const key = `${tm.name}:${kind}`;
-    if (!tilesComplete.get(key)) ctx.drawImage(img, ox, oy);
+    if (!tilesComplete.get(key)) ctx!.drawImage(img, ox, oy);
     const M = 16;                   // map pixels of slack for the quest shake translate
     // The view is the 320 box plus FIELD_VIEW_PAD each side with the wide overworld (web/field-view.js).
     tilesComplete.set(key, tm.draw(ctx, ox, oy, -ox - M - FIELD_VIEW_PAD, -oy - M, FIELD_VIEW_W + 2 * M, VIEW_H / ZOOM + 2 * M, kind));
@@ -288,20 +288,20 @@ export function ensureMapImg(id) {
         };
         const mask = mk();
         const mx = mask.getContext("2d");
-        mx.fillStyle = "#fff";
-        for (const [x0, x1, y] of runs) mx.fillRect(x0, y, x1 - x0 + 1, 1);
+        mx!.fillStyle = "#fff";
+        for (const [x0, x1, y] of runs) mx!.fillRect(x0, y, x1 - x0 + 1, 1);
         // The GROUND layer (OT[7]) = base minus the layer-2-only pixels.
         const ground = mk();
         const gx = ground.getContext("2d");
-        gx.drawImage(base, 0, 0);
-        gx.globalCompositeOperation = "destination-out";
-        gx.drawImage(mask, 0, 0);
+        gx!.drawImage(base, 0, 0);
+        gx!.globalCompositeOperation = "destination-out";
+        gx!.drawImage(mask, 0, 0);
         // The LAYER-2 layer (OT[11]) = base kept only on those pixels.
         const layer2 = mk();
         const lx = layer2.getContext("2d");
-        lx.drawImage(base, 0, 0);
-        lx.globalCompositeOperation = "destination-in";
-        lx.drawImage(mask, 0, 0);
+        lx!.drawImage(base, 0, 0);
+        lx!.globalCompositeOperation = "destination-in";
+        lx!.drawImage(mask, 0, 0);
         if (retainedStageIds.has(id)) {
             state.mapGroundImgs[id] = ground;
             state.mapLayer2Imgs[id] = layer2;
@@ -637,7 +637,7 @@ export function setMap(i, spawn = null) {
     // (single source of truth), declared below; the flag store's own `getOrdinal`
     // option is internal to it and is NOT a method on the returned store, so calling
     // storyFlags.getOrdinal() here threw and took startGame down with it.
-    bgm.play(sceneBgmTrack(currentMap().music, Number(state.progressOrdinal ?? 0) || 0));
+    bgm.play!(sceneBgmTrack(currentMap().music, Number(state.progressOrdinal ?? 0) || 0));
     // A stage with no play id (fieldstg.s:8278-8281): the entry block loads the
     // exclusive latch and stops its holder outright rather than starting a track,
     // so a jingle ringing from a previous screen ends on arrival. bgm.play(null)
@@ -645,7 +645,7 @@ export function setMap(i, spawn = null) {
     // whatever holds it, whichever subsystem started it. s260 is the live case.
     if (!currentMap().music) soundRegister.stopHeld();
     // Area SFX resolve through this map's sound archive (map_sound_archives.json)
-    sfx.setMap(m.id);
+    sfx.setMap!(m.id);
     // Visited-map tracking needs nothing here: the engine's loadStage already set the
     // bit the pause-menu MAP page reads (set_flag(0x1E00 + screen id, 1), fieldstg
     // .L0x00008008-.L0x00008028), and the page reads that same bit back.
@@ -659,7 +659,7 @@ export function setMap(i, spawn = null) {
     // it runs on every arrival, including the one that starts a new game.
     // The card's banks are 0xA9 / 0xB7 + the language byte the boot screen committed.
     placeCard.setLanguage?.(state.languageByte ?? 2);
-    placeCard.begin(m.id);
+    placeCard.begin!(m.id);
     queueMicrotask(() => activateStageNeighborhood(m.id));
 }
 
@@ -843,7 +843,7 @@ export function applyStoryFlag(id, expected) {
     // instead of being dropped. The engine's PlaySparkle op drives the same actor.
     if (id === 0x7013) {
         state.sparkleActor = { program: 3, start: fieldcomTick() };
-        sfx.play("item_get");
+        sfx.play!("item_get");
         return;
     }
     const command = storyCommand(id);

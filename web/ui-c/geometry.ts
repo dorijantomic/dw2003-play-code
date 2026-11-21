@@ -45,7 +45,7 @@ export const IDENTITY = Object.freeze({ a: 1, d: 1, e: 0, f: 0 });
 
 /** A native rect through a relative transform (the fold / slide / zoom the renderer applies about a pivot). */
 export function applyRel(r: UiRect, rel: UiMatrix): UiRect {
-    return { x: r.x * rel.a + rel.e, y: r.y * rel.d + rel.f, w: r.w * rel.a, h: r.h * rel.d };
+    return { x: r.x * rel.a + rel.e!, y: r.y * rel.d + rel.f!, w: r.w * rel.a, h: r.h * rel.d };
 }
 
 /** Does the native rect touch the left / right edge of the 320 box (then it bleeds). */
@@ -60,7 +60,7 @@ export function bleedFlags(r: UiRect) {
 export function snapRect(r: UiRect, pl: Placement, rootOrigin: { x: number; y: number; }, limit: { left: number; top: number; right: number; bottom: number; }, bleed = true) {
     const fl = bleed ? bleedFlags(r) : { left: false, right: false };
     const x0 = pl.ox - rootOrigin.x + r.x * pl.s, x1 = pl.ox - rootOrigin.x + (r.x + r.w) * pl.s;
-    const y0 = pl.oy - rootOrigin.y + r.y * pl.sy, y1 = pl.oy - rootOrigin.y + (r.y + r.h) * pl.sy;
+    const y0 = pl.oy - rootOrigin.y + r.y * pl.sy!, y1 = pl.oy - rootOrigin.y + (r.y + r.h) * pl.sy!;
     const left = fl.left ? Math.floor(limit.left) : Math.floor(x0);
     const right = fl.right ? Math.round(limit.right) : Math.round(x1);
     const top = Math.floor(y0), bottom = Math.round(y1);
@@ -75,7 +75,7 @@ export function edges(s: number) {
 /** The full-screen fade the pause pages submit as a semi-transparent flat quad: 0..1 darkening (the DOM layer takes brightness(1 - dim)). */
 export function dimOf(quads: Quad[] = []) {
     let dim = 0;
-    for (const q of quads) if (q.semiTransparent && q.w >= NATIVE_W && q.h >= NATIVE_H) dim = Math.max(dim, Math.min(1, q.r / 255));
+    for (const q of quads) if (q.semiTransparent && q.w >= NATIVE_W && q.h >= NATIVE_H) dim = Math.max(dim, Math.min(1, q.r! / 255));
     return dim;
 }
 

@@ -44,7 +44,7 @@ type MapId = string | number;
 export function nearestSide(x: number, y: number, w: number, h: number) {
     const c: [string, number][] = [["W", x / w], ["E", (w - x) / w], ["N", y / h], ["S", (h - y) / h]];
     c.sort((a, b) => a[1] - b[1]);
-    return { side: c[0][0], score: Math.max(0, c[0][1]) };
+    return { side: c[0]![0], score: Math.max(0, c[0]![1]) };
 }
 
 export function overlapDepth(a: Rect, b: Rect) {
@@ -246,7 +246,7 @@ export function buildWorld({ maps, scenes, variants = {} }) {
     const byKey = new Map(places.map((p) => [p.key, p]));
     const rel = collectRelations(places, memberOf, scenes, byKey);
     const nbr = new Map(places.map((p) => [p.key, new Set()]));
-    for (const k of rel.keys()) { const [a, b] = k.split("|"); nbr.get(a).add(b); }
+    for (const k of rel.keys()) { const [a, b] = k.split("|"); nbr.get(a)!.add(b); }
 
     // connected components over open-air links
     const compOf = new Map(), comps = [];
@@ -254,57 +254,57 @@ export function buildWorld({ maps, scenes, variants = {} }) {
         if (compOf.has(p.key)) continue;
         const members = [], st = [p.key];
         compOf.set(p.key, comps.length);
-        while (st.length) { const k = st.pop(); members.push(k); for (const n of nbr.get(k)) if (!compOf.has(n)) { compOf.set(n, comps.length); st.push(n); } }
+        while (st.length) { const k = st.pop(); members.push(k); for (const n of nbr.get(k)!) if (!compOf.has(n)) { compOf.set(n, comps.length); st.push(n); } }
         comps.push(members);
     }
 
     const compInfo = [];
     const treeEdges = new Set();
     comps.forEach((members, ci) => {
-        members.sort((a, b) => nbr.get(b).size - nbr.get(a).size || idNum(a) - idNum(b));
+        members.sort((a, b) => nbr.get(b)!.size - nbr.get(a)!.size || idNum(a) - idNum(b));
         const root = byKey.get(members[0]);
-        root.x = 0; root.y = 0; root.comp = ci; root.adjacent = true;
+        root!.x = 0; root!.y = 0; root!.comp = ci; root!.adjacent = true;
         const placed = [root];
-        const done = new Set([root.key]);
+        const done = new Set([root!.key]);
         while (done.size < members.length) {
             // best edge from a placed to an unplaced node
             let best = null;
-            for (const pk of done) for (const qk of nbr.get(pk)) {
+            for (const pk of done) for (const qk of nbr.get(pk)!) {
                 if (done.has(qk)) continue;
                 const cands = rel.get(`${pk}|${qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score);
                 if (!best || cands[0].score < best.score || (cands[0].score === best.score && idNum(qk) < idNum(best.qk))) best = { pk, qk, score: cands[0].score };
             }
-            const q = byKey.get(best.qk);
+            const q = byKey.get(best!.qk);
             // try the best-scoring placed neighbour first, then every other placed neighbour
-            const order = [best.pk, ...[...done].filter((k) => k !== best.pk && nbr.get(k).has(best.qk))];
+            const order = [best!.pk, ...[...done].filter((k) => k !== best!.pk && nbr.get(k)!.has(best!.qk))];
             let res = null, from = null;
             for (const pk of order) {
-                const cands = rel.get(`${pk}|${best.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score);
+                const cands = rel.get(`${pk}|${best!.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score);
                 res = tryPlace(byKey.get(pk), q, cands, placed);
                 if (res) { from = pk; break; }
             }
             if (!res) {
-                const pk = best.pk, c = rel.get(`${pk}|${best.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score)[0];
+                const pk = best!.pk, c = rel.get(`${pk}|${best!.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score)[0];
                 const p = byKey.get(pk);
                 res = { ...pushOutward(q, flush(p, q, c), c.dir, placed), adjacent: false };
                 from = pk;
             }
-            q.x = res.x; q.y = res.y; q.comp = ci; q.adjacent = res.adjacent;
-            treeEdges.add(from < best.qk ? `${from}|${best.qk}` : `${best.qk}|${from}`);
-            placed.push(q); done.add(q.key);
+            q!.x = res.x; q!.y = res.y; q!.comp = ci; q!.adjacent = res.adjacent;
+            treeEdges.add(from < best!.qk ? `${from}|${best!.qk}` : `${best!.qk}|${from}`);
+            placed.push(q); done.add(q!.key);
         }
-        const bx = Math.min(...placed.map((r) => r.x)), by = Math.min(...placed.map((r) => r.y));
-        const bx2 = Math.max(...placed.map((r) => r.x + r.w)), by2 = Math.max(...placed.map((r) => r.y + r.h));
+        const bx = Math.min(...placed.map((r) => r!.x)), by = Math.min(...placed.map((r) => r!.y));
+        const bx2 = Math.max(...placed.map((r) => r!.x + r!.w)), by2 = Math.max(...placed.map((r) => r!.y + r!.h));
         const tally = new Map();
-        for (const k of members) { const s = byKey.get(k).region; tally.set(s, (tally.get(s) ?? 0) + 1); }
-        const top = [...tally].sort((a, b) => b[1] - a[1])[0][0];
+        for (const k of members) { const s = byKey.get(k)!.region; tally.set(s, (tally.get(s) ?? 0) + 1); }
+        const top = [...tally].sort((a, b) => b[1] - a[1])[0]![0];
         compInfo.push({ index: ci, members, box: { x: bx, y: by, w: bx2 - bx, h: by2 - by }, sector: top, dir: sectorDir(top) });
     });
 
     // components: the biggest one (most places) is the main land; the rest go on the side their sector name says
     const orderC = compInfo.slice().sort((a, b) => b.members.length - a.members.length || a.index - b.index);
     const main = orderC[0];
-    const moveComp = (c, dx: number, dy: number) => { for (const k of c.members) { const p = byKey.get(k); p.x += dx; p.y += dy; } c.box.x += dx; c.box.y += dy; };
+    const moveComp = (c, dx: number, dy: number) => { for (const k of c.members) { const p = byKey.get(k); p!.x += dx; p!.y += dy; } c.box.x += dx; c.box.y += dy; };
     const compRects = (c) => c.members.map((k) => byKey.get(k));
     moveComp(main, -main.box.x, -main.box.y);
     const settled = [main];
@@ -341,16 +341,16 @@ export function buildWorld({ maps, scenes, variants = {} }) {
         if (seenPair.has(key)) continue;
         seenPair.add(key);
         const [lo, hi] = key.split("|");
-        links.push({ a: lo, b: hi, tree: treeEdges.has(key), adjacent: adjacent(byKey.get(lo), byKey.get(hi)) });
+        links.push({ a: lo, b: hi, tree: treeEdges.has(key), adjacent: adjacent(byKey.get(lo)!, byKey.get(hi)) });
     }
 
     // pins
     const { pins, unreached } = buildPins(maps, scenes, places, memberOf, byKey);
-    for (const pin of pins) { const p = byKey.get(pin.placeKey); pin.wx = p.x + pin.x; pin.wy = p.y + pin.y; }
+    for (const pin of pins) { const p = byKey.get(pin.placeKey); pin.wx = p!.x + pin.x; pin.wy = p!.y + pin.y; }
 
     // overlaps
     let overlapCount = 0;
-    for (let i = 0; i < places.length; i++) for (let j = i + 1; j < places.length; j++) if (overlaps(places[i], places[j])) overlapCount++;
+    for (let i = 0; i < places.length; i++) for (let j = i + 1; j < places.length; j++) if (overlaps(places[i]!, places[j])) overlapCount++;
 
     const openMaps = maps.filter((m) => isOpenAirMapName(m.name)).length;
     return {

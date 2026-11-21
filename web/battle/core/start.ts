@@ -81,7 +81,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     const partyEntries = (party && party.length)
       ? party
       : [{ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, enemyStatScale: 16 }];
-    const enemyObj = B.buildEnemyRecord(partyEntries[0]);
+    const enemyObj = B.buildEnemyRecord(partyEntries[0]!);
     if (!enemyObj) return;
     const battleConfig = B.fieldEncDB?.battle_config?.[String(screenId)] ?? null;
     const effectGates = battleConfig?.effect_gates ?? {};
@@ -177,7 +177,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     // the form the lead fights in. This is the mark the report's DVEXP scan
     // reads — without it a battle that never changed form would bank no DVEXP
     // (stfgtrep.s state 0x14 arm, file 0x12C0, reads byte 7 + formIndex).
-    markFormTaken(B.battle, 0, initialPlayer.profile.id);
+    markFormTaken(B.battle, 0, initialPlayer!.profile.id);
     B.renderer3d?.setFaceCamVisible?.(true);
     // Both sides reach the SAME pool and name themselves in the original's own terms, so
     // `applyAilment` can queue a recovery without knowing which battle it is in. The side

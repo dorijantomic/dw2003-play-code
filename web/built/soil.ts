@@ -44,7 +44,7 @@ export const SOIL = {
          credit: "Poly Haven brown_mud_leaves_01 (Rob Tuytel), CC0 (polyhaven.com/a/brown_mud_leaves_01) - 2K diffuse + nor_gl" },
 };
 
-const lumaLin = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const lumaLin = (c: number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
 const toLin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
 const linOf = (rgb: number[]) => rgb.map((v: number) => toLin(v / 255));
 
@@ -62,11 +62,11 @@ export function soilTextures() {
     if (st.loaded || st.error) { st.loaded = true; return; }
     try {
       const t0 = performance.now();
-      const img = st.albedo.image, w = img.width, h = img.height;
+      const img = st.albedo!.image, w = img.width, h = img.height;
       const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
       const g = cv.getContext("2d", { willReadFrequently: true });
-      g.drawImage(img, 0, 0);
-      const d = g.getImageData(0, 0, w, h).data;
+      g!.drawImage(img, 0, 0);
+      const d = g!.getImageData(0, 0, w, h).data;
       const lut = new Float32Array(256); for (let i = 0; i < 256; i++) lut[i] = toLin(i / 255);
       // keep every pixel's linear rgb (decimated 2x2 for the percentile pass: 1M samples are plenty for p10/p90)
       const n = w * h, px = new Float32Array(Math.ceil(w / 2) * Math.ceil(h / 2) * 3);
@@ -84,7 +84,7 @@ export function soilTextures() {
   };
   const mk = (file: string | null, srgb: boolean) => {
     const t = loader.load(SOIL.TEX.dir + file, () => { if (--left <= 0) finish(); },
-                          undefined, () => { st.error = file; if (--left <= 0) finish(); });
+                          undefined!, () => { st.error = file; if (--left <= 0) finish(); });
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = SOIL.ANISO;
     t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
     t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.userData.file = file;
@@ -105,12 +105,12 @@ export function soilTexturesReady() {
  *  c' = all + (photo * tint - all) * K, so the mean stays `all` and the span becomes the measured span. */
 export function soilTone(tex, colours) {
   const all = linOf(colours.all), lo = linOf(colours.p10 || colours.all), hi = linOf(colours.p90 || colours.all);
-  const tint = [0, 1, 2].map((c) => all[c] / Math.max(tex.mean[c], 1e-5));
+  const tint = [0, 1, 2].map((c) => all[c]! / Math.max(tex.mean[c], 1e-5));
   const L = new Float32Array(tex.pixels.length / 3);
-  for (let i = 0, j = 0; i < tex.pixels.length; i += 3, j++) L[j] = 0.2126 * tex.pixels[i] * tint[0] + 0.7152 * tex.pixels[i + 1] * tint[1] + 0.0722 * tex.pixels[i + 2] * tint[2];
+  for (let i = 0, j = 0; i < tex.pixels.length; i += 3, j++) L[j] = 0.2126 * tex.pixels[i] * tint[0]! + 0.7152 * tex.pixels[i + 1] * tint[1]! + 0.0722 * tex.pixels[i + 2] * tint[2]!;
   L.sort();
   const q = (p: number) => L[Math.min(L.length - 1, Math.floor(p * (L.length - 1)))];
-  const photoSpan = q(0.9) - q(0.1), target = lumaLin(hi) - lumaLin(lo);
+  const photoSpan = q(0.9)! - q(0.1)!, target = lumaLin(hi) - lumaLin(lo);
   const contrast = photoSpan > 1e-6 ? target / photoSpan : 1;
   return { tint, contrast, all, target: { p10: lumaLin(lo), p90: lumaLin(hi), span: target },
            photo: { p10: q(0.1), p50: q(0.5), p90: q(0.9), span: photoSpan } };

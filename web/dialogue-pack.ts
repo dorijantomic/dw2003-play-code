@@ -84,18 +84,18 @@ export function decodeLine(bytes) {
         for (; i < bytes.length; ) {
             const c = bytes[i];
             if (c === 0x02 && bytes[i + 1] === 0x07) break;
-            if (c === 0x02 && bytes[i + 1] === 0x01) { pages.at(-1).push(""); i += 2; continue; }
+            if (c === 0x02 && bytes[i + 1] === 0x01) { pages.at(-1)!.push(""); i += 2; continue; }
             if (c === 0x02 && bytes[i + 1] === 0x02 && bytes[i + 2] === 0x02 && bytes[i + 3] === 0x02 && bytes[i + 4] === 0x03) { pages.push([""]); i += 5; continue; }
             if (c === 0x02 && bytes[i + 1] === 0x02 && bytes[i + 2] === 0x02 && (bytes[i + 3] === 0x00 || i + 3 >= bytes.length)) { i += 3; break; }
             let ch = null;
             if (c >= 0x04 && c <= 0x0d) ch = String.fromCharCode(0x30 + c - 0x04);
             else if (c >= 0x0e && c <= 0x27) ch = String.fromCharCode(0x41 + c - 0x0e);
             else if (c >= 0x28 && c <= 0x41) ch = String.fromCharCode(0x61 + c - 0x28);
-            if (ch !== null) { pages.at(-1)[pages.at(-1).length - 1] += ch; i += 1; continue; }
+            if (ch !== null) { pages.at(-1)![pages.at(-1)!.length - 1] += ch; i += 1; continue; }
             const two = rev.get(`${c},${bytes[i + 1]}`);
-            if (two !== undefined) { pages.at(-1)[pages.at(-1).length - 1] += two; i += 2; continue; }
+            if (two !== undefined) { pages.at(-1)![pages.at(-1)!.length - 1] += two; i += 2; continue; }
             const one = rev.get(String(c));
-            if (one !== undefined) { pages.at(-1)[pages.at(-1).length - 1] += one; i += 1; continue; }
+            if (one !== undefined) { pages.at(-1)![pages.at(-1)!.length - 1] += one; i += 1; continue; }
             return null;
         }
         return pages;

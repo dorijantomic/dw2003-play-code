@@ -24,7 +24,7 @@ function icoBase(detail: number) {
   const t = (1 + Math.sqrt(5)) / 2, P = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map((p) => { const l = Math.hypot(...p); return p.map((c) => c / l); });
   let F = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
   for (let d = 0; d < detail; d++) {
-    const cache = new Map(), mid = (a: string | number | undefined, b: string | number | undefined) => { const k = a < b ? a + "_" + b : b + "_" + a; let i = cache.get(k); if (i === undefined) { const m = [0, 1, 2].map((c) => (P[a][c] + P[b][c]) / 2), l = Math.hypot(...m); P.push(m.map((c) => c / l)); i = P.length - 1; cache.set(k, i); } return i; };
+    const cache = new Map(), mid = (a: string | number | undefined, b: string | number | undefined) => { const k = a! < b! ? a + "_" + b : b + "_" + a; let i = cache.get(k); if (i === undefined) { const m = [0, 1, 2].map((c) => (P[a][c] + P[b][c]) / 2), l = Math.hypot(...m); P.push(m.map((c) => c / l)); i = P.length - 1; cache.set(k, i); } return i; };
     const G = []; for (const [a, b, c] of F) { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); G.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); } F = G;
   }
   return (_ico[detail] = { P, F });
@@ -33,7 +33,7 @@ function icoBase(detail: number) {
 function addBlob(gb: GB, detail: number, c0, rad: number[], fn, rotY = 0, tiltX = 0) {
   const { P, F } = icoBase(detail), base = gb.p.length / 3, e = new THREE.Euler(tiltX, rotY, 0), q = new THREE.Quaternion().setFromEuler(e), v = new THREE.Vector3();
   for (const p of P) {
-    const o = fn(p[0], p[1], p[2]), k = o.k ?? 1; v.set(p[0] * rad[0] * k, p[1] * rad[1] * k, p[2] * rad[2] * k).applyQuaternion(q);
+    const o = fn(p[0], p[1], p[2]), k = o.k ?? 1; v.set(p[0] * rad[0]! * k, p[1] * rad[1]! * k, p[2] * rad[2]! * k).applyQuaternion(q);
     gb.v(c0.x + v.x, c0.y + v.y, c0.z + v.z, o.c[0], o.c[1], o.c[2], 0.5 + p[0] * 0.5, 0.5 + p[2] * 0.5);
   }
   for (const f of F) gb.tri(base + f[0], base + f[1], base + f[2]);
@@ -50,7 +50,7 @@ const arc = (ox: number, oz: number, a: number, H: number, lean: number, n = 5) 
 export function weather(parts, o: WeatherOpts = {}) {
   const wx = [o.snow ?? 0, o.snowAlt ?? -1e4, o.lichen ?? 0];
   for (const p of parts) {
-    const prev = p.mat.onBeforeCompile, tag = (p.mat.userData.tag || "") + "wx" + (wx[0] > 0 ? "s" : "") + (wx[2] > 0 ? "l" : ""); p.mat.userData.tag = tag;
+    const prev = p.mat.onBeforeCompile, tag = (p.mat.userData.tag || "") + "wx" + (wx[0]! > 0 ? "s" : "") + (wx[2]! > 0 ? "l" : ""); p.mat.userData.tag = tag;
     p.mat.onBeforeCompile = (sh) => {
       prev(sh); sh.uniforms.uWx = { value: new THREE.Vector3(...wx) };
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform vec3 uWx;")
@@ -311,7 +311,7 @@ export function snowPoints(kind = "blow", o: SnowPointsOpts = {}) {
   const crests = o.crests || [[0, 0, 0]];
   for (let i = 0; i < n; i++) {
     if (kind === "blow") { pos[i * 3] = r(); pos[i * 3 + 1] = r(); pos[i * 3 + 2] = r(); }
-    else { const c = crests[i % crests.length]; pos[i * 3] = c[0] + (r() - 0.5) * 14; pos[i * 3 + 1] = c[1] + (r() - 0.5) * 3; pos[i * 3 + 2] = c[2] + (r() - 0.5) * 14; }
+    else { const c = crests[i % crests.length]; pos[i * 3] = c![0]! + (r() - 0.5) * 14; pos[i * 3 + 1] = c![1]! + (r() - 0.5) * 3; pos[i * 3 + 2] = c![2]! + (r() - 0.5) * 14; }
     ph[i * 2] = r(); ph[i * 2 + 1] = r();
   }
   const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("aPh", new THREE.BufferAttribute(ph, 2));
@@ -343,7 +343,7 @@ export function strataTexture() {
     for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${r() < 0.5 ? "255,255,255" : "20,20,20"},${0.04 + r() * 0.07})`; g.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2); }
   }));
 }
-const strataCol = (band: number, f: number, y: number) => { const k = hash1(band * 3.7 + 0.5), b = k < 0.34 ? [0.50, 0.49, 0.47] : k < 0.67 ? [0.56, 0.50, 0.42] : [0.40, 0.40, 0.42]; const s = 0.78 + 0.28 * sstep(0.1, 0.7, f); return [b[0] * s, b[1] * s, b[2] * s]; };
+const strataCol = (band: number, f: number, y: number) => { const k = hash1(band * 3.7 + 0.5), b = k < 0.34 ? [0.50, 0.49, 0.47] : k < 0.67 ? [0.56, 0.50, 0.42] : [0.40, 0.40, 0.42]; const s = 0.78 + 0.28 * sstep(0.1, 0.7, f); return [b[0]! * s, b[1]! * s, b[2]! * s]; };
 
 // ------------------------------------------------------------------ CRAGS and SPIRES (strata-banded, ridged, ledges), CLIFF FACES
 const ridged = (x: number, y: number, z: number, f: number, s: number | undefined) => 1 - Math.abs(2 * vnoise(x * f + y * f * 0.7, z * f - y * f * 0.9, 1, s) - 1);
@@ -355,7 +355,7 @@ export function cragParts(seed = 1, o: { h?: number; w?: number; detail?: number
     const ledge = 1 + 0.07 * (1 - sstep(0.05, 0.5, f)), rid = 1 + 0.3 * ridged(x, y, z, 1.7, sd + 1) + 0.12 * ridged(x, y, z, 4.1, sd + 2) - 0.2;
     const k = taper * ledge * rid * (1 + lean * y * 0.4);
     const c = strataCol(band, f, y); const dark = 0.82 + 0.3 * ridged(x, y, z, 1.7, sd + 1);
-    return { k, c: [c[0] * dark, c[1] * dark, c[2] * dark * (1 + 0.04 * yn)] };
+    return { k, c: [c[0]! * dark, c[1]! * dark, c[2]! * dark * (1 + 0.04 * yn)] };
   }, r() * 6, 0);
   // pointed top: lift the highest ring
   const p = gb.p; let top = 0; for (let i = 1; i < p.length; i += 3) top = Math.max(top, p[i]);
@@ -365,7 +365,7 @@ export function cragParts(seed = 1, o: { h?: number; w?: number; detail?: number
 export function spireCluster(seed = 1) {
   const g = new GB(), r = rng(seed * 17), all = [];
   const parts = [];
-  for (let i = 0; i < 4; i++) { const c = cragParts(seed * 10 + i, { h: i === 0 ? 8 : 3.5 + 2.5 * r(), w: i === 0 ? 1.4 : 0.8 + 0.4 * r(), detail: 3 }); const a = r() * 6.28, d = i === 0 ? 0 : 1.1 + 0.6 * r(); c[0].geo.translate(Math.cos(a) * d, 0, Math.sin(a) * d); parts.push(c[0].geo); }
+  for (let i = 0; i < 4; i++) { const c = cragParts(seed * 10 + i, { h: i === 0 ? 8 : 3.5 + 2.5 * r(), w: i === 0 ? 1.4 : 0.8 + 0.4 * r(), detail: 3 }); const a = r() * 6.28, d = i === 0 ? 0 : 1.1 + 0.6 * r(); c[0]!.geo.translate(Math.cos(a) * d, 0, Math.sin(a) * d); parts.push(c[0]!.geo); }
   // merge the four geometries into one (all have position/normal/uv/color)
   let n = 0; for (const geo of parts) n += geo.attributes.position.count;
   const P = new Float32Array(n * 3), N = new Float32Array(n * 3), C = new Float32Array(n * 3), UV = new Float32Array(n * 2), I = []; let o = 0;
@@ -384,9 +384,9 @@ export function cliffParts(seed = 1, o: { w?: number; h?: number } = {}) {
     z += Math.max(0, 1.3 - y) * 0.85 + 0.5 * Math.pow(Math.abs(u - 0.5) * 2, 3);          // talus apron at the foot, rolled-back sides
     const stain = sstep(0.68, 0.9, vnoise(x, 0, 1.3, sd + 5)) * sstep(0.2, 1.0, v) * 0.38;
     const c = strataCol(band, f, y), dk = (0.86 + 0.18 * z) * (1 - stain);
-    row.push(gb.v(x, y, z, c[0] * dk, c[1] * dk, c[2] * dk, x / 3.2, y / 3.2));
+    row.push(gb.v(x, y, z, c[0]! * dk, c[1]! * dk, c[2]! * dk, x / 3.2, y / 3.2));
   } ids.push(row); }
-  for (let j = 0; j < sy; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j][i], ids[j][i + 1], ids[j + 1][i + 1], ids[j + 1][i]);
+  for (let j = 0; j < sy; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j]![i], ids[j]![i + 1], ids[j + 1]![i + 1], ids[j + 1]![i]);
   const geo = gb.geo(true), mat = new THREE.MeshLambertMaterial({ map: strataTexture(), vertexColors: true, side: THREE.DoubleSide }); mat.userData.tag = "cliff";
   toonify(mat, { height: Hc, shadeK: 0.74, rim: 0.12, grade: { sat: 1.1, post: 0.25 } });
   return [{ geo, mat }];
@@ -397,7 +397,7 @@ export function screeParts(seed = 1) {
   for (let c = 0; c < 10; c++) {
     const a = r() * 6.28, d = Math.sqrt(r()) * 0.65, s = 0.05 + 0.1 * r() * r() * 3, tint = 0.72 + 0.4 * r(), warm = r() < 0.3, rot = new THREE.Euler(r() * 6, r() * 6, r() * 6), q = new THREE.Quaternion().setFromEuler(rot), base = gb.p.length / 3;
     const jit = P.map(() => [0.7 + 0.6 * r(), 0.45 + 0.35 * r(), 0.7 + 0.6 * r()]);
-    P.forEach((p: number[], i: string | number) => { const v = new THREE.Vector3(p[0] * jit[i][0], p[1] * jit[i][1], p[2] * jit[i][2]).multiplyScalar(s).applyQuaternion(q); gb.v(Math.cos(a) * d + v.x, Math.max(0.0, v.y + s * 0.4), Math.sin(a) * d + v.z, (warm ? 0.55 : 0.48) * tint, (warm ? 0.5 : 0.48) * tint, (warm ? 0.42 : 0.47) * tint); });
+    P.forEach((p: number[], i: string | number) => { const v = new THREE.Vector3(p[0]! * jit[i][0], p[1]! * jit[i][1], p[2]! * jit[i][2]).multiplyScalar(s).applyQuaternion(q); gb.v(Math.cos(a) * d + v.x, Math.max(0.0, v.y + s * 0.4), Math.sin(a) * d + v.z, (warm ? 0.55 : 0.48) * tint, (warm ? 0.5 : 0.48) * tint, (warm ? 0.42 : 0.47) * tint); });
     for (const f of F) gb.tri(base + f[0], base + f[1], base + f[2]);
   }
   return done(gb, vcSolid("scree", { height: 0.2, shadeK: 0.76, rim: 0.05, fade: [30, 52], grade: { sat: 1.1, post: 0.3 } }));
@@ -416,7 +416,7 @@ export function glacierParts(seed = 1) {
     let c = mixc(ice, deep, Math.min(1, cd * 1.1)); c = mixc(c, [0.62, 0.8, 0.9], 0.3 * (1 - mid)); const mor = sstep(0.82, 0.97, e + 0.1 * (vnoise(x, z, 1.0, sd + 2) - 0.5)); c = mixc(c, grit, mor * 0.85);
     row.push(gb.v(x, y, z, c[0], c[1], c[2], x / 3, z / 3));
   } ids.push(row); }
-  for (let j = 0; j < sz; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j][i], ids[j + 1][i], ids[j + 1][i + 1], ids[j][i + 1]);
+  for (let j = 0; j < sz; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j]![i], ids[j + 1]![i], ids[j + 1]![i + 1], ids[j]![i + 1]);
   const r = rng(sd + 40);
   for (let k = 0; k < 7; k++) {                                                                  // seracs: tilted jagged ice blocks
     const x = (r() - 0.5) * 5, z = -L / 2 + 1 + r() * (L - 2), h = 1.1 + 1.8 * r(), w = 0.5 + 0.5 * r(), tilt = (r() - 0.5) * 0.5, base = gb.p.length / 3, sides = 5;
@@ -439,7 +439,7 @@ export function snowDriftParts(seed = 1) {
     const c = mixc([0.88, 0.93, 1.0], [0.97, 0.985, 1.0], sstep(0.0, 0.6, y));
     row.push(gb.v(x, y, z, c[0], c[1], c[2], x, z));
   } ids.push(row); }
-  for (let j = 0; j < sz; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j][i], ids[j + 1][i], ids[j + 1][i + 1], ids[j][i + 1]);
+  for (let j = 0; j < sz; j++) for (let i = 0; i < sx; i++) gb.quad(ids[j]![i], ids[j + 1]![i], ids[j + 1]![i + 1], ids[j]![i + 1]);
   return done(gb, vcMat("drift", { height: 1, shadeK: 0.9, rim: 0.35, emissive: [0.02, 0.03, 0.05], grade: { sat: 1.0, post: 0.2 } }));
 }
 
@@ -499,8 +499,8 @@ export function heatherParts(seed = 1) {
 export function lichenParts(seed = 1) {
   const r = rng(seed * 13 + 7), gb = new GB(), cols = [[0.92, 0.56, 0.12], [0.72, 0.78, 0.22], [0.62, 0.7, 0.55], [0.18, 0.17, 0.16], [0.88, 0.74, 0.16]];
   for (let b = 0; b < 5; b++) {
-    const cx = (r() - 0.5) * 0.5, cz = (r() - 0.5) * 0.5, R0 = 0.05 + 0.08 * r(), c = cols[Math.floor(r() * cols.length)], y = 0.012 + b * 0.0008, seg = 16, ctr = gb.v(cx, y + 0.004, cz, c[0] * 1.08, c[1] * 1.08, c[2] * 1.08);
-    const ring = []; for (let s = 0; s < seg; s++) { const a = (s / seg) * 6.283, rr = R0 * (0.7 + 0.5 * vnoise(Math.cos(a) * 3 + b * 7, Math.sin(a) * 3, 1, seed)); ring.push(gb.v(cx + Math.cos(a) * rr, y, cz + Math.sin(a) * rr, c[0] * 0.82, c[1] * 0.82, c[2] * 0.82)); }
+    const cx = (r() - 0.5) * 0.5, cz = (r() - 0.5) * 0.5, R0 = 0.05 + 0.08 * r(), c = cols[Math.floor(r() * cols.length)], y = 0.012 + b * 0.0008, seg = 16, ctr = gb.v(cx, y + 0.004, cz, c![0]! * 1.08, c![1]! * 1.08, c![2]! * 1.08);
+    const ring = []; for (let s = 0; s < seg; s++) { const a = (s / seg) * 6.283, rr = R0 * (0.7 + 0.5 * vnoise(Math.cos(a) * 3 + b * 7, Math.sin(a) * 3, 1, seed)); ring.push(gb.v(cx + Math.cos(a) * rr, y, cz + Math.sin(a) * rr, c![0]! * 0.82, c![1]! * 0.82, c![2]! * 0.82)); }
     for (let s = 0; s < seg; s++) gb.tri(ctr, ring[s], ring[(s + 1) % seg]);
   }
   const geo = gb.geo(true), n = geo.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
@@ -525,7 +525,7 @@ export function dwarfShrubParts(seed = 1, variant = 0) {
     tube(gb, P, P.map((_, i) => 0.006 * (1 - 0.6 * i / 5)), 4, (i: number) => mixc([0.34, 0.24, 0.17], [0.4, 0.3, 0.2], i / 5), [false, false]);
     for (let k = 0; k < 4; k++) {
       const p = lerpP(P, 0.38 + 0.18 * k), col = red ? (r() < 0.5 ? [0.55, 0.16, 0.14] : [0.4, 0.44, 0.15]) : (r() < 0.6 ? [0.42, 0.55, 0.38] : [0.5, 0.6, 0.42]);
-      addBlob(gb, 1, p.clone().add(V(0, 0.018, 0)), [0.046, 0.026, 0.046], (x: number, y, z: number) => { const n = 0.75 + 0.5 * vnoise(x * 5 + k, z * 5, 1, seed); return { k: 1, c: [col[0] * n, col[1] * n, col[2] * n] }; });
+      addBlob(gb, 1, p.clone().add(V(0, 0.018, 0)), [0.046, 0.026, 0.046], (x: number, y, z: number) => { const n = 0.75 + 0.5 * vnoise(x * 5 + k, z * 5, 1, seed); return { k: 1, c: [col[0]! * n, col[1]! * n, col[2]! * n] }; });
       if (red && k === 2) addBlob(gb, 0, p.clone().add(V(0.02, 0.012, 0.01)), [0.011, 0.011, 0.011], () => ({ c: [0.12, 0.08, 0.12] }));
       if (!red && k === 3) addBlob(gb, 1, p.clone().add(V(0, 0.05, 0)), [0.017, 0.028, 0.017], () => ({ c: [0.9, 0.88, 0.7] }));        // catkin
     }
@@ -571,7 +571,7 @@ export function krummholzParts(seed = 1) {
 export function snagParts(seed = 1) {
   const r = rng(seed * 101 + 6), gb = new GB(), H = 7 + 3 * r(), n = 11, P = [], R = [];
   for (let i = 0; i <= n; i++) { const u = i / n; P.push(V(Math.sin(u * 3.2 + seed) * 0.28 * u + (r() - 0.5) * 0.04, H * u, Math.cos(u * 2.6 + seed) * 0.22 * u)); R.push(0.34 * (1 - 0.8 * Math.pow(u, 0.8)) + 0.03 + 0.18 * Math.max(0, 0.12 - u) * 4); }
-  const grain = (i: number, jf: number) => { const k = Math.floor(jf * 14), cr = hash1(k * 3.1 + seed) < 0.28; const base = [0.66, 0.64, 0.58]; const s = 0.82 + 0.3 * hash1(k + i * 0.13 + seed); return cr ? [0.3, 0.28, 0.26] : [base[0] * s, base[1] * s, base[2] * s]; };
+  const grain = (i: number, jf: number) => { const k = Math.floor(jf * 14), cr = hash1(k * 3.1 + seed) < 0.28; const base = [0.66, 0.64, 0.58]; const s = 0.82 + 0.3 * hash1(k + i * 0.13 + seed); return cr ? [0.3, 0.28, 0.26] : [base[0]! * s, base[1]! * s, base[2]! * s]; };
   tube(gb, P, R, 9, grain, [false, true]);
   const tip = P[n]; for (let s = 0; s < 3; s++) { const a = s * 2.1; tube(gb, [tip.clone().add(V(Math.cos(a) * 0.05, -0.2, Math.sin(a) * 0.05)), tip.clone().add(V(Math.cos(a) * 0.04, 0.35 + 0.25 * r(), Math.sin(a) * 0.04))], [0.045, 0.004], 4, grain, [false, false]); }       // splintered top
   for (let b = 0; b < 8; b++) {

@@ -362,7 +362,7 @@ export class ActionVM {
     const arr = (a: number) => (a >= ACT && a < CTX ? actor : ctx);
     const idx = (a: number) => ((a >= ACT ? a - ACT : a - CTX) >>> 2) & 0x3f;
     const half = (a: number) => {
-      const arr2 = arr(a), w = arr2[idx(a)] | 0;
+      const arr2 = arr(a), w = arr2[idx(a)]! | 0;
       return ((w >>> ((a & 2) ? 16 : 0)) & 0xffff) << 16 >> 16;
     };
     return {
@@ -370,7 +370,7 @@ export class ActionVM {
         if (a >= OP && a < OP + 0x40) { const w = (a - OP) >>> 1; return (((ops[w] ?? 0) & 0xffff) << 16) >> 16; }
         return half(a);
       },
-      read32: (a: number) => (a >= OP && a < OP + 0x40) ? 0 : (arr(a)[idx(a)] | 0),
+      read32: (a: number) => (a >= OP && a < OP + 0x40) ? 0 : (arr(a)[idx(a)]! | 0),
       write32: (a: number, v: number) => { if (a < OP || a >= OP + 0x40) arr(a)[idx(a)] = v | 0; },
     };
   }
@@ -391,7 +391,7 @@ export class ActionVM {
         if (rec.words[0] === STRIKE_TYPE) self.justHit = true;
         return 0;
       },
-      projectileFile: () => { self.hooks.setLunge?.({ sub: rec.words[0] | 0, words: rec.words }); return 0; },
+      projectileFile: () => { self.hooks.setLunge?.({ sub: rec.words[0]! | 0, words: rec.words }); return 0; },
       projectileReady: () => 1,
       projectileBuild: (_e, id, vecA, vecB) => {
         self.hooks.setLunge?.({ sub: 0, id, from: [...vecA], to: [...vecB] });
@@ -400,8 +400,8 @@ export class ActionVM {
       cameraView: () => { self.hooks.onCamera?.({ words: rec.words }); },
       cameraArm: () => {},
       motionSelect: playMotion, motionProbe: playMotion, motionReady: () => 0,
-      overlaySpawn: (arg) => { self.hooks.onOverlay?.({ type: rec.words[0] | 0, duration: rec.words[1] | 0 }); return 0; },
-      overlayFree: () => { self.hooks.onOverlay?.({ type: rec.words[0] | 0, duration: rec.words[1] | 0 }); },
+      overlaySpawn: (arg) => { self.hooks.onOverlay?.({ type: rec.words[0]! | 0, duration: rec.words[1]! | 0 }); return 0; },
+      overlayFree: () => { self.hooks.onOverlay?.({ type: rec.words[0]! | 0, duration: rec.words[1]! | 0 }); },
       allocateActionActor: () => { host.fired = true; return 0; },
       destroyActionActor: () => {},
       fired: false,
@@ -425,7 +425,7 @@ export class ActionVM {
     const host = this._portHost(rec);
     const fn = { op1: op1Handler, op3: op3Handler, op4: op4Handler, op5: op5Handler, op6: op6Handler, op7: op7Handler, op10: op10Handler }[name];
     if (fn) fn(ACT, CTX, host, mem, { projectiles: [] });
-    if (host.fired) this.hooks.onAuxAction?.({ mode: rec.words[0] | 0 });
+    if (host.fired) this.hooks.onAuxAction?.({ mode: rec.words[0]! | 0 });
   }
 
   // op11 F0x8008c220 — the WAIT YIELD, driven by the port. The port's op11Wait owns the
@@ -434,7 +434,7 @@ export class ActionVM {
   // `delta` is the per-tick frame step the original reads at D0x8004df9c.
   _driveWait(rec: { words: number[]; }, delta: number) {
     const a = { ip: 0, waitFlag: this._waitFlag | 0, waitCount: this._waitCount | 0 };
-    const released = op11Wait(a, rec.words[0] | 0, delta | 0, 1);
+    const released = op11Wait(a, rec.words[0]! | 0, delta | 0, 1);
     this._waitFlag = a.waitFlag | 0;
     this._waitCount = a.waitCount | 0;
     return released;
@@ -475,7 +475,7 @@ export class ActionVM {
   // the owning battle state, so expose the replacement request to that owner.
   // All other modes are native no-ops.
   _auxAction(words: number[]) {
-    const mode = words[0] | 0;
+    const mode = words[0]! | 0;
     if (mode === 0 || mode === 5) this.hooks.onAuxAction?.({ mode });
   }
 
@@ -499,15 +499,15 @@ export class ActionVM {
   // type 9999 = the actor's current-effect field +0x6c (the tech record's effect type).
   // z = 32767 / -1 → screen-space draw (F0x8008921c), else world-space via the battle camera.
   _effect(words: number[]) {
-    const sub = words[0] | 0;
-    let type = words[1] | 0;
+    const sub = words[0]! | 0;
+    let type = words[1]! | 0;
     if (type === -1) return;
     if (type === EFFECT_CURRENT) {
       if (this.currentEffect == null) return;   // no current effect set → faithful skip
       type = this.currentEffect | 0;
     }
     if (sub === 1) { this.hooks.onEffectPreload?.(type); return; }
-    this.hooks.onEffect?.({ type, x: words[2] | 0, y: words[3] | 0, z: words[4] | 0 });
+    this.hooks.onEffect?.({ type, x: words[2]! | 0, y: words[3]! | 0, z: words[4]! | 0 });
   }
 
   // op6 sub=0: [sub,id, x,y,z, x2,y2,z2]; the handler negates Y,Z of each vector

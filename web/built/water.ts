@@ -160,8 +160,8 @@ export function sandOutline(pos) {
   const at = new Map();
   for (let t = 0; t < pos.length / 9; t++) {
     for (const [i, j] of [[0, 1], [1, 2], [2, 0]]) {
-      const ax = pos[t * 9 + i * 3], az = pos[t * 9 + i * 3 + 2];
-      const bx = pos[t * 9 + j * 3], bz = pos[t * 9 + j * 3 + 2];
+      const ax = pos[t * 9 + i! * 3], az = pos[t * 9 + i! * 3 + 2];
+      const bx = pos[t * 9 + j! * 3], bz = pos[t * 9 + j! * 3 + 2];
       const ka = key2(ax, az), kb = key2(bx, bz), k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
       const e = at.get(k);
       if (e) e.n++; else at.set(k, { a: [ax, az], b: [bx, bz], n: 1 });
@@ -191,7 +191,7 @@ export function waterline(outline, n = SHORE.SECTORS) {
   }
   // one circular 3-tap blur: the ray's outermost crossing can jump between two outline points of the same bay
   const out = new Float32Array(n);
-  for (let k = 0; k < n; k++) out[k] = (r[(k + n - 1) % n] + 2 * r[k] + r[(k + 1) % n]) / 4;
+  for (let k = 0; k < n; k++) out[k] = (r[(k + n - 1) % n]! + 2 * r[k]! + r[(k + 1) % n]!) / 4;
   return { r: out, az: Float32Array.from({ length: n }, (_, k) => (k / n) * Math.PI * 2 - Math.PI) };
 }
 
@@ -220,9 +220,9 @@ export function smoothWaterline(outline, P = SHORE) {
   const gauss = (v: number[] | Float64Array<ArrayBuffer>, width: number) => {               // circular Gaussian in arc length (units) at each sample's own radius
     const o = new Float64Array(n);
     for (let k = 0; k < n; k++) {
-      const K = Math.min(n >> 1, Math.ceil((3 * width) / Math.max(raw[k] * da, 1)));
+      const K = Math.min(n >> 1, Math.ceil((3 * width) / Math.max(raw[k]! * da, 1)));
       let sw = 0, sv = 0;
-      for (let j = -K; j <= K; j++) { const x = j * da * raw[k], w = Math.exp(-(x * x) / (2 * width * width)); sw += w; sv += w * v[(k + j + n) % n]; }
+      for (let j = -K; j <= K; j++) { const x = j * da * raw[k]!, w = Math.exp(-(x * x) / (2 * width * width)); sw += w; sv += w * v[(k + j + n) % n]!; }
       o[k] = sv / sw;
     }
     return o;
@@ -230,22 +230,22 @@ export function smoothWaterline(outline, P = SHORE) {
   const g = gauss(raw, sig), sh = new Float64Array(n), ex = new Float64Array(n), m = new Float64Array(n);
   for (let it = 0; it < 6; it++) {           // the excess seaward of the land edge, removed smoothly (a few rounds)
     let any = 0;
-    for (let k = 0; k < n; k++) { ex[k] = Math.max(0, g[k] - sh[k] - raw[k]); any = Math.max(any, ex[k]); }
+    for (let k = 0; k < n; k++) { ex[k] = Math.max(0, g[k]! - sh[k]! - raw[k]!); any = Math.max(any, ex[k]!); }
     if (any < 0.5) break;
     for (let k = 0; k < n; k++) {
-      const K = Math.ceil((2 * sig) / Math.max(raw[k] * da, 1));
-      let v = 0; for (let j = -K; j <= K; j++) v = Math.max(v, ex[(k + j + n) % n]);
+      const K = Math.ceil((2 * sig) / Math.max(raw[k]! * da, 1));
+      let v = 0; for (let j = -K; j <= K; j++) v = Math.max(v, ex[(k + j + n) % n]!);
       m[k] = v;
     }
     const add = gauss(m, sig);
-    for (let k = 0; k < n; k++) sh[k] += add[k];
+    for (let k = 0; k < n; k++) sh[k]! += add[k]!;
   }
   const r = new Float32Array(n);
   let clamped = 0, dmax = 0, dsum = 0;
   for (let k = 0; k < n; k++) {
-    let v = g[k] - sh[k];
-    if (v > raw[k]) { v = raw[k]; clamped++; }
-    r[k] = v; dmax = Math.max(dmax, raw[k] - v); dsum += raw[k] - v;
+    let v = g[k]! - sh[k]!;
+    if (v > raw[k]!) { v = raw[k]; clamped++; }
+    r[k] = v; dmax = Math.max(dmax, raw[k]! - v); dsum += raw[k]! - v;
   }
   return { r, az, n, sigma: sig, raw: Float32Array.from(raw), dev: { max: Math.round(dmax), mean: Math.round(dsum / n) }, clamped };
 }
@@ -263,11 +263,11 @@ function edt1d(f, n: number, d, v, z: number[] | Float64Array<ArrayBuffer>) {
   let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
   for (let q = 1; q < n; q++) {
     let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    while (s <= z[k]!) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
     k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
   }
   k = 0;
-  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+  for (let q = 0; q < n; q++) { while (z[k + 1]! < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
 }
 function edt2d(zero: Uint8Array<ArrayBuffer>, size: number) {
   const g = new Float32Array(size * size);
@@ -321,7 +321,7 @@ function bakeShore(rec) {
   const onSand = new Uint8Array(N), onBank = new Uint8Array(N), inside = new Uint8Array(N);
   if (sand && sand.pos) rasterise(sand.pos, onSand, size, span, upx);
   for (const b of banks) rasterise(b.pos, onBank, size, span, upx);
-  for (let i = 0; i < N; i++) inside[i] = onSand[i] | onBank[i];
+  for (let i = 0; i < N; i++) inside[i] = onSand[i]! | onBank[i]!;
   // R is the distance to the SMOOTH waterline (smoothWaterline()), not to the outline's straight edges: "land" for R
   // is every texel inside that curve. G, B and A keep the pieces' own rasters (which piece a texel is on).
   const landPos = [...(sand?.pos || []), ...banks.flatMap((b) => b.pos)];
@@ -338,18 +338,18 @@ function bakeShore(rec) {
   const dIn = edt2d(wet, size);           // for outside texels: distance to the nearest inside texel
   // near the line, the EXACT distance to the curve (the raster's 0.5-texel staircase would wiggle every contour of
   // the swash band by +-16 units); blended into the EDT between 0.75 and 1 x EXACT
-  const ptsX = sm ? Float64Array.from(sm.r, (r, k) => Math.sin(sm.az[k]) * r) : null;
-  const ptsZ = sm ? Float64Array.from(sm.r, (r, k) => Math.cos(sm.az[k]) * r) : null;
+  const ptsX = sm ? Float64Array.from(sm.r, (r, k) => Math.sin(sm.az[k]!) * r) : null;
+  const ptsZ = sm ? Float64Array.from(sm.r, (r, k) => Math.cos(sm.az[k]!) * r) : null;
   const exactAt = (x: number, z: number, de: number) => {
-    const rho = Math.hypot(x, z), a = Math.atan2(x, z), n = sm.n, da = (Math.PI * 2) / n;
+    const rho = Math.hypot(x, z), a = Math.atan2(x, z), n = sm!.n, da = (Math.PI * 2) / n;
     const win = Math.min(n >> 1, Math.ceil(Math.asin(Math.min(1, (Math.abs(de) + 2 * upx) / Math.max(rho, 1))) / da) + 2);
     const k0 = Math.floor((a + Math.PI) / da);
     let best = Infinity;
     for (let j = -win; j <= win; j++) {
       const p = ((k0 + j) % n + n) % n, q = (p + 1) % n;
-      const ax = ptsX[p], az = ptsZ[p], bx = ptsX[q] - ax, bz = ptsZ[q] - az, l2 = bx * bx + bz * bz;
-      const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * bx + (z - az) * bz) / l2)) : 0;
-      const dx = x - ax - t * bx, dz = z - az - t * bz, dd = dx * dx + dz * dz;
+      const ax = ptsX![p], az = ptsZ![p], bx = ptsX![q]! - ax!, bz = ptsZ![q]! - az!, l2 = bx * bx + bz * bz;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax!) * bx + (z - az!) * bz) / l2)) : 0;
+      const dx = x - ax! - t * bx, dz = z - az! - t * bz, dd = dx * dx + dz * dz;
       if (dd < best) best = dd;
     }
     return Math.sqrt(best);
@@ -360,16 +360,16 @@ function bakeShore(rec) {
   const toHalf = THREE.DataUtils?.toHalfFloat || ((v) => v);
   for (let i = 0; i < N; i++) {
     // texel centres are 0.5 texel inside the boundary the raster put between the two classes
-    let d = (wet[i] ? Math.sqrt(dOut[i]) - 0.5 : -(Math.sqrt(dIn[i]) - 0.5)) * upx;
+    let d = (wet[i] ? Math.sqrt(dOut[i]!) - 0.5 : -(Math.sqrt(dIn[i]!) - 0.5)) * upx;
     if (sm && Math.abs(d) < SHORE.EXACT) {
       const x = ((i % size) + 0.5) * upx - span, z = (Math.floor(i / size) + 0.5) * upx - span;
       const de = (wet[i] ? 1 : -1) * exactAt(x, z, d), b = Math.abs(d) / SHORE.EXACT, w = b < 0.75 ? 0 : (b - 0.75) / 0.25;
       d = de + (d - de) * w * w * (3 - 2 * w);
     }
     half[i * 4] = toHalf(d);                                               // R: signed distance to the smooth line, + inland
-    half[i * 4 + 1] = toHalf(onSand[i]);                                   // G: 1 on the sand
-    half[i * 4 + 2] = toHalf(Math.sqrt(dSand[i]) * upx);                   // B: distance to the sand
-    half[i * 4 + 3] = toHalf(dBank ? Math.sqrt(dBank[i]) * upx : 4 * span); // A: distance to the bank
+    half[i * 4 + 1] = toHalf(onSand[i]!);                                   // G: 1 on the sand
+    half[i * 4 + 2] = toHalf(Math.sqrt(dSand[i]!) * upx);                   // B: distance to the sand
+    half[i * 4 + 3] = toHalf(dBank ? Math.sqrt(dBank[i]!) * upx : 4 * span); // A: distance to the bank
   }
   const tex = new THREE.DataTexture(half, size, size, THREE.RGBAFormat, THREE.HalfFloatType);
   tex.minFilter = tex.magFilter = THREE.LinearFilter;
@@ -632,7 +632,7 @@ export const SEA_GLSL = /* glsl */`
 // ---------------- uniforms ----------------
 const bytes = (c) => (Array.isArray(c) ? c.map((v) => Math.max(0, Math.min(255, Math.round(v)))) : null);
 const mean = (list) => [0, 1, 2].map((i) => list.reduce((s, c) => s + c[i], 0) / list.length);
-const lift = (c: number[], k: number) => [0, 1, 2].map((i) => c[i] + (255 - c[i]) * k);
+const lift = (c: number[], k: number) => [0, 1, 2].map((i) => c[i]! + (255 - c[i]!) * k);
 const rows8 = (p) => Array.from({ length: WATER.ROWS }, (_, k) => (p.rows?.[k]?.rgb) || p.rows?.find(Boolean)?.rgb || p.colours?.all);
 
 /** The measured anchors: the recipe's own rows / percentiles, averaged over the pieces of each kind. */
@@ -651,12 +651,12 @@ export function anchors(rec) {
   // without a sea piece uses the first water piece's rows; none at all -> shallow .. deep
   const rampSrc = deepPiece?.rows?.some(Boolean) ? rows8(deepPiece).slice().reverse() : null;
   const ramp = rampSrc ? rampSrc.map((c) => bytes(c)) : Array.from({ length: WATER.ROWS }, (_, k) => {
-    const f = k / (WATER.ROWS - 1); return [0, 1, 2].map((i) => Math.round(shallowSrc[i] + (deep[i] - shallowSrc[i]) * f));
+    const f = k / (WATER.ROWS - 1); return [0, 1, 2].map((i) => Math.round(shallowSrc[i]! + (deep[i]! - shallowSrc[i]!) * f));
   });
   return {
     ramp, rampFrom: rampSrc ? deepPiece.name : null,
     deep: deep.map(Math.round), shallow: shallowSrc.map(Math.round), foam: foamSrc.map(Math.round), bed,
-    near: near.map((c) => c.map(Math.round)), p90: p90s.map((c) => c.map(Math.round)),
+    near: near.map((c) => c.map(Math.round)), p90: p90s.map((c) => c!.map(Math.round)),
     rows: water.map((p) => ({ name: p.name, rows: p.rows ? p.rows.map((r) => r?.rgb || null) : null, p10: bytes(p.colours?.p10), p90: bytes(p.colours?.p90) }))
               .concat(sea.map((p) => ({ name: p.name, rows: p.rows ? p.rows.map((r) => r?.rgb || null) : null, p10: bytes(p.colours?.p10), p90: bytes(p.colours?.p90) }))),
   };
@@ -670,13 +670,13 @@ export function rampTangents(cols) {
     const y = cols.map((q) => q[ch[c]]), d = [], m = new Array(n).fill(0);
     for (let k = 0; k < n - 1; k++) d.push(y[k + 1] - y[k]);
     m[0] = d[0]; m[n - 1] = d[n - 2];
-    for (let k = 1; k < n - 1; k++) m[k] = d[k - 1] * d[k] <= 0 ? 0 : (d[k - 1] + d[k]) / 2;
+    for (let k = 1; k < n - 1; k++) m[k] = d[k - 1]! * d[k]! <= 0 ? 0 : (d[k - 1]! + d[k]!) / 2;
     for (let k = 0; k < n - 1; k++) {
       if (d[k] === 0) { m[k] = 0; m[k + 1] = 0; continue; }
-      const a = m[k] / d[k], b = m[k + 1] / d[k], s = a * a + b * b;
-      if (s > 9) { const t = 3 / Math.sqrt(s); m[k] = t * a * d[k]; m[k + 1] = t * b * d[k]; }
+      const a = m[k] / d[k]!, b = m[k + 1] / d[k]!, s = a * a + b * b;
+      if (s > 9) { const t = 3 / Math.sqrt(s); m[k] = t * a * d[k]!; m[k + 1] = t * b * d[k]!; }
     }
-    for (let k = 0; k < n; k++) out[k].setComponent(c, m[k]);
+    for (let k = 0; k < n; k++) out[k]!.setComponent(c, m[k]);
   }
   return out;
 }
@@ -717,7 +717,7 @@ export function seaGeometry(field, P = WATER) {
     const f = i / (NR - 1);
     for (let j = 0; j <= NS; j++) {
       const az = (j / NS) * Math.PI * 2 - Math.PI;
-      const r = r0[j] * Math.pow(P.FAR_R / r0[j], f);      // geometric: the near rings stay tight, the far ones wide
+      const r = r0[j]! * Math.pow(P.FAR_R / r0[j]!, f);      // geometric: the near rings stay tight, the far ones wide
       const o = i * (NS + 1) + j;
       pos[o * 3] = Math.sin(az) * r; pos[o * 3 + 1] = P.SEA_Y; pos[o * 3 + 2] = Math.cos(az) * r;
       uv[o * 2] = j / NS; uv[o * 2 + 1] = f;
@@ -745,7 +745,7 @@ export function bandGeometry(P = WATER) {
   const NS = P.BAND_SEGS, NR = P.BAND_ROWS;
   const pos = new Float32Array((NS + 1) * NR * 3);
   for (let i = 0; i < NR; i++) {
-    const y = P.BAND_Y[0] + (P.BAND_Y[1] - P.BAND_Y[0]) * (i / (NR - 1));
+    const y = P.BAND_Y[0]! + (P.BAND_Y[1]! - P.BAND_Y[0]!) * (i / (NR - 1));
     for (let j = 0; j <= NS; j++) {
       const az = (j / NS) * Math.PI * 2 - Math.PI, o = i * (NS + 1) + j;
       pos[o * 3] = Math.sin(az) * P.BAND_R; pos[o * 3 + 1] = y; pos[o * 3 + 2] = Math.cos(az) * P.BAND_R;
@@ -928,22 +928,22 @@ function bakeLakeField(rec, P) {
   const e0 = new Uint8Array(N); for (let i = 0; i < N; i++) e0[i] = wet[i] ? 0 : 1;
   const dE = edt2d(e0, size);
   const er = P.ERODE / upx, br = Math.max(1, Math.round(P.BLUR / upx));
-  let a = new Float32Array(N); for (let i = 0; i < N; i++) a[i] = Math.sqrt(dE[i]) > er ? 1 : 0;
+  let a = new Float32Array(N); for (let i = 0; i < N; i++) a[i] = Math.sqrt(dE[i]!) > er ? 1 : 0;
   let b2 = new Float32Array(N);
   const box = (src: number[] | Float32Array<ArrayBuffer>, dst: number[] | Float32Array<ArrayBuffer>, horiz: boolean) => {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      let sum = 0; for (let k = -br; k <= br; k++) { const xx = horiz ? Math.min(size - 1, Math.max(0, x + k)) : x, yy = horiz ? y : Math.min(size - 1, Math.max(0, y + k)); sum += src[yy * size + xx]; }
+      let sum = 0; for (let k = -br; k <= br; k++) { const xx = horiz ? Math.min(size - 1, Math.max(0, x + k)) : x, yy = horiz ? y : Math.min(size - 1, Math.max(0, y + k)); sum += src[yy * size + xx]!; }
       dst[y * size + x] = sum / (2 * br + 1);
     }
   };
   for (let pass = 0; pass < 2; pass++) { box(a, b2, true); box(b2, a, false); }
-  const smoothLand = new Uint8Array(N); for (let i = 0; i < N; i++) smoothLand[i] = a[i] > 0.5 ? 1 : 0;
+  const smoothLand = new Uint8Array(N); for (let i = 0; i < N; i++) smoothLand[i] = a[i]! > 0.5 ? 1 : 0;
   for (let i = 0; i < N; i++) wet[i] = smoothLand[i];
   const outside = new Uint8Array(N); for (let i = 0; i < N; i++) outside[i] = wet[i] ? 0 : 1;
   const dOut = edt2d(outside, size), dIn = edt2d(wet, size);
   const half = new Uint16Array(N * 4), toHalf = THREE.DataUtils?.toHalfFloat || ((v) => v);
   for (let i = 0; i < N; i++) {
-    const d = (wet[i] ? Math.sqrt(dOut[i]) - 0.5 : -(Math.sqrt(dIn[i]) - 0.5)) * upx;
+    const d = (wet[i] ? Math.sqrt(dOut[i]!) - 0.5 : -(Math.sqrt(dIn[i]!) - 0.5)) * upx;
     half[i * 4] = toHalf(d); half[i * 4 + 1] = 0; half[i * 4 + 2] = toHalf(4 * span); half[i * 4 + 3] = toHalf(4 * span);
   }
   const tex = new THREE.DataTexture(half, size, size, THREE.RGBAFormat, THREE.HalfFloatType);
@@ -972,7 +972,7 @@ function lakeNormalMaps(P) {
       t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 8;
       t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
       (i ? st.b : st.a).value = t; st.left--;
-    }, undefined, () => { st.failed.push(f); st.left--; });
+    }, undefined!, () => { st.failed.push(f); st.left--; });
   });
   st.ready = () => st.left <= 0;
   return (LAKE_NMAPS = st);
@@ -1147,7 +1147,7 @@ function buildLake(slot, { materials = [], info = {} as BuiltLakeInfo }) {
   const geo = seaGeometry(field, P), mat = lakeMaterial(field, P, A, nmaps, refl);
   const sea: any = new THREE.Mesh(geo, mat);
   sea.name = "sea_surface"; sea.userData.kind = "sea"; sea.userData.preset = "lake"; sea.frustumCulled = false;
-  sea.onBeforeRender = (renderer, scene, camera) => refl.render(renderer, scene, camera, sea);
+  sea.onBeforeRender = (renderer, scene, camera) => refl.render!(renderer, scene, camera, sea);
   const bandGeo = bandGeometry(P), bandMat = bandMaterial(P);
   const band = new THREE.Mesh(bandGeo, bandMat);
   band.name = "sea_horizon"; band.userData.kind = "sea"; band.frustumCulled = false;
@@ -1158,7 +1158,7 @@ function buildLake(slot, { materials = [], info = {} as BuiltLakeInfo }) {
     place(k) { info.water.keepOut = { fightR: k?.fightR ?? null }; },
     update() { info.water.time = S.U.uWindTime.value; info.water.reflection.passes = refl.passes; info.water.reflection.lastMs = +refl.lastMs.toFixed(3); },
     setLayer(name: string, on) { if (name === "water" || name === "sea") { for (const m of meshes) m.visible = on; return true; } return false; },
-    lake: { ready: () => nmaps.ready(), reflection: refl, normalMaps: nmaps },
+    lake: { ready: () => nmaps.ready!(), reflection: refl, normalMaps: nmaps },
     info: null,
   };
   info.water = {

@@ -45,7 +45,7 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
         w._failed = true;
         w._lastDiagnostic = `translated battle loader failed: ${error?.message ?? error}`;
         console.error("Translated battle loader failed", error);
-        w._finish();
+        w._finish!();
     };
 
     function start() {
@@ -94,11 +94,11 @@ export function createWfightTranslated(options: WfightLoaderOptions = {}) {
             fail(error);
             return;
         }
-        if (w._session?.finished()) w._finish();
+        if (w._session?.finished()) w._finish!();
     };
 
     w.close = () => {
-        if (w._open) w._finish();
+        if (w._open) w._finish!();
     };
 
     w._finish = () => {

@@ -8,7 +8,7 @@ export function plan(pctx) {
   const pieces = [];
   const list = [];
   for (const p of pctx.pieces("rock")) {
-    const cards = (p.cards || []).filter((c: { base: number[]; }) => c.base[1] >= -1);   // never a lake copy (wall_04 is another piece)
+    const cards = (p.cards || []).filter((c: { base: number[]; }) => c.base[1]! >= -1);   // never a lake copy (wall_04 is another piece)
     if (!cards.length) continue;
     pieces.push({ name: p.name, cards: cards.map((c) => ({ ...c, name: p.name })), colours: p.colours });
     for (const c of cards) list.push({ p: [c.base[0], Math.max(0, c.base[1]), c.base[2]], yaw: Math.atan2(-c.base[0], -c.base[2]), h: c.h, rad: c.w * 0.5 });

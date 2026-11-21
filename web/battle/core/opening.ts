@@ -31,7 +31,7 @@ import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeOpening(B: BattleContext) {
 function _battleTargetSize() {
-    const stage = B.canvas.parentElement;
+    const stage = B.canvas!.parentElement;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cw = Math.max(640, Math.round((stage?.clientWidth  || 640)));
     const ch = Math.max(480, Math.round((stage?.clientHeight || 480)));
@@ -40,25 +40,25 @@ function _battleTargetSize() {
     return { w: Math.round(cw * dpr * k), h: Math.round(ch * dpr * k) };
   }
 function enterBattleFullscreen() {
-    B._savedCanvas = { w: B.canvas.width, h: B.canvas.height };
-    B.canvas.classList.add("battle-fs");
+    B._savedCanvas = { w: B.canvas!.width, h: B.canvas!.height };
+    B.canvas!.classList.add("battle-fs");
     const { w, h } = _battleTargetSize();
-    B.canvas.width = w; B.canvas.height = h;
+    B.canvas!.width = w; B.canvas!.height = h;
   }
 function exitBattleFullscreen() {
-    B.canvas.classList.remove("battle-fs");
-    if (B._savedCanvas) { B.canvas.width = B._savedCanvas.w; B.canvas.height = B._savedCanvas.h; B._savedCanvas = null; }
+    B.canvas!.classList.remove("battle-fs");
+    if (B._savedCanvas) { B.canvas!.width = B._savedCanvas.w; B.canvas!.height = B._savedCanvas.h; B._savedCanvas = null; }
   }
 function onBattleResize() {
     if (!B.battle) return;
     const { w, h } = _battleTargetSize();
-    B.canvas.width = w; B.canvas.height = h;
+    B.canvas!.width = w; B.canvas!.height = h;
     if (B.offscreen3d) { B.offscreen3d.width = w; B.offscreen3d.height = h; }
   }
 async function _init3DRenderer(b: BattleState) {
     try {
       B.offscreen3d = createBattleLayer(B.canvas)
-        ?? (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(B.canvas.width, B.canvas.height) : null);
+        ?? (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(B.canvas!.width, B.canvas!.height) : null);
       if (!B.offscreen3d) return;
       B.renderer3d  = createBattle3D(B.offscreen3d, B.sfx);
       if (!B.renderer3d) { releaseBattleLayer(); B.offscreen3d = null; return; }
@@ -243,7 +243,7 @@ async function _init3DRenderer(b: BattleState) {
     // transformation effects are suppressed because they are the cinematic.
     const skip = !digivolveDemoOn();
     if (skip) show.frame = 1e6;
-    else show.frame += dt * B.BLAST_CAPTURE_HZ;
+    else show.frame += dt * B.BLAST_CAPTURE_HZ!;
     const prevFrame = show.lastFrame ?? -Infinity;
     const frame = Math.round(show.frame);
     show.lastFrame = frame;
@@ -424,7 +424,7 @@ async function _init3DRenderer(b: BattleState) {
         b._team[tag.slot] = undefined;
         b.partyIndex = tag.slot;
         b.enemy = next;
-        applyGiantScales(B.renderer3d, b.party?.[b.partyIndex], giantModeOn());
+        applyGiantScales(B.renderer3d!, b.party?.[b.partyIndex], giantModeOn());
       },
       // enemy_turn.c substate 4 waits for the child slot, which holds the entrance: the name page is made when the
       // task is gone (ENTRANCE_TASK_END_FRAME), not at f115.

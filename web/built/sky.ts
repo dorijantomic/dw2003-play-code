@@ -118,7 +118,7 @@ interface ArenaSkyRecipe { pieces: SkyRecipePiece[]; bg: number[] }
 export function skyMode(rec: ArenaSkyRecipe, force = "auto") {
   const sky = rec.pieces.find((p) => p.kind === "sky");
   const ring = sky?.colours?.all || rec.bg || [0, 0, 0];
-  const luma = (0.2126 * ring[0] + 0.7152 * ring[1] + 0.0722 * ring[2]) / 255;
+  const luma = (0.2126 * ring[0]! + 0.7152 * ring[1]! + 0.0722 * ring[2]!) / 255;
   const measured = luma < NIGHT.LUMA ? "night" : "day";
   const forced = force === "day" || force === "night";
   return { mode: forced ? force : measured, measured, forced, request: forced ? force : "auto", luma, threshold: NIGHT.LUMA, ring };
@@ -152,7 +152,7 @@ function bakeStars(seed: number, W: number, H: number, tiers: { n: number; mag: 
       const k = j * W + i;
       if (used[k]) continue;
       const dir = starTexelDir(i, j, W, H);
-      if (moon && dir[0] * moon[0] + dir[1] * moon[1] + dir[2] * moon[2] > cosKeep) { skippedMoon++; continue; }
+      if (moon && dir[0] * moon[0]! + dir[1] * moon[1]! + dir[2] * moon[2]! > cosKeep) { skippedMoon++; continue; }
       used[k] = 1;
       data[k * 4 + t] = Math.round(tier.mag * 255);
       dirs.push(dir);
@@ -538,11 +538,11 @@ function bankLobes(spec: { az: number; rc: number; W: number; D: number; H: numb
 function blur3(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: number) {
   const n = F.length, T = new Float32Array(n), at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
-    T[at(i, j, k)] = (F[at(Math.max(0, i - 1), j, k)] + 2 * F[at(i, j, k)] + F[at(Math.min(nx - 1, i + 1), j, k)]) * 0.25;
+    T[at(i, j, k)] = (F[at(Math.max(0, i - 1), j, k)]! + 2 * F[at(i, j, k)]! + F[at(Math.min(nx - 1, i + 1), j, k)]!) * 0.25;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
-    F[at(i, j, k)] = (T[at(i, Math.max(0, j - 1), k)] + 2 * T[at(i, j, k)] + T[at(i, Math.min(ny - 1, j + 1), k)]) * 0.25;
+    F[at(i, j, k)] = (T[at(i, Math.max(0, j - 1), k)]! + 2 * T[at(i, j, k)]! + T[at(i, Math.min(ny - 1, j + 1), k)]!) * 0.25;
   for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++)
-    T[at(i, j, k)] = (F[at(i, j, Math.max(0, k - 1))] + 2 * F[at(i, j, k)] + F[at(i, j, Math.min(nz - 1, k + 1))]) * 0.25;
+    T[at(i, j, k)] = (F[at(i, j, Math.max(0, k - 1))]! + 2 * F[at(i, j, k)]! + F[at(i, j, Math.min(nz - 1, k + 1))]!) * 0.25;
   F.set(T);
 }
 
@@ -578,7 +578,7 @@ function bankField(spec: { az: number; rc: number; W: number; D: number; H: numb
         const dyy = gy0 + j * V - L.y, d2 = dyy * dyy + dz2;
         for (let i = i0; i <= i1; i++) {
           const dx = gx0 + i * V - L.x, o = at(i, j, kk);
-          F[o] = smax(F[o], L.r - Math.sqrt(dx * dx + d2), k);       // + inside, - outside, magnitude = distance
+          F[o] = smax(F[o]!, L.r - Math.sqrt(dx * dx + d2), k);       // + inside, - outside, magnitude = distance
         }
       }
     }
@@ -589,8 +589,8 @@ function bankField(spec: { az: number; rc: number; W: number; D: number; H: numb
     const y = gy0 + j * V;
     for (let i = 0; i < nx; i++) {
       const o = at(i, j, kk), f = F[o];
-      if (f < -amp * 2.5 || f > amp * 2.5) continue;
-      F[o] = f + (S.noise3JS((gx0 + i * V) / wl, y / wl, (gz0 + kk * V) / wl) - 0.5) * 2 * amp;
+      if (f! < -amp * 2.5 || f! > amp * 2.5) continue;
+      F[o] = f! + (S.noise3JS((gx0 + i * V) / wl, y / wl, (gz0 + kk * V) / wl) - 0.5) * 2 * amp;
     }
   }
   // the FLAT BASE: the cloud is intersected with the half-space above the plane (min of two inside-positive distances),
@@ -598,7 +598,7 @@ function bankField(spec: { az: number; rc: number; W: number; D: number; H: numb
   // so the base plane cannot ripple
   for (let j = 0; j < ny; j++) {
     const c = gy0 + j * V - cut;
-    for (let kk = 0; kk < nz; kk++) for (let i = 0; i < nx; i++) { const q = at(i, j, kk); if (c < F[q]) F[q] = c; }
+    for (let kk = 0; kk < nz; kk++) for (let i = 0; i < nx; i++) { const q = at(i, j, kk); if (c < F[q]!) F[q] = c; }
   }
   for (let p = 0; p < CLOUDS.BLUR; p++) blur3(F, nx, ny, nz);
   return { F, nx, ny, nz, x0: gx0, y0: gy0, z0: gz0, V, cut, at, lobes: lobes.length };
@@ -617,7 +617,7 @@ function gridSampler(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: n
     const a = at(i0, j0, k0), b = at(i1, j0, k0), c = at(i0, j1, k0), d = at(i1, j1, k0);
     const e = at(i0, j0, k1), f = at(i1, j0, k1), g = at(i0, j1, k1), h = at(i1, j1, k1);
     const s = (p: number, q: number, t: number) => p + (q - p) * t;
-    return s(s(s(F[a], F[b], fx), s(F[c], F[d], fx), fy), s(s(F[e], F[f], fx), s(F[g], F[h], fx), fy), fz);
+    return s(s(s(F[a]!, F[b]!, fx), s(F[c]!, F[d]!, fx), fy), s(s(F[e]!, F[f]!, fx), s(F[g]!, F[h]!, fx), fy), fz);
   };
 }
 
@@ -637,16 +637,16 @@ function bankSurface(f: { F: Float32Array<ArrayBuffer>; nx: number; ny: number; 
     V8[0] = F[f.at(i, j, k)]; V8[1] = F[f.at(i + 1, j, k)]; V8[2] = F[f.at(i, j + 1, k)]; V8[3] = F[f.at(i + 1, j + 1, k)];
     V8[4] = F[f.at(i, j, k + 1)]; V8[5] = F[f.at(i + 1, j, k + 1)]; V8[6] = F[f.at(i, j + 1, k + 1)]; V8[7] = F[f.at(i + 1, j + 1, k + 1)];
     let mask = 0;
-    for (let c = 0; c < 8; c++) if (V8[c] > ISO) mask |= 1 << c;
+    for (let c = 0; c < 8; c++) if (V8[c]! > ISO) mask |= 1 << c;
     if (mask === 0 || mask === 255) continue;
     let sx = 0, sy = 0, sz = 0, n = 0;
     for (let e = 0; e < 12; e++) {
-      const a = EX[e][0], b = EX[e][1], va = V8[a], vb = V8[b];
+      const a = EX[e]![0], b = EX[e]![1], va = V8[a], vb = V8[b];
       if ((va > ISO) === (vb > ISO)) continue;
       const t = (ISO - va) / (vb - va);
-      sx += (a & 1) + ((b & 1) - (a & 1)) * t;
-      sy += ((a >> 1) & 1) + (((b >> 1) & 1) - ((a >> 1) & 1)) * t;
-      sz += ((a >> 2) & 1) + (((b >> 2) & 1) - ((a >> 2) & 1)) * t;
+      sx += (a! & 1) + ((b! & 1) - (a! & 1)) * t;
+      sy += ((a! >> 1) & 1) + (((b! >> 1) & 1) - ((a! >> 1) & 1)) * t;
+      sz += ((a! >> 2) & 1) + (((b! >> 2) & 1) - ((a! >> 2) & 1)) * t;
       n++;
     }
     cellV[cAt(i, j, k)] = pos.length / 3;
@@ -659,18 +659,18 @@ function bankSurface(f: { F: Float32Array<ArrayBuffer>; nx: number; ny: number; 
   };
   for (let k = 1; k < cnz; k++) for (let j = 1; j < cny; j++) for (let i = 0; i < cnx; i++) {   // edges along x
     const fa = F[f.at(i, j, k)], fb = F[f.at(i + 1, j, k)];
-    if ((fa > ISO) === (fb > ISO)) continue;
-    quad(cellV[cAt(i, j - 1, k - 1)], cellV[cAt(i, j, k - 1)], cellV[cAt(i, j, k)], cellV[cAt(i, j - 1, k)], !(fa > fb));
+    if ((fa! > ISO) === (fb! > ISO)) continue;
+    quad(cellV[cAt(i, j - 1, k - 1)]!, cellV[cAt(i, j, k - 1)]!, cellV[cAt(i, j, k)]!, cellV[cAt(i, j - 1, k)]!, !(fa! > fb!));
   }
   for (let k = 1; k < cnz; k++) for (let j = 0; j < cny; j++) for (let i = 1; i < cnx; i++) {   // edges along y
     const fa = F[f.at(i, j, k)], fb = F[f.at(i, j + 1, k)];
-    if ((fa > ISO) === (fb > ISO)) continue;
-    quad(cellV[cAt(i - 1, j, k - 1)], cellV[cAt(i, j, k - 1)], cellV[cAt(i, j, k)], cellV[cAt(i - 1, j, k)], fa > fb);
+    if ((fa! > ISO) === (fb! > ISO)) continue;
+    quad(cellV[cAt(i - 1, j, k - 1)]!, cellV[cAt(i, j, k - 1)]!, cellV[cAt(i, j, k)]!, cellV[cAt(i - 1, j, k)]!, fa! > fb!);
   }
   for (let k = 0; k < cnz; k++) for (let j = 1; j < cny; j++) for (let i = 1; i < cnx; i++) {   // edges along z
     const fa = F[f.at(i, j, k)], fb = F[f.at(i, j, k + 1)];
-    if ((fa > ISO) === (fb > ISO)) continue;
-    quad(cellV[cAt(i - 1, j - 1, k)], cellV[cAt(i, j - 1, k)], cellV[cAt(i, j, k)], cellV[cAt(i - 1, j, k)], !(fa > fb));
+    if ((fa! > ISO) === (fb! > ISO)) continue;
+    quad(cellV[cAt(i - 1, j - 1, k)]!, cellV[cAt(i, j - 1, k)]!, cellV[cAt(i, j, k)]!, cellV[cAt(i - 1, j, k)]!, !(fa! > fb!));
   }
   return { pos, idx };
 }
@@ -705,13 +705,13 @@ export function buildCloudBanks(sky: { ymin: number; ymax: number }) {
       let occ = 0, wsum = 0;
       for (let r = 0; r < AO_DIRS.length; r++) {
         const d = AO_DIRS[r];
-        const dx = ux * d[0] + vx * d[1] + nx * d[2], dy = uy * d[0] + vy * d[1] + ny * d[2], dz = uz * d[0] + vz * d[1] + nz * d[2];
+        const dx = ux * d![0] + vx * d![1] + nx * d![2], dy = uy * d![0] + vy * d![1] + ny * d![2], dz = uz * d![0] + vz * d![1] + nz * d![2];
         let blocked = 0;
         for (let s = 1; s <= CLOUDS.AO.STEPS; s++) {
           const t = (reach * s) / CLOUDS.AO.STEPS;
           if (samp(x + dx * t, y + dy * t, z + dz * t) > 0) { blocked = 1 - (s - 1) / CLOUDS.AO.STEPS; break; }
         }
-        occ += blocked * d[3]; wsum += d[3];
+        occ += blocked * d![3]; wsum += d![3];
       }
       return Math.min(1, Math.max(0, 1 - occ / wsum));
     };
@@ -722,22 +722,22 @@ export function buildCloudBanks(sky: { ymin: number; ymax: number }) {
     let yMin = 1e9, yMax = -1e9, rMin = 1e9, rMax = -1e9;
     for (let v = 0; v < m.pos.length; v += 3) {
       const x = m.pos[v], y = m.pos[v + 1], z = m.pos[v + 2];
-      const rr = rc + z, wy = base + y - cut;
-      P.push(rr * cs + x * sn, wy, rr * sn - x * cs);
+      const rr = rc + z!, wy = base + y! - cut;
+      P.push(rr * cs + x! * sn, wy, rr * sn - x! * cs);
       // normal: the field's gradient (outward = the direction the distance grows to), turned into the ring's frame
       const h = V * 0.6;
-      const dx = samp(x + h, y, z) - samp(x - h, y, z);
-      const dy = samp(x, y + h, z) - samp(x, y - h, z);
-      const dz = samp(x, y, z + h) - samp(x, y, z - h);
+      const dx = samp(x! + h, y!, z!) - samp(x! - h, y!, z!);
+      const dy = samp(x!, y! + h, z!) - samp(x!, y! - h, z!);
+      const dz = samp(x!, y!, z! + h) - samp(x!, y!, z! - h);
       const L = Math.hypot(dx, dy, dz) || 1;
       const nx = -dx / L, ny = -dy / L, nz = -dz / L;
       N.push(nz * cs + nx * sn, ny, nz * sn - nx * cs);
-      C.push(Math.min(1, Math.max(0, (y - cut) / hSpan)), ao(x, y, z, nx, ny, nz), 0);
+      C.push(Math.min(1, Math.max(0, (y! - cut) / hSpan)), ao(x!, y!, z!, nx, ny, nz), 0);
       yMin = Math.min(yMin, wy); yMax = Math.max(yMax, wy);
-      const rad = Math.hypot(P[P.length - 3], P[P.length - 1]);
+      const rad = Math.hypot(P[P.length - 3]!, P[P.length - 1]!);
       rMin = Math.min(rMin, rad); rMax = Math.max(rMax, rad);
     }
-    for (let i = 0; i < m.idx.length; i++) I.push(m.idx[i] + o0);
+    for (let i = 0; i < m.idx.length; i++) I.push(m.idx[i]! + o0);
     tris += m.idx.length / 3;
     banks.push({ az: +(az * 180 / Math.PI).toFixed(1), widthDeg: +(wid * 180 / Math.PI).toFixed(1), r: Math.round(rc),
                  w: Math.round(W), d: Math.round(D), base: Math.round(base), top: Math.round(top),
@@ -766,8 +766,8 @@ function createClouds(scene: THREE.Scene, sky: SkyRecipePiece, c: SkyRecipePiece
   const hue = [ringC.r / ringL, ringC.g / ringL, ringC.b / ringL].map((v) => Math.min(1.9, Math.max(0.55, v)));
   const mixHue = (col: number[]) => {
     const s = S.srgb(col.map((v) => Math.round(v * 255)));
-    return new THREE.Color(s.r * (1 + (hue[0] - 1) * L.SKY_TINT), s.g * (1 + (hue[1] - 1) * L.SKY_TINT),
-                           s.b * (1 + (hue[2] - 1) * L.SKY_TINT));
+    return new THREE.Color(s.r * (1 + (hue[0]! - 1) * L.SKY_TINT), s.g * (1 + (hue[1]! - 1) * L.SKY_TINT),
+                           s.b * (1 + (hue[2]! - 1) * L.SKY_TINT));
   };
   const shade = mixHue(L.SHADE), deep = mixHue(L.DEEP), rim = S.srgb(L.RIM.map((v) => Math.round(v * 255)));
   const mat = new THREE.ShaderMaterial({
@@ -800,36 +800,36 @@ function createClouds(scene: THREE.Scene, sky: SkyRecipePiece, c: SkyRecipePiece
 const U = S.U;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smooth = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const lumaA = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const lumaA = (c: number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
 const n2 = (x: number, z: number): [number, number] => { const L = Math.hypot(x, z); return [x / L, z / L]; };
 /** sakura skyGradient(), linear RGB [r, g, b], for a unit direction [x, y, z]. */
 export function skyGradientJS(rd: [number, number, number]) {
   const H = arr(SKY_U.uHorizon.value), Z = arr(SKY_U.uZenith.value), M = arr(SKY_U.uMid.value);
   const ey = Math.max(rd[1], 0), t = Math.pow(ey, SKY_U.uZenithPow.value);
-  let c = H.map((h, k) => h + (Z[k] - h) * t);
+  let c = H.map((h, k) => h + (Z[k]! - h) * t);
   const mk = (1 - Math.abs(t * 2 - 1)) * SKY_U.uMidAmt.value;
-  c = c.map((v, k) => v + (M[k] - v) * mk);
+  c = c.map((v, k) => v + (M[k]! - v) * mk);
   const td = smooth(0.36, 0.82, t), deep = SKY_U.uZenDeep.value;
   c = c.map((v) => v * (1 + (deep - 1) * td));
   const lz = lumaA(c), sk = 1 + td * (1 - deep) * 1.75;
   c = c.map((v) => lz + (v - lz) * sk);
   const am = 1 / (ey + 0.10);
   const ext = [0.030, 0.072, 0.170].map((b) => Math.exp(-b * (am - 1))), em = Math.max(...ext);
-  c = c.map((v, k) => v * (1 + (ext[k] / em - 1) * 0.26));
+  c = c.map((v, k) => v * (1 + (ext[k]! / em - 1) * 0.26));
   const hb = Math.exp(-Math.max(rd[1], -0.06) / SKY_U.uHazeH.value);
   const sd = U.uSunDir.value;
   const dxz = n2(rd[0] + 1e-5, rd[2] + 1e-5), sxz = n2(sd.x + 1e-5, sd.z + 1e-5);
   const azi = Math.pow(Math.max(dxz[0] * sxz[0] + dxz[1] * sxz[1], 0), 2.2);
   const hz = arr(U.uHaze.value), hm = clamp01(hb * SKY_U.uHazeAmt.value), wm = arr(SKY_U.uHazeWarm.value);
   const wk = hb * azi * SKY_U.uHazeAmt.value * SKY_U.uHazeWarmK.value;
-  const out = c.map((v, k) => v + (hz[k] - v) * hm + wm[k] * wk);
+  const out = c.map((v, k) => v + (hz[k]! - v) * hm + wm[k]! * wk);
   const bm = SKY_U.uBandMix.value;
-  if (bm > 0) { const b = skyBandJS(rd); return out.map((v, k) => v + (b[k] - v) * bm); }
+  if (bm > 0) { const b = skyBandJS(rd); return out.map((v, k) => v + (b[k]! - v) * bm); }
   return out;
 }
 /** Band mode: distance along rd from the ring-frame eye to the ring cylinder, and the height there (as skyBandT/H). */
 export function skyBandTJS(rd: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
-  const R = SKY_U.uRing.value[0].y, a = rd[0] * rd[0] + rd[2] * rd[2];
+  const R = SKY_U.uRing.value[0]!.y, a = rd[0] * rd[0] + rd[2] * rd[2];
   if (a < 1e-8) return 1e9;
   const b = eye.x * rd[0] + eye.z * rd[2], c = eye.x * eye.x + eye.z * eye.z - R * R;
   return (-b + Math.sqrt(Math.max(b * b - a * c, 0))) / a;
@@ -846,17 +846,17 @@ export function skyBandAtJS(h: number) {
   const B = SKY_U.uBandY.value, H = arr(SKY_U.uHorizon.value), M = arr(SKY_U.uMid.value), Z = arr(SKY_U.uZenith.value);
   const hz = arr(U.uHaze.value);
   const f = Math.max((h - B.x) / Math.max(B.y - B.x, 1e-3), SKY_U.uBandBelow.value);
-  let c = f < 0.5 ? H.map((v, k) => v + (M[k] - v) * (f - S.BAND_BOTTOM_SHARE) / (0.5 - S.BAND_BOTTOM_SHARE)) : M.map((v, k) => v + (Z[k] - v) * Math.min((f - 0.5) / 0.375, 1));
+  let c = f < 0.5 ? H.map((v, k) => v + (M[k]! - v) * (f - S.BAND_BOTTOM_SHARE) / (0.5 - S.BAND_BOTTOM_SHARE)) : M.map((v, k) => v + (Z[k]! - v) * Math.min((f - 0.5) / 0.375, 1));
   c = c.map((v) => Math.max(v, 0));
   const sa = smooth(B.y, B.y + SKY_U.uBandFade.value, h);
-  c = c.map((v, k) => v + (hz[k] - v) * sa);
+  c = c.map((v, k) => v + (hz[k]! - v) * sa);
   const sb = smooth(0, SKY_U.uBandSoft.value, h);
-  return hz.map((v, k) => v + (c[k] - v) * sb);
+  return hz.map((v, k) => v + (c[k]! - v) * sb);
 }
 export function skyGlowKJS() { const m = SKY_U.uBandMix.value; return m > 0 ? 1 + (SKY_U.uBandGlowK.value - 1) * m : 1; }
 /** The two-lobe glow, around uGlowDir (the sun by day, the moon at night). */
 export function skySunGlowJS(rd: number[]) {
-  const gd = SKY_U.uGlowDir.value, s = Math.max(rd[0] * gd.x + rd[1] * gd.y + rd[2] * gd.z, 0);
+  const gd = SKY_U.uGlowDir.value, s = Math.max(rd[0]! * gd.x + rd[1]! * gd.y + rd[2]! * gd.z, 0);
   const k = Math.pow(s, SKY_U.uSunGlowPower.value) * SKY_U.uSunGlow.value + s * s * SKY_U.uBroadGlow.value;
   return arr(SKY_U.uSunGlowColor.value).map((v) => v * k);
 }
@@ -875,23 +875,23 @@ export function skyStarsJS(rd: [number, number, number]) {
   const u = Math.atan2(rd[2], rd[0]) * 0.15915494 + 0.5;
   const v = Math.asin(Math.min(1, Math.max(-1, rd[1]))) * 0.31830989 + 0.5;
   const i = Math.min(m.W - 1, Math.max(0, Math.floor(u * m.W))), j = Math.min(m.H - 1, Math.max(0, Math.floor(v * m.H)));
-  const k = (j * m.W + i) * 4, s = [m.data[k] / 255, m.data[k + 1] / 255, m.data[k + 2] / 255];
+  const k = (j * m.W + i) * 4, s = [m.data[k]! / 255, m.data[k + 1]! / 255, m.data[k + 2]! / 255];
   const tint = [arr(SKY_U.uStarTint0.value), arr(SKY_U.uStarTint1.value), arr(SKY_U.uStarTint2.value)];
   const g = SKY_U.uStarAmt.value * smooth(0.02, 0.10, rd[1]);
-  return [0, 1, 2].map((ch) => (s[0] * tint[0][ch] + s[1] * tint[1][ch] + s[2] * tint[2][ch]) * g);
+  return [0, 1, 2].map((ch) => (s[0]! * tint[0]![ch]! + s[1]! * tint[1]![ch]! + s[2]! * tint[2]![ch]!) * g);
 }
-export function skyRadianceJS(rd: [number, number, number]) { const a = skyGradientJS(rd), b = skySunGlowJS(rd), g = skyGlowKJS(); return a.map((v, k) => v + b[k] * g); }
+export function skyRadianceJS(rd: [number, number, number]) { const a = skyGradientJS(rd), b = skySunGlowJS(rd), g = skyGlowKJS(); return a.map((v, k) => v + b[k]! * g); }
 /** What the dome draws with the clouds off: radiance + moon disc + stars. */
 export function skyDomeJS(rd: [number, number, number]) {
   const c = skyRadianceJS(rd), m = skyMoonJS(rd), s = skyStarsJS(rd);
-  return c.map((v, k) => v + m[k] + s[k]);
+  return c.map((v, k) => v + m[k]! + s[k]!);
 }
 /** Ring radius at height y and the height where a ray from the ring-frame eye meets the ring (as ringHitY()). */
 export function ringRJS(y: number) {
   const P = SKY_U.uRing.value, n = SKY_U.uRingN.value;
-  let a = P[0]; if (y <= a.x || n < 2) return a.y;
-  for (let i = 1; i < n; i++) { const b = P[i]; if (y <= b.x || i === n - 1) return a.y + (b.y - a.y) * (y - a.x) / Math.max(b.x - a.x, 1e-3); a = b; }
-  return a.y;
+  let a = P[0]; if (y <= a!.x || n < 2) return a!.y;
+  for (let i = 1; i < n; i++) { const b = P[i]; if (y <= b!.x || i === n - 1) return a!.y + (b!.y - a!.y) * (y - a!.x) / Math.max(b!.x - a!.x, 1e-3); a = b; }
+  return a!.y;
 }
 export function ringHitYJS(d: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
   const g = (t: number) => Math.hypot(eye.x + t * d[0], eye.z + t * d[2]) - ringRJS(eye.y + t * d[1]);
@@ -909,11 +909,11 @@ function calibrate(tH: [number, number, number], tZ: [number, number, number], d
   H.setRGB(tH[0], tH[1], tH[2]); Z.setRGB(tZ[0], tZ[1], tZ[2]);
   for (let i = 0; i < 60; i++) {
     const h = skyRadianceJS(dirH), z = skyRadianceJS([0, 1, 0]);
-    H.setRGB(H.r * tH[0] / h[0], H.g * tH[1] / h[1], H.b * tH[2] / h[2]);
-    Z.setRGB(Z.r * tZ[0] / z[0], Z.g * tZ[1] / z[1], Z.b * tZ[2] / z[2]);
+    H.setRGB(H.r * tH[0] / h[0]!, H.g * tH[1] / h[1]!, H.b * tH[2] / h[2]!);
+    Z.setRGB(Z.r * tZ[0] / z[0]!, Z.g * tZ[1] / z[1]!, Z.b * tZ[2] / z[2]!);
   }
   const h = skyRadianceJS(dirH), z = skyRadianceJS([0, 1, 0]);
-  return Math.max(...h.map((v, k) => Math.abs(v - tH[k])), ...z.map((v, k) => Math.abs(v - tZ[k])));
+  return Math.max(...h.map((v, k) => Math.abs(v - tH[k]!)), ...z.map((v, k) => Math.abs(v - tZ[k]!)));
 }
 
 // ---------------- baked tiling noise (sakura's layout: R height, GB gradient of a blurred copy, A warp) ----------------
@@ -922,7 +922,7 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
   const perms = Array.from({ length: 12 }, (_, k) => S.makePerm(seed * 31 + k + 1));
   const val = (u: number, v: number, p: number, perm: Uint8Array<ArrayBuffer> | undefined) => {   // value noise, period p cells over the tile (u, v in [0, 1))
     const x = u * p, y = v * p, ix = Math.floor(x), iy = Math.floor(y), fx = fade(x - ix), fy = fade(y - iy);
-    const h = (i: number, j: number) => perm[(perm[((i % p) + p) % p] + (((j % p) + p) % p)) & 255] / 255;
+    const h = (i: number, j: number) => perm![(perm![((i % p) + p) % p]! + (((j % p) + p) % p)) & 255]! / 255;
     const a = h(ix, iy), b = h(ix + 1, iy), c = h(ix, iy + 1), d = h(ix + 1, iy + 1);
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
   };
@@ -938,7 +938,7 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
     A[j * N + i] = fbm(u, v, billow ? 8 : 2, billow ? 4 : 3, 6, false);
   }
   const equalise = (F: Float32Array) => {   // rank -> [0, 1]: a coverage threshold cov then leaves exactly (1 - cov) of the tile above it
-    const ix = Array.from(F.keys()).sort((a, b) => F[a] - F[b]), out = new Float32Array(F.length);
+    const ix = Array.from(F.keys()).sort((a, b) => F[a]! - F[b]!), out = new Float32Array(F.length);
     ix.forEach((k, r) => { out[k] = r / (F.length - 1); });
     return out;
   };
@@ -947,7 +947,7 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
   for (let pass = 0; pass < 2; pass++) {
     const o = new Float32Array(N * N);
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      let s = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) s += B[((j + dj + N) % N) * N + ((i + di + N) % N)];
+      let s = 0; for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) s += B[((j + dj + N) % N) * N + ((i + di + N) % N)]!;
       o[j * N + i] = s / 25;
     }
     B = o;
@@ -955,13 +955,13 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
   const gx = new Float32Array(N * N), gy = new Float32Array(N * N);
   let G = 1e-6;
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    gx[j * N + i] = (B[j * N + (i + 1) % N] - B[j * N + (i - 1 + N) % N]) * N / 2;              // per uv unit
-    gy[j * N + i] = (B[((j + 1) % N) * N + i] - B[((j - 1 + N) % N) * N + i]) * N / 2;
-    G = Math.max(G, Math.abs(gx[j * N + i]), Math.abs(gy[j * N + i]));
+    gx[j * N + i] = (B[j * N + (i + 1) % N]! - B[j * N + (i - 1 + N) % N]!) * N / 2;              // per uv unit
+    gy[j * N + i] = (B[((j + 1) % N) * N + i]! - B[((j - 1 + N) % N) * N + i]!) * N / 2;
+    G = Math.max(G, Math.abs(gx[j * N + i]!), Math.abs(gy[j * N + i]!));
   }
   const px = new Uint8Array(N * N * 4), b8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255)));
   for (let k = 0; k < N * N; k++) {
-    px[k * 4] = b8(He[k]); px[k * 4 + 1] = b8(0.5 + gx[k] / (2 * G)); px[k * 4 + 2] = b8(0.5 + gy[k] / (2 * G)); px[k * 4 + 3] = b8(Ae[k]);
+    px[k * 4] = b8(He[k]!); px[k * 4 + 1] = b8(0.5 + gx[k]! / (2 * G)); px[k * 4 + 2] = b8(0.5 + gy[k]! / (2 * G)); px[k * 4 + 3] = b8(Ae[k]!);
   }
   const t = new THREE.DataTexture(px, N, N, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
@@ -1023,9 +1023,9 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
     SKY_U.uCloudDark.value.copy(S.srgb(NIGHT.CLOUD_DARK));
     const m = bakeStars(1013, NIGHT.STAR_MAP[0], NIGHT.STAR_MAP[1], NIGHT.STAR_TIERS, SKY_U.uMoonDir.value.toArray(), NIGHT.MOON_RADIUS);
     SKY_U.uStarTex.value = m.tex; SKY_U.uStarAmt.value = NIGHT.STAR_AMP;
-    SKY_U.uStarTint0.value.setRGB(...NIGHT.STAR_TIERS[0].tint as [number, number, number]);
-    SKY_U.uStarTint1.value.setRGB(...NIGHT.STAR_TIERS[1].tint as [number, number, number]);
-    SKY_U.uStarTint2.value.setRGB(...NIGHT.STAR_TIERS[2].tint as [number, number, number]);
+    SKY_U.uStarTint0.value.setRGB(...NIGHT.STAR_TIERS[0]!.tint as [number, number, number]);
+    SKY_U.uStarTint1.value.setRGB(...NIGHT.STAR_TIERS[1]!.tint as [number, number, number]);
+    SKY_U.uStarTint2.value.setRGB(...NIGHT.STAR_TIERS[2]!.tint as [number, number, number]);
     current.stars = m;
   } else {   // day: everything the night branch touches goes back to the day values, so a rebuild is not sticky
     SKY_U.uMoonAmt.value = 0; SKY_U.uStarAmt.value = 0; SKY_U.uStarTex.value = null;
@@ -1039,7 +1039,7 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
   // ring
   let prof = sky.profile?.length ? sky.profile : [[sky.ymin, sky.rmax], [sky.ymax, sky.rmin]];   // no profile: a cone
   if (prof.length > RING_MAX) prof = Array.from({ length: RING_MAX }, (_, i) => prof[Math.round(i * (prof.length - 1) / (RING_MAX - 1))]);
-  prof.forEach(([y, r], i: number) => SKY_U.uRing.value[i].set(y, r));
+  prof.forEach(([y, r], i: number) => SKY_U.uRing.value[i]!.set(y!, r!));
   SKY_U.uRingN.value = prof.length; SKY_U.uRingT.value = 8 * sky.rmax;
   SKY_U.uBandY.value.set(sky.ymin, sky.ymax);
   // measured colours -> linear, once
@@ -1052,8 +1052,8 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
   let glowScale = 1;
   if (night.mode === "night") {
     for (const [dir, tgt] of [[dirH, tH], [[0, 1, 0], tZ]]) {
-      const g = skySunGlowJS(dir);
-      for (let k = 0; k < 3; k++) if (g[k] > 0) glowScale = Math.min(glowScale, NIGHT.GLOW_MAX_SHARE * tgt[k] / g[k]);
+      const g = skySunGlowJS(dir!);
+      for (let k = 0; k < 3; k++) if (g[k]! > 0) glowScale = Math.min(glowScale, NIGHT.GLOW_MAX_SHARE * tgt![k]! / g[k]!);
     }
     SKY_U.uSunGlow.value *= glowScale; SKY_U.uBroadGlow.value *= glowScale;
   }
@@ -1073,7 +1073,7 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
     SKY_U.uBandFade.value = BAND.FADE_SHARE * (sky.ymax - sky.ymin);
     SKY_U.uBandGlowK.value = night.mode === "night" ? 1 : BAND.GLOW_K;   // at night the halo is the moon's (picked)
     for (const [k, v] of Object.entries(BAND.CLOUDS)) SKY_U[k].value = v;
-    const err = (h: number, t: number[]) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]))); };
+    const err = (h: number, t: number[]) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]!))); };
     const y = (f: number) => sky.ymin + f * (sky.ymax - sky.ymin);
     residual = Math.max(err(y(S.BAND_BOTTOM_SHARE), tH), err(y(0.5), tM), err(y(0.875), tT));
   } else {
@@ -1113,7 +1113,7 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
   //  texel row is 1-2 colours, std <= 4/255; the subtle band clouds in the dome stand in for them)
   const clouds = null;   // the cloud banks are their own slot (sky.clouds, buildClouds below)
   const info = { triangles: mesh.geometry.index.count / 3, ring: prof, band: [sky.ymin, sky.ymax], calibResidual: residual,
-                 gradS: decks ? [A.G, C.G] : null, decks, clouds: clouds?.info ?? null, ms: Math.round(performance.now() - t0), mode: night.mode, glowScale,
+                 gradS: decks ? [A!.G, C!.G] : null, decks, clouds: clouds?.info ?? null, ms: Math.round(performance.now() - t0), mode: night.mode, glowScale,
                  night: { mode: night.mode, measured: night.measured, forced: night.forced, request: night.request, ringLuma: +night.luma.toFixed(4), threshold: night.threshold, ring: night.ring,
                           moonDir: SKY_U.uMoonDir.value.toArray(), moonRadius: SKY_U.uMoonRadius.value,
                           moonDeg: +(SKY_U.uMoonRadius.value * 180 / Math.PI).toFixed(3), glowDir: SKY_U.uGlowDir.value.toArray(),
@@ -1122,13 +1122,13 @@ export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
                             tiers: current.stars.tiers.map((t) => ({ n: t.n, mag: t.mag })) } : null },
                  targets: { horizon: c.bottom || c.all, zenith: bg, haze: D.haze },
                  bandMode: band ? { stops: { bottom: c.bottom || c.all, median: c.all, top: c.top || c.all, at: [S.BAND_BOTTOM_SHARE, 0.5, 0.875] },
-                   band: [sky.ymin, sky.ymax], ringR: SKY_U.uRing.value[0].y, below: SKY_U.uBandBelow.value, soft: SKY_U.uBandSoft.value,
+                   band: [sky.ymin, sky.ymax], ringR: SKY_U.uRing.value[0]!.y, below: SKY_U.uBandBelow.value, soft: SKY_U.uBandSoft.value,
                    fade: SKY_U.uBandFade.value, glowK: SKY_U.uBandGlowK.value, lake: U.uHaze.value.clone().convertLinearToSRGB().toArray().map((v) => Math.round(v * 255)),
                    clouds: Object.fromEntries(Object.keys(BAND.CLOUDS).map((k) => [k, SKY_U[k].value])) } : null };
-  const noise = decks ? [A.tex, C.tex] : [], stars = current.stars;
+  const noise = decks ? [A!.tex, C!.tex] : [], stars = current.stars;
   // the arena's material list: a rebuild (sky time) replaces the old dome's material in place
   const mats = ctx.materials, prev = current.sky?.scene === scene ? current.sky.material : null, k = mats && prev ? mats.indexOf(prev) : -1;
-  if (k >= 0) mats[k] = mat; else mats?.push(mat);
+  if (k >= 0) mats![k] = mat; else mats?.push(mat);
   if (ctx.info) ctx.info.sky = info;
   current.sky = { mesh, material: mat, info, scene, worldScale, noise, clouds, opts, data: D };
   return { objects: [mesh], meshes: [mesh], dome: mesh, material: mat, info,
@@ -1151,10 +1151,10 @@ export function createBuiltSky(scene: THREE.Scene, rec: ArenaSkyRecipe, pal: unk
   if (!D) return null;
   const slot = { data: D }, ctx = { scene, worldScaleFn: worldScale, materials: null, info: null };
   current.sky = null;
-  const dome = buildSky(slot, ctx);
+  const dome = buildSky(slot!!!!!!, ctx);
   scene.add(dome.dome);
-  if (D.clouds) { const cl = buildClouds(slot, ctx); scene.add(cl.objects[0]); current.sky.clouds = cl; current.sky.cloudInst = cl; }
-  current.sky.pal = pal; current.sky.rec = rec; current.sky.dispose = () => { dome.dispose(); current.sky.cloudInst?.dispose(); };
+  if (D.clouds) { const cl = buildClouds(slot!!!!!!, ctx); scene.add(cl.objects[0]); current.sky!.clouds = cl; current.sky!.cloudInst = cl; }
+  current.sky!.pal = pal; current.sky!.rec = rec; current.sky!.dispose = () => { dome.dispose(); current.sky!.cloudInst?.dispose(); };
   return current.sky;
 }
 
@@ -1165,7 +1165,7 @@ export function setBuiltSkyMode(mode = "auto") {
   const o = current.sky;
   if (!o) return null;
   if (!o.rec && current.rebuildWith) return current.rebuildWith(mode);   // an arena's sky: its slots build again
-  o.scene.remove(o.mesh); if (o.cloudInst) o.scene.remove(o.cloudInst.objects[0]);
+  o.scene.remove(o.mesh); if (o.cloudInst) o.scene.remove(o.cloudInst.objects[0]!);
   o.dispose?.();
-  return createBuiltSky(o.scene, o.rec, o.pal, o.worldScale, { ...o.opts, mode });
+  return createBuiltSky(o.scene, o.rec!, o.pal, o.worldScale, { ...o.opts, mode });
 }

@@ -28,7 +28,7 @@ import {
 
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
-ctx.imageSmoothingEnabled = false;
+ctx!.imageSmoothingEnabled = false;
 
 const soundRegister = createExclusiveRegister(); // D0x80055c34: one register, both players
 const sfx = createSfxPlayer(soundRegister);
@@ -85,7 +85,7 @@ function newGame() {
   // the entrance animation carries the cards the rules actually dealt rather
   // than a preview that then swaps. Stop exactly at the Load Phase.
   let guard = 0;
-  while (phase(duel).key !== "load" && guard++ < 800) tickDuel(duel, simpleAgent, Math.random, EFFECTS);
+  while (phase(duel)!.key !== "load" && guard++ < 800) tickDuel(duel, simpleAgent, Math.random, EFFECTS);
   ticks = 0; intro = true; auto = false; cursor = 0; marks = new Set(); ask = 0;
   confirm = false; banner = "Card Battle"; stage = "intro"; introClock = 0;
   introCards = []; lastLand = new Set(); flights = []; choiceCursor = 0;
@@ -120,14 +120,14 @@ function tick() {
     introClock += 1;
     if (introClock >= introEnd()) { intro = false; }
     for (const c of introCards) {
-      if (introClock >= c.land && !lastLand.has(c)) { lastLand.add(c); sfx.play(SOUND.land); }
-      if (c.si === 0 && introClock === c.flip) sfx.play(SOUND.flip);
+      if (introClock >= c.land && !lastLand.has(c)) { lastLand.add(c); sfx.play!(SOUND.land); }
+      if (c.si === 0 && introClock === c.flip) sfx.play!(SOUND.flip);
     }
     return;
   }
   if (auto) {
     tickDuel(duel, simpleAgent, Math.random, EFFECTS);
-    banner = phase(duel).banner; stage = phase(duel).key;
+    banner = phase(duel)!.banner; stage = phase(duel)!.key;
   } else {
     controller();
   }
@@ -135,7 +135,7 @@ function tick() {
   for (const f of flights) f.t += 1;
   flights = flights.filter((f) => f.t <= FLIGHT_FRAMES);
   const arrived = flights.filter((f) => f.t === FLIGHT_FRAMES);
-  if (arrived.length) sfx.play(SOUND.land);
+  if (arrived.length) sfx.play!(SOUND.land);
 }
 
 let introClock = 0;
@@ -147,14 +147,14 @@ function introT() { return introClock; }
 function controller() {
   if (duel.outcome) { stage = "over"; return; }
   const p = phase(duel);
-  if (stage !== p.key) { stage = p.key; cursor = 0; marks = new Set(); confirm = false; ask = 0; }
-  banner = p.banner;
-  if (p.key === "start" || p.key === "draw" || p.key === "battle") {
+  if (stage !== p!.key) { stage = p!.key; cursor = 0; marks = new Set(); confirm = false; ask = 0; }
+  banner = p!.banner;
+  if (p!.key === "start" || p!.key === "draw" || p!.key === "battle") {
     tickDuel(duel, simpleAgent, Math.random, EFFECTS);
     return;
   }
-  if (p.key === "load" || p.key === "compile") return driveProgram();
-  if (p.key === "summon") return driveSummon();
+  if (p!.key === "load" || p!.key === "compile") return driveProgram();
+  if (p!.key === "summon") return driveSummon();
 }
 
 function advancePhase() {
@@ -201,8 +201,8 @@ function detectMoves() {
       if (!now.includes(id)) {
         const i = Math.min(2, Math.max(0, side.field.length - 1));
         flights.push({ id, x: DUEL_BOARD.rowX + 20, y: key === "player" ? DUEL_BOARD.handY : DUEL_BOARD.oppHandY,
-          tx: DUEL_BOARD.boardSlots[i][0], ty: DUEL_BOARD.boardSlots[i][1], t: 0, back: key === "opponent" });
-        if (key === "player") sfx.play(SOUND.summon);
+          tx: DUEL_BOARD.boardSlots[i]![0], ty: DUEL_BOARD.boardSlots[i]![1], t: 0, back: key === "opponent" });
+        if (key === "player") sfx.play!(SOUND.summon);
       }
     }
     prevHand[key] = now;
@@ -214,8 +214,8 @@ function detectMoves() {
 // drawing
 
 function draw() {
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, 320, 240);
+  ctx!.fillStyle = "#000";
+  ctx!.fillRect(0, 0, 320, 240);
   if (!UI) { drawText(ctx, "loading cardduel_ui.json…", 8, 8); return; }
   drawBackdrop();
   drawBoardSlots();
@@ -240,7 +240,7 @@ function drawBackdrop() {
 function drawBoardSlots() {
   for (let i = 0; i < 3; i++) {
     const id = duel.player.field?.[i]?.id ?? duel.opponent.field?.[i]?.id;
-    if (id != null) drawCard(id, DUEL_BOARD.boardSlots[i][0], DUEL_BOARD.boardSlots[i][1]);
+    if (id != null) drawCard(id, DUEL_BOARD.boardSlots[i]![0], DUEL_BOARD.boardSlots[i]![1]);
   }
 }
 
@@ -259,7 +259,7 @@ function drawIcon(id: number, x: number, y: number) {
   if (!catalog.icons || !icons || !icons.complete || !id) return false;
   const ic = catalog.icons, idx = id - 1;
   if (idx < 0) return false;
-  ctx.drawImage(icons, (idx % ic.cols) * ic.cellW, Math.floor(idx / ic.cols) * ic.cellH,
+  ctx!.drawImage(icons, (idx % ic.cols) * ic.cellW, Math.floor(idx / ic.cols) * ic.cellH,
     ic.cellW, ic.cellH, x, y, ic.cellW, ic.cellH);
   return true;
 }
@@ -268,7 +268,7 @@ function cardById(id: number) { return catalog.cards.find((c: { id: number; }) =
 
 function drawCard(id: number | null, x: number | undefined, y: number | undefined, { back = false, dim = false, glow = false } = {}) {
   const f = UI.face;
-  if (glow) { drawClipAtPaletteRow(ctx, board, 8, UI.select_clut_cycle[Math.floor((ticks % 24) / 4)], x - 2, y - 2); }
+  if (glow) { drawClipAtPaletteRow(ctx, board, 8, UI.select_clut_cycle[Math.floor((ticks % 24) / 4)], x! - 2, y! - 2); }
   if (back || id == null) {
     drawClip(ctx, card, id == null ? f.alt_clip.clip : f.reverse_clip.clip, x, y);
     return;
@@ -276,12 +276,12 @@ function drawCard(id: number | null, x: number | undefined, y: number | undefine
   const rec = cardById(id);
   if (!rec) { drawClip(ctx, card, f.alt_clip.clip, x, y); return; }
   const [ax, ay, aw, ah] = f.art_window;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x + ax, y + ay, aw, ah);
-  ctx.clip();
+  ctx!.save();
+  ctx!.beginPath();
+  ctx!.rect(x + ax, y + ay, aw, ah);
+  ctx!.clip();
   drawIcon(id, x + ax - 1, y + ay - 2);
-  ctx.restore();
+  ctx!.restore();
   const idx = f.frame_by_colour[rec.colour] ?? 0;
   drawClip(ctx, card, f.frame.base + idx + (dim ? f.frame.alt_add : 0), x, y);
   const st = f.stats;
@@ -339,14 +339,14 @@ function drawHands() {
     const target = handX(n, i);
     if (intro) {
       const c = introCards.find((x) => x.si === 0 && x.i === i);
-      const p = Math.max(0, Math.min(1, (introT() - c.start) / DEAL_DURATION));
+      const p = Math.max(0, Math.min(1, (introT() - c!.start) / DEAL_DURATION));
       if (p <= 0) return;
       const x = DEAL_START_X + (target - DEAL_START_X) * p;
-      ctx.save();
-      ctx.translate(x + 20 * p, DUEL_BOARD.handY + 23 * (1 - p));
-      ctx.scale(p, p);
-      drawCard(id, -20, -23, { back: introT() < c.flip + FLIP_FRAMES });
-      ctx.restore();
+      ctx!.save();
+      ctx!.translate(x + 20 * p, DUEL_BOARD.handY + 23 * (1 - p));
+      ctx!.scale(p, p);
+      drawCard(id, -20, -23, { back: introT() < c!.flip + FLIP_FRAMES });
+      ctx!.restore();
       return;
     }
     const on = i === cursor && (stage === "load" || stage === "compile" || stage === "summon");
@@ -360,11 +360,11 @@ function drawHands() {
       if (p <= 0) continue;
       const target = handX(duel.opponent.hand.length, c.i);
       const x = DEAL_START_X + (target - DEAL_START_X) * p;
-      ctx.save();
-      ctx.translate(x + 20 * p, DUEL_BOARD.oppHandY + 23 * (1 - p));
-      ctx.scale(p, p);
+      ctx!.save();
+      ctx!.translate(x + 20 * p, DUEL_BOARD.oppHandY + 23 * (1 - p));
+      ctx!.scale(p, p);
       drawCard(duel.opponent.hand[c.i], -20, -23, { back: true });
-      ctx.restore();
+      ctx!.restore();
     }
   }
 }
@@ -396,11 +396,11 @@ function isLegal(slot: number) {
 }
 
 function drawWindow(x: number, y: number, w: number, h: number) {
-  ctx.fillStyle = "rgba(8,10,24,0.94)";
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#c8cede";
-  ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
-  ctx.fillRect(x, y, 1, h); ctx.fillRect(x + w - 1, y, 1, h);
+  ctx!.fillStyle = "rgba(8,10,24,0.94)";
+  ctx!.fillRect(x, y, w, h);
+  ctx!.fillStyle = "#c8cede";
+  ctx!.fillRect(x, y, w, 1); ctx!.fillRect(x, y + h - 1, w, 1);
+  ctx!.fillRect(x, y, 1, h); ctx!.fillRect(x + w - 1, y, 1, h);
 }
 
 function phasePrompt() {
@@ -439,8 +439,8 @@ function drawWindows() {
 
 function drawBanner() {
   if (intro || stage === "over") return;
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  ctx.fillRect(0, 0, 320, 15);
+  ctx!.fillStyle = "rgba(0,0,0,0.55)";
+  ctx!.fillRect(0, 0, 320, 15);
   drawText(ctx, banner, 6, 3);
 }
 
@@ -466,45 +466,45 @@ function drawHint() {
 // input
 
 window.addEventListener("keydown", (e) => {
-  bgm.unlock(); sfx.unlock();
-  if (e.key === "r" || e.key === "R") { sfx.play(SOUND.cancel); newGame(); return; }
-  if (e.key === "a" || e.key === "A") { auto = !auto; sfx.play(SOUND.confirm); return; }
+  bgm.unlock!(); sfx.unlock!();
+  if (e.key === "r" || e.key === "R") { sfx.play!(SOUND.cancel); newGame(); return; }
+  if (e.key === "a" || e.key === "A") { auto = !auto; sfx.play!(SOUND.confirm); return; }
   if (stage === "over") {
-    if (e.key === " ") { sfx.play(SOUND.confirm); newGame(); e.preventDefault(); }
+    if (e.key === " ") { sfx.play!(SOUND.confirm); newGame(); e.preventDefault(); }
     return;
   }
   if (intro) { if (e.key === " ") { intro = false; e.preventDefault(); } return; }
   if (awaitingCardChoice(duel)) {
     const ch = duelChoice(duel);
     const count = ch.kind === "board" ? ch.targets.length : ch.slots.length;
-    if (e.key === "ArrowRight") { choiceCursor = (choiceCursor + 1) % Math.max(1, count); sfx.play(SOUND.cursor); }
-    else if (e.key === "ArrowLeft") { choiceCursor = (choiceCursor - 1 + Math.max(1, count)) % Math.max(1, count); sfx.play(SOUND.cursor); }
+    if (e.key === "ArrowRight") { choiceCursor = (choiceCursor + 1) % Math.max(1, count); sfx.play!(SOUND.cursor); }
+    else if (e.key === "ArrowLeft") { choiceCursor = (choiceCursor - 1 + Math.max(1, count)) % Math.max(1, count); sfx.play!(SOUND.cursor); }
     else if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
-      if (count) { resolveCardChoice(duel, choiceCursor, Math.random); sfx.play(SOUND.confirm); }
+      if (count) { resolveCardChoice(duel, choiceCursor, Math.random); sfx.play!(SOUND.confirm); }
     }
     return;
   }
   const n = duel.player.hand.length;
-  if (e.key === "ArrowRight") { cursor = (cursor + 1) % Math.max(1, n); sfx.play(SOUND.cursor); }
-  else if (e.key === "ArrowLeft") { cursor = (cursor - 1 + Math.max(1, n)) % Math.max(1, n); sfx.play(SOUND.cursor); }
+  if (e.key === "ArrowRight") { cursor = (cursor + 1) % Math.max(1, n); sfx.play!(SOUND.cursor); }
+  else if (e.key === "ArrowLeft") { cursor = (cursor - 1 + Math.max(1, n)) % Math.max(1, n); sfx.play!(SOUND.cursor); }
   else if (e.key === " " || e.key === "Enter") {
     e.preventDefault();
     if (stage === "summon") {
-      if (confirm) { commitSummons(duel, duel.player, [...marks]); sfx.play(SOUND.summon); marks = new Set(); confirm = false; return; }
+      if (confirm) { commitSummons(duel, duel.player, [...marks]); sfx.play!(SOUND.summon); marks = new Set(); confirm = false; return; }
       if (e.key === " ") {
         if (marks.has(cursor)) marks.delete(cursor); else marks.add(cursor);
-        sfx.play(SOUND.cursor);
-      } else if (marks.size) { confirm = true; sfx.play(SOUND.confirm); }
+        sfx.play!(SOUND.cursor);
+      } else if (marks.size) { confirm = true; sfx.play!(SOUND.confirm); }
       return;
     }
     if ((stage === "load" || stage === "compile") && programTurnSide(duel) === duel.player) {
-      if (e.key === " " && isLegal(cursor)) { playProgramTurn(duel, duel.player, cursor, EFFECTS, Math.random); sfx.play(SOUND.confirm); }
-      else { passProgramTurn(duel, duel.player); sfx.play(SOUND.pass); }
+      if (e.key === " " && isLegal(cursor)) { playProgramTurn(duel, duel.player, cursor, EFFECTS, Math.random); sfx.play!(SOUND.confirm); }
+      else { passProgramTurn(duel, duel.player); sfx.play!(SOUND.pass); }
     }
   } else if (e.key === "Escape") {
-    if (stage === "summon" && summonTurnSide(duel) === duel.player) { endSummonTurn(duel, duel.player); sfx.play(SOUND.pass); }
-    else if ((stage === "load" || stage === "compile") && programTurnSide(duel) === duel.player) { passProgramTurn(duel, duel.player); sfx.play(SOUND.pass); }
+    if (stage === "summon" && summonTurnSide(duel) === duel.player) { endSummonTurn(duel, duel.player); sfx.play!(SOUND.pass); }
+    else if ((stage === "load" || stage === "compile") && programTurnSide(duel) === duel.player) { passProgramTurn(duel, duel.player); sfx.play!(SOUND.pass); }
   }
 });
 
@@ -513,7 +513,7 @@ boot();
 // Debug hook for the lab harness and the verifier scripts.
 window.__duelLab = {
   get stage() { return stage; },
-  get phase() { return duel ? phase(duel).key : null; },
+  get phase() { return duel ? phase(duel)!.key : null; },
   get outcome() { return duel ? duel.outcome : null; },
   get hand() { return duel ? duel.player.hand.length : 0; },
   get field() { return duel ? duel.player.field.length : 0; },

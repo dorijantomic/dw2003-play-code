@@ -78,10 +78,10 @@ function ch1At(model, bone: number, frame: number | undefined) {
   for (const k of ch) {
     const f = k[3] | 0;
     if (f === 30000) break;
-    if (f <= frame) { prev = k; continue; }
+    if (f <= frame!) { prev = k; continue; }
     if (!prev) return [k[0], k[1], k[2]];
     const span = (f - (prev[3] | 0)) || 1;
-    const t = (frame - (prev[3] | 0)) / span;
+    const t = (frame! - (prev[3] | 0)) / span;
     return [prev[0] + (k[0] - prev[0]) * t, prev[1] + (k[1] - prev[1]) * t, prev[2] + (k[2] - prev[2]) * t];
   }
   return prev ? [prev[0], prev[1], prev[2]] : null;
@@ -202,12 +202,12 @@ function detectThrow(model, slots: Record<string, OwnClipRec>, H: number) {
   const hidIdle = new Map(mesh.map((b) => [b, idle.every((f) => boneScale(model, b, f) < HIDDEN * 4096)]));
 
   for (const rec of Object.values(slots)) {
-    const frames = rec.tables.flatMap((t) => tableFrames(model, t));
+    const frames = rec.tables!.flatMap((t) => tableFrames(model, t));
     if (frames.length < 10) continue;
     const script = model.actions?.[rec.slot];
-    const hasWorldSpawn = (script?.ops ?? []).some((o: { op: number; words: number[]; }) => o.op === 3 && (o.words?.[0] | 0) === 0
-      && (o.words?.[4] | 0) !== 32767 && Math.abs(o.words?.[4] | 0) <= 20000);
-    const hasLaunch = rec.launches.length > 0;
+    const hasWorldSpawn = (script?.ops ?? []).some((o: { op: number; words: number[]; }) => o.op === 3 && (o.words?.[0]! | 0) === 0
+      && (o.words?.[4]! | 0) !== 32767 && Math.abs(o.words?.[4]! | 0) <= 20000);
+    const hasLaunch = rec.launches!.length > 0;
     for (const b of mesh) {
       if (bodyLike(b)) continue;                       // the whole body vanishing is not a throw
       const runs = [];
@@ -263,12 +263,12 @@ export function moveKind(model, clip: number, tech) {
 /** The model's own clip of `kind`: its own casting clip first for a shot, its own attack for a blow. */
 export function pickOwnClip(model, kind: string) {
   const inv = ownClipInventory(model);
-  const list = Object.values(inv.slots).filter((r) => (kind === "shoot" ? r.launches.length > 0 : r.contacts.length > 0));
+  const list = Object.values(inv.slots).filter((r) => (kind === "shoot" ? r.launches!.length > 0 : r.contacts!.length > 0));
   if (!list.length) return null;
-  const travels = (r) => r.ramp4 > 0 || r.leap3 > 0 || r.dash8 > 0 || Math.abs(r.rootTravel) > TRAVEL_SHARE * inv.height;
+  const travels = (r) => r.ramp4 > 0 || r.leap3 > 0 || r.dash8 > 0 || Math.abs(r.rootTravel) > TRAVEL_SHARE * inv.height!;
   const rank = (r: OwnClipRec) => {
-    const fit = kind === "shoot" ? (CAST_CLIPS.has(r.slot) ? 0 : r.slot === 5 ? 1 : 2) : (r.slot === 5 ? 0 : 1);
-    return fit * 1000 + (travels(r) ? 0 : 100) + r.slot;
+    const fit = kind === "shoot" ? (CAST_CLIPS.has(r.slot!) ? 0 : r.slot === 5 ? 1 : 2) : (r.slot === 5 ? 0 : 1);
+    return fit * 1000 + (travels(r) ? 0 : 100) + r.slot!;
   };
   list.sort((a, b) => rank(a) - rank(b));
   return list[0];
@@ -289,7 +289,7 @@ export function ownClipPlan(model, clip: number, { tech = null, target = "enemy"
     // the operator's rule: a body that throws its own part plays its OWN attack for every technique
     const pick = pickOwnClip(model, "shoot") ?? pickOwnClip(model, "close");
     if (!pick) return null;
-    return { slot: pick.slot, kind: "own", moveKind: null, tech, why: `body throws a part of itself: ${inv.throwsWhy[0]}`, throws: true };
+    return { slot: pick.slot, kind: "own", moveKind: null, tech, why: `body throws a part of itself: ${inv.throwsWhy![0]}`, throws: true };
   }
   const mv = moveKind(model, clip, tech);
   if (!mv.kind || mv.kind === "self") return null;

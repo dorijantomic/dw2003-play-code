@@ -93,7 +93,7 @@ class Soup {
     return g;
   }
 }
-const add3 = (a, b: number[], k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+const add3 = (a, b: number[], k = 1) => [a[0] + b[0]! * k, a[1] + b[1]! * k, a[2] + b[2]! * k];
 const norm3 = (a) => { const L = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / L, a[1] / L, a[2] / L]; };
 
 /** Fern: 7 arching fronds round a crown. near = rachis ribbon + 6 leaflet pairs a frond (diamond leaflets);
@@ -116,10 +116,10 @@ export function fernGeometry(near: boolean) {
       so.quad(add3(P, B, -w0), add3(P, B, w0), add3(Q, B, w1), add3(Q, B, -w1), s0, s0, s1, s1, 0.3, 0.3, 0.6, 0.6);
     }
     if (near) for (let i = 2; i < SEG; i++) {
-      const P = pts[i], Q = pts[i + 1], T = norm3([Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]]), s = i / SEG;
+      const P = pts[i], Q = pts[i + 1], T = norm3([Q![0]! - P![0]!, Q![1]! - P![1]!, Q![2]! - P![2]!]), s = i / SEG;
       const L = 0.30 * Math.pow(Math.sin(Math.PI * (0.12 + 0.88 * s)), 0.8) * (1 - 0.45 * s) + 0.03, w = L * 0.32;
       for (const side of [-1, 1]) {
-        const dir = norm3(add3(add3([B[0] * side * 0.9, 0, B[2] * side * 0.9], T, 0.35), [0, -0.22, 0]));
+        const dir = norm3(add3(add3([B[0]! * side * 0.9, 0, B[2]! * side * 0.9], T, 0.35), [0, -0.22, 0]));
         const tip = add3(P, dir, L), mid = add3(P, dir, L * 0.5);
         so.tri(P, add3(mid, T, w), tip, s, s, Math.min(1, s + 0.12), 0.0, 1, 1);
         so.tri(P, tip, add3(mid, T, -w), s, Math.min(1, s + 0.12), s, 0.0, 1, 1);
@@ -139,10 +139,10 @@ export function cloverGeometry() {
     const side = [-Math.sin(a), 0, Math.cos(a)];
     so.quad(add3(base, side, -0.012), add3(base, side, 0.012), add3(top, side, 0.008), add3(top, side, -0.008), 0, 0, 0.5, 0.5, 0, 0, 0.2, 0.2);
     for (let l = 0; l < 3; l++) {
-      const th = l / 3 * Math.PI * 2 + a, c = [top[0] + Math.cos(th) * 0.17, top[1] + 0.03, top[2] + Math.sin(th) * 0.17];
+      const th = l / 3 * Math.PI * 2 + a, c = [top[0]! + Math.cos(th) * 0.17, top[1]! + 0.03, top[2]! + Math.sin(th) * 0.17];
       const rad = 0.19; let prev = null;
       for (let q = 0; q <= 5; q++) {
-        const ph = q / 5 * Math.PI * 2, v = [c[0] + Math.cos(ph) * rad, c[1] + Math.sin(ph * 2) * 0.02, c[2] + Math.sin(ph) * rad];
+        const ph = q / 5 * Math.PI * 2, v = [c[0]! + Math.cos(ph) * rad, c[1]! + Math.sin(ph * 2) * 0.02, c[2]! + Math.sin(ph) * rad];
         if (prev) so.tri(top, prev, v, 0.6, 1, 1, 0.1, 1, 1);
         prev = v;
       }
@@ -160,10 +160,10 @@ export function tuftGeometry() {
     const dir = [Math.cos(a), 0, Math.sin(a)], side = [-Math.sin(a), 0, Math.cos(a)];
     let prev = null;
     for (let i = 0; i <= 3; i++) {
-      const s = i / 3, c = [dir[0] * (off + lean * s * s * h), h * s, dir[2] * (off + lean * s * s * h)];
+      const s = i / 3, c = [dir[0]! * (off + lean * s * s * h), h * s, dir[2]! * (off + lean * s * s * h)];
       const ww = w * (1 - s * 0.95);
       const L = add3(c, side, -ww), R = add3(c, side, ww);
-      if (prev) so.quad(prev[0], prev[1], R, L, prev[2], prev[2], s, s, prev[2] * 0, prev[2] * 0, 1, 1);
+      if (prev) so.quad(prev[0], prev[1], R, L, prev[2], prev[2], s, s, prev[2]! * 0, prev[2]! * 0, 1, 1);
       prev = [L, R, s];
     }
   }
@@ -186,7 +186,7 @@ export function leafGeometry() {
 export function twigGeometry() {
   const so = new Soup();
   const pts = [[-0.5, 0.02, 0, 0.026], [-0.05, 0.03, 0.05, 0.020], [0.5, 0.02, -0.03, 0.006]];
-  const ring = (p: number[] | undefined) => [0, 1, 2].map((k) => { const a = k / 3 * Math.PI * 2 + 0.5; return [p[0], p[1] + Math.sin(a) * p[3], p[2] + Math.cos(a) * p[3]]; });
+  const ring = (p: number[] | undefined) => [0, 1, 2].map((k) => { const a = k / 3 * Math.PI * 2 + 0.5; return [p![0], p![1]! + Math.sin(a) * p![3]!, p![2]! + Math.cos(a) * p![3]!]; });
   for (let i = 0; i < 2; i++) {
     const A = ring(pts[i]), B = ring(pts[i + 1]);
     for (let k = 0; k < 3; k++) { const k2 = (k + 1) % 3; so.quad(A[k], A[k2], B[k2], B[k], i / 2, i / 2, (i + 1) / 2, (i + 1) / 2, 0, 0, 0, 0); }
@@ -196,7 +196,7 @@ export function twigGeometry() {
 
 /** A pebble: an icosahedron (20 triangles) squashed to 1 x 0.5 x 0.8, bottom at y 0. */
 export function pebbleGeometry() {
-  const ico = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(), P = ico.attributes.position.array, so = new Soup();
+  const ico = new THREE.IcosahedronGeometry(0.5, 0).toNonIndexed(), P = ico.attributes.position!.array, so = new Soup();
   const r = rng(41), v = [];
   for (let i = 0; i < P.length; i += 3) { const j = 1 + (r() - 0.5) * 0.28; v.push([P[i] * j, P[i + 1] * 0.5 * j + 0.2, P[i + 2] * 0.8 * j]); }
   for (let i = 0; i < v.length; i += 3) so.tri(v[i], v[i + 1], v[i + 2], 0.5, 0.5, 0.5, 0, 0, 0);

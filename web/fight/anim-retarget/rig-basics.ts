@@ -16,7 +16,7 @@ export function sample(ch, frame: number) {
 function mat3Mul(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r] * b[c * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k];
     o[c * 3 + r] = s;
   }
   return o;
@@ -35,16 +35,16 @@ function ps1Mat3(ax: number, ay: number, az: number) {
 function compose(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j] * b[i * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j]! * b[i * 3 + k];
     o[i * 3 + j] = s;
   }
   return o;
 }
 
 function applyRot(R: number[], v) {
-  return [R[0] * v[0] + R[3] * v[1] + R[6] * v[2],
-          R[1] * v[0] + R[4] * v[1] + R[7] * v[2],
-          R[2] * v[0] + R[5] * v[1] + R[8] * v[2]];
+  return [R[0]! * v[0] + R[3]! * v[1] + R[6]! * v[2],
+          R[1]! * v[0] + R[4]! * v[1] + R[7]! * v[2],
+          R[2]! * v[0] + R[5]! * v[1] + R[8]! * v[2]];
 }
 
 /** Rest-pose world position/rotation per bone (the renderer's own formula, battle3d.js buildBoneWorldMatrices). */
@@ -60,7 +60,7 @@ export function restPose(model, frame = 0) {
     if (!rot[p]) proc(p);
     rot[i] = compose(rot[p], R);
     const rt = applyRot(rot[p], c1);
-    pos[i] = [pos[p][0] - rt[0], pos[p][1] + rt[1], pos[p][2] - rt[2]];
+    pos[i] = [pos[p][0] - rt[0]!, pos[p][1] + rt[1], pos[p][2] - rt[2]!];
   };
   for (let i = 0; i < n; i++) if (!rot[i]) proc(i);
   return { rot, pos };
@@ -75,11 +75,11 @@ function meshBox(model, i: number, pose) {
     const x = -(R[0] * v[0] + R[3] * v[1] + R[6] * v[2]) + t[0];
     const y =  (R[1] * v[0] + R[4] * v[1] + R[7] * v[2]) + t[1];
     const z = -(R[2] * v[0] + R[5] * v[1] + R[8] * v[2]) + t[2];
-    if (x < mn[0]) mn[0] = x; if (x > mx[0]) mx[0] = x;
-    if (y < mn[1]) mn[1] = y; if (y > mx[1]) mx[1] = y;
-    if (z < mn[2]) mn[2] = z; if (z > mx[2]) mx[2] = z;
+    if (x < mn[0]!) mn[0] = x; if (x > mx[0]!) mx[0] = x;
+    if (y < mn[1]!) mn[1] = y; if (y > mx[1]!) mx[1] = y;
+    if (z < mn[2]!) mn[2] = z; if (z > mx[2]!) mx[2] = z;
   }
-  return { mn, mx, d: [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]] };
+  return { mn, mx, d: [mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!] };
 }
 
 /**
@@ -107,9 +107,9 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     for (let i = 0; i < n; i++) {
       const bb = meshBox(model, i, pose);
       if (!bb) continue;
-      for (let k = 0; k < 3; k++) { if (bb.mn[k] < mn[k]) mn[k] = bb.mn[k]; if (bb.mx[k] > mx[k]) mx[k] = bb.mx[k]; }
+      for (let k = 0; k < 3; k++) { if (bb.mn[k]! < mn[k]!) mn[k] = bb.mn[k]; if (bb.mx[k]! > mx[k]!) mx[k] = bb.mx[k]; }
     }
-    return { mn, mx, h: mx[1] - mn[1], w: mx[0] - mn[0], d: mx[2] - mn[2] };
+    return { mn, mx, h: mx[1]! - mn[1]!, w: mx[0]! - mn[0]!, d: mx[2]! - mn[2]! };
   })();
   // every root-child chain, walked to its tip (a bone with != 1 child ends the chain); a branch continues
   // down the child that carries the longest subtree, so an arm's shoulder->hand path is one chain
@@ -176,7 +176,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     if (!bb) continue;
     // a head is compact, near the centre line, and much smaller than the torso box
     if (Math.abs(pose.pos[i][0]) > 0.15 * W) continue;
-    if (bb.d[0] > 0.30 * W || bb.d[1] > 0.35 * H) continue;
+    if (bb.d[0]! > 0.30 * W || bb.d[1]! > 0.35 * H) continue;
     if (pose.pos[i][1] < bestY) { bestY = pose.pos[i][1]; head = i; }
   }
   // props: a terminal bone whose mesh is much longer than it is wide (a blade/lance) on either side
@@ -187,7 +187,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
     const bb = meshBox(model, i, pose);
     if (!bb) continue;
     const s = [...bb.d].sort((a, b) => b - a);
-    if (s[0] >= 0.45 * H && s[0] >= 2.2 * Math.max(s[1], 1)) {
+    if (s[0]! >= 0.45 * H && s[0]! >= 2.2 * Math.max(s[1]!, 1)) {
       props.push({ bone: i, side: pose.pos[i][0] < 0 ? "left" : (pose.pos[i][0] > 0 ? "right" : "center"),
                    len: s[0], x: pose.pos[i][0] });
     }
@@ -217,7 +217,7 @@ export function normaliseRoots(rig: K16Rig, model) {
   if (!roots.length) roots = [0];
   const under = (bone: number | undefined, root: number) => {
     let i = bone;
-    for (let step = 0; step <= n && i >= 0; step++) { if (i === root) return true; i = parentOf(i); }
+    for (let step = 0; step <= n && i! >= 0; step++) { if (i === root) return true; i = parentOf(i!); }
     return false;
   };
   const legStarts = rig.legs.filter((l) => l.ordinal === 0 && l.chain.length).map((l) => l.chain[0]);
@@ -230,7 +230,7 @@ export function normaliseRoots(rig: K16Rig, model) {
   const storedRoot = rig.root != null && rig.root >= 0 ? rig.root : roots[0];
   let root = storedRoot;
   if (legsUnder.length === 1) root = legsUnder[0];
-  else if (legsUnder.length > 1 && legsUnder.includes(storedRoot)) root = storedRoot;
+  else if (legsUnder.length > 1 && legsUnder.includes(storedRoot!)) root = storedRoot;
   // the second root: when another root carries the upper body, that root IS the torso (a stored torso may
   // be a chest bone inside the same tree; the upper ROOT is what has to take the donor's torso motion).
   const otherUpper = upperUnder.filter((r) => r !== root);
@@ -324,7 +324,7 @@ export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {
   for (const o of src.ops) {
     if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tableIdx.push(o.words[2] | 0);
   }
-  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
+  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2] | 0;
   if (!table) return null;
   const srcTable = source.timeline?.[table]?.table;
   if (!Array.isArray(srcTable) || !srcTable.length) return null;

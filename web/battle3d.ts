@@ -252,29 +252,29 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
   B$.texProg = createProgram(B$.gl, VERT_SRC, FRAG_SRC);
   B$.texP = {
     program: B$.texProg,
-    aPos:  B$.gl.getAttribLocation(B$.texProg, "aPos"),
-    aUV:   B$.gl.getAttribLocation(B$.texProg, "aUV"),
-    uMVP:  B$.gl.getUniformLocation(B$.texProg, "uMVP"),
-    uTex:  B$.gl.getUniformLocation(B$.texProg, "uTex"),
-    uAlpha:B$.gl.getUniformLocation(B$.texProg, "uAlpha"),
-    uTint: B$.gl.getUniformLocation(B$.texProg, "uTint"),
-    uGradeSub: B$.gl.getUniformLocation(B$.texProg, "uGradeSub"),
-    uFogCol: B$.gl.getUniformLocation(B$.texProg, "uFogCol"),
-    uFogP: B$.gl.getUniformLocation(B$.texProg, "uFogP"),
-    uSkyM: B$.gl.getUniformLocation(B$.texProg, "uSkyM"),
-    uSky: B$.gl.getUniformLocation(B$.texProg, "uSky"),
-    uEye: B$.gl.getUniformLocation(B$.texProg, "uEye"),
-    uMoonDir: B$.gl.getUniformLocation(B$.texProg, "uMoonDir"),
-    uWater: B$.gl.getUniformLocation(B$.texProg, "uWater"),
+    aPos:  B$.gl.getAttribLocation(B$.texProg!, "aPos"),
+    aUV:   B$.gl.getAttribLocation(B$.texProg!, "aUV"),
+    uMVP:  B$.gl.getUniformLocation(B$.texProg!, "uMVP"),
+    uTex:  B$.gl.getUniformLocation(B$.texProg!, "uTex"),
+    uAlpha:B$.gl.getUniformLocation(B$.texProg!, "uAlpha"),
+    uTint: B$.gl.getUniformLocation(B$.texProg!, "uTint"),
+    uGradeSub: B$.gl.getUniformLocation(B$.texProg!, "uGradeSub"),
+    uFogCol: B$.gl.getUniformLocation(B$.texProg!, "uFogCol"),
+    uFogP: B$.gl.getUniformLocation(B$.texProg!, "uFogP"),
+    uSkyM: B$.gl.getUniformLocation(B$.texProg!, "uSkyM"),
+    uSky: B$.gl.getUniformLocation(B$.texProg!, "uSky"),
+    uEye: B$.gl.getUniformLocation(B$.texProg!, "uEye"),
+    uMoonDir: B$.gl.getUniformLocation(B$.texProg!, "uMoonDir"),
+    uWater: B$.gl.getUniformLocation(B$.texProg!, "uWater"),
 // SCENE-LIGHT-BEGIN (Arena Viewer built look only: setSceneLight; strip these blocks = the game's own code)
-    aNormal: B$.gl.getAttribLocation(B$.texProg, "aNormal"),
-    uSLOn: B$.gl.getUniformLocation(B$.texProg, "uSLOn"), uSLDir: B$.gl.getUniformLocation(B$.texProg, "uSLDir"),
-    uSLCol: B$.gl.getUniformLocation(B$.texProg, "uSLCol"), uSLAmb: B$.gl.getUniformLocation(B$.texProg, "uSLAmb"),
+    aNormal: B$.gl.getAttribLocation(B$.texProg!, "aNormal"),
+    uSLOn: B$.gl.getUniformLocation(B$.texProg!, "uSLOn"), uSLDir: B$.gl.getUniformLocation(B$.texProg!, "uSLDir"),
+    uSLCol: B$.gl.getUniformLocation(B$.texProg!, "uSLCol"), uSLAmb: B$.gl.getUniformLocation(B$.texProg!, "uSLAmb"),
 // SCENE-LIGHT-END
 // TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
-    uToon: B$.gl.getUniformLocation(B$.texProg, "uToon"), uToonDir: B$.gl.getUniformLocation(B$.texProg, "uToonDir"),
+    uToon: B$.gl.getUniformLocation(B$.texProg!, "uToon"), uToonDir: B$.gl.getUniformLocation(B$.texProg!, "uToonDir"),
 // TOON-END
-    uSoftA: B$.gl.getUniformLocation(B$.texProg, "uSoftA"),
+    uSoftA: B$.gl.getUniformLocation(B$.texProg!, "uSoftA"),
   };
 
   // World up axis. Eye/look are computed per-frame by the cinematic camera (see render()).
@@ -414,7 +414,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
   B$.dataFieldOffAt = 0;
 
   fetch("assets/battle/backdrops/manifest.json")
-    .then(r => r.json()).then(m => { B$.backdropManifest = m; loadBackdropPack(B$.BD_FALLBACK); })
+    .then(r => r.json()).then(m => { B$.backdropManifest = m; loadBackdropPack(B$.BD_FALLBACK!); })
     .catch(() => { B$.backdropManifest = { byTech: {}, bySig: {} }; });
 
   // 121 ctrl frames @ ~60fps ≈ 2.0 s to reach the target spin, then hold (matches the cast window).
@@ -576,7 +576,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       // A model can finish loading before this table does; re-seat whatever is already up.
       if (B$.playerAnim8r) B$.playerAnim8r.homeSlot = arenaSlotFor(B$.playerFolder, "player", B$.placementTable);
       if (B$.enemyAnim8r)  B$.enemyAnim8r.homeSlot  = arenaSlotFor(B$.enemyFolder,  "enemy",  B$.placementTable);
-      for (const f of B$.extras.values()) {   // (multiplayer fighters that loaded first)
+      for (const f of B$.extras!.values()) {   // (multiplayer fighters that loaded first)
         if (f.anim8r) f.anim8r.homeSlot = arenaSlotFor(f.folder, f.side, B$.placementTable);
         if (f.model && !f.patches) _setupExtraPatches(f);
       }
@@ -804,7 +804,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
               B$.lastCamInfo = null;        // {eye,look,fovDeg} readout for the debug page
                     B$._rotY = (v, a) => {
     const c = Math.cos(a), s = Math.sin(a);
-    return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
+    return [v[0]! * c + v[2]! * s, v[1], -v[0]! * s + v[2]! * c];
   };
   B$._lerp = (a, b, t) => a + (b - a) * t;
 
@@ -874,7 +874,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
   B$.extras = new Map();          // id -> fighter
   B$.multiCam = false;
   B$.fighterScreen = new Map();   // id -> { x, topY, footY } in 0..1 of the canvas, written every render
-  B$.coordinator.extraActors = () => { const out = []; for (const f of B$.extras.values()) if (f.anim8r) out.push(f.anim8r); return out; };
+  B$.coordinator.extraActors = () => { const out = []; for (const f of B$.extras!.values()) if (f.anim8r) out.push(f.anim8r); return out; };
   B$.laneOf = (f) => f.dx + f.lat;
 
   // Many-vs-many line-up (multiCam only). The caller's dx only gives the ORDER along a side; the spacing comes from each
@@ -1102,7 +1102,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       if (held === null) return 0;
       let blitted = 0;
       for (const patch of patches.update(0, held))
-        if (blitTexturePatch(tex, page, patch)) blitted++;
+        if (blitTexturePatch(tex!, page!, patch)) blitted++;
       return blitted;
     },
     // Debug (tools/verify_texture_patches.mjs): read one patch's DESTINATION rectangle
@@ -1118,17 +1118,17 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
       if (!entry || !tex || !page) return null;
       const r = texturePatchRect(entry, page.scale);
       const w = r.w, h = r.h;
-      const fb = B$.gl.createFramebuffer();
-      B$.gl.bindFramebuffer(B$.gl.FRAMEBUFFER, fb);
-      B$.gl.framebufferTexture2D(B$.gl.FRAMEBUFFER, B$.gl.COLOR_ATTACHMENT0, B$.gl.TEXTURE_2D, tex, 0);
+      const fb = B$.gl!.createFramebuffer();
+      B$.gl!.bindFramebuffer(B$.gl!.FRAMEBUFFER, fb);
+      B$.gl!.framebufferTexture2D(B$.gl!.FRAMEBUFFER, B$.gl!.COLOR_ATTACHMENT0, B$.gl!.TEXTURE_2D, tex, 0);
       const got = new Uint8Array(w * h * 4);
-      const complete = B$.gl.checkFramebufferStatus(B$.gl.FRAMEBUFFER) === B$.gl.FRAMEBUFFER_COMPLETE;
+      const complete = B$.gl!.checkFramebufferStatus(B$.gl!.FRAMEBUFFER) === B$.gl!.FRAMEBUFFER_COMPLETE;
       if (complete) {
-        B$.gl.readPixels(r.dx, r.dy, w, h,
-                      B$.gl.RGBA, B$.gl.UNSIGNED_BYTE, got);
+        B$.gl!.readPixels(r.dx, r.dy, w, h,
+                      B$.gl!.RGBA, B$.gl!.UNSIGNED_BYTE, got);
       }
-      B$.gl.bindFramebuffer(B$.gl.FRAMEBUFFER, null);
-      B$.gl.deleteFramebuffer(fb);
+      B$.gl!.bindFramebuffer(B$.gl!.FRAMEBUFFER, null);
+      B$.gl!.deleteFramebuffer(fb);
       if (!complete) return null;
 
       let mismatched = 0;
@@ -1142,7 +1142,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
         ? new OffscreenCanvas(w, h)
         : Object.assign(document.createElement("canvas"), { width: w, height: h })) as CaptureCanvas;
       const ctx = canvas.getContext("2d");
-      ctx.putImageData(new ImageData(new Uint8ClampedArray(got), w, h), 0, 0);
+      ctx!.putImageData(new ImageData(new Uint8ClampedArray(got), w, h), 0, 0);
       return {
         width: w, height: h, variant: entry.variant, mismatched,
         canvas: typeof canvas.convertToBlob === "function" ? null : canvas.toDataURL(),
@@ -1199,7 +1199,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     // async, so a capture taken before it resolves is a blank frame, not a result.
     debugProjectileReady(id) {
       loadProjMesh(id);
-      const e = B$.projCache.get(id);
+      const e = B$.projCache!.get(id);
       return !!(e && e !== "loading" && e.layers.length &&
                 e.layers.every((L) => !L.count || L.groups.every((g) => g.texReady)));
     },
@@ -1234,7 +1234,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     beginOpeningCamera,
     setDataField(on: boolean, techId?: number) {
       B$.dataFieldPinned = !!on;                            // hold until explicitly turned off
-      if (on) triggerDataField(techId, performance.now() - B$.BD_DELAY_MS);   // show immediately
+      if (on) triggerDataField(techId!, performance.now() - B$.BD_DELAY_MS!);   // show immediately
       else B$.dataFieldOffAt = 0;
     },
     get dataFieldActive() { return dataFieldIsActive(); },
@@ -1248,17 +1248,17 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     getFighterBounds(side) {
       const b = side === "enemy" ? B$.eAABBLast : B$.pAABB;
       if (!b) return null;
-      const center = [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2];
+      const center = [(b.min[0]! + b.max[0]!) / 2, (b.min[1]! + b.max[1]!) / 2, (b.min[2]! + b.max[2]!) / 2];
       return {
         min: b.min.slice(), max: b.max.slice(), center,
-        size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]],
+        size: [b.max[0]! - b.min[0]!, b.max[1]! - b.min[1]!, b.max[2]! - b.min[2]!],
       };
     },
     /** Arena Viewer "built" look: no disc arena or sky, see-through clear (needs createBattle3D(.., {alpha: true})). */
     setBuiltArena(on) { B$.builtArena = !!on; return B$.builtArena; },
 // TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
     /** Arena Viewer: { outline, shade } booleans (the game uses F2 window.__fx.toonoutline / .toonshade instead). */
-    setToon(o) { B$.toonSet.outline = !!o?.outline; B$.toonSet.shade = !!o?.shade; return { ...B$.toonSet }; },
+    setToon(o) { B$.toonSet!.outline = !!o?.outline; B$.toonSet!.shade = !!o?.shade; return { ...B$.toonSet }; },
     /** For checks: what is on now, and counters (frames drawn with toon, hull draws, weld builds, last error). */
     getToon() { return { set: { ...B$.toonSet }, on: _toonState(), ...B$.toonLog }; },
 // TOON-END
@@ -1280,18 +1280,18 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
         const model = bufs === B$.playerSkelBufs ? B$.playerModel : B$.enemyModel;
         const vol = (a0: number, a1: number) => {
           let qx = 0, qy = 0, qz = 0; const nv = (a1 - a0) / 3; if (nv < 3) return 0;
-          for (let i = a0; i < a1; i += 3) { qx += p[i]; qy += p[i + 1]; qz += p[i + 2]; }
+          for (let i = a0; i < a1; i += 3) { qx += p[i]!; qy += p[i + 1]!; qz += p[i + 2]!; }
           qx /= nv; qy /= nv; qz /= nv;
           let v = 0;
           for (let a = a0; a + 8 < a1; a += 9) {
-            const x0 = p[a] - qx, y0 = p[a + 1] - qy, z0 = p[a + 2] - qz, x1 = p[a + 3] - qx, y1 = p[a + 4] - qy, z1 = p[a + 5] - qz, x2 = p[a + 6] - qx, y2 = p[a + 7] - qy, z2 = p[a + 8] - qz;
+            const x0 = p[a]! - qx, y0 = p[a + 1]! - qy, z0 = p[a + 2]! - qz, x1 = p[a + 3]! - qx, y1 = p[a + 4]! - qy, z1 = p[a + 5]! - qz, x2 = p[a + 6]! - qx, y2 = p[a + 7]! - qy, z2 = p[a + 8]! - qz;
             v += (x0 * (y1 * z2 - z1 * y2) - y0 * (x1 * z2 - z1 * x2) + z0 * (x1 * y2 - y1 * x2)) / 6;
           }
           return v * SCENE_LIGHT_WINDING;
         };
         let pos = 0, neg = 0, nPos = 0, nNeg = 0;
         for (let b = 0; b < (model?.bones.length || 0); b++) {
-          const a0 = bufs.boneOffsets[b] * 3, a1 = a0 + (model.bones[b].faces || []).length * 9, v = vol(a0, a1);
+          const a0 = bufs.boneOffsets[b]! * 3, a1 = a0 + (model.bones[b].faces || []).length * 9, v = vol(a0, a1);
           if (v > 0) { pos += v; nPos++; } else if (v < 0) { neg -= v; nNeg++; }
         }
         out[side] = { faces: p.length / 9, volume: vol(0, p.length), bonesOut: nPos, bonesIn: nNeg, outShare: pos + neg > 0 ? pos / (pos + neg) : 0,
@@ -1322,7 +1322,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     getEnemyScreen() {
       if (!B$._fxView || !B$.eAABBLast) return null;
       const { pv, enemyPos } = B$._fxView, b = B$.eAABBLast;
-      const pr = (y: number | undefined) => { const cx = pv[0]*enemyPos[0] + pv[4]*y + pv[8]*enemyPos[2] + pv[12], cy = pv[1]*enemyPos[0] + pv[5]*y + pv[9]*enemyPos[2] + pv[13], cw = pv[3]*enemyPos[0] + pv[7]*y + pv[11]*enemyPos[2] + pv[15];
+      const pr = (y: number | undefined) => { const cx = pv[0]!*enemyPos[0]! + pv[4]!*y! + pv[8]!*enemyPos[2]! + pv[12]!, cy = pv[1]!*enemyPos[0]! + pv[5]!*y! + pv[9]!*enemyPos[2]! + pv[13]!, cw = pv[3]!*enemyPos[0]! + pv[7]!*y! + pv[11]!*enemyPos[2]! + pv[15]!;
         return cw > 0 ? { x: cx / cw * 0.5 + 0.5, y: 1 - (cy / cw * 0.5 + 0.5) } : null; };
       const top = pr(b.max[1]), foot = pr(b.min[1]);
       return top && foot ? { x: top.x, topY: top.y, footY: foot.y } : null;
@@ -1391,10 +1391,10 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
             : null },
         playerReactionCam: _reactionCamFor("player"),
         enemyReactionCam: _reactionCamFor("enemy"),
-        camRecord: B$.camRec.get() ? { kind: B$.camRec.get().kind, issuer: B$.camRec.get().issuer ?? null,
-          preset: B$.camRec.get().preset ?? null, fields: B$.camRec.live(),
-          progress: B$.camRec.get().progress ?? null, duration: B$.camRec.get().duration ?? null,
-          gliding: B$.camRec.isGliding() } : null,
+        camRecord: B$.camRec!.get() ? { kind: B$.camRec!.get().kind, issuer: B$.camRec!.get().issuer ?? null,
+          preset: B$.camRec!.get().preset ?? null, fields: B$.camRec!.live(),
+          progress: B$.camRec!.get().progress ?? null, duration: B$.camRec!.get().duration ?? null,
+          gliding: B$.camRec!.isGliding() } : null,
         moveDelta: B$.playerAnim8r?.moveDelta ? B$.playerAnim8r.moveDelta().map(Math.round) : null,
         dnaPresentation: !!B$.dnaPresentation,
         enemyVisible: B$.enemyVisible, enemyAnim: B$.enemyAnim,
@@ -1423,14 +1423,14 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
         // shrinks from DNA_ORB_RADIUS to 0 as u→1, so both cores collide dead-centre; the
         // cores swell as they close in, and the op7 fusion white-out takes over at u≈1.
         const u = B$.dnaOrbs.u;
-        const radius = B$.DNA_ORB_RADIUS * (1 - u);
+        const radius = B$.DNA_ORB_RADIUS! * (1 - u);
         const swell = 1 + u * 0.35;
         for (const key of Object.keys(B$.dnaOrbs.orbs)) {
-          const angle = B$.DNA_ORB_START_ANGLE[key] + u * B$.DNA_ORB_TURNS * 2 * Math.PI;
-          const sc = B$.DNA_ORB_SCALE[key] * swell;
+          const angle = B$.DNA_ORB_START_ANGLE![key] + u * B$.DNA_ORB_TURNS! * 2 * Math.PI;
+          const sc = B$.DNA_ORB_SCALE![key] * swell;
           list.push({
-            arch: B$.DNA_ORB_ARCH, frame: B$.DNA_ORB_CLIPS[key],
-            clutShift: B$.DNA_ORB_CLUT[key],
+            arch: B$.DNA_ORB_ARCH, frame: B$.DNA_ORB_CLIPS![key],
+            clutShift: B$.DNA_ORB_CLUT![key],
             side: "player",
             screen: true,
             pos: { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: -1 },
@@ -1452,9 +1452,9 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
           // The old x'=-x, z'=640-z mirror was inferred from two slot positions in one
           // capture, and those are per-Digimon stand-offs, not arena constants.
           const [wx, wy, wz] = ps1ToRender(pos, MODEL_SCALE);
-          const cx = pv[0]*wx + pv[4]*wy + pv[8]*wz  + pv[12];
-          const cy = pv[1]*wx + pv[5]*wy + pv[9]*wz  + pv[13];
-          const cw = pv[3]*wx + pv[7]*wy + pv[11]*wz + pv[15];
+          const cx = pv[0]!*wx! + pv[4]!*wy! + pv[8]!*wz!  + pv[12]!;
+          const cy = pv[1]!*wx! + pv[5]!*wy! + pv[9]!*wz!  + pv[13]!;
+          const cw = pv[3]!*wx! + pv[7]!*wy! + pv[11]!*wz! + pv[15]!;
           if (cw <= 0) return null;
           return { x: (cx / cw * 0.5 + 0.5) * w, y: (1 - (cy / cw * 0.5 + 0.5)) * h };
         },

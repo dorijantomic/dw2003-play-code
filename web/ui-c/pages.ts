@@ -17,7 +17,7 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
-const lbl = (key: string, str: string | undefined, rect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
+const lbl = (key: string, str: string | undefined, rect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str!, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
 export const takeIn = (runs, rc, used: Set<unknown>, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
 
@@ -78,7 +78,7 @@ export function composeFooter(foot, runs, used: Set<unknown>, out) {
 export function composeDetail(p, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p), h = N(58), y = r.y + (r.h - h) / 2;
     out.push({ key: "detail.band", kind: "band", part: "detail", layer: "under", rect: applyRel({ x: 0, y, w: 320, h }, rel), edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
-    for (const [k, d] of [[1, 206], [2, 624], [3, 846]]) out.push(solid(`detail.div${k}`, applyRel({ x: dx(d), y: y + N(4), w: N(4), h: h - N(8) }, rel), "var(--c-under)", rel));
+    for (const [k, d] of [[1, 206], [2, 624], [3, 846]]) out.push(solid(`detail.div${k}`, applyRel({ x: dx(d!), y: y + N(4), w: N(4), h: h - N(8) }, rel), "var(--c-under)", rel));
     const mine = takeIn(runs, { x: -9999, y: r.y, w: 99999, h: r.h }, used);
     detailTexts(mine, y + h / 2, rel, out, "detail", (m: { x: number; }) => m.x > dx(624));
 }
@@ -153,7 +153,7 @@ export function readInfoRuns(runs) {
         if (head) {
             const nums = g.runs.filter((r) => isNumText(r.text));
             const right = nums.length ? Math.max(...nums.map((n) => n.right ?? n.x + (n.w ?? 8))) : null;
-            out.stats.push({ id: head[1].toUpperCase(), label, y: g.y, values: nums.map((n) => n.text), right, raw: g.runs });
+            out.stats.push({ id: head[1]!.toUpperCase(), label, y: g.y, values: nums.map((n) => n.text), right, raw: g.runs });
         } else if (!out.name && label) out.name = label;
     }
     return out;
@@ -224,7 +224,7 @@ export function composeHeaderPlate(p, i, runs, used: Set<unknown>, out, cover = 
         const price = /^([0-9]+) (BIT)$/.exec(m.text);
         if (price) {
             // the price on Buy / No (C5): the number Chakra Petch 700 34 white, the unit Russo 24 after it
-            const nw = N(21 * price[1].length + 4), mid = r.y + r.h / 2;
+            const nw = N(21 * price[1]!.length + 4), mid = r.y + r.h / 2;
             out.push(lbl(`hdr${i}.${m.y}.n`, price[1], applyRel({ x: m.x, y: mid - N(23), w: nw, h: N(46) }, rel), 34, 46, { role: "number", color: "var(--c-ink)", rel, maxDp: Math.round(nw * 3) }));
             out.push(lbl(`hdr${i}.${m.y}.u`, price[2], applyRel({ x: m.x + nw + N(8), y: mid - N(16) + N(3), w: N(60), h: N(32) }, rel), 24, 32, { rel, maxDp: 60 }));
             continue;
@@ -484,9 +484,9 @@ function composeShopDetail(p, i, runs, used: Set<unknown>, out) {
     rects.forEach((r, k) => out.push(plate(`p${i}.detail${k}`, "detail", applyRel({ x: p.x + r.x, y: p.y + r.y, w: r.w, h: r.h }, rel), rel, { shape: r.shape })));
     // the name block and the Equip / Items block (the top row): C3 detail texts; the price plate under them keeps the generic money text
     if (rects.length < 2) return;
-    const top = rects[0], native = { x: p.x, y: p.y + top.y, w: rects[1].x + rects[1].w, h: top.h };
+    const top = rects[0], native = { x: p.x, y: p.y + top!.y, w: rects[1]!.x + rects[1]!.w, h: top!.h };
     const mine = takeIn(runs, native, used);
-    detailTexts(mine, p.y + top.y + top.h / 2, rel, out, `p${i}.detail`, (m: { x: number; }) => m.x >= p.x + rects[1].x);
+    detailTexts(mine, p.y + top!.y + top!.h / 2, rel, out, `p${i}.detail`, (m: { x: number; }) => m.x >= p.x + rects[1]!.x);
 }
 
 /** The shop partner-card cursor frame: C corner brackets in the cursor's colour cycle (the game's palette row). */

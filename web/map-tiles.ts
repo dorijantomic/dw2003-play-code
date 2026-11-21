@@ -147,10 +147,10 @@ export class TiledMap {
     const tw = e.bmp.width, th = e.bmp.height;
     const cv = env.canvas(tw, th);
     const g = cv.getContext("2d");
-    g.drawImage(e.bmp, 0, 0);
-    g.globalCompositeOperation = kind === "ground" ? "destination-out" : "destination-in";
-    g.imageSmoothingEnabled = false;
-    g.drawImage(this.splitMask, (c * T - G) / S, (r * T - G) / S, tw / S, th / S, 0, 0, tw, th);
+    g!.drawImage(e.bmp, 0, 0);
+    g!.globalCompositeOperation = kind === "ground" ? "destination-out" : "destination-in";
+    g!.imageSmoothingEnabled = false;
+    g!.drawImage(this.splitMask, (c * T - G) / S, (r * T - G) / S, tw / S, th / S, 0, 0, tw, th);
     return (e.split[kind] = cv);
   }
 

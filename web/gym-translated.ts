@@ -61,7 +61,7 @@ const loadShared = () => {
 };
 const banksByLanguage = new Map();
 const loadBank = (language: number | undefined) => {
-    const id = 0x10b + language;
+    const id = 0x10b + language!;
     if (!banksByLanguage.has(id)) {
         banksByLanguage.set(id, fetchBytes(`gym/${id}.bin`, DATA_LABEL).catch((error) => { banksByLanguage.delete(id); throw error; }));
     }

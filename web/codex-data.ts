@@ -248,7 +248,7 @@ export function encounterIndex(stages, screens, maps = null) {
       const zone = zones[i];
       const slots = Array.isArray(zone?.slots) ? zone.slots : null;
       if (!slots) continue;
-      const rateLevel = Number(zone.rate_level) || 0;
+      const rateLevel = Number(zone!.rate_level) || 0;
       const zoneNo = (i % 4) + 1;
       for (let j = 0; j < slots.length; j++) {
         const screen = Number(slots[j]) || 0;

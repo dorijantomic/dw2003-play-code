@@ -132,7 +132,7 @@ export function startTransition(exit) {
         state.moving = false;
         state.stopping = true;
         state.stopTime = 0;
-        sfx.play("digiment");
+        sfx.play!("digiment");
         if (diveDemoReady()) {
             state.diveDemo = {
                 // op 9 = hole (Digmon), op 10 = water (Submarimon).
@@ -172,12 +172,12 @@ export function drawWideSideCovers(ctx: CanvasRenderingContext2D | null) {
     // Covered = black; shown with a menu open (wide overworld) = dimmed by wideField.dim.
     const a = (1 - wideField.sides) + wideField.sides * wideField.dim;
     if (!(padL > 0) || a <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = Math.min(1, a);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(-padL, 0, padL, VIEW_H);
-    ctx.fillRect(VIEW_W, 0, padL, VIEW_H);
-    ctx.restore();
+    ctx!.save();
+    ctx!.globalAlpha = Math.min(1, a);
+    ctx!.fillStyle = "#000";
+    ctx!.fillRect(-padL, 0, padL, VIEW_H);
+    ctx!.fillRect(VIEW_W, 0, padL, VIEW_H);
+    ctx!.restore();
 }
 
 // The A28 checkerboard loading wipe's draw arm (fieldstg asm 0x76D4-0x78EC):
@@ -282,7 +282,7 @@ function paintWipeCoverAround(ctx, level: number, clear: { x: number; y: number;
     subtractLayer(ctx, L, 0, R - L, VIEW_H, (layer) => {
         layer.fillStyle = dimFillStyle(coverLevel(level));
         for (const [x, y, w, h] of outside)
-            if (w > 0 && h > 0) layer.fillRect(x, y, w, h);
+            if (w! > 0 && h! > 0) layer.fillRect(x, y, w, h);
     });
     paintWipeSeams(ctx, level, outside);
 }
@@ -309,7 +309,7 @@ function paintWipeCoverBand(ctx, level: number, f: { w: number; bandX: number; b
 // at its cap, clipped to the regions the cover owns on this frame.
 function paintWipeSeams(ctx, level, regions) {
     const [r, g, b] = seamRgb(level);
-    if (r + g + b <= 0) return;
+    if (r! + g! + b! <= 0) return;
     ctx.save();
     ctx.beginPath();
     for (const [x, y, w, h] of regions)

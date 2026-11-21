@@ -32,7 +32,7 @@ export function runsLeft(counter: number, rateLevel: number) {
     const c = Number(counter);
     if (!Number.isFinite(c)) return Infinity;              // nothing known, no feeling
     if (c <= 0) return 0;
-    return Math.ceil(c / OMEN_RATE_TABLE[level]);
+    return Math.ceil(c / OMEN_RATE_TABLE[level]!);
 }
 
 /**

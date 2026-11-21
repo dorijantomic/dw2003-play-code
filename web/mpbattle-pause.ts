@@ -63,7 +63,7 @@ export function pzText(pz, players = []) {
 export function createLink({ onEnd, setT = real.setT, clearT = real.clearT }: { onEnd?: () => void; setT?: typeof real.setT; clearT?: typeof real.clearT } = {}) {
     let cur = null;
     const stop = () => { if (cur) clearT(cur.timer); cur = null; };
-    const start = (text: string, ms: number) => { stop(); const me = { text, timer: 0 as number | ReturnType<typeof setTimeout> }; me.timer = setT(() => { if (cur !== me) return; cur = null; onEnd(); }, ms); cur = me; };
+    const start = (text: string, ms: number) => { stop(); const me = { text, timer: 0 as number | ReturnType<typeof setTimeout> }; me.timer = setT(() => { if (cur !== me) return; cur = null; onEnd!(); }, ms); cur = me; };
     return {
         get text() { return cur ? cur.text : null; },
         get active() { return !!cur; },

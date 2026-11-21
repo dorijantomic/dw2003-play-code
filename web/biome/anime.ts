@@ -58,7 +58,7 @@ const ENV = {
       { kinds: ["wood"], n: 24, maxSp: 4, sc: [0.8, 1.5], fade: [60, 100] },
     ] },
   beach: { H: (x: number, z: number) => beachH(x, z), area: [0, 55, 100, 70],
-    ok: (x: number, z: number) => { const D = z - shoreZ(x); return D > 6 && Math.hypot(x, z) > 4 && !POOLS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r * 2.4); },
+    ok: (x: number, z: number) => { const D = z - shoreZ(x); return D > 6 && Math.hypot(x, z) > 4 && !POOLS.some(([px, pz, r]) => Math.hypot(x - px!, z - pz!) < r! * 2.4); },
     hide: /^(palm |Rock_Medium|Grass_Common_Tall|Grass_Wispy_Tall|sea grape)/i,
     plan: [
       { kinds: ["palm"], n: 70, maxSp: 4, minD: 4, lod: true, sc: [0.8, 1.3], dens: (x: number, z: number) => 0.3 + nz(x, z, 0.04, 2), okx: (x: number | undefined, z: number) => z - shoreZ(x) > 10 },

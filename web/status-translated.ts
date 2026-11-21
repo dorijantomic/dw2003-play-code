@@ -170,7 +170,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         loadShared().then(async (shared) => {
             const selected = st._state?.languageByte;
             const language = Number.isInteger(selected) ? selected : 2;
-            if (language < 0 || language > 6) throw new Error("Pause language index is invalid");
+            if (language! < 0 || language! > 6) throw new Error("Pause language index is invalid");
             const own = new Set(shared.manifest.banks.map((bank) => bank.id));
             const dirs = new Map(shared.manifest.sharedBanks.map((entryRow) => [entryRow.offset, entryRow.dir]));
             const banks = new Map(await Promise.all(ui.PAUSE_TEXT_BANK_OFFSETS.map(async (offset) => {
@@ -198,7 +198,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
     st.openHome = (state, onClose = null, row = 0) => {
         st._homeOverlay = false;
         st._homeRow = row;
-        st.open(state, "home", onClose, true);
+        st.open!(state, "home", onClose, true);
     };
     /** Re-open one translated page in the same pause, as the disc's screen
      *  manager does when the screen it handed over to comes back: the host
@@ -211,7 +211,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         if (page === "home" || !PAGES.has(page)) return false;
         st._homeOverlay = true;
         st._homeRow = Number.isInteger(row) ? row : 5;
-        st.open(st._state, page, st._returnClose, true);
+        st.open!(st._state, page, st._returnClose!, true);
         return true;
     };
     /** Buttons (words) that were down when this pause came back from a book: the list ignores each until it is let go. */
@@ -220,7 +220,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
 
     st.update = (dt) => {
         if (!st._open) return;
-        if (st._error) { st._finish(false); return; }
+        if (st._error) { st._finish!(false); return; }
         const session = st._session;
         if (!session) return;
         // The held word is already the word the pages read: web/input.js hands every
@@ -229,7 +229,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         let keys = st._state?.keys ? [...st._state.keys] : [];
         if (st._blocked?.size) {
             for (const w of [...st._blocked]) if (!keys.includes(w)) st._blocked.delete(w);
-            keys = keys.filter((w) => !st._blocked.has(w));
+            keys = keys.filter((w) => !st._blocked!.has(w));
         }
         // The console's pages see a press one frame after it happens: on the disc every
         // pause page reacted exactly one frame later than these pages fed at once (182 of 182
@@ -242,22 +242,22 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
                     const result = session.homeResult();
                     if (result?.kind === "page" && result.page === "map" && opts.newMapScreen?.()) {
                         // OPTIONS > Map screen: New. The MAP row opens the new map book instead of the disc's page (same way out and back as a book).
-                        st._finish(false);
+                        st._finish!(false);
                         opts.onBook?.("mapscreen", result.row);
                     } else if (result?.kind === "page") {
                         st._homeOverlay = true;
                         st._homeRow = result.row;
-                        st.open(st._state, result.page, st._onClose, true);
+                        st.open!(st._state, result.page, st._onClose!, true);
                     } else if (result?.kind === "book") {
                         // GLOSSARY / OPTIONS: the list shuts for good (the pause is over) and the browser opens the book,
                         // which brings the list back on this row when it closes (web/game.js openBook).
-                        st._finish(false);
+                        st._finish!(false);
                         opts.onBook?.(result.book, result.row);
-                    } else st._finish(false);
+                    } else st._finish!(false);
                 } else if (st._homeFlow && !session.transition()) {
                     readBack(session);
-                    st.open(st._state, "home", st._onClose, true);
-                } else st._finish(true);
+                    st.open!(st._state, "home", st._onClose!, true);
+                } else st._finish!(true);
                 return;
             }
         }
@@ -280,7 +280,7 @@ export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = 
         ctx.restore();
     };
 
-    st.close = () => { if (st._open) st._finish(false); };
+    st.close = () => { if (st._open) st._finish!(false); };
 
     st._finish = (commit = true) => {
         if (!st._open) return;

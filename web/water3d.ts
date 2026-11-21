@@ -168,18 +168,18 @@ function boxBlur(src: Uint8Array<ArrayBuffer>, W: number, H: number, rad: number
     for (let y = 0; y < H; y++) {            // horizontal
         let acc = 0;
         const row = y * W;
-        for (let x = -rad; x <= rad; x++) acc += src[row + Math.min(W - 1, Math.max(0, x))];
+        for (let x = -rad; x <= rad; x++) acc += src[row + Math.min(W - 1, Math.max(0, x))]!;
         for (let x = 0; x < W; x++) {
             tmp[row + x] = acc / win;
-            acc += src[row + Math.min(W - 1, x + rad + 1)] - src[row + Math.max(0, x - rad)];
+            acc += src[row + Math.min(W - 1, x + rad + 1)]! - src[row + Math.max(0, x - rad)]!;
         }
     }
     for (let x = 0; x < W; x++) {            // vertical
         let acc = 0;
-        for (let y = -rad; y <= rad; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+        for (let y = -rad; y <= rad; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x]!;
         for (let y = 0; y < H; y++) {
             out[y * W + x] = Math.round(acc / win);
-            acc += tmp[Math.min(H - 1, y + rad + 1) * W + x] - tmp[Math.max(0, y - rad) * W + x];
+            acc += tmp[Math.min(H - 1, y + rad + 1) * W + x]! - tmp[Math.max(0, y - rad) * W + x]!;
         }
     }
     return out;
@@ -192,8 +192,8 @@ function buildStage(stageId, mapImg: HTMLImageElement, clsImg) {
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(clsImg, 0, 0);
-    const data = cx.getImageData(0, 0, W, H).data;
+    cx!.drawImage(clsImg, 0, 0);
+    const data = cx!.getImageData(0, 0, W, H).data;
     const raw = new Uint8Array(W * H);
     let count = 0;
     const greenMode = GREEN_WATER_STAGES.has(stageId);

@@ -106,7 +106,7 @@ export function battleMsgSetBank(table, bank = BATTLE_MESSAGE_BANK) {
 export function battleMsgText(bank: number, index: number | undefined) {
     const table = loadedBanks[bank | 0];
     if (!table) return "";
-    return table[index | 0] ?? "";
+    return table[index! | 0] ?? "";
 }
 
 /** The item-name bank's string for an ItemId, the way kind 14's slot 1 is filled. */
@@ -208,8 +208,8 @@ export function battleMsgPaint(ctx: CanvasRenderingContext2D | undefined, frame,
     } else if (!panel) {
         // Nothing loaded yet: leave the region alone rather than paint a guess.
     } else {
-        ctx.fillStyle = "rgba(0,4,45,0.94)";
-        ctx.fillRect(frame.panel.x, frame.panel.y, frame.panel.w, frame.panel.h);
+        ctx!.fillStyle = "rgba(0,4,45,0.94)";
+        ctx!.fillRect(frame.panel.x, frame.panel.y, frame.panel.w, frame.panel.h);
     }
     frame.lines.forEach((text, i: number) => {
         if (!text) return;
@@ -222,8 +222,8 @@ export function battleMsgPaint(ctx: CanvasRenderingContext2D | undefined, frame,
             drawClip(ctx, font, frame.prompt.clipId, frame.prompt.x, frame.prompt.y);
         } else if (font) {
             const { x, y, size } = frame.prompt;
-            ctx.fillStyle = "#eaffff";
-            ctx.fillRect(x + size / 2 - 2, y + 3, 4, 4);
+            ctx!.fillStyle = "#eaffff";
+            ctx!.fillRect(x + size / 2 - 2, y + 3, 4, 4);
         }
     }
 }

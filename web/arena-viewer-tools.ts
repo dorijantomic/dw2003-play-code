@@ -151,8 +151,8 @@ export function createTuner(opts) {
     built.scene.traverse((o) => { for (const m of [].concat(o.material || [])) for (const u of Object.values((m.uniforms || {}) as Record<string, ArenaUniform>)) if (shared.has(u)) used.add(u); });
     for (const u of used) {
       const n = sharedName.get(u);
-      if (SKIP.has(n) || !kindOf(u.value)) continue;
-      const folder = LIGHT_NAMES.includes(n) ? "Light" : WIND_NAMES.includes(n) ? "Wind" : "Sky / clouds";
+      if (SKIP.has(n!) || !kindOf(u.value)) continue;
+      const folder = LIGHT_NAMES.includes(n!) ? "Light" : WIND_NAMES.includes(n!) ? "Wind" : "Sky / clouds";
       out.push({ folder, name: n, targets: [u], mats: ["shared"] });
     }
     for (const [folder, names] of own) for (const [n, list] of names) {
@@ -166,11 +166,11 @@ export function createTuner(opts) {
   }
 
   function write(e: ArenaToolsEntry, v) {
-    for (const u of e.targets) {
+    for (const u of e.targets!) {
       if (e.kind === "num") u.value = v; else u.value.copy(v);
     }
   }
-  function current(e: ArenaToolsEntry) { return e.targets[0].value; }
+  function current(e: ArenaToolsEntry) { return e.targets![0]!.value; }
   function showFrom(e: ArenaToolsEntry) {   // the control's displayed value from the uniform
     const v = current(e);
     if (e.kind === "num") params[e.id] = v;
@@ -189,7 +189,7 @@ export function createTuner(opts) {
     const folders = {};
     const order = ["Light", "Water", "Lake", "Sand", "Sky / clouds", "Spires", "Ground", "Grass blades", "Trees", "Floor cover", "Gulls", "Wind", "Colour pass"];
     list.sort((a, b) => order.indexOf(a.folder) - order.indexOf(b.folder) || a.name.localeCompare(b.name));
-    const folder = (name: string | undefined) => folders[name] ||= gui.addFolder(name).close();
+    const folder = (name: string | undefined) => folders[name] ||= gui.addFolder(name!).close();
     // Light: the sky time switch first (the viewer's own sky time: auto / day / night)
     if (opts.setSkyMode) {
       params.skyTime = opts.skyMode();
@@ -199,17 +199,17 @@ export function createTuner(opts) {
       let id = `${it.folder}/${it.mats.join("+")}/${it.name}`;
       for (let k = 2; entries.some((x) => x.id === id); k++) id = `${it.folder}/${it.mats.join("+")}#${k}/${it.name}`;
       const e = { ...it, kind: kindOf(it.targets[0].value), id } as ArenaToolsEntry;
-      e.dir = DIRS.has(e.name) && e.kind === "vec" && e.targets[0].value.isVector3;
+      e.dir = DIRS.has(e.name!) && e.kind === "vec" && e.targets![0]!.value.isVector3;
       e.start = snap(current(e));
       showFrom(e);
       const f = folder(e.folder);
       // an own uniform that has a shared namesake in the same folder (the clouds' own uCloudLit) is named by its mesh
-      const twin = !e.sub && e.mats[0] !== "shared" && list.some((x) => x !== it && x.folder === e.folder && x.name === e.name);
-      const label = e.name.replace(/^u/, "") + (e.sub ? ` (${e.sub})` : "") + (e.mats.length > 1 || twin ? ` (${e.mats.join(" + ")})` : "");
+      const twin = !e.sub && e.mats![0] !== "shared" && list.some((x) => x !== it && x.folder === e.folder && x.name === e.name);
+      const label = e.name!.replace(/^u/, "") + (e.sub ? ` (${e.sub})` : "") + (e.mats!.length > 1 || twin ? ` (${e.mats!.join(" + ")})` : "");
       e.ctls = [];
       if (e.kind === "num") {
         const [lo, hi] = range(e.start);
-        e.ctls.push(f.add(params, e.id, lo, hi, (hi - lo) / 1000).name(label).onChange((v) => write(e, v)));
+        e.ctls.push(f.add(params, e.id, lo, hi, (hi! - lo!) / 1000).name(label).onChange((v) => write(e, v)));
       } else if (e.kind === "col") {
         e.ctls.push(f.addColor(params, e.id).name(label).onChange((hex: string) =>
           write(e, new THREE.Color().setStyle(hex).multiplyScalar(e.name === "uLightColor" ? params.lightStrength ?? 1 : 1))));
@@ -225,7 +225,7 @@ export function createTuner(opts) {
         for (const c of ["x", "y", "z", "w"]) {
           if (!(c in e.start)) continue;
           const [lo, hi] = range(e.start[c]);
-          e.ctls.push(f.add(params, e.id + "." + c, lo, hi, (hi - lo) / 1000).name(`${label}.${c}`).onChange((v) => {
+          e.ctls.push(f.add(params, e.id + "." + c, lo, hi, (hi! - lo!) / 1000).name(`${label}.${c}`).onChange((v) => {
             const nv = current(e).clone(); nv[c] = v; write(e, nv);
           }));
         }
@@ -360,7 +360,7 @@ export async function shoreUniformNames() {
   for (const src of [W?.SHORE_GLSL, W?.WATER_BODY_GLSL]) {
     if (typeof src !== "string") continue;
     for (const m of src.matchAll(/uniform\s+\w+\s+([^;]+);/g))
-      for (const n of m[1].split(",")) names.add(n.trim().replace(/\[.*$/, ""));
+      for (const n of m[1]!.split(",")) names.add(n.trim().replace(/\[.*$/, ""));
   }
   return names;
 }

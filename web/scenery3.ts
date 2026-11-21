@@ -60,15 +60,15 @@ function drawNightLight(ctx, S) {
     const dark = darkness(p, fx, now);
     if (dark < 0.06) return;
     if (!nl || nl.width !== VIEW_W) { nl = document.createElement("canvas"); nl.width = VIEW_W; nl.height = VIEW_H; nlx = nl.getContext("2d"); }
-    nlx.globalCompositeOperation = "source-over";
-    nlx.clearRect(0, 0, VIEW_W, VIEW_H);
-    nlx.fillStyle = `rgba(5,9,28,${(0.5 * dark * fade).toFixed(3)})`;
-    nlx.fillRect(0, 0, VIEW_W, VIEW_H);
-    nlx.globalCompositeOperation = "destination-out";
+    nlx!.globalCompositeOperation = "source-over";
+    nlx!.clearRect(0, 0, VIEW_W, VIEW_H);
+    nlx!.fillStyle = `rgba(5,9,28,${(0.5 * dark * fade).toFixed(3)})`;
+    nlx!.fillRect(0, 0, VIEW_W, VIEW_H);
+    nlx!.globalCompositeOperation = "destination-out";
     const hole = (x: number, y: number, rad: number, a: number) => {
-        const g = nlx.createRadialGradient(x, y, 0, x, y, rad);
+        const g = nlx!.createRadialGradient(x, y, 0, x, y, rad);
         g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.55, `rgba(0,0,0,${(a * 0.6).toFixed(3)})`); g.addColorStop(1, "rgba(0,0,0,0)");
-        nlx.fillStyle = g; nlx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+        nlx!.fillStyle = g; nlx!.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     };
     for (const f of S.feet || []) {
         const x = f.x - camX, y = f.y - camY - 14;
@@ -186,8 +186,8 @@ function drawWildlife(ctx, S) {
             if (z.dash) { z.dash = 0; z.until = now + 1800 + r3() * 4200; }
             else { const a = r3() * 6.283, v = 70 + r3() * 40; z.vx = Math.cos(a) * v; z.vy = Math.sin(a) * v * 0.5; z.face = z.vx >= 0 ? 1 : -1; z.dash = 1; z.until = now + 330 + r3() * 220; }
         }
-        if (z.dash) { z.x += z.vx * dt; z.y += z.vy * dt; }
-        const sx = z.x - camX, sy = z.y - camY;
+        if (z.dash) { z.x! += z.vx * dt; z.y! += z.vy * dt; }
+        const sx = z.x! - camX, sy = z.y! - camY;
         if (sx < -10 || sx > VIEW_W + 10 || sy < -10 || sy > VIEW_H + 10) continue;
         const wig = z.dash ? Math.sin(t * 40) * 0.8 : 0;
         ctx.globalAlpha = 0.18 * fade; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.ellipse(sx, sy + 0.5, 4, 1.1, 0, 0, 6.2832); ctx.fill();
@@ -212,7 +212,7 @@ function drawWildlife(ctx, S) {
     // bats: erratic, fast, only once it is properly dusk
     const dusk = darkness(p, S.fx, now);
     if (dusk > 0.3 && calm) for (const b of bats) {
-        const tx = b.home[0] + Math.sin(t * 0.31 + b.ph) * 150 + Math.sin(t * 0.77 + b.ph * 2) * 60, ty = b.home[1] + Math.cos(t * 0.27 + b.ph) * 90;
+        const tx = b.home[0]! + Math.sin(t * 0.31 + b.ph) * 150 + Math.sin(t * 0.77 + b.ph * 2) * 60, ty = b.home[1]! + Math.cos(t * 0.27 + b.ph) * 90;
         b.vx += (tx - b.x) * 0.9 * dt + (r3() - 0.5) * 220 * dt; b.vy += (ty - b.y) * 0.9 * dt + (r3() - 0.5) * 220 * dt;
         const sp = Math.hypot(b.vx, b.vy); if (sp > 90) { b.vx *= 90 / sp; b.vy *= 90 / sp; }
         b.x += b.vx * dt; b.y += b.vy * dt;

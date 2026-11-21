@@ -129,7 +129,7 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
     const prims = [];
     for (const p of m.primitives || []) {
       if ((p.mode ?? 4) !== 4 || p.indices != null) continue;      // DW2 writes non-indexed triangles only
-      const pos = readAccessor(model, p.attributes.POSITION);
+      const pos = readAccessor(model, p.attributes.POSITION!);
       if (!pos) continue;
       const uv = p.attributes.TEXCOORD_0 != null ? readAccessor(model, p.attributes.TEXCOORD_0) : null;
       const nrm = p.attributes.NORMAL != null ? readAccessor(model, p.attributes.NORMAL) : null;
@@ -149,21 +149,21 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
     const channels = [];
     for (const ch of a.channels || []) {
       const s = a.samplers[ch.sampler];
-      const times = readAccessor(model, s.input);
-      const values = readAccessor(model, s.output);
+      const times = readAccessor(model, s!.input);
+      const values = readAccessor(model, s!.output);
       const path = ch.target.path;
       if (!times || !values) continue;
       channels.push({
         node: ch.target.node | 0,
         path,
         comps: path === "rotation" ? 4 : 3,
-        interp: s.interpolation || "LINEAR",
+        interp: s!.interpolation || "LINEAR",
         times: times instanceof Float32Array ? times : Float32Array.from(times),
         values,
       });
     }
     let dur = 0;
-    for (const ch of channels) if (ch.times.length) dur = Math.max(dur, ch.times[ch.times.length - 1]);
+    for (const ch of channels) if (ch.times.length) dur = Math.max(dur, ch.times[ch.times.length - 1]!);
     return { index: i, name: a.name || `clip ${i}`, dur, channels };
   });
   // mesh-local boxes (accessor min/max, or a scan) for pose bounds
@@ -173,8 +173,8 @@ export function parseDw2Gltf(json: GltfDoc): Dw2Model {
       if (!p.pos.length) continue;
       for (let i = 0; i < p.pos.length; i += 3) for (let c = 0; c < 3; c++) {
         const v = p.pos[i + c];
-        if (v < min[c]) min[c] = v;
-        if (v > max[c]) max[c] = v;
+        if (v! < min[c]!) min[c] = v;
+        if (v! > max[c]!) max[c] = v;
       }
     }
     mesh.min = min.every(Number.isFinite) ? min : [0, 0, 0];
@@ -198,15 +198,15 @@ export function readAccessor(model: Dw2Model, idx: number): TypedArr | null | un
   if (!info) throw new Error(`accessor ${idx}: componentType ${a.componentType}`);
   const comps = COMPONENTS[a.type] || 1;
   const bv = g.bufferViews[a.bufferView];
-  let bytes = model.buffers.get(bv.buffer);
+  let bytes = model.buffers.get(bv!.buffer);
   if (!bytes) {
-    bytes = dataUri(g.buffers[bv.buffer]?.uri);
-    if (!bytes) throw new Error(`buffer ${bv.buffer} is not embedded`);
-    model.buffers.set(bv.buffer, bytes);
+    bytes = dataUri(g.buffers[bv!.buffer]?.uri);
+    if (!bytes) throw new Error(`buffer ${bv!.buffer} is not embedded`);
+    model.buffers.set(bv!.buffer, bytes);
   }
-  const base = (bv.byteOffset || 0) + (a.byteOffset || 0);
+  const base = (bv!.byteOffset || 0) + (a.byteOffset || 0);
   const elem = comps * info.size;
-  const stride = bv.byteStride && bv.byteStride !== elem ? bv.byteStride : elem;
+  const stride = bv!.byteStride && bv!.byteStride !== elem ? bv!.byteStride : elem;
   const out = new info.Ctor(a.count * comps);
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const norm = a.normalized && info.norm ? info.norm : 0;
@@ -254,7 +254,7 @@ export function composeTRS(t, r, s, out = new Float32Array(16)) {
 export function mat4Mul(a, b: Float32Array<ArrayBuffer>, out = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
-    for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
+    for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]!;
     out[c * 4 + r] = s;
   }
   return out;
@@ -324,13 +324,13 @@ export function poseBounds(model, pose, out: { min?: number[]; max?: number[]; c
     const m = pose.world.subarray(i * 16, i * 16 + 16);
     for (let c = 0; c < 8; c++) {
       const p = point(m, c & 1 ? mesh.max[0] : mesh.min[0], c & 2 ? mesh.max[1] : mesh.min[1], c & 4 ? mesh.max[2] : mesh.min[2]);
-      for (let k = 0; k < 3; k++) { if (p[k] < min[k]) min[k] = p[k]; if (p[k] > max[k]) max[k] = p[k]; }
+      for (let k = 0; k < 3; k++) { if (p[k] < min[k]!) min[k] = p[k]; if (p[k] > max[k]!) max[k] = p[k]; }
     }
   });
   if (!min.every(Number.isFinite)) { min.fill(0); max.fill(0); }
   out.min = min; out.max = max;
-  out.center = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
-  out.size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  out.center = [(min[0]! + max[0]!) / 2, (min[1]! + max[1]!) / 2, (min[2]! + max[2]!) / 2];
+  out.size = [max[0]! - min[0]!, max[1]! - min[1]!, max[2]! - min[2]!];
   return out;
 }
 
@@ -351,7 +351,7 @@ export function measureRig(model) {
   const bind = bindPose(model);
   updateWorld(bind);
   const bounds = poseBounds(model, bind);
-  const H = bounds.size[1] || 1;
+  const H = bounds.size![1] || 1;
   const nodes = model.nodes;
   const joints = (model.json.skins?.[0]?.joints || nodes.map((_, i) => i)).filter((i) => nodes[i]?.mesh == null);
   const jointSet = new Set(joints);
@@ -377,8 +377,8 @@ export function measureRig(model) {
     }
   }
   const legsBelow = legs.filter((L) => L.chain.length >= 3
-    && bind.world[L.end * 16 + 13] < bounds.min[1] + 0.4 * H            // the end hangs low
-    && bind.world[L.end * 16 + 13] < bind.world[L.top * 16 + 13]);      // and the chain descends to it
+    && bind.world[L.end * 16 + 13]! < bounds.min![1]! + 0.4 * H            // the end hangs low
+    && bind.world[L.end * 16 + 13]! < bind.world[L.top * 16 + 13]!);      // and the chain descends to it
   const feet = legsBelow.map((L) => L.end);
   // head: the highest joint that is not on a leg
   const legNodes = new Set(legsBelow.flatMap((L) => L.chain));
@@ -386,13 +386,13 @@ export function measureRig(model) {
   for (const j of joints) {
     if (legNodes.has(j) || j === body) continue;
     const y = bind.world[j * 16 + 13];
-    if (y > headY) { headY = y; head = j; }
+    if (y! > headY) { headY = y; head = j; }
   }
   // forward: from the body's centroid toward the head, on the horizontal plane, as the dominant axis
   let fwd = [0, 0, 0];
   if (head >= 0) {
-    const dx = bind.world[head * 16 + 12] - bind.world[body * 16 + 12];
-    const dz = bind.world[head * 16 + 14] - bind.world[body * 16 + 14];
+    const dx = bind.world[head * 16 + 12]! - bind.world[body * 16 + 12]!;
+    const dz = bind.world[head * 16 + 14]! - bind.world[body * 16 + 14]!;
     if (Math.abs(dx) > Math.abs(dz)) fwd = [Math.sign(dx), 0, 0];
     else fwd = [0, 0, Math.sign(dz)];
   }
@@ -404,7 +404,7 @@ export function measureRig(model) {
     head,
     forward: fwd,
     forwardAxis: fwd[0] !== 0 ? "x" : "z",
-    back: bind.world[body * 16 + 13] + H * 0.16,          // the rider sits a little above the body root
+    back: bind.world[body * 16 + 13]! + H * 0.16,          // the rider sits a little above the body root
     bounds,
     bind,
   };
@@ -431,15 +431,15 @@ export function calibrateGait(model, rig, swingDeg = 14) {
       rotateJoint(probe, hip, local, (swingDeg * Math.PI) / 180);
       updateWorld(probe);
       const d = [
-        probe.world[L.end * 16 + 12] - bind.world[L.end * 16 + 12],
-        probe.world[L.end * 16 + 14] - bind.world[L.end * 16 + 14],
+        probe.world[L.end * 16 + 12]! - bind.world[L.end * 16 + 12],
+        probe.world[L.end * 16 + 14]! - bind.world[L.end * 16 + 14],
       ];
-      const along = rig.forwardAxis === "x" ? d[0] * rig.forward[0] : d[1] * rig.forward[2];
+      const along = rig.forwardAxis === "x" ? d[0]! * rig.forward[0] : d[1]! * rig.forward[2];
       axes.push({ axis: local, along });
     }
     axes.sort((a, b) => Math.abs(b.along) - Math.abs(a.along));
     const pick = axes[0];
-    return { hip, end: L.end, axis: pick.axis, sign: pick.along >= 0 ? 1 : -1, swing: pick.along };
+    return { hip, end: L.end, axis: pick!.axis, sign: pick!.along >= 0 ? 1 : -1, swing: pick!.along };
   });
   return legs;
 }
@@ -527,29 +527,29 @@ export function clipWalkStats(model, clipIndex, rig = null) {
   const P = [];
   for (let t = 0; t <= nticks; t++) {
     const pose = sampleClipPose(model, clipIndex, t / fps);
-    P.push(rig.legs.map((L) => [pose.world[L.end * 16 + 12], pose.world[L.end * 16 + 13], pose.world[L.end * 16 + 14]]));
+    P.push(rig!.legs.map((L) => [pose.world[L.end * 16 + 12], pose.world[L.end * 16 + 13], pose.world[L.end * 16 + 14]]));
   }
-  const H = rig.height || 1;
-  if (rig.legs.length < 2) {
+  const H = rig!.height || 1;
+  if (rig!.legs.length < 2) {
     return { clip: clip.name, dur: clip.dur, ticks: nticks + 1, inPlace: false, loops: false, loopErr: 0,
-      bodyTravel: 0, feet: rig.legs.length, usableFeet: 0, alternation: 0, walk: false,
+      bodyTravel: 0, feet: rig!.legs.length, usableFeet: 0, alternation: 0, walk: false,
       why: "no measured leg chains" };
   }
   const bodyTravel = Math.max(...P.map((f, t) => Math.abs(f[0][0] - P[0][0][0])
     + Math.abs(f[0][2] - P[0][0][2])));
   let loopErr = 0;
-  for (let i = 0; i < rig.legs.length; i++) {
+  for (let i = 0; i < rig!.legs.length; i++) {
     loopErr = Math.max(loopErr, Math.hypot(
       P[P.length - 1][i][0] - P[0][i][0], P[P.length - 1][i][1] - P[0][i][1], P[P.length - 1][i][2] - P[0][i][2]));
   }
-  const feet = rig.legs.map((L, fi) => {
+  const feet = rig!.legs.map((L, fi) => {
     const ys = P.map((f) => f[fi][1]);
     const yMin = Math.min(...ys), lift = Math.max(...ys) - yMin;
-    const zs = P.map((f) => f[fi][rig.forwardAxis === "x" ? 0 : 2]);
+    const zs = P.map((f) => f[fi][rig!.forwardAxis === "x" ? 0 : 2]);
     const vs = zs.map((z, t) => (t ? z - zs[t - 1] : 0));
     const vMax = Math.max(...vs.map(Math.abs), 1e-9);
     const low = ys.map((y) => y <= yMin + Math.max(0.06 * lift, 1e-6));
-    const planted = low.map((l, t) => l && Math.abs(vs[t]) <= 0.3 * vMax);
+    const planted = low.map((l, t) => l && Math.abs(vs[t]!) <= 0.3 * vMax);
     let runs = 0, was = false;
     for (const p of planted) { if (p && !was) runs++; was = p; }
     const stance = vs.filter((_, t) => planted[t]);
@@ -698,14 +698,14 @@ async function loadMountAssetOnce(key: string, url: string) {
       obj.__node = node;
       boneGroups.set(node, obj);
       const parent = model.parents[node];
-      (parent >= 0 ? groupOf(parent) : group).add(obj);
+      (parent! >= 0 ? groupOf(parent) : group).add(obj);
       return obj;
     };
     model.nodes.forEach((node, i) => {
       if (node.mesh == null) return;
       groupOf(i);                       // the bone's own group exists even if it holds no primitive
       const parent = groupOf(i);
-      for (const prim of model.meshes[node.mesh].prims) {
+      for (const prim of model.meshes[node.mesh]!.prims) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.BufferAttribute(prim.pos, 3));
         geo.setAttribute("normal", new THREE.BufferAttribute(prim.nrm || new Float32Array(prim.count * 3).fill(0), 3));
@@ -740,7 +740,7 @@ function standFloor(asset, walk) {
   asset._floor ??= {};
   if (!(walk.idle in asset._floor)) {
     const i = asset.model.anims.findIndex((a) => a.name === walk.idle);
-    asset._floor[walk.idle] = i >= 0 ? poseBounds(asset.model, sampleClipPose(asset.model, i, 0)).min[1] : null;
+    asset._floor[walk.idle] = i >= 0 ? poseBounds(asset.model, sampleClipPose(asset.model, i, 0)).min![1] : null;
   }
   return asset._floor[walk.idle];
 }
@@ -755,7 +755,7 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
   let pose;
   const stillIndex = still ? model.anims.findIndex((a) => a.name === still.clip) : -1;
   // a held frame of one of the model's own clips (`still.at` 0..1, 1 = the clip's last frame): a pose, not a motion
-  if (stillIndex >= 0) pose = sampleClipPose(model, stillIndex, (still.at ?? 1) * model.anims[stillIndex].dur);
+  if (stillIndex >= 0) pose = sampleClipPose(model, stillIndex, (still!.at ?? 1) * model.anims[stillIndex].dur);
   else if (moving && clip) pose = sampleClipPose(model, clipIndex, (phase % 1) * clip.dur);
   else if (moving) pose = applyGait(bindPose(model), rig, legs, phase % 1);
   else if (walk?.idle && model.anims.some((a) => a.name === walk.idle)) {
@@ -765,7 +765,7 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
   } else {
     // standing: the bind pose, with a slow breath in the body root
     pose = bindPose(model);
-    pose.t[rig.body * 3 + 1] += Math.sin(timeSec * 1.7) * rig.height * 0.004;
+    pose.t[rig.body * 3 + 1]! += Math.sin(timeSec * 1.7) * rig.height * 0.004;
     updateWorld(pose);
   }
   // push the pose into the three hierarchy: each bone group takes its LOCAL TRS, three composes the tree
@@ -791,7 +791,7 @@ export function renderMount(asset, { x, y, dir = "down", phase = 0, moving = fal
   // a held frame (lying down) is grounded on its OWN lowest point; the scale stays the standing body's
   // a model with its own stand clip keeps that clip's floor (DW2 field models: hooves at y 0 in anim_E0, while the
   // bind pose reaches -369, which floated the mount ~12 px); one value per asset, so a gallop's leap still leaves it
-  const ground = stillIndex >= 0 ? poseBounds(model, pose).min[1] : standFloor(asset, walk) ?? b.min[1];
+  const ground = stillIndex >= 0 ? poseBounds(model, pose).min![1] : standFloor(asset, walk) ?? b.min[1];
   group.position.set(x, -ground * scale, y / SIN);
   // the camera window: `x` centred, the ground row `y` near the bottom of the cell
   camera.left = x - MOUNT_VIEW.w / 2;
@@ -843,12 +843,12 @@ function splitAtSeat(asset, pix, seat) {
   const rd = splitCanvases.read;
   if (rd.width !== w || rd.height !== h) { rd.width = w; rd.height = h; }
   const rc = rd.getContext("2d", { willReadFrequently: true });
-  rc.clearRect(0, 0, w, h);
-  rc.drawImage(renderer.domElement, 0, 0);
-  const near = rc.getImageData(0, 0, w, h).data;
+  rc!.clearRect(0, 0, w, h);
+  rc!.drawImage(renderer.domElement, 0, 0);
+  const near = rc!.getImageData(0, 0, w, h).data;
   const src = pix.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h);
   const s = src.data;
-  const isNear = (p: number) => near[p * 4 + 3] >= 40;     // the same solid test as pixelate()
+  const isNear = (p: number) => near[p * 4 + 3]! >= 40;     // the same solid test as pixelate()
   const front = new ImageData(w, h), back = new ImageData(w, h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const p = y * w + x, i = p * 4;
@@ -904,7 +904,7 @@ export function renderSelfTest() {
   const buf = new Uint8Array(MOUNT_VIEW.w * MOUNT_VIEW.h * 4);
   gl.readPixels(0, 0, MOUNT_VIEW.w, MOUNT_VIEW.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
   let alpha = 0;
-  for (let i = 3; i < buf.length; i += 4) if (buf[i] > 0) alpha++;
+  for (let i = 3; i < buf.length; i += 4) if (buf[i]! > 0) alpha++;
   return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles, alpha };
 }
 
@@ -917,8 +917,8 @@ export function probeFramebuffer() {
   gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
   let alpha = 0, rgb = 0;
   for (let i = 0; i < buf.length; i += 4) {
-    if (buf[i + 3] > 0) alpha++;
-    if (buf[i] + buf[i + 1] + buf[i + 2] > 0) rgb++;
+    if (buf[i + 3]! > 0) alpha++;
+    if (buf[i]! + buf[i + 1]! + buf[i + 2]! > 0) rgb++;
   }
   return { w, h, alpha, rgb, calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
 }
@@ -977,14 +977,14 @@ export function pixelate(srcCanvas) {
   const w = srcCanvas.width, h = srcCanvas.height;
   if (scratch.width !== w || scratch.height !== h) { scratch.width = w; scratch.height = h; }
   const c2 = scratch.getContext("2d", { willReadFrequently: true });
-  c2.clearRect(0, 0, w, h);
-  c2.drawImage(srcCanvas, 0, 0);
-  const img = c2.getImageData(0, 0, w, h);
+  c2!.clearRect(0, 0, w, h);
+  c2!.drawImage(srcCanvas, 0, 0);
+  const img = c2!.getImageData(0, 0, w, h);
   const d = img.data;
   const solid = new Uint8Array(w * h);
   lastSolid = solid;
   for (let i = 0, p = 0; p < w * h; p++, i += 4) {
-    if (d[i + 3] < 40) { d[i + 3] = 0; continue; }
+    if (d[i + 3]! < 40) { d[i + 3] = 0; continue; }
     solid[p] = 1;
     const [r, g, b] = nearestPalette(d[i], d[i + 1], d[i + 2]);
     d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
@@ -1001,7 +1001,7 @@ export function pixelate(srcCanvas) {
       out[p] = 1;
     }
   }
-  c2.putImageData(img, 0, 0);
+  c2!.putImageData(img, 0, 0);
   return scratch;
 }
 
@@ -1010,7 +1010,7 @@ export function nearestPalette(r: number | undefined, g: number | undefined, b: 
   let best = 0, bestD = Infinity;
   for (let i = 0; i < PALETTE.length; i++) {
     const p = PALETTE[i];
-    const dr = r - p[0], dg = g - p[1], db = b - p[2];
+    const dr = r! - p![0]!, dg = g! - p![1]!, db = b! - p![2]!;
     const dd = dr * dr + dg * dg + db * db;
     if (dd < bestD) { bestD = dd; best = i; }
   }

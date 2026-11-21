@@ -46,7 +46,7 @@ export function centroid3(pts) {
 
 export function sub3(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
 
-export function cross3(a, b: number[]) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+export function cross3(a, b: number[]) { return [a[1]*b[2]!-a[2]*b[1]!, a[2]*b[0]!-a[0]*b[2]!, a[0]*b[1]!-a[1]*b[0]!]; }
 
 export function dot3(a, b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 
@@ -58,7 +58,7 @@ function mat3Mul(a: Float32Array<ArrayBuffer>, b: Float32Array<ArrayBuffer>) {
   for (let r = 0; r < 3; r++)
     for (let c = 0; c < 3; c++)
       for (let k = 0; k < 3; k++)
-        o[c*3+r] += a[k*3+r] * b[c*3+k];
+        o[c*3+r]! += a[k*3+r]! * b[c*3+k]!;
   return o;
 }
 

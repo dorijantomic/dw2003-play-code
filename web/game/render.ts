@@ -187,7 +187,7 @@ export function render() {
     if (battle.isActive()) {
         // Battle owns the shared canvas at device resolution and establishes
         // its own transforms. The field underneath is fully covered.
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx!.setTransform(1, 0, 0, 1, 0, 0);
         wideField.padL = 0;
     } else {
         const hd = assetMode() === ASSET_MODE_HD;
@@ -196,7 +196,7 @@ export function render() {
             ? widePadFor(stageEl.clientWidth, stageEl.clientHeight) : 0;
         setFieldViewPad(pad);
         wideField.padL = FIELD_VIEW_PAD * ZOOM;
-        S.fieldFrame = fieldCanvasResolution.beginFrame(hd, pad ? { padX: wideField.padL, stageHeight: stageEl.clientHeight } : null);
+        S.fieldFrame = fieldCanvasResolution.beginFrame(hd, pad ? { padX: wideField.padL, stageHeight: stageEl!.clientHeight } : null);
     }
     const m = currentMap();
     const mapImg = state.mapImgs[m.id];
@@ -281,14 +281,14 @@ export function render() {
     lastCam.x = camX;
     lastCam.y = camY;
 
-    ctx.fillStyle = window.__clearColour ?? "#000"; // see __cam/__mapInfo above
-    ctx.fillRect(-wideField.padL, 0, VIEW_W + 2 * wideField.padL, VIEW_H);
+    ctx!.fillStyle = window.__clearColour ?? "#000"; // see __cam/__mapInfo above
+    ctx!.fillRect(-wideField.padL, 0, VIEW_W + 2 * wideField.padL, VIEW_H);
     if (window.__perfCut === 1) {  return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 1: after camera, ticks set-up and the clear (no save open yet)
-    ctx.save();
-    ctx.scale(ZOOM, ZOOM);
+    ctx!.save();
+    ctx!.scale(ZOOM, ZOOM);
     // Extra quests: a scene's `shake` step moves the FIELD only -- the text box, the menus and the quest mark are drawn
     // after this transform is restored, so they stay put while the map, the people and the weather rumble.
-    { const sh = questFxShakeOffset(); if (sh.x || sh.y) ctx.translate(sh.x, sh.y); }
+    { const sh = questFxShakeOffset(); if (sh.x || sh.y) ctx!.translate(sh.x, sh.y); }
     // Point-sprite props that draw BEHIND the ground map-tile layer go down
     // first, so the map art covers them — ordering-table buckets 8 and above
     // against the ground's 7 (see effects.js and docs/research/field/map-tile-
@@ -300,7 +300,7 @@ export function render() {
     const fieldBlanks = advanceFieldBlanks();
     tickNativeStage(m.id, fieldBlanks);
     paceStageObjects(m.id, fieldBlanks, camX, camY, FIELD_VIEW_PAD);
-    if (window.__perfCut === 2) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 2: after the stage ticks (inside the zoom save)
+    if (window.__perfCut === 2) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 2: after the stage ticks (inside the zoom save)
     // The leader's own ordering bucket decides which side of the ground it lands
     // on. A type-5 field actor draws into the bucket named by its draw-layer word
     // (+0x78 -> the 0x1002 slot +0x138, F0x8008F52C), and a stage's own step
@@ -368,14 +368,14 @@ export function render() {
     } else if (mapImg === "failed") {
         // The required map image failed and was latched; say so rather than keep
         // showing "loading map..." for ever, and do not re-request it.
-        ctx.fillStyle = "#bbb";
-        ctx.font = "16px monospace";
-        ctx.fillText("map failed to load", 20, 30);
+        ctx!.fillStyle = "#bbb";
+        ctx!.font = "16px monospace";
+        ctx!.fillText("map failed to load", 20, 30);
     } else {
         ensureMapImg(m.id);
-        ctx.fillStyle = "#bbb";
-        ctx.font = "16px monospace";
-        ctx.fillText("loading map…", 20, 30);
+        ctx!.fillStyle = "#bbb";
+        ctx!.font = "16px monospace";
+        ctx!.fillText("loading map…", 20, 30);
     }
 
     // The stage's own SLIDING SCENERY LAYER (the s415 Deeper Crevice backdrop the
@@ -385,7 +385,7 @@ export function render() {
     // the platform and the point sprites stay in front of it.  See
     // engine/systems/point-record-actor.ts `scroll-layer`.
     if (!window.__hideProps) drawScrollLayers(ctx, m.id);
-    if (window.__perfCut === 3) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 3: after the map pictures (layer 2 / base map, scroll layers)
+    if (window.__perfCut === 3) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 3: after the map pictures (layer 2 / base map, scroll layers)
 
     // Props that draw BEHIND the ground go down next, then the ground itself is
     // put back in front of them. On a split stage layer 2 is already down and the
@@ -417,11 +417,11 @@ export function render() {
     // map picture, drawn over the ground. Off with the Effects panel / __noSeamFix.
     if (!window.__noSeamFix && !window.__hideProps && !m.fixedViewportBackground && fxMapImg instanceof Image) {
         const sp = seamPatchFor(m.id, fxMapImg);
-        if (sp) ctx.drawImage(sp.canvas, -camX, -camY);
+        if (sp) ctx!.drawImage(sp.canvas, -camX, -camY);
     }
     // EXPERIMENT (swaying trees): hide the painted canopies; the swaying copy is drawn with the foreground layer
     if (!m.fixedViewportBackground && fxMapImg instanceof Image && swayFor(m, fxMapImg)) drawTreePatch(ctx, m.id, effectsMapImg(m.id, "fg"), fxMapImg, camX, camY);
-    if (window.__perfCut === 4) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 4: after under-map effects, ground picture, seam patch, tree patch
+    if (window.__perfCut === 4) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 4: after under-map effects, ground picture, seam patch, tree patch
     // Build y-sorted drawable list
     //
     // `playerAnimTime` feeds gesture-clip timing (drawEntitySprite's `animTime` for
@@ -446,36 +446,36 @@ export function render() {
     // drawn straight onto the ground (before every entity). ?nowater3d turns it off.
     if (!skipField && !NO_WATER3D && !window.__noWater3d && !m.fixedViewportBackground && !window.__hideProps) {
         const wc = renderWater(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
-        if (wc) ctx.drawImage(wc, -FIELD_VIEW_PAD, 0, WATER_VIEW.w, WATER_VIEW.h);
+        if (wc) ctx!.drawImage(wc, -FIELD_VIEW_PAD, 0, WATER_VIEW.w, WATER_VIEW.h);
     }
-    if (window.__perfCut === 5) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 5: after 3D water
+    if (window.__perfCut === 5) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 5: after 3D water
     if (!skipField && !NO_GRASS3D && !window.__noGrass3d && !m.fixedViewportBackground && !window.__hideProps) {
         const gc = renderGrass(m.id, fxMapImg, camX - FIELD_VIEW_PAD, camY, performance.now() / 1000);
         if (gc) {
             const STRIP = 8, PXS = GRASS_VIEW.px;
             // Firefox: each drawImage from a WebGL canvas holds frames back; one copy + 2D strips is as fast as no grass (measured 12.3 -> 127.5 fps).
             if (!S._grassScratch) S._grassScratch = document.createElement("canvas");
-            if (S._grassScratch.width !== gc.width || S._grassScratch.height !== gc.height) { S._grassScratch.width = gc.width; S._grassScratch.height = gc.height; }
-            const sctx = S._grassScratch.getContext("2d");
-            sctx.clearRect(0, 0, S._grassScratch.width, S._grassScratch.height);
+            if (S._grassScratch!.width !== gc.width || S._grassScratch!.height !== gc.height) { S._grassScratch!.width = gc.width; S._grassScratch!.height = gc.height; }
+            const sctx = S._grassScratch!.getContext("2d");
+            sctx.clearRect(0, 0, S._grassScratch!.width, S._grassScratch!.height);
             sctx.drawImage(gc, 0, 0);
             const gsrc = S._grassScratch;
             for (let sy = 0; sy < GRASS_VIEW.h; sy += STRIP) {
                 drawables.push({
                     y: camY + sy + STRIP,
-                    draw: () => ctx.drawImage(gsrc, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
+                    draw: () => ctx!.drawImage(gsrc!, 0, sy * PXS, GRASS_VIEW.w * PXS, STRIP * PXS,
                                               -FIELD_VIEW_PAD, sy, GRASS_VIEW.w, STRIP),
                 });
             }
         }
     }
-    if (window.__perfCut === 6) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 6: after 3D grass
+    if (window.__perfCut === 6) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 6: after 3D grass
     // EXPERIMENT (ambience ground layer): puddles, footprints, dust and wading ripples,
     // above the ground and under every sprite.
     if (!window.__hideProps && !m.fixedViewportBackground) {
         const gfx = groundFxFor(m, fxMapImg, camX - FIELD_VIEW_PAD, camY);
         const gpad = FIELD_VIEW_PAD;
-        if (gfx) drawables.push({ y: -1e12, draw: () => { ctx.save(); ctx.translate(-gpad, 0); gfx(ctx); ctx.restore(); } });
+        if (gfx) drawables.push({ y: -1e12, draw: () => { ctx!.save(); ctx!.translate(-gpad, 0); gfx(ctx); ctx!.restore(); } });
     }
     const fgImg = state.mapFgImgs[m.id];
     if (fgImg instanceof Image) {
@@ -663,16 +663,16 @@ export function render() {
             // EXPERIMENT (mounts, saddle split): the rider is hidden below the saddle row the mount editor set
             const cutRow = mountRiderCutRow();
             if (cutRow != null) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(-1e4, -1e4, 3e4, Math.round(cutRow - lastCam.y) + 1e4);
-                ctx.clip();
+                ctx!.save();
+                ctx!.beginPath();
+                ctx!.rect(-1e4, -1e4, 3e4, Math.round(cutRow - lastCam.y) + 1e4);
+                ctx!.clip();
             }
             // The leader sheet is not ready (still loading, evicted, or its load failed): draw nothing this frame, like
             // every other actor, and make sure it is requested. drawSprite would throw on an undefined sheet, and an
             // exception out of render() ends the frame loop for good (frame() reschedules after render).
             if (!isLoadedAsset(sheet)) {
-                if (cutRow != null) ctx.restore();
+                if (cutRow != null) ctx!.restore();
                 requestLeaderSheet(c.id);
                 return;
             }
@@ -684,7 +684,7 @@ export function render() {
                 state.moving ? FIELD_RUN_CLIP : FIELD_WALK_CLIP,
                 (state._inCutscene || playerStopping) ? 0 : S.fieldTickAccumulator,
             );
-            if (cutRow != null) ctx.restore();
+            if (cutRow != null) ctx!.restore();
             debugInfos.push({ x: state.x, y: state.y, label: "YOU", sprite: c.id, info });
     }
     // A `ghost`ed player (a memory replay) is drawn faint: web/quest-ghost.js sets the alpha around the whole draw.
@@ -712,7 +712,7 @@ export function render() {
     const kick = state.treeKick?.run;
     if (kick?.kick?.sprite && fieldcomReady()) {
         drawables.push({
-            y: state.y + KICK_YSORT_BIAS[kick.facing],
+            y: state.y + KICK_YSORT_BIAS[kick.facing]!,
             draw: () => drawFieldcomIcon(
                 ctx, 0, kick.kick.sprite,
                 Math.round(state.x - camX), Math.round(state.y - camY),
@@ -746,7 +746,7 @@ export function render() {
         const drawCount = activeFollowerCount();
         for (let i = 0; i < drawCount; i++) {
             const f = followers[i];
-            if (f.parked) continue;
+            if (f!.parked) continue;
             const pc = followerChar(i);
             const ps = pc && state.charImgs[pc.id];
             if (!pc || !ps) continue;
@@ -792,7 +792,7 @@ export function render() {
     const feetNow = [{ id: "leader", x: state.x, y: state.y, moving: !!(state.moving || state._cutTarget), dir: state.dir, leader: true }] as FootPoint[];
     window.__feet = feetNow;
     for (const it of partyFollowerDraws()) {
-        feetNow.push({ id: "f" + feetNow.length, x: it.f.x, y: it.f.y, moving: feetNow[0].moving, dir: state.dir });
+        feetNow.push({ id: "f" + feetNow.length, x: it.f.x, y: it.f.y, moving: feetNow[0]!.moving, dir: state.dir });
         drawables.push({
             y: it.f.y,
             follower: true,
@@ -882,7 +882,7 @@ export function render() {
     // flush calls the head-most first and each callback prepends into its
     // ordering-table bucket). `sortDrawables` (web/draw-order.js) is that rule.
     sortDrawables(drawables);
-    if (window.__perfCut === 7) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 7: after every drawable is collected and sorted, before any is drawn
+    if (window.__perfCut === 7) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 7: after every drawable is collected and sorted, before any is drawn
     // When the leader's bucket is behind the ground it was already painted in the
     // map band above, *before* the ground image; OT[8] is reached before OT[7]
     // and before every entity bucket, so the leader is behind the ground and
@@ -894,7 +894,7 @@ export function render() {
     for (const d of drawables) if (!(playerUnderMap && (d.player || d.follower)) && !skipField) d.draw();
     // Extra quests: effects told to sit over every person (the `fx` step's "layer": "front").
     if (!skipField) questFxDrawOver(ctx, camX, camY);
-    if (window.__perfCut === 8) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 8: after the y-sorted drawables loop and front quest fx
+    if (window.__perfCut === 8) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 8: after the y-sorted drawables loop and front quest fx
     for (const g of multiplayerGhosts(m.id)) drawGhostLabel(ctx, g, Math.round(g.x - camX), Math.round(balloonAnchorY(g.y - camY)));
     { const me = multiplayerSelf(); if (me) drawGhostLabel(ctx, me, Math.round(state.x - camX), Math.round(balloonAnchorY(state.y - camY))); }
     multiplayerTick(m.id, state);   // EXPERIMENT: sends where I am and glides the other players
@@ -902,7 +902,7 @@ export function render() {
     // EXPERIMENT (ambience): weather and drifting particles fall over everything else.
     if (!window.__hideProps && !m.fixedViewportBackground) {
         const amb = ambienceFor(m, fxMapImg, camX - FIELD_VIEW_PAD, camY);
-        if (amb) { ctx.save(); ctx.translate(-FIELD_VIEW_PAD, 0); amb(ctx); ctx.restore(); }
+        if (amb) { ctx!.save(); ctx!.translate(-FIELD_VIEW_PAD, 0); amb(ctx); ctx!.restore(); }
     } else ambienceSilence();
     if (state.debugAnim) drawAnimDebug(debugInfos);
     window.__lastAnimDebug = debugInfos;
@@ -917,7 +917,7 @@ export function render() {
         groundImgSize: groundImg ? [groundImg.width, groundImg.height] : null,
         layer2ImgType: layer2Img ? layer2Img.constructor.name : null,
     };
-    if (window.__perfCut === 9) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 9: after ambience/weather particles and the debug records
+    if (window.__perfCut === 9) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 9: after ambience/weather particles and the debug records
 
     // (SAY speaker indication is the anchored speech balloon itself — the
     // textbox draws attached to the speaker with a tail; see textbox.js.)
@@ -939,7 +939,7 @@ export function render() {
         const now = cutscene.clock();
         for (const [slot, b] of cutscene.bubbles) {
             const key = "bubble:" + slot + ":" + b.openedAt;
-            if (!seen.has(key) && b.sound) sfx.play("fukidash");
+            if (!seen.has(key) && b.sound) sfx.play!("fukidash");
             seen.add(key);
             const e = getNpcResolver(b.actor);
             if (!e || !fieldcomReady()) continue;
@@ -964,7 +964,7 @@ export function render() {
     }
 
     // Extra quests: a red "?" over a character with a job for you, a red "!" over one you can hand a finished job to.
-    if (!textbox.isOpen() && !choice.isOpen() && fade.dir === 0 && !cutscene.isActive() && !battle.isActive() && !state.menuOpen && fieldcomReady()) {
+    if (!textbox.isOpen!() && !choice.isOpen!() && fade.dir === 0 && !cutscene.isActive() && !battle.isActive() && !state.menuOpen && fieldcomReady()) {
         const here = state.scenes[currentMap()?.id];
         if (here) {
             for (const npc of sceneCast(here)) {
@@ -989,7 +989,7 @@ export function render() {
     // `state.fishing` joins the climb here: the cast raises the same scene lock
     // (0x80099dd8) the climb does, and the op-7 spot's own tool icon must not go
     // on advertising a press you are already in the middle of.
-    if (!textbox.isOpen() && fade.dir === 0 && !cutscene.isActive() && fieldcomReady()
+    if (!textbox.isOpen!() && fade.dir === 0 && !cutscene.isActive() && fieldcomReady()
         && !state.climb && !state.fishing) {
         const step = activeTriggerStep();
         // The kind comes from the ENGINE now (engine/systems/scene-step-ops.ts, the port
@@ -1005,7 +1005,7 @@ export function render() {
         // Keyed on the armed STEP identity (grid step + kind), not on draw
         // visibility, so dialogue/fade flicker doesn't machine-gun the cue.
         const indKey = kind == null ? null : `${currentMap().id}:${step ? step.op + ":" + (step.params ?? []) : "ladder"}:${kind}`;
-        if (indKey != null && indKey !== state._indicatorKey) sfx.play("fukidash");
+        if (indKey != null && indKey !== state._indicatorKey) sfx.play!("fukidash");
         state._indicatorKey = indKey;
         if (kind != null) {
             drawIndicatorBubble(
@@ -1103,15 +1103,15 @@ export function render() {
             ]) {
                 const lx = Math.round(p.x - camX),
                     ly = Math.round(p.y - camY);
-                ctx.fillStyle = "rgba(120,200,255,0.6)";
-                ctx.beginPath();
-                ctx.arc(lx, ly, 8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = "#002";
-                ctx.font = "10px monospace";
-                ctx.textAlign = "center";
-                ctx.fillText(glyph, lx, ly + 3);
-                ctx.textAlign = "left";
+                ctx!.fillStyle = "rgba(120,200,255,0.6)";
+                ctx!.beginPath();
+                ctx!.arc(lx, ly, 8, 0, Math.PI * 2);
+                ctx!.fill();
+                ctx!.fillStyle = "#002";
+                ctx!.font = "10px monospace";
+                ctx!.textAlign = "center";
+                ctx!.fillText(glyph, lx, ly + 3);
+                ctx!.textAlign = "left";
             }
         }
     }
@@ -1120,10 +1120,10 @@ export function render() {
     drawTreeRadar(ctx);
     drawDiveTransition(ctx, camX, camY);
 
-    editor.drawOverlay(ctx);
-    if (editor.enabled) sceneEd.drawOverlay(ctx);
-    if (window.__perfCut === 10) { ctx.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 10: after cutscene effects, bubbles, ladders, fishing, overlays (the whole zoomed field), restore done here
-    ctx.restore();
+    editor.drawOverlay!(ctx!);
+    if (editor.enabled) sceneEd.drawOverlay!(ctx!);
+    if (window.__perfCut === 10) { ctx!.restore(); return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 10: after cutscene effects, bubbles, ladders, fishing, overlays (the whole zoomed field), restore done here
+    ctx!.restore();
     drawWideSideCovers(ctx);
     if (window.__perfCut === 11) {  return; }   // dev-only, set by web/perf-test.js; unset = unchanged. cut 11: after the zoom restore and the wide side covers
 
@@ -1132,23 +1132,23 @@ export function render() {
     // (the cast itself is the game's own) and writes nothing.
     if (fx.anglermap && fishingSpotHere()) {
         const line = `Casts left this visit: ${castsLeft(state.fishingBudget ?? FISHING_BUDGET)}`;
-        ctx.save();
-        ctx.font = "10px monospace";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillStyle = "#000";
-        ctx.fillText(line, 9, VIEW_H - 9);
-        ctx.fillStyle = "#ffd34d";
-        ctx.fillText(line, 8, VIEW_H - 10);
-        ctx.restore();
+        ctx!.save();
+        ctx!.font = "10px monospace";
+        ctx!.textAlign = "left";
+        ctx!.textBaseline = "alphabetic";
+        ctx!.fillStyle = "#000";
+        ctx!.fillText(line, 9, VIEW_H - 9);
+        ctx!.fillStyle = "#ffd34d";
+        ctx!.fillText(line, 8, VIEW_H - 10);
+        ctx!.restore();
     }
 
     // Over the field, under everything the player can interact with.
     // update() returns at an open book before placeCard.step, so it would freeze on screen behind the book.
-    if (!books.isOpen()) placeCard.draw(ctx, VIEW_W, VIEW_H);
+    if (!books.isOpen()) placeCard.draw!(ctx!, VIEW_W, VIEW_H);
 
-    textbox.draw(ctx, VIEW_W, VIEW_H);
-    choice.draw(ctx, VIEW_W, VIEW_H);
+    textbox.draw!(ctx!, VIEW_W, VIEW_H);
+    choice.draw!(ctx!, VIEW_W, VIEW_H);
     if (state.nameEntry) {
         // The naming screen holds the name until it has finished going dark
         // (SCREEN-OBJECT-NAME-AUDIT-001, thirty frames). The native adapter
@@ -1160,43 +1160,43 @@ export function render() {
     if (state.endScreen) state.endScreen.draw(ctx, VIEW_W, VIEW_H);
     if (state.titleScreen) drawTitleScreen(ctx, state.titleScreen, VIEW_W, VIEW_H);
 
-    if (inn.isOpen()) inn.draw(ctx, VIEW_W, VIEW_H);
-    if (shop.isOpen()) shop.draw(ctx, VIEW_W, VIEW_H, state);
-    if (driMenu.isOpen()) driMenu.draw(ctx, VIEW_W, VIEW_H);
-    if (dialogueBox.isOpen()) dialogueBox.draw(ctx, VIEW_W, VIEW_H);
-    if (chatBox.isOpen()) chatBox.draw(ctx, VIEW_W, VIEW_H);
+    if (inn.isOpen!()) inn.draw!(ctx!, VIEW_W, VIEW_H);
+    if (shop.isOpen!()) shop.draw!(ctx!, VIEW_W, VIEW_H, state);
+    if (driMenu.isOpen!()) driMenu.draw!(ctx!, VIEW_W, VIEW_H);
+    if (dialogueBox.isOpen!()) dialogueBox.draw!(ctx!, VIEW_W, VIEW_H);
+    if (chatBox.isOpen!()) chatBox.draw!(ctx!, VIEW_W, VIEW_H);
     for (const b of mpBalloons.values()) if (b.box.isOpen()) b.box.draw(ctx, VIEW_W, VIEW_H);
-    if (yesNoWindowUp()) yesNoBox.draw(ctx, VIEW_W, VIEW_H);
-    if (helpMenuWindowUp()) helpMenuBox.draw(ctx, VIEW_W, VIEW_H);
-    if (gym.isOpen()) gym.draw(ctx, VIEW_W, VIEW_H, state);
-    if (cardShop.isOpen()) cardShop.draw(ctx, VIEW_W, VIEW_H, state);
-    if (cardAlbum.isOpen()) cardAlbum.draw(ctx, VIEW_W, VIEW_H, state);
-    if (cardDeck.isOpen()) cardDeck.draw(ctx, VIEW_W, VIEW_H, state);
+    if (yesNoWindowUp()) yesNoBox.draw!(ctx!, VIEW_W, VIEW_H);
+    if (helpMenuWindowUp()) helpMenuBox.draw!(ctx!, VIEW_W, VIEW_H);
+    if (gym.isOpen!()) gym.draw!(ctx!, VIEW_W, VIEW_H, state);
+    if (cardShop.isOpen!()) cardShop.draw!(ctx!, VIEW_W, VIEW_H, state);
+    if (cardAlbum.isOpen!()) cardAlbum.draw!(ctx!, VIEW_W, VIEW_H, state);
+    if (cardDeck.isOpen!()) cardDeck.draw!(ctx!, VIEW_W, VIEW_H, state);
     if (cardDuel.isOpen()) cardDuel.draw(ctx, VIEW_W, VIEW_H, state);
-    if (saveScreen.isOpen()) saveScreen.draw(ctx, VIEW_W, VIEW_H, state);
-    if (fightReport.isOpen()) {
+    if (saveScreen.isOpen!()) saveScreen.draw!(ctx!, VIEW_W, VIEW_H, state);
+    if (fightReport.isOpen!()) {
         // The results screen is a framebuffer takeover (the original
         // switches the display environment); clear the field behind it.
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        ctx.restore();
-        fightReport.draw(ctx, VIEW_W, VIEW_H);
+        ctx!.save();
+        ctx!.setTransform(1, 0, 0, 1, 0, 0);
+        ctx!.fillStyle = "#000";
+        ctx!.fillRect(0, 0, ctx!.canvas.width, ctx!.canvas.height);
+        ctx!.restore();
+        fightReport.draw!(ctx!, VIEW_W, VIEW_H);
     }
-    if (status?.isOpen()) status.draw(ctx, VIEW_W, VIEW_H);
-    else if (state.menuOpen) menu.draw(ctx, VIEW_W, VIEW_H, state);
+    if (status?.isOpen!()) status.draw!(ctx!, VIEW_W, VIEW_H);
+    else if (state.menuOpen) menu.draw!(ctx!, VIEW_W, VIEW_H, state);
     if (battle.isActive()) battle.draw();
     uiC.cover(false);
     // The field movie takes the whole screen (its draw fills black first), the
     // same way the original's movie screen owns the display while it plays.
     if (fieldMovie.isOpen()) fieldMovie.draw(ctx, VIEW_W, VIEW_H);
     // Drawn last so the debug overlay sits on top of everything, including the battle HUD.
-    debugPanel.drawOverlay(ctx, VIEW_W, VIEW_H, state);
-    stagslctMenu.draw(ctx, VIEW_W, VIEW_H);
-    soundTest.draw(ctx, VIEW_W, VIEW_H);
+    debugPanel.drawOverlay!(ctx!, VIEW_W, VIEW_H, state);
+    stagslctMenu.draw!(ctx!, VIEW_W, VIEW_H);
+    soundTest.draw!(ctx!, VIEW_W, VIEW_H);
     cntyselNative.draw(ctx, VIEW_W, VIEW_H);
-    sceneSkip.drawOverlay(ctx, VIEW_W, VIEW_H);
+    sceneSkip.drawOverlay!(ctx!, VIEW_W, VIEW_H);
     // EXPERIMENT (cut-content gallery): the read-only page sits over everything, including the battle HUD.
     cutContentDraw(ctx, VIEW_W, VIEW_H);
     // EXPERIMENT (Blast ladder): the starter card, over everything, drawn only while its page is open.
@@ -1217,9 +1217,9 @@ export function render() {
     // Extra quests: a scene's own screen fade (the `fade` step). It is a plain black cover, not the game's stage-change
     // wipe, so it cannot make the map the quest is still standing on think the player arrived.
     if (questFxFading()) {
-        ctx.save(); ctx.translate(-wideField.padL, 0);
+        ctx!.save(); ctx!.translate(-wideField.padL, 0);
         questFxDrawFade(ctx, VIEW_W + 2 * wideField.padL, VIEW_H);
-        ctx.restore();
+        ctx!.restore();
     }
     // The A28 checkerboard handoff draws over the field while it runs, whatever
     // the A27 fade's alpha is.
@@ -1229,10 +1229,10 @@ export function render() {
     // read (window.__frameCopy / __frameCopySeq).
     if (window.__frameCopy) {
         const fc = window.__frameCopy;
-        if (fc.width !== ctx.canvas.width || fc.height !== ctx.canvas.height) {
-            fc.width = ctx.canvas.width; fc.height = ctx.canvas.height;
+        if (fc.width !== ctx!.canvas.width || fc.height !== ctx!.canvas.height) {
+            fc.width = ctx!.canvas.width; fc.height = ctx!.canvas.height;
         }
-        fc.getContext("2d").drawImage(ctx.canvas, 0, 0);
+        fc.getContext("2d")!.drawImage(ctx!.canvas, 0, 0);
         window.__frameCopySeq = (window.__frameCopySeq || 0) + 1;
     }
 }

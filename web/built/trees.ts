@@ -89,7 +89,7 @@ export function cypressGeometry(THREE, S, Href: number, seed: number) {
     for (let s = 0; s <= SIDES; s++) {
       const sm = s % SIDES, a = sm / SIDES * Math.PI * 2;
       // flames: LOBES vertical lobes that drift round with height, plus a slower wobble (seeded)
-      const lobe = lobed ? 1 + LOBE_AMP * (0.6 * Math.sin(LOBES * a + ph[0] + t * 5.0) + 0.4 * Math.sin(3 * a + ph[1] - t * 8.0)) * Math.min(1, t * 6) : 1;
+      const lobe = lobed ? 1 + LOBE_AMP * (0.6 * Math.sin(LOBES * a + ph[0]! + t * 5.0) + 0.4 * Math.sin(3 * a + ph[1]! - t * 8.0)) * Math.min(1, t * 6) : 1;
       const jag = lobed ? 1 + JAG * ((((sm * 7 + Math.round(t * 997) * 13) % 11) / 11 - 0.5) * 2) * (sm % 2 ? 1 : -0.6) * Math.min(1, t * 8) : 1;
       const r = rr * lobe * jag;
       pos.push(Math.sin(a) * r, y, Math.cos(a) * r); hgt.push(y); kind.push(lobed ? 0 : 1); nor.push(0, 0, 0);
@@ -101,17 +101,17 @@ export function cypressGeometry(THREE, S, Href: number, seed: number) {
   if (S.trunk > 0) {
     // bark: a flared foot, a waist, then up into the crown; kind 1 = bark colour in the shader (the trunk was crown-green)
     const tr = S.trunk * k, ys = [-0.02 / Href, cb * 0.12, cb * 0.5, cb + 0.03], rs = [tr * 1.55, tr * 1.2, tr * 0.95, tr * 0.8];
-    const tb = ys.map((y, i) => ring(y, rs[i], 0, false));
-    for (let i = 0; i < tb.length - 1; i++) for (let s = 0; s < SIDES; s++) idx.push(tb[i] + s, tb[i] + s + 1, tb[i + 1] + s + 1, tb[i] + s, tb[i + 1] + s + 1, tb[i + 1] + s);
+    const tb = ys.map((y, i) => ring(y, rs[i]!, 0, false));
+    for (let i = 0; i < tb.length - 1; i++) for (let s = 0; s < SIDES; s++) idx.push(tb[i]! + s, tb[i]! + s + 1, tb[i + 1]! + s + 1, tb[i]! + s, tb[i + 1]! + s + 1, tb[i + 1]! + s);
   }
   // (the wall's foot starts 2 cm into the ground; object y 1 = Href metres)
   for (const t of ts) rows.push(ring(t === 0 && cb <= 0 ? -0.02 / Href : cb + t * (1 - cb), t < 1 ? prof(t) : 0, t, true));
   for (let i = 0; i < rows.length - 1; i++) for (let s = 0; s < SIDES; s++) {
-    const a = rows[i] + s, b = rows[i] + s + 1, c = rows[i + 1] + s + 1, d = rows[i + 1] + s;
+    const a = rows[i]! + s, b = rows[i]! + s + 1, c = rows[i + 1]! + s + 1, d = rows[i + 1]! + s;
     idx.push(a, b, c, a, c, d);
   }
   // the crown's underside (grove: it floats on the trunk): a fan to the axis
-  if (cb > 0) { const ctr = pos.length / 3; pos.push(0, cb - 0.004, 0); hgt.push(cb); nor.push(0, -1, 0); for (let s = 0; s < SIDES; s++) idx.push(ctr, rows[0] + s + 1, rows[0] + s); }
+  if (cb > 0) { const ctr = pos.length / 3; pos.push(0, cb - 0.004, 0); hgt.push(cb); nor.push(0, -1, 0); for (let s = 0; s < SIDES; s++) idx.push(ctr, rows[0]! + s + 1, rows[0]! + s); }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
@@ -276,54 +276,54 @@ export function pineGeometry(THREE, seed: number) {
   const pos = [], aUV: number[] = [], aH: number[] = [], aK: number[] = [], idx = [];
   const V = (p, u: number, v: number, h: number, k: number) => { pos.push(p[0], p[1], p[2]); aUV.push(u, v); aH.push(h); aK.push(k); return pos.length / 3 - 1; };
   const lean = [(Rn() - 0.5) * 0.03, (Rn() - 0.5) * 0.03];
-  const ctr = (y: number) => [lean[0] * y * y, lean[1] * y * y];
+  const ctr = (y: number) => [lean[0]! * y * y, lean[1]! * y * y];
   // trunk: 5 rings x 6 sides, tapered, flared at the foot, leaning a little
   { const ys = [0, 0.1, 0.35, 0.65, 0.97], SIDES = 6, base = [];
     for (const [i, y] of ys.entries()) {
       const c = ctr(Math.max(y, 0)), r = (0.021 * (1 - y) + 0.004) * (i === 0 ? 1.4 : 1);
       const b = pos.length / 3;
-      for (let s = 0; s <= SIDES; s++) { const a = (s % SIDES) / SIDES * Math.PI * 2; V([c[0] + Math.sin(a) * r, y, c[1] + Math.cos(a) * r], 0, 0, y, 1); }
+      for (let s = 0; s <= SIDES; s++) { const a = (s % SIDES) / SIDES * Math.PI * 2; V([c[0]! + Math.sin(a) * r, y, c[1]! + Math.cos(a) * r], 0, 0, y, 1); }
       base.push(b);
     }
-    for (let i = 0; i < base.length - 1; i++) for (let s = 0; s < SIDES; s++) idx.push(base[i] + s, base[i] + s + 1, base[i + 1] + s + 1, base[i] + s, base[i + 1] + s + 1, base[i + 1] + s);
+    for (let i = 0; i < base.length - 1; i++) for (let s = 0; s < SIDES; s++) idx.push(base[i]! + s, base[i]! + s + 1, base[i + 1]! + s + 1, base[i]! + s, base[i + 1]! + s + 1, base[i + 1]! + s);
   }
-  const add = (a, b: number[], c: number) => [a[0] + b[0] * c, a[1] + b[1] * c, a[2] + b[2] * c];
-  const norm = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-  const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const add = (a, b: number[], c: number) => [a[0] + b[0]! * c, a[1] + b[1]! * c, a[2] + b[2]! * c];
+  const norm = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
+  const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
   // a flat-diamond ring: corners +side, +up, -side, -up. v = across (1 at the side corners, 0 on the ridge / keel)
   const ring = (c, s: number[] | undefined, u: number[] | undefined, w: number, th: number, uu: number, h: number) => [
-    V(add(c, s, w), uu, 1, h, 0), V(add(c, u, th), uu, 0, h, 0), V(add(c, s, -w), uu, -1, h, 0), V(add(c, u, -th), uu, 0, h, 0)];
+    V(add(c, s!, w), uu, 1, h, 0), V(add(c, u!, th), uu, 0, h, 0), V(add(c, s!, -w), uu, -1, h, 0), V(add(c, u!, -th), uu, 0, h, 0)];
   const join = (A: number[], B: number[]) => { for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; idx.push(A[i], A[j], B[j], A[i], B[j], B[i]); } };
   const cap = (A: number[], tip: number) => { for (let i = 0; i < 4; i++) idx.push(A[i], A[(i + 1) % 4], tip); };
   const limb = (t: number, az: number, reach: number, k: number) => {
     const o = [Math.sin(az), 0, Math.cos(az)], L = reach / 0.8;
-    const c0 = ctr(t), P0 = [c0[0] + o[0] * 0.004, t, c0[1] + o[2] * 0.004];
+    const c0 = ctr(t), P0 = [c0[0]! + o[0]! * 0.004, t, c0[1]! + o[2]! * 0.004];
     const e0 = -0.12 + 0.57 * k + (Rn() - 0.5) * 0.12, e1 = e0 - (0.30 - 0.15 * k) - Rn() * 0.1, e2 = e1 + 0.5;
-    const dir = (e: number) => [Math.cos(e) * o[0], Math.sin(e), Math.cos(e) * o[2]];
+    const dir = (e: number) => [Math.cos(e) * o[0]!, Math.sin(e), Math.cos(e) * o[2]!];
     const P1 = add(P0, dir(e0), 0.5 * L), P2 = add(P1, dir(e1), 0.5 * L), A = add(P2, dir(e2), 0.22 * L);
     P2[1] = Math.max(P2[1], 0.02); A[1] = Math.max(A[1], 0.012);   // no needle under the ground
     const w = 0.21 * L, th = 0.3 * w;
     const side = norm(cross([0, 1, 0], o)), frame = (d: number[]) => { const s = norm(cross(d, [0, 1, 0]).every((x) => Math.abs(x) < 1e-6) ? side : cross([0, 1, 0], d)); return [s, norm(cross(d, s))]; };
-    const d0 = norm([P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]]), d1 = norm([P2[0] - P0[0], P2[1] - P0[1], P2[2] - P0[2]]), d2 = norm([A[0] - P1[0], A[1] - P1[1], A[2] - P1[2]]);
+    const d0 = norm([P1[0] - P0[0]!, P1[1] - P0[1]!, P1[2] - P0[2]!]), d1 = norm([P2[0] - P0[0]!, P2[1] - P0[1]!, P2[2] - P0[2]!]), d2 = norm([A[0] - P1[0], A[1] - P1[1], A[2] - P1[2]]);
     const [s0, u0] = frame(d0), [s1, u1] = frame(d1), [s2, u2] = frame(d2);
     const r0 = ring(P0, s0, u0, 0.35 * w, 0.35 * th, 0.0, t), r1 = ring(P1, s1, u1, w, th, 0.42, t), r2 = ring(P2, s2, u2, 0.55 * w, 0.6 * th, 0.78, t);
     join(r0, r1); join(r1, r2);
     cap(r2, V(A, 1, 0, t, 0));
   };
-  const nW = PINE.WHORLS[0] + Math.floor(Rn() * (PINE.WHORLS[1] - PINE.WHORLS[0] + 1));
+  const nW = PINE.WHORLS[0]! + Math.floor(Rn() * (PINE.WHORLS[1]! - PINE.WHORLS[0]! + 1));
   for (let i = 0; i < nW; i++) {
     const s = i / (nW - 1), t = PINE.T0 + (PINE.T1 - PINE.T0) * (1 - Math.pow(1 - s, 1.25));
     const k = (t - PINE.T0) / (0.99 - PINE.T0);                                   // 0 bottom .. 1 top
     const Rc = PINE.RM * Math.pow(Math.max(0, 1 - k), PINE.TAPER) + 0.014;
-    const nL = Math.round(PINE.LIMBS[0] + (PINE.LIMBS[1] - PINE.LIMBS[0]) * k);
+    const nL = Math.round(PINE.LIMBS[0]! + (PINE.LIMBS[1]! - PINE.LIMBS[0]!) * k);
     const a0 = Rn() * Math.PI * 2;
     // the whorl's inner skirt (kind 2): a serrated 12-sided frustum under the limbs, so the layers read as one dense
     // pine and the tree is not see-through (the measured wall_00 has no see-through texel). Spikes alternate long / short.
     { const SK = 12, c = ctr(t), top = [], bot = [], drop = 0.075 + 0.05 * (1 - k);
       for (let q = 0; q < SK; q++) {
         const a = a0 + q / SK * Math.PI * 2, long = q % 2 === 0, rt = 0.14 * Rc, rb = Rc * (long ? 0.9 : 0.5) * (0.9 + Rn() * 0.2);
-        top.push(V([c[0] + Math.sin(a) * rt, t + 0.012, c[1] + Math.cos(a) * rt], 0, 0, t, 2));
-        bot.push(V([c[0] + Math.sin(a) * rb, Math.max(t - drop * (long ? 1 : 0.55), 0.012), c[1] + Math.cos(a) * rb], 1, 0, t, 2));
+        top.push(V([c[0]! + Math.sin(a) * rt, t + 0.012, c[1]! + Math.cos(a) * rt], 0, 0, t, 2));
+        bot.push(V([c[0]! + Math.sin(a) * rb, Math.max(t - drop * (long ? 1 : 0.55), 0.012), c[1]! + Math.cos(a) * rb], 1, 0, t, 2));
       }
       for (let q = 0; q < SK; q++) { const r = (q + 1) % SK; idx.push(top[q], top[r], bot[r], top[q], bot[r], bot[q]); } }
     for (let j = 0; j < nL; j++) limb(t, a0 + (j + (Rn() - 0.5) * 0.35) / nL * Math.PI * 2, Rc * (0.88 + Rn() * 0.24), k);
@@ -407,14 +407,14 @@ export function shrubSpecies(THREE, S, c) {
     const part = fluffyPart(clumps, SHRUB_CARDS, 7, c.bottom);
     // the cards round the low clumps reach under the floor: lift the shrub so its lowest vertex is 0.01 below y 0
     // and scale it to height 1 (the instance scale is then the shrub height in metres x 400)
-    let lo = Infinity, hi = -Infinity; for (let i = 1; i < part.pos.length; i += 3) { lo = Math.min(lo, part.pos[i]); hi = Math.max(hi, part.pos[i]); }
+    let lo = Infinity, hi = -Infinity; for (let i = 1; i < part.pos.length; i += 3) { lo = Math.min(lo, part.pos[i]!); hi = Math.max(hi, part.pos[i]!); }
     const k = 1 / (hi - lo), sh = (x: number, i: number) => (i % 3 === 1 ? (x - lo) * k - 0.01 : x * k);
     part.pos = part.pos.map(sh);
     part.clump = part.clump.map((x, i) => (i % 4 === 1 ? (x - lo) * k - 0.01 : x * k));
     for (const q of clumps) { q.c = q.c.map((x, i) => (i === 1 ? (x - lo) * k - 0.01 : x * k)); q.R *= k; }
     const geo = buildGeometry([part]);
-    const C = [0, 0, 0]; for (const q of clumps) for (let a = 0; a < 3; a++) C[a] += q.c[a] / clumps.length;
-    geo.userData = { crown: C, H: 1, tris: geo.index.count / 3 };
+    const C = [0, 0, 0]; for (const q of clumps) for (let a = 0; a < 3; a++) C[a]! += q.c[a]! / clumps.length;
+    geo.userData = { crown: C, H: 1, tris: geo.index!.count / 3 };
     const hiTint = ["r", "g", "b"].map((k) => c.top[k] / Math.max(c.bottom[k], 1e-4));
   return { geo, mat: foliageMaterial(leafClumpTexture(), C, hiTint) };
 }

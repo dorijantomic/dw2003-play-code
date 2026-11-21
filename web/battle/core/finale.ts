@@ -51,7 +51,7 @@ export function makeFinale(B: BattleContext) {
             // A fresh timeline is a fresh turn for the command phase's Frozen gate.
             b._turnSeq = (b._turnSeq ?? 0) + 1;
             // Giant mode part 1: a scripted phase change may swap in a different-sized body too.
-            applyGiantScales(B.renderer3d, entry, giantModeOn());
+            applyGiantScales(B.renderer3d!, entry, giantModeOn());
           },
           onDone: () => finishFinaleBeat(b, index, beat),
         });

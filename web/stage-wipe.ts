@@ -272,7 +272,7 @@ export function checkerboardWordIndex(ptr) {
     return (ptr - WIPE_A28_GRID_BASE) / 4;
 }
 export function checkerboardRecordCell(rec: { ptr: number; mode: number; limit: number; } | undefined) {
-    return Math.floor(checkerboardWordIndex(rec.ptr) / 2);
+    return Math.floor(checkerboardWordIndex(rec!.ptr) / 2);
 }
 export function checkerboardRecordAxis(rec) {
     return checkerboardWordIndex(rec.ptr) % 2 === 0 ? "x" : "y";
@@ -313,14 +313,14 @@ export function stepCheckerboard(cb, delta, held = false) {
     if (held) return { stepped: false, crossed: false, record: cb.index };
     const idx = cb.index;
     const rec = WIPE_SCHEDULE[idx];
-    if (rec.mode === 0) {
+    if (rec!.mode === 0) {
         cb.index += 1;
         if (cb.index >= WIPE_SCHEDULE.length) cb.done = true;
         return { stepped: false, crossed: false, record: idx };
     }
-    const wi = checkerboardWordIndex(rec.ptr);
-    cb.grid[wi] += delta * rec.mode;
-    const crossed = rec.mode >= 0 ? cb.grid[wi] >= rec.limit : cb.grid[wi] <= rec.limit;
+    const wi = checkerboardWordIndex(rec!.ptr);
+    cb.grid[wi] += delta * rec!.mode;
+    const crossed = rec!.mode >= 0 ? cb.grid[wi] >= rec!.limit : cb.grid[wi] <= rec!.limit;
     if (crossed) {
         cb.grid[wi] = WIPE_A28_SENTINEL;
         cb.index += 1;

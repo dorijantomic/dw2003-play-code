@@ -52,11 +52,11 @@ export function makeFusion(B: BattleContext) {
     en.level = fused.level;
     en.hp = fused.hp; en.maxHp = fused.maxHp;
     en.mp = fused.mp; en.maxMp = fused.maxMp;
-    en.str = fused.stats.str;
-    en.def = fused.stats.def;
-    en.spt = fused.stats.spt;
-    en.wis = fused.stats.wis;
-    en.spd = fused.stats.spd;
+    en.str = fused.stats!.str;
+    en.def = fused.stats!.def;
+    en.spt = fused.stats!.spt;
+    en.wis = fused.stats!.wis;
+    en.spd = fused.stats!.spd;
     en.powerScale = fused.statScale;
     en.statusImmunities = b.statusImmunities;
     en.turnCounter = 0;

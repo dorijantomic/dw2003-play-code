@@ -193,7 +193,7 @@ export function fusionBossFor(fuseInto, bosses = null) {
 export function fusionOnDefeat({ party, partyIndex = 0, fxOn = false, bosses = null }: FusionDefeatArgs = {}) {
   if (!fxOn || !Array.isArray(party) || !party.length) return { fuse: false };
   if (partyIndex !== party.length - 1) return { fuse: false };
-  const boss = fusionBossFor(party[partyIndex]?.fuseInto, bosses);
+  const boss = fusionBossFor(party[partyIndex]?.fuseInto, bosses!);
   if (!boss) return { fuse: false };
   return { fuse: true, hp: Number(boss.hp) || 0, boss };
 }

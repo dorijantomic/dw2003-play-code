@@ -123,7 +123,7 @@ function sideIndex(duel, duelSide) {
 function turnOf(host) {
   const duel = host.duel;
   if (!duel || duel.outcome) return null;
-  const key = phase(duel).key;
+  const key = phase(duel)!.key;
   if (key === 'load' || key === 'compile') return sideIndex(duel, programTurnSide(duel));
   if (key === 'summon') return sideIndex(duel, summonTurnSide(duel));
   return null;
@@ -166,7 +166,7 @@ export function snapshot(host) {
   return {
     seed: host.seed,
     status: host.status,
-    phase: duel ? phase(duel).key : null,
+    phase: duel ? phase(duel)!.key : null,
     set: duel ? duel.set : 0,
     turn: turnOf(host),
     ready: [host.ready[0], host.ready[1]],
@@ -238,7 +238,7 @@ function advance(host) {
   host.ready = [false, false];
   for (let guard = 0; guard < 12; guard++) {
     if (duel.outcome) { finish(host); return; }
-    const key = phase(duel).key;
+    const key = phase(duel)!.key;
     if (key === 'start' || key === 'draw') {
       stepPhase(duel, undefined, host.rng, host.effects);
       continue;
@@ -383,7 +383,7 @@ function doMulligan(host, side: number) {
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
   // A mulligan belongs to the opening hand of set 1 and to nothing after a
   // card has been played: once the phase has seen a play, the hand is in play.
-  if (phase(duel).key !== 'load' || duel.set !== 1) return refuse('wrong_phase');
+  if (phase(duel)!.key !== 'load' || duel.set !== 1) return refuse('wrong_phase');
   if (host.mulligans[side] >= host.rules.mulliganPerSide) return refuse('mulligan_used');
   if (duel.playedThisPhase.length) return refuse('already_played');
   const s = sideOf(duel, side);
@@ -418,7 +418,7 @@ function doPlay(host, side: number, cmd) {
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
   const slot = cmd.slot;
   if (!Number.isInteger(slot) || slot < 0) return refuse('bad_slot');
-  const key = phase(duel).key;
+  const key = phase(duel)!.key;
   const s = sideOf(duel, side);
   if (key === 'summon') {
     if (summonTurnSide(duel) !== s) return refuse('not_your_turn');
@@ -439,7 +439,7 @@ function doPass(host, side: number) {
   const duel = host.duel;
   if (!duel) return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
-  const key = phase(duel).key;
+  const key = phase(duel)!.key;
   const s = sideOf(duel, side);
   if (key === 'summon') {
     if (summonTurnSide(duel) !== s) return refuse('not_your_turn');
@@ -461,7 +461,7 @@ function doAttack(host, side: string | number) {
   const duel = host.duel;
   if (!duel) return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
-  if (phase(duel).key !== 'battle') return refuse('wrong_phase');
+  if (phase(duel)!.key !== 'battle') return refuse('wrong_phase');
   host.ready[side] = true;
   if (!host.ready[0] || !host.ready[1]) return { ok: true, waiting: true };
   // Both sides pressed Start Battle! — the engine's whole Battle Phase runs.

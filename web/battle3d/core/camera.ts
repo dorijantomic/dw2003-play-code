@@ -43,7 +43,7 @@ export function makeCamera(B$: Battle3DContext) {
   // director passes the two arguments directly (fightstg.s:4766-4778, :4804-4812).
   function cannedShotSlot(side: string, index: number) {
     const key = modelKeyFromFolder(side === "player" ? B$.playerFolder : B$.enemyFolder);
-    const cam = !key ? null : side === "player" ? playerNearCamera() : B$.placementTable[key]?.camera;
+    const cam = !key ? null : side === "player" ? playerNearCamera() : B$.placementTable![key]?.camera;
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
     if (eye && look) return { eye, target: look, H: cam.view?.[index] };
     return null;
@@ -56,7 +56,7 @@ export function makeCamera(B$: Battle3DContext) {
     const name = side ? "enemy" : "player";
     if (!folder || folder === (side ? B$.enemyFolder : B$.playerFolder)) return cannedShotSlot(name, index);
     const key = modelKeyFromFolder(folder);
-    const cam = !key ? null : side ? B$.placementTable[key]?.camera : nearCameraFor(B$.placementTable, key);
+    const cam = !key ? null : side ? B$.placementTable![key]?.camera : nearCameraFor(B$.placementTable!, key);
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
     if (eye && look) return { eye, target: look, H: cam.view?.[index] };
     return null;
@@ -90,9 +90,9 @@ function setGiantCameraFit(on: boolean) {
   }
 function playerNearCamera() {
     const key = modelKeyFromFolder(B$.playerFolder);
-    const rec = key != null ? B$.placementTable[key] : null;
+    const rec = key != null ? B$.placementTable![key] : null;
     if (!rec) return null;
-    if ((rec.camera?.eye?.length | 0) >= 12) { B$.giantNearCam = false; return rec.camera; }
+    if ((rec.camera?.eye?.length! | 0) >= 12) { B$.giantNearCam = false; return rec.camera; }
     // Giant mode part 1: the fit's subject is the body as DRAWN, so the cached table is keyed
     // by the live scale as well as by the model folder.
     const playerScale = B$.fighterScale.fighterScale("player");
@@ -104,12 +104,12 @@ function playerNearCamera() {
       fetch("assets/battle/camera_ref_sizes.json").then((r) => (r.ok ? r.json() : null)).then((j) => { B$.camRefSizes = j?.sizes ?? null; }, () => {});
     }
     const ownRest = B$.playerModel ? modelRestSize(B$.playerModel) : null;
-    const pick = closestCameraRef(B$.camRefSizes, ownRest, B$.placementTable);
+    const pick = closestCameraRef(B$.camRefSizes, ownRest, B$.placementTable!);
     const refKey = pick?.key;
-    const refRec = refKey != null ? B$.placementTable[refKey] : null;
+    const refRec = refKey != null ? B$.placementTable![refKey] : null;
     const own = ownRest ? modelFrameSize(B$.playerModel) : null;
     const ref = pick ? Math.max(pick.h, 0.5 * pick.w) : null;
-    if (!refRec?.camera || !own || !ref) return nearCameraFor(B$.placementTable, key);
+    if (!refRec?.camera || !own || !ref) return nearCameraFor(B$.placementTable!, key);
     const k = Math.min(3, Math.max(0.5, own / ref));
     const refSlot = arenaSlot(refRec, "player"), ownSlot = arenaSlot(rec, "player");
     let cam = fitNearCamera(refRec.camera, refSlot, ownSlot, k);
@@ -127,13 +127,13 @@ function playerNearCamera() {
       const eSlot = B$.enemyAnim8r?.homeSlot;
       const eRest = B$.enemyModel ? scaledRest(modelRestSize(B$.enemyModel), B$.fighterScale.fighterScale("enemy")) : null;
       const target = eSlot ? [eSlot.x, eSlot.y - 0.5 * (eRest?.h ?? 0), eSlot.z] : null;
-      const f = fitGiantNearCamera(cam, ownSlot, scaledRest(ownRest, playerScale), target);
+      const f = fitGiantNearCamera(cam, ownSlot, scaledRest(ownRest, playerScale), target!);
       cam = f.cam; giant = f.changed; giantShots = f.shots;
     }
     // The face close-up the same way, but scaled by HEIGHT alone, so it lands on the head
     // the way the reference's lands on the reference's. A 0x48 record's own face-box read runs past the
     // record (see faceBoxShot) and frames nothing.
-    const kh = Math.min(3, Math.max(0.3, ownRest.h / pick.h));
+    const kh = Math.min(3, Math.max(0.3, ownRest.h / pick!.h));
     const face = {};
     for (const side of ["player", "enemy"]) {
       const s = faceBoxSource(B$.placementTable, refKey, side).shot;
@@ -155,7 +155,7 @@ function applyArenaShot() {
     const shot = introShot();
     B$.introCamPending = !shot;
     if (!shot) return null;
-    B$.camRec.cut(fieldsFromShot(shot), { issuer: "battle" });
+    B$.camRec!.cut(fieldsFromShot(shot), { issuer: "battle" });
     return shot;
   }
 function setCameraMode(m: string, opts: CameraModeOptions = {}) {
@@ -198,7 +198,7 @@ function setCameraMode(m: string, opts: CameraModeOptions = {}) {
         B$.idleDirector = null; B$.directorRetired = false;
       }
     }
-    B$.camScriptOwned = !!opts.scriptOwnsCamera || B$.camRec.isGliding() || B$.directorRetired || !!B$.dvCam?.owns();
+    B$.camScriptOwned = !!opts.scriptOwnsCamera || B$.camRec!.isGliding() || B$.directorRetired || !!B$.dvCam?.owns();
     if (m === "defeat" && B$.camMode !== "defeat") {
       B$.defeatDelta = 0; B$.defeatClock = 0;
       // F0x8008c93c's FIRST tick takes the camera with an explicit cut:
@@ -226,7 +226,7 @@ function getCameraMode() { return B$.camMode; }
     const step = engineSetSlowMotion(lv, LOSS_CAM.deltaPerFrame);
     B$.slowMoAcc = step.acc;
     B$.slowMoDelta = step.delta;
-    B$.slowMoTickSpeed = B$.GLOBAL_SPEED * (step.delta / LOSS_CAM.deltaPerFrame);
+    B$.slowMoTickSpeed = B$.GLOBAL_SPEED! * (step.delta / LOSS_CAM.deltaPerFrame);
     return { level: B$.slowMoLevel, delta: B$.slowMoDelta, acc: B$.slowMoAcc, tickSpeed: B$.slowMoTickSpeed };
   }
 // What the loss beat is actually doing to the animation, in the original's own numbers:
@@ -249,12 +249,12 @@ function getCameraMode() { return B$.camMode; }
       slowMoLevel: B$.slowMoLevel, slowMoDelta: B$.slowMoDelta, slowMoAcc: B$.slowMoAcc, slowMoTickSpeed: B$.slowMoTickSpeed, globalSpeed: B$.GLOBAL_SPEED,
       deltaPerFrame: LOSS_CAM.deltaPerFrame,
       slowMoTicks: B$.slowMoTicks, slowMoUnits: B$.slowMoUnits,
-      slowMoRate: B$.slowMoTicks ? B$.slowMoUnits / B$.slowMoTicks : null,
+      slowMoRate: B$.slowMoTicks ? B$.slowMoUnits! / B$.slowMoTicks : null,
       player: side(B$.playerAnim8r),
       enemy: side(B$.enemyAnim8r),
     };
   }
-function setGameCamParam(k: string, v: string | number) { if (k in B$.gameCam) { B$.gameCam[k] = +v; return true; } return false; }
+function setGameCamParam(k: string, v: string | number) { if (k in B$.gameCam!) { B$.gameCam![k] = +v; return true; } return false; }
 function getCameraInfo() { return B$.lastCamInfo ? { ...B$.lastCamInfo, params: { ...B$.gameCam } } : null; }
 function getFaceCamRect() { return B$.faceCamRect; }
 /** A presentation owns the screen: suppress the inset until it says otherwise. The
@@ -294,7 +294,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
     const r = B$.idleDirector.retire();
     B$.idleDirector = null;
     B$.directorRetired = true;
-    if (r) { B$.directorHeld = r; B$.camRec.cut(r, { issuer: "battle" }); }
+    if (r) { B$.directorHeld = r; B$.camRec!.cut(r, { issuer: "battle" }); }
   }
 // ── The battle-open camera flourish ─────────────────────────────────────────
   // The disc opens a battle with a short random camera beat over the arena before the first
@@ -325,7 +325,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
       B$.openCamera = makeOpenCamera();
       B$.openCameraGone = false;
       B$.openCameraHeld = null;
-      B$.openClock.reset();
+      B$.openClock!.reset();
     }
     return B$.openCamera;
   }
@@ -367,8 +367,8 @@ function getFaceCamRect() { return B$.faceCamRect; }
         const duration = Math.max(0, cs.op5.mode | 0);
         if (fields) {
           const installer = (side === "enemy" ? B$.enemyAnim8r : B$.playerAnim8r)?.vm;
-          if (duration > 0) B$.camRec.move(fields, duration, { issuer: side, issuerVm: installer });
-          else B$.camRec.cut(fields, { issuer: side, issuerVm: installer });
+          if (duration > 0) B$.camRec!.move(fields, duration, { issuer: side, issuerVm: installer });
+          else B$.camRec!.cut(fields, { issuer: side, issuerVm: installer });
         }
         return;
       }
@@ -388,8 +388,8 @@ function getFaceCamRect() { return B$.faceCamRect; }
         // duration > 0 arms the move ([0xfc] F0x800922b4, whose start block is the LIVE
         // record); duration 0 is the cut ([0xf8] F0x80092244). Either way the record is
         // REPLACED and outlives the script that installed it.
-        if (duration > 0) B$.camRec.move(cs.op5.fields, duration, { issuer: side, issuerVm: installerVm() });
-        else B$.camRec.cut(cs.op5.fields, { issuer: side, issuerVm: installerVm() });
+        if (duration > 0) B$.camRec!.move(cs.op5.fields, duration, { issuer: side, issuerVm: installerVm() });
+        else B$.camRec!.cut(cs.op5.fields, { issuer: side, issuerVm: installerVm() });
         return;
       }
       if (cs.op5.preset != null) {
@@ -404,15 +404,15 @@ function getFaceCamRect() { return B$.faceCamRect; }
         if (p === 0 || p >= 8) {
           const f = _arenaFields();
           if (f) {
-            if (duration > 0) B$.camRec.move(f, duration, { issuer: side, issuerVm: installerVm() });
-            else B$.camRec.cut(f, { issuer: side, issuerVm: installerVm() });
+            if (duration > 0) B$.camRec!.move(f, duration, { issuer: side, issuerVm: installerVm() });
+            else B$.camRec!.cut(f, { issuer: side, issuerVm: installerVm() });
           }
           return;
         }
         // A canned shot goes through F0x800923b4, which fills only eye/target/H and explicitly
         // zeroes +0x18, +0x24..+0x28 and +0x2c — the record the walker resolves late, since the
         // model's own shot table can land after the op5. `duration` carries the [0xfc] glide.
-        B$.camRec.preset(p, { issuer: side, duration, issuerVm: installerVm() });
+        B$.camRec!.preset(p, { issuer: side, duration, issuerVm: installerVm() });
       }
     };
   }

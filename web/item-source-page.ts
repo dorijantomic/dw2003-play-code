@@ -20,12 +20,12 @@ const queryEl = $("q") as HTMLInputElement;
 const countEl = $("count");
 
 if (!index || !index.items) {
-    countEl.textContent = "the item index did not load";
+    countEl!.textContent = "the item index did not load";
 } else {
     const data = { index, shops, merchants, effects };
     const rows = indexRows(index);
     const sourceLess = rows.filter((r) => r.count === 0).length;
-    countEl.textContent = `${rows.length} items — ${sourceLess} with no source anywhere`;
+    countEl!.textContent = `${rows.length} items — ${sourceLess} with no source anywhere`;
     let shown = rows;
     let cursor = -1;
     let elements = [];
@@ -41,7 +41,7 @@ if (!index || !index.items) {
     function drawDetail(row) {
         const rec = row ? sourcesFor(row.id, data) : null;
         if (!rec) {
-            detailEl.innerHTML = row ? `<div class="empty">item ${row.id} is not in the index</div>` : "";
+            detailEl!.innerHTML = row ? `<div class="empty">item ${row.id} is not in the index</div>` : "";
             return;
         }
         let html = `<h2>${escapeHtml(rec.name)} <span>#${rec.id} · ${escapeHtml(rec.category)}</span></h2>`;
@@ -58,7 +58,7 @@ if (!index || !index.items) {
                 }
             }
         }
-        detailEl.innerHTML = html;
+        detailEl!.innerHTML = html;
     }
 
     function show(index: number) {
@@ -70,7 +70,7 @@ if (!index || !index.items) {
     }
 
     function drawList() {
-        listEl.innerHTML = "";
+        listEl!.innerHTML = "";
         elements = shown.map((row) => {
             const el = document.createElement("div");
             el.className = "item";
@@ -82,9 +82,9 @@ if (!index || !index.items) {
                 `<span class="num${row.count ? "" : " none"}">${row.count}</span>`;
             el.addEventListener("click", () => {
                 show(elements.indexOf(el));
-                listEl.focus();
+                listEl!.focus();
             });
-            listEl.append(el);
+            listEl!.append(el);
             return el;
         });
     }
@@ -95,7 +95,7 @@ if (!index || !index.items) {
             row.name.toLowerCase().includes(q) || row.category.toLowerCase().includes(q) || String(row.id) === q);
         cursor = -1;
         drawList();
-        if (!shown.length) { detailEl.innerHTML = `<div class="empty">no item matches "${escapeHtml(q)}"</div>`; return; }
+        if (!shown.length) { detailEl!.innerHTML = `<div class="empty">no item matches "${escapeHtml(q)}"</div>`; return; }
         show(0);
     }
 
@@ -113,7 +113,7 @@ if (!index || !index.items) {
         } else if (e.key === "Enter" && cursor >= 0) {
             e.preventDefault();
             show(cursor);
-            listEl.focus();
+            listEl!.focus();
         }
     });
 

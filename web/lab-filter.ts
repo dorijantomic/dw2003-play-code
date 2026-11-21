@@ -43,8 +43,8 @@ export function makeFilterable(select: FilterableSelect, { placeholder = "filter
   const count = document.createElement("span");
   count.className = "lab-filter-count";
 
-  select.parentNode.insertBefore(input, select);
-  select.parentNode.insertBefore(count, select.nextSibling);
+  select.parentNode!.insertBefore(input, select);
+  select.parentNode!.insertBefore(count, select.nextSibling);
 
   let terms = [];
 

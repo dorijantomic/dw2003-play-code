@@ -94,7 +94,7 @@ export function sceneCast(sc) {
     // The shared rule lives in engine/dw3/npc-manager.ts `stageCast`; this adds the
     // script-spawned (ephemeral) actors the scene conjures onto scene.npcs.
     // EXPERIMENT (mounts): a mount's quest character is off the map while F2 -> Extras -> Mount is off
-    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get).filter((n) => !mountActorHidden(n));
+    const built = stageCast(sc, sc.npcs, state.chapter, storyFlags.get!!!!!!).filter((n) => !mountActorHidden(n));
     const stand = questStandIns(sc, built);
     const eph = sc.npcs.filter((n) => n._ephemeral);
     if (!eph.length) return stand.length ? built.concat(stand) : built;
@@ -140,9 +140,9 @@ function questStandIns(sc, built) {
 
 // A screen that owns the whole picture: the field stays where it is under it, and the wide sides are covered.
 export function fieldFullScreenUiOpen() {
-    return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
-        || gym.isOpen() || cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
-        || saveScreen.isOpen() || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
+    return !!(state.menuOpen || status?.isOpen!() || inn.isOpen!() || shop.isOpen!() || driMenu.isOpen!()
+        || gym.isOpen!() || cardShop.isOpen!() || cardAlbum.isOpen!() || cardDeck.isOpen!() || cardDuel.isOpen()
+        || saveScreen.isOpen!() || fightReport.isOpen!() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
         || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen() || books.isOpen()
         || cntyselNative.isOpen() || state.wipe28);
 }
@@ -152,13 +152,13 @@ export function fieldFullScreenUiOpen() {
 // screens, the fight report and the movie fill the canvas, the name / pack / title / end / map-select screens and the stage wipe replace
 // the picture, and the dev pages sit over everything. (Every screen of this list is also in fieldFullScreenUiOpen.)
 export function fieldDrawsOverFieldUiOpen() {
-    return !!(state.menuOpen || status?.isOpen() || inn.isOpen() || shop.isOpen() || driMenu.isOpen()
-        || gym.isOpen() || saveScreen.isOpen() || books.isOpen());
+    return !!(state.menuOpen || status?.isOpen!() || inn.isOpen!() || shop.isOpen!() || driMenu.isOpen!()
+        || gym.isOpen!() || saveScreen.isOpen!() || books.isOpen());
 }
 
 export function fieldTakesOverUiOpen() {
-    return !!(cardShop.isOpen() || cardAlbum.isOpen() || cardDeck.isOpen() || cardDuel.isOpen()
-        || fightReport.isOpen() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
+    return !!(cardShop.isOpen!() || cardAlbum.isOpen!() || cardDeck.isOpen!() || cardDuel.isOpen()
+        || fightReport.isOpen!() || fieldMovie.isOpen() || state.nameEntry || state.packSelect
         || state.endScreen || state.titleScreen || stagslctMenu.open || cutContentOpen() || soundTest.open || blastOpen() || plannerOpen() || damageLabOpen() || replayOpen()
         || cntyselNative.isOpen() || state.wipe28);
 }
@@ -173,21 +173,21 @@ export function fieldStageFilled() {
  * failed load, uses web/textbox.js with `legacyAnchor`.
  */
 export function openTalkLine(ref, onClose, npc, legacyAnchor: () => { x: number; y: number; mode: number; }) {
-    const legacy = () => textbox.open(getDialogue(ref), onClose, legacyAnchor);
+    const legacy = () => textbox.open!(getDialogue(ref), onClose, legacyAnchor);
     if (!npc || !/^estalk0\d$/.test(ref?.file ?? "")) return legacy();
     const project = (x, y) => ({
         sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
         sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
     });
     S.translatedDialogueText = getDialogue(ref);
-    dialogueBox.open(
+    dialogueBox.open!(
         { file: ref.file, index: Number(ref.index) },
         { kind: "talk", npc: { x: Math.round(npc.x), y: Math.round(npc.y), facing: fieldDirectionIndex(npc.dir), actorId: npc.npc_id ?? 0 } },
         onClose,
         project,
         {
             playerNameBytes: encodeNativeScreenText(state.playerName),
-            onFail: () => fallbackTextbox.open(getDialogue(ref), onClose, legacyAnchor),
+            onFail: () => fallbackTextbox.open!(getDialogue(ref), onClose, legacyAnchor),
         },
     );
 }
@@ -207,7 +207,7 @@ export function questSpeak(npcId, name, text) {
                 return () => ({ x: (npc.x - lastCam.x) * ZOOM, y: (npc.y - lastCam.y) * ZOOM, mode });
             })()
             : null;
-        const fallback = () => fallbackTextbox.open({ name, pages }, resolve, anchor);
+        const fallback = () => fallbackTextbox.open!({ name, pages }, resolve, anchor);
         const project = (x, y) => ({
             sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W),
             sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H),
@@ -217,15 +217,15 @@ export function questSpeak(npcId, name, text) {
         const mode = npc
             ? { kind: "talk", npc: { x: Math.round(npc.x), y: Math.round(npc.y), facing: fieldDirectionIndex(npc.dir), actorId: npc.npc_id ?? 0 } }
             : { kind: "say", plain: true, balloonMode: 0, actor: null };
-        dialogueBox.open({ pack: buildPack(name, pages), index: 0 }, mode, resolve, project, opts);
+        dialogueBox.open!({ pack: buildPack(name, pages), index: 0 }, mode, resolve, project, opts);
     });
 }
 
 export async function playQuestScene(steps) {
     const mapId = currentMap()?.id;
     const scene = state.scenes[mapId];
-    if (!scene || cutscene.isActive() || textbox.isOpen() || battle.isActive()) {
-        console.warn(`[quest scene] game busy: scene=${!!scene} cutscene=${cutscene.isActive()} textbox=${textbox.isOpen()} battle=${battle.isActive()}`);
+    if (!scene || cutscene.isActive() || textbox.isOpen!() || battle.isActive()) {
+        console.warn(`[quest scene] game busy: scene=${!!scene} cutscene=${cutscene.isActive()} textbox=${textbox.isOpen!()} battle=${battle.isActive()}`);
         questSceneFxReset();
         return null;
     }
@@ -253,7 +253,7 @@ export async function playQuestScene(steps) {
         let answer = null;
         for (const [n, s] of Object.entries(speech) as [string, SpeechBeat][]) {
             hooks.afterSay[n] = s.ask
-                ? (resume) => choice.open(s.ask, s.options, (i) => { answer = i; resume(); })
+                ? (resume) => choice.open!(s.ask!, s.options!, (i) => { answer = i; resume(); })
                 : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };
         }
         S.cutsceneEsdmgRef = null;
@@ -327,13 +327,13 @@ export function runQuestSceneEvent(ev, resume) {
         case "time": setAmbienceScene(ev).then(() => done()); return;
         case "lightning": ambienceLightning(ev.count, ev.force).then(() => done()); return;
         case "sfx":                                        // a sound cue by name; never blocks the scene
-            try { sfx.play(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, e?.message ?? e); }
+            try { sfx.play!(String(ev.name)); } catch (e) { console.warn(`[quest scene] sound ${JSON.stringify(ev.name)} did not play:`, e?.message ?? e); }
             return done();
         case "placecard":
             // The quest's own place card: the field's blue stage-entry card, typed with two names the quest wrote
             // (web/placecard.js beginText). It closes by itself, so the scene goes straight on without waiting.
             loadPlaceCard().then(() => {
-                if (!placeCard.beginText(ev.area, ev.place)) console.warn(`[quest scene] place card ${JSON.stringify(ev.area)} / ${JSON.stringify(ev.place)} did not start`);
+                if (!placeCard.beginText!(ev.area, ev.place)) console.warn(`[quest scene] place card ${JSON.stringify(ev.area)} / ${JSON.stringify(ev.place)} did not start`);
             }).catch((e) => console.warn(`[quest scene] the place card data did not load: ${e?.message ?? e}`));
             return done();
         case "chase": return startQuestChase(ev, done);

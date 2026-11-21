@@ -528,7 +528,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     const nameBox = $("mp-name") as HTMLInputElement, addrBox = $("mp-addr") as HTMLInputElement, codeBox = $("mp-join-code") as HTMLInputElement;
     // The name is the one the player gave their character (so SENIOR stays SENIOR); the box lets them change it for this room only.
     const readName = () => { mp.name = nameBox.value.trim().slice(0, 12) || defaultName(); };
-    mp.ui.fillName = () => { if (mp.status === "off") nameBox.value = defaultName(); };   // not at install: the game's state does not exist yet
+    mp.ui!.fillName = () => { if (mp.status === "off") nameBox.value = defaultName(); };   // not at install: the game's state does not exist yet
     try { addrBox.value = localStorage.getItem(KEY_ADDR) || ""; } catch { /* storage blocked */ }
     $("mp-host").onclick = () => { readName(); hostGame(); };
     const join = () => {

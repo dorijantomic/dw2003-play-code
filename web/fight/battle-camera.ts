@@ -22,7 +22,7 @@ import type { PlacementTable } from "../types/battle3d.js";
 
 const sub3   = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
 const cross3 = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-const dot3   = (a: number[], b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const dot3   = (a: number[], b) => a[0]!*b[0] + a[1]!*b[1] + a[2]!*b[2];
 const norm3  = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
 
 // Right-handed, column-major view matrix (identical convention to battle3d.mat4LookAt).
@@ -32,8 +32,8 @@ export function buildView(eye, target, up = [0, 1, 0], roll = 0) {
   let y = cross3(z, x);                 // up'
   if (roll) {                            // rotate the (x,y) basis about the view axis z
     const c = Math.cos(roll), s = Math.sin(roll);
-    const xr = [x[0]*c + y[0]*s, x[1]*c + y[1]*s, x[2]*c + y[2]*s];
-    const yr = [-x[0]*s + y[0]*c, -x[1]*s + y[1]*c, -x[2]*s + y[2]*c];
+    const xr = [x[0]!*c + y[0]!*s, x[1]!*c + y[1]!*s, x[2]!*c + y[2]!*s];
+    const yr = [-x[0]!*s + y[0]!*c, -x[1]!*s + y[1]!*c, -x[2]!*s + y[2]!*c];
     x = xr; y = yr;
   }
   const m = new Float32Array(16);
@@ -410,9 +410,9 @@ export function rotateAboutAxis(v, axis: number[], rad: number) {
   const k = norm3(axis), c = Math.cos(rad), s = Math.sin(rad);
   const kv = dot3(k, v), kxv = cross3(k, v);
   return [
-    v[0]*c + kxv[0]*s + k[0]*kv*(1 - c),
-    v[1]*c + kxv[1]*s + k[1]*kv*(1 - c),
-    v[2]*c + kxv[2]*s + k[2]*kv*(1 - c),
+    v[0]*c + kxv[0]!*s + k[0]!*kv*(1 - c),
+    v[1]*c + kxv[1]!*s + k[1]!*kv*(1 - c),
+    v[2]*c + kxv[2]!*s + k[2]!*kv*(1 - c),
   ];
 }
 

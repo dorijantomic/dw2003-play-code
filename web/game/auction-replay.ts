@@ -45,7 +45,7 @@ export function runAuctionArrival(mapId) {
     // The disc asks once per field load, behind the same field-owned locks the
     // rest of the arrival work respects: no handoff in flight, no fade, no box.
     if (S.engineBridge?.isBusy() || state.handoffHold || fade.dir !== 0) return "wait";
-    if (choice.isOpen() || textbox.isOpen() || cutscene.isActive()) return "wait";
+    if (choice.isOpen!() || textbox.isOpen!() || cutscene.isActive()) return "wait";
     const ordinal = Number(S.engine.state.vars.get("$story.ordinal") ?? 0);
     const lot = selectAuctionLot(au.lots, ordinal, S.engine.state.flags);
     if (!lot) return "none";
@@ -74,9 +74,9 @@ function startAuctionLot(lot) {
             const yes = auctionPlainLine(strings[1]) ?? "Yes, bid.";
             const no = auctionPlainLine(strings[2]) ?? "No, I'll pass.";
             storyDbg("AUCTION QUESTION", prompt, "yes:", yes, "no:", no);
-            choice.open(prompt, [yes, no], (idx) => onAnswer(idx === 0 ? "accept" : "pass"));
+            choice.open!(prompt, [yes, no], (idx) => onAnswer(idx === 0 ? "accept" : "pass"));
         },
-        writeFlag: (id, value) => S.engine.writeStoryFlag(id, value),
+        writeFlag: (id, value) => S.engine!.writeStoryFlag(id, value),
     };
     runAuctionLot(lot, host, (handoff) => {
         // The answer script's own HANDOFF is the tower's force-exit (530 → s275).
@@ -98,7 +98,7 @@ function startAuctionLot(lot) {
 /** May the theatre open right now? A running scene, fight or screen is never replaced by a replay. */
 export function replayFieldFree() {
     return !!state.started && !state.titleScreen && !state.endScreen
-        && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+        && !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!()
         && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28;
 }
 

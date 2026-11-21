@@ -168,8 +168,8 @@ function pixelsOf(img: HTMLImageElement) {
     const cv = document.createElement("canvas");
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
-    return cx.getImageData(0, 0, cv.width, cv.height).data;
+    cx!.drawImage(img, 0, 0);
+    return cx!.getImageData(0, 0, cv.width, cv.height).data;
 }
 
 // clsImg decides WHERE grass goes (the base map for a day/night variant);
@@ -195,23 +195,23 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
         let run = 0, wrun = 0;
         for (let x = 0; x < W; x++) {
             const o = (y * W + x) * 4;
-            if (isGrass(data[o], data[o + 1], data[o + 2])) run++;
+            if (isGrass(data[o]!, data[o + 1]!, data[o + 2]!)) run++;
             if (isWaterPx(data[o], data[o + 1], data[o + 2])) wrun++;
-            sat[(y + 1) * SW + (x + 1)] = sat[y * SW + (x + 1)] + run;
-            wsat[(y + 1) * SW + (x + 1)] = wsat[y * SW + (x + 1)] + wrun;
+            sat[(y + 1) * SW + (x + 1)] = sat[y * SW + (x + 1)]! + run;
+            wsat[(y + 1) * SW + (x + 1)] = wsat[y * SW + (x + 1)]! + wrun;
         }
     }
     const boxSum = (t: number[] | Int32Array<ArrayBuffer>, x: number, y: number, r: number) => {
         const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
         const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
-        return [t[y1 * SW + x1] - t[y0 * SW + x1] - t[y1 * SW + x0] + t[y0 * SW + x0],
+        return [t[y1 * SW + x1]! - t[y0 * SW + x1]! - t[y1 * SW + x0]! + t[y0 * SW + x0]!,
                 (x1 - x0) * (y1 - y0)];
     };
     const solid = (x: number, y: number) => {
         const [n, area] = boxSum(sat, x, y, STRICT_GRASS_STAGES.has(stageId) ? 9 : SOLID_R);
-        return n >= SOLID_MIN * area;
+        return n! >= SOLID_MIN * area!;
     };
-    const nearWater = (x: number, y: number) => boxSum(wsat, x, y, WATER_GAP)[0] > 0;
+    const nearWater = (x: number, y: number) => boxSum(wsat, x, y, WATER_GAP)[0]! > 0;
 
     const bandCount = Math.ceil(H / BAND_H);
     const perBand = Array.from({ length: bandCount }, () => []);
@@ -232,20 +232,20 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
         for (let cxp = 0; cxp < W; cxp += CELL) {
             // a cell is grass only if its centre and two nearby probes all are
             const m = [sample(cxp + 2, cy + 2), sample(cxp, cy), sample(cxp + 4, cy + 4)];
-            if (!m.every((p) => isGrass(p[0], p[1], p[2]))) continue;
+            if (!m.every((p) => isGrass(p[0]!, p[1]!, p[2]!))) continue;
             if (!solid(cxp + 2, cy + 2) || nearWater(cxp + 2, cy + 2)) continue;
-            { const [wn, wa] = boxSum(wsat, cxp + 2, cy + 2, WET_R); if (wn >= WET_MAX * wa) continue; }
+            { const [wn, wa] = boxSum(wsat, cxp + 2, cy + 2, WET_R); if (wn! >= WET_MAX * wa!) continue; }
             for (let k = 0; k < BLADES_PER_CELL; k++) {
                 const px = cxp + rand() * CELL;
                 const py = cy + rand() * CELL;
                 const [cr, cg, cb] = sample(px, py);
-                if (!isGrass(cr, cg, cb)) continue;
+                if (!isGrass(cr!, cg!, cb!)) continue;
                 const [r, g, b] = sampleColor(px, py);
                 const vary = 0.85 + rand() * 0.35;
-                perBand[Math.min(bandCount - 1, (py / BAND_H) | 0)].push(
+                perBand[Math.min(bandCount - 1, (py / BAND_H) | 0)]!.push(
                     px, 0, py / SIN,                                  // iPos
                     rand() * Math.PI, 9 + rand() * 9, 2.2 + rand() * 1.6, rand() * 6.28, // iData
-                    (r / 255) * vary, (g / 255) * vary * 1.05, (b / 255) * vary,        // iColor
+                    (r! / 255) * vary, (g! / 255) * vary * 1.05, (b! / 255) * vary,        // iColor
                 );
                 total++;
             }
@@ -255,8 +255,8 @@ function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImage
     const bands = [];
     for (let i = 0; i < bandCount; i++) {
         const arr = perBand[i];
-        if (!arr.length) continue;
-        const n = arr.length / 10;
+        if (!arr!.length) continue;
+        const n = arr!.length / 10;
         const geo = bladeGeometry();
         const buf = new THREE.InstancedInterleavedBuffer(new Float32Array(arr), 10);
         geo.setAttribute("iPos", new THREE.InterleavedBufferAttribute(buf, 3, 0));
@@ -312,13 +312,13 @@ export function renderGrass(stageId: string, mapImg: HTMLImageElement, camX: num
     uTime.value = timeSec;
     // who is standing in the grass this frame (map px -> blade world: x, z = y / sin(pitch))
     const feet = window.__feet;
-    for (let i = 0; i < 8; i++) uFeet.value[i].set(0, 0, 0, 0);
+    for (let i = 0; i < 8; i++) uFeet.value[i]!.set(0, 0, 0, 0);
     if (feet && window.__grassPush !== false) {
         let n = 0;
         for (const f of feet) {
             if (n >= 8) break;
             if (f.x < camX - 40 || f.x > camX + VIEW_W + 40 || f.y < camY - 40 || f.y > camY + VIEW_H + 60) continue;
-            uFeet.value[n++].set(f.x, f.y / SIN, f.leader ? 22 : 17, f.moving ? 1 : 0.55);
+            uFeet.value[n++]!.set(f.x, f.y / SIN, f.leader ? 22 : 17, f.moving ? 1 : 0.55);
         }
     }
     const gu = window.__grassGust;

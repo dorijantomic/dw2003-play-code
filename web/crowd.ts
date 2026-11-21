@@ -15,8 +15,8 @@ function walkable(grid: { cell: number; cols: number; rows: number; cells: numbe
     return c >= 0 && r >= 0 && c < grid.cols && r < grid.rows && grid.cells[r * grid.cols + c] === 0;
 }
 function clearLine(grid: { cell: number; cols: number; rows: number; cells: number[]; }, a: number[], b) {
-    const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4));
-    for (let i = 0; i <= n; i++) if (!walkable(grid, a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n)) return false;
+    const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0]!, b[1] - a[1]!) / 4));
+    for (let i = 0; i <= n; i++) if (!walkable(grid, a[0]! + (b[0] - a[0]!) * i / n, a[1]! + (b[1] - a[1]!) * i / n)) return false;
     return true;
 }
 // a closed loop of 3-5 waypoints around a start point, every leg on walkable ground

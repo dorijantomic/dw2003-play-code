@@ -39,7 +39,7 @@ import { startTransition } from "./transitions.js";
 
 /** Open the starter-pack wizard. */
 export function openPackSelect(opts = {}) {
-    return packSelectNative.open({ state, ...opts });
+    return packSelectNative.open!({ state, ...opts });
 }
 
 // The shop's Edit Folder opens the SAME folder screen as the pause menu's Card
@@ -51,7 +51,7 @@ export function openPackSelect(opts = {}) {
 // is the one binding both routes use.
 // Leaving the screen returns to the field, where the hand-off left the player.
 export function openCardShopFolder() {
-    cardDeck.open();
+    cardDeck.open!();
 }
 
 export function openFly(row) {
@@ -102,7 +102,7 @@ export function openFightReport(opts: FightReportOptions = {}) {
     const dropItemId = opts.dropItemId
         ?? (opts.droppedItem ? (itemForDropName(opts.droppedItem, ITEM_BY_NAME, ITEM_BY_ID)?.id ?? 0) : 0);
     if (dropItemId > 0) itemLog.noteSeen([dropItemId]);   // GLOSSARY > ITEMS: the win screen names this drop
-    fightReportNative.open({
+    fightReportNative.open!({
         gameState: state,
         battleId: opts.battleId ?? 0,
         dropItemId,
@@ -133,7 +133,7 @@ export function openMemoryCard(mode, onClose = null, atSavePoint = undefined) {
     const savePoint = atSavePoint !== undefined
         ? (atSavePoint ?? null)
         : savePointForStage(map?.id ?? null);
-    saveScreen.open(state, mode, onClose, {
+    saveScreen.open!(state, mode, onClose, {
         areaName: map?.name ?? "",
         placeName: savePoint?.place ?? map?.name ?? "",
         // The original's record carries the save point's own esshpnam index.
@@ -189,7 +189,7 @@ export function openNativeReport(b, onClose) {
         const firstDrop = (b._loot?.drops ?? []).find(Boolean) ?? null;
         const dropItemId = firstDrop ? (itemForDropName(firstDrop, ITEM_BY_NAME, ITEM_BY_ID)?.id ?? 0) : 0;
         b._reportPaidItemId = dropItemId;
-        fightReportNative.open({
+        fightReportNative.open!({
             gameState: state,
             battleId: b.screenId ?? 0,
             dropItemId,
@@ -228,5 +228,5 @@ export function openNativeReport(b, onClose) {
             }),
             onClose,
         });
-        return fightReportNative.isOpen();
+        return fightReportNative.isOpen!();
 }

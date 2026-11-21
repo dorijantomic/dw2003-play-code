@@ -43,25 +43,25 @@ function rasterHeight(posList, N: number, E: number) {
   for (const P of posList) {
     const V = [0, 1, 2].map(() => ({ x: 0, y: 0, z: 0 }));
     for (let t = 0; t + 8 < P.length; t += 9) {
-      for (let k = 0; k < 3; k++) { V[k].x = P[t + k * 3]; V[k].y = P[t + k * 3 + 1]; V[k].z = P[t + k * 3 + 2]; }
-      const minX = Math.min(V[0].x, V[1].x, V[2].x), maxX = Math.max(V[0].x, V[1].x, V[2].x);
-      const minZ = Math.min(V[0].z, V[1].z, V[2].z), maxZ = Math.max(V[0].z, V[1].z, V[2].z);
+      for (let k = 0; k < 3; k++) { V[k]!.x = P[t + k * 3]; V[k]!.y = P[t + k * 3 + 1]; V[k]!.z = P[t + k * 3 + 2]; }
+      const minX = Math.min(V[0]!.x, V[1]!.x, V[2]!.x), maxX = Math.max(V[0]!.x, V[1]!.x, V[2]!.x);
+      const minZ = Math.min(V[0]!.z, V[1]!.z, V[2]!.z), maxZ = Math.max(V[0]!.z, V[1]!.z, V[2]!.z);
       const i0 = Math.max(0, Math.floor(toTex(minX) - 0.5)), i1 = Math.min(N - 1, Math.ceil(toTex(maxX) - 0.5));
       const j0 = Math.max(0, Math.floor(toTex(minZ) - 0.5)), j1 = Math.min(N - 1, Math.ceil(toTex(maxZ) - 0.5));
       const [a, b, c] = V;
-      const d00 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2, d01 = (b.x - a.x) * (c.x - a.x) + (b.z - a.z) * (c.z - a.z);
-      const d11 = (c.x - a.x) ** 2 + (c.z - a.z) ** 2, den = d00 * d11 - d01 * d01;
+      const d00 = (b!.x - a!.x) ** 2 + (b!.z - a!.z) ** 2, d01 = (b!.x - a!.x) * (c!.x - a!.x) + (b!.z - a!.z) * (c!.z - a!.z);
+      const d11 = (c!.x - a!.x) ** 2 + (c!.z - a!.z) ** 2, den = d00 * d11 - d01 * d01;
       if (Math.abs(den) < 1e-9) continue;
       for (let j = j0; j <= j1; j++) {
         const z = (j + 0.5) / N * span - E;
         for (let i = i0; i <= i1; i++) {
           const x = (i + 0.5) / N * span - E;
-          const vx = x - a.x, vz = z - a.z;
-          const d20 = vx * (b.x - a.x) + vz * (b.z - a.z), d21 = vx * (c.x - a.x) + vz * (c.z - a.z);
+          const vx = x - a!.x, vz = z - a!.z;
+          const d20 = vx * (b!.x - a!.x) + vz * (b!.z - a!.z), d21 = vx * (c!.x - a!.x) + vz * (c!.z - a!.z);
           const bv = (d11 * d20 - d01 * d21) / den, bw = (d00 * d21 - d01 * d20) / den, bu = 1 - bv - bw;
           if (bu < -1e-4 || bv < -1e-4 || bw < -1e-4) continue;
-          const y = bu * a.y + bv * b.y + bw * c.y, k = j * N + i;
-          if (Number.isNaN(h[k]) || y > h[k]) h[k] = y;
+          const y = bu * a!.y + bv * b!.y + bw * c!.y, k = j * N + i;
+          if (Number.isNaN(h[k]) || y > h[k]!) h[k] = y;
         }
       }
     }
@@ -83,31 +83,31 @@ export function bakeArenaMask(posList) {
       const x = (i + 0.5) / N * span - E, r = Math.hypot(x, z);
       // dirt: a worn clearing round the fight, noise patches everywhere, more bare earth where the ground rises
       const wob = (S.noise3JS(x / 2100 + 11.3, 7.31, z / 2100 - 4.7) - 0.5) * 1300;
-      const clear = smooth01(P.DIRT_CLEAR[0], P.DIRT_CLEAR[1], r + wob);
+      const clear = smooth01(P.DIRT_CLEAR[0]!, P.DIRT_CLEAR[1]!, r + wob);
       const patch = S.fbm3JS(x / P.DIRT_SCALE, 5.13, z / P.DIRT_SCALE);
-      const dirt = 0.5 + 0.55 * (0.5 - clear) + 0.60 * (patch - 0.5) + 0.30 * smooth01(P.DIRT_FAR[0], P.DIRT_FAR[1], r);
+      const dirt = 0.5 + 0.55 * (0.5 - clear) + 0.60 * (patch - 0.5) + 0.30 * smooth01(P.DIRT_FAR[0]!, P.DIRT_FAR[1]!, r);
       // rock: outcrops, more of them on the rising outer ground (the slope band in the shader does the cliffs)
       const rock = P.ROCK_BASE + P.ROCK_NOISE * (S.fbm3JS(x / P.ROCK_SCALE, 2.37, z / P.ROCK_SCALE) - 0.5) * 2
-                 + 0.45 * smooth01(P.ROCK_FAR[0], P.ROCK_FAR[1], r);
+                 + 0.45 * smooth01(P.ROCK_FAR[0]!, P.ROCK_FAR[1]!, r);
       // path: a worn ring round the fight, its radius wandering with the same noise
       const rw = r + (S.noise3JS(x / 2000, 9.11, z / 2000) - 0.5) * 700;
       const path = 0.5 + (P.PATH_W * 0.5 - Math.abs(rw - P.PATH_R)) / P.PATH_W;
       // AO: from the baked ground height, plus a little patchiness
       const hh = hgt[j * N + i], hy = Number.isNaN(hh) ? 0 : hh;
-      if (!Number.isNaN(hh)) { baked++; hMax = Math.max(hMax, hh); }
-      const ao = 1 - P.AO_RIM * smooth01(P.AO_H[0], P.AO_H[1], Math.max(0, hy))
+      if (!Number.isNaN(hh)) { baked++; hMax = Math.max(hMax, hh!); }
+      const ao = 1 - P.AO_RIM * smooth01(P.AO_H[0]!, P.AO_H[1]!, Math.max(0, hy!))
                - 0.07 * smooth01(0.35, 0.65, S.noise3JS(x / 700, 1.7, z / 700));
       const o = (j * N + i) * 4;
       data[o] = b8(dirt); data[o + 1] = b8(rock); data[o + 2] = b8(path); data[o + 3] = b8(ao);
     }
   }
   // the JS twin of the shader's read: the SAME bytes, bilinear, same uv mapping
-  const at = (i: number, j: number) => { const k = ((j < 0 ? 0 : j > N - 1 ? N - 1 : j) * N + (i < 0 ? 0 : i > N - 1 ? N - 1 : i)) * 4; return [data[k] / 255, data[k + 1] / 255, data[k + 2] / 255, data[k + 3] / 255]; };
+  const at = (i: number, j: number) => { const k = ((j < 0 ? 0 : j > N - 1 ? N - 1 : j) * N + (i < 0 ? 0 : i > N - 1 ? N - 1 : i)) * 4; return [data[k]! / 255, data[k + 1]! / 255, data[k + 2]! / 255, data[k + 3]! / 255]; };
   function sample(x: number, z: number) {
     const u = (x + E) / span * N - 0.5, v = (z + E) / span * N - 0.5;
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
     const a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1), out = [0, 0, 0, 0];
-    for (let k = 0; k < 4; k++) out[k] = (a[k] * (1 - fu) + b[k] * fu) * (1 - fv) + (c[k] * (1 - fu) + d[k] * fu) * fv;
+    for (let k = 0; k < 4; k++) out[k] = (a[k]! * (1 - fu) + b[k]! * fu) * (1 - fv) + (c[k]! * (1 - fu) + d[k]! * fu) * fv;
     return { dirt: out[0], rock: out[1], path: out[2], ao: out[3] };
   }
   /** the ground's own height where the AO raster saw it (null off the ground) — the mask is over the ground */
@@ -115,7 +115,7 @@ export function bakeArenaMask(posList) {
     const u = (x + E) / span * N - 0.5, v = (z + E) / span * N - 0.5;
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
     const get = (a: number, b: number) => { const ii = Math.max(0, Math.min(N - 1, a)), jj = Math.max(0, Math.min(N - 1, b)); const y = hgt[jj * N + ii]; return Number.isNaN(y) ? 0 : y; };
-    return (get(i, j) * (1 - fu) + get(i + 1, j) * fu) * (1 - fv) + (get(i, j + 1) * (1 - fu) + get(i + 1, j + 1) * fu) * fv;
+    return (get(i, j)! * (1 - fu) + get(i + 1, j)! * fu) * (1 - fv) + (get(i, j + 1)! * (1 - fu) + get(i + 1, j + 1)! * fu) * fv;
   }
   const info = { res: N, extent: E, texel: span / N, channels: "R dirt, G rock, B path, A ao", groundTexels: baked,
                  heightMax: Math.round(hMax), ms: Math.round(performance.now() - t0) };
@@ -152,14 +152,14 @@ export function rockCandidates(rec) {
       for (let t = 380; t < L; t += P.BANK_STRIDE) {
         const x = a[0] + (b[0] - a[0]) * t / L, z = a[2] + (b[2] - a[2]) * t / L, out = Math.hypot(x, z) || 1;
         const rad = Math.min(out + P.BANK_OUT, P.MAX_R);   // stay on the ground: the rim has no triangles past it
-        list.push({ q: [x / out * rad, 0, z / out * rad], s: P.S[0] + r() * (P.S[1] - P.S[0]), seed: list.length + 1 });
+        list.push({ q: [x / out * rad, 0, z / out * rad], s: P.S[0]! + r() * (P.S[1]! - P.S[0]!), seed: list.length + 1 });
       }
     }
   }
   for (let k = 0; k < P.SCATTER; k++) {
     const az = r() * Math.PI * 2, rad = 3650 + r() * 2800, big = k < P.BIG;
     list.push({ q: [Math.sin(az) * rad, 0, Math.cos(az) * rad],
-                s: big ? P.BIG_S[0] + r() * (P.BIG_S[1] - P.BIG_S[0]) : P.S[0] + r() * (P.S[1] - P.S[0]), seed: list.length + 1, big });
+                s: big ? P.BIG_S[0]! + r() * (P.BIG_S[1]! - P.BIG_S[0]!) : P.S[0]! + r() * (P.S[1]! - P.S[0]!), seed: list.length + 1, big });
   }
   return list;
 }
@@ -206,7 +206,7 @@ export function plan(pctx) {
                                 surface: { pos: bank.map((b) => b.pos) }, items: itemsOnTriangles(bank.map((b) => b.pos), 120), data, userData: { kind: "bank" } });
   const scatter = hasGround && !soilGround;
   if (scatter) slots.push({ id: "ground.hills", label: "Distant hills", kind: "hill", layer: "builtHills", default: "mod.hills", data,
-                            items: itemsOnRing(36, P.HILLS.R[0], P.HILLS.BASE, P.HILLS.H[0]), userData: { kind: "hills" } });
+                            items: itemsOnRing(36, P.HILLS.R[0]!, P.HILLS.BASE, P.HILLS.H[0]!), userData: { kind: "hills" } });
 
   // 4. the scattered boulders: placed against the same keep-out the plants use, BEFORE them (placeOrder 0)
   const cands = rockCandidates(rec);
@@ -272,7 +272,7 @@ export function plan(pctx) {
     for (const it of cands) {
       const res = placeRock(it, ko, sh);
       if (res.firstWhy === "fight" || res.firstWhy === "cone") st.rejectedAtSpot++;
-      st.list.push([Math.round(it.q[0]), Math.round(it.q[2]), Math.round(it.s), res.at ? "ok" : res.why, res.push ?? null]);
+      st.list.push([Math.round(it.q[0]!), Math.round(it.q[2]!), Math.round(it.s), res.at ? "ok" : res.why, res.push ?? null]);
       if (!res.at) { st.byReason[res.why] = (st.byReason[res.why] || 0) + 1; st.dropped++; continue; }
       if (res.push > 0) st.pushed++;
       picked.push({ ...it, ...res });

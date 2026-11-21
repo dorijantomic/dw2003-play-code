@@ -106,7 +106,7 @@ export function fusionLootRows(halves, body, enemies: { [k: string]: EnemyRecord
 export function rollFusionDrops(halves, body, enemies: { [k: string]: EnemyRecord; }, rng: { (): number | undefined; (): number; }, disc = false) {
   const dropped = [];
   for (const { item, rate } of fusionDrops(halves, body, enemies)) {
-    const live = disc ? dropPasses(rate, rng) : rng() * 255 < rate;
+    const live = disc ? dropPasses(rate, rng) : rng()! * 255 < rate;
     if (live) dropped.push(item);
   }
   return dropped;

@@ -31,7 +31,7 @@ export function plan(pctx) {
     id: "sky.clouds", label: "Cloud banks", kind: "cloud", layer: "builtClouds", parent: "world", default: "mod.clouds", data: D,
     items: itemsOnRing(10, sky.rmax || 20000, (sky.ymin + sky.ymax) / 2 || 3000, ((sky.ymax - sky.ymin) || 2000) * 0.6), userData: { kind: "clouds" },
   });
-  if (!slots[0].surface) delete slots[0].surface;
+  if (!slots[0]!.surface) delete slots[0]!.surface;
   // the camera-following dome is the bound default's mesh (none when another sky asset is bound)
   pctx.slots.on((id: string) => { if (id === "sky.dome") pctx.camera.userData.sky = pctx.slots.instanceOf(id)?.dome || null; });
   current.rebuildWith = (mode: string | undefined) => {

@@ -111,7 +111,7 @@ function syncLegacyFlags() {
 function applyVolumes() {
     window.__bgm?.setVolume?.(fx.musicVolume);
     window.__sfx?.setVolume?.(fx.soundVolume);
-    setWeatherVolume(fx.soundVolume);
+    setWeatherVolume(fx.soundVolume!);
     setMusicVolume(fx.musicVolume);
 }
 function save(keys = null) {
@@ -157,7 +157,7 @@ window.__setFx = setFx;
     if (q.has("nosand")) fx.sand = false;
     if (q.has("noambience")) for (const k of ["rain", "snow", "sand", "lightning", "sound", "gusts", "breath", "frost", "tod", "clouds", "lamps", "fog", "shafts", "heat", "sparkle", "pollen", "leaves", "fireflies", "butterflies", "birds", "dragonflies", "fish", "critters", "devils", "steps", "puddles", "footsteps", "ambience", "musicfx", "nightlight", "windows", "screenfx", "wildlife", "rainwater", "sway", "wetlook", "mirror", "villagers"]) fx[k] = false;
     if (q.has("nosound")) fx.sound = false;
-    if (q.get("quality") in QUALITY) fx.quality = q.get("quality");
+    if (q.get("quality")! in QUALITY) fx.quality = q.get("quality");
     if (q.get("weather") === "always" || q.get("rain") === "always") fx.weatherMode = "always";
 }
 syncLegacyFlags();
@@ -205,16 +205,16 @@ function scan(img) {
     const cv = document.createElement("canvas");
     cv.width = w; cv.height = h;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(img, 0, 0, w, h);
-    const d = cx.getImageData(0, 0, w, h).data;
+    cx!.drawImage(img, 0, 0, w, h);
+    const d = cx!.getImageData(0, 0, w, h).data;
     let lum = 0, grass = 0, n = 0, room = 0, rn = 0;
     for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < 128) continue;
+        if (d[i + 3]! < 128) continue;
         n++;
-        const l = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11;
+        const l = d[i]! * 0.3 + d[i + 1]! * 0.59 + d[i + 2]! * 0.11;
         lum += l;
         if (l > 14) { room += l; rn++; }                 // the room itself, not the black void around it
-        if (d[i + 1] >= 105 && d[i + 1] > d[i] * 1.22 && d[i + 1] > d[i + 2] * 1.7 && d[i + 1] - d[i + 2] >= 55) grass++;
+        if (d[i + 1]! >= 105 && d[i + 1]! > d[i]! * 1.22 && d[i + 1]! > d[i + 2]! * 1.7 && d[i + 1]! - d[i + 2]! >= 55) grass++;
     }
     return { lum: n ? lum / n : 0, grass: n ? grass / n : 0, room: rn ? room / rn : 0 };
 }
@@ -304,8 +304,8 @@ function pixOf(p) {
         const cv = document.createElement("canvas");
         cv.width = p.w; cv.height = p.h;
         const cx = cv.getContext("2d", { willReadFrequently: true });
-        cx.drawImage(p.cls, 0, 0);
-        px = { data: cx.getImageData(0, 0, p.w, p.h).data, w: p.w, h: p.h };
+        cx!.drawImage(p.cls, 0, 0);
+        px = { data: cx!.getImageData(0, 0, p.w, p.h).data, w: p.w, h: p.h };
     } catch { px = null; }
     pixCache = { p, px };
     return px;
@@ -319,8 +319,8 @@ function pixOfImg(img) {
         const cv = document.createElement("canvas");
         cv.width = img.naturalWidth; cv.height = img.naturalHeight;
         const cx = cv.getContext("2d", { willReadFrequently: true });
-        cx.drawImage(img, 0, 0);
-        px = { data: cx.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
+        cx!.drawImage(img, 0, 0);
+        px = { data: cx!.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
     } catch { px = null; }
     pixImgCache = { img, px };
     return px;
@@ -332,12 +332,12 @@ const S = {
     pix: () => pixOf(S.p),
     pixMap: () => pixOfImg(S.img),
     feet: [], moving: false, dir: "down", wind: 18, img: null,
-    grid: () => window.__state?.collision?.[S.map.id] ?? null,
-    isWater: (x, y) => isWaterAt(S.map.id, x, y),
-    waterStage: () => isWaterStage(S.map.id),
-    waterTest: () => waterPixelTest(S.map.id),
-    onThunder: (ms) => thunder(fx.sound, ms, (Math.random() * 2 - 1) * 0.85),
-    onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps, type, vol); },
+    grid: () => window.__state?.collision?.[S.map!.id] ?? null,
+    isWater: (x, y) => isWaterAt(S.map!.id, x, y),
+    waterStage: () => isWaterStage(S.map!.id),
+    waterTest: () => waterPixelTest(S.map!.id),
+    onThunder: (ms) => thunder(fx.sound!, ms, (Math.random() * 2 - 1) * 0.85),
+    onStep: (type, vol) => { window.__lastStep = { type, vol, n: (window.__lastStep?.n || 0) + 1 }; footstep(fx.footsteps!, type, vol); },
 };
 function fillS(map, p, L: { rain: number; snow: number; blizzard: number; sand: number; leaves: number; }, now: number, dt: number, fade: number, camX: number, camY: number, img: HTMLImageElement, fxo = fx) {
     S.img = img ?? S.img;
@@ -360,18 +360,18 @@ function soundTick(p, L: { rain: number; snow: number; blizzard: number; sand: n
     if (!p.open && !sceneFx) { silenceAll(); return; }
     const rain = fxo.rain ? L.rain : 0, storm = fxo.snow ? L.blizzard : 0, sandL = fxo.sand ? L.sand : 0;
     const bad = Math.max(rain, storm, sandL);
-    setSound(fx.sound, {
+    setSound(fx.sound!, {
         rain, sand: sandL, night: p.night && fxo.fireflies ? 1 : 0,
         wind: clamp01(0.10 + storm * 0.9 + sandL * 0.55 + rain * 0.3 + (fxo.snow ? L.snow * 0.15 : 0)),
     });
     const calm = 1 - clamp01(bad * 1.4);
-    setAmbience(fx.ambience, {
+    setAmbience(fx.ambience!, {
         water: (isWaterStage(S.map?.id) || p.coast ? 0.7 : 0) * (1 - 0.5 * bad),
         forest: (p.grassShare >= 0.05 || p.swamp ? 0.7 : 0.2) * calm,
         city: /City|Street|Bridge/.test(S.map?.name || "") ? 0.8 : 0,
         birds: 0,
     });
-    setMusic(window.__bgm?.el, fx.musicfx, clamp01(rain * 0.7 + storm + sandL * 0.8), clamp01(rain * 0.35 + storm * 0.85 + sandL * 0.6));
+    setMusic(window.__bgm?.el, fx.musicfx!, clamp01(rain * 0.7 + storm + sandL * 0.8), clamp01(rain * 0.35 + storm * 0.85 + sandL * 0.6));
 }
 export function ambienceSilence() { silenceAll(); }
 
@@ -404,11 +404,11 @@ function glowSprite() {
     glow = document.createElement("canvas");
     glow.width = glow.height = 24;
     const g = glow.getContext("2d");
-    const grd = g.createRadialGradient(12, 12, 0, 12, 12, 12);
+    const grd = g!.createRadialGradient(12, 12, 0, 12, 12, 12);
     grd.addColorStop(0, "rgba(255,255,190,1)");
     grd.addColorStop(0.25, "rgba(210,255,120,0.55)");
     grd.addColorStop(1, "rgba(160,255,80,0)");
-    g.fillStyle = grd; g.fillRect(0, 0, 24, 24);
+    g!.fillStyle = grd; g!.fillRect(0, 0, 24, 24);
     return glow;
 }
 
@@ -700,7 +700,7 @@ let lastAtmos = null;
 window.__battleAtmos = () => {
     if (!lastAtmos) return null;
     const phase = todPhaseNow();
-    return { ...lastAtmos, phase, rgb: todColor(phase), thunder: () => thunder(fx.sound, 900, (Math.random() * 2 - 1) * 0.6) };
+    return { ...lastAtmos, phase, rgb: todColor(phase), thunder: () => thunder(fx.sound!, 900, (Math.random() * 2 - 1) * 0.6) };
 };
 export function ambienceFor(map, mapImg, camX: number, camY: number) {
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
@@ -1130,21 +1130,21 @@ export function installFxPanel(stageEl: HTMLElement | null) {
     gear.addEventListener("click", toggle);
     panel.addEventListener("input", (e) => {
         const t = e.target;
-        if (t.dataset && t.dataset.slider) {
-            setNum(t.dataset.slider, +t.value);
-            const v = panel.querySelector(`[data-val="${t.dataset.slider}"]`); if (v) v.textContent = (+t.value).toFixed(2);
+        if (t!.dataset && t!.dataset.slider) {
+            setNum(t!.dataset.slider, +t!.value);
+            const v = panel.querySelector(`[data-val="${t!.dataset.slider}"]`); if (v) v.textContent = (+t!.value).toFixed(2);
         }
     });
     panel.addEventListener("change", (e) => {
         const t = e.target;
-        if (t.dataset.fx) setFx(t.dataset.fx, t.checked);
-        else if ("mode" in t.dataset) setFx("weatherMode", t.value);
-        else if ("quality" in t.dataset) setFx("quality", t.value);
-        else if ("tod" in t.dataset) setFx("todMode", t.value);
-        else if ("spritefilter" in t.dataset) setFx("spriteFilter", t.value);
-        else if ("dial" in t.dataset) setFx("encounterDialMode", t.value);
-        else if ("preset" in t.dataset) { if (t.value) applyPreset(t.value); t.value = ""; }
-        t.blur();
+        if (t!.dataset.fx) setFx(t!.dataset.fx, t!.checked);
+        else if ("mode" in t!.dataset) setFx("weatherMode", t!.value);
+        else if ("quality" in t!.dataset) setFx("quality", t!.value);
+        else if ("tod" in t!.dataset) setFx("todMode", t!.value);
+        else if ("spritefilter" in t!.dataset) setFx("spriteFilter", t!.value);
+        else if ("dial" in t!.dataset) setFx("encounterDialMode", t!.value);
+        else if ("preset" in t!.dataset) { if (t!.value) applyPreset(t!.value); t!.value = ""; }
+        t!.blur();
     });
     // An Open button of the F2 page: the key's own switch must be on. Screens inside the game go through
     // window.__openExtra (web/game.js) and the page steps aside; the others open in a new tab (web/dev-panel-model.js DEV_OPEN).
@@ -1155,7 +1155,7 @@ export function installFxPanel(stageEl: HTMLElement | null) {
         else window.open(o.href, "_blank", o.noopener ? "noopener" : undefined);
     };
     panel.addEventListener("click", (e) => {
-        const act = e.target.closest("[data-act]");
+        const act = e.target!.closest("[data-act]");
         if (act) {
             const [kind, arg] = act.dataset.act.split(":");
             if (kind === "save" || kind === "load") profileAct(kind, arg);
@@ -1165,7 +1165,7 @@ export function installFxPanel(stageEl: HTMLElement | null) {
             else if (kind === "open") openDev(arg);
             act.blur(); return;
         }
-        const b = e.target.closest("[data-all]");
+        const b = e.target!.closest("[data-all]");
         if (!b) return;
         for (const [k] of FX_DEFS) fx[k] = b.dataset.all === "1";
         syncLegacyFlags(); save(); refreshPanel();

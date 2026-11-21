@@ -43,16 +43,16 @@ export function stripCanvas(bytes: number[], w: number, h: number) {
     canvas.width = w;
     canvas.height = h;
     const g = canvas.getContext("2d");
-    const image = g.createImageData(w, h);
+    const image = g!.createImageData(w, h);
     for (let i = 0; i < w * h; i++) {
-        const c = bytes[i * 2] | (bytes[i * 2 + 1] << 8);
+        const c = bytes[i * 2]! | (bytes[i * 2 + 1]! << 8);
         const r = c & 0x1f, gg = (c >> 5) & 0x1f, b = (c >> 10) & 0x1f;
         image.data[i * 4] = (r << 3) | (r >> 2);
         image.data[i * 4 + 1] = (gg << 3) | (gg >> 2);
         image.data[i * 4 + 2] = (b << 3) | (b >> 2);
         image.data[i * 4 + 3] = 0xff;
     }
-    g.putImageData(image, 0, 0);
+    g!.putImageData(image, 0, 0);
     return canvas;
 }
 
@@ -159,7 +159,7 @@ export function createBattleMenuAdapter(spec) {
         r._releaseTicks = 0;
         r._lastDiagnostic = null;
         spec.onOpen?.(r);
-        if (!r._data) r.preload();
+        if (!r._data) r.preload!();
     };
 
     r.isOpen = () => r._open && !r._failed;
@@ -198,7 +198,7 @@ export function createBattleMenuAdapter(spec) {
         if (!r._open || r._failed) return null;
         if (!r._session) {
             if (!r._data) {
-                if (!r._loading) r.preload();
+                if (!r._loading) r.preload!();
                 return null;
             }
             try { startSession(); } catch (error) { fail(error); return null; }
@@ -244,7 +244,7 @@ export function createBattleMenuAdapter(spec) {
     r.diagnostics = () => ({
         execution: "translated",
         open: r._open,
-        pending: r.isPending(),
+        pending: r.isPending!(),
         queued: r._queue.length,
         failed: r._failed,
         error: r._error?.message ?? null,

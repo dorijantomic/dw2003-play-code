@@ -86,14 +86,14 @@ function layout() {
     logo: [
       {
         clip: 0,
-        at: clip("0").settles_at ?? FALLBACK.logo[0].at,
-        start: clip("0").starts_at ?? FALLBACK.logo[0].start,
+        at: clip("0").settles_at ?? FALLBACK.logo[0]!.at,
+        start: clip("0").starts_at ?? FALLBACK.logo[0]!.start,
         from: "left",
       },
       {
         clip: 1,
-        at: clip("1").settles_at ?? FALLBACK.logo[1].at,
-        start: clip("1").starts_at ?? FALLBACK.logo[1].start,
+        at: clip("1").settles_at ?? FALLBACK.logo[1]!.at,
+        start: clip("1").starts_at ?? FALLBACK.logo[1]!.start,
         from: "right",
       },
     ],
@@ -230,10 +230,10 @@ export function drawTitleScreen(ctx, ts, viewW, viewH, background = null) {
 
   const [promptClip, upperClip, lowerClip] = ts.clips();
 
-  const [lx, ly] = ts.logoAt?.() ?? L.logo[0].at;
-  const [wx, wy] = ts.wordmarkAt?.() ?? L.logo[1].at;
-  drawClip(ctx, ART, String(L.logo[0].clip), lx, ly);
-  drawClip(ctx, ART, String(L.logo[1].clip), wx, wy);
+  const [lx, ly] = ts.logoAt?.() ?? L.logo[0]!.at;
+  const [wx, wy] = ts.wordmarkAt?.() ?? L.logo[1]!.at;
+  drawClip(ctx, ART, String(L.logo[0]!.clip), lx, ly);
+  drawClip(ctx, ART, String(L.logo[1]!.clip), wx, wy);
 
   // International: numeral hidden while the glow walks, then the glow goes
   // out and the numeral comes on in the same step (F0x8008426c). Japanese:

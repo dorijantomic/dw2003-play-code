@@ -107,8 +107,8 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, al
     const sx = col * meta.clipFrameW;
     const drawY = Math.round(y - lastCam.y - meta.clipFrameH) + bottom;
     // alpha < 1 = the walk blend's fading-in next frame (web/walk-blend.js): same pixels, partial opacity.
-    const prevAlpha = ctx.globalAlpha;
-    if (alpha < 1) ctx.globalAlpha = prevAlpha * alpha;
+    const prevAlpha = ctx!.globalAlpha;
+    if (alpha < 1) ctx!.globalAlpha = prevAlpha * alpha;
     else S.billboardDraws.push({
         row: drawY, shift: bottom, groundRow: Math.round(y - lastCam.y),
         screenX: Math.round(x - lastCam.x), cellH: meta.clipFrameH, path: "clip", col,
@@ -119,20 +119,20 @@ function drawClipFrame(meta, clipImg, x, y, col, mirror: boolean, bottom = 0, al
             clipImg, sx, 0, meta.clipFrameW, meta.clipFrameH,
             Math.round(x - lastCam.x - meta.clipFrameW / 2), drawY,
         );
-        ctx.globalAlpha = prevAlpha;
+        ctx!.globalAlpha = prevAlpha;
         return;
     }
     const screenX = Math.round(x - lastCam.x);
-    ctx.save();
-    ctx.translate(screenX, 0);
-    ctx.scale(-1, 1);
+    ctx!.save();
+    ctx!.translate(screenX, 0);
+    ctx!.scale(-1, 1);
     questGhostImage(
         ctx,
         clipImg, sx, 0, meta.clipFrameW, meta.clipFrameH,
         -meta.clipFrameW / 2, drawY,
     );
-    ctx.restore();
-    ctx.globalAlpha = prevAlpha;
+    ctx!.restore();
+    ctx!.globalAlpha = prevAlpha;
 }
 
 // Clip "1" is the idle/breathing clip on every sprite that has clip data (verified
@@ -164,17 +164,17 @@ export function drawEntitySprite(meta, sheet, clipImg: HTMLImageElement | undefi
     if (bf.reflect) {
         const a = bf.reflect(x, y);
         if (a > 0.02) {
-            ctx.save();
-            ctx.globalAlpha = a; if (!(window as any).__perfNoFilter) ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
-            ctx.translate(0, 2 * (y - lastCam.y + 4)); ctx.scale(1, -1);
+            ctx!.save();
+            ctx!.globalAlpha = a; if (!(window as any).__perfNoFilter) ctx!.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
+            ctx!.translate(0, 2 * (y - lastCam.y + 4)); ctx!.scale(1, -1);
             _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
-            ctx.restore();
+            ctx!.restore();
         }
     }
     if (bf.filter) {
-        ctx.save(); if (!(window as any).__perfNoFilter) ctx.filter = bf.filter;
+        ctx!.save(); if (!(window as any).__perfNoFilter) ctx!.filter = bf.filter;
         const r = _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
-        ctx.restore();
+        ctx!.restore();
         return r;
     }
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);

@@ -25,7 +25,7 @@ function loadLib() {
 export function anime4kReady() {
   ready ??= (async () => {
     if (!(navigator as GpuNavigator).gpu) throw new Error("this browser has no WebGPU");
-    const adapter = await (navigator as GpuNavigator).gpu.requestAdapter();
+    const adapter = await (navigator as GpuNavigator).gpu!.requestAdapter();
     if (!adapter) throw new Error("no WebGPU adapter");
     const device = await adapter.requestDevice();
     return { lib: await loadLib(), device };

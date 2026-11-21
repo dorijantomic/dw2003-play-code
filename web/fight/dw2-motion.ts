@@ -113,7 +113,7 @@ export function applyMotion(model, letter: string, motion: Dw2Motion) {
   if (!model || !motion || !motion.keys || !Object.keys(motion.keys).length) return null;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return null;
   if (!model.timeline) model.timeline = [];
-  const table = motion.table | 0;
+  const table = motion.table! | 0;
   if (model.timeline[table]?.table?.length) return null;      // never overwrite the model's own table
   for (const [idx, rows] of Object.entries(motion.keys) as [any, any[]][]) {
     const i = idx | 0;
@@ -151,7 +151,7 @@ export function applyMotion(model, letter: string, motion: Dw2Motion) {
  *  writes both for the root only), else bone 0. */
 function rootIndexOf(model, motion: Dw2Motion) {
   for (const [idx, rows] of Object.entries(motion.keys) as [any, any[]][]) {
-    if (rows.length && motion.ch1?.length && rows[0][3] === motion.ch1[0][3]) return idx | 0;
+    if (rows.length && motion.ch1?.length && rows[0][3] === motion.ch1[0]![3]) return idx | 0;
   }
   return 0;
 }

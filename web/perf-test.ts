@@ -120,8 +120,8 @@ function stats(arr: number[]) {
     const s = Float64Array.from(arr).sort();
     const sum = s.reduce((a, b) => a + b, 0);
     const at = (p: number) => s[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))];
-    const r = (v: number | undefined) => Math.round(v * 1000) / 1000;
-    return { n, avg: r(sum / n), median: r(n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2), p95: r(at(0.95)), p99: r(at(0.99)), worst: r(s[n - 1]), best: r(s[0]), sum: r(sum) };
+    const r = (v: number | undefined) => Math.round(v! * 1000) / 1000;
+    return { n, avg: r(sum / n), median: r(n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1]! + s[n / 2]!) / 2), p95: r(at(0.95)), p99: r(at(0.99)), worst: r(s[n - 1]), best: r(s[0]), sum: r(sum) };
 }
 function browserName(ua: string) {
     if (/Firefox\//.test(ua)) return "firefox";
@@ -148,7 +148,7 @@ function glInfo() {
 // ---- localStorage safety
 function takeBackup() {
     const all = {};
-    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); all[k] = localStorage.getItem(k); }
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); all[k] = localStorage.getItem(k!); }
     sessionStorage.setItem(BACKUP_KEY, JSON.stringify(all));
     return all;
 }
@@ -157,7 +157,7 @@ function restoreBackup() {
     if (raw == null) return false;
     const all: Record<string, string | null> = JSON.parse(raw);
     localStorage.clear();
-    for (const [k, v] of Object.entries(all)) localStorage.setItem(k, v);
+    for (const [k, v] of Object.entries(all)) localStorage.setItem(k, v!);
     sessionStorage.removeItem(BACKUP_KEY);
     return true;
 }
@@ -182,7 +182,7 @@ const STALL_GAP_MS = 250, STALL_FPS = 20, FLOW_FPS = 50, FLOW_MS = 2000, MAX_TRI
 function rafFpsOver(ms: number) {
     const now = performance.now();
     let n = 0;
-    for (let i = run.stamps.length - 1; i >= 0 && now - run.stamps[i] <= ms; i--) n++;
+    for (let i = run.stamps.length - 1; i >= 0 && now - run.stamps[i]! <= ms; i--) n++;
     return n / (ms / 1000);
 }
 function rafLoop(now: number) {
@@ -199,7 +199,7 @@ function rafLoop(now: number) {
     const t = performance.now();
     run.lastRafAt = t;
     run.stamps.push(t);
-    while (run.stamps.length && t - run.stamps[0] > 3000) run.stamps.shift();
+    while (run.stamps.length && t - run.stamps[0]! > 3000) run.stamps.shift();
     requestAnimationFrame(rafLoop);
 }
 function guardStart(label: string) {
@@ -340,7 +340,7 @@ async function probeCalls(iw) {
             const t = performance.now();
             const r = orig[n].apply(this, a);
             const d = performance.now() - t;
-            ms[n] += d;
+            ms[n]! += d;
             if (kind === "webgl" || kind === "unknown") {
                 const key = (a[0].width || 0) + "x" + (a[0].height || 0);
                 if (kind === "webgl") { wgl.calls++; wgl.ms += d; if (d > wgl.worst) wgl.worst = d; wgl.sizes.set(key, (wgl.sizes.get(key) || 0) + 1); }
@@ -356,7 +356,7 @@ async function probeCalls(iw) {
     }
     const fdesc = Object.getOwnPropertyDescriptor(proto, "filter");
     counts.filterSet = 0;
-    if (fdesc && fdesc.set) Object.defineProperty(proto, "filter", { ...fdesc, set(v) { if (v && v !== "none") counts.filterSet++; return fdesc.set.call(this, v); } });
+    if (fdesc && fdesc.set) Object.defineProperty(proto, "filter", { ...fdesc, set(v) { if (v && v !== "none") counts.filterSet++; return fdesc.set!.call(this, v); } });
     const t0 = performance.now();
     let frames = 0;
     run.layerFrames = { shown: 0, hidden: 0, missing: 0 };
@@ -372,7 +372,7 @@ async function probeCalls(iw) {
     for (const n of Object.keys(counts)) per[n + "_perGameFrame"] = frames ? Math.round(counts[n] / frames * 10) / 10 : null;
     const r2 = (x: number) => Math.round(x * 100) / 100;
     const msPer = {};
-    for (const n of names) msPer[n + "_msPerGameFrame"] = frames ? r2(ms[n] / frames) : null;
+    for (const n of names) msPer[n + "_msPerGameFrame"] = frames ? r2(ms[n]! / frames) : null;
     const drawImageBySource = Object.entries(bySrc).map(([k, b]) => ({ source: k, callsPerGameFrame: frames ? r2(b.calls / frames) : null, msPerGameFrame: frames ? r2(b.ms / frames) : null }))
         .sort((a, b) => (b.msPerGameFrame || 0) - (a.msPerGameFrame || 0)).slice(0, 25);
     const sizeList = (m) => [...m.entries()].map(([size, calls]) => ({ size, calls }));
@@ -390,7 +390,7 @@ const FX_KEYS = ["grass", "water", "sway", "heat", "wetlook", "mirror", "reflect
 // Settings go into the running game only. setFxMany() (web/ambience.js) also writes localStorage "dw.fx.v1"; that key is removed
 // again at once, and the whole localStorage is wiped/restored by this page anyway, so nothing reaches the player's saved settings.
 function applySettings(iw: { __setFxMany: (arg0: { [x: string]: string | boolean; }) => void; localStorage: { removeItem: (arg0: string) => void; }; }, name: string) {
-    iw.__setFxMany({ ...VARIANTS[name].values });
+    iw.__setFxMany({ ...VARIANTS[name]!.values });
     iw.localStorage.removeItem("dw.fx.v1");
 }
 function applyScene(iw, scene) {
@@ -416,8 +416,8 @@ function applyScene(iw, scene) {
             run.gradients = counter;
             for (const prop of ["fillStyle", "strokeStyle"]) {
                 const d = Object.getOwnPropertyDescriptor(proto, prop);
-                Object.defineProperty(proto, prop, { ...d, set(v) { if (v instanceof G) { counter.n++; v = "rgba(0,0,0,0)"; } return d.set.call(this, v); } });
-                undo.push(() => Object.defineProperty(proto, prop, d));
+                Object.defineProperty(proto, prop, { ...d, set(v) { if (v instanceof G) { counter.n++; v = "rgba(0,0,0,0)"; } return d!.set!.call(this, v); } });
+                undo.push(() => Object.defineProperty(proto, prop, d!));
             }
             undo.push(() => { run.gradients = null; });
         }
@@ -437,7 +437,7 @@ function startWalking(iw) {
     let dir = 0;
     const keys = ["ArrowRight", "ArrowLeft"];
     const send = (type: string, key: string | undefined) => iw.dispatchEvent(new iw.KeyboardEvent(type, { key, code: key, bubbles: true }));
-    const step = () => { if (run.walk?.held) send("keyup", run.walk.held); const key = keys[dir++ % 2]; run.walk.held = key; send("keydown", key); };
+    const step = () => { if (run.walk?.held) send("keyup", run.walk.held); const key = keys[dir++ % 2]; run.walk!.held = key; send("keydown", key); };
     run.walk = { held: null, timer: setInterval(step, 1500) };
     step();
 }
@@ -509,7 +509,7 @@ async function measureScene(iw, scene, extra: PerfTestSceneExtra = {}) {
     const vis0 = { visibility: document.visibilityState, hasFocus: document.hasFocus() };
     const guard = guardStart(sid);
     status("running: " + scene.label + " [" + variant + "]");
-    log("scene " + sid + ": " + scene.label + " [" + VARIANTS[variant].label + "]");
+    log("scene " + sid + ": " + scene.label + " [" + VARIANTS[variant]!.label + "]");
     let undo = () => {}, out;
     try {
         applySettings(iw, variant);
@@ -535,13 +535,13 @@ async function measureScene(iw, scene, extra: PerfTestSceneExtra = {}) {
         const probe = scene.fxOff ? null : await probeCalls(iw);
         const fxs = {}; for (const k of FX_KEYS) fxs[k] = iw.__fx?.[k];
         out = {
-            id: sid, scene: scene.id, variant, variantLabel: VARIANTS[variant].label, label: scene.label, switchesOff: scene.set || [], weather: scene.weather || null, fxOff: scene.fxOff || null,
+            id: sid, scene: scene.id, variant, variantLabel: VARIANTS[variant]!.label, label: scene.label, switchesOff: scene.set || [], weather: scene.weather || null, fxOff: scene.fxOff || null,
             wallMs: Math.round(wall),
             ...(gradientsReplaced !== undefined ? { gradientsReplaced } : {}),
             rafFrameMs: stats(ft), rafFramesOver16_7: ft.filter((v) => v > 16.7 * 1.5).length, rafFramesOver33: ft.filter((v) => v > 33.4).length, rafFramesOver50: ft.filter((v) => v > 50).length,
             rafFps: ft.length ? Math.round(ft.length / (ft.reduce((a, b) => a + b, 0) / 1000) * 10) / 10 : null,
             gameFrames: rec.upd.length, gameFrameGapMs: stats(rec.gap), gameUpdateMs: stats(rec.upd), gameRenderMs: stats(rec.ren),
-            gameDrawPlusUpdateMs: stats(rec.upd.map((u, i) => u + rec.ren[i])),
+            gameDrawPlusUpdateMs: stats(rec.upd.map((u, i) => u + rec.ren[i]!)),
             battle3dHooks: h3,
             ...(censusRes ? { census: censusRes } : {}),
             canvasCallsPerGameFrame: probe,
@@ -584,9 +584,9 @@ async function measureGuarded(iw, scene, extra: PerfTestSceneExtra | undefined) 
         await waitForFlow("scene " + out.id);
         startWalking(iw);
     }
-    out.tries = tries; out.tryLog = tryLog;
-    out.status = out.stalled ? "stalled" : out.error ? "error" : "ok";
-    if (out.stalled) { out.stalledFinal = true; log("  recorded as stalled after " + tries + " tries: " + out.stallReason); }
+    out!.tries = tries; out!.tryLog = tryLog;
+    out!.status = out!.stalled ? "stalled" : out!.error ? "error" : "ok";
+    if (out!.stalled) { out!.stalledFinal = true; log("  recorded as stalled after " + tries + " tries: " + out!.stallReason); }
     return out;
 }
 
@@ -668,19 +668,19 @@ async function main() {
         const groups = QUICK ? [{ ...FIELD_A, scenes: /(^|[#&,])battleonly($|[&,=])/.test(location.hash) ? [] : FIELD_A.scenes.filter((s) => ["a-normal", "a-nogradient", "a-grass-off", "a-water-off", "a-filter-off"].includes(s.id)), battles: /(^|[#&,])nobattle($|[&,=])/.test(location.hash) ? [] : FIELD_A.battles.filter((b) => ["a-battle", "a-battle-grass-off", "a-battle-grass-water-off", "a-battle-grass-filter-off"].includes(b.id)) }] : [FIELD_A, FIELD_B];
         if (FXSWEEP) {
             const an = FIELD_A.scenes.find((s) => s.id === "a-normal");
-            const keys = Object.entries(VARIANTS.on.values).filter(([, v]) => v === true).map(([k]) => k);
-            groups[0].scenes = [an, ...keys.map((k) => ({ id: "fx-" + k + "-off", label: "settings on, only " + k + " forced off", weather: "clear", fxOff: k })), { ...an, id: "a-normal-2", label: "field normal again (drift check)" }];
+            const keys = Object.entries(VARIANTS.on!.values).filter(([, v]) => v === true).map(([k]) => k);
+            groups[0]!.scenes = [an, ...keys.map((k) => ({ id: "fx-" + k + "-off", label: "settings on, only " + k + " forced off", weather: "clear", fxOff: k })), { ...an, id: "a-normal-2", label: "field normal again (drift check)" }];
             log("fxsweep keys (" + keys.length + "): " + keys.join(", "));
         }
         if (CUT) {
             const an = FIELD_A.scenes.find((s) => s.id === "a-normal");
-            groups[0].scenes = [{ ...an, id: "cut-none", label: "no cut (full frame)" }, ...Object.entries(CUT_LABELS).map(([n, t]) => ({ ...an, id: "cut-" + n, label: "cut " + n + ": " + t, cut: Number(n) })), { ...an, id: "cut-none-2", label: "no cut again (drift check)" }];
+            groups[0]!.scenes = [{ ...an, id: "cut-none", label: "no cut (full frame)" }, ...Object.entries(CUT_LABELS).map(([n, t]) => ({ ...an, id: "cut-" + n, label: "cut " + n + ": " + t, cut: Number(n) })), { ...an, id: "cut-none-2", label: "no cut again (drift check)" }];
             log("cut checkpoints: " + Object.entries(CUT_LABELS).map(([n, t]) => n + "=" + t).join("; "));
         }
         if (CENSUS) {
             const an = FIELD_A.scenes.find((s) => s.id === "a-normal");
-            groups[0].scenes = [{ ...an, id: "census", label: "field normal, 2D call census" }];
-            groups[0].battles = [];
+            groups[0]!.scenes = [{ ...an, id: "census", label: "field normal, 2D call census" }];
+            groups[0]!.battles = [];
         }
         for (const G of groups) {
             const grp = { map: G.map, note: G.mapNote, scenes: [], error: null } as PerfTestGroup;
@@ -704,14 +704,14 @@ async function main() {
                         if (variant === "off" && (s.set || []).some((x) => NOOP_WHEN_OFF.has(x))) { log("skip " + s.id + "|off (that feature is already off in Detail Original)"); continue; }
                         startWalking(iw);
                         grp.scenes.push(await measureGuarded(iw, s, { map: G.map, variant }));
-                        if (CENSUS) { const c = grp.scenes[grp.scenes.length - 1].census; if (c) { grp.census = c.census; grp.censusTotalPerFrame = c.totalPerFrame; grp.censusFrames = c.frames; } }
+                        if (CENSUS) { const c = grp.scenes[grp.scenes.length - 1]!.census; if (c) { grp.census = c.census; grp.censusTotalPerFrame = c.totalPerFrame; grp.censusFrames = c.frames; } }
                         stopWalking(iw);
                     }
                 }
                 let bf = null;
                 for (let a = 1; a <= MAX_TRIES && !bf && G.battles.length; a++) {
                     await waitForFlow("before battle on " + G.map);
-                    try { bf = await startBattle(iw, G.battles[0].mapId); } catch (e) {
+                    try { bf = await startBattle(iw, G.battles[0]!.mapId); } catch (e) {
                         log("battle start failed (try " + a + "): " + String(e && e.message || e));
                         progress({ id: "battle-" + G.map, tries: a, status: "battle-start-failed", reason: String(e && e.message || e) });
                         if (a >= MAX_TRIES) throw e;

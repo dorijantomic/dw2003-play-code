@@ -23,7 +23,7 @@ export function frameGeometry(canvas, stage: HTMLElement | null) {
     const cr = canvas.getBoundingClientRect();
     const box = { left: cr.left + canvas.clientLeft, top: cr.top + canvas.clientTop, width: canvas.clientWidth, height: canvas.clientHeight };
     const fills = document.documentElement.classList.contains("window-fill") || !!document.fullscreenElement;
-    const sr = stage.getBoundingClientRect();
+    const sr = stage!.getBoundingClientRect();
     const limit = fills ? { left: sr.left, top: sr.top, width: sr.width, height: sr.height } : box;
     return { box, limit, stageRect: sr };
 }
@@ -47,7 +47,7 @@ function scopeFor(key: string | undefined) {
 
 /** Called at scope start: size the root and the art canvas for this frame; returns the art-context getter. */
 export function prepare(key: string | undefined, stage: HTMLElement | null, canvas) {
-    ensureRoot(stage);
+    ensureRoot(stage!);
     const g = frameGeometry(canvas, stage);
     const rs = root.style;
     rs.left = `${g.limit.left - g.stageRect.left}px`; rs.top = `${g.limit.top - g.stageRect.top}px`;

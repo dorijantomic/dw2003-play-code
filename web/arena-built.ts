@@ -73,7 +73,7 @@ export async function createArenaBuilt(canvas: { width: number; height: number; 
   function keepOutChanged(k) {
     if (!k?.fighters?.length) return false;
     let changed = false;
-    const far = Math.max(...k.fighters.map((f: { c: number[]; }) => Math.hypot(f.c[0], f.c[2])));
+    const far = Math.max(...k.fighters.map((f: { c: number[]; }) => Math.hypot(f.c[0]!, f.c[2]!)));
     if (ko.farthest == null || far > ko.farthest + 0.5) { ko.farthest = Math.max(far, ko.farthest ?? 0); changed = true; }
     for (const f of k.fighters) {
       const near = ko.fighters.find((g) => g.side === f.side && Math.hypot(g.c[0] - f.c[0], g.c[1] - f.c[1], g.c[2] - f.c[2]) < 100);
@@ -89,7 +89,7 @@ export async function createArenaBuilt(canvas: { width: number; height: number; 
   // a thing's keep-out spheres in the world: shape (slots.js shapeOfParts), position p, uniform scale s, yaw about +Y
   function worldBands(sp, p: number[], s: number, yaw: number) {
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
-    const tf = (o: { c: number[]; r: number; }) => ({ c: [p[0] + s * (cs * o.c[0] + sn * o.c[2]), p[1] + s * o.c[1], p[2] + s * (-sn * o.c[0] + cs * o.c[2])], r: s * o.r });
+    const tf = (o: { c: number[]; r: number; }) => ({ c: [p[0]! + s * (cs * o.c[0]! + sn * o.c[2]!), p[1]! + s * o.c[1]!, p[2]! + s * (-sn * o.c[0]! + cs * o.c[2]!)], r: s * o.r });
     return sp.bands.map((b) => ({ ...tf(b), tris: b.tris.map(tf) }));
   }
   function rejectReason(bands) {

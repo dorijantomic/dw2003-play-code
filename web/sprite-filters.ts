@@ -125,8 +125,8 @@ function nativePixels(img) {
   const c = document.createElement("canvas");
   c.width = img.width; c.height = img.height;
   const g = c.getContext("2d");
-  g.drawImage(img, 0, 0);
-  return g.getImageData(0, 0, c.width, c.height);
+  g!.drawImage(img, 0, 0);
+  return g!.getImageData(0, 0, c.width, c.height);
 }
 
 async function run(img, name) {
@@ -134,13 +134,13 @@ async function run(img, name) {
   c.width = w * 4; c.height = h * 4;
   const g = c.getContext("2d");
   if (name === "bilinear") {
-    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-    g.drawImage(img, 0, 0, w * 4, h * 4);
+    g!.imageSmoothingEnabled = true; g!.imageSmoothingQuality = "high";
+    g!.drawImage(img, 0, 0, w * 4, h * 4);
   } else {
     if (name === "xbr" || name === "xbrblend") await ensureXbr();
     const src = nativePixels(img);
     const out = name === "epx" ? epx4(src) : name === "mmpx" ? mmpx4(src) : xbr(src, name === "xbrblend");
-    g.putImageData(out, 0, 0);
+    g!.putImageData(out, 0, 0);
   }
   const blob = await new Promise<Blob>((ok) => c.toBlob(ok, "image/png"));
   const out = new Image();

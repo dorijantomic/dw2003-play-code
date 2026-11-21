@@ -12,9 +12,9 @@ const STD = { header: { x: 34, y: 13 }, panel: { x: 168, y: 40 }, money: { x: 0,
 const CARD_H = 42, CARD_W_RUNS = 116, ROW_PITCH = 14, FIRST_ROW_TEXT_DY = 9;     // list label pen sits 9 native below the panel top
 
 /** A rect builder for design coordinates. Absolute design page x/y (px) become native, then move by the anchor offset and the call's matrix. */
-const at = (rel, ox = 0, oy = 0) => (px: number | undefined, py: number, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px) + ox, y: dy(py) + oy, w: N(pw), h: N(ph) }, rel);
+const at = (rel, ox = 0, oy = 0) => (px: number | undefined, py: number, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: dy(py) + oy, w: N(pw), h: N(ph) }, rel);
 /** Card sub-elements: x absolute design px, y relative to the card top (design px). */
-const inCard = (rel, ox: number, cardY: number) => (px: number | undefined, pyRel: number | undefined, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px) + ox, y: cardY + N(pyRel), w: N(pw), h: N(ph) }, rel);
+const inCard = (rel, ox: number, cardY: number) => (px: number | undefined, pyRel: number | undefined, pw: number | undefined, ph: number | undefined) => applyRel({ x: dx(px!) + ox, y: cardY + N(pyRel), w: N(pw), h: N(ph) }, rel);
 
 const text = textPart;
 
@@ -47,7 +47,7 @@ export const CARD_PLAIN = Object.freeze({ edge: "var(--c-edge)", tabBody: "var(-
 
 export function partyCard(i: number, part, namePart, card, out, v = CARD_VARIANTS.home, c = CARD_PLAIN) {
     const Y = part.y, rel = part.rel, ox = part.x, f = inCard(rel, ox, Y), k = `card${i}`;
-    const plateRect = v.abs ? applyRel({ x: dx(v.plate[0]) + ox, y: Y, w: N(v.plate[1]), h: N(126) }, rel) : f(v.plate[0], 0, v.plate[1], 126);
+    const plateRect = v.abs ? applyRel({ x: dx(v.plate[0]!) + ox, y: Y, w: N(v.plate[1]), h: N(126) }, rel) : f(v.plate[0], 0, v.plate[1], 126);
     out.push(plate(`${k}.plate`, "card", plateRect, rel, { shape: "sr", edge: c.edge }));
     out.push(text(`${k}.slot`, "label", `0${i + 1}`, f(v.slotX, 30, 80, 64), 64, 64, { color: "var(--c-slot)", rel }));
     if (namePart || card.name) {

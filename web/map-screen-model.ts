@@ -32,9 +32,9 @@ export function buildLinks(maps: MapScreenRecord[], scenes) {
 export function buildGraph(maps: MapScreenRecord[], scenes) {
     const regions = [], byName = new Map(), regionOfId = new Map(), names = new Map(), adj = new Map();
     for (const m of maps) {
-        const r = regionOf(m.name);
+        const r = regionOf(m.name!);
         if (!byName.has(r)) { byName.set(r, regions.length); regions.push({ name: r, ids: [] }); }
-        regions[byName.get(r)].ids.push(m.id);
+        regions[byName.get(r)]!.ids.push(m.id);
         regionOfId.set(m.id, byName.get(r));
         names.set(m.id, String(m.name ?? m.id));
         adj.set(m.id, []);
@@ -58,7 +58,7 @@ export function buildGraph(maps: MapScreenRecord[], scenes) {
 export function regionView(graph, regionIdx: string | number, seen: (id: string) => boolean, currentId: string | null) {
     const region = graph.regions[regionIdx];
     if (!region) return { nodes: [], edges: [], visited: 0, total: 0 };
-    const isSeen = (id: string | null) => id === currentId || !!seen(id);
+    const isSeen = (id: string | null) => id === currentId || !!seen(id!);
     const visited = region.ids.filter(isSeen);
     const shown = new Set(visited);
     const frontier = [];
@@ -76,7 +76,7 @@ export function regionView(graph, regionIdx: string | number, seen: (id: string)
 /** The regions with at least one visited area, as indexes into graph.regions (the list the L1 / R1 buttons walk). */
 export function openRegions(graph, seen: (id: string) => boolean, currentId: string | null) {
     const out = [];
-    graph.regions.forEach((r: { ids: (string | null)[]; }, i) => { if (r.ids.some((id: string | null) => id === currentId || seen(id))) out.push(i); });
+    graph.regions.forEach((r: { ids: (string | null)[]; }, i) => { if (r.ids.some((id: string | null) => id === currentId || seen(id!))) out.push(i); });
     return out;
 }
 
@@ -97,7 +97,7 @@ export function layoutNodes(view: RegionView, rootId: string, w: number, h: numb
     const ids = view.nodes.map((n) => n.id);
     if (!ids.length) return new Map();
     const adj = new Map<string, string[]>(ids.map((id) => [id, []] as [string, string[]]));
-    for (const [a, b] of view.edges) { adj.get(a).push(b); adj.get(b).push(a); }
+    for (const [a, b] of view.edges) { adj.get(a)!.push(b); adj.get(b)!.push(a); }
     const layers = [], done = new Set();
     const order = ids.includes(rootId) ? [rootId, ...ids.filter((i) => i !== rootId)] : ids;
     for (const start of order) {
@@ -106,7 +106,7 @@ export function layoutNodes(view: RegionView, rootId: string, w: number, h: numb
         while (layer.length) {
             layers.push(layer);
             const next = [];
-            for (const id of layer) for (const n of adj.get(id)) if (!done.has(n)) { done.add(n); next.push(n); }
+            for (const id of layer) for (const n of adj.get(id)!) if (!done.has(n)) { done.add(n); next.push(n); }
             layer = next;
         }
     }
@@ -160,8 +160,8 @@ export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w:
     let view: RegionView | null = null, pos = null, cursor: string | null = null;
     const build = () => {
         view = regionView(graph, listed[at], seen, currentId);
-        const root = view.nodes.some((n) => n.id === currentId) ? currentId : (view.nodes[0]?.id ?? null);
-        pos = layoutNodes(view, root, box.w, box.h);
+        const root = view!.nodes.some((n) => n.id === currentId) ? currentId : (view!.nodes[0]?.id ?? null);
+        pos = layoutNodes(view!, root!, box.w, box.h);
         cursor = root;
     };
     if (listed.length) build();
@@ -169,9 +169,9 @@ export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w:
         graph,
         count: () => listed.length,
         regionIndex: () => at,
-        regionName: () => (listed.length ? graph.regions[listed[at]].name : ""),
+        regionName: () => (listed.length ? graph.regions[listed[at]]!.name : ""),
         /** Visited of all areas in this region. */
-        progress: () => (listed.length ? { visited: view.visited, total: view.total } : { visited: 0, total: 0 }),
+        progress: () => (listed.length ? { visited: view!.visited, total: view!.total } : { visited: 0, total: 0 }),
         nodes: () => (view ? view.nodes : []),
         edges: () => (view ? view.edges : []),
         position: (id: string) => pos?.get(id) ?? null,

@@ -23,7 +23,7 @@ export function plan(pctx) {
     for (let k = 0; k < copies; k++) {
       const off = ((k + 0.5) / copies - 0.5) * c.w;              // copy k's centre along the card's own dir
       const cx = c.base[0] + off * dir[0], cz = c.base[2] + off * dir[1];
-      const lerp = (a: number[]) => a[0] + (a[1] - a[0]) * r();
+      const lerp = (a: number[]) => a[0]! + (a[1]! - a[0]!) * r();
       gulls.push({ i: gulls.length, card: ci, copy: k, copies, piece: c.piece, cw,
                    R: Math.hypot(cx, cz), az0: Math.atan2(cx, cz), yc, hs, y0: c.base[1], y1: c.base[1] + c.h,
                    bob: GULL.BOB_K * Math.max(0, room), w: lerp(GULL.ORBIT_W), bw: lerp(GULL.BOB_W), bph: r() * 6.2832,
@@ -47,7 +47,7 @@ export function plan(pctx) {
     place(st) {   // keep-out over the whole orbit: one sphere per sample holding the gull and its bob range
       st = st || {};
       const fightR = st.fightR ?? 0;
-      const M2 = Math.max(0, ...(st.rings || []).map((g) => g.r), ...(st.fighters || []).map((f: { c: number[]; r: number; }) => Math.hypot(f.c[0], f.c[2]) + f.r));
+      const M2 = Math.max(0, ...(st.rings || []).map((g) => g.r), ...(st.fighters || []).map((f: { c: number[]; r: number; }) => Math.hypot(f.c[0]!, f.c[2]!) + f.r));
       let exact = 0;
       for (const q of gulls) {
         const rho = q.hs * 1.05 + q.bob;   // the wing reach is < 1 half span in every direction (+5 %)

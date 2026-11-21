@@ -125,9 +125,9 @@ export function drawClipOpaque(ctx, p, id: number, x: number, y: number, scale =
  * whose sprite is an authored 40x8 fill revealed up to the gauge's own width.
  */
 export function drawClipWidth(ctx, p, id: string, x, y, width: number | null | undefined) {
-  if (clipHook(ctx, p, id, x, y, (c) => drawClipWidth(c, p, id, x, y, width), width)) return true;
+  if (clipHook(ctx, p, id, x, y, (c) => drawClipWidth(c, p, id, x, y, width), width!)) return true;
   const clip = p.ids?.[String(id)];
-  if (!clip || !p.img || !(width > 0)) return false;
+  if (!clip || !p.img || !(width! > 0)) return false;
   ctx.imageSmoothingEnabled = false;
   // The PS1 blends a textured primitive per texel: the pack record's `semi`
   // only selects the ABR mode, and a texel blends only when its palette entry
@@ -144,7 +144,7 @@ export function drawClipWidth(ctx, p, id: string, x, y, width: number | null | u
     else ctx.globalAlpha = 0.5;
   }
   for (const l of clip.layers) {
-    const w = Math.min(l.w, Math.max(0, Math.round(width)));
+    const w = Math.min(l.w, Math.max(0, Math.round(width!)));
     if (w <= 0) continue;
     ctx.drawImage(p.img, l.x, l.y, w, l.h, x + l.dx, y + l.dy, w, l.h);
   }
@@ -235,7 +235,7 @@ export function drawPackBackdrop(ctx: CanvasRenderingContext2D, p, clipId: numbe
       const l = cell[k];
       if (!l) continue;
       const [cx, cy] = k.split(",").map(Number);
-      octx.drawImage(p.img, l.x, l.y, l.w, l.h, cx, cy, 48, 48);
+      octx!.drawImage(p.img, l.x, l.y, l.w, l.h, cx!, cy!, 48, 48);
     }
     p.patterns[key] = ctx.createPattern(off, "repeat");
   }

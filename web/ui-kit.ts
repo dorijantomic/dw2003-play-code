@@ -93,7 +93,7 @@ export function withFold(ctx, progress, px: number | undefined, py: number | und
     ctx.save();
     ctx.translate(px, py);
     ctx.scale(axis === "y" ? 1 : progress, axis === "x" ? 1 : progress);
-    ctx.translate(-px, -py);
+    ctx.translate(-px!, -py!);
     draw();
     ctx.restore();
     return true;
@@ -144,7 +144,7 @@ export function drawHeader(ctx: CanvasRenderingContext2D | null | undefined, pro
     if (!tabs.length) { drawText(ctx, title, HEADER.textX, HEADER.textY); return; }
     drawText(ctx, title, 44, HEADER.textY);
     const xs = layoutTabs(tabs, (s) => textWidth(s), tabStart ?? 44 + textWidth(title) + 16, gap);
-    tabs.forEach((label, i) => drawText(ctx, label, xs[i], HEADER.textY, i === active ? undefined : { clut: 7 }));
+    tabs.forEach((label, i) => drawText(ctx, label, xs[i]!, HEADER.textY, i === active ? undefined : { clut: 7 }));
 }
 
 /** Footer plate with up to two text lines. */
@@ -167,16 +167,16 @@ export function barFill(value: number, max: number, w: number) {
 export function drawBar(ctx: CanvasRenderingContext2D | undefined, x: number, y: number, w: number, h: number, value: number, max: number) {
     // inside a look C scope (web/ui-c/books.js) the bar is a C card bar: the same rect and fill ratio, nothing painted here
     if (partHook(ctx, { part: "bookBar", x, y, w, h, ratio: w > 0 ? barFill(value, max, w) / w : 0 })) return;
-    ctx.fillStyle = "rgb(0, 0, 32)";
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = "rgb(104, 104, 208)";
-    ctx.fillRect(x, y, barFill(value, max, w), h);
+    ctx!.fillStyle = "rgb(0, 0, 32)";
+    ctx!.fillRect(x, y, w, h);
+    ctx!.fillStyle = "rgb(104, 104, 208)";
+    ctx!.fillRect(x, y, barFill(value, max, w), h);
 }
 
 /** The field behind a book, dimmed. `padL` is the wide-screen pad on each side (web/game.js wideField.padL), in canvas pixels. */
 export function dimField(ctx: CanvasRenderingContext2D | null, viewW: number, viewH: number, padL = 0, alpha = 0.5) {
-    ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-    ctx.fillRect(0 - padL, 0, viewW + 2 * padL, viewH);
+    ctx!.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+    ctx!.fillRect(0 - padL, 0, viewW + 2 * padL, viewH);
 }
 
 // ---------------------------------------------------------------- the QUESTS page's layout, shared

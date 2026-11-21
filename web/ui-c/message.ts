@@ -82,7 +82,7 @@ export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
     // the opening: the game grows outline boxes from the speaker to the balloon (raw line primitives) -- drawn as 1 native C edge lines
     (opt.lines ?? []).forEach((l, i) => {
         const [x0, y0, x1, y1] = l.points;
-        out.push(rule(`open${i}`, { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) + 1, h: Math.abs(y1 - y0) + 1 }, "var(--c-bln-edge)", ID, "under", "openLine"));
+        out.push(rule(`open${i}`, { x: Math.min(x0!, x1!), y: Math.min(y0!, y1!), w: Math.abs(x1! - x0!) + 1, h: Math.abs(y1! - y0!) + 1 }, "var(--c-bln-edge)", ID, "under", "openLine"));
     });
     const body = opt.body ?? balloonBody(parts);
     const capRel = parts.find((p: { part: string; }) => p.part === "balloonCap")?.rel ?? ID;
@@ -110,7 +110,7 @@ export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
             if (!isCursorToken(r.text)) out.push(bandLine(`band${i}.l${k}`, r, right, ID));
         });
     });
-    if (!body && bands.length && opt.name) pushName("band", opt.name, { x: 6, y: bands[0].r.y - MSG.tabH14 + MSG.tabUp, w: Math.max(MSG.tabMinW, opt.name.length * 6 * 1.15 + 18), h: MSG.tabH14 }, ID, out);
+    if (!body && bands.length && opt.name) pushName("band", opt.name, { x: 6, y: bands[0]!.r.y - MSG.tabH14 + MSG.tabUp, w: Math.max(MSG.tabMinW, opt.name.length * 6 * 1.15 + 18), h: MSG.tabH14 }, ID, out);
     parts.forEach((p, i) => { if (p.part === "more") out.push(moreArrow(`more${i}`, moreBox(p), p.rel ?? ID, body ? "var(--c-bln-more)" : "var(--c-orange)")); });
     restOfRuns(runs, used, ID, out, "msg");
     return out;
@@ -172,8 +172,8 @@ export function placeCardBars(quads: PlaceCardQuad[], out = []) {
             }
         }
         const col = pcColour(q.c);
-        if (isNavy(q) && q.h >= 10 && q.w >= 300) out.push(plate(`pc.q${i}`, "pcBand", r, ID, { shape: "rect", edge: col, body: null, shadow: 6 }));
-        else if (isNavy(q) && q.h >= 10 && q.w >= 10) out.push(plate(`pc.q${i}`, "pcPlate", r, ID, { shape: "ch", edge: col, body: null, shadow: 0 }));
+        if (isNavy(q) && q.h >= 10 && q.w >= 300) out.push(plate(`pc.q${i}`, "pcBand", r, ID, { shape: "rect", edge: col, body: null, shadow: 6 })!!!!!!);
+        else if (isNavy(q) && q.h >= 10 && q.w >= 10) out.push(plate(`pc.q${i}`, "pcPlate", r, ID, { shape: "ch", edge: col, body: null, shadow: 0 })!!!!!!);
         else out.push(rule(`pc.q${i}`, r, col, ID, "under", "pcBar"));
     });
     const band = qs.find((q: { h: number; w: number; }) => isNavy(q) && q.h >= 10 && q.w >= 300);
@@ -201,7 +201,7 @@ export function composePlaceCard({ runs }, scene: PlaceCardScene = {}) {
         const host = area ? plates.find((q) => n.x >= q.x && n.x < q.x + q.w && n.y + 4.5 >= q.y && n.y + 4.5 < q.y + q.h) : null;
         const w = Math.max(8, (host ? host.x + host.w : 320) - n.x - 3);
         out.push(textPart(`pc.${area ? "area" : "place"}${k}`, "label", n.text, { x: n.x, y: n.y + 4.5 - N(line) / 2, w, h: N(line) }, size, line,
-            { color: "var(--c-ink)", maxDp: Math.round(w * 3) }));
+            { color: "var(--c-ink)", maxDp: Math.round(w * 3) })!!!!!!);
     });
     return out;
 }

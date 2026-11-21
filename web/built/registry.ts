@@ -72,7 +72,7 @@ export function plainMaterial(S, col: THREE.Color, { name = "plain", rim = 0.3 }
 /** A sky gradient seen from inside: horizon -> zenith by the view direction (linear THREE.Color). */
 export function skyGradientMaterial(S: { srgb: (arg0: number[] | null) => THREE.Color; }, horizon: { r: number; g: number; b: number; }, mid: { r: number; g: number; b: number; }, zenith: { r: number; g: number; b: number; } | undefined, name = "skyGradient") {
   return new THREE.ShaderMaterial({
-    name, uniforms: { uH: { value: new THREE.Vector3(horizon.r, horizon.g, horizon.b) }, uM: { value: new THREE.Vector3(mid.r, mid.g, mid.b) }, uZ: { value: new THREE.Vector3(zenith.r, zenith.g, zenith.b) } },
+    name, uniforms: { uH: { value: new THREE.Vector3(horizon.r, horizon.g, horizon.b) }, uM: { value: new THREE.Vector3(mid.r, mid.g, mid.b) }, uZ: { value: new THREE.Vector3(zenith!.r, zenith!.g, zenith!.b) } },
     vertexShader: /* glsl */`varying vec3 vD; void main() { mat4 im = mat4(1.0);
       #ifdef USE_INSTANCING
         im = instanceMatrix;
@@ -111,7 +111,7 @@ function builtDefs() {
   }, "Built: ez-tree (MIT) + fluffytree (MIT)", "MIT");
   add("built.bush", "Fluffy bush", ["bush", "shrub"], async (env: { pal: { bushLit: { [x: string]: number; }; bushMid: { [x: string]: number; }; }; }) => {
     const A = await import("../arena-built.js"), geo = A.bushGeometry(7, env.pal);
-    const hiTint = ["r", "g", "b"].map((c) => env.pal.bushLit[c] / Math.max(env.pal.bushMid[c], 1e-4));
+    const hiTint = ["r", "g", "b"].map((c) => env.pal.bushLit[c]! / Math.max(env.pal.bushMid[c]!, 1e-4));
     const r = one(geo, A.foliageMaterial(A.leafClumpTexture(), geo.userData.crown, hiTint)); return r;
   }, "Built: fluffytree (MIT)", "MIT");
   add("built.pine", "Cone-stack pine", ["tree", "pine", "conifer"], async (env) => {

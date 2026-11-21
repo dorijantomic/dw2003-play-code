@@ -214,7 +214,7 @@ export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } =
     }
     if (!revealWindow) return decodeConvertedText(w, line.ptr, w.font, slots);
     const [first, end] = range(bytes.length);
-    return decodeConvertedText(w, line.ptr + first, w.font, slots, end - first);
+    return decodeConvertedText(w, line.ptr + first, w.font, slots, end! - first!);
 }
 
 /**

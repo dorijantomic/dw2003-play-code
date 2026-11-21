@@ -23,7 +23,7 @@ const researchText = {
   mapped: "Research notes describe this route; this step has not been fully checked in the browser.",
   partial: "Some behavior is documented, but gaps remain for this step or its route.",
 };
-const nodeElement = (id: string | undefined) => [...columns.querySelectorAll<HTMLElement>(".node")].find((el) => el.dataset.node === id);
+const nodeElement = (id: string | undefined) => [...columns!.querySelectorAll<HTMLElement>(".node")].find((el) => el.dataset.node === id);
 const incoming = (id: string | undefined) => flow.edges.filter((edge: (string | undefined)[]) => edge[1] === id);
 const outgoing = (id: string | undefined) => flow.edges.filter((edge: (string | undefined)[]) => edge[0] === id);
 const el = (tag: string, className?: string, value?: any): any => {
@@ -55,27 +55,27 @@ function levels() {
 }
 
 function drawWires() {
-  const bounds = graph.getBoundingClientRect();
-  const width = graph.scrollWidth;
-  const height = Math.max(graph.scrollHeight, 430);
-  wires.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  wires.setAttribute("width", width as any);
-  wires.setAttribute("height", height as any);
-  wires.replaceChildren();
+  const bounds = graph!.getBoundingClientRect();
+  const width = graph!.scrollWidth;
+  const height = Math.max(graph!.scrollHeight, 430);
+  wires!.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  wires!.setAttribute("width", width as any);
+  wires!.setAttribute("height", height as any);
+  wires!.replaceChildren();
   const ns = "http://www.w3.org/2000/svg";
   const defs = document.createElementNS(ns, "defs");
   for (const [id, color] of [["forward", "#77a8de"], ["back", "#eea566"]]) {
     const marker = document.createElementNS(ns, "marker");
-    marker.setAttribute("id", id);
+    marker.setAttribute("id", id!);
     marker.setAttribute("markerWidth", "8"); marker.setAttribute("markerHeight", "8");
     marker.setAttribute("refX", "7"); marker.setAttribute("refY", "4");
     marker.setAttribute("orient", "auto");
     const arrow = document.createElementNS(ns, "path");
     arrow.setAttribute("d", "M 0 0 L 8 4 L 0 8 z");
-    arrow.setAttribute("fill", color);
+    arrow.setAttribute("fill", color!);
     marker.append(arrow); defs.append(marker);
   }
-  wires.append(defs);
+  wires!.append(defs);
   const point = (node: HTMLElement, side: string) => {
     const box = node.getBoundingClientRect();
     return { x: (side === "right" ? box.right : box.left) - bounds.left,
@@ -94,7 +94,7 @@ function drawWires() {
     curve.setAttribute("stroke-width", isBack ? "2.5" : "2");
     if (isBack) curve.setAttribute("stroke-dasharray", "7 6");
     curve.setAttribute("marker-end", `url(#${isBack ? "back" : "forward"})`);
-    wires.append(curve);
+    wires!.append(curve);
   };
   for (const [from, to] of flow.edges) path(from, to);
   const target = nodeById(selected)?.back;
@@ -103,14 +103,14 @@ function drawWires() {
 
 function select(id: string | undefined) {
   selected = id;
-  for (const button of columns.querySelectorAll<HTMLElement>(".node")) {
+  for (const button of columns!.querySelectorAll<HTMLElement>(".node")) {
     button.classList.toggle("active", button.dataset.node === id);
     button.setAttribute("aria-pressed", button.dataset.node === id ? "true" : "false");
   }
   const node = nodeById(id);
   const status = classifyFlowNode(flow, node);
-  details.replaceChildren();
-  details.append(el("div", "eyebrow", flow.title), el("h2", null, node.name), el("p", null, node.detail));
+  details!.replaceChildren();
+  details!.append(el("div", "eyebrow", flow.title), el("h2", null, node.name), el("p", null, node.detail));
   const statusBlock = el("div", "statusBlock");
   const badges = el("div", "badges");
   badges.append(el("span", `pill ${status.runtime}`, labels.runtime[status.runtime]));
@@ -123,20 +123,20 @@ function select(id: string | undefined) {
   statusBlock.append(el("p", null, status.note));
   statusBlock.append(el("div", "evidence", `Code: ownership inventory → ${status.surface}`));
   statusBlock.append(el("div", "evidence", `Original behavior: ${status.evidence}`));
-  details.append(statusBlock);
+  details!.append(statusBlock);
   const ins = incoming(id);
   if (ins.length) {
-    details.append(el("h3", null, "How you get here"));
+    details!.append(el("h3", null, "How you get here"));
     const list = el("ul");
     for (const [from, , action] of ins) list.append(el("li", null, `${nodeById(from)?.name ?? from} → ${action}`));
-    details.append(list);
+    details!.append(list);
   }
-  details.append(el("h3", null, "Back goes to"));
-  details.append(el("div", "backline", node.back === "—" ? "No Back path shown"
+  details!.append(el("h3", null, "Back goes to"));
+  details!.append(el("div", "backline", node.back === "—" ? "No Back path shown"
     : `${node.backAction ?? "Back / Escape"} → ${nodeById(node.back)?.name ?? node.back}`));
   const outs = outgoing(id);
   if (outs.length) {
-    details.append(el("h3", null, "Next choices"));
+    details!.append(el("h3", null, "Next choices"));
     const list = el("ul");
     for (const [, to, action] of outs) {
       const row = el("li");
@@ -146,33 +146,33 @@ function select(id: string | undefined) {
       jump.addEventListener("click", () => { select(to); nodeElement(to)?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); });
       row.append(jump); list.append(row);
     }
-    details.append(list);
+    details!.append(list);
   }
   if (node.lab) {
     const link = el("a", "lablink", "Open the real screen in UI Lab ↗");
     link.href = `ui-lab.html?screen=${encodeURIComponent(node.lab)}`;
-    details.append(link);
-    details.append(el("p", "source", "The lab opens the start of this route. Follow the buttons above to reach this step."));
+    details!.append(link);
+    details!.append(el("p", "source", "The lab opens the start of this route. Follow the buttons above to reach this step."));
   }
-  details.append(el("div", "source", `Route checked against: ${flow.source}`));
+  details!.append(el("div", "source", `Route checked against: ${flow.source}`));
   const url = new URL(location.href);
   url.searchParams.set("flow", flow.id);
-  url.searchParams.set("screen", id);
+  url.searchParams.set("screen", id!);
   history.replaceState(null, "", url);
   requestAnimationFrame(drawWires);
 }
 
 function render() {
-  tabs.replaceChildren();
+  tabs!.replaceChildren();
   for (const item of UI_FLOWS) {
     const button = el("button", null, item.title);
     button.type = "button";
     button.setAttribute("aria-selected", item.id === flow.id ? "true" : "false");
-    button.addEventListener("click", () => { flow = item; selected = item.nodes[0].id; search.value = ""; graphScroller.scrollLeft = 0; render(); });
-    tabs.append(button);
+    button.addEventListener("click", () => { flow = item; selected = item.nodes[0]!.id; search.value = ""; graphScroller!.scrollLeft = 0; render(); });
+    tabs!.append(button);
   }
-  intro.textContent = flow.intro;
-  columns.replaceChildren();
+  intro!.textContent = flow.intro;
+  columns!.replaceChildren();
   for (const [index, group] of levels().entries()) {
     if (!group?.length) continue;
     const column = el("div", "column");
@@ -193,7 +193,7 @@ function render() {
       button.addEventListener("click", () => select(node.id));
       column.append(button);
     }
-    columns.append(column);
+    columns!.append(column);
   }
   select(selected);
   filter();
@@ -202,19 +202,19 @@ function render() {
 function filter() {
   const needle = search.value.trim().toLowerCase();
   let matches = 0;
-  for (const button of columns.querySelectorAll<HTMLElement>(".node")) {
+  for (const button of columns!.querySelectorAll<HTMLElement>(".node")) {
     const node = nodeById(button.dataset.node);
     const actions = [...incoming(node.id), ...outgoing(node.id)].map((edge) => edge[2]).join(" ");
     const hit = !needle || `${node.name} ${node.detail} ${actions}`.toLowerCase().includes(needle);
     button.classList.toggle("dim", !hit);
     if (hit) matches++;
   }
-  empty.style.display = matches ? "none" : "block";
+  empty!.style.display = matches ? "none" : "block";
 }
 
 search.addEventListener("input", filter);
-document.getElementById("earlier").addEventListener("click", () => graphScroller.scrollBy({ left: -520, behavior: "smooth" }));
-document.getElementById("later").addEventListener("click", () => graphScroller.scrollBy({ left: 520, behavior: "smooth" }));
-new ResizeObserver(() => requestAnimationFrame(drawWires)).observe(columns);
+document.getElementById("earlier")!.addEventListener("click", () => graphScroller!.scrollBy({ left: -520, behavior: "smooth" }));
+document.getElementById("later")!.addEventListener("click", () => graphScroller!.scrollBy({ left: 520, behavior: "smooth" }));
+new ResizeObserver(() => requestAnimationFrame(drawWires)).observe(columns!);
 window.addEventListener("resize", drawWires);
 render();

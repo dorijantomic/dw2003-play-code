@@ -111,7 +111,7 @@ export function createEndCardTranslated(options: EndCardOptions = {} as EndCardO
             onStopAllSound: () => card._stopSound?.(),
             onLaunch: (code) => card._launches.push(code >>> 0),
         });
-        card._renderer ??= createNativeScreenRenderer({ pack: card._data.pack }, () => card._data.pack);
+        card._renderer ??= createNativeScreenRenderer({ pack: card._data!.pack }, () => card._data!.pack);
         card._clock = new ui.MenuDisplayClock();
         card._session.begin({ language: card._language });
         card._lastState = null;
@@ -190,17 +190,17 @@ export function createEndCardTranslated(options: EndCardOptions = {} as EndCardO
     card.state = () => card._session?.state() ?? card._lastState;
 
     /** The CLUT level the draw is passing: 15 is invisible, 0 the settled green card. */
-    card.level = () => card.state()?.level ?? null;
+    card.level = () => card.state!()?.level ?? null;
 
     card.clip = () => (card._data ? Number(card._data.clipByLanguage[String(card._language)] ?? 0) : 0);
 
     /** The clip id the extracted sheet carries for the language and the current level. */
     card.clipId = () => {
-        const level = card.level();
-        return level === null ? null : paletteClipId(card.clip(), level);
+        const level = card.level!();
+        return level === null ? null : paletteClipId(card.clip!(), level);
     };
 
-    card.label = () => (card._data ? card._data.clipLabels[String(card.clip())] ?? "END" : "END");
+    card.label = () => (card._data ? card._data.clipLabels[String(card.clip!())] ?? "END" : "END");
 
     /** The launch codes the card asked the resident launcher for. */
     card.launches = () => [...card._launches];
@@ -214,10 +214,10 @@ export function createEndCardTranslated(options: EndCardOptions = {} as EndCardO
         error: card._error?.message ?? null,
         ticks: card._ticks,
         language: card._language,
-        state: card.state(),
-        clip: card.clip(),
-        label: card.label(),
-        clipId: card.clipId(),
+        state: card.state!(),
+        clip: card.clip!(),
+        label: card.label!(),
+        clipId: card.clipId!(),
         launches: [...card._launches],
         stoppedSound: card._session?.timesStoppedSound?.() ?? 0,
         // The colour the card asked its display view for, and the fill the walker paints.

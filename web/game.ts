@@ -168,8 +168,8 @@ import { devSnapshot } from "./game/draw-sprites.js";
 import { init } from "./game/init.js";   // FLY row: quest zz_fly, visited towns only
 window.__bgm = bgm;
 window.__sfx = sfx;
-bgm.setVolume(window.__fx?.musicVolume);       // OPTIONS volumes (web/volume-levels.js): 1 = the game's own gain
-sfx.setVolume(window.__fx?.soundVolume);
+bgm.setVolume!(window.__fx?.musicVolume);       // OPTIONS volumes (web/volume-levels.js): 1 = the game's own gain
+sfx.setVolume!(window.__fx?.soundVolume);
 window.__glossaryStage = glossaryStage;      // dev hook for the screenshot tools (like window.__books)
 window.__books = books;
 installFxPanel(document.getElementById("stage"));
@@ -190,7 +190,7 @@ installMpBattle({
     nameOf: (id) => peerOf(id)?.name ?? myName(),
     send: (ids, d) => sendMpb(ids, d),
     releaseKeys: () => state.keys.clear(),
-    snapshot: () => ({ lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null), bits: state.bits | 0 }),
+    snapshot: () => ({ lead: JSON.stringify(state.partnerStats), party: JSON.stringify(state.partyStats ?? null), bits: state.bits! | 0 }),
     restore: (sn) => {
         state.partnerStats = JSON.parse(sn.lead); state.partyStats = JSON.parse(sn.party); state.bits = sn.bits;
         localStorage.setItem("partnerStats", sn.lead); localStorage.setItem("partyStats", sn.party); localStorage.setItem("bits", String(sn.bits));
@@ -215,7 +215,7 @@ installSocial({
         // setMap then gathers my followers on me). The spot comes from pickSpotNear on that map's own collision grid, so never a wall.
         // Resolves "ok", "busy", "nomap" or "noroom".
         warpNear: (mapId, x, y) => warpToMap(mapId, x, y, () => mpIdle() && !mpbVisible()),
-        bits: () => state.bits | 0,
+        bits: () => state.bits! | 0,
         canFight: () => mpIdle() && fieldPartySize(state.party) > 0 && !mpbVisible(),
         // co-op: the same enemy on two screens with one shared HP pool (see web/mpsocial.js)
         coopState: () => battle.coopState(),
@@ -259,11 +259,11 @@ installSocial({
                 if (have < it.qty) problems.push(`(you no longer had ${it.qty} ${it.name})`);
                 if (have > 0) storeRemoveItem(state, it.id, Math.min(have, it.qty));
             }
-            const giveBits = Math.min(gives?.bits | 0, state.bits | 0);
+            const giveBits = Math.min(gives?.bits | 0, state.bits! | 0);
             for (const it of gets?.items ?? []) {
                 if (ITEM_BY_ID[it.id] && it.qty >= 1 && it.qty <= 99) storeAddItem(state, it.id, it.qty);
             }
-            state.bits = Math.min((state.bits | 0) - giveBits + Math.max(0, Math.min(gets?.bits | 0, 9999999)), 9999999);
+            state.bits = Math.min((state.bits! | 0) - giveBits + Math.max(0, Math.min(gets?.bits | 0, 9999999)), 9999999);
             localStorage.setItem("inventory", JSON.stringify(state.inventory));
             localStorage.setItem("bits", String(state.bits));
             return problems.join(" ");
@@ -293,10 +293,10 @@ installQuests({
         return true;
     },
     ownsForm: (id) => [state.partnerStats, ...(Array.isArray(state.partyStats) ? state.partyStats : [])].some((p) => p?.formLedger?.some((f) => Number(f.id) === id)),
-    ask: (prompt, options) => new Promise((resolve) => choice.open(prompt, options, resolve)),
+    ask: (prompt, options) => new Promise((resolve) => choice.open!(prompt, options, resolve)),
     onDone: (title) => socialQuestDone(title),
     idle: () =>
-        !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28,
+        !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!() && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28,
     partnerIds: () => [state.charId, ...(Array.isArray(state.party) ? state.party : [])].filter(Boolean),
     // rewards go through the game's own item store and money, exactly as a battle drop does
     giveItem: (name, count = 1) => {
@@ -330,36 +330,36 @@ installMount({
     },
     resetFollowers: () => resetFollowers(),
     placeFollowers: (spots) => placeFollowersAt(spots),
-    sfx: (id) => sfx.play(id),
+    sfx: (id) => sfx.play!(id),
     // no riding indoors: the same open-air / indoor split the ambience layer uses (web/ambience.js isOpenAirMapName)
     indoor: () => { const n = currentMap()?.name; return !!n && !isOpenAirMapName(n); },
     say: (text) => { questSpeak(null, "", text); },
-    fieldReady: () => !battle.isActive() && !cutscene.isActive() && !textbox.isOpen() && !choice.isOpen()
+    fieldReady: () => !battle.isActive() && !cutscene.isActive() && !textbox.isOpen!() && !choice.isOpen!()
         && !state.menuOpen && fade.dir === 0 && !state.diveDemo && !state.wipe28 && !state.nameEntry
         && !state.climb && !state.fishing && !state.slope && !state.submarimon && !state.diveForm
         && !state._questScene,
     // anything that takes the field away sends the player off first (the map change and the ladder call
     // mountForceDismount themselves; this catches the rest: a fight, a scene, a menu, a fade, a save load)
     mustDismount: () => battle.isActive() || cutscene.isActive() || state.menuOpen || fade.dir !== 0
-        || state.wipe28 || state.diveDemo || textbox.isOpen() || choice.isOpen() || !!state.climb
+        || state.wipe28 || state.diveDemo || textbox.isOpen!() || choice.isOpen!() || !!state.climb
         || !!state.fishing || !!state.slope || !!state.submarimon || !!state.diveForm,
 });
 
 // Type-to-chat: T opens a line box, Enter shows it as a speech bubble over the player.
 installChat({
     stage: document.getElementById("stage"),
-    canOpen: () => state.started && !state.nameEntry && !textbox.isOpen() && !cutscene.isActive()
+    canOpen: () => state.started && !state.nameEntry && !textbox.isOpen!() && !cutscene.isActive()
         && !battle.isActive() && fade.dir === 0,
     releaseKeys: () => state.keys.clear(),
     onSend: (text) => (isOnline() ? sendChat(text) : chatSay(text)),   // in a room the line goes to everyone and shows over every head
-    bubbleOpen: () => chatBox.isOpen(),
-    dismiss: () => { chatBox.pressConfirm(); S.chatShownAt = performance.now() / 1000; S.chatPresses++; },
+    bubbleOpen: () => chatBox.isOpen!(),
+    dismiss: () => { chatBox.pressConfirm!(); S.chatShownAt = performance.now() / 1000; S.chatPresses++; },
 });
  mpOn((type, d) => { if (type === "chat") mpBalloonSay(d.id, d.name, d.text); });
 window.__fade = fade;
 
                       installAssetCanvasDrawing();
-ctx.imageSmoothingEnabled = false;
+ctx!.imageSmoothingEnabled = false;
 // Extra quests: the scene effects draw through this context (web/quest-fx.js), and a `drop` drives the field character
 // through the engine's own +0x54 writer, so the room scrolls exactly as it does in s680's floor collapse.
 installQuestFxCanvas(ctx);
@@ -392,7 +392,7 @@ window.__choice = choice;   // checks: whether a list / yes-no question is up
 // holding a folder, which is what Divermon's grant on the Yellow Cruiser gives.
 // The pause home's STATUS entry hands over to the translated pause page. Keys
 // are not double-handled: the page owns the pad while it is open.
-menu.nativeOpen = () => !!status?.isOpen();
+menu.nativeOpen = () => !!status?.isOpen!();
 // The Demo Setup screen has no place on the disc's pause list (nothing writes
 // the row), so it is a debug-only extra and its Back has no original answer.
 // It returns to the same one list every other route returns to.
@@ -400,7 +400,7 @@ menu.backToHome = pauseHome;
 menu.onNativePage = (label) => {
     const entry = PAUSE_PAGE_ENTRIES.get(label);
     if (!status || !entry) return false;
-    status.open(state, entry, () => { menu.screen = "home"; });
+    status.open!(state, entry, () => { menu.screen = "home"; });
     return true;
 };
 // The same flag store answers web/menu.js's MAP pane markers.
@@ -408,8 +408,8 @@ menu.mapSeen = engineFlagSeen;
 // The same gate as the translated page's seed: the resident byte D0x80048f42 is
 // carried[402], the Folder Bag (UI-CARD-FOLDERS-GATE-IS-FOLDER-BAG-ITEM-2026-10-14).
 menu.cardFolderUnlocked = () => carriesFolderBag(state);
-menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open(backToCardFolders); };
-menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open(backToCardFolders); };
+menu.onCardAlbum = () => { state.menuOpen = false; cardAlbum.open!(backToCardFolders); };
+menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open!(backToCardFolders); };
 // Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
 window.__fly = { places: () => currentFlyPlaces(), copy: (id) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
@@ -550,7 +550,7 @@ window.__assetLocality = () => ({
 });
 // Debug-only: lets a headless verifier drop the player onto a screen and read
 // the follower count, to check the Digi-Egg form swap without walking there.
-window.__setMap = (i, spawn = null) => loadAndSetMap(i, spawn);
+window.__setMap = (i, spawn = null) => loadAndSetMap(i, spawn!);
 window.__activeFollowerCount = () => activeFollowerCount();
 // Debug-only: what a Space press would talk to from where the player stands.
 // Lets a headless verifier (tools/verify_inn.mjs) prove it is addressing the
@@ -590,9 +590,9 @@ window.__blockActors = () => {
 window.__launchPads = { setEnabled: setLaunchPadsEnabled, list: launchPads, debug: launchPadDebug };
 // The stage overlays' own ported actors (the s415 rockfall). The bounce plays
 // through the same packed-sound sink every other field cue uses.
-setStageObjectSound((word) => sfx.playPacked(word, { overlap: true }));
+setStageObjectSound((word) => sfx.playPacked!(word, { overlap: true }));
 // The same sink for a stage overlay's own decor actor (engine/systems/point-record-actor.ts).
-setPointRecordActorSound((word) => sfx.playPacked(word, { overlap: true }));
+setPointRecordActorSound((word) => sfx.playPacked!(word, { overlap: true }));
 // The pad flashes' cues are music stems (env205 digi_en0..2, env011 login_dl),
 // not samples: the actor plays them at its own fire and this sink maps the
 // packed word through the same PACKED_JINGLES table into the jingle player.
@@ -759,7 +759,7 @@ window.__labClose = () => {
     state.titleScreen = null;
     state.menuOpen = false;
     if (textbox?.isOpen?.()) (textbox as Closeable).close?.();
-    if (dialogueBox.isOpen()) dialogueBox.close();
+    if (dialogueBox.isOpen!()) dialogueBox.close!();
     if (status?.isOpen?.()) status.close?.();
     for (const ui of [shop, driMenu, gym, cardShop, cardAlbum, cardDeck, cardDuel, saveScreen, fightReport, inn, cntyselNative]) {
         if (ui?.isOpen?.()) { if (ui.close) ui.close(); else ui._open = false; }
@@ -803,7 +803,7 @@ window.__labOpen = (name, arg) => {
             state.endScreenDone = () => { state.endScreen = null; };
             // The card's last callback asks for the first opening movie, which the walker
             // does not ship; the lab closes the screen as it always has.
-            endCard.open(() => {
+            endCard.open!(() => {
                 const onDone = state.endScreenDone;
                 state.endScreen = null;
                 state.endScreenDone = null;
@@ -824,15 +824,15 @@ window.__labOpen = (name, arg) => {
         // "[player_name]: What the...? Is that a Digimon?!" (raw disc bytes; the name goes in through
         // 0x80048d88). The anchor is the speaker's screen position.
         case "textbox":
-            dialogueBox.open({ esdmg: "esdmg400", entry: 4, index: 4 },
+            dialogueBox.open!({ esdmg: "esdmg400", entry: 4, index: 4 },
                 { kind: "say", plain: false, balloonMode: 0, actor: { x: 221, y: 110, actorId: 1 } },
                 null, undefined, { playerNameBytes: encodeNativeScreenText(state.playerName || "Junior") });
             break;
         case "textbox_plain":
-            dialogueBox.open({ file: "estalk00", index: 11 }, { kind: "say", plain: true, balloonMode: 0, actor: null });
+            dialogueBox.open!({ file: "estalk00", index: 11 }, { kind: "say", plain: true, balloonMode: 0, actor: null });
             break;
         case "textbox_legacy":
-            textbox.open({ name: "MAGAMI", pages: [[
+            textbox.open!({ name: "MAGAMI", pages: [[
                 "This is a sample dialogue box shown in the UI Lab.",
                 "It uses the real textbox renderer and font.",
             ]] }, null);
@@ -848,23 +848,23 @@ window.__labOpen = (name, arg) => {
         // always reachable here; in the game it needs the opt-in flag.
         case "demosetup":
             state.menuOpen = true;
-            if (menu.openAt) menu.openAt("demosetup"); else menu.reset();
+            if (menu.openAt) menu.openAt("demosetup"); else menu.reset!();
             break;
         case "dri":
-            driMenu.open(state, null);
+            driMenu.open!(state, null);
             break;
         // No greeter on the debug/lab path, so pass the stage and let the decoded
         // gym_ranks.json table pick the rank group it would have launched with.
-        case "gym": gym.open(state, null, null, currentMap()?.id); break;
-        case "status": status?.open(state, typeof arg === "string" ? arg : "items", null); break;
+        case "gym": gym.open!(state, null, null, currentMap()?.id); break;
+        case "status": status?.open!(state, typeof arg === "string" ? arg : "items", null); break;
         case "cardshop": {
             // The lab can ask for any decoded stock set by id (the launcher
             // parameter the merchant's flag carries); 0 stays the fallback.
             const which = arg == null || !Number.isFinite(+arg) ? 0 : +arg;
-            cardShop.open(state, null, openCardShopFolder, which);
+            cardShop.open!(state, null, openCardShopFolder, which);
             break;
         }
-        case "cardalbum": cardAlbum.open(state); break;
+        case "cardalbum": cardAlbum.open!(state); break;
         // The folder editor's correctness is about STATE (which slot, which
         // folder, what the swap did), so the lab exposes the screen and the
         // collection for headless capture to read.
@@ -873,7 +873,7 @@ window.__labOpen = (name, arg) => {
             window.__cards = cards;
             window.__labCatalog = cardCatalog;
             ensureStarterFolder();
-            cardDeck.open(state);
+            cardDeck.open!(state);
             break;
         // The duel is also the one lab screen whose correctness is about MOTION
         // rather than layout, so the live sprite pool is exposed for headless
@@ -888,7 +888,7 @@ window.__labOpen = (name, arg) => {
             break;
         }
         // Asuka Inn (s235) — the decoded record: 8 BIT per Digimon.
-        case "inn": inn.open(state, { map: "s235" }); break;
+        case "inn": inn.open!(state, { map: "s235" }); break;
         case "save": openMemoryCard("save"); break;
         // The card-access transition quad. It has no state in the walker
         // (there is no memory card to check), so the lab is where it can
@@ -909,7 +909,7 @@ window.__labOpen = (name, arg) => {
                 // (same normalize as the in-game zone path at :920). The native
                 // shop selects its own stock by shop id.
                 itemLog.noteSeen(s0.items.map((i) => i.id ?? i));   // GLOSSARY > ITEMS: the shop rows were shown
-                shop.open(s0.items.map((i) => i.id ?? i), null, { name: s0.name, state, shopId: which });
+                shop.open!(s0.items.map((i) => i.id ?? i), null, { name: s0.name, state, shopId: which });
             });
             break;
         }
@@ -919,7 +919,7 @@ window.__labOpen = (name, arg) => {
         // restarts it over whatever map is loaded.
         case "placecard":
             loadPlaceCardTranslated().then(() => {
-                placeCard.begin("s780");
+                placeCard.begin!("s780");
                 window.__labPlaceCard = placeCard;
             });
             break;
@@ -1172,7 +1172,7 @@ window.__variantsAt = (x = state.x, y = state.y, r = 40) => {
             shown_now: chapterNpcs(
                 sc.npcs,
                 state.chapter,
-                storyFlags.get,
+                storyFlags.get!!!!!!,
             ).includes(n),
         }))
         .sort((a, b) => a.slot - b.slot);
@@ -1242,14 +1242,14 @@ window.__replay = {
 
 window.addEventListener("keydown", (e) => {
     if (e.repeat) return;
-    bgm.unlock(); sfx.unlock();
+    bgm.unlock!(); sfx.unlock!();
     const raw = e.key.toLowerCase();
     dispatchInput(asButton(raw), e, raw);
     // The arrow keys scroll the page if the game does not claim them.
     if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(raw))
         e.preventDefault();
 });
-window.addEventListener("mousedown", () => { bgm.unlock(); sfx.unlock(); });
+window.addEventListener("mousedown", () => { bgm.unlock!(); sfx.unlock!(); });
 window.addEventListener("keyup", (e) => state.keys.delete(asButton(e.key)));
 window.addEventListener("blur", () => state.keys.clear());
 
@@ -1273,7 +1273,7 @@ window.__openExtra = (name) => {
         case "planner": if (fx.planner !== true) return false; openPlanner(); return tickPlanner(true, plannerPartyMembers);
         case "damagelab": if (fx.damagelab !== true) return false; openDamageLab(); return true;
         case "replay": if (fx.replay !== true) return false; openReplay(replayRowsNow() ?? {}); return true;
-        case "soundtest": if (!fx.soundtest) return false; soundTest.show(); return true;
+        case "soundtest": if (!fx.soundtest) return false; soundTest.show!(); return true;
         default: return false;
     }
 };
@@ -1337,5 +1337,5 @@ window.__dev = {
 };
 
 init().catch((err) => {
-    document.getElementById("loading").textContent = "Error: " + err.message;
+    document.getElementById("loading")!.textContent = "Error: " + err.message;
 });

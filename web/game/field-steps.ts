@@ -268,7 +268,7 @@ export function startAmbush(mapId, tile) {
 
 export async function flushStoryBattle() {
     if (state.pendingStoryBattleIndex == null || S.engineBridge?.isBusy() || battle.isActive()
-        || textbox.isOpen() || cutscene.isActive() || fade.dir !== 0) return;
+        || textbox.isOpen!() || cutscene.isActive() || fade.dir !== 0) return;
     const index = state.pendingStoryBattleIndex;
     const npc = state.pendingStoryBattleNpc;
     state.pendingStoryBattleIndex = null;
@@ -295,7 +295,7 @@ export async function flushStoryBattle() {
     };
     startFieldBattle(() => battle.startScreen(screenId, (res) => {
         presentVictory(res);
-        if (wonFlag != null) S.engine.state.flags.set(wonFlag, true);
+        if (wonFlag != null) S.engine!.state.flags.set(wonFlag, true);
         advanceStory();
     }, advanceStory, gameOverToTitle, { mapId, lead: false }));
 }
@@ -377,7 +377,7 @@ export function tickClimb(dt: number) {
         c.creakT = (c.creakT ?? 0) + dt;
         if (c.creakT >= 16 / 60) {
             c.creakT -= 16 / 60;
-            sfx.play("player01");
+            sfx.play!("player01");
         }
     } else {
         c.creakT = 0;

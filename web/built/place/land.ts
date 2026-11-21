@@ -47,7 +47,7 @@ export function soilLand(rec) {
       const r = Math.hypot(c.base[0], c.base[2]);
       if (r > rim * A.CARD_R_MAX) continue;
       const h = c.w / 2, a = [c.base[0] - c.dir[0] * h, c.base[2] - c.dir[1] * h], b = [c.base[0] + c.dir[0] * h, c.base[2] + c.dir[1] * h];
-      let a0 = azOf(a[0], a[1]), a1 = azOf(b[0], b[1]);
+      let a0 = azOf(a[0]!, a[1]!), a1 = azOf(b[0], b[1]);
       if (wrapDeg(a1 - a0) < 0) [a0, a1] = [a1, a0];
       cards.push({ piece: p.name, a, b, az0: a0, az1: a0 + wrapDeg(a1 - a0), r });
     }
@@ -55,9 +55,9 @@ export function soilLand(rec) {
   /** where the ray at azimuth az (deg) meets a card line: r, or null */
   const cardR = (cd: { b: number[]; a: number[]; }, az: number) => {
     const s = Math.sin(az * Math.PI / 180), c = Math.cos(az * Math.PI / 180);   // ray (x, z) = (s, c) * r
-    const ex = cd.b[0] - cd.a[0], ez = cd.b[1] - cd.a[1], den = s * ez - c * ex;
+    const ex = cd.b[0]! - cd.a[0]!, ez = cd.b[1]! - cd.a[1]!, den = s * ez - c * ex;
     if (Math.abs(den) < 1e-9) return null;
-    const r = (cd.a[0] * ez - cd.a[1] * ex) / den;
+    const r = (cd.a[0]! * ez - cd.a[1]! * ex) / den;
     return r > 0 ? r : null;
   };
   function apronRange(az: number) {
@@ -70,7 +70,7 @@ export function soilLand(rec) {
     }
     return hi > lo ? [Math.max(0, lo), hi] : null;
   }
-  function apronAt(x: number, z: number) { const g = apronRange(azOf(x, z)), r = Math.hypot(x, z); return !!g && r >= g[0] && r <= g[1]; }
+  function apronAt(x: number, z: number) { const g = apronRange(azOf(x, z)), r = Math.hypot(x, z); return !!g && r >= g[0]! && r <= g[1]!; }
   const landAt = (x: number, z: number) => floorAt(x, z) || apronAt(x, z);
   // shore outline: per STEP_DEG of azimuth, the land intervals along the ray (STEP_R steps), first lake radius
   const SH = SOIL.SHORE, nb = Math.round(360 / SH.STEP_DEG);
@@ -86,7 +86,7 @@ export function soilLand(rec) {
       if (!l && inLand) { inLand = false; iv.push([start, r - SH.STEP_R]); }
     }
     if (inLand) iv.push([start, SH.R_MAX]);
-    outline.landEnd.push(lEnd); outline.floorEnd.push(fEnd); outline.intervals.push(iv);
+    outline.landEnd.push(lEnd!); outline.floorEnd.push(fEnd!); outline.intervals.push(iv);
   }
   const out = { rim, tris: tris.length, cards, floorAt, apronAt, apronRange, landAt, outline, ms: Math.round(performance.now() - t0) };
   LAND.set(rec, out);
@@ -105,10 +105,10 @@ export function apronOutline(land) {
     if (!rs.length) continue;
     const g = [Math.min(...rs.map((q) => q[0])), Math.max(...rs.map((q) => q[1]))];
     const a0 = a * Math.PI / 180, a1 = (a + A.STEP_DEG) * Math.PI / 180;
-    for (let r0 = g[0]; r0 < g[1] - 1e-6; r0 += A.STEP_R) {
-      const r1 = Math.min(g[1], r0 + A.STEP_R);
-      const P = [[a0, r0], [a1, r0], [a1, r1], [a0, r1]].map(([t, r]) => [Math.sin(t) * r, 0, Math.cos(t) * r]);
-      const am = (a0 + a1) / 2, rm = (r0 + r1) / 2;
+    for (let r0 = g[0]; r0! < g[1]! - 1e-6; r0! += A.STEP_R) {
+      const r1 = Math.min(g[1]!, r0! + A.STEP_R);
+      const P = [[a0, r0], [a1, r0], [a1, r1], [a0, r1]].map(([t, r]) => [Math.sin(t!) * r!, 0, Math.cos(t!) * r!]);
+      const am = (a0 + a1) / 2, rm = (r0! + r1) / 2;
       if (P.every((q) => land.floorAt(q[0], q[2])) && land.floorAt(Math.sin(am) * rm, Math.cos(am) * rm)) { cellsOnFloor++; continue; }
       pos.push(...P[0], ...P[2], ...P[1], ...P[0], ...P[3], ...P[2]);   // wound to face +y
       cellsKept++;

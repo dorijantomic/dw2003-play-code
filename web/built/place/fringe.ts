@@ -26,7 +26,7 @@ export function plan(pctx) {
       const tk = b % nt, hero = b < FRINGE.HERO;
       const s = Math.max(-0.5, Math.min(0.5, (tk + 0.5) / nt - 0.5 + (r() - 0.5) * 1.5 / nt));   // the tuft's root +- 0.75 tuft
       const jit = (r() * 2 - 1) * FRINGE.JITTER * M;
-      const H = half * (hero ? 1.0 : tuftH[tk] * lerp(FRINGE.HMIN, 1.0));
+      const H = half * (hero ? 1.0 : tuftH[tk]! * lerp(FRINGE.HMIN, 1.0));
       blades.push({
         foot: [bx + dir[0] * s * w + across[0] * jit, 0, bz + dir[1] * s * w + across[1] * jit],
         H,

@@ -58,7 +58,7 @@ export function slotForFile(file) {
 /** XOR-8 over `bytes[from..to)`; the manager's checksum service (+0x358). */
 export function xor8(bytes: number[] | Uint8Array<ArrayBuffer>, from = 4, to = DIR_BLOCK_SIZE) {
     let sum = 0;
-    for (let i = from; i < to; i++) sum ^= bytes[i] & 0xff;
+    for (let i = from; i < to; i++) sum ^= bytes[i]! & 0xff;
     return sum & 0xff;
 }
 
@@ -72,7 +72,7 @@ export function buildSummaryRecord(rec, encodeName = encodeNativeScreenText) {
     if (!rec) return out;
     const dv = new DataView(out.buffer);
     const name = encodeName(rec.name ?? "", 0x18);
-    for (let i = 0; i < name.length && i < 0x18; i++) out[i] = name[i] & 0xff;
+    for (let i = 0; i < name.length && i < 0x18; i++) out[i] = name[i]! & 0xff;
     dv.setUint32(0x18, (rec.areaIndex ?? 0) >>> 0, true);
     dv.setUint32(0x1c, (rec.placeIndex ?? 0) >>> 0, true);
     dv.setUint32(0x20, (rec.bits ?? 0) >>> 0, true);
@@ -148,7 +148,7 @@ export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs
             // A directory header names its own slot in +0x01 (the writer stamps
             // the selected slot there); the image write carries no slot, so it
             // falls back to the file number the manager passed.
-            const slot = buf.length === DIR_BLOCK_SIZE ? buf[1] & 3 : slotForFile(file);
+            const slot = buf.length === DIR_BLOCK_SIZE ? buf[1]! & 3 : slotForFile(file);
             if (buf.length === SAVE_IMAGE_SIZE) images.set(slot, buf);
             onStore?.(slot, buf, buf.length === DIR_BLOCK_SIZE ? "header" : "image");
         },

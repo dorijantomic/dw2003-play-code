@@ -136,9 +136,9 @@ export function loadTexturePixels(url) {
         ? new OffscreenCanvas(width, height)
         : Object.assign(document.createElement("canvas"), { width, height })) as HTMLCanvasElement;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(bitmap, 0, 0);
+      ctx!.drawImage(bitmap, 0, 0);
       bitmap.close?.();
-      const { data } = ctx.getImageData(0, 0, width, height);
+      const { data } = ctx!.getImageData(0, 0, width, height);
       return { data, width, height, scale: width / TEXTURE_PAGE_TEXELS };
     })
     .catch(() => null);
@@ -225,10 +225,10 @@ function drawBillboard(gl, prog, mvp, viewEye, worldPos,
   const hh = heightUnits * 0.5;
   const cx = worldPos[0], cy = worldPos[1] + hh, cz = worldPos[2];
 
-  const tl = [cx - rx[0]*hw + ry[0]*hh, cy - rx[1]*hw + ry[1]*hh, cz - rx[2]*hw + ry[2]*hh];
-  const tr = [cx + rx[0]*hw + ry[0]*hh, cy + rx[1]*hw + ry[1]*hh, cz + rx[2]*hw + ry[2]*hh];
-  const br = [cx + rx[0]*hw - ry[0]*hh, cy + rx[1]*hw - ry[1]*hh, cz + rx[2]*hw - ry[2]*hh];
-  const bl = [cx - rx[0]*hw - ry[0]*hh, cy - rx[1]*hw - ry[1]*hh, cz - rx[2]*hw - ry[2]*hh];
+  const tl = [cx - rx[0]!*hw + ry[0]!*hh, cy - rx[1]!*hw + ry[1]!*hh, cz - rx[2]!*hw + ry[2]!*hh];
+  const tr = [cx + rx[0]!*hw + ry[0]!*hh, cy + rx[1]!*hw + ry[1]!*hh, cz + rx[2]!*hw + ry[2]!*hh];
+  const br = [cx + rx[0]!*hw - ry[0]!*hh, cy + rx[1]!*hw - ry[1]!*hh, cz + rx[2]!*hw - ry[2]!*hh];
+  const bl = [cx - rx[0]!*hw - ry[0]!*hh, cy - rx[1]!*hw - ry[1]!*hh, cz - rx[2]!*hw - ry[2]!*hh];
 
   const bufs = makeQuadBuffers(gl, [tl, tr, br, bl], [[0,0],[1,0],[1,1],[0,1]]);
   drawQuad(gl, prog, mvp, bufs, tex, alpha, tint);
@@ -263,7 +263,7 @@ export function drawQuad(gl, prog, mvp, bufs, tex, alpha, tint) {
 export function changeStageMat4(keys, frame) {
   const r = changeStageMeshMatrix(keys, frame);
   const m = mat4Identity();
-  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col] / 4096;
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) m[col * 4 + row] = r[row * 3 + col]! / 4096;
   return m;
 }
 

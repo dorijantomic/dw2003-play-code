@@ -137,9 +137,9 @@ export function dispatchInput(k, e, raw = "") {
     // still false. The translated card samples the held word, which the publish
     // above already feeds. Scoped to the pre-game case so the running game's
     // own screen order further down is untouched.
-    if (!state.started && saveScreen.isOpen()) {
+    if (!state.started && saveScreen.isOpen!()) {
         e.preventDefault();
-        saveScreen.handleKey(k, state);
+        saveScreen.handleKey!(k, state);
         return;
     }
     // The Sound Test dev screen owns every press while it is open (F2 ->
@@ -147,7 +147,7 @@ export function dispatchInput(k, e, raw = "") {
     // with the switch off this branch never runs.
     if (soundTest.open) {
         e.preventDefault();
-        soundTest.handleKey(k);
+        soundTest.handleKey!(k);
         return;
     }
     if (!state.started) return;
@@ -206,44 +206,44 @@ export function dispatchInput(k, e, raw = "") {
     // arrives as "`". Backslash is a no-dead-key fallback.
     if (e.code === "Backquote" || e.code === "Backslash") {
         e.preventDefault();
-        debugPanel.toggle();
+        debugPanel.toggle!();
         return;
     }
     // Debug-only entry point to the native stagslct gate-travel menu (F10 — the
     // real original trigger is unresolved, see web/stagslct.js header).
     if (e.key === "F10" && !stagslctMenu.open) {
         e.preventDefault();
-        stagslctMenu.show((mapId) => {
+        stagslctMenu.show!((mapId) => {
             startTransition({ to: mapId, spawnX: null, spawnY: null, dir: "down", scripted: true });
         });
         return;
     }
     if (stagslctMenu.open) {
         e.preventDefault();
-        stagslctMenu.handleKey(raw);
+        stagslctMenu.handleKey!(raw);
         return;
     }
-    if (fightReport.isOpen()) {
+    if (fightReport.isOpen!()) {
         e.preventDefault();
-        fightReport.handleKey(k);
+        fightReport.handleKey!(k);
         return;
     }
 
     if (debugPanel.enabled) {
         e.preventDefault();
-        debugPanel.handleKey(raw, state);
+        debugPanel.handleKey!(raw, state);
         return;
     }
 
     // Ž key (Croatian layout): toggle the story scene-skipper (dev — jump to any ordinal beat).
     if (k === "š") {
         e.preventDefault();
-        sceneSkip.toggle();
+        sceneSkip.toggle!();
         return;
     }
     if (sceneSkip.enabled) {
         e.preventDefault();
-        sceneSkip.handleKey(raw);
+        sceneSkip.handleKey!(raw);
         return;
     }
 
@@ -262,18 +262,18 @@ export function dispatchInput(k, e, raw = "") {
         if (
             !battle.isActive() &&
             !cutscene.isActive() &&
-            !textbox.isOpen() &&
-            !dialogueBox.isOpen() &&
-            !choice.isOpen() &&
+            !textbox.isOpen!() &&
+            !dialogueBox.isOpen!() &&
+            !choice.isOpen!() &&
             fade.dir === 0 &&
             !state.nameEntry &&
             !state.packSelect &&
-            !shop.isOpen() &&
-            !driMenu.isOpen() &&
-            !gym.isOpen() &&
-            !cardShop.isOpen() &&
-            !saveScreen.isOpen() &&
-            !fightReport.isOpen() &&
+            !shop.isOpen!() &&
+            !driMenu.isOpen!() &&
+            !gym.isOpen!() &&
+            !cardShop.isOpen!() &&
+            !saveScreen.isOpen!() &&
+            !fightReport.isOpen!() &&
             !cntyselNative.isOpen()
         ) {
             // U-27 / home tick: START is not read once the pause menu is open.
@@ -311,31 +311,31 @@ export function dispatchInput(k, e, raw = "") {
         // inside the page, and at the page's top level the page folds away and
         // the host's child slot goes NULL — which is what closes the pause
         // (web/status-translated.js).
-        if (status?.isOpen()) {
-            status.handleKey(k, state);
+        if (status?.isOpen!()) {
+            status.handleKey!(k, state);
             return;
         }
-        if (driMenu.isOpen()) {
-            driMenu.handleKey(k, sfx);
+        if (driMenu.isOpen!()) {
+            driMenu.handleKey!(k, sfx);
             return;
         }
-        if (shop.isOpen()) {
-            shop.handleKey(k, state);
+        if (shop.isOpen!()) {
+            shop.handleKey!(k, state);
             return;
         }
-        if (gym.isOpen()) {
-            gym.handleKey(k, state);
+        if (gym.isOpen!()) {
+            gym.handleKey!(k, state);
             return;
         }
-        if (cardShop.isOpen()) {
-            cardShop.handleKey(k, state);
+        if (cardShop.isOpen!()) {
+            cardShop.handleKey!(k, state);
             return;
         }
         for (const ui of [cardAlbum, cardDeck, cardDuel]) {
             if (ui.isOpen()) { ui.handleKey(k, state); return; }
         }
-        if (saveScreen.isOpen()) {
-            saveScreen.handleKey(k, state);
+        if (saveScreen.isOpen!()) {
+            saveScreen.handleKey!(k, state);
             return;
         }
         if (state.menuOpen) {
@@ -349,11 +349,11 @@ export function dispatchInput(k, e, raw = "") {
                 // The host owns the fold — the list's port is what plays the
                 // word, and this branch IS that fold for web/menu.js's own list.
                 // The translated page plays its own.
-                sfx.play("system01");
+                sfx.play!("system01");
                 state.menuOpen = false;
-                menu.reset();
+                menu.reset!();
             } else {
-                menu.handleKey(k, state, () => {});
+                menu.handleKey!(k, state, () => {});
             }
             return;
         }
@@ -371,11 +371,11 @@ export function dispatchInput(k, e, raw = "") {
     if (state.titleScreen) {
         e.preventDefault();
         if (k === "up") {
-            if (state.titleScreen.up()) sfx.play("system02");
+            if (state.titleScreen.up()) sfx.play!("system02");
         } else if (k === "down") {
-            if (state.titleScreen.down()) sfx.play("system02");
+            if (state.titleScreen.down()) sfx.play!("system02");
         } else if (k === "circle") {
-            if (state.titleScreen.confirm()) sfx.play("system00");
+            if (state.titleScreen.confirm()) sfx.play!("system00");
         }
         return;
     }
@@ -387,7 +387,7 @@ export function dispatchInput(k, e, raw = "") {
         else if (k === "down") ps.moveDown();
         else if (k === "circle") {
             ps.confirm();
-            if (ps.isDone()) state.packSelectDone();
+            if (ps.isDone()) state.packSelectDone!();
         }
         return;
     }
@@ -433,59 +433,59 @@ export function dispatchInput(k, e, raw = "") {
     // are all reached by their own launcher from the field and none of them can be up
     // at the same time as the card, so no order between them is observable. Only the
     // card-and-inn pair can both be up, so only that pair needed moving. Keep it here.
-    if (saveScreen.isOpen()) {
+    if (saveScreen.isOpen!()) {
         e.preventDefault();
-        saveScreen.handleKey(k, state);
+        saveScreen.handleKey!(k, state);
         return;
     }
 
     // Inn prompt owns the arrows/confirm while open (its own choice widget).
-    if (inn.isOpen()) {
-        if (k === "up") { e.preventDefault(); inn.moveUp(); return; }
-        if (k === "down") { e.preventDefault(); inn.moveDown(); return; }
-        if (k === "cross") { e.preventDefault(); inn.cancel(); return; }
-        if (k === "circle") { e.preventDefault(); inn.confirm(); return; }
+    if (inn.isOpen!()) {
+        if (k === "up") { e.preventDefault(); inn.moveUp!(); return; }
+        if (k === "down") { e.preventDefault(); inn.moveDown!(); return; }
+        if (k === "cross") { e.preventDefault(); inn.cancel!(); return; }
+        if (k === "circle") { e.preventDefault(); inn.confirm!(); return; }
     }
 
     // Route the d-pad to the choice menu when open
-    if (choice.isOpen()) {
+    if (choice.isOpen!()) {
         if (k === "up") {
             e.preventDefault();
-            choice.moveUp();
+            choice.moveUp!();
             return;
         }
         if (k === "down") {
             e.preventDefault();
-            choice.moveDown();
+            choice.moveDown!();
             return;
         }
     }
 
     // Route all keys to the DRI Select Action screen when open
-    if (driMenu.isOpen()) {
+    if (driMenu.isOpen!()) {
         e.preventDefault();
-        driMenu.handleKey(k, sfx);
+        driMenu.handleKey!(k, sfx);
         return;
     }
 
     // Route all keys to shop when open
-    if (shop.isOpen()) {
+    if (shop.isOpen!()) {
         e.preventDefault();
-        shop.handleKey(k, state);
+        shop.handleKey!(k, state);
         return;
     }
 
     // Route all keys to the gym when open
-    if (gym.isOpen()) {
+    if (gym.isOpen!()) {
         e.preventDefault();
-        gym.handleKey(k, state);
+        gym.handleKey!(k, state);
         return;
     }
 
     // Route all keys to the card shop when open
-    if (cardShop.isOpen()) {
+    if (cardShop.isOpen!()) {
         e.preventDefault();
-        cardShop.handleKey(k, state);
+        cardShop.handleKey!(k, state);
         return;
     }
 
@@ -504,7 +504,7 @@ export function dispatchInput(k, e, raw = "") {
     // Route all keys to menu when open
     if (state.menuOpen) {
         e.preventDefault();
-        menu.handleKey(k, state, () => {
+        menu.handleKey!(k, state, () => {
             localStorage.setItem("flags", JSON.stringify(state.flags));
             localStorage.setItem("inventory", JSON.stringify(state.inventory));
             localStorage.setItem("bits", String(state.bits));
@@ -534,12 +534,12 @@ export function dispatchInput(k, e, raw = "") {
             battle.handleKey(k);
             return;
         }
-        if (choice.isOpen()) {
-            choice.confirm();
+        if (choice.isOpen!()) {
+            choice.confirm!();
             return;
         }
-        if (textbox.isOpen()) {
-            textbox.advance();
+        if (textbox.isOpen!()) {
+            textbox.advance!();
             return;
         }
         // A RUNNING SCENE owns the field, exactly as its own textbox owns the press above.
@@ -641,7 +641,7 @@ export function dispatchInput(k, e, raw = "") {
                     if (gymHall) {
                         const plan = gymExtraPlan(state.gymExtra, gymHall, state.inventory);
                         const hallMap = currentMap().id;
-                        questSpeak(npc.npc_id, gymHall.trainer, gymHall.greeting.join("\n\n")).then(() => gym.open(state, null, plan.group, hallMap, plan.drills));
+                        questSpeak(npc.npc_id, gymHall.trainer, gymHall.greeting.join("\n\n")).then(() => gym.open!(state, null, plan.group, hallMap, plan.drills));
                         return;
                     }
                     if (!dlgState) return; // no ptrB dialogue — non-speaking variant
@@ -683,7 +683,7 @@ export function dispatchInput(k, e, raw = "") {
                             // name and price from the map — see web/inn.js.
                             if (state.pendingInn) {
                                 state.pendingInn = false;
-                                inn.open(state, { map: currentMap()?.id });
+                                inn.open!(state, { map: currentMap()?.id });
                             }
                             // Gym greeter: "Do you want to work out?" is a plain
                             // talk line, and the gym screen opens when the box
@@ -693,7 +693,7 @@ export function dispatchInput(k, e, raw = "") {
                             else if (state.pendingGymGroup != null) {
                                 const group = state.pendingGymGroup;
                                 state.pendingGymGroup = null;
-                                gym.open(state, null, group, currentMap()?.id);
+                                gym.open!(state, null, group, currentMap()?.id);
                             }
                             // Card duel, DECODED 2026-08-05 (was a Duel-Island
                             // stage guess). The NPC's own on_close write into
@@ -791,7 +791,7 @@ export function dispatchInput(k, e, raw = "") {
                         npc._animTime = 0;
                         npc._talkClipEnd = boxDur != null ? Math.max(0, boxDur - FIELD_TICK_SECONDS) : null;
                         npc._talking = true;
-                        sfx.playPacked(BOX_TALK_CUE, { overlap: true });
+                        sfx.playPacked!(BOX_TALK_CUE, { overlap: true });
                     }
                 } else if (startLadderClimb(scene)) {
                     // Ladder press-to-climb (authentic activation: the PS1 fires the
@@ -805,7 +805,7 @@ export function dispatchInput(k, e, raw = "") {
                     // the bank lacks the row-4 program -- authentic). Fired
                     // on door-glyph (op 4) trigger activation only; plain
                     // walk-through warps (op 1 arrows) stay silent.
-                    if (activeTriggerStep()?.op === 4) sfx.playArea("dooropen");
+                    if (activeTriggerStep()?.op === 4) sfx.playArea!("dooropen");
                     startTransition(activeExitAt());
                 } else if (startPadHandoff()) {
                     // Op 14 — the launch-pad handoff tile. The disc's handler calls
@@ -841,15 +841,15 @@ export function dispatchInput(k, e, raw = "") {
     if (raw === "h") setCharacter(state.charIdx + 1);
     else if (raw === "m") loadAndSetMap(state.mapIdx + 1);
     else if (raw === "o") {
-        editor.toggle();
-        sceneEd.arm(null);
+        editor.toggle!();
+        sceneEd.arm!(null);
     } else if (raw === "u" && editor.enabled) {
-        if (e.shiftKey) sceneEd.download();
-        else editor.download();
-    } else if (raw === "b") bgm.toggleMute();
-    else if (raw === "n" && editor.enabled) sceneEd.arm("npc");
-    else if (raw === "g" && editor.enabled) sceneEd.arm("exit");
-    else if (raw === "delete" && editor.enabled) sceneEd.removeNearest();
+        if (e.shiftKey) sceneEd.download!();
+        else editor.download!();
+    } else if (raw === "b") bgm.toggleMute!();
+    else if (raw === "n" && editor.enabled) sceneEd.arm!("npc");
+    else if (raw === "g" && editor.enabled) sceneEd.arm!("exit");
+    else if (raw === "delete" && editor.enabled) sceneEd.removeNearest!();
     else if (raw === "j") state.debugAnim = !state.debugAnim;
 
 }

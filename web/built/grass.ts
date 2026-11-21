@@ -45,7 +45,7 @@ const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math
 // it (curl along an arc, twist round the spine) after scaling, so the bend keeps its shape whatever the width/height.
 export function bladeGeometry() {
   const hw = GRASS.HW, rows = hw.length, pos = [], idx = [];
-  for (let k = 0; k < rows; k++) { const y = k / rows; pos.push(-hw[k], y, 0, hw[k], y, 0); }
+  for (let k = 0; k < rows; k++) { const y = k / rows; pos.push(-hw[k]!, y, 0, hw[k], y, 0); }
   pos.push(0, 1, 0);
   for (let k = 0; k < rows - 1; k++) { const a = 2 * k; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
   idx.push(2 * rows - 2, 2 * rows - 1, 2 * rows);
@@ -162,7 +162,7 @@ function grassMaterial() {
  *  at a world point, through the shared noise's JS twin. */
 export const GROUND_SCALE = 0.0016;
 export function groundAlbedo(a: THREE.Color, b: THREE.Color, p: number[]) {
-  const t = smooth(0.35, 0.65, S.fbm3JS(p[0] * GROUND_SCALE, p[1] * GROUND_SCALE, p[2] * GROUND_SCALE));
+  const t = smooth(0.35, 0.65, S.fbm3JS(p[0]! * GROUND_SCALE, p[1]! * GROUND_SCALE, p[2]! * GROUND_SCALE));
   return [a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t];
 }
 

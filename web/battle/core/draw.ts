@@ -23,11 +23,11 @@ function draw() {
     // The finale's ending chain owns the whole framebuffer the same way: the
     // host's movie adapter draws it over the battle's last pose frame.
     if (b._endingHosted) { uiC.hide("ui-battle"); return; }
-    const cw = B.canvas.width, ch = B.canvas.height;  // real device px (fullscreen)
+    const cw = B.canvas!.width, ch = B.canvas!.height;  // real device px (fullscreen)
     const W  = B.BATTLE_REF_W;   // 640 — logical UI layout space (scaled to fill below)
     const H  = B.BATTLE_REF_H;   // 480
 
-    B.ctx.save();
+    B.ctx!.save();
 
     // STFGTREP replaces the battle framebuffer completely. Scale its native
     // 320x240 image uniformly so fullscreen keeps the original 4:3 framing.
@@ -35,17 +35,17 @@ function draw() {
       // The 3D compositor and battle helpers may leave a device transform on
       // the shared context between frames; a takeover screen starts at the
       // framebuffer origin just like the PSX display environment switch.
-      B.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      B.ctx.globalAlpha = 1;
-      B.ctx.globalCompositeOperation = "source-over";
-      B.ctx.fillStyle = "#000";
-      B.ctx.fillRect(0, 0, cw, ch);
+      B.ctx!.setTransform(1, 0, 0, 1, 0, 0);
+      B.ctx!.globalAlpha = 1;
+      B.ctx!.globalCompositeOperation = "source-over";
+      B.ctx!.fillStyle = "#000";
+      B.ctx!.fillRect(0, 0, cw, ch);
       const scale = Math.min(cw / 320, ch / 240);
-      B.ctx.translate((cw - 320 * scale) / 2, (ch - 240 * scale) / 2);
-      B.ctx.scale(scale, scale);
-      B.ctx.imageSmoothingEnabled = false;
+      B.ctx!.translate((cw - 320 * scale) / 2, (ch - 240 * scale) / 2);
+      B.ctx!.scale(scale, scale);
+      B.ctx!.imageSmoothingEnabled = false;
       B.drawFightReport(b);
-      B.ctx.restore();
+      B.ctx!.restore();
       uiC.hide("ui-battle");   // look C: the report owns the screen, the HUD layer goes with the HUD
       return;
     }
@@ -59,10 +59,10 @@ function draw() {
       const mixes = takeBackdropBlends() > 0;
       const certain = (b.state === ST.LOSE && b._loseFade > 0) || (!!fx && effectsBlendBackdrop(fx.list, fx.manifest));
       if (layerFrameOk(mixes, certain) && showBattleLayer(true)) {
-        B.ctx.clearRect(0, 0, cw, ch);
+        B.ctx!.clearRect(0, 0, cw, ch);
       } else {
         showBattleLayer(false);
-        B.ctx.drawImage(B.offscreen3d, 0, 0, cw, ch);
+        B.ctx!.drawImage(B.offscreen3d, 0, 0, cw, ch);
       }
       // ORDER MATTERS during a form change: the transformation controller's
       // curtain blacks the arena out FIRST and the E000EVOL sprites play over
@@ -74,40 +74,40 @@ function draw() {
       // The transformation's own effects (types 1000-1003/1007/1008, file
       // E000EVOL) come through this same pass.
       if (fx) {
-        B.ctx.save();
-        B.ctx.scale(cw / B.offscreen3d.width, ch / B.offscreen3d.height);
+        B.ctx!.save();
+        B.ctx!.scale(cw / B.offscreen3d.width, ch / B.offscreen3d.height);
         drawEffects(B.ctx, fx.list, fx.manifest, fx.images, fx.view);
-        B.ctx.restore();
+        B.ctx!.restore();
       }
       // The flash washes those sprites, so it sits on top of them — and still
       // UNDER the battle chrome, which the capture keeps visible throughout.
       if (b.blastShow?.state) drawBlastFlash(B.ctx, b.blastShow.state, cw, ch);
       const overlay = B.renderer3d.getScreenOverlay?.();
       if (overlay) {
-        B.ctx.save();
-        B.ctx.globalAlpha = overlay.alpha;
-        B.ctx.fillStyle = "#fff";
-        B.ctx.fillRect(0, 0, cw, ch);
-        B.ctx.restore();
+        B.ctx!.save();
+        B.ctx!.globalAlpha = overlay.alpha;
+        B.ctx!.fillStyle = "#fff";
+        B.ctx!.fillRect(0, 0, cw, ch);
+        B.ctx!.restore();
       }
     } else {
       showBattleLayer(false);
-      B.ctx.fillStyle = "rgba(0,0,8,0.92)";
-      B.ctx.fillRect(0, 0, cw, ch);
+      B.ctx!.fillStyle = "rgba(0,0,8,0.92)";
+      B.ctx!.fillRect(0, 0, cw, ch);
     }
 
     // All player-facing battle chrome is laid out in the original 320x240
     // coordinate space, then scaled once to the fullscreen canvas.
-    B.ctx.save();
+    B.ctx!.save();
     const nativeScale = Math.min(
       cw / BATTLE_UI_LAYOUT.nativeW,
       ch / BATTLE_UI_LAYOUT.nativeH,
     );
     const nativeX = (cw - BATTLE_UI_LAYOUT.nativeW * nativeScale) / 2;
     const nativeY = (ch - BATTLE_UI_LAYOUT.nativeH * nativeScale) / 2;
-    B.ctx.translate(nativeX, nativeY);
-    B.ctx.scale(nativeScale, nativeScale);
-    B.ctx.imageSmoothingEnabled = false;
+    B.ctx!.translate(nativeX, nativeY);
+    B.ctx!.scale(nativeScale, nativeScale);
+    B.ctx!.imageSmoothingEnabled = false;
     // Look C (web/ui-c/battlehud.js): the whole 2D chrome below is one capture scope. The clips, the HUD's text and the bar / notice
     // parts become the C overlay; nothing about the battle changes (same calls, same order, same state). The 3D close-up stays under
     // the overlay and the bezel ring leaves its window open. The lose fade dims the overlay the way it darkens the canvas.
@@ -169,13 +169,13 @@ function draw() {
       dim: b.state === ST.LOSE && b._loseFade > 0 ? Math.min(1, b._loseFade) : 0,
       compose: (sc) => composeBattle(sc, { view: BATTLE_UI_LAYOUT.portraitView, stage: sc.stage }),
     }, chrome);
-    B.ctx.restore();
+    B.ctx!.restore();
     // The Blast transformation returns before the lose fade, as it always has.
-    if (b.blastShow) { B.ctx.restore(); return; }
+    if (b.blastShow) { B.ctx!.restore(); return; }
 
-    if (b.state === ST.LOSE && b._loseFade > 0) drawSubtractiveFade(B.ctx, cw, ch, b._loseFade);
+    if (b.state === ST.LOSE && b._loseFade > 0) drawSubtractiveFade(B.ctx!, cw, ch, b._loseFade);
 
-    B.ctx.restore();
+    B.ctx!.restore();
   }
 // True only when this frame's draw() paints or clears EVERY pixel of the shared canvas, so the field drawn under it is never
   // seen (web/game.js render() then skips the field's pure pixel work). Mirrors draw()'s own branches and has no side effects:
@@ -223,7 +223,7 @@ function draw() {
       // this to see the machine advance and to watch a slow load hold phase 3.
       opening: b._opening ? {
         top: b._opening.top, sub: b._opening.sub, phase: b._opening.phase,
-        phaseName: openingPhaseFor(b._opening.phase).name, of: OPENING_PHASE_COUNT,
+        phaseName: openingPhaseFor(b._opening.phase)!.name, of: OPENING_PHASE_COUNT,
         linePending: b._opening.linePending, exited: b._opening.exited,
         introVariant: b._opening.introVariant, specialMode4: b._opening.specialMode4,
         openCameraArmed: b._opening.openCameraArmed,

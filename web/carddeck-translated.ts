@@ -109,7 +109,7 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     loadCardIcons();
     deck._clock = new ui.MenuDisplayClock();
     const request = ++deck._request;
-    const language = Number.isInteger(deck._state?.languageByte) ? deck._state.languageByte : 2;
+    const language = Number.isInteger(deck._state?.languageByte) ? deck._state!.languageByte : 2;
     loadData(language).then(({ resident, banks, tables }) => {
       if (!deck._open || request !== deck._request) return;
       deck._session = new ui.FolderSession(language, resources(resident, banks, tables),
@@ -127,17 +127,17 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
     if (!deck._open || !deck._session || deck._error) return;
     for (const frame of deck._clock.advance(dt)) {
       deck._session.tick(deck._state?.keys ?? [], frame.tick);
-      if (deck._session.finished()) { deck._finish(); break; }
+      if (deck._session.finished()) { deck._finish!(); break; }
     }
   };
   deck.draw = (ctx, viewW) => {
     if (!deck._open || !deck._session) return;
     ctx.save();
-    ctx.scale(viewW / 320, viewW / 320);
+    ctx.scale(viewW! / 320, viewW! / 320);
     paintNativeSession(ctx, renderer, deck._session, { ui: { key: "ui-deck", compose: composeDeck } });
     ctx.restore();
   };
-  deck.close = () => { if (deck._open) deck._finish(); };
+  deck.close = () => { if (deck._open) deck._finish!(); };
   deck._finish = () => {
     if (!deck._open) return;
     deck._open = false;

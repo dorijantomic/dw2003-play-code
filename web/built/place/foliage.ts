@@ -83,16 +83,16 @@ export function plan(pctx) {
           const why = pctx.ko.rejectReason(pctx.ko.worldBands(shape, [x, y, z], it.s, it.yaw));
           lastWhy = why; (it.seq ||= []).push(why);
           if (!why) { ok = { x, y, z, push }; break; }
-          if (first) { stats.rejectedAtRecipeSpot++; stats.byReason[why]++; }
+          if (first) { stats.rejectedAtRecipeSpot++; stats.byReason![why]++; }
           first = false;
           if (!it.onGround) break;   // bushes sit on the bank's top edge: never moved
         }
-        stats.list.push([name, it.piece, Math.round(Math.hypot(it.q[0], it.q[2])), ok ? +ok.push.toFixed(1) : (first ? "noGround" : "dropped"), lastWhy, (it.seq || []).join(",")]); it.seq = null;
+        stats.list!.push([name, it.piece, Math.round(Math.hypot(it.q[0], it.q[2])), ok ? +ok.push.toFixed(1) : (first ? "noGround" : "dropped"), lastWhy, (it.seq || []).join(",")]); it.seq = null;
         if (!ok) { if (!first) stats.dropped++; continue; }
         if (ok.push > 0) stats.moved++;
         stats.accepted++;
         const az = Math.atan2(ok.z, ok.x), sector = ((Math.floor((az + Math.PI) / (Math.PI / 2)) % 4) + 4) % 4;
-        sectors[sector].push({ ...it, at: [ok.x, ok.y, ok.z] });
+        sectors[sector]!.push({ ...it, at: [ok.x, ok.y, ok.z] });
       }
       // exact transforms for the default asset (its units: the species geometry); h / rad = the plant's world size
       const H = shape.box.max[1] - shape.box.min[1], R = 0.5 * Math.max(shape.box.max[0] - shape.box.min[0], shape.box.max[2] - shape.box.min[2]);
@@ -109,7 +109,7 @@ export function plan(pctx) {
   const slotRef = Object.fromEntries(SPECIES.map(([name], i) => [name, slots[i]]));
   // B.species[name]: what is bound in that slot now (geometry, material, keep-out shape)
   const species = {};
-  for (const [name] of SPECIES) Object.defineProperty(species, name, { enumerable: true, get() {
+  for (const [name] of SPECIES) Object.defineProperty(species, name!, { enumerable: true, get() {
     const s = slotRef[name], a = s.asset, sh = shapes[name] || null, part = a?.parts?.[0];
     return part ? { geo: part.geo, mat: part.mat, bands: sh?.bands || [], tris: sh?.tris ?? 0, box: sh?.box || null, asset: a.id } : null;
   } });

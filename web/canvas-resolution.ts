@@ -111,7 +111,7 @@ export function createCanvasResolutionController(
   // follows its backing shape, so reading it would only repeat last frame's shape), and the
   // transform puts the box's (0,0) padX in from the left edge.
   function beginFrame(hd: boolean, wide = null) {
-    const padX = hd && wide?.padX > 0 ? wide.padX : 0;
+    const padX = hd && wide?.padX > 0 ? wide!.padX : 0;
     const fullWidth = logicalWidth + 2 * padX;
     if (
       dirty
@@ -123,7 +123,7 @@ export function createCanvasResolutionController(
       let target;
       if (padX > 0) {
         const dpr = Math.max(1, Number(view.devicePixelRatio) || 1);
-        let height = Math.max(logicalHeight, Math.round((wide.stageHeight || logicalHeight) * dpr));
+        let height = Math.max(logicalHeight, Math.round((wide!.stageHeight || logicalHeight) * dpr));
         let width = Math.round(height * fullWidth / logicalHeight);
         const reduction = Math.min(1, maxDimension / Math.max(width, height));
         if (reduction < 1) {
@@ -162,12 +162,12 @@ export function createCanvasResolutionController(
 
     // Canvas width/height changes reset all 2D state, and battle also uses this
     // shared context, so establish the field transform at every field frame.
-    ctx.setTransform(current.scaleX, 0, 0, current.scaleY, (current.padX || 0) * current.scaleX, 0);
+    ctx!.setTransform(current.scaleX, 0, 0, current.scaleY, (current.padX || 0) * current.scaleX, 0);
     // Native fallbacks and authentic pixel atlases stay nearest-neighbour.
     // web/assets.js temporarily enables smoothing only for density-tagged HD
     // sources, so one missing HD file cannot blur or bleed an entire UI.
-    ctx.imageSmoothingEnabled = false;
-    if (hd && "imageSmoothingQuality" in ctx) ctx.imageSmoothingQuality = "high";
+    ctx!.imageSmoothingEnabled = false;
+    if (hd && "imageSmoothingQuality" in ctx!) ctx.imageSmoothingQuality = "high";
     return current;
   }
 

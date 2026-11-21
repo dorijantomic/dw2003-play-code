@@ -49,9 +49,9 @@ export function itemsFrom(list, { attrs = null } = {}) {
   list.forEach((q, i) => {
     it.p[i * 3] = q.p[0]; it.p[i * 3 + 1] = q.p[1]; it.p[i * 3 + 2] = q.p[2];
     it.yaw[i] = q.yaw || 0; it.h[i] = q.h; it.rad[i] = q.rad;
-    if (hasM) (q.m.isMatrix4 ? q.m.toArray(it.m, i * 16) : it.m.set(q.m, i * 16));
-    if (hasC) { it.col[i * 3] = q.col[0]; it.col[i * 3 + 1] = q.col[1]; it.col[i * 3 + 2] = q.col[2]; }
-    if (hasG) it.grp[i] = q.grp;
+    if (hasM) (q.m.isMatrix4 ? q.m.toArray(it.m, i * 16) : it.m!.set(q.m, i * 16));
+    if (hasC) { it.col![i * 3] = q.col[0]; it.col![i * 3 + 1] = q.col[1]; it.col![i * 3 + 2] = q.col[2]; }
+    if (hasG) it.grp![i] = q.grp;
   });
   if (attrs) it.attrs = attrs;
   return it;
@@ -68,9 +68,9 @@ export function itemsOnTriangles(posList, n = 400, seed = 7, size = 400) {
   const r = rng(seed), out = [];
   if (tris.length) for (let k = 0; k < n; k++) {
     const x = r() * tot; let lo = 0, hi = tris.length - 1;
-    while (lo < hi) { const m = (lo + hi) >> 1; if (tris[m][2] < x) lo = m + 1; else hi = m; }
+    while (lo < hi) { const m = (lo + hi) >> 1; if (tris[m]![2] < x) lo = m + 1; else hi = m; }
     const [pos, i] = tris[lo], s1 = Math.sqrt(r()), s2 = r(), w = [1 - s1, s1 * (1 - s2), s1 * s2];
-    out.push({ p: [0, 1, 2].map((c) => w[0] * pos[i + c] + w[1] * pos[i + 3 + c] + w[2] * pos[i + 6 + c]), yaw: r() * Math.PI * 2, h: size, rad: size * 0.5 });
+    out.push({ p: [0, 1, 2].map((c) => w[0]! * pos[i + c] + w[1]! * pos[i + 3 + c] + w[2]! * pos[i + 6 + c]), yaw: r() * Math.PI * 2, h: size, rad: size * 0.5 });
   }
   return itemsFrom(out);
 }
@@ -94,9 +94,9 @@ export function shapeOfParts(parts, windShare = 0.04) {
   const vi = (t: number, k: number) => (ix ? ix[t * 3 + k] : t * 3 + k);
   for (let t = 0; t < nT; t++) {
     const v = [0, 1, 2].map((k) => [pa[vi(t, k) * 3], pa[vi(t, k) * 3 + 1], pa[vi(t, k) * 3 + 2]]);
-    const c = [0, 1, 2].map((k) => (v[0][k] + v[1][k] + v[2][k]) / 3);
-    const r = Math.max(...v.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]))) + windShare * (y1 - y0);
-    bands[Math.min(NB - 1, Math.max(0, Math.floor((c[1] - y0) / Math.max(y1 - y0, 1e-9) * NB)))].push({ c, r });
+    const c = [0, 1, 2].map((k) => (v[0]![k] + v[1]![k] + v[2]![k]) / 3);
+    const r = Math.max(...v.map((p) => Math.hypot(p[0] - c[0]!, p[1] - c[1]!, p[2] - c[2]!))) + windShare * (y1 - y0);
+    bands[Math.min(NB - 1, Math.max(0, Math.floor((c[1]! - y0) / Math.max(y1 - y0, 1e-9) * NB)))]!.push({ c, r });
   }
   let maxRad = 0; const bottomVerts = [];
   for (let i = 0; i < pa.length; i += 3) { maxRad = Math.max(maxRad, Math.hypot(pa[i], pa[i + 1], pa[i + 2])); if (pa[i + 1] < -0.02) bottomVerts.push([pa[i], pa[i + 1], pa[i + 2]]); }
@@ -104,7 +104,7 @@ export function shapeOfParts(parts, windShare = 0.04) {
     bands: bands.filter((l) => l.length).map((tris) => {
       const bb = new THREE.Box3(); for (const t of tris) bb.expandByPoint(new THREE.Vector3(...t.c));
       const c = bb.getCenter(new THREE.Vector3()).toArray();
-      return { c, r: Math.max(...tris.map((t) => Math.hypot(t.c[0] - c[0], t.c[1] - c[1], t.c[2] - c[2]) + t.r)), tris };
+      return { c, r: Math.max(...tris.map((t) => Math.hypot(t.c[0] - c[0]!, t.c[1] - c[1]!, t.c[2] - c[2]!) + t.r)), tris };
     }),
     box: { min: b.min.toArray(), max: b.max.toArray() }, tris: nT, maxRad, bottomVerts,
   };
@@ -207,7 +207,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
             m.instanceColor.setUsage(THREE.DynamicDrawUsage);
             (parent || parentOf(s)).add(m); meshes.push(m);
           }
-          lodSets.set(s.id, { near, far, mats, cols: near.instanceColor.array.slice(), idx, items, mask: "" });
+          lodSets.set(s.id, { near, far, mats, cols: near.instanceColor!.array.slice(), idx, items, mask: "" });
         } else {
           const m = mk(part.geo, nameOf(g, part, pi));
           m.computeBoundingSphere();

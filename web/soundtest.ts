@@ -237,9 +237,9 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
     d.handleKey = (k) => {
         if (!d.open) return false;
         const key = String(k ?? "").toLowerCase();
-        if (key === "start") { d.hide(); return true; }
+        if (key === "start") { d.hide!(); return true; }
         if (!catalogue) {
-            if (key === "cross") d.hide();
+            if (key === "cross") d.hide!();
             return true;
         }
         if (d.stage === "categories") {
@@ -251,7 +251,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
             } else if (key === "circle") {
                 openCategory();
             } else if (key === "cross") {
-                d.hide();
+                d.hide!();
             }
             return true;
         }
@@ -310,9 +310,9 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
             const y = L.rowsY + i * L.pitch;
             // A music-start record is a SEP sequence, not a sample; say so,
             // because the original plays it through the same Circle press.
-            const suffix = packedIsMusicStart(parseInt(row.id, 16)) ? "  (music)" : "";
-            drawText(ctx, row.text + suffix, L.rowsX, y, { kind: 1 });
-            if (row.index === view.cursor) drawText(ctx, ">", L.cursorX, y, { kind: 3 });
+            const suffix = packedIsMusicStart(parseInt(row!.id, 16)) ? "  (music)" : "";
+            drawText(ctx, row!.text + suffix, L.rowsX, y, { kind: 1 });
+            if (row!.index === view.cursor) drawText(ctx, ">", L.cursorX, y, { kind: 3 });
         }
         drawText(ctx, "Circle hold to play  Square stop", 16, H - 32, { kind: 3 });
         drawText(ctx, "Cross back  Start close", 16, H - 16, { kind: 3 });

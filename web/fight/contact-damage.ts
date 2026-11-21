@@ -37,8 +37,8 @@ import type { ContactDamageSpec } from "./types.js";
  */
 export function contactPlan(total: number, perHit: number | undefined, hits: number | undefined, hp = null) {
   const t = Math.max(0, total | 0);
-  const per = Math.max(0, perHit | 0);
-  const n = Math.max(1, hits | 0);
+  const per = Math.max(0, perHit! | 0);
+  const n = Math.max(1, hits! | 0);
   const finiteHp = hp != null && Number.isFinite(hp);
   let left = t;
   let pool = finiteHp ? Math.max(0, hp | 0) : 0;
@@ -63,8 +63,8 @@ export function contactPlan(total: number, perHit: number | undefined, hits: num
  * when the script fires no contact at all, e.g. clip 15's field moves).
  */
 export function contactDamager({ total, perHit, hits, hp = null, pay = null }: ContactDamageSpec = {}) {
-  const t = Math.max(0, total | 0);
-  const shares = contactPlan(t, perHit, hits, hp);
+  const t = Math.max(0, total! | 0);
+  const shares = contactPlan(t, perHit, hits, hp!);
   let taken = 0;
   let paid = 0;
   const apply = typeof pay === "function" ? pay : () => {};
@@ -76,7 +76,7 @@ export function contactDamager({ total, perHit, hits, hp = null, pay = null }: C
       if (type !== 98) return false;                // anything else is not a contact
       if (taken >= shares.length - 1) return false; // more contacts than hits: nothing early
       const share = shares[taken++];
-      if (share > 0) { paid += share; apply(share); }
+      if (share! > 0) { paid += share!; apply(share); }
       return false;
     },
     remaining: () => Math.max(0, t - paid),

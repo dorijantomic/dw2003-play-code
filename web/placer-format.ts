@@ -34,5 +34,5 @@ export function groundPoint(o, d, heightFn, h0 = 0, iters = 8) {
     if (Math.abs(g - h) < 1e-4) { p.y = g; return p; }
     h = g;
   }
-  p.y = h; return p;
+  p!.y = h; return p;
 }

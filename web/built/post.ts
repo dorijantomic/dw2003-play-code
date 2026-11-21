@@ -94,14 +94,14 @@ const SRGB_GLSL = /* glsl */`
 // ---------------- JS twins (the same maths, for the checks and for CPU work) ----------------
 const IN = [[0.59719, 0.35458, 0.04823], [0.07600, 0.90834, 0.01566], [0.02840, 0.13383, 0.83777]];
 const OUT = [[1.60475, -0.53108, -0.07367], [-0.10208, 1.10813, -0.00605], [-0.00327, -0.07276, 1.07602]];
-const mul3 = (m: number[][], v: number[]) => m.map((r: number[]) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+const mul3 = (m: number[][], v: number[]) => m.map((r: number[]) => r[0]! * v[0]! + r[1]! * v[1]! + r[2]! * v[2]!);
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smoothstep = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const lumaOf = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const lumaOf = (c: number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
 
 /** three r186 ACESFilmicToneMapping. */
 export function acesJS(c: number[], exposure = 1) {
-  let v = [c[0] * exposure / 0.6, c[1] * exposure / 0.6, c[2] * exposure / 0.6];
+  let v = [c[0]! * exposure / 0.6, c[1]! * exposure / 0.6, c[2]! * exposure / 0.6];
   v = mul3(IN, v);
   v = v.map((x) => (x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.4329510) + 0.238081));
   v = mul3(OUT, v);
@@ -132,7 +132,7 @@ export function ditherJS(e: number[], x: number, y: number, amp = SETTINGS.dithe
 /** The whole chain for one linear colour at one pixel (x, y in gl_FragCoord terms), 0-1 sRGB out. */
 export function chainJS(c: number[], x = 0, y = 0, s = SETTINGS) {
   const t = splitToneJS(c, s.grade), a = acesJS(t, s.exposure), m = s.toneMix ?? 1;
-  const mapped = m >= 1 ? a : a.map((v, k) => v * m + clamp01(t[k]) * (1 - m));   // toneMix 1 = ACES, 0 = no tone map
+  const mapped = m >= 1 ? a : a.map((v, k) => v * m + clamp01(t[k]!) * (1 - m));   // toneMix 1 = ACES, 0 = no tone map
   return ditherJS(srgbJS(mapped), x, y, s.dither);
 }
 
@@ -347,8 +347,8 @@ export function createPost(width: number, height: number, opts: BuiltPostOpts = 
   const finalMat = new THREE.ShaderMaterial({
     uniforms: {
       tColor: { value: target.texture },
-      tB0: { value: levels[0].rt.texture }, tB1: { value: levels[1].rt.texture },
-      tB2: { value: levels[2].rt.texture }, tB3: { value: levels[3].rt.texture },
+      tB0: { value: levels[0]!.rt.texture }, tB1: { value: levels[1]!.rt.texture },
+      tB2: { value: levels[2]!.rt.texture }, tB3: { value: levels[3]!.rt.texture },
       uBloomW: { value: new THREE.Vector4(...S.bloom.weights.map((w) => w / wSum)) },
       uBloomStrength: U.uBloom, uBloomOn: { value: 1 },
       uExposure: U.uExposure, uDither: U.uDither, uGrade: U.uGrade, uToneMix: U.uToneMix,
@@ -479,10 +479,10 @@ export function createPost(width: number, height: number, opts: BuiltPostOpts = 
     const seen = new Map();
     for (let i = 0; i < px.length; i += 4) {
       const v = px[i];
-      if (v <= 0.02) { dark++; continue; }
-      if (v >= 0.98) { light++; continue; }
+      if (v! <= 0.02) { dark++; continue; }
+      if (v! >= 0.98) { light++; continue; }
       mid++;
-      const k = Math.round(v * 16) / 16;
+      const k = Math.round(v! * 16) / 16;
       seen.set(k, (seen.get(k) || 0) + 1);
     }
     const vals = [...seen.entries()].sort((a, b) => a[0] - b[0]);
@@ -503,9 +503,9 @@ export function createPost(width: number, height: number, opts: BuiltPostOpts = 
     if (U.uBloom.value <= 0) return { max: 0, mean: 0, l0max: 0, nonzero: 0, texels: 0 };
     let max = 0, sum = 0, n = 0, l0max = 0, nonzero = 0;
     for (let i = 0; i < levels.length; i++) {
-      const L = levels[i], px = readRT(L.rt, L.w, L.h), w = S.bloom.weights[i] / wSum;
+      const L = levels[i], px = readRT(L.rt, L.w, L.h), w = S.bloom.weights[i]! / wSum;
       for (let k = 0; k < px.length; k += 4) {
-        const v = (px[k] + px[k + 1] + px[k + 2]) / 3;
+        const v = (px[k]! + px[k + 1]! + px[k + 2]!) / 3;
         if (px[k] !== 0 || px[k + 1] !== 0 || px[k + 2] !== 0) nonzero++;
         if (i === 0) l0max = Math.max(l0max, v);
         const wv = v * w; max = Math.max(max, wv); sum += wv; n++;

@@ -325,7 +325,7 @@ export function tipPointFor(model, point, frame = null) {
   const p = frame == null ? poseWindow(model, null) : window;
   const poses = p;
   let best = null;
-  for (const pose of poses) {
+  for (const pose of poses!) {
     const v = tipOf(pose.pos, model, point.bone, chainPrevBone(folder, point.id, point.bone));
     if (!v) continue;
     if (!best || v[2] > best[2] || (v[2] === best[2] && v[1] < best[1])) best = v;

@@ -381,8 +381,8 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
       const room = rootCap != null ? Math.sqrt(Math.max(0, rootCap * rootCap - lift * lift)) : Infinity;
       const fwd = Math.min(wu.travel || 0, SOLVER.centreDrive * H, room);
       const x = t ? t[0] : torsoX;
-      const y = (t ? t[1] : floorY - base.height) - lift;
-      const z = (t ? t[2] : torsoZ + base.forward) + fwd;
+      const y = (t ? t[1] : floorY - base!.height!) - lift;
+      const z = (t ? t[2] : torsoZ + base!.forward) + fwd;
       return [x, y, z];
     }
     // Where the WRIST goes: the class's wrist record holds its height and its forward offset.
@@ -391,8 +391,8 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
     //   its reach and swung his upper arm through his pelvis (K19f item 4; K19e's "0.403 h lateral").
     //   A BARE hand IS the emitter, so its lateral is the class's own measured emitter lateral (the
     //   release record): that is the number the class's casts actually hold the hand at.
-    const lat = cls === "prop" ? (base.lateral || 0) : (lateral || base.lateral || 0);
-    return [torsoX + lat * s, floorY - base.height, torsoZ + base.forward];
+    const lat = cls === "prop" ? (base!.lateral || 0) : (lateral || base!.lateral || 0);
+    return [torsoX + lat * s, floorY - base!.height!, torsoZ + base!.forward];
   };
   // R3: a combined shot converges the sites to the measured clasp gap; a spread keeps each site's own side.
   let targets = group.sites.map((_, i) => releaseFor(i));
@@ -403,7 +403,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): Fi
     if (group.mode === "combined") {
       shared = sharedShotTargets({
         points: pts, mode: group.mode, height: H,
-        aim: [0, 0, 1], origin: { x: torsoX, y: floorY - base.height, z: torsoZ + base.forward },
+        aim: [0, 0, 1], origin: { x: torsoX, y: floorY - base!.height!, z: torsoZ + base!.forward },
       });
       targets = shared.points.map((p) => [p.x, p.y, p.z]);
       origins = shared.origins.map((p) => [p.x, p.y, p.z]);
@@ -539,15 +539,15 @@ const rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Math.s
 const fromTo = (u, v) => {
   const a = unit3(u), b = unit3(v);
   if (!len3(a) || !len3(b)) return ID3;
-  const c = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const c = a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
   if (c > 1 - 1e-9) return ID3;
   if (c < -1 + 1e-9) {
-    const t = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-    const p = unit3([a[1] * t[2] - a[2] * t[1], a[2] * t[0] - a[0] * t[2], a[0] * t[1] - a[1] * t[0]]);
+    const t = Math.abs(a[0]!) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const p = unit3([a[1]! * t[2]! - a[2]! * t[1]!, a[2]! * t[0]! - a[0]! * t[2]!, a[0]! * t[1]! - a[1]! * t[0]!]);
     return axisAngle(p, Math.PI);
   }
-  const ax = unit3([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]);
-  return axisAngle(ax, Math.atan2(len3([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]), c));
+  const ax = unit3([a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!]);
+  return axisAngle(ax, Math.atan2(len3([a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!]), c));
 };
 const axisAngle = (axis, ang) => {
   const [x, y, z] = axis, c = Math.cos(ang), s = Math.sin(ang), t = 1 - c;
@@ -580,12 +580,12 @@ function toCh2(M, prev = null) {
   let t = [c0 / TAU, c1 / TAU, c2 / TAU];
   if (prev) {
     const wrap = (x: number, p) => { let d = x - p; d = ((d % 4096) + 4096) % 4096; if (d > 2048) d -= 4096; return p + d; };
-    const alt = [t[0] + 2048, 2048 - t[1], t[2] + 2048];
+    const alt = [t[0]! + 2048, 2048 - t[1]!, t[2]! + 2048];
     const cost = (v) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
     const a = t.map((x, i) => wrap(x, prev[i])), b = alt.map((x, i) => wrap(x, prev[i]));
     t = cost(a) <= cost(b) ? a : b;
   }
-  const norm = (x: number | undefined) => { let r = Math.round(x) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
+  const norm = (x: number | undefined) => { let r = Math.round(x!) % 4096; if (r < 0) r += 4096; return r >= 2048 ? r - 4096 : r; };
   return [norm(t[0]), norm(t[1]), norm(t[2])];
 }
 
@@ -597,7 +597,7 @@ function rigTopology(model) {
   const parent = Array.from({ length: n }, (_, i) => (model.bones[i]?.parent_slot ?? 0) - 1);
   for (let i = 0; i < n; i++) {
     const p = parent[i];
-    if (p >= 0 && p < n) kids[p].push(i); else roots.push(i);
+    if (p! >= 0 && p! < n) kids[p].push(i); else roots.push(i);
   }
   const order = [];
   const stack = roots.slice().reverse();
@@ -610,7 +610,7 @@ function rigTopology(model) {
   const subs = Array.from({ length: n }, () => []);
   for (let i = 0; i < n; i++) {
     let p = i, guard = 0;
-    while (p >= 0 && p < n && guard++ <= n) { subs[p].push(i); p = parent[p]; }
+    while (p >= 0 && p < n && guard++ <= n) { subs[p]!.push(i); p = parent[p]; }
   }
   return { n, kids, roots, order, subs, parent };
 }
@@ -679,7 +679,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
   const idleW = idlePoses.map((p) => p.rot.map(m3));
   const idleL = idlePoses.map((p, k) => p.rot.map((f, i) => {
     const pp = parent[i];
-    return mul(tr(pp >= 0 && pp < n ? idleW[k][pp] : ID3), m3(f));
+    return mul(tr(pp! >= 0 && pp! < n ? idleW[k][pp] : ID3), m3(f));
   }));
   const rootBone = rig.root;
   const keys = new Map(), prevKeys = new Map(), key1 = new Map();
@@ -696,10 +696,10 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const p = parent[i];
       if (p < 0 || p >= n) { P[i] = [-c1[0], c1[1], -c1[2]]; continue; }
       const o = mv(W[p], c1);
-      P[i] = [P[p][0] - o[0], P[p][1] + o[1], P[p][2] - o[2]];
+      P[i] = [P[p][0] - o[0]!, P[p][1] + o[1], P[p][2] - o[2]!];
     }
   };
-  const rotateSubtree = (bone, R) => { for (const j of subs[bone]) W[j] = mul(R, W[j]); };
+  const rotateSubtree = (bone, R) => { for (const j of subs[bone]!) W[j] = mul(R, W[j]); };
   // a bone whose subtree carries mesh that stands on the floor at the neutral pose: turning it drags the
   // feet, so a head cast spreads its pitch over the ancestors ABOVE that line only (K20a's hub section).
   const groundedSet = (() => {
@@ -712,7 +712,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const R = restW[i], p0 = rest.pos[i];
       if (!R || !p0) continue;
       for (const v of vs) {
-        const y = (R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2]) + p0[1];
+        const y = (R[1]![0] * v[0] + R[1]![1] * v[1] + R[1]![2] * v[2]) + p0[1];
         if (y >= low.y - 0.12 * plan.H) { out.add(i); break; }
       }
     }
@@ -724,7 +724,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
   const headJointsOf = (bone) => {
     const out = [bone];
     let p = parent[bone], guard = 0;
-    while (p >= 0 && p < n && guard++ < n) {
+    while (p! >= 0 && p! < n && guard++ < n) {
       if (carriesGrounded(p)) break;
       out.push(p);
       p = parent[p];
@@ -771,7 +771,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     // negates x and z). So a world-space rotation R applied to a bone's matrix rotates the DRAWN geometry
     // by S·R·S. Both the measured axis and the wanted direction therefore go through S before the
     // rotation is computed — otherwise the limb turns about a mirrored axis and never lands on the aim.
-    const num = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const num = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
     const toMat = (v) => [-v[0], v[1], -v[2]];
     /**
      * The rotation to apply to a bone so that the DRAWN geometry turns `u` onto `v`. The drawn geometry is
@@ -829,7 +829,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
     const driveChainOf = (bone) => {
       const chain = [];
       let p = parent[bone], guard = 0;
-      while (p >= 0 && p < n && guard++ < n) { chain.push(p); p = parent[p]; }
+      while (p! >= 0 && p! < n && guard++ < n) { chain.push(p); p = parent[p]; }
       chain.reverse();
       // the root itself is the last resort (a bird's head is attached straight to the body): it may be
       // turned, because the ground gate then judges the feet the turn lifts.
@@ -841,7 +841,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       for (let pass = 0; pass < passes; pass++) {
         for (let k = chain.length - 1; k >= 0; k--) {
           const j = chain[k];
-          const tip = tipOf(P, target, s.bone, prev);
+          const tip = tipOf(P, target, s.bone, prev!);
           if (!tip) continue;
           const u = sub3(tip, P[j]), v = sub3(point, P[j]);
           if (len3(u) < 1e-6 || len3(v) < 1e-6) continue;
@@ -929,9 +929,9 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
               const eff = m?.fa?.origin ?? P[tipBone];
               if (!eff) continue;
               const cur = sub3(eff, P[tipBone]);
-              const point = [wantP[0] + cur[0] + (effOff[0] - cur[0]) * aimScale,
-                             wantP[1] + cur[1] + (effOff[1] - cur[1]) * aimScale,
-                             wantP[2] + cur[2] + (effOff[2] - cur[2]) * aimScale];
+              const point = [wantP[0] + cur[0] + (effOff[0]! - cur[0]!) * aimScale,
+                             wantP[1] + cur[1] + (effOff[1]! - cur[1]!) * aimScale,
+                             wantP[2] + cur[2] + (effOff[2]! - cur[2]!) * aimScale];
               const u = sub3(eff, P[j]), v = sub3(point, P[j]);
               if (len3(u) < 1e-6 || len3(v) < 1e-6) continue;
               const R = fromToDraw(u, v);
@@ -963,7 +963,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
         const restP = plan.restTip?.[i] ?? null;
         if (restP) {
           const d = sub3(frame.aim.point, restP);
-          rootDelta = [rootDelta[0] + d[0], rootDelta[1] + d[1], rootDelta[2] + d[2]];
+          rootDelta = [rootDelta[0]! + d[0]!, rootDelta[1]! + d[1]!, rootDelta[2]! + d[2]!];
         }
         // K20b: the head's OWN pitch. K20a measured it in the MESH frame (the geometry the player sees);
         // the module's firing axis reports the exact mirror (geoPitch + axisPitch = 0 on 110 of 115
@@ -1007,7 +1007,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const lowNow = lowestVertex(target, { rot: W.map(flatOf), pos: P });
       const rise = (idleLowY[idleIdx] ?? baseLowY) - lowNow.y;
       if (Number.isFinite(rise) && rise > 1e-6) {
-        rootDelta[1] += rise;
+        rootDelta[1]! += rise;
         metrics.footPlant = Math.max(metrics.footPlant ?? 0, +(rise / plan.H).toFixed(3));
       }
     }
@@ -1027,11 +1027,11 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       // caught it. A root key at the idle changes nothing the solver does and makes the drawn pose the
       // solved pose.
       const p = parent[i];
-      const Wp = p >= 0 && p < n ? W[p] : ID3;
+      const Wp = p! >= 0 && p! < n ? W[p] : ID3;
       const L = mul(tr(Wp), W[i]);
       // K20b: the delta is measured against the IDLE local of this tick, so a bone the cast does not drive
       // keeps its idle value exactly (dc = I) and the joint limit is a limit on the cast's own deviation.
-      const Lr = LrTick?.[i] ?? mul(tr(p >= 0 && p < n ? restW[p] : ID3), restW[i]);
+      const Lr = LrTick?.[i] ?? mul(tr(p! >= 0 && p! < n ? restW[p] : ID3), restW[i]);
       const d = mul(tr(Lr), L);
       const dc = clampRot(d, K16.maxJoint);
       const { ang } = axisOf(d);
@@ -1058,11 +1058,11 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const c1 = chan(target.bones[i]?.anim?.ch1, curFrame);
       // +Y is down and a root's ch1 is written as (x, y, z) with the model's axes (pos = -x, +y, -z):
       // a body-transport delta in MODEL space is (-dx, +dy, -dz) in the channel.
-      const isRoot = parent[i] < 0;
+      const isRoot = parent[i]! < 0;
       c1s[i] = [
-        Math.round(c1[0] - (isRoot ? rootDelta[0] : 0)),
+        Math.round(c1[0] - (isRoot ? rootDelta[0] : 0)!),
         Math.round(c1[1] + (isRoot ? rootDelta[1] : 0)),
-        Math.round(c1[2] - (isRoot ? rootDelta[2] : 0)),
+        Math.round(c1[2] - (isRoot ? rootDelta[2] : 0)!),
       ];
     }
     for (const i of topo.order) {
@@ -1293,8 +1293,8 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
         if (!R) return null;
         const W = toM(R);
         // R_delta = W * W0^T
-        const D = [0, 1, 2].map((r) => [0, 1, 2].map((c) => W[r][0] * W0[c][0] + W[r][1] * W0[c][1] + W[r][2] * W0[c][2]));
-        return Math.atan2(D[2][1] - D[1][2], D[1][1] + D[2][2]) * 180 / Math.PI;
+        const D = [0, 1, 2].map((r) => [0, 1, 2].map((c) => W[r]![0] * W0[c]![0] + W[r]![1] * W0[c]![1] + W[r]![2] * W0[c]![2]));
+        return Math.atan2(D[2]![1]! - D[1]![2]!, D[1]![1]! + D[2]![2]!) * 180 / Math.PI;
       };
       const series = [];
       for (let t = 0; t < plan.ticks; t++) {
@@ -1303,8 +1303,8 @@ export function verifyBake(model, plan: FightPlan, bake, group) {
       }
       let peak = -Infinity, peakTick = 0, jump = 0;
       for (let i = 0; i < series.length; i++) {
-        if (series[i] > peak) { peak = series[i]; peakTick = i; }
-        if (i) jump = Math.max(jump, Math.abs(series[i] - series[i - 1]));
+        if (series[i]! > peak) { peak = series[i]; peakTick = i; }
+        if (i) jump = Math.max(jump, Math.abs(series[i]! - series[i - 1]!));
       }
       const lo = plan.head.p10, hi = plan.head.p90;
       headGate = {
@@ -1407,7 +1407,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
     // the midline and read as one combined shot — exactly what "spread" is not; it also crossed the forearms
     // (K19c's clearance flagged left-arm x right-arm at -0.08 h). A combined shot is one shot, one aim point.
     p.aimPoints = p.sites.map((s, i) => (p.mode === "spread" && p.sites.length > 1)
-      ? [p.targets[i][0], p.aimPoint[1], p.aimPoint[2]]
+      ? [p.targets[i][0], p.aimPoint![1], p.aimPoint![2]]
       : p.aimPoint);
     return p;
   };
@@ -1439,7 +1439,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
     if (rung.lean != null) p.leanScale = rung.lean;
     return p;
   };
-  const start0 = makePlan(SOLVER.attemptLadder[0].quantile);
+  const start0 = makePlan(SOLVER.attemptLadder[0]!.quantile);
   if (!start0) return null;
   if (start + start0.ticks >= SOLVER.frameLimit) return null;   // the channel sentinel/16-bit limit
   let best = null, plan = start0, gapNeed = 0;
@@ -1469,7 +1469,7 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
         if (v2.pass) {
           // the report carries BOTH numbers: what the disc measured for this size class and the share this
           // body could actually take (verified by re-running the same gate on the re-baked pose)
-          v = { ...v2, report: { ...v2.report, head: { ...v2.report.head, liftFull: v2.report.head.lift, lift: +(v2.report.head.lift * k).toFixed(2), scale: k } } };
+          v = { ...v2, report: { ...v2.report, head: { ...v2.report.head, liftFull: v2.report.head!.lift, lift: +(v2.report.head!.lift * k).toFixed(2), scale: k } } };
           bk = b2; p.headScale = k; break;
         }
       }
@@ -1484,11 +1484,11 @@ export function solveCast(model, { tech = null, apply = true, offset = null, for
     // the limb around the body. Anything else is out of this ladder's hands.
     if (!v.gate.clearance && !v.gate.gap) break;
     if (!v.gate.gap && Number.isFinite(v.report.gap.min)) {
-      gapNeed = Math.max(gapNeed, (SHARED_SHOT.minSeparation * p.H - v.report.gap.min * p.H) + 0.01 * p.H);
+      gapNeed = Math.max(gapNeed, (SHARED_SHOT.minSeparation * p.H - v.report.gap.min! * p.H) + 0.01 * p.H);
     }
   }
   const { bake, v } = best;
-  plan = best.plan;
+  plan = best!.plan;
   const pass = v.pass;
   const forced = !!force && !pass;
   const report = { ...v.report, pass, forced, shared: plan.shared?.basis ?? null };

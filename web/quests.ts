@@ -565,7 +565,7 @@ async function showQuest(d) {
     if (s === "active" && challengeIndex(d) >= 0 && canBegin(d)) acts.push(["Begin the fight", () => { beginChallenge(d.id); return "leave"; }]);
     if (!acts.length) return null;
     const pick = await ask(clip(d.title, 28), [...acts.map((a) => a[0]), "Back"]);
-    return pick < acts.length ? acts[pick][1]() : null;
+    return pick < acts.length ? acts[pick]![1]!() : null;
 }
 /** The quest log: a choice list of quests (4 to a page), each opening its details in the conversation box. */
 // a quest whose giver (or notice board) is in the place the player is standing in
@@ -600,8 +600,8 @@ export async function openLog() {
             if (!all.length) { await say("Quests", "No quests yet.\n\nExplore, fight and talk to people: quests unlock as you play."); return true; }
             const by = (k: string) => all.filter((e) => e.s === k).map((e) => e.d);
             const avail = by("available");
-            const buckets = [["Ready to claim", by("ready")], ["Open quests", by("active")], ["New here", avail.filter(isHere)], ["Elsewhere", avail.filter((d) => !isHere(d))], ["Finished", by("done")]].filter(([, l]) => l.length);
-            const options = [...buckets.map(([n, l]) => `${n} (${l.length})`), "Reset quests", "Close"];
+            const buckets = [["Ready to claim", by("ready")], ["Open quests", by("active")], ["New here", avail.filter(isHere)], ["Elsewhere", avail.filter((d) => !isHere(d))], ["Finished", by("done")]].filter(([, l]) => l!.length);
+            const options = [...buckets.map(([n, l]) => `${n} (${l!.length})`), "Reset quests", "Close"];
             const pick = await ask("Quests", options);
             if (pick < buckets.length) {
                 const [name, list] = buckets[pick] as [string, any[]];

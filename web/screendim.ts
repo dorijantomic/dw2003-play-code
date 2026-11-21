@@ -38,7 +38,7 @@ function scratch(w: number, h: number) {
     layerCanvas.width = minCanvas.width = w;
     layerCanvas.height = minCanvas.height = h;
   }
-  return [layerCanvas.getContext("2d"), minCanvas.getContext("2d")];
+  return [layerCanvas.getContext("2d"), minCanvas!.getContext("2d")];
 }
 
 /**
@@ -70,23 +70,23 @@ export function subtractLayer(ctx: CanvasRenderingContext2D, x: number, y: numbe
 
   // The layer carries the caller's transform, shifted so the region's top-left
   // lands on the layer's origin. paintLayer then works in native coordinates.
-  layer.setTransform(1, 0, 0, 1, 0, 0);
-  layer.globalCompositeOperation = "source-over";
-  layer.globalAlpha = 1;
-  layer.fillStyle = "#000";
-  layer.fillRect(0, 0, dw, dh);
-  layer.setTransform(m.a, 0, 0, m.d, m.e - dx, m.f - dy);
-  layer.imageSmoothingEnabled = false;
+  layer!.setTransform(1, 0, 0, 1, 0, 0);
+  layer!.globalCompositeOperation = "source-over";
+  layer!.globalAlpha = 1;
+  layer!.fillStyle = "#000";
+  layer!.fillRect(0, 0, dw, dh);
+  layer!.setTransform(m.a, 0, 0, m.d, m.e - dx, m.f - dy);
+  layer!.imageSmoothingEnabled = false;
   paintLayer(layer, w, h);
 
   // min(screen, dim)
-  min.setTransform(1, 0, 0, 1, 0, 0);
-  min.globalCompositeOperation = "copy";
-  min.globalAlpha = 1;
-  min.imageSmoothingEnabled = false;
-  min.drawImage(ctx.canvas, dx, dy, dw, dh, 0, 0, dw, dh);
-  min.globalCompositeOperation = "darken";
-  min.drawImage(layerCanvas, 0, 0);
+  min!.setTransform(1, 0, 0, 1, 0, 0);
+  min!.globalCompositeOperation = "copy";
+  min!.globalAlpha = 1;
+  min!.imageSmoothingEnabled = false;
+  min!.drawImage(ctx.canvas, dx, dy, dw, dh, 0, 0, dw, dh);
+  min!.globalCompositeOperation = "darken";
+  min!.drawImage(layerCanvas!, 0, 0);
 
   // screen - min(screen, dim)
   ctx.save();
@@ -94,7 +94,7 @@ export function subtractLayer(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.globalAlpha = 1;
   ctx.imageSmoothingEnabled = false;
   ctx.globalCompositeOperation = "difference";
-  ctx.drawImage(minCanvas, dx, dy);
+  ctx.drawImage(minCanvas!, dx, dy);
   ctx.restore();
 }
 

@@ -29,7 +29,7 @@ export function gymStatForId(id: number) {
 //   dig        = { elemGrowth: {fire:1..5,...}, elemCur: {fire:0..999,...} } for brackets
 // Returns { tpCost, effects: [{ stat, delta }] } (negative delta = loss; "maxHp"/"maxMp").
 export function gymTrainingResult(drillEntry, tpChoice, ultra: boolean, dig, gym, rng = RAND_U16) {
-  const roll = ([base, range]) => base + (range ? rng() % range : 0);
+  const roll = ([base, range]) => base + (range ? rng()! % range : 0);
   const superDrill = drillEntry.drill >= 13;
   const variant = !ultra ? 0 : superDrill ? 2 : 1; // elem/hpmp row variant
   const effects = [];
@@ -39,7 +39,7 @@ export function gymTrainingResult(drillEntry, tpChoice, ultra: boolean, dig, gym
       if (isPrimary) { // core gain (0x8008c304): (super?6:0) + ultra*3 + tpChoice
         const row = gym.core_rows[(superDrill ? 6 : 0) + (ultra ? 3 : 0) + tpChoice];
         effects.push({ stat: GYM_CORE_STATS[id], delta: roll(row) });
-      } else if ((rng() & 1) === 0) {
+      } else if ((rng()! & 1) === 0) {
         // core loss (0x8008c364), applier 0x800862d0: only rolled in when rand()&1 == 0
         // (50% of trainings); the store floor-clamps the stat at 0.
         effects.push({ stat: GYM_CORE_STATS[id], delta: -roll(gym.loss_rows[tpChoice]) });
@@ -80,9 +80,9 @@ export function gymRepPercent(equip) {
 // (unk18 2→4 at 0x71fc). Basic drills always stop at three. Returns the per-rep results for
 // the rep-marker row (F0x80086c0c: hit → ring clip 0x45, miss → X clip 0x46).
 export function gymRepResults(percent: number, superDrill = false, rng = RAND_U16) {
-  const reps = [0, 1, 2].map(() => rng() % 100 <= percent);
+  const reps = [0, 1, 2].map(() => rng()! % 100 <= percent);
   if (superDrill && !reps.every(Boolean)) {
-    reps.push(rng() % 100 <= percent, rng() % 100 <= percent);
+    reps.push(rng()! % 100 <= percent, rng()! % 100 <= percent);
   }
   return reps;
 }
@@ -94,7 +94,7 @@ export function gymRepResults(percent: number, superDrill = false, rng = RAND_U1
 // normal tables.
 export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
   const percent = drill === lastUltraDrill ? 0 : 50;
-  return rng() % 100 <= percent;
+  return rng()! % 100 <= percent;
 }
 
 // Total session stat change. DECODED 2026-07-13 (F0x800866cc + F0x80087334): the native

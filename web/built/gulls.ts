@@ -68,7 +68,7 @@ export function gullGeometry() {
 const f = (x: number) => x.toFixed(4);
 export const GULL_GLSL = /* glsl */`
   vec2 gullAngles(vec3 g, float t) {
-    float env = smoothstep(${f(GULL.ENV[0])}, ${f(GULL.ENV[1])}, 0.5 + 0.5 * sin(t * g.z + g.y));
+    float env = smoothstep(${f(GULL.ENV[0]!)}, ${f(GULL.ENV[1]!)}, 0.5 + 0.5 * sin(t * g.z + g.y));
     float w = ${f(GULL.FLAP_HZ * 2 * Math.PI)};
     float a1 = ${f(GULL.A1)} + env * ${f(GULL.F1)} * sin(t * w + g.x) + ${f(GULL.BREATHE)} * sin(t * ${f(GULL.BREATHE_W)} + g.x);
     float a2 = ${f(GULL.A2)} + env * ${f(GULL.F2)} * sin(t * w + g.x - ${f(GULL.LAG)});
@@ -91,9 +91,9 @@ const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math
 /** JS twin of gullFlap (position only), for the bob room and the checker. */
 export function gullFlapJS(p, seg: number, g: number[], t: number) {
   if (seg < 0.5) return [...p];
-  const env = smooth(GULL.ENV[0], GULL.ENV[1], 0.5 + 0.5 * Math.sin(t * g[2] + g[1])), w = GULL.FLAP_HZ * 2 * Math.PI;
-  const a1 = GULL.A1 + env * GULL.F1 * Math.sin(t * w + g[0]) + GULL.BREATHE * Math.sin(t * GULL.BREATHE_W + g[0]);
-  const a2 = GULL.A2 + env * GULL.F2 * Math.sin(t * w + g[0] - GULL.LAG);
+  const env = smooth(GULL.ENV[0]!, GULL.ENV[1]!, 0.5 + 0.5 * Math.sin(t * g[2]! + g[1]!)), w = GULL.FLAP_HZ * 2 * Math.PI;
+  const a1 = GULL.A1 + env * GULL.F1 * Math.sin(t * w + g[0]!) + GULL.BREATHE * Math.sin(t * GULL.BREATHE_W + g[0]!);
+  const a2 = GULL.A2 + env * GULL.F2 * Math.sin(t * w + g[0]! - GULL.LAG);
   const side = p[0] < 0 ? -1 : 1, d = Math.abs(p[0]);
   const q = Math.min(Math.max(d - GULL.ROOT, 0), GULL.ELBOW - GULL.ROOT), o = Math.max(d - GULL.ELBOW, 0);
   const x = GULL.ROOT + q * Math.cos(a1) + o * Math.cos(a1 + a2), y = q * Math.sin(a1) + o * Math.sin(a1 + a2);
@@ -203,7 +203,7 @@ export function buildGulls(slot, env: { S: typeof S0; materials: THREE.ShaderMat
   }
   const info = {
     count: n, shown: n, cards: cards.length, cardCopies,
-    trisPerGull: geo.attributes.position.count / 3, reach,
+    trisPerGull: geo.attributes.position!.count / 3, reach,
     band: D.band,
     gulls: gulls.map((q) => ({ card: q.card, copy: q.copy, copies: q.copies, cw: +q.cw.toFixed(1), R: +q.R.toFixed(1),
                                yc: +q.yc.toFixed(1), y: [q.y0, +q.y1.toFixed(1)], hs: +q.hs.toFixed(1), bob: +q.bob.toFixed(1), w: +q.w.toFixed(4) })),

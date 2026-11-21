@@ -56,8 +56,8 @@ export async function startGame(mapId = null) {
     await prepareStageAssets(targetId);
     state.started = true;
     canvas.hidden = false;
-    document.getElementById("hud").classList.add("visible");
-    setMap(idx >= 0 ? idx : 0, saved);
+    document.getElementById("hud")!.classList.add("visible");
+    setMap(idx >= 0 ? idx : 0, saved!);
     grantNewPartners();
     checkStageCutscene(currentMap().id);
     requestAnimationFrame(frame);

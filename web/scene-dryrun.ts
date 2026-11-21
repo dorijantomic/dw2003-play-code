@@ -379,7 +379,7 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     const timeout = !ended && stalls.length === 0;
 
     // Which steps never played. A step that emits no opcode is "played" once the pc has reached its own boundary.
-    const played = (span: { step: number; start: number; end: number; firstEvent: number; endEvent: number; } | undefined) => (span.end === span.start ? maxPc >= span.end : maxPc > span.start);
+    const played = (span: { step: number; start: number; end: number; firstEvent: number; endEvent: number; } | undefined) => (span!.end === span!.start ? maxPc >= span!.end : maxPc > span!.start);
     const unreachableTail = pendingFollowUp ? [] : spans.filter((s) => !played(s)).map((s) => s.step);
     const conditionalTail = chaseSteps
         .filter((step) => played(spans[step - 1]))

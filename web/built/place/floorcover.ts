@@ -42,7 +42,7 @@ function planType(kind: string, spec: { n: number; tMin: number; p: number; h: n
     const n = noise3JS(x / (COVER.PATCH_M * M), 0.5, z / (COVER.PATCH_M * M));
     const dens = Math.pow(t, spec.p) * Math.max(0.06, Math.min(1.4, 0.35 + 1.5 * (n - 0.3)));
     if (r() > dens) continue;
-    const s = (spec.h[0] + (spec.h[1] - spec.h[0]) * Math.pow(r(), 1.6)) * M * (0.85 + 0.3 * t);   // bigger toward the trees
+    const s = (spec.h[0]! + (spec.h[1]! - spec.h[0]!) * Math.pow(r(), 1.6)) * M * (0.85 + 0.3 * t);   // bigger toward the trees
     const it = { x, z, yaw: r() * Math.PI * 2, s, lean: r(), t, u: r() };
     if (wantTall && keepOut?.reject && state && keepOut.reject([x, s * 0.5, z], s * 0.9)) continue;
     out.push(it);
@@ -52,7 +52,7 @@ function planType(kind: string, spec: { n: number; tMin: number; p: number; h: n
 function colourFor(kind: string, it: { x: number; z: number; yaw: number; s: number; lean: number; t: number; u: number; }, u2: number) {
   if (kind === "fern" || kind === "clover" || kind === "tuft") {
     const g = MEAS.green[0], k = 0.9 + 0.35 * u2;
-    return [g[0] * k, g[1] * k, g[2] * k];
+    return [g![0]! * k, g![1]! * k, g![2]! * k];
   }
   if (kind === "litter") {
     const tot = MEAS.shares.brown + MEAS.shares.light + MEAS.shares.green, x = u2 * tot;
@@ -103,7 +103,7 @@ export function plan(pctx) {
     per[kind] = { planned: spec.n, placed: items.length, tries };
     const nS = spec.sectors, list = [];
     const bySector = Array.from({ length: nS }, () => []);
-    for (const it of items) bySector[kind === "fern" ? 0 : Math.min(nS - 1, Math.floor((azOfXZ(it.x, it.z) + 180) / 360 * nS))].push(it);
+    for (const it of items) bySector[kind === "fern" ? 0 : Math.min(nS - 1, Math.floor((azOfXZ(it.x, it.z) + 180) / 360 * nS))]!.push(it);
     bySector.forEach((l, si) => l.forEach((it) => {
       const m = placeMatrix(kind, it).toArray();
       C.setRGB(it.col[0] / 255, it.col[1] / 255, it.col[2] / 255, THREE.SRGBColorSpace);

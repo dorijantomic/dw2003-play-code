@@ -77,7 +77,7 @@ export function _drawItems(ctx: CanvasRenderingContext2D, state: GameState, m: M
   if ((fold ? fold("itemsTitle", ...(I.title_plate.pivot ?? [0xC, 0x17]), "x", clipAt(I.title_plate)) : (clipAt(I.title_plate)(), 1)) >= 1) {
     drawText(ctx, ITEM_CATS[m.itemCat], I.title_text.x, I.title_text.y);
   }
-  const list = m.itemList(state);
+  const list = m.itemList!(state);
   const G = I.grid;
   const perPage = G.cols * G.rows;
   const page = Math.floor((list.length ? m.itemCursor : 0) / perPage);
@@ -167,8 +167,8 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
     if (D.stat_icons) drawClip(ctx, cmfont, D.stat_icons.clip, D.stat_icons.x, D.stat_icons.y);
     STAT_ROWS.forEach((stat, i) => {
       const y = D.stat_values.y_base + i * D.stat_values.pitch;
-      const after = sheetStatValue(p, preview, stat, wornSlot);
-      const before = sheetStatValue(p, snapshot, stat, wornSlot);
+      const after = sheetStatValue(p, preview, stat, wornSlot!);
+      const before = sheetStatValue(p, snapshot, stat, wornSlot!);
       // These are the STATUS SHEET's own widgets, still on screen: the equip
       // screen's ctor F0x80086498 builds no stat widget and its draw F0x80086dd4
       // never lays down the stat window, so it draws over a sheet that is still
@@ -249,12 +249,12 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
     // palette 0 when it admits the piece, palette 7 when it refuses. The
     // take-off row (id -1) is skipped by the `blez` at :3d04, so it keeps its
     // own grey. The refusal colour had been open since 2026-07-10.
-    const listRow = EQUIP_ROW_SLOTS.indexOf(slotKey);
+    const listRow = EQUIP_ROW_SLOTS.indexOf(slotKey!);
     const listLine = rosterSlotOfCharId(String(state.party?.[m.detailIdx ?? 0] ?? ""));
     if (fold("eqList", ...LW.pivot, "x", () => drawClip(ctx, ststat, LW.clip, LW.x, LW.y)) >= 1) {
       const L = E.list;
       drawText(ctx, E.slot_names[m.equipCursor], L.header.x, L.header.y, GREY);
-      options.slice(m.equipScroll, m.equipScroll + L.rows).forEach((opt, vi) => {
+      options!.slice(m.equipScroll, m.equipScroll + L.rows).forEach((opt, vi) => {
         const y = L.y_base + vi * L.pitch;
         const idx = m.equipScroll + vi;
         drawClip(ctx, ststat, L.plate_clip, L.icon_x, y);
@@ -271,15 +271,15 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
         }
       });
       // blinking scroll arrows (toggle every 9 vsyncs) when >8 rows
-      if (options.length > L.rows) {
+      if (options!.length > L.rows) {
         const on = Math.floor(t * VSYNC / E.scroll_arrows.blink_vsync) % 2 === 0;
         if (on) {
           const A = E.scroll_arrows;
           if (m.equipScroll > 0) drawClip(ctx, ststat, A.up.clip, A.up.x, A.up.y);
-          if (m.equipScroll < options.length - L.rows) drawClip(ctx, ststat, A.down.clip, A.down.x, A.down.y);
+          if (m.equipScroll < options!.length - L.rows) drawClip(ctx, ststat, A.down.clip, A.down.x, A.down.y);
         }
       }
-      const bar = equipScrollbarThumb(options.length, m.equipListCursor, E.scrollbar ?? EQUIP_SCROLLBAR);
+      const bar = equipScrollbarThumb(options!.length, m.equipListCursor, E.scrollbar ?? EQUIP_SCROLLBAR);
       if (bar) {
         ctx.fillStyle = "#fff";
         ctx.fillRect(bar.x, bar.y, bar.w, bar.h);
@@ -307,7 +307,7 @@ export function _drawEquip(ctx: CanvasRenderingContext2D, state: GameState, m: M
   if (m.equipFocus === "list" &&
       fold("eqList", ...(sh.footer.pivot ?? [0, 0xD3]), "x",
         () => drawClip(ctx, ststat, sh.footer.clip, sh.footer.x, sh.footer.y)) >= 1) {
-    const sel = options[m.equipListCursor];
+    const sel = options![m.equipListCursor];
     const [d1, d2] = E.desc_lines;
     if (sel?.unequip) {
       drawText(ctx, E.unequip_desc, d1.x, d1.y);

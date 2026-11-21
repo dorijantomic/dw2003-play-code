@@ -241,7 +241,7 @@ const SPARKLE_UNIT_FRAMES = ORB_FRAMES / 8;
 export function sparkleActorFrame(frames: number) {
     let t = frames;
     for (const [id, dur] of SPARKLE_FLOURISH) {
-        const n = Math.max(1, Math.round(dur * SPARKLE_UNIT_FRAMES));
+        const n = Math.max(1, Math.round(dur! * SPARKLE_UNIT_FRAMES));
         if (t < n) return id;
         t -= n;
     }
@@ -249,7 +249,7 @@ export function sparkleActorFrame(frames: number) {
 }
 
 export const SPARKLE_ACTOR_FRAMES = SPARKLE_FLOURISH.reduce(
-    (s, [, dur]) => s + Math.max(1, Math.round(dur * SPARKLE_UNIT_FRAMES)), 0);
+    (s, [, dur]) => s + Math.max(1, Math.round(dur! * SPARKLE_UNIT_FRAMES)), 0);
 
 // The type-0x16 actor's other two scripts, decoded 2026-09-13 from the program
 // table at RAM 0x8009771c (fieldstg image file 0x14a6c):
@@ -336,6 +336,6 @@ export function drawGroundShadow(ctx, cx, cy, w, h, alpha = 1) {
 export function drawFieldShadow(ctx: CanvasRenderingContext2D | null, input: { screenX: number; actorScreenY: number; actorHeightFixed: number; groundOffsetFixed: number; }) {
     if (!shadowImg) return false;
     const r = fieldShadowRect(input);
-    ctx.drawImage(shadowImg, r.x, r.y, r.w, r.h);
+    ctx!.drawImage(shadowImg, r.x, r.y, r.w, r.h);
     return true;
 }

@@ -88,7 +88,7 @@ function decodeUri(uri) {
   const s = String(uri || "");
   const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(s);
   if (!m) return { external: s, bytes: null };
-  return m[2] ? { external: null, bytes: decodeBase64(m[3]) } : { external: null, bytes: null, text: decodeURIComponent(m[3]) };
+  return m[2] ? { external: null, bytes: decodeBase64(m[3]) } : { external: null, bytes: null, text: decodeURIComponent(m[3]!) };
 }
 
 /**
@@ -267,16 +267,16 @@ export function composeTRS(t, r, s, out = new Float32Array(16)) {
 export function mat4Mul(a: number[], b: number[] | Float32Array<ArrayBuffer>, out = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
-    for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
+    for (let k = 0; k < 4; k++) s += a[k * 4 + r]! * b[c * 4 + k]!;
     out[c * 4 + r] = s;
   }
   return out;
 }
 
 const point = (m: number[], x: number, y: number, z: number) => [
-  m[0] * x + m[4] * y + m[8] * z + m[12],
-  m[1] * x + m[5] * y + m[9] * z + m[13],
-  m[2] * x + m[6] * y + m[10] * z + m[14],
+  m[0]! * x + m[4]! * y + m[8]! * z + m[12]!,
+  m[1]! * x + m[5]! * y + m[9]! * z + m[13]!,
+  m[2]! * x + m[6]! * y + m[10]! * z + m[14]!,
 ];
 
 /** The bind pose (no clip): every node's own TRS from the file. */
@@ -303,11 +303,11 @@ function applyChannel(pose: Dw2Pose, ch, time: number) {
   const off = ch.node * comps;
   const put = (i?: number, a?: number) => {
     if (interp === "CUBICSPLINE") {
-      const base = i * comps * 3 + comps;                    // (inTangent, value, outTangent)
+      const base = i! * comps * 3 + comps;                    // (inTangent, value, outTangent)
       for (let c = 0; c < comps; c++) dst[off + c] = values[base + c];
       return;
     }
-    for (let c = 0; c < comps; c++) dst[off + c] = values[i * comps + c];
+    for (let c = 0; c < comps; c++) dst[off + c] = values[i! * comps + c];
   };
   if (n === 1 || time <= times[0]) { put(0); return; }
   if (time >= times[n - 1]) { put(n - 1); return; }
@@ -331,10 +331,10 @@ function applyChannel(pose: Dw2Pose, ch, time: number) {
     const q = [0, 0, 0, 0];
     for (let c = 0; c < 4; c++) {
       q[c] = values[lo * 4 + c] + (values[hi * 4 + c] * sign - values[lo * 4 + c]) * a;
-      len += q[c] * q[c];
+      len += q[c]! * q[c]!;
     }
     len = Math.sqrt(len) || 1;
-    for (let c = 0; c < 4; c++) dst[off + c] = q[c] / len;
+    for (let c = 0; c < 4; c++) dst[off + c] = q[c]! / len;
   }
 }
 
@@ -376,13 +376,13 @@ export function poseBounds(model, pose, out: PoseBounds = {}) {
     const m = pose.world.subarray(i * 16, i * 16 + 16);
     for (let c = 0; c < 8; c++) {
       const p = point(m, c & 1 ? mesh.max[0] : mesh.min[0], c & 2 ? mesh.max[1] : mesh.min[1], c & 4 ? mesh.max[2] : mesh.min[2]);
-      for (let k = 0; k < 3; k++) { if (p[k] < min[k]) min[k] = p[k]; if (p[k] > max[k]) max[k] = p[k]; }
+      for (let k = 0; k < 3; k++) { if (p[k]! < min[k]!) min[k] = p[k]; if (p[k]! > max[k]!) max[k] = p[k]; }
     }
   });
   if (!min.every(Number.isFinite)) { min.fill(0); max.fill(0); }
   out.min = min; out.max = max;
-  out.center = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
-  out.size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  out.center = [(min[0]! + max[0]!) / 2, (min[1]! + max[1]!) / 2, (min[2]! + max[2]!) / 2];
+  out.size = [max[0]! - min[0]!, max[1]! - min[1]!, max[2]! - min[2]!];
   return out;
 }
 
@@ -399,9 +399,9 @@ export function offsetPose(model, pose, [dx, dy, dz] = [0, 0, 0]) {
 /** Move a pose so the model stands with its lowest point at y=0 and its feet on the origin. */
 export function groundPose(model, pose, { centerXZ = true } = {}) {
   const b = poseBounds(model, pose);
-  const dy = -b.min[1];
-  const dx = centerXZ ? -b.center[0] : 0;
-  const dz = centerXZ ? -b.center[2] : 0;
+  const dy = -b.min![1]!;
+  const dx = centerXZ ? -b.center![0]! : 0;
+  const dz = centerXZ ? -b.center![2]! : 0;
   return offsetPose(model, pose, [dx, dy, dz]);
 }
 
@@ -552,11 +552,11 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
               uv: upload(p.uv || blank.uv, gl.ARRAY_BUFFER, gl.STATIC_DRAW),
             };
             const mat = model.materials[p.material] || {};
-            model.draws.push({
+            model.draws!.push({
               node: ni, prim: p,
               blend: mat.alphaMode === "BLEND",
               alphaCut: mat.alphaMode === "MASK" ? (mat.alphaCutoff ?? 0.5) : mat.alphaMode === "BLEND" ? 0.02 : 0,
-              tex: mat.image != null ? model.textures[mat.image] || null : null,
+              tex: mat.image != null ? model.textures![mat.image] || null : null,
             });
           }
         });

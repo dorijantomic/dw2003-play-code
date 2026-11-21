@@ -201,7 +201,7 @@ export function makeMenus(B: BattleContext) {
     b.playerFirst = true;
     b.state = ST.PLAYER_ACT;
     b.timer = 0;
-    if (!gag) B.sayOriginal(b, B.attackSpec(b), `${b.player.profile.name} attacks!`);
+    if (!gag) B.sayOriginal(b, B.attackSpec(b)!, `${b.player.profile.name} attacks!`);
   }
 /**
    * Run the command the selection points at. This is the body of the Circle
@@ -217,7 +217,7 @@ export function makeMenus(B: BattleContext) {
       b.playerFirst = true;
       b.state = ST.PLAYER_ACT;
       b.timer = 0;
-      B.sayOriginal(b, B.attackSpec(b), `${b.player.profile.name} attacks!`);
+      B.sayOriginal(b, B.attackSpec(b)!, `${b.player.profile.name} attacks!`);
     } else if (sel === "tech") {
       // The TECH row is ALWAYS enterable, exactly as on the disc. The command-flow
       // phase routes row 1 to branch 3 (`0x800830F4[3] = 0x80092A28`,

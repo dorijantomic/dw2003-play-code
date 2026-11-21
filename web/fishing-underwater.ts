@@ -453,7 +453,7 @@ export function renderUnderwater(f, mapId, extrasData, nowSec: number) {
     tailPivot.rotation.y = Math.sin(t * wag) * 0.55;
     eyeMesh.visible = eye;
 
-    for (let i = 0; i < SHAFT_COUNT; i++) shafts.children[i].rotation.z = shaftBase[i] + 0.05 * Math.sin(t * 0.3 + i);
+    for (let i = 0; i < SHAFT_COUNT; i++) shafts.children[i].rotation.z = shaftBase[i]! + 0.05 * Math.sin(t * 0.3 + i);
     camera.position.x = Math.sin(t * 0.2) * 0.3;
     camera.lookAt(0.4, 0.2, 0);
 

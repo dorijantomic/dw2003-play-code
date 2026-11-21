@@ -104,17 +104,17 @@ export function createCardAlbumTranslated(sfx = null) {
     if (!album._open || !album._session || album._error) return;
     for (const frame of album._clock.advance(dt)) {
       album._session.tick(album._state?.keys ?? [], frame.tick);
-      if (album._session.finished()) { album._finish(); break; }
+      if (album._session.finished()) { album._finish!(); break; }
     }
   };
   album.draw = (ctx, viewW) => {
     if (!album._open || !album._session) return;
     ctx.save();
-    ctx.scale(viewW / 320, viewW / 320);
+    ctx.scale(viewW! / 320, viewW! / 320);
     paintNativeSession(ctx, renderer, album._session, { ui: { key: "ui-album", compose: composeWindow } });
     ctx.restore();
   };
-  album.close = () => { if (album._open) album._finish(); };
+  album.close = () => { if (album._open) album._finish!(); };
   album._finish = () => {
     if (!album._open) return;
     album._open = false;

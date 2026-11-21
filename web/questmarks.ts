@@ -32,7 +32,7 @@ function questionSprite() {
     const cols = { a: RED, b: GREY_A, c: GREY_B };
     QUESTION.forEach((row, y) => [...row].forEach((ch, x) => {
         if (ch === ".") return;
-        g.fillStyle = cols[ch]; g.fillRect(7 + x, 4 + y, 1, 1);
+        g!.fillStyle = cols[ch]; g!.fillRect(7 + x, 4 + y, 1, 1);
     }));
     questionCanvas = c;
     return c;
@@ -43,9 +43,9 @@ export function drawQuestMark(ctx: CanvasRenderingContext2D | null, kind: string
     const bob = Math.round(Math.sin(tick / 9) * 1.5);       // a gentle hover so it reads as a marker
     if (kind === "turnin") drawFieldcomIcon(ctx, 0, 0, x, y + bob);
     else if (kind === "offer") {
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(questionSprite(), x - 12, y - 32 + bob);
-        ctx.restore();
+        ctx!.save();
+        ctx!.imageSmoothingEnabled = false;
+        ctx!.drawImage(questionSprite(), x - 12, y - 32 + bob);
+        ctx!.restore();
     }
 }

@@ -50,8 +50,8 @@ export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose
         fieldPartySize(state.party) === 0 ||
         battle.isActive() ||
         cutscene.isActive() ||
-        textbox.isOpen() ||
-        choice.isOpen() ||
+        textbox.isOpen!() ||
+        choice.isOpen!() ||
         fade.dir !== 0 ||
         !!state.diveDemo ||
         !!state.wipe28
@@ -121,8 +121,8 @@ export function triggerRandomEncounter(mapId, x: number, y: number) {
         fieldPartySize(state.party) === 0 ||
         battle.isActive() ||
         cutscene.isActive() ||
-        textbox.isOpen() ||
-        choice.isOpen() ||
+        textbox.isOpen!() ||
+        choice.isOpen!() ||
         fade.dir !== 0 ||
         !!state.diveDemo ||
         !!state.wipe28

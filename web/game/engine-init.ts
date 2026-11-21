@@ -50,7 +50,7 @@ export async function initEngine() {
         },
     });
     const engineParty = (state.party ?? []).map((_, i) => i + 1);
-    S.engine.state.party.load({ members: engineParty, lead: engineParty[0] });
+    S.engine!.state.party.load({ members: engineParty, lead: engineParty[0] });
     state.sbIndex = buildScriptedBattleIndex(content); // map→[{preKey,postKey,screenId,wonFlag,actor}]
 
     // UNIFY INVENTORY (single source of truth): replace the engine's private Inventory with an
@@ -58,7 +58,7 @@ export async function initEngine() {
     // 0x80–0x92, e.g. the Blue Card gate flag 0x818e) and GiveItem grants read/write the SAME bag
     // the menu/shop/save use — no second inventory to keep in sync. evalContext() reads
     // engine.state.inventory fresh each eval, so this takes effect immediately.
-    S.engine.state.inventory = {
+    S.engine!.state.inventory = {
         // The scene's possession gate is F0x80015F04's "do we have any" form, which
         // counts a WORN copy as having it; a script's larger `count` is the
         // walker's own shape and still answers from the carried count.
@@ -80,7 +80,7 @@ export async function initEngine() {
     // load doesn't echo back to storage. FlagManager.load only touches known banks; ignore junk.
     try {
         const savedFlags = localStorage.getItem("engineFlags");
-        if (savedFlags) S.engine.state.flags.load(JSON.parse(savedFlags));
+        if (savedFlags) S.engine!.state.flags.load(JSON.parse(savedFlags));
     } catch {
         /* corrupt save — start clean */
     }
@@ -90,22 +90,22 @@ export async function initEngine() {
     // old player's MAP page keeps its revealed places. Then the list is dropped — the
     // original never had one, and nothing writes it now.
     const migrateVisited = () => {
-        if (!state.visitedMaps.size) return;
+        if (!state.visitedMaps!.size) return;
         migrateVisitedMaps([...state.visitedMaps], S.fieldScreenTable, {
             get: engineFlagSeen,
-            set: (id, value) => S.engine.state.flags.set(id, value),
+            set: (id, value) => S.engine!.state.flags.set(id, value),
         });
         state.visitedMaps = new Set();
         localStorage.removeItem("visitedMaps");
     };
-    S.engine.state.vars.set(
+    S.engine!.state.vars.set(
         "$story.ordinal",
         Number(localStorage.getItem("progressOrdinal") ?? 0),
     );
     // Seed the chosen starter-pack selector (0/1/2) from the persisted pack, so the s212 download
     // gate (bank-0x70 op0x10 flags 0x7000/1/2) resolves to the right variant after a reload. null
     // until a pack is picked → gate dormant. Kept in sync at the pack pick + cleared on New Game.
-    S.engine.state.vars.set(
+    S.engine!.state.vars.set(
         "$party.pack",
         state.packId != null ? "ABC".indexOf(state.packId) : null,
     );
@@ -114,25 +114,25 @@ export async function initEngine() {
     // in, and refresh it whenever the party or its stats could have moved, so both sides of
     // the walker agree about which tamers will duel you.
     loadCharismaDb().then(() => refreshPartyCharisma());
-    S.engine.state.flags.onChange(() =>
+    S.engine!.state.flags.onChange(() =>
         localStorage.setItem(
             "engineFlags",
-            JSON.stringify(S.engine.state.flags.toJSON()),
+            JSON.stringify(S.engine!.state.flags.toJSON()),
         ),
     );
     migrateVisited();
     // The wallet is the engine's $party.bit from here on (see the state.bits accessor):
     // seed it from the persisted value before persistence is registered, so seeding does
     // not echo back to storage.
-    S.engine.state.vars.set("$party.bit", Number(state._bits) || 0);
+    S.engine!.state.vars.set("$party.bit", Number(state._bits) || 0);
     // Same for the obtained-partner set. A save written before the roster was modelled
     // has a deployed party and an empty mask; whoever is deployed is by definition
     // obtained, so the mask is repaired from the party instead of starting wrong.
-    S.engine.state.vars.set(
+    S.engine!.state.vars.set(
         "$roster.owned",
         rosterMaskForParty(Number(state._rosterOwned) || 0, state.party ?? []),
     );
-    S.engine.state.vars.onChange((n: string, _o, v) => {
+    S.engine!.state.vars.onChange((n: string, _o, v) => {
         if (n === "$story.ordinal")
             localStorage.setItem("progressOrdinal", String(v));
         else if (n === "$party.bit") {
@@ -198,7 +198,7 @@ export async function initEngine() {
         onPresentation: (op, args) => {
             if (op !== "PlaySparkle") return;
             state.sparkleActor = { program: args[0] ?? 0, start: fieldcomTick() };
-            if (args[0] === 1 || args[0] === 3) sfx.play("item_get");
+            if (args[0] === 1 || args[0] === 3) sfx.play!("item_get");
         },
     });
 
@@ -247,7 +247,7 @@ export async function initEngine() {
                 // flag 0x7401) reaches the field ONLY through this trigger, so the
                 // coarse per-stage ladder (advanceOrdinal) could not move the story
                 // for it — and the ladder would move it on the WRONG event anyway.
-                S.engine.completeEvent(ev.id);
+                S.engine!.completeEvent(ev.id);
                 onDone(); // host already ran the completion leaf; no duplicate command writes
                 // A position-triggered scene's own HANDOFF warps, exactly like the other two
                 // launch routes (the bridge's rows, web/engine-bridge.js:92, and the bank-0x90
@@ -276,11 +276,11 @@ export async function initEngine() {
             (S.engineBridge ? S.engineBridge.isBusy() : false) ||
             cutscene.isActive(),
         isBusy: () =>
-            S.engineBridge.isBusy() ||
+            S.engineBridge!.isBusy() ||
             battle.isActive() ||
             cutscene.isActive() ||
-            textbox.isOpen() ||
-            choice.isOpen() ||
+            textbox.isOpen!() ||
+            choice.isOpen!() ||
             fade.dir !== 0 ||
             !!state.diveDemo ||
             !!state.nameEntry ||

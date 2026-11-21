@@ -49,7 +49,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
   const normalise = rootNormalise === "auto" ? disagree : !!rootNormalise;
   const T = normalise ? T0 : { ...T0, root: T0.rootRaw, torso: T0.torsoRaw };
   const S = normalise ? S0 : { ...S0, root: S0.rootRaw, torso: S0.torsoRaw };
-  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
+  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2]! | 0) > 1)?.words[2] | 0;
   const srcTable = source.timeline?.[table]?.table;
   if (!table || !Array.isArray(srcTable) || !srcTable.length) return null;
   let lo = Infinity, hi = -1;
@@ -95,11 +95,11 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
     const kids = Array.from({ length: T.n }, () => []);
     for (let i = 0; i < T.n; i++) {
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
-      if (p >= 0 && p < T.n) kids[p].push(i);
+      if (p >= 0 && p < T.n) kids[p]!.push(i);
     }
     const rootsT = [];
     for (let i = 0; i < T.n; i++) { const p = (target.bones[i]?.parent_slot ?? 0) - 1; if (p < 0 || p >= T.n) rootsT.push(i); }
-    const visit = (i: number) => { order.push(i); for (const k of kids[i]) visit(k); };
+    const visit = (i: number) => { order.push(i); for (const k of kids[i]!) visit(k); };
     for (const r of rootsT) visit(r);
     for (let i = 0; i < T.n; i++) if (!order.includes(i)) order.push(i);
   }
@@ -157,14 +157,14 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
     //     a small vertical move and the bend plane is undefined), a hip turn is one smooth angle.
     for (const p of legPairs) {
       const tipBone = p.tc[p.tc.length - 1];
-      const hip = Pt[p.tc[0]], ankle = Pt[tipBone];
+      const hip = Pt![p.tc[0]], ankle = Pt![tipBone];
       const restY = tRest.P[tipBone][1];
       const lim = K16.ankleShare * H;
       const dy = ankle[1] - restY;
       if (Math.abs(dy) < lim) continue;
       const v1 = k16sub(ankle, hip);
       const v2 = [v1[0], restY + Math.sign(dy) * lim * 0.5 - hip[1], v1[2]];
-      const ax = [v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2], v1[0] * v2[1] - v1[1] * v2[0]];
+      const ax = [v1[1]! * v2[2]! - v1[2]! * v2[1]!, v1[2]! * v2[0]! - v1[0]! * v2[2]!, v1[0]! * v2[1]! - v1[1]! * v2[0]!];
       const an = k16norm(ax);
       if (an < 1e-6) continue;
       const ang = Math.atan2(an, k16dot(v1, v2));
@@ -181,12 +181,12 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
     for (const p of armPairs) {
       const tipBone = p.tc[p.tc.length - 1];
       const scTip = p.sc[p.sc.length - 1];
-      const S0 = Pt[p.tc[0]];
-      const cur = Pt[tipBone];
+      const S0 = Pt![p.tc[0]];
+      const cur = Pt![tipBone];
       const hand = k16scale(k16sub(sp.P[scTip], sp.P[p.sc[0]]), p.ratio);
       const want = [S0[0] + hand[0], S0[1] + hand[1], S0[2] + hand[2]];
       if (k16norm(k16sub(want, cur)) < K16.ikDeadband * H) continue;
-      const E0 = Pt[p.tc[p.split]];
+      const E0 = Pt![p.tc[p.split]];
       const u1 = k16sub(E0, S0), u2 = k16sub(cur, E0);
       const l1 = k16norm(u1), l2 = k16norm(u2);
       if (l1 < 1e-6 || l2 < 1e-6) continue;
@@ -198,7 +198,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
         const key = `arm:${p.side}`;
         const wantInterior = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + l2 * l2 - dClamp * dClamp) / (2 * l1 * l2))));
         const curInterior = Math.acos(Math.max(-1, Math.min(1, k16dot(u1, u2) / (l1 * l2))));
-        let hinge = [u1[1] * u2[2] - u1[2] * u2[1], u1[2] * u2[0] - u1[0] * u2[2], u1[0] * u2[1] - u1[1] * u2[0]];
+        let hinge = [u1[1]! * u2[2]! - u1[2]! * u2[1]!, u1[2]! * u2[0]! - u1[0]! * u2[2]!, u1[0]! * u2[1]! - u1[1]! * u2[0]!];
         const hn = k16norm(hinge);
         if (hn < 1e-6 * l1 * l2) hinge = ikPlane.get(key) ?? k16perp(u1);
         else hinge = k16scale(hinge, 1 / hn);
@@ -209,9 +209,9 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
           rebuild();
         }
       }
-      const E1 = Pt[p.tc[p.split]];
+      const E1 = Pt![p.tc[p.split]];
       const v1 = k16sub(E1, S0), v2 = k16sub(want, S0);
-      const ax = [v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2], v1[0] * v2[1] - v1[1] * v2[0]];
+      const ax = [v1[1]! * v2[2]! - v1[2]! * v2[1]!, v1[2]! * v2[0]! - v1[0]! * v2[2]!, v1[0]! * v2[1]! - v1[1]! * v2[0]!];
       const an = k16norm(ax), vn = k16norm(v1) * k16norm(v2);
       if (an > 1e-6 && vn > 1e-9) {
         const ang = Math.min(K16.maxIk, Math.atan2(an, k16dot(v1, v2)));
@@ -295,7 +295,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
       if (wantRoot) {
         const own1 = (b.anim?.ch1 ?? []).filter((r: number[]) => r[3] !== 30000).map((r) => r.slice());
         const l1 = rootKeys[rootKeys.length - 1];
-        anim.ch1 = [...own1, ...rootKeys, [l1[0], l1[1], l1[2], 30000]];
+        anim.ch1 = [...own1, ...rootKeys, [l1![0], l1![1], l1![2], 30000]];
       }
       return { ...b, anim };
     }),

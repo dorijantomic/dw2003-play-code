@@ -74,11 +74,11 @@ export function k23Cloud(model, pose) {
       const x = -o[0] + P[0], y = o[1] + P[1], z = -o[2] + P[2];
       cx += x; cy += y; cz += z; sx += x; sz += z; cnt++;
       if (y < top) top = y; if (y > floor) floor = y;
-      if (x < mn[0]) mn[0] = x; if (x > mxv[0]) mxv[0] = x;
-      if (y < mn[1]) mn[1] = y; if (y > mxv[1]) mxv[1] = y;
-      if (z < mn[2]) mn[2] = z; if (z > mxv[2]) mxv[2] = z;
+      if (x < mn[0]!) mn[0] = x; if (x > mxv[0]!) mxv[0] = x;
+      if (y < mn[1]!) mn[1] = y; if (y > mxv[1]!) mxv[1] = y;
+      if (z < mn[2]!) mn[2] = z; if (z > mxv[2]!) mxv[2] = z;
     }
-    parts[i] = { c: [cx / vs.length, cy / vs.length, cz / vs.length], v: vs.length, sz: [mxv[0] - mn[0], mxv[1] - mn[1], mxv[2] - mn[2]] };
+    parts[i] = { c: [cx / vs.length, cy / vs.length, cz / vs.length], v: vs.length, sz: [mxv[0]! - mn[0]!, mxv[1]! - mn[1]!, mxv[2]! - mn[2]!] };
   }
   return { parts, mx: cnt ? sx / cnt : 0, mz: cnt ? sz / cnt : 0, H: Math.max(1, floor - top), floor };
 }
@@ -122,14 +122,14 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     const m = model.bones.length;
     const par = (i: number) => { const q = (model.bones[i]?.parent_slot ?? 0) - 1; return q >= 0 && q < m ? q : -1; };
     const kids = Array.from({ length: m }, () => []);
-    for (let i = 0; i < m; i++) { const q = par(i); if (q >= 0) kids[q].push(i); }
+    for (let i = 0; i < m; i++) { const q = par(i); if (q >= 0) kids[q]!.push(i); }
     const out = [];
     const walk = (start) => {
       const ch = [start];
       let cur = start;
-      while (kids[cur].length === 1) { cur = kids[cur][0]; ch.push(cur); }
+      while (kids[cur]!.length === 1) { cur = kids[cur]![0]; ch.push(cur); }
       out.push(ch);
-      for (const k of kids[cur]) walk(k);
+      for (const k of kids[cur]!) walk(k);
     };
     for (let i = 0; i < m; i++) if (par(i) < 0) walk(i);
     return out;
@@ -142,33 +142,33 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     for (const i of pts) {
       const q = deg === undefined ? P[i] : yawOf(deg, P[i]);
       const half = c.parts[i].sz.map((v) => v / c.H / 2);
-      for (let k = 0; k < 3; k++) { cen[k] += q[k]; lo3[k] = Math.min(lo3[k], q[k] - half[k]); hi3[k] = Math.max(hi3[k], q[k] + half[k]); }
+      for (let k = 0; k < 3; k++) { cen[k] += q[k]; lo3[k] = Math.min(lo3[k]!, q[k] - half[k]); hi3[k] = Math.max(hi3[k]!, q[k] + half[k]); }
     }
-    for (let k = 0; k < 3; k++) cen[k] /= pts.length;
-    return { cen, ext: [hi3[0] - lo3[0], hi3[1] - lo3[1], hi3[2] - lo3[2]], len: pts.length, depth: D[chain[0]], tip: P[pts[pts.length - 1]] };
+    for (let k = 0; k < 3; k++) cen[k]! /= pts.length;
+    return { cen, ext: [hi3[0]! - lo3[0]!, hi3[1]! - lo3[1]!, hi3[2]! - lo3[2]!], len: pts.length, depth: D[chain[0]], tip: P[pts[pts.length - 1]] };
   };
   const pair = (deg: number) => {
     const fT = chT.map((ch) => featOf(ch, ct, pt, zt, dT)), fS = chS.map((ch) => featOf(ch, cs, ps, zs, dS, deg));
     const cand = [];
     for (let a = 0; a < chT.length; a++) if (fT[a]) for (let b = 0; b < chS.length; b++) if (fS[b]) {
       const x = fT[a], y = fS[b];
-      const tipT = x.tip, tipS = deg === 180 ? [-y.tip[0], y.tip[1], -y.tip[2]] : y.tip;
-      const cost = dist(x.cen, y.cen) + 0.5 * dist(x.tip, y.tip) + K23.sizeWeight * (Math.abs(x.ext[0] - y.ext[0]) + Math.abs(x.ext[1] - y.ext[1]) + Math.abs(x.ext[2] - y.ext[2])) / 3
-        + 0.06 * Math.abs(x.len - y.len) + K23.depthWeight * Math.abs(x.depth - y.depth);
+      const tipT = x!.tip, tipS = deg === 180 ? [-y!.tip![0]!, y!.tip![1], -y!.tip![2]!] : y!.tip;
+      const cost = dist(x!.cen, y!.cen) + 0.5 * dist(x!.tip, y!.tip) + K23.sizeWeight * (Math.abs(x!.ext[0]! - y!.ext[0]!) + Math.abs(x!.ext[1]! - y!.ext[1]!) + Math.abs(x!.ext[2]! - y!.ext[2]!)) / 3
+        + 0.06 * Math.abs(x!.len - y!.len) + K23.depthWeight * Math.abs(x!.depth - y!.depth);
       cand.push([cost, a, b]);
     }
-    cand.sort((p, q) => p[0] - q[0]);
+    cand.sort((p, q) => p[0]! - q[0]!);
     const usedA = new Set(), usedB = new Set(), map = new Array(n).fill(-1), nxt = new Array(n).fill(-1), starts = new Set();
     let cost = 0, matched = 0;
     for (const [c, a, b] of cand) {
-      if (c > matchMax) break;
+      if (c! > matchMax) break;
       if (usedA.has(a) || usedB.has(b)) continue;
       usedA.add(a); usedB.add(b);
       const ca = chT[a].filter((i) => pt[i]), cb = chS[b].filter((i) => ps[i]);
       const m = Math.min(ca.length, cb.length);
       for (let k = 0; k < m; k++) { map[ca[k]] = cb[k]; matched++; if (k + 1 < m) nxt[ca[k]] = ca[k + 1]; }
       if (m) starts.add(ca[0]);
-      cost += c * Math.sqrt(ca.reduce((t, i) => t + ct.parts[i].v, 0));
+      cost += c! * Math.sqrt(ca.reduce((t, i) => t + ct.parts[i].v, 0));
     }
     for (let a = 0; a < chT.length; a++) if (fT[a] && !usedA.has(a)) cost += matchMax * 1.5 * Math.sqrt(chT[a].reduce((t, i) => t + (ct.parts[i]?.v ?? 0), 0));
     return { map, cost, matched, nxt, starts };
@@ -176,7 +176,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const cand0 = yaw === "auto" || yaw === 0 ? pair(0) : null, cand180 = yaw === "auto" || yaw === 180 ? pair(180) : null;
   const pick = cand0 && cand180 ? (cand180.cost < cand0.cost ? 180 : 0) : (cand0 ? 0 : 180);
   const chosen = pick === 180 ? cand180 : cand0;
-  const map = chosen.map, nxt = chosen.nxt, starts = chosen.starts;
+  const map = chosen!.map, nxt = chosen!.nxt, starts = chosen!.starts;
   const Q = Qs[pick], Qt = k16tr(Q);
   // the body root: the root bone with the biggest subtree (the one the rest of the body hangs from)
   let tTorso = -1, bestSub = -1;
@@ -185,7 +185,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     for (let i = 0; i < n; i++) {
       const p = (target.bones[i]?.parent_slot ?? 0) - 1;
       if (p >= 0 && p < n) continue;
-      if (map[i] >= 0 && (sub[i]?.length ?? 0) > bestSub) { bestSub = sub[i].length; tTorso = i; }
+      if (map[i] >= 0 && (sub[i]?.length ?? 0) > bestSub) { bestSub = sub[i]!.length; tTorso = i; }
     }
   }
   const sTorso = tTorso >= 0 ? map[tTorso] : -1;
@@ -195,8 +195,8 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   {
     const kids = Array.from({ length: n }, () => []);
     const rootsT = [];
-    for (let i = 0; i < n; i++) { const p = parentOf(i); if (p >= 0) kids[p].push(i); else rootsT.push(i); }
-    const visit = (i) => { order.push(i); for (const k of kids[i]) visit(k); };
+    for (let i = 0; i < n; i++) { const p = parentOf(i); if (p >= 0) kids[p]!.push(i); else rootsT.push(i); }
+    const visit = (i) => { order.push(i); for (const k of kids[i]!) visit(k); };
     for (const r of rootsT) visit(r);
     for (let i = 0; i < n; i++) if (!order.includes(i)) order.push(i);
   }
@@ -210,7 +210,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     if (!vs.length) return null;
     const c = [0, 0, 0];
     for (const v of vs) { c[0] += v[0]; c[1] += v[1]; c[2] += v[2]; }
-    const m = [c[0] / vs.length, c[1] / vs.length, c[2] / vs.length];
+    const m = [c[0]! / vs.length, c[1]! / vs.length, c[2]! / vs.length];
     return k16norm(m) > K23.dirMin * H ? m : null;
   });
   const cLocT = centreOf(target, ct.H), cLocS = centreOf(source, cs.H);
@@ -299,7 +299,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
       return [q[0] * ratio * w, q[1] * ratio * w, q[2] * ratio * w];
     };
     const dBody = sTorso >= 0 ? disp(sTorso) : [0, 0, 0];
-    travelMax = Math.max(travelMax, Math.hypot(dBody[0], dBody[2]));
+    travelMax = Math.max(travelMax, Math.hypot(dBody[0]!, dBody[2]!));
     for (const i of order) {
       const p = parentOf(i), j = map[i];
       let P;
@@ -331,7 +331,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
   const withVerts = pt.filter(Boolean).length;
   return {
     model, table, map, clip, offset, frames: hi - lo + 1, pairs,
-    covered: withVerts ? chosen.matched / withVerts : 0,
+    covered: withVerts ? chosen!.matched / withVerts : 0,
     metrics: { yaw: pick, yawCost: { 0: cand0 ? +cand0.cost.toFixed(3) : null, 180: cand180 ? +cand180.cost.toFixed(3) : null }, sizeRatio: +ratio.toFixed(3), neutralFrame: neutralT, torso: [tTorso, sTorso], travelMax: Math.round(travelMax), roots: rootsT },
   };
 }

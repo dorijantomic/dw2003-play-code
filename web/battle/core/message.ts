@@ -154,7 +154,7 @@ function tickBattleMessage(b: BattleState, dt: number) {
     if (opened) {
       const [kind, payload] = opened;
       const id = session.mem.read32(payload) >>> 0;
-      sayOriginal(b, { kind, payload: [id] }, B.LOSS_MESSAGE_WORDS[id] ?? "");
+      sayOriginal(b, { kind, payload: [id] }, B.LOSS_MESSAGE_WORDS![id] ?? "");
     }
     return session;
   }

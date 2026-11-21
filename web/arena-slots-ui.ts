@@ -42,39 +42,39 @@ export function createSlotsUI({ getBuilt, container }) {
       const row = document.createElement("div"); row.className = "slotRow"; row.dataset.slot = s.id;
       row.innerHTML = `<span class="n" title="${s.id}">${s.label} <small>(${s.count})</small></span><span class="cur ${s.error ? "err" : ""}">${s.error ? "error" : s.bound ? label(s.bound) : "default"}</span>
         <button class="replace">Replace...</button><button class="reset">reset</button>`;
-      row.querySelector<HTMLElement>(".replace").onclick = () => open(s.id);
-      row.querySelector<HTMLElement>(".reset").onclick = () => { b.slots.reset(s.id); renderList(); };
+      row.querySelector<HTMLElement>(".replace")!.onclick = () => open(s.id);
+      row.querySelector<HTMLElement>(".reset")!.onclick = () => { b.slots.reset(s.id); renderList(); };
       list.appendChild(row);
     }
   }
   async function open(slotId) {
     curSlot = slotId; gal.style.display = "flex";
-    $("galTitle").textContent = `Replace: ${getBuilt().slots.get(slotId)?.label || slotId}`;
-    $("galGrid").textContent = "loading assets ...";
+    $("galTitle")!.textContent = `Replace: ${getBuilt().slots.get(slotId)?.label || slotId}`;
+    $("galGrid")!.textContent = "loading assets ...";
     assets ||= await listAllAssets();
-    if (!$("galKind").dataset.done) {
+    if (!$("galKind")!.dataset.done) {
       const kinds = [...new Set<string>(assets.flatMap((a) => a.kinds))].sort(), srcs = [...new Set<string>(assets.map((a) => a.sourceGroup || a.source))].sort();
-      for (const k of kinds) $<HTMLSelectElement>("galKind").add(new Option(k, k));
-      for (const s of srcs) $<HTMLSelectElement>("galSrc").add(new Option(s, s));
-      $("galKind").dataset.done = "1";
+      for (const k of kinds) $<HTMLSelectElement>("galKind")!.add(new Option(k, k));
+      for (const s of srcs) $<HTMLSelectElement>("galSrc")!.add(new Option(s, s));
+      $("galKind")!.dataset.done = "1";
     }
     draw();
   }
   function draw() {
-    const q = $<HTMLInputElement>("galSearch").value.toLowerCase().trim(), kind = $<HTMLSelectElement>("galKind").value, src = $<HTMLSelectElement>("galSrc").value;
+    const q = $<HTMLInputElement>("galSearch")!.value.toLowerCase().trim(), kind = $<HTMLSelectElement>("galKind")!.value, src = $<HTMLSelectElement>("galSrc")!.value;
     const hit = [{ id: "default", name: "Default (the module's own)", kinds: ["default"], source: "Built", licence: "-" }, ...assets]
       .filter((a) => (!kind || a.kinds.includes(kind) || a.id === "default") && (!src || (a.sourceGroup || a.source) === src || a.id === "default")
         && (!q || `${a.name} ${a.source} ${a.licence} ${a.kinds.join(" ")} ${a.id}`.toLowerCase().includes(q)));
-    $("galCount").textContent = `${hit.length} of ${assets.length}`;
-    const g = $("galGrid"); g.innerHTML = "";
+    $("galCount")!.textContent = `${hit.length} of ${assets.length}`;
+    const g = $("galGrid"); g!.innerHTML = "";
     for (const a of hit.slice(0, 500)) {
       const c = document.createElement("div"); c.className = "card"; c.dataset.asset = a.id;
       c.innerHTML = `<b></b><i></i><br><i></i>`;
-      c.children[0].textContent = a.name; c.children[1].textContent = `${a.sourceGroup || a.source}, ${a.licence}`; c.children[3].textContent = a.kinds.join(", ");
+      c.children[0]!.textContent = a.name; c.children[1]!.textContent = `${a.sourceGroup || a.source}, ${a.licence}`; c.children[3]!.textContent = a.kinds.join(", ");
       c.onclick = () => choose(curSlot, a.id);
-      g.appendChild(c);
+      g!.appendChild(c);
     }
-    if (hit.length > 500) { const m = document.createElement("div"); m.textContent = `... ${hit.length - 500} more: narrow the search`; g.appendChild(m); }
+    if (hit.length > 500) { const m = document.createElement("div"); m.textContent = `... ${hit.length - 500} more: narrow the search`; g!.appendChild(m); }
   }
   async function choose(slotId, assetId: string) {
     const b = getBuilt(); if (!b?.slots) return false;
@@ -86,8 +86,8 @@ export function createSlotsUI({ getBuilt, container }) {
     renderList();
     return !status;
   }
-  for (const id of ["galSearch", "galKind", "galSrc"]) $(id).oninput = () => assets && draw();
-  $("galClose").onclick = () => { gal.style.display = "none"; };
+  for (const id of ["galSearch", "galKind", "galSrc"]) $(id)!.oninput = () => assets && draw();
+  $("galClose")!.onclick = () => { gal.style.display = "none"; };
   addEventListener("keydown", (e) => { if (e.key === "Escape") gal.style.display = "none"; });
   return { renderList, open, choose, resetSlot: (id) => { getBuilt()?.slots.reset(id); renderList(); }, resetAll: () => { getBuilt()?.slots.resetAll(); renderList(); },
     get status() { return status; }, get galleryOpen() { return gal.style.display !== "none"; } };

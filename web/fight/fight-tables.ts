@@ -101,7 +101,7 @@ export function setThrowItemEffects(json) {
 export function throwItemEffect(itemId: number) { return THROW_ITEM_EFFECTS?.get(itemId | 0) ?? null; }
 export function isThrowItem(itemId: number) {
   const id = itemId | 0;
-  return id >= THROW_ITEM_BAND[0] && id <= THROW_ITEM_BAND[1];
+  return id >= THROW_ITEM_BAND[0]! && id <= THROW_ITEM_BAND[1]!;
 }
 
 // ── WHO A TECHNIQUE IS AIMED AT (A9) ────────────────────────────────────────────
@@ -136,15 +136,15 @@ export function setSkillTable(json) {
   for (const s of rows) {
     const n = String(s.name ?? "");
     if (!n) continue;
-    if (!SKILL_BY_NAME.has(n)) SKILL_BY_NAME.set(n, []);
-    SKILL_BY_NAME.get(n).push(s);
+    if (!SKILL_BY_NAME!.has(n)) SKILL_BY_NAME!.set(n, []);
+    SKILL_BY_NAME!.get(n).push(s);
   }
 }
 export function skillType(techId: number) { return SKILL_TYPES?.get(techId | 0) ?? null; }
 /** Every skills row that carries this NAME (the technique name the animator passes down), or []. */
 export function skillRowsForName(name) { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
 /** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
-export function skillRow(techId: number | null) { return SKILL_ROWS?.get(techId | 0) ?? null; }
+export function skillRow(techId: number | null) { return SKILL_ROWS?.get(techId! | 0) ?? null; }
 /**
  * The technique's in-game NAME ("Triple Fire"), which is the key the anatomy's per-technique tables use
  * (shots rules, firing limb). K13: a built script needs the name to know how many projectiles leave and

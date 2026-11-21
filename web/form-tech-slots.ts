@@ -77,7 +77,7 @@ export function applyFormTechGates(record: { id: number; formLevel: number; dvex
     if (!slots[i]) continue;
     if (formLevel < (learn[i] ?? 0)) continue;
     record.techSlots[i] = (Number(slots[i]) | (i === 5 ? 0x8000 : 0)) & 0xffff;
-    learned.push(record.techSlots[i] & 0x1fff);
+    learned.push(record.techSlots[i]! & 0x1fff);
   }
   for (let i = 0; i < 5; i++) {
     const word = Number(record.techSlots[i] ?? 0);

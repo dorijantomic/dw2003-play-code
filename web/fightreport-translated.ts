@@ -64,7 +64,7 @@ function loadData(language) {
         ]).then(([manifest, tables, profiles, shared, ...banks]) => ({
             manifest, tables, profiles, font: shared.font, cursorGlyphs: shared.cursorGlyphs,
             textButtons: Uint8Array.from(manifest.textButtons.bytes),
-            banks: new Map(banks.map((data, i) => [BANKS[i][0] + language, data])),
+            banks: new Map(banks.map((data, i) => [BANKS[i]![0] + language, data])),
         })).catch((error) => { dataByLanguage.delete(language); throw error; }));
     }
     return dataByLanguage.get(language);
@@ -141,8 +141,8 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         r._clock = new ui.MenuDisplayClock();
         // What the walker was carrying when the screen opened: the screen's own
         // save context starts from these, so a change from them IS its payout.
-        r._seedBits = r._session.bits();
-        r._seedHeld = r._session.heldCount(r._opts?.dropItemId ?? 0);
+        r._seedBits = r._session!.bits();
+        r._seedHeld = r._session!.heldCount(r._opts?.dropItemId ?? 0);
     }
 
     /** The screen's payout -> walker state (BIT and the dropped item only). */
@@ -289,7 +289,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         loadedBanks: r._session ? r._session.loadedBanks.slice() : (r._summary?.loadedBanks ?? []),
         displayCalls: r._session ? r._session.displayCalls.map((c) => ({ ...c })) : (r._summary?.displayCalls ?? []),
         records: r._session
-            ? (r._opts?.participants ?? []).map((p) => { try { return { pos: p.pos ?? 0, ...r._session.record(p.pos ?? 0) }; } catch { return null; } })
+            ? (r._opts?.participants ?? []).map((p) => { try { return { pos: p.pos ?? 0, ...r._session!.record(p.pos ?? 0) }; } catch { return null; } })
             : (r._summary?.records ?? []),
         summary: r._summary,
         renderer: renderer.stats,

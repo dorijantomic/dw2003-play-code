@@ -120,9 +120,9 @@ export function createDebugPanel() {
       if (k === "arrowright") { d.itemIdx = (d.itemIdx + 1) % ITEMS.length; return true; }
       if (k === " " || k === "enter") {
         const item = ITEMS[d.itemIdx];
-        storeAddItem(state, item.id, 1);
+        storeAddItem(state, item!.id, 1);
         persist(state);
-        d.msg = `Gave ${item.name}.`;
+        d.msg = `Gave ${item!.name}.`;
         return true;
       }
       return true;
@@ -186,7 +186,7 @@ export function createDebugPanel() {
       state.bits = Math.max(0, (state.bits ?? 0) + delta * 100);
     } else {
       const f = FIELDS[d.sel];
-      f.set(ps, f.get(ps) + delta * f.step, state);
+      f!.set(ps, f!.get(ps) + delta * f!.step, state);
     }
     persist(state);
     return true;

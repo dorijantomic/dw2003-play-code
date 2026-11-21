@@ -47,9 +47,9 @@ export function quatSlerp(a, b, t) {
 /** Quaternion -> column-major mat3, the same storage convention as ps1AnglesToMat3. */
 export function quatToMat3(q: number[]) {
   const [x, y, z, w] = quatNormalize(q);
-  const xx = x*x, yy = y*y, zz = z*z;
-  const xy = x*y, xz = x*z, yz = y*z;
-  const wx = w*x, wy = w*y, wz = w*z;
+  const xx = x!*x!, yy = y!*y!, zz = z!*z!;
+  const xy = x!*y!, xz = x!*z!, yz = y!*z!;
+  const wx = w!*x!, wy = w!*y!, wz = w!*z!;
   return new Float32Array([
     1 - 2*(yy + zz), 2*(xy + wz), 2*(xz - wy),
     2*(xy - wz), 1 - 2*(xx + zz), 2*(yz + wx),
@@ -311,7 +311,7 @@ export function buildBoneWorldMatrices(model, frame, blend = null, hide = null) 
         for (let i = 0; i < 3; i++)
             for (let j = 0; j < 3; j++)
                 for (let k = 0; k < 3; k++)
-                    out[i * 3 + j] += a[k * 3 + j] * b[i * 3 + k];
+                    out[i * 3 + j]! += a[k * 3 + j] * b[i * 3 + k]!;
         return out;
     }
 
@@ -374,9 +374,9 @@ export function buildBoneWorldMatrices(model, frame, blend = null, hide = null) 
             worldRot[i] = composeRot3x3(worldRot[parentIdx], localRot);
             const rotatedT = applyRot3x3(worldRot[parentIdx], c1);
             worldTrans[i] = [
-                worldTrans[parentIdx][0] - rotatedT[0],
+                worldTrans[parentIdx][0] - rotatedT[0]!,
                 worldTrans[parentIdx][1] + rotatedT[1],
-                worldTrans[parentIdx][2] - rotatedT[2],
+                worldTrans[parentIdx][2] - rotatedT[2]!,
             ];
         }
         worlds[i] = toMat4(worldRot[i], worldTrans[i]);

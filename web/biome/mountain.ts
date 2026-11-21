@@ -30,7 +30,7 @@ function tile(mat, x0: number, x1: number, z0: number, z1: number, cell: number,
 const slab = async (x0: number, x1: number, z0: number, z1: number, cell: number, extra = [], o = {}) => { const g = new THREE.Group(); g.add(tile(await gmat(o), x0, x1, z0, z1, cell)); for (const e of extra) g.add(e); return g; };
 function fld(parts, n: number, rad: number, sc: number[], seed: number, base = 0x5c6b3e, y = 0.04) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16), b = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.05, rad * 1.05, 0.05, 44), toonMat({ color: base }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
-  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
+  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0]! + (sc[1]! - sc[0]!) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
 const MEAD = 0x6a7f3c, ROCKB = 0x7d7a76, SNOWB = 0xe9f1fa, SCREEB = 0x8b8780;
@@ -46,8 +46,8 @@ const SPRUCE = { bark: { tint: 0x5a4636 }, leaves: { tint: 0x2e5f4a } }, LARCH =
 const screeField = async () => { const g = new THREE.Group(), r = rng(3), b = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.05, 44), toonMat({ color: SCREEB }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
   for (let k = 1; k <= 2; k++) { const m = new Float32Array(9 * 16); for (let i = 0; i < 9; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 1.1; composeTRS(m, i, Math.cos(a) * d, 0.05, Math.sin(a) * d, r() * 6.28, 0.9 + 0.5 * r()); } g.add(instancedParts(MP.screeParts(k), m, 9)); }
   return g; };
-const stoneRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w);
-const qRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w);
+const stoneRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w!);
+const qRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w!);
 const rockEntry = (id: string, c: string, name: string, w = {}, t = {}) => ({ id: "mr_" + id, cat: c, name, source: PS + " + our weather shader (snow dust, lichen)", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false, make: async () => part((await stoneRes(id, { w, t })).parts) });
 
 const rawEntries = [
@@ -133,7 +133,7 @@ const rawEntries = [
   mp("w_stream2", cat.water, "Mountain stream, lower reach", async () => slab(-8, 24, 10, 38, 0.5, [MP.streamMesh(10, 38, 0.5)]), { noSpin: true }),
   mp("w_tarn", cat.water, "Alpine tarn (depth bands, caustics, foam line, bowl bed)", async () => slab(-44, -4, -80, -38, 0.8, [MP.tarnMesh()]), { noSpin: true }),
   mp("w_fall", cat.water, "Waterfall (scrolling sheet, foam pool, spray) over the scarp into the tarn", async () => slab(-40, -12, -92, -62, 0.7, [(() => { const w = MP.waterfallParts(); w.position.set(M.FALL.x, M.TARN.y, M.FALL.z + 0.5); return w; })(), MP.tarnMesh()]), { noSpin: true }),
-  mp("w_fall_only", cat.water, "Waterfall sheet alone", async () => { const g = new THREE.Group(), w = MP.waterfallParts(3.4, 5); g.add(w); const c = MP.cliffParts(3, { w: 9, h: 6 }); c[0].geo.translate(0, 0, -0.9); g.add(part(c)); return g; }),
+  mp("w_fall_only", cat.water, "Waterfall sheet alone", async () => { const g = new THREE.Group(), w = MP.waterfallParts(3.4, 5); g.add(w); const c = MP.cliffParts(3, { w: 9, h: 6 }); c[0]!.geo.translate(0, 0, -0.9); g.add(part(c)); return g; }),
   // ---- sky, ranges, clouds, snow in the air
   mp("ranges", cat.air, "Distant mountain ranges: 3 layered silhouettes with aerial haze", async () => { const g = new THREE.Group(); for (let i = 0; i < 3; i++) g.add(MP.rangeLayer(i)); g.userData.keep = true; return g; }, { noSpin: true }),
   mp("cloudsea", cat.air, "Cloud sea below the peaks (toon deck, 3 steps)", async () => { const g = new THREE.Group(), b = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.05, 40), toonMat({ color: 0x6f86a8 }, { rim: 0 })); b.position.y = 0.025;
@@ -147,7 +147,7 @@ const rawEntries = [
 ];
 export const entries = rawEntries.map((e) => ({ ...e, id: "m_" + e.id }));
 // snow-dusted spruce entry needs the weather hook applied to its parts
-{ const e = entries.find((x) => x.id === "m_ez_spruce_snow"); e.make = async () => { const p = ezTreeParts("Pine Medium", 3, SPRUCE, 14); MP.weather(p, { snow: 0.8 }); return part(p); }; }
+{ const e = entries.find((x) => x.id === "m_ez_spruce_snow"); e!.make = async () => { const p = ezTreeParts("Pine Medium", 3, SPRUCE, 14); MP.weather(p, { snow: 0.8 }); return part(p); }; }
 { const e = entries.find((x) => x.id === "m_mp_ranges" || x.id === "m_proc_ranges"); if (e) e.make = async () => { const g = new THREE.Group(); for (let i = 0; i < 3; i++) { const m = MP.rangeLayer(i); m.onBeforeRender = () => {}; g.add(m); } g.scale.setScalar(0.004); return g; }; }
 
 // ------------------------------------------------------------------ the assembled mountain
@@ -155,13 +155,13 @@ const FOG = new THREE.Color(0xc9dcec);
 function scatterPts(n: number, seed: number, area: number[], ok, o: ScatterOpts = {}) {
   const r = rng(seed), out = [], sc = o.scale || [0.9, 1.2]; let tries = 0;
   while (out.length < n && tries++ < n * (o.tries || 60)) {
-    const x = area[0] + (r() * 2 - 1) * area[2], z = area[1] + (r() * 2 - 1) * area[3], inf = mtInfo(x, z), pr = ok(x, z, inf.h, inf.ny);
+    const x = area[0]! + (r() * 2 - 1) * area[2]!, z = area[1]! + (r() * 2 - 1) * area[3]!, inf = mtInfo(x, z), pr = ok(x, z, inf.h, inf.ny);
     if (!(pr > 0) || r() > pr) continue;
-    out.push({ x, z, s: sc[0] + (sc[1] - sc[0]) * r(), yaw: r() * 6.28, h: inf.h, ny: inf.ny });
+    out.push({ x, z, s: sc[0]! + (sc[1]! - sc[0]!) * r(), yaw: r() * 6.28, h: inf.h, ny: inf.ny });
   }
   return out;
 }
-const toMats = (pts, o: ScatterOpts = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p: { x: number | undefined; z: number | undefined; yaw: number; s: number; }, i: number) => composeTRS(m, i, p.x, mtH(p.x, p.z) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
+const toMats = (pts, o: ScatterOpts = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p: { x: number | undefined; z: number | undefined; yaw: number; s: number; }, i: number) => composeTRS(m, i, p.x, mtH(p.x!, p.z!) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
 const patch = (x: number, z: number, s = 4, f = 0.05) => Math.pow(vnoise(x, z, f, s), 1.6) * 1.8;
 const valleyClear = (x: number, z: number) => sstep(10, 22, Math.hypot(x - 2, z - 6));            // keep the camera area open
 
@@ -187,12 +187,12 @@ export async function buildMountain(ctx) {
   root.add(MP.cloudDeck({ y: [11], size: 900, near: 130, far: 300, cover: 0.62, scale: 0.0042, name: "cloud sea" })); note("cloud sea (toon deck, fades near the camera)", 1, null);
   root.add(MP.cloudDeck({ y: [78, 118], size: 900, near: 200, far: 330, cover: 0.34, scale: 0.0052, col: [0.98, 0.99, 1], name: "low clouds" })); note("low clouds round the peaks", 2, null);
   root.add(MP.snowPoints("blow", { n: N(1300), box: 70, seed: 9 })); note("blowing snow (GPU points)", N(1300), null);
-  const crests: number[][] = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0] - x, c[2] - z) > 45)) crests.push([x, h + 1, z]); } }
+  const crests: number[][] = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0]! - x, c[2]! - z) > 45)) crests.push([x, h + 1, z]); } }
   if (crests.length) { root.add(MP.snowPoints("spindrift", { n: crests.length * 220, crests, speed: 3.2, life: 8, seed: 12, scale: 620 })); note("spindrift plumes off the crests", crests.length * 220, null); }
 
   const add = (name: string | undefined, parts, pts: { x: number; z: number; s: number; yaw: number; h: number; ny: number; }[], o: SpeciesAddOpts = {}) => {
     if (!pts.length) return;
-    const mats = toMats(pts, o), g = cull.add(parts, mats, pts.length, name, o.cell || 16); g.name = name; root.add(g); note(name, pts.length, parts); return g;
+    const mats = toMats(pts, o), g = cull.add(parts, mats, pts.length, name, o.cell || 16); g.name = name; root.add(g); note(name!, pts.length, parts); return g;
   };
   const FD = [34, 60], FDS = [70, 110];
   const Lq = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });

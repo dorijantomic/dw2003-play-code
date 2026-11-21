@@ -61,7 +61,7 @@ export function battleTechWords({
     const at = words.findIndex((word) => (word & 0x1fff) === sig);
     // The mark rewrites the entry as masked|0x8000 (dropping its other flags);
     // an absent signature is appended with the flag.
-    if (at >= 0) words[at] = ((words[at] & 0x1fff) | 0x8000) & 0xffff;
+    if (at >= 0) words[at] = ((words[at]! & 0x1fff) | 0x8000) & 0xffff;
     else words.push((sig | 0x8000) & 0xffff);
   }
   const equipped = equippedForms ?? (current ? [currentId] : []);
@@ -120,7 +120,7 @@ export const TAG_PRESENTATION = Object.freeze({
 export function dnaClip12Chunks(segs, dna: BattleDnaPresentation) {
   if (!Array.isArray(segs) || segs.length !== 5) return null;
   const s2 = segs[2];
-  const cut = s2.findIndex((r: { op: number; words: number[]; }) => r.op === 2 && (r.words?.[0] | 0) === 2 && (r.words?.[1] | 0) === 2);
+  const cut = s2.findIndex((r: { op: number; words: number[]; }) => r.op === 2 && (r.words?.[0]! | 0) === 2 && (r.words?.[1]! | 0) === 2);
   if (cut < 0) return null;
   // Runtime replay (2026-07-15, state-9, orbtrace/orb4 frames): each flight segment OPENS
   // with its parent model in close-up (op2 [1,slot] show + mode-3 teleport near the staging

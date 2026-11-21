@@ -33,7 +33,7 @@ function gapCount(s) {
 function totals() {
   const t = data.totals;
   const files = data.codeFiles;
-  const sum = (k: string) => files.reduce((a, f) => a + f[k], 0);
+  const sum = (k: string) => files!.reduce((a, f) => a + f[k], 0);
   $("totals").innerHTML = [
     [t.systems, "systems"],
     [t.claims, "facts recorded"],
@@ -81,7 +81,7 @@ function renderSystems() {
         <td class="hideNarrow">${s.routines.decoded ? s.routines.decoded : `<span class="pill muted">0</span>`}<div class="sub">${s.routines.labels.length} label${s.routines.labels.length === 1 ? "" : "s"}</div></td>
         <td class="hideNarrow">${l.frontiersOpen ? `<span class="pill gap">${l.frontiersOpen} open</span>` : `<span class="pill ok">none open</span>`}<div class="sub">${l.frontiers - l.frontiersOpen} answered${l.exhaustive ? " · fully covered" : ""}</div></td>
         <td><span class="pill ${s.wired.status}">${WIRED_WORDS[s.wired.status] ?? s.wired.status}</span><div class="sub">${s.wired.modules.length} files named</div></td>
-        <td class="hideNarrow"><div class="sub">${s.ownedFiles.length} owned of ${data.totals.codeFilesOwned + data.totals.codeFilesUnowned}</div><div class="sub">${s.owns.length} globs</div></td>
+        <td class="hideNarrow"><div class="sub">${s.ownedFiles.length} owned of ${data.totals.codeFilesOwned! + data.totals.codeFilesUnowned!}</div><div class="sub">${s.owns.length} globs</div></td>
         <td class="hideNarrow"><div class="sub">${s.checked.tests.length} test${s.checked.tests.length === 1 ? "" : "s"} named</div><div class="sub">mark checked ${esc(s.checked.markVerified ?? "never")}</div></td>
         <td>${g ? `<span class="pill gap">${g}</span>` : `<span class="pill ok">0</span>`}</td>
       </tr>`;
@@ -140,14 +140,14 @@ function renderSystemDetails(s) {
 }
 
 function renderFiles() {
-  const rows = data.codeFiles.filter((f) => matches(`${f.module} ${f.systems.join(" ")}`));
+  const rows = data.codeFiles!.filter((f) => matches(`${f.module} ${f.systems.join(" ")}`));
   $("list").innerHTML = `
     <p class="legend">One row for each code file of the original game. <strong>Read</strong> counts routines with a name or a topic. <strong>Translated</strong> counts routines with a line-by-line port in our code. <strong>Running ours</strong> counts ports that the game uses in place of the original routine. <strong>Oracle</strong> counts ports with a test that runs the original routine and ours side by side. Many systems are rebuilt in our own code instead of translated routine by routine; those show under Systems, not here.</p>
     <div class="keys"><span><i class="c-wired"></i>running ours</span><span><i class="c-translated"></i>translated, not running</span><span><i class="c-read"></i>read only</span><span><i class="c-unread"></i>not read</span></div>
     <table><thead><tr><th>Code file</th><th>Pipeline</th><th>Read</th><th>Translated</th><th>Running ours</th><th>Oracle</th><th class="hideNarrow">Systems</th></tr></thead>
     <tbody>${rows.map((f) => {
       const read = (f.read.named ?? 0) + (f.read.topic ?? 0);
-      const game = f.routines - f.library;
+      const game = f.routines - f.library!;
       const translatedOnly = Math.max(0, f.translated - f.wired);
       const readOnly = Math.max(0, read - f.translated);
       const parts = [["wired", f.wired], ["translated", translatedOnly], ["read", readOnly], ["unread", Math.max(0, game - f.wired - translatedOnly - readOnly)]];
@@ -164,27 +164,27 @@ function renderScreens() {
   const li = (x) => `<li>${esc(typeof x === "string" ? x : `${x.what} — ${x.state}${x.commit ? ` (${x.commit})` : ""}`)}</li>`;
   $("list").innerHTML = `
     <p class="legend">The screen progress list, kept by hand in <code>data/screen_progress.json</code> and updated in every screen commit. The <a href="ui-flow.html">Screen Map</a> shows how the screens connect.</p>
-    <h3>Next (${s.next.length})</h3><ul class="screens">${s.next.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>
-    <h3>In progress (${s.inProgress.length})</h3><ul class="screens">${s.inProgress.map(li).join("") || "<li>None.</li>"}</ul>
-    <h3>Open (${s.open.length})</h3><ul class="screens">${s.open.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>
-    <h3>Done (${s.done.length})</h3><ul class="screens">${s.done.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>`;
-  $("details").innerHTML = `<div class="eyebrow">Screens</div><h2>Screen progress</h2><p>${s.done.length} screens or fixes are done. ${s.next.length} are next and ${s.open.length} are open.</p>${generatedNote()}`;
+    <h3>Next (${s!.next.length})</h3><ul class="screens">${s!.next.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>
+    <h3>In progress (${s!.inProgress.length})</h3><ul class="screens">${s!.inProgress.map(li).join("") || "<li>None.</li>"}</ul>
+    <h3>Open (${s!.open.length})</h3><ul class="screens">${s!.open.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>
+    <h3>Done (${s!.done.length})</h3><ul class="screens">${s!.done.filter((x) => matches(JSON.stringify(x))).map(li).join("")}</ul>`;
+  $("details").innerHTML = `<div class="eyebrow">Screens</div><h2>Screen progress</h2><p>${s!.done.length} screens or fixes are done. ${s!.next.length} are next and ${s!.open.length} are open.</p>${generatedNote()}`;
 }
 
 function renderGaps() {
   const g = data.catalogGaps;
   $("list").innerHTML = `
     <p class="legend">Places where the records themselves are incomplete. Each item here is something the status page cannot place under a system yet.</p>
-    <h3>Shared engine files that no system names (${g.unclaimedEngine.length})</h3>
-    <ul class="screens">${g.unclaimedEngine.map((p) => `<li><code>${esc(p)}</code> — add it to its system's implementation list in <code>docs/research/systems/catalog.json</code>.</li>`).join("") || "<li>None.</li>"}</ul>
-    <h3>Our files that no system owns (${g.unownedCode.length})</h3>
-    <ul class="screens">${g.unownedCode.map((x) => `<li><code>${esc(x.path)}</code> — ${esc(x.reason)}; add it to a system's <code>owns</code> list, or say why it belongs to none.</li>`).join("") || "<li>None.</li>"}</ul>
-    <h3>Decoded routines that no system claims (${g.unassignedRoutines.reduce((a, r) => a + r.count, 0)})</h3>
-    <ul class="screens">${g.unassignedRoutines.map((x) => `<li><b>${esc(x.label)}</b>: ${x.count} routine${x.count === 1 ? "" : "s"} — no system lists this function-table label in its <code>routine_labels</code>.</li>`).join("") || "<li>None.</li>"}</ul>
+    <h3>Shared engine files that no system names (${g!.unclaimedEngine.length})</h3>
+    <ul class="screens">${g!.unclaimedEngine.map((p) => `<li><code>${esc(p)}</code> — add it to its system's implementation list in <code>docs/research/systems/catalog.json</code>.</li>`).join("") || "<li>None.</li>"}</ul>
+    <h3>Our files that no system owns (${g!.unownedCode.length})</h3>
+    <ul class="screens">${g!.unownedCode.map((x) => `<li><code>${esc(x.path)}</code> — ${esc(x.reason)}; add it to a system's <code>owns</code> list, or say why it belongs to none.</li>`).join("") || "<li>None.</li>"}</ul>
+    <h3>Decoded routines that no system claims (${g!.unassignedRoutines.reduce((a, r) => a + r.count, 0)})</h3>
+    <ul class="screens">${g!.unassignedRoutines.map((x) => `<li><b>${esc(x.label)}</b>: ${x.count} routine${x.count === 1 ? "" : "s"} — no system lists this function-table label in its <code>routine_labels</code>.</li>`).join("") || "<li>None.</li>"}</ul>
     <h3>Routines no one has read yet (${data.totals.routinesUnlabeled})</h3>
-    <p class="legend">These carry no subsystem or topic label at all, so there is nothing for a system to claim: ${Object.entries(g.unlabeledRoutines ?? {}).map(([k, v]) => `${v} ${esc(k)}`).join(", ")}. Reading state comes from <code>docs/generated/function-table.json</code>.</p>
-    <h3>Facts filed under a system the catalog does not have (${g.strayClaims.length})</h3>
-    <ul class="screens">${g.strayClaims.map((x) => `<li><b>${esc(x.system)}</b>: ${x.claims.map(esc).join(", ")}</li>`).join("") || "<li>None.</li>"}</ul>
+    <p class="legend">These carry no subsystem or topic label at all, so there is nothing for a system to claim: ${Object.entries(g!.unlabeledRoutines ?? {}).map(([k, v]) => `${v} ${esc(k)}`).join(", ")}. Reading state comes from <code>docs/generated/function-table.json</code>.</p>
+    <h3>Facts filed under a system the catalog does not have (${g!.strayClaims.length})</h3>
+    <ul class="screens">${g!.strayClaims.map((x) => `<li><b>${esc(x.system)}</b>: ${x.claims.map(esc).join(", ")}</li>`).join("") || "<li>None.</li>"}</ul>
     <h3>Catalog marks that name missing files</h3>
     <ul class="screens">${data.systems.filter((s) => s.gaps.missingFiles.length).map((s) => `<li><b>${esc(pretty(s.id))}</b>: ${s.gaps.missingFiles.map(esc).join(", ")}</li>`).join("") || "<li>None.</li>"}</ul>
     <h3>Catalog-named files not part of this export (${data.totals.notExportedFiles ?? 0})</h3>
@@ -194,7 +194,7 @@ function renderGaps() {
 
 function generatedNote() {
   const i = data.inputs;
-  return `<p class="note">Built by <code>${esc(data.generatedBy)}</code> from the evidence ledger (${i.ledgerClaims} facts), the system catalog (updated ${esc(i.catalogUpdated)}), the code ownership report (${esc(String(i.ownershipGeneratedAt).slice(0, 10))}) and the screen progress list.</p>`;
+  return `<p class="note">Built by <code>${esc(data.generatedBy)}</code> from the evidence ledger (${i!.ledgerClaims} facts), the system catalog (updated ${esc(i!.catalogUpdated)}), the code ownership report (${esc(String(i!.ownershipGeneratedAt).slice(0, 10))}) and the screen progress list.</p>`;
 }
 
 function render() {

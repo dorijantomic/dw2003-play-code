@@ -66,7 +66,7 @@ export function createChoice(sfx = null) {
 
   // The move branch: set the cursor, and blip only when the value moved.
   const move = (next: number) => {
-    if (!ch.isOpen()) return;
+    if (!ch.isOpen!()) return;
     const target = Math.max(0, Math.min(ch.options.length - 1, next));
     if (target === ch.cursorIdx) return; // clamped: no sound, no reposition
     ch.cursorIdx = target;
@@ -77,17 +77,17 @@ export function createChoice(sfx = null) {
   ch.moveDown = () => move(ch.cursorIdx + 1);
 
   ch.confirm = () => {
-    if (!ch.isOpen()) return;
+    if (!ch.isOpen!()) return;
     const idx = ch.cursorIdx;
     const cb = ch._onSelect;
     ch._onSelect = null;
     sfx?.playPacked?.(CHOICE_CONFIRM_SOUND);
-    cb(idx);
+    cb!(idx);
   };
 
   // Drawn in SCREEN space (call after ctx.restore()).
   ch.draw = (ctx, viewW, viewH) => {
-    if (!ch.isOpen()) { uiC.hide(uiKey); return; }
+    if (!ch.isOpen!()) { uiC.hide(uiKey); return; }
     // look C (web/ui-c, task T5): the C question box, the same composer as the field Yes / No box (choiceScene); the canvas below is the
     // fallback when the overlay is not there.
     const s = Math.max(1, Math.min(viewW / 320, viewH / 240));

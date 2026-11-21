@@ -109,8 +109,8 @@ export function finalBossPhaseSwitchesTrack(specialMode: number, battleKind: num
 // data" → use the fallback. Pure.
 export function enemyVitals(real: { hp: number | undefined; mp: number | undefined; }, fallback) {
   return {
-    hp: real?.hp > 0 ? real.hp : fallback.hp,
-    mp: real?.mp > 0 ? real.mp : fallback.mp,
+    hp: real?.hp! > 0 ? real.hp : fallback.hp,
+    mp: real?.mp! > 0 ? real.mp : fallback.mp,
   };
 }
 

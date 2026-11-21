@@ -84,26 +84,26 @@ export function sandTextures() {
     // is the measured one whatever photo is loaded
     try {
       const t0 = performance.now();
-      const img = state.albedo.image, w = img.width, h = img.height;
+      const img = state.albedo!.image, w = img.width, h = img.height;
       const cv = document.createElement("canvas");
       cv.width = w; cv.height = h;
       const g = cv.getContext("2d", { willReadFrequently: true });
-      g.drawImage(img, 0, 0);
-      const d = g.getImageData(0, 0, w, h).data;
+      g!.drawImage(img, 0, 0);
+      const d = g!.getImageData(0, 0, w, h).data;
       const lut = new Float64Array(256);
       for (let i = 0; i < 256; i++) { const v = i / 255; lut[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
       let r = 0, gg = 0, b = 0;
       for (let i = 0; i < d.length; i += 4) { r += lut[d[i]]; gg += lut[d[i + 1]]; b += lut[d[i + 2]]; }
       const n = w * h;
       state.mean = [r / n, gg / n, b / n];
-      state.albedoMean = 0.2126 * state.mean[0] + 0.7152 * state.mean[1] + 0.0722 * state.mean[2];
+      state.albedoMean = 0.2126 * state.mean![0] + 0.7152 * state.mean![1] + 0.0722 * state.mean![2];
       state.px = w;
       state.readMs = Math.round(performance.now() - t0);
     } catch (e) { /* the image is there but unreadable (cross-origin): mean stays null, the sand paints the flat `all` */ }
     state.loaded = true;
   };
   const mk = (file: string | null, srgb: boolean) => {
-    const t = loader.load(SAND.TEX.dir + file, () => { if (--left <= 0) finish(); }, undefined, () => { state.error = file; if (--left <= 0) finish(); });
+    const t = loader.load(SAND.TEX.dir + file, () => { if (--left <= 0) finish(); }, undefined!, () => { state.error = file; if (--left <= 0) finish(); });
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = SAND.ANISO;
     t.generateMipmaps = true;
@@ -386,7 +386,7 @@ export function buildSand(slot, { materials = [], info = {} as BuiltSandInfo } =
   }
   const tex = sandTextures();
   const out = {
-    meshes: meshes.length, shore: shore.length, triangles: meshes.reduce((s, m) => s + m.geometry.attributes.position.count / 3, 0),
+    meshes: meshes.length, shore: shore.length, triangles: meshes.reduce((s, m) => s + m.geometry.attributes.position!.count / 3, 0),
     params: SAND, waterline: { bakeMs: field.ms, sectors: field.wl.r.length, rMin: Math.round(Math.min(...field.wl.r)), rMax: Math.round(Math.max(...field.wl.r)) },
     tex: { ready: tex.loaded, mean: tex.mean, albedoMean: tex.albedoMean, px: tex.px, readMs: tex.readMs, aniso: SAND.ANISO, tile: SAND.TILE, credit: SAND.TEX.credit },
     anchors: { lo: [...A.bed], hi: [...sandHi] },

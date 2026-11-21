@@ -28,7 +28,7 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
   P.Ctx = window.AudioContext || window.webkitAudioContext;
   P.ctx = P.Ctx ? new P.Ctx() : null;
   P.gain = P.ctx ? P.ctx.createGain() : null;
-  if (P.gain) { P.gain.gain.value = BASE_GAIN.effects; P.gain.connect(P.ctx.destination); }
+  if (P.gain) { P.gain.gain.value = BASE_GAIN.effects; P.gain.connect(P.ctx!.destination); }
   P.manifest = null;
   P.buffers = {}; // name -> AudioBuffer | Promise
   P.player = { muted: false } as SfxPlayerContext;
@@ -167,7 +167,7 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
     .catch(() => { P.mapArchives = {}; });
   // The 2D phrase note table, asked for with the other manifests: without it a
   // cue would play as one source on its first press and as its notes after.
-  loadPhraseTable();
+  loadPhraseTable!();
 
     // The note table row for a 2D phrase, or null when this sound is not one.
   // The ARCHIVE the sound was asked for is part of the lookup: a common-bank cue

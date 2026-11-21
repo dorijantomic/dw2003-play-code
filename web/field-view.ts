@@ -68,7 +68,7 @@ export function scriptIsStaged(opcodes) {
     for (const line of opcodes) {
         if (typeof line !== "string") continue;
         const op = line.trim().split(/\s+/, 1)[0];
-        if (STAGED_OPS.has(op)) return true;
+        if (STAGED_OPS.has(op!)) return true;
     }
     return false;
 }

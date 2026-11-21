@@ -67,8 +67,8 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
   function playPlayerItemUse(itemId: number, hooks: AnimHooks = {}) {
     const rec = itemUseEffect(itemId);
     B$.playerAnim = `item:${itemId}`;
-    B$.contactSoundType.player = rec ? rec.sound : null;
-    B$.contactEvade.player = false;   // no accuracy roll on the item path
+    B$.contactSoundType!.player = rec ? rec.sound : null;
+    B$.contactEvade!.player = false;   // no accuracy roll on the item path
     return B$.playerAnim8r
       ? B$.playerAnim8r.setAnimByItem(itemId, B$._playerHooks(B$._fxHooks("player", hooks)))
       : false;
@@ -87,14 +87,14 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
     const rec = throwItemEffect(itemId);
     if (!rec) return false;   // table not loaded -> the caller keeps the default clip-10 entry
     B$.playerAnim = `throw:${itemId}`;
-    B$.contactSoundType.player = (branch != null && rec.sound_branch && rec.sound_branch[branch] != null)
+    B$.contactSoundType!.player = (branch != null && rec.sound_branch && rec.sound_branch[branch] != null)
       ? rec.sound_branch[branch]
       : rec.sound;
-    B$.contactEvade.player = false;   // no accuracy roll on the item path
+    B$.contactEvade!.player = false;   // no accuracy roll on the item path
     let motion = rec.motion;
     if (rec.motion_random) {
       const count = rec.motion_random.count | 0;
-      const k = (elementIndex != null ? elementIndex | 0 : (RAND_U16() % count)) % count;
+      const k = (elementIndex != null ? elementIndex | 0 : (RAND_U16()! % count)) % count;
       motion = rec.motion_random.base + rec.motion_random.step * k;
     }
     B$.armThrowBackdrop(motion);      // the clip's op4 switches the element pack in and out
@@ -129,8 +129,8 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
   // The player's action drives the script camera (op5); the enemy's does not.
   function setPlayerAnimByTech(techId: number, hooks: { onMotion: (arg0: number) => void; }) {
     B$.playerAnim = `tech:${techId}`;
-    B$.contactSoundType.player = B$.contactSoundTypeFor(techId);
-    B$.contactEvade.player = false;   // no accuracy roll on this path
+    B$.contactSoundType!.player = B$.contactSoundTypeFor(techId);
+    B$.contactEvade!.player = false;   // no accuracy roll on this path
     // The backdrop follows the clip's own op4 (see armDataField above), not a timer.
     B$.armDataField(techId);
     const h = { ...(hooks || {}), onMotion: (m: number) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
@@ -138,8 +138,8 @@ function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
   }
 function setEnemyAnimByTech(techId: number, hooks: { onMotion: (arg0: number) => void; }) {
     B$.enemyAnim = `tech:${techId}`;
-    B$.contactSoundType.enemy = B$.contactSoundTypeFor(techId);
-    B$.contactEvade.enemy = false;
+    B$.contactSoundType!.enemy = B$.contactSoundTypeFor(techId);
+    B$.contactEvade!.enemy = false;
     B$.armDataField(techId);
     const h = { ...(hooks || {}), onMotion: (m: number) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
     return B$.enemyAnim8r ? B$.enemyAnim8r.setAnimByTech(techId, B$._enemyHooks(B$._fxHooks("enemy", h))) : false;
@@ -150,24 +150,24 @@ function setEnemyAnimByTech(techId: number, hooks: { onMotion: (arg0: number) =>
   function playerAttack(techId: number, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.playerAnim = `tech:${techId}`; B$.enemyAnim = `hit`;
-    if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack
-    B$.contactSoundType.player = B$.contactSoundTypeFor(techId);
+    if (B$.sfx) { B$.sfx.stopBattle!("player"); B$.sfx.stopBattle!("enemy"); }   // clear any sustained voice from the last attack
+    B$.contactSoundType!.player = B$.contactSoundTypeFor(techId);
     B$.armDataField(techId);   // the backdrop follows the clip's own op4, not a timer
     const { lethal = false, miss = false, ...hooks } = opts;   // lethal -> death reaction (clip 3); miss -> no recoil
-    B$.contactEvade.player = miss;   // an evaded contact cues COMEX102, not the weapon's id
-    return B$.coordinator.attack(B$.playerAnim8r, B$.enemyAnim8r, techId,
+    B$.contactEvade!.player = miss;   // an evaded contact cues COMEX102, not the weapon's id
+    return B$.coordinator!.attack(B$.playerAnim8r, B$.enemyAnim8r, techId,
       B$._playerHooks(B$._fxHooks("player", B$._impactContact({ ...hooks, onMotion: B$.dataFieldMotion }))),
       { lethal, miss, defenderHooks: B$._enemyHooks(B$._fxHooks("enemy")) });
   }
 function enemyAttack(techId: number, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.enemyAnim = `tech:${techId}`; B$.playerAnim = "hit";
-    if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack
-    B$.contactSoundType.enemy = B$.contactSoundTypeFor(techId);
+    if (B$.sfx) { B$.sfx.stopBattle!("player"); B$.sfx.stopBattle!("enemy"); }   // clear any sustained voice from the last attack
+    B$.contactSoundType!.enemy = B$.contactSoundTypeFor(techId);
     B$.armDataField(techId);
     const { lethal = false, miss = false, ...hooks } = opts;
-    B$.contactEvade.enemy = miss;
-    return B$.coordinator.attack(B$.enemyAnim8r, B$.playerAnim8r, techId,
+    B$.contactEvade!.enemy = miss;
+    return B$.coordinator!.attack(B$.enemyAnim8r, B$.playerAnim8r, techId,
       B$._enemyHooks(B$._fxHooks("enemy", B$._impactContact({ ...hooks, onMotion: B$.dataFieldMotion }))),
       { lethal, miss, defenderHooks: B$._playerHooks(B$._fxHooks("player")) });
   }

@@ -38,13 +38,13 @@ export function bakeGenericMotion(model, id: string, { offset = 8000 } = {}) {
   const idx = GENERIC_MOTIONS.findIndex((m) => m.id === id);
   if (idx < 0) return { ok: false, reason: `unknown motion ${id}` };
   const listed = listGenericMotions(model).find((m) => m.id === id);
-  if (!listed.applicable) return { ok: false, reason: listed.reason };
+  if (!listed!.applicable) return { ok: false, reason: listed!.reason };
   const tl = model?.timeline || [];
   const pool = tl.map((t, i) => ({ i, frames: plainFrames(t) })).filter((x) => x.i !== 0 && x.frames.length >= 8);
   if (!pool.length) return { ok: false, reason: "stub: this body has no own table to replay" };
   const src = pool[(idx * 3 + 1) % pool.length];
   let frames = src.frames;
-  if (/reversed/.test(GENERIC_MOTIONS[idx].name)) frames = [...frames].reverse();
+  if (/reversed/.test(GENERIC_MOTIONS[idx]!.name)) frames = [...frames].reverse();
   const out = JSON.parse(JSON.stringify(model));
   const table = out.timeline.length;
   out.timeline.push({ table: [...frames.map((value) => ({ value, loop_target: 0, aux: null })), { value: 0xFFFF, loop_target: 0, aux: null }] });

@@ -223,9 +223,9 @@ export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng
     // physical leaf: (RAND & 0x3f) + 0x20; magical leaf (0x8009fd54-0x8009fda4): RAND % 65 + 0x20
     const r = (magical ? rng() % 65 : rng() & 0x3f) + 0x20;
     running += Math.floor((running * r) / 64);
-    critNote = `roll ${critRoll & 0x7f}: crit, +${r}/64 (${critBefore} -> ${running})`;
+    critNote = `roll ${critRoll! & 0x7f}: crit, +${r}/64 (${critBefore} -> ${running})`;
   } else {
-    critNote = `roll ${critRoll & 0x7f}: no crit`;
+    critNote = `roll ${critRoll! & 0x7f}: no crit`;
   }
   stages.push({ name: "crit", value: running, note: critNote });
 
@@ -520,10 +520,10 @@ export function damageLabPress(button) {
   const key = OPTION_KEYS[S.sel];
   if (button === "up") S.sel = (S.sel + OPTION_KEYS.length - 1) % OPTION_KEYS.length;
   else if (button === "down") S.sel = (S.sel + 1) % OPTION_KEYS.length;
-  else if (button === "left") changePick(key, -1);
-  else if (button === "right") changePick(key, 1);
-  else if (button === "l1") changePick(key, -10);
-  else if (button === "r1") changePick(key, 10);
+  else if (button === "left") changePick(key!, -1);
+  else if (button === "right") changePick(key!, 1);
+  else if (button === "l1") changePick(key!, -10);
+  else if (button === "r1") changePick(key!, 10);
   else if (button === "triangle") recompute();
   else if (button === "cross" || button === "start") S.open = false;
   return true;
@@ -663,7 +663,7 @@ export function damageLabDraw(ctx, W = 640, H = 480) {
       ctx.fillRect(left - 4, ry - 1, w - 20, 14);
     }
     ctx.fillStyle = hit ? "#ffe9a8" : "#c8d2e2";
-    ctx.fillText(shorten(`${hit ? ">" : " "} ${opts[i].label.padEnd(11)} ${opts[i].value}`, 104), left, ry);
+    ctx.fillText(shorten(`${hit ? ">" : " "} ${opts[i]!.label.padEnd(11)} ${opts[i]!.value}`, 104), left, ry);
     ry += 15;
   }
 
@@ -705,7 +705,7 @@ export function damageLabDraw(ctx, W = 640, H = 480) {
     ctx.textAlign = "left";
     ctx.font = "10px monospace";
     ctx.fillStyle = "#c8d2e2";
-    const line = `the fight as picked: ${opts[0].value.split("  ")[0]} -> ${opts[1].value.split("  ")[0]}`
+    const line = `the fight as picked: ${opts[0]!.value.split("  ")[0]} -> ${opts[1]!.value.split("  ")[0]}`
       + `  |  ${tech?.named ? "" : "unnamed record  "}${tech ? tech.name : ""}`;
     ctx.fillText(shorten(line, 100), left + 2, sy + 18);
   }

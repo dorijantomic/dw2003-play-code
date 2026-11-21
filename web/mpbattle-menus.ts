@@ -50,7 +50,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         const i = text.indexOf(": ");
         const name = i > 0 && i <= 18 ? text.slice(0, i) : null, body = name ? text.slice(i + 2) : text;
         if (name && tags.length === 1) {
-            const [idx, ...nums] = tags[0][1].split(",").map(Number);
+            const [idx, ...nums] = tags[0]![1]!.split(",").map(Number);
             if (idx === 0x0b && nums.length === 1) return { spec: { kind: 4, payload: [0, nums[0]], name, slots: [String(nums[0])] } };
             if (!nums.length && body === battleMsgText(0x7f, idx)) return { spec: { kind: 2, payload: [idx], name } };
         }
@@ -124,6 +124,6 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
             }
             ctx.restore();
         },
-        diagnostics: () => ({ mode, page, queued: pages.length, widgets: Object.fromEntries(Object.entries(widgets).map(([k, w]) => [k, { open: w.isOpen(), active: w.active(), failed: w.failed() }])) }),
+        diagnostics: () => ({ mode, page, queued: pages.length, widgets: Object.fromEntries(Object.entries(widgets).map(([k, w]) => [k, { open: w.isOpen!(), active: w.active!(), failed: w.failed!() }])) }),
     };
 }

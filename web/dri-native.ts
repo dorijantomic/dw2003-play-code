@@ -103,7 +103,7 @@ export function ownedSlots(state, { includeParty = false } = {}) {
  *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
 export function slotStats(state: GameState, slot: number) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
-    const pos = (state.party ?? []).indexOf(charId);
+    const pos = (state.party ?? []).indexOf(charId!);
     if (pos === 0) return state.partnerStats ?? null;
     if (pos > 0) return state.partyStats?.[pos] ?? null;
     return state.reserveStats?.[charId] ?? null;
@@ -209,7 +209,7 @@ export function createDriNative(sfx = null) {
         d._state = state ?? d._state ?? null;
         d._onClose = onClose;
         d._lastDiagnostic = null;
-        d._begin();
+        d._begin!();
     };
 
     d.isOpen = () => d._open;

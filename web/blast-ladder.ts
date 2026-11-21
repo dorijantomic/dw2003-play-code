@@ -90,7 +90,7 @@ export function blastCards(digimon, skills) {
       id: starter.id,
       forms: (starter.blasts ?? []).slice(0, 5).map((id, tier) => {
         const profile = profileById.get(id);
-        const method = skillById.get(profile?.tech_signature);
+        const method = skillById.get(profile?.tech_signature!);
         const [min, max] = BLAST_BRACKETS[tier];
         return {
           id,
@@ -270,7 +270,7 @@ export function blastDraw(ctx, page = null, W = 640, H = 480) {
   }
 
   const asked = Number.isInteger(page) ? page : S.index;
-  const index = Math.max(0, Math.min(asked, S.cards.length - 1));
+  const index = Math.max(0, Math.min(asked!, S.cards.length - 1));
   const card = (typeof page === "object" && page) ? page : S.cards[index] ?? S.cards[0];
   if (!card) {
     drawMessage(ctx, W, H, "This ladder is empty.");

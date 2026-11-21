@@ -41,7 +41,7 @@ async function loadData(language: number | undefined) {
   const [shops,prices,boosters,catalog,packData,resident] = await dataPromise;
   const banks = new Map();
   for(const offset of [0x16,0x1d,0x32,0x6a,0x94]) {
-    const id=offset+language;
+    const id=offset+language!;
     const path=offset===0x6a||offset===0x94 ? `assets/data/shop-banks/${id}.bin` : `cardshop-data/${id}.bin`;
     const response=await fetch(path);
     if(!response.ok)throw new Error(`Card shop text ${id}: ${response.status}`);
@@ -83,15 +83,15 @@ export function createCardShopTranslated(sfx=null,options: CardShopOptions={}) {
   c.update=(dt)=>{
     if(!c._open||!c._session||c._error)return;
     for(const frame of c._clock.advance(dt)) {
-      c._session.tick(c._state.keys??[],frame.tick);
+      c._session.tick(c._state!.keys??[],frame.tick);
       // Original grants/payments happen while the child is still open. Persist
       // that transaction immediately, then preserve it again on screen teardown.
       if(c._savedRevision!==c._session.revision) {
         c._savedRevision=c._session.revision;
-        persistCollection();localStorage.setItem('bits',String(c._state.bits));
-        localStorage.setItem('inventory',JSON.stringify(c._state.inventory));
+        persistCollection();localStorage.setItem('bits',String(c._state!.bits));
+        localStorage.setItem('inventory',JSON.stringify(c._state!.inventory));
       }
-      if(c._session.finished()){c._finish();break;}
+      if(c._session.finished()){c._finish!();break;}
     }
   };
   c.draw=(ctx,width)=>{
@@ -99,11 +99,11 @@ export function createCardShopTranslated(sfx=null,options: CardShopOptions={}) {
     ctx.save();ctx.scale(width/320,width/320);
     paintNativeSession(ctx,renderer,c._session,{ui:{key:'ui-cardshop',compose:composeWindow}});ctx.restore();
   };
-  c.close=()=>{if(c._open)c._finish();};
+  c.close=()=>{if(c._open)c._finish!();};
   c._finish=()=>{
     c._open=false;++c._request;
     persistCollection();
-    localStorage.setItem('inventory',JSON.stringify(c._state.inventory));
+    localStorage.setItem('inventory',JSON.stringify(c._state!.inventory));
     const transition=c._session?.transition??0;c._session=null;
     const callback=transition===0x400?c._onEditFolder:c._onClose;
     c._onEditFolder=null;c._onClose=null;callback?.();

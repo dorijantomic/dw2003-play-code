@@ -42,7 +42,7 @@ function resolve(text: string) {
   if (byId.has(text)) return text;
   const low = text.toLowerCase();
   const hits = [...byLabel].filter(([l]) => l.toLowerCase().startsWith(low + " ") || l.toLowerCase() === low);
-  return hits.length === 1 ? hits[0][1] : null;
+  return hits.length === 1 ? hits[0]![1] : null;
 }
 
 // ---- candidate lists (parts found by position; several = the user must pick)
@@ -110,16 +110,16 @@ function addRow(init?: FusionLabSelection | null | undefined) {
 async function refreshRow(row: FusionLabRow) {
   const token = (row.token = (row.token || 0) + 1);
   const kind = row.part.value, donorId = resolve(row.donor.value), baseId = resolve($("base").value);
-  row.cands.textContent = ""; row.warn.textContent = "";
+  row.cands!.textContent = ""; row.warn!.textContent = "";
   row.donorPick = null; row.basePick = null;
-  if (donorId && blockedOf(donorId)) row.warn.textContent = "Blocked donor: " + blockedOf(donorId);
+  if (donorId && blockedOf(donorId)) row.warn!.textContent = "Blocked donor: " + blockedOf(donorId);
   try {
     if (baseId) {
       const bc = await loadCands(baseId, kind);
       if (token !== row.token) return;
       row.basePick = candPicker("Base " + kind, bc, () => {});
       if (row.pre && row.pre.base_chain && row.basePick.needs) { const s = row.basePick.el.querySelector("select"); if (s) s.value = row.pre.base_chain; }
-      row.cands.appendChild(row.basePick.el);
+      row.cands!.appendChild(row.basePick.el);
     }
     if (donorId) {
       try {
@@ -131,15 +131,15 @@ async function refreshRow(row: FusionLabRow) {
           const f = (l: { technique: string; bodyPart: string; }[]) => l.map((s: { technique: string; bodyPart: string; }) => s.technique + " (" + s.bodyPart + ")").join(", ");
           a.textContent = "Attacks from this donor " + kind + ": " + (at.mine.length ? f(at.mine) : "none listed in anatomy.json") + (at.others.length ? ".  Other attacks of this Digimon come from other parts: " + f(at.others) : "");
         }
-        row.cands.appendChild(a);
+        row.cands!.appendChild(a);
       } catch (e) { /* attacks are extra info only */ }
       const dc = await loadCands(donorId, kind);
       if (token !== row.token) return;
       row.donorPick = candPicker("Donor " + kind, dc, () => {});
       if (row.pre && row.pre.donor_chain && row.donorPick.needs) { const s = row.donorPick.el.querySelector("select"); if (s) s.value = row.pre.donor_chain; }
-      row.cands.appendChild(row.donorPick.el);
+      row.cands!.appendChild(row.donorPick.el);
     }
-  } catch (e) { row.warn.textContent = "Could not read parts: " + e.message; }
+  } catch (e) { row.warn!.textContent = "Could not read parts: " + e.message; }
   row.pre = null;
 }
 
@@ -336,7 +336,7 @@ async function loadLists() {
 function baseWarn() {
   const id = resolve($("base").value);
   $("baseWarn").textContent = id && blockedOf(id) ? "Blocked base: " + blockedOf(id) : "";
-  rows.forEach((r) => r.refresh());
+  rows.forEach((r) => r.refresh!());
 }
 
 async function randomFusion() {

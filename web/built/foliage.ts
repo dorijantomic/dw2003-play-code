@@ -141,8 +141,8 @@ export function fluffyPart(clumps, cards: number, seed: number, mid: { r: number
   }
   const pos = Float32Array.from(out.pos), nor = new Float32Array(pos.length);
   for (let v = 0; v < pos.length / 3; v++) {
-    const d = [0, 1, 2].map((a) => pos[v * 3 + a] - out.clump[v * 4 + a]), l = Math.hypot(...d) || 1;
-    for (let a = 0; a < 3; a++) nor[v * 3 + a] = d[a] / l;
+    const d = [0, 1, 2].map((a) => pos[v * 3 + a]! - out.clump[v * 4 + a]!), l = Math.hypot(...d) || 1;
+    for (let a = 0; a < 3; a++) nor[v * 3 + a] = d[a]! / l;
   }
   return { pos, nor, uv: out.uv, idx: out.idx, tint, leaf: 1, clump: out.clump };
 }
@@ -172,13 +172,13 @@ export function broadleafGeometry(seed, pal) {
   });
   const branchTris = bg.index.count / 3;
   const leafPart = fluffyPart(clumps, Math.floor((TREE_TRIS - branchTris) / 2), seed * 7 + 1, pal.crownMid);
-  let H = 0; for (let i = 1; i < bp.length; i += 3) H = Math.max(H, bp[i]); for (let i = 1; i < leafPart.pos.length; i += 3) H = Math.max(H, leafPart.pos[i]);
+  let H = 0; for (let i = 1; i < bp.length; i += 3) H = Math.max(H, bp[i]); for (let i = 1; i < leafPart.pos.length; i += 3) H = Math.max(H, leafPart.pos[i]!);
   const k = 1 / H;
   const bpos = Float32Array.from(bp, (x: number) => x * k);
-  for (let i = 1; i < bpos.length; i += 3) if (bpos[i] < 1e-6) bpos[i] = -0.02;   // trunk foot a little into the ground
+  for (let i = 1; i < bpos.length; i += 3) if (bpos[i]! < 1e-6) bpos[i] = -0.02;   // trunk foot a little into the ground
   leafPart.pos = leafPart.pos.map((x) => x * k);
   leafPart.clump = leafPart.clump.map((x) => x * k);
-  const C = [0, 0, 0]; for (const q of clumps) for (let a = 0; a < 3; a++) C[a] += q.c[a] * k / clumps.length;   // crown centre
+  const C = [0, 0, 0]; for (const q of clumps) for (let a = 0; a < 3; a++) C[a]! += q.c[a] * k / clumps.length;   // crown centre
   const out = buildGeometry([
     { pos: bpos, nor: bg.attributes.normal.array, uv: bg.attributes.uv.array.map((x, i: number) => (i % 2 ? 0 : x)), idx: bg.index.array,
       tint: [pal.bark.r, pal.bark.g, pal.bark.b], leaf: 0 },
@@ -198,7 +198,7 @@ const BUSH_CLUMPS = [{ c: [-0.24, 0.27, 0.02], R: 0.27 }, { c: [0.22, 0.25, -0.0
 export function bushGeometry(seed, pal) {
   const part = fluffyPart(BUSH_CLUMPS, 28, seed, pal.bushMid);
   const g = buildGeometry([part]);
-  const C = [0, 0, 0]; for (const q of BUSH_CLUMPS) for (let a = 0; a < 3; a++) C[a] += q.c[a] / BUSH_CLUMPS.length;
+  const C = [0, 0, 0]; for (const q of BUSH_CLUMPS) for (let a = 0; a < 3; a++) C[a]! += q.c[a]! / BUSH_CLUMPS.length;
   g.userData = { crown: C, cards: part.pos.length / 12, H: 0.7, clumps: BUSH_CLUMPS };
   return g;
 }
@@ -208,27 +208,27 @@ export function bushGeometry(seed, pal) {
 export function pineGeometry(seed, pal) {
   const parts = [], r = rng(seed);
   const trunk = new THREE.CylinderGeometry(0.03, 0.05, 0.32, 7); trunk.translate(0, 0.14, 0);
-  const tp = trunk.attributes.position.array;   // foot at y -0.02: a little into the ground
-  parts.push({ pos: tp, nor: trunk.attributes.normal.array, uv: trunk.attributes.uv.array.map(() => 0), idx: trunk.index.array,
+  const tp = trunk.attributes.position!.array;   // foot at y -0.02: a little into the ground
+  parts.push({ pos: tp, nor: trunk.attributes.normal!.array, uv: trunk.attributes.uv!.array.map(() => 0), idx: trunk.index!.array,
                tint: [pal.needleBark.r, pal.needleBark.g, pal.needleBark.b], leaf: 0 });
   const C = new THREE.Vector3(0, 0.55, 0);
   for (let k = 0; k < 4; k++) {
     const rad = 0.27 - k * 0.055, h = 0.36 - k * 0.04;
     const c = new THREE.ConeGeometry(rad, h, 12, 2); c.translate(0, 0.22 + k * 0.19 + h / 2, 0);
-    const p = c.attributes.position.array, seen = new Map();
+    const p = c.attributes.position!.array, seen = new Map();
     for (let i = 0; i < p.length; i += 3) {
       const key = `${p[i].toFixed(3)},${p[i + 1].toFixed(3)},${p[i + 2].toFixed(3)}`;
       if (!seen.has(key)) seen.set(key, 1 + (r() - 0.5) * 0.12);
       const s = seen.get(key); p[i] *= s; p[i + 2] *= s;
     }
     c.computeVertexNormals();
-    const n = c.attributes.normal.array, v = new THREE.Vector3(), d = new THREE.Vector3();
+    const n = c.attributes.normal!.array, v = new THREE.Vector3(), d = new THREE.Vector3();
     for (let i = 0; i < n.length; i += 3) {
       v.fromArray(n, i); d.fromArray(p, i).sub(C).normalize();
       v.lerp(d, 0.5).normalize().toArray(n, i);
     }
     const col = k % 2 ? pal.needleLit : pal.needleMid;
-    parts.push({ pos: p, nor: n, uv: c.attributes.uv.array.map(() => 0), idx: c.index.array, tint: [col.r, col.g, col.b], leaf: 0 });
+    parts.push({ pos: p, nor: n, uv: c.attributes.uv!.array.map(() => 0), idx: c.index!.array, tint: [col.r, col.g, col.b], leaf: 0 });
   }
   const g = buildGeometry(parts);
   g.userData = { crown: C.toArray(), cards: 0, H: 1 };

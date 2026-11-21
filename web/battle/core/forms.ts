@@ -93,7 +93,7 @@ export function makeForms(B: BattleContext) {
       options: forms.map((form) => ({
         species: form.id & 0xffff,
         left: [form.str, form.def, form.spt, form.wis, form.spd, form.chr],
-        right: elems.map((k) => form.resistances?.[k] ?? 0),
+        right: elems!.map((k) => form.resistances?.[k] ?? 0),
         techs: techsFor(form.id),
         level: B.battleFormLevel(index, form.id, b),
         dvexp: Number(ledger.find((row) => Number(row?.id) === Number(form.id))?.dvexp ?? 0) >>> 0,
@@ -102,7 +102,7 @@ export function makeForms(B: BattleContext) {
       panelBlock: [
         rec?.level | 0, 0, rec?.hp | 0, rec?.maxHp | 0, rec?.mp | 0, rec?.maxMp | 0,
         rec?.str | 0, rec?.def | 0, rec?.spt | 0, rec?.wis | 0, rec?.spd | 0, rec?.chr | 0,
-        ...elems.map((k) => elemValue(rec?.savedProfile, rec?.elemBonuses, k)),
+        ...elems!.map((k) => elemValue(rec?.savedProfile, rec?.elemBonuses, k)),
         0, 0, 0,
       ],
       preselected: (rec?.profile?.tech_signature ?? 0) & 0xffff,

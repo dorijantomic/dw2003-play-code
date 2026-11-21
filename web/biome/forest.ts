@@ -12,7 +12,7 @@ const PS = "Poly Haven (decimated, 1K albedo)", PU = (id: string | undefined) =>
 const CC0 = "CC0 1.0";
 
 // ------------------------------------------------------------------ entry helpers (shared with the Shared tab)
-export const q = (id: string | undefined, cat: string, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "q_" + id, cat, name: o.name || id.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
+export const q = (id: string | undefined, cat: string, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "q_" + id, cat, name: o.name || id!.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
   make: async () => partsGroup((await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
 export const ph = (id: string, cat: string, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "ph_" + id, cat, name: o.name || id.replace(/_/g, " "), source: PS, licence: CC0, url: PU(id),
   make: async () => partsGroup((await loadToon(`${ASSETS}polyhaven/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
@@ -34,7 +34,7 @@ export function ezTreeParts(preset: string, seed: number | undefined, over: { le
   t.options.seed = seed; t.generate();
   const bg = t.branchesMesh.geometry.clone(), lg = t.leavesMesh.geometry.clone();
   bg.computeBoundingBox(); lg.computeBoundingBox();
-  const top = Math.max(bg.boundingBox.max.y, lg.boundingBox.max.y), k = height / top;
+  const top = Math.max(bg.boundingBox.max.y, lg.boundingBox.max.y), k = height! / top;
   const fix = (g) => { g.scale(k, k, k); const n = g.attributes; if (!n.uv) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(n.position.count * 2), 2)); const gg = new THREE.BufferGeometry(); gg.setAttribute("position", n.position); gg.setAttribute("normal", n.normal); gg.setAttribute("uv", n.uv); gg.setIndex(g.index); gg.computeBoundingSphere(); return gg; };
   const bm = new THREE.MeshLambertMaterial({ map: t.branchesMesh.material.map, color: 0xffffff }), lm = new THREE.MeshLambertMaterial({ map: t.leavesMesh.material.map, side: THREE.DoubleSide, alphaTest: 0.5, alphaToCoverage: true });
   const lc = new THREE.Color(t.options.leaves.tint); const bc = new THREE.Color(t.options.bark.tint ?? 0xffffff);
@@ -154,7 +154,7 @@ export function grassPatch() {
 // ------------------------------------------------------------------ the assembled forest
 const HALF = 110;
 function vnoise(x: number | undefined, z: number | undefined, f: number, s = 0) { // cheap smooth value noise 0..1
-  const X = x * f + s * 17.3, Z = z * f + s * 9.1, xi = Math.floor(X), zi = Math.floor(Z), fx = X - xi, fz = Z - zi;
+  const X = x! * f + s * 17.3, Z = z! * f + s * 9.1, xi = Math.floor(X), zi = Math.floor(Z), fx = X - xi, fz = Z - zi;
   const h = (i: number, j: number) => { const n = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
   const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
   return (h(xi, zi) * (1 - sx) + h(xi + 1, zi) * sx) * (1 - sz) + (h(xi, zi + 1) * (1 - sx) + h(xi + 1, zi + 1) * sx) * sz;
@@ -187,9 +187,9 @@ export async function buildForest(ctx) {
   const clearing = 5.5;
   const pts = dart(tune.trees ?? 300, 21, 3.4, (x: number, z: number) => Math.hypot(x, z) > clearing + 1 && vnoise(x, z, 0.03, 1) > 0.18);
   const B = [], Pn = [], Bi = [], D = [];
-  for (const [x, z] of pts) { const n = vnoise(x, z, 0.022, 2), r2 = vnoise(x * 7.1, z * 3.3, 1, 5); (n > 0.62 ? Pn : n < 0.38 ? Bi : (r2 > 0.8 ? D : B)).push([x, z]); }
+  for (const [x, z] of pts) { const n = vnoise(x, z, 0.022, 2), r2 = vnoise(x! * 7.1, z! * 3.3, 1, 5); (n > 0.62 ? Pn : n < 0.38 ? Bi : (r2 > 0.8 ? D : B)).push([x, z]); }
   // top up: some dead trees, birch groves, a few broadleaf among pines
-  const treeGrid = new Map(); const gk = (x: number | undefined, z: number | undefined) => Math.floor(x / 4) + "," + Math.floor(z / 4);
+  const treeGrid = new Map(); const gk = (x: number | undefined, z: number | undefined) => Math.floor(x! / 4) + "," + Math.floor(z! / 4);
   for (const [x, z] of pts) { const k = gk(x, z); if (!treeGrid.has(k)) treeGrid.set(k, []); treeGrid.get(k).push([x, z]); }
   const nearTree = (x: number, z: number, d: number) => { const cx = Math.floor(x / 4), cz = Math.floor(z / 4), R = Math.ceil(d / 4); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) for (const p of treeGrid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < d) return true; return false; };
 

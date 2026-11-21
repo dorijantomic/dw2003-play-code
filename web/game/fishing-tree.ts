@@ -169,7 +169,7 @@ function awardFishingExtra({ area: areaId, entry }) {
     if (!area) return;
     let tries = 0;
     const go = () => {
-        const busy = battle.isActive() || cutscene.isActive() || textbox.isOpen() || choice.isOpen() || state.menuOpen || fade.dir !== 0 || !!state.wipe28;
+        const busy = battle.isActive() || cutscene.isActive() || textbox.isOpen!() || choice.isOpen!() || state.menuOpen || fade.dir !== 0 || !!state.wipe28;
         if (busy && tries++ < 300) { setTimeout(go, 200); return; }
         let itemName = null;
         if (entry.kind === "item") {
@@ -181,7 +181,7 @@ function awardFishingExtra({ area: areaId, entry }) {
             localStorage.setItem("bits", String(state.bits));
         }
         fishFinds.note(area.id, entry);
-        sfx.play("item_get");
+        sfx.play!("item_get");
         questSpeak(null, "", messageFor(state.fishingExtras, area, entry, itemName));
     };
     go();
@@ -221,7 +221,7 @@ function fieldPointOccupied(m, px, py) {
     if (questPropSolidAt(m.id, px, py)) return true;
     const scene = state.scenes[m.id];
     const npcs = scene?.npcs
-        ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get)
+        ? chapterNpcs(scene.npcs, state.chapter, storyFlags.get!!!!!!)
         : [];
     if (actorFootprintBlocked(npcs, (n) => npcHalfWidth(n.npc_id), px, py)) return true;
     const trees = treeStage(m.id)?.trees ?? null;
@@ -289,7 +289,7 @@ export function tryTreeKick() {
     state.treeKick = { run: startTreeKick(index, facing), rec: stage.trees[index].rec };
     state.moving = false;
     state.stopping = false;
-    sfx.playPacked(KICK_SOUND, { overlap: true });
+    sfx.playPacked!(KICK_SOUND, { overlap: true });
     return true;
 }
 

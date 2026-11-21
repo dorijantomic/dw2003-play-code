@@ -21,10 +21,10 @@ const I3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 const FDF = (D) => mul(F, mul(D, F));
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const scl = (a: number[], s: number) => [a[0] * s, a[1] * s, a[2] * s];
-const len = (a: number[]) => Math.hypot(a[0], a[1], a[2]);
+const scl = (a: number[], s: number) => [a[0]! * s, a[1]! * s, a[2]! * s];
+const len = (a: number[]) => Math.hypot(a[0]!, a[1]!, a[2]!);
 const nrm = (a) => { const l = len(a); return l > 1e-9 ? scl(a, 1 / l) : [0, 0, 0]; };
-const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const cross = (a: number[], b: number[]) => [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
 const lerp3 = (a, b, t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const cl = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const ss = (x: number) => { x = cl(x); return x * x * (3 - 2 * x); };
@@ -67,7 +67,7 @@ function buildCtx(model) {
   const bones = model.bones, n = bones.length;
   const par = bones.map((b) => { const p = (b.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; });
   const kids = Array.from({ length: n }, () => []);
-  par.forEach((p: number, i) => { if (p >= 0) kids[p].push(i); });
+  par.forEach((p: number, i) => { if (p >= 0) kids[p]!.push(i); });
   const fN = k23NeutralFrame(model);
   const rest = k16Pose(model, fN);
   const Wr = rest.W, Pr = rest.P;
@@ -120,9 +120,9 @@ function buildCtx(model) {
   }
   // effective children + DFS order
   const ekids = Array.from({ length: n }, () => []);
-  ep.forEach((p: number, i) => { if (p >= 0) ekids[p].push(i); });
+  ep.forEach((p: number, i) => { if (p >= 0) ekids[p]!.push(i); });
   const order = [], seen = new Set();
-  const visit = (i) => { if (seen.has(i)) return; seen.add(i); order.push(i); for (const k of ekids[i]) visit(k); };
+  const visit = (i) => { if (seen.has(i)) return; seen.add(i); order.push(i); for (const k of ekids[i]!) visit(k); };
   visit(mainRoot);
   for (let i = 0; i < n; i++) visit(i);
   // pivot for body rotations: the hips
@@ -130,11 +130,11 @@ function buildCtx(model) {
   if (legs.length) { hips = [0, 0, 0]; for (const l of legs) hips = add(hips, Pr[l.root]); hips = scl(hips, 1 / legs.length); }
   // spine: tail, else the longest descending chain (greedy by subtree depth)
   const depth = new Array(n).fill(1);
-  for (let k = order.length - 1; k >= 0; k--) { const i = order[k]; for (const c of kids[i]) depth[i] = Math.max(depth[i], 1 + depth[c]); }
+  for (let k = order.length - 1; k >= 0; k--) { const i = order[k]; for (const c of kids[i]!) depth[i] = Math.max(depth[i], 1 + depth[c]); }
   let spine = [];
   for (const r of roots) {
     const ch = [r]; let c = r;
-    while (kids[c].length) { c = kids[c].reduce((a, b) => (depth[b] > depth[a] ? b : a)); ch.push(c); }
+    while (kids[c]!.length) { c = kids[c]!.reduce((a, b) => (depth[b] > depth[a] ? b : a)); ch.push(c); }
     if (ch.length > spine.length) spine = ch;
   }
   const limbBones = new Set([...arms, ...legs, ...wings].flatMap((l) => l.chain));
@@ -223,9 +223,9 @@ function fabrik(J, l: number[], T, H: number) {
   const k = J.length - 1, J0 = J[0].slice();
   for (let it = 0; it < 24; it++) {
     J[k] = T.slice();
-    for (let j = k - 1; j >= 0; j--) J[j] = add(J[j + 1], scl(nrm(sub(J[j], J[j + 1])), l[j]));
+    for (let j = k - 1; j >= 0; j--) J[j] = add(J[j + 1], scl(nrm(sub(J[j], J[j + 1])), l[j]!));
     J[0] = J0.slice();
-    for (let j = 1; j <= k; j++) J[j] = add(J[j - 1], scl(nrm(sub(J[j], J[j - 1])), l[j - 1]));
+    for (let j = 1; j <= k; j++) J[j] = add(J[j - 1], scl(nrm(sub(J[j], J[j - 1])), l[j - 1]!));
     if (len(sub(J[k], T)) < 1e-3 * H) break;
   }
   return J;
@@ -305,7 +305,7 @@ function bendChain(S, c, chain, fn, floor = 0.5) {
     let d = j < chain.length - 1 ? nrm(sub(c.Pr[chain[j + 1]], c.Pr[b])) : (j > 0 ? nrm(sub(c.Pr[b], c.Pr[chain[j - 1]])) : [0, 0, -1]);
     if (!len(d)) continue;
     let la = cross(d, [1, 0, 0]); la = len(la) > 0.3 ? nrm(la) : [0, 1, 0];
-    let va = Math.abs(d[1]) < 0.8 ? cross(d, [0, -1, 0]) : cross(d, [0, 0, 1]);
+    let va = Math.abs(d[1]!) < 0.8 ? cross(d, [0, -1, 0]) : cross(d, [0, 0, 1]);
     va = nrm(va);
     const [a, v] = fn(j, chain.length);
     S.rotate(b, mul(axAng(la, a), axAng(va, v)), { floor, ceil: 1.4 });
@@ -592,15 +592,15 @@ export function bakeGenericMotion(model: MotionBonesOut, id: string, { offset = 
         if (p < 0) c1 = [-Pn[i][0], Pn[i][1], -Pn[i][2]];
         else c1 = mv(tr(Wn[p]), [Pn[p][0] - Pn[i][0], Pn[i][1] - Pn[p][1], Pn[p][2] - Pn[i][2]]);
         const f = offset + t;
-        keys2[i].push([o2[0], o2[1], o2[2], f]);
-        keys1[i].push([Math.round(c1[0]), Math.round(c1[1]), Math.round(c1[2]), f]);
+        keys2[i]!.push([o2[0], o2[1], o2[2], f]);
+        keys1[i]!.push([Math.round(c1[0]), Math.round(c1[1]), Math.round(c1[2]), f]);
       }
     }
     const out = {
       ...model,
       bones: model.bones.map((b, i: string | number) => {
-        const own2 = (b.anim?.ch2 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
-        const own1 = (b.anim?.ch1 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
+        const own2 = (b.anim?.ch2 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3]! < offset).map((r) => r.slice());
+        const own1 = (b.anim?.ch1 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3]! < offset).map((r) => r.slice());
         const l2 = keys2[i][T - 1], l1 = keys1[i][T - 1];
         return { ...b, anim: { ...(b.anim || {}), ch2: [...own2, ...keys2[i], [l2[0], l2[1], l2[2], 30000]], ch1: [...own1, ...keys1[i], [l1[0], l1[1], l1[2], 30000]] } };
       }),

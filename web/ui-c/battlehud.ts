@@ -40,7 +40,7 @@ export function dockLayout(stage: { x0: number; y0: number; x1: number; y1: numb
     if (main.x < S.x0 + pad) main.x = S.x0 + pad;
     main.cx = main.x + side / 2; main.cy = main.y + side / 2;
     const tall = H > 300, fr = tall ? o.tallFracs : o.fracs, ringTop = main.cy - main.R * 0.98;
-    const s2 = side * fr[0], s3 = side * fr[1];
+    const s2 = side * fr[0]!, s3 = side * fr[1]!;
     const second = box(main.x, ringTop - o.gap - s2, s2), third = box(second.x + s2 + o.gap, ringTop - o.gap - s3, s3);
     return { main, others: [second, third] };
 }
@@ -66,11 +66,11 @@ const FOE_GRAD = { ok: "linear-gradient(90deg, var(--c-hp-a), var(--c-hp-b))", m
 export function turnArc(S: { x1: number; x0: number; y0: number; }, now: string, pName, eName: string) {
     const W = S.x1 - S.x0, k = Math.max(0.6, Math.min(1, W / 240)), other = now === "enemy" ? "player" : "enemy";
     const seq = [now, other, now], turns = ["now", "next", "later"], rad = [6.4, 4.6, 3.5].map((r) => r * k);
-    const yBase = S.y0 + CAP.top + 5 + rad[0] * 2 * 0 + 28 * k, cx = S.x1 - 4 - 8.2 * k;
+    const yBase = S.y0 + CAP.top + 5 + rad[0]! * 2 * 0 + 28 * k, cx = S.x1 - 4 - 8.2 * k;
     return seq.map((side, i) => {
-        const r = rad[i], y = yBase - [0, 12.5, 21.5][i] * k, x = cx - [0, 1.8, -0.4][i] * k;
+        const r = rad[i], y = yBase - [0, 12.5, 21.5][i]! * k, x = cx - [0, 1.8, -0.4][i]! * k;
         const name = side === "enemy" ? eName : pName;
-        return { side, turn: turns[i], letter: String(name ?? "?").trim().charAt(0).toUpperCase() || "?", rect: { x: x - r, y: y - r, w: 2 * r, h: 2 * r } };
+        return { side, turn: turns[i], letter: String(name ?? "?").trim().charAt(0).toUpperCase() || "?", rect: { x: x - r!, y: y - r!, w: 2 * r!, h: 2 * r! } };
     });
 }
 /** A counter blow named in the full message line ("<Name> countered for N damage!"): the pop lands on the side opposite the one that countered. */
@@ -79,7 +79,7 @@ export function classifyCounter(line, who, note) {
     if (!m) return null;
     const by = [who.player, who.enemy].filter(Boolean).find((nm) => t.includes(nm + " countered")) ?? null;
     if (!by) return null;
-    return { kind: "counter", side: by === who.player ? "enemy" : "player", n: +m[1], tag: "COUNTER", evt: `c${note?.seq ?? 0}:${t}` };
+    return { kind: "counter", side: by === who.player ? "enemy" : "player", n: +m[1]!, tag: "COUNTER", evt: `c${note?.seq ?? 0}:${t}` };
 }
 const POP_STATUS: [string, RegExp, string][] = [["poison", /poison/i, "POISON"], ["frozen", /frozen|paraly[sz]/i, "FROZEN"], ["confuse", /confus/i, "CONFUSED"], ["sleep", /asleep|sleep/i, "SLEEP"]];
 const statusOf = (t: string) => { for (const [k, re, tag] of POP_STATUS) if (re.test(t)) return { status: k, tag }; return null; };
@@ -94,9 +94,9 @@ export function classifyPop(line, who, note) {
     const named = [who.player, who.enemy].filter(Boolean).find((nm) => t.startsWith(nm + " ")) ?? null;
     let m;
     if ((m = t.match(/(\d+)\s*damage/i))) {
-        const n = +m[1], st = statusOf(t.replace(/\d+\s*damage.*$/i, ""));
+        const n = +m[1]!, st = statusOf(t.replace(/\d+\s*damage.*$/i, ""));
         const action = t.match(/^(.+?) (attacks|uses) ?(.*?)!\s*(.*)$/i);
-        const victim = action ? (sideOf(action[1].trim()) === "enemy" ? "player" : "enemy") : named ? sideOf(named) : (who.enemy && t.indexOf(who.enemy) >= 0 ? "enemy" : "player");
+        const victim = action ? (sideOf(action[1]!.trim()) === "enemy" ? "player" : "enemy") : named ? sideOf(named) : (who.enemy && t.indexOf(who.enemy) >= 0 ? "enemy" : "player");
         const fresh = !st && note && note.kind === "hit" && note.hit && note.dmg === n;
         const eff = fresh ? note.eff : 1;
         const tone = fresh && note.crit ? "crit" : eff >= 1.5 ? "weak" : eff <= 0.75 && fresh ? "resist" : "";
@@ -105,7 +105,7 @@ export function classifyPop(line, who, note) {
     }
     if ((m = t.match(/(?:(?:recovers?|restores?|restored|healed|drained)\s+(\d+)\s*HP|(\d+)\s*HP\s+(?:healed|restored|recovered))/i))) {
         const s = sideOf(named) ?? who.actor ?? null;          // "<N>HP healed!" names nobody: it lands on the one who acts (the partner's item)
-        if (s) return { kind: "heal", side: s, n: +(m[1] ?? m[2]), evt: `h:${s}:${t}` };
+        if (s) return { kind: "heal", side: s, n: +(m[1] ?? m[2])!, evt: `h:${s}:${t}` };
     }
     if (/\bevad(?:e|ed)\b/i.test(t)) {
         const s = sideOf(named);
@@ -153,7 +153,7 @@ function take(runs, used: Set<unknown>, r) {
 
 /** A row label (Russo 28 / 51, or the given sizes) at native x, filling the row's height. */
 const rowLabel = (key: string, m, x: number, row, right: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, on: boolean, o: UiTextOpts = {}) => textPart(key, "label", m.text,
-    applyRel({ x, y: row.y + row.h / 2 - N(o.lineDp ?? BATTLE.labelLineDp) / 2, w: Math.max(8, right - x), h: N(o.lineDp ?? BATTLE.labelLineDp) }, rel),
+    applyRel({ x, y: row.y + row.h / 2 - N(o.lineDp ?? BATTLE.labelLineDp) / 2, w: Math.max(8, right - x), h: N(o.lineDp ?? BATTLE.labelLineDp) }, rel!),
     o.sizeDp ?? BATTLE.labelDp, o.lineDp ?? BATTLE.labelLineDp, { color: on ? "var(--c-orange-ink)" : (m.face ?? null), rel, maxDp: Math.max(24, Math.round((right - x) * 3)) });
 
 const isNumRun = (m) => /^[0-9/]+$/.test(String(m.text).trim());
@@ -193,7 +193,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     const foeBox = foeLayout(S, foeList.length || 1);
     const narrowS = S.x1 - S.x0 < FOE.narrowW;
     // the caption / hit-banner box: top left, up to the enemy block (a narrow stage puts it under the block)
-    const callout = data ? (narrowS ? { x: S.x0 + CAP.inX, y: S.y0 + CAP.top + FOE.blockH, w: S.x1 - S.x0 - 2 * CAP.inX - FOE.arcW } : { x: S.x0 + CAP.inX, y: S.y0 + CAP.top, w: foeBox[0].x - CAP.gap - (S.x0 + CAP.inX) }) : null;
+    const callout = data ? (narrowS ? { x: S.x0 + CAP.inX, y: S.y0 + CAP.top + FOE.blockH, w: S.x1 - S.x0 - 2 * CAP.inX - FOE.arcW } : { x: S.x0 + CAP.inX, y: S.y0 + CAP.top, w: foeBox[0]!.x - CAP.gap - (S.x0 + CAP.inX) }) : null;
     const enemyPips = [];
     const actor = !data ? null : (data.st === 6 ? "enemy" : [2, 3, 4, 5, 11, 13, 15].includes(data.st) ? "player" : null);
     // keep clear of the ring: a plate that would start inside it starts right of it
@@ -215,7 +215,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
 
     const cmds = [];
     const oldRow = (p, r, on: boolean, k: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined) => {
-        const R = (q) => applyRel(q, rel);
+        const R = (q) => applyRel(q, rel!);
         const row = { x: r.x, y: r.y, w: r.w, h: BATTLE.rowH };
         keyBox(`${k}.key`, R({ x: r.x, y: r.y, w: BATTLE.keyW, h: BATTLE.rowH }), on, rel, out);
         const px = r.x + BATTLE.plateIn + (on ? BATTLE.plateOn : 0), pw = r.w - 18;
@@ -399,19 +399,19 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     if (dockOn) {
         const words = cmds.map((c) => take(runs, used, c.r).map((m) => m.text).join(" "));
         const at = cmds.findIndex((c) => c.on);
-        out.push(dockPart("dock.cmd", S, { cx: lay.main.cx, cy: lay.main.cy, R: lay.main.R }, words, at));
+        out.push(dockPart("dock.cmd", S, { cx: lay!.main.cx, cy: lay!.main.cy, R: lay!.main.R }, words, at));
     } else if (arcList && listRows.length) {
         const rows = listRows.slice(0, 6), at = rows.findIndex((c) => c.on);
-        out.push(dockPart("dock.list", S, { cx: lay.main.cx, cy: lay.main.cy, R: lay.main.R }, rows.map((c) => c.t), at, { rows, title: TITLE[data.st] ?? "", pager }));
+        out.push(dockPart("dock.list", S, { cx: lay!.main.cx, cy: lay!.main.cy, R: lay!.main.R }, rows.map((c) => c.t), at, { rows, title: TITLE[data.st] ?? "", pager }));
         if (at >= 0 && rows[at].cost > 0) spend = rows[at].cost;
     } else cmds.forEach((c) => oldRow(c.p, c.r, c.on, c.k, c.rel));
     if (data) {
-        const one = (key: string, variant: string, rect: { x: number; y: number; w: number; h: number; cx: number; cy: number; R: number; } | undefined, v, menu: boolean | undefined, o: UiRingOpts = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect, variant, v, o)); };
+        const one = (key: string, variant: string, rect: { x: number; y: number; w: number; h: number; cx: number; cy: number; R: number; } | undefined, v, menu: boolean | undefined, o: UiRingOpts = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect!, variant, v, o)); };
         if (!fullScreen) {
-            one("ring.main", "main", lay.main, data, dockOn || (arcList && listRows.length > 0), { act: actor === "player", mpPrev: spend, real: data.hpReal, eReal: data.eHpReal });
-            (data.others ?? []).slice(0, 2).forEach((o, i: number) => one(`ring.o${i + 1}`, "mini", lay.others[i], o, false));
+            one("ring.main", "main", lay!.main, data, dockOn || (arcList && listRows.length > 0), { act: actor === "player", mpPrev: spend, real: data.hpReal, eReal: data.eHpReal });
+            (data.others ?? []).slice(0, 2).forEach((o, i: number) => one(`ring.o${i + 1}`, "mini", lay!.others[i], o, false));
         }
-        if (actor === "player" && !fullScreen) out.push({ ...triangle("act.player", lay.main.cx, lay.main.y + lay.main.h + 3, "up", ID, "var(--c-cyan)"), nb: true });      // nb: a marker in the side area never bleeds to the screen edge
+        if (actor === "player" && !fullScreen) out.push({ ...triangle("act.player", lay!.main.cx, lay!.main.y + lay!.main.h + 3, "up", ID, "var(--c-cyan)"), nb: true });      // nb: a marker in the side area never bleeds to the screen edge
         // the enemy block at the top centre: the name with a small LV over a thin HP bar (green, yellow below 50 %, red below 25 %), no number; the team's pips under it. N foes = N bars side by side.
         const hot = actor === "enemy", eN = String(foeList[0]?.name ?? "");
         foeList.forEach((f, i: string | number) => {
@@ -425,17 +425,17 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         });
         enemyPips.sort((a, b) => raw(a).x - raw(b).x).forEach((p, i) => {
             const state = p.base & 3, active = p.base < 0x3c, c = state ? (active ? PIP[state] : `color-mix(in srgb, ${PIP[state]} 60%, var(--c-hud-body))`) : (active ? HUD.edge : "var(--c-pip-off)");
-            out.push(plate(`foe0.pip${i}`, "pip", { x: foeBox[0].x + i * 8, y: foeBox[0].y + FOE.pipDy, w: 6, h: FOE.pipH }, ID, { shape: "key", edge: c, body: null, shadow: 0, layer: "over" }));
+            out.push(plate(`foe0.pip${i}`, "pip", { x: foeBox[0]!.x + i * 8, y: foeBox[0]!.y + FOE.pipDy, w: 6, h: FOE.pipH }, ID, { shape: "key", edge: c, body: null, shadow: 0, layer: "over" }));
         });
         // who acts: the turn arc at the top right (read-only: the game's state and the side it opens with)
         const bannerNow = banner && eN && banner.startsWith(eN + " ") ? "enemy" : null;
         turnArc(S, actor ?? bannerNow ?? (data.pFirst === false ? "enemy" : "player"), data.name, eN).forEach((n, i) => out.push(turnNode(`turn${i}`, n.rect, n)));
         // the hit banner: who acts (small), the move (big, slanted), then the damage line; the number pops at the target
         if (banner) {
-            const x0 = callout.x, y0 = callout.y, w = Math.max(24, callout.w - 6);
+            const x0 = callout!.x, y0 = callout!.y, w = Math.max(24, callout!.w - 6);
             // "<Name> uses <Move> [element]! N damage!" | "<Name> attacks! N damage!" | "<Name> <Move>!" | "<Name> N damage!" | any other line
             const m = banner.match(/^(.+?) (attacks|uses) ?(.*?)!\s*(.*)$/i);
-            const named = [data.name, eN].filter(Boolean).find((nm) => banner.startsWith(nm + " "));
+            const named = [data.name, eN].filter(Boolean).find((nm) => banner!.startsWith(nm + " "));
             const who = m ? `${m[1]} ${m[2]}`.toUpperCase() : named ? named.toUpperCase() : "";
             const title = m ? (m[2].toLowerCase() === "uses" ? m[3].replace(/\s*[\[(].*$/, "") : "Fight") : named ? banner.slice(named.length + 1) : banner, rest = m ? m[4] : "";
             const big0 = title.length <= 18 ? 40 : title.length <= 30 ? 32 : 26, big = Math.max(18, Math.min(big0, Math.floor(w * 3 / (Math.max(1, title.length) * 0.58)))), bh = N(big * 1.25);       // never wider than the box
@@ -448,20 +448,20 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         // the damage pop: ONE per hit event, typed from the game's own line and the read-only hit note
         const names = { player: String(data.name ?? ""), enemy: eN, actor: actor ?? bannerNow ?? "player" };
         const popRect = (side: string) => {
-            if (side === "player") return { x: lay.main.x + lay.main.w + 4, y: lay.main.cy - 26, w: 70, h: 44 };
+            if (side === "player") return { x: lay!.main.x + lay!.main.w + 4, y: lay!.main.cy - 26, w: 70, h: 44 };
             const sw = S.x1 - S.x0, pw = 76, ph = 56, sc = data.eScr, floor = S.y0 + CAP.top + FOE.blockH + 1;
             let pr = { x: S.x0 + (sw - pw) / 2, y: floor + 2, w: pw, h: ph };       // without the renderer's projection: under the enemy block
             if (sc && Number.isFinite(sc.x) && Number.isFinite(sc.topY)) {
                 const cx = S.x0 + sc.x * sw, cy = S.y0 + (sc.topY + (sc.footY - sc.topY) * 0.25) * (S.y1 - S.y0);
-                const ringsRight = lay.main.x + lay.main.w + 2;
-                pr = { x: Math.min(Math.max(cx - pw / 2, S.x0 + 2, cy + 28 > lay.others[0].y ? ringsRight : S.x0 + 2), S.x1 - pw - 2), y: Math.min(Math.max(cy - 28, floor), S.y1 - 58), w: pw, h: ph };
+                const ringsRight = lay!.main.x + lay!.main.w + 2;
+                pr = { x: Math.min(Math.max(cx - pw / 2, S.x0 + 2, cy + 28 > lay!.others[0]!.y ? ringsRight : S.x0 + 2), S.x1 - pw - 2), y: Math.min(Math.max(cy - 28, floor), S.y1 - 58), w: pw, h: ph };
             }
             return pr;
         };
         const pops = [];
         if (banner) { const c = classifyPop(banner, names, data.hitNote); if (c) pops.push(["pop", c]); }
         if (counterLine) { const c = classifyCounter(counterLine, names, data.hitNote); if (c) pops.push(["pop.c", c]); }
-        pops.forEach(([key, c]) => out.push(popPart(key, popRect(c.side), c.n, c.side, { kind: c.kind, tone: c.tone, tag: c.tag, status: c.status, evt: c.evt })));
+        pops.forEach(([key, c]) => out.push(popPart(key, popRect(c!.side), c!.n, c!.side, { kind: c!.kind, tone: c!.tone, tag: c!.tag, status: c!.status, evt: c!.evt })));
     }
     // a marker the game drew where no row is (should not happen): show it as focus corners, so focus is never lost
     focus.forEach((f, j) => { if (!f.hit) out.push(corners(`focus${j}`, applyRel({ x: f.p.x, y: f.p.y, w: f.p.w, h: f.p.h }, f.p.rel ?? ID))); });

@@ -44,8 +44,8 @@ export function makeRecords(B: BattleContext) {
     const { hp: eHp, mp: eMp } = enemyVitals(
       { hp: realHp, mp: realMp },
       {
-        hp: eStats ? B.enemyHp(eStats, enemyLevel) : scaledHp(enemyProf, enemyLevel),
-        mp: eStats ? B.enemyMp(eStats, enemyLevel) : scaledMp(enemyProf, enemyLevel),
+        hp: eStats ? B.enemyHp(eStats, enemyLevel!) : scaledHp(enemyProf, enemyLevel),
+        mp: eStats ? B.enemyMp(eStats, enemyLevel!) : scaledMp(enemyProf, enemyLevel),
       },
     );
 
@@ -153,7 +153,7 @@ export function makeRecords(B: BattleContext) {
     // the LAST matching accessory slot (acc1 overwrites acc0), so both equipped
     // means one −10, never −15.
     const mpProxies = (eb.effects ?? []).filter((f) => f.kind === "mp_cost_down");
-    const mpCostDown = mpProxies.length ? (mpProxies[mpProxies.length - 1].amount || 1) : 0;
+    const mpCostDown = mpProxies.length ? (mpProxies[mpProxies.length - 1]!.amount || 1) : 0;
     // The trained points with the worn gear's coded resist folded on top, through
     // the one shared helper (web/party.js) — the same sum the status sheet and the
     // gym HUD print, so the battle divisor cannot drift from them.
@@ -291,7 +291,7 @@ function profileByName(name: string | number) {
     if (!B.digimonDB) return null;
     if (!B._profileByName) {
       B._profileByName = {};
-      for (const id of Object.keys(B.digimonDB)) B._profileByName[B.digimonDB[id].name] = B.digimonDB[id];
+      for (const id of Object.keys(B.digimonDB)) B._profileByName[B.digimonDB[id]!.name] = B.digimonDB[id];
     }
     return B._profileByName[canonicalProfileName(name)] ?? null;
   }

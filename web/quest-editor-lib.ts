@@ -29,7 +29,7 @@ export function snapPoint(grid: QuestWalkGrid | null, x: number, y: number): num
     const px = Math.round(x), py = Math.round(y);
     if (walkable(grid, px, py)) return [px, py];
     const cell = questFreeCellNear(grid, px, py, SNAP_LIMIT);
-    return cell ? cellSpot(grid, cell[0], cell[1]).map(Math.round) : null;
+    return cell ? cellSpot(grid, cell[0]!, cell[1]!).map(Math.round) : null;
 }
 
 /** The walking legs of a path: from each point to the next, through the wall routing. [] when it has fewer than 2 points. */
@@ -71,10 +71,10 @@ export function checkData(data: QuestEditorWork, gridOf: (mapId: string) => Ques
         if (!g) { bad.push(`path ${name}: no walk data for map ${p.map}`); continue; }
         if (!Array.isArray(p.points) || !p.points.length) { bad.push(`path ${name}: no points`); continue; }
         p.points.forEach(([x, y], i) => {
-            if (!walkable(g, x, y)) bad.push(`path ${name}: point ${i + 1} (${x},${y}) is not walkable ground`);
+            if (!walkable(g, x!, y!)) bad.push(`path ${name}: point ${i + 1} (${x},${y}) is not walkable ground`);
         });
         for (let i = 1; i < p.points.length; i++) {
-            const r = questWalkLegs(g, p.points[i - 1][0], p.points[i - 1][1], p.points[i][0], p.points[i][1]);
+            const r = questWalkLegs(g, p.points[i - 1]![0], p.points[i - 1]![1], p.points[i]![0], p.points[i]![1]);
             if (!r) bad.push(`path ${name}: no way from point ${i} to point ${i + 1}`);
         }
     }

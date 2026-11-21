@@ -35,9 +35,9 @@ export function makeUpdate(B: BattleContext) {
     B.renderer3d?.setCameraMode(
       b.state === ST.TAG_PRESENT ? "tag"
       : b.state === ST.INTRO ? "opening"
-      : B.DIRECTOR_STATES.has(b.state) ? "director"
+      : B.DIRECTOR_STATES!.has(b.state) ? "director"
       : b.state === ST.LOSE ? B.lossCameraMode()
-      : B.ORBIT_STATES.has(b.state) ? "orbit"
+      : B.ORBIT_STATES!.has(b.state) ? "orbit"
       : "behind",
       { scriptOwnsCamera: !!B.renderer3d?.coordinator?.cameraScriptOwned?.() });
     // The defeat effect F0x8008c93c's FIRST tick -- the same tick that cuts the camera --

@@ -29,11 +29,11 @@ function build(img: HTMLImageElement) {
     const cv = document.createElement("canvas");
     cv.width = W; cv.height = H;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
-    const src = cx.getImageData(0, 0, W, H).data;
+    cx!.drawImage(img, 0, 0);
+    const src = cx!.getImageData(0, 0, W, H).data;
     const hole = new Uint8Array(W * H);
     let any = false;
-    for (let i = 0, n = W * H; i < n; i++) if (src[i * 4 + 3] < 128) { hole[i] = 1; any = true; }
+    for (let i = 0, n = W * H; i < n; i++) if (src[i * 4 + 3]! < 128) { hole[i] = 1; any = true; }
     if (!any) return null;
 
     const seen = new Uint8Array(W * H);
@@ -87,7 +87,7 @@ function build(img: HTMLImageElement) {
                 const j = ny * W + nx;
                 if (!known[j]) continue;
                 const a = col(j);
-                r += a[j * 4]; g += a[j * 4 + 1]; b += a[j * 4 + 2]; c++;
+                r += a[j * 4]!; g += a[j * 4 + 1]!; b += a[j * 4 + 2]!; c++;
             }
             if (c) paint.push(i, r / c, g / c, b / c); else rest.push(i);
         }
@@ -100,7 +100,7 @@ function build(img: HTMLImageElement) {
     }
     const patch = document.createElement("canvas");
     patch.width = W; patch.height = H;
-    patch.getContext("2d").putImageData(new ImageData(out, W, H), 0, 0);
+    patch.getContext("2d")!.putImageData(new ImageData(out, W, H), 0, 0);
     return { canvas: patch, regions, pixels: fix.length };
 }
 

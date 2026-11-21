@@ -163,8 +163,8 @@ export function frame(t) {
     // switching the switch off closes it. With the switch off it can never be open, so the game
     // below behaves exactly as before.
     const soundTestOn = !!window.__fx?.soundtest;
-    if (!soundTestOn && soundTest.open) soundTest.hide();
-    if (soundTest.open) soundTest.tick(state.keys);
+    if (!soundTestOn && soundTest.open) soundTest.hide!();
+    if (soundTest.open) soundTest.tick!(state.keys);
     // Game-speed hack: window.__gameSpeed fast-forwards EVERYTHING (cutscenes, WAITs, auto
     // walks, fades, animations) by sub-stepping the sim that many times. Set __gameSpeed=4
     // in the console to blitz through auto-scenes; 1 (or unset) = normal. Sub-stepping (vs.
@@ -188,18 +188,18 @@ function fpsTick(t) {
     }
     if (!S.fpsBox) {
         S.fpsBox = document.createElement("div");
-        S.fpsBox.id = "fps-box";
-        S.fpsBox.style.cssText = "position:absolute;top:4px;right:4px;z-index:60;padding:2px 6px;background:#000c;color:#fff;" +
+        S.fpsBox!.id = "fps-box";
+        S.fpsBox!.style.cssText = "position:absolute;top:4px;right:4px;z-index:60;padding:2px 6px;background:#000c;color:#fff;" +
             "font:12px/1.3 monospace;pointer-events:none;white-space:nowrap";
-        (document.getElementById("stage") || document.body).appendChild(S.fpsBox);
+        (document.getElementById("stage") || document.body).appendChild(S.fpsBox!);
         S.fpsShown = t;
     }
     if (S.fpsLast) fpsGaps.push(t - S.fpsLast);
     S.fpsLast = t;
     if (t - S.fpsShown >= 500 && fpsGaps.length) {
         const n = fpsGaps.length, sorted = fpsGaps.slice().sort((a, b) => a - b);
-        const med = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
-        S.fpsBox.textContent = `${Math.round(n * 1000 / (t - S.fpsShown))} fps  ${med.toFixed(1)} ms`;
+        const med = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1]! + sorted[n / 2]!) / 2;
+        S.fpsBox!.textContent = `${Math.round(n * 1000 / (t - S.fpsShown))} fps  ${med!.toFixed(1)} ms`;
         fpsGaps.length = 0; S.fpsShown = t;
     }
 }
@@ -216,8 +216,8 @@ function fpsTick(t) {
 export function syncSubThrustSound(thrusting: boolean) {
     if (thrusting === !!state._subThrustSound) return;
     state._subThrustSound = thrusting;
-    if (thrusting) sfx.playSustained("sub_move");
-    else sfx.stopSustained("sub_move");
+    if (thrusting) sfx.playSustained!("sub_move");
+    else sfx.stopSustained!("sub_move");
 }
 
 function update(dt: number) {
@@ -257,7 +257,7 @@ function update(dt: number) {
     if (state.started) state.playSeconds = (state.playSeconds || 0) + dt;
     scheduleFieldLocationSave();
     sweepCollectionSave();
-    textbox.update(dt);
+    textbox.update!(dt);
     cutscene.step(dt);
     questFxTick(dt);            // extra quests: the scene effects' own clock (web/quest-fx.js)
     // A running chase (the `chase` step, web/quest-chase.js): the target walks its path while the player is in control.
@@ -265,7 +265,7 @@ function update(dt: number) {
     // A chase whose scene has gone (a warp, a stage entry, the title screen) is not a chase any more: it may not keep the
     // field's controls or a target's walk pose after the scene that started it has ended, whatever path ended it.
     if (S.questChase && !cutscene.isActive()) clearQuestChase();
-    if (S.questChase && fade.dir === 0 && !textbox.isOpen() && !dialogueBox.isOpen() && !choice.isOpen() && !battle.isActive() && !state.menuOpen)
+    if (S.questChase && fade.dir === 0 && !textbox.isOpen!() && !dialogueBox.isOpen!() && !choice.isOpen!() && !battle.isActive() && !state.menuOpen)
         tickQuestChase(dt);
     questPropsTick(currentMap()?.id, questPropsOn(currentMap()?.id));   // props: art a quest's state leaves on the map (web/quest-props.js)
     tickAmbienceScene(dt);      // extra quests: a scene's weather/time-of-day fades (web/ambience.js)
@@ -294,14 +294,14 @@ function update(dt: number) {
     const cutsceneWalkTicks = cutscene.isActive() ? (cutscene.playerWalking?.() ?? 0) : 0;
     if (cutsceneWalkTicks > 0)
         tickFootstep(state, cutsceneWalkTicks * FIELD_TICK_SECONDS);
-    shop.update(dt);
+    shop.update!(dt);
     gym.update?.(dt); // native gym host step (the legacy gym has no update)
-    fightReport.update(dt);
+    fightReport.update!(dt);
     saveScreen.update?.(dt); // native save-screen host step (the legacy screen has none)
-    dialogueBox.update(dt, state.keys); // translated conversation box (UI Lab)
+    dialogueBox.update!(dt, state.keys); // translated conversation box (UI Lab)
     chatTick(dt);
-    yesNoBox.update(dt, state.keys);
-    helpMenuBox.update(dt, state.keys); // translated eight-topic help menu (5 NPC counters)
+    yesNoBox.update!(dt, state.keys);
+    helpMenuBox.update!(dt, state.keys); // translated eight-topic help menu (5 NPC counters)
     cardAlbum.update?.(dt); // native album host step (the legacy album has no update)
     cardDeck.update?.(dt); // native folder editor host step (the legacy editor has none)
     cardShop.update?.(dt); // native card shop host step (the legacy shop has none)
@@ -311,10 +311,10 @@ function update(dt: number) {
     // and a screen that is only stepped while drawing never advances there.
     if (state.nameEntry) state.nameEntry.update?.(dt, state);
     cntyselNative.update(dt, state.keys); // native language-select host step
-    inn.tick(dt);
-    driMenu.update(dt, state.keys);
-    status?.update(dt);
-    menu.update(dt);
+    inn.tick!(dt);
+    driMenu.update!(dt, state.keys);
+    status?.update!(dt);
+    menu.update!(dt);
     state.packSelect?.update?.(dt, state);
     // The native wizard closes inside its own tick (the commit store sets the
     // root's lifecycle to 3), so the walker's done handler must run from here;
@@ -392,14 +392,14 @@ function update(dt: number) {
             const tick = Math.floor((cutscene.clock() - cutscene.partyGatherAt) / FIELD_TICK_SECONDS) + 1;
             for (let i = 0; i < activeFollowerCount(); i++) {
                 const f = followers[i];
-                if (f.parked) continue;
+                if (f!.parked) continue;
                 const sample = followerGatherSample(partnerHistory, i, tick);
-                if (!sample) { f.parked = true; f.gathering = false; continue; }
-                f.gathering = true;
-                f.x = sample.x;
-                f.y = sample.y;
-                f.dir = sample.dir;
-                f.animTime = (f.animTime ?? 0) + dt;
+                if (!sample) { f!.parked = true; f!.gathering = false; continue; }
+                f!.gathering = true;
+                f!.x = sample.x;
+                f!.y = sample.y;
+                f!.dir = sample.dir;
+                f!.animTime = (f!.animTime ?? 0) + dt;
             }
         }
         // The resident scene object's notify arms the player's FIELDCOM sparkle actor
@@ -409,7 +409,7 @@ function update(dt: number) {
         if (cutscene.sparkleSeq !== (state._sparkleSeq ?? 0)) {
             state._sparkleSeq = cutscene.sparkleSeq;
             state.sparkleActor = { program: cutscene.sparkleProgram, start: fieldcomTick() };
-            if (cutscene.sparkleProgram === 1 || cutscene.sparkleProgram === 3) sfx.play("item_get");
+            if (cutscene.sparkleProgram === 1 || cutscene.sparkleProgram === 3) sfx.play!("item_get");
         }
     }
 
@@ -429,8 +429,8 @@ function update(dt: number) {
         // Separate from the DIGIMENT cue at the trigger, ~80 frames earlier.
         if (!d.cued && d.frame >= DIVE_DEMO_CUE_FRAME) {
             d.cued = true;
-            if (d.mode === "hole") sfx.play("dig_demo");
-            else sfx.play("sub_demo");
+            if (d.mode === "hole") sfx.play!("dig_demo");
+            else sfx.play!("sub_demo");
         }
         if (diveDemoFrame(d.mode, d.frame).done) {
             // Hand off to the ordinary stage change, which is what draws the
@@ -446,8 +446,8 @@ function update(dt: number) {
     // and it is what covers the arrival. Its release — the original's "the
     // field has finished arriving" gate — is held while the screen is still
     // fading in, which is the walker's stand-in for that sequence.
-    placeCard.hold(fade.dir !== 0 || fade.alpha > 0);
-    placeCard.step(dt);
+    placeCard.hold!(fade.dir !== 0 || fade.alpha > 0);
+    placeCard.step!(dt);
 
     // Advance the A28 checkerboard loading wipe (fieldstg F0x80089F7C), the
     // field->battle handoff. The original runs it while the battle loads; here it
@@ -613,8 +613,8 @@ function update(dt: number) {
     }
 
     if (
-        textbox.isOpen() ||
-        choice.isOpen() ||
+        textbox.isOpen!() ||
+        choice.isOpen!() ||
         // A chase (the `chase` step) is the one scene that hands the field back: the player walks it themselves.
         (cutscene.isActive() && !state._questChase) ||
         fade.dir !== 0 ||
@@ -626,17 +626,17 @@ function update(dt: number) {
         state.titleScreen ||
         !state.started ||   // the title is up over a still-loaded field (after a lost fight): it must not walk
         state.menuOpen ||
-        shop.isOpen() ||
-        driMenu.isOpen() ||
-        dialogueBox.isOpen() ||
-        gym.isOpen() ||
-        cardShop.isOpen() ||
-        cardAlbum.isOpen() ||
-        cardDeck.isOpen() ||
+        shop.isOpen!() ||
+        driMenu.isOpen!() ||
+        dialogueBox.isOpen!() ||
+        gym.isOpen!() ||
+        cardShop.isOpen!() ||
+        cardAlbum.isOpen!() ||
+        cardDeck.isOpen!() ||
         cardDuel.isOpen() ||
-        inn.isOpen() ||
-        saveScreen.isOpen() ||
-        fightReport.isOpen() ||
+        inn.isOpen!() ||
+        saveScreen.isOpen!() ||
+        fightReport.isOpen!() ||
         cntyselNative.isOpen()
     ) {
         state.moving = false;
@@ -691,7 +691,7 @@ function update(dt: number) {
                     Math.floor(Math.random() * 0x10000),
                     fieldcomTick(),
                 );
-                if (cue.kind === "sound") sfx.playPacked(cue.id, { overlap: true });
+                if (cue.kind === "sound") sfx.playPacked!(cue.id, { overlap: true });
                 else if (cue.kind === "catch") f.pending = cue.slot;
                 if (f.run.phase === "over") f.castOver = true;
             }
@@ -704,7 +704,7 @@ function update(dt: number) {
             const pc = tickFishingPose(f.pose, animDone, f.castOver);
             // A fresh SETANIM restarts the clip clock (it clears +0xcc/+0xd0).
             f.poseT = f.pose.clip !== was ? 0 : f.poseT + FIELD_TICK_SECONDS;
-            if (pc.sound) sfx.playPacked(pc.sound, { overlap: true });
+            if (pc.sound) sfx.playPacked!(pc.sound, { overlap: true });
             if (pc.openResult) f.result = startFishingBubble();
             if (pc.closeResult && f.result) closeFishingBubble(f.result);
             if (pc.finished) {
@@ -751,7 +751,7 @@ function update(dt: number) {
         state.y = ss.y;
         state.moving = ss.phase !== "landed";
         state.stopping = false;
-        if (ss.playSound) sfx.play(ss.playSound);
+        if (ss.playSound) sfx.play!(ss.playSound);
         state.animTime += spt.ticks * FIELD_TICK_SECONDS;
         if (ss.phase === "landed") {
             state.slope = null;
@@ -777,7 +777,7 @@ function update(dt: number) {
             // separate SPU voices and they pile up; through the common-sound
             // category arbitration each one would instead cut the last, so the
             // first two blasts were being truncated to a short thud.
-            if (cue.kind === "sound") sfx.playPacked(cue.id, { overlap: true });
+            if (cue.kind === "sound") sfx.playPacked!(cue.id, { overlap: true });
             else if (cue.kind === "hit") forcePartyMemberToOneHp(cue.partyIndex);
             else if (cue.kind === "end") {
                 // The event framework runs the event's on_complete when the
@@ -814,7 +814,7 @@ function update(dt: number) {
             if (ev.action) {
                 // The target's action arm: the cue, then its bank-0 completion
                 // bit, then its clip 0x54 — the order the original runs them.
-                sfx.playPacked(BLOCK_CUE, { overlap: true });
+                sfx.playPacked!(BLOCK_CUE, { overlap: true });
                 storyFlags.set(be.ix.bit, 1);
                 if (be.npc) be.npc.activeClip = BLOCK_TARGET_CLIP;
             }
@@ -866,7 +866,7 @@ function update(dt: number) {
             // fieldstg 0x8008c34c plays packed 0x0004001d = TELEPORT the moment the
             // controller flips the pad into state 2 (the leader has arrived and the
             // pad starts flashing) — the only cue on the whole op-13 path.
-            if (st.playSound === LAUNCH_PAD_SOUND) sfx.play("teleport");
+            if (st.playSound === LAUNCH_PAD_SOUND) sfx.play!("teleport");
             state.x = st.x;
             state.y = st.y;
             state.moving = st.phase === "approach";
@@ -925,9 +925,9 @@ function update(dt: number) {
         state.stopTime = 0;
         state._idleTime = 0;
         for (let i = 0; i < activeFollowerCount(); i++) {
-            followers[i].stopping = true;
-            followers[i].stopTime = 0;
-            followers[i]._idleTime = 0;
+            followers[i]!.stopping = true;
+            followers[i]!.stopTime = 0;
+            followers[i]!._idleTime = 0;
         }
     }
     const fieldTicks = consumeFieldTicks(S.fieldTickAccumulator, dt);
@@ -969,12 +969,12 @@ function update(dt: number) {
                 for (let i = 0; i < followCount; i++) {
                     const sample = followerHistorySample(partnerHistory, i);
                     if (!sample) continue;
-                    followers[i].x = sample.x;
-                    followers[i].y = sample.y;
-                    followers[i].dir = sample.dir;
-                    followers[i].parked = !!sample.parked;
-                    followers[i].animTime =
-                        (followers[i].animTime ?? 0) + FIELD_TICK_SECONDS;
+                    followers[i]!.x = sample.x;
+                    followers[i]!.y = sample.y;
+                    followers[i]!.dir = sample.dir;
+                    followers[i]!.parked = !!sample.parked;
+                    followers[i]!.animTime =
+                        (followers[i]!.animTime ?? 0) + FIELD_TICK_SECONDS;
                 }
             }
         }
@@ -1183,12 +1183,12 @@ function update(dt: number) {
                 for (let i = 0; i < followCount; i++) {
                     const sample = followerHistorySample(partnerHistory, i);
                     if (!sample) continue;
-                    followers[i].x = sample.x;
-                    followers[i].y = sample.y;
-                    followers[i].dir = sample.dir;
-                    followers[i].parked = !!sample.parked;
-                    followers[i].animTime =
-                        (followers[i].animTime ?? 0) + FIELD_TICK_SECONDS;
+                    followers[i]!.x = sample.x;
+                    followers[i]!.y = sample.y;
+                    followers[i]!.dir = sample.dir;
+                    followers[i]!.parked = !!sample.parked;
+                    followers[i]!.animTime =
+                        (followers[i]!.animTime ?? 0) + FIELD_TICK_SECONDS;
                 }
             }
         }
@@ -1209,7 +1209,7 @@ function update(dt: number) {
         if (reset) {
             // SWITCH03: the Bug-Maze pad state-toggle sound (wstag745/746
             // sites play it exactly when the pad flips state; sfx-triggers.json)
-            sfx.play("switch02");
+            sfx.play!("switch02");
             state.x = reset.x;
             state.y = reset.y;
             state.dir = reset.dir || state.dir;
@@ -1312,11 +1312,11 @@ function update(dt: number) {
                         // 8-tick driver, the zone rate table and the slot roll are untouched.
                         const dial = dialModeFromFx(window.__fx);
                         // Original order: the gated launch, then the reset.
-                        if (!NO_ENCOUNTERS && dialAllowsFight(dial))
+                        if (!NO_ENCOUNTERS && dialAllowsFight(dial!))
                             triggerRandomEncounter(m.id, state.x, state.y);
                         state._encCounter = dialReset(resetEncounterCounter(
                             () => Math.floor(Math.random() * 0x10000),
-                        ), dial);
+                        ), dial!);
                     }
                 }
             }
@@ -1435,7 +1435,7 @@ function update(dt: number) {
     // 0x818e real, 0x818f fake) — the same predicate the events gate on.
     if (
         onExitZone?.gondola && S.engine && fade.dir === 0 &&
-        !textbox.isOpen() && !battle.isActive() &&
+        !textbox.isOpen!() && !battle.isActive() &&
         !(S.engineBridge && S.engineBridge.isBusy()) && !state.gondolaAutoFired
     ) {
         const hasCard =

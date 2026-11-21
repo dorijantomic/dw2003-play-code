@@ -40,7 +40,7 @@ export function headerLayout(widthOf, title: string, tabs: string[], hintW = wid
     const titleX = 44, l1 = titleX + widthOf(title) + 8, tabStart = l1 + hintW + 8, tabGap = 8;
     const xs = layoutTabs(tabs, widthOf, tabStart, tabGap);
     const tabBoxes = tabs.map((t, i) => [xs[i], xs[i] + widthOf(t)]);
-    const r1 = tabBoxes.length ? tabBoxes[tabBoxes.length - 1][1] + 8 : tabStart;
+    const r1 = tabBoxes.length ? tabBoxes[tabBoxes.length - 1]![1] + 8 : tabStart;
     return { title: [titleX, titleX + widthOf(title)], l1: [l1, l1 + hintW], r1: [r1, r1 + hintW], tabs: tabBoxes, tabStart, tabGap };
 }
 

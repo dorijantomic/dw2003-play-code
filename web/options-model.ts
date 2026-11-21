@@ -172,7 +172,7 @@ export function buildRows(pixelFilters = [["off", "Off"]]) {
                 if (s.get("battlespeed") !== true) return 0;                       // the switch is off: the game really runs x1
                 const v = Number(s.get("battleSpeed"));
                 const want = Number.isFinite(v) ? v : 2;
-                return SPEEDS.reduce((best, sp, k) => (Math.abs(sp - want) < Math.abs(SPEEDS[best] - want) ? k : best), 0);
+                return SPEEDS.reduce((best, sp, k) => (Math.abs(sp - want) < Math.abs(SPEEDS[best]! - want) ? k : best), 0);
             },
             write: (s, i: string | number) => (SPEEDS[i] === 1 ? s.setMany({ battlespeed: false, battleSpeed: 1 }) : s.setMany({ battlespeed: true, battleSpeed: SPEEDS[i] })),
         },
@@ -228,8 +228,8 @@ export function createOptionsModel(store, pixelFilters) {
     const lockedRow = (r) => !!r.keys && typeof store.locked === "function" && r.keys.some((k) => store.locked(k));   // the host decides this row
     const backRow = { id: "back", label: "Back", help: "Back to the list of effects.", choices: [""], read: () => 0, write: () => { }, back: true };
     let page = 0, row = 0, top = 0, open = null;          // open = the EFFECTS category that is showing its switches, or null
-    const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
-    const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page].rows.map((id) => rows[id]));
+    const switchRows = (c: { id: string; label: string; help: string; items: { key: string; label: string; help: string; }[]; } | undefined) => [...c!.items.map((i) => toggleRow(`fx:${i.key}`, i.label, i.help, [i.key])), backRow];
+    const pageRows = () => (open ? switchRows(EFFECT_CATEGORIES[open.index]) : PAGES[page]!.rows.map((id) => rows[id]));
     const here = () => pageRows()[row];
     const clampTop = () => { const n = pageRows().length; if (row < top) top = row; if (row >= top + LIST_ROWS) top = row - LIST_ROWS + 1; top = Math.max(0, Math.min(top, Math.max(0, n - LIST_ROWS))); };
     const close = () => { const c = open; open = null; row = c.cat; top = 0; };

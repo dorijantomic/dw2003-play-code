@@ -143,8 +143,8 @@ function shelfMount(box) {
 
   const render = () => {
     list.textContent = "";
-    if (!shelf.length) { list.append($("div", { className: "s" }, "No states saved yet.")); return; }
-    for (const item of shelf) {
+    if (!shelf!.length) { list.append($("div", { className: "s" }, "No states saved yet.")); return; }
+    for (const item of shelf!) {
       list.append($("div", { className: "q" },
         $("div", { className: "t" }, item.name),
         $("div", { className: "s" }, new Date(item.at).toLocaleString()),
@@ -208,7 +208,7 @@ function shelfMount(box) {
     const read = shelfImport(area.value);
     if (read.problems.length) { say(read.problems.join("; ")); return; }
     shelf = read.shelf; shelfStore(shelf);
-    say(`Imported ${shelf.length} state${shelf.length === 1 ? "" : "s"}.`); render();
+    say(`Imported ${shelf!.length} state${shelf!.length === 1 ? "" : "s"}.`); render();
   };
 
   box.append($("div", { className: "q" },

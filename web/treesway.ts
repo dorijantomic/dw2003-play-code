@@ -20,14 +20,14 @@ import { FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 
 const stages = new Map();    // stageId -> built data | null (nothing to sway)
 
-const isFoliage = (r: number | undefined, g: number | undefined, b: number | undefined) => g > 40 && g > r * 1.06 && g > b * 1.06;
+const isFoliage = (r: number | undefined, g: number | undefined, b: number | undefined) => g! > 40 && g! > r! * 1.06 && g! > b! * 1.06;
 
 function pixels(img: HTMLImageElement) {
     const cv = document.createElement("canvas");
     cv.width = img.naturalWidth; cv.height = img.naturalHeight;
     const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
-    return { cv, cx, data: cx.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
+    cx!.drawImage(img, 0, 0);
+    return { cv, cx, data: cx!.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
 }
 
 function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
@@ -41,19 +41,19 @@ function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
     const comps = [null];                // [ { area, green, y0, y1 } ], index = blob id
     const stack = [];
     for (let s = 0, n = W * H; s < n; s++) {
-        if (id[s] || d[s * 4 + 3] < 128) continue;
+        if (id[s] || d[s * 4 + 3]! < 128) continue;
         const cid = comps.length;
         if (cid >= 65000) break;
         const c = { area: 0, green: 0, y0: H, y1: 0 };
         stack.length = 0; stack.push(s); id[s] = cid;
         while (stack.length) {
-            const i = stack.pop(), x = i % W, y = (i / W) | 0, o = i * 4;
+            const i = stack.pop(), x = i! % W, y = (i! / W) | 0, o = i! * 4;
             c.area++; if (isFoliage(d[o], d[o + 1], d[o + 2])) c.green++;
             if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
-            if (x > 0 && !id[i - 1] && d[(i - 1) * 4 + 3] >= 128) { id[i - 1] = cid; stack.push(i - 1); }
-            if (x < W - 1 && !id[i + 1] && d[(i + 1) * 4 + 3] >= 128) { id[i + 1] = cid; stack.push(i + 1); }
-            if (y > 0 && !id[i - W] && d[(i - W) * 4 + 3] >= 128) { id[i - W] = cid; stack.push(i - W); }
-            if (y < H - 1 && !id[i + W] && d[(i + W) * 4 + 3] >= 128) { id[i + W] = cid; stack.push(i + W); }
+            if (x > 0 && !id[i! - 1] && d[(i! - 1) * 4 + 3]! >= 128) { id[i! - 1] = cid; stack.push(i! - 1); }
+            if (x < W - 1 && !id[i! + 1] && d[(i! + 1) * 4 + 3]! >= 128) { id[i! + 1] = cid; stack.push(i! + 1); }
+            if (y > 0 && !id[i! - W] && d[(i! - W) * 4 + 3]! >= 128) { id[i! - W] = cid; stack.push(i! - W); }
+            if (y < H - 1 && !id[i! + W] && d[(i! + W) * 4 + 3]! >= 128) { id[i! + W] = cid; stack.push(i! + W); }
         }
         comps.push(c);
     }
@@ -69,12 +69,12 @@ function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
     const occ = new Uint8Array(cols * rows);
     for (let i = 0, n = W * H; i < n; i++) {
         const o = i * 4;
-        if (d[o + 3] < 8) continue;
+        if (d[o + 3]! < 8) continue;
         const dest = id[i] && isTree[id[i]] ? tree.data : rest.data;
         dest[o] = d[o]; dest[o + 1] = d[o + 1]; dest[o + 2] = d[o + 2]; dest[o + 3] = d[o + 3];
         if (dest === tree.data) { mask[i] = 1; occ[((i / W / CELL_H) | 0) * cols + (((i % W) / CELL_W) | 0)] = 1; }
     }
-    const mk = (img: ImageData) => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.getContext("2d").putImageData(img, 0, 0); return cv; };
+    const mk = (img: ImageData) => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.getContext("2d")!.putImageData(img, 0, 0); return cv; };
     const treeCv = mk(tree), restCv = mk(rest);
 
     // 3. fill the base picture under the removed canopies from the ground around them
@@ -83,12 +83,12 @@ function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
     const sum = new Float32Array(bw * bh * 3), cnt = new Uint16Array(bw * bh);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const i = y * W + x;
-        if (mask[i] || base[i * 4 + 3] < 128) continue;
+        if (mask[i] || base[i * 4 + 3]! < 128) continue;
         const b = ((y / BLOCK) | 0) * bw + ((x / BLOCK) | 0);
-        sum[b * 3] += base[i * 4]; sum[b * 3 + 1] += base[i * 4 + 1]; sum[b * 3 + 2] += base[i * 4 + 2]; cnt[b]++;
+        sum[b * 3]! += base[i * 4]!; sum[b * 3 + 1]! += base[i * 4 + 1]!; sum[b * 3 + 2]! += base[i * 4 + 2]!; cnt[b]++;
     }
     const col = new Float32Array(bw * bh * 3), known = new Uint8Array(bw * bh);
-    for (let b = 0; b < bw * bh; b++) if (cnt[b] >= 3) { known[b] = 1; for (let k = 0; k < 3; k++) col[b * 3 + k] = sum[b * 3 + k] / cnt[b]; }
+    for (let b = 0; b < bw * bh; b++) if (cnt[b]! >= 3) { known[b] = 1; for (let k = 0; k < 3; k++) col[b * 3 + k] = sum[b * 3 + k]! / cnt[b]!; }
     for (let pass = 0; pass < 90; pass++) {              // grow the known colours inward
         const add = [];
         for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
@@ -96,15 +96,15 @@ function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
             if (known[b]) continue;
             let r = 0, g = 0, bl = 0, n = 0;
             for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                const nx = bx + dx, ny = by + dy;
+                const nx = bx + dx!, ny = by + dy!;
                 if (nx < 0 || ny < 0 || nx >= bw || ny >= bh) continue;
                 const q = ny * bw + nx;
-                if (known[q]) { r += col[q * 3]; g += col[q * 3 + 1]; bl += col[q * 3 + 2]; n++; }
+                if (known[q]) { r += col[q * 3]!; g += col[q * 3 + 1]!; bl += col[q * 3 + 2]!; n++; }
             }
             if (n) add.push(b, r / n, g / n, bl / n);
         }
         if (!add.length) break;
-        for (let k = 0; k < add.length; k += 4) { const b = add[k]; known[b] = 1; col[b * 3] = add[k + 1]; col[b * 3 + 1] = add[k + 2]; col[b * 3 + 2] = add[k + 3]; }
+        for (let k = 0; k < add.length; k += 4) { const b = add[k]; known[b] = 1; col[b! * 3] = add[k + 1]; col[b! * 3 + 1] = add[k + 2]; col[b! * 3 + 2] = add[k + 3]; }
     }
     const patch = new ImageData(W, H);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -112,7 +112,7 @@ function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
         if (!mask[i]) continue;
         const b = ((y / BLOCK) | 0) * bw + ((x / BLOCK) | 0), o = i * 4;
         // a little darker than the surroundings: it is the shade under a canopy
-        patch.data[o] = col[b * 3] * 0.78; patch.data[o + 1] = col[b * 3 + 1] * 0.8; patch.data[o + 2] = col[b * 3 + 2] * 0.78; patch.data[o + 3] = 255;
+        patch.data[o] = col[b * 3]! * 0.78; patch.data[o + 1] = col[b * 3 + 1]! * 0.8; patch.data[o + 2] = col[b * 3 + 2]! * 0.78; patch.data[o + 3] = 255;
     }
     const out = { treeCv, restCv, patchCv: mk(patch), id, comps, isTree, occ, cols, rows, W, H };
     console.log(`treesway: ${stageId} -> ${comps.filter((c, i) => i && isTree[i]).length} canopies, ${treePx}px, built in ${Math.round(performance.now() - t0)}ms`);
@@ -130,7 +130,7 @@ export function drawTreePatch(ctx: CanvasRenderingContext2D | null, stageId, fgI
     if (!(fgImg instanceof Image) || !(baseImg instanceof Image)) return false;
     const b = get(stageId, fgImg, baseImg);
     if (!b) return false;
-    ctx.drawImage(b.patchCv, -camX, -camY);
+    ctx!.drawImage(b.patchCv, -camX, -camY);
     return true;
 }
 
@@ -141,7 +141,7 @@ export function drawSwayingForeground(ctx: CanvasRenderingContext2D | null, stag
     if (!b) return false;
     // The view is the 320 box plus FIELD_VIEW_PAD each side with F2 -> Screen -> Wide overworld (web/field-view.js).
     const t = now / 1000, VIEW_W = FIELD_VIEW_W, VIEW_H = 240, left = camX - FIELD_VIEW_PAD;
-    ctx.drawImage(b.restCv, -camX, -camY);
+    ctx!.drawImage(b.restCv, -camX, -camY);
     const cx0 = Math.max(0, Math.floor(left / CELL_W)), cx1 = Math.min(b.cols - 1, Math.floor((left + VIEW_W) / CELL_W) + 1);
     const ry0 = Math.max(0, Math.floor(camY / CELL_H)), ry1 = Math.min(b.rows - 1, Math.floor((camY + VIEW_H) / CELL_H) + 1);
     const amp = (0.7 + 0.5 * Math.sin(t * 0.21)) * calm;
@@ -158,7 +158,7 @@ export function drawSwayingForeground(ctx: CanvasRenderingContext2D | null, stag
             let shift = wave * amp * (0.25 + 0.75 * top);
             if (gust) { const gd = (x - gust.x) / 60; shift += Math.exp(-gd * gd) * gust.s * 2.6 * (0.3 + 0.7 * top); }
             shift = Math.round(shift * 2) / 2;
-            ctx.drawImage(b.treeCv, x, y, CELL_W, CELL_H, x - camX + shift, y - camY, CELL_W, CELL_H);
+            ctx!.drawImage(b.treeCv, x, y, CELL_W, CELL_H, x - camX + shift, y - camY, CELL_W, CELL_H);
         }
     }
     return true;

@@ -130,7 +130,7 @@ export function findPager(runs, used = new Set()) {
 export function composePager(runs, used: Set<unknown> | undefined, out, rel = ID, plates = []) {
     const pg = findPager(runs, used);
     if (!pg) return null;
-    for (const r of [pg.a, pg.slash, pg.b]) if (r) used.add(r);
+    for (const r of [pg.a, pg.slash, pg.b]) if (r) used!.add(r);
     const w = 40, h = N(40);
     const box = plates.find((b) => pg.cx >= b.x && pg.cx < b.x + b.w && pg.y + 4.5 >= b.y && pg.y + 4.5 < b.y + b.h);
     const rect = box ? { x: box.x, y: box.y + (box.h - h) / 2, w: box.w, h } : applyRel({ x: pg.cx - w / 2, y: pg.y + 4.5 - h / 2, w, h }, rel);
@@ -157,7 +157,7 @@ export function composePageChip(p, i, runs, used, out) {
 /** A frame under a picture of a grid (card face, drill picture, form portrait): the art itself stays the game's pixels on the art canvas. */
 export function composeArtFrame(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, out) {
     const r = clipRect(p), g = 2;
-    out.push(plate(`gf${i}`, "gridFrame", { x: r.x - g * p.rel.a, y: r.y - g * p.rel.d, w: r.w + 2 * g * p.rel.a, h: r.h + 2 * g * p.rel.d }, p.rel, { shape: "chip", edge: "var(--c-under)", shadow: 4 }));
+    out.push(plate(`gf${i}`, "gridFrame", { x: r.x - g * p.rel!.a, y: r.y - g * p.rel!.d, w: r.w + 2 * g * p.rel!.a, h: r.h + 2 * g * p.rel!.d }, p.rel, { shape: "chip", edge: "var(--c-under)", shadow: 4 }));
 }
 
 /** An empty grid slot (no card there): the dim C empty plate at the game's slot rect; nothing moves into it. */
@@ -213,7 +213,7 @@ export function composeLists(parts, runs, used, out, o: { skip?: UiRect[]; twoCo
     });
     parts.forEach((p, i) => {
         if (p.part === "iconHl") composeIconHl(p, i, ons, out);
-        else if (p.part === "cursorBox") composeCursorBox(p, i, out, o.pulse);
+        else if (p.part === "cursorBox") composeCursorBox(p, i, out, o.pulse!);
         else if (p.part === "pageChip") composePageChip(p, i, runs, used, out);
     });
     composePager(runs, used, out, ID, parts.filter((p: { part: string; }) => p.part === "pagePlate").map(clipRect));

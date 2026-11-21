@@ -253,13 +253,13 @@ function boulderHull(seed: number) {
   }
   const g = new ConvexGeometry(pts);
   g.computeBoundingBox();
-  const bb = g.boundingBox, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2,
-        cy = (bb.min.y + bb.max.y) / 2, w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) || 1;
-  const P = g.attributes.position.array;
+  const bb = g.boundingBox, cx = (bb!.min.x + bb!.max.x) / 2, cz = (bb!.min.z + bb!.max.z) / 2,
+        cy = (bb!.min.y + bb!.max.y) / 2, w = Math.max(bb!.max.x - bb!.min.x, bb!.max.z - bb!.min.z) || 1;
+  const P = g.attributes.position!.array;
   for (let i = 0; i < P.length; i += 3) {
     P[i] = (P[i] - cx) / w; P[i + 1] = (P[i + 1] - cy) / w * 0.78; P[i + 2] = (P[i + 2] - cz) / w;
   }
-  g.attributes.position.needsUpdate = true;
+  g.attributes.position!.needsUpdate = true;
   g.computeVertexNormals();   // flat face normals after the squash
   g.computeBoundingBox(); g.computeBoundingSphere();
   g.userData = { tris: P.length / 9, width: 1, height: 0.78 };
@@ -283,19 +283,19 @@ function hillsGeometry(pal) {
       const c = Math.cos(a), s2 = Math.sin(a);
       const n1 = S.fbm3JS(c * 2.7 + i * 5.1, 1.3 + i, s2 * 2.7 + i * 3.7);
       const n2 = S.noise3JS(c * 6.2 + i, 7.1, s2 * 6.2);
-      const top = P.BASE + Math.max(H * 0.45, H * (0.62 + 1.1 * (n1 - 0.5) + 0.36 * (n2 - 0.5)));
+      const top = P.BASE + Math.max(H! * 0.45, H! * (0.62 + 1.1 * (n1 - 0.5) + 0.36 * (n2 - 0.5)));
       const mid = P.BASE + (top - P.BASE) * P.CONTOUR;
-      const x = s2 * R, z = c * R;
+      const x = s2 * R!, z = c * R!;
       rows.push([[x, P.BASE, z], [x, mid, z], [x, top, z]]);
     }
     for (let k = 0; k < SEG; k++) {
       const A = rows[k], B = rows[k + 1];
       for (const lo of [0, 1]) {                            // band 0: base->contour, band 1: contour->ridge
-        const hi = lo + 1, quad = [A[lo], B[lo], B[hi], A[lo], B[hi], A[hi]];
+        const hi = lo + 1, quad = [A![lo], B![lo], B![hi], A![lo], B![hi], A![hi]];
         const bands = [lo * 0.5, lo * 0.5, hi * 0.5, lo * 0.5, hi * 0.5, hi * 0.5];   // 0 / 0.5 / 1: a hard contour
         for (let v = 0; v < 6; v++) {
           const q = quad[v];
-          pos.push(q[0], q[1], q[2]); band.push(bands[v]); haze.push(P.HAZE[i]);
+          pos.push(q![0], q![1], q![2]); band.push(bands[v]); haze.push(P.HAZE[i]);
           colsA.push(col.r, col.g, col.b);
         }
       }
@@ -367,9 +367,9 @@ export function buildFloor(slot, { materials = [] } = {}) {
     apron.name = "builtApron"; apron.userData.kind = "soil";
     meshes.push(apron);
     const L = D.apron.land;
-    soilInfo.apron = { tris: ag.userData.tris, cellsKept: ag.userData.cellsKept, cellsOnFloor: ag.userData.cellsOnFloor,
+    soilInfo!.apron = { tris: ag.userData.tris, cellsKept: ag.userData.cellsKept, cellsOnFloor: ag.userData.cellsOnFloor,
                        cards: L.cards, in: SOIL.APRON.IN, out: SOIL.APRON.OUT };
-    soilInfo.shore = { rim: L.rim, stepDeg: L.stepDeg, az0: L.az0, landEnd: L.landEnd, floorEnd: L.floorEnd, ms: L.ms,
+    soilInfo!.shore = { rim: L.rim, stepDeg: L.stepDeg, az0: L.az0, landEnd: L.landEnd, floorEnd: L.floorEnd, ms: L.ms,
                        how: "soil.js soilLand(rec): landAt/floorAt/apronRange/outline" };
   }
   return { objects: meshes, meshes, soilInfo, dispose() { for (const m of meshes) m.geometry.dispose(); } };
@@ -381,7 +381,7 @@ export function buildBank(slot, { materials = [] } = {}) {
   const parts = D.bank.map((b) => {
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(b.pos.slice(), 3));
     g.computeVertexNormals();
-    const nor = g.attributes.normal.array, n = b.pos.length / 3;
+    const nor = g.attributes.normal!.array, n = b.pos.length / 3;
     const aBottom = new Float32Array(n * 3), aTop = new Float32Array(n * 3), aY = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) { aBottom.set(b.bottom, i * 3); aTop.set(b.top, i * 3); aY[i * 2] = b.y0; aY[i * 2 + 1] = b.y1; }
     g.dispose();

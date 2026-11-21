@@ -139,53 +139,53 @@ export function createMenu(sfx = null) {
   m._anim = {};       // key -> {t0, dir}; missing = never animated, i.e. open
   m._sfxPlayed = {};
   m._foldOpen = (...keys) => {
-    for (const k of keys) { m._anim[k] = { t0: m.time ?? 0, dir: 1 }; delete m._sfxPlayed[k]; }
+    for (const k of keys) { m._anim![k] = { t0: m.time ?? 0, dir: 1 }; delete m._sfxPlayed![k]; }
   };
   m._foldClose = (...keys) => {
-    for (const k of keys) { m._anim[k] = { t0: m.time ?? 0, dir: 0 }; delete m._sfxPlayed[k]; }
+    for (const k of keys) { m._anim![k] = { t0: m.time ?? 0, dir: 0 }; delete m._sfxPlayed![k]; }
   };
   // Forget a window entirely: the next draw shows it fully open with no sound.
   m._foldForget = (...keys) => {
-    for (const k of keys) { delete m._anim[k]; delete m._sfxPlayed[k]; }
+    for (const k of keys) { delete m._anim![k]; delete m._sfxPlayed![k]; }
   };
   // Put a window in the SHUT state without animating or sounding it — the
   // state a screen's windows are in before its constructor has opened them.
   m._foldShut = (...keys) => {
-    for (const k of keys) { m._anim[k] = { t0: -1e9, dir: 0 }; m._sfxPlayed[k] = 1; }
+    for (const k of keys) { m._anim![k] = { t0: -1e9, dir: 0 }; m._sfxPlayed![k] = 1; }
   };
   // Start an open at a fixed delay. Kept for the screens whose original
   // sequence is a plain chain of equal-length folds, where a delay and a
   // wait-for-previous are the same thing.
   m._animStart = (delay, ...keys) => {
-    for (const k of keys) { m._anim[k] = { t0: (m.time ?? 0) + delay, dir: 1 }; delete m._sfxPlayed[k]; }
+    for (const k of keys) { m._anim![k] = { t0: (m.time ?? 0) + delay, dir: 1 }; delete m._sfxPlayed![k]; }
   };
   // The transform, from the shared fold class (engine/dw3/ui/fold-tween.ts)
   // rather than a formula local to this screen.
   m._foldTr = (key, px, py, axis) => {
-    const a = m._anim[key];
+    const a = m._anim![key];
     if (!a) return ui.foldTransformAtTime(0, null, px, py, axis, ANIM_T);
     return a.dir
       ? ui.foldTransformAtTime(m.time ?? 0, a.t0, px, py, axis, ANIM_T)
       : ui.foldCloseTransformAtTime(m.time ?? 0, a.t0, px, py, axis, ANIM_T);
   };
-  m._animP = (key) => m._foldTr(key, 0, 0, "x").progress;
+  m._animP = (key) => m._foldTr!(key, 0, 0, "x").progress;
   // The boolean the original's states branch on: window_fold_tick() != 0,
   // true once the fold has LANDED, in whichever direction it was going.
-  m._foldReady = (key) => m._foldTr(key, 0, 0, "x").ready;
+  m._foldReady = (key) => m._foldTr!(key, 0, 0, "x").ready;
 
   // ── the screens' own choreography ──────────────────────────────────────
   // Each pause-menu screen is a small state machine that starts a fold, waits
   // for it, then starts the next. `_after(keys, fn)` queues one such step.
   m._seq = [];
-  m._after = (keys, run) => { m._seq.push({ wait: keys, run }); };
-  m._seqClear = () => { m._seq.length = 0; };
+  m._after = (keys, run) => { m._seq!.push({ wait: keys, run }); };
+  m._seqClear = () => { m._seq!.length = 0; };
   m._runSeq = () => {
     let guard = 0;
-    while (m._seq.length && guard++ < 32) {
-      const step = m._seq[0];
-      if (!step.wait.every((k) => (k === "slide" ? m._slideReady() : m._foldReady(k)))) break;
-      m._seq.shift();
-      step.run();
+    while (m._seq!.length && guard++ < 32) {
+      const step = m._seq![0];
+      if (!step!.wait.every((k) => (k === "slide" ? m._slideReady!() : m._foldReady!(k)))) break;
+      m._seq!.shift();
+      step!.run();
     }
   };
 
@@ -206,7 +206,7 @@ export function createMenu(sfx = null) {
   m._slideReady = () => m._slide == null;
 
   // A window counts as OPEN unless a close is running or has finished on it.
-  m._isOpen = (k) => { const a = m._anim[k]; return !(a && a.dir === 0); };
+  m._isOpen = (k) => { const a = m._anim![k]; return !(a && a.dir === 0); };
 
   // ── the STATUS SHEET's own windows (F0x8008d684 states 0..3) ───────────
   // card + name tab, then the EXP plate + the Digivolve panel, then the stat
@@ -215,17 +215,17 @@ export function createMenu(sfx = null) {
   // which is what makes coming back from See Equipment cheaper than a fresh
   // entry.
   m._openSheet = (fresh) => {
-    if (fresh) m._foldOpen("shCard");
-    m._foldOpen("shName");
-    m._after(fresh ? ["shCard", "shName"] : ["shName"], () => {
-      if (!m._isOpen("shExp")) m._foldOpen("shExp");
-      m._foldOpen("shDv");
+    if (fresh) m._foldOpen!("shCard");
+    m._foldOpen!("shName");
+    m._after!(fresh ? ["shCard", "shName"] : ["shName"], () => {
+      if (!m._isOpen!("shExp")) m._foldOpen!("shExp");
+      m._foldOpen!("shDv");
     });
-    m._after(["shExp", "shDv"], () => {
-      if (!m._isOpen("shStat")) m._foldOpen("shStat");
-      m._foldOpen("shEq");
+    m._after!(["shExp", "shDv"], () => {
+      if (!m._isOpen!("shStat")) m._foldOpen!("shStat");
+      m._foldOpen!("shEq");
     });
-    m._after(["shStat", "shEq"], () => { m.detailStep = "prompt"; });
+    m._after!(["shStat", "shEq"], () => { m.detailStep = "prompt"; });
   };
   // Leaving the sheet for a sub-screen (state 10). The card always stays; the
   // EXP plate and the stat window come down only for See Digivolve (row 0) —
@@ -235,7 +235,7 @@ export function createMenu(sfx = null) {
     const keys = ["shName", "shDv", "shEq"];
     if (row === 0) keys.push("shExp", "shStat");
     if (alsoCard) keys.push("shCard");
-    m._foldClose(...keys);
+    m._foldClose!(...keys);
     return keys;
   };
 
@@ -265,15 +265,15 @@ export function createMenu(sfx = null) {
     m.fadeLeaving = false; m.fadeT0 = 0; m.fadePending = null;
     m.feedbackMsg = null;
     m._anim = {}; m._sfxPlayed = {}; m._screenSeen = null; // re-fold on open
-    m._seq.length = 0; m._slide = null; m._slideY = 0;
-    m.ensureData();
+    m._seq!.length = 0; m._slide = null; m._slideY = 0;
+    m.ensureData!();
   };
 
   // Open the menu directly on one screen. Used by the DRI-desk launcher (set_flag
   // bank 0x7c index 0 = the original SWITCH-DIGIMON screen 0xd00); the walker's
   // equivalent of that screen is the SORT formation view.
   m.openAt = (screen) => {
-    m.reset();
+    m.reset!();
     m.screen = screen;
     if (screen !== "home") m.fieldHome = false;
   };
@@ -355,7 +355,7 @@ export function createMenu(sfx = null) {
     const casterIdx = m.statusCursor;
     const caster = statBlock(state, casterIdx);
     const skill = m.skillDB?.[techId];
-    if (!caster || !skill) { m.showFeedback("No technique."); return; }
+    if (!caster || !skill) { m.showFeedback!("No technique."); return; }
 
     const idxs = target === null ? view.map((_, i) => i) : [target];
     const blocks = idxs.map((i: number) => statBlock(state, i)).filter(Boolean);
@@ -365,7 +365,7 @@ export function createMenu(sfx = null) {
       ?? view[casterIdx]?.profile?.[HEAL_SCALE_STAT] ?? 0;
 
     const r = useFieldTechnique(caster, blocks, skill.mp_cost ?? 0, skill.power ?? 0, scale);
-    m.showFeedback(r.msg);
+    m.showFeedback!(r.msg);
     if (!r.ok) { sfx?.play(failSound); return; }
     sfx?.play("recovery"); // 0x40014 — the applied-heal cue
     idxs.forEach((i: number) => persistStats(state, i));
@@ -395,7 +395,7 @@ export function createMenu(sfx = null) {
         // the apply (ststatus.s:14643 calls F0x8008F584), and the applier is
         // what you hear: 0x40014 on the applied arm, 0x4001c SYSTEM07 with
         // "No effect." on the refusal arm (file 0xcbc8 / 0xcc10).
-        const list = m.itemList(state);
+        const list = m.itemList!(state);
         const slot = list[m.itemCursor];
         if (slot) {
           const item = ITEM_BY_ID[slot.id];
@@ -420,14 +420,14 @@ export function createMenu(sfx = null) {
             // charges — the old "savedemo" here was 0x00040015, a different
             // sample (the save screen's demo jingle).
             sfx?.play("recovery");
-            m.showFeedback(useMessage(item, before, view.partnerStats, r));
+            m.showFeedback!(useMessage(item, before, view.partnerStats, r));
             if (tgt === 0) localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
             else localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
             localStorage.setItem("inventory", JSON.stringify(state.inventory));
           } else {
             // The refusal arm ("No effect."): file 0xcc10, `ori $a0,0x1c`.
             sfx?.play("system07");
-            m.showFeedback(r.msg);
+            m.showFeedback!(r.msg!);
           }
         }
         m.itemMode = "list";
@@ -464,7 +464,7 @@ export function createMenu(sfx = null) {
         sfx?.play("system00");
         if (chosen === "MAP" && mapUnavailable(state)) return;
         m.fieldHome = false;
-        if (m.onNativePage?.(chosen)) { /* the native pause page owns the pad */ }
+        if (m.onNativePage?.(chosen!)) { /* the native pause page owns the pad */ }
         else if (chosen === "ITEMS") { m.screen = "items"; m.itemMode = "cats"; m.itemCursor = 0; }
         else if (chosen === "SORT") { m.screen = "sort"; m.statusCursor = 0; m.sortPick = null; m.sortSwapping = false; }
         else if (chosen === "MAP") { m.screen = "map"; m.mapInit = false; }
@@ -495,7 +495,7 @@ export function createMenu(sfx = null) {
     }
 
     if (m.screen === "items") {
-      const list = m.itemList(state);
+      const list = m.itemList!(state);
       const perPage = (MS.UI?.screens?.items?.grid?.cols ?? 2) * (MS.UI?.screens?.items?.grid?.rows ?? 8);
       if (m.itemMode === "cats" || m.itemMode == null) {
         if ((key === "up" || key === "down") && state.keys?.has?.(key)) return;
@@ -512,8 +512,8 @@ export function createMenu(sfx = null) {
           // esstatus 0x64+cat ("No Items." … "No Important Items.", :14286)
           // and STAYS, with no second sound.
           sfx?.play("system00");
-          if (m.itemList(state).length > 0) { m.itemMode = "list"; m.itemCursor = 0; }
-          else m.showFeedback(ITEM_CAT_EMPTY[m.itemCat]);
+          if (m.itemList!(state).length > 0) { m.itemMode = "list"; m.itemCursor = 0; }
+          else m.showFeedback!(ITEM_CAT_EMPTY[m.itemCat]!);
         }
         return;
       }
@@ -588,11 +588,11 @@ export function createMenu(sfx = null) {
         // the original's two extra states do.
         const a = m.sortPick, b = m.statusCursor;
         m.sortSwapping = true;
-        m._foldClose(`card${a}`, `card${b}`);
-        m._after([`card${a}`, `card${b}`], () => {
+        m._foldClose!(`card${a}`, `card${b}`);
+        m._after!([`card${a}`, `card${b}`], () => {
           swapFormation(state, a, b);
-          m._foldOpen(`card${a}`, `card${b}`);
-          m._after([`card${a}`, `card${b}`], () => {
+          m._foldOpen!(`card${a}`, `card${b}`);
+          m._after!([`card${a}`, `card${b}`], () => {
             m.sortSwapping = false;
             m.sortPick = null;
           });
@@ -615,7 +615,7 @@ export function createMenu(sfx = null) {
         sfx?.play("system00");
         const on = m.demoCursor === 0;
         setDigivolveDemo(on);
-        m.showFeedback(on ? "Turned on Battle Digivolve" : "Turned off Battle Digivolve");
+        m.showFeedback!(on ? "Turned on Battle Digivolve" : "Turned off Battle Digivolve");
       }
       return;
     }
@@ -656,7 +656,7 @@ export function createMenu(sfx = null) {
     }
 
     if (m.screen === "techniques-list") {
-      const rows = m.techRows(state, m.statusCursor);
+      const rows = m.techRows!(state, m.statusCursor);
       // "Use it on who?" (esstatus 43) — only the single-target heals ask.
       if (m.techMode === "use_target") {
         const n = roster(state).length;
@@ -668,7 +668,7 @@ export function createMenu(sfx = null) {
           // F0x80093A58 is called with 0x4001C and plays 0x40014 on a heal,
           // its caller's 0x4001C on a refusal (state 0x20,
           // engine/dw3/ui/native/pause-techniques.ts:616-632).
-          m.applyTechnique(state, rows[m.techCursor], m.techTarget);
+          m.applyTechnique!(state, rows[m.techCursor]!, m.techTarget);
           m.techMode = null;
         }
         return;
@@ -687,7 +687,7 @@ export function createMenu(sfx = null) {
         // prompt entirely and apply to everyone at once — F0x80093a58. Its
         // refusal replays this list's own confirm cue (0x8004503C), which the
         // copy has just played as "system00" (pause-home-button-table §7.2).
-        if (isPartyWide(techId)) m.applyTechnique(state, techId, null, "system00");
+        if (isPartyWide(techId)) m.applyTechnique!(state, techId, null, "system00");
         else { m.techMode = "use_target"; m.techTarget = m.statusCursor; }
       }
       return;
@@ -705,9 +705,9 @@ export function createMenu(sfx = null) {
         m.detailIdx = m.statusCursor; m.detailFocus = 0; m.detailSel = 0;
         m.detailStep = "opening";
         m.screen = "status-detail";
-        m._foldShut("shCard", "shName", "shExp", "shStat", "shDv", "shEq");
-        m._seqClear();
-        m._openSheet(true);
+        m._foldShut!("shCard", "shName", "shExp", "shStat", "shDv", "shEq");
+        m._seqClear!();
+        m._openSheet!(true);
       }
       return;
     }
@@ -716,7 +716,7 @@ export function createMenu(sfx = null) {
       // While a fold is running the original is in a state that reads no pad
       // at all. Swallow the key rather than letting a screen change land
       // halfway through a window opening.
-      if (m._seq.length) return;
+      if (m._seq!.length) return;
       const r = roster(state)[m.detailIdx];
       const evos = window.__battle?.availableEvolutions?.(state, m.detailIdx) ?? [];
 
@@ -726,9 +726,9 @@ export function createMenu(sfx = null) {
         if (key === "cross") {
           // Cross leaves the sheet: every panel shuts, the card with them.
           sfx?.play("system01");
-          const keys = m._closeSheet(1, true);
+          const keys = m._closeSheet!(1, true);
           m.detailStep = "closing";
-          m._after(keys, () => { m.screen = "status-list"; m.detailStep = "prompt"; });
+          m._after!(keys, () => { m.screen = "status-list"; m.detailStep = "prompt"; });
           return;
         }
         if (key === "up") m.detailFocus = moveCursor(m.detailFocus, 0, sfx);
@@ -736,28 +736,28 @@ export function createMenu(sfx = null) {
         else if (key === "circle") {
           sfx?.play("system00");
           m.detailSel = 0; m.dvHome = true; m.dvAction = 0;
-          const keys = m._closeSheet(m.detailFocus, false);
+          const keys = m._closeSheet!(m.detailFocus, false);
           if (m.detailFocus === 0) {
             // See Digivolve: its own screen. Name plate, then the candidate
             // list, then the lower panel (F0x80089bf0 states 0..3).
             m.detailStep = "closing";
-            m._after(keys, () => {
-              m._foldShut("dvName", "dvList", "dvAct", "dvPanel", "dvFoot");
-              m._slideSet(0);
-              m._foldOpen("dvName");
+            m._after!(keys, () => {
+              m._foldShut!("dvName", "dvList", "dvAct", "dvPanel", "dvFoot");
+              m._slideSet!(0);
+              m._foldOpen!("dvName");
             });
-            m._after(["dvName"], () => m._foldOpen("dvList"));
-            m._after(["dvList"], () => m._foldOpen("dvPanel"));
-            m._after(["dvPanel"], () => { m.detailStep = "digivolve"; });
+            m._after!(["dvName"], () => m._foldOpen!("dvList"));
+            m._after!(["dvList"], () => m._foldOpen!("dvPanel"));
+            m._after!(["dvPanel"], () => { m.detailStep = "digivolve"; });
           } else {
             // See Equipment: header plate, then the slots window.
-            m._after(keys, () => {
+            m._after!(keys, () => {
               m.equipFocus = "slots"; m.equipCursor = 0;
               m.screen = "equip"; m.detailStep = "prompt";
-              m._foldShut("eqHeader", "eqSlots", "eqList", "eqDetail");
-              m._foldOpen("eqHeader");
+              m._foldShut!("eqHeader", "eqSlots", "eqList", "eqDetail");
+              m._foldOpen!("eqHeader");
             });
-            m._after(["eqHeader"], () => m._foldOpen("eqSlots"));
+            m._after!(["eqHeader"], () => m._foldOpen!("eqSlots"));
           }
         }
         return;
@@ -768,29 +768,29 @@ export function createMenu(sfx = null) {
       // then the sheet builds itself back up.
       const leaveDigivolve = () => {
         sfx?.play("system01");
-        m._foldClose("dvName", "dvList", "dvPanel");
+        m._foldClose!("dvName", "dvList", "dvPanel");
         m.detailStep = "closing";
-        m._after(["dvName", "dvList", "dvPanel"], () => {
+        m._after!(["dvName", "dvList", "dvPanel"], () => {
           m.detailFocus = 0;
-          m._openSheet(false);
+          m._openSheet!(false);
         });
       };
       // The technique explanation: the panel slides 34px up, the footer plate
       // opens under it, and the highlighted slot's text and MP cost appear.
       const openExplanation = (closeKey: string, backStep: string) => {
-        m._foldClose(closeKey);
+        m._foldClose!(closeKey);
         m.detailStep = "closing";
-        m._after([closeKey], () => m._slideStart(0, MS.UI.screens.see_digivolve.panel_slide?.to ?? -34));
-        m._after(["slide"], () => m._foldOpen("dvFoot"));
-        m._after(["dvFoot"], () => { m.detailStep = "techinfo"; m.dvBackStep = backStep; });
+        m._after!([closeKey], () => m._slideStart!(0, MS.UI.screens.see_digivolve.panel_slide?.to ?? -34));
+        m._after!(["slide"], () => m._foldOpen!("dvFoot"));
+        m._after!(["dvFoot"], () => { m.detailStep = "techinfo"; m.dvBackStep = backStep; });
       };
       const closeExplanation = () => {
         sfx?.play(m.dvBackStep === "dvaction" ? "system00" : "system01");
-        m._foldClose("dvFoot");
+        m._foldClose!("dvFoot");
         m.detailStep = "closing";
-        m._after(["dvFoot"], () => m._slideStart(m._slideY, 0));
-        m._after(["slide"], () => m._foldOpen(m.dvBackStep === "dvaction" ? "dvAct" : "dvList"));
-        m._after([m.dvBackStep === "dvaction" ? "dvAct" : "dvList"],
+        m._after!(["dvFoot"], () => m._slideStart!(m._slideY!, 0));
+        m._after!(["slide"], () => m._foldOpen!(m.dvBackStep === "dvaction" ? "dvAct" : "dvList"));
+        m._after!([m.dvBackStep === "dvaction" ? "dvAct" : "dvList"],
           () => { m.detailStep = m.dvBackStep === "dvaction" ? "dvaction" : "digivolve"; });
       };
 
@@ -822,10 +822,10 @@ export function createMenu(sfx = null) {
           // shorter action window takes its place (states 0xA..0xC).
           sfx?.play("system00");
           m.dvAction = 0;
-          m._foldClose("dvList");
+          m._foldClose!("dvList");
           m.detailStep = "closing";
-          m._after(["dvList"], () => m._foldOpen("dvAct"));
-          m._after(["dvAct"], () => { m.detailStep = "dvaction"; });
+          m._after!(["dvList"], () => m._foldOpen!("dvAct"));
+          m._after!(["dvAct"], () => { m.detailStep = "dvaction"; });
         }
         return;
       }
@@ -841,10 +841,10 @@ export function createMenu(sfx = null) {
         if (key === "cross") {
           // Back to the candidate list (states 0x14..0x16).
           sfx?.play("system01");
-          m._foldClose("dvAct");
+          m._foldClose!("dvAct");
           m.detailStep = "closing";
-          m._after(["dvAct"], () => m._foldOpen("dvList"));
-          m._after(["dvList"], () => { m.detailStep = "digivolve"; });
+          m._after!(["dvAct"], () => m._foldOpen!("dvList"));
+          m._after!(["dvList"], () => { m.detailStep = "digivolve"; });
           return;
         }
         if (key !== "circle" || !target) return;
@@ -871,12 +871,12 @@ export function createMenu(sfx = null) {
         // The message takes the whole screen down to the footer: the name plate
         // and the action window shut, the panel slides up, the footer opens
         // (states 0x19..0x1C).
-        m._foldClose("dvName", "dvAct");
+        m._foldClose!("dvName", "dvAct");
         m.detailStep = "closing";
-        m._after(["dvName", "dvAct"],
-          () => m._slideStart(0, MS.UI.screens.see_digivolve.panel_slide?.to ?? -34));
-        m._after(["slide"], () => m._foldOpen("dvFoot"));
-        m._after(["dvFoot"], () => { m.detailStep = "dvmessage"; });
+        m._after!(["dvName", "dvAct"],
+          () => m._slideStart!(0, MS.UI.screens.see_digivolve.panel_slide?.to ?? -34));
+        m._after!(["slide"], () => m._foldOpen!("dvFoot"));
+        m._after!(["dvFoot"], () => { m.detailStep = "dvmessage"; });
         return;
       }
 
@@ -886,17 +886,17 @@ export function createMenu(sfx = null) {
       if (m.detailStep === "dvmessage") {
         if (key !== "circle") return;
         sfx?.play("system07");
-        m._foldClose("dvFoot", "dvPanel");
+        m._foldClose!("dvFoot", "dvPanel");
         m.detailStep = "closing";
-        m._after(["dvFoot", "dvPanel"], () => {
-          m._slideSet(0);
+        m._after!(["dvFoot", "dvPanel"], () => {
+          m._slideSet!(0);
           m.dvHome = true; m.dvMessage = null;
-          m._foldShut("dvAct");
-          m._foldOpen("dvName");
+          m._foldShut!("dvAct");
+          m._foldOpen!("dvName");
         });
-        m._after(["dvName"], () => m._foldOpen("dvList"));
-        m._after(["dvList"], () => m._foldOpen("dvPanel"));
-        m._after(["dvPanel"], () => { m.detailStep = "digivolve"; });
+        m._after!(["dvName"], () => m._foldOpen!("dvList"));
+        m._after!(["dvList"], () => m._foldOpen!("dvPanel"));
+        m._after!(["dvPanel"], () => { m.detailStep = "digivolve"; });
         return;
       }
 
@@ -924,7 +924,7 @@ export function createMenu(sfx = null) {
     }
 
     if (m.screen === "equip") {
-      if (m._seq.length) return;   // a fold is running: the original reads no pad
+      if (m._seq!.length) return;   // a fold is running: the original reads no pad
       const apply = (choice, slotKey: string | undefined) => {
         ensureEquipment(state);
         // Build the new slot map on a COPY, then hand both to the store's one
@@ -939,7 +939,7 @@ export function createMenu(sfx = null) {
           unequipItem(slots, slotKey);
         } else {
           const res = equipItem(slots, slotKey, choice.id);
-          if (!res.ok) { m.showFeedback(res.msg ?? "Can't equip that."); return; }
+          if (!res.ok) { m.showFeedback!(res.msg ?? "Can't equip that."); return; }
         }
         commitEquipSlot(state, m.detailIdx, slotKey, slots);
         syncEquipBonuses(state, m.detailIdx);
@@ -953,11 +953,11 @@ export function createMenu(sfx = null) {
           // (states 0x32..0x34). Only then does the sheet build itself back up,
           // with "See Equipment" still highlighted.
           sfx?.play("system01");
-          m._foldClose("eqSlots");
-          m._after(["eqSlots"], () => m._foldClose("eqHeader"));
-          m._after(["eqHeader"], () => {
+          m._foldClose!("eqSlots");
+          m._after!(["eqSlots"], () => m._foldClose!("eqHeader"));
+          m._after!(["eqHeader"], () => {
             m.screen = "status-detail"; m.detailStep = "opening"; m.detailFocus = 1;
-            m._openSheet(false);
+            m._openSheet!(false);
           });
           return;
         }
@@ -975,10 +975,10 @@ export function createMenu(sfx = null) {
           // The slots window shuts, then the header plate, then the
           // current-piece panel opens and the bag list after it — states
           // 0xA/0xB/0xC/0xD/0xE, four folds in a row, never two at once.
-          m._foldClose("eqSlots");
-          m._after(["eqSlots"], () => m._foldClose("eqHeader"));
-          m._after(["eqHeader"], () => { m.equipFocus = "list"; m._foldOpen("eqDetail"); });
-          m._after(["eqDetail"], () => m._foldOpen("eqList"));
+          m._foldClose!("eqSlots");
+          m._after!(["eqSlots"], () => m._foldClose!("eqHeader"));
+          m._after!(["eqHeader"], () => { m.equipFocus = "list"; m._foldOpen!("eqDetail"); });
+          m._after!(["eqDetail"], () => m._foldOpen!("eqList"));
         }
         return;
       }
@@ -989,10 +989,10 @@ export function createMenu(sfx = null) {
       // then the current-piece panel, then the header plate and the slots
       // window open again in that order.
       const backToSlots = () => {
-        m._foldClose("eqList");
-        m._after(["eqList"], () => m._foldClose("eqDetail"));
-        m._after(["eqDetail"], () => { m.equipFocus = "slots"; m._foldOpen("eqHeader"); });
-        m._after(["eqHeader"], () => m._foldOpen("eqSlots"));
+        m._foldClose!("eqList");
+        m._after!(["eqList"], () => m._foldClose!("eqDetail"));
+        m._after!(["eqDetail"], () => { m.equipFocus = "slots"; m._foldOpen!("eqHeader"); });
+        m._after!(["eqHeader"], () => m._foldOpen!("eqSlots"));
       };
       if (key === "cross") {
         sfx?.play("system01"); backToSlots();
@@ -1022,8 +1022,8 @@ export function createMenu(sfx = null) {
     // The screens' choreography advances on the clock, not on the draw: each
     // queued step fires the frame its folds land, exactly as the original's
     // state machine advances when window_fold_tick returns non-zero.
-    m._slideTick();
-    m._runSeq();
+    m._slideTick!();
+    m._runSeq!();
     if (m.feedbackMsg) {
       m.feedbackTimer -= dt;
       if (m.feedbackTimer <= 0) m.feedbackMsg = null;
@@ -1057,7 +1057,7 @@ export function createMenu(sfx = null) {
     const lookC = m.screen === "demosetup" && !!m.digimonDB && !!MS.UI;
     uiC.scope("ui-menu", ctx, { enable: lookC, texts: true, compose: composeDemo }, () => {
       if (lookC) partHook(ctx, { part: "backdrop", x: (backdrop.time() * 25) % 96, y: (backdrop.time() * 25) % 96, w: 320, h: 240 });
-      m._drawNative(ctx, viewW, viewH, state);
+      m._drawNative!(ctx, viewW, viewH, state);
     });
     ctx.restore();
   };
@@ -1088,22 +1088,22 @@ export function createMenu(sfx = null) {
           // opens all three cards TOGETHER (F0x8001270c's first state starts
           // +0x70, +0x80 and +0x90 in one breath). It has no header or footer
           // plate of its own.
-          m._animStart(0, "header", "footer", "card0", "card1", "card2");
+          m._animStart!(0, "header", "footer", "card0", "card1", "card2");
         } else {
           // The overlay screens do it one card at a time, and open the footer
           // plate beside the LAST of them, not the first: F0x8008ddb0 /
           // F0x80084238 / F0x80085b6c all branch on the party size and open
           // card0 + header, then card1, then card2 + footer (a party of one
           // opens the footer with card0).
-          m._animStart(0, "header", "card0");
-          if (n >= 2) m._animStart(ANIM_T, "card1");
-          if (n >= 3) m._animStart(ANIM_T * 2, "card2");
-          m._animStart(ANIM_T * (n - 1), "footer");
+          m._animStart!(0, "header", "card0");
+          if (n >= 2) m._animStart!(ANIM_T, "card1");
+          if (n >= 3) m._animStart!(ANIM_T * 2, "card2");
+          m._animStart!(ANIM_T * (n - 1), "footer");
         }
       }
       const base = chrome ? ANIM_T : 0;
-      if (m.screen === "home") m._animStart(base, "homeWin");
-      else if (m.screen === "items") { m._animStart(0, "itemsTitle"); m._animStart(ANIM_T, "itemsList"); m._animStart(ANIM_T * 2, "itemsCat"); }
+      if (m.screen === "home") m._animStart!(base, "homeWin");
+      else if (m.screen === "items") { m._animStart!(0, "itemsTitle"); m._animStart!(ANIM_T, "itemsList"); m._animStart!(ANIM_T * 2, "itemsCat"); }
       // "equip" is not listed here: the sheet's own state machine opens its
       // header plate and then its slots window as it hands over, so a
       // screen-change trigger would restart a fold already running.
@@ -1114,12 +1114,12 @@ export function createMenu(sfx = null) {
     // class; the SFX gate stays here because the sound belongs to the screen's
     // own behaviour, not to the tween's arithmetic.
     const fold = (key: string, px: number, py: number, axis: string, fn: () => void) => {
-      const a = m._anim[key];
-      const tr = m._foldTr(key, px, py, axis);
+      const a = m._anim![key];
+      const tr = m._foldTr!(key, px, py, axis);
       // A window that has finished SHUTTING is gone; one that has finished
       // opening draws at unity. Both come back as progress 0 / 1 here.
-      if (!m._sfxPlayed[key] && a != null) {
-        m._sfxPlayed[key] = 1;
+      if (!m._sfxPlayed![key] && a != null) {
+        m._sfxPlayed![key] = 1;
         sfx?.play(a.dir ? "system03" : "system04");
       }
       if (tr.progress <= 0) return 0;
@@ -1183,7 +1183,7 @@ export function createMenu(sfx = null) {
       _drawFooter(ctx, state, t, "[triangle] Button: Back to Menu", null, fold, { hideBit: true });
       // The same rows the input machine picks from — one reader, so the list on
       // screen and the list the cursor walks cannot disagree (F0x800937a4).
-      _drawTechniques(ctx, m.techRows(state, m.statusCursor), m, t);
+      _drawTechniques(ctx, m.techRows!(state, m.statusCursor), m, t);
     } else if (m.screen === "status-detail") {
       // "See Digivolve" is a SCREEN OF ITS OWN, and it is a CHILD of the sheet:
       // the sheet object keeps running underneath, which is why the partner's
@@ -1194,7 +1194,7 @@ export function createMenu(sfx = null) {
       // The sub-screen draws FIRST and the sheet over it: capture
       // 03-choose-digivolve.png has the partner's card plate sitting on top of
       // the "Choose digivolve" band, which runs the full width behind it.
-      if (m.detailStep !== "prompt" && m.detailStep !== "opening" && !m._isOpen("shDv")) {
+      if (m.detailStep !== "prompt" && m.detailStep !== "opening" && !m._isOpen!("shDv")) {
         _drawSeeDigivolve(ctx, r[m.detailIdx], m, state, t, fold);
       }
       _drawDetail(ctx, r[m.detailIdx], m, state, t, fold);
@@ -1207,7 +1207,7 @@ export function createMenu(sfx = null) {
       drawText(ctx, m.feedbackMsg, (NATIVE_W - w) / 2, 0xA8, { kind: 3 });
     }
     if (m.fadeLeaving) {
-      const frames = Math.max(0, Math.floor((m.time - m.fadeT0) * VSYNC));
+      const frames = Math.max(0, Math.floor((m.time! - m.fadeT0) * VSYNC));
       const a = Math.min(255, (frames * CARD_FOLDER_FADE_DELTA) >> 8) / 255;
       paintScreenDim(ctx, a * 255, NATIVE_W, 240);
     }

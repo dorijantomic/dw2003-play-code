@@ -39,7 +39,7 @@ export function mpCard() {
             hp: r.hp | 0, mhp: r.maxHp | 0, mp: r.mp | 0, mmp: r.maxMp | 0, st,
         };
     });
-    return { v: 1, chapter: state.chapter ?? 1, bits: state.bits | 0, quests: questsDoneCount(), party };
+    return { v: 1, chapter: state.chapter ?? 1, bits: state.bits! | 0, quests: questsDoneCount(), party };
 }
 
 // The ordinary map change to a spot beside (x, y) on `mapId` (runStageHandoff scripted:true: the same wipe and load as an exit; setMap
@@ -60,13 +60,13 @@ export async function warpToMap(mapId, x, y, idle: (() => boolean) | (() => bool
 }
 
 export function chatSay(text) {
-    chatBox.close();
+    chatBox.close!();
     S.chatShownAt = performance.now() / 1000;
     S.chatPresses = 0;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
     const pack = buildChatPack(text, String(state.playerName || "")) as ChatPack;
     S.chatPages = pack.pages;
-    chatBox.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
+    chatBox.open!({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
 }
 
@@ -106,7 +106,7 @@ function mpBalloonTick(dt: number) {
 
 export function chatTick(dt: number) {
     mpBalloonTick(dt);
-    if (!chatBox.isOpen()) return;
+    if (!chatBox.isOpen!()) return;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
     // The balloon re-reads its speaker's position from the game's own memory record every tick, so
     // write the player's position there and the bubble follows when they walk.
@@ -115,10 +115,10 @@ export function chatTick(dt: number) {
         const rec = cs.mem.read32(cs.controller + 0x50) >>> 0;
         if (rec) { cs.mem.write32(rec + 0x58, chatActor.x >>> 0); cs.mem.write32(rec + 0x5c, chatActor.y >>> 0); }
     }
-    chatBox.update(dt, null);
+    chatBox.update!(dt, null);
     // close it by itself a few seconds after the text has shown (the box wants a confirm press)
     if (performance.now() / 1000 - S.chatShownAt > (S.chatPresses < S.chatPages - 1 ? 4.5 : 10) && Math.floor(performance.now() / 300) % 2) {
-        chatBox.pressConfirm(); S.chatShownAt = performance.now() / 1000; S.chatPresses++;
+        chatBox.pressConfirm!(); S.chatShownAt = performance.now() / 1000; S.chatPresses++;
     }
 }
 
@@ -129,7 +129,7 @@ export function tickFootstep(holder: GameState, dt: number) {
     holder._footstepT = (holder._footstepT ?? interval) + dt;
     if (holder._footstepT < interval) return;
     holder._footstepT -= interval;
-    if (isDigmon) { sfx.play("dig_move"); S.footstepCount++; }
-    else if (!form) { sfx.play("player00"); S.footstepCount++; }
+    if (isDigmon) { sfx.play!("dig_move"); S.footstepCount++; }
+    else if (!form) { sfx.play!("player00"); S.footstepCount++; }
     // else: 327 Submarimon plays no sample at all — see above.
 }

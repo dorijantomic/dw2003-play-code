@@ -73,14 +73,14 @@ const _nearCamCache = new WeakMap();
 export function nearCameraFor(placementTable: PlacementTable, key: string | null) {
   const rec = key != null ? placementTable?.[key] : null;
   if (!rec) return null;
-  if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
+  if ((rec.camera?.eye?.length! | 0) >= 12) return rec.camera;
   let cache = _nearCamCache.get(placementTable);
   if (!cache) { cache = new Map(); _nearCamCache.set(placementTable, cache); }
   if (cache.has(key)) return cache.get(key);
   let best = null, bestD = Infinity;
   for (const r of Object.values(placementTable)) {
-    if ((r?.camera?.eye?.length | 0) < 12) continue;
-    const d = Math.abs((r.standoff | 0) - (rec.standoff | 0)) * 4 + Math.abs((r.hover | 0) - (rec.hover | 0));
+    if ((r?.camera?.eye?.length! | 0) < 12) continue;
+    const d = Math.abs((r.standoff! | 0) - (rec.standoff! | 0)) * 4 + Math.abs((r.hover! | 0) - (rec.hover! | 0));
     if (d < bestD) { best = r; bestD = d; }
   }
   const cam = best ? best.camera : null;
@@ -98,7 +98,7 @@ export function closestCameraRef(sizes: Record<string, [number, number]>, rest: 
   const frame = Math.max(rest.h, 0.5 * rest.w), shape = Math.log(rest.h / rest.w);
   let best = null, bestD = Infinity;
   for (const [key, [h, w]] of Object.entries(sizes)) {
-    if ((placementTable?.[key]?.camera?.eye?.length | 0) < 12 || !(h > 0) || !(w > 0)) continue;
+    if ((placementTable?.[key]?.camera?.eye?.length! | 0) < 12 || !(h > 0) || !(w > 0)) continue;
     const d = Math.abs(Math.log(Math.max(h, 0.5 * w) / frame)) + 0.5 * Math.abs(Math.log(h / w) - shape);
     if (d < bestD) { best = { key, h, w }; bestD = d; }
   }
@@ -115,9 +115,9 @@ export function closestCameraRef(sizes: Record<string, [number, number]>, rest: 
 export function fitNearCamera(refCam, refSlot, ownSlot, k: number) {
   if (!refCam) return null;
   const fit = (p: number[]) => p && [
-    ownSlot.x + (p[0] - refSlot.x) * k,
-    ownSlot.y + (p[1] - refSlot.y) * k,
-    ownSlot.z + (p[2] - refSlot.z) * k,
+    ownSlot.x + (p[0]! - refSlot.x) * k,
+    ownSlot.y + (p[1]! - refSlot.y) * k,
+    ownSlot.z + (p[2]! - refSlot.z) * k,
   ];
   return { eye: refCam.eye.map(fit), look: refCam.look.map(fit), view: refCam.view.slice() };
 }
@@ -207,7 +207,7 @@ export function bodyBoxCorners(rest: { h: number; w: number; }, slot: { x: numbe
 export function shotPointNdc(shot, p: number[], aspect = GIANT_FIT_ASPECT) {
   if (!shot?.eye || !shot?.target || !(shot.H > 0)) return null;
   const fwd = normalize(sub3(shot.target, shot.eye));
-  const back = [-fwd[0], -fwd[1], -fwd[2]];           // camera space looks down −z
+  const back = [-fwd[0]!, -fwd[1]!, -fwd[2]!];           // camera space looks down −z
   const right = normalize(cross3(PS1_UP, back));
   const up = cross3(back, right);
   const d = sub3(p, shot.eye);
@@ -305,7 +305,7 @@ export function fitGiantNearCamera(cam, slot, rest: { h: number; w: number; } | 
   for (let i = 0; i < cam.eye.length; i++) {
     const eye = cam.eye[i], look = cam.look?.[i], H = cam.view?.[i];
     if (!eye || !look || !(H > 0)) { shots.push(null); continue; }
-    const fit = giantShotFor({ eye, target: look, H }, slot, rest, target, opts);
+    const fit = giantShotFor({ eye, target: look, H }, slot, rest!, target, opts);
     shots.push(fit);
     if (fit.changed) changed = true;
   }
@@ -367,5 +367,5 @@ export function scaledRest(rest, k: number) {
  *  nearly — below 0.7x it is ordinary), or a normal body drawn at 1.6x or more. */
 export function usesGiantFit(folder: string | null | undefined, k = 1) {
   const m = clampFighterScale(k);
-  return isGiant(folder) ? m >= GIANT_FIT_MIN_K : m >= GIANT_FIT_K;
+  return isGiant(folder!) ? m >= GIANT_FIT_MIN_K : m >= GIANT_FIT_K;
 }

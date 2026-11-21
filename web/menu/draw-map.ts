@@ -20,23 +20,23 @@ import type { GameState } from "../game/types.js";
 // it resumes free movement.
 export function _mapMove(m: MenuState, C, dx: number | undefined, dy: number | undefined) {
   const s = m.mapSpd;
-  if (dx < 0) {
-    if (m.mapCX > C.pan_x) m.mapCX = Math.max(C.pan_x, m.mapCX - s);
-    else if (m.mapCX < C.pan_x) m.mapCX = Math.max(C.x_min, m.mapCX - s);
-    else { m.mapSX = Math.min(0, m.mapSX + s); if (m.mapSX === 0) m.mapCX = C.pan_x - 1; }
-  } else if (dx > 0) {
-    if (m.mapCX < C.pan_x) m.mapCX = Math.min(C.pan_x, m.mapCX + s);
-    else if (m.mapCX > C.pan_x) m.mapCX = Math.min(C.x_max, m.mapCX + s);
-    else { m.mapSX = Math.max(C.scroll_x_min, m.mapSX - s); if (m.mapSX === C.scroll_x_min) m.mapCX = C.pan_x + 1; }
+  if (dx! < 0) {
+    if (m.mapCX! > C.pan_x) m.mapCX = Math.max(C.pan_x, m.mapCX! - s!);
+    else if (m.mapCX! < C.pan_x) m.mapCX = Math.max(C.x_min, m.mapCX! - s!);
+    else { m.mapSX = Math.min(0, m.mapSX! + s!); if (m.mapSX === 0) m.mapCX = C.pan_x - 1; }
+  } else if (dx! > 0) {
+    if (m.mapCX! < C.pan_x) m.mapCX = Math.min(C.pan_x, m.mapCX! + s!);
+    else if (m.mapCX! > C.pan_x) m.mapCX = Math.min(C.x_max, m.mapCX! + s!);
+    else { m.mapSX = Math.max(C.scroll_x_min, m.mapSX! - s!); if (m.mapSX === C.scroll_x_min) m.mapCX = C.pan_x + 1; }
   }
-  if (dy < 0) {
-    if (m.mapCY > C.pan_y) m.mapCY = Math.max(C.pan_y, m.mapCY - s);
-    else if (m.mapCY < C.pan_y) m.mapCY = Math.max(C.y_min, m.mapCY - s);
-    else { m.mapSY = Math.min(0, m.mapSY + s); if (m.mapSY === 0) m.mapCY = C.pan_y - 1; }
-  } else if (dy > 0) {
-    if (m.mapCY < C.pan_y) m.mapCY = Math.min(C.pan_y, m.mapCY + s);
-    else if (m.mapCY > C.pan_y) m.mapCY = Math.min(C.y_max, m.mapCY + s);
-    else { m.mapSY = Math.max(C.scroll_y_min, m.mapSY - s); if (m.mapSY === C.scroll_y_min) m.mapCY = C.pan_y + 1; }
+  if (dy! < 0) {
+    if (m.mapCY! > C.pan_y) m.mapCY = Math.max(C.pan_y, m.mapCY! - s!);
+    else if (m.mapCY! < C.pan_y) m.mapCY = Math.max(C.y_min, m.mapCY! - s!);
+    else { m.mapSY = Math.min(0, m.mapSY! + s!); if (m.mapSY === 0) m.mapCY = C.pan_y - 1; }
+  } else if (dy! > 0) {
+    if (m.mapCY! < C.pan_y) m.mapCY = Math.min(C.pan_y, m.mapCY! + s!);
+    else if (m.mapCY! > C.pan_y) m.mapCY = Math.min(C.y_max, m.mapCY! + s!);
+    else { m.mapSY = Math.max(C.scroll_y_min, m.mapSY! - s!); if (m.mapSY === C.scroll_y_min) m.mapCY = C.pan_y + 1; }
   }
 }
 
@@ -147,7 +147,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   // visited location markers on THIS server: every place the flag store says you have
   // been composes to a {server, loc} via walker_map (native: flag 0x2000|(ps1&0xff)
   // per stage, filler F0x8009a6b8). The current map's own marker always shows.
-  const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen));
+  const seenPs1 = new Set(visitedPs1Stages(state, MS.UI, m.mapSeen!!!!!!));
   const vis = new Set();
   for (const row of Object.values(M.walker_map) as MapSeenRow[]) {
     if (seenPs1.has(row.ps1) && row.server === server && row.loc) vis.add(row.loc);
@@ -161,7 +161,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   for (const r of M.markers) if (vis.has(r.loc)) drawClip(ctx, iconPack, r.clip, r.x + ox, r.y + oy);
 
   // hover test: 12px square at marker+(7..18) (F0x80098294), visited only
-  const cmx = m.mapCX - m.mapSX, cmy = m.mapCY - m.mapSY;
+  const cmx = m.mapCX! - m.mapSX!, cmy = m.mapCY! - m.mapSY!;
   let hov = null;
   for (const r of M.markers) {
     if (!vis.has(r.loc)) continue;
@@ -176,7 +176,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
     const A = M.current_arrow;
     const a3 = Math.floor(t * VSYNC / A.anim_vsync) % A.anim_frames;
     const ax = cur.x + A.offset[0], ay = cur.y + A.offset[1];
-    const base = m.mapCX < ax + m.mapSX ? A.clip_right : A.clip_left;
+    const base = m.mapCX! < ax + m.mapSX ? A.clip_right : A.clip_left;
     drawClip(ctx, iconPack, base + a3, ax + ox, ay + oy);
   }
 
@@ -189,7 +189,7 @@ export function _drawMapPane(ctx: CanvasRenderingContext2D, state: GameState, m:
   // top half of the screen, else top; string bank esaskmap/esamtmap[record #]
   if (hov) {
     const HV = M.hover;
-    const bottom = m.mapHoverY < 0x78;
+    const bottom = m.mapHoverY! < 0x78;
     drawClip(ctx, ststat, HV.window.clip, 0, bottom ? HV.window.y_bottom : HV.window.y_top);
     const name = M.location_names[server ? "amaterasu" : "asuka"][hov.loc] ?? "";
     name.split("\\n").forEach((line: string | undefined, i: number) =>

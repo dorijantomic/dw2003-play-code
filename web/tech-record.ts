@@ -43,7 +43,7 @@ export function dropRoll(rate: number, draw: number) {
 
 /** Draw once from the shared stream and run the drop roll. */
 export function dropPasses(rate: number, rng: { (): number | undefined; (): number; (): number | undefined; (): number; (): number; }) {
-  return dropRoll(rate, rng());
+  return dropRoll(rate, rng()!);
 }
 
 /**
@@ -56,6 +56,6 @@ export function dropPasses(rate: number, rng: { (): number | undefined; (): numb
 export function rollBattleDrop(candidates, rng: { (): number | undefined; (): number; }) {
   const list = (candidates ?? []).filter((e: { drop_item: string; }) => e && e.drop_item && e.drop_item !== "Null");
   if (list.length === 0) return null;
-  const pick = list[rng() % list.length];
+  const pick = list[rng()! % list.length];
   return dropPasses(pick.drop_rate, rng) ? pick.drop_item : null;
 }

@@ -12,11 +12,11 @@ import type { GroundDetailOpts, WaterlineOpts } from "./types.js";
 // ------------------------------------------------------------------ lake law
 export const LAKE_C = [0, -26];
 export const lakeR = (t: number) => 44 + 5.5 * Math.sin(2 * t + 0.8) + 3.2 * Math.sin(3 * t + 2.1) + 1.8 * Math.sin(5 * t + 0.3);
-export const lakeD = (x: number, z: number) => { const qx = x - LAKE_C[0], qz = z - LAKE_C[1]; return lakeR(Math.atan2(qz, qx)) - Math.hypot(qx, qz); };
+export const lakeD = (x: number, z: number) => { const qx = x - LAKE_C[0]!, qz = z - LAKE_C[1]!; return lakeR(Math.atan2(qz, qx)) - Math.hypot(qx, qz); };
 export const lakeDepth = (d: number) => Math.min(0.14 * d + 0.012 * d * d, 4.2);
 /** point at angle th (0 = +x, pi/2 = +z, the near bank) and e metres inland of the shore (e < 0 = in the water) */
-export const polar = (th: number, e: number) => { const r = lakeR(th) + e; return [LAKE_C[0] + Math.cos(th) * r, LAKE_C[1] + Math.sin(th) * r]; };
-export const angleOf = (x: number, z: number) => Math.atan2(z - LAKE_C[1], x - LAKE_C[0]);
+export const polar = (th: number, e: number) => { const r = lakeR(th) + e; return [LAKE_C[0]! + Math.cos(th) * r, LAKE_C[1]! + Math.sin(th) * r]; };
+export const angleOf = (x: number, z: number) => Math.atan2(z - LAKE_C[1]!, x - LAKE_C[0]!);
 export const GLSL_LAKE = /* glsl */`
 float lkR(float t){ return 44.0 + 5.5 * sin(2.0 * t + 0.8) + 3.2 * sin(3.0 * t + 2.1) + 1.8 * sin(5.0 * t + 0.3); }
 float lkD(vec2 p){ vec2 q = p - vec2(0.0, -26.0); return lkR(atan(q.y, q.x)) - length(q); }
@@ -292,7 +292,7 @@ export function milfoilParts(seed = 1) {
     const a = r() * 3.14, H = 0.7 + 0.5 * r(), W = 0.5, sx = Math.cos(a), sz = Math.sin(a), ox = (r() - 0.5) * 0.3, oz = (r() - 0.5) * 0.3, bend = 0.25 * r(), rows = [];
     for (let i = 0; i <= 3; i++) { const u = i / 3, hw = W * 0.5 * (0.5 + 0.5 * Math.sin(Math.PI * (0.15 + 0.7 * u))), cx = ox + Math.cos(a + 1.57) * bend * u * u, cz = oz + Math.sin(a + 1.57) * bend * u * u;
       rows.push([gb.v(cx - sx * hw, H * u, cz - sz * hw, 1, 1, 1, 0, u), gb.v(cx + sx * hw, H * u, cz + sz * hw, 1, 1, 1, 1, u)]); }
-    for (let i = 0; i < 3; i++) gb.quad(rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]);
+    for (let i = 0; i < 3; i++) gb.quad(rows[i]![0], rows[i]![1], rows[i + 1]![1], rows[i + 1]![0]);
   }
   return [{ geo: gb.geo(true), mat: cardMat("milfoil", milfoilTex(), { wind: 0.8, height: 1.2, flutter: 0.1, fade: [30, 55], shadeK: 0.85, rim: 0, trans: 0.2 }) }];
 }
@@ -337,7 +337,7 @@ function strandCard(gb: GB, p: { x: number; z: number; y: number; }, L: number, 
       const cx = p.x + ox * Math.sin(v * 1.6) + sw * sz, cz = p.z + oz * Math.sin(v * 1.6) - sw * sx, y = p.y - L * v;
       ids.push([gb.v(cx - sx * hw, y, cz - sz * hw, shade, shade, shade, 0, 1 - v), gb.v(cx + sx * hw, y, cz + sz * hw, shade, shade, shade, 1, 1 - v)]);
     }
-    for (let k = 0; k < 5; k++) gb.quad(ids[k][0], ids[k][1], ids[k + 1][1], ids[k + 1][0]);
+    for (let k = 0; k < 5; k++) gb.quad(ids[k]![0], ids[k]![1], ids[k + 1]![1], ids[k + 1]![0]);
   }
 }
 const barkCol = (i, jf: number) => (Math.floor(jf * 14) % 2 ? [0.3, 0.25, 0.19] : [0.22, 0.18, 0.14]);
@@ -427,7 +427,7 @@ void main(){ vec2 p = vW.xz * 0.032 + vec2(uTime * 0.007, uTime * 0.0035) + vW.y
 }
 export function moteCloud(n = 180, seed = 4, area = [0, -2, 40, 26], y = [0.3, 3.2]) {
   const r = rng(seed), pos = new Float32Array(n * 3), ph = new Float32Array(n);
-  for (let i = 0; i < n; i++) { pos[i * 3] = area[0] + (r() * 2 - 1) * area[2]; pos[i * 3 + 1] = y[0] + (y[1] - y[0]) * r(); pos[i * 3 + 2] = area[1] + (r() * 2 - 1) * area[3]; ph[i] = r() * 6.28; }
+  for (let i = 0; i < n; i++) { pos[i * 3] = area[0]! + (r() * 2 - 1) * area[2]!; pos[i * 3 + 1] = y[0]! + (y[1]! - y[0]!) * r(); pos[i * 3 + 2] = area[1]! + (r() * 2 - 1) * area[3]!; ph[i] = r() * 6.28; }
   const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("aPh", new THREE.BufferAttribute(ph, 1));
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(area[0], 1.5, area[1]), 120);
   const mat = new THREE.ShaderMaterial({

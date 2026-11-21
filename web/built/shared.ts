@@ -35,7 +35,7 @@ export function makePerm(seed: number) {
 }
 let PERM = makePerm(1);
 const wrap = (v: number) => ((v % 256) + 256) % 256;
-const h3 = (x: number, y: number, z: number) => PERM[wrap(PERM[wrap(PERM[wrap(x)] + y)] + z)] / 255;
+const h3 = (x: number, y: number, z: number) => PERM[wrap(PERM[wrap(PERM[wrap(x)]! + y)]! + z)]! / 255;
 const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export function noise3JS(x: number, y: number, z: number) {
@@ -54,7 +54,7 @@ const permTex = new THREE.DataTexture(new Uint8Array(256), 256, 1, THREE.RedForm
 permTex.magFilter = permTex.minFilter = THREE.NearestFilter; permTex.generateMipmaps = false;
 export function initNoise(seed: number) {
   PERM = makePerm(seed);
-  permTex.image.data.set(PERM); permTex.needsUpdate = true;
+  permTex.image!.data.set(PERM); permTex.needsUpdate = true;
   U.uNoiseSeed.value = seed;
 }
 
@@ -291,7 +291,7 @@ export const light = { mode: "day", skyGraded: false, gradedFor: null };
 const lumaJS = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 function gradeNight(c: THREE.Color) {   // forced-night sky grade, in place, on a THREE.Color
   const l = lumaJS(c), s = NIGHT_LIGHT.SKY_SAT, g = NIGHT_LIGHT.SKY_GAIN;
-  c.setRGB((l + (c.r - l) * s) * g[0], (l + (c.g - l) * s) * g[1], (l + (c.b - l) * s) * g[2]);
+  c.setRGB((l + (c.r - l) * s) * g[0]!, (l + (c.g - l) * s) * g[1]!, (l + (c.b - l) * s) * g[2]!);
 }
 /** Light the built world from the sky's mode. skyNight = the sky's info.night ({mode, measured}); call it after every
  *  sky (re)build. Day writes today's values back; night lights from the moon. A night FORCED on a measured-day arena
@@ -339,7 +339,7 @@ const enc = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 /
  *  lit multiplier and the shade multiplier, both as toonLight makes them on a white albedo, sRGB-encoded. */
 export function modelLight() {
   const st = U.uShadowTint.value, l = Math.max(lumaJS(st), 1e-4), m = U.uShadowMix.value, k = U.uShadeK.value, a = U.uAmbient.value;
-  const sh = [st.r, st.g, st.b].map((v, i) => (1 + (v / l - 1) * m) * k * [a.r, a.g, a.b][i]);
+  const sh = [st.r, st.g, st.b].map((v, i) => (1 + (v / l - 1) * m) * k * [a.r, a.g, a.b][i]!);
   const lc = U.uLightColor.value;
   return { dir: U.uLightDir.value.toArray(), colour: [lc.r, lc.g, lc.b].map(enc), ambient: sh.map(enc) };
 }
@@ -438,7 +438,7 @@ export const wind = {
   t0: null,
   tick(nowMs: number | null) {
     if (this.t0 == null) this.t0 = nowMs;
-    U.uWindTime.value = (nowMs - this.t0) / 1000;
+    U.uWindTime.value = (nowMs! - this.t0!) / 1000;
   },
 };
 
@@ -447,12 +447,12 @@ export const wind = {
  *  convex hull of the eye and the fighter's sphere (tangent lines from the eye, closed by the sphere), so only what
  *  stands BETWEEN the eye and the fighter counts. Worked in the plane of the axis: a = along, d = off the axis. */
 export function inViewCone(c: number[], rho: number, e, f: number[], R: number) {
-  const ax = [f[0] - e[0], f[1] - e[1], f[2] - e[2]], L = Math.hypot(...ax);
-  const v = [c[0] - e[0], c[1] - e[1], c[2] - e[2]];
-  if (Math.hypot(c[0] - f[0], c[1] - f[1], c[2] - f[2]) <= R + rho) return true;   // touches the fighter's sphere
+  const ax = [f[0]! - e[0], f[1]! - e[1], f[2]! - e[2]], L = Math.hypot(...ax);
+  const v = [c[0]! - e[0], c[1]! - e[1], c[2]! - e[2]];
+  if (Math.hypot(c[0]! - f[0]!, c[1]! - f[1]!, c[2]! - f[2]!) <= R + rho) return true;   // touches the fighter's sphere
   if (L <= R) return true;                                                          // the eye is in the fighter's sphere
-  const a = (v[0] * ax[0] + v[1] * ax[1] + v[2] * ax[2]) / L;
-  const d = Math.sqrt(Math.max(0, v[0] * v[0] + v[1] * v[1] + v[2] * v[2] - a * a));
+  const a = (v[0]! * ax[0]! + v[1]! * ax[1]! + v[2]! * ax[2]!) / L;
+  const d = Math.sqrt(Math.max(0, v[0]! * v[0]! + v[1]! * v[1]! + v[2]! * v[2]! - a * a));
   const t = Math.sqrt(L * L - R * R), ta = t * t / L, td = t * R / L;               // tangent point (along, off)
   if (a >= 0 && a <= ta && d * ta <= a * td) return true;                           // centre inside the cone part
   // distance from (a, d) to the segment eye -> tangent point (the cone's side)

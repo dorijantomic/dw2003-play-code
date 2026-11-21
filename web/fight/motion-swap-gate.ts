@@ -97,12 +97,12 @@ export const SWAP_NEEDS = Object.freeze({ idle: "all", hit: "all", death: "legs"
 
 const ROT_STEP = (A: number[], B: number[]) => {
   let d = 0;
-  for (let k = 0; k < 9; k++) d += A[k] * B[k];
+  for (let k = 0; k < 9; k++) d += A[k]! * B[k]!;
   return Math.acos(Math.max(-1, Math.min(1, (d - 1) / 2)));
 };
-const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const unit = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-const angleDeg = (a: number[], b: number[]) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * 180 / Math.PI;
+const dist = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+const unit = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0]! / l, a[1]! / l, a[2]! / l]; };
+const angleDeg = (a: number[], b: number[]) => Math.acos(Math.max(-1, Math.min(1, a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!))) * 180 / Math.PI;
 const pick = (a: number[], n: number) => (a.length <= n ? a.slice() : Array.from({ length: n }, (_, k) => a[Math.round(((a.length - 1) * k) / (n - 1))]));
 /** The frames a timeline table plays, in order (0x8000+ entries are LOOP markers, not frames). */
 export function playedFrames(model, table: number) {
@@ -194,7 +194,7 @@ export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts
   if (frames.length < 2) return null;
   const lo = frames[0], hi = frames[frames.length - 1];
   const poseT = (f: number | undefined) => poseFromChannels(baked, f);
-  const poseS = (f: number | undefined) => poseFromChannels(source, f - off);
+  const poseS = (f: number | undefined) => poseFromChannels(source, f! - off);
   const sampleT = pick(frames, samples);
   const first = poseT(lo), last = poseT(hi);
 
@@ -496,7 +496,7 @@ export function judgeFill(bake, slot: number, model = null, opts: SwapJudgeOpts 
   if (restIdle != null && restIdle > 0.25) notes.push(`rest-idle: the bake's rest frame is ${restIdle.toFixed(2)} rad from the idle clip's start (K23 neutralFrame)`);
   if (startGap > B.start) keys.push("start");
   if (kind !== "death" && endGap > (B.end ?? 0.25)) keys.push("end");
-  if (numbers.covered < 0.55) keys.push("coverage");
+  if (numbers.covered! < 0.55) keys.push("coverage");
   const over = (name: string, v: number | null | undefined, bar: number | null) => { if (v != null && bar != null && v > bar) keys.push(name); };
   over("step", numbers.step, B.step);
   over("ankle", numbers.ankle, B.ankle);

@@ -112,9 +112,9 @@ let rvMask: HTMLCanvasElement | null = null, rvTmp = null, rvSprite: HTMLCanvasE
 function revealSprite() {
     if (rvSprite) return rvSprite;
     rvSprite = document.createElement("canvas"); rvSprite.width = rvSprite.height = 64;
-    const x = rvSprite.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    const x = rvSprite.getContext("2d"), g = x!.createRadialGradient(32, 32, 0, 32, 32, 32);
     g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.4, "rgba(255,255,255,0.55)"); g.addColorStop(1, "rgba(255,255,255,0)");
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    x!.fillStyle = g; x!.fillRect(0, 0, 64, 64);
     return rvSprite;
 }
 setReveal({
@@ -126,19 +126,19 @@ setReveal({
         if (!rvMask || rvMask.width !== VIEW_W) { rvMask = document.createElement("canvas"); rvMask.width = VIEW_W; rvMask.height = VIEW_H; }
         if (!rvTmp || rvTmp.width !== snap.width || rvTmp.height !== snap.height) { rvTmp = document.createElement("canvas"); rvTmp.width = snap.width; rvTmp.height = snap.height; }
         const mx = rvMask.getContext("2d");
-        mx.setTransform(1, 0, 0, 1, 0, 0); mx.globalCompositeOperation = "source-over"; mx.clearRect(0, 0, VIEW_W, VIEW_H);
-        mx.globalCompositeOperation = "lighter";
+        mx!.setTransform(1, 0, 0, 1, 0, 0); mx!.globalCompositeOperation = "source-over"; mx!.clearRect(0, 0, VIEW_W, VIEW_H);
+        mx!.globalCompositeOperation = "lighter";
         let any = false;
         for (const m of sc2.lamps) {
             if (!m.rec) continue;
             const rad = 12 + m.sz * 2.0, small = 0.5 + 0.5 * clamp01(m.sz / 24), x = m.x - S.camX, y = m.y - S.camY + (m.wall ? rad * 0.2 : 0);
             if (x < -rad || x > VIEW_W + rad || y < -rad || y > VIEW_H + rad) continue;
             any = true;
-            mx.globalAlpha = a * small;
-            mx.drawImage(revealSprite(), x - rad, y - rad * 0.8, rad * 2, rad * 1.6);
+            mx!.globalAlpha = a * small;
+            mx!.drawImage(revealSprite(), x - rad, y - rad * 0.8, rad * 2, rad * 1.6);
         }
         if (!any) return;
-        mx.globalAlpha = 1;
+        mx!.globalAlpha = 1;
         const tx = rvTmp.getContext("2d");
         tx.setTransform(1, 0, 0, 1, 0, 0); tx.globalCompositeOperation = "copy"; tx.drawImage(snap, 0, 0);
         tx.globalCompositeOperation = "destination-in"; tx.drawImage(rvMask, 0, 0, rvTmp.width, rvTmp.height);
@@ -196,19 +196,19 @@ function findLamps(S) {
     const seen = new Uint8Array(cols * rows), out: any = [], windows = [];
     let bx0 = 0, bx1 = 0, by0 = 0, by1 = 0;
     for (let i = 0; i < cnt.length; i++) {
-        if (cnt[i] < 3 || seen[i]) continue;
+        if (cnt[i]! < 3 || seen[i]) continue;
         let sx = 0, sy = 0, sw = 0, n = 0;
         bx0 = bx1 = i % cols; by0 = by1 = (i / cols) | 0;
         const stack = [i]; seen[i] = 1;
         while (stack.length) {
-            const c = stack.pop(), cx = c % cols, cy = (c / cols) | 0;
+            const c = stack.pop(), cx = c! % cols, cy = (c! / cols) | 0;
             sx += (cx + 0.5) * cnt[c]; sy += (cy + 0.5) * cnt[c]; sw += cnt[c]; n++;
             bx0 = Math.min(bx0, cx); bx1 = Math.max(bx1, cx); by0 = Math.min(by0, cy); by1 = Math.max(by1, cy);
             for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
                 const nx = cx + dx, ny = cy + dy;
                 if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
                 const k = ny * cols + nx;
-                if (cnt[k] >= 2 && !seen[k]) { seen[k] = 1; stack.push(k); }
+                if (cnt[k]! >= 2 && !seen[k]) { seen[k] = 1; stack.push(k); }
             }
         }
         const bw = bx1 - bx0 + 1, bh = by1 - by0 + 1;
@@ -253,15 +253,15 @@ function makeFrost() {
     cv.width = VIEW_W; cv.height = VIEW_H;
     const g = cv.getContext("2d");
     const r = rng(0xf205);
-    const vg = g.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.66);
+    const vg = g!.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.4, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.66);
     vg.addColorStop(0, "rgba(225,240,255,0)"); vg.addColorStop(0.65, "rgba(225,240,255,0.14)"); vg.addColorStop(1, "rgba(235,246,255,0.55)");
-    g.fillStyle = vg; g.fillRect(0, 0, VIEW_W, VIEW_H);
-    g.strokeStyle = "rgba(247,252,255,0.75)"; g.lineCap = "round";
+    g!.fillStyle = vg; g!.fillRect(0, 0, VIEW_W, VIEW_H);
+    g!.strokeStyle = "rgba(247,252,255,0.75)"; g!.lineCap = "round";
     const branch = (x: number, y: number, a: number, len: number, w: number, depth: number) => {
         if (depth > 3 || len < 3) return;
-        g.lineWidth = w; g.beginPath(); g.moveTo(x, y);
+        g!.lineWidth = w; g!.beginPath(); g!.moveTo(x, y);
         const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;
-        g.lineTo(nx, ny); g.stroke();
+        g!.lineTo(nx, ny); g!.stroke();
         branch(nx, ny, a + 0.55 + r() * 0.3, len * 0.6, w * 0.7, depth + 1);
         branch(nx, ny, a - 0.55 - r() * 0.3, len * 0.6, w * 0.7, depth + 1);
     };
@@ -273,10 +273,10 @@ function makeFrost() {
         branch(x, y, toward + (r() - 0.5) * 0.9, 9 + r() * 10, 1.2, 0);
     }
     // keep the middle of the picture clear: fade everything out toward the centre
-    g.globalCompositeOperation = "destination-in";
-    const mask = g.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.36, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.6);
+    g!.globalCompositeOperation = "destination-in";
+    const mask = g!.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.36, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.6);
     mask.addColorStop(0, "rgba(0,0,0,0)"); mask.addColorStop(1, "rgba(0,0,0,1)");
-    g.fillStyle = mask; g.fillRect(0, 0, VIEW_W, VIEW_H);
+    g!.fillStyle = mask; g!.fillRect(0, 0, VIEW_W, VIEW_H);
     return cv;
 }
 
@@ -514,7 +514,7 @@ export function drawScenery2(ctx, S) {
         for (let i = 0; i < Math.min(feet.length, 3); i++) {
             const f = feet[i];
             const moving = i === 0 ? S.moving : S.moving;
-            if (now >= nextBreath[i] || (i === 0 && wasMoving && !S.moving && now >= nextBreath[i] - 1500)) {
+            if (now >= nextBreath[i]! || (i === 0 && wasMoving && !S.moving && now >= nextBreath[i]! - 1500)) {
                 const left = /left/.test(S.dir || ""), right = /right/.test(S.dir || "");
                 breath.push({ x: f.x + (left ? -4 : right ? 4 : 0), y: f.y - (/up/.test(S.dir || "") ? 30 : 24), born: now, life: 1700 + Math.random() * 500, big: !S.moving && i === 0, vx: (left ? -3 : right ? 3 : 0) });
                 nextBreath[i] = now + (moving ? 1700 : 2600) + i * 450 + Math.random() * 500;

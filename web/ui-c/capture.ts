@@ -121,7 +121,7 @@ export function artHook(ctx: CanvasRenderingContext2D | undefined, draw) {
     if (!s || s.inArt || ctx !== s.ctx) return false;
     const art = s.getArt();
     if (!art) return false;
-    const m = ctx.getTransform();
+    const m = ctx!.getTransform();
     art.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
     s.inArt = true;
     try { draw(art); } finally { s.inArt = false; }
@@ -153,7 +153,7 @@ export function textRunHook(ctx: CanvasRenderingContext2D | null | undefined, ru
 export function partHook(ctx: CanvasRenderingContext2D | undefined, part) {
     const s = cur;
     if (!s || s.inArt || ctx !== s.ctx) return false;
-    const rel = relative(s.m0, ctx.getTransform());
+    const rel = relative(s.m0, ctx!.getTransform());
     s.parts.push({ layer: "under", bx: 0, by: 0, ...part, rel });
     s.claimed.push({ pack: null, id: String(part.part), part: part.part });
     return true;

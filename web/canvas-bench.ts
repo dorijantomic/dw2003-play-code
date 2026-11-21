@@ -7,7 +7,7 @@ const CLOSE = /(^|[#&,])close($|[&,=])/.test(location.hash);
 const WARM_MS = 1000, MEASURE_MS = 4000;
 const LW = 640, LH = 480;
 const hud = document.getElementById("hud");
-const say = (t: string | null) => { hud.textContent = t; };
+const say = (t: string | null) => { hud!.textContent = t; };
 
 function browserName(ua: string) {
     if (/Firefox\//.test(ua)) return "firefox";
@@ -39,23 +39,23 @@ function makeSource() {
     let s = 12345;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
     for (let y = 0; y < 1280; y += 8) for (let x = 0; x < 1664; x += 8) {
-        g.fillStyle = "rgb(" + (rnd() * 256 | 0) + "," + (rnd() * 256 | 0) + "," + (rnd() * 256 | 0) + ")";
-        g.fillRect(x, y, 8, 8);
+        g!.fillStyle = "rgb(" + (rnd() * 256 | 0) + "," + (rnd() * 256 | 0) + "," + (rnd() * 256 | 0) + ")";
+        g!.fillRect(x, y, 8, 8);
     }
     return c;
 }
 function makeSprite() {
     const c = document.createElement("canvas"); c.width = 64; c.height = 64;
     const g = c.getContext("2d");
-    g.fillStyle = "#e0a030"; g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
-    g.fillStyle = "#304090"; g.fillRect(20, 20, 24, 24);
-    g.fillStyle = "rgba(255,255,255,0.6)"; g.fillRect(8, 8, 16, 16);
+    g!.fillStyle = "#e0a030"; g!.beginPath(); g!.arc(32, 32, 28, 0, Math.PI * 2); g!.fill();
+    g!.fillStyle = "#304090"; g!.fillRect(20, 20, 24, 24);
+    g!.fillStyle = "rgba(255,255,255,0.6)"; g!.fillRect(8, 8, 16, 16);
     return c;
 }
 function makeStrips() {
     const c = document.createElement("canvas"); c.width = LW; c.height = LH;
     const g = c.getContext("2d");
-    for (let y = 0; y < LH; y += 8) { g.fillStyle = "hsl(" + ((y * 7) % 360) + ",50%," + (30 + (y % 5) * 6) + "%)"; g.fillRect(0, y, LW, 8); }
+    for (let y = 0; y < LH; y += 8) { g!.fillStyle = "hsl(" + ((y * 7) % 360) + ",50%," + (30 + (y % 5) * 6) + "%)"; g!.fillRect(0, y, LW, 8); }
     return c;
 }
 function makeGlCanvas() {
@@ -105,7 +105,7 @@ function getCachedGrads() {
     if (!cachedGrads) {
         const g0 = document.createElement("canvas").getContext("2d");
         cachedGrads = RECTS.map((r) => {
-            const g = g0.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+            const g = g0!.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
             g.addColorStop(0, "rgba(255,200,80,0.5)"); g.addColorStop(1, "rgba(255,200,80,0)");
             return g;
         });
@@ -138,9 +138,9 @@ function gradStrip() {
     if (!gradCanvas) {
         gradCanvas = document.createElement("canvas"); gradCanvas.width = 1; gradCanvas.height = 256;
         const g = gradCanvas.getContext("2d");
-        const lg = g.createLinearGradient(0, 0, 0, 256);
+        const lg = g!.createLinearGradient(0, 0, 0, 256);
         lg.addColorStop(0, "rgba(255,200,80,0.5)"); lg.addColorStop(1, "rgba(255,200,80,0)");
-        g.fillStyle = lg; g.fillRect(0, 0, 1, 256);
+        g!.fillStyle = lg; g!.fillRect(0, 0, 1, 256);
     }
     return gradCanvas;
 }
@@ -162,19 +162,19 @@ function heavy(ctx) {
     sprites(ctx);
 }
 function radial1(ctx) {
-    const r = RECTS[0], cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r.w / 2);
+    const r = RECTS[0], cx = r!.x + r!.w / 2, cy = r!.y + r!.h / 2;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r!.w / 2);
     g.addColorStop(0, "rgba(255,200,80,0.5)"); g.addColorStop(1, "rgba(255,200,80,0)");
-    ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = g; ctx.fillRect(r!.x, r!.y, r!.w, r!.h);
 }
 let radialPreCanvas: HTMLCanvasElement | null = null;
 function radialPre() {
     if (!radialPreCanvas) {
         radialPreCanvas = document.createElement("canvas"); radialPreCanvas.width = 256; radialPreCanvas.height = 256;
         const g = radialPreCanvas.getContext("2d");
-        const rg = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+        const rg = g!.createRadialGradient(128, 128, 0, 128, 128, 128);
         rg.addColorStop(0, "rgba(255,200,80,0.5)"); rg.addColorStop(1, "rgba(255,200,80,0)");
-        g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+        g!.fillStyle = rg; g!.fillRect(0, 0, 256, 256);
     }
     return radialPreCanvas;
 }
@@ -204,11 +204,11 @@ const CASES = [
     { id: 17, d: "case 2 + 20 fillRect with new HORIZONTAL linear gradient each", f: (c) => { big(c); hlinears(c); } },
     { id: 18, d: "case 2 + 1 vertical linear gradient fillRect only", f: (c) => {
         big(c); const r = RECTS[0];
-        const g = c.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+        const g = c.createLinearGradient(r!.x, r!.y, r!.x, r!.y + r!.h);
         g.addColorStop(0, "rgba(255,200,80,0.5)"); g.addColorStop(1, "rgba(255,200,80,0)");
-        c.fillStyle = g; c.fillRect(r.x, r.y, r.w, r.h);
+        c.fillStyle = g; c.fillRect(r!.x, r!.y, r!.w, r!.h);
     } },
-    { id: 19, d: "case 2 + 20 vertical linear gradients created once (cached), reused every frame", f: (c: { fillStyle: CanvasGradient | undefined; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => { big(c); const gs = getCachedGrads(); for (let i = 0; i < RECTS.length; i++) { const r = RECTS[i]; c.fillStyle = gs[i]; c.fillRect(r.x, r.y, r.w, r.h); } } },
+    { id: 19, d: "case 2 + 20 vertical linear gradients created once (cached), reused every frame", f: (c: { fillStyle: CanvasGradient | undefined; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => { big(c); const gs = getCachedGrads(); for (let i = 0; i < RECTS.length; i++) { const r = RECTS[i]; c.fillStyle = gs[i]; c.fillRect(r!.x, r!.y, r!.w, r!.h); } } },
     { id: 20, d: "case 2 + 20 vertical linear gradients with 3 stops", f: (c) => { big(c); linears3(c); } },
     { id: 21, d: "case 2 + 10 slanted shafts, lighter, horizontal 3-stop gradient each", f: (c) => { big(c); shafts(c); } },
     { id: 22, d: "case 2 + 20 drawImage of pre-made 1x256 gradient canvas stretched to 260x195", f: (c: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number) => void; }) => { big(c); gradImages(c); } },
@@ -217,7 +217,7 @@ const CASES = [
     { id: 31, fresh: true, keep: true, d: "FRESH canvas: heavy + 1 radial gradient fillRect 260x195", f: (c) => { heavy(c); radial1(c); } },
     { id: 32, fresh: true, d: "FRESH canvas: heavy + ctx.filter sepia(0.3) saturate(1.2), 1 sprite, filter none", f: (c) => { heavy(c); c.filter = "sepia(0.3) saturate(1.2)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
     { id: 33, fresh: true, d: "FRESH canvas: heavy + ctx.filter brightness(0.9), 1 sprite, filter none", f: (c) => { heavy(c); c.filter = "brightness(0.9)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
-    { id: 34, fresh: true, d: "FRESH canvas: heavy + 1 drawImage of radial gradient pre-rendered once into 256x256 canvas, scaled to 260x195", f: (c) => { heavy(c); const r = RECTS[0]; c.drawImage(radialPre(), 0, 0, 256, 256, r.x, r.y, r.w, r.h); } },
+    { id: 34, fresh: true, d: "FRESH canvas: heavy + 1 drawImage of radial gradient pre-rendered once into 256x256 canvas, scaled to 260x195", f: (c) => { heavy(c); const r = RECTS[0]; c.drawImage(radialPre(), 0, 0, 256, 256, r!.x, r!.y, r!.w, r!.h); } },
     { id: 35, reuse: true, d: "NOT fresh: canvas kept from case 31, heavy only (is the switch permanent?)", f: (c) => { heavy(c); } },
 ];
 // Cases that must not run (no linear-gradient case runs any more). Code kept above.
@@ -229,7 +229,7 @@ let nativeW = 0, nativeH = 0;
 function freshCanvas(w: number, h: number) {
     const n = document.createElement("canvas");
     n.id = "cv"; n.width = w; n.height = h;
-    cvEl.replaceWith(n); cvEl = n;
+    cvEl!.replaceWith(n); cvEl = n;
     return n.getContext("2d");
 }
 
@@ -237,14 +237,14 @@ let keptEl = null;
 // Take the case canvas out of the page; a blank placeholder (same id/CSS, no context) takes its place.
 function removeCaseCanvas() {
     const ph = document.createElement("canvas"); ph.id = "cv";
-    cvEl.replaceWith(ph); cvEl = ph;
+    cvEl!.replaceWith(ph); cvEl = ph;
 }
 function runCase(cs) {
     return new Promise((resolve) => {
         let w = cs.w || nativeW, h = cs.h || nativeH, ctx;
         if (cs.reuse) {
             if (!keptEl) throw new Error("case " + cs.id + ": no kept canvas (case 31 did not run)");
-            cvEl.replaceWith(keptEl); cvEl = keptEl; w = keptEl.width; h = keptEl.height;
+            cvEl!.replaceWith(keptEl); cvEl = keptEl; w = keptEl.width; h = keptEl.height;
             ctx = keptEl.getContext("2d");
         } else ctx = freshCanvas(w, h);
         const sx = w / LW, sy = h / LH;
@@ -261,18 +261,18 @@ function runCase(cs) {
             cs.f(ctx);
             const b = performance.now();
             if (measuring) {
-                if (mFirst === null) { mFirst = ts; } else { gaps.push(ts - last); }
+                if (mFirst === null) { mFirst = ts; } else { gaps.push(ts - last!); }
                 mLast = ts; frames++; js.push(b - a);
             }
             last = ts;
             if (el >= WARM_MS + MEASURE_MS) {
                 const sg = gaps.slice().sort((x, y) => x - y);
-                const dur = mLast - mFirst;
+                const dur = mLast! - mFirst!;
                 if (cs.keep) keptEl = cvEl;
                 if (cs.fresh || cs.reuse) removeCaseCanvas();
                 resolve({
                     id: cs.id, description: cs.d, fresh: !!cs.fresh, fps: dur > 0 ? r3((frames - 1) * 1000 / dur) : 0,
-                    gapMedian: r3(pct(sg, 0.5)), gapP95: r3(pct(sg, 0.95)), gapWorst: r3(sg[sg.length - 1]),
+                    gapMedian: r3(pct(sg, 0.5)!), gapP95: r3(pct(sg, 0.95)!), gapWorst: r3(sg[sg.length - 1]!),
                     jsMs: r3(js.reduce((s, v) => s + v, 0) / (js.length || 1)),
                     canvasW: w, canvasH: h, canvas: w + "x" + h, frames,
                 });
@@ -320,7 +320,7 @@ async function main() {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(new Blob([JSON.stringify(results, null, 1)], { type: "application/json" }));
         a.download = results.meta.browser + "-canvasbench-" + Date.now() + ".json";
-        a.textContent = "download results"; hud.appendChild(document.createElement("br")); hud.appendChild(a);
+        a.textContent = "download results"; hud!.appendChild(document.createElement("br")); hud!.appendChild(a);
     }
     running = false;
     if (CLOSE) { await new Promise((r) => setTimeout(r, 1000)); window.close(); }

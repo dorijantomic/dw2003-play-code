@@ -28,7 +28,7 @@ const raw = [];
 for (let i = 0; i < SLOT_COUNT; i++) raw.push(localStorage.getItem(slotKey(i)));
 const slots = decodeSlots(raw);
 const ready = slots.filter((slot) => slot.hasImage);
-let selected = ready.length ? ready[0].slot : null;
+let selected = ready.length ? ready[0]!.slot : null;
 
 function bag(counts) {
   const rows = counts.map((n, id) => [id, n]).filter(([id, n]) => id >= 1 && n > 0);
@@ -137,7 +137,7 @@ function renderPicker() {
   diffSel.innerHTML = `<option value="">choose a slot…</option>` +
     others.map((slot) => `<option value="${slot.slot}">Slot ${slot.slot + 1}${slot.record?.name ? " — " + esc(slot.record.name) : ""}</option>`).join("");
   diffSel.disabled = others.length === 0;
-  if (others.length) diffSel.value = String(others[0].slot);
+  if (others.length) diffSel.value = String(others[0]!.slot);
   renderDiff();
 }
 

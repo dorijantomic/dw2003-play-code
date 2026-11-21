@@ -54,16 +54,16 @@ export function makeRender(B$: Battle3DContext) {
 function render(dt) {
     B$.animTime += dt;
 
-    const W = B$.canvas.width, H = B$.canvas.height;
-    B$.gl.viewport(0, 0, W, H);
-    if (B$.builtArena || (B$.isolatedMode && !B$.viewerStudio)) B$.gl.clearColor(0, 0, 0, 0);
-    else B$.gl.clearColor(0.04, 0.04, 0.08, 1);   // #0a0a14 = the sky gradient's bottom stop
-    B$.gl.clear(B$.gl.COLOR_BUFFER_BIT | B$.gl.DEPTH_BUFFER_BIT);
+    const W = B$.canvas!.width, H = B$.canvas!.height;
+    B$.gl!.viewport(0, 0, W, H);
+    if (B$.builtArena || (B$.isolatedMode && !B$.viewerStudio)) B$.gl!.clearColor(0, 0, 0, 0);
+    else B$.gl!.clearColor(0.04, 0.04, 0.08, 1);   // #0a0a14 = the sky gradient's bottom stop
+    B$.gl!.clear(B$.gl!.COLOR_BUFFER_BIT | B$.gl!.DEPTH_BUFFER_BIT);
 
-    B$.gl.enable(B$.gl.DEPTH_TEST);
-    B$.gl.depthFunc(B$.gl.LEQUAL);
-    B$.gl.enable(B$.gl.BLEND);
-    B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+    B$.gl!.enable(B$.gl!.DEPTH_TEST);
+    B$.gl!.depthFunc(B$.gl!.LEQUAL);
+    B$.gl!.enable(B$.gl!.BLEND);
+    B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
 
     // ── Digimon world placement ──
     // Like the real game: our digimon in the foreground, the enemy far down-field near the
@@ -81,8 +81,8 @@ function render(dt) {
     // (stepFormChangeFrame, shared with the tests). The frame is drawn with the snapshot.
     const dvView = B$.dvCam ? stepFormChangeFrame(B$.camRec, B$.dvCam, B$.dvFrame).shot : null;
     const dvAtOrigin = !!B$.dvCam?.atOrigin();
-    const pBob = Math.sin(B$.animTime * 3) * 2;
-    const eBob = Math.sin(B$.animTime * 3 + Math.PI) * 2;
+    const pBob = Math.sin(B$.animTime! * 3) * 2;
+    const eBob = Math.sin(B$.animTime! * 3 + Math.PI) * 2;
     // Slot position + the action VM's movement delta (op2 modes 3/7/8: dash to contact,
     // signature leap, return home). Delta is PS1 units, same frame as the slot.
     const pMove = B$.playerAnim8r && !dvAtOrigin ? B$.playerAnim8r.moveDelta() : [0, 0, 0];
@@ -97,8 +97,8 @@ function render(dt) {
                                   ARENA);
     const enemyPos  = ps1ToRender([eHome.x + eMove[0], eHome.y + eMove[1], eHome.z + eMove[2]],
                                   ARENA);
-    playerPos[1] += pBob;
-    enemyPos[1]  += eBob;
+    playerPos[1]! += pBob;
+    enemyPos[1]!  += eBob;
     // Facing: the renderer bakes the D-flip (180° about Y) into every model. The game's player
     // root rot = that flip (faces +Z, toward the enemy) → yaw 0; the game's enemy root rot =
     // identity → +π so it faces back (−Z, toward the player). They square off.
@@ -153,10 +153,10 @@ function render(dt) {
       // GLOBAL_SPEED (the walker's 2x animation tempo, a visual preference), which halved the
       // glide to ~0.5 s and read as a fast zoom rather than the original's slow one.
       // While a form change runs, its camera run is stepFormChangeFrame's (once per presentation frame).
-      if (!B$.dvCam) B$.camRec.tick(CAMERA_FRAME_DELTA);
-      B$.coordinator.tick(speed);
+      if (!B$.dvCam) B$.camRec!.tick(CAMERA_FRAME_DELTA);
+      B$.coordinator!.tick(speed);
       B$._layoutExtras();
-      for (const f of B$.extras.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
+      for (const f of B$.extras!.values()) {   // (multiplayer) slide sideways into the target's lane for an attack, and back
         if (f.follow) {                                             // sideways in step with the clip's own run
           if (f.anim8r?.vm && !f.anim8r.vm.ended) {
             const k = attackLateralFraction(f.anim8r.moveDelta()[2], f.follow.reach);
@@ -173,10 +173,10 @@ function render(dt) {
       // original's blink timer counts down by (D0x800a4464), so the blink keeps the
       // cadence the record was authored for.
       for (const patch of B$.playerPatches?.update(speed, B$.patchState("player")) || [])
-        B$.blitTexturePatch(B$.playerTex, B$.playerPage, patch);
+        B$.blitTexturePatch(B$.playerTex!, B$.playerPage!, patch);
       for (const patch of B$.enemyPatches?.update(speed, B$.patchState("enemy")) || [])
-        B$.blitTexturePatch(B$.enemyTex, B$.enemyPage, patch);
-      for (const f of B$.extras.values()) {   // (multiplayer) the extra fighters' eyes
+        B$.blitTexturePatch(B$.enemyTex!, B$.enemyPage!, patch);
+      for (const f of B$.extras!.values()) {   // (multiplayer) the extra fighters' eyes
         if (!f.patches || !f.page) continue;
         for (const patch of f.patches.update(speed, f.anim8r ? f.anim8r.animationId : 1)) B$.blitTexturePatch(f.tex, f.page, patch);
       }
@@ -198,7 +198,7 @@ function render(dt) {
       }
     }
     B$._acc += dt;
-    const stepDur = 1 / B$.STEP_HZ;
+    const stepDur = 1 / B$.STEP_HZ!;
     // DNA clip 12 plays at the same rate as every other action/tech animation (GLOBAL_SPEED);
     // speeding it up made the models animate comically fast.
     //
@@ -209,14 +209,14 @@ function render(dt) {
     // At level 2 the published value is 1 on every fourth tick and 0 on the other three, so
     // the pose freezes for three frames and steps one on the fourth — the original's stutter
     // is preserved rather than smoothed into a constant quarter speed.
-    while (B$._acc >= stepDur) {
-      B$._acc -= stepDur;
+    while (B$._acc! >= stepDur) {
+      B$._acc! -= stepDur;
       if (B$.slowMoLevel) {
         const step = slowMoStep(B$.slowMoLevel, LOSS_CAM.deltaPerFrame, B$.slowMoAcc);
         B$.slowMoAcc = step.acc;
         B$.slowMoDelta = step.delta;
-        B$.slowMoTickSpeed = B$.GLOBAL_SPEED * (step.delta / LOSS_CAM.deltaPerFrame);
-        B$.slowMoTicks += 1;
+        B$.slowMoTickSpeed = B$.GLOBAL_SPEED! * (step.delta / LOSS_CAM.deltaPerFrame);
+        B$.slowMoTicks! += 1;
         B$.slowMoUnits += step.delta;
       } else {
         B$.slowMoDelta = LOSS_CAM.deltaPerFrame;
@@ -227,11 +227,11 @@ function render(dt) {
 
     // Key-off sustained battle voices when the attack finishes (the effect objects
     // are freed): a looping op10 sound plays for the attack, then stops. Edge-triggered.
-    const coordActive = B$.coordinator.active;
+    const coordActive = B$.coordinator!.active;
     if (B$._coordWasActive && !coordActive && B$.sfx) {
-      B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy");
+      B$.sfx.stopBattle!("player"); B$.sfx.stopBattle!("enemy");
       // A clip cut short before its op10 type 91 would otherwise leave the whirl ringing.
-      B$.sfx.stopSustained?.(B$.SUSTAINED_LOOP_KEY);
+      B$.sfx.stopSustained?.(B$.SUSTAINED_LOOP_KEY!);
     }
     B$._coordWasActive = coordActive;
 
@@ -240,9 +240,9 @@ function render(dt) {
     // pose snaps to the latest tick, and when the render rate isn't phase-locked to STEP_HZ the
     // 0-tick/2-tick beat shows as an occasional stutter/hitch. renderSample() suppresses the lerp
     // across phase cuts/loop-backs so only genuinely continuous motion is smoothed.
-    const alpha = stepDur > 0 ? Math.min(1, B$._acc / stepDur) : 0;
-    const pSample = usePlayerA ? B$.playerAnim8r.renderSample(alpha) : null;
-    const eSample = useEnemyA  ? B$.enemyAnim8r.renderSample(alpha)  : null;
+    const alpha = stepDur > 0 ? Math.min(1, B$._acc! / stepDur) : 0;
+    const pSample = usePlayerA ? B$.playerAnim8r!.renderSample(alpha) : null;
+    const eSample = useEnemyA  ? B$.enemyAnim8r!.renderSample(alpha)  : null;
 
     B$.playerFrame = pSample ? pSample.frame
       : advanceFrame(B$.playerFrame, dt, B$.playerModel, B$.playerAnim);
@@ -275,21 +275,21 @@ function render(dt) {
       if (_pt) globalThis.__perfHook3d?.("fighterVBO", performance.now() - _pt, B$.enemySkelBufs.totalVerts);
       B$.eAABBLast = eAABB;
     }
-    if (B$.extras.size) B$._updateExtras(alpha, ARENA);
+    if (B$.extras!.size) B$._updateExtras(alpha, ARENA);
 
     // ── Cinematic camera: rotate-around-target look-at on our digimon ──
     const pCenter = B$.pAABB
-      ? [(B$.pAABB.min[0]+B$.pAABB.max[0])/2, (B$.pAABB.min[1]+B$.pAABB.max[1])/2, (B$.pAABB.min[2]+B$.pAABB.max[2])/2]
-      : [playerPos[0], playerPos[1] + B$.DIGI_H/2, playerPos[2]];
-    const pH = B$.pAABB ? Math.max(40, B$.pAABB.max[1] - B$.pAABB.min[1]) : B$.DIGI_H;
+      ? [(B$.pAABB.min[0]!+B$.pAABB.max[0]!)/2, (B$.pAABB.min[1]!+B$.pAABB.max[1]!)/2, (B$.pAABB.min[2]!+B$.pAABB.max[2]!)/2]
+      : [playerPos[0], playerPos[1]! + B$.DIGI_H!/2, playerPos[2]];
+    const pH = B$.pAABB ? Math.max(40, B$.pAABB.max[1]! - B$.pAABB.min[1]!) : B$.DIGI_H;
     // Battle axis from the stable placements (not the pose-dependent AABB centres).
-    let fwd = [enemyPos[0]-playerPos[0], 0, enemyPos[2]-playerPos[2]];
-    const fl = Math.hypot(fwd[0], fwd[2]) || 1; fwd = [fwd[0]/fl, 0, fwd[2]/fl];
+    let fwd = [enemyPos[0]!-playerPos[0]!, 0, enemyPos[2]!-playerPos[2]!];
+    const fl = Math.hypot(fwd[0]!, fwd[2]!) || 1; fwd = [fwd[0]!/fl, 0, fwd[2]!/fl];
 
     B$.orbitClock += dt;
-    const azTarget = B$.camMode === "orbit" ? Math.sin(B$.orbitClock * 0.5) * 1.15 : 0; // ±66° sweep
-    B$.camAz += (azTarget - B$.camAz) * Math.min(1, dt * 2.5);  // smooth toward target
-    const behindDir = B$._rotY([-fwd[0], 0, -fwd[2]], B$.camAz);
+    const azTarget = B$.camMode === "orbit" ? Math.sin(B$.orbitClock! * 0.5) * 1.15 : 0; // ±66° sweep
+    B$.camAz! += (azTarget - B$.camAz!) * Math.min(1, dt * 2.5);  // smooth toward target
+    const behindDir = B$._rotY([-fwd[0]!, 0, -fwd[2]!], B$.camAz!);
 
     const groundY = B$.pAABB ? B$.pAABB.min[1] : 0;  // feet of our digimon
 
@@ -334,11 +334,11 @@ function render(dt) {
         // The walker's own over-the-shoulder shot. It is now only a FALLBACK: the record owner
         // cuts it while the director's held record has not resolved yet (before both staging
         // records land).
-        const radius = Math.max(140, pH * 1.7);
-        eye  = [ pCenter[0] + behindDir[0]*radius, pCenter[1] + pH*0.75, pCenter[2] + behindDir[2]*radius ];
-        look = [ pCenter[0] + fwd[0]*pH*3.0,
-                 groundY + pH*0.55,
-                 pCenter[2] + fwd[2]*pH*3.0 ];
+        const radius = Math.max(140, pH! * 1.7);
+        eye  = [ pCenter[0]! + behindDir[0]!*radius, pCenter[1]! + pH!*0.75, pCenter[2]! + behindDir[2]!*radius ];
+        look = [ pCenter[0]! + fwd[0]!*pH!*3.0,
+                 groundY! + pH!*0.55,
+                 pCenter[2]! + fwd[2]!*pH!*3.0 ];
       }
     } else if (B$.camMode === "tag") {
       // Sequence 0x38's captured arrival is a frontal full-body shot. Reuse
@@ -351,14 +351,14 @@ function render(dt) {
       // REAL PS1 battle camera (session-23 dump): absolute eye/target in PS1 world × MODEL_SCALE,
       // mapped by ps1ToRender. eye=(-3840,-2432,-4608), target=(0,-2048,768).
       const s = MODEL_SCALE;
-      const look0 = ps1ToRender([0, -2048 * B$.gameCam.height, 768], s);
-      const eye0  = ps1ToRender([-3840 * B$.gameCam.side, -2432 * B$.gameCam.height, -4608], s);
+      const look0 = ps1ToRender([0, -2048 * B$.gameCam!.height, 768], s);
+      const eye0  = ps1ToRender([-3840 * B$.gameCam!.side, -2432 * B$.gameCam!.height, -4608], s);
       // zoom = slide the eye along (eye → look)
-      eye  = [ look0[0] + (eye0[0]-look0[0])*B$.gameCam.zoom,
-               look0[1] + (eye0[1]-look0[1])*B$.gameCam.zoom,
-               look0[2] + (eye0[2]-look0[2])*B$.gameCam.zoom ];
+      eye  = [ look0[0]! + (eye0[0]!-look0[0]!)*B$.gameCam!.zoom,
+               look0[1]! + (eye0[1]!-look0[1]!)*B$.gameCam!.zoom,
+               look0[2]! + (eye0[2]!-look0[2]!)*B$.gameCam!.zoom ];
       look = look0;
-      fovRad = B$.gameCam.fovDeg * Math.PI / 180;
+      fovRad = B$.gameCam!.fovDeg * Math.PI / 180;
     } else if (B$.camMode === "defeat") {
       // F0x8008c93c: the cut to OUR digimon's canned near shot 11, then the shot frame's
       // Y angle gains `delta * 2` every frame. Phase 1 also adds the same delta to +0x10
@@ -369,7 +369,7 @@ function render(dt) {
       // One delta per 60 Hz frame, from the real elapsed time, so a faster display
       // does not turn the camera faster.
       B$.defeatClock += dt;
-      B$.defeatDelta = Math.floor(B$.defeatClock * 60) * LOSS_CAM.deltaPerFrame;
+      B$.defeatDelta = Math.floor(B$.defeatClock! * 60) * LOSS_CAM.deltaPerFrame;
       const p = B$.lossShot() || OP5_PRESETS[4];
       const turned = rotateShotYaw(p.eye, p.target, lossCamYawUnits(B$.defeatDelta));
       eye  = ps1ToRender(turned.eye, MODEL_SCALE);
@@ -377,8 +377,8 @@ function render(dt) {
       fovRad = fovYFromH(p.H) * Math.PI / 180;
     } else if (B$.camMode === "orbit") {
       // Sweep around OUR digimon, framing its full body (scale-aware on pH).
-      const radius = Math.max(180, pH * 2.4);
-      eye  = [ pCenter[0] + behindDir[0]*radius, pCenter[1] + pH*0.30, pCenter[2] + behindDir[2]*radius ];
+      const radius = Math.max(180, pH! * 2.4);
+      eye  = [ pCenter[0]! + behindDir[0]!*radius, pCenter[1]! + pH!*0.30, pCenter[2]! + behindDir[2]!*radius ];
       look = [ pCenter[0], pCenter[1], pCenter[2] ];
     } else if (B$.camMode === "opening") {
       // The battle-open camera flourish OWNS the camera for the whole opening. Tick the actor on
@@ -389,12 +389,12 @@ function render(dt) {
       if (!B$.openCamera) B$.beginOpeningCamera();
       if (B$.openCamera && !B$.openCameraGone
           && stagingRecordsReady(B$.placementTable, B$.playerFolder, B$.enemyFolder)) {
-        const out = B$.openCamera.update(B$.openClock.tick(dt));
+        const out = B$.openCamera.update(B$.openClock!.tick(dt));
         B$.openCameraArm = out.arm;
         if (out.action) {
           B$.openCameraHeld = out.action.fields;
-          if (out.action.kind === "move") B$.camRec.move(out.action.fields, out.action.duration, { issuer: "battle" });
-          else B$.camRec.cut(out.action.fields, { issuer: "battle" });
+          if (out.action.kind === "move") B$.camRec!.move(out.action.fields, out.action.duration, { issuer: "battle" });
+          else B$.camRec!.cut(out.action.fields, { issuer: "battle" });
         }
         if (out.gone) B$.openCameraGone = true;
       }
@@ -441,10 +441,10 @@ function render(dt) {
         // edited in place and re-cut, and the yaw at +0x26 is what the arm's turn writes. A
         // null director record means its canned shot has not resolved yet, and then the record
         // stands, exactly as it does while a script owns the camera.
-        B$.camRec.cut(directorFields, { issuer: "battle" });
+        B$.camRec!.cut(directorFields, { issuer: "battle" });
       } else if (B$.camMode !== "director") {
         const s = MODEL_SCALE;
-        B$.camRec.cut([
+        B$.camRec!.cut([
           ...renderToPs1(eye, s), ...renderToPs1(look, s),
           0, 0, 0,                          // +0x18 anchor — an absolute shot has none
           0, 0, 0,                          // +0x24/+0x26/+0x28 frame angles
@@ -452,7 +452,7 @@ function render(dt) {
         ], { issuer: "battle" });
       }
     }
-    const shot = dvView || B$.camRec.sample();
+    const shot = dvView || B$.camRec!.sample();
     // The viewer's FREE camera wins over the record: its eye/look are already render space (the
     // page hands them in through setFreeCameraView), so no ps1ToRender and no record. This is the
     // whole isolation: op5 cuts still update the record (the info panel reports them), but the
@@ -473,7 +473,7 @@ function render(dt) {
       if (shot.up) up = ps1ToRender(shot.up, 1);
       rollDeg = shot.roll || 0;
       if (shot.H) fovRad = fovYFromH(shot.H) * Math.PI / 180;
-    } else if (!(B$.multiCam && B$.extras.size)) {
+    } else if (!(B$.multiCam && B$.extras!.size)) {
       // The frame is drawn THROUGH the record, or not at all. `sample()` is null in exactly one
       // situation — no writer has installed a record yet — and then there is no view matrix to
       // build: `eye`/`look` were never computed for this mode, because a camera mode that computes
@@ -494,7 +494,7 @@ function render(dt) {
       return;
     }
 
-    if (B$.multiCam && B$.extras.size) {   // (multiplayer) the wide shot of everybody owns the camera
+    if (B$.multiCam && B$.extras!.size) {   // (multiplayer) the wide shot of everybody owns the camera
       const c = window.__fx?.smartcam ? B$._smartCameraShot() : B$._multiCameraShot();
       if (c) { eye = c.eye; look = c.look; up = B$.UP; rollDeg = 0; fovRad = c.fov; } else if (!shot) return;
     }
@@ -504,7 +504,7 @@ function render(dt) {
     // 8k far plane therefore clipped the entire authored Paildramon shot even
     // though its camera transform was correct.  Widen only explicit op5 shots;
     // normal battle/preset framing keeps the tighter arena depth range.
-    const liveRec = B$.camRec.get();
+    const liveRec = B$.camRec!.get();
     const explicitShot = liveRec?.kind === "move"
       || (liveRec?.kind === "cut" && liveRec.issuer !== "battle");
     // A giant's fitted near shot is dollyed back 2-3× so its whole body fits (fitGiantNearCamera),
@@ -515,7 +515,7 @@ function render(dt) {
     // command camera, the acting phases' held arena shot and the multiplayer wide shot step back along
     // their own view ray. A technique's own camera (an explicit op5 shot) is left exactly as the disc has it.
     const battleWide = !explicitShot && !freeView
-      && (BATTLE_WIDE_MODES.has(B$.camMode) || (B$.multiCam && B$.extras.size > 0))
+      && (BATTLE_WIDE_MODES.has(B$.camMode!) || (B$.multiCam && B$.extras!.size > 0))
       && document.documentElement.dataset.assetMode === "hd" && !!window.__fx?.battlewide;
     if (battleWide) {
       eye = [ look[0] + (eye[0] - look[0]) * BATTLE_WIDE_DOLLY,
@@ -533,11 +533,11 @@ function render(dt) {
     if (rollDeg) camUp = applyScreenRoll(camUp, camEye, camLook, rollDeg);
     const view = mat4LookAt(camEye, camLook, camUp);
     const pv   = mat4Mul(proj, view);
-    if (B$.extras.size) B$._projectExtras(pv, W, H);
+    if (B$.extras!.size) B$._projectExtras(pv, W, H);
     B$.lastCamInfo = {
       eye, look, fovDeg: fovRad * 180 / Math.PI,
       // The camera the frame is really drawn with (after the wide-shot step, blast dolly and screen roll), render space.
-      render: { eye: camEye.slice(), look: camLook.slice(), up: camUp.slice(), fovRad, aspect: W / H,
+      render: { eye: camEye.slice(), look: camLook.slice(), up: camUp!.slice(), fovRad, aspect: W / H,
                 arenaScale: B$.multiCam ? B$.arenaScale : 1 },
       // PS1 convention, matching the record's own frame.
       up: renderToPs1(up, 1), roll: rollDeg,
@@ -566,7 +566,7 @@ function render(dt) {
     const stageName = (id) => `meft10${String(id).padStart(2, "0")}`;
     if (B$.blastState && B$.blastState.stageChange) {          // load the change stage's pack and textures ahead of its frame
       const ahead = B$.loadArenaPack(stageName(B$.blastState.stageChange));
-      if (ahead.groups) for (const g of ahead.groups) if (g.count) B$.arenaTextureFor(ahead, g);
+      if (ahead!.groups) for (const g of ahead!.groups) if (g.count) B$.arenaTextureFor(ahead!, g);
     }
     const shownArena = stageId ? B$.loadArenaPack(stageName(stageId)) : B$.activeArena;
     const shownReady = !!(shownArena && shownArena.groups && shownArena.groups.length);
@@ -586,7 +586,7 @@ function render(dt) {
     // Sky background (draw first, no depth write). During a special the per-element backdrop
     // replaces the arena environment: black void + the MEFT10<sigEffect> wall+floor meshes drawn
     // ADDITIVELY (abr=1) through this frame's camera — the same 3D scene the real game renders.
-    B$.gl.depthMask(false);
+    B$.gl!.depthMask(false);
     // The arena view's background colour, when the ported effect-tint feed has set one
     // (view+0x12C); otherwise each branch keeps its own default (black void / sky).
     const bgTint = B$.arenaTint;
@@ -601,21 +601,21 @@ function render(dt) {
       // spans ±20479×MODEL_SCALE (≈±7168 world) and its far edge exceeds the scene's 8000 far plane
       // at wide shots → far triangles clipped to black holes. A 60000 far plane keeps it all in.
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
-      const world = ps1ToRenderMatrix(MODEL_SCALE * (B$.multiCam ? B$.arenaScale : 1));   // fight-model → world (larger for many fighters)
+      const world = ps1ToRenderMatrix(MODEL_SCALE * (B$.multiCam ? B$.arenaScale : 1)!);   // fight-model → world (larger for many fighters)
       // Spin phase: each group lerps 0→spinDeg over BD_ROT_MS from when the backdrop appeared, then
       // holds (the real ctrl reaches its target at frame 121 then sentinel-holds).
-      const spinT = Math.min(1, Math.max(0, (performance.now() - B$.dataFieldOnAt) / B$.BD_ROT_MS));
-      B$.gl.enable(B$.gl.BLEND);
-      B$.gl.blendFunc(B$.gl.ONE, B$.gl.ONE);                                 // additive (abr=1)
-      for (const g of B$.activeBackdrop.groups) {
+      const spinT = Math.min(1, Math.max(0, (performance.now() - B$.dataFieldOnAt!) / B$.BD_ROT_MS!));
+      B$.gl!.enable(B$.gl!.BLEND);
+      B$.gl!.blendFunc(B$.gl!.ONE, B$.gl!.ONE);                                 // additive (abr=1)
+      for (const g of B$.activeBackdrop!.groups!) {
         if (!g.count) continue;
         // Y-axis spin about the arena centre (X,Z scaled equally, so it commutes with `world`).
         const mvp = g.spinDeg
           ? mat4Mul(mat4Mul(bdPV, world), mat4RotateY(g.spinDeg * spinT * Math.PI / 180))
           : mat4Mul(bdPV, world);
-        drawProjLayer(B$.gl, B$.texP, mvp, g, g.page === "floor" ? B$.activeBackdrop.floorTex : B$.activeBackdrop.wallTex, 1);
+        drawProjLayer(B$.gl, B$.texP, mvp, g, g.page === "floor" ? B$.activeBackdrop!.floorTex : B$.activeBackdrop!.wallTex, 1);
       }
-      B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);           // restore normal alpha blend
+      B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);           // restore normal alpha blend
     } else if (arenaActive) {
       // Ordinary battle: the per-area arena scene over the arena view's own background colour —
       // SFSTDATA[arenaId]+0x0c is the sky (record 1 = (59,115,233), matching the captured
@@ -632,8 +632,8 @@ function render(dt) {
       // primitives — which the original drops before packing — covered the scene. With the cull
       // the surviving set is the original's own post-cull set, so opaque paints the scene the
       // original shows. `arenaLegacy` keeps the pre-decode alpha/one-palette render for captures.
-      B$.gl.enable(B$.gl.BLEND);
-      B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+      B$.gl!.enable(B$.gl!.BLEND);
+      B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
       let skyColor = B$.arenaBg || bgTint || [0, 0, 0, 1];   // the arena view's sky colour
       let stageTint = null;
       if (B$.blastState && (stageId || stageLevel !== CHANGE_STAGE_FULL)) {
@@ -642,23 +642,23 @@ function render(dt) {
           ? (B$.arenaManifest?.byArena?.[String(stageId)]?.bg ?? [0, 0, 0])
           : (B$.arenaBg ? B$.arenaBg.slice(0, 3).map((v) => Math.round(v * 255)) : [0, 0, 0]);
         const c = changeStageBg(base, stageLevel);
-        skyColor = [c[0] / 255, c[1] / 255, c[2] / 255, 1];
+        skyColor = [c[0]! / 255, c[1]! / 255, c[2]! / 255, 1];
         const k = stageLevel / CHANGE_STAGE_FULL;
         stageTint = [k, k, k, 1];
       }
       if (!B$.builtArena) drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, 1, skyColor);   // the arena view's sky colour
       const bdPV = mat4Mul(mat4Perspective(fovRad, W / H, 1, 60000), view);
-      const world = ps1ToRenderMatrix(MODEL_SCALE * (B$.multiCam ? B$.arenaScale : 1));   // larger for many fighters (_layoutExtras)
+      const world = ps1ToRenderMatrix(MODEL_SCALE * (B$.multiCam ? B$.arenaScale : 1)!);   // larger for many fighters (_layoutExtras)
       const mvp = mat4Mul(bdPV, world);
       B$._atmosArena(atm, world, camEye, camLook, fovRad, W / H, B$.multiCam ? B$.arenaScale : 1);
       const panoP = B$.isolatedMode ? null : B$._panoActive();
-      B$.panoLog.id = B$.pano?.id ?? null; B$.panoLog.loaded = !!panoP; B$.panoLog.missing = !!B$.pano?.missing;
+      B$.panoLog!.id = B$.pano?.id ?? null; B$.panoLog!.loaded = !!panoP; B$.panoLog!.missing = !!B$.pano?.missing;
       if (panoP) B$._drawPano(panoP, bdPV, camEye, atm);   // F2 painted place (HD Remaster): replaces the whole disc arena
-      if (panoP) { const bx = [B$.pAABB, B$.eAABBLast, ...[...B$.extras.values()].map((f) => f.aabb)].filter(Boolean);
-        B$.panoLog.eye = camEye.slice(); B$.panoLog.feet = bx.map((b) => +b.min[1].toFixed(1)); B$.panoLog.heights = bx.map((b) => +(b.max[1] - b.min[1]).toFixed(1)); B$.panoLog.xz = bx.map((b) => [Math.round((b.min[0] + b.max[0]) / 2), Math.round((b.min[2] + b.max[2]) / 2)]); }
+      if (panoP) { const bx = [B$.pAABB, B$.eAABBLast, ...[...B$.extras!.values()].map((f) => f.aabb)].filter(Boolean);
+        B$.panoLog!.eye = camEye.slice(); B$.panoLog!.feet = bx.map((b) => +b!.min[1]!.toFixed(1)); B$.panoLog!.heights = bx.map((b) => +(b!.max[1]! - b!.min[1]!).toFixed(1)); B$.panoLog!.xz = bx.map((b) => [Math.round((b!.min[0]! + b!.max[0]!) / 2), Math.round((b!.min[2]! + b!.max[2]!) / 2)]); }
       arenaCullLog.kept = 0; arenaCullLog.total = 0; arenaCullLog.groups = [];
-      if (B$.arenaDebug.opaque) B$.gl.disable(B$.gl.BLEND);         // OPAQUE: the decoded arena blend (cmd 0x2C)
-      else { B$.gl.enable(B$.gl.BLEND); B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA); }
+      if (B$.arenaDebug!.opaque) B$.gl!.disable(B$.gl!.BLEND);         // OPAQUE: the decoded arena blend (cmd 0x2C)
+      else { B$.gl!.enable(B$.gl!.BLEND); B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA); }
       // DEPTH-SORT THE ARENA — the original's ordering table, ported by the SAME display-list
       // interpreter. Each arena primitive carries an OT Z the walker already decodes
       // (`engine/dw3/battle-displaylist.ts#buildMeshFields`: `fields.otz = avsz(...)`, read off
@@ -671,7 +671,7 @@ function render(dt) {
       // render becomes independent of the grouping, exactly as the OT makes it independent of
       // the emit order. Decoded + measured 2026-10-07,
       // .dw3-research/arena-construction-2026-10-07/worker-e.md.
-      if (B$.arenaDebug.depthWrite) B$.gl.depthMask(true);
+      if (B$.arenaDebug!.depthWrite) B$.gl!.depthMask(true);
       if (panoP?.paint) B$._drawArenaPaint(panoP, mvp, world, atm);
       const _pf3 = globalThis.__perfHook3d, _pt3 = _pf3 ? performance.now() : 0;   // dev-only timing hook (web/perf-test.js); unset = no change
       let _ptri = 0;
@@ -683,15 +683,15 @@ function render(dt) {
         const tex = B$.arenaTextureFor(shownArena, g);
         let gm = mvp;
         if (stageId && g.rotKeys) gm = mat4Mul(mvp, changeStageMat4(g.rotKeys, motionU));
-        const idx = B$.arenaDebug.cull ? arenaCullIndices(gm, g) : null;
+        const idx = B$.arenaDebug!.cull ? arenaCullIndices(gm, g) : null;
         if (idx) arenaCullLog.groups.push({ page: g.page, clut: g.clut, kept: idx.length / 3, total: (g.count / 3) | 0 });
         if (_pf3) _ptri += (g.count / 3) | 0;
-        if (B$.arenaDebug.cull) drawProjLayerIndexed(B$.gl, B$.texP, gm, g, tex, idx, stageTint);
-        else drawProjLayer(B$.gl, B$.texP, gm, g, tex, 1, stageTint);
+        if (B$.arenaDebug!.cull) drawProjLayerIndexed(B$.gl, B$.texP, gm, g, tex, idx, stageTint!);
+        else drawProjLayer(B$.gl, B$.texP, gm, g, tex, 1, stageTint!);
       }
       if (_pf3) _pf3("arenaGroups", performance.now() - _pt3, _ptri);
-      B$.gl.enable(B$.gl.BLEND);
-      B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+      B$.gl!.enable(B$.gl!.BLEND);
+      B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
       if (atm) B$._atmosArena(null);
       // THE ARENA IS A BACKGROUND LAYER — its own pass must not reject the entities drawn after
       // it. The arena writes depth above so its (page,CLUT) groups depth-sort like the original's
@@ -712,11 +712,11 @@ function render(dt) {
       // fighters/effects start from a clean buffer. This is the treatment the sky (depthMask
       // false) and the face box (its own depth clear) already get, and it cannot regress the
       // flat-patch fix, which lives in the colour buffer now, not the depth buffer.
-      if (B$.arenaDebug.depthWrite && B$.arenaDebug.depthClear) B$.gl.clear(B$.gl.DEPTH_BUFFER_BIT);
+      if (B$.arenaDebug!.depthWrite && B$.arenaDebug!.depthClear) B$.gl!.clear(B$.gl!.DEPTH_BUFFER_BIT);
     } else {
       drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.skyTexture, 1, bgTint || [1,1,1,1]);
     }
-    B$.gl.depthMask(true);
+    B$.gl!.depthMask(true);
 
     // Arena floor (skipped during the special: the backdrop is a full-screen 2D scene; and skipped
     // when the disc's own per-area arena is loaded, which supplies its own ground — and skipped in
@@ -730,14 +730,14 @@ function render(dt) {
     // above, so a black layer at voidAlpha darkens exactly that, under the fighters and the sprites.
     // (voidAlpha 1 is the black void branch above.)
     if (B$.blastState && B$.blastState.voidAlpha > 0 && B$.blastState.voidAlpha < 1) {
-      const depthOn = B$.gl.isEnabled(B$.gl.DEPTH_TEST);
-      B$.gl.disable(B$.gl.DEPTH_TEST);
-      B$.gl.depthMask(false);
-      B$.gl.enable(B$.gl.BLEND);
-      B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+      const depthOn = B$.gl!.isEnabled(B$.gl!.DEPTH_TEST);
+      B$.gl!.disable(B$.gl!.DEPTH_TEST);
+      B$.gl!.depthMask(false);
+      B$.gl!.enable(B$.gl!.BLEND);
+      B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
       drawQuad(B$.gl, B$.texP, B$.IDENT_MVP, B$.skyBufs, B$.whiteTex, B$.blastState.voidAlpha, [0, 0, 0, 1]);
-      B$.gl.depthMask(true);
-      if (depthOn) B$.gl.enable(B$.gl.DEPTH_TEST);
+      B$.gl!.depthMask(true);
+      if (depthOn) B$.gl!.enable(B$.gl!.DEPTH_TEST);
     }
 
     // op3 sprites spawned at z == -1 (every effect but 1000-1002/1007) sit BEFORE the fighters in the
@@ -762,7 +762,7 @@ function render(dt) {
 // TOON-END
 // SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
     const softA = !!window.__fx?.softalpha;
-    if (softA) { B$.gl.useProgram(B$.texP.program); B$.gl.uniform2f(B$.texP.uSoftA, 1, 2 / 1024); }
+    if (softA) { B$.gl!.useProgram(B$.texP!.program); B$.gl!.uniform2f(B$.texP!.uSoftA, 1, 2 / 1024); }
 // SOFTA-END
     if (B$.blastState && B$.blastState.wipeRow !== undefined && B$.playerModel && B$.playerSkelBufs) {
       // Blast and manual DV: the change task's wipe (digimon_change.c setChangeClips, engine
@@ -770,20 +770,20 @@ function render(dt) {
       // layer of the SAME model to the rows [wipeRow, 240). The model is the old partner until the swap
       // (f278), the new one after it; the main view spans the 240 native rows over the canvas height.
       const rowPx = Math.round(B$.blastState.wipeRow * H / 240);
-      B$.gl.enable(B$.gl.SCISSOR_TEST);
+      B$.gl!.enable(B$.gl!.SCISSOR_TEST);
       if (rowPx > 0) {
-        B$.gl.scissor(0, H - rowPx, W, rowPx);
+        B$.gl!.scissor(0, H - rowPx, W, rowPx);
         drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs, B$.playerTex || B$.whiteTex, fighterTint("player"));
       }
       if (B$.blastState.wireOn && rowPx < H) {
-        B$.gl.scissor(0, 0, W, H - rowPx);
-        B$.gl.enable(B$.gl.BLEND);
-        B$.gl.blendFunc(B$.gl.ONE, B$.gl.ONE);                    // additive: it glows
+        B$.gl!.scissor(0, 0, W, H - rowPx);
+        B$.gl!.enable(B$.gl!.BLEND);
+        B$.gl!.blendFunc(B$.gl!.ONE, B$.gl!.ONE);                    // additive: it glows
         drawSkeletalMesh(B$.gl, B$.texP, pv, B$.playerSkelBufs, B$.whiteTex,
           [0.18, 1.0, 0.28, 1], 1, true);
-        B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+        B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
       }
-      B$.gl.disable(B$.gl.SCISSOR_TEST);
+      B$.gl!.disable(B$.gl!.SCISSOR_TEST);
     } else if (B$.playerVisible && B$.playerModel && B$.playerSkelBufs) {
       // Also the entrance (entrance.c): no wipe, no wireframe, the ordinary model. The entering fighter's OLD model
       // stays until the cut (models->setId, f114), the new one is drawn from there; the other side's model is
@@ -806,9 +806,9 @@ function render(dt) {
     if (B$.sceneLight) B$._sceneLightDraw(false);
 // SCENE-LIGHT-END
 
-    if (B$.extras.size) B$._drawExtras(pv);
+    if (B$.extras!.size) B$._drawExtras(pv);
 // SOFTA-BEGIN (F2 "Smooth cut-out edges", off by default; strip these blocks = the code before softa)
-    if (softA) { B$.gl.useProgram(B$.texP.program); B$.gl.uniform2f(B$.texP.uSoftA, 0, 0); }
+    if (softA) { B$.gl!.useProgram(B$.texP!.program); B$.gl!.uniform2f(B$.texP!.uSoftA, 0, 0); }
 // SOFTA-END
 // TOON-BEGIN (F2 "Toon outlines" / "Toon shading", off by default; strip these blocks = the code before toon)
     if (toonSt) B$._toonEnd(toonSt, pv, proj, H);
@@ -845,7 +845,7 @@ function render(dt) {
       const flights = B$.effectPlayer.projectileList();
       for (const fl of flights) {
         B$.loadProjMesh(fl.id);
-        const entry = B$.projCache.get(fl.id);
+        const entry = B$.projCache!.get(fl.id);
         if (!entry || entry === "loading") continue;
         const s = MODEL_SCALE;
         // flight space -> render world as a matrix (the one mapping, ps1ToRenderMatrix —
@@ -854,7 +854,7 @@ function render(dt) {
         const root = mat4Mul(mat4Translate(fl.pos.x, fl.pos.y, fl.pos.z),
                              mat4RotPSX(fl.rot?.x || 0, fl.rot?.y || 0, fl.rot?.z || 0));
         const base = mat4Mul(pv, mat4Mul(world, root));
-        B$.gl.depthMask(false);
+        B$.gl!.depthMask(false);
         // Sample at the CLIP's frame for this tick, not at the raw tick: a clip can hold,
         // and packs 108/109 replay their beam segment four times, which a raw tick cannot
         // express.
@@ -862,8 +862,8 @@ function render(dt) {
         const { world: layerWorld, shown } = projLayerWorlds(entry.layers, frame, base);
         for (let li = 0; li < entry.layers.length; li++) {
           const L = entry.layers[li];
-          if (!L.count || !shown[li + 1]) continue;
-          for (const g of L.groups) {
+          if (!L!.count || !shown[li + 1]) continue;
+          for (const g of L!.groups) {
             // PS1 semi-transparency, already converted from the one-based `0xEn` state nibble
             // by meshAbrMode. `null` means the primitive carries no semi-transparent bit at
             // all and is drawn OPAQUE; otherwise the hardware mode is
@@ -874,26 +874,26 @@ function render(dt) {
             if (g.abr === null) {
               // Opaque. The texel still drops out where its palette entry is 0x0000, which
               // the atlas bakes as alpha 0, so this is a straight cut-out draw.
-              B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
+              B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
             } else if (g.abr === 2) {
-              B$.gl.blendEquation(B$.gl.FUNC_REVERSE_SUBTRACT);
-              B$.gl.blendFunc(B$.gl.ONE, B$.gl.ONE);
+              B$.gl!.blendEquation(B$.gl!.FUNC_REVERSE_SUBTRACT);
+              B$.gl!.blendFunc(B$.gl!.ONE, B$.gl!.ONE);
             } else if (g.abr === 0) {
-              B$.gl.blendColor(0, 0, 0, 0.5);
-              B$.gl.blendFunc(B$.gl.CONSTANT_ALPHA, B$.gl.ONE_MINUS_CONSTANT_ALPHA);
+              B$.gl!.blendColor(0, 0, 0, 0.5);
+              B$.gl!.blendFunc(B$.gl!.CONSTANT_ALPHA, B$.gl!.ONE_MINUS_CONSTANT_ALPHA);
             } else if (g.abr === 3) {
-              B$.gl.blendColor(0, 0, 0, 0.25);
-              B$.gl.blendFunc(B$.gl.CONSTANT_ALPHA, B$.gl.ONE);
+              B$.gl!.blendColor(0, 0, 0, 0.25);
+              B$.gl!.blendFunc(B$.gl!.CONSTANT_ALPHA, B$.gl!.ONE);
             } else {
-              B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE);
+              B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE);
             }
             drawProjLayer(B$.gl, B$.texP, layerWorld[li + 1], g, g.tex, 1.0);
-            B$.gl.blendEquation(B$.gl.FUNC_ADD);
+            B$.gl!.blendEquation(B$.gl!.FUNC_ADD);
           }
         }
-        B$.gl.blendEquation(B$.gl.FUNC_ADD);
-        B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
-        B$.gl.depthMask(true);
+        B$.gl!.blendEquation(B$.gl!.FUNC_ADD);
+        B$.gl!.blendFunc(B$.gl!.SRC_ALPHA, B$.gl!.ONE_MINUS_SRC_ALPHA);
+        B$.gl!.depthMask(true);
       }
     }
 
@@ -995,13 +995,13 @@ function render(dt) {
         backdropOnly: dfActive || dnaVoidActive, draws: boxDraws,
       });
       if (scene.length) {
-        B$.gl.enable(B$.gl.SCISSOR_TEST);
-        B$.gl.viewport(fx, glY, fw, fh);
-        B$.gl.scissor(fx, glY, fw, fh);
-        B$.gl.clearColor(0.04, 0.05, 0.09, 1);
-        B$.gl.clear(B$.gl.COLOR_BUFFER_BIT | B$.gl.DEPTH_BUFFER_BIT);
+        B$.gl!.enable(B$.gl!.SCISSOR_TEST);
+        B$.gl!.viewport(fx, glY, fw, fh);
+        B$.gl!.scissor(fx, glY, fw, fh);
+        B$.gl!.clearColor(0.04, 0.05, 0.09, 1);
+        B$.gl!.clear(B$.gl!.COLOR_BUFFER_BIT | B$.gl!.DEPTH_BUFFER_BIT);
 
-        const boxBufs = B$._faceBoxBuffers(B$.gl);
+        const boxBufs = B$._faceBoxBuffers(B$.gl!);
         const s = MODEL_SCALE;
         const boxWorld = (v) => ps1ToRender(v, s);
         _updateSkeletalVBOGL(B$.gl, B$.playerModel, boxBufs, B$.pBwm, boxPos, MODEL_SCALE,
@@ -1021,19 +1021,19 @@ function render(dt) {
           const mvp = item.mvp === "identity" ? B$.IDENT_MVP : boxPV;
           if (item.what === "sky") {
             // No depth write: the sky is behind everything and must not occlude the head.
-            B$.gl.depthMask(false);
+            B$.gl!.depthMask(false);
             drawQuad(B$.gl, B$.texP, mvp, B$.skyBufs,
                      item.tex === "void" ? B$.whiteTex : B$.skyTexture, 1, item.tint);
-            B$.gl.depthMask(true);
+            B$.gl!.depthMask(true);
           } else if (item.what === "floor") {
             drawQuad(B$.gl, B$.texP, mvp, B$.floorBufs, B$.arenaTexture || B$.whiteTex, 1, [0.8,0.8,0.85,1]);
           } else {
             drawSkeletalMesh(B$.gl, B$.texP, mvp, boxBufs, B$.playerTex || B$.whiteTex, fighterTint("player"));
           }
         }
-        B$.gl.disable(B$.gl.SCISSOR_TEST);
+        B$.gl!.disable(B$.gl!.SCISSOR_TEST);
       }
-      B$.gl.viewport(0, 0, W, H);
+      B$.gl!.viewport(0, 0, W, H);
       B$.faceCamRect = { x: fx, y: fyTop, w: fw, h: fh };
     }
   }
@@ -1070,21 +1070,21 @@ function drawShadow(gl, prog, mvp, pos, rx, ry) {
 function destroy() {
     B$.clearFighters();
     for (const pk of Object.values(B$.backdropPacks) as BackdropPack[]) {
-      if (pk.floorTex) B$.gl.deleteTexture(pk.floorTex);
-      if (pk.wallTex) B$.gl.deleteTexture(pk.wallTex);
+      if (pk.floorTex) B$.gl!.deleteTexture(pk.floorTex);
+      if (pk.wallTex) B$.gl!.deleteTexture(pk.wallTex);
       for (const g of pk.groups || [])
-        if (g && g.vbo) { B$.gl.deleteBuffer(g.vbo); B$.gl.deleteBuffer(g.ubo); }
+        if (g && g.vbo) { B$.gl!.deleteBuffer(g.vbo); B$.gl!.deleteBuffer(g.ubo); }
     }
     [B$.arenaTexture, B$.skyTexture, B$.playerTex, B$.enemyTex, B$.whiteTex].forEach(t => {
-      if (t) B$.gl.deleteTexture(t);
+      if (t) B$.gl!.deleteTexture(t);
     });
-    B$.gl.deleteBuffer(B$.floorBufs.vbo); B$.gl.deleteBuffer(B$.floorBufs.ubo);
-    B$.gl.deleteBuffer(B$.floorBufs.ibo);
-    B$.gl.deleteBuffer(B$.skyBufs.vbo); B$.gl.deleteBuffer(B$.skyBufs.ubo);
-    B$.gl.deleteBuffer(B$.skyBufs.ibo);
-    B$.freeSkelBufs(B$.playerSkelBufs);
-    B$.freeSkelBufs(B$.enemySkelBufs);
-    B$.gl.deleteProgram(B$.texProg);
+    B$.gl!.deleteBuffer(B$.floorBufs!.vbo); B$.gl!.deleteBuffer(B$.floorBufs!.ubo);
+    B$.gl!.deleteBuffer(B$.floorBufs!.ibo);
+    B$.gl!.deleteBuffer(B$.skyBufs!.vbo); B$.gl!.deleteBuffer(B$.skyBufs!.ubo);
+    B$.gl!.deleteBuffer(B$.skyBufs!.ibo);
+    B$.freeSkelBufs(B$.playerSkelBufs!);
+    B$.freeSkelBufs(B$.enemySkelBufs!);
+    B$.gl!.deleteProgram(B$.texProg!);
   }
   return { render, drawDigimonBillboard, drawShadow, destroy };
 }

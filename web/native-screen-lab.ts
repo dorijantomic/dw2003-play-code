@@ -56,13 +56,13 @@ async function loadRefIndex() {
 }
 
 async function setReference(moduleId: string | number) {
-    refbox.style.display = "none";
+    refbox!.style.display = "none";
     refimg.removeAttribute("src");
     const index = await loadRefIndex();
-    const file = index[moduleId];
+    const file = index![moduleId];
     if (!file) return;
-    refimg.onload = () => { refbox.style.display = ""; };
-    refimg.onerror = () => { refbox.style.display = "none"; };
+    refimg.onload = () => { refbox!.style.display = ""; };
+    refimg.onerror = () => { refbox!.style.display = "none"; };
     refimg.src = `assets/ref/native/${file}?t=${Date.now()}`;
 }
 
@@ -117,7 +117,7 @@ function start(moduleId: string, opts: { rootCtor?: number; bridge?: boolean } =
     renderer = createNativeScreenRenderer(nativeScreenEntry(moduleId), nativeScreenPackNameForDir);
     blanks.reset();
     lastRt = null;
-    status.textContent = `booted ${moduleId} (pack ${renderer.stats.pack ?? "none"}` +
+    status!.textContent = `booted ${moduleId} (pack ${renderer.stats.pack ?? "none"}` +
         `${rootCtor === undefined ? "" : `, ctor 0x${rootCtor.toString(16)}`}${opts.bridge ? ", bridge" : ""})`;
     setReference(moduleId);
     const loop = (stamp) => {
@@ -135,15 +135,15 @@ function start(moduleId: string, opts: { rootCtor?: number; bridge?: boolean } =
         // frame so the page still redraws at the display's refresh: an idle
         // browser frame redraws the identical picture rather than clearing it, so
         // a 30 Hz monitor sees the same screen a 144 Hz one does.
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx!.fillStyle = "#000";
+        ctx!.fillRect(0, 0, canvas.width, canvas.height);
         if (lastRt) {
             renderer.draw(ctx, lastRt.drawCalls, lastRt.vram, lastRt.cardPrims, lastRt.ctxMarkers, lastRt.rawPrims);
             lastTextStats = drawNativeTextWidgets(ctx, nativeTextWidgets());
         }
         const s = nativeScreenState();
         const r = renderer.stats;
-        status.textContent = s
+        status!.textContent = s
             ? `${s.module}: booted=${s.booted} objects=${s.objects} frames=${s.frames} intents=${s.drawIntents} ` +
               `traps=${s.traps} | pad=0x${pad.word().toString(16).padStart(4, "0")} keys=[${pad.held().join(",")}] ` +
               `| packs=${r.packs.join("+")} clips=${r.clips} cards=${r.cards} skipped=${r.skipped} ` +
@@ -167,7 +167,7 @@ async function main() {
     sel.value = "pro/stitshop";
     const bridge = new URLSearchParams(location.search).get("bridge") === "1";
     sel.addEventListener("change", () => start(sel.value, { bridge }));
-    reboot.addEventListener("click", () => start(sel.value, { bridge }));
+    reboot!.addEventListener("click", () => start(sel.value, { bridge }));
     start(sel.value, { bridge });
 }
 
@@ -206,7 +206,7 @@ window.__nativeScreenKeys = () => ({ held: pad.held(), word: pad.word() });
 window.__nativeScreenReleaseAfter = (frames) => pad.releaseAfter(frames);
 window.__nativeScreenReleasePending = () => pad.releasePending();
 window.__nativeScreenRef = () => ({
-    shown: refbox.style.display !== "none",
+    shown: refbox!.style.display !== "none",
     src: refimg.getAttribute("src") ?? "",
     width: refimg.naturalWidth,
     height: refimg.naturalHeight,

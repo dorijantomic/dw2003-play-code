@@ -516,7 +516,7 @@ export function questFxDrawables(camX: number, camY: number) {
 
 /** The "front" layer: effects that must cover every person on the map. */
 export function questFxDrawOver(ctx: CanvasRenderingContext2D | null, camX: number, camY: number) {
-    for (const fx of live.values()) if (fx.layer === "front") drawFx(fx, camX, camY, ctx);
+    for (const fx of live.values()) if (fx.layer === "front") drawFx(fx, camX, camY, ctx!);
 }
 
 function drawFx(fx, camX: number, camY: number, ctx2 = null) {
@@ -545,12 +545,12 @@ export function installQuestFxCanvas(ctx: CanvasRenderingContext2D | null) {
 /** The screen fade, drawn last: a black quad over the finished frame, at the field's scale (640x480 device pixels). */
 export function questFxDrawFade(ctx: CanvasRenderingContext2D | null, viewW: number, viewH: number) {
     if (fade.alpha <= 0) return;
-    ctx.save();
-    if (typeof ctx.setTransform === "function") ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = Math.min(1, fade.alpha);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, ctx.canvas?.width ?? viewW, ctx.canvas?.height ?? viewH);
-    ctx.restore();
+    ctx!.save();
+    if (typeof ctx!.setTransform === "function") ctx!.setTransform(1, 0, 0, 1, 0, 0);
+    ctx!.globalAlpha = Math.min(1, fade.alpha);
+    ctx!.fillStyle = "#000";
+    ctx!.fillRect(0, 0, ctx!.canvas?.width ?? viewW, ctx!.canvas?.height ?? viewH);
+    ctx!.restore();
 }
 
 /** Test/debug view of the effect list: what is on the map right now. */

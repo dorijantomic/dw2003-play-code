@@ -47,13 +47,13 @@ async function bankDisc(o: { mud?: any; peb?: any; g?: GroundDetailOpts; water?:
 // ------------------------------------------------------------------ small display fields for the grid
 function fld(parts, n: number, rad: number, sc: number[], seed: number, base = 0x5c6b3e, y = 0.04) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16), b = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.05, rad * 1.05, 0.05, 44), toonMat({ color: base }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
-  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
+  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0]! + (sc[1]! - sc[0]!) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
 function waterBlock(rad = 1.3) { const b = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 1.0, 56), toonMat({ color: 0x3b8f9c }, { shadeK: 0.85, rim: 0 })); b.position.y = -0.47; return b; }
 function floatField(parts, n: number, rad: number, sc: number[], seed: number) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16); g.add(waterBlock(rad + 0.1));
-  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad * 0.85; composeTRS(m, i, Math.cos(a) * d, 0.03, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
+  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad * 0.85; composeTRS(m, i, Math.cos(a) * d, 0.03, Math.sin(a) * d, r() * 6.28, sc[0]! + (sc[1]! - sc[0]!) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
 const mossy = (parts, m: number) => { for (const x of parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = (x.mat.userData.tag || "") + "moss"; } return parts; };
@@ -80,9 +80,9 @@ const ALDER = { bark: { type: "oak", tint: 0x8a7868 }, leaves: { type: "ash", ti
 const rawEntries = [
   // ---- water
   lp("w_shallows", cat.water, "Lake water, shore to deep (depth bands, caustics, foam, ripples, sparkle)", async () => bankDisc({ water: true }), { noSpin: true, source: OWN, licence: "own code" }),
-  lp("w_shore", cat.water, "Lake shore tile with the real shore law (water + bowl bed + bank)", async () => shoreTile(-10, 10, ZS - 14, ZS + 10, 0.5), { noSpin: true }),
+  lp("w_shore", cat.water, "Lake shore tile with the real shore law (water + bowl bed + bank)", async () => shoreTile(-10, 10, ZS! - 14, ZS! + 10, 0.5), { noSpin: true }),
   lp("w_deep", cat.water, "Open lake: deep colour bands, ripple rings, sparkle", async () => shoreTile(-12, 12, -46, -20, 1.4), { noSpin: true }),
-  lp("w_caustic", cat.water, "Shallows close-up: caustics, soft foam line, pebbles under water", async () => shoreTile(-3.5, 3.5, ZS - 4, ZS + 1, 0.12), { noSpin: true }),
+  lp("w_caustic", cat.water, "Shallows close-up: caustics, soft foam line, pebbles under water", async () => shoreTile(-3.5, 3.5, ZS! - 4, ZS! + 1, 0.12), { noSpin: true }),
   // ---- shore materials
   ...tex([["river_small_rocks", "River small rocks"], ["ganges_river_pebbles", "Ganges river pebbles"], ["pebble_ground_01", "Pebble ground 01"], ["floor_pebbles_01", "Floor pebbles 01"], ["dry_riverbed_rock", "Dry riverbed rock"],
     ["mud_cracked_dry_riverbed_002", "Cracked dry riverbed mud"]], cat.shore),
@@ -97,7 +97,7 @@ const rawEntries = [
     return g;
   }, { noSpin: true, source: OWN + ", Quaternius pebbles, Poly Haven textures", licence: CC0 }),
   // ---- terrain
-  lp("t_profile", cat.terr, "Lake bowl profile: bed, shore, bank (no water)", async () => shoreTile(-8, 8, ZS - 16, ZS + 14, 0.7, false), { noSpin: true }),
+  lp("t_profile", cat.terr, "Lake bowl profile: bed, shore, bank (no water)", async () => shoreTile(-8, 8, ZS! - 16, ZS! + 14, 0.7, false), { noSpin: true }),
   lp("t_hills", cat.terr, "Far hills ring (low-res heightfield, fog colour)", async () => hillsRing(), { noSpin: false }),
   // ---- reeds
   lp("reed0", cat.reeds, "Common reed A (culms, straps, plumes, dead culms), GPU wind", async () => fld(L.reedParts(1, 0), 10, 1.0, [0.8, 1.2], 3), { noSpin: false }),
@@ -186,7 +186,7 @@ export const entries = rawEntries.map((e) => ({ ...e, id: "l_" + e.id }));
 function subField(parts, n: number, rad: number, sc: number[], seed: number) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16);
   const bed = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.2, rad * 1.2, 0.08, 44), toonMat({ color: 0x6b5d45 }, { shadeK: 0.8, rim: 0 })); bed.position.y = 0.04; g.add(bed);
-  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, 0.08, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
+  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, 0.08, Math.sin(a) * d, r() * 6.28, sc[0]! + (sc[1]! - sc[0]!) * r()); }
   g.add(instancedParts(parts, m, n));
   const w = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.2, rad * 1.2, 0.02, 44), new THREE.MeshBasicMaterial({ color: 0x3f9fae, transparent: true, opacity: 0.38, depthWrite: false })); w.position.y = 1.45; w.renderOrder = 5; g.add(w);
   return g;
@@ -195,7 +195,7 @@ async function stepsPath() {
   const g = new THREE.Group(), base = await bankDisc({ water: true }), r = rng(7); g.add(base);
   const names = ["Round_Small_1", "Round_Small_2", "Square_Small_1", "Round_Small_3", "Square_Small_2", "Round_Thin", "Square_Small_3"], res = [];
   for (const n of names) { const x = await loadToon(`${ASSETS}quaternius/RockPath_${n}.glb`, { scale: 0.45 }); L.waterlineify(x.parts, { mode: "object", level: 0.0 }); res.push(x); }
-  for (let i = 0; i < 12; i++) { const b = part(res[i % res.length].parts), u = i / 11; b.position.set(Math.sin(u * 5) * 0.35, 0.09, 0.9 - u * 1.9); b.rotation.y = r() * 6.28; b.scale.setScalar(0.8 + 0.4 * r()); g.add(b); }
+  for (let i = 0; i < 12; i++) { const b = part(res[i % res.length]!.parts), u = i / 11; b.position.set(Math.sin(u * 5) * 0.35, 0.09, 0.9 - u * 1.9); b.rotation.y = r() * 6.28; b.scale.setScalar(0.8 + 0.4 * r()); g.add(b); }
   return g;
 }
 function hillsRing() {
@@ -210,9 +210,9 @@ const HALF = 112;
 function dartPolar(n: number, seed: number, minD: number, eRange: number[], ok) {
   const r = rng(seed), cell = minD, grid = new Map(), out = []; let tries = 0;
   while (out.length < n && tries++ < n * 60) {
-    const th = r() * 6.2832, e = eRange[0] + (eRange[1] - eRange[0]) * r(), [x, z] = polar(th, e); if (ok && !ok(x, z, e, th, r)) continue;
-    const cx = Math.floor(x / cell), cz = Math.floor(z / cell); let bad = false;
-    for (let i = -1; i <= 1 && !bad; i++) for (let j = -1; j <= 1 && !bad; j++) for (const p of grid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < minD) { bad = true; break; }
+    const th = r() * 6.2832, e = eRange[0]! + (eRange[1]! - eRange[0]!) * r(), [x, z] = polar(th, e); if (ok && !ok(x, z, e, th, r)) continue;
+    const cx = Math.floor(x! / cell), cz = Math.floor(z! / cell); let bad = false;
+    for (let i = -1; i <= 1 && !bad; i++) for (let j = -1; j <= 1 && !bad; j++) for (const p of grid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x!, p[1] - z!) < minD) { bad = true; break; }
     if (bad) continue; out.push([x, z, th, e]); const k = cx + "," + cz; if (!grid.has(k)) grid.set(k, []); grid.get(k).push([x, z]);
   }
   return out;
@@ -247,7 +247,7 @@ export async function buildLake(ctx) {
       const th = r() * 6.2832, e = o.e[0] + (o.e[1] - o.e[0]) * Math.pow(r(), o.skew || 1), [x, z] = polar(th, e);
       const pr = (o.prob ? o.prob(x, z, e, th) : 1) * (o.beach === false ? 1 : o.beach ?? beachMask(th, e));
       if (r() > pr) continue;
-      const s = sc[0] + (sc[1] - sc[0]) * r(), y = o.float ? 0 : lakeH(x, z);
+      const s = sc[0] + (sc[1] - sc[0]) * r(), y = o.float ? 0 : lakeH(x!, z!);
       composeTRS(out, i, x, y + (o.y || 0), z, r() * 6.28, s, o.tiltFix ?? (o.tilt || 0) * r(), r() * 6.28, o.sy ? s * o.sy : null); i++;
     }
     return { mats: out.subarray(0, i * 16), count: i };
@@ -352,17 +352,17 @@ export async function buildLake(ctx) {
   const species = (name: string, l0: any, l1: any, pos: any[], o: SpeciesLODOpts = {}) => {
     if (!pos.length) return;
     const imp = bakeImpostor(renderer, partsGroup(l0), 8, 256), r = rng(name.length * 977 + pos.length), mats = new Float32Array(pos.length * 16), sc = o.scale || [0.85, 1.25];
-    pos.forEach((p, i) => composeTRS(mats, i, p[0], lakeH(p[0], p[1]) - 0.05, p[1], r() * 6.28, (p[4] ?? (sc[0] + (sc[1] - sc[0]) * r())), 0.02 * r(), r() * 6.28));
+    pos.forEach((p, i) => composeTRS(mats, i, p[0], lakeH(p[0], p[1]) - 0.05, p[1], r() * 6.28, (p[4] ?? (sc[0]! + (sc[1]! - sc[0]!) * r())), 0.02 * r(), r() * 6.28));
     const levels: LODLevel[] = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
     const sp = new LODSpecies(name, levels, mats, pos.length, l1 ? [o.d0 ?? 26, o.d1 ?? 70] : [o.d1 ?? 50]); lods.push(sp); root.add(sp.group); note(name, pos.length, l0); info.impostors++;
     const rs = new LODSpecies(name + " (mirror)", [{ impostor: imp.factory }], mats, pos.length, [0]); rs.group.traverse((x) => x.layers.set(1)); rs.update({ position: new THREE.Vector3(0, 0, 0) }, true); root.add(rs.group);
   };
-  const hero = [[TH0 + 0.62, 2.6, 1, 1.35], [TH0 - 0.7, 3.4, 2, 1.2], [TH0 + 1.35, 3.0, 1, 1.4]].map(([th, e, s, sc]) => [...polar(th, e), th, e, sc]);
+  const hero = [[TH0 + 0.62, 2.6, 1, 1.35], [TH0 - 0.7, 3.4, 2, 1.2], [TH0 + 1.35, 3.0, 1, 1.4]].map(([th, e, s, sc]) => [...polar(th!, e!), th, e, sc]);
   const okTree = (x: number, z: number, e: number, th: number) => beachMask(th) > 0.35 && vnoise(x, z, 0.03, 1) > 0.12;
-  const willowPos = [...hero, ...dartPolar(N(5), 91, 12, [1.5, 8], (x: number, z: number, e, th: number) => beachMask(th) > 0.6 && !hero.some((h) => Math.hypot(h[0] - x, h[1] - z) < 14))];
+  const willowPos = [...hero, ...dartPolar(N(5), 91, 12, [1.5, 8], (x: number, z: number, e, th: number) => beachMask(th) > 0.6 && !hero.some((h) => Math.hypot(h[0]! - x, h[1]! - z) < 14))];
   species("willow A", L.willowParts(1, 0), L.willowParts(1, 1), willowPos.filter((_, i) => i % 2 === 0), { scale: [1.0, 1.4], d0: 24, d1: 70 });
   species("willow B", L.willowParts(2, 0), L.willowParts(2, 1), willowPos.filter((_, i) => i % 2 === 1), { scale: [1.0, 1.4], d0: 24, d1: 70 });
-  const treePos = dartPolar(N(150), 21, 5.6, [4, 90], (x: number, z: number, e: number, th) => okTree(x, z, e, th) && !willowPos.some((h) => Math.hypot(h[0] - x, h[1] - z) < 9) && (e < 24 || vnoise(x, z, 0.05, 3) > 0.22) && Math.hypot(x - 0, z - 26) > 6);
+  const treePos = dartPolar(N(150), 21, 5.6, [4, 90], (x: number, z: number, e: number, th) => okTree(x, z, e, th) && !willowPos.some((h) => Math.hypot(h[0]! - x, h[1]! - z) < 9) && (e < 24 || vnoise(x, z, 0.05, 3) > 0.22) && Math.hypot(x - 0, z - 26) > 6);
   const bucket = (k: number, m: number) => treePos.filter((_, i) => i % m === k);
   species("birch A", ezTreeParts("Aspen Medium", 3, BIRCH, 10), null, bucket(0, 5), { d1: 45 });
   species("birch B", ezTreeParts("Aspen Medium", 11, BIRCH, 8.5), null, bucket(1, 5), { d1: 45 });
@@ -378,7 +378,7 @@ export async function buildLake(ctx) {
     const pos = dartPolar(N(13), 301, 11, [0.6, 2.2], (x, z, e, th: number) => beachMask(th) > 0.7), ov = [L.overhangParts(1), L.overhangParts(2), L.overhangParts(3)];
     for (const [k, parts] of ov.entries()) {
       const mine = pos.filter((_, i) => i % 3 === k); if (!mine.length) continue; const m = new Float32Array(mine.length * 16), r = rng(310 + k);
-      mine.forEach(([x, z, th], j) => { const sc = 1.0 + 0.5 * r(), yaw = Math.atan2(-Math.cos(th), -Math.sin(th)); composeTRS(m, j, x, lakeH(x, z) - 0.1, z, yaw + (r() - 0.5) * 0.3, sc, 0, 0); });
+      mine.forEach(([x, z, th], j) => { const sc = 1.0 + 0.5 * r(), yaw = Math.atan2(-Math.cos(th!), -Math.sin(th!)); composeTRS(m, j, x, lakeH(x!, z!) - 0.1, z, yaw + (r() - 0.5) * 0.3, sc, 0, 0); });
       const g = cull.add(parts, m, mine.length, "overhanging branch " + (k + 1), 24); root.add(g); refl(g); note("leaning tree + branch over water " + (k + 1), mine.length, parts);
     }
     const t = { grade: true, wind: 0.3, flutter: 0.6, trans: 0.3 }, dp = dartPolar(N(12), 311, 10, [6, 40], (x, z, e: number, th: number) => beachMask(th) > 0.5 && e > 4);

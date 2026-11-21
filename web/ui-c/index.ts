@@ -73,7 +73,7 @@ function coveredBy(root, rr) {
         const z = parseInt(c.zIndex, 10);
         if (Number.isNaN(z) || z < rz || (z === rz && i < at)) continue;
         const a = /^rgba\(.*,\s*([\d.]+)\)$/.exec(c.backgroundColor);
-        if (c.backgroundColor === "transparent" || (a && parseFloat(a[1]) < 0.99) || !c.backgroundColor.startsWith("rgb")) continue;
+        if (c.backgroundColor === "transparent" || (a && parseFloat(a[1]!) < 0.99) || !c.backgroundColor.startsWith("rgb")) continue;
         const b = s.getBoundingClientRect();
         if (b.width >= rr.width * 0.9 && b.height >= rr.height * 0.9) return { id: s.id, tag: s.tag ?? s.tagName, z, bg: c.backgroundColor };
     }

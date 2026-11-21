@@ -47,11 +47,11 @@ function build(slot: number) {
     const src = document.createElement("canvas");
     src.width = fw * FRAMES; src.height = fh;
     const sc = src.getContext("2d");
-    picks.forEach((c, i) => sc.drawImage(img, (c % perRow) * fw, Math.floor(c / perRow) * fh, fw, fh, i * fw, 0, fw, fh));
-    const px = sc.getImageData(0, 0, src.width, fh).data;
+    picks.forEach((c, i) => sc!.drawImage(img, (c % perRow) * fw, Math.floor(c / perRow) * fh, fw, fh, i * fw, 0, fw, fh));
+    const px = sc!.getImageData(0, 0, src.width, fh).data;
     let x0 = fw, x1 = -1, y0 = fh, y1 = -1;
     for (let y = 0; y < fh; y++) for (let x = 0; x < src.width; x++) {
-      if (px[(y * src.width + x) * 4 + 3] < 16) continue;
+      if (px[(y * src.width + x) * 4 + 3]! < 16) continue;
       const lx = x % fw;
       if (lx < x0) x0 = lx; if (lx > x1) x1 = lx; if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
@@ -62,9 +62,9 @@ function build(slot: number) {
     const out = document.createElement("canvas");
     out.width = CELL * FRAMES; out.height = CELL;
     const oc = out.getContext("2d");
-    oc.imageSmoothingEnabled = false;
+    oc!.imageSmoothingEnabled = false;
     for (let i = 0; i < FRAMES; i++) {
-      oc.drawImage(src, i * fw + x0, y0, bw, bh, i * CELL + Math.floor((CELL - dw) / 2), CELL - 1 - dh, dw, dh);
+      oc!.drawImage(src, i * fw + x0, y0, bw, bh, i * CELL + Math.floor((CELL - dw) / 2), CELL - 1 - dh, dw, dh);
     }
     cache.set(slot, { canvas: out });
   };

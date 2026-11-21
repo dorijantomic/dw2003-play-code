@@ -240,7 +240,7 @@ export function syncEquipBonuses(state: GameState, idx: number) {
 //     the slot is empty (`sh $v0, 0x78($s3)` with `li $v0, -1`, unconditional).
 export function equipPickOptions(state: GameState, partyIdx: number, slotKey: string | undefined) {
   ensureEquipment(state);
-  const row = EQUIP_ROW_SLOTS.indexOf(slotKey);
+  const row = EQUIP_ROW_SLOTS.indexOf(slotKey!);
   const line = rosterSlotOfCharId(state.party?.[partyIdx] ?? "");
   const equippedId = state.equipment[partyIdx]?.[slotKey];
   const eqName = equippedId != null
@@ -315,7 +315,7 @@ export function sheetResValue(p, slots: Record<string, number>, res: string) {
 // no candidate the species part is simply absent. These two helpers exist so the
 // fold cannot drift from the sheet's: they call the sheet's own readers.
 export function seeDigivolvePanelStat(p, slots: Record<string, number>, stat: string, rosterSlot: number | null | undefined, formProfile = null) {
-  return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot) + Number(formProfile?.[stat] ?? 0));
+  return Math.min(999, sheetStatValue(p, slots, stat, rosterSlot!) + Number(formProfile?.[stat] ?? 0));
 }
 
 export function seeDigivolvePanelRes(p, slots: Record<string, number>, res: string, formProfile = null) {

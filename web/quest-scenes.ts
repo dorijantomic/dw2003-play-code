@@ -232,7 +232,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const emitWalk = (who, to, f: string | number | null) => {
         const from = walkStart(idOf(who));
         const legs = from && opts.walk ? opts.walk(from.x, from.y, num(to[0]), num(to[1])) : null;
-        const routed = legs && legs.length && (legs.length > 1 || legs[0][0] !== num(to[0]) || legs[0][1] !== num(to[1]));
+        const routed = legs && legs.length && (legs.length > 1 || legs[0]![0] !== num(to[0]) || legs[0]![1] !== num(to[1]));
         if (routed) {
             legs.forEach((leg, k) => {
                 const last = k === legs.length - 1;

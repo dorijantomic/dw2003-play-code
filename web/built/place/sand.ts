@@ -20,7 +20,7 @@ export function plan(pctx) {
     if (p.kind === "shore" && p.rows?.some(Boolean)) {
       out.rows = Array.from({ length: SAND.ROWS }, (_, k) => (p.rows[k] || p.rows.find(Boolean)).rgb);
       out.green = new Float32Array(n);
-      for (let i = 0; i < n; i++) out.green[i] = rowValue(p.rows, row[i], (r) => r.green);
+      for (let i = 0; i < n; i++) out.green[i] = rowValue(p.rows, row[i]!, (r) => r.green);
       // blade colours on the shore: the measured greens of the band's two greenest picture rows
       const greenest = p.rows.filter(Boolean).sort((a: { green: number; }, b: { green: number; }) => b.green - a.green).slice(0, 2).map((r) => r.rgb)
         .sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));

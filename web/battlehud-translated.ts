@@ -258,8 +258,8 @@ export function battleHudDvPaint(ctx: CanvasRenderingContext2D | undefined, fram
     if (frame.backing && !uiCCapturing()) {
         const { x, y, w, h, rgb } = frame.trough;
         if (w > 0 && h > 0) {
-            ctx.fillStyle = `rgb(${rgb[0].join(",")})`;
-            ctx.fillRect(x, y, w, h);
+            ctx!.fillStyle = `rgb(${rgb[0].join(",")})`;
+            ctx!.fillRect(x, y, w, h);
         }
     }
     if (ready && frame.fill.width > 0) {

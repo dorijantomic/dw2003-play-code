@@ -45,30 +45,30 @@ export function questGrid(src) {
 export function questRectBlocked(grid, x0: number, y0: number, x1: number, y1: number | undefined) {
     if (!grid) return true;
     const [c0, r0] = cellOf(grid, x0, y0), [c1, r1] = cellOf(grid, x1, y1);
-    for (let r = r0; r <= r1; r++)
-        for (let c = c0; c <= c1; c++) {
-            if (c < 0 || r < 0 || c >= grid.cols || r >= grid.rows) return true;
-            if (grid.cells[r * grid.cols + c]) return true;
+    for (let r = r0; r! <= r1!; r++)
+        for (let c = c0; c! <= c1!; c++) {
+            if (c! < 0 || r! < 0 || c! >= grid.cols || r! >= grid.rows) return true;
+            if (grid.cells[r! * grid.cols + c!]) return true;
         }
     return false;
 }
 
 /** Whether a character standing with its feet at (x, y) is on walkable ground. */
 export function questStandFree(grid, x: number | undefined, y: number | undefined) {
-    return !questRectBlocked(grid, x - FOOT_HALF, y - FOOT_DEPTH, x + FOOT_HALF, y);
+    return !questRectBlocked(grid, x! - FOOT_HALF, y! - FOOT_DEPTH, x! + FOOT_HALF, y);
 }
 
 /** Whether a character can walk the straight line a->b without its foot box touching a wall (sampled every `step` px). */
 export function questLineClear(grid, ax: number, ay: number, bx: number | undefined, by: number | undefined, step = 4, skip = 0) {
     if (!grid) return true;
-    const len = Math.hypot(bx - ax, by - ay);
+    const len = Math.hypot(bx! - ax, by! - ay);
     // `skip` px at the start are not sampled: a character the scene did not place (an NPC on its own post) may already
     // be standing with its foot box clipped, and walking away from that is not the scene's fault
     const from = skip > 0 && len > skip ? skip / len : 0;
     const n = Math.max(1, Math.ceil((len * (1 - from)) / step));
     for (let i = 0; i <= n; i++) {
         const t = from + (1 - from) * (i / n);
-        if (!questStandFree(grid, ax + (bx - ax) * t, ay + (by - ay) * t)) return false;
+        if (!questStandFree(grid, ax + (bx! - ax) * t, ay + (by! - ay) * t)) return false;
     }
     return true;
 }
@@ -93,11 +93,11 @@ export function questFreeCellNear(grid, x: number | undefined, y: number | undef
     if (questCellFree(grid, c0, r0)) return [c0, r0];
     for (let d = 1; d <= limit; d++) {
         let best = null, bestD = Infinity;
-        for (let r = r0 - d; r <= r0 + d; r++)
-            for (let c = c0 - d; c <= c0 + d; c++) {
-                if (Math.max(Math.abs(c - c0), Math.abs(r - r0)) !== d) continue;      // the ring only
+        for (let r = r0! - d; r <= r0! + d; r++)
+            for (let c = c0! - d; c <= c0! + d; c++) {
+                if (Math.max(Math.abs(c - c0!), Math.abs(r - r0!)) !== d) continue;      // the ring only
                 if (!questCellFree(grid, c, r)) continue;
-                const dd = Math.hypot(c - c0, r - r0);
+                const dd = Math.hypot(c - c0!, r - r0!);
                 if (dd < bestD) { best = [c, r]; bestD = dd; }
             }
         if (best) return best;
@@ -112,7 +112,7 @@ export function questCellPath(grid, from: (number | undefined)[], to) {
     const key = (c: number, r: number) => r * cols + c;
     const prev = new Int32Array(cols * rows).fill(-1);
     const seen = new Uint8Array(cols * rows);
-    const start = key(from[0], from[1]);
+    const start = key(from[0]!, from[1]!);
     seen[start] = 1;
     const queue = [from];
     const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -147,7 +147,7 @@ export function questCellPath(grid, from: (number | undefined)[], to) {
 export function questRoute(grid, ax: number, ay: number, bx: number, by: number) {
     if (!grid) return null;
     const target = [Math.round(bx), Math.round(by)];
-    const len = Math.hypot(target[0] - ax, target[1] - ay);
+    const len = Math.hypot(target[0]! - ax, target[1]! - ay);
     const exact = questStandFree(grid, target[0], target[1]);
     // the walker's own first 12 px are not checked: it may already stand with a clipped foot box on its own post
     if (questLineClear(grid, ax, ay, target[0], target[1], 4, 12)) {
@@ -179,13 +179,13 @@ export function questRoute(grid, ax: number, ay: number, bx: number, by: number)
     let i = 0;
     while (i < points.length - 1) {
         let j = points.length - 1;
-        while (j > i + 1 && !questLineClear(grid, points[i][0], points[i][1], points[j][0], points[j][1])) j--;
-        legs.push([Math.round(points[j][0]), Math.round(points[j][1])]);
+        while (j > i + 1 && !questLineClear(grid, points[i]![0]!, points[i]![1]!, points[j]![0], points[j]![1])) j--;
+        legs.push([Math.round(points[j]![0]!), Math.round(points[j]![1]!)]);
         i = j;
     }
     // the last leg is the destination itself (or its standable stand-in), never a cell centre short of it
-    if (legs.length === 0) legs.push([Math.round(end[0]), Math.round(end[1])]);
-    else legs[legs.length - 1] = [Math.round(end[0]), Math.round(end[1])];
+    if (legs.length === 0) legs.push([Math.round(end![0]!), Math.round(end![1]!)]);
+    else legs[legs.length - 1] = [Math.round(end![0]!), Math.round(end![1]!)];
     return { legs, exact: !stopsShort };
 }
 
@@ -195,13 +195,13 @@ export function questClosestCell(grid, start: (number | undefined)[], target: nu
     const { cols, rows } = grid;
     const seen = new Uint8Array(cols * rows);
     const queue = [start];
-    seen[start[1] * cols + start[0]] = 1;
+    seen[start[1]! * cols + start[0]!] = 1;
     let best = null, bestD = Infinity;
     const STEP = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (let head = 0; head < queue.length; head++) {
         const [c, r] = queue[head];
         const [x, y] = cellPoint(grid, c, r);
-        const d = Math.hypot(x - target[0], y - target[1]);
+        const d = Math.hypot(x! - target[0]!, y! - target[1]!);
         if (d < bestD) { best = [c, r]; bestD = d; }
         for (const [dc, dr] of STEP) {
             const nc = c + dc, nr = r + dr;
@@ -221,7 +221,7 @@ export function questClosestCell(grid, start: (number | undefined)[], target: nu
  * the character goes around the wall instead of through it), and null when there is nothing to route over.
  */
 export function questWalkLegs(grid, ax: number | undefined, ay: number | undefined, bx: number | undefined, by: number | undefined) {
-    const r = questRoute(grid, ax, ay, bx, by);
+    const r = questRoute(grid, ax!, ay!, bx!, by!);
     if (!r) return null;
     if (r.exact && r.legs.length === 1) return r.legs;
     if (!r.legs.length) return null;                  // the destination is inside a wall and nowhere near ground
@@ -299,7 +299,7 @@ export function questReachArea(grid, seeds = [], links = []) {
         if (label !== -1) on.add(find(label));
     }
     let biggest = -1;
-    for (let i = 0; i < sizes.length; i++) if (biggest === -1 || sizes[i] > sizes[biggest]) biggest = i;
+    for (let i = 0; i < sizes.length; i++) if (biggest === -1 || sizes[i]! > sizes[biggest]!) biggest = i;
     if (biggest !== -1) on.add(find(biggest));
     const reach = new Uint8Array(cols * rows);
     for (let k = 0; k < labels.length; k++) if (labels[k] !== -1 && on.has(find(labels[k]))) reach[k] = 1;
@@ -310,9 +310,9 @@ export function questReachArea(grid, seeds = [], links = []) {
 export function questReachable(grid, reach, x, y, limit = 4) {
     if (!grid || !reach) return true;
     const [c0, r0] = cellOf(grid, x, y);
-    if (questCellFree(grid, c0, r0)) return !!reach[r0 * grid.cols + c0];
+    if (questCellFree(grid, c0, r0)) return !!reach[r0! * grid.cols + c0!];
     const near = questFreeCellNear(grid, x, y, limit);
-    return near ? !!reach[near[1] * grid.cols + near[0]] : false;
+    return near ? !!reach[near[1]! * grid.cols + near[0]!] : false;
 }
 
 // --- where a stand-in may stand ------------------------------------------------------------------------------------
@@ -331,6 +331,6 @@ export const STAND_IN_OFFSETS = [
 export function standInSpot(post, clear, offsets = STAND_IN_OFFSETS) {
     const x = Math.round(Number(post?.x) || 0), y = Math.round(Number(post?.y) || 0);
     if (typeof clear !== "function" || clear(x, y)) return { x, y };
-    for (const [dx, dy] of offsets) if (clear(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+    for (const [dx, dy] of offsets) if (clear(x + dx!, y + dy!)) return { x: x + dx!, y: y + dy! };
     return { x, y };
 }

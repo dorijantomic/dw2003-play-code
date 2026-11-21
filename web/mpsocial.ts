@@ -74,7 +74,7 @@ function drawLog() {
 function badge() {
     if (!el.tabs) return;
     const n = playingCount();
-    el.tabs.players.textContent = `PLAYERS ${n}`;
+    el.tabs.players!.textContent = `PLAYERS ${n}`;
     el.unread.textContent = S.collapsed && S.unread ? String(Math.min(S.unread, 99)) : "";
     el.unread.hidden = !(S.collapsed && S.unread);
 }
@@ -736,7 +736,7 @@ export function installSocial({ stageEl, api: a }) {
     const goBox = h("div", "mp-win"); goBox.hidden = true;
     stageEl.append(dock, inspect, tradeBox, duelBox, coopBox, goBox);
     el = { log, players, tabs, unread, toggle, inspect, trade: tradeBox, duel: duelBox, coop: coopBox, go: goBox };
-    tabs.all.classList.add("on");
+    tabs.all!.classList.add("on");
 
     const submit = () => {
         const text = input.value.replace(/\s+/g, " ").trim();

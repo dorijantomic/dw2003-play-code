@@ -192,7 +192,7 @@ export function buildFringe(slot, env) {
   geo.setAttribute("aH", new THREE.BufferAttribute(new Float32Array(AH), 1));
   geo.setAttribute("aRef", new THREE.BufferAttribute(new Float32Array(AR), 1));
   geo.setAttribute("aTint", new THREE.BufferAttribute(new Float32Array(ATI), 1));
-  geo.setIndex(IDX);
+  geo.setIndex(IDX!!!!!!);
   geo.computeBoundingSphere();
 
   const mat = fringeMaterial(S, uni);

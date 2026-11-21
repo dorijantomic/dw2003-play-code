@@ -81,37 +81,37 @@ export function meshFrame(verts) {
   if (Math.hypot(...u) === 0) u = [0, 1, 0];
   for (let it = 0; it < 32; it++) {
     const w = [
-      C[0] * u[0] + C[1] * u[1] + C[2] * u[2],
-      C[3] * u[0] + C[4] * u[1] + C[5] * u[2],
-      C[6] * u[0] + C[7] * u[1] + C[8] * u[2],
+      C[0]! * u[0]! + C[1]! * u[1]! + C[2]! * u[2]!,
+      C[3]! * u[0]! + C[4]! * u[1]! + C[5]! * u[2]!,
+      C[6]! * u[0]! + C[7]! * u[1]! + C[8]! * u[2]!,
     ];
-    const len = Math.hypot(w[0], w[1], w[2]);
+    const len = Math.hypot(w[0]!, w[1]!, w[2]!);
     if (len < 1e-12) break;
-    u = [w[0] / len, w[1] / len, w[2] / len];
+    u = [w[0]! / len, w[1]! / len, w[2]! / len];
   }
   let lo = Infinity, hi = -Infinity;
   for (const v of verts) {
-    const t = (v[0] - cx) * u[0] + (v[1] - cy) * u[1] + (v[2] - cz) * u[2];
+    const t = (v[0] - cx) * u[0]! + (v[1] - cy) * u[1]! + (v[2] - cz) * u[2]!;
     if (t < lo) lo = t;
     if (t > hi) hi = t;
   }
   const half = Math.max(1e-6, (hi - lo) / 2);
-  const mid = [cx + u[0] * (lo + hi) / 2, cy + u[1] * (lo + hi) / 2, cz + u[2] * (lo + hi) / 2];
+  const mid = [cx + u[0]! * (lo + hi) / 2, cy + u[1]! * (lo + hi) / 2, cz + u[2]! * (lo + hi) / 2];
   const rad = [];
   for (const v of verts) {
     const dx = v[0] - cx, dy = v[1] - cy, dz = v[2] - cz;
-    const t = dx * u[0] + dy * u[1] + dz * u[2];
-    rad.push(Math.hypot(dx - u[0] * t, dy - u[1] * t, dz - u[2] * t));
+    const t = dx * u[0]! + dy * u[1]! + dz * u[2]!;
+    rad.push(Math.hypot(dx - u[0]! * t, dy - u[1]! * t, dz - u[2]! * t));
   }
   rad.sort((a, b) => a - b);
-  const radius = Math.max(1e-6, percentile(rad, P90));
+  const radius = Math.max(1e-6, percentile(rad, P90)!);
   // a blob whose length is comparable to its width is a sphere: a capsule along a short axis would
   // invent two sharp ends the mesh does not have
   const compact = half * 2 <= radius * 2.4;
   return {
     c: [cx, cy, cz], u, half, radius, compact,
-    a: [mid[0] - u[0] * half, mid[1] - u[1] * half, mid[2] - u[2] * half],
-    b: [mid[0] + u[0] * half, mid[1] + u[1] * half, mid[2] + u[2] * half],
+    a: [mid[0]! - u[0]! * half, mid[1]! - u[1]! * half, mid[2]! - u[2]! * half],
+    b: [mid[0]! + u[0]! * half, mid[1]! + u[1]! * half, mid[2]! + u[2]! * half],
   };
 }
 
@@ -243,7 +243,7 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a, b: number[]) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
-const len = (a: number[]) => Math.hypot(a[0], a[1], a[2]);
+const len = (a: number[]) => Math.hypot(a[0]!, a[1]!, a[2]!);
 
 /**
  * Closest points between two segments (Ericson, Real-Time Collision Detection 5.1.9) plus the
@@ -331,7 +331,7 @@ export function penetration(model, pose, { folder = model?.folder, rig = null, t
     clearance,
     depth: Math.max(0, -clearance),
     tolerance: worst ? worst.floor : 0,
-    over: violations.length ? violations[0].over : 0,
+    over: violations.length ? violations[0]!.over : 0,
     tested,
     violations,
     clasp: clasped,
@@ -432,7 +432,7 @@ export function clearanceTolerance(model, folder = model?.folder, { samples = nu
       if (bar != null && bar < floor) floor = bar;
     }
     out.floor = floor;
-    out.source = wins[0].source;
+    out.source = wins[0]!.source;
   }
   out.pairFloor = (i, j) => {
     const v = out.byPair.get(`${i}:${j}`);
@@ -502,8 +502,8 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
     };
   }
   const c = centred(pts);
-  const aimLen = Math.hypot(aim[0], aim[1], aim[2]) || 1;
-  const ax = [aim[0] / aimLen, aim[1] / aimLen, aim[2] / aimLen];
+  const aimLen = Math.hypot(aim[0]!, aim[1]!, aim[2]!) || 1;
+  const ax = [aim[0]! / aimLen, aim[1]! / aimLen, aim[2]! / aimLen];
   // the aim LINE the spread is mirrored about: through the body's own centre line by default
   const o = origin && Number.isFinite(origin.x) ? origin : c;
 
@@ -515,12 +515,12 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
       out = pts.map((p) => ({ ...p, x: c.x + (p.x - c.x) * s, y: c.y + (p.y - c.y) * s, z: c.z + (p.z - c.z) * s }));
     } else {
       // unlike sites: keep their lateral/vertical places, close the gap ALONG the aim
-      const along = pts.map((p) => (p.x - c.x) * ax[0] + (p.y - c.y) * ax[1] + (p.z - c.z) * ax[2]);
+      const along = pts.map((p) => (p.x - c.x) * ax[0]! + (p.y - c.y) * ax[1]! + (p.z - c.z) * ax[2]!);
       const lead = Math.max(...along);
       out = pts.map((p, i) => {
         const back = lead - along[i];
         const slide = back > gap ? back - gap : 0;
-        return { ...p, x: p.x + ax[0] * slide, y: p.y + ax[1] * slide, z: p.z + ax[2] * slide };
+        return { ...p, x: p.x + ax[0]! * slide, y: p.y + ax[1]! * slide, z: p.z + ax[2]! * slide };
       });
     }
     const m = centred(out);
@@ -537,7 +537,7 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
   // (cross(aim, up), up = -Y in this frame). Height and forward position are each emitter's own - a
   // mouth above two hands stays above them - and the pair straddles the line.
   const sideways = lateralAxis(ax);
-  const off = pts.map((p) => (p.x - o.x) * sideways[0] + (p.y - o.y) * sideways[1] + (p.z - o.z) * sideways[2]);
+  const off = pts.map((p) => (p.x - o.x) * sideways[0]! + (p.y - o.y) * sideways[1]! + (p.z - o.z) * sideways[2]!);
   const used = new Array(pts.length).fill(false);
   const target = off.slice();
   // the middle of an odd group stays on the line; the rest pair most-positive with most-negative
@@ -566,7 +566,7 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
   }
   const out = pts.map((p, i) => {
     const slide = target[i] - off[i];
-    return { ...p, x: p.x + sideways[0] * slide, y: p.y + sideways[1] * slide, z: p.z + sideways[2] * slide };
+    return { ...p, x: p.x + sideways[0]! * slide, y: p.y + sideways[1]! * slide, z: p.z + sideways[2]! * slide };
   });
   return {
     mode, span, gap, separation: sep, height: H, rule,
@@ -578,9 +578,9 @@ export function sharedShotTargets({ points, mode, height = null, aim = [0, 0, 1]
 /** The horizontal axis square to the aim: cross(aim, up), with the model frame's up = -Y. */
 function lateralAxis(aim) {
   const up = [0, -1, 0];
-  let v = [aim[1] * up[2] - aim[2] * up[1], aim[2] * up[0] - aim[0] * up[2], aim[0] * up[1] - aim[1] * up[0]];
+  let v = [aim[1] * up[2]! - aim[2] * up[1]!, aim[2] * up[0]! - aim[0] * up[2]!, aim[0] * up[1]! - aim[1] * up[0]!];
   let l = Math.hypot(...v);
   if (l < 1e-6) { v = [1, 0, 0]; l = 1; }
-  return [v[0] / l, v[1] / l, v[2] / l];
+  return [v[0]! / l, v[1]! / l, v[2]! / l];
 }
 

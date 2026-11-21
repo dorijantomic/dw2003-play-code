@@ -40,7 +40,7 @@ const STORED_BANKS = new Set([
 
 const ROSTER = new Map(rosterFile.records.map((rec) => [rec.key, rec]));
 
-const hex = (id: number | undefined) => `0x${(id >>> 0).toString(16).padStart(4, "0")}`;
+const hex = (id: number | undefined) => `0x${(id! >>> 0).toString(16).padStart(4, "0")}`;
 
 function commandWords(bank: number, index: number) {
   if (bank === 0x74) return `scripted battle slot ${index}`;
@@ -52,7 +52,7 @@ function commandWords(bank: number, index: number) {
 }
 
 function bank70Words(id: number | undefined, want: number) {
-  const rec = ROSTER.get(id & 0x1ff);
+  const rec = ROSTER.get(id! & 0x1ff);
   if (!rec) return `gate ${hex(id)}`;        // no decoded record: never invent a meaning
   if ((rec.op & 0xf0) === 0x30) {
     // op 0x30, F0x80015b9c: lo <= story ordinal <= hi, both inclusive. The extractor
@@ -72,8 +72,8 @@ function bank70Words(id: number | undefined, want: number) {
  * means when the field is absent.
  */
 export function gateWords({ id, expected = 1 }: { id?: number; expected?: number } = {}) {
-  const bank = (id >> 8) & 0xfe;
-  const index = id & 0x1ff;
+  const bank = (id! >> 8) & 0xfe;
+  const index = id! & 0x1ff;
   const want = expected ? 1 : 0;
 
   if (COMMAND_BANKS.has(bank)) return commandWords(bank, index);

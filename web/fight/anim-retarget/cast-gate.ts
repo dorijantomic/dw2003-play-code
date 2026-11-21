@@ -92,12 +92,12 @@ export const CAST_GATE = {
 
 const TAU_R = (Math.PI * 2) / 4096;
 
-const angOf = (ch2, frame: number | undefined) => sample(ch2, frame).map((v) => v * TAU_R);
+const angOf = (ch2, frame: number | undefined) => sample(ch2, frame!).map((v) => v * TAU_R);
 
 const angBetween = (a: number[], b: number[]) => {
   let d = 0;
   for (let i = 0; i < 3; i++) {
-    let x = a[i] - b[i];
+    let x = a[i]! - b[i]!;
     while (x > Math.PI) x -= 2 * Math.PI;
     while (x < -Math.PI) x += 2 * Math.PI;
     d += x * x;
@@ -121,7 +121,7 @@ export function handPoint(model, { table = null, side = null } = {}) {
   let bone = own ? own.bone : null;
   if (bone == null && roles.arms.length) {
     const arm = side ? (roles.arms.find((a) => a.side === side) ?? roles.arms[0]) : roles.arms[0];
-    bone = arm.chain[arm.chain.length - 1];
+    bone = arm!.chain[arm!.chain.length - 1];
   }
   if (bone == null) return null;
   let lo = Infinity, hi = -1;
@@ -196,7 +196,7 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
   let handT = 0, handS = 0;
   const handBaseT = [], handBaseS = [];
   for (let k = 0; k < frames.length; k++) {
-    const f = frames[k], sf = f - off;
+    const f = frames[k], sf = f! - off;
     const Tp = restPose(baked, f), Sp = restPose(source, sf);
     if (handBone != null && Tp.pos[handBone]) {
       if (!handBaseT.length) { handBaseT.push(...Tp.pos[handBone]); }
@@ -227,7 +227,7 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
         const v = [Tp.pos[kids[0]][0] - Tp.pos[i][0], Tp.pos[kids[0]][1] - Tp.pos[i][1], Tp.pos[kids[0]][2] - Tp.pos[i][2]];
         const lu = Math.hypot(...u), lv = Math.hypot(...v);
         if (lu > 1 && lv > 1) {
-          const c = (u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (lu * lv);
+          const c = (u[0]! * v[0]! + u[1]! * v[1]! + u[2]! * v[2]!) / (lu * lv);
           if (c < CAST_GATE.foldCos) folds++;
         }
       }
@@ -301,17 +301,17 @@ export function applyCastBake(target, source, clip: number, { offset = null } = 
   if (!bake) return null;
   bake.source = source;
   const bakedTable = bake.table;
-  bake.model.timeline[table] = bake.model.timeline[bakedTable];
+  bake.model!.timeline[table] = bake.model!.timeline[bakedTable];
   bake.table = table;
   const gate = castGate(bake);
   if (!gate.used) return { table: null, offset: off, gate };
   // write the bake onto the live model: appended ch2 keys + the re-based playlist at `table`
   for (let i = 0; i < target.bones.length; i++) {
-    const b = bake.model.bones[i];
+    const b = bake.model!.bones[i];
     if (b !== target.bones[i]) target.bones[i] = b;
   }
   if (!target.timeline) target.timeline = [];
-  target.timeline[table] = bake.model.timeline[bakedTable];
+  target.timeline[table] = bake.model!.timeline[bakedTable];
   target.__castBakes = (target.__castBakes ?? 0) + 1;
   return { table, offset: off, gate, map: bake.map, covered: bake.covered };
 }

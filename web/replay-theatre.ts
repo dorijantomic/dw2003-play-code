@@ -272,7 +272,7 @@ export function replayDraw(ctx, W = 640, H = 480) {
       const selected = first + i === S.cursor;
       ctx.fillStyle = selected ? "#ffd34d" : "#d8e2f0";
       const mark = selected ? ">" : " ";
-      ctx.fillText(`${mark} #${row.eventId}  ${row.firstSay ?? "(no line)"}`, left, ty);
+      ctx.fillText(`${mark} #${row!.eventId}  ${row!.firstSay ?? "(no line)"}`, left, ty);
       ty += lh;
     }
   }

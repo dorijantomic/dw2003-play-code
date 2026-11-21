@@ -1,9 +1,9 @@
 {
- "total": 19191,
+ "total": 12333,
  "any": 1091,
  "files": {
   "web/ambience.ts": {
-   "errors": 311,
+   "errors": 257,
    "any": 3
   },
   "web/anim-viewer-bake.ts": {
@@ -11,27 +11,27 @@
    "any": 0
   },
   "web/anim-viewer-camera.ts": {
-   "errors": 181,
+   "errors": 39,
    "any": 0
   },
   "web/anim-viewer-compare.ts": {
-   "errors": 63,
+   "errors": 50,
    "any": 0
   },
   "web/anim-viewer-data.ts": {
-   "errors": 35,
+   "errors": 32,
    "any": 0
   },
   "web/anim-viewer-dw2.ts": {
-   "errors": 116,
+   "errors": 72,
    "any": 0
   },
   "web/anim-viewer-dw2motion.ts": {
-   "errors": 71,
+   "errors": 70,
    "any": 2
   },
   "web/anim-viewer-generic-stub.ts": {
-   "errors": 14,
+   "errors": 11,
    "any": 0
   },
   "web/anim-viewer-generic.ts": {
@@ -39,27 +39,27 @@
    "any": 0
   },
   "web/anime4k-lab.ts": {
-   "errors": 8,
+   "errors": 7,
    "any": 0
   },
   "web/arena-add-picker.ts": {
-   "errors": 52,
+   "errors": 28,
    "any": 2
   },
   "web/arena-built.ts": {
-   "errors": 57,
+   "errors": 48,
    "any": 5
   },
   "web/arena-placer.ts": {
-   "errors": 153,
+   "errors": 140,
    "any": 9
   },
   "web/arena-slots-ui.ts": {
-   "errors": 34,
+   "errors": 14,
    "any": 0
   },
   "web/arena-viewer-tools.ts": {
-   "errors": 83,
+   "errors": 64,
    "any": 0
   },
   "web/arrival-lab.ts": {
@@ -67,7 +67,7 @@
    "any": 0
   },
   "web/audio.ts": {
-   "errors": 8,
+   "errors": 6,
    "any": 0
   },
   "web/audio/bgm.ts": {
@@ -75,23 +75,23 @@
    "any": 0
   },
   "web/audio/playback.ts": {
-   "errors": 74,
+   "errors": 14,
    "any": 0
   },
   "web/audio/player-play.ts": {
-   "errors": 158,
+   "errors": 7,
    "any": 0
   },
   "web/audio/player-stop.ts": {
-   "errors": 98,
+   "errors": 14,
    "any": 0
   },
   "web/battle-menu-adapter.ts": {
-   "errors": 19,
+   "errors": 12,
    "any": 0
   },
   "web/battle-speed.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 0
   },
   "web/battle-voice-gate.ts": {
@@ -99,51 +99,43 @@
    "any": 0
   },
   "web/battle.ts": {
-   "errors": 30,
+   "errors": 29,
    "any": 1
   },
   "web/battle/core/counter.ts": {
-   "errors": 12,
-   "any": 0
-  },
-  "web/battle/core/dna.ts": {
-   "errors": 19,
-   "any": 1
-  },
-  "web/battle/core/draw.ts": {
-   "errors": 34,
-   "any": 0
-  },
-  "web/battle/core/end.ts": {
-   "errors": 54,
-   "any": 0
-  },
-  "web/battle/core/enemy-action.ts": {
-   "errors": 26,
-   "any": 1
-  },
-  "web/battle/core/finale.ts": {
-   "errors": 1,
-   "any": 0
-  },
-  "web/battle/core/flow.ts": {
-   "errors": 18,
-   "any": 2
-  },
-  "web/battle/core/forms.ts": {
    "errors": 11,
    "any": 0
   },
+  "web/battle/core/dna.ts": {
+   "errors": 10,
+   "any": 1
+  },
+  "web/battle/core/draw.ts": {
+   "errors": 1,
+   "any": 0
+  },
+  "web/battle/core/end.ts": {
+   "errors": 43,
+   "any": 0
+  },
+  "web/battle/core/enemy-action.ts": {
+   "errors": 17,
+   "any": 1
+  },
+  "web/battle/core/flow.ts": {
+   "errors": 11,
+   "any": 2
+  },
+  "web/battle/core/forms.ts": {
+   "errors": 9,
+   "any": 0
+  },
   "web/battle/core/fusion.ts": {
-   "errors": 13,
+   "errors": 8,
    "any": 0
   },
   "web/battle/core/hud.ts": {
-   "errors": 57,
-   "any": 0
-  },
-  "web/battle/core/input.ts": {
-   "errors": 1,
+   "errors": 8,
    "any": 0
   },
   "web/battle/core/load.ts": {
@@ -151,35 +143,35 @@
    "any": 0
   },
   "web/battle/core/menus.ts": {
-   "errors": 4,
+   "errors": 2,
    "any": 0
   },
   "web/battle/core/message.ts": {
-   "errors": 12,
+   "errors": 11,
    "any": 0
   },
   "web/battle/core/native.ts": {
-   "errors": 71,
+   "errors": 5,
    "any": 0
   },
   "web/battle/core/opening.ts": {
-   "errors": 25,
+   "errors": 10,
    "any": 0
   },
   "web/battle/core/player-action.ts": {
-   "errors": 24,
+   "errors": 18,
    "any": 1
   },
   "web/battle/core/records.ts": {
-   "errors": 21,
+   "errors": 18,
    "any": 1
   },
   "web/battle/core/report.ts": {
-   "errors": 34,
+   "errors": 22,
    "any": 0
   },
   "web/battle/core/start.ts": {
-   "errors": 17,
+   "errors": 16,
    "any": 0
   },
   "web/battle/core/types.ts": {
@@ -187,15 +179,15 @@
    "any": 17
   },
   "web/battle/core/update.ts": {
-   "errors": 6,
+   "errors": 4,
    "any": 0
   },
   "web/battle/form-blast.ts": {
-   "errors": 29,
+   "errors": 27,
    "any": 0
   },
   "web/battle/gym.ts": {
-   "errors": 30,
+   "errors": 24,
    "any": 0
   },
   "web/battle/hit-results.ts": {
@@ -203,11 +195,11 @@
    "any": 0
   },
   "web/battle/hud.ts": {
-   "errors": 8,
+   "errors": 7,
    "any": 0
   },
   "web/battle/layout.ts": {
-   "errors": 7,
+   "errors": 4,
    "any": 2
   },
   "web/battle/messages.ts": {
@@ -215,11 +207,11 @@
    "any": 0
   },
   "web/battle/plans.ts": {
-   "errors": 17,
+   "errors": 15,
    "any": 0
   },
   "web/battle/progress.ts": {
-   "errors": 23,
+   "errors": 20,
    "any": 0
   },
   "web/battle/report.ts": {
@@ -227,7 +219,7 @@
    "any": 0
   },
   "web/battle/restore.ts": {
-   "errors": 10,
+   "errors": 8,
    "any": 0
   },
   "web/battle/state.ts": {
@@ -239,59 +231,59 @@
    "any": 0
   },
   "web/battle3d.ts": {
-   "errors": 198,
+   "errors": 65,
    "any": 0
   },
   "web/battle3d/camera-fit.ts": {
-   "errors": 49,
+   "errors": 34,
    "any": 0
   },
   "web/battle3d/camera-shots.ts": {
-   "errors": 11,
+   "errors": 7,
    "any": 0
   },
   "web/battle3d/core/anim.ts": {
-   "errors": 23,
+   "errors": 4,
    "any": 0
   },
   "web/battle3d/core/atmos.ts": {
-   "errors": 211,
-   "any": 0
-  },
-  "web/battle3d/core/backdrop.ts": {
-   "errors": 48,
-   "any": 0
-  },
-  "web/battle3d/core/blast.ts": {
-   "errors": 21,
-   "any": 0
-  },
-  "web/battle3d/core/camera.ts": {
    "errors": 36,
    "any": 0
   },
+  "web/battle3d/core/backdrop.ts": {
+   "errors": 8,
+   "any": 0
+  },
+  "web/battle3d/core/blast.ts": {
+   "errors": 14,
+   "any": 0
+  },
+  "web/battle3d/core/camera.ts": {
+   "errors": 12,
+   "any": 0
+  },
   "web/battle3d/core/fighters.ts": {
-   "errors": 130,
+   "errors": 9,
    "any": 0
   },
   "web/battle3d/core/model.ts": {
-   "errors": 40,
+   "errors": 7,
    "any": 1
   },
   "web/battle3d/core/pano.ts": {
-   "errors": 480,
+   "errors": 32,
    "any": 1
   },
   "web/battle3d/core/render.ts": {
-   "errors": 329,
+   "errors": 40,
    "any": 0
   },
   "web/battle3d/core/smartcam.ts": {
-   "errors": 170,
+   "errors": 23,
    "any": 0
   },
   "web/battle3d/core/toon.ts": {
-   "errors": 130,
+   "errors": 16,
    "any": 0
   },
   "web/battle3d/core/types.ts": {
@@ -299,19 +291,19 @@
    "any": 1
   },
   "web/battle3d/gl.ts": {
-   "errors": 83,
+   "errors": 56,
    "any": 2
   },
   "web/battle3d/math.ts": {
-   "errors": 35,
+   "errors": 26,
    "any": 0
   },
   "web/battle3d/rotation.ts": {
-   "errors": 69,
+   "errors": 47,
    "any": 0
   },
   "web/battle3d/skeleton.ts": {
-   "errors": 17,
+   "errors": 16,
    "any": 0
   },
   "web/battlecmd-translated.ts": {
@@ -331,7 +323,7 @@
    "any": 0
   },
   "web/battlehud-translated.ts": {
-   "errors": 82,
+   "errors": 80,
    "any": 0
   },
   "web/battleitem-translated.ts": {
@@ -339,7 +331,7 @@
    "any": 0
   },
   "web/battlemsg-translated.ts": {
-   "errors": 58,
+   "errors": 53,
    "any": 0
   },
   "web/battletag-translated.ts": {
@@ -351,35 +343,35 @@
    "any": 0
   },
   "web/biome/anime.ts": {
-   "errors": 39,
+   "errors": 36,
    "any": 0
   },
   "web/biome/beach.ts": {
-   "errors": 78,
+   "errors": 23,
    "any": 0
   },
   "web/biome/beachproc.ts": {
-   "errors": 105,
+   "errors": 39,
    "any": 4
   },
   "web/biome/detailframe.ts": {
-   "errors": 5,
+   "errors": 1,
    "any": 0
   },
   "web/biome/forest.ts": {
-   "errors": 83,
+   "errors": 75,
    "any": 1
   },
   "web/biome/gallery.ts": {
-   "errors": 69,
+   "errors": 48,
    "any": 8
   },
   "web/biome/lake.ts": {
-   "errors": 160,
+   "errors": 125,
    "any": 6
   },
   "web/biome/lakeproc.ts": {
-   "errors": 53,
+   "errors": 32,
    "any": 9
   },
   "web/biome/loader.ts": {
@@ -387,15 +379,11 @@
    "any": 0
   },
   "web/biome/mountain.ts": {
-   "errors": 49,
+   "errors": 31,
    "any": 3
   },
   "web/biome/mountainproc.ts": {
-   "errors": 83,
-   "any": 0
-  },
-  "web/biome/mtlaw.ts": {
-   "errors": 12,
+   "errors": 26,
    "any": 0
   },
   "web/biome/objects.ts": {
@@ -403,7 +391,7 @@
    "any": 0
   },
   "web/biome/procedural.ts": {
-   "errors": 78,
+   "errors": 32,
    "any": 0
   },
   "web/biome/sharedtab.ts": {
@@ -411,27 +399,23 @@
    "any": 0
   },
   "web/biome/toolkit.ts": {
-   "errors": 42,
+   "errors": 36,
    "any": 22
   },
   "web/biome/types.ts": {
    "errors": 0,
    "any": 8
   },
-  "web/bit-ledger-page.ts": {
-   "errors": 24,
-   "any": 0
-  },
   "web/bit-ledger.ts": {
-   "errors": 10,
+   "errors": 8,
    "any": 0
   },
   "web/blast-ladder.ts": {
-   "errors": 26,
+   "errors": 24,
    "any": 0
   },
   "web/blast-presentation.ts": {
-   "errors": 9,
+   "errors": 1,
    "any": 0
   },
   "web/book-blank.ts": {
@@ -447,7 +431,7 @@
    "any": 0
   },
   "web/built/boulders.ts": {
-   "errors": 73,
+   "errors": 8,
    "any": 0
   },
   "web/built/colourfit.ts": {
@@ -455,11 +439,11 @@
    "any": 0
   },
   "web/built/floorcover.ts": {
-   "errors": 60,
+   "errors": 23,
    "any": 4
   },
   "web/built/foliage.ts": {
-   "errors": 34,
+   "errors": 18,
    "any": 0
   },
   "web/built/fringe.ts": {
@@ -467,55 +451,55 @@
    "any": 0
   },
   "web/built/grass.ts": {
-   "errors": 15,
-   "any": 0
-  },
-  "web/built/ground.ts": {
-   "errors": 59,
-   "any": 0
-  },
-  "web/built/gulls.ts": {
-   "errors": 24,
-   "any": 0
-  },
-  "web/built/mirror.ts": {
-   "errors": 86,
-   "any": 0
-  },
-  "web/built/mushrooms.ts": {
-   "errors": 34,
-   "any": 1
-  },
-  "web/built/place/boulders.ts": {
-   "errors": 3,
-   "any": 0
-  },
-  "web/built/place/floorcover.ts": {
-   "errors": 46,
-   "any": 0
-  },
-  "web/built/place/foliage.ts": {
-   "errors": 43,
-   "any": 0
-  },
-  "web/built/place/fringe.ts": {
    "errors": 11,
    "any": 0
   },
+  "web/built/ground.ts": {
+   "errors": 31,
+   "any": 0
+  },
+  "web/built/gulls.ts": {
+   "errors": 15,
+   "any": 0
+  },
+  "web/built/mirror.ts": {
+   "errors": 54,
+   "any": 0
+  },
+  "web/built/mushrooms.ts": {
+   "errors": 28,
+   "any": 1
+  },
+  "web/built/place/boulders.ts": {
+   "errors": 2,
+   "any": 0
+  },
+  "web/built/place/floorcover.ts": {
+   "errors": 36,
+   "any": 0
+  },
+  "web/built/place/foliage.ts": {
+   "errors": 39,
+   "any": 0
+  },
+  "web/built/place/fringe.ts": {
+   "errors": 10,
+   "any": 0
+  },
   "web/built/place/grass.ts": {
-   "errors": 75,
+   "errors": 2,
    "any": 0
   },
   "web/built/place/ground.ts": {
-   "errors": 123,
+   "errors": 48,
    "any": 0
   },
   "web/built/place/gulls.ts": {
-   "errors": 24,
+   "errors": 20,
    "any": 0
   },
   "web/built/place/land.ts": {
-   "errors": 29,
+   "errors": 10,
    "any": 0
   },
   "web/built/place/mirror.ts": {
@@ -523,15 +507,15 @@
    "any": 0
   },
   "web/built/place/mushrooms.ts": {
-   "errors": 27,
+   "errors": 17,
    "any": 0
   },
   "web/built/place/sand.ts": {
-   "errors": 10,
+   "errors": 9,
    "any": 0
   },
   "web/built/place/sky.ts": {
-   "errors": 4,
+   "errors": 2,
    "any": 0
   },
   "web/built/place/spires.ts": {
@@ -539,7 +523,7 @@
    "any": 0
   },
   "web/built/place/trees.ts": {
-   "errors": 74,
+   "errors": 66,
    "any": 0
   },
   "web/built/place/types.ts": {
@@ -547,47 +531,47 @@
    "any": 30
   },
   "web/built/place/water.ts": {
-   "errors": 13,
+   "errors": 11,
    "any": 0
   },
   "web/built/post.ts": {
-   "errors": 56,
+   "errors": 32,
    "any": 4
   },
   "web/built/registry.ts": {
-   "errors": 101,
+   "errors": 96,
    "any": 0
   },
   "web/built/sand.ts": {
-   "errors": 35,
+   "errors": 28,
    "any": 0
   },
   "web/built/shared.ts": {
-   "errors": 45,
+   "errors": 11,
    "any": 0
   },
   "web/built/sky.ts": {
-   "errors": 197,
+   "errors": 20,
    "any": 2
   },
   "web/built/slots.ts": {
-   "errors": 100,
+   "errors": 79,
    "any": 3
   },
   "web/built/soil.ts": {
-   "errors": 32,
+   "errors": 20,
    "any": 0
   },
   "web/built/spires.ts": {
-   "errors": 147,
+   "errors": 70,
    "any": 0
   },
   "web/built/spires_gemini.ts": {
-   "errors": 120,
+   "errors": 36,
    "any": 3
   },
   "web/built/trees.ts": {
-   "errors": 106,
+   "errors": 32,
    "any": 0
   },
   "web/built/types.ts": {
@@ -595,39 +579,39 @@
    "any": 34
   },
   "web/built/water.ts": {
-   "errors": 161,
+   "errors": 86,
    "any": 8
   },
   "web/canvas-bench.ts": {
-   "errors": 95,
+   "errors": 38,
    "any": 0
   },
   "web/canvas-resolution.ts": {
-   "errors": 11,
+   "errors": 8,
    "any": 0
   },
   "web/cardalbum-translated.ts": {
-   "errors": 18,
-   "any": 0
-  },
-  "web/carddeck-translated.ts": {
-   "errors": 32,
-   "any": 0
-  },
-  "web/cardduel-lab.ts": {
-   "errors": 218,
-   "any": 0
-  },
-  "web/cardduel-native.ts": {
    "errors": 14,
    "any": 0
   },
+  "web/carddeck-translated.ts": {
+   "errors": 27,
+   "any": 0
+  },
+  "web/cardduel-lab.ts": {
+   "errors": 150,
+   "any": 0
+  },
+  "web/cardduel-native.ts": {
+   "errors": 12,
+   "any": 0
+  },
   "web/cardduel-net.ts": {
-   "errors": 47,
+   "errors": 40,
    "any": 0
   },
   "web/cardshop-translated.ts": {
-   "errors": 19,
+   "errors": 12,
    "any": 0
   },
   "web/cardstate.ts": {
@@ -647,7 +631,7 @@
    "any": 0
   },
   "web/choice.ts": {
-   "errors": 9,
+   "errors": 2,
    "any": 0
   },
   "web/cinema.ts": {
@@ -659,11 +643,11 @@
    "any": 0
   },
   "web/codex-data.ts": {
-   "errors": 37,
+   "errors": 36,
    "any": 0
   },
   "web/crowd.ts": {
-   "errors": 18,
+   "errors": 12,
    "any": 0
   },
   "web/cursor-almanac.ts": {
@@ -679,11 +663,11 @@
    "any": 0
   },
   "web/damage-lab.ts": {
-   "errors": 98,
+   "errors": 88,
    "any": 0
   },
   "web/debugPanel.ts": {
-   "errors": 30,
+   "errors": 25,
    "any": 0
   },
   "web/dev-panel-model.ts": {
@@ -691,19 +675,19 @@
    "any": 0
   },
   "web/dev-panel.ts": {
-   "errors": 46,
+   "errors": 45,
    "any": 0
   },
   "web/devtools-bosslist.ts": {
-   "errors": 18,
+   "errors": 17,
    "any": 0
   },
   "web/devtools.ts": {
-   "errors": 77,
+   "errors": 54,
    "any": 1
   },
   "web/dialogue-pack.ts": {
-   "errors": 12,
+   "errors": 5,
    "any": 0
   },
   "web/dialogue-translated.ts": {
@@ -711,7 +695,7 @@
    "any": 1
   },
   "web/dive-demo.ts": {
-   "errors": 11,
+   "errors": 10,
    "any": 0
   },
   "web/draw-order.ts": {
@@ -719,11 +703,11 @@
    "any": 0
   },
   "web/dri-model.ts": {
-   "errors": 80,
+   "errors": 79,
    "any": 1
   },
   "web/dri-native.ts": {
-   "errors": 38,
+   "errors": 36,
    "any": 0
   },
   "web/dri.ts": {
@@ -739,7 +723,7 @@
    "any": 0
   },
   "web/effects/draw.ts": {
-   "errors": 32,
+   "errors": 27,
    "any": 2
   },
   "web/effects/launch-pads.ts": {
@@ -747,7 +731,7 @@
    "any": 0
   },
   "web/effects/point-records.ts": {
-   "errors": 83,
+   "errors": 81,
    "any": 0
   },
   "web/effects/state.ts": {
@@ -758,12 +742,8 @@
    "errors": 23,
    "any": 0
   },
-  "web/encounter-dial.ts": {
-   "errors": 1,
-   "any": 0
-  },
   "web/endscreen-translated.ts": {
-   "errors": 19,
+   "errors": 8,
    "any": 0
   },
   "web/enemy-stats.ts": {
@@ -771,11 +751,11 @@
    "any": 0
   },
   "web/enemy-switch.ts": {
-   "errors": 3,
+   "errors": 2,
    "any": 0
   },
   "web/engine-bridge.ts": {
-   "errors": 8,
+   "errors": 5,
    "any": 8
   },
   "web/evolution-planner.ts": {
@@ -791,7 +771,7 @@
    "any": 0
   },
   "web/field-view.ts": {
-   "errors": 7,
+   "errors": 6,
    "any": 0
   },
   "web/field-war.ts": {
@@ -799,19 +779,19 @@
    "any": 0
   },
   "web/fieldcom.ts": {
-   "errors": 31,
+   "errors": 28,
    "any": 0
   },
   "web/fight/action-vm.ts": {
-   "errors": 26,
+   "errors": 11,
    "any": 10
   },
   "web/fight/actor-animator.ts": {
-   "errors": 47,
+   "errors": 41,
    "any": 17
   },
   "web/fight/anim-collision.ts": {
-   "errors": 134,
+   "errors": 59,
    "any": 0
   },
   "web/fight/anim-donor-map.ts": {
@@ -819,19 +799,19 @@
    "any": 0
   },
   "web/fight/anim-retarget/by-role.ts": {
-   "errors": 69,
+   "errors": 21,
    "any": 0
   },
   "web/fight/anim-retarget/cast-gate.ts": {
-   "errors": 33,
+   "errors": 17,
    "any": 0
   },
   "web/fight/anim-retarget/k16-rig.ts": {
-   "errors": 129,
+   "errors": 79,
    "any": 0
   },
   "web/fight/anim-retarget/rig-basics.ts": {
-   "errors": 76,
+   "errors": 32,
    "any": 0
   },
   "web/fight/anim-retarget/types.ts": {
@@ -839,19 +819,19 @@
    "any": 6
   },
   "web/fight/anim-retarget/world.ts": {
-   "errors": 127,
+   "errors": 57,
    "any": 0
   },
   "web/fight/anim-solver.ts": {
-   "errors": 313,
+   "errors": 190,
    "any": 2
   },
   "web/fight/battle-camera.ts": {
-   "errors": 91,
+   "errors": 70,
    "any": 0
   },
   "web/fight/battle-idle-director.ts": {
-   "errors": 3,
+   "errors": 2,
    "any": 0
   },
   "web/fight/battle-settings.ts": {
@@ -859,11 +839,11 @@
    "any": 0
   },
   "web/fight/body-loadout.ts": {
-   "errors": 37,
+   "errors": 35,
    "any": 0
   },
   "web/fight/clip-fallback.ts": {
-   "errors": 137,
+   "errors": 115,
    "any": 7
   },
   "web/fight/clip-names.ts": {
@@ -871,7 +851,7 @@
    "any": 0
   },
   "web/fight/contact-damage.ts": {
-   "errors": 6,
+   "errors": 1,
    "any": 0
   },
   "web/fight/digimon-anatomy.ts": {
@@ -883,7 +863,7 @@
    "any": 0
   },
   "web/fight/digivolve-camera.ts": {
-   "errors": 27,
+   "errors": 24,
    "any": 0
   },
   "web/fight/display-list.ts": {
@@ -895,7 +875,7 @@
    "any": 0
   },
   "web/fight/dw2-motion.ts": {
-   "errors": 27,
+   "errors": 25,
    "any": 6
   },
   "web/fight/dw2-picks.ts": {
@@ -911,19 +891,19 @@
    "any": 0
   },
   "web/fight/fight-coordinator.ts": {
-   "errors": 6,
+   "errors": 4,
    "any": 4
   },
   "web/fight/fight-tables.ts": {
-   "errors": 19,
+   "errors": 13,
    "any": 0
   },
   "web/fight/firing-axis.ts": {
-   "errors": 132,
+   "errors": 61,
    "any": 2
   },
   "web/fight/generic-motion.ts": {
-   "errors": 138,
+   "errors": 109,
    "any": 12
   },
   "web/fight/head-cast-constants.ts": {
@@ -931,7 +911,7 @@
    "any": 0
   },
   "web/fight/launch-plan.ts": {
-   "errors": 37,
+   "errors": 36,
    "any": 1
   },
   "web/fight/motion-constants.ts": {
@@ -939,11 +919,11 @@
    "any": 0
   },
   "web/fight/motion-swap-gate.ts": {
-   "errors": 63,
+   "errors": 44,
    "any": 1
   },
   "web/fight/own-clips.ts": {
-   "errors": 42,
+   "errors": 29,
    "any": 1
   },
   "web/fight/playability.ts": {
@@ -951,7 +931,7 @@
    "any": 0
   },
   "web/fight/proj-layers.ts": {
-   "errors": 17,
+   "errors": 11,
    "any": 0
   },
   "web/fight/side-mirror.ts": {
@@ -975,7 +955,7 @@
    "any": 62
   },
   "web/fightreport-translated.ts": {
-   "errors": 35,
+   "errors": 31,
    "any": 1
   },
   "web/fishing-almanac.ts": {
@@ -991,7 +971,7 @@
    "any": 0
   },
   "web/fishing-underwater.ts": {
-   "errors": 81,
+   "errors": 80,
    "any": 11
   },
   "web/flag-store.test.ts": {
@@ -1003,7 +983,7 @@
    "any": 0
   },
   "web/fly-book.ts": {
-   "errors": 4,
+   "errors": 3,
    "any": 0
   },
   "web/fly-points.ts": {
@@ -1011,7 +991,7 @@
    "any": 0
   },
   "web/form-tech-slots.ts": {
-   "errors": 10,
+   "errors": 9,
    "any": 0
   },
   "web/fusion-forms.ts": {
@@ -1019,11 +999,11 @@
    "any": 0
   },
   "web/fusion-lab.ts": {
-   "errors": 32,
+   "errors": 23,
    "any": 1
   },
   "web/fusion-loot.ts": {
-   "errors": 9,
+   "errors": 8,
    "any": 0
   },
   "web/fusion.ts": {
@@ -1031,71 +1011,71 @@
    "any": 2
   },
   "web/fxaudio.ts": {
-   "errors": 54,
+   "errors": 52,
    "any": 0
   },
   "web/game.ts": {
-   "errors": 199,
+   "errors": 152,
    "any": 2
   },
   "web/game/auction-replay.ts": {
-   "errors": 27,
+   "errors": 22,
    "any": 0
   },
   "web/game/battle-launch.ts": {
-   "errors": 19,
+   "errors": 15,
    "any": 1
   },
   "web/game/draw-sprites.ts": {
-   "errors": 56,
+   "errors": 39,
    "any": 10
   },
   "web/game/engine-init.ts": {
-   "errors": 39,
+   "errors": 35,
    "any": 0
   },
   "web/game/field-fx.ts": {
-   "errors": 24,
+   "errors": 3,
    "any": 0
   },
   "web/game/field-steps.ts": {
-   "errors": 26,
+   "errors": 24,
    "any": 0
   },
   "web/game/fishing-tree.ts": {
-   "errors": 34,
+   "errors": 30,
    "any": 0
   },
   "web/game/followers.ts": {
-   "errors": 23,
+   "errors": 16,
    "any": 0
   },
   "web/game/init.ts": {
-   "errors": 86,
+   "errors": 51,
    "any": 1
   },
   "web/game/input.ts": {
-   "errors": 100,
+   "errors": 8,
    "any": 0
   },
   "web/game/map-load.ts": {
-   "errors": 70,
+   "errors": 49,
    "any": 0
   },
   "web/game/mp-chat.ts": {
-   "errors": 25,
+   "errors": 16,
    "any": 0
   },
   "web/game/quest-scenes.ts": {
-   "errors": 131,
+   "errors": 100,
    "any": 0
   },
   "web/game/render.ts": {
-   "errors": 183,
+   "errors": 27,
    "any": 1
   },
   "web/game/session.ts": {
-   "errors": 12,
+   "errors": 11,
    "any": 0
   },
   "web/game/state.ts": {
@@ -1103,11 +1083,11 @@
    "any": 0
   },
   "web/game/story-events.ts": {
-   "errors": 63,
+   "errors": 51,
    "any": 0
   },
   "web/game/transitions.ts": {
-   "errors": 24,
+   "errors": 12,
    "any": 0
   },
   "web/game/types.ts": {
@@ -1115,15 +1095,15 @@
    "any": 63
   },
   "web/game/ui-openers.ts": {
-   "errors": 18,
+   "errors": 12,
    "any": 1
   },
   "web/game/update.ts": {
-   "errors": 129,
+   "errors": 53,
    "any": 1
   },
   "web/game/vars.ts": {
-   "errors": 118,
+   "errors": 93,
    "any": 0
   },
   "web/gameEvents.ts": {
@@ -1131,7 +1111,7 @@
    "any": 0
   },
   "web/gate-text.ts": {
-   "errors": 17,
+   "errors": 13,
    "any": 0
   },
   "web/gl-shared.ts": {
@@ -1143,11 +1123,11 @@
    "any": 0
   },
   "web/glossary-digimon.ts": {
-   "errors": 111,
+   "errors": 105,
    "any": 8
   },
   "web/glossary-fallback.ts": {
-   "errors": 7,
+   "errors": 6,
    "any": 0
   },
   "web/glossary-items.ts": {
@@ -1159,15 +1139,15 @@
    "any": 0
   },
   "web/glossary-stage.ts": {
-   "errors": 91,
+   "errors": 51,
    "any": 0
   },
   "web/gpu-pixel-filter.ts": {
-   "errors": 30,
+   "errors": 29,
    "any": 0
   },
   "web/grass3d.ts": {
-   "errors": 47,
+   "errors": 23,
    "any": 4
   },
   "web/gym-extra.ts": {
@@ -1183,7 +1163,7 @@
    "any": 0
   },
   "web/gym-translated.ts": {
-   "errors": 29,
+   "errors": 28,
    "any": 0
   },
   "web/gym-vram-paint.ts": {
@@ -1195,7 +1175,7 @@
    "any": 0
   },
   "web/help-menu-translated.ts": {
-   "errors": 16,
+   "errors": 11,
    "any": 0
   },
   "web/host-rules.ts": {
@@ -1219,7 +1199,7 @@
    "any": 0
   },
   "web/item-rulebook-page.ts": {
-   "errors": 17,
+   "errors": 7,
    "any": 4
   },
   "web/item-rulebook.ts": {
@@ -1227,7 +1207,7 @@
    "any": 0
   },
   "web/item-source-page.ts": {
-   "errors": 16,
+   "errors": 7,
    "any": 1
   },
   "web/item-source.ts": {
@@ -1239,7 +1219,7 @@
    "any": 0
   },
   "web/lab-filter.ts": {
-   "errors": 6,
+   "errors": 4,
    "any": 0
   },
   "web/lab-translated.ts": {
@@ -1259,11 +1239,11 @@
    "any": 0
   },
   "web/map-screen-model.ts": {
-   "errors": 30,
+   "errors": 17,
    "any": 1
   },
   "web/map-tiles.ts": {
-   "errors": 40,
+   "errors": 36,
    "any": 6
   },
   "web/mapclass.ts": {
@@ -1271,11 +1251,11 @@
    "any": 0
   },
   "web/memcard.ts": {
-   "errors": 11,
+   "errors": 8,
    "any": 3
   },
   "web/menu/create.ts": {
-   "errors": 260,
+   "errors": 92,
    "any": 0
   },
   "web/menu/draw-common.ts": {
@@ -1283,23 +1263,23 @@
    "any": 0
   },
   "web/menu/draw-digivolve.ts": {
-   "errors": 25,
+   "errors": 13,
    "any": 0
   },
   "web/menu/draw-items.ts": {
-   "errors": 22,
+   "errors": 14,
    "any": 0
   },
   "web/menu/draw-map.ts": {
-   "errors": 48,
+   "errors": 6,
    "any": 0
   },
   "web/menu/logic.ts": {
-   "errors": 31,
+   "errors": 30,
    "any": 0
   },
   "web/menu/pure.ts": {
-   "errors": 9,
+   "errors": 6,
    "any": 0
   },
   "web/menu/state.ts": {
@@ -1311,11 +1291,11 @@
    "any": 3
   },
   "web/mount.ts": {
-   "errors": 80,
+   "errors": 79,
    "any": 1
   },
   "web/mount3d.ts": {
-   "errors": 257,
+   "errors": 177,
    "any": 4
   },
   "web/mp-credit.ts": {
@@ -1335,15 +1315,15 @@
    "any": 0
   },
   "web/mpbattle-menus.ts": {
-   "errors": 30,
+   "errors": 25,
    "any": 0
   },
   "web/mpbattle-pause.ts": {
-   "errors": 20,
+   "errors": 19,
    "any": 0
   },
   "web/mpbattle-rules.ts": {
-   "errors": 99,
+   "errors": 97,
    "any": 10
   },
   "web/mpbattle.ts": {
@@ -1375,7 +1355,7 @@
    "any": 2
   },
   "web/mpsocial.ts": {
-   "errors": 244,
+   "errors": 242,
    "any": 1
   },
   "web/multiplayer.ts": {
@@ -1383,7 +1363,7 @@
    "any": 1
   },
   "web/nameentry-translated.ts": {
-   "errors": 18,
+   "errors": 15,
    "any": 2
   },
   "web/native-runtime.ts": {
@@ -1395,7 +1375,7 @@
    "any": 6
   },
   "web/native-screen-lab.ts": {
-   "errors": 25,
+   "errors": 15,
    "any": 0
   },
   "web/native-screen-pad.ts": {
@@ -1403,7 +1383,7 @@
    "any": 0
   },
   "web/native-screen-render.ts": {
-   "errors": 96,
+   "errors": 25,
    "any": 8
   },
   "web/native-screen-roots.ts": {
@@ -1411,11 +1391,11 @@
    "any": 0
   },
   "web/native-screen-text.ts": {
-   "errors": 32,
+   "errors": 30,
    "any": 2
   },
   "web/native-screen.ts": {
-   "errors": 81,
+   "errors": 80,
    "any": 6
   },
   "web/native-session.ts": {
@@ -1430,16 +1410,12 @@
    "errors": 9,
    "any": 0
   },
-  "web/omen.ts": {
-   "errors": 1,
-   "any": 0
-  },
   "web/options-book.ts": {
-   "errors": 19,
+   "errors": 18,
    "any": 0
   },
   "web/options-model.ts": {
-   "errors": 41,
+   "errors": 38,
    "any": 0
   },
   "web/ordinal-scene-variant.ts": {
@@ -1455,7 +1431,7 @@
    "any": 0
   },
   "web/packselect-translated.ts": {
-   "errors": 18,
+   "errors": 11,
    "any": 1
   },
   "web/panel-kit.ts": {
@@ -1463,7 +1439,7 @@
    "any": 0
   },
   "web/partner-pictures.ts": {
-   "errors": 9,
+   "errors": 4,
    "any": 0
   },
   "web/party.ts": {
@@ -1479,11 +1455,11 @@
    "any": 0
   },
   "web/perf-test.ts": {
-   "errors": 147,
+   "errors": 112,
    "any": 2
   },
   "web/placecard-translated.ts": {
-   "errors": 23,
+   "errors": 10,
    "any": 0
   },
   "web/placecard.ts": {
@@ -1491,7 +1467,7 @@
    "any": 0
   },
   "web/placer-format.ts": {
-   "errors": 11,
+   "errors": 10,
    "any": 0
   },
   "web/post2d.ts": {
@@ -1499,19 +1475,15 @@
    "any": 0
   },
   "web/quartermaster.ts": {
-   "errors": 40,
+   "errors": 32,
    "any": 0
   },
   "web/quest-chase.ts": {
    "errors": 6,
    "any": 0
   },
-  "web/quest-editor-lib.ts": {
-   "errors": 6,
-   "any": 0
-  },
   "web/quest-editor.ts": {
-   "errors": 81,
+   "errors": 9,
    "any": 1
   },
   "web/quest-endings.ts": {
@@ -1519,15 +1491,15 @@
    "any": 0
   },
   "web/quest-fx.ts": {
-   "errors": 58,
+   "errors": 49,
    "any": 0
   },
   "web/quest-ghost.ts": {
-   "errors": 34,
+   "errors": 22,
    "any": 0
   },
   "web/quest-lab.ts": {
-   "errors": 33,
+   "errors": 29,
    "any": 0
   },
   "web/quest-offers.ts": {
@@ -1539,11 +1511,11 @@
    "any": 0
   },
   "web/quest-readback.ts": {
-   "errors": 36,
+   "errors": 25,
    "any": 0
   },
   "web/quest-scenes.ts": {
-   "errors": 26,
+   "errors": 24,
    "any": 0
   },
   "web/quest-shelf.ts": {
@@ -1555,15 +1527,15 @@
    "any": 0
   },
   "web/quest-walk.ts": {
-   "errors": 103,
+   "errors": 41,
    "any": 0
   },
   "web/questmarks.ts": {
-   "errors": 7,
+   "errors": 1,
    "any": 0
   },
   "web/quests.ts": {
-   "errors": 238,
+   "errors": 234,
    "any": 5
   },
   "web/redirect-view.ts": {
@@ -1575,7 +1547,7 @@
    "any": 1
   },
   "web/resident-data.ts": {
-   "errors": 9,
+   "errors": 4,
    "any": 0
   },
   "web/retry-loader.ts": {
@@ -1583,15 +1555,15 @@
    "any": 1
   },
   "web/save-translated.ts": {
-   "errors": 33,
+   "errors": 31,
    "any": 0
   },
   "web/save-xray-page.ts": {
-   "errors": 28,
+   "errors": 26,
    "any": 2
   },
   "web/save-xray.ts": {
-   "errors": 19,
+   "errors": 3,
    "any": 1
   },
   "web/save.ts": {
@@ -1599,11 +1571,11 @@
    "any": 0
   },
   "web/scene-dryrun.ts": {
-   "errors": 39,
+   "errors": 35,
    "any": 0
   },
   "web/sceneEditor.ts": {
-   "errors": 8,
+   "errors": 4,
    "any": 0
   },
   "web/sceneSkip.ts": {
@@ -1611,27 +1583,27 @@
    "any": 0
   },
   "web/scenery.ts": {
-   "errors": 68,
+   "errors": 66,
    "any": 3
   },
   "web/scenery2.ts": {
-   "errors": 134,
+   "errors": 104,
    "any": 4
   },
   "web/scenery3.ts": {
-   "errors": 39,
+   "errors": 25,
    "any": 0
   },
   "web/screendim.ts": {
-   "errors": 21,
+   "errors": 4,
    "any": 0
   },
   "web/screenpack.ts": {
-   "errors": 32,
+   "errors": 28,
    "any": 0
   },
   "web/seamfix.ts": {
-   "errors": 9,
+   "errors": 2,
    "any": 3
   },
   "web/ship-list.ts": {
@@ -1643,15 +1615,15 @@
    "any": 1
   },
   "web/shop.ts": {
-   "errors": 118,
+   "errors": 53,
    "any": 0
   },
   "web/showcase.ts": {
-   "errors": 2,
+   "errors": 1,
    "any": 0
   },
   "web/silence-report.ts": {
-   "errors": 21,
+   "errors": 19,
    "any": 5
   },
   "web/slot-check.ts": {
@@ -1663,7 +1635,7 @@
    "any": 0
   },
   "web/soundtest.ts": {
-   "errors": 38,
+   "errors": 32,
    "any": 0
   },
   "web/soundtrack.ts": {
@@ -1675,7 +1647,7 @@
    "any": 0
   },
   "web/sprite-filters.ts": {
-   "errors": 44,
+   "errors": 38,
    "any": 0
   },
   "web/stage-locality.ts": {
@@ -1687,7 +1659,7 @@
    "any": 0
   },
   "web/stage-wipe.ts": {
-   "errors": 18,
+   "errors": 11,
    "any": 0
   },
   "web/stagslct.ts": {
@@ -1695,7 +1667,7 @@
    "any": 0
   },
   "web/status-translated.ts": {
-   "errors": 43,
+   "errors": 27,
    "any": 0
   },
   "web/story-explorer.ts": {
@@ -1703,15 +1675,15 @@
    "any": 3
   },
   "web/systems.ts": {
-   "errors": 51,
+   "errors": 23,
    "any": 1
   },
   "web/tech-record.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 0
   },
   "web/test-tech-pose.mts": {
-   "errors": 10,
+   "errors": 1,
    "any": 0
   },
   "web/text-fit.ts": {
@@ -1719,7 +1691,7 @@
    "any": 0
   },
   "web/textbox.ts": {
-   "errors": 53,
+   "errors": 12,
    "any": 0
   },
   "web/theatre-plan.ts": {
@@ -1731,7 +1703,7 @@
    "any": 0
   },
   "web/titlescreen.ts": {
-   "errors": 25,
+   "errors": 17,
    "any": 0
   },
   "web/translated-screen-host.ts": {
@@ -1739,7 +1711,7 @@
    "any": 0
   },
   "web/treesway.ts": {
-   "errors": 77,
+   "errors": 20,
    "any": 0
   },
   "web/types/anim-viewer-dw2.ts": {
@@ -1927,11 +1899,11 @@
    "any": 10
   },
   "web/ui-c/base.ts": {
-   "errors": 69,
+   "errors": 52,
    "any": 0
   },
   "web/ui-c/battlehud.ts": {
-   "errors": 122,
+   "errors": 73,
    "any": 0
   },
   "web/ui-c/books.ts": {
@@ -1939,7 +1911,7 @@
    "any": 0
   },
   "web/ui-c/capture.ts": {
-   "errors": 47,
+   "errors": 45,
    "any": 0
   },
   "web/ui-c/claims.ts": {
@@ -1954,12 +1926,8 @@
    "errors": 11,
    "any": 2
   },
-  "web/ui-c/geometry.ts": {
-   "errors": 5,
-   "any": 0
-  },
   "web/ui-c/home.ts": {
-   "errors": 30,
+   "errors": 27,
    "any": 0
   },
   "web/ui-c/icons.ts": {
@@ -1967,27 +1935,27 @@
    "any": 0
   },
   "web/ui-c/index.ts": {
-   "errors": 32,
+   "errors": 31,
    "any": 0
   },
   "web/ui-c/layers.ts": {
-   "errors": 25,
+   "errors": 23,
    "any": 0
   },
   "web/ui-c/lists.ts": {
-   "errors": 70,
+   "errors": 65,
    "any": 0
   },
   "web/ui-c/message.ts": {
-   "errors": 59,
+   "errors": 52,
    "any": 0
   },
   "web/ui-c/pages.ts": {
-   "errors": 201,
+   "errors": 191,
    "any": 0
   },
   "web/ui-c/parts.ts": {
-   "errors": 114,
+   "errors": 72,
    "any": 0
   },
   "web/ui-c/screens.ts": {
@@ -1995,7 +1963,7 @@
    "any": 0
   },
   "web/ui-c/sheets.ts": {
-   "errors": 119,
+   "errors": 118,
    "any": 0
   },
   "web/ui-c/vic.ts": {
@@ -2007,7 +1975,7 @@
    "any": 0
   },
   "web/ui-flow.ts": {
-   "errors": 59,
+   "errors": 19,
    "any": 8
   },
   "web/ui-kit-input.ts": {
@@ -2015,7 +1983,7 @@
    "any": 0
   },
   "web/ui-kit.ts": {
-   "errors": 31,
+   "errors": 22,
    "any": 0
   },
   "web/ui-lab-screens.ts": {
@@ -2027,7 +1995,7 @@
    "any": 0
   },
   "web/uifont.ts": {
-   "errors": 57,
+   "errors": 38,
    "any": 0
   },
   "web/walk-blend.ts": {
@@ -2035,11 +2003,11 @@
    "any": 0
   },
   "web/water3d.ts": {
-   "errors": 36,
+   "errors": 28,
    "any": 0
   },
   "web/wfight-translated.ts": {
-   "errors": 24,
+   "errors": 21,
    "any": 0
   },
   "web/wire.ts": {
@@ -2047,11 +2015,11 @@
    "any": 1
   },
   "web/world-globe-layout.ts": {
-   "errors": 134,
+   "errors": 94,
    "any": 3
   },
   "web/world-globe.ts": {
-   "errors": 23,
+   "errors": 9,
    "any": 1
   },
   "web/yesno-translated.ts": {

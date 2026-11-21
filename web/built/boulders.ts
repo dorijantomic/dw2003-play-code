@@ -46,21 +46,21 @@ function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525
  *  round; the facet edges must not show in the light). Non-indexed. */
 export function cobbleMesh(seed: number) {
   const ico = new THREE.IcosahedronGeometry(1, BOULDERS.DETAIL).toNonIndexed();
-  const P = ico.attributes.position.array, r = rng(seed);
+  const P = ico.attributes.position!.array, r = rng(seed);
   const f = [1 + r() * 2.5, 1 + r() * 2.5, 1 + r() * 2.5], ph = [r() * 6.3, r() * 6.3, r() * 6.3];
   const out = new Float32Array(P.length), nrm = new Float32Array(P.length);
   const sq = [0.9 + r() * 0.25, 0.62 + r() * 0.30, 0.9 + r() * 0.25];     // a flattened, slightly squarish cobble
   for (let i = 0; i < P.length; i += 3) {
     const x = P[i], y = P[i + 1], z = P[i + 2];
-    const bump = 1 + BOULDERS.BUMP * (Math.sin(x * f[0] * 2 + ph[0]) * Math.sin(y * f[1] * 2 + ph[1]) + 0.6 * Math.sin(z * f[2] * 2.3 + ph[2] + x));
-    out[i] = x * sq[0] * bump; out[i + 1] = y * sq[1] * bump; out[i + 2] = z * sq[2] * bump;
-    const nx = x / (sq[0] * sq[0]), ny = y / (sq[1] * sq[1]), nz = z / (sq[2] * sq[2]), L = Math.hypot(nx, ny, nz) || 1;
+    const bump = 1 + BOULDERS.BUMP * (Math.sin(x * f[0]! * 2 + ph[0]!) * Math.sin(y * f[1]! * 2 + ph[1]!) + 0.6 * Math.sin(z * f[2]! * 2.3 + ph[2]! + x));
+    out[i] = x * sq[0]! * bump; out[i + 1] = y * sq[1]! * bump; out[i + 2] = z * sq[2]! * bump;
+    const nx = x / (sq[0]! * sq[0]!), ny = y / (sq[1]! * sq[1]!), nz = z / (sq[2]! * sq[2]!), L = Math.hypot(nx, ny, nz) || 1;
     nrm[i] = nx / L; nrm[i + 1] = ny / L; nrm[i + 2] = nz / L;
   }
   let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < out.length; i += 3) for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], out[i + a]); hi[a] = Math.max(hi[a], out[i + a]); }
-  const cx = (lo[0] + hi[0]) / 2, cz = (lo[2] + hi[2]) / 2, w = Math.max(hi[0] - lo[0], hi[2] - lo[2]) || 1, h = (hi[1] - lo[1]) || 1;
-  for (let i = 0; i < out.length; i += 3) { out[i] = (out[i] - cx) / w; out[i + 1] = (out[i + 1] - lo[1]) / h; out[i + 2] = (out[i + 2] - cz) / w; }
+  for (let i = 0; i < out.length; i += 3) for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a]!, out[i + a]!); hi[a] = Math.max(hi[a]!, out[i + a]!); }
+  const cx = (lo[0]! + hi[0]!) / 2, cz = (lo[2]! + hi[2]!) / 2, w = Math.max(hi[0]! - lo[0]!, hi[2]! - lo[2]!) || 1, h = (hi[1]! - lo[1]!) || 1;
+  for (let i = 0; i < out.length; i += 3) { out[i] = (out[i]! - cx) / w; out[i + 1] = (out[i + 1]! - lo[1]!) / h; out[i + 2] = (out[i + 2]! - cz) / w; }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(out, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
@@ -88,7 +88,7 @@ function pileLumps(w: number, h: number, layers: number, seed: number) {
         const z = (zr ? 0.22 : -0.20) * w * BOULDERS.DEPTH_K + (r() - 0.5) * dd * 0.25;
         const y = k * dd * 0.62 * 1.18 - (k === 0 ? BOULDERS.SINK * h : 0) + (r() - 0.5) * dd * 0.06 + (zr ? dd * 0.10 : 0);
         out.push({ x, y, z, w: lw, h: lh, yaw: r() * Math.PI * 2, seed: seed * 31 + out.length,
-                   tone: BOULDERS.TONE[0] + (BOULDERS.TONE[1] - BOULDERS.TONE[0]) * Math.pow(r(), 0.85) + 0.05 * k,
+                   tone: BOULDERS.TONE[0]! + (BOULDERS.TONE[1]! - BOULDERS.TONE[0]!) * Math.pow(r(), 0.85) + 0.05 * k,
                    hue: r() * 2 - 1 });
       }
     }
@@ -112,7 +112,7 @@ function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color
     let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], tris = 0;
     for (const [li, L] of lumps.entries()) {
       const g = hulls[(L.seed + li) % hulls.length];
-      const src = g.attributes.position.array, nsrc = g.attributes.normal.array;
+      const src = g!.attributes.position!.array, nsrc = g!.attributes.normal!.array;
       Q.setFromAxisAngle(Yv, L.yaw);
       M4.compose(new THREE.Vector3(L.x, L.y, L.z), Q, new THREE.Vector3(L.w, L.h, L.w));
       const P = new Float32Array(src.length), N = new Float32Array(nsrc.length);
@@ -121,7 +121,7 @@ function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color
       for (let i = 0; i < src.length; i += 3) {
         v.fromArray(src, i).applyMatrix4(M4); v.toArray(P as unknown as number[], i);
         nm.fromArray(nsrc, i).applyMatrix3(invT).normalize().toArray(N as unknown as number[], i);
-        for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], P[i + a]); hi[a] = Math.max(hi[a], P[i + a]); }
+        for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a]!, P[i + a]!); hi[a] = Math.max(hi[a]!, P[i + a]!); }
       }
       tris += src.length / 9;
       placed.push({ L, P, N, c: [L.x, L.y + L.h * 0.5, L.z], rad: [L.w * 0.5, L.h * 0.5, L.w * 0.5] });
@@ -132,11 +132,11 @@ function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color
     const rad = Math.hypot(card.base[0], card.base[2]) || 1;
     const nx = card.base[0] / rad, nz = card.base[2] / rad;                       // radial (the card's normal)
     const dx = card.dir ? card.dir[0] : -nz, dz = card.dir ? card.dir[1] : nx;    // sideways (the card's own dir)
-    const fx = w / Math.max(1e-6, hi[0] - lo[0]), fz = BOULDERS.DEPTH_K * w / Math.max(1e-6, hi[2] - lo[2]),
-          fy = h / Math.max(1e-6, hi[1] - lo[1]);
-    const cx = (lo[0] + hi[0]) / 2, cz = (lo[2] + hi[2]) / 2;
+    const fx = w / Math.max(1e-6, hi[0]! - lo[0]!), fz = BOULDERS.DEPTH_K * w / Math.max(1e-6, hi[2]! - lo[2]!),
+          fy = h / Math.max(1e-6, hi[1]! - lo[1]!);
+    const cx = (lo[0]! + hi[0]!) / 2, cz = (lo[2]! + hi[2]!) / 2;
     const toPile = (p: (number | undefined)[]) => {
-      const lx = (p[0] - cx) * fx, lz = (p[2] - cz) * fz, y = (p[1] - lo[1]) * fy;
+      const lx = (p[0]! - cx) * fx, lz = (p[2]! - cz) * fz, y = (p[1]! - lo[1]!) * fy;
       return [card.base[0] + dx * lx + nx * lz, y, card.base[2] + dz * lx + nz * lz];
     };
     let topY = 0;
@@ -150,7 +150,7 @@ function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color
         if (!q.L.core) {
           for (const o of placed) {
             if (o === q) continue;
-            const sd = Math.hypot((q.P[i] - o.c[0]) / o.rad[0], (q.P[i + 1] - o.c[1]) / o.rad[1], (q.P[i + 2] - o.c[2]) / o.rad[2]) - 1;
+            const sd = Math.hypot((q.P[i]! - o.c[0]!) / o.rad[0]!, (q.P[i + 1]! - o.c[1]!) / o.rad[1]!, (q.P[i + 2]! - o.c[2]!) / o.rad[2]!) - 1;
             if (sd < BOULDERS.CRACK_W) a *= 1 - BOULDERS.CRACK_K * Math.min(1, (BOULDERS.CRACK_W - sd) / (BOULDERS.CRACK_W + 0.10));
           }
         }
@@ -160,7 +160,7 @@ function pilesGeometry(THREE_, pieces, cols: { lo: THREE.Color; mid: THREE.Color
         // cobble tone: its own base tone along the piece's p10 .. median .. p90 ramp, a little shared-noise grain, and
         // top faces a touch lighter; the dark core is the p10 end
         const nz = S.fbm3JS(p[0] / 400 * BOULDERS.GRAIN, p[1] / 400 * BOULDERS.GRAIN, p[2] / 400 * BOULDERS.GRAIN);
-        const up = Math.max(0, q.N[i + 1]);
+        const up = Math.max(0, q.N[i + 1]!);
         tint.push(Math.max(0, Math.min(1, q.L.tone + 0.34 * (nz - 0.5) + 0.16 * up)));
         hue.push(q.L.hue);
         ao.push(a);

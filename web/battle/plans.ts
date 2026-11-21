@@ -127,7 +127,7 @@ export function battleScriptedPlanFor(b, side: number, record, techniqueId: numb
   // number at all, so a blocked cast must not take a draw either.
   const playerActiveRookie = playerActiveIsRookie(b);
   const rollBlocked = arm.effect === "statusOnly" && playerActiveRookie;
-  const roll7 = options.roll7 ?? (rolls && !rollBlocked ? (RAND_U16() & 0x7f) : 0);
+  const roll7 = options.roll7 ?? (rolls && !rollBlocked ? (RAND_U16()! & 0x7f) : 0);
   const rollLanded = options.rollLanded ?? (rolls && damageTermRoll(record.f8 ?? 0, roll7));
   const rollStatusLanded = rollBlocked ? false
     : (options.rollStatusLanded ?? rollLanded);
@@ -290,7 +290,7 @@ function category5Row(arm, techniqueId: number) {
 /** The stat the arm changes, 0 attack / 1 defense / 2 speed, for one record. */
 export function statValue(rec, stat: number) {
   const values = engineEffStats(rec);
-  return [values.str, values.def, values.spd][stat] | 0;
+  return [values.str, values.def, values.spd][stat]! | 0;
 }
 
 /**

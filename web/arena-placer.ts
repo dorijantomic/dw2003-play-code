@@ -41,8 +41,8 @@ export function pathOf(o, root) {
 }
 export function findByPath(root, path: string | undefined) {
   let x = root;
-  for (const s of path.split("/")) {
-    const m = /^(.*?)(?:#(\d+))?$/.exec(s), label = m[1], want = +(m[2] || 0);
+  for (const s of path!.split("/")) {
+    const m = /^(.*?)(?:#(\d+))?$/.exec(s), label = m![1], want = +(m![2] || 0);
     let n = 0, hit = null;
     for (const c of x.children) if ((c.name || c.type) === label) { if (n === want) { hit = c; break; } n++; }
     if (!hit) return null;
@@ -90,15 +90,15 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   function apply() {
     orig = new Map();
     for (const [key, e] of Object.entries(data.edits)) {
-      const [path, i] = key.split("|"), inst = +i, o = findByPath(built.scene, path) as any;
+      const [path, i] = key.split("|"), inst = +i!, o = findByPath(built.scene, path) as any;
       if (!o) continue;
       if (inst >= 0 && o.isInstancedMesh) {
         if (inst >= o.count) continue;
         o.getMatrixAt(inst, tmpM); orig.set(key, tmpM.clone());
-        o.setMatrixAt(inst, e.hidden ? ZERO : tmpM.fromArray(e.m)); o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere();
+        o.setMatrixAt(inst, e.hidden ? ZERO : tmpM.fromArray(e.m!)); o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere();
       } else if (inst < 0) {
         orig.set(key, { m: o.matrix.clone(), visible: o.visible });
-        if (e.hidden) o.visible = false; else { tmpM.fromArray(e.m).decompose(o.position, o.quaternion, o.scale); o.updateMatrix(); }
+        if (e.hidden) o.visible = false; else { tmpM.fromArray(e.m!).decompose(o.position, o.quaternion, o.scale); o.updateMatrix(); }
       }
     }
     for (const a of addedObjs.values()) a.removeFromParent();
@@ -145,7 +145,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     at.y = built.groundHeight?.(at.x, at.z) ?? 0;
     world.worldToLocal(at);
     const m = new THREE.Matrix4().compose(at, new THREE.Quaternion(), new THREE.Vector3(ADD_SCALE, ADD_SCALE, ADD_SCALE));
-    const a = newAssetEntry(`a${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, assetId, m.toArray());
+    const a = newAssetEntry(`a${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, assetId!, m.toArray());
     data.added.push(a);
     let g;
     try { g = await makeAsset(a); } catch (err) { data.added = data.added.filter((x) => x !== a); throw err; }
@@ -246,13 +246,13 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     if (ent && isAssetEntry(ent)) {   // a copy of an added registry asset: a second entry of the same asset, beside it
       const m = localMatrixOf(o, null), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); m.decompose(p, q, s);
       p.x += Math.max(s.x, s.z) * 1.2; m.compose(p, q, s);
-      const a = newAssetEntry(`a${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, ent.asset, m.toArray());
+      const a = newAssetEntry(`a${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`, ent.asset!, m.toArray());
       data.added.push(a); data.unsaved = true;
       makeAsset(a).then((g) => { draftSave(); if (g) select(g, null); });
       return;
     }
-    const srcObj = o.userData?.placed != null ? findByPath(built.scene, data.added.find((a) => a.id === o.userData.placed)?.src.path || "") : o;
-    const srcInfo = o.userData?.placed != null ? data.added.find((a) => a.id === o.userData.placed).src : { path: pathOf(o, built.scene), inst: inst ?? -1 };
+    const srcObj = o.userData?.placed != null ? findByPath(built.scene, data.added.find((a) => a.id === o.userData.placed)?.src!.path || "") : o;
+    const srcInfo = o.userData?.placed != null ? data.added.find((a) => a.id === o.userData.placed)!.src : { path: pathOf(o, built.scene), inst: inst ?? -1 };
     if (!srcObj) return;
     const m = localMatrixOf(o, inst);
     const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); m.decompose(p, q, s);
@@ -373,7 +373,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     if (window.showDirectoryPicker) {
       try {
         let dir = await idbGet("dir") as PickedDirectory;
-        if (dir && (await dir.queryPermission({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission({ mode: "readwrite" })) !== "granted") dir = null;
+        if (dir && (await dir.queryPermission!({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission!({ mode: "readwrite" })) !== "granted") dir = null;
         if (!dir) { dir = await window.showDirectoryPicker({ id: "arenaPlacements", mode: "readwrite" }); await idbSet("dir", dir); }
         const fh = await dir.getFileHandle(`${pack}.json`, { create: true }), w = await fh.createWritable();
         await w.write(text); await w.close(); ok = true;
@@ -402,7 +402,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
       copy of a thing here: <select id="plList" style="max-width:270px"></select> <button data-a="add">add in view</button><br>
       <button data-a="save" style="font-weight:bold">Save</button> <button data-a="undoAll">Discard unsaved changes</button>
       <div id="plStat" style="color:#9ab;font-size:11px;margin-top:4px"></div>`;
-    container.appendChild(el);
+    container!.appendChild(el);
     ui = { el, q: (s) => el.querySelector(s) };
     el.onclick = (e) => {
       const a = (e.target as HTMLElement).dataset?.a; if (!a) return;

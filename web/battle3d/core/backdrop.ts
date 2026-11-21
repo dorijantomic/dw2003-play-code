@@ -10,22 +10,22 @@ import type { Battle3dTexturePage } from "./types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeBackdrop(B$: Battle3DContext) {
 function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
-    const vbo = B$.gl.createBuffer();
-    B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, vbo);
-    B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl.STATIC_DRAW);
-    const ubo = B$.gl.createBuffer();
-    B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, ubo);
-    B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl.STATIC_DRAW);
+    const vbo = B$.gl!.createBuffer();
+    B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, vbo);
+    B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl!.STATIC_DRAW);
+    const ubo = B$.gl!.createBuffer();
+    B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, ubo);
+    B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl!.STATIC_DRAW);
     return { page: g.page, spinDeg: g.spinDeg || 0, vbo, ubo, count: g.pos.length / 3 };
   }
 function loadBackdropPack(packName: string | number) {
     if (!packName) return null;
-    let pk = B$.backdropPacks[packName];
+    let pk = B$.backdropPacks![packName];
     if (pk) return pk;
     pk = { floorTex: loadTexture(B$.gl, `assets/battle/backdrops/${packName}/floor.png`),
            wallTex:  loadTexture(B$.gl, `assets/battle/backdrops/${packName}/wall.png`),
            groups: null };
-    B$.backdropPacks[packName] = pk;
+    B$.backdropPacks![packName] = pk;
     fetch(`assets/battle/backdrops/${packName}/geometry.json`)
       .then(r => r.json())
       .then(g => { pk.groups = (g.groups || []).map(_bdGroupBuf); })
@@ -56,7 +56,7 @@ function armDataField(techId: number) {
     B$.activeBackdrop = loadBackdropPack(entry.pack);
     // sound == -1 on the data-field fallback (SFSTDATA rec 55 carries no sound), so a
     // sig-0 special is silent on this path in the original too — do not invent one.
-    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null;
+    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap![String(entry.sound)] || null) : null;
   }
 // The THROW band's element pack: the item arm's motion id IS the sig (34/37/40/43/46/49/52
   // for the seven field items), so the pack is bySig[motion] — the same MEFT10<motion> pack the
@@ -74,7 +74,7 @@ function armThrowBackdrop(sig) {
     B$.dataFieldOn = false;
     if (!entry) return;
     B$.activeBackdrop = loadBackdropPack(entry.pack);
-    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null;
+    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap![String(entry.sound)] || null) : null;
   }
 /** The acting clip's op4 motion, straight from the VM: 0 = return to the arena, else the pack. */
   function dataFieldMotion(motion: number) {
@@ -88,11 +88,11 @@ function armThrowBackdrop(sig) {
     const entry = backdropEntryForTech(techId);
     if (!entry) return;                                 // basic attack: keep the normal arena
     B$.activeBackdrop = loadBackdropPack(entry.pack);
-    B$.dataFieldOnAt  = now + B$.BD_DELAY_MS;
-    B$.dataFieldOffAt = now + B$.BD_DELAY_MS + B$.BD_HOLD_MS;
+    B$.dataFieldOnAt  = now + B$.BD_DELAY_MS!;
+    B$.dataFieldOffAt = now + B$.BD_DELAY_MS! + B$.BD_HOLD_MS!;
     // sound == -1 on the data-field fallback (SFSTDATA rec 55 carries no sound), so a
     // sig-0 special is silent on this path in the original too — do not invent one.
-    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null;
+    B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap![String(entry.sound)] || null) : null;
   }
 // Hold the element loop for exactly as long as the backdrop is up.
   function syncSpecialLoop(active: boolean) {
@@ -106,16 +106,16 @@ function armThrowBackdrop(sig) {
   }
 function dataFieldIsActive(now: number = performance.now()) {
     return B$.activeBackdrop && B$.activeBackdrop.groups && B$.activeBackdrop.groups.length
-      && (B$.dataFieldPinned || B$.dataFieldOn || (now >= B$.dataFieldOnAt && now < B$.dataFieldOffAt));
+      && (B$.dataFieldPinned || B$.dataFieldOn || (now >= B$.dataFieldOnAt! && now < B$.dataFieldOffAt!));
   }
-function setArenaLegacy(on: boolean) { B$.arenaLegacy = !!on; B$.arenaDebug.legacy = !!on; return B$.arenaLegacy; }
+function setArenaLegacy(on: boolean) { B$.arenaLegacy = !!on; B$.arenaDebug!.legacy = !!on; return B$.arenaLegacy; }
 function setArenaDebug(d: { legacy?: boolean; cull?: boolean; opaque?: boolean; voidRaw?: boolean; depthWrite?: boolean; depthClear?: boolean; }) {
     if (d && typeof d === "object") {
       if ("legacy" in d) B$.arenaLegacy = !!d.legacy;
       B$.arenaDebug = { legacy: B$.arenaLegacy, cull: d.cull !== false, opaque: d.opaque !== false,
                      voidRaw: !!d.voidRaw,
-                     depthWrite: "depthWrite" in d ? !!d.depthWrite : B$.arenaDebug.depthWrite,
-                     depthClear: "depthClear" in d ? !!d.depthClear : B$.arenaDebug.depthClear };
+                     depthWrite: "depthWrite" in d ? !!d.depthWrite : B$.arenaDebug!.depthWrite,
+                     depthClear: "depthClear" in d ? !!d.depthClear : B$.arenaDebug!.depthClear };
     }
     return B$.arenaDebug;
   }
@@ -127,8 +127,8 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
     // what NEAREST reads. Authentic keeps the pack's UVs.
     if (assetMode() === "hd" && Array.isArray(g.uv)) {
       const half = 0.5 / TEXTURE_PAGE_TEXELS;
-      B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, b.ubo);
-      B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv.map((t: number) => t + half)), B$.gl.STATIC_DRAW);
+      B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, b.ubo);
+      B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, new Float32Array(g.uv.map((t: number) => t + half)), B$.gl!.STATIC_DRAW);
     }
     b.clut = Array.isArray(g.clut) ? g.clut : null;   // the layer's palette group (col,row)
     b.degenerate = !!g.degenerate;     // blank CLUT slot: the original only culls these away
@@ -149,17 +149,17 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
     }
     const col = g.clut ? g.clut[0] : 0, row = g.clut ? g.clut[1] : 255;
     const key = `${g.page || "wall"}_c${col}_r${row}`;
-    const file = B$.arenaDebug.voidRaw ? `${key}_void.png` : `${key}.png`;
+    const file = B$.arenaDebug!.voidRaw ? `${key}_void.png` : `${key}.png`;
     if (!pk.tex) pk.tex = {};
     if (!pk.tex[file]) pk.tex[file] = loadTexture(B$.gl, `assets/battle/arenas/${pk.name}/${file}`);
     return pk.tex[file];
   }
 function loadArenaPack(packName: string) {
     if (!packName) return null;
-    let pk = B$.arenaPacks[packName];
+    let pk = B$.arenaPacks![packName];
     if (pk) return pk;
     pk = { name: packName, tex: {}, groups: null, blend: "opaque" };
-    B$.arenaPacks[packName] = pk;
+    B$.arenaPacks![packName] = pk;
     fetch(`assets/battle/arenas/${packName}/geometry.json`)
       .then(r => r.json())
       .then(g => { pk.blend = g.blend || "opaque"; pk.groups = (g.groups || []).map(_arenaGroupBuf); })
@@ -225,7 +225,7 @@ function patchState(side: string) {
 // Start (or clear) a fighter's patch animation. Both halves land asynchronously and
   // either may arrive first, so this is called again when the placement table lands.
   function setupTexturePatches(side: string, folder: string | null | undefined) {
-    const entries = B$.placementTable[modelKeyFromFolder(folder)]?.texture_anim;
+    const entries = B$.placementTable![modelKeyFromFolder(folder)]?.texture_anim;
     const animator = entries && entries.length ? new TexturePatchAnimator(entries) : null;
     if (side === "player") B$.playerPatches = animator; else B$.enemyPatches = animator;
     if (!animator) return;
@@ -247,8 +247,8 @@ function patchState(side: string) {
       const from = ((r.y0 + row) * page.width + r.x0) * 4;
       rect.set(page.data.subarray(from, from + r.w * 4), row * r.w * 4);
     }
-    B$.gl.bindTexture(B$.gl.TEXTURE_2D, tex);
-    B$.gl.texSubImage2D(B$.gl.TEXTURE_2D, 0, r.dx, r.dy, r.w, r.h, B$.gl.RGBA, B$.gl.UNSIGNED_BYTE, rect);
+    B$.gl!.bindTexture(B$.gl!.TEXTURE_2D, tex);
+    B$.gl!.texSubImage2D(B$.gl!.TEXTURE_2D, 0, r.dx, r.dy, r.w, r.h, B$.gl!.RGBA, B$.gl!.UNSIGNED_BYTE, rect);
     return true;
   }
   return { _bdGroupBuf, loadBackdropPack, backdropEntryForTech, backdropPackForTech, armDataField, backdropEntryForSig, armThrowBackdrop, dataFieldMotion, triggerDataField, syncSpecialLoop, dataFieldIsActive, setArenaLegacy, setArenaDebug, _arenaGroupBuf, arenaTextureFor, loadArenaPack, arenaIdFor, resolveArenaStage, setArenaStage, _faceBoxBuffers, _freeFaceBoxBuffers, patchState, setupTexturePatches, blitTexturePatch };

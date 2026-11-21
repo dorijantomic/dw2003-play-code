@@ -123,7 +123,7 @@ function applyEnemyAction() {
       const team = B.enemyTeamActive(b);
       const pick = enemySelfTagPick(move, enemyTeamSlots(team ? B.enemyTeamRecords(b) : [en]),
         team ? b.partyIndex : 0, RAND_U16);
-      if (team && pick >= 0) {
+      if (team && pick! >= 0) {
         b._selfTag = { slot: pick, stage: "taking" };
         B.setResultPages(b, [{
           text: "Taking out Digimon!",
@@ -148,7 +148,7 @@ function applyEnemyAction() {
     if (b._finaleCopiedAttack && (requestedSkillId | 0) === FINALE_HEAD_ATTACK_ID) skill = b._finaleCopiedAttack;
     if (!usesTech && skill) skill = { ...skill, basic_attack: true };
     if (usesTech) {
-      const mpCost = techniqueMpCost(skill.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
+      const mpCost = techniqueMpCost(skill!.mp_cost ?? 0, 0, { enemySide: true }); // enemy side pays list price
       // F0x80088564's dispatch for action codes >= 2 (.L0x80088934-.L0x800889d0,
       // fightstg.s:6080-6100): the actor's current MP is tested against the technique
       // record's own u16 cost FIRST, and when it is below the cost the action is
@@ -194,10 +194,10 @@ function applyEnemyAction() {
         B.clearBattleLine(b);
         b._dedigivolvePending = true;
       } else if (spec) B.sayOriginal(b, spec, text); else B.sayWalker(b, text);
-      B.renderer3d?.enemyAttack(skill.id ?? en.profile?.tech_basic, { miss: false });
+      B.renderer3d?.enemyAttack(skill!.id ?? en.profile?.tech_basic, { miss: false });
       return;
     }
-    const restore = battleRestorePlanFor(b, 1, restoreRecord, skill?.id ?? 0, { name });
+    const restore = battleRestorePlanFor(b, 1, restoreRecord!, skill?.id ?? 0, { name });
     if (restore) {
       const spec = restore.page
         ? { kind: restore.page.kind, payload: restore.page.payload,
@@ -205,7 +205,7 @@ function applyEnemyAction() {
         : null;
       const text = restoreWalkerSentence(restore, skill, name);
       if (spec) B.sayOriginal(b, spec, text); else B.sayWalker(b, text);
-      B.renderer3d?.enemyAttack(skill.id ?? en.profile?.tech_basic, { miss: false });
+      B.renderer3d?.enemyAttack(skill!.id ?? en.profile?.tech_basic, { miss: false });
       return;
     }
     // The category-6 field write, on the enemy's side too: F0x800907cc is the record
@@ -237,7 +237,7 @@ function applyEnemyAction() {
     // announces through the same plate; until now the enemy action never reached it and
     // only the damage page followed. A named technique has its own page (kind 3,
     // `enemyTechniqueSpec`), which is why this is gated on the basic-attack word.
-    if (!skillName) B.sayOriginal(b, B.attackSpec(b, name), `${name} attacks!`);
+    if (!skillName) B.sayOriginal(b, B.attackSpec(b, name)!, `${name} attacks!`);
     if (anyHit) {
       const lethal = total >= b.player.hp;
       // the enemy's blow comes off contact by contact too (A12)
@@ -270,7 +270,7 @@ function applyEnemyAction() {
           applyPostHitDispatch(b, restoreRecord, { lockRecord: B.fightTechDB?.[String(DAMAGE_TERM_FLEE_LOCK_RECORD)], playerName: pname, enemyName: name }),
           applyStatDebuffDispatch(b, 1, restoreRecord, { player: pname, enemy: name }),
         ].map((r) => (r as { page?: any })?.page ?? null).filter(Boolean);
-        if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._forcedFlee = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c)
+        if ((restoreRecord?.dispatch! | 0) === RESULT_QUEUE.CROSS_SLASH) b._forcedFlee = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c)
         b.message += inflicted.text;
         b.message = prefix + b.message;
         // The line names the Digimon that took the damage, as on the player's side.
@@ -326,7 +326,7 @@ function applyEnemyAction() {
       // defender's name when nothing landed, either side (`pro/fightstg.s:14673`/`:14674`).
       // The enemy path used to leave a typed sentence here, so the announcement plate
       // above was the only page; now the miss reads the disc's own words too.
-      B.sayOriginal(b, B.evadeSpec(b, pname), prefix + `${pname} evaded!`);
+      B.sayOriginal(b, B.evadeSpec(b, pname)!, prefix + `${pname} evaded!`);
       B.renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, { miss: true });
     }
   }
@@ -390,7 +390,7 @@ function applyParticipantProgress(b: BattleEndContext, rosterIndex: number | und
       ps.formLedger ??= [];
       const participants = dvexpShareCount(b.formFlags, paidParticipants(b));
       for (const formId of markedEquippedForms(b.formFlags?.[rosterIndex], ps.equippedForms)) {
-        const formProfile = B.digimonDB?.[formId] ?? B.profileById(formId) ?? prof;
+        const formProfile = B.digimonDB?.[formId] ?? B.profileById(formId!) ?? prof;
         let record = ps.formLedger.find((r) => Number(r.id) === Number(formId));
         if (!record) {
           record = { id: formId, formLevel: 1, dvexp: ps.dvexpByForm[formId] ?? 0,

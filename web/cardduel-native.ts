@@ -75,7 +75,7 @@ export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptio
     /** Walker state -> the RAM the screen reads. */
     function seed({ write }) {
         const state = d._state ?? {};
-        write(LAUNCHER_CELL, (Number.isInteger(d._opponentId) ? d._opponentId : 1) >>> 0, 4);
+        write(LAUNCHER_CELL, (Number.isInteger(d._opponentId) ? d._opponentId : 1)! >>> 0, 4);
         write(MONEY, (state.bits ?? 0) >>> 0, 4);
         write(DUEL_WON, 0, 4);
         seedBoosterStock(state, BOOSTER_ITEM_IDS, write);
@@ -152,7 +152,7 @@ export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptio
         d._opponentId = Number.isInteger(opponentId) ? opponentId : null;
         d._state = state ?? d._state ?? d._getState?.() ?? null;
         d._lastDiagnostic = null;
-        d._begin();
+        d._begin!();
     };
 
     d.isOpen = () => d._open;

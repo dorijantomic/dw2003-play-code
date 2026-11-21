@@ -150,7 +150,7 @@ export function makeFlow(B: BattleContext) {
     if (!(index > (en.bossPhase ?? -1))) return [];
     en.bossPhase = index;
     const phase = phases[index];
-    en.eStats.ai_moves = phaseRows(phase, boss.moves);
+    en.eStats!.ai_moves = phaseRows(phase, boss.moves);
     const effects = phaseEffects(phase);
     if (effects.element) b.field = { element: effects.element, power: effects.power };
     if (effects.tint) setFighterTint("enemy", effects.tint);
@@ -172,7 +172,7 @@ export function makeFlow(B: BattleContext) {
     // renderer call is optional: a headless battle has none.
     if (effects.size && window.__fx?.bossgrows === true) {
       B.renderer3d?.setFighterScale?.("enemy", clampFighterScale(effects.size));
-      if (b.party?.[b.partyIndex]) b.party[b.partyIndex].size = clampFighterScale(effects.size);
+      if (b.party?.[b.partyIndex]) b.party[b.partyIndex]!.size = clampFighterScale(effects.size);
     }
     return effects.page ? [{ text: effects.page, spec: null }] : [];
   }
@@ -197,9 +197,9 @@ export function makeFlow(B: BattleContext) {
     b._resultPageIndex = 0;
     b._resultReady = false;
     if (list.length) {
-      const first = list[0].spec ?? spec ?? null;
-      if (first) B.sayOriginal(b, first, list[0].text);
-      else B.sayWalker(b, list[0].text);
+      const first = list[0]!.spec ?? spec ?? null;
+      if (first) B.sayOriginal(b, first, list[0]!.text);
+      else B.sayWalker(b, list[0]!.text);
     }
   }
 /**
@@ -359,7 +359,7 @@ function elementNameForElem1(elem1: number) {
     };
     const state = { count: 0, total: 0, done: 0 };
     multiHitReset(slotViews, { side: () => sideByte, id: () => skill?.id ?? 0 }, manager, state);
-    return { landed: state.count | 0, total: (damages[0] | 0) + (damages[1] | 0), damageBySlot: damages };
+    return { landed: state.count | 0, total: (damages[0]! | 0) + (damages[1]! | 0), damageBySlot: damages };
   }
 // Continue after the current action's result text has either timed out (ordinary results) or
   // been confirmed (the explicit impact/defeat sequence).

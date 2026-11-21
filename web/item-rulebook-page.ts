@@ -21,7 +21,7 @@ const sheetEl = $("sheet");
 const noteEl = $("sheetnote");
 const queryEl = $("q") as HTMLInputElement;
 
-capsEl.innerHTML =
+capsEl!.innerHTML =
     `<div class="cap"><b>${CAPS.hpMp}</b><span>HP and MP stop here</span></div>` +
     `<div class="cap"><b>${CAPS.stat}</b><span>a stat or a tolerance stops here</span></div>` +
     `<div class="cap"><b>${CAPS.tp}</b><span>TP stops here</span></div>`;
@@ -29,7 +29,7 @@ capsEl.innerHTML =
 const res = await fetch("assets/data/item_effects.json");
 const effects = res.ok ? await res.json() : null;
 if (!effects || !Array.isArray(effects.items)) {
-    countEl.textContent = "the effect table did not load";
+    countEl!.textContent = "the effect table did not load";
     bookEl.innerHTML = `<div class="none">web/assets/data/item_effects.json was not found — run the launcher's data step, then reload.</div>`;
 } else {
     const rules = ruleRows(effects);
@@ -40,7 +40,7 @@ if (!effects || !Array.isArray(effects.items)) {
     const oddIds = new Set(sheet.notHalf.map((r) => r.id));
     const consumables = effects.items.filter((r: { category: string; }) => r.category === "consumable").length;
 
-    countEl.textContent =
+    countEl!.textContent =
         `${effects.items.length} items · ${consumables} tagged consumable · ${rows.length - fight.length} with a field effect · ${fight.length} fight-only`;
 
     const sellTags = (r: { id: unknown; }) => {
@@ -75,12 +75,12 @@ if (!effects || !Array.isArray(effects.items)) {
         `<span class="pr">${r.buy} → ${r.sell} BIT</span>` +
         `</div>`;
 
-    sheetEl.innerHTML =
+    sheetEl!.innerHTML =
         `<div class="sheet"><h3>No shop sells it, a shop pays for it <span>(${sheet.neverSold.length})</span></h3>` +
         (sheet.neverSold.length ? sheet.neverSold.map(sheetRow).join("") : `<div class="none">none</div>`) + `</div>` +
         `<div class="sheet"><h3>A price that is not half <span>(${sheet.notHalf.length})</span></h3>` +
         (sheet.notHalf.length ? sheet.notHalf.map(sheetRow).join("") : `<div class="none">none</div>`) + `</div>`;
-    noteEl.textContent =
+    noteEl!.textContent =
         "Both lists are computed from the shipped prices: a 0 BIT buy price with a real sell price is the " +
         "never-sold row, and any price where sell × 2 does not equal buy is the not-half row. Those rows carry " +
         "equipment and accessories too, because the shop rule applies to every one of the " +
@@ -93,15 +93,15 @@ if (!effects || !Array.isArray(effects.items)) {
         for (const body of bookEl.querySelectorAll<HTMLElement>("tbody.group")) {
             let any = false;
             for (const tr of body.querySelectorAll<HTMLTableRowElement>("tr[data-id]")) {
-                const hit = !q || tr.dataset.name.includes(q) || tr.dataset.id === q || tr.dataset.id === q.replace(/^#/, "");
+                const hit = !q || tr.dataset.name!.includes(q) || tr.dataset.id === q || tr.dataset.id === q.replace(/^#/, "");
                 tr.hidden = !hit;
                 if (hit) any = true;
             }
             body.hidden = !any;
             if (any) shown += body.querySelectorAll("tr[data-id]:not([hidden])").length;
         }
-        countEl.textContent = q ? `${shown} matching items` : countEl.dataset.plain;
+        countEl!.textContent = q ? `${shown} matching items` : countEl!.dataset.plain;
     });
-    countEl.dataset.plain = countEl.textContent;
+    countEl!.dataset.plain = countEl!.textContent;
     queryEl.focus();
 }

@@ -55,15 +55,15 @@ async function main() {
     const canvas = document.createElement("canvas");
     canvas.width = texW; canvas.height = texH;
     const g = canvas.getContext("2d");
-    g.fillStyle = SEA; g.fillRect(0, 0, texW, texH);
-    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+    g!.fillStyle = SEA; g!.fillRect(0, 0, texW, texH);
+    g!.imageSmoothingEnabled = true; g!.imageSmoothingQuality = "high";
     const images = await Promise.all(world.places.map((p) => loadImage(p.image || `assets/maps/${p.id}.png`)));
     let missing = 0;
     world.places.forEach((p, i) => {
         const t = worldToTex(fit, p.x, p.y), w = p.w * fit.scale, h = p.h * fit.scale;
-        if (images[i]) g.drawImage(images[i], t.x, t.y, w, h); else { missing++; g.fillStyle = "#334"; g.fillRect(t.x, t.y, w, h); }
-        g.strokeStyle = regionColor(p.region); g.lineWidth = Math.max(2, 3 * fit.scale * 4);
-        g.strokeRect(t.x + g.lineWidth / 2, t.y + g.lineWidth / 2, w - g.lineWidth, h - g.lineWidth);
+        if (images[i]) g!.drawImage(images[i], t.x, t.y, w, h); else { missing++; g!.fillStyle = "#334"; g!.fillRect(t.x, t.y, w, h); }
+        g!.strokeStyle = regionColor(p.region); g!.lineWidth = Math.max(2, 3 * fit.scale * 4);
+        g!.strokeRect(t.x + g!.lineWidth / 2, t.y + g!.lineWidth / 2, w - g!.lineWidth, h - g!.lineWidth);
     });
 
     const scene = new THREE.Scene();

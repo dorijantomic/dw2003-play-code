@@ -85,7 +85,7 @@ export function createPlaceCardTranslated() {
         if (Number.isInteger(language) && language >= 0 && language <= 6) card._language = language;
     };
 
-    card.isActive = () => textCard.isActive() || (!!card._session?.isActive() && !card._failed);
+    card.isActive = () => textCard.isActive!() || (!!card._session?.isActive() && !card._failed);
 
     /** The field's busy flag: raised on begin, cleared by the card's last callback. */
     card.isBusy = () => !!card._session?.busy();
@@ -97,7 +97,7 @@ export function createPlaceCardTranslated() {
     card.begin = (mapId) => {
         const scene = placeCardScene(mapId);
         card._session?.dispose();
-        textCard.cancel();                     // an arrival is not a scene's card: the arrival takes the screen
+        textCard.cancel!();                     // an arrival is not a scene's card: the arrival takes the screen
         if (!data || scene == null) return false;
         try {
             card._session ??= new ui.PlaceCardSession(data);
@@ -116,7 +116,7 @@ export function createPlaceCardTranslated() {
     };
 
     card.cancel = () => {
-        textCard.cancel();
+        textCard.cancel!();
         card._session?.dispose();
     };
 
@@ -127,7 +127,7 @@ export function createPlaceCardTranslated() {
      */
     card.beginText = (area, place) => {
         card._session?.dispose();
-        return textCard.beginText(area, place);
+        return textCard.beginText!(area, place);
     };
 
     /**
@@ -140,7 +140,7 @@ export function createPlaceCardTranslated() {
 
     /** Advance by `dt` seconds: one card callback per display tick due, plus a scene's own card (beginText). */
     card.step = (dt) => {
-        textCard.step(dt);                     // quest text runs its own clock and closes without the field's release
+        textCard.step!(dt);                     // quest text runs its own clock and closes without the field's release
         const session = card._session;
         if (!session?.isActive() || card._failed) return;
         try {
@@ -157,10 +157,10 @@ export function createPlaceCardTranslated() {
     card.draw = (ctx, viewW, viewH) => {
         const session = card._session;
         if (!session?.isActive() || card._failed) {
-            textCard.draw(ctx, viewW, viewH);  // a scene's own two names (beginText), while it plays
+            textCard.draw!(ctx, viewW!, viewH!);  // a scene's own two names (beginText), while it plays
             return;
         }
-        const s = viewW / NATIVE_W;
+        const s = viewW! / NATIVE_W;
         const slit = session.slit();
         ctx.save();
         ctx.beginPath();
@@ -187,7 +187,7 @@ export function createPlaceCardTranslated() {
 
     /** Live state, for tests and the UI lab (the fields web/placecard.js's verifier reads). */
     card.state = () => {
-        if (textCard.isActive()) return textCard.state();     // a scene's own card (beginText) is what is on screen
+        if (textCard.isActive!()) return textCard.state!();     // a scene's own card (beginText) is what is on screen
         const st = card._session?.state();
         if (!st) return null;
         const name = (n) => ({ revealed: n?.revealed ?? 0, total: n?.total ?? 0, ended: !!n?.ended });
@@ -199,9 +199,9 @@ export function createPlaceCardTranslated() {
     };
 
     card.diagnostics = () => ({
-        execution: "translated", active: card.isActive(), failed: card._failed,
+        execution: "translated", active: card.isActive!(), failed: card._failed,
         error: card._error?.message ?? null, ticks: card._ticks, held: card._held,
-        language: card._language, painted: card._painted.slice(), state: card.state(),
+        language: card._language, painted: card._painted.slice(), state: card.state!(),
     });
 
     return card;

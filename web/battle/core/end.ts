@@ -169,7 +169,7 @@ async function mpKit() {
     const persist = () => {
       localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
       if (state.partyStats) localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
-      localStorage.setItem("bits", String(state.bits | 0));
+      localStorage.setItem("bits", String(state.bits! | 0));
     };
     const basic = (rec: { profile: { tech_basic: string | number; }; }) => {
       const s = B.skillDB[rec?.profile?.tech_basic];
@@ -190,12 +190,12 @@ async function mpKit() {
       /** My lead Digimon as a fighter (null when I have none). */
       myRecord: () => {
         const roster = B.buildPlayerRoster(state), prof = B.getPlayerProfile(state);
-        return roster.length && prof ? B.buildPlayerRecord(roster[0], prof.id) : null;
+        return roster.length && prof ? B.buildPlayerRecord(roster[0]!, prof.id) : null;
       },
       basic,
       /** The forms this Digimon could digivolve to right now (the one-on-one battle's Digivolve list): [{ id, name }]. */
       forms: (rec) => battleFormIds(Number(rec?.profile?.id), rec?.statsRecord ?? {})
-        .map((id) => B.digimonDB[id]).filter((p) => p && p.id !== rec?.profile?.id).map((p) => ({ id: p.id, name: p.name })),
+        .map((id) => B.digimonDB[id]).filter((p) => p && p.id !== rec?.profile?.id).map((p) => ({ id: p!.id, name: p!.name })),
       /** A manual digivolve: the record takes the form; the numbers it fights with are re-derived from it, as in the game. */
       digivolve: (rec, id: string | number) => { const p = B.digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
       /** A plain-data copy of a fighter record, to hand to the referee. */
@@ -234,7 +234,7 @@ async function mpKit() {
         const newLevel = lu ? levelForExp(oldLevel, newXp, growthProfile.growth_xp ?? 8, lu) : oldLevel;
         if (newLevel > oldLevel) applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile);
         ps.xp = newXp;
-        state.bits = Math.min((state.bits | 0) + reward.bits, 9999999);
+        state.bits = Math.min((state.bits! | 0) + reward.bits, 9999999);
         persist();
         return { xp: reward.xp, bits: reward.bits, from: oldLevel, to: Math.max(oldLevel, newLevel) };
       },
@@ -250,7 +250,7 @@ async function mpKit() {
           activePlayerIndex: took[0] ?? 0, formFlags: [], _loot: { drops: [] }, player: recs[0], enemy: null,
         } as BattleEndContext;
         for (const i of took) {
-          const flags = (b.formFlags[i] = new Array(10).fill(0));
+          const flags = (b.formFlags![i] = new Array(10).fill(0));
           const triple = equippedTriple(recs[i].statsRecord?.equippedForms);
           triple.forEach((id, k) => { if (id === Number(recs[i].profile?.id)) flags[7 + k] = 1; });
         }
@@ -305,7 +305,7 @@ async function mpKit() {
       // the seeds the game's own translated screens are opened with (the same shapes the one-on-one battle hands them)
       techSeed: (rec: { mp: number; maxMp: number; }, free = false) => {
         const list = mpKitTechs(rec, free);
-        return { activeIndex: 0, mp: rec.mp | 0, maxMp: rec.maxMp | 0, noCharge: free ? 1 : 0, techniques: list.map((t) => ({ word: t.tw & 0xffff, cost: t.cost })) };
+        return { activeIndex: 0, mp: rec.mp | 0, maxMp: rec.maxMp | 0, noCharge: free ? 1 : 0, techniques: list.map((t) => ({ word: t!.tw & 0xffff, cost: t!.cost })) };
       },
       itemSeed: () => B.itemListSeed(null),
       formSeed: (rec, member) => B.formListSeed({ playerRoster: [member], playerRecords: [rec], activePlayerIndex: 0, player: rec, blast: null }),
@@ -337,7 +337,7 @@ function coopSetEnemyHp(index: number, hp: number) {
     if (fusionBoss) {
       // The stream is the disc's RAND_U16 word, exactly as rollBattleDrop does.
       // One live draw per owed row; every item that lands joins the loot list the report banks.
-      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, B.enemiesDB, RAND_U16, true)) {
+      for (const item of rollFusionDrops(fusionBoss.halves, fusionBoss.body, B.enemiesDB, RAND_U16!!!!!!, true)) {
         b._loot.drops.push(item);
       }
     } else {
@@ -379,10 +379,10 @@ function coopSetEnemyHp(index: number, hp: number) {
     const step = team
       ? (slot < 0 ? { done: true } : { done: false, index: slot, entry: b.party[slot] })
       : gauntletNext(b.party, b.partyIndex);
-    const nextEnemy = step.done ? null : (team ? B.enemyTeamRecord(b, step.index) : B.buildEnemyRecord(step.entry));
+    const nextEnemy = step.done ? null : (team ? B.enemyTeamRecord(b, step.index!) : B.buildEnemyRecord(step.entry!));
     if (!nextEnemy) {
       // The battle's single disc drop roll: pick one candidate (RAND % count), then its rate.
-      const drop = rollBattleDrop(b._loot.candidates, RAND_U16);
+      const drop = rollBattleDrop(b._loot.candidates, RAND_U16!!!!!!);
       if (drop) b._loot.drops.push(drop);
       b._loot.candidates = [];
       b.state = ST.WIN;
@@ -430,7 +430,7 @@ function coopSetEnemyHp(index: number, hp: number) {
         // A fresh timeline is a fresh turn for the command phase's Frozen gate.
         b._turnSeq = (b._turnSeq ?? 0) + 1;
         // Giant mode part 1: the next boss-party member may be a different size than the last.
-        applyGiantScales(B.renderer3d, b.party?.[b.partyIndex], giantModeOn());
+        applyGiantScales(B.renderer3d!, b.party?.[b.partyIndex], giantModeOn());
       },
     });
   }

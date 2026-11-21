@@ -137,7 +137,7 @@ export const agreementText = (sum) => `direction agreement: ${sum?.agree ?? 0} o
 /** `m050coca` -> `050COCA` (the DW2 file code the K21d source names), null when it does not fit. */
 export function dw2CodeForFolder(folder) {
   const m = /^m(\d{3})([a-z0-9]+)$/.exec(String(folder || ""));
-  return m ? `${m[1]}${m[2].toUpperCase()}` : null;
+  return m ? `${m[1]}${m[2]!.toUpperCase()}` : null;
 }
 
 export function findDw2Entry(models, code) {
@@ -230,11 +230,11 @@ export function partVolumes(model, pose) {
         m[1] * x + m[5] * y + m[9] * z + m[13],
         m[2] * x + m[6] * y + m[10] * z + m[14],
       ];
-      for (let k = 0; k < 3; k++) { if (w[k] < mn[k]) mn[k] = w[k]; if (w[k] > mx[k]) mx[k] = w[k]; }
+      for (let k = 0; k < 3; k++) { if (w[k] < mn[k]!) mn[k] = w[k]; if (w[k] > mx[k]!) mx[k] = w[k]; }
     }
-    const size = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+    const size = [mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!];
     if (!size.every(Number.isFinite)) continue;
-    out.push({ bone: j, volume: size[0] * size[1] * size[2], size, center: mn.map((v, k) => (v + mx[k]) / 2) });
+    out.push({ bone: j, volume: size[0]! * size[1]! * size[2]!, size, center: mn.map((v, k) => (v + mx[k]!) / 2) });
   }
   return out;
 }

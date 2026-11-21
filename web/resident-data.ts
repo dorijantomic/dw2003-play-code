@@ -92,8 +92,8 @@ export const loadEsdmgEntry = async (file: string, entry: number | undefined, la
     const data = await loadDialogueFile(file, label);
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const entries = view.getUint32(0, true) / 4;
-    if (!(entry >= 0 && entry < entries)) throw new Error(`${label} ${file}: no entry ${entry}`);
-    const start = view.getUint32(entry * 4, true);
-    const end = entry + 1 < entries ? view.getUint32((entry + 1) * 4, true) : data.length;
+    if (!(entry! >= 0 && entry! < entries)) throw new Error(`${label} ${file}: no entry ${entry}`);
+    const start = view.getUint32(entry! * 4, true);
+    const end = entry! + 1 < entries ? view.getUint32((entry! + 1) * 4, true) : data.length;
     return data.subarray(start, end);
 };

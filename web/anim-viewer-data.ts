@@ -50,7 +50,7 @@ export function techGroup(skill) {
   return hit || { key: `${base}?`, type, clip, multi, label: `Other (${type}, clip ${clip})` };
 }
 
-export const groupOrder = (g: { key: string; type: string; clip: number; multi: boolean; label: string; } | null) => GROUP_ORDER.get(g?.key) ?? 99;
+export const groupOrder = (g: { key: string; type: string; clip: number; multi: boolean; label: string; } | null) => GROUP_ORDER.get(g?.key!) ?? 99;
 
 // Three display names differ from their model_map key; the same three that battle3d.js's
 // canonicalModelName() rewrites before resolveModelFolder (the pause/report screens print the
@@ -200,7 +200,7 @@ export function groupActions(actions) {
     if (b.key === "idle|0") return 92;
     return 95;
   };
-  return [...buckets.values()].sort((a, b) => order(a) - order(b));
+  return [...buckets.values()].sort((a, b) => order(a)! - order(b)!);
 }
 
 /** Elements a species can show (the elements of its own techniques). */

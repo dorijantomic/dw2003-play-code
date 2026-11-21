@@ -29,9 +29,9 @@ export function plan(pctx) {
       const v = k === 0 ? 0 : (r() * 2 - 1);
       const ox = dir[0] * u * MUSH.FOOT * c.w * 0.5 + across[0] * v * MUSH.FOOT_ACROSS * M;
       const oz = dir[1] * u * MUSH.FOOT * c.w * 0.5 + across[1] * v * MUSH.FOOT_ACROSS * M;
-      const h = Math.max(0.12 * M, H * hf[k]);
+      const h = Math.max(0.12 * M, H * hf[k]!);
       const leanAz = Math.atan2(ox, oz) + (r() - 0.5) * 0.6;   // lean away from the cluster centre
-      const lean = (MUSH.LEAN[0] + (MUSH.LEAN[1] - MUSH.LEAN[0]) * r()) * Math.PI / 180;
+      const lean = (MUSH.LEAN[0]! + (MUSH.LEAN[1]! - MUSH.LEAN[0]!) * r()) * Math.PI / 180;
       const st = { k, cluster: ci, c: [bx + ox, 0, bz + oz], h, yaw: r() * 6.2832, lean, leanAz, phase, fade: 1, capY: 0.837 * h };
       stems.push(st); cl.stems.push(st);
     }
@@ -47,9 +47,9 @@ export function plan(pctx) {
   let si = 0;
   for (const cl of clusters) {
     for (let k = 0; k < MUSH.SPORES; k++, si++) {
-      const a = r() * 6.2832, rr = (MUSH.SPORE_R[0] + (MUSH.SPORE_R[1] - MUSH.SPORE_R[0]) * r()) * M;
+      const a = r() * 6.2832, rr = (MUSH.SPORE_R[0]! + (MUSH.SPORE_R[1]! - MUSH.SPORE_R[0]!) * r()) * M;
       spPos[si * 3] = cl.c[0] + Math.sin(a) * rr;
-      spPos[si * 3 + 1] = (MUSH.SPORE_Y[0] + (MUSH.SPORE_Y[1] - MUSH.SPORE_Y[0]) * r()) * M;
+      spPos[si * 3 + 1] = (MUSH.SPORE_Y[0]! + (MUSH.SPORE_Y[1]! - MUSH.SPORE_Y[0]!) * r()) * M;
       spPos[si * 3 + 2] = cl.c[2] + Math.cos(a) * rr;
       spPhase[si] = r() * 6.2832;
       spSize[si] = MUSH.SPORE_SIZE * M * (0.6 + 0.8 * r());

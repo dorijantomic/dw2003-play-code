@@ -31,9 +31,9 @@ export function plan(pctx) {
     for (let i = 0; i < P.length; i += 9) {
       const a = [P[i], P[i + 1], P[i + 2]], b = [P[i + 3], P[i + 4], P[i + 5]], cc = [P[i + 6], P[i + 7], P[i + 8]];
       const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [cc[0] - a[0], cc[1] - a[1], cc[2] - a[2]];
-      let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      let n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
       const L = Math.hypot(...n); if (L < 1e-9) continue;
-      n = n.map((x) => x / L); if (n[1] < 0) n = n.map((x) => -x);   // the face normal, turned to point up
+      n = n.map((x) => x / L); if (n[1]! < 0) n = n.map((x) => -x);   // the face normal, turned to point up
       const vi = i / 3;
       const g3 = green ? [green[vi], green[vi + 1], green[vi + 2]] : null;
       effArea += (L / 2) * (g3 ? (g3[0] + g3[1] + g3[2]) / 3 : 1);
@@ -43,7 +43,7 @@ export function plan(pctx) {
   if (!tris.length) { info.grass = { blades: 0, note: "no grass surface in this arena" }; return null; }
   const cum = new Float64Array(tris.length); let tot = 0;
   tris.forEach((t, i) => { tot += t.area; cum[i] = tot; });
-  const pickTri = (x: number) => { let lo = 0, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < x) lo = m + 1; else hi = m; } return lo; };
+  const pickTri = (x: number) => { let lo = 0, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m]! < x) lo = m + 1; else hi = m; } return lo; };
 
   // blades per unit of surface, so a small surface (a beach's green fringe) gets a proportional count, not 450k
   const N = Math.min(GRASS.COUNT, Math.max(GRASS.MIN_COUNT, Math.round(GRASS.DENSITY * effArea)));
@@ -57,36 +57,36 @@ export function plan(pctx) {
     const ti = pickTri(r() * tot), t = tris[ti];
     const s1 = Math.sqrt(r()), s2 = r();
     const w = [1 - s1, s1 * (1 - s2), s1 * s2];   // uniform barycentric point
-    const p = [0, 1, 2].map((k) => w[0] * t.a[k] + w[1] * t.b[k] + w[2] * t.c[k]);
-    const rad = Math.hypot(p[0], p[2]), yaw = r() * Math.PI * 2, hr = r(), wr = r(), keep = r();
+    const p = [0, 1, 2].map((k) => w[0]! * t!.a[k] + w[1]! * t!.b[k] + w[2]! * t!.c[k]);
+    const rad = Math.hypot(p[0]!, p[2]!), yaw = r() * Math.PI * 2, hr = r(), wr = r(), keep = r();
     const cr = r(), tw = r(), ph = r(), vr = r();
     if (rad > R) continue;   // rejection keeps the density area-weighted inside the radius
     // only where the ground paints GRASS (not dirt, path, rock, cliff); thinner and shorter toward a paint edge
-    const mk = masks.get(t.mesh), m = mk ? mk.sample(p[0], p[2]) : { dirt: 0, rock: 0, path: 0, ao: 1 };
-    if (mk && 1 - t.n[1] >= mk.cliffLo) { offPaint++; continue; }
+    const mk = masks.get(t!.mesh), m = mk ? mk.sample(p[0], p[2]) : { dirt: 0, rock: 0, path: 0, ao: 1 };
+    if (mk && 1 - t!.n[1]! >= mk.cliffLo) { offPaint++; continue; }
     // green share: the ground's own paint on a grass arena, the shore's measured picture row on a beach
-    const g = t.green ? w[0] * t.green[0] + w[1] * t.green[1] + w[2] * t.green[2]
-                      : 1 - smooth(GRASS.MASK_EDGE[0], GRASS.MASK_EDGE[1], Math.max(m.dirt, m.rock, m.path));
-    if (t.green ? g <= GRASS.GREEN_MIN : keep >= g) { offPaint++; continue; }
-    const gk = t.green ? smooth(GRASS.GREEN_MIN, GRASS.GREEN_FULL, g) : g;
-    const h = (GRASS.H[0] + (GRASS.H[1] - GRASS.H[0]) * hr) * smooth(R, R * GRASS.EDGE, rad) * (0.55 + 0.45 * gk);
-    const wd = GRASS.W[0] + (GRASS.W[1] - GRASS.W[0]) * wr;
+    const g = t!.green ? w[0]! * t!.green[0] + w[1]! * t!.green[1] + w[2]! * t!.green[2]
+                      : 1 - smooth(GRASS.MASK_EDGE[0]!, GRASS.MASK_EDGE[1]!, Math.max(m.dirt, m.rock, m.path));
+    if (t!.green ? g <= GRASS.GREEN_MIN : keep >= g) { offPaint++; continue; }
+    const gk = t!.green ? smooth(GRASS.GREEN_MIN, GRASS.GREEN_FULL, g) : g;
+    const h = (GRASS.H[0]! + (GRASS.H[1]! - GRASS.H[0]!) * hr) * smooth(R, R * GRASS.EDGE, rad) * (0.55 + 0.45 * gk);
+    const wd = GRASS.W[0]! + (GRASS.W[1]! - GRASS.W[0]!) * wr;
     mats.set(composeYaw(p, yaw, wd, Math.max(h, 1e-3), wd), made * 16);
     pp.set(p, made * 3); yawA[made] = yaw; hA[made] = Math.max(h, 1e-3); radA[made] = wd / 2;
     // colours: root = the ground's own albedo there (grass pattern x the ground's AO), so the root vanishes into it
     const ao = mk ? 1 + (m.ao - 1) * mk.aoAmt : 1;
-    const pc = t.green ? [t.lo.r + (t.hi.r - t.lo.r) * vr, t.lo.g + (t.hi.g - t.lo.g) * vr, t.lo.b + (t.hi.b - t.lo.b) * vr]
-                       : groundAlbedo(t.lo, t.hi, p);
+    const pc = t!.green ? [t!.lo.r + (t!.hi.r - t!.lo.r) * vr, t!.lo.g + (t!.hi.g - t!.lo.g) * vr, t!.lo.b + (t!.hi.b - t!.lo.b) * vr]
+                       : groundAlbedo(t!.lo, t!.hi, p);
     const rc = pc.map((x) => x * ao);
-    const lo = [t.lo.r, t.lo.g, t.lo.b], hi = [t.hi.r, t.hi.g, t.hi.b];
+    const lo = [t!.lo.r, t!.lo.g, t!.lo.b], hi = [t!.hi.r, t!.hi.g, t!.hi.b];
     root.set(rc, made * 3);
     for (let k = 0; k < 3; k++) {
-      const own = lo[k] + (hi[k] - lo[k]) * vr;                  // this blade's own palette colour
-      mid[made * 3 + k] = pc[k] + (own - pc[k]) * GRASS.VAR;
-      tip[made * 3 + k] = mid[made * 3 + k] + (hi[k] * GRASS.TIP_LIFT - mid[made * 3 + k]) * GRASS.TIP_MIX;
+      const own = lo[k]! + (hi[k]! - lo[k]!) * vr;                  // this blade's own palette colour
+      mid[made * 3 + k] = pc[k]! + (own - pc[k]!) * GRASS.VAR;
+      tip[made * 3 + k] = mid[made * 3 + k]! + (hi[k]! * GRASS.TIP_LIFT - mid[made * 3 + k]!) * GRASS.TIP_MIX;
     }
-    blade.set([GRASS.CURL[0] + (GRASS.CURL[1] - GRASS.CURL[0]) * cr, GRASS.TWIST[0] + (GRASS.TWIST[1] - GRASS.TWIST[0]) * tw, ph * Math.PI * 2], made * 3);
-    gn.set(t.n, made * 3); triOf[made] = ti; bary.set(w, made * 3);
+    blade.set([GRASS.CURL[0]! + (GRASS.CURL[1]! - GRASS.CURL[0]!) * cr, GRASS.TWIST[0]! + (GRASS.TWIST[1]! - GRASS.TWIST[0]!) * tw, ph * Math.PI * 2], made * 3);
+    gn.set(t!.n, made * 3); triOf[made] = ti; bary.set(w, made * 3);
     maskAt.set([m.dirt, m.rock, m.path, m.ao], made * 4);
     made++;
   }

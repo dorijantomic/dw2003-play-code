@@ -4,6 +4,6 @@
 export function frameSphere(center, radius: number, fovDeg: number, aspect: number, dir = [0.25, 0.3, 1]) {
   const r = Math.max(radius, 1e-3), vHalf = (fovDeg * Math.PI) / 360, hHalf = Math.atan(Math.tan(vHalf) * aspect);
   const dist = (r / Math.sin(Math.min(vHalf, hHalf))) * 1.08;   // the narrower field decides; 8% margin
-  const l = Math.hypot(dir[0], dir[1], dir[2]) || 1;
-  return { position: [center[0] + (dir[0] / l) * dist, center[1] + (dir[1] / l) * dist, center[2] + (dir[2] / l) * dist], dist, near: Math.max(0.002, r * 0.01), minDistance: r * 0.05, maxDistance: r * 30 };
+  const l = Math.hypot(dir[0]!, dir[1]!, dir[2]!) || 1;
+  return { position: [center[0] + (dir[0]! / l) * dist, center[1] + (dir[1]! / l) * dist, center[2] + (dir[2]! / l) * dist], dist, near: Math.max(0.002, r * 0.01), minDistance: r * 0.05, maxDistance: r * 30 };
 }

@@ -232,7 +232,7 @@ function viewRect(camX: number, camY: number, viewW: number, viewH: number, pad 
 // map art then covers them, which is what the console does. It also ticks the
 // frame, so drawEffects must follow it on the same frame.
 export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, viewW: number, viewH: number, pad = 0) {
-    const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
+    const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad)!);
     preparedFrame = f;
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw: () => void) => {
@@ -249,7 +249,7 @@ export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageI
 export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], viewW: number, viewH: number, pad = 0) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
-        : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
+        : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad)!);
     preparedFrame = null; // one frame's preparation is good for one frame
     if (!f) return;
     eachRecord(f, ctx, camX, camY, (r, draw: () => void, py, pysort) => {
@@ -426,12 +426,12 @@ export function drawNativeIntents(ctx: CanvasRenderingContext2D | null, stageId:
                 y,
                 draw: () => {
                     if (flipNow) {
-                        ctx.save();
-                        ctx.translate(x - camX, 0);
-                        ctx.scale(-1, 1);
-                        ctx.translate(-(x - camX), 0);
+                        ctx!.save();
+                        ctx!.translate(x - camX, 0);
+                        ctx!.scale(-1, 1);
+                        ctx!.translate(-(x - camX), 0);
                         drawSprite(ctx, sheet, layers, x - camX, y - camY, semiSheet);
-                        ctx.restore();
+                        ctx!.restore();
                     } else {
                         drawSprite(ctx, sheet, layers, x - camX, y - camY, semiSheet);
                     }

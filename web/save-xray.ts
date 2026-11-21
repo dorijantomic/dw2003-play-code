@@ -46,7 +46,7 @@ const OFF_ALBUM = 0x04df;      // id zero + 315 album bytes
 const OFF_FOLDERS = 0x0628;    // three 0x66 records
 const OFF_ROSTER = 0x0760;     // eight 0x3dc records
 const OFF_PACK = 0x2640;       // u32 starter pack id
-const OFF_FLAGS = SAVE_STORED_BANKS[0][1]; // 0x2644, the first stored-bank base
+const OFF_FLAGS = SAVE_STORED_BANKS[0]![1]; // 0x2644, the first stored-bank base
 
 const HELD_BYTES = wornArrayAddress(0, 0) - heldArrayAddress(0, 0); // 403: id zero through id 402
 const WORN_BYTES = OFF_CARD_COUNTS - OFF_WORN;                      // 403, the same span
@@ -54,7 +54,7 @@ const CARD_BYTES = SAVE_CARD_MAX + 1;
 const ROSTER_BYTES = RESIDENT_ROSTER_COUNT * ROSTER_STRIDE;
 const FOLDER_BYTES = SAVE_FOLDER_COUNT * SAVE_FOLDER_SIZE;
 const FOLDER_NAME_BYTES = SAVE_FOLDER_SIZE - SAVE_FOLDER_CARDS * 2; // 22 name bytes before the forty cards
-const FLAG_BYTES = RESIDENT_SAVE_SIZE - OFF_FLAGS;
+const FLAG_BYTES = RESIDENT_SAVE_SIZE - OFF_FLAGS!;
 
 // Record-relative field offsets (ddw3-walker save-block-layout.md, "Roster record
 // partition"; the engine's RECORD_FIELDS / ROSTER_EQUIP_OFFSETS agree).
@@ -166,7 +166,7 @@ function textOf(bytes: Uint8Array<ArrayBufferLike>, at: number, length: number) 
   for (let i = 0; i < length; i++) {
     const b = bytes[at + i];
     if (b === 0) break;
-    out += b >= 0x20 && b <= 0x7e ? String.fromCharCode(b) : "\u00b7";
+    out += b! >= 0x20 && b! <= 0x7e ? String.fromCharCode(b!) : "\u00b7";
   }
   return out;
 }
@@ -276,7 +276,7 @@ export function xray(image: Uint8Array<ArrayBuffer>) {
     flags[bank] = {
       bank,
       offset: start,
-      length: end - start,
+      length: end - start!,
       bytes: Array.from(bytes.subarray(start, end)),
     };
   });
@@ -299,8 +299,8 @@ export function xray(image: Uint8Array<ArrayBuffer>) {
     cards: {
       counts,
       album,
-      owned: counts.map((n, id) => [id, n]).filter(([id, n]) => id >= 1 && n > 0),
-      seen: album.map((n, id) => [id, n]).filter(([id, n]) => id >= 1 && n > 0).map(([id]) => id),
+      owned: counts.map((n, id) => [id, n]).filter(([id, n]) => id! >= 1 && n! > 0),
+      seen: album.map((n, id) => [id, n]).filter(([id, n]) => id! >= 1 && n! > 0).map(([id]) => id),
     },
     folders,
     flags,
@@ -347,8 +347,8 @@ export function diffSlots(a: Uint8Array<ArrayBuffer> | null, b: Uint8Array<Array
   }
   const rows: { field: string; a: number | undefined; b: number | undefined; }[] = [];
   const at = (atA: number | undefined, name: string, length: number) => {
-    const va = fieldValue(A, name, atA, length);
-    const vb = fieldValue(B, name, atA, length);
+    const va = fieldValue(A, name, atA!, length);
+    const vb = fieldValue(B, name, atA!, length);
     pushRow(rows, name, va, vb);
   };
 
@@ -398,7 +398,7 @@ export function diffSlots(a: Uint8Array<ArrayBuffer> | null, b: Uint8Array<Array
   at(OFF_PACK, "pack", 4);
   SAVE_STORED_BANKS.forEach(([bank, start], row) => {
     const end = SAVE_STORED_BANKS[row + 1]?.[1] ?? RESIDENT_SAVE_SIZE;
-    for (let off = start; off < end; off++) at(off, `flags[${bank}].byte[${off - start}]`, 1);
+    for (let off = start; off! < end; off++) at(off, `flags[${bank}].byte[${off! - start!}]`, 1);
   });
 
   // Retained gaps: one row per changed byte, never a collapsed block, so the
@@ -427,7 +427,7 @@ export const slotKey = (i: number) => `mcardSlot${i}`;
 export function decodeSlots(raw: (string | null)[]) {
   const list = Array.isArray(raw) ? raw : [];
   return Array.from({ length: SLOT_COUNT }, (_, slot) => {
-    const entry = parseEntry(list[slot]);
+    const entry = parseEntry(list[slot]!);
     const image = entry?.image;
     const hasImage = Array.isArray(image) && image.length === RESIDENT_SAVE_SIZE;
     return {

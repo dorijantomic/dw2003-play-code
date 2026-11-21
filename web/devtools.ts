@@ -175,7 +175,7 @@ function loadBossRows() {
     const esdmgByStage = {};
     await Promise.all(esdmgStagesNeeded(scripted).map(async (n: number) => { esdmgByStage[n] = await j(`assets/events/esdmg${n}.json`); }));
     return buildBossList({ stageEnc, fieldEnc, scripted: scripted ?? {}, esdmgByStage,
-      manifestMaps: DATA.manifest.maps ?? [], stageNames: DATA.stageNames });
+      manifestMaps: DATA.manifest!.maps ?? [], stageNames: DATA.stageNames });
   })();
   return bossRowsPromise;
 }
@@ -248,7 +248,7 @@ function startLabBoss(rec) {
 // chosen arena can be forced through the renderer's own setArenaStage.
 function arenaReverseMap() {
   const rev = new Map();
-  for (const [stage, e] of Object.entries(DATA.arenas.byStage ?? {})) {
+  for (const [stage, e] of Object.entries(DATA.arenas!.byStage ?? {})) {
     for (const [k, v] of Object.entries(e)) {
       if (typeof v === "number" && !rev.has(v)) rev.set(v, { stage, screen: k === "_default" ? null : Number(k) });
     }
@@ -279,8 +279,8 @@ function renderStages() {
   pane.append(el("div", { className: "row" }, search));
 
   const list = el("ul", { className: "list" });
-  const maps = DATA.manifest.maps ?? [];
-  const nameOf = (id) => DATA.stageNames[id] ?? (maps.find((m) => m.id === id)?.name) ?? "";
+  const maps = DATA.manifest!.maps ?? [];
+  const nameOf = (id) => DATA.stageNames![id] ?? (maps.find((m) => m.id === id)?.name) ?? "";
   function fill() {
     const q = search.value.trim().toLowerCase();
     list.textContent = "";
@@ -309,7 +309,7 @@ function selectStage(mapId) {
   selectedMap = mapId;
   const hint = $("evHint"), host = $("evList");
   if (!hint || !host) return;
-  const events = DATA.wstag[mapId] ?? [];
+  const events = DATA.wstag![mapId] ?? [];
   hint.textContent = `${mapId}: ${events.length} stage event(s). Each event normally fires from a `
     + `stage controller (a step-VM zone, a talk launcher or a story flag). "Play" bypasses that `
     + `gate and runs the script directly through the walker's own cutscene path.`;
@@ -343,7 +343,7 @@ function renderBattles() {
     "Enemy ids are the disc's own (web/assets/data/enemies.json)."));
 
   const enemy = el("select", { id: "btEnemy" });
-  for (const e of DATA.enemies) enemy.append(el("option", { value: e.enemy_id, textContent: e.enemy_id }));
+  for (const e of DATA.enemies!) enemy.append(el("option", { value: e.enemy_id, textContent: e.enemy_id }));
   pane.append(el("div", { className: "row" }, el("label", {}, "enemy"), enemy));
 
   const level = el("input", { type: "number", id: "btLevel", value: 5, min: 1, max: 99, style: "width:70px" });
@@ -351,14 +351,14 @@ function renderBattles() {
 
   const arena = el("select", { id: "btArena" });
   arena.append(el("option", { value: "", textContent: "(stage default)" }));
-  const ids = Object.keys(DATA.arenas.byArena ?? {}).map(Number).sort((a, b) => a - b);
-  for (const id of ids) arena.append(el("option", { value: String(id), textContent: `arena ${id} — ${DATA.arenas.byArena[id].pack}` }));
+  const ids = Object.keys(DATA.arenas!.byArena ?? {}).map(Number).sort((a, b) => a - b);
+  for (const id of ids) arena.append(el("option", { value: String(id), textContent: `arena ${id} — ${DATA.arenas!.byArena[id]!.pack}` }));
   pane.append(el("div", { className: "row" }, el("label", {}, "arena"),
     arena, el("span", { className: "meta", id: "arenaNote" })));
 
   const tech = el("select", { id: "btTech" });
   tech.append(el("option", { value: "", textContent: "(none)" }));
-  for (const s of DATA.skills) tech.append(el("option", { value: String(s.id), textContent: `${s.id} ${s.name}` }));
+  for (const s of DATA.skills!) tech.append(el("option", { value: String(s.id), textContent: `${s.id} ${s.name}` }));
   pane.append(el("div", { className: "row" }, el("label", {}, "tech / signature"), tech));
   pane.append(el("div", { className: "hint" },
     "The tech picks the special-attack backdrop (its sigEffect -> MEFT10 pack) and is applied live ",
@@ -488,21 +488,21 @@ function renderAssets() {
 
   function urlsFor(key) {
     if (key === "maps") {
-      return (DATA.manifest.maps ?? []).map((m) => ({
-        id: m.id, name: DATA.stageNames[m.id] ?? m.name, url: m.image,
+      return (DATA.manifest!.maps ?? []).map((m) => ({
+        id: m.id, name: DATA.stageNames![m.id] ?? m.name, url: m.image,
       }));
     }
     if (key === "arenas") {
-      return Object.keys(DATA.arenas.byArena ?? {}).map(Number).sort((a, b) => a - b).map((id) => ({
+      return Object.keys(DATA.arenas!.byArena ?? {}).map(Number).sort((a, b) => a - b).map((id) => ({
         id: `meft10${String(id).padStart(2, "0")}`, name: `arena ${id}`, url: `assets/battle/arenas/meft10${String(id).padStart(2, "0")}/floor.png`,
       }));
     }
     if (key === "backdrops") {
-      return Object.keys(DATA.backdrops.bySig ?? {}).map((sig) => DATA.backdrops.bySig[sig]).map((e) => ({
-        id: e.pack, name: `${e.element} (${e.pack})`, url: `assets/battle/backdrops/${e.pack}/floor.png`,
+      return Object.keys(DATA.backdrops!.bySig ?? {}).map((sig) => DATA.backdrops!.bySig[sig]).map((e) => ({
+        id: e!.pack, name: `${e!.element} (${e!.pack})`, url: `assets/battle/backdrops/${e!.pack}/floor.png`,
       }));
     }
-    return (DATA.manifest.characters ?? []).map((c) => ({ id: c.id, name: c.name, url: c.sheet }));
+    return (DATA.manifest!.characters ?? []).map((c) => ({ id: c.id, name: c.name, url: c.sheet }));
   }
 
   function showPreview(rec) {
@@ -629,7 +629,7 @@ function installDev() {
 
   reloadGame(null);
   onReady(() => {
-    log(`game ready on ${win().__mapInfo?.().id ?? "?"} — data: ${DATA.manifest.maps.length} maps, ${DATA.enemies.length} enemies, ${Object.keys(DATA.arenas.byArena).length} arenas`);
+    log(`game ready on ${win().__mapInfo?.().id ?? "?"} — data: ${DATA.manifest!.maps.length} maps, ${DATA.enemies!.length} enemies, ${Object.keys(DATA.arenas!.byArena).length} arenas`);
     // The events panel is (re)selected for the loaded stage by selectLoadedStage()
     // on every ready transition, so it also survives a Jump reload.
     refreshSnapshot();

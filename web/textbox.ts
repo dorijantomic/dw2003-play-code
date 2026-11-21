@@ -126,7 +126,7 @@ export function createTextbox(sfx = null) {
   const pageRuns = (x: number, baseline: number, lineH: number, s: number) => {
     let remaining = Math.floor(tb.shown);
     const out = [];
-    tb.currentPage().forEach((line, i) => {
+    tb.currentPage!().forEach((line, i) => {
       if (remaining <= 0) return;
       const text = line.slice(0, remaining);
       remaining -= line.length;
@@ -137,9 +137,9 @@ export function createTextbox(sfx = null) {
   const moreBox = (x: number, y: number, s: number) => ({ part: "more", x: x / s - 6, y: y / s - 3, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } });
 
   tb.isOpen = () => tb.dialogue !== null;
-  tb.currentPage = () => tb.dialogue.pages[tb.pageIdx];
-  tb.pageLength = () => tb.currentPage().join("").length;
-  tb.isPageFullyShown = () => tb.shown >= tb.pageLength();
+  tb.currentPage = () => tb.dialogue!.pages[tb.pageIdx];
+  tb.pageLength = () => tb.currentPage!().join("").length;
+  tb.isPageFullyShown = () => tb.shown >= tb.pageLength!();
 
   // `anchor` (optional): per-frame () => {x, y, mode} — SCREEN position of the
   // speaker (entity origin) and the balloon quadrant mode 0-3 — or null for
@@ -161,9 +161,9 @@ export function createTextbox(sfx = null) {
   };
 
   tb.advance = () => {
-    if (!tb.isOpen()) return;
-    if (!tb.isPageFullyShown()) { tb.shown = tb.pageLength(); return; }
-    if (tb.pageIdx + 1 < tb.dialogue.pages.length) {
+    if (!tb.isOpen!()) return;
+    if (!tb.isPageFullyShown!()) { tb.shown = tb.pageLength!(); return; }
+    if (tb.pageIdx + 1 < tb.dialogue!.pages.length) {
       tb.pageIdx++;
       tb.shown = 0;
     } else {
@@ -180,13 +180,13 @@ export function createTextbox(sfx = null) {
   tb.update = (dt) => {
     tb.t += dt;
     tb.openT += dt;
-    if (tb.isOpen() && !tb.isPageFullyShown()) tb.shown += dt * CHARS_PER_SEC;
+    if (tb.isOpen!() && !tb.isPageFullyShown!()) tb.shown += dt * CHARS_PER_SEC;
   };
 
   const drawPageText = (ctx: CanvasRenderingContext2D, x: number, y: number, lineH: number) => {
     ctx.font = "bold 16px monospace";
     let remaining = Math.floor(tb.shown);
-    tb.currentPage().forEach((line, i) => {
+    tb.currentPage!().forEach((line, i) => {
       if (remaining <= 0) return;
       const text = line.slice(0, remaining);
       const ty = y + i * lineH;
@@ -204,7 +204,7 @@ export function createTextbox(sfx = null) {
     grad.addColorStop(1, "#3050b0");
     ctx.fillStyle = grad;
     ctx.font = "italic bold 15px monospace";
-    ctx.fillText(tb.dialogue.name, x + 10, y - 6);
+    ctx.fillText(tb.dialogue!.name!, x + 10, y - 6);
   };
 
   const drawBalloon = (ctx: CanvasRenderingContext2D, viewW: number, viewH: number, pos: TextboxAnchor) => {
@@ -217,14 +217,14 @@ export function createTextbox(sfx = null) {
     const { ax, ay } = balloonAnchor(mode, pos.x, pos.y, sc);
 
     const pad = BALLOON_TEXT_INSET.x, lineH = 24;
-    const lines = tb.currentPage();
+    const lines = tb.currentPage!();
     ctx.font = "bold 16px monospace";
     const textW = Math.max(...lines.map((l) => ctx.measureText(l).width), 80);
     const w = Math.min(Math.ceil(textW) + pad * 2 + 12, viewW - 24);
     const h = pad * 2 + lines.length * lineH - 6;
 
-    const hasName = !!tb.dialogue.name;
-    const nameW = hasName ? 12 + tb.dialogue.name.length * 10 : 0;
+    const hasName = !!tb.dialogue!.name;
+    const nameW = hasName ? 12 + tb.dialogue!.name!.length * 10 : 0;
     const nameH = hasName ? 22 : 0;
 
     // Body box from the disc's layout table D0x8004dcf4 (record +0x18 edge, then
@@ -246,24 +246,24 @@ export function createTextbox(sfx = null) {
     if (uiC.capturing()) {
       const s = viewW / PS1_W, tail = BALLOON_TAIL[mode];
       scene = {
-        body: { x: x / s, y: y / s, w: w / s, h: h / s }, name: hasName ? tb.dialogue.name : null,
+        body: { x: x / s, y: y / s, w: w / s, h: h / s }, name: hasName ? tb.dialogue!.name : null,
         runs: pageRuns(x + BALLOON_TEXT_INSET.x, y + BALLOON_TEXT_INSET.y, lineH, s),
-        more: tb.isPageFullyShown() ? moreBox(x + w - 16, y + h - 20, s) : null,
+        more: tb.isPageFullyShown!() ? moreBox(x + w - 16, y + h - 20, s) : null,
       };
       ctx.save();
       ctx.scale(s, s);
-      if (packReady(cmfont)) drawClipOpaque(ctx, cmfont, tail.clip, ax / s + tail.dx * sc / s, ay / s + tail.dy * sc / s, sc / s);
+      if (packReady(cmfont)) drawClipOpaque(ctx, cmfont, tail!.clip, ax / s + tail!.dx * sc / s, ay / s + tail!.dy * sc / s, sc / s);
       ctx.restore();
       return;
     }
     const tail = BALLOON_TAIL[mode];
-    drawClipOpaque(ctx, cmfont, tail.clip, ax + tail.dx * sc, ay + tail.dy * sc, sc);
+    drawClipOpaque(ctx, cmfont, tail!.clip, ax + tail!.dx * sc, ay + tail!.dy * sc, sc);
 
     drawTalkWindow(ctx, x, y, w, h, nameW, nameH);
 
     if (hasName) drawName(ctx, x, y, nameH);
     drawPageText(ctx, x + BALLOON_TEXT_INSET.x, y + BALLOON_TEXT_INSET.y, lineH);
-    if (tb.isPageFullyShown()) {
+    if (tb.isPageFullyShown!()) {
       drawAdvanceCursor(ctx, x + w - 16, y + h - 20, tb.t);
     }
   };
@@ -272,7 +272,7 @@ export function createTextbox(sfx = null) {
   // Chrome geometry/colors pixel-sampled from verified PS1 savestates — see
   // docs/research/ui/dialogue-chrome-decoded-2026-07-01.md.
   tb.draw = (ctx, viewW, viewH) => {
-    if (!tb.isOpen()) return;
+    if (!tb.isOpen!()) return;
     const s = viewW / PS1_W;
     scene = null;
     ctx.save();
@@ -322,21 +322,21 @@ export function createTextbox(sfx = null) {
     const w = viewW - x * 2;
     const y = viewH - boxH - 12;
 
-    const hasName = !!tb.dialogue.name;
-    const nameW = hasName ? 12 + tb.dialogue.name.length * 10 : 0;
+    const hasName = !!tb.dialogue!.name;
+    const nameW = hasName ? 12 + tb.dialogue!.name!.length * 10 : 0;
     const nameH = hasName ? 22 : 0;
 
     if (uiC.capturing()) {
-      scene = { body: undefined, name: hasName ? tb.dialogue.name : null, runs: pageRuns(x + pad, y + pad + 14, 24, s),
+      scene = { body: undefined, name: hasName ? tb.dialogue!.name : null, runs: pageRuns(x + pad, y + pad + 14, 24, s),
         // the more arrow where the game's own band draws its marker (cmfont 10, centre 298 / 211 native): the band is shorter than this old box
-        more: tb.isPageFullyShown() ? { part: "more", x: 292, y: 205, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } } : null };
+        more: tb.isPageFullyShown!() ? { part: "more", x: 292, y: 205, w: 12, h: 12, rel: { a: 1, d: 1, e: 0, f: 0 } } : null };
       return;
     }
     drawTalkWindow(ctx, x, y, w, boxH, nameW, nameH);
     if (hasName) drawName(ctx, x, y, nameH);
     drawPageText(ctx, x + pad, y + pad + 14, 24);
 
-    if (tb.isPageFullyShown()) {
+    if (tb.isPageFullyShown!()) {
       drawAdvanceCursor(ctx, x + w - 14, y + boxH - 24, tb.t);
     }
   };

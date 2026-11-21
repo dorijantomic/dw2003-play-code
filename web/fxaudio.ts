@@ -102,8 +102,8 @@ export function footstep(on: boolean, type: string, vol = 1) {
     } else if (type === "metal") {
         burst("highpass", 3400, 0.8, 0.1, 0.04);
         for (const [fq, pk] of [[820, 0.12], [1330, 0.08]]) {
-            const o = ac.createOscillator(); o.type = "sine"; o.frequency.value = fq * (0.98 + Math.random() * 0.04);
-            const g = ac.createGain(); g.gain.setValueAtTime(pk * vol, t0); g.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.22);
+            const o = ac.createOscillator(); o.type = "sine"; o.frequency.value = fq! * (0.98 + Math.random() * 0.04);
+            const g = ac.createGain(); g.gain.setValueAtTime(pk! * vol, t0); g.gain.exponentialRampToValueAtTime(0.0005, t0 + 0.22);
             o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + 0.24);
         }
     } else if (type === "grass") burst("bandpass", 2400 + Math.random() * 500, 0.7, 0.14, 0.09);

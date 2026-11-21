@@ -45,7 +45,7 @@ function drawVramSprite(ctx: CanvasRenderingContext2D, vram, prim: { tpage: numb
         vramScratch.height = CARD_SPRITE;
     }
     const sctx = vramScratch.getContext("2d");
-    const img = sctx.createImageData(CARD_SPRITE, CARD_SPRITE);
+    const img = sctx!.createImageData(CARD_SPRITE, CARD_SPRITE);
     let pixels = 0;
     for (let dy = 0; dy < CARD_SPRITE; dy++) {
         for (let dx = 0; dx < CARD_SPRITE; dx++) {
@@ -73,7 +73,7 @@ function drawVramSprite(ctx: CanvasRenderingContext2D, vram, prim: { tpage: numb
         }
     }
     if (pixels === 0) return false;
-    sctx.putImageData(img, 0, 0);
+    sctx!.putImageData(img, 0, 0);
     ctx.drawImage(vramScratch, prim.x, prim.y);
     return true;
 }
@@ -165,9 +165,9 @@ function paintDimQuad(ctx: CanvasRenderingContext2D, intent) {
             const xc = left + i + 0.5;
             if (xc < crossings[0] || xc >= crossings[crossings.length - 1]) continue;
             const o = rowOff + i * 4;
-            data[o] = Math.max(0, data[o] - k);
-            data[o + 1] = Math.max(0, data[o + 1] - k);
-            data[o + 2] = Math.max(0, data[o + 2] - k);
+            data[o] = Math.max(0, data[o]! - k);
+            data[o + 1] = Math.max(0, data[o + 1]! - k);
+            data[o + 2] = Math.max(0, data[o + 2]! - k);
         }
     }
     ctx.putImageData(img, left, top);
@@ -342,42 +342,42 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
             for (const b of buckets) {
             for (let i = draws.length - 1; i >= 0; i--) {
                 const d = draws[i];
-                if (d.bucket !== b) continue;
-                if (d.kind === "vram") {
+                if (d!.bucket !== b) continue;
+                if (d!.kind === "vram") {
                     // look C scope: a VRAM picture (card face, drill picture) is art, drawn on the art canvas like a partner picture
-                    if (typeof options.paintPrim === "function") { if (!artHook(ctx, (c) => options.paintPrim(c, d.call))) options.paintPrim(ctx, d.call); }
+                    if (typeof options.paintPrim === "function") { if (!artHook(ctx, (c) => options.paintPrim!(c, d!.call))) options.paintPrim(ctx, d!.call); }
                     else stats.skipped += 1;
                     continue;
                 }
-                if (d.kind === "raw") {
+                if (d!.kind === "raw") {
                     let painted = false;
-                    if (typeof options.paintRaw === "function" && options.paintRaw(ctx, d.raw, getPack)) painted = true;
-                    if (!painted) painted = paintRawPrimitive(ctx, d.raw);
+                    if (typeof options.paintRaw === "function" && options.paintRaw(ctx, d!.raw, getPack)) painted = true;
+                    if (!painted) painted = paintRawPrimitive(ctx, d!.raw);
                     if (painted) {
                         stats.raw += 1;
-                        stats.rawKinds[d.raw.kind] = (stats.rawKinds[d.raw.kind] ?? 0) + 1;
+                        stats.rawKinds[d!.raw.kind] = (stats.rawKinds[d!.raw.kind] ?? 0) + 1;
                     } else stats.skipped += 1;
                     continue;
                 }
-                if (d.kind === "quad") {
-                    paintGouraudQuad(ctx, d.args);
+                if (d!.kind === "quad") {
+                    paintGouraudQuad(ctx, d!.args);
                     stats.quads = (stats.quads ?? 0) + 1;
                     continue;
                 }
-                stats.paintOrder.push({ id: d.id, bucket: d.bucket });
-                if (isPartnerPicture(d.id)) {
+                stats.paintOrder.push({ id: d!.id, bucket: d!.bucket });
+                if (isPartnerPicture(d!.id)) {
                     // A new partner's picture (web/partner-pictures.js): no pack holds it.
                     ctx.save();
-                    if (d.sx !== 1 || d.sy !== 1) {
-                        ctx.translate(d.px, d.py);
-                        ctx.scale(d.sx, d.sy);
-                        ctx.translate(-d.px, -d.py);
+                    if (d!.sx !== 1 || d!.sy !== 1) {
+                        ctx.translate(d!.px!, d!.py!);
+                        ctx.scale(d!.sx!, d!.sy!);
+                        ctx.translate(-d!.px!, -d!.py!);
                     }
-                    if (artHook(ctx, (c) => drawPartnerPicture(c, d.id, d.x, d.y)) || drawPartnerPicture(ctx, d.id, d.x, d.y)) stats.clips += 1;   // look C scope: art canvas
+                    if (artHook(ctx, (c) => drawPartnerPicture(c, d!.id, d!.x, d!.y)) || drawPartnerPicture(ctx, d!.id, d!.x, d!.y)) stats.clips += 1;   // look C scope: art canvas
                     ctx.restore();
                     continue;
                 }
-                const name = packNameForDir ? packNameForDir(d.dir) : entry && entry.pack;
+                const name = packNameForDir ? packNameForDir(d!.dir) : entry && entry.pack;
                 const pack = getPack(name);
                 if (!name) {
                     stats.skipped += 1;
@@ -389,28 +389,28 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
                     noteSkip(stats.frames, "pack-in-flight", d, name);
                     continue;
                 }
-                if (skipClip && skipClip(name, d.id)) continue;
-                const scaled = d.sx !== 1 || d.sy !== 1;
+                if (skipClip && skipClip(name, d!.id)) continue;
+                const scaled = d!.sx !== 1 || d!.sy !== 1;
                 ctx.save();
                 if (scaled) {
-                    ctx.translate(d.px, d.py);
-                    ctx.scale(d.sx, d.sy);
-                    ctx.translate(-d.px, -d.py);
+                    ctx.translate(d!.px!, d!.py!);
+                    ctx.scale(d!.sx!, d!.sy!);
+                    ctx.translate(-d!.px!, -d!.py!);
                 }
                 // `opaqueClips`: the sheet records STP per clip, not per texel, so a clip whose
                 // body texels are opaque but whose bevel texels carry STP would blend whole.
                 // The dialogue box asks for plain copies (its capture shows opaque chrome).
-                const ok = options.opaqueClips && !d.palette
-                    ? drawClip(ctx, { ...pack, ids: { [String(d.id)]: { ...pack.ids[String(d.id)], stp: false } } }, d.id, d.x, d.y)
-                    : d.palette
-                        ? drawClipAtPaletteRow(ctx, pack, d.id, d.palette, d.x, d.y)
-                        : drawClip(ctx, pack, d.id, d.x, d.y);
+                const ok = options.opaqueClips && !d!.palette
+                    ? drawClip(ctx, { ...pack, ids: { [String(d!.id)]: { ...pack.ids[String(d!.id)], stp: false } } }, d!.id, d!.x, d!.y)
+                    : d!.palette
+                        ? drawClipAtPaletteRow(ctx, pack, d!.id, d!.palette, d!.x, d!.y)
+                        : drawClip(ctx, pack, d!.id, d!.x, d!.y);
                 ctx.restore();
                 if (ok) {
                     stats.clips += 1;
                     stats.byPack[name] = (stats.byPack[name] ?? 0) + 1;
-                    stats.last = { id: d.id, x: d.x, y: d.y, pack: name };
-                    if (stats.seen.length < 64 && !stats.seen.includes(d.id)) stats.seen.push(d.id);
+                    stats.last = { id: d!.id, x: d!.x, y: d!.y, pack: name };
+                    if (stats.seen.length < 64 && !stats.seen.includes(d!.id)) stats.seen.push(d!.id);
                 } else {
                     stats.skipped += 1;
                     noteSkip(stats.frames, "clip-not-in-pack", d, name);

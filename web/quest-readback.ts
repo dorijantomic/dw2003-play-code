@@ -20,7 +20,7 @@ export const KINDS = [
 // The game's facing index (cutscene-manager DIR8), the same list web/quest-scenes.js turns a name into.
 const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right", "down-right"];
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
-const cap = (s: string | string[]) => (typeof s === "string" && s.length ? s[0].toUpperCase() + s.slice(1) : s);
+const cap = (s: string | string[]) => (typeof s === "string" && s.length ? s[0]!.toUpperCase() + s.slice(1) : s);
 
 /** The name tab for an npc id: the scene's own `name`, else opts.names, else "npc 27". "player" is the player label. */
 function nameOf(who, opts) {
@@ -410,7 +410,7 @@ export function diffReadback(a, b) {
     const dp = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
     for (let i = n - 1; i >= 0; i--) {
         for (let j = m - 1; j >= 0; j--) {
-            dp[i][j] = A[i].text === B[j].text ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+            dp[i]![j] = A[i].text === B[j].text ? dp[i + 1]![j + 1]! + 1 : Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
         }
     }
     const lines = [];
@@ -423,7 +423,7 @@ export function diffReadback(a, b) {
     };
     while (i < n && j < m) {
         if (A[i].text === B[j].text) { take(B[j], "same"); i++; j++; }
-        else if (dp[i + 1][j] >= dp[i][j + 1]) { take(A[i], "removed"); i++; }
+        else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) { take(A[i], "removed"); i++; }
         else { take(B[j], "added"); j++; }
     }
     while (i < n) { take(A[i], "removed"); i++; }

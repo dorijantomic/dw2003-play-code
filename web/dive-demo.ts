@@ -67,7 +67,7 @@ export function drawDiveDemoCells(ctx: CanvasRenderingContext2D | null, mode, ce
         const clip = pack.clips[String(cell)];
         if (!clip) continue;
         for (const l of clip.layers) {
-            ctx.drawImage(
+            ctx!.drawImage(
                 sheet.opaque, l.x, l.y, l.w, l.h,
                 Math.round(offX + l.dx * scale), Math.round(offY + l.dy * scale),
                 Math.ceil(l.w * scale), Math.ceil(l.h * scale),

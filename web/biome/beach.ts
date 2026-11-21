@@ -39,7 +39,7 @@ const ripple = (x: number, z: number) => 0.024 * Math.max(0, Math.sin((z - shore
 function clumpField(parts, n: number, rad: number, sc = [0.8, 1.3], seed = 8) {
   const r = rng(seed), m = new Float32Array(n * 16), g = new THREE.Group();
   const base = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.05, rad * 1.05, 0.05, 44), toonMat({ color: 0xd9c79a }, { shadeK: 0.82, rim: 0 })); base.position.y = 0.025; g.add(base);
-  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, 0.04, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
+  for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, 0.04, Math.sin(a) * d, r() * 6.28, sc[0]! + (sc[1]! - sc[0]!) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
 /** instanced litter pile on a sand disc: kinds = [{parts, n, scale}] */
@@ -76,8 +76,8 @@ function poolWater(i: number) {
 function islands() {
   const g = new THREE.Group(), mat = toonMat({ color: 0x6f8aa6 }, { shadeK: 0.8, rim: 0 }), r = rng(5);
   for (const [x, s] of [[-30, 1.0], [14, 1.5], [46, 0.8]]) {
-    const geo = new THREE.PlaneGeometry(40 * s, 14 * s, 40, 8); geo.rotateX(-Math.PI / 2); const p = geo.attributes.position;
-    for (let i = 0; i < p.count; i++) { const u = p.getX(i) / (20 * s), v = p.getZ(i) / (7 * s), e = Math.max(0, 1 - u * u - v * v * 1.6); p.setY(i, Math.pow(e, 0.8) * 5.5 * s * (0.8 + 0.4 * Math.sin(u * 7 + x))); }
+    const geo = new THREE.PlaneGeometry(40 * s!, 14 * s!, 40, 8); geo.rotateX(-Math.PI / 2); const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const u = p.getX(i) / (20 * s!), v = p.getZ(i) / (7 * s!), e = Math.max(0, 1 - u * u - v * v * 1.6); p.setY(i, Math.pow(e, 0.8) * 5.5 * s! * (0.8 + 0.4 * Math.sin(u * 7 + x!))); }
     geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.position.set(x, -0.2, 0); g.add(m);
   }
   return g;
@@ -89,7 +89,7 @@ const cat = { sand: "Sand (dry)", wet: "Sand (wet) and shoreline", shelly: "Sand
   succ: "Succulents and ground cover", palm: "Palms", pine: "Coastal pine", drift: "Driftwood", shell: "Shells", weed: "Seaweed and wrack", rock: "Coastal rocks", cliff: "Cliffs and sea stacks",
   pool: "Tide pools", peb: "Pebbles", rtex: "Rock textures", sky: "Sky" };
 const tex = (ids: string[][], c: string) => ids.map(([id, n]) => texDisc(id, c, n));
-const prox = (id: string, c: string, name: string | undefined, make, extra = {}) => proc(id, c, name, make, extra);
+const prox = (id: string, c: string, name: string | undefined, make, extra = {}) => proc(id, c, name!, make, extra);
 const palmEntry = (kind: string | undefined, seed: number | undefined, name: string) => prox(`palm_${kind}_${seed}`, cat.palm, name, async () => part(B.palmParts(kind, seed, 0)), { url: "web/biome/beachproc.js palmParts" });
 const driftPH = (id: string, name: string, t = {}, e = {}) => ph(id, cat.drift, { name, t: { grade: true, tint: [1.28, 1.22, 1.1], ...t }, e });
 const rawEntries = [
@@ -186,7 +186,7 @@ function composeLean(out: Float32Array<ArrayBuffer>, i: number, x: number | unde
 function dart(n: number, seed: number, minD: number, ok, xr = [-HALF, HALF], zr = [-12, 120]) {
   const r = rng(seed), cell = minD, grid = new Map(), out = []; let tries = 0;
   while (out.length < n && tries++ < n * 60) {
-    const x = xr[0] + (xr[1] - xr[0]) * r(), z = zr[0] + (zr[1] - zr[0]) * r(); if (ok && !ok(x, z, r)) continue;
+    const x = xr[0]! + (xr[1]! - xr[0]!) * r(), z = zr[0]! + (zr[1]! - zr[0]!) * r(); if (ok && !ok(x, z, r)) continue;
     const cx = Math.floor(x / cell), cz = Math.floor(z / cell); let bad = false;
     for (let i = -1; i <= 1 && !bad; i++) for (let j = -1; j <= 1 && !bad; j++) for (const p of grid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < minD) { bad = true; break; }
     if (bad) continue; out.push([x, z]); const k = cx + "," + cz; if (!grid.has(k)) grid.set(k, []); grid.get(k).push([x, z]);
@@ -197,8 +197,8 @@ function dart(n: number, seed: number, minD: number, ok, xr = [-HALF, HALF], zr 
 function bscatter(n: number, seed: number, area: number[], prob, o: ScatterOpts = {}) {
   const r = rng(seed), [cx, cz, hw, hd] = area, out = new Float32Array(n * 16), sc = o.scale || [0.9, 1.2]; let i = 0, tries = 0;
   while (i < n && tries++ < n * 80) {
-    const x = cx + (r() * 2 - 1) * hw, z = cz + (r() * 2 - 1) * hd; if (r() > prob(x, z)) continue;
-    const s = sc[0] + (sc[1] - sc[0]) * r();
+    const x = cx! + (r() * 2 - 1) * hw!, z = cz! + (r() * 2 - 1) * hd!; if (r() > prob(x, z)) continue;
+    const s = sc[0]! + (sc[1]! - sc[0]!) * r();
     composeTRS(out, i, x, beachH(x, z) + (o.y || 0), z, r() * 6.28, s, o.tiltFix ?? (o.tilt || 0) * r(), r() * 6.28, o.sy ? s * o.sy : null); i++;
   }
   return { mats: out.subarray(0, i * 16), count: i };
@@ -210,7 +210,7 @@ export async function buildBeach(ctx) {
   const N = (n: number) => Math.round(n * (tune.density ?? 1));
   const D = (x: number | undefined, z: number) => z - shoreZ(x);
   const patchy = (x: number, z: number, s = 4, f = 0.06) => Math.pow(vnoise(x, z, f, s), 2.0) * 1.9;
-  const nearPool = (x: number, z: number) => POOLS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r * 2.2);
+  const nearPool = (x: number, z: number) => POOLS.some(([px, pz, r]) => Math.hypot(x - px!, z - pz!) < r! * 2.2);
   const bandG = (d: number, c: number, w: number) => Math.exp(-(((d - c) / w) ** 2));
 
   // ---- ground (fine near, coarse far) + ocean + islands
@@ -247,10 +247,10 @@ export async function buildBeach(ctx) {
   const kinds: [string, number, number][] = [["coconut", 1, 3], ["coconut", 2, 2], ["curved", 1, 1], ["curved", 2, 1], ["young", 1, 2], ["fan", 1, 1], ["fan", 2, 1]], tot = kinds.reduce((a, k) => a + k[2], 0);
   for (const [kind, seed, w] of kinds) {
     const pos = hero.filter((h) => h[2] === kind && h[3] === seed).map((h) => [h[0], h[1]]);
-    grove.forEach((p, i) => { let a = i % tot, ki = 0; for (let k = 0; k < kinds.length; k++) { if (a < kinds[k][2]) { ki = k; break; } a -= kinds[k][2]; } if (kinds[ki][0] === kind && kinds[ki][1] === seed) pos.push(p); });
+    grove.forEach((p, i) => { let a = i % tot, ki = 0; for (let k = 0; k < kinds.length; k++) { if (a < kinds[k]![2]) { ki = k; break; } a -= kinds[k]![2]; } if (kinds[ki]![0] === kind && kinds[ki]![1] === seed) pos.push(p); });
     if (!pos.length) continue;
     const r = rng(seed * 7 + kind.length), m = new Float32Array(pos.length * 16);
-    pos.forEach(([x, z], i) => composeTRS(m, i, x, beachH(x, z) - 0.05, z, r() * 6.28, 0.85 + 0.4 * r(), 0.02 * r(), r() * 6.28));
+    pos.forEach(([x, z], i) => composeTRS(m, i, x, beachH(x!, z!) - 0.05, z, r() * 6.28, 0.85 + 0.4 * r(), 0.02 * r(), r() * 6.28));
     lodSp(`palm ${kind} ${seed}`, B.palmParts(kind, seed, 0), B.palmParts(kind, seed, 1), m, pos.length, [30, 85]);
   }
 
@@ -260,7 +260,7 @@ export async function buildBeach(ctx) {
     const pos = pinePos.filter((_, k) => k % 3 === i); if (!pos.length) continue;
     const t = { wind: 0.3, flutter: 0.5, trans: 0.2, tint: [1.08, 1.05, 0.9] };
     const l0 = await loadToon(`${ASSETS}quaternius/${id}.glb`, t), l1 = await loadToon(`${ASSETS}quaternius/${id}_lod1.glb`, t), r = rng(40 + i), m = new Float32Array(pos.length * 16);
-    pos.forEach(([x, z], k) => { const s = 0.85 + 0.45 * r(); composeLean(m, k, x, beachH(x, z) - 0.1, z, r() * 6.28, s * 1.1, s * 0.85, 0.12 + 0.08 * r()); });
+    pos.forEach(([x, z], k) => { const s = 0.85 + 0.45 * r(); composeLean(m, k, x, beachH(x!, z!) - 0.1, z, r() * 6.28, s * 1.1, s * 0.85, 0.12 + 0.08 * r()); });
     lodSp(`coastal ${id}`, l0.parts, l1.parts, m, pos.length, [50, 120]);
   }
 
@@ -273,14 +273,14 @@ export async function buildBeach(ctx) {
   await big("coast_rocks_01", 3.0, 112, shoreZ(112) + 24, 2.2); await big("coast_line_01", 2.4, -100, shoreZ(-100) + 2, 0.3, { y: -0.6 }); await big("coast_line_02", 2.2, 98, shoreZ(98) - 4, 1.2, { y: -0.6 });
   await big("coastal_cliff_01", 10, -118, 28, Math.PI / 2, { y: -1.2 }); await big("coastal_cliff_02", 10, 124, 48, -Math.PI / 2, { y: -1.2 }); await big("coastal_cliff_04", 14, 0, 135, 0, { y: -1.5 });
   for (const [i, [x, z, Rr, Hh]] of [[-38, -46, 2.8, 12], [22, -64, 3.6, 14], [60, -36, 2.4, 9], [-72, -30, 3.0, 11]].entries()) {
-    const parts = B.seaStackParts(i + 1, Hh, Rr), g = partsGroup(parts); g.position.set(x, beachH(x, z) + 0.9, z); g.rotation.y = i; root.add(g); note("sea stack " + (i + 1), 1, parts);
+    const parts = B.seaStackParts(i + 1, Hh, Rr), g = partsGroup(parts); g.position.set(x, beachH(x!, z!) + 0.9, z); g.rotation.y = i; root.add(g); note("sea stack " + (i + 1), 1, parts);
   }
 
   // ---- tide-pool rocks with algae around each pool
   {
     const rk = await loadToon(`${ASSETS}polyhaven/coast_rocks_05.glb`, { h: 0.8, grade: true, fade: FDS }); B.algaeify(rk.parts, 0.95, [0.1, 0.42, 0.2]);
     const m = new Float32Array(POOLS.length * 9 * 16), r = rng(77); let k = 0;
-    for (const [px, pz, pr] of POOLS) for (let i = 0; i < 9; i++) { const a = (i / 9) * 6.28 + r() * 0.5, d = pr * 1.35 + r() * 0.9, x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d, s = 0.35 + 0.45 * r(); composeTRS(m, k++, x, beachH(x, z) - 0.05, z, r() * 6.28, s, 0, 0, s * (0.8 + 0.5 * r())); }
+    for (const [px, pz, pr] of POOLS) for (let i = 0; i < 9; i++) { const a = (i / 9) * 6.28 + r() * 0.5, d = pr! * 1.35 + r() * 0.9, x = px! + Math.cos(a) * d, z = pz! + Math.sin(a) * d, s = 0.35 + 0.45 * r(); composeTRS(m, k++, x, beachH(x, z) - 0.05, z, r() * 6.28, s, 0, 0, s * (0.8 + 0.5 * r())); }
     const g = instancedParts(rk.parts, m, k, "tide pool rocks"); root.add(g); note("tide pool rocks (algae)", k, rk.parts);
   }
   const rightShelf = (x: number, z: number) => sstep(30, 48, x) * (1 - sstep(80, 100, x)) * sstep(1, 4, D(x, z)) * (1 - sstep(20, 34, D(x, z)));
@@ -288,8 +288,8 @@ export async function buildBeach(ctx) {
   await add("coast_land_rocks_04", (await H("coast_land_rocks_04", { h: 0.8, grade: true, fade: FDS })).parts, N(6), (x: number, z: number) => rightShelf(x, z) * 0.9, { scale: [0.4, 0.9] });
   await add("coast_land_rocks_02", (await H("coast_land_rocks_02", { h: 0.9, grade: true, fade: FDS })).parts, N(5), (x: number, z: number) => rightShelf(x, z) * 0.8, { scale: [0.4, 0.9] });
   await add("coast_rocks_05", (await H("coast_rocks_05", { h: 0.9, grade: true, fade: FDS })).parts, N(34), (x: number, z: number) => (D(x, z) > -2 && D(x, z) < 40 ? 0.05 + 0.5 * rightShelf(x, z) + 0.2 * Math.abs(x) / HALF * patchy(x, z, 2, 0.05) : 0), { scale: [0.5, 1.3] });
-  await add("sand_rocks_small_01", (await H("sand_rocks_small_01", { h: 0.35, grade: true, fade: FDS })).parts, N(16), (x: number | undefined, z: number) => (D(x, z) > 1 && D(x, z) < 30 ? 0.3 * patchy(x, z, 6, 0.04) : 0), { scale: [0.7, 1.4] });
-  for (let i = 1; i <= 3; i++) await add("Rock_Medium_" + i, (await L("Rock_Medium_" + i, { fade: FDS, tint: [1.25, 1.15, 1.0] })).parts, N(5), (x: number | undefined, z: number) => (D(x, z) > 0 && D(x, z) < 50 ? 0.4 * patchy(x, z, 7 + i, 0.03) : 0), { scale: [0.5, 1.1] });
+  await add("sand_rocks_small_01", (await H("sand_rocks_small_01", { h: 0.35, grade: true, fade: FDS })).parts, N(16), (x: number | undefined, z: number) => (D(x, z) > 1 && D(x, z) < 30 ? 0.3 * patchy(x!, z, 6, 0.04) : 0), { scale: [0.7, 1.4] });
+  for (let i = 1; i <= 3; i++) await add("Rock_Medium_" + i, (await L("Rock_Medium_" + i, { fade: FDS, tint: [1.25, 1.15, 1.0] })).parts, N(5), (x: number | undefined, z: number) => (D(x, z) > 0 && D(x, z) < 50 ? 0.4 * patchy(x!, z, 7 + i, 0.03) : 0), { scale: [0.5, 1.1] });
 
   // ---- dune vegetation
   const dunes = (x: number | undefined, z: number, c = 20) => sstep(c - 6, c + 6, D(x, z));
@@ -299,25 +299,25 @@ export async function buildBeach(ctx) {
   await add("sea oats", B.seaOatsParts(2), N(300), (x: number, z: number) => dunes(x, z, 24) * patchy(x, z, 11, 0.05), { scale: [0.8, 1.4] });
   await add("Grass_Wispy_Tall", (await L("Grass_Wispy_Tall", { h: 0.9, wind: 0.7, flutter: 0.4, tint: SAND_TINT })).parts, N(260), (x: number, z: number) => dunes(x, z, 28) * patchy(x, z, 12, 0.05), { scale: [0.8, 1.3] });
   await add("Grass_Common_Tall", (await L("Grass_Common_Tall", { h: 0.7, wind: 0.7, flutter: 0.4, tint: SAND_TINT })).parts, N(220), (x: number, z: number) => dunes(x, z, 30) * patchy(x, z, 13, 0.05), { scale: [0.8, 1.3] });
-  await add("sea grape A", B.seaGrapeParts(1, 1), N(70), (x: number | undefined, z: number) => (D(x, z) > 14 ? 0.8 * patchy(x, z, 14, 0.04) : 0), { scale: [0.8, 1.5] });
-  await add("sea grape B", B.seaGrapeParts(2, 1.5), N(40), (x: number | undefined, z: number) => (D(x, z) > 18 ? 0.8 * patchy(x, z, 15, 0.04) : 0), { scale: [0.8, 1.4] });
-  await add("searsia_burchellii", (await H("searsia_burchellii", { h: 2.0, grade: true, wind: 0.25, flutter: 0.4, trans: 0.3, fade: FDS })).parts, N(11), (x: number | undefined, z: number) => (D(x, z) > 30 ? 0.7 * patchy(x, z, 16, 0.04) : 0), { scale: [0.8, 1.3] });
-  await add("searsia_lucida", (await H("searsia_lucida", { h: 1.5, grade: true, wind: 0.25, flutter: 0.4, trans: 0.3, fade: FDS })).parts, N(22), (x: number | undefined, z: number) => (D(x, z) > 24 ? 0.8 * patchy(x, z, 17, 0.04) : 0), { scale: [0.8, 1.3] });
-  await add("wild_rooibos_bush", (await H("wild_rooibos_bush", { grade: true, wind: 0.3, flutter: 0.4 })).parts, N(60), (x: number | undefined, z: number) => (D(x, z) > 18 ? 0.8 * patchy(x, z, 18, 0.05) : 0), { scale: [0.6, 1.2] });
-  await add("Bush_Common (salt tint)", (await L("Bush_Common", { h: 1.1, wind: 0.3, flutter: 0.5, tint: [1.15, 1.2, 0.85] })).parts, N(36), (x: number | undefined, z: number) => (D(x, z) > 26 ? 0.6 * patchy(x, z, 19, 0.045) : 0), { scale: [0.8, 1.4] });
-  await add("cheiridopsis", (await H("cheiridopsis_succulent", { grade: true, fade: FD })).parts, N(80), (x: number | undefined, z: number) => (D(x, z) > 12 ? 0.6 * patchy(x, z, 20, 0.07) : 0), { scale: [0.5, 1.0] });
-  await add("crystalline iceplant", (await H("crystalline_iceplant", { grade: true, fade: FD })).parts, N(90), (x: number | undefined, z: number) => (D(x, z) > 10 ? 0.6 * patchy(x, z, 21, 0.07) : 0), { scale: [0.5, 1.1] });
-  await add("leipoldtia", (await H("leipoldtia_schultzei", { grade: true, fade: FD })).parts, N(60), (x: number | undefined, z: number) => (D(x, z) > 14 ? 0.6 * patchy(x, z, 22, 0.07) : 0), { scale: [0.5, 1.0] });
-  await add("othonna", (await H("othonna_cerarioides", { h: 1.0, grade: true, wind: 0.2, fade: FDS })).parts, N(14), (x: number | undefined, z: number) => (D(x, z) > 28 ? 0.6 * patchy(x, z, 23, 0.05) : 0), { scale: [0.7, 1.2] });
-  await add("didelta", (await H("didelta_spinosa", { h: 1.2, grade: true, wind: 0.2, fade: FDS })).parts, N(14), (x: number | undefined, z: number) => (D(x, z) > 30 ? 0.6 * patchy(x, z, 24, 0.05) : 0), { scale: [0.7, 1.2] });
+  await add("sea grape A", B.seaGrapeParts(1, 1), N(70), (x: number | undefined, z: number) => (D(x, z) > 14 ? 0.8 * patchy(x!, z, 14, 0.04) : 0), { scale: [0.8, 1.5] });
+  await add("sea grape B", B.seaGrapeParts(2, 1.5), N(40), (x: number | undefined, z: number) => (D(x, z) > 18 ? 0.8 * patchy(x!, z, 15, 0.04) : 0), { scale: [0.8, 1.4] });
+  await add("searsia_burchellii", (await H("searsia_burchellii", { h: 2.0, grade: true, wind: 0.25, flutter: 0.4, trans: 0.3, fade: FDS })).parts, N(11), (x: number | undefined, z: number) => (D(x, z) > 30 ? 0.7 * patchy(x!, z, 16, 0.04) : 0), { scale: [0.8, 1.3] });
+  await add("searsia_lucida", (await H("searsia_lucida", { h: 1.5, grade: true, wind: 0.25, flutter: 0.4, trans: 0.3, fade: FDS })).parts, N(22), (x: number | undefined, z: number) => (D(x, z) > 24 ? 0.8 * patchy(x!, z, 17, 0.04) : 0), { scale: [0.8, 1.3] });
+  await add("wild_rooibos_bush", (await H("wild_rooibos_bush", { grade: true, wind: 0.3, flutter: 0.4 })).parts, N(60), (x: number | undefined, z: number) => (D(x, z) > 18 ? 0.8 * patchy(x!, z, 18, 0.05) : 0), { scale: [0.6, 1.2] });
+  await add("Bush_Common (salt tint)", (await L("Bush_Common", { h: 1.1, wind: 0.3, flutter: 0.5, tint: [1.15, 1.2, 0.85] })).parts, N(36), (x: number | undefined, z: number) => (D(x, z) > 26 ? 0.6 * patchy(x!, z, 19, 0.045) : 0), { scale: [0.8, 1.4] });
+  await add("cheiridopsis", (await H("cheiridopsis_succulent", { grade: true, fade: FD })).parts, N(80), (x: number | undefined, z: number) => (D(x, z) > 12 ? 0.6 * patchy(x!, z, 20, 0.07) : 0), { scale: [0.5, 1.0] });
+  await add("crystalline iceplant", (await H("crystalline_iceplant", { grade: true, fade: FD })).parts, N(90), (x: number | undefined, z: number) => (D(x, z) > 10 ? 0.6 * patchy(x!, z, 21, 0.07) : 0), { scale: [0.5, 1.1] });
+  await add("leipoldtia", (await H("leipoldtia_schultzei", { grade: true, fade: FD })).parts, N(60), (x: number | undefined, z: number) => (D(x, z) > 14 ? 0.6 * patchy(x!, z, 22, 0.07) : 0), { scale: [0.5, 1.0] });
+  await add("othonna", (await H("othonna_cerarioides", { h: 1.0, grade: true, wind: 0.2, fade: FDS })).parts, N(14), (x: number | undefined, z: number) => (D(x, z) > 28 ? 0.6 * patchy(x!, z, 23, 0.05) : 0), { scale: [0.7, 1.2] });
+  await add("didelta", (await H("didelta_spinosa", { h: 1.2, grade: true, wind: 0.2, fade: FDS })).parts, N(14), (x: number | undefined, z: number) => (D(x, z) > 30 ? 0.6 * patchy(x!, z, 24, 0.05) : 0), { scale: [0.7, 1.2] });
 
   // ---- tide line: wrack, shells, driftwood, pebbles; kelp under the surf
-  const tideLine = (x: number | undefined, z: number) => bandG(D(x, z), 4.0, 1.1) * (0.35 + 0.65 * patchy(x, z, 30, 0.07));
+  const tideLine = (x: number | undefined, z: number) => bandG(D(x, z), 4.0, 1.1) * (0.35 + 0.65 * patchy(x!, z, 30, 0.07));
   for (let i = 1; i <= 3; i++) await add("wrack " + i, B.wrackParts(i), N(100), tideLine, { scale: [0.9, 1.7], y: 0.01 });
-  const shellZone = (x: number | undefined, z: number) => bandG(D(x, z), 3.8, 2.4) * (0.4 + 0.6 * patchy(x, z, 33, 0.09));
+  const shellZone = (x: number | undefined, z: number) => bandG(D(x, z), 3.8, 2.4) * (0.4 + 0.6 * patchy(x!, z, 33, 0.09));
   for (const [i, k] of ["scallop", "conch", "whelk", "clam", "cowrie", "dollar"].entries()) await add("shell " + k, B.shellParts(k, i + 1), N(90), shellZone, { scale: [0.8, 1.5], y: 0.01, colors: SHELLCOL });
   await add("lambis shell", (await H("lambis_shell", { grade: true, fade: FD })).parts, N(60), shellZone, { scale: [0.8, 1.4], y: 0.01 });
-  const driftZ = (x: number | undefined, z: number) => bandG(D(x, z), 9.5, 4.5) * (0.2 + 0.8 * patchy(x, z, 35, 0.04));
+  const driftZ = (x: number | undefined, z: number) => bandG(D(x, z), 9.5, 4.5) * (0.2 + 0.8 * patchy(x!, z, 35, 0.04));
   const dw = { grade: true, tint: [1.28, 1.22, 1.1], fade: FDS };
   for (let k = 0; k < 3; k++) await add("driftwood " + "ABC"[k], B.driftwoodParts(3, k), N(14), driftZ, { scale: [0.8, 1.6] });
   await add("dead_tree_trunk (bleached)", (await H("dead_tree_trunk", dw)).parts, N(8), driftZ, { scale: [0.7, 1.3], y: 0.05 });
@@ -326,9 +326,9 @@ export async function buildBeach(ctx) {
   await add("dead_quiver_branch_01", (await H("dead_quiver_branch_01", dw)).parts, N(16), driftZ, { scale: [0.8, 1.6] });
   await add("dead_quiver_branch_02", (await H("dead_quiver_branch_02", dw)).parts, N(16), driftZ, { scale: [0.8, 1.6] });
   await add("dry_branches (driftwood)", (await H("dry_branches_medium_01", dw)).parts, N(14), driftZ, { scale: [0.6, 1.1] });
-  const pebZone = (x: number | undefined, z: number) => (D(x, z) > 0.5 && D(x, z) < 18 ? (0.1 + 0.9 * bandG(D(x, z), 6, 6)) * (0.2 + 0.8 * patchy(x, z, 38, 0.05)) + 0.5 * rightShelf(x, z) : 0);
+  const pebZone = (x: number | undefined, z: number) => (D(x, z) > 0.5 && D(x, z) < 18 ? (0.1 + 0.9 * bandG(D(x, z), 6, 6)) * (0.2 + 0.8 * patchy(x!, z, 38, 0.05)) + 0.5 * rightShelf(x!, z) : 0);
   for (const id of ["Pebble_Round_1", "Pebble_Round_3", "Pebble_Square_1", "Pebble_Square_4"]) await add(id, (await L(id, { h: 0.1, tint: [1.35, 1.3, 1.2] })).parts, N(300), pebZone, { scale: [0.6, 1.6] });
-  await add("kelp (standing)", B.kelpParts(1), N(150), (x: number | undefined, z: number) => (D(x, z) < -1.5 && D(x, z) > -9 ? 0.7 * patchy(x, z, 40, 0.06) : 0), { scale: [0.8, 1.4], area: [0, -6, HALF, 8] });
+  await add("kelp (standing)", B.kelpParts(1), N(150), (x: number | undefined, z: number) => (D(x, z) < -1.5 && D(x, z) > -9 ? 0.7 * patchy(x!, z, 40, 0.06) : 0), { scale: [0.8, 1.4], area: [0, -6, HALF, 8] });
 
   // ---- surf mist / haze
   const mist = P.mistSheets(260, 2, 0.35); root.add(mist); note("coastal haze sheets", 2, null);

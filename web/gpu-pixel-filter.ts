@@ -268,7 +268,7 @@ export function pixelFilterNow(source, name) {
   const canvas = imagePipe.gl.canvas;
   const out = makeCanvas(w * 4, h * 4), g = out.getContext("2d");
   const ok = imagePipe.filter4(imagePipe.upload(source), w, h, name,
-    (t) => g.drawImage(canvas, 0, 0, t.w, t.h, t.x, t.y, t.w, t.h));
+    (t) => g!.drawImage(canvas, 0, 0, t.w, t.h, t.x, t.y, t.w, t.h));
   canvas.width = 1; canvas.height = 1;      // give the drawing buffer back
   if (!ok) console.warn("[pixel filter] the browser gave a smaller drawing buffer than asked; image left native");
   return ok ? out : null;

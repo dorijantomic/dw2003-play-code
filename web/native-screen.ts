@@ -141,7 +141,7 @@ export function seedNativeScreenParty(seed: NativePartySeed = {}) {
     const REC = 0x80049494;
     const positions = seed.positions ?? [];
     for (let i = 0; i < 3; i++) {
-        mem.write32(PARTY + i * 4, i < positions.length ? positions[i] >>> 0 : 0xffffffff);
+        mem.write32(PARTY + i * 4, i < positions.length ? positions[i]! >>> 0 : 0xffffffff);
     }
     for (const s of seed.stats ?? []) {
         const r = REC + (s.slot ?? 0) * ROSTER_STRIDE;
@@ -258,7 +258,7 @@ export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {})
         allocs: [],
         effect_ids: [],
     };
-    const residentBase = state.manifest.resident.base >>> 0;
+    const residentBase = state.manifest!.resident.base >>> 0;
     const rt = new ns.NativeStageRuntime(
         bytes,
         manifestEntry,

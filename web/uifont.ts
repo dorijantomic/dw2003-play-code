@@ -101,8 +101,8 @@ function sheetForClut(kind: number | undefined, clut: number | undefined) {
   c.width = img.naturalWidth;
   c.height = img.naturalHeight;
   const x = c.getContext("2d");
-  x.drawImage(img, 0, 0, c.width, c.height);
-  const data = x.getImageData(0, 0, c.width, c.height);
+  x!.drawImage(img, 0, 0, c.width, c.height);
+  const data = x!.getImageData(0, 0, c.width, c.height);
   const px = data.data;
   const from = new Map();
   for (let i = 0; i < src.length; i++) {
@@ -116,7 +116,7 @@ function sheetForClut(kind: number | undefined, clut: number | undefined) {
     if (!n) continue;
     px[i] = n[0]; px[i + 1] = n[1]; px[i + 2] = n[2]; px[i + 3] = n[3];
   }
-  x.putImageData(data, 0, 0);
+  x!.putImageData(data, 0, 0);
   clutSheets[key] = tagAssetSource(c, density);
   return clutSheets[key];
 }
@@ -128,10 +128,10 @@ function sheetFor(color: string | undefined) {
     const density = assetImageScale(img);
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     const x = c.getContext("2d");
-    x.drawImage(img, 0, 0, c.width, c.height);
-    x.globalCompositeOperation = "source-in";
-    x.fillStyle = color;
-    x.fillRect(0, 0, c.width, c.height);
+    x!.drawImage(img, 0, 0, c.width, c.height);
+    x!.globalCompositeOperation = "source-in";
+    x!.fillStyle = color;
+    x!.fillRect(0, 0, c.width, c.height);
     tinted[color] = tagAssetSource(c, density);
   }
   return tinted[color];
@@ -217,22 +217,22 @@ export function drawText(ctx: CanvasRenderingContext2D | null | undefined, text:
   }
   if (alignRight) x -= textWidth(text, kind) * scale;
   if (!fontReady()) {
-    ctx.fillStyle = color ?? "#e8e8f0";
-    ctx.font = `${Math.round(11 * scale)}px monospace`;
-    ctx.fillText(text, x, y + 11 * scale);
-    return ctx.measureText(text).width;
+    ctx!.fillStyle = color ?? "#e8e8f0";
+    ctx!.font = `${Math.round(11 * scale)}px monospace`;
+    ctx!.fillText(text!, x, y! + 11 * scale);
+    return ctx!.measureText(text!).width;
   }
   const paint = glyphPaint(opts);
   const sheet = paint.source === "tint" ? sheetFor(paint.color) : sheetForClut(paint.kind, paint.clut);
-  ctx.imageSmoothingEnabled = false;
+  ctx!.imageSmoothingEnabled = false;
   let cx = x;
   for (const ch of units(text)) {
     const source = glyphFor(kind, ch);
     const g = source && glyphMetrics ? { ...source, ...glyphMetrics(map.chars[ch]) } : source;
     if (!g) { cx += (cellWidth ?? 6) * scale; continue; }
     if (g.w > 0 && g.h > 0) {
-      ctx.drawImage(sheet, g.x, g.y, g.w, g.h,
-        cx + (g.dx || 0) * scale, y + (g.dy || 0) * scale, g.w * scale, g.h * scale);
+      ctx!.drawImage(sheet, g.x, g.y, g.w, g.h,
+        cx + (g.dx || 0) * scale, y! + (g.dy || 0) * scale, g.w * scale, g.h * scale);
     }
     cx += (cellWidth ?? advanceOf(g)) * scale;
   }
@@ -268,7 +268,7 @@ export function drawIconGlyph(ctx: CanvasRenderingContext2D | undefined, name: s
   if (!fontReady()) return false;
   const r = map.icons?.[name];
   if (!r) return false;
-  const paint = (c: CanvasRenderingContext2D | undefined) => { c.imageSmoothingEnabled = false; c.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
+  const paint = (c: CanvasRenderingContext2D | undefined) => { c!.imageSmoothingEnabled = false; c!.drawImage(img, r.x, r.y, r.w, r.h, x, y, r.w * scale, r.h * scale); };
   // a look C scope (web/ui-c) keeps the icon as a picture on its art canvas, over the C plates
   if (!artHook(ctx, paint)) paint(ctx);
   return true;

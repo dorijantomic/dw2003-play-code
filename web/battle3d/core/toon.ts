@@ -32,22 +32,22 @@ function _litNormals(model, bufs) {
       const w = weld[i] * 3, x = acc[w], y = acc[w + 1], z = acc[w + 2], l = Math.sqrt(x * x + y * y + z * z) || 1;
       nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
     }
-    if (!bufs.nbo) bufs.nbo = B$.gl.createBuffer();
-    B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, bufs.nbo);
-    B$.gl.bufferData(B$.gl.ARRAY_BUFFER, nrm, B$.gl.DYNAMIC_DRAW);
+    if (!bufs.nbo) bufs.nbo = B$.gl!.createBuffer();
+    B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, bufs.nbo);
+    B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, nrm, B$.gl!.DYNAMIC_DRAW);
   }
 function _sceneLightDraw(on) {          // before the fighters (on) and right after them (off)
-    B$.gl.useProgram(B$.texP.program);
+    B$.gl!.useProgram(B$.texP!.program);
     const L = on ? B$.sceneLight : null;
-    B$.gl.uniform1f(B$.texP.uSLOn, L ? 1 : 0);
+    B$.gl!.uniform1f(B$.texP!.uSLOn, L ? 1 : 0);
     for (const bufs of [B$.playerSkelBufs, B$.enemySkelBufs]) if (bufs) bufs.litOn = !!L;
     if (!L) return;
-    B$.gl.uniform3fv(B$.texP.uSLDir, L.dir); B$.gl.uniform3fv(B$.texP.uSLCol, L.colour); B$.gl.uniform3fv(B$.texP.uSLAmb, L.ambient);
+    B$.gl!.uniform3fv(B$.texP!.uSLDir, L.dir); B$.gl!.uniform3fv(B$.texP!.uSLCol, L.colour); B$.gl!.uniform3fv(B$.texP!.uSLAmb, L.ambient);
     _litNormals(B$.playerModel, B$.playerSkelBufs);
     _litNormals(B$.enemyModel, B$.enemySkelBufs);
   }
 function _toonState() {
-    const o = !!(window.__fx?.toonoutline || B$.toonSet.outline), s = !!(window.__fx?.toonshade || B$.toonSet.shade);
+    const o = !!(window.__fx?.toonoutline || B$.toonSet!.outline), s = !!(window.__fx?.toonshade || B$.toonSet!.shade);
     return o || s ? { outline: o, shade: s } : null;
   }
 // Built once per model from that frame's skinned corners: weld = one id per position (quantised to 0.5 render units),
@@ -80,12 +80,12 @@ function _toonState() {
       let id = ids.get(key); if (id === undefined) { id = ids.size; ids.set(key, id); }
       weld[i] = id;
     }
-    if (!bufs.toonIbo) bufs.toonIbo = B$.gl.createBuffer();
-    B$.gl.bindBuffer(B$.gl.ELEMENT_ARRAY_BUFFER, bufs.toonIbo);
-    B$.gl.bufferData(B$.gl.ELEMENT_ARRAY_BUFFER, hull, B$.gl.STATIC_DRAW);
+    if (!bufs.toonIbo) bufs.toonIbo = B$.gl!.createBuffer();
+    B$.gl!.bindBuffer(B$.gl!.ELEMENT_ARRAY_BUFFER, bufs.toonIbo);
+    B$.gl!.bufferData(B$.gl!.ELEMENT_ARRAY_BUFFER, hull, B$.gl!.STATIC_DRAW);
     Object.assign(bufs, { toonFor: model, toonN: n, toonSign: sign, toonWeldIds: weld, toonAcc: new Float32Array(ids.size * 3),
       toonNrm: new Float32Array(n * 3), toonWeldN: ids.size });
-    B$.toonLog.welds++;
+    B$.toonLog!.welds++;
   }
 // This frame's smooth outward normals (area-weighted face normals summed per weld id) into bufs.nbo.
   function _toonNormals(model, bufs) {
@@ -104,16 +104,16 @@ function _toonState() {
       const w = weld[i] * 3, x = acc[w], y = acc[w + 1], z = acc[w + 2], l = Math.sqrt(x * x + y * y + z * z) || 1;
       nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
     }
-    if (!bufs.nbo) bufs.nbo = B$.gl.createBuffer();
-    B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, bufs.nbo);
-    B$.gl.bufferData(B$.gl.ARRAY_BUFFER, nrm, B$.gl.DYNAMIC_DRAW);
+    if (!bufs.nbo) bufs.nbo = B$.gl!.createBuffer();
+    B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, bufs.nbo);
+    B$.gl!.bufferData(B$.gl!.ARRAY_BUFFER, nrm, B$.gl!.DYNAMIC_DRAW);
     return true;
   }
 function _toonBodies() {
     const out = [];
     if (!(B$.blastState && B$.blastState.wipeRow !== undefined && B$.blastState.showNewModel) && B$.playerVisible && B$.playerModel && B$.playerSkelBufs) out.push([B$.playerModel, B$.playerSkelBufs, B$.playerTex]);
     if (B$.enemyVisible && B$.enemyModel && B$.enemySkelBufs) out.push([B$.enemyModel, B$.enemySkelBufs, B$.enemyTex]);
-    for (const f of B$.extras.values()) if (f.visible && f.model && f.bufs) out.push([f.model, f.bufs, f.tex]);
+    for (const f of B$.extras!.values()) if (f.visible && f.model && f.bufs) out.push([f.model, f.bufs, f.tex]);
     return out;
   }
 // Before the fighters: normals for every body; Toon shading binds them (litOn) and sets the band uniforms.
@@ -129,10 +129,10 @@ function _toonBodies() {
       d = [vx, vy + 1, vz];
     }
     const dl = Math.hypot(d[0], d[1], d[2]) || 1;
-    B$.gl.useProgram(B$.texP.program);
-    B$.gl.uniform1f(B$.texP.uToon, 1);
-    B$.gl.uniform3fv(B$.texP.uToonDir, [d[0] / dl, d[1] / dl, d[2] / dl]);
-    B$.gl.uniform1f(B$.texP.uSLOn, 0);           // no tinted scene light on the Digimon while toon shading is on
+    B$.gl!.useProgram(B$.texP!.program);
+    B$.gl!.uniform1f(B$.texP!.uToon, 1);
+    B$.gl!.uniform3fv(B$.texP!.uToonDir, [d[0] / dl, d[1] / dl, d[2] / dl]);
+    B$.gl!.uniform1f(B$.texP!.uSLOn, 0);           // no tinted scene light on the Digimon while toon shading is on
   }
 // After the fighters (and the 2 vs 2 extras): the hulls, then everything back to the game's own state.
   function _toonEnd(st, pv, proj, H) {
@@ -140,46 +140,46 @@ function _toonBodies() {
     if (st.outline) {
       try {
         if (!B$.toonProg) {
-          const p = B$.gl.createProgram();
-          B$.gl.attachShader(p, compileShader(B$.gl, B$.gl.VERTEX_SHADER, TOON_HULL_VERT_SRC));
-          B$.gl.attachShader(p, compileShader(B$.gl, B$.gl.FRAGMENT_SHADER, TOON_HULL_FRAG_SRC));
+          const p = B$.gl!.createProgram();
+          B$.gl!.attachShader(p, compileShader(B$.gl, B$.gl!.VERTEX_SHADER, TOON_HULL_VERT_SRC));
+          B$.gl!.attachShader(p, compileShader(B$.gl, B$.gl!.FRAGMENT_SHADER, TOON_HULL_FRAG_SRC));
           // the same attribute slots as the main program, so its enabled arrays stay as it left them
-          if (B$.texP.aPos >= 0) B$.gl.bindAttribLocation(p, B$.texP.aPos, "aPos");
-          if (B$.texP.aUV >= 0) B$.gl.bindAttribLocation(p, B$.texP.aUV, "aUV");
-          if (B$.texP.aNormal >= 0) B$.gl.bindAttribLocation(p, B$.texP.aNormal, "aNormal");
-          B$.gl.linkProgram(p);
-          if (!B$.gl.getProgramParameter(p, B$.gl.LINK_STATUS)) throw new Error("Link: " + B$.gl.getProgramInfoLog(p));
-          B$.toonProg = { program: p, aPos: B$.gl.getAttribLocation(p, "aPos"), aUV: B$.gl.getAttribLocation(p, "aUV"), aNormal: B$.gl.getAttribLocation(p, "aNormal"),
-            uMVP: B$.gl.getUniformLocation(p, "uMVP"), uPush: B$.gl.getUniformLocation(p, "uPush"), uTex: B$.gl.getUniformLocation(p, "uTex"), uCol: B$.gl.getUniformLocation(p, "uCol") };
+          if (B$.texP!.aPos >= 0) B$.gl!.bindAttribLocation(p, B$.texP!.aPos, "aPos");
+          if (B$.texP!.aUV >= 0) B$.gl!.bindAttribLocation(p, B$.texP!.aUV, "aUV");
+          if (B$.texP!.aNormal >= 0) B$.gl!.bindAttribLocation(p, B$.texP!.aNormal, "aNormal");
+          B$.gl!.linkProgram(p);
+          if (!B$.gl!.getProgramParameter(p, B$.gl!.LINK_STATUS)) throw new Error("Link: " + B$.gl!.getProgramInfoLog(p));
+          B$.toonProg = { program: p, aPos: B$.gl!.getAttribLocation(p, "aPos"), aUV: B$.gl!.getAttribLocation(p, "aUV"), aNormal: B$.gl!.getAttribLocation(p, "aNormal"),
+            uMVP: B$.gl!.getUniformLocation(p, "uMVP"), uPush: B$.gl!.getUniformLocation(p, "uPush"), uTex: B$.gl!.getUniformLocation(p, "uTex"), uCol: B$.gl!.getUniformLocation(p, "uCol") };
         }
-        const px = Math.max(1, B$.TOON_PX_1080 * H / 1080);
-        B$.gl.useProgram(B$.toonProg.program);
-        B$.gl.uniformMatrix4fv(B$.toonProg.uMVP, false, pv);
-        B$.gl.uniform1f(B$.toonProg.uPush, px * 2 / (H * proj[5]));
-        B$.gl.uniform3fv(B$.toonProg.uCol, B$.TOON_COL);
-        B$.gl.uniform1i(B$.toonProg.uTex, 0);
-        B$.gl.activeTexture(B$.gl.TEXTURE0);
-        B$.gl.enable(B$.gl.CULL_FACE); B$.gl.frontFace(B$.gl.CCW); B$.gl.cullFace(B$.gl.BACK);   // outward faces wind clockwise (SCENE_LIGHT_WINDING): cull the ones toward the camera
-        B$.gl.depthMask(false);
+        const px = Math.max(1, B$.TOON_PX_1080! * H / 1080);
+        B$.gl!.useProgram(B$.toonProg.program);
+        B$.gl!.uniformMatrix4fv(B$.toonProg.uMVP, false, pv);
+        B$.gl!.uniform1f(B$.toonProg.uPush, px * 2 / (H * proj[5]));
+        B$.gl!.uniform3fv(B$.toonProg.uCol, B$.TOON_COL);
+        B$.gl!.uniform1i(B$.toonProg.uTex, 0);
+        B$.gl!.activeTexture(B$.gl!.TEXTURE0);
+        B$.gl!.enable(B$.gl!.CULL_FACE); B$.gl!.frontFace(B$.gl!.CCW); B$.gl!.cullFace(B$.gl!.BACK);   // outward faces wind clockwise (SCENE_LIGHT_WINDING): cull the ones toward the camera
+        B$.gl!.depthMask(false);
         for (const [, b, tex] of bodies) {
           if (!b.toonOk || !b.vbo || !b.nbo || !b.toonIbo) continue;
-          B$.gl.bindTexture(B$.gl.TEXTURE_2D, tex || B$.whiteTex);
-          B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, b.vbo); B$.gl.enableVertexAttribArray(B$.toonProg.aPos); B$.gl.vertexAttribPointer(B$.toonProg.aPos, 3, B$.gl.FLOAT, false, 0, 0);
-          B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, b.ubo); B$.gl.enableVertexAttribArray(B$.toonProg.aUV); B$.gl.vertexAttribPointer(B$.toonProg.aUV, 2, B$.gl.FLOAT, false, 0, 0);
-          B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, b.nbo); B$.gl.enableVertexAttribArray(B$.toonProg.aNormal); B$.gl.vertexAttribPointer(B$.toonProg.aNormal, 3, B$.gl.FLOAT, false, 0, 0);
-          B$.gl.bindBuffer(B$.gl.ELEMENT_ARRAY_BUFFER, b.toonIbo);
-          B$.gl.drawElements(B$.gl.TRIANGLES, b.totalVerts, B$.gl.UNSIGNED_SHORT, 0);
-          B$.gl.disableVertexAttribArray(B$.toonProg.aNormal);
-          B$.toonLog.hulls++;
+          B$.gl!.bindTexture(B$.gl!.TEXTURE_2D, tex || B$.whiteTex);
+          B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, b.vbo); B$.gl!.enableVertexAttribArray(B$.toonProg.aPos); B$.gl!.vertexAttribPointer(B$.toonProg.aPos, 3, B$.gl!.FLOAT, false, 0, 0);
+          B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, b.ubo); B$.gl!.enableVertexAttribArray(B$.toonProg.aUV); B$.gl!.vertexAttribPointer(B$.toonProg.aUV, 2, B$.gl!.FLOAT, false, 0, 0);
+          B$.gl!.bindBuffer(B$.gl!.ARRAY_BUFFER, b.nbo); B$.gl!.enableVertexAttribArray(B$.toonProg.aNormal); B$.gl!.vertexAttribPointer(B$.toonProg.aNormal, 3, B$.gl!.FLOAT, false, 0, 0);
+          B$.gl!.bindBuffer(B$.gl!.ELEMENT_ARRAY_BUFFER, b.toonIbo);
+          B$.gl!.drawElements(B$.gl!.TRIANGLES, b.totalVerts, B$.gl!.UNSIGNED_SHORT, 0);
+          B$.gl!.disableVertexAttribArray(B$.toonProg.aNormal);
+          B$.toonLog!.hulls++;
         }
-      } catch (e) { B$.toonLog.err = String(e?.message || e); B$.toonSet.outline = false; }
-      B$.gl.depthMask(true);
-      B$.gl.disable(B$.gl.CULL_FACE);
+      } catch (e) { B$.toonLog!.err = String(e?.message || e); B$.toonSet!.outline = false; }
+      B$.gl!.depthMask(true);
+      B$.gl!.disable(B$.gl!.CULL_FACE);
     }
     for (const [, b] of bodies) b.litOn = false;
-    B$.gl.useProgram(B$.texP.program);
-    B$.gl.uniform1f(B$.texP.uToon, 0);
-    B$.toonLog.frames++;
+    B$.gl!.useProgram(B$.texP!.program);
+    B$.gl!.uniform1f(B$.texP!.uToon, 0);
+    B$.toonLog!.frames++;
   }
   return { _litNormals, _sceneLightDraw, _toonState, _toonWeld, _toonNormals, _toonBodies, _toonBegin, _toonEnd };
 }

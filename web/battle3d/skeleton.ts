@@ -80,7 +80,7 @@ export function buildSkeletalGLBuffers(gl, model) {
       const face = faces[f];
       // face: [v0,v1,v2, u0,v0, u1,v1, u2,v2]
       for (let c = 0; c < 3; c++) {
-        const slot = offset + f * 3 + c;
+        const slot = offset! + f * 3 + c;
         // Texture is 4bpp-indexed 256x256 (session 15). UVs are baked from the
         // mesh cmd-0x01 base (byte1=U, byte3=V) + raw per-vertex u/v, so both
         // axes are 0..255 -> divide by 256.

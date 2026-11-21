@@ -12,7 +12,7 @@ const bytes = (c) => (Array.isArray(c) ? c.map((v) => Math.max(0, Math.min(255, 
 function ringTriangles(field, P) {
   const NS = P.SECTORS, NR = P.RINGS, V = [];
   const r0 = Array.from({ length: NS + 1 }, (_, j) => Math.max(200, waterlineAt(field, (j / NS) * Math.PI * 2 - Math.PI) - P.OVERLAP));
-  const at = (i: number, j: number) => { const az = (j / NS) * Math.PI * 2 - Math.PI, r = r0[j] * Math.pow(P.FAR_R / r0[j], i / (NR - 1)); return [Math.sin(az) * r, P.SEA_Y, Math.cos(az) * r]; };
+  const at = (i: number, j: number) => { const az = (j / NS) * Math.PI * 2 - Math.PI, r = r0[j]! * Math.pow(P.FAR_R / r0[j]!, i / (NR - 1)); return [Math.sin(az) * r, P.SEA_Y, Math.cos(az) * r]; };
   for (let i = 0; i < NR - 1; i++) for (let j = 0; j < NS; j++) V.push(...at(i, j), ...at(i + 1, j), ...at(i, j + 1), ...at(i, j + 1), ...at(i + 1, j), ...at(i + 1, j + 1));
   return Float32Array.from(V);
 }

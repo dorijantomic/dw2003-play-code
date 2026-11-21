@@ -199,8 +199,8 @@ export async function init() {
             const res = own ? null : await fetch("assets/scenes/" + m.id + ".json");
             const scene = own
                 ? structuredClone(own)
-                : res.ok
-                    ? await res.json()
+                : res!.ok
+                    ? await res!.json()
                     : { npcs: [], exits: [], zones: [] };
             addNewMapExits(state.newMaps, m.id, scene); // doors that lead into the new maps
             scene.npcs = applyNpcPrograms(scene.npcs ?? [], npcPrograms[m.id] ?? []);
@@ -218,8 +218,8 @@ export async function init() {
                 if (!npc.dir) npc.dir = "down-left";
             }
             for (const r of S.extraResidents) {
-                if (r.map === m.id && state.npcSprites[r.npc_id]) {
-                    scene.npcs.push({ id: "res_" + r.npc_id, npc_id: r.npc_id, sprite: state.npcSprites[r.npc_id], x: r.x, y: r.y, dir: r.dir || "down", _quest: true });
+                if (r.map === m.id && state.npcSprites![r.npc_id]) {
+                    scene.npcs.push({ id: "res_" + r.npc_id, npc_id: r.npc_id, sprite: state.npcSprites![r.npc_id], x: r.x, y: r.y, dir: r.dir || "down", _quest: true });
                 }
             }
             state.scenes[m.id] = scene;
@@ -565,12 +565,12 @@ export async function init() {
         const musicSelect = document.getElementById("musicSelect") as HTMLSelectElement;
         for (const t of tracks) musicSelect.add(new Option(t, t));
         musicSelect.onchange = () => {
-            bgm.play(musicSelect.value);
+            bgm.play!(musicSelect.value);
             musicSelect.blur();
         };
     } catch {
         const musicSelect = document.getElementById("musicSelect");
-        if (musicSelect) musicSelect.parentElement.hidden = true;
+        if (musicSelect) musicSelect.parentElement!.hidden = true;
     }
 
     const chapterSelect = document.getElementById("chapterSelect") as HTMLSelectElement;
@@ -600,7 +600,7 @@ export async function init() {
     }
     charSelectEl.selectedIndex = state.charIdx;
 
-    document.getElementById("loading").hidden = true;
+    document.getElementById("loading")!.hidden = true;
 
     // A memory-card load reloads the page into the loaded slot; go straight to
     // the field instead of the language and title screens (set once by
@@ -648,11 +648,11 @@ export async function init() {
     if (!contEl) return; // defensive: element missing
 
     const closeTitle = (then) => {
-        if (title.classList.contains("fade-out")) return; // already closing
-        bgm.unlock(); sfx.unlock();
-        title.classList.add("fade-out");
+        if (title!.classList.contains("fade-out")) return; // already closing
+        bgm.unlock!(); sfx.unlock!();
+        title!.classList.add("fade-out");
         setTimeout(() => {
-            title.hidden = true;
+            title!.hidden = true;
             then();
         }, 650);
     };
@@ -695,7 +695,7 @@ export async function init() {
         }
     };
 
-    document.getElementById("title-newgame").onclick = () => {
+    document.getElementById("title-newgame")!.onclick = () => {
         requestGameFullscreen();
         for (const k of [
             "flags",
@@ -774,9 +774,9 @@ export async function init() {
             // cannot draw it and the field canvas is still hidden. Like the
             // boot language screen, it paints on the title canvas until it
             // closes (padLoop ticks it).
-            title.hidden = false;
-            title.classList.remove("fade-out");
-            title.classList.add("native");
+            title!.hidden = false;
+            title!.classList.remove("fade-out");
+            title!.classList.add("native");
             openMemoryCard("load", leaveMemoryCardToTitle);
             requestAnimationFrame(continueLoadFrame);
         });
@@ -826,10 +826,10 @@ export async function init() {
         destination: "0x" + movieDestination.toString(16),
     });
     const startMovie = (code: number) => {
-        title.hidden = false;
+        title!.hidden = false;
         titleNative = true;
-        title.classList.add("native");
-        bgm.play(null);
+        title!.classList.add("native");
+        bgm.play!(null);
         movie.open(code);
     };
     // The title publishes packed-sound words; a MUSIC-START word is a SEP
@@ -844,7 +844,7 @@ export async function init() {
                 const stem = PACKED_MUSIC[packedKey(id)];
                 if (stem) { bgm?.play?.(stem); continue; }
             }
-            sfx.playPacked(id);
+            sfx.playPacked!(id);
         }
     };
     // Starts false so the first successful draw flips it: the class toggle only
@@ -858,7 +858,7 @@ export async function init() {
 
     const commitTitle = (result, launchCode = 0) => {
         if (result === RESULT_START) {
-            document.getElementById("title-newgame").click();
+            document.getElementById("title-newgame")!.click();
         } else if (result === RESULT_CONTINUE) {
             // The same choice the button makes, and the same unconditional hand
             // off: no "is there a file" test, on either the pad route or the
@@ -879,7 +879,7 @@ export async function init() {
     // a second on a 60Hz panel and on a 144Hz one, as the disc does.
     let titleLastT = 0;
     const titleFrame = (t) => {
-        if (state.started || title.hidden) return;
+        if (state.started || title!.hidden) return;
         const dt = titleLastT ? Math.min((t - titleLastT) / 1000, 0.1) : 0;
         titleLastT = t;
         if (!movie.isOpen()) ts.tick(dt);
@@ -894,11 +894,11 @@ export async function init() {
             if (movie.isOpen()) {
                 drew = movie.draw(titleCtx, w, h, bgm.muted);
             } else {
-                drew = drawTitleScreen(titleCtx, ts, w, h, bgImg);
+                drew = drawTitleScreen(titleCtx, ts, w, h, bgImg!);
             }
             if (drew !== titleNative) {
                 titleNative = drew;
-                title.classList.toggle("native", drew);
+                title!.classList.toggle("native", drew);
             }
         }
         if (!movie.isOpen() && ts.isDone()) {
@@ -914,7 +914,7 @@ export async function init() {
         // ~10-second idle timeout the title never came back and no input
         // advanced it. New Game / Continue close the title synchronously with
         // the fade-out class, so they still stop the loop.
-        if (!state.started && !title.hidden && !title.classList.contains("fade-out")) {
+        if (!state.started && !title!.hidden && !title!.classList.contains("fade-out")) {
             requestAnimationFrame(titleFrame);
         }
     };
@@ -932,7 +932,7 @@ export async function init() {
         cntyselNative.isOpen();
     const startTitle = () => {
         ts = newTitle();
-        title.hidden = false;
+        title!.hidden = false;
         // A title opening again starts its real-time clock fresh, so the first
         // browser frame spends no time it did not live through.
         titleLastT = 0;
@@ -960,8 +960,8 @@ S.launchTitleScreen = () => {
         // timeout launches 0xE01 from here, whatever movie ran earlier.
         previousScreenCode = BATTLE_HANDOFF_SELECTOR;
         ts = newTitle();
-        title.hidden = false;
-        title.classList.remove("fade-out");
+        title!.hidden = false;
+        title!.classList.remove("fade-out");
         state.started = false;
         // No early title-theme start here: the fresh title runs its reveal and
         // its own TITLEBGM cue starts the theme, as on the disc.
@@ -993,7 +993,7 @@ S.launchTitleScreen = () => {
     // `if (titleInput) { titleInput(button); return; }` never reaches the game).
     const attachTitleInput = () => {
         S.titleInput = (k) => {
-            if (state.started || title.hidden) {
+            if (state.started || title!.hidden) {
                 S.titleInput = null;
                 return false;
             }
@@ -1008,7 +1008,7 @@ S.launchTitleScreen = () => {
                 return true;
             }
             if (!titleNative) {
-                if (k === "circle") document.getElementById("title-newgame").click();
+                if (k === "circle") document.getElementById("title-newgame")!.click();
                 return true;
             }
             if (k === "start") {
@@ -1038,7 +1038,7 @@ S.launchTitleScreen = () => {
     // stays visible with the `native` class so the walker's own logo/buttons
     // are hidden and the canvas is displayed.
     const continueLoadFrame = () => {
-        if (state.started || !saveScreen.isOpen()) return;
+        if (state.started || !saveScreen.isOpen!()) return;
         if (titleCtx) {
             const w = titleCanvas.clientWidth || 320;
             const h = titleCanvas.clientHeight || 240;
@@ -1051,7 +1051,7 @@ S.launchTitleScreen = () => {
             titleCtx.save();
             titleCtx.translate(t.offsetX, t.offsetY);
             titleCtx.scale(t.scale, t.scale);
-            saveScreen.draw(titleCtx, 320, 240, state);
+            saveScreen.draw!(titleCtx, 320, 240, state);
             titleCtx.restore();
         }
         requestAnimationFrame(continueLoadFrame);
@@ -1098,8 +1098,8 @@ S.launchTitleScreen = () => {
         if (debugLanguage !== null) state.languageByte = Number(debugLanguage) & 0xff;
         startTitle();
     } else {
-        title.hidden = false;
-        title.classList.add("native");
+        title!.hidden = false;
+        title!.classList.add("native");
         const onPick = (row, language, launchCode = 0) => {
             // The screen's own commit: the language byte it wrote to the
             // original's global. The walker ships one language, so this is

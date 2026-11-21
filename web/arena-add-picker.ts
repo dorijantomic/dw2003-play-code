@@ -80,12 +80,12 @@ export function createAddPicker({ getBuilt, onPick }) {
     try {
       asset = await getAsset(id, b.slots.env, pk, null);
       const g = buildAssetGroup(asset, "preview");
-      scene.add(g);
+      scene!.add(g);
       const h = asset.h || 1, r = asset.r || 1, dist = Math.max(h, r * 2) * 2.6;
       cam.position.set(dist * 0.62, h * 0.5 + dist * 0.32, dist * 0.78); cam.lookAt(0, h * 0.45, 0);
       rend.render(scene, cam);
       url = rend.domElement.toDataURL("image/png");
-      scene.remove(g);
+      scene!.remove(g);
     } catch (e) { console.warn("[add-picker] preview", id, e?.message || e); }
     try { asset?.dispose?.(); for (const p of asset?.parts || []) p.mat?.dispose?.(); } catch {}
     dropCache(pk);
@@ -105,43 +105,43 @@ export function createAddPicker({ getBuilt, onPick }) {
   }
   function lazy(card: HTMLDivElement) {
     io ||= new IntersectionObserver((ents) => {
-      for (const e of ents) if (e.isIntersecting) { io.unobserve(e.target); queue.push(e.target); }
+      for (const e of ents) if (e.isIntersecting) { io!.unobserve(e.target); queue.push(e.target); }
       pump();
     }, { root: $("addGrid"), rootMargin: "200px" });
     io.observe(card);
   }
   function draw() {
-    const q = $<HTMLInputElement>("addSearch").value.toLowerCase().trim(), kind = $<HTMLSelectElement>("addKind").value, src = $<HTMLSelectElement>("addSrc").value;
+    const q = $<HTMLInputElement>("addSearch")!.value.toLowerCase().trim(), kind = $<HTMLSelectElement>("addKind")!.value, src = $<HTMLSelectElement>("addSrc")!.value;
     const hit = entries.filter((a) => (!kind || a.kinds.includes(kind)) && (!src || a.source === src)
       && (!q || `${a.name} ${a.source} ${a.licence} ${a.kinds.join(" ")} ${a.id}`.toLowerCase().includes(q)));
-    $("addCount").textContent = `${hit.length} of ${entries.length}`;
-    const g = $("addGrid"); g.innerHTML = ""; queue.length = 0;
+    $("addCount")!.textContent = `${hit.length} of ${entries.length}`;
+    const g = $("addGrid"); g!.innerHTML = ""; queue.length = 0;
     for (const a of hit.slice(0, 400)) {
       const c = document.createElement("div"); c.className = "card"; c.dataset.asset = a.id;
       c.innerHTML = `<div class="pv">...</div><b></b><i></i><i></i>`;
-      c.children[1].textContent = a.name; (c.children[1] as HTMLElement).title = a.id; c.children[2].textContent = `${a.source}, ${a.licence}`; c.children[3].textContent = a.kinds.join(", ");
+      c.children[1]!.textContent = a.name; (c.children[1] as HTMLElement).title = a.id; c.children[2]!.textContent = `${a.source}, ${a.licence}`; c.children[3]!.textContent = a.kinds.join(", ");
       const done = cache.get(a.id);
-      if (done && done !== "fail") { c.querySelector(".pv").textContent = ""; const im = new Image(); im.src = done; c.querySelector(".pv").appendChild(im); }
-      else if (done === "fail") c.querySelector(".pv").textContent = "no preview";
+      if (done && done !== "fail") { c.querySelector(".pv")!.textContent = ""; const im = new Image(); im.src = done; c.querySelector(".pv")!.appendChild(im); }
+      else if (done === "fail") c.querySelector(".pv")!.textContent = "no preview";
       else lazy(c);
-      c.onclick = async () => { $("addMsg").textContent = ""; try { const ok = await onPick(a.id); if (ok !== false) close(); } catch (e) { $("addMsg").textContent = String(e?.message || e); } };
-      g.appendChild(c);
+      c.onclick = async () => { $("addMsg")!.textContent = ""; try { const ok = await onPick(a.id); if (ok !== false) close(); } catch (e) { $("addMsg")!.textContent = String(e?.message || e); } };
+      g!.appendChild(c);
     }
-    if (hit.length > 400) { const m = document.createElement("div"); m.textContent = `... ${hit.length - 400} more: narrow the search`; g.appendChild(m); }
+    if (hit.length > 400) { const m = document.createElement("div"); m.textContent = `... ${hit.length - 400} more: narrow the search`; g!.appendChild(m); }
   }
   async function open() {
-    gal.style.display = "flex"; $("addMsg").textContent = "";
+    gal.style.display = "flex"; $("addMsg")!.textContent = "";
     if (!entries) {
-      $("addGrid").textContent = "loading assets ...";
+      $("addGrid")!.textContent = "loading assets ...";
       entries = pickerEntries(await listAllAssets());
-      for (const k of [...new Set<string>(entries.flatMap((a) => a.kinds))].sort()) $<HTMLSelectElement>("addKind").add(new Option(k, k));
-      for (const s of [...new Set<string>(entries.map((a) => a.source))].sort()) $<HTMLSelectElement>("addSrc").add(new Option(s, s));
+      for (const k of [...new Set<string>(entries.flatMap((a) => a.kinds))].sort()) $<HTMLSelectElement>("addKind")!.add(new Option(k, k));
+      for (const s of [...new Set<string>(entries.map((a) => a.source))].sort()) $<HTMLSelectElement>("addSrc")!.add(new Option(s, s));
     }
     draw();
   }
   function close() { gal.style.display = "none"; queue.length = 0; }
-  for (const id of ["addSearch", "addKind", "addSrc"]) $(id).oninput = () => entries && draw();
-  $("addClose").onclick = close;
+  for (const id of ["addSearch", "addKind", "addSrc"]) $(id)!.oninput = () => entries && draw();
+  $("addClose")!.onclick = close;
   const onEsc = (e: { key: string; }) => { if (e.key === "Escape" && gal.style.display !== "none") close(); };
   addEventListener("keydown", onEsc);
   return { open, close, previewOf, get isOpen() { return gal.style.display !== "none"; }, get entries() { return entries; },

@@ -57,11 +57,11 @@ export const EMITTER_CLASSES = ["prop", "hand", "head", "chest", "back", "tail",
 // ---------------------------------------------------------------- vector helpers
 
 export function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
-export function sub(a: number[], b: number[]) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
-export function mul(a: number[], s: number) { return [a[0] * s, a[1] * s, a[2] * s]; }
-export function dot(a, b: (number | undefined)[]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+export function sub(a: number[], b: number[]) { return [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!]; }
+export function mul(a: number[], s: number) { return [a[0]! * s, a[1]! * s, a[2]! * s]; }
+export function dot(a, b: (number | undefined)[]) { return a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!; }
 export function len(a: number[]) { return Math.sqrt(dot(a, a)); }
-export function unit(a: (number | undefined)[]) { const l = len(a); return l > 1e-9 ? mul(a, 1 / l) : [0, 0, 0]; }
+export function unit(a: (number | undefined)[]) { const l = len(a!!!!!!); return l > 1e-9 ? mul(a!!!!!!, 1 / l) : [0, 0, 0]; }
 export function dist(a, b: number[]) { return len(sub(a, b)); }
 
 /** The angle between two vectors in degrees (0 = same direction, 180 = opposite). */
@@ -82,17 +82,17 @@ export function aimError(axis: number[], origin: number[], target: number[]) {
   const d = sub(target, origin);
   const dl = len(d);
   const full = angleBetween(axis, d);
-  const ah = Math.hypot(axis[0], axis[2]), dh = Math.hypot(d[0], d[2]);
+  const ah = Math.hypot(axis[0]!, axis[2]!), dh = Math.hypot(d[0]!, d[2]!);
   if (ah < 1e-6 || dh < 1e-6 * Math.max(1, dl)) {
     return { full, yaw: 0, pitch: 0, flat: true, distance: dl };
   }
-  const aYaw = Math.atan2(axis[0], axis[2]) * (180 / Math.PI);
-  const dYaw = Math.atan2(d[0], d[2]) * (180 / Math.PI);
+  const aYaw = Math.atan2(axis[0]!, axis[2]!) * (180 / Math.PI);
+  const dYaw = Math.atan2(d[0]!, d[2]!) * (180 / Math.PI);
   let yaw = aYaw - dYaw;
   while (yaw > 180) yaw -= 360;
   while (yaw < -180) yaw += 360;
-  const aPitch = Math.atan2(-axis[1], ah) * (180 / Math.PI);
-  const dPitch = Math.atan2(-d[1], dh) * (180 / Math.PI);
+  const aPitch = Math.atan2(-axis[1]!, ah) * (180 / Math.PI);
+  const dPitch = Math.atan2(-d[1]!, dh) * (180 / Math.PI);
   return { full, yaw, pitch: aPitch - dPitch, flat: false, distance: dl };
 }
 
@@ -124,7 +124,7 @@ function ps1Mat3(ax: number, ay: number, az: number) {
 function mat3Mul(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
-    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r] * b[c * 3 + k];
+    let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r]! * b[c * 3 + k];
     o[c * 3 + r] = s;
   }
   return o;
@@ -170,7 +170,7 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
       if (!rot[p]) proc(p);
       rot[i] = mat3Mul(rot[p], R);
       const rt = applyRot(rot[p], c1);
-      pos[i] = [pos[p][0] - rt[0], pos[p][1] + rt[1], pos[p][2] - rt[2]];
+      pos[i] = [pos[p][0] - rt[0]!, pos[p][1] + rt[1], pos[p][2] - rt[2]!];
     }
     if (b.anim.ch3) {
       const c3 = sample(b.anim.ch3);
@@ -195,7 +195,7 @@ export function boneMatrix(pose, i: string | number) {
 export function vertexWorld(model, boneIdx: string | number, v: number[], pose) {
   const R = pose.rot[boneIdx], t = pose.pos[boneIdx];
   const s = pose.scale?.[boneIdx] || [1, 1, 1];
-  const x = v[0] * s[0], y = v[1] * s[1], z = v[2] * s[2];
+  const x = v[0]! * s[0], y = v[1]! * s[1], z = v[2]! * s[2];
   return [
     -(R[0] * x + R[3] * y + R[6] * z) + t[0],
      (R[1] * x + R[4] * y + R[7] * z) + t[1],
@@ -250,8 +250,8 @@ function jacobiEigen3(A) {
           a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk;
         }
         for (let k = 0; k < 3; k++) {
-          const vkp = V[k][p], vkq = V[k][q];
-          V[k][p] = c * vkp - s * vkq; V[k][q] = s * vkp + c * vkq;
+          const vkp = V[k]![p], vkq = V[k]![q];
+          V[k]![p] = c * vkp! - s * vkq!; V[k]![q] = s * vkp! + c * vkq!;
         }
       }
     }
@@ -260,7 +260,7 @@ function jacobiEigen3(A) {
   const order = [0, 1, 2].sort((x, y) => eig[y] - eig[x]);
   return {
     values: order.map((i) => eig[i]),
-    vectors: order.map((i) => [V[0][i], V[1][i], V[2][i]]),
+    vectors: order.map((i) => [V[0]![i], V[1]![i], V[2]![i]]),
   };
 }
 
@@ -274,13 +274,13 @@ export function pca(points) {
   if (!n) return { mean: [0, 0, 0], axes: [], extents: [0, 0, 0], n: 0 };
   const mean = [0, 0, 0];
   for (const p of points) { mean[0] += p[0]; mean[1] += p[1]; mean[2] += p[2]; }
-  mean[0] /= n; mean[1] /= n; mean[2] /= n;
+  mean[0]! /= n; mean[1]! /= n; mean[2]! /= n;
   const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
   for (const p of points) {
-    const d = [p[0] - mean[0], p[1] - mean[1], p[2] - mean[2]];
-    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i][j] += d[i] * d[j];
+    const d = [p[0] - mean[0]!, p[1] - mean[1]!, p[2] - mean[2]!];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i]![j]! += d[i]! * d[j]!;
   }
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i][j] /= n;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) C[i]![j]! /= n;
   const { values, vectors } = jacobiEigen3(C);
   const total = values[0] + values[1] + values[2];
   const axes = vectors.map((v, i) => ({
@@ -290,10 +290,10 @@ export function pca(points) {
   }));
   const extents = [0, 0, 0];
   for (const p of points) {
-    const d = [p[0] - mean[0], p[1] - mean[1], p[2] - mean[2]];
+    const d = [p[0] - mean[0]!, p[1] - mean[1]!, p[2] - mean[2]!];
     for (let i = 0; i < 3; i++) {
-      const e = Math.abs(dot(d, axes[i].axis));
-      if (e > extents[i]) extents[i] = e;
+      const e = Math.abs(dot(d, axes[i]!.axis));
+      if (e > extents[i]!) extents[i] = e;
     }
   }
   return { mean, axes, extents: extents.map((e) => e * 2), n };
@@ -388,7 +388,7 @@ export function carriedFacing(boneIdx: string | number, pose, rest) {
 /** The direction of a bone CHAIN in the pose (first joint -> last joint), unit length. */
 export function chainDirection(chain, pose: { pos: { [x: string]: number[]; }; }) {
   if (!chain || chain.length < 2) return [0, 0, 1];
-  return unit(sub(pose.pos[chain[chain.length - 1]], pose.pos[chain[0]]));
+  return unit(sub(pose.pos[chain[chain.length - 1]]!, pose.pos[chain[0]]!));
 }
 
 function propAxis(model, bone: string | number, pose, bones, kind = "elongated", anchor = null) {
@@ -401,20 +401,20 @@ function propAxis(model, bone: string | number, pose, bones, kind = "elongated",
   // which is which, so this is still pure geometry.
   let axis, which, spread;
   if (kind === "flat") {
-    axis = unit(P.axes[2].axis);
+    axis = unit(P.axes[2]!.axis);
     which = "face-normal";
-    spread = P.axes[2].sigmaPct;
+    spread = P.axes[2]!.sigmaPct;
   } else {
-    axis = unit(P.axes[0].axis);
+    axis = unit(P.axes[0]!.axis);
     which = "long-axis";
-    spread = P.axes[0].sigmaPct;
+    spread = P.axes[0]!.sigmaPct;
   }
   // sign: away from the joint the prop hangs off (the wrist, or the shoulder when that is all there is)
   const root = anchor || pose.pos[0];
   if (dot(axis, sub(P.mean, root)) < 0) axis = mul(axis, -1);
   const reach = kind === "flat" ? P.extents[2] : P.extents[0];
-  const far = add(P.mean, mul(axis, reach / 2));
-  const near = sub(P.mean, mul(axis, reach / 2));
+  const far = add(P.mean, mul(axis, reach! / 2));
+  const near = sub(P.mean, mul(axis, reach! / 2));
   if (dist(near, root) > dist(far, root)) axis = mul(axis, -1);
   // IS THERE AN AXIS AT ALL? Two ways a posed mesh refuses to have one:
   //   collapsed  the disc hides a part by drawing it at ch3 scale 0, so its posed vertices all sit
@@ -427,9 +427,9 @@ function propAxis(model, bone: string | number, pose, bones, kind = "elongated",
   // `sep` is the variance share that separates the chosen axis from its neighbour: a blade reads
   // ~0.8, a round block ~0.
   const sep = kind === "flat"
-    ? P.axes[1].sigmaPct - P.axes[2].sigmaPct
-    : P.axes[0].sigmaPct - P.axes[1].sigmaPct;
-  const collapsed = !(P.axes[0].sigma > 1e-3);
+    ? P.axes[1]!.sigmaPct - P.axes[2]!.sigmaPct
+    : P.axes[0]!.sigmaPct - P.axes[1]!.sigmaPct;
+  const collapsed = !(P.axes[0]!.sigma > 1e-3);
   const unstable = collapsed || sep < 0.02;
   return { axis, pca: P, which, spread, sep, collapsed, unstable };
 }
@@ -443,15 +443,15 @@ function handAxes(model, bone: string | number, pose, arm) {
   const push = unit(sub(P.mean, wrist));
   // palm: the thinnest axis of the hand block, signed outward (same sign as push)
   const thinnest = P.axes.slice().sort((a, b) => a.sigma - b.sigma)[0];
-  let palm = unit(thinnest.axis);
+  let palm = unit(thinnest!.axis);
   if (dot(palm, push) < 0) palm = mul(palm, -1);
   // A block centred on its own joint has no "push" direction (the difference is zero), and a block
   // with no thin side (a cube) has no palm normal. Both are reported so the caller can fall back
   // instead of aiming along a zero vector.
-  const sepThin = P.axes[1].sigmaPct - P.axes[2].sigmaPct;
+  const sepThin = P.axes[1]!.sigmaPct - P.axes[2]!.sigmaPct;
   return {
-    push, palm, pca: P, thin: thinnest.sigmaPct, sepThin,
-    pushLen: len(push), palmUnstable: P.axes[0].sigma <= 1e-3 || sepThin < 0.02 || len(push) === 0,
+    push, palm, pca: P, thin: thinnest!.sigmaPct, sepThin,
+    pushLen: len(push), palmUnstable: P.axes[0]!.sigma <= 1e-3 || sepThin < 0.02 || len(push) === 0,
   };
 }
 
@@ -567,7 +567,7 @@ export function armAxisCandidates(model, folder: string | number, emitterId, pos
   const chain = info.arm?.chain ?? [];
   const wrist = chain.length >= 2 ? pose.pos[chain[chain.length - 2]] : pose.pos[bone];
   const push = unit(sub(P.mean, wrist));
-  const out = { push, long: unit(P.axes[0].axis), thin: unit(P.axes[2].axis), pca: P };
+  const out = { push, long: unit(P.axes[0]!.axis), thin: unit(P.axes[2]!.axis), pca: P };
   // sign every candidate outward (away from the wrist), so a comparison is not a sign coin-flip
   for (const k of ["long", "thin"]) if (dot(out[k], push) < 0) out[k] = mul(out[k], -1);
   return out;

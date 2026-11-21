@@ -274,7 +274,7 @@ function applyCounter(b: BattleState, c) {
     // F0x8009ff40 (fightstg.s:30399-30520): the blow's base is the damage just taken times the countering
     // record's own f9 (+0x0c) / 64, or / 32 while the countering fighter's charge byte +0x1b (Aura Plug) is on.
     const r = noteHit("counter", engineResolveCounterBlow(defender, attacker, skill, damage,
-      B.fightTechDB?.[String(skillId)]?.crit | 0, RAND_U16, b.field));
+      B.fightTechDB?.[String(skillId)]?.crit! | 0, RAND_U16, b.field));
     if (!r.hit) return ` ${defenderName} countered, but ${attackerName} evaded!`;
     attacker.hp = Math.max(0, attacker.hp - r.dmg);
     return ` ${defenderName} countered for ${r.dmg} damage!`;

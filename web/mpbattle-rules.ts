@@ -425,7 +425,7 @@ export class Arena {
         if (out.blast?.active) endBlast(out, { form: true });   // a Tag forfeits the Blast
         for (let i = this.pool.length - 1; i >= 0; i--) {                     // the outgoing Digimon's timers do not follow it
             const e = this.pool[i];
-            if ((e.side | 0) === SIDE_PLAYER && (e.slot | 0) === (out.slot | 0)) this.pool.splice(i, 1);
+            if ((e!.side | 0) === SIDE_PLAYER && (e!.slot | 0) === (out.slot | 0)) this.pool.splice(i, 1);
         }
         const seat = out.slot | 0;
         this.#seat(inc, SIDE_PLAYER, seat);

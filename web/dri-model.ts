@@ -354,7 +354,7 @@ export function chartPages(starter, records, digimonById) {
     if (!profile || profile.id > 52) continue;
     seen.add(record.to);
     const page = profile.id <= 20 ? 0 : profile.id <= 33 ? 1 : profile.id <= 43 ? 2 : 3;
-    tiers[page].push({ ...record, profile, to: profile.name });
+    tiers[page]!.push({ ...record, profile, to: profile.name });
   }
   return tiers.map((entries, page) => ({ page, starter, entries }));
 }

@@ -215,7 +215,7 @@ export function mergeMotion(model, letter: string, motion: Dw2Motion, table: num
       model.bones[i] = { ...bone, anim };
     }
   }
-  while (model.timeline.length <= table) model.timeline.push(empty());
+  while (model.timeline.length <= table!) model.timeline.push(empty());
   model.timeline[table] = { table: motion.playlist.map((e) => ({ ...e })) };
   return true;
 }

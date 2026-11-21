@@ -86,9 +86,9 @@ function idsOf(rows: SfxManifest | undefined) {
  * every other sequence.
  */
 export function stemForWord(word: number | null, bank: string, startWords: Record<string, string> = START_WORDS) {
-    const named = startWords?.[packedKey(word >>> 0)];
+    const named = startWords?.[packedKey(word! >>> 0)];
     if (named) return named;
-    const seq = (word >>> 0) & 0xffff;
+    const seq = (word! >>> 0) & 0xffff;
     return seq === 0 ? bank : `${bank}_${seq}`;
 }
 

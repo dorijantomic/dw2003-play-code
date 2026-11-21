@@ -37,8 +37,8 @@ const PARENT = 0x100, CTX = 0x200, MODE_CELL = 0x300, CHILD = 0x400;
 /** A word memory backed by a Map, seeded with the parent actor's fields. */
 function dispatchMemory(w: Map<number, number>) {
   return {
-    read32: (a: number) => w.get(a) | 0,
-    read16s: (a: number) => { const v = w.get(a) | 0; return (v << 16) >> 16; },
+    read32: (a: number) => w.get(a)! | 0,
+    read16s: (a: number) => { const v = w.get(a)! | 0; return (v << 16) >> 16; },
     write32: (a: number, v: number) => { w.set(a, v | 0); },
   };
 }

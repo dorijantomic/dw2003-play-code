@@ -58,11 +58,11 @@ export function ownNumbers(sp, partner, profiles = null) {
     const add = onStarter ? null : sp.profile;
     const root = add ? (profiles ?? []).find((p) => p.name === partner.rookie) : null;
     const base = baseNumbers(root ?? sp.profile, level);
-    const out = { hp: Number(rec.maxHp ?? base.hp), mp: Number(rec.maxMp ?? base.mp), level };
+    const out = { hp: Number(rec.maxHp ?? base!.hp), mp: Number(rec.maxMp ?? base!.mp), level };
     for (const k of CORE_KEYS) {
         const worn = add && FORM_KEYS.includes(k) ? Number(add[k]) || 0 : 0;
         const stored = rec.stats?.[k];
-        out[k] = stored == null ? base[k] + (root ? worn : 0) : Number(stored) + Number(rec.bonuses?.[k] ?? 0) + worn;
+        out[k] = stored == null ? base![k] + (root ? worn : 0) : Number(stored) + Number(rec.bonuses?.[k] ?? 0) + worn;
     }
     return out;
 }
@@ -240,7 +240,7 @@ export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = n
     for (const sp of species) {
         const into = sp.partner ? maxima : wildMaxima;
         for (const [, key] of BARS) {
-            if (isForm(sp) && !FORM_KEYS.includes(key)) continue;      // a form's HP, MP and CHR are not shown, and are not like the starters' totals
+            if (isForm(sp) && !FORM_KEYS.includes(key!)) continue;      // a form's HP, MP and CHR are not shown, and are not like the starters' totals
             const v = key === "hp" ? sp.hp : key === "mp" ? sp.mp : sp.stats?.[key];
             if (Number.isFinite(v) && v > into[key]) into[key] = v;
         }
@@ -358,7 +358,7 @@ export function pageTwoLines(sp, state: string, partner, world, maxima, wildMaxi
     const form = isForm(sp);
     if (sp.partner && sp.profile) out.push({ kind: "head", label: own ? `Yours, Lv ${own.level}` : form ? "Adds when digivolved" : "Base, Lv 1" });
     for (const [label, key, icon] of BARS) {
-        if (form && !own && !FORM_KEYS.includes(key)) continue;
+        if (form && !own && !FORM_KEYS.includes(key!)) continue;
         const value = own ? own[key] : key === "hp" ? sp.hp : key === "mp" ? sp.mp : sp.stats?.[key];
         if (!Number.isFinite(value)) continue;
         const r = sp.fought?.[key];
@@ -369,7 +369,7 @@ export function pageTwoLines(sp, state: string, partner, world, maxima, wildMaxi
     const base = form ? formPartner(sp, lead, world) : null;
     const total = (e: string) => (form ? (base?.elements[e] ?? 0) + (sp.resists?.[e] ?? 0) : (sp.resists?.[e] ?? 100));
     if (!form || base) {
-        if (form) out.push({ kind: "head", label: `On ${base.name}` });
+        if (form) out.push({ kind: "head", label: `On ${base!.name}` });
         const strong = ELEMENTS.filter((e) => total(e) > 100).map(cap);
         const weak = ELEMENTS.filter((e) => total(e) < 100).map(cap);
         out.push({ kind: "text", label: "Resists", text: strong.join(", ") || "-" });

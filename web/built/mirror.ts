@@ -161,14 +161,14 @@ export function makeWaterNormalData(size = 256, seed = 20261030) {
   const H = new Float32Array(size * size);
   const oct = [[4, 0.50], [8, 0.27], [16, 0.15], [32, 0.08]];
   for (const [per, amp] of oct) {
-    const lat = new Float32Array(per * per);
+    const lat = new Float32Array(per! * per!);
     for (let i = 0; i < lat.length; i++) lat[i] = rnd();
-    const at = (x: number, y: number) => lat[((y % per) + per) % per * per + ((x % per) + per) % per];
+    const at = (x: number, y: number) => lat[((y % per!) + per!) % per! * per! + ((x % per!) + per!) % per!];
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const fx = x / size * per, fy = y / size * per, ix = Math.floor(fx), iy = Math.floor(fy);
+      const fx = x / size * per!, fy = y / size * per!, ix = Math.floor(fx), iy = Math.floor(fy);
       const tx = fx - ix, ty = fy - iy, ux = tx * tx * (3 - 2 * tx), uy = ty * ty * (3 - 2 * ty);
-      const n = (at(ix, iy) * (1 - ux) + at(ix + 1, iy) * ux) * (1 - uy) + (at(ix, iy + 1) * (1 - ux) + at(ix + 1, iy + 1) * ux) * uy;
-      H[y * size + x] += amp * (1 - Math.abs(2 * n - 1));
+      const n = (at(ix, iy)! * (1 - ux) + at(ix + 1, iy)! * ux) * (1 - uy) + (at(ix, iy + 1)! * (1 - ux) + at(ix + 1, iy + 1)! * ux) * uy;
+      H[y * size + x]! += amp! * (1 - Math.abs(2 * n - 1));
     }
   }
   let lo = Infinity, hi = -Infinity;
@@ -177,11 +177,11 @@ export function makeWaterNormalData(size = 256, seed = 20261030) {
   const h = (x: number, y: number) => H[((y + size) % size) * size + ((x + size) % size)];
   const K = 3.2;   // slope gain before the shader's own strength
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const dx = (h(x + 1, y) - h(x - 1, y)) * K * size / 64, dy = (h(x, y + 1) - h(x, y - 1)) * K * size / 64;
+    const dx = (h(x + 1, y)! - h(x - 1, y)!) * K * size / 64, dy = (h(x, y + 1)! - h(x, y - 1)!) * K * size / 64;
     const L = Math.hypot(dx, dy, 1), o = (y * size + x) * 4;
     data[o] = Math.round((-dx / L * 0.5 + 0.5) * 255); data[o + 1] = Math.round((-dy / L * 0.5 + 0.5) * 255);
     data[o + 2] = Math.round((1 / L * 0.5 + 0.5) * 255);
-    data[o + 3] = Math.round((h(x, y) - lo) / Math.max(1e-6, hi - lo) * 255);
+    data[o + 3] = Math.round((h(x, y)! - lo) / Math.max(1e-6, hi - lo) * 255);
   }
   return { size, data, range: [lo, hi] };
 }
@@ -488,7 +488,7 @@ function pileGeometry(THREE, piles = PILES) {
     const tx = Math.cos(a), tz = -Math.sin(a);                            // tangent
     // built UPWARD from y 0: the caller hangs it from a parent with scale.y = -1, like every other mirrored copy
     const r = p.r * M, w = p.w * M / 2, y1 = p.h * M;
-    const P = [[-w, 0], [w, 0], [w, y1], [-w, y1]].map(([t, y]) => [ux * r + tx * t, y, uz * r + tz * t]);
+    const P = [[-w, 0], [w, 0], [w, y1], [-w, y1]].map(([t, y]) => [ux * r + tx * t!, y, uz * r + tz * t!]);
     pos.push(...P[0], ...P[2], ...P[1], ...P[0], ...P[3], ...P[2]);
     idx.push(n, n + 1, n + 2, n + 3, n + 4, n + 5);
     n += 6;
@@ -508,7 +508,7 @@ export function bankGeometry(THREE, B = BANK, seg = BANK.SEG) {
   for (let i = 0; i <= seg; i++) {
     const a = (i / seg) * Math.PI * 2;
     for (let j = 0; j < n; j++) {
-      const r = (B.R0 + (B.R1 - B.R0) * j / (n - 1)) * M, y = B.PROFILE[j] * B.H * M;
+      const r = (B.R0 + (B.R1 - B.R0) * j / (n - 1)) * M, y = B.PROFILE[j]! * B.H * M;
       pos.push(Math.sin(a) * r, y, Math.cos(a) * r);
       uv.push(i / seg, j / (n - 1));
     }
@@ -592,7 +592,7 @@ export function buildMirror(slot, ctx) {
   // the water's own colours: linear THREE.Colors made from the sRGB numbers in LAKE (one shared object, so the copies
   // fade toward the SAME water the surface draws)
   const lin = (c: number[]) => SH.srgb(c);
-  const lakeMid = lin(LAKE.NEAR.map((v, i) => (v + LAKE.FAR[i]) / 2));
+  const lakeMid = lin(LAKE.NEAR.map((v, i) => (v + LAKE.FAR[i]!) / 2));
   const lakeU = {
     uWN: { value: waterNormalTexture() },
     uLakeNear: { value: lin(LAKE.NEAR) }, uLakeFar: { value: lin(LAKE.FAR) }, uShoreCol: { value: lin(LAKE.SHORE_COL) },
@@ -689,11 +689,11 @@ export function buildMirror(slot, ctx) {
     let farSrc = null;
     world.traverse((o) => { if (!farSrc && o.isMesh && !o.isInstancedMesh && o.name === "builtFarPines") farSrc = o; });
     const shared = !!(farSrc && farSrc.geometry?.attributes?.position);
-    if (shared) { u.uBandH = { value: (REFL.BAND_TOP[0] + REFL.BAND_TOP[1]) / 2 }; delete u.uSkyline; }
+    if (shared) { u.uBandH = { value: (REFL.BAND_TOP[0]! + REFL.BAND_TOP[1]!) / 2 }; delete u.uSkyline; }
     const mat = reflectionMaterial(T, u, shared ? { MIRROR_SHARED: "" } : { MIRROR_BAND: "" });
     mat.name = "lake_treeline";
     materials.push(mat);
-    const g = shared ? farSrc.geometry : bandGeometry(T, pine);
+    const g = shared ? farSrc!.geometry : bandGeometry(T, pine);
     if (!shared) own.push(g);
     const m = new T.Mesh(g, mat);
     m.name = "builtLakeTreeline"; m.renderOrder = 7; m.frustumCulled = false;
@@ -719,7 +719,7 @@ export function buildMirror(slot, ctx) {
   const fp = D.farPines;
   const rowsFP = fp?.rows || [];
   const foot = rowsFP.length > 2 ? rowsFP[rowsFP.length - 1]?.rgb : null, above = rowsFP.length > 2 ? rowsFP[rowsFP.length - 2]?.rgb : null;
-  const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const lum = (c: number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
   if (foot && above && lum(foot) > 2.0 * lum(above) && foot[1] >= foot[0]) {
     const bg = bankGeometry(T); own.push(bg);
     const bankCol = lin(foot);

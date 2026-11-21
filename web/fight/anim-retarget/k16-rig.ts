@@ -65,7 +65,7 @@ export const k16tr = (A) => A[0].map((_, j) => A.map((r) => r[j]));
 
 export const k16mv = (A, v) => A.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
 
-export const k16dot = (a, b: number[] | (number | undefined)[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+export const k16dot = (a, b: number[] | (number | undefined)[]) => a[0] * b[0]! + a[1] * b[1]! + a[2] * b[2]!;
 
 export const k16sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
@@ -86,8 +86,8 @@ const k16rx = (t: number) => [[1, 0, 0], [0, Math.cos(t), -Math.sin(t)], [0, Mat
 const k16local = (c0: number, c1: number, c2: number) => k16mul(k16rz(c2), k16mul(k16ry(c1), k16rx(c0)));
 
 export const k16perp = (a: number[]) => {
-  const t = Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const p = [a[1] * t[2] - a[2] * t[1], a[2] * t[0] - a[0] * t[2], a[0] * t[1] - a[1] * t[0]];
+  const t = Math.abs(a[0]!) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const p = [a[1]! * t[2]! - a[2]! * t[1]!, a[2]! * t[0]! - a[0]! * t[2]!, a[0]! * t[1]! - a[1]! * t[0]!];
   const n = k16norm(p);
   return n > 1e-9 ? k16scale(p, 1 / n) : [0, 0, 1];
 };
@@ -132,7 +132,7 @@ export function k16fromTo(u, v) {
   const c = k16dot(a, b);
   if (c > 1 - 1e-9) return K16_ID;
   if (c < -1 + 1e-9) return k16axisAngle(k16perp(a), Math.PI);
-  const ax = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const ax = [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
   const s = k16norm(ax);
   return k16axisAngle(k16scale(ax, 1 / s), Math.atan2(s, c));
 }
@@ -166,14 +166,14 @@ export function k16ToCh2(M, prev = null) {
       if (d > 2048) d -= 4096;
       return p + d;
     };
-    const alt = [t[0] + 2048, 2048 - t[1], t[2] + 2048];
+    const alt = [t[0]! + 2048, 2048 - t[1]!, t[2]! + 2048];
     const cost = (v) => Math.abs(v[0] - prev[0]) + Math.abs(v[1] - prev[1]) + Math.abs(v[2] - prev[2]);
     const a = t.map((x, i) => wrapNear(x, prev[i]));
     const b = alt.map((x, i) => wrapNear(x, prev[i]));
     t = cost(a) <= cost(b) ? a : b;
   }
   const norm = (x: number | undefined) => {
-    let r = Math.round(x) % 4096;
+    let r = Math.round(x!) % 4096;
     if (r < 0) r += 4096;
     return r >= 2048 ? r - 4096 : r;
   };
@@ -208,10 +208,10 @@ export function k16Subtrees(model) {
   const kids = Array.from({ length: n }, () => []);
   for (let i = 0; i < n; i++) {
     const p = (model.bones[i]?.parent_slot ?? 0) - 1;
-    if (p >= 0 && p < n) kids[p].push(i);
+    if (p >= 0 && p < n) kids[p]!.push(i);
   }
   const out = Array.from({ length: n }, () => []);
-  const walk = (i, acc) => { acc.push(i); for (const k of kids[i]) walk(k, acc); return acc; };
+  const walk = (i, acc) => { acc.push(i); for (const k of kids[i]!) walk(k, acc); return acc; };
   for (let i = 0; i < n; i++) out[i] = walk(i, []);
   return out;
 }
@@ -260,7 +260,7 @@ export function rigOf(model) {
   rig.roots = nr.roots;
   rig.rootFix = {
     legRoot: nr.legRoots[0] ?? null, upperRoot: nr.upperRoot,
-    rawCarriesLegs: nr.legRoots.includes(nr.rootRaw),
+    rawCarriesLegs: nr.legRoots.includes(nr.rootRaw!),
     moved: nr.root !== nr.rootRaw || nr.torso !== nr.torsoRaw,
   };
   if (folder) k16RigCache.set(cacheKey, rig);
@@ -409,8 +409,8 @@ function k16TwoBone(S0, H, a, b, hint, plane = null) {
   // solved as a straight chain instead (one rotation, no knee/elbow).
   if (angle >= 0.995 || dist >= (a + b) * 0.995) {
     return {
-      elbow: [S0[0] + a * u[0], S0[1] + a * u[1], S0[2] + a * u[2]],
-      tip: [S0[0] + dist * u[0], S0[1] + dist * u[1], S0[2] + dist * u[2]],
+      elbow: [S0[0] + a * u[0]!, S0[1] + a * u[1]!, S0[2] + a * u[2]!],
+      tip: [S0[0] + dist * u[0]!, S0[1] + dist * u[1]!, S0[2] + dist * u[2]!],
       reach: d / Math.max(1e-6, a + b), clamped: Math.abs(dist - d) > 1e-6, straight: true, bendDir: null,
     };
   }
@@ -422,8 +422,8 @@ function k16TwoBone(S0, H, a, b, hint, plane = null) {
   if (k16norm(v) < 1e-6) v = k16perp(u);
   v = k16scale(v, 1 / k16norm(v));
   return {
-    elbow: [S0[0] + a * (cosA * u[0] + sinA * v[0]), S0[1] + a * (cosA * u[1] + sinA * v[1]), S0[2] + a * (cosA * u[2] + sinA * v[2])],
-    tip: [S0[0] + dist * u[0], S0[1] + dist * u[1], S0[2] + dist * u[2]],
+    elbow: [S0[0] + a * (cosA * u[0]! + sinA * v[0]!), S0[1] + a * (cosA * u[1]! + sinA * v[1]!), S0[2] + a * (cosA * u[2]! + sinA * v[2]!)],
+    tip: [S0[0] + dist * u[0]!, S0[1] + dist * u[1]!, S0[2] + dist * u[2]!],
     reach: d / Math.max(1e-6, a + b),
     clamped: Math.abs(dist - d) > 1e-6,
     bendDir: v,

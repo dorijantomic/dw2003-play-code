@@ -91,19 +91,19 @@ function drawFightReport(b: BattleState) {
     const page = pages[pageIdx];
 
     if (!chromeReady || !L) {
-      B.ctx.fillStyle = "#000018";
-      B.ctx.fillRect(0, 0, 320, 240);
-      B.ctx.fillStyle = "#fff";
-      B.ctx.font = "bold 14px monospace";
-      B.ctx.textAlign = "center";
-      B.ctx.fillText(page.message ?? `${page.label}: ${page.value}`, 160, 210);
+      B.ctx!.fillStyle = "#000018";
+      B.ctx!.fillRect(0, 0, 320, 240);
+      B.ctx!.fillStyle = "#fff";
+      B.ctx!.font = "bold 14px monospace";
+      B.ctx!.textAlign = "center";
+      B.ctx!.fillText(page.message ?? `${page.label}: ${page.value}`, 160, 210);
       return;
     }
 
     // Brief black cut before the first report page only.
     if (pageIdx === 0 && b.timer < 0.42) {
-      B.ctx.fillStyle = "#000";
-      B.ctx.fillRect(0, 0, 320, 240);
+      B.ctx!.fillStyle = "#000";
+      B.ctx!.fillRect(0, 0, 320, 240);
       return;
     }
 
@@ -148,10 +148,10 @@ function drawFightReport(b: BattleState) {
       message.slice(0, chars).split("\n").forEach((line: string | undefined, i: number) =>
         uiDrawText(B.ctx, line, MSG.x, MSG.y + i * 13, { kind: MSG.kind }));
     } else {
-      B.ctx.fillStyle = "#fff";
-      B.ctx.font = "bold 12px monospace";
-      B.ctx.textAlign = "left";
-      B.ctx.fillText(page.message ?? `${page.label}: ${page.value}`, 20, 44);
+      B.ctx!.fillStyle = "#fff";
+      B.ctx!.font = "bold 12px monospace";
+      B.ctx!.textAlign = "left";
+      B.ctx!.fillText(page.message ?? `${page.label}: ${page.value}`, 20, 44);
     }
 
     // Shared cmfont blink cursor (CLUT-cycled, 5 frames — same clip every

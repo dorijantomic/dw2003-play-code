@@ -88,9 +88,9 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     const forward = [-sy * cp, -sp, -cy * cp];      // pivot - eye, normalised
     const right = [cy, 0, -sy];                     // forward x worldUp, yaw-only
     const up = [
-      right[1] * forward[2] - right[2] * forward[1],
-      right[2] * forward[0] - right[0] * forward[2],
-      right[0] * forward[1] - right[1] * forward[0],
+      right[1]! * forward[2]! - right[2]! * forward[1]!,
+      right[2]! * forward[0]! - right[0]! * forward[2]!,
+      right[0]! * forward[1]! - right[1]! * forward[0]!,
     ];
     return { forward, right, up };
   }
@@ -98,9 +98,9 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   function eye(out?: number[]) {
     const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     const p = out || [0, 0, 0];
-    p[0] = cam.pivot[0] + cam.dist * Math.sin(cam.yaw) * cp;
-    p[1] = cam.pivot[1] + cam.dist * sp;
-    p[2] = cam.pivot[2] + cam.dist * Math.cos(cam.yaw) * cp;
+    p[0] = cam.pivot[0]! + cam.dist * Math.sin(cam.yaw) * cp;
+    p[1] = cam.pivot[1]! + cam.dist * sp;
+    p[2] = cam.pivot[2]! + cam.dist * Math.cos(cam.yaw) * cp;
     return p;
   }
 
@@ -130,9 +130,9 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     const unitsPerPx = (2 * cam.dist * Math.tan(cam.fovDeg * DEG / 2)) / Math.max(1, viewportH);
     const sx = -dx * unitsPerPx, sy = dy * unitsPerPx;
     cam.targetPivot = [
-      cam.targetPivot[0] + right[0] * sx + up[0] * sy,
-      cam.targetPivot[1] + right[1] * sx + up[1] * sy,
-      cam.targetPivot[2] + right[2] * sx + up[2] * sy,
+      cam.targetPivot[0]! + right[0]! * sx + up[0]! * sy,
+      cam.targetPivot[1]! + right[1]! * sx + up[1]! * sy,
+      cam.targetPivot[2]! + right[2]! * sx + up[2]! * sy,
     ];
     return cam.targetPivot.slice();
   }
@@ -150,21 +150,21 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
       const { forward, right, up } = basis();
       const th = Math.tan(cam.fovDeg * DEG / 2);
       // ray through the cursor in world space
-      const dx = right[0] * cursorNdc[0] * th * aspect + up[0] * cursorNdc[1] * th + forward[0];
-      const dy = right[1] * cursorNdc[0] * th * aspect + up[1] * cursorNdc[1] * th + forward[1];
-      const dz = right[2] * cursorNdc[0] * th * aspect + up[2] * cursorNdc[1] * th + forward[2];
+      const dx = right[0]! * cursorNdc[0] * th * aspect + up[0]! * cursorNdc[1] * th + forward[0]!;
+      const dy = right[1]! * cursorNdc[0] * th * aspect + up[1]! * cursorNdc[1] * th + forward[1]!;
+      const dz = right[2]! * cursorNdc[0] * th * aspect + up[2]! * cursorNdc[1] * th + forward[2]!;
       const len = Math.hypot(dx, dy, dz) || 1;
       const dir = [dx / len, dy / len, dz / len];
-      const denom = dir[0] * forward[0] + dir[1] * forward[1] + dir[2] * forward[2];
+      const denom = dir[0]! * forward[0]! + dir[1]! * forward[1]! + dir[2]! * forward[2]!;
       if (denom > 0.05) {
         const t = cam.dist / denom;               // distance along the ray to the pivot plane
         const o = eye();
-        const hit = [o[0] + dir[0] * t, o[1] + dir[1] * t, o[2] + dir[2] * t];
+        const hit = [o[0]! + dir[0]! * t, o[1]! + dir[1]! * t, o[2]! + dir[2]! * t];
         const k = 1 - applied;                     // how much closer we got
         cam.targetPivot = [
-          cam.targetPivot[0] + (hit[0] - cam.targetPivot[0]) * k,
-          cam.targetPivot[1] + (hit[1] - cam.targetPivot[1]) * k,
-          cam.targetPivot[2] + (hit[2] - cam.targetPivot[2]) * k,
+          cam.targetPivot[0]! + (hit[0]! - cam.targetPivot[0]!) * k,
+          cam.targetPivot[1]! + (hit[1]! - cam.targetPivot[1]!) * k,
+          cam.targetPivot[2]! + (hit[2]! - cam.targetPivot[2]!) * k,
         ];
       }
     }
@@ -190,9 +190,9 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     const { right, up, forward } = basis();
     const c = box.center, h = box.half;
     // extent of the box along the screen axes: sum |axis·half| is the exact projected half-size
-    const ex = Math.abs(right[0]) * h[0] + Math.abs(right[1]) * h[1] + Math.abs(right[2]) * h[2];
-    const ey = Math.abs(up[0]) * h[0] + Math.abs(up[1]) * h[1] + Math.abs(up[2]) * h[2];
-    const ez = Math.abs(forward[0]) * h[0] + Math.abs(forward[1]) * h[1] + Math.abs(forward[2]) * h[2];
+    const ex = Math.abs(right[0]!) * h[0] + Math.abs(right[1]!) * h[1] + Math.abs(right[2]!) * h[2];
+    const ey = Math.abs(up[0]!) * h[0] + Math.abs(up[1]!) * h[1] + Math.abs(up[2]!) * h[2];
+    const ez = Math.abs(forward[0]!) * h[0] + Math.abs(forward[1]!) * h[1] + Math.abs(forward[2]!) * h[2];
     const th = Math.tan(cam.fovDeg * DEG / 2);
     // for ortho the projection is a box: the same half-extents, no perspective divide
     if (cam.ortho) return Math.max(1, 2 * Math.max(ey, ex / Math.max(0.1, aspect)) * padding + ez);
@@ -224,8 +224,8 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     if (!boxes.length) return false;
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
     for (const b of boxes) for (let i = 0; i < 3; i++) {
-      min[i] = Math.min(min[i], b.center[i] - b.half[i]);
-      max[i] = Math.max(max[i], b.center[i] + b.half[i]);
+      min[i] = Math.min(min[i]!, b.center[i] - b.half[i]);
+      max[i] = Math.max(max[i]!, b.center[i] + b.half[i]);
     }
     if (!min.every(Number.isFinite)) return false;
     return frameBounds({ min, max }, aspect, opts);
@@ -264,19 +264,19 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     if (!active || dt <= 0) return false;
     const { forward, right, up } = basis();
     const flatF = [forward[0], 0, forward[2]];
-    const fl = Math.hypot(flatF[0], flatF[2]) || 1;
-    flatF[0] /= fl; flatF[2] /= fl;
+    const fl = Math.hypot(flatF[0]!, flatF[2]!) || 1;
+    flatF[0]! /= fl; flatF[2]! /= fl;
     const speed = cam.dist * 0.9 * cam.flySpeed * dt;   // relative speed: consistent at any zoom
     const move = [0, 0, 0];
-    const add = (v: number[] | (number | undefined)[], k: number) => { move[0] += v[0] * k; move[1] += v[1] * k; move[2] += v[2] * k; };
+    const add = (v: number[] | (number | undefined)[], k: number) => { move[0]! += v[0]! * k; move[1]! += v[1]! * k; move[2]! += v[2]! * k; };
     if (keys.w) add(flatF, speed);
     if (keys.s) add(flatF, -speed);
     if (keys.d) add(right, speed);
     if (keys.a) add(right, -speed);
     if (keys.e) add([0, 1, 0], speed);
     if (keys.q) add([0, 1, 0], -speed);
-    cam.targetPivot = [cam.targetPivot[0] + move[0], cam.targetPivot[1] + move[1], cam.targetPivot[2] + move[2]];
-    cam.pivot = [cam.pivot[0] + move[0], cam.pivot[1] + move[1], cam.pivot[2] + move[2]];
+    cam.targetPivot = [cam.targetPivot[0]! + move[0]!, cam.targetPivot[1]! + move[1]!, cam.targetPivot[2]! + move[2]!];
+    cam.pivot = [cam.pivot[0]! + move[0]!, cam.pivot[1]! + move[1]!, cam.pivot[2]! + move[2]!];
     return true;
   }
 
@@ -352,23 +352,23 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     const o = new Float32Array(16);
     for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
       let s = 0;
-      for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
+      for (let k = 0; k < 4; k++) s += a[k * 4 + r]! * b[c * 4 + k]!;
       o[c * 4 + r] = s;
     }
     return o;
   }
   function transform(m: Float32Array<ArrayBuffer>, p) {
     const x = p[0], y = p[1], z = p[2];
-    const w = m[3] * x + m[7] * y + m[11] * z + m[15];
-    return [(m[0] * x + m[4] * y + m[8] * z + m[12]) / w,
-            (m[1] * x + m[5] * y + m[9] * z + m[13]) / w,
-            (m[2] * x + m[6] * y + m[10] * z + m[14]) / w];
+    const w = m[3]! * x + m[7]! * y + m[11]! * z + m[15]!;
+    return [(m[0]! * x + m[4]! * y + m[8]! * z + m[12]!) / w,
+            (m[1]! * x + m[5]! * y + m[9]! * z + m[13]!) / w,
+            (m[2]! * x + m[6]! * y + m[10]! * z + m[14]!) / w];
   }
 
   /** Project a world point to NDC [-1,1]. Returns null when behind the camera or non-finite. */
   function project(point, aspect) {
     const ndc = transform(viewProjection(aspect), point);
-    if (!ndc.every(Number.isFinite) || ndc[2] < -1 || ndc[2] > 1) return null;
+    if (!ndc.every(Number.isFinite) || ndc[2]! < -1 || ndc[2]! > 1) return null;
     return ndc;
   }
 
@@ -377,12 +377,12 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
     const { forward, right, up } = basis();
     const th = Math.tan(cam.fovDeg * DEG / 2);
     const d = [
-      forward[0] + right[0] * ndc[0] * th * aspect + up[0] * ndc[1] * th,
-      forward[1] + right[1] * ndc[0] * th * aspect + up[1] * ndc[1] * th,
-      forward[2] + right[2] * ndc[0] * th * aspect + up[2] * ndc[1] * th,
+      forward[0]! + right[0]! * ndc[0] * th * aspect + up[0]! * ndc[1] * th,
+      forward[1]! + right[1]! * ndc[0] * th * aspect + up[1]! * ndc[1] * th,
+      forward[2]! + right[2]! * ndc[0] * th * aspect + up[2]! * ndc[1] * th,
     ];
-    const l = Math.hypot(d[0], d[1], d[2]) || 1;
-    return [d[0] / l, d[1] / l, d[2] / l];
+    const l = Math.hypot(d[0]!, d[1]!, d[2]!) || 1;
+    return [d[0]! / l, d[1]! / l, d[2]! / l];
   }
 
   /** Re-pivot on the nearest point under the cursor: the model box, else the ground plane y=groundY. */
@@ -394,23 +394,23 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
       let tmin = 0, tmax = Infinity, hit = true;
       for (let i = 0; i < 3; i++) {
         const lo = box.center[i] - box.half[i], hi = box.center[i] + box.half[i];
-        if (Math.abs(d[i]) < EPS) { if (o[i] < lo || o[i] > hi) { hit = false; break; } continue; }
-        let t1 = (lo - o[i]) / d[i], t2 = (hi - o[i]) / d[i];
+        if (Math.abs(d[i]!) < EPS) { if (o[i]! < lo || o[i]! > hi) { hit = false; break; } continue; }
+        let t1 = (lo - o[i]!) / d[i]!, t2 = (hi - o[i]!) / d[i]!;
         if (t1 > t2) { const t = t1; t1 = t2; t2 = t; }
         tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2);
         if (tmin > tmax) { hit = false; break; }
       }
       if (hit && tmax > 0) {
         const t = tmin > 0 ? tmin : tmax;
-        cam.targetPivot = [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t];
+        cam.targetPivot = [o[0]! + d[0]! * t, o[1]! + d[1]! * t, o[2]! + d[2]! * t];
         return cam.targetPivot.slice();
       }
     }
     const gy = groundY != null ? groundY : (box ? box.center[1] - box.half[1] : 0);
-    if (Math.abs(d[1]) > 1e-4) {
-      const t = (gy - o[1]) / d[1];
+    if (Math.abs(d[1]!) > 1e-4) {
+      const t = (gy - o[1]!) / d[1]!;
       if (t > 0) {
-        cam.targetPivot = [o[0] + d[0] * t, gy, o[2] + d[2] * t];
+        cam.targetPivot = [o[0]! + d[0]! * t, gy, o[2]! + d[2]! * t];
         return cam.targetPivot.slice();
       }
     }
@@ -419,7 +419,7 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
 
   /** URL state: everything needed to reproduce this exact view. */
   function state() {
-    const r = (v: number | undefined, n = 4) => +v.toFixed(n);
+    const r = (v: number | undefined, n = 4) => +v!.toFixed(n);
     return {
       yaw: r(cam.yaw / DEG, 2), pitch: r(cam.pitch / DEG, 2), dist: r(cam.dist, 1),
       px: r(cam.pivot[0], 1), py: r(cam.pivot[1], 1), pz: r(cam.pivot[2], 1),
@@ -429,8 +429,8 @@ export function createFreeCamera(opts: FreeCameraOptions = {}) {
   function setState(s) {
     if (!s) return false;
     const num = (v) => (v == null || v === "" ? null : +v);
-    if (num(s.yaw) != null) cam.yaw = cam.targetYaw = num(s.yaw) * DEG;
-    if (num(s.pitch) != null) cam.pitch = cam.targetPitch = clampPitch(num(s.pitch) * DEG);
+    if (num(s.yaw) != null) cam.yaw = cam.targetYaw = num(s.yaw)! * DEG;
+    if (num(s.pitch) != null) cam.pitch = cam.targetPitch = clampPitch(num(s.pitch)! * DEG);
     if (num(s.dist) != null) cam.dist = cam.targetDist = clamp(num(s.dist), cam.minDist, cam.maxDist);
     if (num(s.px) != null && num(s.py) != null && num(s.pz) != null) {
       cam.pivot = [num(s.px), num(s.py), num(s.pz)];

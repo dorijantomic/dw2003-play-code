@@ -13,7 +13,7 @@ export function makeBlast(B$: Battle3DContext) {
 function dnaPresentationStart() { B$.dnaPresentation = { tick: 0, fusionTick: null }; }
 function dnaFusionStart() {
     if (!B$.dnaPresentation) dnaPresentationStart();
-    B$.dnaPresentation.fusionTick = 0;
+    B$.dnaPresentation!.fusionTick = 0;
   }
 function dnaPresentationStop() { B$.dnaPresentation = null; B$.dnaOrbs = null; }
 /** The renderer's arenaTint sink: r,g,b are PS1 view-colour bytes (0..255). */
@@ -87,18 +87,18 @@ function dnaOrbIgnite(key: string | number) {
     // Register a parent orb (1005/1006 ignitions during the parent phase). The converging
     // orbit itself starts when dnaOrbsPath() is called at the fusion segment.
     if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
-    B$.dnaOrbs.orbs[key] = { tick: 0 };
+    B$.dnaOrbs!.orbs[key] = { tick: 0 };
   }
 // Begin the clockwise inward spiral that ends in the central collision. (Kept named
   // dnaOrbsPath for the battle.js call site; the old captured screen-path was replaced by
   // this procedural orbit — the capture never engaged and did not match the real motion.)
   function dnaOrbsPath(_path, _durTicks: number) {
     if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
-    B$.dnaOrbs.orbs.A ||= { tick: 0 };   // ensure both cores exist even if an ignite was missed
-    B$.dnaOrbs.orbs.B ||= { tick: 0 };
-    B$.dnaOrbs.orbiting = true;
-    B$.dnaOrbs.u = 0;
-    B$.dnaOrbs.dur = B$.DNA_ORB_TICKS;
+    B$.dnaOrbs!.orbs.A ||= { tick: 0 };   // ensure both cores exist even if an ignite was missed
+    B$.dnaOrbs!.orbs.B ||= { tick: 0 };
+    B$.dnaOrbs!.orbiting = true;
+    B$.dnaOrbs!.u = 0;
+    B$.dnaOrbs!.dur = B$.DNA_ORB_TICKS;
   }
 function dnaOrbsClear() { B$.dnaOrbs = null; }
 // Sample an authored program record without creating an op3 object. The DNA

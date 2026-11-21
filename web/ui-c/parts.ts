@@ -118,17 +118,17 @@ export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "va
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 /** The line p + t * d moved by `e` along its normal towards `inside`: returns [point, dir]. */
 function offsetLine(p, q, inside: number[], e): [number[], number[]] {
-    const d = sub(q, p), len = Math.hypot(d[0], d[1]) || 1;
-    let n = [-d[1] / len, d[0] / len];
+    const d = sub(q, p), len = Math.hypot(d[0]!, d[1]!) || 1;
+    let n = [-d[1]! / len, d[0]! / len];
     const m = sub(inside, p);
-    if (n[0] * m[0] + n[1] * m[1] < 0) n = [-n[0], -n[1]];
-    return [[p[0] + n[0] * e, p[1] + n[1] * e], d];
+    if (n[0]! * m[0]! + n[1]! * m[1]! < 0) n = [-n[0]!, -n[1]!];
+    return [[p[0] + n[0]! * e, p[1] + n[1]! * e], d];
 }
 function cross(a: [number[], number[]], b: [number[], number[]]) {
-    const [p, r] = a, [q, s] = b, den = r[0] * s[1] - r[1] * s[0];
+    const [p, r] = a, [q, s] = b, den = r[0]! * s[1]! - r[1]! * s[0]!;
     if (Math.abs(den) < 1e-9) return null;
-    const t = ((q[0] - p[0]) * s[1] - (q[1] - p[1]) * s[0]) / den;
-    return [p[0] + t * r[0], p[1] + t * r[1]];
+    const t = ((q[0]! - p[0]!) * s[1]! - (q[1]! - p[1]!) * s[0]!) / den;
+    return [p[0]! + t * r[0]!, p[1]! + t * r[1]!];
 }
 const atY = ([p, d], y) => (Math.abs(d[1]) < 1e-9 ? null : [p[0] + (y - p[1]) * d[0] / d[1], y]);
 
@@ -151,7 +151,7 @@ export function balloonShape(b: { l: number; t: number; w: number; h: number; },
             const iy = top ? t + e : bo - e, mid = [(b0 + b1) / 2, by];
             const A = offsetLine([b0, by], tip, [b1, by], e), B = offsetLine(tip, [b1, by], [b0, by], e);
             const itip = cross(A, B), i0 = atY(A, iy), i1 = atY(B, iy);
-            const ok = itip && i0 && i1 && i0[0] < i1[0] && (top ? itip[1] < iy : itip[1] > iy);
+            const ok = itip && i0 && i1 && i0[0] < i1[0] && (top ? itip[1]! < iy : itip[1]! > iy);
             tl = { top, b0, b1, by, tip, inner: ok ? [i0, itip, i1] : null, mid };
         }
     }
@@ -275,10 +275,10 @@ function fillDock(root, desc, g) {
         root.style.setProperty("--dk", `${d}px`);
         const [hx, hy] = rel(desc.hub.x, desc.hub.y), k = desc.k ?? 1, V = (D.arc + 10) * 2;
         const gd = el("dk-gd", root);
-        gd.style.cssText = `left:${hx - V / 2 * d * k}px;top:${hy - V / 2 * d * k}px;width:${V * d * k}px;height:${V * d * k}px`;
+        gd.style.cssText = `left:${hx! - V / 2 * d * k}px;top:${hy! - V / 2 * d * k}px;width:${V * d * k}px;height:${V * d * k}px`;
         const ring = (cls: string, rad: number, w: number, extra = "") => `<svg class="${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${V} ${V}" aria-hidden="true"><circle cx="${V / 2}" cy="${V / 2}" r="${rad}" fill="none" stroke-width="${w}" ${extra}/></svg>`;
         gd.innerHTML = ring("dk-line", D.arc, 1.2) + `<div class="dk-spin">${ring("dk-ticks", D.arc, 5, 'pathLength="360" stroke-dasharray=".35 4.65"')}${ring("dk-ticks dk-major", D.arc, 9, 'pathLength="360" stroke-dasharray=".8 29.2"')}</div>` + ring("dk-flash", D.arc, 3);
-        const pt = (a: number | undefined, rad: number) => `${V / 2 + rad * Math.cos(a * Math.PI / 180)} ${V / 2 + rad * Math.sin(a * Math.PI / 180)}`;
+        const pt = (a: number | undefined, rad: number) => `${V / 2 + rad * Math.cos(a! * Math.PI / 180)} ${V / 2 + rad * Math.sin(a! * Math.PI / 180)}`;
         const dk = el("dk-dkarc", root);
         dk.style.cssText = gd.style.cssText;
         const dR = (desc.dockR ?? 205) / k, arc = `M${pt(D.dockArc[0], dR)} A${dR} ${dR} 0 0 1 ${pt(D.dockArc[1], dR)}`;
@@ -290,7 +290,7 @@ function fillDock(root, desc, g) {
         const LS = desc.list ? { x: 300, chip: D.chip, r: D.cost, gap: D.gap, size: D.listSize, line: D.listLine } : null;
         if (desc.list && desc.title) {
             const [tx, ty] = rel(desc.words[0].x, desc.words[0].y - 18);          // above the first row, flush with it
-            const t = el("dk-ttl", root); t.style.cssText = `left:${tx}px;top:${ty - 12 * d}px;font-size:${16 * d}px;height:${24 * d}px;line-height:${24 * d}px`;
+            const t = el("dk-ttl", root); t.style.cssText = `left:${tx}px;top:${ty! - 12 * d}px;font-size:${16 * d}px;height:${24 * d}px;line-height:${24 * d}px`;
             t.dataset.uicText = desc.title; t.textContent = desc.title;
             if (desc.pager) for (const k2 of ["L1", "R1"]) { const c = el("cap", t, "i"); c.textContent = k2; }
         }
@@ -299,10 +299,10 @@ function fillDock(root, desc, g) {
             if (LS) {                                  // a list row: name, element chip, cost (the same slot / dock mechanics as a command)
                 const nameW = Math.max(60, Math.min(LS.x, w.maxDp - (LS.chip + LS.r + 2 * LS.gap))), lh = LS.line * d, fs = LS.size * d;
                 const fit = fitRun((sz, spc) => measureText(w.t, FACE.text, 700, sz, spc), fs, 0, nameW * d);
-                const rowCss = `left:${x}px;top:${y - lh / 2}px;height:${lh}px;line-height:${lh}px;font-size:${fs}px;`;
+                const rowCss = `left:${x}px;top:${y! - lh / 2}px;height:${lh}px;line-height:${lh}px;font-size:${fs}px;`;
                 const ghost = el("dk-g", root, "div"); ghost.style.cssText = rowCss; ghost.dataset.dkI = String(i); ghost.style.display = "none";
                 const word = el("dk-w rw", root, "div");
-                word.style.cssText = `${rowCss}--tx:${rel(desc.dock.x, desc.dock.y)[0] - x}px;--ty:${rel(desc.dock.x, desc.dock.y)[1] - y}px;--sc:${desc.scale};gap:${LS.gap * d}px`;
+                word.style.cssText = `${rowCss}--tx:${rel(desc.dock.x, desc.dock.y)[0]! - x!}px;--ty:${rel(desc.dock.x, desc.dock.y)[1]! - y!}px;--sc:${desc.scale};gap:${LS.gap * d}px`;
                 word.dataset.dkI = String(i); word.dataset.uicText = w.t; word.dataset.uicFits = fit.fits ? "1" : "0"; if (w.dis) word.classList.add("dis");
                 const tn = el("tn", word, "span"); tn.textContent = w.t; tn.style.cssText = `max-width:${nameW * d}px;font-size:${+fit.size.toFixed(2)}px`;
                 const ch = el("chip", word, "i"); ch.style.cssText = `width:${LS.chip * d}px;font-size:${12 * d}px;line-height:${16 * d}px;padding:${2 * d}px 0;border-width:${Math.max(1, 1.5 * d)}px`;
@@ -311,11 +311,11 @@ function fillDock(root, desc, g) {
                 return;
             }
             const fit = fitRun((sz, spc) => measureText(w.t, family, 400, sz, spc), size, sp, w.maxDp * d);
-            const common = `left:${x}px;top:${y - line / 2}px;font-size:${+fit.size.toFixed(2)}px;line-height:${+line.toFixed(2)}px;letter-spacing:${+fit.spacing.toFixed(2)}px;height:${+line.toFixed(2)}px`;
+            const common = `left:${x}px;top:${y! - line / 2}px;font-size:${+fit.size.toFixed(2)}px;line-height:${+line.toFixed(2)}px;letter-spacing:${+fit.spacing.toFixed(2)}px;height:${+line.toFixed(2)}px`;
             const ghost = el("dk-g", root, "div");
             ghost.style.cssText = common; ghost.textContent = w.t; ghost.dataset.dkI = String(i);
             const word = el("dk-w", root, "div");
-            word.style.cssText = `${common};--tx:${dxp - x}px;--ty:${dyp - y}px;--sc:${D.scale}`;
+            word.style.cssText = `${common};--tx:${dxp! - x!}px;--ty:${dyp! - y!}px;--sc:${D.scale}`;
             word.dataset.dkI = String(i); word.dataset.uicText = w.t; word.dataset.uicFits = fit.fits ? "1" : "0";
             const wd = el("wd", word, "span");
             el("ol", wd, "span").textContent = w.t;

@@ -294,15 +294,15 @@ export function makePillar(seed: number, kind = "wall") {
   for (let i = 0; i < rings; i++) {
     const cap = i === rings - 1;
     const u = cap ? 1 : us[i];
-    const f = u > P.BED_U0 && u < P.CROWN_U ? fract((u - P.BED_U0) / band) : 0;        // position within its bed
+    const f = u! > P.BED_U0 && u! < P.CROWN_U ? fract((u! - P.BED_U0) / band) : 0;        // position within its bed
     for (let k = 0; k < sec; k++) {
       const th = (k / sec) * TAU;
-      const j = jointsAt(th, u, seed);
+      const j = jointsAt(th, u!, seed);
       let r = 0;
       if (!cap) {
-        const n = S0.noise3JS(th * 2.3 + seed * 5.1, u * 3.7, seed * 1.3) - 0.5;       // micro grain, 2 scales
-        const n2 = S0.noise3JS(th * 6.1 + seed * 2.7, u * 11.0, 7.3) - 0.5;
-        r = (profileAt(u) + beddingAt(u)) *
+        const n = S0.noise3JS(th * 2.3 + seed * 5.1, u! * 3.7, seed * 1.3) - 0.5;       // micro grain, 2 scales
+        const n2 = S0.noise3JS(th * 6.1 + seed * 2.7, u! * 11.0, 7.3) - 0.5;
+        r = (profileAt(u!) + beddingAt(u!)) *
             (1 - P.FLUTE_DEPTH * (1 - j.jA) - P.JOINT_DEPTH * (1 - j.jB) + (n * 0.7 + n2 * 0.3) * P.GRAIN);
       }
       R[i * sec + k] = r; maxR = Math.max(maxR, r);
@@ -316,22 +316,22 @@ export function makePillar(seed: number, kind = "wall") {
       let ao = 1 - P.AO_GROOVE * gA * gA - P.AO_JOINT * gB * gB;
       // the crack towards the neighbours, broken up: a per-pillar strength and a slow variation with height, so the
       // joints do not run as unbroken vertical lines down every pillar (that reads as a picket fence, not a cliff)
-      const crackK = P.AO_CRACK * (0.55 + 0.45 * S0.noise3JS(seed * 3.7, 1.3, 5.1)) * (0.60 + 0.40 * Math.sin(u * 13.0 + seed * 1.7));
+      const crackK = P.AO_CRACK * (0.55 + 0.45 * S0.noise3JS(seed * 3.7, 1.3, 5.1)) * (0.60 + 0.40 * Math.sin(u! * 13.0 + seed * 1.7));
       ao *= 1 - crackK * Math.pow(Math.abs(Math.sin(th)), P.AO_CRACK_P);
       ao *= 1 - P.AO_LEDGE * P.AO_LEDGE_K * (1 - smooth(0, 0.25, f));
       ao *= 1 - P.AO_LEDGE * (1 - smooth(0, 0.20, f));
-      ao *= 1 - P.AO_BASE * (1 - smooth(0, P.AO_BASE_U, u));
-      ao = smooth(P.AO_CURVE[0], P.AO_CURVE[1], ao);            // one remap: pale open faces, dark only in a groove
+      ao *= 1 - P.AO_BASE * (1 - smooth(0, P.AO_BASE_U, u!));
+      ao = smooth(P.AO_CURVE[0]!, P.AO_CURVE[1]!, ao);            // one remap: pale open faces, dark only in a groove
       AO[i * sec + k] = clamp01(cap ? P.AO_CROWN : ao);
     }
   }
-  for (let i = 0; i < R.length; i++) R[i] /= maxR;     // R is the pillar's MAXIMUM radius, exactly
+  for (let i = 0; i < R.length; i++) R[i]! /= maxR;     // R is the pillar's MAXIMUM radius, exactly
 
   const nv = rings * sec + 1;
   const pos = new Float32Array(nv * 3), ao = new Float32Array(nv), idx = [];
   for (let i = 0; i < rings; i++) for (let k = 0; k < sec; k++) {
     const th = (k / sec) * TAU, r = R[i * sec + k], o = (i * sec + k) * 3;
-    pos[o] = Math.sin(th) * r; pos[o + 1] = i === rings - 1 ? 1 : us[i]; pos[o + 2] = Math.cos(th) * r;
+    pos[o] = Math.sin(th) * r!; pos[o + 1] = i === rings - 1 ? 1 : us[i]; pos[o + 2] = Math.cos(th) * r!;
     ao[i * sec + k] = AO[i * sec + k];
   }
   const capV = rings * sec;
@@ -351,9 +351,9 @@ export function makePillar(seed: number, kind = "wall") {
     const th0 = a1 * TAU, wA = 0.45 + a2 * 0.85;                 // the facet's half-width, radians
     const r0 = R[i0 * sec + Math.round((th0 / TAU) * sec) % sec], u0 = us[i0];
     const nx = Math.sin(th0), nz = Math.cos(th0), ny = (a2 - 0.5) * 0.22;
-    const px = nx * r0, py = u0, pz = nz * r0;
+    const px = nx * r0!, py = u0, pz = nz * r0!;
     for (let i = 1; i < rings - 1; i++) {
-      const wU = 1 - smooth(0.10, 0.34, Math.abs(us[i] - u0));
+      const wU = 1 - smooth(0.10, 0.34, Math.abs(us[i]! - u0!));
       if (wU <= 0) continue;
       for (let k = 0; k < sec; k++) {
         const th = (k / sec) * TAU;
@@ -361,16 +361,16 @@ export function makePillar(seed: number, kind = "wall") {
         const w = wU * (1 - smooth(wA * 0.45, wA, dA));
         if (w <= 0) continue;
         const o = (i * sec + k) * 3;
-        const d = (pos[o] - px) * nx + (pos[o + 1] - py) * ny + (pos[o + 2] - pz) * nz + P.SCRAPE_STRENGTH;
+        const d = (pos[o]! - px) * nx + (pos[o + 1]! - py!) * ny + (pos[o + 2]! - pz) * nz + P.SCRAPE_STRENGTH;
         if (d <= 0) continue;                                     // already behind the plane: leave it
-        pos[o] -= nx * d * w; pos[o + 1] -= ny * d * w; pos[o + 2] -= nz * d * w;
+        pos[o]! -= nx * d * w; pos[o + 1]! -= ny * d * w; pos[o + 2]! -= nz * d * w;
       }
     }
   }
   let m2 = 0;                                                     // the scrape only cuts inward: normalise again
-  for (let v = 0; v < rings * sec; v++) m2 = Math.max(m2, Math.hypot(pos[v * 3], pos[v * 3 + 2]));
+  for (let v = 0; v < rings * sec; v++) m2 = Math.max(m2, Math.hypot(pos[v * 3]!, pos[v * 3 + 2]!));
   const kk = m2 > 1e-6 ? 1 / m2 : 1;
-  for (let v = 0; v < rings * sec; v++) { pos[v * 3] *= kk; pos[v * 3 + 2] *= kk; }
+  for (let v = 0; v < rings * sec; v++) { pos[v * 3]! *= kk; pos[v * 3 + 2]! *= kk; }
 
   return { pos, ao, idx: Uint16Array.from(idx), rings, sec, vcount: nv, icount: idx.length, shelfRings, capV,
            ringY: (i: number) => (i === rings - 1 ? 1 : us[i]) };
@@ -449,9 +449,9 @@ function emitRock(groups, buf) {
           const az = p.az0 + p.span * (t - 0.5);
           const top = r === p.rows - 1;
           const jag = top ? (S0.noise3JS(c * 1.7 + p.seed * 3.1, 0.5, 2.5) - 0.5) * 2 * p.jag : 0;
-          const y = p.y0 + p.H * Math.min(1, Math.max(0, rowY[r] * p.top + jag));
+          const y = p.y0 + p.H * Math.min(1, Math.max(0, rowY[r]! * p.top + jag));
           const rad = p.r + p.lean * (y - p.y0);
-          put(gx + Math.sin(az) * rad, y, gz + Math.cos(az) * rad, clamp01(p.aoK * (0.72 + 0.28 * rowY[r])));
+          put(gx + Math.sin(az) * rad, y, gz + Math.cos(az) * rad, clamp01(p.aoK * (0.72 + 0.28 * rowY[r]!)));
         }
         for (let r = 0; r < p.rows - 1; r++) for (let c = 0; c < p.cols - 1; c++) {
           const a = p.v0 + r * p.cols + c, b2 = a + 1, c2 = a + p.cols + 1, d = a + p.cols;
@@ -497,13 +497,13 @@ function bakeBush(preset: string, seed: number) {
   // normalise: height 1, base y 0, xz centred on the bush's own middle
   let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity, mnz = Infinity, mxz = -Infinity;
   for (let i = 0; i < nv; i++) {
-    mnx = Math.min(mnx, pos[i * 3]); mxx = Math.max(mxx, pos[i * 3]);
-    mny = Math.min(mny, pos[i * 3 + 1]); mxy = Math.max(mxy, pos[i * 3 + 1]);
-    mnz = Math.min(mnz, pos[i * 3 + 2]); mxz = Math.max(mxz, pos[i * 3 + 2]);
+    mnx = Math.min(mnx, pos[i * 3]!); mxx = Math.max(mxx, pos[i * 3]!);
+    mny = Math.min(mny, pos[i * 3 + 1]!); mxy = Math.max(mxy, pos[i * 3 + 1]!);
+    mnz = Math.min(mnz, pos[i * 3 + 2]!); mxz = Math.max(mxz, pos[i * 3 + 2]!);
   }
   const H = Math.max(1e-6, mxy - mny), k = 1 / H, cxm = (mnx + mxx) / 2, czm = (mnz + mxz) / 2;
   for (let i = 0; i < nv; i++) {
-    pos[i * 3] = (pos[i * 3] - cxm) * k; pos[i * 3 + 1] = (pos[i * 3 + 1] - mny) * k; pos[i * 3 + 2] = (pos[i * 3 + 2] - czm) * k;
+    pos[i * 3] = (pos[i * 3]! - cxm) * k; pos[i * 3 + 1] = (pos[i * 3 + 1]! - mny) * k; pos[i * 3 + 2] = (pos[i * 3 + 2]! - czm) * k;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
@@ -519,22 +519,22 @@ function bakeBush(preset: string, seed: number) {
 function drawBushCard(doc: Document, size = 128, seed = 7) {
   const c = doc.createElement("canvas"); c.width = c.height = size;
   const g = c.getContext("2d"), r = F.rng(seed);
-  g.clearRect(0, 0, size, size);
-  g.fillStyle = "#fff";
+  g!.clearRect(0, 0, size, size);
+  g!.fillStyle = "#fff";
   for (let i = 0; i < 26; i++) {
     const a = r() * TAU, dd = Math.sqrt(r());
     const cx = size * 0.5 + Math.cos(a) * dd * size * 0.40;
     const cy = size * 0.62 - Math.sin(a) * dd * size * 0.30 - size * 0.06;
-    g.beginPath(); g.arc(cx, cy, size * (0.07 + r() * 0.12), 0, TAU); g.fill();
+    g!.beginPath(); g!.arc(cx, cy, size * (0.07 + r() * 0.12), 0, TAU); g!.fill();
   }
-  g.fillRect(size * 0.46, size * 0.62, size * 0.08, size * 0.34);   // a short trunk, so the clump sits on the rock
+  g!.fillRect(size * 0.46, size * 0.62, size * 0.08, size * 0.34);   // a short trunk, so the clump sits on the rock
   return c;
 }
 
 /** Every bush instance: planted on the exact vertices the rock mesh draws (a ledge's lip or a crown), sunk into it.
  *  Positions are stored relative to the group's axis so a moved group carries its plants along. */
 function bushSpots(groups, rockGeo: THREE.BufferGeometry) {
-  const P = SPIRE, pos = rockGeo.attributes.position.array, nor = rockGeo.attributes.normal.array;
+  const P = SPIRE, pos = rockGeo.attributes.position!.array, nor = rockGeo.attributes.normal!.array;
   const spots = [], rnd = F.rng(P.SEED + 17);
   for (const g of groups) for (const p of g.parts) {
     if (p.type !== "pillar" || !p.bushP) continue;
@@ -567,8 +567,8 @@ function bushSpots(groups, rockGeo: THREE.BufferGeometry) {
 
 function spot(g, p: { pitch: number; }, vi: number, pos: number[], nor, rnd: { (): number; (): number; (): number; }) {
   const P = SPIRE;
-  return { g: g.id, vi, x: pos[vi * 3] - g.dx, y: pos[vi * 3 + 1], z: pos[vi * 3 + 2] - g.dz,
-           s: p.pitch * (P.BUSH_K[0] + rnd() * (P.BUSH_K[1] - P.BUSH_K[0])), variant: Math.floor(rnd() * 3),
+  return { g: g.id, vi, x: pos[vi * 3]! - g.dx, y: pos[vi * 3 + 1], z: pos[vi * 3 + 2]! - g.dz,
+           s: p.pitch * (P.BUSH_K[0]! + rnd() * (P.BUSH_K[1]! - P.BUSH_K[0]!)), variant: Math.floor(rnd() * 3),
            yaw: rnd() * TAU, jit: 0.88 + rnd() * 0.24, ny: nor[vi * 3 + 1] };
 }
 
@@ -618,7 +618,7 @@ function cardSpots(groups) {
 
 function card(g, az: number, rad: number, y, rnd: { (): number; (): number; (): number; (): number; }) {
   const P = SPIRE;
-  const w = (g.pitch || 400) * (P.CARD_K[0] + rnd() * (P.CARD_K[1] - P.CARD_K[0]));
+  const w = (g.pitch || 400) * (P.CARD_K[0]! + rnd() * (P.CARD_K[1]! - P.CARD_K[0]!));
   const j = 0.86 + rnd() * 0.28;
   return { g: g.id, x: Math.sin(az) * rad, y, z: Math.cos(az) * rad, az, w, h: w / 1.25,
            tint: [g.tone0[0] * j, g.tone0[1] * j, g.tone0[2] * j] };
@@ -865,7 +865,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   const off = groups.map((g) => [g.dx, g.dz]);
   for (const g of groups) { g.dx = 0; g.dz = 0; }
   let pillars = emitRock(groups, buf);
-  rockGeo.attributes.position.needsUpdate = true;
+  rockGeo.attributes.position!.needsUpdate = true;
   rockGeo.computeVertexNormals();
   spots = bushSpots(groups, rockGeo);
   groups.forEach((g, i: string | number) => { g.dx = off[i][0]; g.dz = off[i][1]; });
@@ -874,7 +874,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   const bushPer = new Array(groups.length).fill(0);
   for (const s of spots) bushPer[s.g]++;
   bushMeshes = bushs.map((b, i) => {
-    const m = new THREE.InstancedMesh(b.geo, bushMat, Math.max(1, perVariant[i]));
+    const m = new THREE.InstancedMesh(b.geo, bushMat, Math.max(1, perVariant[i]!));
     m.name = `builtSpireBush${i}`; m.userData = { kind: "spire", variant: i, tris: b.tris, at: [], group: [], vertex: [], normal: [] };
     m.frustumCulled = false; m.count = 0;
     return m;
@@ -888,7 +888,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   for (let i = 0; i < cards.length; i++) {
     const c = cards[i], o = i * 4;
     cardUv.set([0, 0, 1, 0, 1, 1, 0, 1], o * 2);
-    cardTint.set([...c.tint, ...c.tint, ...c.tint, ...c.tint], o * 3);
+    cardTint.set([...c!.tint, ...c!.tint, ...c!.tint, ...c!.tint], o * 3);
     cardIdx.set([o, o + 2, o + 1, o, o + 3, o + 2], i * 6);
   }
   cardGeo.setAttribute("position", new THREE.BufferAttribute(cardPos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -913,22 +913,22 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   function rebuild() {
     const t = performance.now();
     pillars = emitRock(groups, buf);
-    rockGeo.attributes.position.needsUpdate = true;
-    rockGeo.attributes.aAO.needsUpdate = true;
-    rockGeo.attributes.aRock.needsUpdate = true;
-    rockGeo.attributes.aMid.needsUpdate = true;
-    rockGeo.attributes.aDark.needsUpdate = true;
-    rockGeo.attributes.aGreen.needsUpdate = true;
-    rockGeo.attributes.aVar.needsUpdate = true;
+    rockGeo.attributes.position!.needsUpdate = true;
+    rockGeo.attributes.aAO!.needsUpdate = true;
+    rockGeo.attributes.aRock!.needsUpdate = true;
+    rockGeo.attributes.aMid!.needsUpdate = true;
+    rockGeo.attributes.aDark!.needsUpdate = true;
+    rockGeo.attributes.aGreen!.needsUpdate = true;
+    rockGeo.attributes.aVar!.needsUpdate = true;
     if (rockGeo.index) rockGeo.index.needsUpdate = true;
     rockGeo.computeVertexNormals();
-    rockGeo.attributes.normal.needsUpdate = true;
+    rockGeo.attributes.normal!.needsUpdate = true;
     rockGeo.computeBoundingSphere();
     // bushes: the instance sits on its rock vertex, sunk BUSH_SINK of its own height into it
     const n = [0, 0, 0];
     for (const s of spots) {
       const g = groups[s.g], m = bushMeshes[s.variant];
-      const k = s.s / bushs[s.variant].w;
+      const k = s.s / bushs[s.variant]!.w;
       V3.set(g.dx + s.x, s.y - P.BUSH_SINK * k, g.dz + s.z);
       Q.setFromAxisAngle(Y, s.yaw); SC.setScalar(g.hidden ? 0 : k);
       m.setMatrixAt(n[s.variant], M.compose(V3, Q, SC));
@@ -941,7 +941,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
     }
     bushMeshes.forEach((m, i) => { m.count = perVariant[i]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
     // far cards
-    const cp = cardGeo.attributes.position.array, cn = cardGeo.attributes.normal.array;
+    const cp = cardGeo.attributes.position!.array, cn = cardGeo.attributes.normal!.array;
     for (const [i, c] of cards.entries()) {
       const g = groups[c.g], tx = Math.cos(c.az), tz = -Math.sin(c.az);
       const x = g.hidden ? 0 : g.dx + c.x, z = g.hidden ? 0 : g.dz + c.z, y = g.hidden ? -1e6 : c.y;
@@ -952,8 +952,8 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
       cp[o + 9] = x - tx * w; cp[o + 10] = y + c.h; cp[o + 11] = z - tz * w;
       for (let v = 0; v < 4; v++) { cn[o + v * 3] = -Math.sin(c.az); cn[o + v * 3 + 1] = 0; cn[o + v * 3 + 2] = -Math.cos(c.az); }
     }
-    cardGeo.attributes.position.needsUpdate = true;
-    cardGeo.attributes.normal.needsUpdate = true;
+    cardGeo.attributes.position!.needsUpdate = true;
+    cardGeo.attributes.normal!.needsUpdate = true;
     cardGeo.computeBoundingSphere();
     nan = { rock: nanCount(rockGeo), cards: nanCount(cardGeo) };   // 0 pos / 0 nor is the invariant, reported below
     // each group's own slice of the merged buffers, so a checker can bucket vertices to a panel / an island
@@ -1029,7 +1029,7 @@ export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMa
   info.measured = { recipeRmin, cardBaseY: measured.waterTop, waterTop: measured.waterTop, waterFloor: measured.waterFloor,
                     seaFloor: measured.seaFloor, wallBase: walls.length ? walls[0].baseY : null,
                     wallHeight: walls.length ? walls[0].H : null };
-  info.bushes = { count: spots.length, perVariant, tris: bushMeshes.reduce((s, m, i) => s + perVariant[i] * bushs[i].tris, 0),
+  info.bushes = { count: spots.length, perVariant, tris: bushMeshes.reduce((s, m, i) => s + perVariant[i]! * bushs[i]!.tris, 0),
                   trisPerBush: bushs.map((b) => b.tris), width: bushs.map((b) => +b.w.toFixed(3)) };
   info.cards = cards.length;
   info.triangles = plan.ni / 3 + info.bushes.tris + cards.length * 2;
@@ -1053,7 +1053,7 @@ export function pillarPart(S = S0, colours = null) {
   const pale = S0.srgb(c.p90 || c.all || [194, 180, 211]), mid = S0.srgb(c.other || c.p90 || c.all || [131, 118, 146]);
   const dark = S0.srgb(c.p10 || c.all || [28, 33, 20]), green = S0.srgb(c.green || [55, 71, 36]);
   const pos = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { pos[i * 3] = t.pos[i * 3]; pos[i * 3 + 1] = t.pos[i * 3 + 1] * H; pos[i * 3 + 2] = t.pos[i * 3 + 2]; }
+  for (let i = 0; i < n; i++) { pos[i * 3] = t.pos[i * 3]; pos[i * 3 + 1] = t.pos[i * 3 + 1]! * H; pos[i * 3 + 2] = t.pos[i * 3 + 2]; }
   const g = new THREE.BufferGeometry();
   const fill = (col: THREE.Color) => { const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([col.r, col.g, col.b], i * 3); return a; };
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));

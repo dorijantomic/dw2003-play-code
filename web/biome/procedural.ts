@@ -16,10 +16,10 @@ function leafPath(g: { beginPath: () => void; lineTo: (arg0: number, arg1: numbe
   g.beginPath();
   if (kind === "ivy") {   // five-lobed ivy leaf, tip up
     const P = [[0.5, 0.02], [0.62, 0.3], [0.95, 0.34], [0.72, 0.55], [0.86, 0.86], [0.52, 0.72], [0.5, 0.98], [0.48, 0.72], [0.14, 0.86], [0.28, 0.55], [0.05, 0.34], [0.38, 0.3]];
-    P.forEach(([x, y], i) => (i ? g.lineTo(x * w, y * h) : g.moveTo(x * w, y * h)));
+    P.forEach(([x, y], i) => (i ? g.lineTo(x! * w, y! * h) : g.moveTo(x! * w, y! * h)));
   } else if (kind === "maple") {
     const n = 5, pts = []; for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + (i / (n * 2)) * Math.PI * 2, r = (i % 2 ? 0.2 : 0.47) * (i === 0 ? 1.08 : 1); pts.push([0.5 + Math.cos(a) * r, 0.5 + Math.sin(a) * r]); }
-    pts.forEach(([x, y], i) => (i ? g.lineTo(x * w, y * h) : g.moveTo(x * w, y * h)));
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x! * w, y! * h) : g.moveTo(x! * w, y! * h)));
   } else {                 // oak: lobed ellipse
     const N = 40; for (let i = 0; i <= N; i++) { const t = i / N, wd = Math.pow(Math.sin(Math.PI * t), 0.8) * (0.62 + 0.3 * Math.sin(t * Math.PI * 7)) * 0.5; g.lineTo((0.5 + wd) * w, (0.02 + t * 0.96) * h); }
     for (let i = N; i >= 0; i--) { const t = i / N, wd = Math.pow(Math.sin(Math.PI * t), 0.8) * (0.62 + 0.3 * Math.sin(t * Math.PI * 7)) * 0.5; g.lineTo((0.5 - wd) * w, (0.02 + t * 0.96) * h); }
@@ -47,17 +47,17 @@ function mushTexture(kind: string) {
   const pal = { agaric: ["#d3342a", "#f5eede", "#fff8e8"], brown: ["#8a5a35", "#d9c7a3", "#e8dcc0"], glow: ["#37c9c6", "#bff7f0", "#e6fffb"] }[kind];
   const r = rng(11);
   return (_mushTex[kind] = canvasTex(256, 128, (g, w: number, h: number) => {
-    g.fillStyle = pal[2]; g.fillRect(0, 0, w, h * 0.46);        // stem + gills (bottom of the profile = low v at bottom of canvas)
-    g.fillStyle = pal[0]; g.fillRect(0, h * 0.46, w, h * 0.54);   // cap
-    if (kind === "agaric") { g.fillStyle = pal[1]; for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse(r() * w, h * (0.52 + r() * 0.44), 6 + r() * 7, 4 + r() * 5, 0, 0, 7); g.fill(); } }
+    g.fillStyle = pal![2]; g.fillRect(0, 0, w, h * 0.46);        // stem + gills (bottom of the profile = low v at bottom of canvas)
+    g.fillStyle = pal![0]; g.fillRect(0, h * 0.46, w, h * 0.54);   // cap
+    if (kind === "agaric") { g.fillStyle = pal![1]; for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse(r() * w, h * (0.52 + r() * 0.44), 6 + r() * 7, 4 + r() * 5, 0, 0, 7); g.fill(); } }
     if (kind === "brown") { const gr = g.createLinearGradient(0, h * 0.46, 0, h); gr.addColorStop(0, "#6e4527"); gr.addColorStop(1, "#b07a4a"); g.fillStyle = gr; g.fillRect(0, h * 0.46, w, h * 0.54); }
-    if (kind === "glow") { g.fillStyle = pal[1]; for (let i = 0; i < 14; i++) { g.beginPath(); g.arc(r() * w, h * (0.55 + r() * 0.4), 2 + r() * 3, 0, 7); g.fill(); } }
+    if (kind === "glow") { g.fillStyle = pal![1]; for (let i = 0; i < 14; i++) { g.beginPath(); g.arc(r() * w, h * (0.55 + r() * 0.4), 2 + r() * 3, 0, 7); g.fill(); } }
     g.strokeStyle = "rgba(0,0,0,0.18)"; g.lineWidth = 1; for (let i = 0; i < 48; i++) { g.beginPath(); g.moveTo(i * w / 48, h * 0.30); g.lineTo(i * w / 48, h * 0.46); g.stroke(); }  // gills
   }));
 }
 function mushroomGeo(sx = 1, sy = 1) {
   const pr = [[0.20, 0], [0.17, 0.10], [0.14, 0.26], [0.125, 0.42], [0.20, 0.44], [0.40, 0.47], [0.60, 0.52], [0.66, 0.58], [0.62, 0.68], [0.50, 0.79], [0.30, 0.88], [0.0, 0.92]];
-  const pts = pr.map(([x, y]) => new THREE.Vector2(x * sx, y * sy));
+  const pts = pr.map(([x, y]) => new THREE.Vector2(x! * sx, y! * sy));
   const g = new THREE.LatheGeometry(pts, 16);   // uv v follows the profile index
   // v: stem part (first 4 points) -> canvas bottom region; cap -> top region
   const uv = g.attributes.uv, n = pr.length;
@@ -69,8 +69,8 @@ export function mushroomParts(kind = "agaric", seed = 5) {
   const r = rng(seed), gs = [];
   const set = [[0, 0, 1.0], [0.20, 0.08, 0.7], [-0.16, 0.12, 0.55], [0.06, -0.22, 0.45], [-0.12, -0.14, 0.38]];
   for (const [x, z, s] of set) {
-    const g = mushroomGeo(1 + r() * 0.3, 1 + r() * 0.3); g.scale(0.28 * s, 0.30 * s, 0.28 * s);
-    g.rotateZ((r() - 0.5) * 0.25); g.rotateY(r() * 6); g.translate(x * 0.5, 0, z * 0.5); gs.push(g);
+    const g = mushroomGeo(1 + r() * 0.3, 1 + r() * 0.3); g.scale(0.28 * s!, 0.30 * s!, 0.28 * s!);
+    g.rotateZ((r() - 0.5) * 0.25); g.rotateY(r() * 6); g.translate(x! * 0.5, 0, z! * 0.5); gs.push(g);
   }
   const geo = mergeGeometries(gs);
   const mat = toonify(new THREE.MeshLambertMaterial({ map: mushTexture(kind), side: THREE.DoubleSide }),
@@ -86,7 +86,7 @@ function leafQuad(c, n: { y: number; }, s: number, rollR: number, rnd: { (): num
   const a = new THREE.Vector3().crossVectors(t, n).normalize(), b = new THREE.Vector3().crossVectors(n, a);
   const ang = rnd() * 6.28, ca = Math.cos(ang), sa = Math.sin(ang);
   const ax = a.clone().multiplyScalar(ca).addScaledVector(b, sa), bx = b.clone().multiplyScalar(ca).addScaledVector(a, -sa);
-  const v = [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]].map(([u, w]) => c.clone().addScaledVector(ax, u * s).addScaledVector(bx, (w - 0.3) * s * 1.1));
+  const v = [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]].map(([u, w]) => c.clone().addScaledVector(ax, u! * s).addScaledVector(bx, (w! - 0.3) * s * 1.1));
   return v;
 }
 function quadsGeometry(quads, uvs, normals, cols: number[][]) {
@@ -180,21 +180,21 @@ export function grassClumpParts(o = {}) {
   const r = rng(O.seed), pos = [], nor = [], col = [], idx = []; let base = 0;
   for (let b = 0; b < O.blades; b++) {
     const a = r() * 6.28, rad = r() * O.spread, ox = Math.cos(a) * rad, oz = Math.sin(a) * rad, yaw = r() * 6.28;
-    const H = O.h[0] + (O.h[1] - O.h[0]) * r(), W = O.w * (0.8 + 0.5 * r()), lean = 0.15 + r() * 0.5, curl = 0.2 + r() * 0.5;
+    const H = O.h[0]! + (O.h[1]! - O.h[0]!) * r(), W = O.w * (0.8 + 0.5 * r()), lean = 0.15 + r() * 0.5, curl = 0.2 + r() * 0.5;
     const fx = Math.cos(yaw), fz = Math.sin(yaw), rx = -fz, rz = fx;
     const tint = 0.85 + r() * 0.3, ring = [];
     for (let s = 0; s <= O.segs; s++) {
       const t = s / O.segs, h = t * H, f = lean * t * t * H + curl * t * t * t * H * 0.5;
       const w = W * (1 - t * 0.92) * (s === O.segs ? 0 : 1);
       const cx = ox + fx * f, cz = oz + fz * f, cy = h * (1 - 0.25 * lean * t);
-      const c = [0, 1, 2].map((k) => (O.rootCol[k] + (O.tipCol[k] - O.rootCol[k]) * Math.pow(t, 0.8)) * tint);
+      const c = [0, 1, 2].map((k) => (O.rootCol[k]! + (O.tipCol[k]! - O.rootCol[k]!) * Math.pow(t, 0.8)) * tint);
       const nx = -fx * (0.35 + 0.4 * t), nz = -fz * (0.35 + 0.4 * t), nl = Math.hypot(nx, nz, 1);
       for (const sgn of s === O.segs ? [0] : [-1, 1]) { pos.push(cx + rx * w * sgn, cy, cz + rz * w * sgn); nor.push(nx / nl, 1 / nl, nz / nl); col.push(...c); ring.push(pos.length / 3 - 1); }
     }
     const per = []; let k = 0; for (let s = 0; s <= O.segs; s++) { if (s === O.segs) { per.push([k]); k += 1; } else { per.push([k, k + 1]); k += 2; } }
     for (let s = 0; s < O.segs; s++) {
       const A = per[s], B = per[s + 1];
-      if (B.length === 1) idx.push(base + A[0], base + A[1], base + B[0]); else idx.push(base + A[0], base + A[1], base + B[0], base + A[1], base + B[1], base + B[0]);
+      if (B!.length === 1) idx.push(base + A![0]!, base + A![1]!, base + B![0]!); else idx.push(base + A![0]!, base + A![1]!, base + B![0]!, base + A![1]!, base + B![1]!, base + B![0]!);
     }
     base += k;
   }

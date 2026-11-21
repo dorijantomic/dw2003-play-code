@@ -122,7 +122,7 @@ export function createDevView(panel, api) {
             main.innerHTML = CONTROLS_HTML(api.spriteFilters);
         } else {
             const rows = selectRows({ tab: st.tab, query: st.query, filter: st.filter }, shipOf);
-            const tabName = (id: string) => DEV_TABS.find((t) => t.id === id).name;
+            const tabName = (id: string) => DEV_TABS.find((t) => t.id === id)!.name;
             let html = searching ? `<div class="hint">${rows.length} found across all tabs.</div>` : "";
             if (!searching && st.tab === "quests" && st.note) html += `<div class="hint">${st.note}</div>`;
             for (const g of groupRows(rows)) {

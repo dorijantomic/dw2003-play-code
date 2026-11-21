@@ -366,8 +366,8 @@ export function drawScrollLayers(ctx: CanvasRenderingContext2D | null, stageId) 
     for (const d of engineScrollLayerDraws(stageId)) {
         const img = scrollSheets[d.sheet] ?? ensureScrollSheet(d.sheet);
         if (!(img instanceof Image)) continue;
-        ctx.drawImage(img, d.x, d.y);
-        ctx.drawImage(img, d.x, d.y + d.wrapY);
+        ctx!.drawImage(img, d.x, d.y);
+        ctx!.drawImage(img, d.x, d.y + d.wrapY);
     }
 }
 

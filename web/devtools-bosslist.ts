@@ -52,7 +52,7 @@ export function speakersOf(entry) {
   const seen: string[] = [];
   for (const s of entry?.strings ?? []) {
     for (const m of String(s).matchAll(/\[name\](.*?)\[name\]/g)) {
-      const name = m[1].trim();
+      const name = m[1]!.trim();
       if (name && name !== "[player_name]" && !seen.includes(name)) seen.push(name);
     }
   }

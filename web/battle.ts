@@ -790,7 +790,7 @@ export function createBattle(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
     // Headless read-out of the party pips' decoded cels (FIGHTSTG_F0x800934f0).
     debugPips: () => (B.battle ? partyPipCels(B.battle) : null),
     // Every cel the battle's own 2D layer drew since the last frame, with its place.
-    debugHudCels: () => B.hudCels.map((c) => ({ ...c, ...(c.size || {}) })),
+    debugHudCels: () => B.hudCels!.map((c) => ({ ...c, ...(c.size || {}) })),
     // Headless read-out of the DV gauge's decoded sprite/width (FIGHTSTG_F0x800934F0).
     debugGauge: () => (B.battle ? {
       gauge: Math.round(B.battle.player.gauge ?? 0),

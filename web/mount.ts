@@ -165,7 +165,7 @@ export function mountActorDraw(ctx: CanvasRenderingContext2D | null, npc, camX: 
     walk: healed ? def.walk : null, still: healed ? null : { clip: hurt.clip, at: hurt.at ?? 1 },
   });
   if (!canvas) return false;
-  ctx.drawImage(canvas, Math.round(npc.x - MOUNT_VIEW.w / 2 - camX), Math.round(npc.y - MOUNT_VIEW.h + 8 - camY));
+  ctx!.drawImage(canvas, Math.round(npc.x - MOUNT_VIEW.w / 2 - camX), Math.round(npc.y - MOUNT_VIEW.h + 8 - camY));
   return true;
 }
 
@@ -444,12 +444,12 @@ export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
   const useSeat = seatOn() && (S.mode === "riding" || S.mode === "mounting");
   const canvas = renderMount(S.asset, {
     x: S.x, y: S.y, dir: S.dir, phase: S.phase, moving: S.mode === "riding" && S.moving,
-    size: S.def?.size ?? 68, timeSec, walk: S.def?.walk ?? null, seat: useSeat ? S.def.seat : null, hide: PROBE.hideNodes,
+    size: S.def?.size ?? 68, timeSec, walk: S.def?.walk ?? null, seat: useSeat ? S.def!.seat : null, hide: PROBE.hideNodes,
   });
   if (!canvas) return false;
   const split = useSeat ? mountSplit() : null;
   // the rider's place from the saddle point measured this frame and this facing's saved settings (seatLayout)
-  S.rider = split ? { ...seatLayout(S.def, split, seatSettings(S.def.id, S.dir)), seatX: split.seatX, seatY: split.seatY } : null;
+  S.rider = split ? { ...seatLayout(S.def, split, seatSettings(S.def!.id, S.dir)), seatX: split.seatX, seatY: split.seatY } : null;
   S.renders += 1;
   const dx = Math.round(S.x - MOUNT_VIEW.w / 2 - camX);
   const dy = Math.round(S.y - MOUNT_VIEW.h + 8 - camY);
@@ -470,7 +470,7 @@ export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
   if (split && S.mode === "riding") {
     // "auto": the part behind the saddle plane draws before the rider, the part in front of it after;
     // "front": the whole mount before the rider; "behind": the whole mount after him
-    const layer = S.rider.layer;
+    const layer = S.rider!.layer;
     const blit = (c) => () => ctx.drawImage(c, dx, dy);
     if (layer === "front") drawables.push({ y: S.y - 0.5, mount: true, draw: blit(canvas) });
     else if (layer === "behind") drawables.push({ y: S.y + 0.5, mount: true, draw: blit(canvas) });

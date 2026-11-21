@@ -100,9 +100,9 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
       if (y && y.kind === "event") {
         presented = true;
         const flagKey = engine.eventFlagKey(engine.currentStage, y.evId);
-        playCutscene(flagKey, (handoff) => {
+        playCutscene!(flagKey, (handoff) => {
           engine.completeEvent(y.evId);              // flags set on event END (faithful order)
-          if (handoff != null) doHandoff(handoff);
+          if (handoff != null) doHandoff!(handoff);
           engine.vm.resume(h); step();
           // The PRE just ended and its on_complete ARMED the battle. Fire the next now-eligible
           // row on the SAME trigger (PRE → battle in ONE interaction; the battle's win-callback
@@ -111,7 +111,7 @@ export function createEngineBridge({ engine, playCutscene, startBattle, doHandof
         });
       } else if (y && y.kind === "battle") {
         presented = true;
-        startBattle(y.screenId,
+        startBattle!(y.screenId,
           () => {                                    // win
             engine.state.flags.set(y.wonFlag, true);
             engine.vm.resume(h); step();             // finish the (one-op) battle script
