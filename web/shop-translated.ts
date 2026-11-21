@@ -13,7 +13,8 @@ import { partyRosterView, storedNumbers, syncLeadEquipBonuses } from "./party.js
 import { ensureStoredStats } from "./battle.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import { composeWindow } from "./ui-c/screens.js";
-import type { ShopOpenOpts, ShopTranslatedOptions, ShopTranslatedScreen } from "./types/shop-translated.js";
+import type { ShopOpenOpts } from "./types/shop.js";
+import type { ShopTranslatedOptions, ShopTranslatedScreen } from "./types/shop-translated.js";
 
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };

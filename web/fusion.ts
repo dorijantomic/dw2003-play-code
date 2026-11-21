@@ -11,6 +11,8 @@
 // (key `fusionbosses`, off by default): web/battle.js asks fusionEnabled() before it
 // merges the authored skill, keeps a party entry's `fuseInto`, or tints a fighter.
 
+import type { FusionDefeatArgs } from "./battle/core/types.js";
+
 /** The five primary stats every blend covers. */
 export const FUSION_STATS = Object.freeze(["str", "def", "spt", "wis", "spd"]);
 
@@ -186,14 +188,6 @@ export function fusionBossFor(fuseInto, bosses = null) {
  *
  * Returns `{ fuse: false }`, or `{ fuse: true, hp, boss }` with the authored record.
  */
-/** What a battle hand-off asks: the party as it stands, which body fell, the fusion switch, and the Lab's boss table. */
-interface FusionDefeatArgs {
-  party?: { fuseInto?: any; hp?: any }[];
-  partyIndex?: number;
-  fxOn?: boolean;
-  bosses?: Record<string, any> | null;
-}
-
 export function fusionOnDefeat({ party, partyIndex = 0, fxOn = false, bosses = null }: FusionDefeatArgs = {}) {
   if (!fxOn || !Array.isArray(party) || !party.length) return { fuse: false };
   if (partyIndex !== party.length - 1) return { fuse: false };

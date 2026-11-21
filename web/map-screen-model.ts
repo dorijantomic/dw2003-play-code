@@ -143,11 +143,11 @@ export function nearestInDirection(pos, from, dir) {
 
 /** The screen's state: which region, which node the cursor is on, and the text for the help band. */
 /** A manifest map as the map screen reads it: its stage id and its "Region — Town" name. */
-export interface MapRecord { id: string; name?: string }
+export interface MapScreenRecord { id: string; name?: string }
 
 /** What the game hands the map screen: the maps, the scene routing data, the seen flag, and the map you are on. */
 export interface MapScreenData {
-    maps: MapRecord[];
+    maps: MapScreenRecord[];
     scenes?: Record<string, any> | null;
     seen: (id: string) => boolean;
     currentId: string | null;

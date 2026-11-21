@@ -11,7 +11,7 @@ import type {
   Battle3dFighter,
   Battle3dTexturePage,
 } from "../battle3d/core/types.js";
-import type { SfxPlayerContext } from "./audio.js";
+import type { BattleSide, SfxPlayerContext } from "./audio.js";
 
 // The two per-model GL buffer sets (web/battle3d/core/model.ts builds them, toon.ts and the
 // renderer decorate them as they go).
@@ -214,7 +214,6 @@ export interface AtmParticle {
 // A camera mode: the director's own sweep, the two game cameras, the tag/idle/free debug views.
 export type CameraMode = "opening" | "director" | "behind" | "orbit" | "game" | "tag" | "defeat" | "free";
 
-export type BattleSide = "player" | "enemy";
 
 // A canvas that may be an OffscreenCanvas: the capture path reads it back either way.
 export interface CaptureCanvas extends HTMLCanvasElement {

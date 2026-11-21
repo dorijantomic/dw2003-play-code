@@ -50,12 +50,12 @@ export interface ShopScreen {
   update?: (dt: number) => void;
 }
 
-/** What shop.open() is told about the merchant (web/shop.ts). */
+/** What shop.open() is told about the merchant (web/shop.ts, web/shop-translated.ts). */
 export interface ShopOpenOpts {
   /** the merchant's name, shown in the window's title row */
   name?: string;
   /** the live game state the shop reads its bag, wallet and party from */
   state?: any;
-  /** which shop this is (index into the stage's item_shop rows) */
+  /** which shop this is: the stage's item_shop row, or the decoded shop id (0-29) */
   shopId?: number;
 }

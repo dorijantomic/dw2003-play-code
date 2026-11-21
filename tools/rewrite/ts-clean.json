@@ -546,7 +546,6 @@
   "web/types/tech-record.ts",
   "web/types/textbox.ts",
   "web/types/translated-screen-host.ts",
-  "web/types/u-core.ts",
   "web/types/u-scene.ts",
   "web/types/ui-kit.ts",
   "web/types/uifont.ts",

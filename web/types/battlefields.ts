@@ -21,7 +21,7 @@ export interface ArenaManifest {
 }
 
 /** One map record of the map manifest: its id ("s013"), its own name, and the zones it carries. */
-export interface MapRecord {
+export interface BattlefieldMapRecord {
   id?: string;
   name?: string;
   zones?: MapZoneRecord[];
@@ -33,8 +33,8 @@ export interface MapZoneRecord {
   stage?: string;
 }
 
-/** One backdrop pack: the pack folder it draws from, its element world ("data" = the ordinary arena) and its sound. */
-export interface BackdropPack {
+/** One backdrop pack as the manifest's table defines it: the pack folder it draws from, its element world ("data" = the ordinary arena) and its sound. The loader turns it into a loaded pack (types/battle3d.ts BackdropPack). */
+export interface BackdropPackDef {
   element?: string;
   pack?: string;
   sound?: number;
@@ -42,7 +42,7 @@ export interface BackdropPack {
 
 /** The backdrop tables: the packs by technique signature, by technique id, and the ordinary fallback. */
 export interface BackdropTable {
-  bySig?: Record<string, BackdropPack>;
+  bySig?: Record<string, BackdropPackDef>;
   byTech?: Record<string, number>;
   fallbackSig?: number;
 }
@@ -63,7 +63,7 @@ export interface SkillRecord {
 export interface BattlefieldsInput {
   arenas?: ArenaManifest;
   backdrops?: BackdropTable;
-  maps?: MapRecord[];
+  maps?: BattlefieldMapRecord[];
   skills?: SkillRecord[];
   techTable?: Record<string, TechniqueTableEntry>;
 }

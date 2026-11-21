@@ -1,3 +1,5 @@
+import type { Dw2Motion } from "../fight/types.js";
+
 /** A bone's DW2 channel-2 keys: one [time, x, y, term] row per key. */
 export interface Dw2MotionCh2 {
   ch2?: number[][];
@@ -6,17 +8,6 @@ export interface Dw2MotionCh2 {
 /** A bone's DW2 channel-1 keys: one [time, x, y, term] row per key. */
 export interface Dw2MotionCh1 {
   ch1?: number[][];
-}
-
-/** One DW2 motion as the swap gate judged it: the per-bone keys, the playlist, and the table it wants. */
-export interface Dw2Motion {
-  keys?: Record<string, number[][]>;
-  playlist?: number[][];
-  used?: boolean;
-  table?: number;
-  /** either one bone's keys, or a per-bone map of them */
-  ch1?: number[][] | Record<number, number[][]>;
-  rootBone?: number;
 }
 
 /** What the gate measured on one model: the motions it judged (by letter) and the slots it already owns. */

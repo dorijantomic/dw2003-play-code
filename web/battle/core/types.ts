@@ -152,11 +152,12 @@ export interface BattleMusicTrack {
 // fusionOnDefeat()'s arguments (web/fusion.ts): the authored party, the body that just fell and
 // the fusion-boss table to look its `fuseInto` up in.
 export interface FusionDefeatArgs {
-  party?: any[];
+  /** the party as it stands; the last body may carry `fuseInto` (a boss id or its record) */
+  party?: { fuseInto?: any; hp?: any }[];
   partyIndex?: number;
   fxOn?: boolean;
   /** the fusion-boss table (fusion.json), looked up by the fallen body's id */
-  bosses?: any;
+  bosses?: Record<string, any> | null;
 }
 
 // The fused body's stat block, re-rolled to the fusion's own attack/techniques (web/fusion.ts).

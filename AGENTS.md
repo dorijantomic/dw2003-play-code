@@ -5,6 +5,13 @@
 
 Short pointers to knowledge that is easy to lose. Read the linked file before touching the area.
 
+## TypeScript code (web/*.ts, engine/)
+
+- Every code folder has a `MAP.md` (file, lines, job, main exports): read it before opening big files.
+- Edit the `.ts`; `npm run build:web` writes the `.js` beside it (git-ignored). Types live in `web/types/<module>.ts` and folder `types.ts`.
+- After any type edit: `node tools/rewrite/same-js.mjs` (must say all same) and `npm run check:types` (web/ is at 0 tsc errors).
+  Type syntax only; no `@ts-ignore`; class fields only as `declare x: T;`.
+
 ## Extra quests and new characters (a layer on top of the game, never part of the story)
 
 - Read first: `docs/quests-bible.md` (design rules, stages, how to add quests), `docs/quests-lore.md` (Digimon World 3 plot and

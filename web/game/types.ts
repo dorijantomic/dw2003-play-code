@@ -2,6 +2,7 @@
 // (see tools/rewrite/add-types.mjs). Nothing here is emitted — node's strip mode erases the
 // declarations — so this file must never hold runtime code.
 
+import type { BattleStartArgs, BattleWinResult } from "../battle/core/types.js";
 import type { ChatPacket } from "../types/chat.js";
 
 /** The tri-state story-flag adapter the field code gates on (web/flag-store.ts createFlagStore). */
@@ -249,3 +250,36 @@ export type WalkBlend = number | false;
 
 // A wrapped chat message as web/chat.ts builds it: the packet bytes the box steps through.
 export type ChatPack = ChatPacket;
+
+// A screen object that may expose the optional quad wipe (save screen, book screens).
+export interface TransitionQuadScreen {
+  showTransitionQuad?: (on: boolean) => void;
+}
+
+// Anything that may be closed when it is still open (textbox, dialogue box).
+export interface Closeable {
+  close?: () => void;
+}
+
+// The field state objects that hold the ordinal-43 movie's resolve callback (state S, web/game/state.ts).
+export interface FieldMovieHost {
+  fieldMovieDone?: (() => void) | null;
+}
+
+// The options the quest layer hands to startQuestBattle (web/game/battle-launch.ts). A loss is
+// handed back with the party restored, so onLose never has to undo anything itself.
+export interface QuestBattleOptions {
+  /** the battle id that keys battle_rewards; the caller nulls it when the roll had one */
+  screenId?: number | null;
+  onWin?: (result: BattleWinResult) => void;
+  onFlee?: () => void;
+  onLose?: () => void;
+  mapId?: number;
+  lead?: boolean;
+}
+
+// The options the dev toolset hands to battle.start / startScreen / startParty (window.__dev):
+// the same arguments the field hands the engine, plus `lead` for the 1v1 startScreen path.
+export interface DevBattleOptions extends BattleStartArgs {
+  lead?: boolean;
+}

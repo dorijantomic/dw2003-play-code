@@ -7,7 +7,8 @@ import { mountForceDismount } from "../mount.js";
 import { PRACTICE_BOT_ID, battle, choice, cutscene, fade, mpIdle, state, textbox } from "./vars.js";
 import { currentMap } from "./session.js";
 import { S } from "./state.js";
-import type { MpLaunchOptions, MpPracticeOptions, QuestBattleOptions } from "../types/u-core.js";
+import type { MpLaunchOptions, MpPracticeOptions } from "../mpbattle/types.js";
+import type { QuestBattleOptions } from "./types.js";
 
 // Encounter rate is now governed by the authentic data: stages with no zone pool
 // (city interiors, story maps) return no encounter, and a zone's empty slots are the

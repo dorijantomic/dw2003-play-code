@@ -61,12 +61,12 @@ export interface SwapNumbers {
   idleRange?: { pen: number | null; ankle: number | null; step: number | null; };
 }
 
-/** One DW2 motion as the generated motion file writes it: per-bone rotation keys (ch2), optional root translation (ch1), the playlist the keys play on. */
+/** One DW2 motion as the generated motion file writes it: per-bone rotation keys (ch2), optional root translation (ch1), the playlist the keys play on. The swap gate adds `used` to the motions it passed. */
 export interface Dw2Motion {
   /** bone index -> that bone's rotation keys: [frame, x, y, z, terminator] rows */
   keys?: Record<string, number[][]>;
   /** the root translation keys: one array for a v1 file, per-bone arrays for a v2 bake */
-  ch1?: any;
+  ch1?: number[][] | Record<string | number, number[][]>;
   /** the motion's playlist entries (the table the keys hang on) */
   playlist?: any[];
   table?: number;
@@ -78,6 +78,8 @@ export interface Dw2Motion {
   /** the playlist entry of the strike pose */
   hit?: number | null;
   letter?: string;
+  /** the swap gate judged this motion worth offering (web/anim-viewer-dw2motion.ts) */
+  used?: boolean;
 }
 
 /** One node of the face-box scene: what to draw, the matrix it is drawn with, and the texture/tint (the box nodes take neither). */

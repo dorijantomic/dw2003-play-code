@@ -25,7 +25,8 @@
 import { MODEL_ANIM, MODEL_TEXTURE } from "./anim-viewer-bake.js";
 import { DW2_CLIP_MAP } from "./fight/dw2-clip-map.js";
 import { kindOfSlot, judgeNumbers, WORLD_BARS } from "./fight/motion-swap-gate.js";
-import type { Dw2ActionsOptions, Dw2Fetch, Dw2Motion, Dw2MotionCh1, Dw2MotionCh2, Dw2Query, Dw2SwapData } from "./types/anim-viewer-dw2motion.js";
+import type { Dw2ActionsOptions, Dw2Fetch, Dw2MotionCh1, Dw2MotionCh2, Dw2Query, Dw2SwapData } from "./types/anim-viewer-dw2motion.js";
+import type { Dw2Motion } from "./fight/types.js";
 
 export const DW2_ROOT = "assets/battle/dw2motion";
 export const dw2FileUrl = (folder, root = DW2_ROOT) => `${root}/${folder}.json`;

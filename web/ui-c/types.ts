@@ -314,7 +314,7 @@ export interface PlaceCardQuad {
 }
 
 /** One name line of the place card: the area (above) or the place, at the game's pen. */
-export interface PlaceCardName {
+export interface PlaceCardNameLine {
   text: string;
   x: number;
   y: number;
@@ -323,7 +323,7 @@ export interface PlaceCardName {
 /** The place card's scene: the bars the game paints this frame and the two names. */
 export interface PlaceCardScene {
   quads?: PlaceCardQuad[];
-  names?: PlaceCardName[];
+  names?: PlaceCardNameLine[];
 }
 
 /** The damage pop: what the number is and how it reads. */

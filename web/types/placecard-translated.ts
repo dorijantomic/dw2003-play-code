@@ -1,7 +1,7 @@
 import type { LocationCardState } from "../../engine/systems/location-card.js";
 
 /** One of the card's two names (the area, the place) as it has revealed so far. */
-export interface PlaceCardName {
+export interface PlaceCardNameReveal {
   revealed: number;
   total: number;
   ended: boolean;
@@ -15,8 +15,8 @@ export interface PlaceCardView {
   hold: number;
   released: number;
   busy: boolean;
-  area: PlaceCardName;
-  place: PlaceCardName;
+  area: PlaceCardNameReveal;
+  place: PlaceCardNameReveal;
   /** the sliding bars (the frame's quads) */
   bars: unknown[];
   /** the slit the bars are drawn through */

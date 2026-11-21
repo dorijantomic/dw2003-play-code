@@ -1,3 +1,5 @@
+import type { ShopOpenOpts } from "./shop.js";
+
 export interface ShopTranslatedScreen {
   /** vendor object: the ui.MenuDisplayClock the shop ticks on */
   _clock: any;
@@ -23,13 +25,4 @@ export interface ShopTranslatedScreen {
 export interface ShopTranslatedOptions {
   /** the resident digimon table (species stats) the save seed is built against */
   digimonDB?: () => any;
-}
-
-/** What shop.open() is told about the merchant and the save it edits. */
-export interface ShopOpenOpts {
-  /** the decoded shop id (0-29) */
-  shopId?: number;
-  /** the shop's name, when the caller shows one */
-  name?: string;
-  state?: any;
 }

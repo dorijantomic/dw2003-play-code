@@ -20,6 +20,36 @@ export interface MpFightResult {
   reward?: unknown;
 }
 
+/** The callbacks a many-vs-many fight reports back to the field with. */
+export interface MpFightHandlers {
+  onWin?: (result: MpFightResult) => void;
+  onFlee?: () => void;
+  onLose?: () => void;
+}
+
+// The many-vs-many launch: the foes, the partner's id, the label the window shows and the
+// callbacks the field battle reports back to (web/game/battle-launch.ts).
+export interface MpLaunchOptions {
+  /** one encounter entry per foe (the party entries the field fights) */
+  foes?: unknown[];
+  /** the telegraphed partner's id (myId's peer) */
+  withId?: number;
+  label?: string;
+  /** the battle id that keys the music and the rewards, null when the roll found none */
+  screenId?: number | null;
+  /** the challenge record a serialized bout carries (null for a wild fight) */
+  challenge?: unknown;
+  opts?: MpFightHandlers;
+}
+
+// The practice bout against a bot partner: same shape, no partner id.
+export interface MpPracticeOptions {
+  foes?: unknown[];
+  label?: string;
+  screenId?: number | null;
+  opts?: MpFightHandlers;
+}
+
 /** One player in the host's table (host.ts). */
 export interface MpNetPlayer {
   id: number;

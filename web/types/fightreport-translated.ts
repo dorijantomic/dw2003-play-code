@@ -68,3 +68,32 @@ export interface FightReportScreen {
   textWidgets?: () => unknown[];
   update?: (dt: number) => void;
 }
+
+/** One partner row on the results overlay: the fighter at that position, what it earned and the
+ *  forms the win opened (buildFightReportRows, web/battle/report.ts). */
+export interface FightReportRow {
+  index: number;
+  /** the digimon.json id the fighter's body is */
+  rookieId?: number;
+  name?: string;
+  level?: number;
+  /** the EXP this fight paid it */
+  xp?: number;
+  /** the forms it can now turn into */
+  forms?: unknown[];
+}
+
+// The options the results overlay is opened with (openFightReport, web/game/ui-openers.ts).
+export interface FightReportOptions {
+  rows?: FightReportRow[];
+  /** the pages the report screen shows, already built for it */
+  pages?: unknown[] | null;
+  /** the menu adapter each participant position drew through */
+  adapterByIndex?: unknown;
+  rewardXp?: number;
+  /** the item def id the fight dropped; droppedItem is its name */
+  dropItemId?: number | null;
+  droppedItem?: string | null;
+  battleId?: number;
+  onClose?: (() => void) | null;
+}

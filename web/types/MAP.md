@@ -70,7 +70,6 @@ tools/rewrite/split-types.mjs.
 | textbox.ts | 1 | types of web/textbox.ts |
 | wfight-translated.ts | 1 | types of web/wfight-translated.ts |
 | yesno-translated.ts | 1 | types of web/yesno-translated.ts |
-| u-core.ts | 4 | types added after the split — see the file's own header |
 | anim-viewer-bake.ts | 2 | types added after the split — see the file's own header |
 | anim-viewer-compare.ts | 2 | types added after the split — see the file's own header |
 | anim-viewer-data.ts | 2 | types added after the split — see the file's own header |

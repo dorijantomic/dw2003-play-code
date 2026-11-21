@@ -9,7 +9,7 @@ import { openDamageLab } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> 
 import { openReplay, replayPress, replayTake, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { areaOf } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { underwaterInfo } from "./fishing-underwater.js"; // fishing: a 3D underwater inset while the line is in the water (reads state.fishing only)
-import type { Closeable, DevBattleOptions, FieldMovieHost, TransitionQuadScreen } from "./types/u-core.js";
+import type { Closeable, DevBattleOptions, FieldMovieHost, TransitionQuadScreen } from "./game/types.js";
 
 import { installFxPanel, ambienceSceneState, isOpenAirMapName } from "./ambience.js";
 import { loadTileIndex } from "./map-tiles.js";

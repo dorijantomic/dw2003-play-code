@@ -1,5 +1,4 @@
 import { createExclusiveRegister, createBgmPlayer, createSfxPlayer } from "../audio.js";
-import type { Closeable } from "../types/u-core.js";
 import { createItemLog } from "../item-log.js";
 import { createSpeciesLog } from "../species-log.js";
 import { createRetryLoader } from "../retry-loader.js";
@@ -80,7 +79,7 @@ import { openFly } from "./ui-openers.js";
 import { checkStageCutscene, storyDbg } from "./story-events.js";
 import { runQuestSceneEvent, sceneCast } from "./quest-scenes.js";
 import { dispatchInput } from "./input.js";
-import type { Follower, GameState } from "./types.js";
+import type { Closeable, Follower, GameState } from "./types.js";
 
 // D0x80055c34 is ONE register in the original, so both players share one
 // instance here: a track or jingle started on either side first ends whatever

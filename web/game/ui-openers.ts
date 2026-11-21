@@ -1,5 +1,6 @@
 import { questDone } from "../quests.js";
-import type { FieldMovieHost, FightReportOptions } from "../types/u-core.js";
+import type { FieldMovieHost } from "./types.js";
+import type { FightReportOptions } from "../types/fightreport-translated.js";
 import { FLY_QUEST, flyBlock, FLY_POINTS, flyCopyFor, arrivalSpot } from "../fly-points.js";
 import {
   rosterSlotOfCharId,
