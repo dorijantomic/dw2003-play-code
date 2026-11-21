@@ -10,7 +10,7 @@ export function normaliseData(raw, pack) {
   d.added = d.added.filter((a) => a && (isAssetEntry(a) ? okM(a.m) && typeof a.id === "string" : true));
   return d;
 }
-export const newAssetEntry = (id: string, asset: string | undefined, m: Iterable<unknown> | ArrayLike<unknown>) => ({ id, asset, m: Array.from(m) });
+export const newAssetEntry = (id: string, asset: string, m: Iterable<unknown> | ArrayLike<unknown>) => ({ id, asset, m: Array.from(m) });
 
 /** The picker list: every registry asset that can stand as an object (all but "none" and "default"), sorted by source, then name. */
 export function pickerEntries(assets) {

@@ -31,8 +31,39 @@ export const PALETTE = [
 export const OUTLINE = [10, 10, 14];
 
 // ── glTF decoding (the DW2 subset: non-indexed triangles, rigid node TRS, LINEAR clips) ─────────
-const COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
-const COMPONENT = {
+/** Any of the views an accessor decodes into. */
+type TypedArr = Int8Array | Uint8Array | Int16Array | Uint16Array | Uint32Array | Float32Array;
+/** The DataView readers the component table names, all with the same shape so they stay callable. */
+interface DataReader {
+  getInt8(offset: number, littleEndian?: boolean): number;
+  getUint8(offset: number, littleEndian?: boolean): number;
+  getInt16(offset: number, littleEndian?: boolean): number;
+  getUint16(offset: number, littleEndian?: boolean): number;
+  getInt32(offset: number, littleEndian?: boolean): number;
+  getUint32(offset: number, littleEndian?: boolean): number;
+  getFloat32(offset: number, littleEndian?: boolean): number;
+  getFloat64(offset: number, littleEndian?: boolean): number;
+}
+// ── the glTF 2.0 document subset the converter writes ──────────────────────────────────────────
+interface GltfAccessor { componentType: number; type: string; count: number; bufferView?: number; byteOffset?: number; normalized?: boolean }
+interface GltfPrimitive { mode?: number; indices?: number; attributes: Record<string, number>; material?: number }
+interface GltfMesh { primitives?: GltfPrimitive[]; name?: string }
+interface GltfMaterial { name?: string; alphaMode?: string; alphaCutoff?: number; pbrMetallicRoughness?: { baseColorTexture?: { index: number } } }
+interface GltfImage { uri?: string }
+interface GltfSampler { input: number; output: number; interpolation?: string }
+interface GltfChannel { sampler: number; target: { node: number; path: string } }
+interface GltfAnimation { name?: string; channels?: GltfChannel[]; samplers: GltfSampler[] }
+interface GltfBufferView { buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }
+interface GltfBuffer { uri?: string; byteLength?: number }
+interface GltfNode { children?: number[]; mesh?: number; name?: string }
+interface GltfDoc {
+  nodes: GltfNode[]; scene?: number; scenes?: { nodes?: number[] }[];
+  meshes?: GltfMesh[]; accessors: GltfAccessor[]; materials?: GltfMaterial[];
+  images?: GltfImage[]; animations?: GltfAnimation[]; buffers: GltfBuffer[];
+  bufferViews: GltfBufferView[]; textures?: { source?: number }[];
+}
+const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+const COMPONENT: Record<number, { Ctor: new (n: number) => TypedArr; get: keyof DataReader; size: number; norm: number }> = {
   5120: { Ctor: Int8Array, get: "getInt8", size: 1, norm: 127 },
   5121: { Ctor: Uint8Array, get: "getUint8", size: 1, norm: 255 },
   5122: { Ctor: Int16Array, get: "getInt16", size: 2, norm: 32767 },
@@ -51,18 +82,36 @@ function decodeBase64(b64: string | undefined) {
   return new Uint8Array(Buffer.from(b64, "base64"));   // unit tests in node
 }
 
-function dataUri(uri) {
+function dataUri(uri: string | undefined) {
   const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(uri || ""));
   return m && m[2] ? decodeBase64(m[3]) : null;
 }
 
+/** One decoded primitive: its attribute arrays plus the vertex count and material index. */
+interface DwPrim { pos: TypedArr; nrm: TypedArr | null | undefined; uv: TypedArr | null | undefined; count: number; material: number }
+/** One mesh: its primitives and (after the box pass) its local bounds. */
+interface DwMesh { prims: DwPrim[]; min?: number[]; max?: number[] }
+/** One material as the renderer wants it. */
+interface DwMaterial { name: string | null; alphaMode: string; alphaCutoff: number; image: number | null }
+/** One animated node channel. */
+interface DwChannel { node: number; path: string; comps: number; interp: string; times: Float32Array; values: TypedArr }
+/** One clip. */
+interface DwAnim { index: number; name: string; dur: number; channels: DwChannel[] }
+/** The parsed model the renderer and the tests work on. */
+export interface Dw2Model {
+  json: GltfDoc; buffers: Map<number, Uint8Array | null>; accessors: Map<number, TypedArr>;
+  nodes: GltfNode[]; parents: Int32Array; roots: number[];
+  meshes: DwMesh[]; materials: DwMaterial[]; images: { uri: string | null }[];
+  anims: DwAnim[]; texcoordSets: number;
+}
+
 /** Parse a self-contained DW2 glTF into the shapes the renderer and the tests need. */
-export function parseDw2Gltf(json) {
+export function parseDw2Gltf(json: GltfDoc): Dw2Model {
   if (!json || !Array.isArray(json.nodes)) throw new Error("not a glTF");
-  const model = {
+  const model: Dw2Model = {
     json,
-    buffers: new Map(),
-    accessors: new Map(),
+    buffers: new Map<number, Uint8Array | null>(),
+    accessors: new Map<number, TypedArr>(),
     nodes: json.nodes,
     parents: new Int32Array(json.nodes.length).fill(-1),
     roots: (json.scenes?.[json.scene ?? 0]?.nodes || []).slice(),
@@ -134,13 +183,13 @@ export function parseDw2Gltf(json) {
   return model;
 }
 
-function walkParents(json, idx, parent, out) {
+function walkParents(json: GltfDoc, idx: number, parent: number, out: Int32Array) {
   out[idx] = parent;
   for (const c of json.nodes[idx]?.children || []) walkParents(json, c, idx, out);
 }
 
 /** One accessor as a typed array (de-interleaved when the bufferView says so). */
-export function readAccessor(model, idx) {
+export function readAccessor(model: Dw2Model, idx: number): TypedArr | null | undefined {
   if (idx == null) return null;
   if (model.accessors.has(idx)) return model.accessors.get(idx);
   const g = model.json, a = g.accessors?.[idx];

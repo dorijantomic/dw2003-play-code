@@ -17,7 +17,7 @@ import type { AmbienceSettings } from "./types/ambience.js";
 export const DIAL_MODES = ["none", "rare", "normal", "lure"];
 
 /** True unless the dial says "none": only that setting suppresses the launch. */
-export function dialAllowsFight(mode: string | undefined) {
+export function dialAllowsFight(mode: string) {
     return mode !== "none";
 }
 
@@ -26,7 +26,7 @@ export function dialAllowsFight(mode: string | undefined) {
  * reset (0..1279); "rare" doubles it, "lure" halves it (floored), and every other
  * setting — including off/unknown — keeps the decoded value exactly.
  */
-export function dialReset(decoded: number, mode: string | undefined) {
+export function dialReset(decoded: number, mode: string) {
     if (mode === "rare") return decoded * 2;
     if (mode === "lure") return Math.floor(decoded / 2);
     return decoded;

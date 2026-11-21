@@ -70,7 +70,7 @@ export function plainMaterial(S, col: THREE.Color, { name = "plain", rim = 0.3 }
   return m;
 }
 /** A sky gradient seen from inside: horizon -> zenith by the view direction (linear THREE.Color). */
-export function skyGradientMaterial(S: { srgb: (arg0: number[] | null) => THREE.Color; }, horizon: { r: number | undefined; g: number | undefined; b: number | undefined; }, mid: { r: number | undefined; g: number | undefined; b: number | undefined; }, zenith: { r: number | undefined; g: number | undefined; b: number | undefined; } | undefined, name = "skyGradient") {
+export function skyGradientMaterial(S: { srgb: (arg0: number[] | null) => THREE.Color; }, horizon: { r: number; g: number; b: number; }, mid: { r: number; g: number; b: number; }, zenith: { r: number; g: number; b: number; } | undefined, name = "skyGradient") {
   return new THREE.ShaderMaterial({
     name, uniforms: { uH: { value: new THREE.Vector3(horizon.r, horizon.g, horizon.b) }, uM: { value: new THREE.Vector3(mid.r, mid.g, mid.b) }, uZ: { value: new THREE.Vector3(zenith.r, zenith.g, zenith.b) } },
     vertexShader: /* glsl */`varying vec3 vD; void main() { mat4 im = mat4(1.0);
@@ -291,7 +291,7 @@ function builtDefs() {
     return one(geo, G.gullMaterial(env.S, col), { attrs: { aGull: [3, 0.5] } });
   });
   // --- surfaces: plain painted ground, water, sky (a surface slot takes the material; any other slot gets a flat disc of it)
-  const surf = (id: string | undefined, name: string, kinds: string[], col: number[] | null, extra: { sky?: number[][] } = {}) => add(id, name, ["surface", ...kinds], async (env: { S: { srgb: (arg0: number[] | null) => THREE.Color; }; }) => {
+  const surf = (id: string, name: string, kinds: string[], col: number[] | null, extra: { sky?: number[][] } = {}) => add(id, name, ["surface", ...kinds], async (env: { S: { srgb: (arg0: number[] | null) => THREE.Color; }; }) => {
     const mat = extra.sky ? skyGradientMaterial(env.S, ...extra.sky.map((c) => env.S.srgb(c)) as [any, any, any], id) : plainMaterial(env.S, env.S.srgb(col), { name: id, rim: 0.0 });
     const disc = new THREE.CylinderGeometry(1, 1, 0.04, 28, 1);
     return { parts: [{ geo: disc, mat }], assume: true, surfaceMat: mat };

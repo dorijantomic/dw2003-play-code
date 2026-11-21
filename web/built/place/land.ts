@@ -4,7 +4,7 @@
 import { SOIL, APRON_KINDS } from "../soil.js";
 
 // ---------------- land: floor triangles + apron, and the shore outline ----------------
-const azOf = (x: number | undefined, z: number | undefined) => Math.atan2(x, z) * 180 / Math.PI;
+const azOf = (x: number, z: number) => Math.atan2(x, z) * 180 / Math.PI;
 const wrapDeg = (a: number) => ((a + 180) % 360 + 360) % 360 - 180;
 const LAND = new WeakMap();
 

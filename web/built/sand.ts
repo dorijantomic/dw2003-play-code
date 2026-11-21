@@ -348,7 +348,7 @@ export function paintProbeMaterial(mesh) {
 }
 
 /** green share of a shore vertex = the measured green share of its picture row (same bin interpolation as the paint) */
-export function rowValue(rows, row: number | undefined, get) {
+export function rowValue(rows, row: number, get) {
   const n = rows.length, p = Math.min(n - 1, Math.max(0, row * n - 0.5)), i = Math.floor(p), j = Math.min(i + 1, n - 1);
   const a = get(rows[i] ?? rows.find(Boolean)), b = get(rows[j] ?? rows[i] ?? rows.find(Boolean));
   return a + (b - a) * (p - i);

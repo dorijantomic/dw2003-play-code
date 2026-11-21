@@ -5,7 +5,7 @@
 const norm = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
 const cache = new WeakMap();
 
-export function itemForDropName(name, byName = window.__ITEM_BY_NAME, byId = window.__ITEM_BY_ID) {
+export function itemForDropName(name: string, byName = window.__ITEM_BY_NAME, byId = window.__ITEM_BY_ID) {
   if (!name || name === "Null") return null;
   const exact = byName?.[name];
   if (exact) return exact;

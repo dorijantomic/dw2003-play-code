@@ -60,14 +60,21 @@ import { SKY_U, SKY_GLSL } from "./shared.js";
 
 export { SKY_U, SKY_GLSL };
 import { skyData as skyDataOf } from "./place/sky.js";
-import type { BuiltSkyState } from "./types.js";
 
 const RING_MAX = S.SKY_RING_MAX;   // profile points the shader takes
-const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const arr = (c: THREE.Color) => [c.r, c.g, c.b];
+const v3 = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
+const arr = (c: THREE.Color): [number, number, number] => [c.r, c.g, c.b];
 
 // ---------------- night (PICKED numbers: nothing night-lit is measured yet) ----------------
-export const NIGHT = {
+interface NightCfg {
+  LUMA: number; MOON_RADIUS: number;
+  MOON_COLOR: [number, number, number]; GLOW_COLOR: [number, number, number];
+  GLOW: number; GLOW_POWER: number; BROAD: number; GLOW_MAX_SHARE: number; HAZE_WARM_K: number;
+  CLOUD_LIT: [number, number, number]; CLOUD_AMB: [number, number, number]; CLOUD_DARK: [number, number, number];
+  STAR_AMP: number; STAR_MIN_EL: number; STAR_MAP: [number, number];
+  STAR_TIERS: { n: number; mag: number; tint: [number, number, number] }[];
+}
+export const NIGHT: NightCfg = {
   LUMA: 0.34,            // sRGB luma of the sky ring's median colour below which the arena is a night arena
   MOON_RADIUS: 0.055,    // rad (3.15 deg): an anime moon, not the real 0.26 deg
   MOON_COLOR: [0.92, 0.95, 1.00],        // linear
@@ -105,9 +112,10 @@ export const BAND = {
             uSkyClSpeed: 40, uSkyClSilver: 0.6, uSkyClFex: 0.85, uSkyClGain: 1.0 },
 };
 
+interface ArenaSkyRecipe { pieces: SkyRecipePiece[]; bg: number[] }
 /** Is this arena a night arena? The sky ring's measured median colour decides (sRGB luma), not the pack name.
  *  force "day" / "night" (the Arena Viewer's "sky time" switch) overrides the measurement; "auto" or nothing keeps it. */
-export function skyMode(rec, force = "auto") {
+export function skyMode(rec: ArenaSkyRecipe, force = "auto") {
   const sky = rec.pieces.find((p) => p.kind === "sky");
   const ring = sky?.colours?.all || rec.bg || [0, 0, 0];
   const luma = (0.2126 * ring[0] + 0.7152 * ring[1] + 0.0722 * ring[2]) / 255;
@@ -122,7 +130,7 @@ const starHash = (seed: number) => {
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 };
 /** Texel (i, j) centre -> unit direction: the inverse of the shader's uv (u = atan2(z,x)/2pi + 0.5, v = asin(y)/pi + 0.5). */
-export function starTexelDir(i: number, j: number, W: number | undefined, H: number | undefined) {
+export function starTexelDir(i: number, j: number, W: number, H: number): [number, number, number] {
   const u = (i + 0.5) / W, v = (j + 0.5) / H;
   const az = (u - 0.5) * 2 * Math.PI, el = (v - 0.5) * Math.PI;
   return [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
@@ -130,15 +138,15 @@ export function starTexelDir(i: number, j: number, W: number | undefined, H: num
 /** Bake the three tiers into one RGBA8 equirect texture. One star = one texel, unique across tiers. No star is
  *  placed where the moon disc has any light (the moon stands in front of the stars): a texel is skipped when its
  *  centre is within the disc's outer edge (asin(1.06 r), where skyMoon() reaches 0) plus one texel diagonal. */
-function bakeStars(seed: number, W: number | undefined, H: number | undefined, tiers: { n: number; mag: number; tint: number[]; }[], moon = null, moonR = 0) {
+function bakeStars(seed: number, W: number, H: number, tiers: { n: number; mag: number; tint: [number, number, number]; }[], moon: number[] | null = null, moonR = 0) {
   const data = new Uint8Array(W * H * 4), used = new Uint8Array(W * H), rnd = starHash(seed);
   const jMin = Math.ceil((0.5 + NIGHT.STAR_MIN_EL / 180) * H), jMax = H - 2;
   const texDiag = Math.hypot(2 * Math.PI / W, Math.PI / H);
   const cosKeep = moon ? Math.cos(Math.asin(Math.min(1, moonR * 1.06)) + texDiag) : 2;
   let skippedMoon = 0;
-  const out = [];
+  const out: { n: number; want: number; mag: number; tint: [number, number, number]; dirs: [number, number, number][] }[] = [];
   for (const [t, tier] of tiers.entries()) {
-    const dirs = [];
+    const dirs: [number, number, number][] = [];
     for (let guard = 0; dirs.length < tier.n && guard < tier.n * 200; guard++) {
       const i = 1 + Math.floor(rnd() * (W - 2)), j = jMin + Math.floor(rnd() * (jMax - jMin));
       const k = j * W + i;
@@ -342,7 +350,19 @@ function skyMaterial() {
 // STEP 1 (baked banks) of research r4/clouds.md §7. Shapes and the shading terms are PICKED (nothing cloud-shaped is
 // measured on this arena); the band heights come from the arena's own sky ring profile and
 // the lit albedo from the ring's measured p90, so each arena keeps its own cloud colour and its own sky band.
-export const CLOUDS = {
+interface CloudsCfg {
+  BANKS: number;
+  R: [number, number]; WIDTH_DEG: [number, number];
+  GAP_JIT: number; BASE_F: number; TOP_F: [number, number]; DEPTH: [number, number];
+  VOXEL: number; SEED: number;
+  SHAPE: { PILES: [number, number]; R_PUFF: number; TAPER: number; STEP: number; LEAN: number; CROWNS: number;
+           CROWN_R: number; BASE_LOBES: number; R_BASE: number; SHOULDERS: number; R_SHOULDER: number;
+           JITTER: number; SMELL: number };
+  WARP: { AMP: number; WAVE: number };
+  AO: { STEPS: number; LEN: number };
+  BLUR: number;
+}
+export const CLOUDS: CloudsCfg = {
   BANKS: 9,                 // banks along the horizon (r4: 6-10)
   R: [9600, 10400],         // bank centre radius (render units)
   WIDTH_DEG: [22, 40],      // each bank's width round the ring (broad, low puffy banks: wider than they are tall)
@@ -380,7 +400,13 @@ export const CLOUDS = {
 // dark flat base. `key` is the one number that drives the ramp — wrapped diffuse x how much sky the surface can see
 // (the baked sky visibility) x height — so the tops reach the measured white and everything the sun cannot reach
 // falls to the shade and then, in the creases and under the base, to the deep.
-export const CLOUD_LOOK = {
+interface CloudLookCfg {
+  SHADE: [number, number, number]; DEEP: [number, number, number]; RIM: [number, number, number];
+  WRAP: number; KEY_POW: number; HEIGHT_POW: number; BASE_K: number; VIS_FLOOR: number;
+  KEY_LO: number; KEY_HI: number; DEEP_HI: number; SKY_TINT: number; KEY_GAIN: number;
+  RIM_POW: number; RIM_BACK: number; RIM_GAIN: number; BILLOW: number; BILLOW_W: number;
+}
+export const CLOUD_LOOK: CloudLookCfg = {
   SHADE: [0.46, 0.52, 0.66],   // PICKED: blue-violet albedo of a shadowed side
   DEEP: [0.27, 0.32, 0.46],    // PICKED: the darkest creases and the flat base
   RIM: [1.00, 0.99, 0.97],     // PICKED: the silver lining, times the shared light's colour
@@ -447,7 +473,7 @@ const cloudRng = (seed: number) => { let s = seed >>> 0; return () => ((s = (s *
 /** The directions the baked sky visibility is measured in: a small fixed cosine-weighted hemisphere — one straight up,
  *  four at 40 deg and four at 72 deg. Fixed, so a bank bakes to the same numbers every time. */
 const AO_DIRS = (() => {
-  const out = [], add = (el: number, az: number, w: number) => out.push([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el), w]);
+  const out: [number, number, number, number][] = [], add = (el: number, az: number, w: number) => out.push([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el), w]);
   add(Math.PI / 2, 0, 1.7);
   for (let i = 0; i < 4; i++) add(40 * Math.PI / 180, i * Math.PI / 2 + 0.4, 1.0);
   for (let i = 0; i < 4; i++) add(72 * Math.PI / 180, i * Math.PI / 2 + 1.15, 0.55);
@@ -455,13 +481,13 @@ const AO_DIRS = (() => {
 })();
 /** The height at radius rc that stands at the same elevation, seen from the ring's centre, as the ring's own point
  *  at band share f — the same projection the old puffs used, so a bank stands where the ring's cloud band stood. */
-const atR = (sky, f: number, rc: number) => { const y = sky.ymin + f * (sky.ymax - sky.ymin); return y * rc / Math.max(ringRJS(y), 1); };
+const atR = (sky: { ymin: number; ymax: number }, f: number, rc: number) => { const y = sky.ymin + f * (sky.ymax - sky.ymin); return y * rc / Math.max(ringRJS(y), 1); };
 
 /** One bank's lobes, in the bank's own frame (x across the ring, y up from the base plane, z in and out): a heap of
  *  soft puffs — piles of overlapping lobes that narrow as they rise, broad lobes lying ON the base plane, a few small
  *  puffs crowning each pile (the lumpy billowy edge) and shoulders that close the gaps into one mass. */
 function bankLobes(spec: { az: number; rc: number; W: number; D: number; H: number; base: number; top: number; wid: number; }, rnd: () => number) {
-  const SH = CLOUDS.SHAPE, { W, D, H } = spec, out = [];
+  const SH = CLOUDS.SHAPE, { W, D, H } = spec, out: { x: number; y: number; z: number; r: number }[] = [];
   const jit = (a: number) => (rnd() - 0.5) * 2 * a;
   const add = (x: number, y: number, z: number, r: number) => { if (r > 0) out.push({ x, y, z, r }); };
   const nP = SH.PILES[0] + Math.floor(rnd() * (SH.PILES[1] - SH.PILES[0] + 1));
@@ -540,7 +566,7 @@ function bankField(spec: { az: number; rc: number; W: number; D: number; H: numb
   const ny = Math.ceil((H + pad) / V) + 1;
   const F = new Float32Array(nx * ny * nz).fill(-1e9), at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
   // Inigo Quilez's polynomial smooth minimum, mirrored into a smooth MAXIMUM: a fillet of width k where two lobes meet
-  const smax = (a: number | undefined, b: number, k: number) => { const h = Math.min(1, Math.max(0, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
+  const smax = (a: number, b: number, k: number) => { const h = Math.min(1, Math.max(0, 0.5 + 0.5 * (a - b) / k)); return b + (a - b) * h + k * h * (1 - h); };
   for (const L of lobes) {
     const k = L.r * SH.SMELL, R = L.r + k;
     const i0 = Math.max(0, Math.floor((L.x - R - gx0) / V)), i1 = Math.min(nx - 1, Math.ceil((L.x + R - gx0) / V));
@@ -581,7 +607,7 @@ function bankField(spec: { az: number; rc: number; W: number; D: number; H: numb
 /** Trilinear sample of a grid, clamped at its edges. */
 function gridSampler(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: number, x0: number, y0: number, z0: number, V: number) {
   const at = (i: number, j: number, k: number) => (k * ny + j) * nx + i;
-  return (x, y, z) => {
+  return (x: number, y: number, z: number) => {
     let fx = (x - x0) / V, fy = (y - y0) / V, fz = (z - z0) / V;
     let i = Math.floor(fx), j = Math.floor(fy), k = Math.floor(fz);
     fx -= i; fy -= j; fz -= k;
@@ -590,7 +616,7 @@ function gridSampler(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: n
     const k0 = Math.min(Math.max(k, 0), nz - 1), k1 = Math.min(k + 1, nz - 1);
     const a = at(i0, j0, k0), b = at(i1, j0, k0), c = at(i0, j1, k0), d = at(i1, j1, k0);
     const e = at(i0, j0, k1), f = at(i1, j0, k1), g = at(i0, j1, k1), h = at(i1, j1, k1);
-    const s = (p, q, t: number) => p + (q - p) * t;
+    const s = (p: number, q: number, t: number) => p + (q - p) * t;
     return s(s(s(F[a], F[b], fx), s(F[c], F[d], fx), fy), s(s(F[e], F[f], fx), s(F[g], F[h], fx), fy), fz);
   };
 }
@@ -599,12 +625,12 @@ function gridSampler(F: Float32Array<ArrayBuffer>, nx: number, ny: number, nz: n
  *  straddles the isosurface, one quad per straddling grid edge, wound so the face agrees with the field's gradient.
  *  The field is a distance, so its zero level is the surface; the normals are that field's gradient (the true, smooth
  *  normal of the distance field, so a low-poly surface still shades as one soft mass). */
-function bankSurface(f) {
+function bankSurface(f: { F: Float32Array<ArrayBuffer>; nx: number; ny: number; nz: number; x0: number; y0: number; z0: number; V: number; at: (i: number, j: number, k: number) => number }) {
   const { F, nx, ny, nz, x0, y0, z0, V } = f, ISO = 0;
   const cnx = nx - 1, cny = ny - 1, cnz = nz - 1;
   const cellV = new Int32Array(cnx * cny * cnz).fill(-1);
   const cAt = (i: number, j: number, k: number) => (k * cny + j) * cnx + i;
-  const pos = [], idx = [];
+  const pos: number[] = [], idx: number[] = [];
   const EX = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
   const V8 = new Float32Array(8);
   for (let k = 0; k < cnz; k++) for (let j = 0; j < cny; j++) for (let i = 0; i < cnx; i++) {
@@ -626,7 +652,7 @@ function bankSurface(f) {
     cellV[cAt(i, j, k)] = pos.length / 3;
     pos.push(x0 + (i + sx / n) * V, y0 + (j + sy / n) * V, z0 + (k + sz / n) * V);
   }
-  const quad = (a: number | undefined, b: number | undefined, c: number | undefined, d: number | undefined, flip: boolean) => {
+  const quad = (a: number, b: number, c: number, d: number, flip: boolean) => {
     if (a < 0 || b < 0 || c < 0 || d < 0) return;
     if (flip) { const t = b; b = d; d = t; }   // [a,b,c,d] -> [a,d,c,b]: the SAME quad, wound the other way
     idx.push(a, b, c, a, c, d);
@@ -651,9 +677,9 @@ function bankSurface(f) {
 
 /** Bake all the banks: for each one, place it round the ring, build its surface, then take per-vertex the height share,
  *  the sky visibility and the outward normal. */
-export function buildCloudBanks(sky) {
+export function buildCloudBanks(sky: { ymin: number; ymax: number }) {
   const rnd = cloudRng(CLOUDS.SEED), V = CLOUDS.VOXEL;
-  const banks = [], P = [], N = [], C = [], I = [];
+  const banks: { az: number; widthDeg: number; r: number; w: number; d: number; base: number; top: number; y: number[]; rr: number[]; lobes: number; tris: number; v0: number; vn: number }[] = [], P: number[] = [], N: number[] = [], C: number[] = [], I: number[] = [];
   let tris = 0;
   for (let b = 0; b < CLOUDS.BANKS; b++) {
     const az = ((b + 0.5 + (rnd() - 0.5) * 2 * CLOUDS.GAP_JIT) / CLOUDS.BANKS) * Math.PI * 2;
@@ -670,7 +696,7 @@ export function buildCloudBanks(sky) {
     // and count how much of the sky the cloud's own mass covers. This is the whole of the cloud's self-shadowing —
     // the crease between two lobes and the underside of a tower go dark, an outer lobe stays open to the sky.
     const reach = CLOUDS.AO.LEN * spec.H * CLOUDS.SHAPE.R_PUFF;   // how far the sky is sampled: a puff radius and a half
-    const ao = (x, y, z, nx: number, ny: number, nz: number) => {
+    const ao = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
       // a frame with +z along the normal (any up will do: pick the world axis the normal is least aligned with)
       let ux, uy, uz;
       if (Math.abs(ny) < 0.9) { ux = -nz; uy = 0; uz = nx; } else { ux = 1; uy = 0; uz = 0; }
@@ -721,7 +747,7 @@ export function buildCloudBanks(sky) {
   return { pos: P, nor: N, cloud: C, idx: I, banks, tris, verts: P.length / 3 };
 }
 
-function createClouds(scene, sky, c, worldScale) {
+function createClouds(scene: THREE.Scene, sky: SkyRecipePiece, c: SkyRecipePiece["colours"], worldScale: () => number) {
   const t0 = performance.now();
   const M = buildCloudBanks(sky);
   const bakedMs = performance.now() - t0;
@@ -773,11 +799,11 @@ function createClouds(scene, sky, c, worldScale) {
 // ---------------- JS twins (same maths as the GLSL above) ----------------
 const U = S.U;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smooth = (a: number, b: number, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const smooth = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const lumaA = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-const n2 = (x, z) => { const L = Math.hypot(x, z); return [x / L, z / L]; };
+const n2 = (x: number, z: number): [number, number] => { const L = Math.hypot(x, z); return [x / L, z / L]; };
 /** sakura skyGradient(), linear RGB [r, g, b], for a unit direction [x, y, z]. */
-export function skyGradientJS(rd) {
+export function skyGradientJS(rd: [number, number, number]) {
   const H = arr(SKY_U.uHorizon.value), Z = arr(SKY_U.uZenith.value), M = arr(SKY_U.uMid.value);
   const ey = Math.max(rd[1], 0), t = Math.pow(ey, SKY_U.uZenithPow.value);
   let c = H.map((h, k) => h + (Z[k] - h) * t);
@@ -802,21 +828,21 @@ export function skyGradientJS(rd) {
   return out;
 }
 /** Band mode: distance along rd from the ring-frame eye to the ring cylinder, and the height there (as skyBandT/H). */
-export function skyBandTJS(rd, eye = SKY_U.uRingEye.value) {
+export function skyBandTJS(rd: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
   const R = SKY_U.uRing.value[0].y, a = rd[0] * rd[0] + rd[2] * rd[2];
   if (a < 1e-8) return 1e9;
   const b = eye.x * rd[0] + eye.z * rd[2], c = eye.x * eye.x + eye.z * eye.z - R * R;
   return (-b + Math.sqrt(Math.max(b * b - a * c, 0))) / a;
 }
-export function skyBandHJS(rd, eye = SKY_U.uRingEye.value) {
+export function skyBandHJS(rd: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
   return Math.min(1e8, Math.max(-1e8, eye.y + Math.min(skyBandTJS(rd, eye), 1e9) * rd[1]));
 }
 /** Band mode colour (linear) at the height where rd meets the ring (shared.js skyBand()). */
-export function skyBandJS(rd, eye = SKY_U.uRingEye.value) {
+export function skyBandJS(rd: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
   return skyBandAtJS(skyBandHJS(rd, eye));
 }
 /** The same colour by ring height h (render units), for checks and CPU bakes. */
-export function skyBandAtJS(h) {
+export function skyBandAtJS(h: number) {
   const B = SKY_U.uBandY.value, H = arr(SKY_U.uHorizon.value), M = arr(SKY_U.uMid.value), Z = arr(SKY_U.uZenith.value);
   const hz = arr(U.uHaze.value);
   const f = Math.max((h - B.x) / Math.max(B.y - B.x, 1e-3), SKY_U.uBandBelow.value);
@@ -829,13 +855,13 @@ export function skyBandAtJS(h) {
 }
 export function skyGlowKJS() { const m = SKY_U.uBandMix.value; return m > 0 ? 1 + (SKY_U.uBandGlowK.value - 1) * m : 1; }
 /** The two-lobe glow, around uGlowDir (the sun by day, the moon at night). */
-export function skySunGlowJS(rd) {
+export function skySunGlowJS(rd: number[]) {
   const gd = SKY_U.uGlowDir.value, s = Math.max(rd[0] * gd.x + rd[1] * gd.y + rd[2] * gd.z, 0);
   const k = Math.pow(s, SKY_U.uSunGlowPower.value) * SKY_U.uSunGlow.value + s * s * SKY_U.uBroadGlow.value;
   return arr(SKY_U.uSunGlowColor.value).map((v) => v * k);
 }
 /** The moon disc (0 by day). */
-export function skyMoonJS(rd) {
+export function skyMoonJS(rd: [number, number, number]) {
   if (SKY_U.uMoonAmt.value <= 0) return [0, 0, 0];
   const md = SKY_U.uMoonDir.value, r = SKY_U.uMoonRadius.value;
   const c = rd[0] * md.x + rd[1] * md.y + rd[2] * md.z, dd = Math.sqrt(Math.max(1 - c * c, 0));
@@ -843,7 +869,7 @@ export function skyMoonJS(rd) {
   return arr(SKY_U.uMoonColor.value).map((v) => v * disc * limb * a);
 }
 /** The stars (0 by day): the same baked texel the shader reads, nearest sampled. */
-export function skyStarsJS(rd) {
+export function skyStarsJS(rd: [number, number, number]) {
   const m = current.stars;
   if (SKY_U.uStarAmt.value <= 0 || !m || rd[1] <= 0.02) return [0, 0, 0];
   const u = Math.atan2(rd[2], rd[0]) * 0.15915494 + 0.5;
@@ -854,20 +880,20 @@ export function skyStarsJS(rd) {
   const g = SKY_U.uStarAmt.value * smooth(0.02, 0.10, rd[1]);
   return [0, 1, 2].map((ch) => (s[0] * tint[0][ch] + s[1] * tint[1][ch] + s[2] * tint[2][ch]) * g);
 }
-export function skyRadianceJS(rd) { const a = skyGradientJS(rd), b = skySunGlowJS(rd), g = skyGlowKJS(); return a.map((v, k) => v + b[k] * g); }
+export function skyRadianceJS(rd: [number, number, number]) { const a = skyGradientJS(rd), b = skySunGlowJS(rd), g = skyGlowKJS(); return a.map((v, k) => v + b[k] * g); }
 /** What the dome draws with the clouds off: radiance + moon disc + stars. */
-export function skyDomeJS(rd) {
+export function skyDomeJS(rd: [number, number, number]) {
   const c = skyRadianceJS(rd), m = skyMoonJS(rd), s = skyStarsJS(rd);
   return c.map((v, k) => v + m[k] + s[k]);
 }
 /** Ring radius at height y and the height where a ray from the ring-frame eye meets the ring (as ringHitY()). */
-export function ringRJS(y) {
+export function ringRJS(y: number) {
   const P = SKY_U.uRing.value, n = SKY_U.uRingN.value;
   let a = P[0]; if (y <= a.x || n < 2) return a.y;
   for (let i = 1; i < n; i++) { const b = P[i]; if (y <= b.x || i === n - 1) return a.y + (b.y - a.y) * (y - a.x) / Math.max(b.x - a.x, 1e-3); a = b; }
   return a.y;
 }
-export function ringHitYJS(d, eye = SKY_U.uRingEye.value) {
+export function ringHitYJS(d: [number, number, number], eye: THREE.Vector3 = SKY_U.uRingEye.value) {
   const g = (t: number) => Math.hypot(eye.x + t * d[0], eye.z + t * d[2]) - ringRJS(eye.y + t * d[1]);
   const T = SKY_U.uRingT.value;
   if (g(0) >= 0 || g(T) < 0) return -1e9;
@@ -878,7 +904,7 @@ export function ringHitYJS(d, eye = SKY_U.uRingEye.value) {
 
 // ---------------- colours: measured, then the two stops solved so the finished sky gives them ----------------
 /** Solve uHorizon / uZenith so skyRadiance(horizon dir) = horizon target and skyRadiance(up) = zenith target. */
-function calibrate(tH, tZ, dirH: (number | undefined)[]) {
+function calibrate(tH: [number, number, number], tZ: [number, number, number], dirH: [number, number, number]) {
   const H = SKY_U.uHorizon.value, Z = SKY_U.uZenith.value;
   H.setRGB(tH[0], tH[1], tH[2]); Z.setRGB(tZ[0], tZ[1], tZ[2]);
   for (let i = 0; i < 60; i++) {
@@ -933,7 +959,7 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
     gy[j * N + i] = (B[((j + 1) % N) * N + i] - B[((j - 1 + N) % N) * N + i]) * N / 2;
     G = Math.max(G, Math.abs(gx[j * N + i]), Math.abs(gy[j * N + i]));
   }
-  const px = new Uint8Array(N * N * 4), b8 = (x: number | undefined) => Math.max(0, Math.min(255, Math.round(x * 255)));
+  const px = new Uint8Array(N * N * 4), b8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255)));
   for (let k = 0; k < N * N; k++) {
     px[k * 4] = b8(He[k]); px[k * 4 + 1] = b8(0.5 + gx[k] / (2 * G)); px[k * 4 + 2] = b8(0.5 + gy[k] / (2 * G)); px[k * 4 + 3] = b8(Ae[k]);
   }
@@ -943,19 +969,44 @@ function bakeNoise(seed: number, N: number, billow: boolean) {
   return { tex: t, G };
 }
 
-export const current = { sky: null, stars: null, rebuildWith: null };
+export interface SkyRecipePiece {
+  kind: string; name: string;
+  colours: { all: number[]; bottom?: number[]; top?: number[]; p10?: number[]; p90?: number[] };
+  profile?: [number, number][]; ymin: number; ymax: number; rmin: number; rmax: number; md?: unknown; pos?: number[];
+}
+interface SkySlotData {
+  sky: SkyRecipePiece; bg?: number[] | null; haze?: number[]; band?: boolean; clouds?: boolean;
+  mode?: string; opts?: Record<string, unknown> & { mode?: string };
+}
+interface SkyCtx {
+  scene: THREE.Scene; worldScaleFn?: () => number; world?: { scale: { x: number } };
+  materials: THREE.Material[] | null; info?: { sky?: SkyInfo } | null; camera?: unknown;
+}
+interface SkyStars {
+  tex: THREE.Texture; data: Uint8Array; W: number; H: number; skippedMoon: number;
+  tiers: { n: number; want: number; mag: number; tint: [number, number, number]; dirs: [number, number, number][] }[];
+}
+interface SkyInfo { clouds?: unknown; stars?: unknown; [k: string]: unknown }
+interface SkyClouds { objects: THREE.Object3D[]; meshes: THREE.Object3D[]; info: SkyInfo; dispose: () => void }
+interface SkyLive {
+  mesh: THREE.Object3D; material: THREE.Material; info: SkyInfo; scene: THREE.Scene; worldScale: () => number;
+  noise: { dispose: () => void }[]; clouds: unknown; opts: Record<string, unknown> & { mode?: string }; data: SkySlotData;
+  pal?: unknown; rec?: ArenaSkyRecipe; cloudInst?: SkyClouds | null; dispose?: () => void;
+}
+export const current: { sky: SkyLive | null; stars: SkyStars | null; rebuildWith: ((mode: string) => unknown) | null }
+  = { sky: null, stars: null, rebuildWith: null };
 
 /** ASSET: the sky dome from the slot's data (web/built/place/sky.js skyData: the measured ring, band, colours). It sets
  *  the shared sky uniforms (SKY_U: calibrated stops, day / night, moon, stars) and draws one camera-following box in the
  *  scene. ctx: { scene, world (its scale: the ring is in recipe units), materials, info, camera }. */
-export function buildSky(slot, ctx) {
+export function buildSky(slot: { data: SkySlotData }, ctx: SkyCtx) {
   const D = slot.data, sky = D.sky, opts = D.opts || {}, scene = ctx.scene;
   const worldScale = ctx.worldScaleFn || (() => ctx.world?.scale.x || 1);
   const t0 = performance.now();
   const c = sky.colours, bg = D.bg || c.all;
   const night = skyMode({ pieces: [sky], bg: D.bg }, D.mode ?? opts.mode);
   const sd = U.uSunDir.value, perp = n2(-sd.z, sd.x);
-  const dirH = [perp[0], 0, perp[1]];   // the horizon at right angles to the light: no warm band there
+  const dirH: [number, number, number] = [perp[0], 0, perp[1]];   // the horizon at right angles to the light: no warm band there
 
   // ---- night first: calibrate() below must see the glow that will actually be in the sky ----
   if (night.mode === "night") {
@@ -988,11 +1039,11 @@ export function buildSky(slot, ctx) {
   // ring
   let prof = sky.profile?.length ? sky.profile : [[sky.ymin, sky.rmax], [sky.ymax, sky.rmin]];   // no profile: a cone
   if (prof.length > RING_MAX) prof = Array.from({ length: RING_MAX }, (_, i) => prof[Math.round(i * (prof.length - 1) / (RING_MAX - 1))]);
-  prof.forEach(([y, r], i) => SKY_U.uRing.value[i].set(y, r));
+  prof.forEach(([y, r], i: number) => SKY_U.uRing.value[i].set(y, r));
   SKY_U.uRingN.value = prof.length; SKY_U.uRingT.value = 8 * sky.rmax;
   SKY_U.uBandY.value.set(sky.ymin, sky.ymax);
   // measured colours -> linear, once
-  const lin = (rgb) => arr(S.srgb(rgb));
+  const lin = (rgb: number[]) => arr(S.srgb(rgb));
   const tH = lin(c.bottom || c.all), tZ = lin(bg);
   SKY_U.uMid.value.setRGB((tH[0] + tZ[0]) / 2, (tH[1] + tZ[1]) / 2, (tH[2] + tZ[2]) / 2);   // PICKED: nothing measured between
   // night: the measurement wins over the picked halo. calibrate() can only scale the stops (never below 0), so the
@@ -1022,7 +1073,7 @@ export function buildSky(slot, ctx) {
     SKY_U.uBandFade.value = BAND.FADE_SHARE * (sky.ymax - sky.ymin);
     SKY_U.uBandGlowK.value = night.mode === "night" ? 1 : BAND.GLOW_K;   // at night the halo is the moon's (picked)
     for (const [k, v] of Object.entries(BAND.CLOUDS)) SKY_U[k].value = v;
-    const err = (h, t: number[]) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]))); };
+    const err = (h: number, t: number[]) => { const g = skyBandAtJS(h); return Math.max(...g.map((v, k) => Math.abs(v - t[k]))); };
     const y = (f: number) => sky.ymin + f * (sky.ymax - sky.ymin);
     residual = Math.max(err(y(S.BAND_BOTTOM_SHARE), tH), err(y(0.5), tM), err(y(0.875), tT));
   } else {
@@ -1044,7 +1095,7 @@ export function buildSky(slot, ctx) {
   const mesh: any = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
   mesh.name = "builtSky"; mesh.renderOrder = -1000; mesh.frustumCulled = false;
   const tmpH = new THREE.Vector2();
-  mesh.onBeforeRender = (renderer, _scene, camera) => {
+  mesh.onBeforeRender = (renderer: THREE.WebGLRenderer, _scene: THREE.Scene, camera: THREE.PerspectiveCamera & { position: THREE.Vector3 }) => {
     mesh.position.copy(camera.position);
     mesh.scale.setScalar(Math.max(camera.far ?? 400, 10) * 0.5);
     mesh.updateMatrixWorld();
@@ -1079,13 +1130,13 @@ export function buildSky(slot, ctx) {
   const mats = ctx.materials, prev = current.sky?.scene === scene ? current.sky.material : null, k = mats && prev ? mats.indexOf(prev) : -1;
   if (k >= 0) mats[k] = mat; else mats?.push(mat);
   if (ctx.info) ctx.info.sky = info;
-  current.sky = { mesh, material: mat, info, scene, worldScale, noise, clouds, opts, data: D } as BuiltSkyState;
+  current.sky = { mesh, material: mat, info, scene, worldScale, noise, clouds, opts, data: D };
   return { objects: [mesh], meshes: [mesh], dome: mesh, material: mat, info,
            dispose() { mesh.geometry.dispose(); mat.dispose(); for (const t of noise) t.dispose(); stars?.tex?.dispose(); } };
 }
 
 /** ASSET: the 3D cumulus banks in the ring's measured band, behind the trees (slot sky.clouds). */
-export function buildClouds(slot, ctx) {
+export function buildClouds(slot: { data: SkySlotData }, ctx: SkyCtx) {
   const sky = slot.data.sky, worldScale = ctx.worldScaleFn || (() => ctx.world?.scale.x || 1);
   const cl = createClouds(ctx.scene, sky, sky.colours, worldScale);
   if (ctx.info?.sky) ctx.info.sky.clouds = cl.info;
@@ -1095,7 +1146,7 @@ export function buildClouds(slot, ctx) {
 }
 
 /** The sky of a recipe on its own (the checkers' stand-alone build): skyData (placement) + buildSky + buildClouds. */
-export function createBuiltSky(scene, rec, pal, worldScale = () => 1, opts = {}) {
+export function createBuiltSky(scene: THREE.Scene, rec: ArenaSkyRecipe, pal: unknown, worldScale: () => number = () => 1, opts: Record<string, unknown> & { mode?: string } = {}) {
   const D = skyDataOf(rec, opts);
   if (!D) return null;
   const slot = { data: D }, ctx = { scene, worldScaleFn: worldScale, materials: null, info: null };

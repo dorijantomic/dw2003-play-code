@@ -8,7 +8,7 @@ import { GRASS, groundAlbedo } from "../grass.js";
 import { itemsFrom, composeYaw } from "../slots.js";
 
 function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export function plan(pctx) {
   const { rec, info } = pctx, t0 = performance.now();

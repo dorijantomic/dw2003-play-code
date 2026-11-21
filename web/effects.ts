@@ -59,7 +59,7 @@ export {
 // type and byte+2 ends its walk when it is zero. The extractor carries byte+1 as
 // `atlasFlag` and byte+2 as the record's texture `size`, so those are the names
 // the engine gets. Registered once, here, because this module owns the table.
-setStageObjectPoleRecords((stageId) => {
+setStageObjectPoleRecords((stageId: string | number) => {
     const s = S.data?.[stageId];
     if (!s) return null;
     return s.records.map((r) => ({ type: r.atlasFlag, size: r.size }));

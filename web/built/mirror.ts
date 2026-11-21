@@ -800,7 +800,7 @@ export function buildMirror(slot, ctx) {
     // the checker's handles: the surface mesh, the mirrored copies, and the probe for their measured colour
     lake: meshes.find((m) => m.userData.part === "surface") || null,
     reflections: meshes.filter((m) => m.userData.part !== "surface" && m.userData.part !== "bank"),
-    probeMaterial: (mesh, cols: number | undefined, rows: number | undefined) => mirrorProbeMaterial(mesh.material.uniforms, cols, rows),
+    probeMaterial: (mesh, cols: number, rows: number) => mirrorProbeMaterial(mesh.material.uniforms, cols, rows),
     update(camera, ms) {   // nothing per frame (the ripple rides the shared uWindTime); only the rock hand-off waits
       if (rockAdopt) { rockAdopt(); rockAdopt = null; }
     },

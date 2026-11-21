@@ -32,7 +32,7 @@ export function createSceneSkip(deps) {
 
   // Jump to spine[i]. `ordOverride` lets the caller force a specific ordinal (else beat value
   // + the live ordAdj nudge). Returns a small report (used by the autonomous test).
-  function jump(i, ordOverride?: number) {
+  function jump(i: number, ordOverride?: number) {
     const b = d.spine[i];
     if (!b) return { ok: false, why: "no beat" };
     const ord = ordOverride != null ? ordOverride : b.ordinal + d.ordAdj;
@@ -45,7 +45,7 @@ export function createSceneSkip(deps) {
   }
 
   // Auto-talk every say-actor of the currently selected beat (surfaces talk-gated scenes).
-  function talkActors(i) {
+  function talkActors(i: number) {
     const b = d.spine[i];
     if (!b) return [];
     const fired = [];

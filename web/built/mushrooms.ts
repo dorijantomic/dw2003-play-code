@@ -81,10 +81,10 @@ export function mushroomGeometry(THREE0 = THREE, segments = MUSH.SEGMENTS) {
 }
 
 function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // ---------------- mushroom material: toon light + emission AFTER it, band-limited gills ----------------
-const f = (x: number | undefined) => x.toFixed(4);
+const f = (x: number) => x.toFixed(4);
 export function mushroomMaterial(S, col, uni) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith(uni),

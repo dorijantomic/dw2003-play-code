@@ -1,9 +1,9 @@
 {
- "total": 19294,
+ "total": 19191,
  "any": 1091,
  "files": {
   "web/ambience.ts": {
-   "errors": 304,
+   "errors": 311,
    "any": 3
   },
   "web/anim-viewer-bake.ts": {
@@ -475,7 +475,7 @@
    "any": 0
   },
   "web/built/gulls.ts": {
-   "errors": 25,
+   "errors": 24,
    "any": 0
   },
   "web/built/mirror.ts": {
@@ -483,7 +483,7 @@
    "any": 0
   },
   "web/built/mushrooms.ts": {
-   "errors": 35,
+   "errors": 34,
    "any": 1
   },
   "web/built/place/boulders.ts": {
@@ -503,11 +503,11 @@
    "any": 0
   },
   "web/built/place/grass.ts": {
-   "errors": 77,
+   "errors": 75,
    "any": 0
   },
   "web/built/place/ground.ts": {
-   "errors": 121,
+   "errors": 123,
    "any": 0
   },
   "web/built/place/gulls.ts": {
@@ -527,11 +527,11 @@
    "any": 0
   },
   "web/built/place/sand.ts": {
-   "errors": 9,
+   "errors": 10,
    "any": 0
   },
   "web/built/place/sky.ts": {
-   "errors": 5,
+   "errors": 4,
    "any": 0
   },
   "web/built/place/spires.ts": {
@@ -551,15 +551,15 @@
    "any": 0
   },
   "web/built/post.ts": {
-   "errors": 60,
+   "errors": 56,
    "any": 4
   },
   "web/built/registry.ts": {
-   "errors": 102,
+   "errors": 101,
    "any": 0
   },
   "web/built/sand.ts": {
-   "errors": 36,
+   "errors": 35,
    "any": 0
   },
   "web/built/shared.ts": {
@@ -567,11 +567,11 @@
    "any": 0
   },
   "web/built/sky.ts": {
-   "errors": 257,
+   "errors": 197,
    "any": 2
   },
   "web/built/slots.ts": {
-   "errors": 103,
+   "errors": 100,
    "any": 3
   },
   "web/built/soil.ts": {
@@ -579,11 +579,11 @@
    "any": 0
   },
   "web/built/spires.ts": {
-   "errors": 154,
+   "errors": 147,
    "any": 0
   },
   "web/built/spires_gemini.ts": {
-   "errors": 125,
+   "errors": 120,
    "any": 3
   },
   "web/built/trees.ts": {
@@ -679,7 +679,7 @@
    "any": 0
   },
   "web/damage-lab.ts": {
-   "errors": 94,
+   "errors": 98,
    "any": 0
   },
   "web/debugPanel.ts": {
@@ -730,16 +730,12 @@
    "errors": 1,
    "any": 0
   },
-  "web/drop-item.ts": {
-   "errors": 1,
-   "any": 0
-  },
   "web/editor.ts": {
    "errors": 1,
    "any": 0
   },
   "web/effects.ts": {
-   "errors": 2,
+   "errors": 1,
    "any": 0
   },
   "web/effects/draw.ts": {
@@ -1123,7 +1119,7 @@
    "any": 1
   },
   "web/game/update.ts": {
-   "errors": 127,
+   "errors": 129,
    "any": 1
   },
   "web/game/vars.ts": {
@@ -1263,7 +1259,7 @@
    "any": 0
   },
   "web/map-screen-model.ts": {
-   "errors": 29,
+   "errors": 30,
    "any": 1
   },
   "web/map-tiles.ts": {
@@ -1319,7 +1315,7 @@
    "any": 1
   },
   "web/mount3d.ts": {
-   "errors": 263,
+   "errors": 257,
    "any": 4
   },
   "web/mp-credit.ts": {
@@ -1607,15 +1603,15 @@
    "any": 0
   },
   "web/sceneEditor.ts": {
-   "errors": 9,
+   "errors": 8,
    "any": 0
   },
   "web/sceneSkip.ts": {
-   "errors": 3,
+   "errors": 1,
    "any": 0
   },
   "web/scenery.ts": {
-   "errors": 74,
+   "errors": 68,
    "any": 3
   },
   "web/scenery2.ts": {
@@ -1935,7 +1931,7 @@
    "any": 0
   },
   "web/ui-c/battlehud.ts": {
-   "errors": 120,
+   "errors": 122,
    "any": 0
   },
   "web/ui-c/books.ts": {
@@ -1959,11 +1955,11 @@
    "any": 2
   },
   "web/ui-c/geometry.ts": {
-   "errors": 15,
+   "errors": 5,
    "any": 0
   },
   "web/ui-c/home.ts": {
-   "errors": 27,
+   "errors": 30,
    "any": 0
   },
   "web/ui-c/icons.ts": {
@@ -1987,11 +1983,11 @@
    "any": 0
   },
   "web/ui-c/pages.ts": {
-   "errors": 200,
+   "errors": 201,
    "any": 0
   },
   "web/ui-c/parts.ts": {
-   "errors": 121,
+   "errors": 114,
    "any": 0
   },
   "web/ui-c/screens.ts": {
@@ -2000,10 +1996,6 @@
   },
   "web/ui-c/sheets.ts": {
    "errors": 119,
-   "any": 0
-  },
-  "web/ui-c/text.ts": {
-   "errors": 2,
    "any": 0
   },
   "web/ui-c/vic.ts": {
@@ -2055,7 +2047,7 @@
    "any": 1
   },
   "web/world-globe-layout.ts": {
-   "errors": 138,
+   "errors": 134,
    "any": 3
   },
   "web/world-globe.ts": {

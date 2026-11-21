@@ -65,7 +65,7 @@ export function gullGeometry() {
 
 // The one place a gull vertex's flapped position is made (material and the checker's GPU probe both call it).
 // g = per-gull (flap phase, envelope phase, envelope speed), t seconds.
-const f = (x: number | undefined) => x.toFixed(4);
+const f = (x: number) => x.toFixed(4);
 export const GULL_GLSL = /* glsl */`
   vec2 gullAngles(vec3 g, float t) {
     float env = smoothstep(${f(GULL.ENV[0])}, ${f(GULL.ENV[1])}, 0.5 + 0.5 * sin(t * g.z + g.y));
@@ -87,7 +87,7 @@ export const GULL_GLSL = /* glsl */`
     return vec3(side * x, p.y + y, p.z);
   }
 `;
-const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** JS twin of gullFlap (position only), for the bob room and the checker. */
 export function gullFlapJS(p, seg: number, g: number[], t: number) {
   if (seg < 0.5) return [...p];

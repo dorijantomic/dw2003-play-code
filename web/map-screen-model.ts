@@ -7,7 +7,7 @@
 // area you have not visited as a "???" box (its name stays hidden). Regions with no visited area are not listed.
 
 /** The region a manifest name belongs to: "Central Sector — Asuka City" -> "Central Sector"; a name without a dash is its own region. */
-export function regionOf(name: string | undefined) {
+export function regionOf(name: string) {
     const s = String(name ?? "");
     const i = s.indexOf(" — ");
     return i > 0 ? s.slice(0, i) : s;

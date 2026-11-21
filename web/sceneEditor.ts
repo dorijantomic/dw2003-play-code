@@ -54,7 +54,7 @@ export function createSceneEditor(canvas: HTMLCanvasElement, getCtx) {
     });
   }
 
-  function finishRect(e: MouseEvent, kind) {
+  function finishRect(e: MouseEvent, kind: string) {
     const a = ed.dragStart, b = toMap(e);
     ed.dragStart = null;
     const rect = {

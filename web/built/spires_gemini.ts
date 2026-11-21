@@ -94,7 +94,7 @@ function createRockTexture(size = 1024) {
 }
 
 // ---------------------------------------------------------------- 3. the fluted spire (reference geometry, base at y 0)
-function createSpire(height: number | undefined, radiusBottom: number | undefined, flutes: number | undefined, segR: number | undefined, segH: number | undefined, seed: number) {
+function createSpire(height: number, radiusBottom: number, flutes: number, segR: number, segH: number, seed: number) {
   const geo = new THREE.CylinderGeometry(0.12, radiusBottom, height, segR, segH, true);
   const pos = geo.attributes.position, n = pos.count;
   const ao = new Float32Array(n), rnd = mulberry(seed);

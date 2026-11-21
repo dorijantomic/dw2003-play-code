@@ -264,7 +264,7 @@ function countToneMapSites(sources: string[]) {
  * @param {number} height
  * @param {{canvas?: HTMLCanvasElement, settings?: object}} [opts]
  */
-export function createPost(width: number | undefined, height: number | undefined, opts: BuiltPostOpts = {}) {
+export function createPost(width: number, height: number, opts: BuiltPostOpts = {}) {
   const S = Object.assign({}, SETTINGS, opts.settings || {});
   S.bloom = Object.assign({}, SETTINGS.bloom, opts.settings?.bloom || {});
   S.grade = Object.assign({}, SETTINGS.grade, opts.settings?.grade || {});

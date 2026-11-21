@@ -84,7 +84,7 @@ export function cypressGeometry(THREE, S, Href: number, seed: number) {
   const prof = (t: number) => crownRadius(S, Href, cb * Href + t * (Href - S.cb)) * k;   // t 0..1 up the crown
   // rows: denser toward the top (the taper), t = 1 - (1 - s)^1.4
   const ts = Array.from({ length: ROWS + 1 }, (_, i) => 1 - Math.pow(1 - i / ROWS, 1.4));
-  const ring = (y: number, rr: number | undefined, t: number, lobed: boolean) => {
+  const ring = (y: number, rr: number, t: number, lobed: boolean) => {
     const base = pos.length / 3;
     for (let s = 0; s <= SIDES; s++) {
       const sm = s % SIDES, a = sm / SIDES * Math.PI * 2;

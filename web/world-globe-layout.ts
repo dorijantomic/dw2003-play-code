@@ -26,6 +26,20 @@ const PIN_MERGE = 24;
 const OPP = { E: "W", W: "E", N: "S", S: "N" };
 const horiz = (d: string) => d === "E" || d === "W";
 
+/** A rectangle in map or world pixels. */
+interface Rect { x: number; y: number; w: number; h: number }
+/** One open-air map row from the manifest. */
+interface MapRow { id: string | number; name: string; width: number; height: number; image?: string }
+/** One exit of a scene (the rectangle in the map, the spawn point in the target). */
+interface ExitRow { to: string; x: number; y: number; w: number; h: number; spawnX: number; spawnY: number }
+interface SceneMap { exits?: ExitRow[] }
+type Scenes = Record<string, SceneMap | undefined>;
+/** One oriented relation candidate (see collectRelations). */
+interface Cand { dir: string; score: number; ax: number; ay: number; bx: number; by: number }
+/** A place: one real spot, drawn as its base picture. */
+interface Place { key: string; id: string | number; ids: (string | number)[]; name: string; names: string[]; region: string; w: number; h: number; image?: string; x?: number; y?: number; comp?: number; adjacent?: boolean }
+type MapId = string | number;
+
 /** Nearest edge of a w x h map to the point, with distance / size (0 = on the edge). */
 export function nearestSide(x: number, y: number, w: number, h: number) {
     const c: [string, number][] = [["W", x / w], ["E", (w - x) / w], ["N", y / h], ["S", (h - y) / h]];
@@ -33,16 +47,16 @@ export function nearestSide(x: number, y: number, w: number, h: number) {
     return { side: c[0][0], score: Math.max(0, c[0][1]) };
 }
 
-export function overlapDepth(a, b) {
+export function overlapDepth(a: Rect, b: Rect) {
     const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
     const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     return { ox, oy };
 }
-export function overlaps(a, b, tol = OVERLAP_TOL) {
+export function overlaps(a: Rect, b: Rect, tol = OVERLAP_TOL) {
     const { ox, oy } = overlapDepth(a, b);
     return ox > tol && oy > tol;
 }
-export function adjacent(a, b, tol = ADJ_TOL) {
+export function adjacent(a: Rect, b: Rect, tol = ADJ_TOL) {
     const { ox, oy } = overlapDepth(a, b);
     // ox < 0 = gap on x; touching when the gap is small and they overlap on y (and vice versa)
     return (-ox <= tol && oy > 0) || (-oy <= tol && ox > 0);

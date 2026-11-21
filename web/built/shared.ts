@@ -73,8 +73,8 @@ export const NOISE_GLSL = /* glsl */`
 `;
 
 // ---------------- the ONE shared uniform object ----------------
-const v3 = (x: number | undefined, y: number | undefined, z: number | undefined) => new THREE.Vector3(x, y, z);
-const col = (r: string | number | THREE.Color | undefined, g: number | undefined, b: number | undefined) => new THREE.Color(r, g, b);
+const v3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const col = (r: string | number | THREE.Color | undefined, g: number, b: number) => new THREE.Color(r, g, b);
 export const U = {
   uPerm: { value: permTex }, uNoiseSeed: { value: 1 },
   // light

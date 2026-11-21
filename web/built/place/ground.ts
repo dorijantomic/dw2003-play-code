@@ -13,7 +13,7 @@ import type { BuiltSlotItem } from "../types.js";
 
 function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smooth01 = (a: number | undefined, b: number | undefined, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const smooth01 = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const b8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255)));
 
 // ---------------- palette: the recipe's measured colours, sRGB -> linear once ----------------

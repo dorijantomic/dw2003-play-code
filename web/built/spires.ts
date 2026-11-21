@@ -133,7 +133,7 @@ import type { BuiltSpiresCounts, BuiltSpiresInfo } from "./types.js";
 
 const TAU = Math.PI * 2;
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
-const smooth = (a: number | undefined, b: number | undefined, x: number | undefined) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const smooth = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const fract = (x: number) => x - Math.floor(x);
 
 export const SPIRE = {
@@ -237,7 +237,7 @@ export const SPIRE = {
 
 // ============================================================================================ one pillar's maths
 /** A pillar's radius profile at height fraction u (0 = foot, 1 = crown), as a share of its radius R. */
-export function profileAt(u: number | undefined) {
+export function profileAt(u: number) {
   const P = SPIRE;
   const talus = 1 + P.TALUS * (1 - smooth(0, P.TALUS_U, u));                 // the flare at the foot
   const stem = 1 - P.STEM * Math.exp(-(((u - P.STEM_U) / P.STEM_W) ** 2));   // the undercut above it
@@ -252,7 +252,7 @@ export function profileAt(u: number | undefined) {
 
 /** The bedding sawtooth at u: 0 just above a shelf, LEDGE_DEPTH x R just below it. So every shelf faces UP (and
  *  catches the light and holds the shrubs) and the step back down is the overhang that shades the band above it. */
-export function beddingAt(u: number | undefined) {
+export function beddingAt(u: number) {
   const P = SPIRE;
   if (u <= P.BED_U0 || u >= P.CROWN_U) return 0;
   const band = (P.CROWN_U - P.BED_U0) / P.LEDGES;
@@ -261,7 +261,7 @@ export function beddingAt(u: number | undefined) {
 
 /** The two joint families at azimuth th (0..TAU) and height u: 1 on a ridge, 0 at the bottom of a groove. th = 0 is
  *  the pillar's outward direction, so the grooves facing +-PI/2 are the cracks towards its neighbours in the row. */
-export function jointsAt(th: number, u: number | undefined, seed: number) {
+export function jointsAt(th: number, u: number, seed: number) {
   const P = SPIRE;
   const drift = u * P.JOINT_DRIFT + seed * 0.11;
   const a = Math.abs(Math.sin(((th / TAU) * P.FLUTE_N + drift * 0.55 + seed * 0.37) * Math.PI));

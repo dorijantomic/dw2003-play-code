@@ -75,7 +75,7 @@ export function itemsOnTriangles(posList, n = 400, seed = 7, size = 400) {
   return itemsFrom(out);
 }
 /** n points on a ring of radius R at height y (sky, clouds, horizon). */
-export function itemsOnRing(n: number, R: number | undefined, y: number, size: number | undefined) {
+export function itemsOnRing(n: number, R: number, y: number, size: number) {
   return itemsFrom(Array.from({ length: n }, (_, k) => { const a = k / n * Math.PI * 2; return { p: [Math.sin(a) * R, y, Math.cos(a) * R], yaw: a + Math.PI, h: size, rad: size * 0.5 }; }));
 }
 

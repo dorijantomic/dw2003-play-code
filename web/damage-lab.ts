@@ -489,7 +489,7 @@ function recompute() {
 }
 
 /** How many values one picker has. */
-function optionLength(key: string | undefined) {
+function optionLength(key: string) {
   switch (key) {
     case "form": return S.forms.length;
     case "enemy": return S.enemies.length;
@@ -502,7 +502,7 @@ function optionLength(key: string | undefined) {
   }
 }
 
-function changePick(key: string | undefined, delta: number) {
+function changePick(key: string, delta: number) {
   const n = optionLength(key);
   if (n <= 0) return;
   S.pick[key] = ((S.pick[key] + delta) % n + n) % n;

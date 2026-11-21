@@ -2,6 +2,25 @@
 // game's 320x240 space); this file turns them into whole page pixels. Lines and edges land on whole screen pixels (user decision):
 // the left and top edge use floor, the right and bottom edge use round, so two touching parts stay flush.
 
+import type { UiMatrix, UiRect } from "./types.js";
+
+/** A drawn quad as the renderer reports it: the flat colour it fills (0..255) and whether it was semi-transparent. */
+interface Quad {
+    x?: number;
+    y?: number;
+    w: number;
+    h: number;
+    r?: number;
+    semiTransparent?: boolean;
+}
+/** The page px of the native box: page px per native px and the page px of native (0,0), with the y scale when it differs. */
+interface Placement {
+    s: number;
+    sy?: number;
+    ox: number;
+    oy: number;
+}
+
 export const NATIVE_W = 320;
 export const NATIVE_H = 240;
 /** Page px a part may bleed past the native box (a window that touches a screen side runs on to the limit). */
@@ -12,7 +31,7 @@ export const BLEED_MARGIN = 1e5;
  * { w, h } the canvas pixel size, `box` = { left, top, width, height } the canvas content box in page px. Returns { s, ox, oy }:
  * s = page px per native px, (ox, oy) = the page px of native (0,0).
  */
-export function placement(m0: { a: number; d: number; e: number; f: number; }, canvas, box) {
+export function placement(m0: { a: number; d: number; e: number; f: number; }, canvas: { w: number; h: number; }, box: { left: number; top: number; width: number; height: number; }) {
     const kx = box.width / canvas.w, ky = box.height / canvas.h;
     return { s: m0.a * kx, sy: m0.d * ky, ox: box.left + m0.e * kx, oy: box.top + m0.f * ky };
 }
@@ -25,12 +44,12 @@ export function relative(m0: { a: number; d: number; e: number; f: number; }, m:
 export const IDENTITY = Object.freeze({ a: 1, d: 1, e: 0, f: 0 });
 
 /** A native rect through a relative transform (the fold / slide / zoom the renderer applies about a pivot). */
-export function applyRel(r, rel) {
+export function applyRel(r: UiRect, rel: UiMatrix): UiRect {
     return { x: r.x * rel.a + rel.e, y: r.y * rel.d + rel.f, w: r.w * rel.a, h: r.h * rel.d };
 }
 
 /** Does the native rect touch the left / right edge of the 320 box (then it bleeds). */
-export function bleedFlags(r) {
+export function bleedFlags(r: UiRect) {
     return { left: r.x <= 0, right: r.x + r.w >= NATIVE_W };
 }
 
@@ -38,7 +57,7 @@ export function bleedFlags(r) {
  * Native rect -> whole page px rect { left, top, right, bottom, width, height } relative to the overlay root.
  * `rootOrigin` = page px of the root's top-left, `limit` = { left, top, right, bottom } the bleed limit relative to the root.
  */
-export function snapRect(r, pl: { ox: number; s: number; oy: number; sy: number; }, rootOrigin, limit, bleed = true) {
+export function snapRect(r: UiRect, pl: Placement, rootOrigin: { x: number; y: number; }, limit: { left: number; top: number; right: number; bottom: number; }, bleed = true) {
     const fl = bleed ? bleedFlags(r) : { left: false, right: false };
     const x0 = pl.ox - rootOrigin.x + r.x * pl.s, x1 = pl.ox - rootOrigin.x + (r.x + r.w) * pl.s;
     const y0 = pl.oy - rootOrigin.y + r.y * pl.sy, y1 = pl.oy - rootOrigin.y + (r.y + r.h) * pl.sy;
@@ -54,7 +73,7 @@ export function edges(s: number) {
 }
 
 /** The full-screen fade the pause pages submit as a semi-transparent flat quad: 0..1 darkening (the DOM layer takes brightness(1 - dim)). */
-export function dimOf(quads = []) {
+export function dimOf(quads: Quad[] = []) {
     let dim = 0;
     for (const q of quads) if (q.semiTransparent && q.w >= NATIVE_W && q.h >= NATIVE_H) dim = Math.max(dim, Math.min(1, q.r / 255));
     return dim;
@@ -62,11 +81,11 @@ export function dimOf(quads = []) {
 
 /** The visible part of the page in native units { x0, y0, x1, y1 } for placement `pl` and the root's page box `limit`: on a wide stage x0 < 0 and
  *  x1 > 320 (the side area), on 4:3 it is 0..320 x 0..240, on a tall stage y0 < 0. */
-export function visibleNative(pl, limit) {
+export function visibleNative(pl: Placement, limit: { left: number; top: number; width: number; height: number; }) {
     const sy = pl.sy ?? pl.s;
     return { x0: (limit.left - pl.ox) / pl.s, x1: (limit.left + limit.width - pl.ox) / pl.s, y0: (limit.top - pl.oy) / sy, y1: (limit.top + limit.height - pl.oy) / sy };
 }
 
 /** Design px (the C files, drawn at 3 px per native px on a 1280x720 page with the native box at x 160) -> native units. */
-export const dx = (px: number | undefined) => (px - 160) / 3;
+export const dx = (px: number) => (px - 160) / 3;
 export const dy = (px: number) => px / 3;

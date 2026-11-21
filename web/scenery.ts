@@ -75,7 +75,7 @@ export function resetScenery(map, p: { seed: number; }, S) {
 
 // positions that need a pixel look-up (butterflies, sparkles, puddles) are built
 // the first frame the map's pixels are readable
-function scatter(S, count: number, test, tries = 80) {
+function scatter(S, count: number, test: (R: number, G: number, B: number, x: number, y: number) => boolean, tries = 80) {
     const px = S.pix();
     if (!px) return [];
     const out = [];
@@ -119,17 +119,17 @@ function buildPuddles(S, grid: { cell: number; cols: number; rows: number; cells
 let revealer = null;
 export const setReveal = (r) => { revealer = r; };
 let snapC: HTMLCanvasElement | null = null;
-function takeSnap(ctx) {
+function takeSnap(ctx: CanvasRenderingContext2D): HTMLCanvasElement {
     const cv = ctx.canvas;
     if (!snapC || snapC.width !== cv.width || snapC.height !== cv.height) { snapC = document.createElement("canvas"); snapC.width = cv.width; snapC.height = cv.height; }
-    const g = snapC.getContext("2d");
+    const g: CanvasRenderingContext2D = snapC.getContext("2d");
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = "copy"; g.drawImage(cv, 0, 0);
     return snapC;
 }
 
 // Indoors and underground there is no sky to dim, but the stage has its own lights: a gentle cool
 // dim stands in for the night so they can show, with the same reveal that restores true colours.
-function drawIndoorMood(ctx, S) {
+function drawIndoorMood(ctx: CanvasRenderingContext2D, S) {
     const { fade } = S;
     const snap = revealer && revealer.wants(S) ? takeSnap(ctx) : null;
     ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = fade;
@@ -143,7 +143,7 @@ function drawIndoorMood(ctx, S) {
     if (snap) revealer.draw(ctx, snap, S);
 }
 
-export function drawScenery(ctx, S) {
+export function drawScenery(ctx: CanvasRenderingContext2D, S) {
     if (!sc || sc.id !== S.map.id) return;
     const { fx, p, L, t, dt, fade, camX, camY, Q, now } = S;
     if (!sc.built) build(S);
