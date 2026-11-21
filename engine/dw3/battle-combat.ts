@@ -156,7 +156,7 @@ export interface Skill {
   basic_attack?: boolean;
 }
 
-export interface AttackResult { hit: boolean; dmg: number; heal: number; /** look only: the critical roll came up / the element x family multiplier (reporting, never read by the rules) */ crit?: boolean; eff?: number; }
+export interface AttackResult { hit: boolean; dmg: number; heal: number; /** look only: the critical roll came up / the element x family multiplier (reporting, never read by the rules) */ crit?: boolean | undefined; eff?: number | undefined; }
 
 /**
  * The original's turn-start gate page, `FIGHTSTG_F0x80088564`'s `+0xac` call: line 1 the

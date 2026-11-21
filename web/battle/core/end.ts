@@ -281,12 +281,12 @@ async function mpKit() {
       /** The profile Blast would turn this Digimon into at its level, or null. */
       blastForm: (rec) => blastTargetProfile(rec, B.digimonDB),
       /** The form (by its name) the record takes, as the game's own Digivolve / Tag / Blast commits do. */
-      setFormByName: (rec, name) => {
+      setFormByName: (rec, name: string) => {
         const p = Object.values(B.digimonDB ?? {}).find((x) => x?.name === name);
         if (!p) return false;
         setLiveBattleForm(rec, p); return true;
       },
-      profileByName: (name) => Object.values(B.digimonDB ?? {}).find((x) => x?.name === name) ?? null,
+      profileByName: (name: string) => Object.values(B.digimonDB ?? {}).find((x) => x?.name === name) ?? null,
       /** The disc's steal roll for a landed steal technique: { ok, item, name } | { ok:false, nothing } (no draw: it missed). */
       stealRoll: (skill, thief, enemy) => {
         if (skill?.effect !== "steal" || enemy.hp <= 0) return null;

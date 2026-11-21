@@ -37,7 +37,7 @@ export function turnsUntil(nextTurnNumber: number, value: number) {
 }
 
 /** The turn number the enemy's next action tests: the live +0x04 counter plus this turn's bump. */
-export function nextTurnNumber(turnCounter) {
+export function nextTurnNumber(turnCounter: number) {
   return (turnCounter ?? 0) + 1;
 }
 
@@ -49,7 +49,7 @@ export function nextTurnNumber(turnCounter) {
  * evaluated (pickEnemyAiMove), so a cond-18 row there is not a promise the game
  * can keep and is skipped.
  */
-export function nearestTell(rows, turnCounter) {
+export function nearestTell(rows, turnCounter: number) {
   const next = nextTurnNumber(turnCounter);
   let best = null;
   for (const row of everyNthRows(rows)) {

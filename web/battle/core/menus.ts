@@ -17,6 +17,7 @@ import { persistPlayerGauge } from "../form-blast.js";
 import { releaseBattleLayer } from "../../battle-layer.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeMenus(B: BattleContext) {
 // ── Input ──
@@ -27,7 +28,7 @@ export function makeMenus(B: BattleContext) {
    * the Blast-active flag (3d-battle-complete-model §"Blast"), which is what
    * makes the original skip both the grey test and the MP debit.
    */
-  function techListSeed(b) {
+  function techListSeed(b: BattleState) {
     const mpCostDown = b.player.mpCostDown ?? 0;
     return {
       activeIndex: b.activePlayerIndex | 0,
@@ -46,7 +47,7 @@ export function makeMenus(B: BattleContext) {
    * same set the original's inventory filter keeps (the four HP charges and the
    * 25 battle disks), so the rows and the page count are unchanged by the port.
    */
-  function itemListSeed(b) {
+  function itemListSeed(b: BattleState) {
     void b;
     return { items: B.usableItems().map((item) => ({
       id: Number(item.id) | 0,
@@ -61,7 +62,7 @@ export function makeMenus(B: BattleContext) {
     })) };
   }
 /** The item id the screen answered with, resolved through the same list. */
-  function confirmItem(b, id) {
+  function confirmItem(b: BattleState, id: number | string) {
     const item = B.usableItems().find((entry) => entry.id === id);
     if (!item) { b.state = ST.PLAYER_MENU; return; }
     b.itemSel = Math.max(0, B.usableItems().indexOf(item));
@@ -76,7 +77,7 @@ export function makeMenus(B: BattleContext) {
     B.sayOriginal(b, B.itemAnnouncementSpec(b, item), `Used ${item.name}!`);
   }
 /** The technique id the screen answered with, resolved through the same list. */
-  function confirmTech(b, id: number) {
+  function confirmTech(b: BattleState, id: number) {
     const skill = B.playerTechs().find((entry) => (Number(entry.techWord ?? 0) & 0x1fff) === id);
     if (!skill) { b.state = ST.PLAYER_MENU; return; }
     b.techSel = Math.max(0, B.playerTechs().indexOf(skill));
@@ -143,7 +144,7 @@ export function makeMenus(B: BattleContext) {
    * with the member's STARTER species (rows 0..7) and lists its equipped forms
    * after it -- the form the player wants is chosen on that strip, not here.
    */
-  function confirmTag(b, slot) {
+  function confirmTag(b: BattleState, slot: number) {
     const position = Number(slot) | 0;
     const member = b.playerRoster?.[position];
     if (!member) { b.state = ST.PLAYER_MENU; return; }
@@ -171,7 +172,7 @@ export function makeMenus(B: BattleContext) {
    * at :16392-16410). The picked row only chooses which of that joke's two lines is
    * printed (:24738-24754). Shared by the ported list and the hand-drawn fallback.
    */
-  function confirmJokePick(b, row: string | number) {
+  function confirmJokePick(b: BattleState, row: string | number) {
     const joke = b.confusedMenu?.[row] ?? b.confusedMenu?.[0];
     const magnitude = b.player.ailments.confuse?.power ?? 0;
     // The gag's wind term is the block F0x8009EC94 has just rebuilt
@@ -208,7 +209,7 @@ export function makeMenus(B: BattleContext) {
    * pro/fightstg menu (which hands back its chosen row): the native route must
    * not be able to drift from the walker's own confirm.
    */
-  function confirmCommand(b) {
+  function confirmCommand(b: BattleState) {
     const items = currentMenuItems(b);
     const sel = (items[b.menuSel] ?? "").toLowerCase();
     if (sel === "fight") {

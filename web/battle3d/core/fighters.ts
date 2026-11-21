@@ -9,6 +9,8 @@ import { buildBoneWorldMatrices } from "../rotation.js";
 import type { Battle3dFighter } from "./types.js";
 import type { AttackOptions, Battle3DContext } from "../../types/battle3d.js";
 
+import type { ArenaGroupBuf, ArenaPack } from "../../types/battle3d.js";
+import type { BattleSide } from "../../types/audio.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeFighters(B$: Battle3DContext) {
 function _layoutExtras() {
@@ -36,7 +38,7 @@ function _layoutExtras() {
     // (tools/verify_smart_cam.mjs: meft1009 near rock on the fighters 5% at the lowered scale, 0% at full)
     B$.arenaScale = window.__fx?.smartcam ? Math.min(B$.MULTI_ARENA_MAX, scale) : _arenaScaleClear(Math.min(B$.MULTI_ARENA_MAX, scale));
   }
-function _rockCover(groups, s, cam, fs, aspect) {
+function _rockCover(groups: ArenaGroupBuf[], s: number, cam, fs: Pick<Battle3dFighter, "aabb">[], aspect: number) {
     const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
     const fwd = nrm(sub(cam.look, cam.eye)), right = nrm([-fwd[2], 0, fwd[0]]);
@@ -77,7 +79,7 @@ function _rockCover(groups, s, cam, fs, aspect) {
     let n = 0; for (const h of hit) n += h;
     return n / (GW * GH);
   }
-function _arenaScaleClear(want, pk = B$.activeArena) {
+function _arenaScaleClear(want: number, pk: ArenaPack | null = B$.activeArena) {
     if (!(want > 1)) return 1;
     const groups = pk?.groups, fs = [...B$.extras.values()].filter((f) => f.aabb);
     if (!groups?.length || !B$.lastCamInfo || !fs.length) return B$.arenaScale;   // not ready: keep what is drawn now
@@ -93,11 +95,11 @@ function _arenaScaleClear(want, pk = B$.activeArena) {
     return s;
   }
 /** (checks) the scale this arena pack would get for the current line-up and camera; null while it loads. */
-  function probeArenaScale(name, want) { const pk = B$.loadArenaPack(name); return pk?.groups ? _arenaScaleClear(want, pk) : null; }
+  function probeArenaScale(name: string, want: number) { const pk = B$.loadArenaPack(name); return pk?.groups ? _arenaScaleClear(want, pk) : null; }
 function getMultiLayout() {
     return { arenaScale: B$.arenaScale, arena: B$.activeArena?.name ?? null, fighters: [...B$.extras.values()].map((f) => ({ id: f.id, side: f.side, dx: f.dx, dxT: f.dxT, dz: f.dz, restW: f.restW, aabb: f.aabb ? { min: [...f.aabb.min], max: [...f.aabb.max] } : null })) };
   }
-function addFighter(id, side, folder, dx = 0) {
+function addFighter(id: string, side: BattleSide, folder: string, dx: number = 0) {
     const old = B$.extras.get(id);
     removeFighter(id);
     const f = { id, side, folder, dx: old ? old.dx : dx, dx0: dx, dxT: old ? old.dxT : dx, dz: old ? old.dz : 0, latz: 0, latzT: 0, restW: 0, born: null,
@@ -118,27 +120,27 @@ function addFighter(id, side, folder, dx = 0) {
     });
   }
 // the eyes and looping body textures of an extra fighter, the same animator the two main ones use
-  function _setupExtraPatches(f) {
+  function _setupExtraPatches(f: Battle3dFighter) {
     const entries = B$.placementTable[modelKeyFromFolder(f.folder)]?.texture_anim;
     f.patches = entries && entries.length ? new TexturePatchAnimator(entries) : null;
     if (f.patches) loadTexturePixels(`assets/battle/textures/${f.folder}.png`).then((page) => { if (B$.extras.get(f.id) === f) f.page = page; });
   }
-function removeFighter(id) {
+function removeFighter(id: string) {
     const f = B$.extras.get(id);
     if (!f) return;
     B$.extras.delete(id); B$.fighterScreen.delete(id);
     B$.releaseActorResources([f.tex, f.bufs, f.model]);
   }
-function clearFighters(side = null) { for (const f of [...B$.extras.values()]) if (!side || f.side === side) removeFighter(f.id); }
-function setFighterLane(id, dx) { const f = B$.extras.get(id); if (f) { f.dx0 = dx; if (!B$.multiCam) f.dx = f.dxT = dx; } }
-function setFighterVisible(id, v) { const f = B$.extras.get(id); if (f) f.visible = !!v; }
-function setMultiCamera(on) { B$.multiCam = !!on; }
+function clearFighters(side: BattleSide | null = null) { for (const f of [...B$.extras.values()]) if (!side || f.side === side) removeFighter(f.id); }
+function setFighterLane(id: string, dx: number) { const f = B$.extras.get(id); if (f) { f.dx0 = dx; if (!B$.multiCam) f.dx = f.dxT = dx; } }
+function setFighterVisible(id: string, v: boolean) { const f = B$.extras.get(id); if (f) f.visible = !!v; }
+function setMultiCamera(on: boolean) { B$.multiCam = !!on; }
 function fightersReady() { for (const f of B$.extras.values()) if (!f.anim8r) return false; return true; }
 function fightersBusy() { return B$.coordinator.active; }
-function getFighterScreen(id) { return B$.fighterScreen.get(id) ?? null; }
+function getFighterScreen(id: string) { return B$.fighterScreen.get(id) ?? null; }
 // A hurt Digimon stands in its low-HP stance (the same base idle table the main fighters use).
-  function setFighterHurt(id, low) { const f = B$.extras.get(id); if (f?.anim8r) f.anim8r.baseTable = low ? 1 : 0; }
-function fighterVictory(id) {
+  function setFighterHurt(id: string, low: boolean) { const f = B$.extras.get(id); if (f?.anim8r) f.anim8r.baseTable = low ? 1 : 0; }
+function fighterVictory(id: string) {
     const f = B$.extras.get(id);
     const table = B$.victoryTable(f?.model);
     if (!f?.anim8r || !table || !table.length) return false;
@@ -146,7 +148,7 @@ function fighterVictory(id) {
     return true;
   }
 /** A fighter plays one technique's own motion with nobody on the receiving end (a heal, a buff). */
-  function fighterTech(id, techId) {
+  function fighterTech(id: string, techId: number) {
     const f = B$.extras.get(id);
     if (!f?.anim8r) return false;
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }
@@ -154,12 +156,12 @@ function fighterVictory(id) {
     return f.anim8r.setAnimByTech(techId, B$._fxHooks(f.side, { onMotion: B$.dataFieldMotion }));
   }
 /** A fighter plays a raw action clip (10 = the item-use motion). */
-  function fighterAction(id, clip) {
+  function fighterAction(id: string, clip: number) {
     const f = B$.extras.get(id);
     return f?.anim8r ? f.anim8r.setAction(clip, B$._fxHooks(f.side)) : false;
   }
 /** A bystander's reaction (a spread attack hits several): the same op1 reaction clips the coordinator picks. */
-  function fighterReact(id, { lethal = false, miss = false } = {}) {
+  function fighterReact(id: string, { lethal = false, miss = false } = {}) {
     const f = B$.extras.get(id);
     if (!f?.anim8r) return false;
     const clip = lethal ? REACTION_DEATH_CLIP : miss ? REACTION_EVADE_CLIP : REACTION_HIT_CLIP;
@@ -168,7 +170,7 @@ function fighterVictory(id) {
 // The attacker plays techId's clip; at its strike the defender plays its reaction (survive / die / dodge), exactly as in the
   // two-fighter attack. Positions in the action records are absolute arena coordinates authored for ONE fighter per side, so
   // the ones that land in a lane other than the middle one are shifted sideways into the right lane here.
-  function fighterAttack(attId, defId, techId, opts = {}) {
+  function fighterAttack(attId: string, defId: string, techId: number, opts: AttackOptions = {}) {
     const A = B$.extras.get(attId), D = B$.extras.get(defId);
     if (!A?.anim8r || !D?.anim8r) return false;
     const { lethal = false, miss = false, ...hooks } = opts as AttackOptions;
@@ -198,7 +200,7 @@ function fighterVictory(id) {
     return started;
   }
 // Per frame: pose every extra fighter into its own skeleton buffer (before the camera, so it can frame them).
-  function _updateExtras(alpha, ARENA) {
+  function _updateExtras(alpha: number, ARENA: number) {
     for (const f of B$.extras.values()) {
       if (!f.model || !f.bufs || !f.anim8r) { f.aabb = null; continue; }
       const a = f.anim8r;
@@ -217,7 +219,7 @@ function fighterVictory(id) {
       { f.restW = Math.max(f.restW, (f.aabb.max[0] - f.aabb.min[0]) / ARENA); f.restH = Math.max(f.restH || 0, f.aabb.max[1] - f.aabb.min[1]); }
     }
   }
-function _drawExtras(pv) {
+function _drawExtras(pv: Float32Array) {
     for (const f of B$.extras.values()) {
       if (!f.visible || !f.model || !f.bufs) continue;
       drawSkeletalMesh(B$.gl, B$.texP, pv, f.bufs, f.tex || B$.whiteTex, fighterTint(f.side === "enemy" ? "enemy" : "player"));

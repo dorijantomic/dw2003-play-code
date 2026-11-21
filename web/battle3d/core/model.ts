@@ -11,6 +11,8 @@ import { arenaSlotFor } from "../camera-shots.js";
 import { resolveContactSoundType } from "../../battle3d.js";
 import type { Battle3DContext } from "../../types/battle3d.js";
 
+import type { BattleSide } from "../../types/audio.js";
+import type { SkelBufs } from "../../types/battle3d.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeModel(B$: Battle3DContext) {
 function contactSoundTypeFor(techId: number) {
@@ -95,7 +97,7 @@ function loadProjMesh(id: number) {
   }
 // Warm the projectile-mesh cache for one model's actions so the bullet is ready at the
   // muzzle-exit frame (no async-load gap). Called when a model's anim.json actions load.
-  function preloadModelProjectiles(actions) {
+  function preloadModelProjectiles(actions: unknown) {
     if (!Array.isArray(actions)) return;
     for (const a of actions) {
       for (const o of a?.ops || []) {
@@ -110,11 +112,11 @@ function loadProjMesh(id: number) {
   // flights are NOT mirrored for the far side, as op3 is not: the op6 handler stores its
   // two triples with no side test, and the shipped root yaw is 2048 (180°) in 223 of the 224
   // player-side records and 0 in all 121 enemy-side ones — the data is authored per side.
-  function projWorld(pos, side) {
+  function projWorld(pos: number[], side: BattleSide) {
     return ps1ToRender(pos, MODEL_SCALE);
   }
 // Effect-spawn hook for one side's action VM (op3 sub=0 → spawn at actor-relative pos).
-  function _fxHooks(side, extra?: any) {
+  function _fxHooks(side: BattleSide, extra?: any) {
     const e = extra || {};
     return {
       ...e,
@@ -154,7 +156,7 @@ function loadProjMesh(id: number) {
       },
     };
   }
-function freeSkelBufs(bufs) {
+function freeSkelBufs(bufs: SkelBufs) {
     if (!bufs) return;
     if (bufs.ibo) B$.gl.deleteBuffer(bufs.ibo);
     if (bufs.ubo) B$.gl.deleteBuffer(bufs.ubo);
@@ -167,7 +169,7 @@ function freeSkelBufs(bufs) {
   // the model data (+0x80); the release now runs THROUGH the port rather than a hand-written
   // `if (tex) deleteTexture; freeSkelBufs; null`, so the guard and the zero test are the
   // original's. `free` does the browser-side release — that half is genuinely browser-side.
-  function releaseActorResources(resources) {
+  function releaseActorResources(resources: unknown[]) {
     const slots = resources.slice();
     actorTeardown({
       // The browser tears its actor down when it is replaced, which is the original's state 3.
@@ -184,7 +186,7 @@ function freeSkelBufs(bufs) {
   }
 // Warm the model + texture caches ahead of a presentation model swap (the DNA
   // flow swaps actors at every segment boundary; fetching there stalls the show).
-  function preloadDigimon(folder) {
+  function preloadDigimon(folder: string) {
     if (!folder) return Promise.resolve(false);
     loadAssetImage(`assets/battle/textures/${folder}.png`).catch(() => null);
     return loadSkeletalModel(folder).then((m) => !!m);
@@ -245,7 +247,7 @@ function setEnemyDigimon(folder: string | null | undefined) {
   // the original plays for a badly hurt Digimon. Every action script's trailing "return to base"
   // record and every action->idle return play this table, so setting it here is what makes the
   // hurt stance appear ONLY while the Digimon is actually hurt.
-  function setFighterBaseIdle(side: string, low) {
+  function setFighterBaseIdle(side: string, low: boolean) {
     const a = side === "enemy" ? B$.enemyAnim8r : B$.playerAnim8r;
     if (a) a.baseTable = low ? 1 : 0;
   }
@@ -256,14 +258,14 @@ function entranceMotionTry() {
     if ((e.folder && e.folder !== live) || !(e.side ? B$.enemyAnim8r : B$.playerAnim8r)) return;
     if ((e.side ? B$.playEnemyMotion : B$.playPlayerMotion)(e.motion)) B$.entranceMotion = null;
   }
-function entranceMotionSet(side, folder, motion) { B$.entranceMotion = { side, folder, motion }; entranceMotionTry(); }
-function setPlayerVisible(visible) { B$.playerVisible = !!visible; }
-function setEnemyVisible(visible) { B$.enemyVisible = !!visible; }
+function entranceMotionSet(side: number, folder: string, motion) { B$.entranceMotion = { side, folder, motion }; entranceMotionTry(); }
+function setPlayerVisible(visible: boolean) { B$.playerVisible = !!visible; }
+function setEnemyVisible(visible: boolean) { B$.enemyVisible = !!visible; }
 // NEW content (F2 -> Extras -> "Fusion bosses"): the fusion's white-out. It is the
   // original's own full-screen monochrome primitive (op7, FIGHTSTG_F0x80092e18/0x800930c0
   // -- the DNA clip's white-out), started at full white on type 1 so it ramps back down and
   // clears itself; a type-0 overlay would hold the screen white forever.
-  function whiteOut(frames = 20) {
+  function whiteOut(frames: number = 20) {
     B$.screenOverlay = { type: 1, duration: Math.max(1, frames | 0), t: 0 };
   }
   return { contactSoundTypeFor, loadProjMesh, preloadModelProjectiles, projWorld, _fxHooks, freeSkelBufs, releaseActorResources, preloadDigimon, setPlayerDigimon, setEnemyDigimon, setFighterBaseIdle, entranceMotionTry, entranceMotionSet, setPlayerVisible, setEnemyVisible, whiteOut };

@@ -11,6 +11,8 @@ import { battleRestoreTargets, clearActionAffinity } from "./restore.js";
 import { applyCategory5Plan } from "./status.js";
 import { effStats } from "./hit-results.js";
 import type { ScriptedPlanOptions } from "./core/types.js";
+import type { BattleState, FightTechRow } from "../types/battle.js";
+import type { PlayerRecord, EnemyBattleRecord } from "../types/battle.js";
 
 /**
  * THE WHOLE CATEGORY-5 FAMILY — one call per technique, both sides of a battle.
@@ -303,7 +305,7 @@ export function statValue(rec, stat: number) {
  * from the disc on a form change, a buff/debuff, or an earlier battle's penalty.
  * A missing record answers 0, which is what the raw sites passed.
  */
-export function effectiveSpd(rec) {
+export function effectiveSpd(rec: PlayerRecord | EnemyBattleRecord | undefined) {
   return rec ? effStats(rec).spd | 0 : 0;
 }
 

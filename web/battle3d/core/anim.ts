@@ -3,9 +3,11 @@ import { RAND_U16 } from "../../vendor/engine.js";
 import type { AttackOptions, Battle3DContext, PlayScriptOptions, ThrowItemOptions } from "../../types/battle3d.js";
 import type { ActorAnimator } from "../../fight/actor-animator.js";
 
+import type { AnimHooks } from "../../types/battle3d.js";
+import type { DnaScriptOp } from "../../battle/core/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeAnim(B$: Battle3DContext) {
-function _applyNamed(anim8r: ActorAnimator | null | undefined, name: string | null, hooks) {
+function _applyNamed(anim8r: ActorAnimator | null | undefined, name: string | null, hooks: AnimHooks) {
     if (!anim8r) return;
     if (name === "idle" || name == null) anim8r.setIdle();
     else anim8r.setAction(B$.NAMED_CLIP[name] ?? null, hooks || {});
@@ -50,7 +52,7 @@ function playPlayerVictory() {
     B$.playerAnim8r.playTimelineTable(table);
     return true;
   }
-function playPlayerActionClip(clip: number | null, hooks = {}) {
+function playPlayerActionClip(clip: number | null, hooks: AnimHooks = {}) {
     B$.playerAnim = `clip:${clip}`;
     return B$.playerAnim8r
       ? B$.playerAnim8r.setAction(clip, B$._playerHooks(B$._fxHooks("player", hooks)))
@@ -62,7 +64,7 @@ function playPlayerActionClip(clip: number | null, hooks = {}) {
   // reads it; the attack path's own writer .L0x8008f21c-.L0x8008f234 is what contactSoundTypeFor
   // ports). An item with no table record writes neither field, exactly as the disc's scan falls
   // through — so contactSoundType is cleared rather than left holding the previous attack's.
-  function playPlayerItemUse(itemId: number, hooks = {}) {
+  function playPlayerItemUse(itemId: number, hooks: AnimHooks = {}) {
     const rec = itemUseEffect(itemId);
     B$.playerAnim = `item:${itemId}`;
     B$.contactSoundType.player = rec ? rec.sound : null;
@@ -96,7 +98,7 @@ function playPlayerActionClip(clip: number | null, hooks = {}) {
       motion = rec.motion_random.base + rec.motion_random.step * k;
     }
     B$.armThrowBackdrop(motion);      // the clip's op4 switches the element pack in and out
-    const h = { ...hooks, onMotion: (m) => { B$.dataFieldMotion(m); hooks.onMotion?.(m); } };
+    const h = { ...hooks, onMotion: (m: number) => { B$.dataFieldMotion(m); hooks.onMotion?.(m); } };
     return B$.playerAnim8r
       ? B$.playerAnim8r.setAnimByThrowItem(itemId, B$._playerHooks(B$._fxHooks("player", h)), { branch, motion })
       : false;
@@ -105,7 +107,7 @@ function playPlayerActionClip(clip: number | null, hooks = {}) {
   // barriers — and NOTHING here touches the camera record. The record outlives the script that
   // installed it (there is no expiry anywhere in the original), so a segment's op5 carries into
   // the next segment on its own and this needs no per-presentation flag.
-  function playPlayerScript(script, {
+  function playPlayerScript(script: { ops: DnaScriptOp[]; }, {
     initialTable = null, motionTables = {}, rotationBase = 0, ...hooks
   }: PlayScriptOptions = {}) {
     B$.playerAnim = "external-script";
@@ -125,21 +127,21 @@ function playPlayerActionClip(clip: number | null, hooks = {}) {
   }
 // Real, confirmed path (technique id -> clip via techToClip). hooks = { onHit, onCamera, setLunge }.
   // The player's action drives the script camera (op5); the enemy's does not.
-  function setPlayerAnimByTech(techId: number, hooks) {
+  function setPlayerAnimByTech(techId: number, hooks: { onMotion: (arg0: number) => void; }) {
     B$.playerAnim = `tech:${techId}`;
     B$.contactSoundType.player = B$.contactSoundTypeFor(techId);
     B$.contactEvade.player = false;   // no accuracy roll on this path
     // The backdrop follows the clip's own op4 (see armDataField above), not a timer.
     B$.armDataField(techId);
-    const h = { ...(hooks || {}), onMotion: (m) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
+    const h = { ...(hooks || {}), onMotion: (m: number) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
     return B$.playerAnim8r ? B$.playerAnim8r.setAnimByTech(techId, B$._playerHooks(B$._fxHooks("player", h))) : false;
   }
-function setEnemyAnimByTech(techId: number, hooks) {
+function setEnemyAnimByTech(techId: number, hooks: { onMotion: (arg0: number) => void; }) {
     B$.enemyAnim = `tech:${techId}`;
     B$.contactSoundType.enemy = B$.contactSoundTypeFor(techId);
     B$.contactEvade.enemy = false;
     B$.armDataField(techId);
-    const h = { ...(hooks || {}), onMotion: (m) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
+    const h = { ...(hooks || {}), onMotion: (m: number) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
     return B$.enemyAnim8r ? B$.enemyAnim8r.setAnimByTech(techId, B$._enemyHooks(B$._fxHooks("enemy", h))) : false;
   }
 // Coordinated attacks (Phase E entry points for battle.js): the attacker plays techId's clip;

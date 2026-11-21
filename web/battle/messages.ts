@@ -80,7 +80,7 @@ export const MSG_KIND = Object.freeze({
  * acting Digimon's name on the first and `jokeFlavorMessageId(jokeIndex, bit)` — the phrase
  * F0x8009a734 reads off its own table at 0x800a35e4 — on the second.
  */
-export function jokeGagMessageSpec(playerName, jokeIndex: number, bit: number) {
+export function jokeGagMessageSpec(playerName: string, jokeIndex: number, bit: number) {
   return {
     kind: MSG_KIND.JOKE_GAG,
     payload: [jokeFlavorMessageId(jokeIndex | 0, bit | 0)],

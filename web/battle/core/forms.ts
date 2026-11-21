@@ -8,6 +8,7 @@ import { ST } from "../messages.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeForms(B: BattleContext) {
 /**
@@ -61,7 +62,7 @@ export function makeForms(B: BattleContext) {
    * `0x8003EF5C` are the eight starters, so both screens list the member's own
    * starter species first and its equipped forms after it.
    */
-  function partyRosterSlot(b, position: number) {
+  function partyRosterSlot(b: BattleState, position: number) {
     return partyPositionRosterSlot(b?.playerRoster ?? [], position | 0);
   }
 /**
@@ -112,7 +113,7 @@ export function makeForms(B: BattleContext) {
    * DV path (web/battle.js applyDvAction): one turn, the form written, the
    * Digivolved scene. The screen itself only reports the choice.
    */
-  function confirmDvForm(b, speciesId: number) {
+  function confirmDvForm(b: BattleState, speciesId: number) {
     const forms = B.formOptionsFor(b.activePlayerIndex);
     const row = forms.findIndex((form) => (form.id & 0xffff) === (speciesId & 0xffff));
     if (row < 0) { b.state = ST.PLAYER_MENU; return; }
@@ -134,7 +135,7 @@ export function makeForms(B: BattleContext) {
    * form, which is the same number for most of a battle and wrong after either of
    * those two.
    */
-  function liveFormId(b, slot: number) {
+  function liveFormId(b: BattleState, slot: number) {
     const record = b.playerRecords?.[slot];
     const member = b.playerRoster?.[slot];
     const id = Number(record?.profile?.id ?? member?.id ?? member?.rookieId ?? record?.rookieId ?? 0);
@@ -205,7 +206,7 @@ export function makeForms(B: BattleContext) {
    * fightstg.s:16314-16316 loads -2 in the branch delay slot, before the poll.
    * Cancel restarts the partner picker, without spending a turn or MP.
    */
-  function applyDnaAnswer(b, answer, kind = "command") {
+  function applyDnaAnswer(b: BattleState, answer, kind: string = "command") {
     const action = dnaAnswerAction(kind, answer);
     if (action === "wait") return false;
     if (action === "restart") {

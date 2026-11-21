@@ -24,7 +24,7 @@ interface Window {
   __assetLocality: () => { retainedStages: unknown[]; readyStages: unknown[]; retainedSprites: unknown[]; };
   __auctionArrival: (mapId: number) => "none" | "wait" | "fired";
   __auctionScriptRow: unknown;
-  __battle: any;
+  __battle: BattleContext;
   __battle3d: { setDataField?: (on: boolean, value?: number) => void; } | null;
   __battleAtmos: any;
   __battleB: () => unknown;
@@ -201,7 +201,7 @@ interface Window {
   __stageAmbience: unknown;
   __stageEnter: (mapId: number) => void;
   __stageObjects: unknown;
-  __state: any;
+  __state: GameState;
   __status: unknown;
   __storyDebug: boolean;
   __storyFlags: unknown;

@@ -30,7 +30,7 @@ export function makeCamera(B$: Battle3DContext) {
 // An op5 canned shot, read from the record of the Digimon standing in the slot the
   // preset names. Falls back to the captured Renamon/Woodmon table if that record is not
   // loaded yet.
-  function cannedShot(preset) {
+  function cannedShot(preset: string) {
     const sel = op5ShotSlot(preset);
     if (!sel) return null;
     const slot = cannedShotSlot(sel.side, sel.index);
@@ -41,7 +41,7 @@ export function makeCamera(B$: Battle3DContext) {
   // twelve (near) or three (far) that side's own Digimon record stores. This is the same
   // read `cannedShot` already made, named by slot instead of by op5 preset, because the
   // director passes the two arguments directly (fightstg.s:4766-4778, :4804-4812).
-  function cannedShotSlot(side, index) {
+  function cannedShotSlot(side: string, index: number) {
     const key = modelKeyFromFolder(side === "player" ? B$.playerFolder : B$.enemyFolder);
     const cam = !key ? null : side === "player" ? playerNearCamera() : B$.placementTable[key]?.camera;
     const eye = cam?.eye?.[index], look = cam?.look?.[index];
@@ -52,7 +52,7 @@ export function makeCamera(B$: Battle3DContext) {
   // fighter's record before models->setId): near shot 10 of the incoming partner form, far shot 2 of the incoming
   // enemy. Until the swap `folder` is not the live model, so the record is read by its key; once swapped it is
   // the live model and cannedShotSlot answers (the fitted near table for a model without its own).
-  function entranceShot(side, folder: string | null | undefined, index) {
+  function entranceShot(side, folder: string | null | undefined, index: number) {
     const name = side ? "enemy" : "player";
     if (!folder || folder === (side ? B$.enemyFolder : B$.playerFolder)) return cannedShotSlot(name, index);
     const key = modelKeyFromFolder(folder);
@@ -82,7 +82,7 @@ export function makeCamera(B$: Battle3DContext) {
   function introShot() {
     return arenaShotFor(B$.placementTable, B$.playerFolder, B$.enemyFolder, playerNearCamera());
   }
-function setGiantCameraFit(on) {
+function setGiantCameraFit(on: boolean) {
     B$.giantCamFit = !!on;
     B$.fittedNearCam = null;         // drop the cached decision so the next call re-runs with the flag
     B$.giantNearCam = false;
@@ -259,9 +259,9 @@ function getCameraInfo() { return B$.lastCamInfo ? { ...B$.lastCamInfo, params: 
 function getFaceCamRect() { return B$.faceCamRect; }
 /** A presentation owns the screen: suppress the inset until it says otherwise. The
    *  object rule still decides whether the box exists; this only covers it. */
-  function setFaceCamVisible(visible) { B$.faceBoxSuppressed = !visible; }
+  function setFaceCamVisible(visible: boolean) { B$.faceBoxSuppressed = !visible; }
 /** Feed the object rule this frame's three HUD facts. Returns whether the box is up. */
-  function syncFaceBox(events) {
+  function syncFaceBox(events: unknown) {
     B$.faceBoxOnScreen = battleFaceBoxVisible(B$.faceBox, events);
     return B$.faceBoxOnScreen;
   }
@@ -282,7 +282,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
   function makeIdleDirector() {
     return createIdleDirector({
       arena: () => { const s = introShot(); return s ? fieldsFromShot(s) : null; },
-      canned: (side, index) => {
+      canned: (side: string, index: number) => {
         const s = cannedShotSlot(side, index);
         return s ? fieldsFromShot(s) : null;
       },

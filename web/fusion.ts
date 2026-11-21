@@ -12,6 +12,7 @@
 // merges the authored skill, keeps a party entry's `fuseInto`, or tints a fighter.
 
 import type { FusionDefeatArgs } from "./battle/core/types.js";
+import type { BattleSkill } from "./types/battle.js";
 
 /** The five primary stats every blend covers. */
 export const FUSION_STATS = Object.freeze(["str", "def", "spt", "wis", "spd"]);
@@ -225,7 +226,7 @@ export function enemyMessageName(en, record: { nameId: number | null; }, nameBan
  * nothing authored, so the battle's skill table is exactly today's. Keys stay the
  * technique ids the battle already indexes by.
  */
-export function mergeFusionSkills(skillDB, skills: ArrayLike<unknown> | { [s: string]: unknown; }, fxOn = false) {
+export function mergeFusionSkills(skillDB: { [k: string]: BattleSkill; }, skills: ArrayLike<unknown> | { [s: string]: unknown; }, fxOn = false) {
   if (!fxOn || !skills) return skillDB;
   const rows = Array.isArray(skills) ? skills : Object.values(skills);
   if (!rows.length) return skillDB;

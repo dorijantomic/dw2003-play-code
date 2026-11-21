@@ -12,6 +12,7 @@ import { applyGiantScales, giantModeOn, battleKindOf } from "../form-blast.js";
 import { MSG_KIND, ST } from "../messages.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeFinale(B: BattleContext) {
 /**
@@ -27,7 +28,7 @@ export function makeFinale(B: BattleContext) {
    * beat hands the command menu to the player, who gets the first turn of the head
    * phase — the kind-6 fixed roll governs the player's attacks from there on.
    */
-  function runFinaleBeat(b, index) {
+  function runFinaleBeat(b: BattleState, index: number) {
     const beat = FINALE_TAIL_DEFEAT_BEATS[index];
     if (!beat) return;
     b._finaleKind = beat.kind;
@@ -62,7 +63,7 @@ export function makeFinale(B: BattleContext) {
     finishFinaleBeat(b, index, beat);
   }
 /** The rest of a finale beat: the head's attack record and the beat's pages (after the body has entered). */
-  function finishFinaleBeat(b, index, beat) {
+  function finishFinaleBeat(b: BattleState, index: number, beat: { kind: number; member: number; message: number; cannon: boolean; head: boolean; } | { kind: number; member: number; message: null; cannon: boolean; head: boolean; }) {
     if (beat.head) {
       // Arm 22 state 2: the head's own attack record (technique 440, the "?????"
       // skill) is rebuilt from the technique row latched at 0x800a4538. The record

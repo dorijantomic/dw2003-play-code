@@ -1,6 +1,6 @@
 {
- "total": 20996,
- "any": 1140,
+ "total": 20234,
+ "any": 1091,
  "files": {
   "web/ambience.ts": {
    "errors": 338,
@@ -103,95 +103,95 @@
    "any": 0
   },
   "web/battle.ts": {
-   "errors": 36,
+   "errors": 33,
    "any": 1
   },
   "web/battle/core/counter.ts": {
-   "errors": 28,
+   "errors": 12,
    "any": 0
   },
   "web/battle/core/dna.ts": {
-   "errors": 32,
+   "errors": 23,
    "any": 1
   },
   "web/battle/core/draw.ts": {
-   "errors": 52,
+   "errors": 34,
    "any": 0
   },
   "web/battle/core/end.ts": {
-   "errors": 84,
+   "errors": 54,
    "any": 0
   },
   "web/battle/core/enemy-action.ts": {
-   "errors": 54,
+   "errors": 28,
    "any": 1
   },
   "web/battle/core/finale.ts": {
-   "errors": 7,
+   "errors": 1,
    "any": 0
   },
   "web/battle/core/flow.ts": {
-   "errors": 53,
+   "errors": 18,
    "any": 2
   },
   "web/battle/core/forms.ts": {
-   "errors": 23,
+   "errors": 13,
    "any": 0
   },
   "web/battle/core/fusion.ts": {
-   "errors": 23,
+   "errors": 13,
    "any": 0
   },
   "web/battle/core/hud.ts": {
-   "errors": 121,
+   "errors": 57,
    "any": 0
   },
   "web/battle/core/input.ts": {
-   "errors": 26,
+   "errors": 1,
    "any": 0
   },
   "web/battle/core/load.ts": {
-   "errors": 15,
+   "errors": 6,
    "any": 0
   },
   "web/battle/core/menus.ts": {
-   "errors": 35,
+   "errors": 4,
    "any": 0
   },
   "web/battle/core/message.ts": {
-   "errors": 36,
+   "errors": 12,
    "any": 0
   },
   "web/battle/core/native.ts": {
-   "errors": 78,
+   "errors": 71,
    "any": 0
   },
   "web/battle/core/opening.ts": {
-   "errors": 48,
+   "errors": 25,
    "any": 0
   },
   "web/battle/core/player-action.ts": {
-   "errors": 61,
+   "errors": 24,
    "any": 1
   },
   "web/battle/core/records.ts": {
-   "errors": 53,
+   "errors": 24,
    "any": 1
   },
   "web/battle/core/report.ts": {
-   "errors": 36,
+   "errors": 34,
    "any": 0
   },
   "web/battle/core/start.ts": {
-   "errors": 38,
+   "errors": 17,
    "any": 0
   },
   "web/battle/core/types.ts": {
    "errors": 0,
-   "any": 18
+   "any": 17
   },
   "web/battle/core/update.ts": {
-   "errors": 55,
+   "errors": 6,
    "any": 0
   },
   "web/battle/form-blast.ts": {
@@ -207,7 +207,7 @@
    "any": 0
   },
   "web/battle/hud.ts": {
-   "errors": 19,
+   "errors": 12,
    "any": 0
   },
   "web/battle/layout.ts": {
@@ -215,15 +215,15 @@
    "any": 2
   },
   "web/battle/messages.ts": {
-   "errors": 13,
+   "errors": 12,
    "any": 0
   },
   "web/battle/plans.ts": {
-   "errors": 18,
+   "errors": 17,
    "any": 0
   },
   "web/battle/progress.ts": {
-   "errors": 33,
+   "errors": 27,
    "any": 0
   },
   "web/battle/report.ts": {
@@ -243,7 +243,7 @@
    "any": 0
   },
   "web/battle3d.ts": {
-   "errors": 224,
+   "errors": 202,
    "any": 0
   },
   "web/battle3d/camera-fit.ts": {
@@ -255,43 +255,43 @@
    "any": 0
   },
   "web/battle3d/core/anim.ts": {
-   "errors": 67,
+   "errors": 23,
    "any": 0
   },
   "web/battle3d/core/atmos.ts": {
-   "errors": 215,
+   "errors": 211,
    "any": 0
   },
   "web/battle3d/core/backdrop.ts": {
-   "errors": 56,
+   "errors": 48,
    "any": 0
   },
   "web/battle3d/core/blast.ts": {
-   "errors": 27,
+   "errors": 21,
    "any": 0
   },
   "web/battle3d/core/camera.ts": {
-   "errors": 45,
+   "errors": 36,
    "any": 0
   },
   "web/battle3d/core/fighters.ts": {
-   "errors": 162,
+   "errors": 133,
    "any": 0
   },
   "web/battle3d/core/model.ts": {
-   "errors": 59,
+   "errors": 40,
    "any": 1
   },
   "web/battle3d/core/pano.ts": {
-   "errors": 483,
+   "errors": 482,
    "any": 1
   },
   "web/battle3d/core/render.ts": {
-   "errors": 370,
+   "errors": 329,
    "any": 0
   },
   "web/battle3d/core/smartcam.ts": {
-   "errors": 175,
+   "errors": 170,
    "any": 0
   },
   "web/battle3d/core/toon.ts": {
@@ -447,7 +447,7 @@
    "any": 1
   },
   "web/boss-phase.ts": {
-   "errors": 6,
+   "errors": 4,
    "any": 0
   },
   "web/built/boulders.ts": {
@@ -783,7 +783,7 @@
    "any": 0
   },
   "web/enemy-tells.ts": {
-   "errors": 9,
+   "errors": 7,
    "any": 0
   },
   "web/engine-bridge.ts": {
@@ -923,7 +923,7 @@
    "any": 0
   },
   "web/fight/fight-coordinator.ts": {
-   "errors": 7,
+   "errors": 6,
    "any": 4
   },
   "web/fight/fight-tables.ts": {
@@ -984,7 +984,7 @@
   },
   "web/fight/types.ts": {
    "errors": 0,
-   "any": 67
+   "any": 62
   },
   "web/fightreport-translated.ts": {
    "errors": 35,
@@ -1039,11 +1039,11 @@
    "any": 1
   },
   "web/fusion-loot.ts": {
-   "errors": 12,
+   "errors": 9,
    "any": 0
   },
   "web/fusion.ts": {
-   "errors": 21,
+   "errors": 20,
    "any": 2
   },
   "web/fxaudio.ts": {
@@ -1051,15 +1051,15 @@
    "any": 0
   },
   "web/game.ts": {
-   "errors": 212,
+   "errors": 203,
    "any": 2
   },
   "web/game/auction-replay.ts": {
-   "errors": 28,
+   "errors": 27,
    "any": 0
   },
   "web/game/battle-launch.ts": {
-   "errors": 36,
+   "errors": 25,
    "any": 1
   },
   "web/game/draw-sprites.ts": {
@@ -1067,7 +1067,7 @@
    "any": 10
   },
   "web/game/engine-init.ts": {
-   "errors": 43,
+   "errors": 39,
    "any": 0
   },
   "web/game/field-fx.ts": {
@@ -1075,11 +1075,11 @@
    "any": 0
   },
   "web/game/field-steps.ts": {
-   "errors": 38,
+   "errors": 34,
    "any": 0
   },
   "web/game/fishing-tree.ts": {
-   "errors": 39,
+   "errors": 38,
    "any": 0
   },
   "web/game/followers.ts": {
@@ -1091,7 +1091,7 @@
    "any": 1
   },
   "web/game/input.ts": {
-   "errors": 108,
+   "errors": 100,
    "any": 0
   },
   "web/game/map-load.ts": {
@@ -1103,11 +1103,11 @@
    "any": 0
   },
   "web/game/quest-scenes.ts": {
-   "errors": 135,
+   "errors": 133,
    "any": 0
   },
   "web/game/render.ts": {
-   "errors": 194,
+   "errors": 183,
    "any": 1
   },
   "web/game/session.ts": {
@@ -1119,7 +1119,7 @@
    "any": 0
   },
   "web/game/story-events.ts": {
-   "errors": 66,
+   "errors": 63,
    "any": 0
   },
   "web/game/transitions.ts": {
@@ -1128,18 +1128,18 @@
   },
   "web/game/types.ts": {
    "errors": 0,
-   "any": 75
+   "any": 63
   },
   "web/game/ui-openers.ts": {
    "errors": 18,
    "any": 1
   },
   "web/game/update.ts": {
-   "errors": 139,
+   "errors": 129,
    "any": 1
   },
   "web/game/vars.ts": {
-   "errors": 120,
+   "errors": 118,
    "any": 0
   },
   "web/gameEvents.ts": {
@@ -1788,11 +1788,11 @@
   },
   "web/types/battle.ts": {
    "errors": 0,
-   "any": 154
+   "any": 135
   },
   "web/types/battle3d.ts": {
    "errors": 0,
-   "any": 138
+   "any": 128
   },
   "web/types/battletag-translated.ts": {
    "errors": 0,
@@ -1840,7 +1840,7 @@
   },
   "web/types/globals.d.ts": {
    "errors": 0,
-   "any": 23
+   "any": 21
   },
   "web/types/gym-translated.ts": {
    "errors": 0,

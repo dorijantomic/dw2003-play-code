@@ -18,6 +18,8 @@ import { winBattleRewards, paidParticipants } from "../progress.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { BattleEndContext } from "./types.js";
 
+import type { EnemyRecord } from "../../types/battle.js";
+import type { GameState } from "../../game/types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeLoad(B: BattleContext) {
 async function loadFusionData() {
@@ -42,7 +44,7 @@ async function loadFusionData() {
   // slot → screen_id → enemy party. Returns the party array (1–3 members) or null when the
   // roll lands on an empty slot / the stage has no pool ("no encounter this roll").
   // See docs/research/battle-invocation.md and web/encounters.js.
-  function pickEnemy(mapId, x = 0, y = 0) {
+  function pickEnemy(mapId: number | string, x: number = 0, y: number = 0) {
     if (!B.stageEncDB) return null;
     return pickEncounter({
       stageDB: B.stageEncDB, fieldDB: B.fieldEncDB, gridDB: B.zoneGridDB,
@@ -53,7 +55,7 @@ async function loadFusionData() {
 // The encounter-rate level of the zone the player is standing in, for the field's
   // step counter (fieldstg driver fn 0x80092664 reads `*zoneArray[zone-1]`).
   // Returns 0 when the stage has no pool — the caller then rolls nothing.
-  function encounterRateLevel(mapId, x = 0, y = 0) {
+  function encounterRateLevel(mapId: number | string, x: number = 0, y: number = 0) {
     if (!B.stageEncDB) return 0;
     const key = String(mapId).match(/(\d+)/)?.[1];
     const stage = key ? B.stageEncDB.stages?.[key] : null;
@@ -62,7 +64,7 @@ async function loadFusionData() {
                          stageZoneBlocks(stage, B.storyOrdinal(), B.entryKey()));
   }
 // Build a fake profile-like object from a sdigiedt enemy entry so elementFactor works.
-  function enemyToProfile(eStats) {
+  function enemyToProfile(eStats: EnemyRecord) {
     return {
       name: eStats.digimon_id,
       resistances: eStats.resistances ?? {},
@@ -84,7 +86,7 @@ function enemyMp(eStats: { spt: number; }, level: number) {
     return Math.max(10, Math.round(eStats.spt * 1.5 + level * 3));
   }
 // Map charId → digimon id (matches packs.js charId values)
-  function getPlayerProfile(state) {
+  function getPlayerProfile(state: GameState) {
     const chars = state.manifest?.characters;
     if (!chars || state.charIdx <= 0) return null;
     const char   = chars[state.charIdx];
@@ -146,7 +148,7 @@ function enemyMp(eStats: { spt: number; }, level: number) {
   // has no per-enemy EXP rule, so a battle with no record pays 0 (winBattleRewards).
   // The divisor is the number of participants STILL STANDING at the outcome, which is
   // what stfgtrep's flagged-row count divides by (.L0x00002c68).
-  function winRewards(b: BattleEndContext, rosterIndex = b.activePlayerIndex ?? 0) {
+  function winRewards(b: BattleEndContext, rosterIndex: number = b.activePlayerIndex ?? 0) {
     return winBattleRewards({
       screenId: b.screenId,
       participants: Math.max(1, paidParticipants(b).length),

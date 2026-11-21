@@ -20,6 +20,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import type { BattleCommandSeed } from "./types/battlecmd-translated.js";
+import type { PlayerRecord, EnemyBattleRecord } from "./types/battle.js";
 
 /** The row picture pack: handle 0x04550000 is disc index 1109, PGFGTC00. */
 const PACKS = { 1109: "pgfgc00" };

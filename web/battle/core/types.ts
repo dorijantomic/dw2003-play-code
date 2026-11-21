@@ -2,6 +2,7 @@
 // (see tools/rewrite/add-types.mjs). Nothing here is emitted — node's strip mode erases the
 // declarations — so this file must never hold runtime code.
 
+import type { EnemyAiMove, EnemyRecord } from "../../types/battle.js";
 /** The bit of a digimon profile a DNA presentation needs: the model name it stages. */
 export interface DnaProfileName {
   name: string;
@@ -79,20 +80,16 @@ export interface BattleEndContext {
   activePlayerIndex: number;
   enemy: any;
   /** per participant, the ten form flags the DNA/revert rules read */
-  formFlags: number[][];
+  formFlags?: number[][];
   participantIndices: Set<number>;
   player: any;
   playerRecords: any[];
   playerRoster: any[];
-  screenId: number;
+  screenId?: number;
 }
 
-export interface EnemyStatBlock {
-  ai_moves?: any[];
-  attack?: number;
-  move_1?: number;
-  move_2?: number;
-}
+/** an enemies.json row (the fused boss builds its own copy of one) */
+export type EnemyStatBlock = EnemyRecord;
 
 /** One entry of a startParty() gauntlet: an enemy and the stats it is fought with. */
 export interface BattlePartyEntry {
@@ -102,6 +99,12 @@ export interface BattlePartyEntry {
   enemyHp?: number;
   enemyMp?: number;
   enemyStatScale?: number;
+  /** authored name the plate shows instead of the body species (Fusion content) */
+  displayName?: string | null;
+  /** the fusion boss this entry fuses into (a boss record, or the name of one), cleared once it has happened */
+  fuseInto?: unknown;
+  /** giant mode: the fighter scale */
+  size?: number;
 }
 
 /** What a won fight hands onWin() (web/battle/core/end.ts). */
@@ -109,9 +112,12 @@ export interface BattleWinResult {
   xp: number;
   bits: number;
   levelUp: boolean;
+  newLevel?: number;
   droppedItem?: any;
   /** the evolutions this win opened */
   availableEvos?: unknown[];
+  /** every paid partner's payout */
+  participantProgress?: ParticipantProgress[];
   /** the enemy ran instead of being beaten */
   enemyFled?: boolean;
 }
@@ -125,7 +131,7 @@ export interface BattleStartArgs {
   enemyMp?: number;
   party?: BattlePartyEntry[];
   screenId?: number;
-  mapId?: number;
+  mapId?: number | string;
   onWin?: (result: BattleWinResult) => void;
   onFlee?: () => void;
   onLose?: () => void;
@@ -133,14 +139,14 @@ export interface BattleStartArgs {
 
 // startScreen(): `lead` keeps the lead fighter alone (the 1v1 dev path).
 export interface StartScreenOptions {
-  mapId?: number;
+  mapId?: number | string;
   lead?: boolean;
 }
 
 // startParty(): where the fight takes place, so the music stage and the map tag survive.
 export interface StartPartyOptions {
   screenId?: number;
-  mapId?: number;
+  mapId?: number | string;
 }
 
 // One battle_music.json entry: the rolled battle-trigger screen id and the music archive it plays.
@@ -180,7 +186,7 @@ export interface FusedRecord {
   attack?: number;
   move_1?: number;
   move_2?: number;
-  ai_moves?: number[];
+  ai_moves?: EnemyAiMove[];
   statScale?: number;
   stats?: FusedStats;
 }

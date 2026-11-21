@@ -98,7 +98,7 @@ export class FightCoordinator {
 
     return attacker.setAnimByTech(techId, {
       ...hooks,
-      onHit: (rec) => {
+      onHit: (rec: { type: number; words: number[]; }) => {
         hooks.onHit?.(rec);
       },
       onAuxAction: (rec: { mode: number; }) => {

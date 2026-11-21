@@ -15,6 +15,7 @@ import { noteHit } from "../hit-results.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeCounter(B: BattleContext) {
 /**
@@ -78,10 +79,10 @@ export function makeCounter(B: BattleContext) {
    * the swing is queued: when the provoking action's animation is over the defender plays its own basic attack
    * toward the attacker, and the HP comes off at that attack's contact. `from` is the countering side.
    */
-  function queueCounter(b, from: string, { dmg, hit = true, techId }) {
+  function queueCounter(b: BattleState, from: string, { dmg, hit = true, techId }) {
     b._counter = { from, dmg: Math.max(0, dmg | 0), hit, techId, phase: "wait", applied: false };
   }
-function applyCounter(b, c) {
+function applyCounter(b: BattleState, c) {
     if (c.applied) return;
     c.applied = true;
     if (!c.hit) return;
@@ -89,7 +90,7 @@ function applyCounter(b, c) {
     target.hp = Math.max(0, target.hp - c.dmg);
   }
 /** Advance the queued counter. True while it still owns the result phase (the next page must wait for it). */
-  function stepCounter(b) {
+  function stepCounter(b: BattleState) {
     const c = b._counter;
     if (!c) return false;
     if (B.animBusy()) return true;             // the blow that provoked it is still playing
@@ -108,7 +109,7 @@ function applyCounter(b, c) {
     return false;
   }
 /** Run an armed result once no action is playing. The armed closure is one-shot. */
-  function commitPendingImpact(b) {
+  function commitPendingImpact(b: BattleState) {
     const commit = b._pendingImpact;
     if (!commit || B.animBusy()) return false;
     b._pendingImpact = null;
@@ -179,7 +180,7 @@ function applyCounter(b, c) {
    *
    * Returns true when the turn is already lost, so no pad press reaches the list.
    */
-  function frozenGateLosesTurn(b) {
+  function frozenGateLosesTurn(b: BattleState) {
     if (b._frozenGateTurn === b._turnSeq) return b._frozenGateLost === true;
     b._frozenGateTurn = b._turnSeq;
     if (!frozenGateBlocksTurn(b.player, RAND_U16)) {
@@ -203,7 +204,7 @@ function applyCounter(b, c) {
   }
 // Our Digimon swings back (Counter Crest). The outcome is decided here, so the page can name it; the
   // swing itself is queued and plays after the enemy's blow (queueCounter), where the damage lands at its contact.
-  function triggerPlayerCounter(b, attacker, defender, damage: number, attackerName, defenderName) {
+  function triggerPlayerCounter(b: BattleState, attacker, defender, damage: number, attackerName: string, defenderName: string) {
     if (!defender.counterCrest || defender.hp <= 0 || damage <= 0 ||
         !counterCrestProc(damage, defender.maxHp, RAND_U16)) return "";
     const basic = B.skillDB[defender.profile?.tech_basic];
@@ -240,7 +241,7 @@ function applyCounter(b, c) {
    * no row and never counters — never the 0x58-byte player profile's bytes at +0x42..+0x44,
    * which are growth fields (`phase2-rtarget.md` 2.2).
    */
-  function triggerEnemyCounterRow(b, attacker: { hp: number; }, defender, damage: number, attackerName, defenderName) {
+  function triggerEnemyCounterRow(b: BattleState, attacker: { hp: number; }, defender, damage: number, attackerName: string, defenderName: string) {
     if (damage <= 0 || defender.hp <= 0) return "";
     // Gate 2 (fightstg.s:12433-12440, .L0x8008ef14-.L0x8008ef40): a Frozen defender whose Frozen roll
     // F0x800a19d8 returns non-zero starts no reaction. Gate 4: comparator 0 means NO counter, never "always".

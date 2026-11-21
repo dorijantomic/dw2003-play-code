@@ -27,6 +27,7 @@ import { ENTRANCE_TASK_END_FRAME } from "../../enemy-switch.js";
 import { clearActionAffinity } from "../restore.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeOpening(B: BattleContext) {
 function _battleTargetSize() {
@@ -54,7 +55,7 @@ function onBattleResize() {
     B.canvas.width = w; B.canvas.height = h;
     if (B.offscreen3d) { B.offscreen3d.width = w; B.offscreen3d.height = h; }
   }
-async function _init3DRenderer(b) {
+async function _init3DRenderer(b: BattleState) {
     try {
       B.offscreen3d = createBattleLayer(B.canvas)
         ?? (typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(B.canvas.width, B.canvas.height) : null);
@@ -163,7 +164,7 @@ async function _init3DRenderer(b) {
   // draw is RAND_U16 masked to 0x1f/0xf. Returns the item id or null for any other
   // enemy. Computed once per battle and remembered, because the native flag is set
   // at setup.
-  function cardmonBoosterForBattle(b) {
+  function cardmonBoosterForBattle(b: BattleState) {
     if (b._cardmonBoosterId !== undefined) return b._cardmonBoosterId;
     b._cardmonBoosterId = null;
     const entries = B.fieldEncDB?.screens?.[String(b.screenId)];
@@ -185,7 +186,7 @@ async function _init3DRenderer(b) {
   // are MP-free and the gauge takes no further gain (a Tag would forfeit it).
 
   /** True when the gauge just saturated and an automatic Blast can fire. */
-  function blastReady(b = B.battle) {
+  function blastReady(b: BattleState = B.battle) {
     return !b?.blast?.active
         && (b?.player?.gauge ?? 0) >= DV_GAUGE_MAX
         && !!blastTargetProfile(b?.player, B.digimonDB);
@@ -197,7 +198,7 @@ async function _init3DRenderer(b) {
    * the menu heals when the new model's motion is 13 (f438), so advanceBlastPresentation()
    * applies them on those frames, counted from the task start f-214. The state flags land here.
    */
-  function triggerBlast(b = B.battle) {
+  function triggerBlast(b: BattleState = B.battle) {
     const p = b.player;
     const target = blastTargetProfile(p, B.digimonDB);
     if (!target) return false;
@@ -230,7 +231,7 @@ async function _init3DRenderer(b) {
    * frozen while this runs — the capture is 14 s of cinematic with no input and
    * no turn progress.
    */
-  function advanceBlastPresentation(b, dt: number) {
+  function advanceBlastPresentation(b: BattleState, dt: number) {
     const show = b.blastShow;
     // An entrance first has its entering fighter's model loaded (the original adds it hidden in state 0 before
     // anything shows): the presentation clock does not start until the folder is resolved and preloaded.
@@ -345,7 +346,7 @@ async function _init3DRenderer(b) {
    * state 1 start the presentation (f5941). So the model is already back before
    * a single frame of the effect plays, and there is NO heal.
    */
-  function revertBlast(b = B.battle) {
+  function revertBlast(b: BattleState = B.battle) {
     const p = b.player;
     if (!b.blast) return;
     const saved = B.digimonDB?.[b.blast.savedFormId] ?? B.digimonDB?.[p.rookieId] ?? p.profile;
@@ -380,7 +381,7 @@ async function _init3DRenderer(b) {
    * flash over f178, final fade + other model shown + motion 1 (2 weak) f299. `onDone` runs when the window ends.
    * `name` is the entering fighter's model (species name or id). The clock waits until that model is loaded.
    */
-  function startEntrance(b, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }) {
+  function startEntrance(b: BattleState, { side, name, endMessage = "", endSpec = null, onSwap = null, onDone = null, onTaskEnd = null }) {
     const show = {
       program: side ? FormChangeProgram.ENTRANCE_ENEMY : FormChangeProgram.BLAST_REVERT,
       frame: 0, target: null, swapped: false, healed: false, state: null, sounded: false,
@@ -410,7 +411,7 @@ async function _init3DRenderer(b) {
    * team with its hp). The entering enemy's name page (kind 0xD, substate 4) waits for the child slot, which holds the
    * entrance task, so it is made when the task is gone (ENTRANCE_TASK_END_FRAME, f301); reading it ends the turn.
    */
-  function startEnemySelfTag(b, tag: { slot: number; stage: string; }) {
+  function startEnemySelfTag(b: BattleState, tag: { slot: number; stage: string; }) {
     const next = B.enemyTeamRecord(b, tag.slot);
     if (!next) { b._selfTag = null; B.queueAfterAction(b, "enemy"); return; }
     const nextName = enemyMsgName(next, "");
@@ -447,7 +448,7 @@ async function _init3DRenderer(b) {
    * HP, MP, statuses, the DV gauge of a manual form and the form flags are untouched (nothing else is written).
    * The partner's queued technique event (EVENT_PARTNER_TECH) has no counterpart in this game's turn model.
    */
-  function forcedDedigivolve(b) {
+  function forcedDedigivolve(b: BattleState) {
     const p = b.player;
     const saved = B.digimonDB?.[p.rookieId] ?? p.profile;
     setLiveBattleForm(p, saved);
@@ -461,7 +462,7 @@ async function _init3DRenderer(b) {
     });
   }
 /** Count one elapsed player turn while Blast is active; flag the revert when the schedule expires. */
-  function tickBlastTurn(b = B.battle) {
+  function tickBlastTurn(b: BattleState = B.battle) {
     if (!b?.blast?.active) return;
     if (--b.blast.playerTurns <= 0) b._blastRevertPending = true;
   }

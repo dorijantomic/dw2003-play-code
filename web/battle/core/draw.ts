@@ -193,7 +193,7 @@ function draw() {
   }
 // PSX ABR 2 (B - F) with a grey F: each channel becomes max(0, c - level).
   // Canvas has no subtract mode, so: invert, add the level, invert again.
-  function drawSubtractiveFade(ctx, cw, ch, amount) {
+  function drawSubtractiveFade(ctx: CanvasRenderingContext2D, cw: number, ch: number, amount: number) {
     const level = Math.round(amount * 255);
     noteBackdropBlend();
     ctx.save();
@@ -279,7 +279,7 @@ function draw() {
       enemy: b.enemy ? { name: b.enemy.profile?.name ?? b.enemy.name, hp: b.enemy.hp, maxHp: b.enemy.maxHp } : null,
     };
   }
-async function scriptedScreen(mapId, index) {
+async function scriptedScreen(mapId: number | string, index: number) {
     await B.loadData();
     const stage = B.stageEncDB?.stages?.[String(mapId).replace(/^s/, "")];
     return scriptedScreenId(stage, index, B.storyOrdinal(), B.entryKey());

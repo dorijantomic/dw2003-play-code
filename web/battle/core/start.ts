@@ -13,18 +13,18 @@ import { markFormTaken, battleKindOf, partyEntriesWithSize, giantModeOn } from "
 import type { BattleStartArgs, StartPartyOptions, StartScreenOptions } from "./types.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import { fusionEnabled, partyEntriesFor } from "../../fusion.js";
-import type { BattleContext } from "../../types/battle.js";
+import type { BattleContext, EnemyBattleRecord, PlayerRecord } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeStart(B: BattleContext) {
-async function swapPlayerModel(name) {
+async function swapPlayerModel(name: string) {
     if (!B.renderer3d) return false;
     const folder = await resolveModelFolder(name);
     if (!folder || !B.renderer3d) return false;
     return B.renderer3d.setPlayerDigimon(folder);
   }
 // Swap the on-screen 3D enemy model when the next boss-party member steps in.
-  async function swapEnemyModel(name) {
+  async function swapEnemyModel(name: string) {
     if (!B.renderer3d) return;
     const folder = await resolveModelFolder(name);
     if (folder && B.renderer3d) B.renderer3d.setEnemyDigimon(folder);
@@ -37,7 +37,7 @@ async function swapPlayerModel(name) {
   // wfightmn plays it; archive=(id>>18)&0x7f). Stage-local record first (4
   // screens collide across stages), then global; batl00 = the documented
   // default written by wfightts@0xebc for non-trigger battles.
-  function musicForScreen(screenId: number | null | undefined, mapId: number | undefined) {
+  function musicForScreen(screenId: number | null | undefined, mapId: number | string | undefined) {
     if (screenId == null || !B.battleMusicDB) return "batl00";
     const sk = mapId ? "s" + String(mapId).replace(/^s/, "") : null;
     const local = sk ? (B.battleMusicDB[sk] || []).find(r => r.screen_id === screenId) : null;
@@ -183,7 +183,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     // `applyAilment` can queue a recovery without knowing which battle it is in. The side
     // bytes are 0 and 0x10 (the `andi $s2, $a0, 0xff` over the two side words every
     // stager does), and each side's active fighter slot is 0.
-    for (const [side, rec] of [[0, B.battle.player], [0x10, B.battle.enemy]]) {
+    for (const [side, rec] of [[0, B.battle.player], [0x10, B.battle.enemy]] as [number, PlayerRecord | EnemyBattleRecord][]) {
       if (!rec) continue;
       rec.statusEvents = B.battle.statusEvents;
       rec.sideByte = side;
@@ -229,7 +229,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // walk-up encounters are always a SINGLE Digimon (user-confirmed in-game) — the multi-member
   // screens in the stage pool are scripted boss screens, so we fight only the lead here. The
   // sequential gauntlet (full party) is reserved for scripted battles via startParty.
-  async function startRandom(mapId, x, y, onWin, onFlee, onLose) {
+  async function startRandom(mapId: number | string, x: number, y: number, onWin, onFlee, onLose) {
     await B.loadData();
     const roll = B.pickEnemy(mapId, x, y);
     if (!roll) return false;
@@ -237,13 +237,13 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   }
 // The authentic party for a global screen_id (field_encounters.json), e.g. screen
   // 200 = Genji's Kuwagamon. Used by the story engine to fight a scripted battle.
-  function partyForScreen(screenId) {
+  function partyForScreen(screenId: number) {
     return B.fieldEncDB?.screens?.[String(screenId)] ?? null;
   }
 // The trigger-table screens for a stage (stage_encounters.json, the scene_ctx+0x18
   // pools). The story engine validates a scripted battle's screen_id against these so
   // it never fires a fight the field engine wouldn't roll for that stage.
-  function triggersForStage(mapId) {
+  function triggersForStage(mapId: number | string) {
     const key = String(mapId).replace(/^s/, "");
     const st = B.stageEncDB?.stages?.[key];
     if (!st) return [];
@@ -258,7 +258,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // resolves the party itself and then starts the battle therefore silently
   // does nothing on the first fight of a session. This awaits the load first,
   // which is the only safe order for a caller holding just a screen id.
-  async function startScreen(screenId, onWin, onFlee, onLose, { mapId, lead = true }: StartScreenOptions = {}) {
+  async function startScreen(screenId: number, onWin, onFlee, onLose, { mapId, lead = true }: StartScreenOptions = {}) {
     await B.loadData();
     const party = partyForScreen(screenId);
     if (!party || !party.length) {

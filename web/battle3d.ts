@@ -1232,7 +1232,7 @@ export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {
     applyIntroCamera() { return applyArenaShot(); },
     /** The opening machine's phase-1 slot-6 create: build the battle-open camera actor once. */
     beginOpeningCamera,
-    setDataField(on, techId) {
+    setDataField(on: boolean, techId?: number) {
       B$.dataFieldPinned = !!on;                            // hold until explicitly turned off
       if (on) triggerDataField(techId, performance.now() - B$.BD_DELAY_MS);   // show immediately
       else B$.dataFieldOffAt = 0;

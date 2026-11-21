@@ -28,7 +28,7 @@ import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // (`resetAnimSlotLiveToHome`). This file consumes those instead of hand-writing them.
 import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from "../vendor/engine.js";
 import { smoothAnimEnabled } from "./smooth-anim.js";
-import type { FightActionHooks } from "./types.js";
+import type { FightActionHooks, FightMoveRec } from "./types.js";
 
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
 // Real motion advances ~1–4 frames/tick (the vsync delta); phase cuts jump by hundreds. 16 cleanly
@@ -398,7 +398,7 @@ export class ActorAnimator {
       this._holdFinalPose = !!holdFinalPose;
       const h2 = {
         ...hooks,
-        onMove: (rec: { tween: number; }) => { this._onMove(rec); hooks.onMove?.(rec); },
+        onMove: (rec: FightMoveRec) => { this._onMove(rec); hooks.onMove?.(rec); },
         onRotate: (rec) => {
           this._rotation = [rec.x, rec.y, rec.z];
           hooks.onRotate?.(rec);
@@ -436,7 +436,7 @@ export class ActorAnimator {
     this._hidden = null;
     const h2 = {
       ...hooks,
-      onMove: (rec: { tween: number; }) => { this._onMove(rec); hooks.onMove?.(rec); },
+      onMove: (rec: FightMoveRec) => { this._onMove(rec); hooks.onMove?.(rec); },
       onRotate: (rec) => {
         this._rotation = [rec.x, rec.y, rec.z];
         hooks.onRotate?.(rec);

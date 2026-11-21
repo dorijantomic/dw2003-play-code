@@ -20,6 +20,7 @@ import {
 } from "../vendor/engine.js";
 import { activeSlotOf, encounterGateBytes, setStatModifier, statModifier, statValue } from "./plans.js";
 import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
+import type { FightTechRow } from "../types/battle.js";
 
 export function battleRestoreParty(b, side: number) {
   if ((side | 0) < 1) {
@@ -179,7 +180,7 @@ export function castFieldTechnique(b, side: number, record: { crit: number; }, _
  * skipped when the PLAYER acts and encounter gate byte 0x80042b62 is non-zero (`:27840`-`:27850`).
  * Returns the change or null.
  */
-export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, actingSide: number, record, names: StatDebuffNames = {}) {
+export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, actingSide: number, record: FightTechRow | null, names: StatDebuffNames = {}) {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch !== 26 && dispatch !== 27) return null;
   const stat = dispatch === 26 ? 0 : 1;

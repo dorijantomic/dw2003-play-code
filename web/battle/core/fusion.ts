@@ -84,7 +84,7 @@ export function makeFusion(B: BattleContext) {
     b.state = ST.RESULT_MSG;
     b.timer = 0;
   }
-function applyTagAction(action: { rosterIndex: string | number; formId: string | number; }) {
+function applyTagAction(action: { rosterIndex: number; formId: number; }) {
     const b = B.battle;
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
@@ -119,7 +119,7 @@ function applyTagAction(action: { rosterIndex: string | number; formId: string |
    * The Tag commit, menu.c:388-398 (WFIGHTMN_tag state 2, run when `entrance->done` is set at the cut):
    * the new fighter becomes the active one, the turn was queued at command time with the OUTGOING speed (spd; none when forced).
    */
-  function commitTag(b, action: { rosterIndex: string | number; formId: string | number; }, spd: number | undefined) {
+  function commitTag(b, action: { rosterIndex: number; formId: number; }, spd: number | undefined) {
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
     const profile = B.digimonDB[action.formId];
@@ -157,7 +157,7 @@ function applyTagAction(action: { rosterIndex: string | number; formId: string |
     b.participantIndices.add(action.rosterIndex);
     if (typeof spd === "number") B.queueAfterAction(b, "player", spd);
   }
-function applyDvAction(action: { formId: string | number; }) {
+function applyDvAction(action: { formId: number; }) {
     const b = B.battle;
     const member = b.playerRoster[b.activePlayerIndex];
     const profile = B.digimonDB[action.formId];

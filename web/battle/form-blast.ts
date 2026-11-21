@@ -9,6 +9,7 @@ import {
   statPenaltyOf,
 } from "../vendor/engine.js";
 import { normalizeDvGauge } from "./layout.js";
+import type { BattlePartyEntry } from "./core/types.js";
 
 /**
  * The disc's per-form learn/load pass, one battle's worth: F0x8008670C until it
@@ -40,7 +41,7 @@ export function applyFormLearnPass(record, formProfile) {
 
 // Sequential boss party: after the member at `index` is defeated, decide whether the next
 // member steps in (gauntlet) or the whole party is down. Pure.
-export function gauntletNext(party, index: number) {
+export function gauntletNext(party: BattlePartyEntry[] | null | undefined, index: number): { done: boolean; index?: number; entry?: BattlePartyEntry; } {
   const next = index + 1;
   if (!party || next >= party.length) return { done: true };
   return { done: false, index: next, entry: party[next] };

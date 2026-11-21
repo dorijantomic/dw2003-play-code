@@ -28,7 +28,7 @@ function dvHome() {
   }
 // `entrance` = { folder }: the model folder of the fighter that enters (entrance.c key1), for the programs
   // BLAST_REVERT (player side, key2 0) and ENTRANCE_ENEMY (enemy side, key2 0x10).
-  function blastPresentationSet(state, program: string | null, skipped = false, weak = false, entrance = null) {
+  function blastPresentationSet(state, program: string | null, skipped: boolean = false, weak: boolean | (() => boolean) = false, entrance = null) {
     B$.blastState = state || null;
     B$.entranceMotionTry();
     // "Digivolve Demo: OFF": the end state of the original presentation in one step.
@@ -73,7 +73,7 @@ function blastPresentationStop() { B$.dvCam?.stop(); B$.dvCam = null; B$.blastSt
    * This is the same EffectPlayer the action VM's op3 uses, so the art, the
    * channel defaults and the draw path are the shipped ones.
    */
-  function blastSpawnEffect(type, pos) {
+  function blastSpawnEffect(type: number, pos?: { x: number; y: number; z: number; } | null) {
     if (!B$.effectPlayer?.hasType(type)) return 0;
     // The position is DECODED: F0x80089be4 copies the 8-byte {x,y,z,w} record it
     // is handed straight into the effect object, and the three records fightstg
@@ -92,7 +92,7 @@ function dnaOrbIgnite(key: string | number) {
 // Begin the clockwise inward spiral that ends in the central collision. (Kept named
   // dnaOrbsPath for the battle.js call site; the old captured screen-path was replaced by
   // this procedural orbit — the capture never engaged and did not match the real motion.)
-  function dnaOrbsPath(_path, _durTicks) {
+  function dnaOrbsPath(_path, _durTicks: number) {
     if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
     B$.dnaOrbs.orbs.A ||= { tick: 0 };   // ensure both cores exist even if an ignite was missed
     B$.dnaOrbs.orbs.B ||= { tick: 0 };
@@ -104,7 +104,7 @@ function dnaOrbsClear() { B$.dnaOrbs = null; }
 // Sample an authored program record without creating an op3 object. The DNA
   // presentation owner uses this to restart its looping backdrop and to place
   // its fusion pair at the native screen sentinel.
-  function _sampleEffectRecord(type: number, recordIndex: number, tick: number, pos: { x: number; y: number; z: number; }, loop = false) {
+  function _sampleEffectRecord(type: number, recordIndex: number, tick: number, pos: { x: number; y: number; z: number; }, loop: boolean = false) {
     const typeRec = B$.effectAssets?.manifest?.types?.[String(type)];
     const rec = typeRec?.records?.[recordIndex];
     if (!rec || rec.duration <= 0) return null;

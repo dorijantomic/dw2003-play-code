@@ -1,6 +1,8 @@
 import { unlockedTreeRecords, firstUnlockedTreeRecord, RAND_U16, scaledStat } from "../vendor/engine.js";
 import { evolvedMaxStats } from "../battle.js";
 import type { BattleEndContext, WinBattleRewardsArgs } from "./core/types.js";
+import type { DigimonRecord } from "../types/battle.js";
+import type { PartnerStats } from "../game/types.js";
 
 /**
  * The Digimon a won battle PAYS — the set the reward is split between. One
@@ -250,21 +252,21 @@ export const CORE_STATS = ["str", "def", "spt", "wis", "spd", "chr"];
 
 // Profile-derived baseline for the core block — used to migrate old saves and to reseed
 // on evolution (form change swaps the whole stat body in the walker's model).
-export function seedStoredStats(profile, level) {
+export function seedStoredStats(profile: DigimonRecord | undefined, level: number) {
   const s = {};
   for (const k of CORE_STATS) s[k] = scaledStat(profile, k, level);
   return s;
 }
 
 // Seed ps.stats if missing (old save / fresh partner); returns the live block.
-export function ensureStoredStats(ps, profile) {
+export function ensureStoredStats(ps: PartnerStats, profile: DigimonRecord | undefined) {
   if (!ps.stats) ps.stats = seedStoredStats(profile, ps.level ?? 1);
   return ps.stats;
 }
 
 // Apply one level-up's rolled gains in place (fn 0x80085e3c store semantics: plain adds,
 // clamp maxHP/maxMP at 9999 and core/elems at 999; there is NO lower clamp).
-export function applyLevelUpGains(ps, gains, lu: { hpmp_cap: number; stat_cap: number; }) {
+export function applyLevelUpGains(ps: PartnerStats, gains, lu: { hpmp_cap: number; stat_cap: number; }) {
   const hpmpCap = lu?.hpmp_cap ?? 9999;
   const statCap = lu?.stat_cap ?? 999;
   ps.maxHp = Math.min((ps.maxHp ?? 0) + gains.hp, hpmpCap);
@@ -292,7 +294,7 @@ export function applyLevelUpGains(ps, gains, lu: { hpmp_cap: number; stat_cap: n
 // `growthProfile` is the row the disc's rolls read: the member's STARTER species'
 // (levelUpGrowthProfile), never the active form's. `prof` stays the active form only
 // for the no-progression-table branch, which has no disc counterpart.
-export function applyLevelUp(ps, prof, oldLevel: number, newLevel: number, lu, growthProfile = prof) {
+export function applyLevelUp(ps: PartnerStats, prof, oldLevel: number, newLevel: number, lu, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
     ensureStoredStats(ps, growthProfile);

@@ -17,6 +17,7 @@
 //   off -> Math.random() * 255 < rate        -> rate / 255
 //   on  -> dropPasses: draw % 1024 < rate + 1 -> (rate + 1) / 1024
 import { dropPasses } from "./tech-record.js";
+import type { EnemyRecord } from "./types/battle.js";
 
 /** A drop that can actually be banked: a name, not the table's "Null" placeholder. */
 const isRealDrop = (item) => typeof item === "string" && item.length > 0 && item !== "Null";
@@ -50,7 +51,7 @@ function rowFor(enemies, name: string | number) {
  * @param {object} enemies   enemiesDB (name -> enemies.json row)
  * @returns {{item: string, rate: number}[]}
  */
-export function fusionDrops(halves, body, enemies) {
+export function fusionDrops(halves, body, enemies: { [k: string]: EnemyRecord; }) {
   const rows = [];
   const byItem = new Map();
   for (const name of Array.isArray(halves) ? halves : []) {
@@ -85,7 +86,7 @@ export function dropChanceText(rate: number, disc = false) {
 }
 
 /** The fused body's loot, with the chance text for the switch that is on right now. */
-export function fusionLootRows(halves, body, enemies, disc = false) {
+export function fusionLootRows(halves, body, enemies: { [k: string]: EnemyRecord; }, disc = false) {
   return fusionDrops(halves, body, enemies).map(({ item, rate }) => ({
     item,
     rate,
@@ -102,7 +103,7 @@ export function fusionLootRows(halves, body, enemies, disc = false) {
  *
  * @returns {string[]} the item names that dropped, in row order
  */
-export function rollFusionDrops(halves, body, enemies, rng: { (): number | undefined; (): number; }, disc = false) {
+export function rollFusionDrops(halves, body, enemies: { [k: string]: EnemyRecord; }, rng: { (): number | undefined; (): number; }, disc = false) {
   const dropped = [];
   for (const { item, rate } of fusionDrops(halves, body, enemies)) {
     const live = disc ? dropPasses(rate, rng) : rng() * 255 < rate;

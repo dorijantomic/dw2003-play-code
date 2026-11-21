@@ -13,6 +13,7 @@ import { stfrptChrome, REPORT_LAYOUT } from "../../battle.js";
 import type { BattleContext } from "../../types/battle.js";
 import type { ReportGroupOptions } from "./types.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeReport(B: BattleContext) {
 // STFGTREP chrome from stfgtrep_ui.json. header.rowStepY (50) is page pitch
@@ -76,7 +77,7 @@ export function makeReport(B: BattleContext) {
       }
     });
   }
-function drawFightReport(b) {
+function drawFightReport(b: BattleState) {
     const L = REPORT_LAYOUT;
     const groups = L
       ? Array.from({ length: fightReportGroupCount(L) },

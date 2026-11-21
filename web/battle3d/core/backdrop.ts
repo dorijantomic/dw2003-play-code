@@ -5,6 +5,8 @@ import { modelKeyFromFolder } from "../camera-shots.js";
 import { TexturePatchAnimator } from "../../fight/texture-patch-animator.js";
 import type { ArenaGroupBuf, Battle3DContext } from "../../types/battle3d.js";
 
+import type { ArenaPack } from "../../types/battle3d.js";
+import type { Battle3dTexturePage } from "./types.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeBackdrop(B$: Battle3DContext) {
 function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
@@ -33,7 +35,7 @@ function loadBackdropPack(packName: string | number) {
 // Resolve a casting tech id → its backdrop pack name (via the manifest's byTech→sigEffect→bySig).
   // Returns null for a BASIC attack (not in byTech): basics keep the normal arena, no backdrop swap.
   // techId == null (manual/debug) → the data-field fallback.
-  function backdropEntryForTech(techId) {
+  function backdropEntryForTech(techId: number) {
     if (techId == null) return { pack: B$.BD_FALLBACK, sound: -1 };
     const m = B$.backdropManifest;
     if (!m || !m.byTech) return null;
@@ -43,10 +45,10 @@ function loadBackdropPack(packName: string | number) {
     return { pack: (entry && entry.pack) || B$.BD_FALLBACK, // sig 0 → data-field; else element pack
              sound: entry && entry.sound != null ? entry.sound : -1 };
   }
-function backdropPackForTech(techId) {
+function backdropPackForTech(techId: number) {
     return backdropEntryForTech(techId)?.pack ?? null;
   }
-function armDataField(techId) {
+function armDataField(techId: number) {
     const entry = backdropEntryForTech(techId);
     B$.dataFieldArmed = !!entry;                           // basic attack: keep the normal arena
     B$.dataFieldOn = false;
@@ -82,7 +84,7 @@ function armThrowBackdrop(sig) {
     else if (m > 0) { B$.dataFieldOn = true; syncSpecialLoop(true); }
   }
 // Debug / lab entry: pin the backdrop open on a wall clock (never the attack path).
-  function triggerDataField(techId, now = performance.now()) {
+  function triggerDataField(techId: number, now: number = performance.now()) {
     const entry = backdropEntryForTech(techId);
     if (!entry) return;                                 // basic attack: keep the normal arena
     B$.activeBackdrop = loadBackdropPack(entry.pack);
@@ -102,12 +104,12 @@ function armThrowBackdrop(sig) {
       B$.sfx?.stopEffectLoop?.();
     }
   }
-function dataFieldIsActive(now = performance.now()) {
+function dataFieldIsActive(now: number = performance.now()) {
     return B$.activeBackdrop && B$.activeBackdrop.groups && B$.activeBackdrop.groups.length
       && (B$.dataFieldPinned || B$.dataFieldOn || (now >= B$.dataFieldOnAt && now < B$.dataFieldOffAt));
   }
-function setArenaLegacy(on) { B$.arenaLegacy = !!on; B$.arenaDebug.legacy = !!on; return B$.arenaLegacy; }
-function setArenaDebug(d) {
+function setArenaLegacy(on: boolean) { B$.arenaLegacy = !!on; B$.arenaDebug.legacy = !!on; return B$.arenaLegacy; }
+function setArenaDebug(d: { legacy?: boolean; cull?: boolean; opaque?: boolean; voidRaw?: boolean; depthWrite?: boolean; depthClear?: boolean; }) {
     if (d && typeof d === "object") {
       if ("legacy" in d) B$.arenaLegacy = !!d.legacy;
       B$.arenaDebug = { legacy: B$.arenaLegacy, cull: d.cull !== false, opaque: d.opaque !== false,
@@ -138,7 +140,7 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
   }
 // Lazy per-(page, CLUT) texture: one PNG per palette group the pack's meshes reference,
   // `{page}_c{col}_r{row}.png` (tools/extract_arenas.py). The group's page+clut name the file.
-  function arenaTextureFor(pk, g) {
+  function arenaTextureFor(pk: ArenaPack, g: ArenaGroupBuf) {
     if (B$.arenaLegacy) {   // debug/before-after: one palette per page, the pre-decode render
       const leg = `${g.page || "wall"}.png`;
       if (!pk.tex) pk.tex = {};
@@ -166,7 +168,7 @@ function loadArenaPack(packName: string) {
   }
 // The arena id for a battle started on `mapId` with encounter `screenId`: the record's own
   // param, else the stage's default, else the fallback. null when the stage is unknown.
-  function arenaIdFor(mapId: number | null | undefined, screenId: number | null | undefined) {
+  function arenaIdFor(mapId: number | string | null | undefined, screenId: number | null | undefined) {
     if (!B$.arenaManifest || mapId == null) return null;
     const stage = String(mapId).replace(/^s/, "");
     const e = B$.arenaManifest.byStage?.[stage];
@@ -191,12 +193,12 @@ function resolveArenaStage() {
   }
 // Called by web/battle.js when a battle opens, with the field screen it started on and the
   // encounter id it rolled — the two values the original's battle descriptor carries.
-  function setArenaStage(mapId, screenId) {
+  function setArenaStage(mapId: number | string | null | undefined, screenId: number | null | undefined) {
     B$.arenaStageReq = { mapId: mapId ?? null, screenId: screenId ?? null };
     resolveArenaStage();
     return B$.activeArena ? B$.activeArena : null;
   }
-function _faceBoxBuffers(gl) {
+function _faceBoxBuffers(gl: WebGLRenderingContext) {
     const src = B$.playerSkelBufs;
     let box = B$.playerBoxBufs;
     if (!src) return null;
@@ -210,7 +212,7 @@ function _faceBoxBuffers(gl) {
     }
     return box;
   }
-function _freeFaceBoxBuffers(gl) {
+function _freeFaceBoxBuffers(gl: WebGLRenderingContext) {
     if (B$.playerBoxBufs?.vbo) gl.deleteBuffer(B$.playerBoxBufs.vbo);
     B$.playerBoxBufs = null;
   }
@@ -236,7 +238,7 @@ function patchState(side: string) {
   // its destination — the walker's stand-in for the original's per-frame VRAM copy.
   // Nothing is uploaded unless the chosen picture actually changed, which is also how
   // the original behaves: it caches the last variant per entry.
-  function blitTexturePatch(tex: WebGLTexture | null, page, entry) {
+  function blitTexturePatch(tex: WebGLTexture | null, page: Battle3dTexturePage | null, entry) {
     if (!tex || !page) return false;
     const r = texturePatchRect(entry, page.scale);
     if (r.w <= 0 || r.h <= 0 || r.x0 + r.w > page.width || r.y0 + r.h > page.height) return false;

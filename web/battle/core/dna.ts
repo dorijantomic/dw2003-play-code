@@ -25,6 +25,7 @@ import { finalizePlayerDamage } from "../../battle.js";
 import type { BattleDnaPresentation } from "./types.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeDna(B: BattleContext) {
 function playerTechs() {
@@ -103,7 +104,7 @@ function formOptionsFor(rosterIndex: number, bb = B.battle) {
     return battleFormIds(B.liveFormId(bb, rosterIndex), member.stats)
       .map((id) => B.digimonDB[id]).filter(Boolean);
   }
-function battleFormLevel(rosterIndex: number, formId, bb = B.battle) {
+function battleFormLevel(rosterIndex: number, formId: number, bb = B.battle) {
     const member = bb?.playerRoster?.[rosterIndex];
     const record = member?.stats?.formLedger?.find((r) => Number(r.id) === Number(formId));
     return Number(record?.formLevel ?? (Number(formId) === B.liveFormId(bb, rosterIndex)
@@ -198,7 +199,7 @@ function battleFormLevel(rosterIndex: number, formId, bb = B.battle) {
    * mesh is missing; the presentation falls back to the acting form for those three
    * and says nothing different about it.
    */
-  function dnaChoiceFor(rosterIndex: string | number, partnerProfile) {
+  function dnaChoiceFor(rosterIndex: number, partnerProfile) {
     const b = B.battle;
     const tables = B.dnaNative?.tables?.();
     if (!b || !partnerProfile || !tables) return null;
@@ -238,7 +239,7 @@ function battleFormLevel(rosterIndex: number, formId, bb = B.battle) {
    * otherwise, rather than inventing a bit-to-ailment mapping the evidence does
    * not support.
    */
-  function dnaParticipantsFor(b, rosterIndex: string | number) {
+  function dnaParticipantsFor(b, rosterIndex: number) {
     const partner = b.playerRecords?.[rosterIndex];
     return {
       activeMp: Number(b.player?.mp ?? 0),
@@ -252,7 +253,7 @@ function battleFormLevel(rosterIndex: number, formId, bb = B.battle) {
 function dnaScriptChunks(dna: BattleDnaPresentation) {
     return dnaClip12Chunks(B.dnaResultScript?.fullScript?.segments, dna);
   }
-function startDnaChunk(b, dna: BattleDnaPresentation) {
+function startDnaChunk(b: BattleState, dna: BattleDnaPresentation) {
     const c = dna.chunks[dna.chunk];
     if (!c || !B.renderer3d) return;
     if (c.show) B.renderer3d.setPlayerVisible(true);   // seg 4: the original actor returns
@@ -298,7 +299,7 @@ function startDnaChunk(b, dna: BattleDnaPresentation) {
       },
     });
   }
-function applyDnaAction(action: { rosterIndex: string | number; formId: string | number; }) {
+function applyDnaAction(action: { rosterIndex: number; formId: number; }) {
     const b = B.battle;
     const partner = b.playerRecords[action.rosterIndex];
     const partnerProfile = B.digimonDB[action.formId];
@@ -369,7 +370,7 @@ function applyDnaAction(action: { rosterIndex: string | number; formId: string |
     return true;
   }
 /** A category-4 DNA result (375): the record machine's restore arm on the player's own party, no hit. */
-  function commitDnaRestore(b, dna) {
+  function commitDnaRestore(b: BattleState, dna) {
     if (dna.committed) return;
     dna.committed = true;
     const who = b.player.profile.name;
@@ -382,7 +383,7 @@ function applyDnaAction(action: { rosterIndex: string | number; formId: string |
       : null;
     B.setResultPages(b, [{ text: restoreWalkerSentence(restore, { name }, who), spec }]);
   }
-function commitDnaImpact(b, dna) {
+function commitDnaImpact(b: BattleState, dna) {
     if (!dna?.hit || dna.committed) return;
     dna.committed = true;   // then the disc's special-encounter finalizer, WFIGHTMN 0x800aabf0
     dna.damage = finalizePlayerDamage(b, dna.damage); dna.lethal = dna.damage > 0 && dna.damage >= b.enemy.hp; b.enemy.hp = Math.max(0, b.enemy.hp - dna.damage);

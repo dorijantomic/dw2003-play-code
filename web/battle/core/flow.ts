@@ -22,6 +22,7 @@ import { persistPlayerGauge } from "../form-blast.js";
 import { releaseBattleLayer } from "../../battle-layer.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState, BattleResultPage, BattleLineSpec, BattleHeal } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeFlow(B: BattleContext) {
 // ── Public API ──
@@ -38,7 +39,7 @@ export function makeFlow(B: BattleContext) {
   }
 // playerSpd: the player speed the delay is read with when it is not the live active fighter's
   // (Tag: menu.c:312 asks getDelay at command time, before WFIGHTMN_tag swaps active[0]).
-  function queueAfterAction(b, acted: string, playerSpd?: any) {
+  function queueAfterAction(b: BattleState, acted: string, playerSpd?: any) {
     // A new turn on the shared timeline, so the command phase's Frozen gate rolls again
     // (F0x800a7418 step 1 runs once per player turn, `wfightmn.s:1494-1540`).
     b._turnSeq = (b._turnSeq ?? 0) + 1;
@@ -140,7 +141,7 @@ export function makeFlow(B: BattleContext) {
    * fired phase never fires again and a single hit that crosses two thresholds fires
    * only the newer one. Returns [] when no new phase is due.
    */
-  function advanceBossPhase(b) {
+  function advanceBossPhase(b: BattleState) {
     const en = b?.enemy;
     const boss = en?.bossId ? B.fusionBossesDB?.[en.bossId] ?? null : null;
     const phases = boss?.phases;
@@ -185,7 +186,7 @@ export function makeFlow(B: BattleContext) {
    * its own two lines for that page. `spec` (the third argument) is the shorthand for
    * "the first page's spec", for the callers that have one page and one arm.
    */
-  function setResultPages(b, pages, spec?: any) {
+  function setResultPages(b: BattleState, pages: Array<BattleResultPage | string | null>, spec?: any) {
     const list = (pages || []).filter(Boolean).map((page) => (
       page && typeof page === "object"
         ? { text: String(page.text ?? ""), spec: page.spec ?? null }
@@ -215,7 +216,7 @@ export function makeFlow(B: BattleContext) {
    * `walker` is what `peek()` still sees; it is the old sentence
    * and it is never what the original's own panel draws.
    */
-  function showItemPage(b, prefix, walker, pages) {
+  function showItemPage(b: BattleState, prefix: string, walker: string, pages: BattleLineSpec[]) {
     const list = (pages || []).filter(Boolean).map((page) => ({
       text: page.name
         ? `${page.name} ${page.slots?.length ? `${page.slots[0]} ` : ""}`.trim()
@@ -270,7 +271,7 @@ export function makeFlow(B: BattleContext) {
    * @param {{heal?: number, missingHp?: number, healer?: string}} [heal] the heal context,
    *   read only when the record's category is 4
    */
-  function damageSpec(name, total, extra, techniqueId = 0, side = 1, heal = null) {
+  function damageSpec(name: string, total: number, extra?: string, techniqueId: number = 0, side: number = 1, heal: BattleHeal | null = null) {
     if (extra) return null;
     const record = B.fightTechDB?.[String(techniqueId | 0)] ?? null;
     const isHeal = record?.category === 4;
@@ -362,7 +363,7 @@ function elementNameForElem1(elem1: number) {
   }
 // Continue after the current action's result text has either timed out (ordinary results) or
   // been confirmed (the explicit impact/defeat sequence).
-  function advanceAfterResult(b) {
+  function advanceAfterResult(b: BattleState) {
     // The finale's scripted beats chain through here: once a beat's pages have been
     // read, the next beat runs (the kind advance, the body's cannon, the head swap).
     // Set only while the sequence is in flight, and cleared before it runs so a beat
@@ -491,7 +492,7 @@ function elementNameForElem1(elem1: number) {
    * short to be a field, and a loss beat counted on browser frames would run at the
    * display's speed rather than the original's. With the panel rolled back
    */
-  function advanceDisplayFrames(dt) {
+  function advanceDisplayFrames(dt: number) {
     return B.msgClock.advance(dt);
   }
 function tickHudEase(dt: number) {

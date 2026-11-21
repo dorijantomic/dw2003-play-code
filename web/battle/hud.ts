@@ -11,6 +11,7 @@ import { ST } from "./messages.js";
 import { battleKindOf } from "./form-blast.js";
 import { BATTLE_UI_LAYOUT } from "../battle.js";
 import { DV_GAUGE_MAX, normalizeDvGauge } from "./layout.js";
+import type { EnemyBattleRecord } from "../types/battle.js";
 
 /**
  * The pgfgc00 cel each party pip must draw, straight from the decoded HUD rule
@@ -74,7 +75,7 @@ export function enemyStatRecordFor(name: string) {
 }
 
 /** Enemy name for battle messages: the disc name line the HUD plate reads (see fusion.js). */
-export function enemyMsgName(en, fallback = "Enemy") {
+export function enemyMsgName(en: EnemyBattleRecord, fallback = "Enemy") {
   const record = enemyStatRecordFor(en?.eStats?.enemy_id ?? en?.profile?.name ?? "");
   return enemyMessageName(en, record, battleHudNameBankSync(), fallback);
 }
@@ -193,7 +194,7 @@ export const HUD_CLOCK_HZ = 30;
 export const { createHpPlateState, hpPlateShown, hpPlateTick } = ui;
 
 /** Bar length in 128ths of the full bar. @returns {number} */
-export function hpBarLength(cur, max) {
+export function hpBarLength(cur: number, max: number) {
   const hp = Number(cur ?? 0), maxHp = Number(max ?? 0);
   if (maxHp <= 0) return 0;
   if (hp <= 0) return 0;
@@ -205,7 +206,7 @@ export function hpBarLength(cur, max) {
  * F0x800934f0 HP-fill quad. Partner grows right from 0xAF; enemy shrinks left
  * from 0x8F. @returns {{x:number,y:number,w:number,h:number}}
  */
-export function hpBarFillRect(side: string, cur, max) {
+export function hpBarFillRect(side: string, cur: number, max: number) {
   const len = hpBarLength(cur, max);
   const B = BATTLE_UI_LAYOUT.hpBar;
   if (side === "enemy") return { x: B.enemyRight - len, y: B.y, w: len, h: B.h };
@@ -213,7 +214,7 @@ export function hpBarFillRect(side: string, cur, max) {
 }
 
 /** The two gradient stops the bar is drawn with. @returns {readonly string[]} */
-export function hpBarColors(cur, max) {
+export function hpBarColors(cur: number, max: number) {
   return lowHpStance({ hp: cur, maxHp: max }) || Number(cur ?? 0) <= 0
     ? HP_BAR_COLORS.low : HP_BAR_COLORS.healthy;
 }

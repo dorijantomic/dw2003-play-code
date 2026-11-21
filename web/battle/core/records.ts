@@ -21,7 +21,10 @@ import { enemyTeamSlots } from "../../enemy-switch.js";
 import { canonicalProfileName } from "../messages.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { BattlePartyEntry } from "./types.js";
 
+import type { GameState } from "../../game/types.js";
+import type { RosterMember, BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeRecords(B: BattleContext) {
 // Build one enemy combat record from an encounter entry (enemyId name/id, level, and the
@@ -29,7 +32,7 @@ export function makeRecords(B: BattleContext) {
   // null when the species can't be resolved.
   function buildEnemyRecord({
     enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, enemyStatScale = 16, displayName = null,
-  }) {
+  }: BattlePartyEntry) {
     // Resolve enemy: prefer sdigiedt entry by name, fall back to profile by numeric id
     const eStats = typeof enemyId === "string" ? B.enemiesDB[enemyId] : null;
     const enemyProf = eStats ? B.enemyToProfile(eStats) : (B.digimonDB[enemyId] ?? null);
@@ -90,7 +93,7 @@ export function makeRecords(B: BattleContext) {
 // Materialize the three persistent roster records for battle.  Slot 0 remains
   // state.partnerStats for compatibility with existing saves; reserve slots are
   // the index-aligned partyStats records used by DRI/status/formation screens.
-  function buildPlayerRoster(state) {
+  function buildPlayerRoster(state: GameState) {
     const leadChar = state.manifest?.characters?.[state.charIdx]?.id;
     const partyIds = Array.isArray(state.party) && state.party.length
       ? state.party : (leadChar ? [leadChar] : []);
@@ -116,7 +119,7 @@ export function makeRecords(B: BattleContext) {
   // wfightmn F0x800a66b0 copies the persistent HP/MP/stat body once at battle
   // setup. Manual DV and Tag subsequently replace only record+0x00 (form id)
   // before reloading the model; they do not rebuild the live stat body.
-  function buildPlayerRecord(member, requestedFormId = null) {
+  function buildPlayerRecord(member: RosterMember, requestedFormId: number | null = null) {
     const state = B.getState();
     const ps = member.stats;
     const configuredId = Number(ps.digimonId ?? member.rookieId);
@@ -246,13 +249,13 @@ export function makeRecords(B: BattleContext) {
   // turn can switch to another (enemy_turn.c FIGHTSTG_pickEnemySwitch); a KO brings the lowest living slot
   // (menu.c:1088-1096). Here slot i is the boss party's entry i. Not a team: a one-member party, the Galacticmon finale
   // (its three members are phases of one body, specialMode 4) and the F2 fusion bodies.
-  function enemyTeamActive(b) {
+  function enemyTeamActive(b: BattleState) {
     return !!b?.enemy && (b.party?.length ?? 0) > 1 && b.specialMode !== 4
       && !b.enemy.bossId && !b.party.some((entry) => entry?.fuseInto);
   }
 /** Slot i's record: the active one is b.enemy; the others are built once (full hp) and kept, so a member that tagged
    *  out keeps its hp, mp and ailments. null for a slot the party does not have or whose species does not resolve. */
-  function enemyTeamRecord(b, i: number) {
+  function enemyTeamRecord(b: BattleState, i: number) {
     if (i === b.partyIndex) return b.enemy;
     const entry = b.party?.[i];
     if (!entry) return null;
@@ -265,13 +268,13 @@ export function makeRecords(B: BattleContext) {
     return b._team[i];
   }
 /** The three slots' records, in slot order. */
-  function enemyTeamRecords(b) {
+  function enemyTeamRecords(b: BattleState) {
     const out = [];
     for (let i = 0; i < Math.min(3, b.party?.length ?? 0); i++) out.push(enemyTeamRecord(b, i));
     return out;
   }
 /** check_move_cond 10's operands for the actor `en`: the team's slots and the active one, or just `en` alone. */
-  function enemyConditionSlots(b, en) {
+  function enemyConditionSlots(b: BattleState, en) {
     if (b && en === b.enemy && enemyTeamActive(b)) {
       return { enemySlots: enemyTeamSlots(enemyTeamRecords(b)), activeEnemyIndex: b.partyIndex };
     }
@@ -280,7 +283,7 @@ export function makeRecords(B: BattleContext) {
 // Resolve a digimon profile by its DiscId. The evolution trees name their forms by
   // DigimonId (the 1-based species-table row), which is also what the form ledger keys,
   // so nothing in the unlock path has to go through a name and get it misspelled.
-  function profileById(id) {
+  function profileById(id: number | string) {
     return B.digimonDB?.[Number(id)] ?? null;
   }
 function profileByName(name: string | number) {
@@ -308,7 +311,7 @@ function profileByName(name: string | number) {
   // current level (+ stat-item bonuses), full-heal, and persist. The partner identity rides on
   // the character's `digimonId` (getPlayerProfile reads it); we also stash it in partnerStats so
   // it survives a reload. Returns { ok, from, name } or { ok:false }.
-  function partyFormState(state, rosterIndex = 0) {
+  function partyFormState(state: GameState, rosterIndex = 0) {
     const charId = state?.party?.[rosterIndex]
       ?? (rosterIndex === 0 ? state?.manifest?.characters?.[state?.charIdx]?.id : null);
     const rookieId = Number(CHARID_TO_DIGID[charId]);
@@ -325,7 +328,7 @@ function profileByName(name: string | number) {
     const slot = rosterSlotOfCharId(charId) ?? rosterSlotOfDigimonId(rookieId) ?? rookieId - 1;
     return { charId, rookieId, rookie, current, stats, slot };
   }
-function initializePartyStats(state) {
+function initializePartyStats(state: GameState) {
     if (!Array.isArray(state?.party) || !state.party.length) return false;
     state.partyStats = state.party.map((charId: string | number) =>
       baseStatsFor(B.digimonDB?.[Number(CHARID_TO_DIGID[charId])]),
@@ -368,7 +371,7 @@ function applyEvolution(toName: string | number, state = B.getState(), rosterInd
   }
 // The current partner's resolved profile + scaled combat stats at its level (+ bonuses) —
   // for the menu's Digimon/Status tabs. null when there's no partner yet.
-  function partnerInfo(state) {
+  function partnerInfo(state: GameState) {
     const prof = B.getPlayerProfile(state);
     const ps = state?.partnerStats;
     if (!prof || !ps) return null;
@@ -391,7 +394,7 @@ function applyEvolution(toName: string | number, state = B.getState(), rosterInd
   // then the forms its own line's tree says it has earned and not yet used. The
   // second list is one rule call over the disc's tree for THIS roster slot, so a
   // Kotemon line is never offered another line's route.
-  function availableEvolutions(state, rosterIndex = 0) {
+  function availableEvolutions(state: GameState, rosterIndex: number = 0) {
     const member = partyFormState(state, rosterIndex);
     if (!member?.stats) return [];
     const out = [];

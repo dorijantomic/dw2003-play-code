@@ -27,9 +27,10 @@ import { drawItemIcon } from "../../itemicons.js";
 import { BATTLE_UI_LAYOUT, pgfgc00, TECH_PAGE_HINT, ITEM_PAGE_HINT, FORM_PAGE_HINT } from "../../battle.js";
 import type { BattleContext } from "../../types/battle.js";
 
+import type { BattleState } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeHud(B: BattleContext) {
-function drawBattleHud(b) {
+function drawBattleHud(b: BattleState) {
     B.hudCels = [];
     const L = BATTLE_UI_LAYOUT;
     const enemy = L.enemyPlate;
@@ -236,12 +237,12 @@ function drawBattleHud(b) {
     }
   }
 /** The "No techs!" / "Cannot digivolve." notice over whichever list is up. */
-  function drawMenuNotice(b) {
+  function drawMenuNotice(b: BattleState) {
     if (!b.menuNotice) return;
     if (!uiCPart(B.ctx, { part: "notice", x: 118, y: 194, w: 186, h: 25 })) B.drawNativePanel(118, 194, 186, 25, "rgba(0,4,45,0.94)");
     B.nativeText(b.menuNotice, 125, 201, { kind: 1 });
   }
-function drawCommandMenu(b) {
+function drawCommandMenu(b: BattleState) {
     const C = BATTLE_UI_LAYOUT.commands;
     const items = currentMenuItems(b);
     for (let i = 0; i < items.length; i++) {
@@ -308,7 +309,7 @@ function drawListSelector(x: number, y: number, selected: boolean) {
     B.nativeText("L1", hint.l1.x, hint.l1.y, { kind: hint.kind, clut: hint.clut });
     B.nativeText("R1", hint.r1.x, hint.r1.y, { kind: hint.kind, clut: hint.clut });
   }
-function drawDescription(text, mp = null) {
+function drawDescription(text: string, mp: number = null) {
     const D = BATTLE_UI_LAYOUT.description;
     B.drawFightPane(D.x, D.y, D.w, D.h);
     B.nativeText(text ?? "", D.x + 5, D.y + 7, { kind: 1 });
@@ -322,7 +323,7 @@ function visibleList(rows, selected: number) {
     const top = Math.max(0, Math.min(selected - visible + 1, rows.length - visible));
     return { visible, top };
   }
-function drawTechMenu(b) {
+function drawTechMenu(b: BattleState) {
     const L = BATTLE_UI_LAYOUT.list;
     const techs = B.playerTechs();
     const { visible, top } = visibleList(techs, b.techSel);
@@ -389,7 +390,7 @@ function drawTagMenu(b: { tagSel: number; }) {
       });
     }
   }
-function drawFormMenu(b, rosterIndex: number, title) {
+function drawFormMenu(b: BattleState, rosterIndex: number, title: string) {
     const forms = B.formOptionsFor(rosterIndex);
     const member = b.playerRoster[rosterIndex];
     const L = BATTLE_UI_LAYOUT.list;
@@ -416,7 +417,7 @@ function drawFormMenu(b, rosterIndex: number, title) {
     B.nativeText(`WIS ${projected.wis}`, 238, 140, { kind: 3 });
     B.nativeText(`SPD ${projected.spd}`, 170, 154, { kind: 3 });
   }
-function drawDnaChoice(b) {
+function drawDnaChoice(b: BattleState) {
     const choice = b._dnaChoice;
     if (!choice) return;
     // Savestate-8 native geometry: selected partner form above two authentic

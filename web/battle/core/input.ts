@@ -7,7 +7,7 @@ import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeInput(B: BattleContext) {
-function handleKey(rawKey) {
+function handleKey(rawKey: string) {
     // Accept either a pad button name from the dispatcher or the raw key it
     // stands for, so a caller (and a test) may use whichever it has.
     const k = asButton(rawKey);

@@ -6,6 +6,35 @@ import type { BattleStartArgs, BattleWinResult } from "../battle/core/types.js";
 import type { ChatPacket } from "../types/chat.js";
 
 /** The tri-state story-flag adapter the field code gates on (web/flag-store.ts createFlagStore). */
+/** assets/data/chapter_progression.json: the story-flag ladder that decides the chapter */
+export interface ChapterTable {
+  _comment: string;
+  default_chapter: number;
+  ladder: { chapter: number; flag: number; flag_hex: string; milestone: string; evidence: string; }[];
+  frontier: { chapter: number; flag: number | null; note: string; }[];
+}
+
+/** assets/data/progress_ordinal.json: the story ordinals each stage can hold, as a ladder and by stage */
+export interface ProgressOrdinalTable {
+  _comment: string;
+  ladder: { stage: number; ordinals: number[]; }[];
+  by_stage: Record<string, number[]>;
+}
+
+/** one row of assets/data/stage_cast_lists.json: an actor a stage places, its slot and spot, and the flag gates on it */
+export interface StageCastRecord {
+  id: number;
+  slot: number;
+  x: number;
+  y: number;
+  n: number;
+  gate: { id: number; expected: number; }[];
+  ptrB: number | null;
+}
+
+/** a party member's stored stat block: the five numbers every save carries; the other fields (digimonId, stats, bonuses, formLedger...) are read where they are used */
+export type PartnerStats = { hp: number; maxHp: number; mp: number; maxMp: number; level: number; } & Record<string, any>;
+
 export interface FlagStore {
   /** 1 = set, 0 = clear, null = a bank the walker does not model (stays dormant) */
   get(id: number, current?: number): number | null;
@@ -63,16 +92,16 @@ export interface GameState {
   blockEngage: { ix: any; npc: any; } | null;
   chapter?: number;
   /** the chapter table (parsed JSON) */
-  chapterTable: any;
+  chapterTable: ChapterTable | null;
   /** the manifest char id of the leader ("p003pken"...) */
   charId: string | null;
   /** the leader's roster slot, 0..2 */
   charIdx: number;
   /** char id -> the loaded sprite image ("loading" while it is on its way) */
-  charImgs: Record<string, any>;
+  charImgs: Record<string, HTMLImageElement>;
   climb?: any;
   /** sprite pack id -> the loaded clip sheet ("loading" while it is on its way) */
-  clipImgs: Record<string, any>;
+  clipImgs: Record<string, HTMLImageElement>;
   /** map id -> the parsed collision grid */
   collision: Record<string, any>;
   debugAnim?: boolean;
@@ -82,7 +111,7 @@ export interface GameState {
   dir: string;
   diveDemo: any;
   diveForm: any;
-  diveFormMarkers: any;
+  diveFormMarkers: Record<string, number> | null;
   diveNetwork: Map<string, any>;
   endScreen?: any;
   endScreenDone?: () => void;
@@ -113,19 +142,19 @@ export interface GameState {
   /** assets/manifest.json as fetched */
   manifest: any;
   /** map id -> the loaded foreground image */
-  mapFgImgs: Record<string, any>;
+  mapFgImgs: Record<string, HTMLImageElement | "loading" | "failed">;
   /** map id -> the loaded ground image */
   mapGroundImgs: Record<string, any>;
-  mapGroundIndex: any;
+  mapGroundIndex: Record<string, boolean> | null;
   mapIdx: number;
   /** map id -> the loaded map image */
-  mapImgs: Record<string, any>;
-  mapLayer2: any;
+  mapImgs: Record<string, HTMLImageElement | "loading" | "failed">;
+  mapLayer2: Record<string, [number, number, number][]> | null;
   /** map id -> the loaded layer-2 image */
   mapLayer2Imgs: Record<string, any>;
   /** map id -> part -> the loaded native-resolution image */
   mapNativeImgs: Record<string, any>;
-  mapOverlays: any;
+  mapOverlays: Record<string, boolean> | null;
   mapTiles: any;
   menuOpen: boolean;
   moving: boolean;
@@ -133,7 +162,7 @@ export interface GameState {
   nameEntryDone?: () => void;
   newMaps?: { records: any[]; scenes: any; exits: any; } | null;
   /** char id -> the loaded npc image */
-  npcImgs: Record<string, any>;
+  npcImgs: Record<string, HTMLImageElement>;
   npcSprites?: Record<string, any>;
   onExit?: boolean;
   ordinalByStage: Record<string, number>;
@@ -161,7 +190,7 @@ export interface GameState {
   playSeconds: number;
   /** the story ordinal the walker has reached */
   progressOrdinal?: number;
-  progressTable: any;
+  progressTable: ProgressOrdinalTable | null;
   replayLadder: { byStage: Record<string, any>; names: Record<string, any>; };
   reserveEquipment: any;
   reserveStats: any;
@@ -174,8 +203,8 @@ export interface GameState {
   slope: any;
   /** the sparkle cue the field is playing: its program and the tick it started at */
   sparkleActor?: { program: number; start: number; } | null;
-  stageCastLists: Record<string, any>;
-  stageDefaultSpawn: any;
+  stageCastLists: Record<string, StageCastRecord[]> | null;
+  stageDefaultSpawn: Record<string, { x: number; y: number; facing: number; }> | null;
   stageLayoutVariants?: Record<string, any>;
   started: boolean;
   stepEnableTable?: any;

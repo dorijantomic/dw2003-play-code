@@ -15,11 +15,12 @@ import {
 } from "../../vendor/engine.js";
 import { attackPageSpec, evadePageSpec } from "../hit-results.js";
 import { createHpPlateState } from "../hud.js";
-import type { BattleContext } from "../../types/battle.js";
+import type { BattleContext, BattleState } from "../../types/battle.js";
 
+import type { BattleLineSpec } from "../../types/battle.js";
 // moved by tools/rewrite/split-closure.mjs
 export function makeMessage(B: BattleContext) {
-function tickBattleMessage(b, dt: number) {
+function tickBattleMessage(b: BattleState, dt: number) {
     const frames = B.advanceDisplayFrames(dt);
     b._displayFrames = frames;
     // While the opening machine has not yet armed the line (its phases 0..4) there is no
@@ -79,7 +80,7 @@ function tickBattleMessage(b, dt: number) {
    * the current actor and a party record (FIGHTSTG_F0x80098d14) — 0 for the enemy
    * or the digivolving Digimon, as the original's own sites write it.
    */
-  function sayOriginal(b, spec, walker: string) {
+  function sayOriginal(b: BattleState, spec: BattleLineSpec, walker: string) {
     b.message = walker;
     b._msgSpec = spec;
     // The spec only belongs to this one sentence: any other site that overwrites
@@ -88,7 +89,7 @@ function tickBattleMessage(b, dt: number) {
     b._msgSpecFor = walker;
   }
 /** Drop any original-words spec, for a line the original has no counterpart for. */
-  function sayWalker(b, walker) {
+  function sayWalker(b: BattleState, walker: string) {
     clearBattleLine(b);
     b.message = walker;
   }
@@ -107,7 +108,7 @@ function tickBattleMessage(b, dt: number) {
    * empty here", and the census in
    * docs/research/battle/battle-message-page-kinds-2026-10-04.md counts the two apart.
    */
-  function clearBattleLine(b: { message: string; _msgSpec: null; _msgSpecFor: null; }) {
+  function clearBattleLine(b: BattleState) {
     b.message = "";
     b._msgSpec = null;
     b._msgSpecFor = null;
@@ -138,14 +139,14 @@ function tickBattleMessage(b, dt: number) {
    * of the session's memory and opened through the already-ported panel, so "Annihilated..."
    * arrives the way every other battle line does.
    */
-  function startLossSession(b) {
+  function startLossSession(b: BattleState) {
     const session = new ui.BattleLossSession({
       playSound: (id: number) => { if ((id >>> 0) === 0x60040008) B.bgm?.play("gameover"); },
       armDefeatEffect: () => { B.renderer3d?.setCameraMode?.(B.lossCameraMode()); return 0; },
       turnDefeatCamera: () => {},
       // The port owns the level's arming and lowering, the renderer draws the
       // quarter-speed result.
-      slowMotion: (level) => B.renderer3d?.setSlowMotion?.(level),
+      slowMotion: (level: number) => B.renderer3d?.setSlowMotion?.(level),
     }, { onLaunch: (code: number) => { b._lossLaunch = code >>> 0; } });
     session.begin();
     b._lossSession = session;
@@ -158,7 +159,7 @@ function tickBattleMessage(b, dt: number) {
     return session;
   }
 /** The one place the battle is lost: the shared loss sequence starts here. */
-  function enterLossState(b: { state: number; _lossSession: null; }) {
+  function enterLossState(b: BattleState) {
     b.state = ST.LOSE;
     b._lossSession = null;
     startLossSession(b);
@@ -173,7 +174,7 @@ function tickBattleMessage(b, dt: number) {
    * (`attackPageSpec`) serves both sides, so the name is an argument and the
    * caller supplies its own fighter.
    */
-  function attackSpec(b, name = b.player?.profile?.name) {
+  function attackSpec(b: BattleState, name: string = b.player?.profile?.name) {
     return attackPageSpec(name);
   }
 /**
@@ -182,7 +183,7 @@ function tickBattleMessage(b, dt: number) {
    * `unkAC(kind 2, {0x1d, 0x10})` — three sites because three different attackers can
    * miss, and all three write the same two payload words.
    */
-  function techniqueSpec(b, skill) {
+  function techniqueSpec(b: BattleState, skill) {
     return {
       kind: MSG_KIND.TECHNIQUE, payload: [MSG.ATTACK], name: b.player.profile.name,
       slots: [skill.name],
@@ -198,7 +199,7 @@ function tickBattleMessage(b, dt: number) {
    * rather than the acting Digimon -- the enemy is the other side of the fight from the
    * player's partner.
    */
-  function enemyTechniqueSpec(enemyName, skill) {
+  function enemyTechniqueSpec(enemyName: string, skill) {
     // `battleMessagePage(3, ...)` IS the original's call: payload[0] = 0x10 (the side
     // test) and the technique name in slot 1 out of bank 0xa2 by payload[1]
     // (`pro/fightstg.s:23476` / `:23479`).
@@ -225,11 +226,11 @@ function tickBattleMessage(b, dt: number) {
    * @param {{id: number}} item the item the player chose
    * @returns {{kind: number, payload: number[], name: string, slots: string[]}}
    */
-  function itemAnnouncementSpec(b, item: { id: number | undefined; }) {
+  function itemAnnouncementSpec(b: BattleState, item: { id: number | undefined; }) {
     return itemAnnouncementPage(
       b.player.profile.name, item.id, battleMsgText(ui.BATTLE_MESSAGE_BANK_FIELD, item.id));
   }
-function evadeSpec(b, enemyName) {
+function evadeSpec(b: BattleState, enemyName: string) {
     return evadePageSpec(enemyName);
   }
 /**
@@ -244,10 +245,10 @@ function evadeSpec(b, enemyName) {
    * prints "Defeated!", and side 0 at `:3254`-`:3264` prints `esmfight[0x50]` "KO!"
    * through a different tail (`j 0x800a90d8`).
    */
-  function defeatedSpec(enemyName) {
+  function defeatedSpec(enemyName: string) {
     return battleMessagePage(MSG_KIND.OUTCOME, { index: MSG.DEFEATED, name: enemyName });
   }
-function msgHoldsTurn(b) {
+function msgHoldsTurn(b: BattleState) {
     if (!B.msgSession?.active || B.msgSession.finished) return false;
     if (b._resultPages?.length || b._victoryPhase || b.blastShow) return false;
     return b.state === ST.PLAYER_ACT || b.state === ST.ENEMY_ACT || b.state === ST.RESULT_MSG;
@@ -271,7 +272,7 @@ function msgHoldsTurn(b) {
   //   5 frameCameraOrOpenLine      no line -> camera beat + EXIT; line -> arm the window.
   //   6 awaitLineThenHandOff       the window is up until the player reads the line, then
   //                                EXIT (top state 1) -> the walker's PLAYER_MENU.
-  function armIntroLine(b: { _introLineArmed: boolean; }) {
+  function armIntroLine(b: BattleState) {
     // The original's own opener: phase 5 makes the window (F0x8009a298) and writes kind 1,
     // payload 7 (wfightmn.s .L0x000012f8) — one line, "Ambush!".
     sayOriginal(b, { kind: MSG_KIND.ONE_LINE, payload: [MSG.AMBUSH] }, "Ambush!");
@@ -294,7 +295,7 @@ function msgHoldsTurn(b) {
    * walker's previous default (a line), exactly what the old constant call did.
    * `?introNoLine=1` still forces the no-line branch for captures.
    */
-  function introLinePendingFor(b) {
+  function introLinePendingFor(b: BattleState) {
     if (B.FORCE_INTRO_NO_LINE) return false;
     const chanceByte = b.encounterGateBytes?.[0];
     if (chanceByte == null) return true;
@@ -308,7 +309,7 @@ function msgHoldsTurn(b) {
       roll: RAND_U16(),
     });
   }
-function openingPorts(b) {
+function openingPorts(b: BattleState) {
     return {
       assembleBattleObjects() {},
       loadEncounterAndFighters(state: { introVariant: number; specialMode4: boolean; }) {
@@ -337,7 +338,7 @@ function openingPorts(b) {
    * (top state -> 1) the walker enters its command menu, which is the hand-off the
    * original makes to the already-ported secondary sequencer F0x800a9cb4.
    */
-  function stepBattleOpening(b, dt) {
+  function stepBattleOpening(b: BattleState, dt: number) {
     stepOpeningPhase(b._opening, openingPorts(b));
     b.timer += dt;
     if (b._opening.exited) {
@@ -351,14 +352,14 @@ function openingPorts(b) {
    * the player's active party member out of `0x800a4468`, side 1 the active enemy
    * out of `0x800a446c`, and each carries the record's own `+0x08` and `+0x06`.
    */
-  function hpPlateMembers(b) {
+  function hpPlateMembers(b: BattleState) {
     return [
       { index: b.activePlayerIndex ?? 0, hp: Number(b.player?.hp ?? 0), maxHp: Number(b.player?.maxHp ?? 0) },
       { index: b.enemySlot ?? 0, hp: Number(b.enemy?.hp ?? 0), maxHp: Number(b.enemy?.maxHp ?? 0) },
     ];
   }
 /** The plate object (FIGHTSTG_F0x80093a74), built on its first frame. */
-  function hpPlateOf(b) {
+  function hpPlateOf(b: BattleState) {
     if (!b._hpPlate) {
       // FIGHTSTG_F0x80093cc8, the plate-HUD spawner, ported (engine/dw3/battle-task-spawn.ts):
       // the plate object is created through the shared resident allocator with the plate build

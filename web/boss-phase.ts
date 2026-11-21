@@ -44,7 +44,7 @@ import { FIELD_POWER } from "./field-war.js";
  * `maxHp <= 0` (no record), `hp < 0` (no HP read) and a missing phase list all mean
  * "no phase" — the caller then behaves exactly as today.
  */
-export function phaseFor(maxHp, hp, phases) {
+export function phaseFor(maxHp: number, hp: number, phases) {
   const max = Number(maxHp);
   const cur = Number(hp);
   if (!Array.isArray(phases) || !(max > 0) || !(cur >= 0)) return -1;

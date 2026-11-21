@@ -19,14 +19,17 @@ export interface FightCollisionOut {
   source: string;
 }
 
+/** One move cue of the action stream (action-vm.ts): a slide to a spot, or back home, or to the contact point. */
+export type FightMoveRec = { kind: "to"; x: number; y: number; z: number; tween: number; } | { kind: "home" | "contact"; tween: number; };
+
 /** The hooks an action run reports back: a bone moved or turned this tick, the script switched table, a hit landed, the camera cue (setAction/setScript take them). */
 export interface FightActionHooks {
-  onMove?: (rec: any) => void;
-  onRotate?: (rec: any) => void;
+  onMove?: (rec: FightMoveRec) => void;
+  onRotate?: (rec: { x: number; y: number; z: number; }) => void;
   onMotion?: (motion: number) => void;
-  onHit?: (hit: any) => void;
-  onAuxAction?: (aux: any) => void;
-  onCamera?: (cue: any) => void;
+  onHit?: (hit: { type: number; words: number[]; }) => void;
+  onAuxAction?: (aux: { mode: number; }) => void;
+  onCamera?: (cue: { words: number[]; }) => void;
   setLunge?: (lunged: boolean) => void;
 }
 
