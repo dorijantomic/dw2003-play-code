@@ -28,12 +28,12 @@ import {
 /** Bank 0x60 = the master story ordinal's equality predicate. Same test the flag
  *  store's reader uses (`(id >> 8) & 0xfe`), so the lab and the engine agree on
  *  which leaves are beats. */
-export function isOrdinalLeaf(id) {
+export function isOrdinalLeaf(id: number) {
   return ((id >> 8) & 0xfe) === 0x60;
 }
 
 /** The beat an ordinal leaf names (bank 0x60 compares the low nine bits). */
-export function beatOf(id) {
+export function beatOf(id: number) {
   return id & 0x1ff;
 }
 
@@ -70,9 +70,9 @@ export function flagChoices(chain) {
  *  `flagsSet` is a Set of the flag ids that currently read 1. The index is found by
  *  asking the engine about each prefix of the chain, so it is the SAME walk (first
  *  whole match wins), not a second one. */
-export function arrivalVerdict(chain, beat, flagsSet) {
+export function arrivalVerdict(chain, beat: number, flagsSet) {
   const flags = flagsSet instanceof Set ? flagsSet : new Set(flagsSet ?? []);
-  const test = (id, expected) =>
+  const test = (id: number, expected: number) =>
     isOrdinalLeaf(id)
       ? (beatOf(id) === beat) === (expected === 1)
       : flags.has(id) === (expected === 1);

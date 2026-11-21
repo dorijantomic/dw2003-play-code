@@ -91,7 +91,7 @@ const hue = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charC
 
 export const mk = (tag, cls?: any, text?: any) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
-function makeCard(key, foe, small = false) {
+function makeCard(key: string, foe: boolean, small = false) {
     const root = mk("div", (small ? "plate " : "card ") + (foe ? "foe" : ""));
     const pic = mk("div", "pic"), nm = mk("div", "nm"), sub = mk("div", "sub");
     const hp = mk("div", "bar " + (foe ? "foe" : "hp")), hpi = mk("i"); hp.append(hpi);
@@ -107,7 +107,7 @@ function makeCard(key, foe, small = false) {
     return { key, root, pic, nm, sub, hpi, hpn, ail, mpi, dvi, last: null };
 }
 
-function updateCard(c, o, foe) {
+function updateCard(c, o, foe: boolean) {
     c.pic.textContent = (o.n || "?")[0].toUpperCase();
     c.pic.style.background = `hsl(${hue(o.n)} 55% 38%)`;
     c.nm.textContent = foe ? o.n : `${o.pn}`;
@@ -146,7 +146,7 @@ export async function makeScene() {
     } catch (e) { console.warn("[mpbattle] no native menus, using buttons", e); U.nat = MB.F.nat = null; }
     U.ctx = U.view.getContext("2d");
     U.last = performance.now();
-    const loop = (t) => {
+    const loop = (t: number) => {
         if (!U.r3d) return;
         const dt = Math.min(0.05, (t - U.last) / 1000); U.last = t;
         const cw = U.view.clientWidth, ch = U.view.clientHeight;
@@ -185,7 +185,7 @@ export function endScene(U) {
     U.plateMap.clear();
 }
 
-function placePlates(cw, ch) {
+function placePlates(cw: number, ch: number) {
     const U = MB.A.ui; if (!U?.r3d) return;
     const placed = [], rows = [];
     for (const [key, c] of U.plateMap) {
@@ -212,8 +212,8 @@ function placePlates(cw, ch) {
 function syncScene() {
     const U = MB.F.ui, S = MB.F.S, r = MB.F.r3d;
     if (!r || !S) return;
-    const laneOf = (i, n) => (i - (n - 1) / 2) * LANE;
-    S.P.forEach((p, i) => {                                          // players: placed once, in the order the referee lists them
+    const laneOf = (i: number, n: number) => (i - (n - 1) / 2) * LANE;
+    S.P.forEach((p, i: number) => {                                          // players: placed once, in the order the referee lists them
         const key = "p" + p.id;
         if (MB.F.placed.has(key) && MB.F.modelName.get(key) !== p.n) {         // it digivolved: the new form's model takes its place
             MB.F.modelName.set(key, p.n);
@@ -231,7 +231,7 @@ function syncScene() {
         MB.F.waveKey = waveKey;
         r.clearFighters("enemy");
         for (const [k, c] of [...U.plateMap]) if (k[0] === "e") { c.root.remove(); U.plateMap.delete(k); MB.F.placed.delete(k); }
-        S.E.forEach((e, i) => {
+        S.E.forEach((e, i: number) => {
             const key = "e" + e.i;
             MB.F.placed.add(key);
             resolveModelFolder(e.n).then((folder) => { if (folder && MB.F && MB.F.r3d === r) r.addFighter(key, "enemy", folder, laneOf(i, S.E.length)); });
@@ -270,7 +270,7 @@ export function render() {
     if (!S) { U.title.textContent = MB.F.label || "Fight"; U.status.textContent = MB.F.link.text ?? "Waiting for everyone to get ready..."; return; }
     const mine = S.P.find((p) => p.id === MB.A.myId());
     if (mine) {
-        if (!MB.F.isHost && mine.pt) mine.pt.forEach((q, i) => { const r = MB.F.party[i]?.rec; if (r) { r.hp = q.hp; r.mp = q.mp; r.gauge = q.dv; } });   // the referee's numbers are the true ones
+        if (!MB.F.isHost && mine.pt) mine.pt.forEach((q, i: string | number) => { const r = MB.F.party[i]?.rec; if (r) { r.hp = q.hp; r.mp = q.mp; r.gauge = q.dv; } });   // the referee's numbers are the true ones
         const key = `${mine.ac | 0}|${mine.n}|${mine.bl | 0}`;
         if (MB.F.mineKey !== key) {                                             // I digivolved, tagged or blasted: my record and technique list follow
             MB.F.mineKey = key; MB.F.act = mine.ac | 0; (MB.F.took ??= new Set()).add(MB.F.act);
@@ -297,14 +297,14 @@ export function render() {
         if (!(MB.F.cmd?.stage === "target")) MB.F.nat.say(S.ln ?? []);
     }
     const t = S.t;
-    const who = !t ? "" : t[0] === "e" ? (S.E.find((e) => "e" + e.i === t)?.n ?? "Enemy") : (S.P.find((p) => "p" + p.id === t)?.pn ?? "Player");
+    const who = !t ? "" : t[0] === "e" ? (S.E.find((e: { i: string; }) => "e" + e.i === t)?.n ?? "Enemy") : (S.P.find((p: { id: string; }) => "p" + p.id === t)?.pn ?? "Player");
     U.status.textContent = MB.F.link.text ?? (S.ph !== "play" ? "" : t === "p" + MB.A.myId() ? "YOUR TURN" : S.pz ? pzText(S.pz, S.P) : t ? `${who}'s turn` : "");
     renderCmd();
 }
 
 // the fallback when there is no WebGL: plain cards
 function renderCards(U, S) {
-    const foeKeys = S.E.map((e) => "e" + e.i).join(",");
+    const foeKeys = S.E.map((e: { i: string; }) => "e" + e.i).join(",");
     if (U.foeKeys !== foeKeys) {
         for (const [k, c] of [...U.cards]) if (k[0] === "e") { c.root.remove(); U.cards.delete(k); }
         for (const e of S.E) { const c = makeCard("e" + e.i, true); U.cards.set(c.key, c); U.foes.append(c.root); }

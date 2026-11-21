@@ -68,7 +68,7 @@ export const SAND = {
 };
 
 // ---------------- the CC0 textures (one pair per page, mipmapped + anisotropic) ----------------
-let TEX = null;
+let TEX: { albedo: null; normal: null; loaded: boolean; mean: null; albedoMean: null; px: number; readMs: number; credit: string; error: null; } | null = null;
 /** The 2 m sand tile: albedo (sRGB) + normal (linear), RepeatWrapping, mipmaps, anisotropy 8 (three clamps it to the
  *  backend's maximum). Loaded once; `loaded` flips when both images are in (the checkers wait for it). */
 export function sandTextures() {
@@ -102,7 +102,7 @@ export function sandTextures() {
     } catch (e) { /* the image is there but unreadable (cross-origin): mean stays null, the sand paints the flat `all` */ }
     state.loaded = true;
   };
-  const mk = (file, srgb) => {
+  const mk = (file: string | null, srgb: boolean) => {
     const t = loader.load(SAND.TEX.dir + file, () => { if (--left <= 0) finish(); }, undefined, () => { state.error = file; if (--left <= 0) finish(); });
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = SAND.ANISO;
@@ -221,7 +221,7 @@ function setTint(u, tex) {
   u.uTexOn.value = 1;
 }
 
-function sandUniforms(lo, hi, all, field, A = anchors(field.rec)) {
+function sandUniforms(lo: THREE.Color, hi: THREE.Color, all: THREE.Color, field, A = anchors(field.rec)) {
   const tex = sandTextures();
   const u = {
     ...shoreUniforms(field),
@@ -252,7 +252,7 @@ function sandUniforms(lo, hi, all, field, A = anchors(field.rec)) {
   return u;
 }
 
-function sandMaterial(lo, hi, all, field, A) {
+function sandMaterial(lo: THREE.Color, hi: THREE.Color, all: THREE.Color, field, A) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith(sandUniforms(lo, hi, all, field, A)),
     vertexShader: FLAT_VS,
@@ -348,7 +348,7 @@ export function paintProbeMaterial(mesh) {
 }
 
 /** green share of a shore vertex = the measured green share of its picture row (same bin interpolation as the paint) */
-export function rowValue(rows, row, get) {
+export function rowValue(rows, row: number | undefined, get) {
   const n = rows.length, p = Math.min(n - 1, Math.max(0, row * n - 0.5)), i = Math.floor(p), j = Math.min(i + 1, n - 1);
   const a = get(rows[i] ?? rows.find(Boolean)), b = get(rows[j] ?? rows[i] ?? rows.find(Boolean));
   return a + (b - a) * (p - i);

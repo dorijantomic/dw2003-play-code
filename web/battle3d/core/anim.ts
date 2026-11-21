@@ -1,23 +1,24 @@
 import { itemUseEffect, throwItemEffect } from "../../fight/fight-tables.js";
 import { RAND_U16 } from "../../vendor/engine.js";
 import type { AttackOptions, Battle3DContext, PlayScriptOptions, ThrowItemOptions } from "../../types/battle3d.js";
+import type { ActorAnimator } from "../../fight/actor-animator.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeAnim(B$: Battle3DContext) {
-function _applyNamed(anim8r, name, hooks) {
+function _applyNamed(anim8r: ActorAnimator | null | undefined, name: string | null, hooks) {
     if (!anim8r) return;
     if (name === "idle" || name == null) anim8r.setIdle();
     else anim8r.setAction(B$.NAMED_CLIP[name] ?? null, hooks || {});
   }
-function setPlayerAnim(anim) {
+function setPlayerAnim(anim: string | null) {
     B$.screenOverlay = null;   // safety: a persistent op7 type-0 white-out never outlives the presentation
     B$.dnaOrbs = null;         // same safety for the DNA orb overlay
     _applyNamed(B$.playerAnim8r, anim, B$._playerHooks(B$._fxHooks("player")));
   }
-function setEnemyAnim(anim)  { B$.enemyAnim = anim;  _applyNamed(B$.enemyAnim8r, anim, B$._fxHooks("enemy")); }
+function setEnemyAnim(anim: string)  { B$.enemyAnim = anim;  _applyNamed(B$.enemyAnim8r, anim, B$._fxHooks("enemy")); }
 // entrance.c / model_mesh.c: control->motion m plays timeline table m - 1; motion 1 / 2 are the two
   // idle tables (idleMotion 0 / 1), which the animator holds as baseTable.
-  function playPlayerMotion(motion) {
+  function playPlayerMotion(motion: number) {
     if (!B$.playerAnim8r) return false;
     if (motion === 1 || motion === 2) {
       B$.playerAnim8r.baseTable = motion === 2 ? 1 : 0;
@@ -30,7 +31,7 @@ function setEnemyAnim(anim)  { B$.enemyAnim = anim;  _applyNamed(B$.enemyAnim8r,
     return true;
   }
 // The enemy side of playPlayerMotion (entrance.c sets the ENTERING fighter's motion, either side).
-  function playEnemyMotion(motion) {
+  function playEnemyMotion(motion: number) {
     if (!B$.enemyAnim8r) return false;
     if (motion === 1 || motion === 2) {
       B$.enemyAnim8r.baseTable = motion === 2 ? 1 : 0;
@@ -49,7 +50,7 @@ function playPlayerVictory() {
     B$.playerAnim8r.playTimelineTable(table);
     return true;
   }
-function playPlayerActionClip(clip, hooks = {}) {
+function playPlayerActionClip(clip: number | null, hooks = {}) {
     B$.playerAnim = `clip:${clip}`;
     return B$.playerAnim8r
       ? B$.playerAnim8r.setAction(clip, B$._playerHooks(B$._fxHooks("player", hooks)))
@@ -61,7 +62,7 @@ function playPlayerActionClip(clip, hooks = {}) {
   // reads it; the attack path's own writer .L0x8008f21c-.L0x8008f234 is what contactSoundTypeFor
   // ports). An item with no table record writes neither field, exactly as the disc's scan falls
   // through — so contactSoundType is cleared rather than left holding the previous attack's.
-  function playPlayerItemUse(itemId, hooks = {}) {
+  function playPlayerItemUse(itemId: number, hooks = {}) {
     const rec = itemUseEffect(itemId);
     B$.playerAnim = `item:${itemId}`;
     B$.contactSoundType.player = rec ? rec.sound : null;
@@ -80,7 +81,7 @@ function playPlayerActionClip(clip, hooks = {}) {
   // backdrop's rule (armDataField above). `branch` picks item 88's STR/DEF effect/sound pair;
   // `elementIndex` supplies item 84's rolled element (the draw the engine's handler already made)
   // so the motion, the pack and the field all agree on one roll.
-  function playPlayerThrowItem(itemId, { branch = null, elementIndex = null, hooks = {} }: ThrowItemOptions = {}) {
+  function playPlayerThrowItem(itemId: number, { branch = null, elementIndex = null, hooks = {} }: ThrowItemOptions = {}) {
     const rec = throwItemEffect(itemId);
     if (!rec) return false;   // table not loaded -> the caller keeps the default clip-10 entry
     B$.playerAnim = `throw:${itemId}`;
@@ -124,7 +125,7 @@ function playPlayerActionClip(clip, hooks = {}) {
   }
 // Real, confirmed path (technique id -> clip via techToClip). hooks = { onHit, onCamera, setLunge }.
   // The player's action drives the script camera (op5); the enemy's does not.
-  function setPlayerAnimByTech(techId, hooks) {
+  function setPlayerAnimByTech(techId: number, hooks) {
     B$.playerAnim = `tech:${techId}`;
     B$.contactSoundType.player = B$.contactSoundTypeFor(techId);
     B$.contactEvade.player = false;   // no accuracy roll on this path
@@ -133,7 +134,7 @@ function playPlayerActionClip(clip, hooks = {}) {
     const h = { ...(hooks || {}), onMotion: (m) => { B$.dataFieldMotion(m); hooks?.onMotion?.(m); } };
     return B$.playerAnim8r ? B$.playerAnim8r.setAnimByTech(techId, B$._playerHooks(B$._fxHooks("player", h))) : false;
   }
-function setEnemyAnimByTech(techId, hooks) {
+function setEnemyAnimByTech(techId: number, hooks) {
     B$.enemyAnim = `tech:${techId}`;
     B$.contactSoundType.enemy = B$.contactSoundTypeFor(techId);
     B$.contactEvade.enemy = false;
@@ -144,7 +145,7 @@ function setEnemyAnimByTech(techId, hooks) {
 // Coordinated attacks (Phase E entry points for battle.js): the attacker plays techId's clip;
   // on its type-99 strike the defender plays its hit-reaction. The PLAYER attacker also drives the
   // op5 script camera (_playerHooks). hooks = optional extra (e.g. a hit-spark/sound onHit).
-  function playerAttack(techId, opts: AttackOptions = {}) {
+  function playerAttack(techId: number, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.playerAnim = `tech:${techId}`; B$.enemyAnim = `hit`;
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack
@@ -156,7 +157,7 @@ function setEnemyAnimByTech(techId, hooks) {
       B$._playerHooks(B$._fxHooks("player", B$._impactContact({ ...hooks, onMotion: B$.dataFieldMotion }))),
       { lethal, miss, defenderHooks: B$._enemyHooks(B$._fxHooks("enemy")) });
   }
-function enemyAttack(techId, opts: AttackOptions = {}) {
+function enemyAttack(techId: number, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.enemyAnim = `tech:${techId}`; B$.playerAnim = "hit";
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack

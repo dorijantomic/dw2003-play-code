@@ -19,7 +19,7 @@ function loadPhraseTable() {
     const u8 = new Uint8Array(bytes);
     // An ArrayBuffer is not indexable: the chunk id has to be read through a
     // Uint8Array view, or every tag comes back empty and this returns silence.
-    const tag = (at) => String.fromCharCode(u8[at], u8[at + 1], u8[at + 2], u8[at + 3]);
+    const tag = (at: number) => String.fromCharCode(u8[at], u8[at + 1], u8[at + 2], u8[at + 3]);
     let at = 12;
     while (at + 8 <= u8.length) {
       const id = tag(at);
@@ -29,7 +29,7 @@ function loadPhraseTable() {
     }
     return new Int16Array(0);
   }
-function phraseSampleFor(vag) {
+function phraseSampleFor(vag: string) {
     if (!P.phraseSamples.has(vag)) {
       P.phraseSamples.set(vag, loadPhraseTable()
         .then((t) => (t && t.samples && t.samples[vag]) || null)
@@ -80,14 +80,14 @@ function phraseSampleFor(vag) {
    * plays the notes, and `otherwise()` is the single-source path for a sound
    * that is not a phrase. `bank` is null for the common bank.
    */
-  function whenPhraseRow(name, bank, run, otherwise) {
+  function whenPhraseRow(name: string, bank: string | null, run, otherwise: { (): void; (): void; }) {
     if (P.phraseTable) { const row = P.phraseRowFor(name, bank); if (row) run(row); else otherwise(); return; }
     loadPhraseTable().then((t) => {
       const row = t && P.phraseRowFor(name, bank);
       if (row) run(row); else otherwise();
     }).catch(() => otherwise());
   }
-function bufferFor(name, bank = null) {
+function bufferFor(name: string, bank = null) {
     const key = bank ? bank + "/" + name : name;
     if (!P.buffers[key]) {
       const url = bank
@@ -109,19 +109,19 @@ function bufferFor(name, bank = null) {
    * which of its notes is still ringing. `onIdle` fires when the last note has
    * finished on its own, so a caller holding it by slot key can let go.
    */
-  function startPhrase(row, onIdle) {
+  function startPhrase(row, onIdle: { (): void; (): void; }) {
     return Promise.all(row.notes.map((note) => phraseNoteAudio(note)))
       .then((audios) => {
         if (P.player.muted || audios.some((a) => !a)) return null;
         if (P.ctx.state === "suspended") P.ctx.resume().catch(() => {});
         const t0 = P.ctx.currentTime + P.PHRASE_LEAD_S;
         const units = new Set<PhraseVoice>();          // the voices this phrase still holds
-        const timers = [];
+        const timers: NodeJS.Timeout[] = [];
         const phraseGain = P.ctx.createGain();
         if (phraseGain.gain) phraseGain.gain.value = 1;
         phraseGain.connect(P.gain);
         let stopped = false;
-        const later = (ms, fn) => { if (ms > 0) timers.push(setTimeout(fn, ms)); else fn(); };
+        const later = (ms: number | undefined, fn) => { if (ms > 0) timers.push(setTimeout(fn, ms)); else fn(); };
         const stop = () => {
           if (stopped) return;
           stopped = true;
@@ -141,7 +141,7 @@ function bufferFor(name, bank = null) {
           try { phraseGain.disconnect(); } catch (e) { /* already gone */ }
           onIdle?.();
         };
-        row.notes.forEach((note, i) => {
+        row.notes.forEach((note, i: string | number) => {
           const audio = audios[i];
           const at = t0 + note.start / SAMPLE_RATE;
           const begin = () => {
@@ -187,7 +187,7 @@ function bufferFor(name, bank = null) {
   // archive = bits 18-24, row = bits 8-15 (selects the bank through the
   // channel's +0x4208 row array), slot = bits 0-7. Positional ids get no key
   // because their path never keys anything off.
-  function slotKeyFor(name, meta, bank) {
+  function slotKeyFor(name: string, meta, bank: string | null | undefined) {
     if (meta.positional) return null;
     const id = meta.id ? Number(meta.id) : NaN;
     if (Number.isFinite(id)) {
@@ -195,7 +195,7 @@ function bufferFor(name, bank = null) {
     }
     return `${bank ?? "common"}/${name}`;
   }
-function stopVoice(slotKey) {
+function stopVoice(slotKey: string | null) {
     const v = P.voices.get(slotKey);
     if (!v) return;
     P.voices.delete(slotKey);
@@ -210,7 +210,7 @@ function stopVoice(slotKey) {
   // to ring out (the Fire-Dungeon trap: three explosions half a second apart
   // out of a sound over a second long). With the corrected model this is only
   // a deliberate override, no longer a workaround for category arbitration.
-  function startVoice(name, meta, bank, sustain = false, overlap = false) {
+  function startVoice(name: string, meta, bank: string | null | undefined, sustain = false, overlap = false) {
     const slotKey = overlap ? null : slotKeyFor(name, meta, bank);
     // Bit 30 goes through the ONE exclusive-track register: a different id
     // first stops the register's holder through its own stop entry, and the

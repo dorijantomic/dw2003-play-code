@@ -129,15 +129,15 @@ const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right",
 // 7 = talk. Every other clip is the number the actor's own animation sheet holds, so a name is never invented for it.
 export const ANIMS = { idle: 1, talk: 7 };
 // the facing index that looks along (vx, vy) in screen space (y grows downward)
-const lookAlong = (vx, vy) => [6, 7, 0, 1, 2, 3, 4, 5][(Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8];
+const lookAlong = (vx: number, vy: number) => [6, 7, 0, 1, 2, 3, 4, 5][(Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) + 8) % 8];
 /**
  * Where a character and the player can walk side by side from here: up to `dist` px along one of the eight directions, both
  * on free ground the whole way (opts.free(x, y) is true on walkable ground). Prefers carrying on away from the character.
  */
-function planTogether(p, w, dist, free) {
+function planTogether(p, w, dist: number, free: ((x: number, y: number) => boolean) | undefined) {
     if (!free) return null;
     const away = Math.hypot(p.x - w.x, p.y - w.y) < 4 ? Math.PI / 2 : Math.atan2(p.y - w.y, p.x - w.x);
-    const line = (a, b) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8); for (let i = 1; i <= n; i++) if (!free(a.x + ((b.x - a.x) * i) / n, a.y + ((b.y - a.y) * i) / n)) return false; return true; };
+    const line = (a: { x: number; y: number; }, b) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8); for (let i = 1; i <= n; i++) if (!free(a.x + ((b.x - a.x) * i) / n, a.y + ((b.y - a.y) * i) / n)) return false; return true; };
     const SIDE = 38;                                          // wide enough that two sprites never overlap
     let best = null;
     for (let i = 0; i < 8; i++) {
@@ -166,7 +166,7 @@ const facing = (v) => (typeof v === "string" && DIRS.includes(v) ? DIRS.indexOf(
 const WEATHERS = ["fog", "rain", "storm", "snow", "blizzard", "sand", "leaves", "fireflies", "clear"];
 /** The times of day a scene may pin (web/ambience.js TOD_PHASES holds the phase each one means). */
 const TIMES = ["day", "golden", "dusk", "night"];
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
  * @param steps      the scene's steps (see above)
@@ -178,7 +178,7 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const playerId = opts.playerId ?? 2;
     const idOf = (w) => (isPlayer(w) ? playerId : Number(w));
-    const opcodes = [], speech = {}, events = [], errors = [];
+    const opcodes = [], speech = {}, events = [], errors: string[] = [];
     let say = 0;
     if (!Array.isArray(steps) || !steps.length) return { opcodes: ["END"], speech, events, errors: ["a scene needs at least one step"] };
     // A point in the world: a pair, or a character plus an offset (resolved once, when the scene begins, like walk targets)
@@ -191,7 +191,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     // answer from where they stood when the scene began (a scene is written against that), but a second walk of the same
     // character is routed from where the first one put them, not from their post.
     const walkAt = new Map();
-    const walkStart = (id) => walkAt.get(Number(id)) ?? opts.pos?.(Number(id)) ?? null;
+    const walkStart = (id: number) => walkAt.get(Number(id)) ?? opts.pos?.(Number(id)) ?? null;
     const point = (v) => {
         if (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isFinite(Number(n)))) return [num(v[0]), num(v[1])];
         if (v && typeof v === "object" && "near" in v) {
@@ -229,7 +229,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const settings = opts.fx ?? (typeof window !== "undefined" ? window.__fx : null);
     opcodes.push(`FN6A 1 ${playerId}`);                       // the camera starts on the player, as in the story scenes
     // One walk to a point: a clear line is one WALKTO, a blocked one is routed into legs (see the walk step below)
-    const emitWalk = (who, to, f) => {
+    const emitWalk = (who, to, f: string | number | null) => {
         const from = walkStart(idOf(who));
         const legs = from && opts.walk ? opts.walk(from.x, from.y, num(to[0]), num(to[1])) : null;
         const routed = legs && legs.length && (legs.length > 1 || legs[0][0] !== num(to[0]) || legs[0][1] !== num(to[1]));
@@ -245,7 +245,7 @@ export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
         walkAt.set(Number(idOf(who)), { x: num(to[0]), y: num(to[1]) });
     };
     steps.forEach((s, i) => {
-        const bad = (why) => errors.push(`step ${i + 1}: ${why}`);
+        const bad = (why: string) => errors.push(`step ${i + 1}: ${why}`);
         if (s == null || typeof s !== "object") return bad("not an object");
         if ("walk" in s && s.path != null && s.to == null) {
             // A named path (quests/quest-paths.json, drawn in web/quest-editor.html): its points are walked in order, each

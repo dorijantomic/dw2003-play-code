@@ -59,7 +59,7 @@ function mapNameLookup(maps) {
  * field_encounters.screens. A slot the stage does not carry, or a screen the
  * encounters table does not know, leaves the missing half null.
  */
-function catchAt(stageRecord, slot, screens) {
+function catchAt(stageRecord, slot: string, screens) {
     const record = stageRecord?.catch?.[slot];
     if (!record || record.screenId == null) return { screen: null, species: null };
     const party = screens?.[String(record.screenId)];
@@ -122,7 +122,7 @@ export function waterIndex(rows) {
  * The field line passes the live `state.fishingBudget` (or FISHING_BUDGET
  * before the first cast); a missing number means a fresh visit.
  */
-export function castsLeft(budget) {
+export function castsLeft(budget: number) {
     const n = Number(budget);
     if (!Number.isFinite(n)) return CASTS_PER_VISIT;
     return Math.max(0, Math.min(CASTS_PER_VISIT, Math.floor(n)));

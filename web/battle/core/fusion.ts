@@ -32,7 +32,7 @@ export function makeFusion(B: BattleContext) {
     // A Fusion Lab part with no enemies.json row (a partner form) brings its own stat row in `boss.rows`.
     const bodyRow = B.enemiesDB?.[boss?.body] ?? boss?.rows?.[boss?.body] ?? null;
     if (!en || !bodyRow) return;
-    const halves = (boss.halves ?? []).map((name) => B.enemiesDB?.[name] ?? boss.rows?.[name] ?? null).filter(Boolean);
+    const halves = (boss.halves ?? []).map((name: string | number) => B.enemiesDB?.[name] ?? boss.rows?.[name] ?? null).filter(Boolean);
     const fused: FusedRecord = fusedRecord({
       halves, body: boss.body, level: boss.level, hp: boss.hp,
       statScale: boss.statScale, moves: boss.moves, aiFill: boss.aiFill === true,
@@ -84,7 +84,7 @@ export function makeFusion(B: BattleContext) {
     b.state = ST.RESULT_MSG;
     b.timer = 0;
   }
-function applyTagAction(action) {
+function applyTagAction(action: { rosterIndex: string | number; formId: string | number; }) {
     const b = B.battle;
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
@@ -119,7 +119,7 @@ function applyTagAction(action) {
    * The Tag commit, menu.c:388-398 (WFIGHTMN_tag state 2, run when `entrance->done` is set at the cut):
    * the new fighter becomes the active one, the turn was queued at command time with the OUTGOING speed (spd; none when forced).
    */
-  function commitTag(b, action, spd) {
+  function commitTag(b, action: { rosterIndex: string | number; formId: string | number; }, spd: number | undefined) {
     const member = b.playerRoster[action.rosterIndex];
     const incoming = b.playerRecords[action.rosterIndex];
     const profile = B.digimonDB[action.formId];
@@ -157,7 +157,7 @@ function applyTagAction(action) {
     b.participantIndices.add(action.rosterIndex);
     if (typeof spd === "number") B.queueAfterAction(b, "player", spd);
   }
-function applyDvAction(action) {
+function applyDvAction(action: { formId: string | number; }) {
     const b = B.battle;
     const member = b.playerRoster[b.activePlayerIndex];
     const profile = B.digimonDB[action.formId];

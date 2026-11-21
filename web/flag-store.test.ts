@@ -7,8 +7,8 @@ import { createFlagStore } from "./flag-store.js";
 function makeBackend(initial = {}) {
   const bits = { ...initial };
   return {
-    get: (id) => (bits[id] ? 1 : 0),
-    set: (id, val) => { bits[id] = val ? 1 : 0; },
+    get: (id: string | number) => (bits[id] ? 1 : 0),
+    set: (id: string | number, val) => { bits[id] = val ? 1 : 0; },
     _bits: bits,
   };
 }
@@ -57,7 +57,7 @@ test("bank 0x70 non-op30 (party/currency) = null when unmodelled (no pack source
 // bank 0x70 op0x10 case-0 (F0x80015754 case 0): get_flag(0x700N) = (DIGIMON_CUR_STATS[+0x1ED8]
 // == param2). That field is the chosen starter-pack selector (0/1/2); the s212 download gate
 // uses flags 0x7000/1/2 to pick the pack's variant. The walker's packIndex IS that selector.
-const packRec = (v) => ({ op: 0x10, op_lo: 0, param2: v,
+const packRec = (v: number) => ({ op: 0x10, op_lo: 0, param2: v,
                           semantics: { kind: "pack_selector_equals", effect: "read", value: v } });
 
 test("bank 0x70 op0x10 case-0 = chosen-pack selector (== param2)", () => {

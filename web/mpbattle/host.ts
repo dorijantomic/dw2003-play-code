@@ -7,7 +7,7 @@ import { render } from "./ui-scene.js";
 import { finish } from "./net.js";
 
 // ------------------------------------------------------------ the referee: runs the rules, tells everyone
-const later = (ms, fn) => { const id = setTimeout(() => { if (MB.F) fn(); }, ms); (MB.F.timers ??= new Set()).add(id); return id; };
+const later = (ms: number | undefined, fn: { (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; (): void; }) => { const id = setTimeout(() => { if (MB.F) fn(); }, ms); (MB.F.timers ??= new Set()).add(id); return id; };
 
 const say = (lines) => {
     const list = [].concat(lines).filter(Boolean).map((l) => String(l).slice(0, 120));
@@ -17,7 +17,7 @@ const say = (lines) => {
 };
 
 /** Run `fn` once the attack animation on the referee's own screen is over (and at least a moment has passed). */
-function afterAnim(fn) {
+function afterAnim(fn: { (): void; (): void; (): void; (): void; (): void; }) {
     const t0 = performance.now();
     const poll = () => {
         if (!MB.F) return;
@@ -45,7 +45,7 @@ export const people = (ids, fight = MB.F) => ids.filter((id) => id !== MB.A.myId
 
 function broadcast(ph = "play") {
     const S = snapshot(ph);
-    const others = people(MB.F.ids).filter((id) => !MB.F.H.arena.byKey("p" + id)?.fled);
+    const others = people(MB.F.ids).filter((id: string) => !MB.F.H.arena.byKey("p" + id)?.fled);
     if (others.length) MB.A.send(others, { k: "st", fid: MB.F.fid, S });
     MB.F.S = S; render();
 }
@@ -64,7 +64,7 @@ export function hostBegin() {
     if (!H.P.size) { finish(false, { fled: true }); return; }
     const players = [...H.P.values()].map((p) => ({ id: p.id, name: p.pn, rec: p.rec, party: p.party }));
     const waveSize = Math.max(2, players.length);
-    H.arena = new Arena({ kit: MB.F.kit, players, foes: MB.F.erec.map((rec, i) => ({ name: H.names[i], rec })), screenId: MB.F.screenId, waveSize });
+    H.arena = new Arena({ kit: MB.F.kit, players, foes: MB.F.erec.map((rec, i: string | number) => ({ name: H.names[i], rec })), screenId: MB.F.screenId, waveSize });
     MB.F.waves = H.arena.waves();
     say("The fight begins!");
     const peers = people(MB.F.ids);
@@ -116,16 +116,16 @@ function botTurn(key) {
         if (!actor || H.turn !== key) return;
         const id = actor.id;
         if (H.forced) {
-            const slot = actor.party.findIndex((r, i) => i !== actor.act && r.hp > 0);
+            const slot = actor.party.findIndex((r: { hp: number; }, i) => i !== actor.act && r.hp > 0);
             hostCommand(id, { fid: MB.F.fid, c: { k: "tag", slot: Math.max(0, slot) } });
             return;
         }
-        const foe = ar.aliveFoes().sort((a, b) => a.rec.hp - b.rec.hp)[0];
+        const foe = ar.aliveFoes().sort((a: { rec: { hp: number; }; }, b: { rec: { hp: number; }; }) => a.rec.hp - b.rec.hp)[0];
         hostCommand(id, { fid: MB.F.fid, c: foe ? { k: "fight", t: foe.i } : { k: "run" } });
     });
 }
 
-function armTurnTimer(key, actor) {
+function armTurnTimer(key: string, actor) {
     const H = MB.F.H, ar = H.arena;
     clearTimeout(H.turnTimer);
     H.turnTimer = later(TURN_MS, () => { say(`${actor.name} took too long.`); const res = { lines: [], rows: [], a: key, sk: 0, kind: "run" }; ar.finish(key, res); say(res.lines); H.turn = null; broadcast(); later(400, nextTurn); });
@@ -135,7 +135,7 @@ function armForcedTimer(key, actor) {                          // the forced swa
     const H = MB.F.H;
     clearTimeout(H.turnTimer);
     H.turnTimer = later(TURN_MS, () => {
-        const slot = actor.party.findIndex((r, i) => i !== actor.act && r.hp > 0);
+        const slot = actor.party.findIndex((r: { hp: number; }, i) => i !== actor.act && r.hp > 0);
         if (H.forced && H.turn === key && slot >= 0) hostCommand(Number(key.slice(1)), { fid: MB.F.fid, c: { k: "tag", slot } });
     });
 }
@@ -151,7 +151,7 @@ function foeTurn(key) {
 }
 
 /** A player's choice reached the referee. */
-export function hostCommand(from, d) {
+export function hostCommand(from: string | number, d) {
     const H = MB.F.H; if (!H?.arena) return;
     const ar = H.arena, key = "p" + from;
     if (d.fid !== MB.F.fid || H.turn !== key) return;
@@ -183,7 +183,7 @@ function releaseBlasts() {                                    // a Blast does no
     for (const p of ar.P) for (const r of p.party) if (r.blast?.active) endBlast(r);
 }
 
-export function hostGone(from) {                                     // a player's connection dropped mid-fight
+export function hostGone(from: string) {                                     // a player's connection dropped mid-fight
     const H = MB.F.H; if (!H?.arena) return false;
     const p = H.arena.byKey("p" + from); if (!p || p.fled) return false;
     p.fled = true; say(`${p.name} left the fight.`);
@@ -195,18 +195,18 @@ export function hostGone(from) {                                     // a player
 }
 
 /** A guest's link dropped (the relay said `away`): wait for them up to AWAY_MS. They are NOT marked fled; their turn, if it is theirs, stays theirs. */
-export function hostAway(from) {
+export function hostAway(from: string) {
     const H = MB.F.H; if (!H?.arena) return;
     const p = H.arena.byKey("p" + from);
     if (!p || p.fled || MB.F.bots?.has(from) || H.pause.has(from)) return;
     if (H.turn === p.key) clearTimeout(H.turnTimer);           // their 45 s must not run while they cannot answer
-    H.pause.add(from, (id) => { if (!MB.F?.H) return; releasePause(hostGone(id) ? ["next"] : []); });   // not back in time: they have left, as before
+    H.pause.add(from, (id: string) => { if (!MB.F?.H) return; releasePause(hostGone(id) ? ["next"] : []); });   // not back in time: they have left, as before
     say(`${p.name} lost connection. Waiting...`);
     broadcast();                                               // everyone's screen shows "Waiting for ..."
 }
 
 /** The guest's own game says it is back (mpb `back`). A guest who already left gets `left`; otherwise everyone gets the full picture. */
-export function hostBack(from) {
+export function hostBack(from: string) {
     const H = MB.F.H; if (!H?.arena) return;
     const p = H.arena.byKey("p" + from); if (!p) return;
     if (p.fled) { MB.A.send([from], { k: "left", fid: MB.F.fid }); return; }
@@ -233,7 +233,7 @@ function releasePause(covered = []) {
     for (const f of run) later(0, f);
 }
 
-function hostEnd(state) {
+function hostEnd(state: string) {
     const won = state === "won";
     releaseBlasts();
     const others = people(MB.F.ids);

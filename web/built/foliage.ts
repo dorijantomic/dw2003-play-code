@@ -12,7 +12,7 @@ import { Tree, TreePreset } from "../lib3d/ez-tree.es.js";
 import * as S from "./shared.js";
 import * as F from "../lib3d/fluffytree/fluffy.js";
 
-function rng(seed) {   // small seeded random, so the same arena always builds the same
+function rng(seed: number) {   // small seeded random, so the same arena always builds the same
   let s = seed >>> 0;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 }
@@ -29,7 +29,7 @@ export function leafClumpTexture() {   // exported: web/built/trees.js (meft1008
 // light . fromCentre). PICKED here: CROWN_MIX (share of the whole-crown direction), INNER_VIS (sunVis at a clump's
 // core: 0.45 keeps the core in the shade band).
 const CROWN_MIX = 0.3, INNER_VIS = 0.45, HI_LO = 0.5, HI_HI = 1.8;
-export function foliageMaterial(leafTex, crown, hiTint) {
+export function foliageMaterial(leafTex: THREE.CanvasTexture, crown: number[], hiTint: number[]) {
   const m = new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uLeafTex: { value: leafTex }, uLeafAlpha: { value: 0.4 },
       uCrown: { value: new THREE.Vector3(...crown) }, uCrownMix: { value: CROWN_MIX }, uInnerVis: { value: INNER_VIS },
@@ -124,9 +124,9 @@ export function buildGeometry(parts) {
 // each; card side CARD_K x R (PICKED 0.75: with centres out to 0.62 R the clump's edge is ~1.15 R). The vertex
 // normal attribute is the radial direction from the clump centre (the fragment shader recomputes it per pixel).
 const CARD_K = 0.75;
-export function fluffyPart(clumps, cards, seed, mid) {
+export function fluffyPart(clumps, cards: number, seed: number, mid: { r: number; g: number; b: number; }) {
   const r = F.rng(seed), out = { pos: [], uv: [], idx: [], clump: [] }, tint = [];
-  const w = clumps.map((q) => q.R * q.R), W = w.reduce((a, b) => a + b, 0);
+  const w = clumps.map((q: { R: number; }) => q.R * q.R), W = w.reduce((a, b) => a + b, 0);
   let left = cards;
   for (const [i, q] of clumps.entries()) {
     const n = i === clumps.length - 1 ? left : Math.max(6, Math.round(cards * w[i] / W));
@@ -154,7 +154,7 @@ export function fluffyPart(clumps, cards, seed, mid) {
 const BROADLEAF = { branch: { levels: 1, children: { 0: 7 }, sections: { 0: 4, 1: 3 }, segments: { 0: 5, 1: 3 }, start: { 1: 0.45 } },
                     leaves: { count: 10, size: 9, start: 0.2 } };
 const CLUMPS = 6, TREE_TRIS = 760;
-function setDeep(o, m) { for (const [k, v] of Object.entries(m)) (typeof v === "object" ? setDeep(o[k], v) : (o[k] = v)); }
+function setDeep(o, m: object | null) { for (const [k, v] of Object.entries(m)) (typeof v === "object" ? setDeep(o[k], v) : (o[k] = v)); }
 export function broadleafGeometry(seed, pal) {
   const t = new Tree();
   t.options.copy(structuredClone(TreePreset["Oak Medium"]));
@@ -164,10 +164,10 @@ export function broadleafGeometry(seed, pal) {
   const bg = t.branchesMesh.geometry, lg = t.leavesMesh.geometry;
   const bp = bg.attributes.position.array, lp = lg.attributes.position.array;
   // where ez-tree's leaf cards hang (card centres, raw units) -> clumps; radius = 1.1 x the 80th-percentile spread
-  const spots = []; for (let q = 0; q < lp.length / 12; q++) spots.push([0, 1, 2].map((a) => (lp[q * 12 + a] + lp[q * 12 + 3 + a] + lp[q * 12 + 6 + a] + lp[q * 12 + 9 + a]) / 4));
+  const spots: number[][] = []; for (let q = 0; q < lp.length / 12; q++) spots.push([0, 1, 2].map((a) => (lp[q * 12 + a] + lp[q * 12 + 3 + a] + lp[q * 12 + 6 + a] + lp[q * 12 + 9 + a]) / 4));
   const leafSize = t.options.leaves.size;
   const clumps = F.kmeans(spots, CLUMPS).map((g) => {
-    const d = g.members.map((i) => Math.hypot(...[0, 1, 2].map((a) => spots[i][a] - g.c[a]))).sort((a, b) => a - b);
+    const d = g.members.map((i: string | number) => Math.hypot(...[0, 1, 2].map((a) => spots[i][a] - g.c[a]))).sort((a: number, b: number) => a - b);
     return { c: g.c, R: Math.max(leafSize * 0.6, 1.1 * d[Math.floor(0.8 * (d.length - 1))] + leafSize * 0.35) };
   });
   const branchTris = bg.index.count / 3;
@@ -180,7 +180,7 @@ export function broadleafGeometry(seed, pal) {
   leafPart.clump = leafPart.clump.map((x) => x * k);
   const C = [0, 0, 0]; for (const q of clumps) for (let a = 0; a < 3; a++) C[a] += q.c[a] * k / clumps.length;   // crown centre
   const out = buildGeometry([
-    { pos: bpos, nor: bg.attributes.normal.array, uv: bg.attributes.uv.array.map((x, i) => (i % 2 ? 0 : x)), idx: bg.index.array,
+    { pos: bpos, nor: bg.attributes.normal.array, uv: bg.attributes.uv.array.map((x, i: number) => (i % 2 ? 0 : x)), idx: bg.index.array,
       tint: [pal.bark.r, pal.bark.g, pal.bark.b], leaf: 0 },
     leafPart,
   ]);
@@ -188,7 +188,7 @@ export function broadleafGeometry(seed, pal) {
   t.branchesMesh.material.dispose(); t.leavesMesh.material.map?.dispose(); t.leavesMesh.material.dispose();
   bg.dispose(); lg.dispose();
   out.userData = { crown: C, cards: leafPart.pos.length / 12, H: 1,
-                   clumps: clumps.map((q) => ({ c: q.c.map((x) => x * k), R: q.R * k })) };
+                   clumps: clumps.map((q) => ({ c: q.c.map((x: number) => x * k), R: q.R * k })) };
   return out;
 }
 

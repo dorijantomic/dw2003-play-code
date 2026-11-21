@@ -34,7 +34,7 @@ export const SCENE_VARIANT_SLOT_TAG = 1;
 export const SCENE_VARIANT_SLOT_FLAG = 1;
 export const SCENE_DEFAULT_SLOT_FLAG = 0;
 
-export function sceneVariantActive(ordinal) {
+export function sceneVariantActive(ordinal: number) {
   return SCENE_VARIANT_ORDINALS.includes(ordinal);
 }
 
@@ -57,16 +57,16 @@ export function sceneVariantSlotIndex(records) {
 }
 
 /** The byte the map setup writes into that slot: 1 on a variant beat, else 0. */
-export function sceneVariantSlotActive(ordinal) {
+export function sceneVariantSlotActive(ordinal: number) {
   return sceneVariantActive(ordinal) ? SCENE_VARIANT_SLOT_FLAG : SCENE_DEFAULT_SLOT_FLAG;
 }
 
-export function sceneBgmPlayId(ordinal) {
+export function sceneBgmPlayId(ordinal: number) {
   return sceneVariantActive(ordinal) ? SCENE_BGM_VARIANT_PLAY_ID : SCENE_BGM_DEFAULT_PLAY_ID;
 }
 
 /** The background track for a screen whose own track is `defaultTrack`. */
-export function sceneBgmTrack(defaultTrack, ordinal) {
+export function sceneBgmTrack(defaultTrack: string, ordinal: number) {
   if (defaultTrack === SCENE_BGM_DEFAULT_TRACK && sceneVariantActive(ordinal)) {
     return SCENE_BGM_VARIANT_TRACK;
   }

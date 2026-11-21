@@ -40,9 +40,9 @@ const STORED_BANKS = new Set([
 
 const ROSTER = new Map(rosterFile.records.map((rec) => [rec.key, rec]));
 
-const hex = (id) => `0x${(id >>> 0).toString(16).padStart(4, "0")}`;
+const hex = (id: number | undefined) => `0x${(id >>> 0).toString(16).padStart(4, "0")}`;
 
-function commandWords(bank, index) {
+function commandWords(bank: number, index: number) {
   if (bank === 0x74) return `scripted battle slot ${index}`;
   if (bank === 0x76 || bank === 0x78) return "card duel";
   if (bank === 0x7a) return "shop/inn";      // item shop, card shop or inn — the desk index picks
@@ -51,7 +51,7 @@ function commandWords(bank, index) {
   return "gym";                              // 0x94
 }
 
-function bank70Words(id, want) {
+function bank70Words(id: number | undefined, want: number) {
   const rec = ROSTER.get(id & 0x1ff);
   if (!rec) return `gate ${hex(id)}`;        // no decoded record: never invent a meaning
   if ((rec.op & 0xf0) === 0x30) {
@@ -97,7 +97,7 @@ export function gateWords({ id, expected = 1 }: { id?: number; expected?: number
 }
 
 /** A whole gate (an AND list) as one sentence; an empty gate always passes. */
-export function gateListWords(list) {
+export function gateListWords(list: { id?: number; expected?: number; }[]) {
   if (!list || !list.length) return "always";
   return list.map(gateWords).join(" and ");
 }

@@ -13,13 +13,13 @@ import type { BiomeMountainTerrain, LODLevel, MountainGroundOpts, ScatterOpts, S
 const { mtH, mtInfo, waterDist, sstep, vnoise } = M;
 const PS = "Poly Haven (decimated, 1K albedo)", CC0 = "CC0 1.0", OWN = "Procedural (our code)", EZ = "EZ-Tree by Daniel Greenheck (generated live)";
 const T = (id) => loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
-let _gt = null;
+let _gt: Promise<{ grass: unknown; rock: unknown; scree: unknown; snow: unknown; lichen: unknown; }> | null = null;
 const groundTex = () => _gt || (_gt = Promise.all(["aerial_grass_rock", "rock_face", "rocky_gravel", "snow_field_aerial", "lichen_rock"].map(T)).then(([grass, rock, scree, snow, lichen]) => ({ grass, rock, scree, snow, lichen })));
 const gmat = async (o: MountainGroundOpts) => MP.mountainGround(await groundTex(), o);
 const part = (parts) => partsGroup(parts);
 
 // ------------------------------------------------------------------ terrain tiles in real world coordinates
-function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => number) {
+function tile(mat, x0: number, x1: number, z0: number, z1: number, cell: number, extra?: (x: number, z: number) => number) {
   const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, Math.max(2, Math.round(w / cell)), Math.max(2, Math.round(d / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.attributes.position;
@@ -27,8 +27,8 @@ function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => numbe
   g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
   const m = new THREE.Mesh(g, mat); m.name = "ground"; return m;
 }
-const slab = async (x0, x1, z0, z1, cell, extra = [], o = {}) => { const g = new THREE.Group(); g.add(tile(await gmat(o), x0, x1, z0, z1, cell)); for (const e of extra) g.add(e); return g; };
-function fld(parts, n, rad, sc, seed, base = 0x5c6b3e, y = 0.04) {
+const slab = async (x0: number, x1: number, z0: number, z1: number, cell: number, extra = [], o = {}) => { const g = new THREE.Group(); g.add(tile(await gmat(o), x0, x1, z0, z1, cell)); for (const e of extra) g.add(e); return g; };
+function fld(parts, n: number, rad: number, sc: number[], seed: number, base = 0x5c6b3e, y = 0.04) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16), b = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.05, rad * 1.05, 0.05, 44), toonMat({ color: base }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
   for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
@@ -39,16 +39,16 @@ const wx = (res, o: WeatherOpts) => { MP.weather(res.parts, o); return res; };
 // ------------------------------------------------------------------ grid entries
 const cat = { terr: "Mountain terrain", snow: "Snow, ice, glacier", cliff: "Cliffs and rock faces", crag: "Crags, spires, boulders", scree: "Scree, talus, gravel", ground: "Rock and ground textures",
   meadow: "Alpine meadow grass and flowers", cover: "Lichen, moss, dwarf shrubs", conif: "Conifers: spruce, fir, larch", krum: "Krummholz and dwarf pines", dead: "Dead silver snags", water: "Stream, waterfall, tarn", air: "Ranges, clouds, snow in the air" };
-const mp = (id, c, name, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/mountainproc.js", ...extra });
-const ph2 = (id, c, name, t = {}, extra = {}) => ph(id, c, { name, t: { grade: true, ...t }, e: extra });
-const ez = (id, c, name, preset, seed, over, h) => ({ id: "ez_" + id, cat: c, name, source: EZ, licence: "MIT", url: "https://github.com/dgreenheck/ez-tree", noSpin: false, make: async () => part(ezTreeParts(preset, seed, over, h)) });
+const mp = (id: string, c: string, name: string, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/mountainproc.js", ...extra });
+const ph2 = (id: string, c: string, name: string, t = {}, extra = {}) => ph(id, c, { name, t: { grade: true, ...t }, e: extra });
+const ez = (id: string, c: string, name: string, preset: string, seed: number, over: { bark: { tint: number; } | { tint: number; } | { tint: number; }; leaves: { tint: number; } | { tint: number; } | { tint: number; }; }, h: number) => ({ id: "ez_" + id, cat: c, name, source: EZ, licence: "MIT", url: "https://github.com/dgreenheck/ez-tree", noSpin: false, make: async () => part(ezTreeParts(preset, seed, over, h)) });
 const SPRUCE = { bark: { tint: 0x5a4636 }, leaves: { tint: 0x2e5f4a } }, LARCH = { bark: { tint: 0x7a5a42 }, leaves: { tint: 0xb2c25a } }, SPRUCE2 = { bark: { tint: 0x4f3d30 }, leaves: { tint: 0x3a6b52 } };
 const screeField = async () => { const g = new THREE.Group(), r = rng(3), b = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.05, 44), toonMat({ color: SCREEB }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
   for (let k = 1; k <= 2; k++) { const m = new Float32Array(9 * 16); for (let i = 0; i < 9; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 1.1; composeTRS(m, i, Math.cos(a) * d, 0.05, Math.sin(a) * d, r() * 6.28, 0.9 + 0.5 * r()); } g.add(instancedParts(MP.screeParts(k), m, 9)); }
   return g; };
-const stoneRes = async (id, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w);
-const qRes = async (id, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w);
-const rockEntry = (id, c, name, w = {}, t = {}) => ({ id: "mr_" + id, cat: c, name, source: PS + " + our weather shader (snow dust, lichen)", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false, make: async () => part((await stoneRes(id, { w, t })).parts) });
+const stoneRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w);
+const qRes = async (id: string, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w);
+const rockEntry = (id: string, c: string, name: string, w = {}, t = {}) => ({ id: "mr_" + id, cat: c, name, source: PS + " + our weather shader (snow dust, lichen)", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false, make: async () => part((await stoneRes(id, { w, t })).parts) });
 
 const rawEntries = [
   // ---- terrain
@@ -152,7 +152,7 @@ export const entries = rawEntries.map((e) => ({ ...e, id: "m_" + e.id }));
 
 // ------------------------------------------------------------------ the assembled mountain
 const FOG = new THREE.Color(0xc9dcec);
-function scatterPts(n, seed, area, ok, o: ScatterOpts = {}) {
+function scatterPts(n: number, seed: number, area: number[], ok, o: ScatterOpts = {}) {
   const r = rng(seed), out = [], sc = o.scale || [0.9, 1.2]; let tries = 0;
   while (out.length < n && tries++ < n * (o.tries || 60)) {
     const x = area[0] + (r() * 2 - 1) * area[2], z = area[1] + (r() * 2 - 1) * area[3], inf = mtInfo(x, z), pr = ok(x, z, inf.h, inf.ny);
@@ -161,21 +161,21 @@ function scatterPts(n, seed, area, ok, o: ScatterOpts = {}) {
   }
   return out;
 }
-const toMats = (pts, o: ScatterOpts = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p, i) => composeTRS(m, i, p.x, mtH(p.x, p.z) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
-const patch = (x, z, s = 4, f = 0.05) => Math.pow(vnoise(x, z, f, s), 1.6) * 1.8;
-const valleyClear = (x, z) => sstep(10, 22, Math.hypot(x - 2, z - 6));            // keep the camera area open
+const toMats = (pts, o: ScatterOpts = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p: { x: number | undefined; z: number | undefined; yaw: number; s: number; }, i: number) => composeTRS(m, i, p.x, mtH(p.x, p.z) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
+const patch = (x: number, z: number, s = 4, f = 0.05) => Math.pow(vnoise(x, z, f, s), 1.6) * 1.8;
+const valleyClear = (x: number, z: number) => sstep(10, 22, Math.hypot(x - 2, z - 6));            // keep the camera area open
 
 export async function buildMountain(ctx) {
   const { renderer, scene, tune = {} } = ctx;
-  const root = new THREE.Group(), lods = [], cull = new CullSet(), info = { species: [], impostors: 0 };
-  const note = (name, n, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a, p) => a + tris(p.geo), 0) : 0 });
-  const N = (n) => Math.round(n * (tune.density ?? 1));
+  const root = new THREE.Group(), lods: LODSpecies[] = [], cull = new CullSet(), info = { species: [], impostors: 0 };
+  const note = (name: string, n: number, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0) : 0 });
+  const N = (n: number) => Math.round(n * (tune.density ?? 1));
   const AREA = [0, -60, 290, 290];
 
   // ---- terrain: fine near tile, coarse far tile (sunk under the near one), water, waterfall
   const gm = await gmat({});
   const near = tile(gm, -110, 110, -150, 90, 1.5); near.name = "ground near"; root.add(near);
-  const nearX = (x, z) => 1 - sstep(96, 110, Math.max(Math.abs(x), Math.abs(z + 30) * 0.92));
+  const nearX = (x: number, z: number) => 1 - sstep(96, 110, Math.max(Math.abs(x), Math.abs(z + 30) * 0.92));
   const far = tile(gm, -300, 300, -300, 300, 6, (x, z) => -1.1 * nearX(x, z)); far.name = "ground far"; root.add(far);
   note("ground near (220x240 m, 1.5 m cells)", 1, [{ geo: near.geometry }]); note("ground far (600x600 m, 6 m cells, slope/altitude splat: meadow, rock+strata+lichen, scree, snow, ice)", 1, [{ geo: far.geometry }]);
   const stream = MP.streamMesh(); root.add(stream); note("mountain stream (toon water, flow streaks, white water, foam)", 1, [{ geo: stream.geometry }]);
@@ -187,52 +187,52 @@ export async function buildMountain(ctx) {
   root.add(MP.cloudDeck({ y: [11], size: 900, near: 130, far: 300, cover: 0.62, scale: 0.0042, name: "cloud sea" })); note("cloud sea (toon deck, fades near the camera)", 1, null);
   root.add(MP.cloudDeck({ y: [78, 118], size: 900, near: 200, far: 330, cover: 0.34, scale: 0.0052, col: [0.98, 0.99, 1], name: "low clouds" })); note("low clouds round the peaks", 2, null);
   root.add(MP.snowPoints("blow", { n: N(1300), box: 70, seed: 9 })); note("blowing snow (GPU points)", N(1300), null);
-  const crests = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0] - x, c[2] - z) > 45)) crests.push([x, h + 1, z]); } }
+  const crests: number[][] = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0] - x, c[2] - z) > 45)) crests.push([x, h + 1, z]); } }
   if (crests.length) { root.add(MP.snowPoints("spindrift", { n: crests.length * 220, crests, speed: 3.2, life: 8, seed: 12, scale: 620 })); note("spindrift plumes off the crests", crests.length * 220, null); }
 
-  const add = (name, parts, pts, o: SpeciesAddOpts = {}) => {
+  const add = (name: string | undefined, parts, pts, o: SpeciesAddOpts = {}) => {
     if (!pts.length) return;
     const mats = toMats(pts, o), g = cull.add(parts, mats, pts.length, name, o.cell || 16); g.name = name; root.add(g); note(name, pts.length, parts); return g;
   };
   const FD = [34, 60], FDS = [70, 110];
-  const Lq = (id, t) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
-  const H = (id, t) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
-  const wd = (x, z) => sstep(0.8, 2.5, waterDist(x, z));
-  const meadowP = (x, z, h, ny) => (ny > 0.82 && h < 70 ? (1 - sstep(48, 70, h)) * wd(x, z) : 0);
+  const Lq = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
+  const H = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
+  const wd = (x: number, z: number) => sstep(0.8, 2.5, waterDist(x, z));
+  const meadowP = (x: number, z: number, h: number, ny: number) => (ny > 0.82 && h < 70 ? (1 - sstep(48, 70, h)) * wd(x, z) : 0);
 
   // ---- meadow: grass tussocks, flowers
-  add("alpine grass tussocks", P.grassClumpParts({ seed: 4, blades: 5, segs: 3, h: [0.16, 0.34], w: 0.02, fade: [26, 46], rootCol: [0.12, 0.24, 0.08], tipCol: [0.56, 0.68, 0.26] }), scatterPts(N(5200), 11, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * (0.15 + 0.85 * patch(x, z, 3)), { scale: [0.9, 1.6] }));
-  add("tall alpine grass", P.grassClumpParts({ seed: 13, blades: 4, segs: 3, h: [0.4, 0.75], w: 0.03, fade: [24, 44], tipCol: [0.7, 0.74, 0.3] }), scatterPts(N(1300), 12, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 6, 0.04) * (h < 45 ? 1 : 0.3), { scale: [0.9, 1.6] }));
-  add("Grass_Common_Short", (await Lq("Grass_Common_Short", { h: 0.35, wind: 0.7, flutter: 0.4, tint: [1.0, 0.98, 0.8] })).parts, scatterPts(N(700), 13, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 7), { scale: [0.9, 1.5] }));
-  add("Grass_Wispy_Short", (await Lq("Grass_Wispy_Short", { h: 0.4, wind: 0.7, flutter: 0.4, tint: [1.0, 0.98, 0.8] })).parts, scatterPts(N(600), 14, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 8), { scale: [0.9, 1.5] }));
-  add("gentian", MP.gentianParts(1), scatterPts(N(900), 15, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 15, 0.07), { scale: [1.4, 2.4] }));
-  add("edelweiss", MP.edelweissParts(1), scatterPts(N(500), 16, AREA, (x, z, h, ny) => (ny > 0.7 && h > 25 && h < 85 ? patch(x, z, 16, 0.06) : 0), { scale: [1.4, 2.4] }));
-  add("saxifrage white", MP.saxifrageParts(1), scatterPts(N(300), 17, AREA, (x, z, h, ny) => (ny > 0.6 && h > 30 && h < 95 ? patch(x, z, 17, 0.07) : 0), { scale: [1.2, 2.0] }));
-  add("saxifrage pink", MP.saxifrageParts(2), scatterPts(N(300), 18, AREA, (x, z, h, ny) => (ny > 0.6 && h > 30 && h < 95 ? patch(x, z, 18, 0.07) : 0), { scale: [1.2, 2.0] }));
-  add("heather", MP.heatherParts(1), scatterPts(N(700), 19, AREA, (x, z, h, ny) => (ny > 0.7 && h > 8 && h < 60 ? patch(x, z, 19, 0.05) * wd(x, z) : 0), { scale: [1.0, 1.8] }));
-  add("Flower_3_Group", (await Lq("Flower_3_Group", { h: 0.4, wind: 0.5, flutter: 0.4 })).parts, scatterPts(N(120), 20, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 20, 0.07), { scale: [0.9, 1.4] }));
-  add("Flower_4_Group", (await Lq("Flower_4_Group", { h: 0.4, wind: 0.5, flutter: 0.4 })).parts, scatterPts(N(120), 21, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 21, 0.07), { scale: [0.9, 1.4] }));
-  add("dandelion", (await H("dandelion_01", { wind: 0.4, flutter: 0.3, grade: true })).parts, scatterPts(N(80), 22, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 22, 0.07), { scale: [0.9, 1.4] }));
-  add("Clover_1", (await Lq("Clover_1", { h: 0.12, wind: 0.3 })).parts, scatterPts(N(260), 23, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 23, 0.07), { scale: [0.9, 1.5] }));
-  add("Plant_1", (await Lq("Plant_1", { h: 0.4, wind: 0.5 })).parts, scatterPts(N(90), 24, AREA, (x, z, h, ny) => meadowP(x, z, h, ny) * patch(x, z, 24), { scale: [0.8, 1.3] }));
+  add("alpine grass tussocks", P.grassClumpParts({ seed: 4, blades: 5, segs: 3, h: [0.16, 0.34], w: 0.02, fade: [26, 46], rootCol: [0.12, 0.24, 0.08], tipCol: [0.56, 0.68, 0.26] }), scatterPts(N(5200), 11, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * (0.15 + 0.85 * patch(x, z, 3)), { scale: [0.9, 1.6] }));
+  add("tall alpine grass", P.grassClumpParts({ seed: 13, blades: 4, segs: 3, h: [0.4, 0.75], w: 0.03, fade: [24, 44], tipCol: [0.7, 0.74, 0.3] }), scatterPts(N(1300), 12, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 6, 0.04) * (h < 45 ? 1 : 0.3), { scale: [0.9, 1.6] }));
+  add("Grass_Common_Short", (await Lq("Grass_Common_Short", { h: 0.35, wind: 0.7, flutter: 0.4, tint: [1.0, 0.98, 0.8] })).parts, scatterPts(N(700), 13, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 7), { scale: [0.9, 1.5] }));
+  add("Grass_Wispy_Short", (await Lq("Grass_Wispy_Short", { h: 0.4, wind: 0.7, flutter: 0.4, tint: [1.0, 0.98, 0.8] })).parts, scatterPts(N(600), 14, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 8), { scale: [0.9, 1.5] }));
+  add("gentian", MP.gentianParts(1), scatterPts(N(900), 15, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 15, 0.07), { scale: [1.4, 2.4] }));
+  add("edelweiss", MP.edelweissParts(1), scatterPts(N(500), 16, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.7 && h > 25 && h < 85 ? patch(x, z, 16, 0.06) : 0), { scale: [1.4, 2.4] }));
+  add("saxifrage white", MP.saxifrageParts(1), scatterPts(N(300), 17, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > 30 && h < 95 ? patch(x, z, 17, 0.07) : 0), { scale: [1.2, 2.0] }));
+  add("saxifrage pink", MP.saxifrageParts(2), scatterPts(N(300), 18, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > 30 && h < 95 ? patch(x, z, 18, 0.07) : 0), { scale: [1.2, 2.0] }));
+  add("heather", MP.heatherParts(1), scatterPts(N(700), 19, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.7 && h > 8 && h < 60 ? patch(x, z, 19, 0.05) * wd(x, z) : 0), { scale: [1.0, 1.8] }));
+  add("Flower_3_Group", (await Lq("Flower_3_Group", { h: 0.4, wind: 0.5, flutter: 0.4 })).parts, scatterPts(N(120), 20, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 20, 0.07), { scale: [0.9, 1.4] }));
+  add("Flower_4_Group", (await Lq("Flower_4_Group", { h: 0.4, wind: 0.5, flutter: 0.4 })).parts, scatterPts(N(120), 21, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 21, 0.07), { scale: [0.9, 1.4] }));
+  add("dandelion", (await H("dandelion_01", { wind: 0.4, flutter: 0.3, grade: true })).parts, scatterPts(N(80), 22, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 22, 0.07), { scale: [0.9, 1.4] }));
+  add("Clover_1", (await Lq("Clover_1", { h: 0.12, wind: 0.3 })).parts, scatterPts(N(260), 23, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 23, 0.07), { scale: [0.9, 1.5] }));
+  add("Plant_1", (await Lq("Plant_1", { h: 0.4, wind: 0.5 })).parts, scatterPts(N(90), 24, AREA, (x: number, z: number, h: number, ny: number) => meadowP(x, z, h, ny) * patch(x, z, 24), { scale: [0.8, 1.3] }));
 
   // ---- cover: lichen, moss, dwarf shrubs, juniper
-  add("lichen patches", MP.lichenParts(1), scatterPts(N(900), 25, AREA, (x, z, h, ny) => (ny > 0.6 && h > 18 && h < 90 ? 0.2 + 0.8 * patch(x, z, 25, 0.06) : 0), { scale: [1.2, 2.4] }), { y: 0.02 });
-  add("moss cushions", MP.mossCushionParts(1), scatterPts(N(260), 26, AREA, (x, z, h, ny) => (ny > 0.75 && h < 60 && waterDist(x, z) < 12 ? 0.3 + 0.7 * patch(x, z, 26) : 0), { scale: [1.0, 1.8] }), { y: -0.02 });
-  add("moss_01", (await H("moss_01", { grade: true })).parts, scatterPts(N(60), 27, AREA, (x, z, h, ny) => (ny > 0.75 && h < 50 ? patch(x, z, 27) : 0), { scale: [0.8, 1.4] }), { y: -0.01 });
-  add("dwarf willow", MP.dwarfShrubParts(1, 0), scatterPts(N(420), 28, AREA, (x, z, h, ny) => (ny > 0.65 && h > 20 && h < 85 ? patch(x, z, 28, 0.06) : 0), { scale: [1.0, 1.9] }));
-  add("crowberry", MP.dwarfShrubParts(2, 1), scatterPts(N(420), 29, AREA, (x, z, h, ny) => (ny > 0.65 && h > 20 && h < 85 ? patch(x, z, 29, 0.06) : 0), { scale: [1.0, 1.9] }));
-  add("shrub_01", (await H("shrub_01", { grade: true, wind: 0.3, trans: 0.3, h: 0.7, fade: FDS })).parts, scatterPts(N(60), 30, AREA, (x, z, h, ny) => (ny > 0.7 && h > 5 && h < 60 ? patch(x, z, 30) * wd(x, z) : 0), { scale: [0.8, 1.5] }));
-  add("juniper A", MP.juniperParts(1), scatterPts(N(120), 31, AREA, (x, z, h, ny) => (ny > 0.6 && h > 15 && h < 80 ? patch(x, z, 31, 0.05) * wd(x, z) * valleyClear(x, z) : 0), { scale: [0.9, 1.6] }));
-  add("juniper B", MP.juniperParts(2), scatterPts(N(120), 32, AREA, (x, z, h, ny) => (ny > 0.6 && h > 15 && h < 80 ? patch(x, z, 32, 0.05) * wd(x, z) * valleyClear(x, z) : 0), { scale: [0.9, 1.6] }));
+  add("lichen patches", MP.lichenParts(1), scatterPts(N(900), 25, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > 18 && h < 90 ? 0.2 + 0.8 * patch(x, z, 25, 0.06) : 0), { scale: [1.2, 2.4] }), { y: 0.02 });
+  add("moss cushions", MP.mossCushionParts(1), scatterPts(N(260), 26, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.75 && h < 60 && waterDist(x, z) < 12 ? 0.3 + 0.7 * patch(x, z, 26) : 0), { scale: [1.0, 1.8] }), { y: -0.02 });
+  add("moss_01", (await H("moss_01", { grade: true })).parts, scatterPts(N(60), 27, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.75 && h < 50 ? patch(x, z, 27) : 0), { scale: [0.8, 1.4] }), { y: -0.01 });
+  add("dwarf willow", MP.dwarfShrubParts(1, 0), scatterPts(N(420), 28, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.65 && h > 20 && h < 85 ? patch(x, z, 28, 0.06) : 0), { scale: [1.0, 1.9] }));
+  add("crowberry", MP.dwarfShrubParts(2, 1), scatterPts(N(420), 29, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.65 && h > 20 && h < 85 ? patch(x, z, 29, 0.06) : 0), { scale: [1.0, 1.9] }));
+  add("shrub_01", (await H("shrub_01", { grade: true, wind: 0.3, trans: 0.3, h: 0.7, fade: FDS })).parts, scatterPts(N(60), 30, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.7 && h > 5 && h < 60 ? patch(x, z, 30) * wd(x, z) : 0), { scale: [0.8, 1.5] }));
+  add("juniper A", MP.juniperParts(1), scatterPts(N(120), 31, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > 15 && h < 80 ? patch(x, z, 31, 0.05) * wd(x, z) * valleyClear(x, z) : 0), { scale: [0.9, 1.6] }));
+  add("juniper B", MP.juniperParts(2), scatterPts(N(120), 32, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > 15 && h < 80 ? patch(x, z, 32, 0.05) * wd(x, z) * valleyClear(x, z) : 0), { scale: [0.9, 1.6] }));
 
   // ---- rocks: scree, boulders, crags, cliffs
-  const scr = (x, z, h, ny) => (ny > 0.5 && ny < 0.86 && h > 14 ? 0.35 + 0.65 * patch(x, z, 40, 0.07) : 0);
+  const scr = (x: number, z: number, h: number, ny: number) => (ny > 0.5 && ny < 0.86 && h > 14 ? 0.35 + 0.65 * patch(x, z, 40, 0.07) : 0);
   add("scree shards A", MP.screeParts(1), scatterPts(N(2200), 40, AREA, scr, { scale: [1.0, 2.2] }), { y: -0.02 });
   add("scree shards B", MP.screeParts(2), scatterPts(N(2200), 41, AREA, scr, { scale: [1.0, 2.2] }), { y: -0.02 });
   for (const id of ["Pebble_Square_1", "Pebble_Square_3", "Pebble_Square_5", "Pebble_Round_2"]) add(id, (await Lq(id, { h: 0.14, tint: [1, 1, 1.05], fade: [28, 50] })).parts, scatterPts(N(500), 42 + id.length, AREA, scr, { scale: [0.8, 2.0] }), { y: -0.01 });
-  const rk = (x, z, h, ny) => (ny > 0.55 && h > 4 && h < 140 ? (0.1 + 0.9 * patch(x, z, 50, 0.04)) * wd(x, z) * valleyClear(x, z) : 0);
-  const rockSp = async (name, res, n, sc, y = -0.15, fade?: number[]) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
+  const rk = (x: number, z: number, h: number, ny: number) => (ny > 0.55 && h > 4 && h < 140 ? (0.1 + 0.9 * patch(x, z, 50, 0.04)) * wd(x, z) * valleyClear(x, z) : 0);
+  const rockSp = async (name, res, n: number, sc: number[], y = -0.15, fade?: number[]) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
   const alt = (h) => M.SNOWLINE - 12;                                                                              // snow dust from just below the snowline
   const RW = { lichen: 0.7, snow: 0.55, snowAlt: M.SNOWLINE - 18 };
   await rockSp("boulder_01", wx(await H("boulder_01", { grade: true, fade: [100, 150] }), RW), 8, [1.2, 2.2]);
@@ -245,16 +245,16 @@ export async function buildMountain(ctx) {
   await rockSp("rock_moss_set_01", wx(await H("rock_moss_set_01", { grade: true, fade: FDS }), { lichen: 0.3 }), 14, [1.2, 2.0]);
   for (let i = 1; i <= 3; i++) await rockSp("Rock_Medium_" + i, wx(await Lq("Rock_Medium_" + i, { fade: [100, 150] }), RW), 16, [1.0, 2.2]);
   for (let s = 1; s <= 4; s++) { const parts = MP.cragParts(s); MP.weather(parts, { snow: 0.5, snowAlt: M.SNOWLINE - 18, lichen: 0.6 }); for (const p of parts) p.mat.userData.toon.fade = [140, 200];
-    add("crag " + s, parts, scatterPts(N(18), 60 + s, AREA, (x, z, h, ny) => (ny > 0.3 && h > 35 ? 0.2 + 0.8 * patch(x, z, 60 + s, 0.05) : 0), { scale: [1.4, 3.2] }), { y: -0.4, cell: 32 }); }
-  { const parts = MP.spireCluster(2); MP.weather(parts, { snow: 0.6, snowAlt: M.SNOWLINE - 18 }); for (const p of parts) p.mat.userData.toon.fade = [150, 220]; add("spire clusters", parts, scatterPts(N(12), 70, AREA, (x, z, h, ny) => (h > 70 ? 1 : 0), { scale: [2, 3.6] }), { y: -0.5, cell: 32 }); }
+    add("crag " + s, parts, scatterPts(N(18), 60 + s, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.3 && h > 35 ? 0.2 + 0.8 * patch(x, z, 60 + s, 0.05) : 0), { scale: [1.4, 3.2] }), { y: -0.4, cell: 32 }); }
+  { const parts = MP.spireCluster(2); MP.weather(parts, { snow: 0.6, snowAlt: M.SNOWLINE - 18 }); for (const p of parts) p.mat.userData.toon.fade = [150, 220]; add("spire clusters", parts, scatterPts(N(12), 70, AREA, (x, z, h: number, ny) => (h > 70 ? 1 : 0), { scale: [2, 3.6] }), { y: -0.5, cell: 32 }); }
   for (const id of ["rock_face_01", "rock_face_02", "namaqualand_cliff_01", "namaqualand_cliff_02", "mountainside"]) {
     const res = wx(await H(id, { grade: true, fade: [150, 230] }), { lichen: 0.5, snow: 0.35, snowAlt: M.SNOWLINE - 10 });
-    add(id, res.parts, scatterPts(N(7), 80 + id.length, AREA, (x, z, h, ny) => (ny < 0.6 && h > 14 ? 1 : 0), { scale: [1.2, 2.2], tries: 400 }), { y: -1.0, cell: 32 });
+    add(id, res.parts, scatterPts(N(7), 80 + id.length, AREA, (x, z, h: number, ny: number) => (ny < 0.6 && h > 14 ? 1 : 0), { scale: [1.2, 2.2], tries: 400 }), { y: -1.0, cell: 32 });
   }
   { const parts = MP.cliffParts(1); MP.weather(parts, { snow: 0.4, snowAlt: M.SNOWLINE - 10 }); for (const p of parts) p.mat.userData.toon.fade = [160, 240];
-    add("cliff faces (procedural)", parts, scatterPts(N(10), 90, AREA, (x, z, h, ny) => (ny < 0.5 && h > 25 ? 1 : 0), { scale: [1.2, 2.2], tries: 600 }), { y: -0.8, cell: 32 }); }
+    add("cliff faces (procedural)", parts, scatterPts(N(10), 90, AREA, (x, z, h: number, ny: number) => (ny < 0.5 && h > 25 ? 1 : 0), { scale: [1.2, 2.2], tries: 600 }), { y: -0.8, cell: 32 }); }
   { const g = MP.glacierParts(1); for (const p of g) p.mat.userData.toon.fade = [180, 260];
-    const gp = scatterPts(N(5), 91, AREA, (x, z, h, ny) => (ny > 0.8 && h > M.SNOWLINE - 8 && h < M.SNOWLINE + 70 ? 1 : 0), { scale: [3.0, 4.5], tries: 800 });
+    const gp = scatterPts(N(5), 91, AREA, (x, z, h: number, ny: number) => (ny > 0.8 && h > M.SNOWLINE - 8 && h < M.SNOWLINE + 70 ? 1 : 0), { scale: [3.0, 4.5], tries: 800 });
     add("glacier tongues", g, gp, { y: -0.1, cell: 64 }); }
 
   // ---- trees by LOD species with impostor atlas: spruce, larch, fir, pines (some snow-dusted), krummholz, snags
@@ -264,11 +264,11 @@ export async function buildMountain(ctx) {
     const levels: LODLevel[] = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
     const sp = new LODSpecies(name, levels, mats, pts.length, l1 ? [o.d0 ?? 28, o.d1 ?? 90] : [o.d1 ?? 60]); lods.push(sp); root.add(sp.group); note(name, pts.length, l0); info.impostors++;
   };
-  const forestP = (hmax = M.TREELINE) => (x, z, h, ny) => (ny > 0.62 && h > 1.5 && h < hmax + 6 ? (1 - sstep(hmax - 10, hmax + 6, h + 5 * (vnoise(x, z, 0.08, 3) - 0.5))) * (0.15 + 0.85 * Math.pow(vnoise(x, z, 0.018, 70), 1.3) * 1.8) * sstep(3, 8, waterDist(x, z)) * sstep(18, 40, Math.hypot(x - 2, z - 6)) : 0);
-  const fp = forestP(), tp = (n, seed, sc) => scatterPts(N(n), seed, AREA, fp, { scale: sc, tries: 120 });
+  const forestP = (hmax = M.TREELINE) => (x: number, z: number, h: number, ny: number) => (ny > 0.62 && h > 1.5 && h < hmax + 6 ? (1 - sstep(hmax - 10, hmax + 6, h + 5 * (vnoise(x, z, 0.08, 3) - 0.5))) * (0.15 + 0.85 * Math.pow(vnoise(x, z, 0.018, 70), 1.3) * 1.8) * sstep(3, 8, waterDist(x, z)) * sstep(18, 40, Math.hypot(x - 2, z - 6)) : 0);
+  const fp = forestP(), tp = (n: number, seed: number, sc: number[]) => scatterPts(N(n), seed, AREA, fp, { scale: sc, tries: 120 });
   species("spruce A", ezTreeParts("Pine Medium", 3, SPRUCE, 14), null, tp(120, 100, [0.8, 1.35]), { d1: 55 });
   species("spruce B", ezTreeParts("Pine Medium", 8, SPRUCE2, 11), null, tp(120, 101, [0.8, 1.35]), { d1: 55 });
-  { const p = ezTreeParts("Pine Medium", 3, SPRUCE, 14); MP.weather(p, { snow: 0.8 }); species("spruce A (snow-dusted)", p, null, scatterPts(N(80), 102, AREA, (x, z, h, ny) => (ny > 0.62 && h > 22 && h < M.TREELINE + 6 ? fp(x, z, h, ny) * 2 : 0), { scale: [0.8, 1.3], tries: 200 }), { d1: 55 }); }
+  { const p = ezTreeParts("Pine Medium", 3, SPRUCE, 14); MP.weather(p, { snow: 0.8 }); species("spruce A (snow-dusted)", p, null, scatterPts(N(80), 102, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.62 && h > 22 && h < M.TREELINE + 6 ? fp(x, z, h, ny) * 2 : 0), { scale: [0.8, 1.3], tries: 200 }), { d1: 55 }); }
   species("larch A", ezTreeParts("Pine Medium", 5, LARCH, 15), null, tp(70, 103, [0.8, 1.3]), { d1: 55 });
   species("larch B", ezTreeParts("Pine Medium", 12, LARCH, 12), null, tp(70, 104, [0.8, 1.3]), { d1: 55 });
   species("fir_tree_01", (await loadToon(`${ASSETS}polyhaven/fir_tree_01.glb`, { grade: true, wind: 0.25, flutter: 0.4, h: 14 })).parts, (await loadToon(`${ASSETS}polyhaven/fir_tree_01_lod1.glb`, { grade: true, wind: 0.25, flutter: 0.4, h: 14 })).parts, tp(60, 105, [0.7, 1.15]), { d0: 26, d1: 80 });
@@ -277,21 +277,21 @@ export async function buildMountain(ctx) {
     species("Pine_" + i, (await loadToon(`${ASSETS}quaternius/Pine_${i}.glb`, t)).parts, (await loadToon(`${ASSETS}quaternius/Pine_${i}_lod1.glb`, t)).parts, tp(50, 106 + i, [0.8, 1.3]), { d0: 28, d1: 90 });
   }
   { const t = { wind: 0.3, flutter: 0.5, h: 9 }, p = (await loadToon(`${ASSETS}quaternius/Pine_2.glb`, t)).parts, p1 = (await loadToon(`${ASSETS}quaternius/Pine_2_lod1.glb`, t)).parts; MP.weather(p, { snow: 0.7 }); MP.weather(p1, { snow: 0.7 });
-    species("Pine_2 (snow-dusted)", p, p1, scatterPts(N(50), 120, AREA, (x, z, h, ny) => (ny > 0.62 && h > 20 && h < M.TREELINE + 6 ? fp(x, z, h, ny) * 2 : 0), { scale: [0.8, 1.3], tries: 200 }), { d0: 28, d1: 90 }); }
+    species("Pine_2 (snow-dusted)", p, p1, scatterPts(N(50), 120, AREA, (x: number, z: number, h: number, ny: number) => (ny > 0.62 && h > 20 && h < M.TREELINE + 6 ? fp(x, z, h, ny) * 2 : 0), { scale: [0.8, 1.3], tries: 200 }), { d0: 28, d1: 90 }); }
   species("pine_sapling_medium", (await loadToon(`${ASSETS}polyhaven/pine_sapling_medium.glb`, { grade: true, wind: 0.3, flutter: 0.4, h: 4 })).parts, null, tp(40, 121, [0.8, 1.4]), { d1: 40 });
   // upper belt: krummholz (wind-bent) between the tree line and the alpine meadow, all facing the lee direction through their own geometry
-  const kp = (x, z, h, ny) => (ny > 0.6 && h > M.TREELINE - 8 && h < M.TREELINE + 30 ? sstep(M.TREELINE - 8, M.TREELINE + 2, h) * (1 - sstep(M.TREELINE + 18, M.TREELINE + 30, h)) * (0.3 + 0.7 * patch(x, z, 130, 0.05)) : 0);
+  const kp = (x: number, z: number, h: number, ny: number) => (ny > 0.6 && h > M.TREELINE - 8 && h < M.TREELINE + 30 ? sstep(M.TREELINE - 8, M.TREELINE + 2, h) * (1 - sstep(M.TREELINE + 18, M.TREELINE + 30, h)) * (0.3 + 0.7 * patch(x, z, 130, 0.05)) : 0);
   for (let k = 1; k <= 3; k++) add("krummholz " + "ABC"[k - 1], MP.krummholzParts(k), scatterPts(N(60), 130 + k, AREA, kp, { scale: [0.9, 1.7], tries: 200 }), { y: -0.05, cell: 24 });
   for (const i of [1, 2, 3]) add("Twisted pine " + i, (await Lq("TwistedTree_" + i, { wind: 0.3, flutter: 0.5, h: 3.2, fade: FDS })).parts, scatterPts(N(30), 140 + i, AREA, kp, { scale: [0.8, 1.4], tries: 200 }), { cell: 24 });
   // dead silver snags in the forest belt and above
-  const dp = (x, z, h, ny) => (ny > 0.55 && h > 6 && h < M.TREELINE + 30 ? (0.1 + 0.9 * vnoise(x, z, 0.03, 150)) * 0.2 * sstep(18, 40, Math.hypot(x - 2, z - 6)) * sstep(3, 8, waterDist(x, z)) : 0);
+  const dp = (x: number, z: number, h: number, ny: number) => (ny > 0.55 && h > 6 && h < M.TREELINE + 30 ? (0.1 + 0.9 * vnoise(x, z, 0.03, 150)) * 0.2 * sstep(18, 40, Math.hypot(x - 2, z - 6)) * sstep(3, 8, waterDist(x, z)) : 0);
   for (let s = 1; s <= 3; s++) { const parts = MP.snagParts(s); for (const p of parts) p.mat.userData.toon.fade = [100, 160]; add("silver snag " + s, parts, scatterPts(N(24), 150 + s, AREA, dp, { scale: [0.8, 1.3], tries: 200 }), { y: -0.1, cell: 32 }); }
   for (const i of [2, 4]) add("DeadTree_" + i + " (silver)", (await Lq("DeadTree_" + i, { wind: 0.05, h: 6, tint: [1.25, 1.28, 1.32], fade: [100, 160] })).parts, scatterPts(N(18), 160 + i, AREA, dp, { scale: [0.8, 1.3], tries: 200 }), { y: -0.1, cell: 32 });
   add("dead_tree_trunk", (await H("dead_tree_trunk", { grade: true, tint: [1.2, 1.22, 1.25], fade: FDS })).parts, scatterPts(N(14), 170, AREA, dp, { scale: [1.0, 1.6], tries: 200 }), { y: -0.1 });
 
   return {
     root, info, cull,
-    update(camera, frame) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
+    update(camera, frame: number) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
     lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 } as BiomeMountainTerrain; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; return t; },
   };
 }

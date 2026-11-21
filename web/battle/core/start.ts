@@ -37,7 +37,7 @@ async function swapPlayerModel(name) {
   // wfightmn plays it; archive=(id>>18)&0x7f). Stage-local record first (4
   // screens collide across stages), then global; batl00 = the documented
   // default written by wfightts@0xebc for non-trigger battles.
-  function musicForScreen(screenId, mapId) {
+  function musicForScreen(screenId: number | null | undefined, mapId: number | undefined) {
     if (screenId == null || !B.battleMusicDB) return "batl00";
     const sk = mapId ? "s" + String(mapId).replace(/^s/, "") : null;
     const local = sk ? (B.battleMusicDB[sk] || []).find(r => r.screen_id === screenId) : null;
@@ -74,7 +74,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
 
     const playerRoster = B.buildPlayerRoster(state);
     if (!playerRoster.length) return;
-    const playerRecords = playerRoster.map((member, index) =>
+    const playerRecords = playerRoster.map((member, index: number) =>
       B.buildPlayerRecord(member, index === 0 ? playerProf.id : null));
     const initialPlayer = playerRecords[0];
 

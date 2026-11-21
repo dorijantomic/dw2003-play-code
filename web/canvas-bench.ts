@@ -7,7 +7,7 @@ const CLOSE = /(^|[#&,])close($|[&,=])/.test(location.hash);
 const WARM_MS = 1000, MEASURE_MS = 4000;
 const LW = 640, LH = 480;
 const hud = document.getElementById("hud");
-const say = (t) => { hud.textContent = t; };
+const say = (t: string | null) => { hud.textContent = t; };
 
 function browserName(ua) {
     if (/Firefox\//.test(ua)) return "firefox";
@@ -29,8 +29,8 @@ function glInfo() {
     out.renderString = out.unmaskedRenderer || out.renderer;
     return out;
 }
-const r3 = (v) => Math.round(v * 1000) / 1000;
-function pct(sorted, p) { const n = sorted.length; return n ? sorted[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] : null; }
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
+function pct(sorted, p: number) { const n = sorted.length; return n ? sorted[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))] : null; }
 
 // ---- sources
 function makeSource() {
@@ -71,7 +71,7 @@ const RECTS = Array.from({ length: 20 }, () => ({ x: lrnd() * (LW - 260), y: lrn
 const SPOS = Array.from({ length: 150 }, () => ({ x: lrnd() * (LW - 32), y: lrnd() * (LH - 32) }));
 const APOS = Array.from({ length: 60 }, () => ({ x: 3 + lrnd() * (LW - 6), y: 3 + lrnd() * (LH - 6) }));
 
-let src, sprite, strips, glc, glFrame = 0;
+let src: HTMLCanvasElement, sprite: HTMLCanvasElement, strips: HTMLCanvasElement, glc, glFrame = 0;
 
 function big(ctx) { ctx.imageSmoothingEnabled = true; ctx.drawImage(src, 0, 0, LW, LH); }
 function radials(ctx) {
@@ -89,8 +89,8 @@ function linears(ctx) {
         ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
     }
 }
-function solids(ctx) { ctx.fillStyle = "rgba(255,200,80,0.3)"; for (const r of RECTS) ctx.fillRect(r.x, r.y, r.w, r.h); }
-function fulls(ctx) { ctx.fillStyle = "rgba(20,40,90,0.15)"; for (let i = 0; i < 4; i++) ctx.fillRect(0, 0, LW, LH); }
+function solids(ctx: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) { ctx.fillStyle = "rgba(255,200,80,0.3)"; for (const r of RECTS) ctx.fillRect(r.x, r.y, r.w, r.h); }
+function fulls(ctx: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) { ctx.fillStyle = "rgba(20,40,90,0.15)"; for (let i = 0; i < 4; i++) ctx.fillRect(0, 0, LW, LH); }
 function sprites(ctx) { for (const p of SPOS) ctx.drawImage(sprite, p.x, p.y, 32, 32); }
 
 function hlinears(ctx) {
@@ -100,7 +100,7 @@ function hlinears(ctx) {
         ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
     }
 }
-let cachedGrads = null, gradCanvas = null;
+let cachedGrads: CanvasGradient[] | null = null, gradCanvas: HTMLCanvasElement | null = null;
 function getCachedGrads() {
     if (!cachedGrads) {
         const g0 = document.createElement("canvas").getContext("2d");
@@ -144,7 +144,7 @@ function gradStrip() {
     }
     return gradCanvas;
 }
-function gradImages(ctx) { const s = gradStrip(); for (const r of RECTS) ctx.drawImage(s, 0, 0, 1, 256, r.x, r.y, r.w, r.h); }
+function gradImages(ctx: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number) => void; }) { const s = gradStrip(); for (const r of RECTS) ctx.drawImage(s, 0, 0, 1, 256, r.x, r.y, r.w, r.h); }
 function linearsPath(ctx) {
     for (const r of RECTS) {
         const g = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
@@ -167,7 +167,7 @@ function radial1(ctx) {
     g.addColorStop(0, "rgba(255,200,80,0.5)"); g.addColorStop(1, "rgba(255,200,80,0)");
     ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
 }
-let radialPreCanvas = null;
+let radialPreCanvas: HTMLCanvasElement | null = null;
 function radialPre() {
     if (!radialPreCanvas) {
         radialPreCanvas = document.createElement("canvas"); radialPreCanvas.width = 256; radialPreCanvas.height = 256;
@@ -184,15 +184,15 @@ const CASES = [
     { id: 2, d: "1 big drawImage 1664x1280 over whole canvas", f: (c) => { big(c); } },
     { id: 3, d: "case 2 + 20 fillRect with new radial gradient each", f: (c) => { big(c); radials(c); } },
     { id: 4, d: "case 2 + 20 fillRect with new linear gradient each", f: (c) => { big(c); linears(c); } },
-    { id: 5, d: "case 2 + 20 fillRect solid semi-transparent", f: (c) => { big(c); solids(c); } },
-    { id: 6, d: "case 2 + 4 full-screen fillRect semi-transparent", f: (c) => { big(c); fulls(c); } },
+    { id: 5, d: "case 2 + 20 fillRect solid semi-transparent", f: (c: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => { big(c); solids(c); } },
+    { id: 6, d: "case 2 + 4 full-screen fillRect semi-transparent", f: (c: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => { big(c); fulls(c); } },
     { id: 7, d: "case 2 + 150 sprite drawImage 64x64 -> 32x32 source-over", f: (c) => { big(c); sprites(c); } },
-    { id: 8, d: "case 7 with globalCompositeOperation lighter", f: (c) => { big(c); c.globalCompositeOperation = "lighter"; sprites(c); c.globalCompositeOperation = "source-over"; } },
-    { id: 9, d: "case 2 + ctx.filter brightness(0.9), 1 sprite, filter none", f: (c) => { big(c); c.filter = "brightness(0.9)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
-    { id: 10, d: "case 2 + ctx.filter sepia(0.3) saturate(1.2), 1 sprite, filter none", f: (c) => { big(c); c.filter = "sepia(0.3) saturate(1.2)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
-    { id: 11, d: "case 2 + save, clip rect whole view, 150 sprites, restore", f: (c) => { big(c); c.save(); c.beginPath(); c.rect(0, 0, LW, LH); c.clip(); sprites(c); c.restore(); } },
-    { id: 12, d: "case 2 + 60 small solid arc fills (r=3 logical)", f: (c) => { big(c); c.fillStyle = "#ffd34d"; for (const p of APOS) { c.beginPath(); c.arc(p.x, p.y, 3, 0, Math.PI * 2); c.fill(); } } },
-    { id: 13, d: "case 2 + 30 drawImage strips 8px tall from a second 640x480 2D canvas", f: (c) => { big(c); for (let i = 0; i < 30; i++) { const y = i * 16; c.drawImage(strips, 0, y, LW, 8, 0, y, LW, 8); } } },
+    { id: 8, d: "case 7 with globalCompositeOperation lighter", f: (c: { globalCompositeOperation: string; }) => { big(c); c.globalCompositeOperation = "lighter"; sprites(c); c.globalCompositeOperation = "source-over"; } },
+    { id: 9, d: "case 2 + ctx.filter brightness(0.9), 1 sprite, filter none", f: (c: { filter: string; drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number) => void; }) => { big(c); c.filter = "brightness(0.9)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
+    { id: 10, d: "case 2 + ctx.filter sepia(0.3) saturate(1.2), 1 sprite, filter none", f: (c: { filter: string; drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number) => void; }) => { big(c); c.filter = "sepia(0.3) saturate(1.2)"; c.drawImage(sprite, 100, 100, 32, 32); c.filter = "none"; } },
+    { id: 11, d: "case 2 + save, clip rect whole view, 150 sprites, restore", f: (c: { save: () => void; beginPath: () => void; rect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; clip: () => void; restore: () => void; }) => { big(c); c.save(); c.beginPath(); c.rect(0, 0, LW, LH); c.clip(); sprites(c); c.restore(); } },
+    { id: 12, d: "case 2 + 60 small solid arc fills (r=3 logical)", f: (c: { fillStyle: string; beginPath: () => void; arc: (arg0: number, arg1: number, arg2: number, arg3: number, arg4: number) => void; fill: () => void; }) => { big(c); c.fillStyle = "#ffd34d"; for (const p of APOS) { c.beginPath(); c.arc(p.x, p.y, 3, 0, Math.PI * 2); c.fill(); } } },
+    { id: 13, d: "case 2 + 30 drawImage strips 8px tall from a second 640x480 2D canvas", f: (c: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number) => void; }) => { big(c); for (let i = 0; i < 30; i++) { const y = i * 16; c.drawImage(strips, 0, y, LW, 8, 0, y, LW, 8); } } },
     { id: 14, d: "case 2 + 1 drawImage of 640x480 WebGL canvas (cleared each frame) covering view", f: (c) => {
         big(c);
         const gl = glc.gl;
@@ -208,10 +208,10 @@ const CASES = [
         g.addColorStop(0, "rgba(255,200,80,0.5)"); g.addColorStop(1, "rgba(255,200,80,0)");
         c.fillStyle = g; c.fillRect(r.x, r.y, r.w, r.h);
     } },
-    { id: 19, d: "case 2 + 20 vertical linear gradients created once (cached), reused every frame", f: (c) => { big(c); const gs = getCachedGrads(); for (let i = 0; i < RECTS.length; i++) { const r = RECTS[i]; c.fillStyle = gs[i]; c.fillRect(r.x, r.y, r.w, r.h); } } },
+    { id: 19, d: "case 2 + 20 vertical linear gradients created once (cached), reused every frame", f: (c: { fillStyle: CanvasGradient | undefined; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => { big(c); const gs = getCachedGrads(); for (let i = 0; i < RECTS.length; i++) { const r = RECTS[i]; c.fillStyle = gs[i]; c.fillRect(r.x, r.y, r.w, r.h); } } },
     { id: 20, d: "case 2 + 20 vertical linear gradients with 3 stops", f: (c) => { big(c); linears3(c); } },
     { id: 21, d: "case 2 + 10 slanted shafts, lighter, horizontal 3-stop gradient each", f: (c) => { big(c); shafts(c); } },
-    { id: 22, d: "case 2 + 20 drawImage of pre-made 1x256 gradient canvas stretched to 260x195", f: (c) => { big(c); gradImages(c); } },
+    { id: 22, d: "case 2 + 20 drawImage of pre-made 1x256 gradient canvas stretched to 260x195", f: (c: { drawImage: (arg0: HTMLCanvasElement, arg1: number, arg2: number, arg3: number, arg4: number, arg5: number, arg6: number, arg7: number, arg8: number) => void; }) => { big(c); gradImages(c); } },
     { id: 23, d: "case 2 + 20 vertical linear gradients drawn with fill() on a rect path", f: (c) => { big(c); linearsPath(c); } },
     { id: 30, fresh: true, d: "FRESH canvas: heavy only (6 full drawImage alpha 0.5 + 150 sprites)", f: (c) => { heavy(c); } },
     { id: 31, fresh: true, keep: true, d: "FRESH canvas: heavy + 1 radial gradient fillRect 260x195", f: (c) => { heavy(c); radial1(c); } },
@@ -226,7 +226,7 @@ const RUN_CASES = CASES.filter((cs) => !DISABLED.has(cs.id));
 
 let cvEl = document.getElementById("cv");
 let nativeW = 0, nativeH = 0;
-function freshCanvas(w, h) {
+function freshCanvas(w: number, h: number) {
     const n = document.createElement("canvas");
     n.id = "cv"; n.width = w; n.height = h;
     cvEl.replaceWith(n); cvEl = n;
@@ -248,9 +248,9 @@ function runCase(cs) {
             ctx = keptEl.getContext("2d");
         } else ctx = freshCanvas(w, h);
         const sx = w / LW, sy = h / LH;
-        const gaps = [], js = [];
-        let t0 = null, last = null, frames = 0, mFirst = null, mLast = null;
-        const frame = (ts) => {
+        const gaps: number[] = [], js: number[] = [];
+        let t0: number | null = null, last: number | null = null, frames = 0, mFirst: number | null = null, mLast: number | null = null;
+        const frame = (ts: number) => {
             if (t0 === null) t0 = ts;
             const el = ts - t0;
             const measuring = el >= WARM_MS;

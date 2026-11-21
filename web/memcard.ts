@@ -56,7 +56,7 @@ export function slotForFile(file) {
 }
 
 /** XOR-8 over `bytes[from..to)`; the manager's checksum service (+0x358). */
-export function xor8(bytes, from = 4, to = DIR_BLOCK_SIZE) {
+export function xor8(bytes: number[] | Uint8Array<ArrayBuffer>, from = 4, to = DIR_BLOCK_SIZE) {
     let sum = 0;
     for (let i = from; i < to; i++) sum ^= bytes[i] & 0xff;
     return sum & 0xff;
@@ -143,7 +143,7 @@ export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs
             const img = read()[slot]?.image;
             return img ? Uint8Array.from(img) : null;
         },
-        store(file, bytes) {
+        store(file, bytes: Iterable<number>) {
             const buf = Uint8Array.from(bytes);
             // A directory header names its own slot in +0x01 (the writer stamps
             // the selected slot there); the image write carries no slot, so it

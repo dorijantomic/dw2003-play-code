@@ -13,9 +13,9 @@
 // 52/52 partition rule (which the extracted table reproduces exactly for techs 1..104).
 let TECH_TABLE = null;
 export function setTechTable(json) { TECH_TABLE = json || null; }
-export function techRecord(techId) { return TECH_TABLE?.[String(techId)] ?? null; }
+export function techRecord(techId: number) { return TECH_TABLE?.[String(techId)] ?? null; }
 
-export function techToClip(techId) {
+export function techToClip(techId: number) {
   const rec = techRecord(techId);
   if (rec && rec.clip != null) return rec.clip;
   if (techId >= 1 && techId <= 52) return 5;
@@ -34,7 +34,7 @@ export function techToClip(techId) {
 // A zero +0x0e on any other clip leaves the field as the actor was constructed (0), and an
 // absent record leaves the browser's field unset (null = op3 9999 skips, the faithful no-op).
 export const TECH_BASIC_FALLBACK_EFFECT = 0x2e;
-export function techEffectType(rec) {
+export function techEffectType(rec: { effect: number; clip: number; }) {
   if (!rec) return null;
   const effect = rec.effect | 0;
   if (effect !== 0) return effect;
@@ -51,14 +51,14 @@ export function techEffectType(rec) {
 // setItemUseEffects. Until it loads, itemUseEffect() returns null -> the item action runs with
 // no effect write, the faithful behaviour for a context with no matching record.
 export const ITEM_USE_CLIP = 10; // the clip the default arm writes to actor+0x54
-let ITEM_USE_EFFECTS = null;     // Map item id -> { effect, sound }
+let ITEM_USE_EFFECTS: Map<number, { effect: number; sound: number; }> | null = null;     // Map item id -> { effect, sound }
 export function setItemUseEffects(json) {
   const recs = json?.records;
   ITEM_USE_EFFECTS = Array.isArray(recs)
     ? new Map(recs.map((r) => [r.item | 0, { effect: r.effect | 0, sound: r.sound | 0 }]))
     : null;
 }
-export function itemUseEffect(itemId) { return ITEM_USE_EFFECTS?.get(itemId | 0) ?? null; }
+export function itemUseEffect(itemId: number) { return ITEM_USE_EFFECTS?.get(itemId | 0) ?? null; }
 
 // Defender damage-reaction clips — USER VISUAL GROUND TRUTH (Renamon + Agumon, N=2, 2026-06-21,
 // authored blind in fight-action-lab and matched byte-for-byte against the scripts):
@@ -98,8 +98,8 @@ export function setThrowItemEffects(json) {
     ? new Map(recs.map((r) => [r.item | 0, r]))
     : null;
 }
-export function throwItemEffect(itemId) { return THROW_ITEM_EFFECTS?.get(itemId | 0) ?? null; }
-export function isThrowItem(itemId) {
+export function throwItemEffect(itemId: number) { return THROW_ITEM_EFFECTS?.get(itemId | 0) ?? null; }
+export function isThrowItem(itemId: number) {
   const id = itemId | 0;
   return id >= THROW_ITEM_BAND[0] && id <= THROW_ITEM_BAND[1];
 }
@@ -119,7 +119,7 @@ export function isThrowItem(itemId) {
 // cures or charges its USER, so the default arm is a SELF presentation. The throw band
 // 77..90 is a typed attack arm (clips 14/15/17, motion/effect of the thrown item) and stays
 // aimed at the opponent.
-let SKILL_TYPES = null;                    // Map skill id -> "attack" | "heal" | "support"
+let SKILL_TYPES: Map<number, string> | null = null;                    // Map skill id -> "attack" | "heal" | "support"
 let SKILL_ROWS = null;                     // Map skill id -> the whole skills row (hits, name, clip)
 let SKILL_BY_NAME = null;                  // Map skill name -> the rows that carry it
 export function setSkillTable(json) {
@@ -140,21 +140,21 @@ export function setSkillTable(json) {
     SKILL_BY_NAME.get(n).push(s);
   }
 }
-export function skillType(techId) { return SKILL_TYPES?.get(techId | 0) ?? null; }
+export function skillType(techId: number) { return SKILL_TYPES?.get(techId | 0) ?? null; }
 /** Every skills row that carries this NAME (the technique name the animator passes down), or []. */
 export function skillRowsForName(name) { return SKILL_BY_NAME?.get(String(name ?? "")) ?? []; }
 /** The technique's own skills row (digimon.json "skills"), or null before the table loads. */
-export function skillRow(techId) { return SKILL_ROWS?.get(techId | 0) ?? null; }
+export function skillRow(techId: number | null) { return SKILL_ROWS?.get(techId | 0) ?? null; }
 /**
  * The technique's in-game NAME ("Triple Fire"), which is the key the anatomy's per-technique tables use
  * (shots rules, firing limb). K13: a built script needs the name to know how many projectiles leave and
  * from which emitter, so the animator passes it down from the same skills row it already reads for hits.
  */
-export function techName(techId) { return skillRow(techId)?.name ?? null; }
+export function techName(techId: number | null) { return skillRow(techId)?.name ?? null; }
 /** "self" when the technique is a heal/support cast (or an unknown record is absent -> "enemy"). */
-export function techTargetClass(techId) {
+export function techTargetClass(techId: number) {
   const t = skillType(techId);
   return (t === "heal" || t === "support") ? "self" : "enemy";
 }
 /** The item machine's target: the default clip-10 arm is self-use, the throw band is an attack. */
-export function itemTargetClass(itemId) { return isThrowItem(itemId) ? "enemy" : "self"; }
+export function itemTargetClass(itemId: number) { return isThrowItem(itemId) ? "enemy" : "self"; }

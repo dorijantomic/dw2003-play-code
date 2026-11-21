@@ -57,15 +57,15 @@ export const EMITTER_CLASSES = ["prop", "hand", "head", "chest", "back", "tail",
 // ---------------------------------------------------------------- vector helpers
 
 export function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
-export function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
-export function mul(a, s) { return [a[0] * s, a[1] * s, a[2] * s]; }
-export function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
-export function len(a) { return Math.sqrt(dot(a, a)); }
-export function unit(a) { const l = len(a); return l > 1e-9 ? mul(a, 1 / l) : [0, 0, 0]; }
-export function dist(a, b) { return len(sub(a, b)); }
+export function sub(a: number[], b: number[]) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+export function mul(a: number[], s: number) { return [a[0] * s, a[1] * s, a[2] * s]; }
+export function dot(a, b: (number | undefined)[]) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+export function len(a: number[]) { return Math.sqrt(dot(a, a)); }
+export function unit(a: (number | undefined)[]) { const l = len(a); return l > 1e-9 ? mul(a, 1 / l) : [0, 0, 0]; }
+export function dist(a, b: number[]) { return len(sub(a, b)); }
 
 /** The angle between two vectors in degrees (0 = same direction, 180 = opposite). */
-export function angleBetween(a, b) {
+export function angleBetween(a: (number | undefined)[], b: number[]) {
   const ua = unit(a), ub = unit(b);
   const c = Math.max(-1, Math.min(1, dot(ua, ub)));
   return (Math.acos(c) * 180) / Math.PI;
@@ -78,7 +78,7 @@ export function angleBetween(a, b) {
  *   pitch signed elevation error, + = the axis points ABOVE the line (remember +Y is down)
  * `flat` is true when the target is ~directly overhead/underfoot (yaw undefined).
  */
-export function aimError(axis, origin, target) {
+export function aimError(axis: number[], origin: number[], target: number[]) {
   const d = sub(target, origin);
   const dl = len(d);
   const full = angleBetween(axis, d);
@@ -98,7 +98,7 @@ export function aimError(axis, origin, target) {
 
 // ---------------------------------------------------------------- the pose
 
-function sampleChannel(ch, frame) {
+function sampleChannel(ch, frame: number) {
   if (!ch || !ch.length) return [0, 0, 0];
   let lo = ch[0], hi = ch[0];
   for (const rec of ch) {
@@ -112,7 +112,7 @@ function sampleChannel(ch, frame) {
 
 // Rz(ax) x Ry(ay) x Rx(az), column-major 3x3 - battle3d.js ps1AnglesToMat3, and the argument order
 // (c2[2], c2[1], c2[0]) is the renderer's, not a typo.
-function ps1Mat3(ax, ay, az) {
+function ps1Mat3(ax: number, ay: number, az: number) {
   const cx = Math.cos(ax * TAU), sx = Math.sin(ax * TAU);
   const cy = Math.cos(ay * TAU), sy = Math.sin(ay * TAU);
   const cz = Math.cos(az * TAU), sz = Math.sin(az * TAU);
@@ -121,7 +121,7 @@ function ps1Mat3(ax, ay, az) {
   const Rx = [1, 0, 0, 0, cz, sz, 0, -sz, cz];
   return mat3Mul(Rz, mat3Mul(Ry, Rx));
 }
-function mat3Mul(a, b) {
+function mat3Mul(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
     let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r] * b[c * 3 + k];
@@ -160,7 +160,7 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
     const t = blend.t;
     return [b[0] + (a[0] - b[0]) * t, b[1] + (a[1] - b[1]) * t, b[2] + (a[2] - b[2]) * t];
   };
-  const proc = (i) => {
+  const proc = (i: number) => {
     const b = model.bones[i];
     if (!b || !b.anim) { rot[i] = ps1Mat3(0, 0, 0); pos[i] = [0, 0, 0]; scale[i] = [1, 1, 1]; return; }
     const c2 = sample(b.anim.ch2), c1 = sample(b.anim.ch1);
@@ -183,7 +183,7 @@ export function poseFromChannels(model, frame, { blend = null } = {}) {
 }
 
 /** The renderer's matrix for one bone at this pose: the rotation columns times the ch3 draw scale. */
-export function boneMatrix(pose, i) {
+export function boneMatrix(pose, i: string | number) {
   const R = pose.rot[i], s = pose.scale?.[i] || [1, 1, 1], t = pose.pos[i];
   return [R[0] * s[0], R[1] * s[0], R[2] * s[0],
           R[3] * s[1], R[4] * s[1], R[5] * s[1],
@@ -192,7 +192,7 @@ export function boneMatrix(pose, i) {
 }
 
 /** One mesh vertex of `boneIdx` in the pose frame (the renderer's vertex path, D-flip included). */
-export function vertexWorld(model, boneIdx, v, pose) {
+export function vertexWorld(model, boneIdx: string | number, v: number[], pose) {
   const R = pose.rot[boneIdx], t = pose.pos[boneIdx];
   const s = pose.scale?.[boneIdx] || [1, 1, 1];
   const x = v[0] * s[0], y = v[1] * s[1], z = v[2] * s[2];
@@ -204,7 +204,7 @@ export function vertexWorld(model, boneIdx, v, pose) {
 }
 
 /** Every bone index in the subtree rooted at `root` (root included). */
-export function subtree(model, root) {
+export function subtree(model, root: string | number) {
   const n = model.num_bones ?? model.bones.length;
   const kids = new Map();
   for (let i = 0; i < n; i++) {
@@ -212,8 +212,8 @@ export function subtree(model, root) {
     if (!kids.has(p)) kids.set(p, []);
     kids.get(p).push(i);
   }
-  const out = [];
-  const walk = (i) => { out.push(i); for (const k of kids.get(i) ?? []) walk(k); };
+  const out: (string | number)[] = [];
+  const walk = (i: string | number) => { out.push(i); for (const k of kids.get(i) ?? []) walk(k); };
   walk(root);
   return out;
 }
@@ -302,7 +302,7 @@ export function pca(points) {
 // ---------------------------------------------------------------- emitter class
 
 /** The arm chain a bone belongs to ('left' | 'right' | null), and whether it is that arm's tip. */
-export function armOfBone(folder, boneIdx) {
+export function armOfBone(folder: string | number, boneIdx) {
   const m = boneMap(folder);
   if (!m) return null;
   const sides = [["left", m.aL], ["right", m.aR]];
@@ -327,7 +327,7 @@ export function armOfBone(folder, boneIdx) {
  *   { cls, bone, arm: {side, chain} | null, equip, reason }
  * `cls` is one of EMITTER_CLASSES; null for an unknown model or a site the rig does not have.
  */
-export function emitterClass(folder, emitterId) {
+export function emitterClass(folder: string | number, emitterId) {
   const m = boneMap(folder);
   if (!m) return { cls: null, bone: null, reason: "no-model" };
   const id = String(emitterId || "");
@@ -378,7 +378,7 @@ export function emitterClass(folder, emitterId) {
  * (poseFromChannels(model, restFrame)); the direction that was +Z in the rest pose is turned by
  * R_now * R_rest^T. The result is unit length.
  */
-export function carriedFacing(boneIdx, pose, rest) {
+export function carriedFacing(boneIdx: string | number, pose, rest) {
   const R = pose.rot[boneIdx], R0 = rest.rot[boneIdx];
   if (!R || !R0) return [0, 0, 1];
   const local = applyRot(transpose3(R0), [0, 0, 1]);
@@ -386,12 +386,12 @@ export function carriedFacing(boneIdx, pose, rest) {
 }
 
 /** The direction of a bone CHAIN in the pose (first joint -> last joint), unit length. */
-export function chainDirection(chain, pose) {
+export function chainDirection(chain, pose: { pos: { [x: string]: number[]; }; }) {
   if (!chain || chain.length < 2) return [0, 0, 1];
   return unit(sub(pose.pos[chain[chain.length - 1]], pose.pos[chain[0]]));
 }
 
-function propAxis(model, bone, pose, bones, kind = "elongated", anchor = null) {
+function propAxis(model, bone: string | number, pose, bones, kind = "elongated", anchor = null) {
   const pts = pointsOf(model, bones ?? subtree(model, bone), pose);
   const P = pca(pts);
   if (!P.axes.length) return null;
@@ -434,7 +434,7 @@ function propAxis(model, bone, pose, bones, kind = "elongated", anchor = null) {
   return { axis, pca: P, which, spread, sep, collapsed, unstable };
 }
 
-function handAxes(model, bone, pose, arm) {
+function handAxes(model, bone: string | number, pose, arm) {
   const P = pca(pointsOf(model, subtree(model, bone), pose));
   if (!P.axes.length) return null;
   // push: from the wrist (the bone before the hand in the chain) into the hand block
@@ -466,7 +466,7 @@ function handAxes(model, bone, pose, arm) {
  * `variant` picks the hand-class candidate ('push' | 'palm'); the class default comes from the
  * calibration (HAND_DEFAULT). Returns null when the site has no geometry to read.
  */
-export function firingAxis(model, folder, emitterId, pose, { rest = null, variant = null } = {}) {
+export function firingAxis(model, folder: string | number, emitterId, pose, { rest = null, variant = null } = {}) {
   const info = emitterClass(folder, emitterId);
   if (!info.cls || info.bone == null) return null;
   const bone = info.bone;
@@ -556,7 +556,7 @@ export const HAND_DEFAULT = "push";
  * unit vectors in the pose frame; none is right for every arm design, which is why the K19b
  * calibration measured them against the disc's own casts and firingAxis() picks by class.
  */
-export function armAxisCandidates(model, folder, emitterId, pose) {
+export function armAxisCandidates(model, folder: string | number, emitterId, pose) {
   const info = emitterClass(folder, emitterId);
   if (!info.bone) return null;
   const bone = info.bone;
@@ -574,7 +574,7 @@ export function armAxisCandidates(model, folder, emitterId, pose) {
 }
 
 /** Both hand-class candidates, so a caller (or the calibration) can compare them. */
-export function axisVariants(model, folder, emitterId, pose, { rest = null } = {}) {
+export function axisVariants(model, folder: string | number, emitterId, pose, { rest = null } = {}) {
   const out: Record<string, any> = {};
   for (const v of ["push", "palm"]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
   return { push: out.push, palm: out.palm };
@@ -656,7 +656,7 @@ export const R1 = {
 };
 
 /** R1's acceptance for one emitter class (an unknown class gets the loose arm-class values). */
-export function r1Acceptance(cls) {
+export function r1Acceptance(cls: string | number) {
   return R1.acceptance[cls] ?? { yaw: 25, pitch: 30, enforce: "axis" };
 }
 
@@ -670,7 +670,7 @@ export function r1Acceptance(cls) {
  * how well the prop is conditioned). They differ by design: a raised sword's blade can point 56 deg
  * off while the arm that fires the spell points at the target.
  */
-export function aimAxisFor(model, folder, emitterId, pose, { rest = null } = {}) {
+export function aimAxisFor(model, folder: string | number, emitterId, pose, { rest = null } = {}) {
   const fa = firingAxis(model, folder, emitterId, pose, { rest });
   if (!fa) return null;
   if (fa.cls !== "prop" && fa.cls !== "hand") return { ...fa, calibrated: true };

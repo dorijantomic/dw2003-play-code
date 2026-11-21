@@ -16,8 +16,8 @@ const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const STATUSES = ["poison", "paralyze", "confuse", "sleep", "ko"];
 const WILD_STATS = ["str", "def", "spt", "wis", "spd"];   // the enemy record's five core stats (no CHR)
 
-const pick = (source, keys) =>
-  Object.fromEntries(keys.map((k) => [k, Number(source?.[k] ?? 0)]));
+const pick = (source, keys: string[]) =>
+  Object.fromEntries(keys.map((k: string | number) => [k, Number(source?.[k] ?? 0)]));
 
 /**
  * One row per profile in a digimon.json-shaped table (`digimon` rows + `skills`). Pure.
@@ -62,13 +62,13 @@ export function partnerRows(digimon, skills) {
  * record's `to` is a profile id). Pure. An unknown slot is an empty list, never a guess.
  * `profiles` may be the profile array or a digimon.json-shaped object.
  */
-export function lineTargets(evolutions, slot, profiles) {
+export function lineTargets(evolutions, slot: string | number, profiles) {
   const list = Array.isArray(profiles) ? profiles : profiles?.digimon ?? [];
   const nameById = new Map(list.map((p) => [p.id, p.name]));
   const line = evolutions?.lines?.[slot];
   if (!line) return [];
   return (line.records ?? [])
-    .map((record) => nameById.get(record.to))
+    .map((record: { to: unknown; }) => nameById.get(record.to))
     .filter((name) => typeof name === "string");
 }
 
@@ -76,7 +76,7 @@ export function lineTargets(evolutions, slot, profiles) {
 const FIELD_ELEMENT_NAMES = { 1: "normal", 2: "Fire", 3: "Water", 4: "Ice", 5: "Wind", 6: "Thunder", 7: "Machine", 8: "Dark" };
 
 /** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11 -> "11th". */
-function ordinal(n) {
+function ordinal(n: number) {
   const abs = Math.abs(n) % 100;
   const last = abs % 10;
   const suffix = abs >= 11 && abs <= 13 ? "th" : last === 1 ? "st" : last === 2 ? "nd" : last === 3 ? "rd" : "th";
@@ -88,7 +88,7 @@ function ordinal(n) {
  * the decoded FIGHTSTG_check_move_cond table (ddw3-walker
  * docs/research/battle/enemy-ai-move-conditions.md); nothing here is guessed.
  */
-function conditionText(comparator, value) {
+function conditionText(comparator: number, value: number) {
   switch (comparator) {
     case 0: return "always";
     case 1: return `a random ${value} in 128 chance`;
@@ -118,7 +118,7 @@ function conditionText(comparator, value) {
  * attack, 2/3 -> the record's move_1/move_2 techniques, 4 -> the flee special,
  * 5..8 -> the enemy-slot switch (which a one-enemy fight can only fail).
  */
-function actionText(action, row) {
+function actionText(action: number, row: CodexRow) {
   switch (action) {
     case 1: return "basic attack";
     case 2: return row.move1.name ? `special 1: ${row.move1.name}` : "special 1 (no technique set)";
@@ -169,7 +169,7 @@ export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill>
       drop: e.drop_item ?? "Null",
       dropRate: Number(e.drop_rate) || 0,
     } as CodexRow;
-    row.aiRows = (Array.isArray(e.ai_moves) ? e.ai_moves : []).slice(0, 4).map((a, i) => {
+    row.aiRows = (Array.isArray(e.ai_moves) ? e.ai_moves : []).slice(0, 4).map((a, i: number) => {
       const action = Number(a?.action) || 0;
       const comparator = Number(a?.comparator) || 0;
       const value = Number(a?.value) || 0;
@@ -203,7 +203,7 @@ export function wildSearch(rows, query) {
  * A `{ key: table }` object (the extracted JSON ships a header key) or the table itself.
  * Anything else is an empty table, never a guess.
  */
-function innerTable(value, key) {
+function innerTable(value, key: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const inner = value[key];
   if (inner && typeof inner === "object" && !Array.isArray(inner)) return inner;
@@ -295,7 +295,7 @@ export function encounterSpecies(index, query = "") {
 }
 
 /** Every real row of the species matching `query`; an unknown or empty query is []. Pure. */
-export function encounterSearch(index, query) {
+export function encounterSearch(index, query: string | undefined) {
   if (!String(query ?? "").trim()) return [];
   const rows = [];
   for (const name of encounterSpecies(index, query)) rows.push(...(index.bySpecies.get(name) ?? []));
@@ -303,7 +303,7 @@ export function encounterSearch(index, query) {
 }
 
 /** The drop as the page prints it: the disc's `Null` placeholder means no item. */
-export function dropText(row) {
+export function dropText(row: { drop: string; }) {
   const name = row?.drop ?? "Null";
   return name === "Null" ? "none" : name;
 }
@@ -311,20 +311,20 @@ export function dropText(row) {
 // --------------------------------------------------------------- drop finder
 
 /** Plain code-unit order, so the list is the same on every machine. */
-const nameOrder = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const nameOrder = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * The disc's drop odds for one rate byte: the fight rolls `rate + 1` in 1024, so the
  * byte 128 is 129 in 1024 per win, never "12.8%". Pure.
  */
-export function dropOdds(rate) {
+export function dropOdds(rate: number) {
   return { n: (Number(rate) || 0) + 1, of: 1024 };
 }
 
 /** Every stage number a species' real encounter pools can roll, ascending. Pure. */
 export function enemyStages(stageIndex, enemy) {
   const rows = stageIndex?.bySpecies instanceof Map ? stageIndex.bySpecies.get(enemy) ?? [] : [];
-  const stages = [];
+  const stages: number[] = [];
   for (const row of rows) {
     const stage = Number(row?.stage);
     if (Number.isFinite(stage) && !stages.includes(stage)) stages.push(stage);
@@ -363,7 +363,7 @@ export function dropIndex(enemies, stageIndex = null) {
       if (!entry.stages.includes(stage)) entry.stages.push(stage);
     }
   }
-  for (const entry of byItem.values()) entry.stages.sort((a, b) => a - b);
+  for (const entry of byItem.values()) entry.stages.sort((a: number, b: number) => a - b);
   return { byItem };
 }
 

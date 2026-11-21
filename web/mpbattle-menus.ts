@@ -38,7 +38,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
     const packs = { pgfgc00: loadPack("pgfgc00"), cmfont: loadPack("cmfont") };
     const msg = new BattleMessageSession({ textOf: battleMsgText, paint: () => {} });
     const clock = new ui.MenuDisplayClock();
-    let mode = null;
+    let mode: string | null = null;
     let pages = [], page = null, pageLeft = 0, hold = false, ms = PAGE_MS;
 
     const TAG = /([^]*)/g;
@@ -62,7 +62,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         get mode() { return mode; },
         isOpen: () => mode != null,
         failed: (m = mode) => !!widgets[m]?.failed(),
-        open(m, seed) {
+        open(m: string, seed: { row: number; }) {
             if (mode && mode !== m) widgets[mode].close();
             mode = m;
             const w = widgets[m];
@@ -83,7 +83,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         clearSay() { pages = []; page = null; msg.open([]); hold = false; },
         /** True while log lines are still going through the window. */
         busy: () => pages.length > 0 || (!!page && !hold && pageLeft > 0),
-        update(dt) {
+        update(dt: number) {
             for (const f of clock.advance(dt)) msg.tick(f.tick, 0);
             if (!mode) {                                    // message window paging (never while a menu is up)
                 if (!page && pages.length) { showPage(pages.shift()); pageLeft = ms; }
@@ -102,7 +102,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
             w.close(); mode = null;
             return { mode: m, value: v };
         },
-        draw(ctx, cw, ch) {
+        draw(ctx, cw: number, ch: number) {
             ctx.save();
             // one even scale, the 320 x 240 box centred: the one-on-one battle's own rule (battle.js), so a wide window
             // does not stretch the menus sideways

@@ -243,10 +243,10 @@ export const ANIM_GIANTS = new Set([
 ]);
 
 /** The donor row for `folder` clip `clip`, or null when the model owns (or never misses) that clip. */
-export function donorRow(folder, clip) {
+export function donorRow(folder: string | number, clip: string | number) {
   const gaps = folder ? ANIM_DONOR_GAPS[folder] : null;
   return (gaps && gaps[clip]) || null;
 }
 
 /** True when the model plants its feet: no dash / leap in its built clips. */
-export function isGiant(folder) { return ANIM_GIANTS.has(folder); }
+export function isGiant(folder: string) { return ANIM_GIANTS.has(folder); }

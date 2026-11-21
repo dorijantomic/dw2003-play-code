@@ -37,7 +37,7 @@ export function loadRaw(url, color = false) {   // color = keep COLOR_0 (opt-in,
  * Toon parts from a loaded GLB. o: { wind (0..1), flutter, fade, grade (true=photo grade), scale (uniform pre-scale), tint, trans, ground (sit on y=0) }
  * Foliage / MASK materials get alpha-to-coverage + double side.
  */
-export async function loadToon(url, o: ToonLoadOpts = {}) {
+export async function loadToon(url: string, o: ToonLoadOpts = {}) {
   const raw = await loadRaw(url, !!o.vertexColors);
   const k = o.h ? o.h / raw.size.y : (o.scale || 1), h = raw.size.y * k;
   const lift = o.ground === false ? 0 : -raw.box.min.y * k;
@@ -51,7 +51,7 @@ export async function loadToon(url, o: ToonLoadOpts = {}) {
     toonify(m, { wind: o.wind || 0, height: h, flutter: mask ? (o.flutter || 0) : 0, fade: o.fade || null, grade: o.grade ? (o.grade === true ? GRADE_PHOTO : o.grade as ToonGrade) : null, tint: o.tint || null, trans: mask ? (o.trans || 0) : 0, shadeK: o.shadeK ?? 0.72, rim: o.rim ?? 0.28 });
     return { geo, mat: m };
   });
-  return { parts, height: h, size: raw.size.clone().multiplyScalar(k), tris: parts.reduce((a, p) => a + tris(p.geo), 0), draws: parts.length, url };
+  return { parts, height: h, size: raw.size.clone().multiplyScalar(k), tris: parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0), draws: parts.length, url };
 }
 
 export function partsGroup(parts) {
@@ -60,6 +60,6 @@ export function partsGroup(parts) {
   return g;
 }
 export const texLoader = new THREE.TextureLoader();
-export function loadTex(url, srgb = true, anis = 8) {
+export function loadTex(url: string | undefined, srgb = true, anis = 8) {
   return new Promise((res, rej) => texLoader.load(url, (t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = anis; res(t); }, undefined, () => { loadStats.failed.push(url); rej(new Error(url)); }));
 }

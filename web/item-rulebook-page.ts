@@ -3,8 +3,8 @@
 // hand-written.
 import { ruleRows, capWords, sellSheet, battleOnly, CAPS } from "./item-rulebook.js";
 
-const $ = (id) => document.getElementById(id);
-const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $ = (id: string) => document.getElementById(id);
+const escapeHtml = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const GROUPS = [
     ["hp", "HP charges", "a flat restore, clipped at max HP"],
@@ -38,12 +38,12 @@ if (!effects || !Array.isArray(effects.items)) {
     const sheet = sellSheet(effects);
     const neverIds = new Set(sheet.neverSold.map((r) => r.id));
     const oddIds = new Set(sheet.notHalf.map((r) => r.id));
-    const consumables = effects.items.filter((r) => r.category === "consumable").length;
+    const consumables = effects.items.filter((r: { category: string; }) => r.category === "consumable").length;
 
     countEl.textContent =
         `${effects.items.length} items · ${consumables} tagged consumable · ${rows.length - fight.length} with a field effect · ${fight.length} fight-only`;
 
-    const sellTags = (r) => {
+    const sellTags = (r: { id: unknown; }) => {
         let out = "";
         if (neverIds.has(r.id)) out += `<span class="tag never">no shop sells it</span>`;
         if (oddIds.has(r.id)) out += `<span class="tag odd">not half</span>`;

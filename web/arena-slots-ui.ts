@@ -31,9 +31,9 @@ export function createSlotsUI({ getBuilt, container }) {
     <select id="galKind"><option value="">all kinds</option></select><select id="galSrc"><option value="">all sources</option></select>
     <span id="galCount"></span><span style="flex:1"></span><button id="galClose">close</button></header><div class="grid" id="galGrid">loading ...</div>`;
   document.body.appendChild(gal);
-  const $ = <T extends HTMLElement = HTMLElement>(id) => gal.querySelector<T>("#" + id);
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => gal.querySelector<T>("#" + id);
   let assets = null, curSlot = null, status = "";
-  const label = (id) => (id === "default" || !id ? "default (module's own)" : (assets || listAssets()).find((a) => a.id === id)?.name || id);
+  const label = (id: string) => (id === "default" || !id ? "default (module's own)" : (assets || listAssets()).find((a: { id: string; }) => a.id === id)?.name || id);
 
   function renderList() {
     const b = getBuilt(); list.innerHTML = "";
@@ -76,7 +76,7 @@ export function createSlotsUI({ getBuilt, container }) {
     }
     if (hit.length > 500) { const m = document.createElement("div"); m.textContent = `... ${hit.length - 500} more: narrow the search`; g.appendChild(m); }
   }
-  async function choose(slotId, assetId) {
+  async function choose(slotId, assetId: string) {
     const b = getBuilt(); if (!b?.slots) return false;
     gal.style.display = "none";
     try {

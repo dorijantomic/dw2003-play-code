@@ -5,11 +5,11 @@ import type { SystemStatusPage } from "./types/systems.js";
 const data: SystemStatusPage = await (await fetch("system-status.json")).json();
 
 const $ = (id: string): any => document.getElementById(id);
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const esc = (s: string | undefined) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const CLAIM_KEYS = ["verified", "partially_verified", "candidate", "contradicted"];
 const CLAIM_WORDS = { verified: "proven", partially_verified: "partly proven", candidate: "unproven reading", contradicted: "disproved" };
 const WIRED_WORDS = { implemented: "In the game", partial: "Partly in the game", not_applicable: "Not a game feature", unknown: "Unknown" };
-const pretty = (id) => id.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+const pretty = (id: string) => id.replace(/-/g, " ").replace(/^./, (c: string) => c.toUpperCase());
 
 const views = [
   { id: "systems", label: "Systems" },
@@ -18,10 +18,10 @@ const views = [
   { id: "gaps", label: "Records gaps" },
 ];
 let view = "systems";
-let selected = null;
+let selected: string | null = null;
 let sortKey = "name";
 
-function bar(parts, total) {
+function bar(parts, total: number) {
   if (!total) return `<div class="bar"></div>`;
   return `<div class="bar">${parts.filter(([, n]) => n > 0).map(([cls, n]) => `<span class="c-${cls}" style="width:${(100 * n) / total}%"></span>`).join("")}</div>`;
 }
@@ -33,7 +33,7 @@ function gapCount(s) {
 function totals() {
   const t = data.totals;
   const files = data.codeFiles;
-  const sum = (k) => files.reduce((a, f) => a + f[k], 0);
+  const sum = (k: string) => files.reduce((a, f) => a + f[k], 0);
   $("totals").innerHTML = [
     [t.systems, "systems"],
     [t.claims, "facts recorded"],
@@ -51,7 +51,7 @@ function totals() {
   ].map(([n, w]) => `<span class="total"><b>${n}</b>${w}</span>`).join("");
 }
 
-function matches(text) {
+function matches(text: string) {
   const q = $("search").value.trim().toLowerCase();
   return !q || text.toLowerCase().includes(q);
 }
@@ -59,11 +59,11 @@ function matches(text) {
 function renderSystems() {
   const rows = data.systems.filter((s) => matches(`${s.id} ${s.aliases.join(" ")} ${s.summary} ${s.wired.modules.join(" ")} ${s.claimList.map((c) => c.id).join(" ")}`));
   const by = {
-    name: (a, b) => a.id.localeCompare(b.id),
+    name: (a: { id: string; }, b: { id: string; }) => a.id.localeCompare(b.id),
     learned: (a, b) => b.learned.verified / (b.learned.claims || 1) - a.learned.verified / (a.learned.claims || 1),
     gaps: (a, b) => gapCount(b) - gapCount(a),
-    wired: (a, b) => a.wired.status.localeCompare(b.wired.status),
-    routines: (a, b) => b.routines.decoded - a.routines.decoded,
+    wired: (a: { wired: { status: string; }; }, b: { wired: { status: string; }; }) => a.wired.status.localeCompare(b.wired.status),
+    routines: (a: { routines: { decoded: number; }; }, b: { routines: { decoded: number; }; }) => b.routines.decoded - a.routines.decoded,
     owns: (a, b) => b.ownedFiles.length - a.ownedFiles.length,
   }[sortKey];
   rows.sort(by);
@@ -99,11 +99,11 @@ function renderSystemDetails(s) {
     return;
   }
   const l = s.learned;
-  const claims = s.claimList.filter((c) => claimFilter === "all" || c.status === claimFilter);
+  const claims = s.claimList.filter((c: { status: string; }) => claimFilter === "all" || c.status === claimFilter);
   $("details").innerHTML = `
     <div class="eyebrow">System</div><h2>${esc(pretty(s.id))}</h2>
     <p>${esc(s.summary || "No summary in the catalog yet.")}</p>
-    ${s.labs.length ? `<div>${s.labs.map((x) => `<a class="lablink" href="${esc(x.href)}">${esc(x.label)}</a>`).join("")}</div>` : ""}
+    ${s.labs.length ? `<div>${s.labs.map((x: { href: string | undefined; label: string | undefined; }) => `<a class="lablink" href="${esc(x.href)}">${esc(x.label)}</a>`).join("")}</div>` : ""}
     <div class="stage"><b>Understood.</b> ${l.claims} facts: ${CLAIM_KEYS.map((k) => `${l[k]} ${CLAIM_WORDS[k]}`).join(", ")}.${l.scope ? ` <span class="sub">Scope: ${esc(l.scope)}</span>` : ""}</div>
     <div class="stage"><b>In the game.</b> <span class="pill ${s.wired.status}">${WIRED_WORDS[s.wired.status] ?? s.wired.status}</span> <p style="margin-top:6px">${esc(s.wired.note || "No note.")}</p></div>
     ${s.wired.remaining ? `<div class="stage"><b>Remaining work.</b>
@@ -116,20 +116,20 @@ function renderSystemDetails(s) {
     <div class="stage"><b>Original routines.</b> ${s.routines.decoded} decoded routines of the original carry a label this system claims${s.routines.labels.length ? ` (${esc(s.routines.labels.slice(0, 12).join(", "))}${s.routines.labels.length > 12 ? ", …" : ""})` : " (no label claimed yet)"}. Labels come from <code>docs/generated/function-table.json</code>.</div>
     <h3>Gaps</h3>
     ${s.gaps.frontiers.length || s.gaps.missingFiles.length || s.gaps.contradicted.length ? `<ul>
-      ${s.gaps.frontiers.map((f) => `<li><b>${esc(f.question)}</b><br><span class="sub">Needs: ${esc(f.needed)}</span></li>`).join("")}
-      ${s.gaps.missingFiles.map((p) => `<li>The catalog names <code>${esc(p)}</code>, which no longer exists.</li>`).join("")}
+      ${s.gaps.frontiers.map((f: { question: string | undefined; needed: string | undefined; }) => `<li><b>${esc(f.question)}</b><br><span class="sub">Needs: ${esc(f.needed)}</span></li>`).join("")}
+      ${s.gaps.missingFiles.map((p: string | undefined) => `<li>The catalog names <code>${esc(p)}</code>, which no longer exists.</li>`).join("")}
       ${s.gaps.contradicted.length ? `<li>${s.gaps.contradicted.length} earlier readings were disproved and are kept for the record.</li>` : ""}
     </ul>` : `<p>No open question is recorded. That does not mean the system is complete.</p>`}
     ${s.gaps.notExportedFiles?.length ? `<div class="stage"><b>Not part of this export.</b> ${s.gaps.notExportedFiles.length} file${s.gaps.notExportedFiles.length === 1 ? "" : "s"} the catalog names exist in the full project but not in this export by design (walker-only tests); see <code>data/not-exported-files.json</code>.</div>` : ""}
-    <h3>Research documents</h3><ul>${s.docs.map((d) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None named.</li>"}</ul>
+    <h3>Research documents</h3><ul>${s.docs.map((d: string | undefined) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None named.</li>"}</ul>
     <h3>Our files (${s.ownedFiles.length})</h3>
     <p class="sub">Every file of ours that this system owns, matched from its <code>owns</code> globs: ${esc(s.owns.join(" ")) || "none"}.</p>
-    <ul>${s.ownedFiles.map((d) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
-    <h3>Modules the catalog names (${s.wired.modules.length})</h3><ul>${s.wired.modules.map((d) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
-    <h3>Tests</h3><ul>${s.checked.tests.map((d) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
+    <ul>${s.ownedFiles.map((d: string | undefined) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
+    <h3>Modules the catalog names (${s.wired.modules.length})</h3><ul>${s.wired.modules.map((d: string | undefined) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
+    <h3>Tests</h3><ul>${s.checked.tests.map((d: string | undefined) => `<li><code>${esc(d)}</code></li>`).join("") || "<li>None.</li>"}</ul>
     <h3>Recorded facts (${s.claimList.length})</h3>
     <div class="claimFilter">${["all", ...CLAIM_KEYS].map((k) => `<button data-f="${k}" aria-pressed="${claimFilter === k}">${k === "all" ? "all" : CLAIM_WORDS[k]}</button>`).join("")}</div>
-    ${claims.slice(0, 200).map((c) => `<div class="claim" style="border-color:var(--c)"><span class="mono">${esc(c.id)} · ${esc(CLAIM_WORDS[c.status] ?? c.status)}</span>${esc(c.text)}</div>`).join("")}
+    ${claims.slice(0, 200).map((c: { id: string | undefined; status: string | number; text: string | undefined; }) => `<div class="claim" style="border-color:var(--c)"><span class="mono">${esc(c.id)} · ${esc(CLAIM_WORDS[c.status] ?? c.status)}</span>${esc(c.text)}</div>`).join("")}
     ${claims.length > 200 ? `<p class="sub">${claims.length - 200} more; use the search box to narrow.</p>` : ""}
     ${generatedNote()}`;
   for (const b of $("details").querySelectorAll(".claimFilter button")) b.onclick = () => { claimFilter = b.dataset.f; renderSystemDetails(s); };

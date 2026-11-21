@@ -10,11 +10,11 @@ import type { BuiltSlotRef } from "./types.js";
 
 /** the sky numbers of a recipe (also used by sky.js createBuiltSky, the checkers' stand-alone sky) */
 export function skyData(rec, opts: { band?: boolean; clouds?: boolean; mode?: string } = {}) {
-  const p = rec.pieces.find((q) => q.kind === "sky");
+  const p = rec.pieces.find((q: { kind: string; }) => q.kind === "sky");
   if (!p) return null;
   const sky = { kind: "sky", name: p.name, colours: p.colours, profile: p.profile, ymin: p.ymin, ymax: p.ymax, rmin: p.rmin, rmax: p.rmax, md: p.md, pos: p.pos };
   const band = opts.band ?? (sky.ymin > 0);
-  return { sky, bg: rec.bg, haze: rec.pieces.find((q) => q.kind === "haze")?.colours?.all, band, opts, mode: opts.mode,
+  return { sky, bg: rec.bg, haze: rec.pieces.find((q: { kind: string; }) => q.kind === "haze")?.colours?.all, band, opts, mode: opts.mode,
            clouds: !(opts.clouds === false || (band && opts.clouds !== true)) };
 }
 
@@ -33,8 +33,8 @@ export function plan(pctx) {
   });
   if (!slots[0].surface) delete slots[0].surface;
   // the camera-following dome is the bound default's mesh (none when another sky asset is bound)
-  pctx.slots.on((id) => { if (id === "sky.dome") pctx.camera.userData.sky = pctx.slots.instanceOf(id)?.dome || null; });
-  current.rebuildWith = (mode) => {
+  pctx.slots.on((id: string) => { if (id === "sky.dome") pctx.camera.userData.sky = pctx.slots.instanceOf(id)?.dome || null; });
+  current.rebuildWith = (mode: string | undefined) => {
     D.mode = mode;
     pctx.slots.rebuild("sky.dome");
     if (D.clouds) pctx.slots.rebuild("sky.clouds");

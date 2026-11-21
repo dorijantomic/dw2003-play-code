@@ -23,7 +23,7 @@ fetch("assets/data/item_effects.json")
   })
   .catch(() => {});
 
-export function itemIconClip(itemId) {
+export function itemIconClip(itemId: string | number) {
   const fam = familyById?.[itemId];
   return FAMILY_TO_CLIP[fam] ?? null;
 }
@@ -35,12 +35,12 @@ export function itemIconClip(itemId) {
  * ITEM list seeds it into FightItemSession, engine/dw3/ui/fight-item-session.ts) reads
  * it here rather than passing a literal. `null` until item_effects.json has loaded.
  */
-export function itemFamily(itemId) {
+export function itemFamily(itemId: string | number) {
   return familyById?.[itemId] ?? null;
 }
 
 /** Draw item `itemId`'s real 14×14 icon with its top-left at (x, y). */
-export function drawItemIcon(ctx, itemId, x, y, scale = 1) {
+export function drawItemIcon(ctx: CanvasRenderingContext2D | undefined, itemId: number, x: number, y: number, scale = 1) {
   const clip = itemIconClip(itemId);
   if (clip == null || !packReady(cmfont)) return false;
   return drawClip(ctx, cmfont, clip, x, y, scale);

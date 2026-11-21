@@ -35,7 +35,7 @@ function itemMap(index) {
 }
 
 /** An array table either handed as its own list or as the file's own wrapper. */
-function tableRows(table, key) {
+function tableRows(table, key: string) {
     if (Array.isArray(table)) return table;
     return table && Array.isArray(table[key]) ? table[key] : [];
 }
@@ -145,7 +145,7 @@ export function shopRows(source, shops, merchants) {
  * buy_price/sell_price names are read only when a caller passes it and the
  * effects table has no price for the id.
  */
-export function priceWord(id, effects, equipment = null) {
+export function priceWord(id: number, effects, equipment = null) {
     const itemId = Number(id);
     const effect = tableRows(effects, "items").find((r) => Number(r.id) === itemId);
     let buy = null;

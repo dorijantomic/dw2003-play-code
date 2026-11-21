@@ -2,7 +2,7 @@
 import type { FusionLabBody, FusionLabRow, FusionLabSelection } from "./types/fusion-lab.js";
 const API = "http://localhost:8791";
 const KINDS = ["arms", "legs", "head", "tail", "wings"];
-const $ = (id) => document.getElementById(id) as any;
+const $ = (id: string) => document.getElementById(id) as any;
 
 let models = [];          // {id, name, rookie}
 let fusions = [];         // {id, name}
@@ -11,21 +11,21 @@ let byId = new Map();     // id -> {label, rookie, blocked}
 let rookieIds = new Set();
 let bossIds = new Set();  // Lab bosses already written (ids "lab_<model>")
 let lastBuild = null;     // {model, recipe}
-const rows = [];
+const rows: FusionLabRow[] = [];
 
-async function api(path, body?: FusionLabBody) {
+async function api(path: string, body?: FusionLabBody) {
   const r = await fetch(API + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
   return r.json();
 }
 
 function blockedOf(id) { return (byId.get(id) || {}).blocked || null; }
 function labelFor(m) { return m.name + " (" + m.id + ")" + (m.rookie ? " [rookie]" : ""); }
-function fusionLabel(f) { return "fusion " + f.id + (f.name ? " - " + f.name : ""); }
+function fusionLabel(f: { id: string; name: string; }) { return "fusion " + f.id + (f.name ? " - " + f.name : ""); }
 
 function fillList() {
   byLabel = new Map(); byId = new Map(); rookieIds = new Set();
   const dl = $("all"); dl.textContent = "";
-  const add = (label, id, rookie, blocked) => {
+  const add = (label: string, id, rookie: boolean, blocked) => {
     byLabel.set(label, id); byId.set(id, { label, rookie, blocked: blocked || null });
     const o = document.createElement("option"); o.value = label; dl.appendChild(o);
     if (rookie) rookieIds.add(id);
@@ -35,7 +35,7 @@ function fillList() {
 }
 
 // text typed in an input -> model id (exact label, bare id, or a unique name match), else null
-function resolve(text) {
+function resolve(text: string) {
   text = (text || "").trim();
   if (!text) return null;
   if (byLabel.has(text)) return byLabel.get(text);
@@ -46,14 +46,14 @@ function resolve(text) {
 }
 
 // ---- candidate lists (parts found by position; several = the user must pick)
-async function loadCands(model, kind) {
+async function loadCands(model: string | number | boolean, kind: string) {
   const d = await api("/api/candidates?model=" + encodeURIComponent(model) + "&kind=" + kind);
   if (d.error) throw new Error(d.error);
   return d.candidates;
 }
 
 // a part the tool is not sure about (fuse.py disagrees with bodies.json / anatomy.json): plain warning under the picker
-function trustWarn(box, label, c) {
+function trustWarn(box: HTMLDivElement, label: string, c) {
   if (!c || c.trusted) return;
   const w = document.createElement("div"); w.className = "warn";
   w.textContent = "Warning, " + label + ": " + ((c.reasons && c.reasons.length) ? [...new Set(c.reasons)].join("; ") : "the tool is not sure this is the right part.") +
@@ -61,7 +61,7 @@ function trustWarn(box, label, c) {
   box.appendChild(w);
 }
 
-function candPicker(label, cands, onChange) {
+function candPicker(label: string, cands, onChange: { (): void; (): void; (): void; }) {
   const wrap = document.createElement("div");
   if (!cands.length) {
     wrap.className = "err"; wrap.textContent = label + ": no part of this kind found on this model (adding parts comes later).";
@@ -80,13 +80,13 @@ function candPicker(label, cands, onChange) {
     sel.appendChild(o);
   }
   const tw = document.createElement("div");
-  sel.addEventListener("change", () => { tw.textContent = ""; trustWarn(tw, label, cands.find((c) => c.spec === sel.value)); onChange(); });
+  sel.addEventListener("change", () => { tw.textContent = ""; trustWarn(tw, label, cands.find((c: { spec: string; }) => c.spec === sel.value)); onChange(); });
   const t = document.createElement("div"); t.className = "warn"; t.textContent = label + ": " + cands.length + " candidates, pick one.";
   wrap.append(t, sel, tw);
   return { el: wrap, value: () => sel.value || null, missing: false, needs: true };
 }
 
-function addRow(init?) {
+function addRow(init?: FusionLabSelection | null | undefined) {
   const row = { part: null, donor: null, baseCands: null, donorCands: null } as FusionLabRow;
   const el = document.createElement("div"); el.className = "row";
   const part = document.createElement("select");
@@ -128,7 +128,7 @@ async function refreshRow(row: FusionLabRow) {
         const a = document.createElement("div"); a.className = "small";
         if (!at.known) a.textContent = "Attacks from this part: donor is not in anatomy.json, unknown.";
         else {
-          const f = (l) => l.map((s) => s.technique + " (" + s.bodyPart + ")").join(", ");
+          const f = (l: { technique: string; bodyPart: string; }[]) => l.map((s: { technique: string; bodyPart: string; }) => s.technique + " (" + s.bodyPart + ")").join(", ");
           a.textContent = "Attacks from this donor " + kind + ": " + (at.mine.length ? f(at.mine) : "none listed in anatomy.json") + (at.others.length ? ".  Other attacks of this Digimon come from other parts: " + f(at.others) : "");
         }
         row.cands.appendChild(a);
@@ -176,8 +176,8 @@ function problems(rc) {
 
 // ---- battle data (tools/fusion_battle.py, plain words)
 const STAT_WORDS = { str: "Strength", def: "Defence", spt: "Spirit", wis: "Wisdom", spd: "Speed" };
-function li(ul, text, cls?) { const e = document.createElement("li"); e.textContent = text; if (cls) e.className = cls; ul.appendChild(e); return e; }
-function heading(box, text) { const h = document.createElement("div"); h.className = "small"; h.style.marginTop = "8px"; h.style.color = "#9ec5ff"; h.textContent = text; box.appendChild(h); }
+function li(ul: HTMLUListElement, text: string | null, cls?: string | undefined) { const e = document.createElement("li"); e.textContent = text; if (cls) e.className = cls; ul.appendChild(e); return e; }
+function heading(box: { appendChild: (arg0: HTMLDivElement) => void; }, text: string | null) { const h = document.createElement("div"); h.className = "small"; h.style.marginTop = "8px"; h.style.color = "#9ec5ff"; h.textContent = text; box.appendChild(h); }
 
 function renderBattle(d) {
   const box = $("battle"); box.textContent = "";
@@ -235,7 +235,7 @@ async function showBattle() {
   catch (e) { renderBattle({ error: "Helper server not reachable: " + e.message }); }
 }
 
-function show(model) {
+function show(model: string | number | boolean) {
   $("resId").textContent = model ? "(" + model + ")" : "";
   $("viewer").src = model ? "model-viewer.html?model=" + encodeURIComponent(model) + "&t=" + Date.now() : "about:blank";
 }
@@ -288,7 +288,7 @@ function reopen(f) {
   showBattle();
 }
 
-async function makeBoss(f, msg) {
+async function makeBoss(f, msg: HTMLSpanElement) {
   msg.textContent = "working...";
   const d = await api("/api/boss", { model: f.model });
   if (d.ok) {

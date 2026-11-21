@@ -12,7 +12,7 @@ const bytes = (c) => (Array.isArray(c) ? c.map((v) => Math.max(0, Math.min(255, 
 function ringTriangles(field, P) {
   const NS = P.SECTORS, NR = P.RINGS, V = [];
   const r0 = Array.from({ length: NS + 1 }, (_, j) => Math.max(200, waterlineAt(field, (j / NS) * Math.PI * 2 - Math.PI) - P.OVERLAP));
-  const at = (i, j) => { const az = (j / NS) * Math.PI * 2 - Math.PI, r = r0[j] * Math.pow(P.FAR_R / r0[j], i / (NR - 1)); return [Math.sin(az) * r, P.SEA_Y, Math.cos(az) * r]; };
+  const at = (i: number, j: number) => { const az = (j / NS) * Math.PI * 2 - Math.PI, r = r0[j] * Math.pow(P.FAR_R / r0[j], i / (NR - 1)); return [Math.sin(az) * r, P.SEA_Y, Math.cos(az) * r]; };
   for (let i = 0; i < NR - 1; i++) for (let j = 0; j < NS; j++) V.push(...at(i, j), ...at(i + 1, j), ...at(i, j + 1), ...at(i, j + 1), ...at(i + 1, j), ...at(i + 1, j + 1));
   return Float32Array.from(V);
 }
@@ -24,7 +24,7 @@ export function plan(pctx) {
   const P = preset === "lake" ? LAKE_PRESET : WATER;
   const field = preset === "lake" ? lakeField(rec, P as typeof LAKE_PRESET) : shoreField(rec);
   const A = preset === "lake" ? lakeAnchors(P) : anchors(rec);
-  const pieces = preset === "lake" ? [] : (rec.pieces || []).filter((p) => p.kind === "water" || p.kind === "sea").map((p) => {
+  const pieces = preset === "lake" ? [] : (rec.pieces || []).filter((p: { kind: string; }) => p.kind === "water" || p.kind === "sea").map((p) => {
     let pmin = Infinity, pmax = 0, ymin = Infinity, ymax = -Infinity;
     for (let i = 0; i < p.pos.length; i += 3) {
       const r = Math.hypot(p.pos[i], p.pos[i + 2]);
@@ -48,7 +48,7 @@ export function plan(pctx) {
     get lake() { return inst().lake || null; },
     get info() { return pctx.info.water; },
     place: (k) => inst().place?.(k),
-    setLayer(name, on) { if (name === "water" || name === "sea") { pctx.slots.setVisible(slot.id, on); return true; } return false; },
+    setLayer(name: string, on) { if (name === "water" || name === "sea") { pctx.slots.setVisible(slot.id, on); return true; } return false; },
     setVisible: (v) => pctx.slots.setVisible(slot.id, v),
   };
   return { slots: [slot], layer, afterPlace: (st) => inst().place?.(st) };

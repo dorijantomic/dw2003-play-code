@@ -13,17 +13,17 @@ import { soilLand } from "./land.js";
 import type { BuiltFloorcoverApi, BuiltFloorcoverInfo, BuiltSlotRef } from "./types.js";
 const M = 400;
 
-function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-const pickW = (list, u) => { let tot = 0; for (const c of list) tot += c[3]; let a = u * tot; for (const c of list) { a -= c[3]; if (a <= 0) return c; } return list[list.length - 1]; };
-const azOfXZ = (x, z) => Math.atan2(x, z) * 180 / Math.PI;
+function rng(seed: number) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const pickW = (list, u: number) => { let tot = 0; for (const c of list) tot += c[3]; let a = u * tot; for (const c of list) { a -= c[3]; if (a <= 0) return c; } return list[list.length - 1]; };
+const azOfXZ = (x: number, z: number) => Math.atan2(x, z) * 180 / Math.PI;
 
 /** The land edge radius (render units) of the azimuth, from the land outline (1 degree steps). */
-function edgeAt(land, az) {
+function edgeAt(land, az: number) {
   const o = land.outline, k = Math.max(0, Math.min(o.landEnd.length - 1, Math.floor((az - o.az0) / o.stepDeg)));
   return o.landEnd[k] ?? o.stepR * 0;
 }
 /** Deterministic placement of one type. Returns [{x, z, yaw, s, lean, t, u}] */
-function planType(kind, spec, land, clearR, keepOut, state, noise3JS) {
+function planType(kind: string, spec: { n: number; tMin: number; p: number; h: number[]; }, land, clearR: number, keepOut, state, noise3JS) {
   const r = rng(COVER.SEED + kind.charCodeAt(0) * 131 + kind.length), out = [];
   const rim = land.rim || 6700;
   let tries = 0;
@@ -49,7 +49,7 @@ function planType(kind, spec, land, clearR, keepOut, state, noise3JS) {
   }
   return { items: out, tries };
 }
-function colourFor(kind, it, u2) {
+function colourFor(kind: string, it, u2: number) {
   if (kind === "fern" || kind === "clover" || kind === "tuft") {
     const g = MEAS.green[0], k = 0.9 + 0.35 * u2;
     return [g[0] * k, g[1] * k, g[2] * k];
@@ -67,7 +67,7 @@ function colourFor(kind, it, u2) {
   return [c[0], c[1], c[2]];
 }
 const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V1 = new THREE.Vector3(), V2 = new THREE.Vector3(), C = new THREE.Color();
-function placeMatrix(kind, it) {
+function placeMatrix(kind: string, it) {
   // flat things lie on the floor: yaw about Y, a small lean, lifted by half their lean so no edge dips below y 0
   const lean = (kind === "litter" ? 0.30 : kind === "twig" ? 0.10 : kind === "pebble" ? 0.2 : 0.18) * (it.lean - 0.5) * 2;
   E.set(kind === "litter" || kind === "twig" || kind === "pebble" ? lean : lean * 0.8, it.yaw, kind === "litter" ? lean * 0.6 : lean * 0.5, "YXZ");
@@ -94,7 +94,7 @@ export function plan(pctx) {
   let dirty = false, t0 = 0;
   const sigOf = (st) => st ? `${Math.round(st.fightR / COVER.REBUILD_STEP)}|${st.fighters?.length || 0}|${st.rings?.length || 0}` : "none";
   const ferns = { items: [], mats: [], cols: [] };
-  function itemsOf(kind, clearR, state) {
+  function itemsOf(kind: string, clearR: number, state) {
     if (!dirty) { dirty = true; t0 = performance.now(); }
     const spec = TYPES[kind];
     const { items, tries } = planType(kind, spec, land, clearR, pctx.keepOut, state, pctx.S.noise3JS);
@@ -131,7 +131,7 @@ export function plan(pctx) {
     };
   });
   const ids = slots.map((s) => s.id);
-  function report(clearR) {   // B.info.floorcover: the numbers of what is placed and bound now
+  function report(clearR: number) {   // B.info.floorcover: the numbers of what is placed and bound now
     let tris = 0, inst = 0;
     for (const s of slots) {
       const kind = s.id.slice(11), meshes = pctx.slots.meshesOf(s.id), a = s.asset;
@@ -160,5 +160,5 @@ export function plan(pctx) {
     setVisible(v) { api.visible = !!v; for (const id of ids) pctx.slots.setVisible(id, v); },
   };
   pctx.info.floorcover = info_;
-  return { slots, layer, after: () => { info_.shared = Object.keys(pctx.slots.env.shared?.fcUniforms || {}); report(clear0); }, afterPlace: (st) => { if (dirty) report(Math.max(st.fightR, 0)); } };
+  return { slots, layer, after: () => { info_.shared = Object.keys(pctx.slots.env.shared?.fcUniforms || {}); report(clear0); }, afterPlace: (st: { fightR: number; }) => { if (dirty) report(Math.max(st.fightR, 0)); } };
 }

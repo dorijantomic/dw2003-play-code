@@ -64,8 +64,8 @@ function bodyBone(m) {
 }
 
 /** The bone a side-blind shot leaves from, and the bone a rig with no arms fires from (see emitterBone). */
-export function centreEmitterBone(folder) { return BONEMAP[folder] ? centreBone(BONEMAP[folder]) : null; }
-export function bodyEmitterBone(folder) { return BONEMAP[folder] ? bodyBone(BONEMAP[folder]) : null; }
+export function centreEmitterBone(folder: string | number) { return BONEMAP[folder] ? centreBone(BONEMAP[folder]) : null; }
+export function bodyEmitterBone(folder: string | number) { return BONEMAP[folder] ? bodyBone(BONEMAP[folder]) : null; }
 
 /**
  * The bone that carries one emitter site. Emitter ids are bone-map `f` keys, with a site index when a
@@ -77,7 +77,7 @@ export function bodyEmitterBone(folder) { return BONEMAP[folder] ? bodyBone(BONE
  *     that arm would be a guess: the shot leaves from the body's centre emitter instead.
  *   * no arm chain - 23 rigs have no arm chain to fire from: the body emitter is the honest site.
  */
-export function emitterBone(folder, id) {
+export function emitterBone(folder: string | number, id) {
   const m = BONEMAP[folder];
   if (!m || !id) return null;
   const part = String(id).replace(/-\d+$/, "");
@@ -107,7 +107,7 @@ export function emitterBone(folder, id) {
 }
 
 /** Every bone the model fires from, from its emitter list (not from the technique). */
-export function emitterBones(folder) {
+export function emitterBones(folder: string | number) {
   const out = [];
   for (const e of emitters(folder)) {
     if (e.kind === "melee") continue;
@@ -118,7 +118,7 @@ export function emitterBones(folder) {
 }
 
 /** The frame window a timeline table plays (frames it names), or null. */
-export function tableWindow(model, table) {
+export function tableWindow(model, table: string | number | null) {
   const tab = table != null ? model?.timeline?.[table]?.table : null;
   if (!Array.isArray(tab) || !tab.length) return null;
   let lo = Infinity, hi = -1;
@@ -173,7 +173,7 @@ export function poseWindow(model, tables, samples = 16) {
  *      this pack ships carry a self-referential slot, so this rarely fires);
  *   3. none - the bone's own point (a root/torso emitter has no limb to extend along).
  */
-export function tipOf(pos, model, bone, prevBone = null) {
+export function tipOf(pos, model, bone: string | number, prevBone = null) {
   const p = pos?.[bone];
   if (!p) return null;
   let q = prevBone != null ? pos?.[prevBone] : null;
@@ -186,7 +186,7 @@ export function tipOf(pos, model, bone, prevBone = null) {
 }
 
 /** The bone before `bone` in the anatomy's own limb chain for emitter `id`, or null. */
-export function chainPrevBone(folder, id, bone) {
+export function chainPrevBone(folder: string | number, id, bone) {
   const part = String(id ?? "").replace(/-\d+$/, "");
   const side = part === "left-arm" ? "left" : part === "right-arm" ? "right"
     : part === "both-arms" ? "left" : null;
@@ -210,7 +210,7 @@ export function chainPrevBone(folder, id, bone) {
  * (C12 measured the closest approach at 6493 units). Reaching forward first, high second, picks the
  * extended pose the flight is authored for.
  */
-export function boneTip(model, bone, { table = null, window = null, prev = null } = {}) {
+export function boneTip(model, bone: string | number | null, { table = null, window = null, prev = null } = {}) {
   if (!model || bone == null) return null;
   const poses = window ?? poseWindow(model, table);
   let best = null;
@@ -246,7 +246,7 @@ export function emitterSide(id) {
  *   * bare hand, no data, or a prop worn on the torso/back -> null, and the caller keeps the bone tip.
  * No species names, no per-model pins: the verdict is K17's data and the vertices are the model's own.
  */
-export function propTipPoint(model, folder, side, { window = null } = {}) {
+export function propTipPoint(model, folder: string | number, side: string, { window = null } = {}) {
   if (!model || !folder || !side) return null;
   const equip = armEquip(folder, side);
   if (!equip || equip.class === "none" || equip.class === "bare") return null;
@@ -284,7 +284,7 @@ export function propTipPoint(model, folder, side, { window = null } = {}) {
 }
 
 /** Linear read of a ch3 scale channel ([x,y,z,frame] keys, 4096 = 1.0) at `frame`. */
-function scaleAt(ch3, frame) {
+function scaleAt(ch3, frame: number) {
   if (!Array.isArray(ch3) || !ch3.length) return 1;
   let prev = null;
   for (const k of ch3) {
@@ -304,7 +304,7 @@ function scaleAt(ch3, frame) {
  * The point an emitter's shot leaves from: the WEAPON's tip when the arm carries a prop (C15), else the
  * limb's own tip as before.
  */
-export function emitterTip(model, folder, id, bone, { window = null, prev = null } = {}) {
+export function emitterTip(model, folder: string | number, id, bone: string | number | null, { window = null, prev = null } = {}) {
   const side = emitterSide(id);
   const prop = side ? propTipPoint(model, folder, side, { window }) : null;
   if (prop) return { frame: prop.frame, x: prop.x, y: prop.y, z: prop.z, source: "prop", propBone: prop.bone, equip: prop.equip };
@@ -349,7 +349,7 @@ export function launchPointsFor(model, { folder = model?.folder, tech = null, vo
   const mode = rule.mode;
   if (mode === "none") return { mode, shots: 0, points: [], limbs: [], basis: rule.basis };
   if (mode === "per-limb-contact") {
-    const limbs = (rule.emitters || []).map((id) => ({ id, bone: emitterBone(folder, id) })).filter((l) => l.bone != null);
+    const limbs = (rule.emitters || []).map((id) => ({ id, bone: emitterBone(folder, id) })).filter((l: { bone: null; }) => l.bone != null);
     return { mode, shots: 0, points: [], limbs, basis: rule.basis };
   }
   const sites = emitters(folder);

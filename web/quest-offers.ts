@@ -11,16 +11,16 @@
 //   pageCount(n)          -> pages of four labels, the size pagedPick() shows
 import type { QuestOfferFilters } from "./types/quest-offers.js";
 
-const clipTitle = (s, n) => (s.length > n ? s.slice(0, n - 1) + "." : s);
+const clipTitle = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "." : s);
 
 /** The jobs this person could hand out in this place right now, in file order (the offer loop's exact filters). */
-export function offersAt(defs, npcId, mapId, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
+export function offersAt(defs, npcId, mapId: number, { statusOf = () => "available", declined, labFocus = null, canon = (m) => m }: QuestOfferFilters = {}) {
     const out = [];
     for (const d of defs ?? []) {
         if (labFocus && d.id !== labFocus) continue;                       // the lab asked for one quest in particular
         if (statusOf(d) !== "available" || !d.offer) continue;
         if (d.offer.npc !== npcId) continue;
-        if (!d.offer.maps.some((m) => canon(m) === canon(mapId))) continue; // night/story variants count as the same place
+        if (!d.offer.maps.some((m: number) => canon(m) === canon(mapId))) continue; // night/story variants count as the same place
         if (declined && typeof declined.has === "function" && declined.has(d.id)) continue;   // "not now" this session
         out.push(d);
     }
@@ -33,6 +33,6 @@ export function offerLabels(defs, n = 28) {
 }
 
 /** Pages of four labels (the game's own choice widget holds four rows plus its More/Back rows). */
-export function pageCount(n) {
+export function pageCount(n: number) {
     return Math.ceil(n / 4);
 }

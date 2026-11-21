@@ -21,18 +21,18 @@ const I3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 const FDF = (D) => mul(F, mul(D, F));
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const scl = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
-const len = (a) => Math.hypot(a[0], a[1], a[2]);
+const scl = (a: number[], s: number) => [a[0] * s, a[1] * s, a[2] * s];
+const len = (a: number[]) => Math.hypot(a[0], a[1], a[2]);
 const nrm = (a) => { const l = len(a); return l > 1e-9 ? scl(a, 1 / l) : [0, 0, 0]; };
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-const ss = (x) => { x = cl(x); return x * x * (3 - 2 * x); };
-const rx = (a) => axAng([1, 0, 0], a);
-const ry = (a) => axAng([0, 1, 0], a);
-const rz = (a) => axAng([0, 0, 1], a);
+const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const lerp3 = (a, b, t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const cl = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ss = (x: number) => { x = cl(x); return x * x * (3 - 2 * x); };
+const rx = (a: number) => axAng([1, 0, 0], a);
+const ry = (a: number) => axAng([0, 1, 0], a);
+const rz = (a: number) => axAng([0, 0, 1], a);
 /** eased piecewise curve through [u, value] keys */
-function kf(u, pts) {
+function kf(u: number, pts) {
   if (u <= pts[0][0]) return pts[0][1];
   for (let i = 0; i < pts.length - 1; i++) {
     const [a, va] = pts[i], [b, vb] = pts[i + 1];
@@ -40,12 +40,12 @@ function kf(u, pts) {
   }
   return pts[pts.length - 1][1];
 }
-const win = (u, a, b, c, d) => ss((u - a) / (b - a)) * (1 - ss((u - c) / (d - c)));
-function scaleRot(R, t) {
+const win = (u: number, a: number, b: number, c: number, d: number) => ss((u - a) / (b - a)) * (1 - ss((u - c) / (d - c)));
+function scaleRot(R: number[][], t: number) {
   const { axis, ang } = axOf(R);
   return ang < 1e-9 ? I3 : axAng(axis, ang * t);
 }
-function clampRot(R, cap) {
+function clampRot(R: number[][], cap: number) {
   const { axis, ang } = axOf(R);
   return ang > cap ? axAng(axis, cap) : R;
 }
@@ -67,7 +67,7 @@ function buildCtx(model) {
   const bones = model.bones, n = bones.length;
   const par = bones.map((b) => { const p = (b.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; });
   const kids = Array.from({ length: n }, () => []);
-  par.forEach((p, i) => { if (p >= 0) kids[p].push(i); });
+  par.forEach((p: number, i) => { if (p >= 0) kids[p].push(i); });
   const fN = k23NeutralFrame(model);
   const rest = k16Pose(model, fN);
   const Wr = rest.W, Pr = rest.P;
@@ -86,7 +86,7 @@ function buildCtx(model) {
   while (par[mainRoot] >= 0) mainRoot = par[mainRoot];
   const torso = rig && Number.isInteger(rig.torso) && rig.torso >= 0 && rig.torso < n ? rig.torso : mainRoot;
   const head = rig && Number.isInteger(rig.head) && rig.head >= 0 && rig.head < n ? rig.head : null;
-  const mkLimb = (chain0, label, extra: { side?: string; ordinal?: number } = {}) => {
+  const mkLimb = (chain0, label: string, extra: { side?: string; ordinal?: number } = {}) => {
     const chain = hierPrefix(par, chain0);
     if (!chain.length) return null;
     const root = chain[0], tip = chain[chain.length - 1];
@@ -109,7 +109,7 @@ function buildCtx(model) {
   const tailChain = hierPrefix(par, rig?.tail || []);
   const tail = tailChain.length ? tailChain : [];
   // subtree membership
-  const sub_ = (r) => { const out = new Set(); const st = [r]; while (st.length) { const b = st.pop(); out.add(b); st.push(...kids[b]); } return out; };
+  const sub_ = (r: number) => { const out = new Set(); const st = [r]; while (st.length) { const b = st.pop(); out.add(b); st.push(...kids[b]); } return out; };
   const legRoots = new Set(legs.map((l) => l.root));
   const ep = par.slice();
   for (const r of roots) {
@@ -120,7 +120,7 @@ function buildCtx(model) {
   }
   // effective children + DFS order
   const ekids = Array.from({ length: n }, () => []);
-  ep.forEach((p, i) => { if (p >= 0) ekids[p].push(i); });
+  ep.forEach((p: number, i) => { if (p >= 0) ekids[p].push(i); });
   const order = [], seen = new Set();
   const visit = (i) => { if (seen.has(i)) return; seen.add(i); order.push(i); for (const k of ekids[i]) visit(k); };
   visit(mainRoot);
@@ -170,7 +170,7 @@ function buildCtx(model) {
   };
   return ctx;
 }
-function getCtx(model) {
+function getCtx(model: WeakKey) {
   let c = ctxCache.get(model);
   if (!c) { c = buildCtx(model); ctxCache.set(model, c); }
   return c;
@@ -184,12 +184,12 @@ class Spec {
   declare reaches: Map<any, any>;
   declare rot: Map<any, any>;
   declare sh: number[] | any[];
-  constructor(ctx, g) {
+  constructor(ctx, g: number) {
     this.ctx = ctx; this.g = g; this.sh = [0, 0, 0];
     this.rot = new Map(); this.legs = new Map(); this.reaches = new Map();
   }
-  shift(v) { this.sh = add(this.sh, scl(v, this.g)); }
-  rotate(b, R, { pivot = null, floor = 0.5, ceil = 1.9 } = {}) {
+  shift(v: number[]) { this.sh = add(this.sh, scl(v, this.g)); }
+  rotate(b: number | null, R: number[][], { pivot = null, floor = 0.5, ceil = 1.9 } = {}) {
     if (b == null || b < 0) return;
     const cur = this.rot.get(b);
     let M = scaleRot(R, this.g);
@@ -198,7 +198,7 @@ class Spec {
     this.rot.set(b, { R: M, pivot: pivot || cur?.pivot || null });
   }
   /** rotate a whole limb rigidly so its rest direction turns toward `dir` by `amt` of the way */
-  aim(limb, dir, amt, opts = {}) {
+  aim(limb, dir, amt: number, opts = {}) {
     if (!limb || amt <= 1e-4) return;
     const d = nrm(dir); if (!len(d)) return;
     this.rotate(limb.root, scaleRot(fromTo(limb.dir, d), cl(amt)), { floor: 1.6, ceil: 2.6, ...opts });
@@ -216,10 +216,10 @@ class Spec {
   leg(l, { off = [0, 0, 0], air = 0, tuck = [0, 0, 0] } = {}) {
     this.legs.set(l, { off: scl(off, this.g), air: air * this.g, tuck: scl(tuck, this.g) });
   }
-  reach(arm, target, w) { this.reaches.set(arm, { target, w: cl(w) * this.g }); }
+  reach(arm, target, w: number) { this.reaches.set(arm, { target, w: cl(w) * this.g }); }
 }
 
-function fabrik(J, l, T, H) {
+function fabrik(J, l: number[], T, H: number) {
   const k = J.length - 1, J0 = J[0].slice();
   for (let it = 0; it < 24; it++) {
     J[k] = T.slice();
@@ -231,7 +231,7 @@ function fabrik(J, l, T, H) {
   return J;
 }
 
-function solve(ctx, spec, stats) {
+function solve(ctx, spec: Spec, stats) {
   const { n, ep, order, Wr, Pr, H } = ctx;
   const Wn = new Array(n), Pn = new Array(n), Dn = new Array(n), done = new Array(n).fill(false);
   const ik = new Map();
@@ -257,7 +257,7 @@ function solve(ctx, spec, stats) {
     const c = ik.get(i);
     if (c) {
       const ch = c.limb.chain, k = ch.length - 1, c0 = ch[0];
-      const J = ch.map((b) => add(Pn[c0], mv(Dn[c0], sub(Pr[b], Pr[c0]))));
+      const J = ch.map((b: string | number) => add(Pn[c0], mv(Dn[c0], sub(Pr[b], Pr[c0]))));
       const Jc = J.map((x) => x.slice());
       const l = []; for (let j = 0; j < k; j++) l.push(len(sub(Pr[ch[j + 1]], Pr[ch[j]])));
       let T;
@@ -296,8 +296,8 @@ function headRot(S, c, { pitch = 0, yaw = 0, roll = 0, floor = 0.6 } = {}) {
   if (c.head == null || c.head === c.torso) return;
   S.rotate(c.head, mul(ry(yaw), mul(rz(roll), rx(-pitch))), { floor });
 }
-const prim = (c) => c.arms.filter((a) => a.ordinal === 0);
-const armS = (a, i) => a.s || (i % 2 ? 1 : -1);
+const prim = (c) => c.arms.filter((a: { ordinal: number; }) => a.ordinal === 0);
+const armS = (a, i: number) => a.s || (i % 2 ? 1 : -1);
 /** a bend of every bone of a chain toward lateral (+x) and/or up, per-bone angles */
 function bendChain(S, c, chain, fn, floor = 0.5) {
   for (let j = 0; j < chain.length; j++) {
@@ -311,10 +311,10 @@ function bendChain(S, c, chain, fn, floor = 0.5) {
     S.rotate(b, mul(axAng(la, a), axAng(va, v)), { floor, ceil: 1.4 });
   }
 }
-const frontLegs = (c) => c.legs.filter((l) => l.frontness > 0.08);
-const rearLegs = (c) => c.legs.filter((l) => l.frontness <= 0.08);
+const frontLegs = (c) => c.legs.filter((l: { frontness: number; }) => l.frontness > 0.08);
+const rearLegs = (c) => c.legs.filter((l: { frontness: number; }) => l.frontness <= 0.08);
 
-function runRear(c, S, u) {
+function runRear(c, S, u: number) {
   const H = c.H, hunched = /hunched/.test(c.plan);
   const pmax = c.quad ? 0.7 : hunched ? 0.5 : 0.4;
   const dip = kf(u, [[0, 0], [0.14, 1], [0.27, 0], [1, 0]]);
@@ -325,16 +325,16 @@ function runRear(c, S, u) {
   headRot(S, c, { pitch: -0.3 * rise - 0.12 * sh, yaw: 0.1 * sh, floor: 0.8 });
   const fl = c.quad ? frontLegs(c) : [];
   for (const l of fl) S.leg(l, { off: [l.s * -0.03 * H * rise, -0.28 * H * rise, 0.1 * H * rise] });
-  prim(c).forEach((a, i) => {
+  prim(c).forEach((a, i: number) => {
     if (fl.some((l) => l.root === a.root)) return;
     const s = armS(a, i);
     S.aimMix(a, [[[s * 0.8, -0.5, 0.3], 0.85 * rise], [[s * 0.3, 0.2, 0.5], 0.5 * dip]]);
   });
-  if (c.tail.length) bendChain(S, c, c.tail, (j, k) => [0.35 * Math.sin(2 * Math.PI * 2 * u - j * 0.5) * rise / k * 2, -0.25 * rise / k]);
+  if (c.tail.length) bendChain(S, c, c.tail, (j: number, k: number) => [0.35 * Math.sin(2 * Math.PI * 2 * u - j * 0.5) * rise / k * 2, -0.25 * rise / k]);
   for (const w of c.wings) S.aim(w, [w.s * 0.8, -0.6, -0.2], 0.6 * rise);
 }
 
-function runLunge(c, S, u) {
+function runLunge(c, S, u: number) {
   const H = c.H;
   const wind = kf(u, [[0, 0], [0.2, 1], [0.32, 0], [1, 0]]);
   const lunge = kf(u, [[0, 0], [0.22, 0], [0.36, 1], [0.7, 1], [0.92, 0], [1, 0]]);
@@ -342,10 +342,10 @@ function runLunge(c, S, u) {
   const hitB = kf(u, [[0, 0], [0.4, 0], [0.66, 1], [0.76, 0.5], [0.88, 0], [1, 0]]);
   S.shift([0, 0, H * (0.17 * lunge - 0.04 * wind)]);
   lean(S, c, { pitch: 0.28 * lunge - 0.12 * wind, floor: 0.7 });
-  const arms = prim(c).sort((a, b) => b.len - a.len);
+  const arms = prim(c).sort((a: { len: number; }, b: { len: number; }) => b.len - a.len);
   headRot(S, c, { pitch: 0.15 * lunge + (arms.length ? 0 : 0.35 * hitA), floor: 0.7 });
   if (!arms.length) S.shift([0, 0, H * 0.06 * hitA]);
-  arms.slice(0, 2).forEach((a, i) => {
+  arms.slice(0, 2).forEach((a: { root: string | number; len: number; tip: string | number; }, i: number) => {
     const s = armS(a, i), hit = i === 0 ? hitA : hitB, wd = wind * (i === 0 ? 1 : 0.6);
     const dir = nrm(lerp3([s * 0.25, 0.4, -0.7], [-s * 0.08, -0.02, 1], 0.5 + 0.5 * (hit - wd)));
     let T = add(c.Pr[a.root], scl(dir, a.len * 0.92));
@@ -357,27 +357,27 @@ function runLunge(c, S, u) {
   carryReaches(c, S, 0);
 }
 /** reach targets are given in rest coordinates; make them ride the body shift (cheap carry) */
-function carryReaches(c, S, extraZ) {
+function carryReaches(c, S, extraZ: number) {
   for (const r of S.reaches.values()) r.target = add(r.target, add(S.sh, [0, 0, extraZ]));
 }
 
-function runTail(c, S, u) {
+function runTail(c, S, u: number) {
   const H = c.H;
   const wind = kf(u, [[0, 0], [0.25, 1], [0.35, 1], [0.55, 0], [1, 0]]);
   const sweep = kf(u, [[0, 0], [0.25, -1], [0.38, -1], [0.58, 1], [0.7, 1], [0.92, 0], [1, 0]]);
   const k = c.tail.length;
-  bendChain(S, c, c.tail, (j) => {
+  bendChain(S, c, c.tail, (j: number) => {
     const lag = kf(u - j * 0.025, [[0, 0], [0.25, -1], [0.38, -1], [0.58, 1], [0.7, 1], [0.92, 0], [1, 0]]);
     return [1.5 / k * lag, -0.15 * wind / k];
   }, 0.7);
   lean(S, c, { yaw: -0.3 * sweep, roll: 0.05 * sweep, floor: 0.5 });
   headRot(S, c, { yaw: 0.2 * sweep, floor: 0.5 });
-  prim(c).forEach((a, i) => S.aim(a, [armS(a, i) * 0.7, -0.1 + 0.2 * sweep, 0.2 - 0.2 * sweep], 0.35 * Math.abs(sweep)));
+  prim(c).forEach((a, i: number) => S.aim(a, [armS(a, i) * 0.7, -0.1 + 0.2 * sweep, 0.2 - 0.2 * sweep], 0.35 * Math.abs(sweep)));
   for (const w of c.wings) S.aim(w, [w.s * 0.8, -0.3, -0.3], 0.3 * Math.abs(sweep));
   S.shift([H * 0.015 * sweep, 0, 0]);
 }
 
-function runStomp(c, S, u) {
+function runStomp(c, S, u: number) {
   const H = c.H;
   const raise = kf(u, [[0, 0], [0.28, 1], [0.34, 1], [0.42, 0], [1, 0]]);
   const armsUp = kf(u, [[0, 0], [0.26, 1], [0.34, 1], [0.44, 0], [1, 0]]);
@@ -391,14 +391,14 @@ function runStomp(c, S, u) {
   S.shift([lead ? -lead.s * 0.05 * H * raise : 0, H * 0.05 * ring, 0]);
   lean(S, c, { pitch: -0.12 * raise + 0.18 * slamA + 0.03 * ring, floor: 0.6 });
   headRot(S, c, { pitch: 0.05 * ring + 0.1 * slamA, floor: 0.5 });
-  prim(c).forEach((a, i) => {
+  prim(c).forEach((a, i: number) => {
     const s = armS(a, i);
     S.aimMix(a, [[[s * 0.3, -1, 0.4], 0.9 * armsUp], [[s * 0.2, 0.7, 0.9], 0.85 * slamA]]);
   });
-  bendChain(S, c, c.tail, (j, k) => [0.2 * ring / k * 3, 0.15 * slamA / k]);
+  bendChain(S, c, c.tail, (j, k: number) => [0.2 * ring / k * 3, 0.15 * slamA / k]);
 }
 
-function runLeap(c, S, u) {
+function runLeap(c, S, u: number) {
   const H = c.H;
   const crouch = kf(u, [[0, 0], [0.2, 1], [0.3, 1], [0.42, 0], [1, 0]]);
   const hop = Math.sin(Math.PI * cl((u - 0.3) / 0.42)) * (u > 0.3 && u < 0.72 ? 1 : 0);
@@ -409,15 +409,15 @@ function runLeap(c, S, u) {
   lean(S, c, { pitch: 0.18 * crouch + 0.22 * hop * hop + 0.12 * land, floor: 0.7 });
   headRot(S, c, { pitch: -0.15 * hop, floor: 0.5 });
   for (const l of c.legs) S.leg(l, { air, tuck: scl([0, -0.2 * H, (l.frontness > 0.08 ? 0.12 : -0.12) * H], tuckAmt) });
-  prim(c).forEach((a, i) => {
+  prim(c).forEach((a, i: number) => {
     const s = armS(a, i);
     S.aimMix(a, [[[s * 0.3, 0.5, -0.8], 0.8 * crouch], [[s * 0.2, -0.3, 1], 0.9 * hop], [[s * 0.4, 0.3, 0.6], 0.5 * land]]);
   });
   for (const w of c.wings) S.aim(w, [w.s * 0.9, -0.6 * hop, -0.1], 0.7 * hop);
-  bendChain(S, c, c.tail, (j, k) => [0, (0.3 * hop - 0.2 * crouch) / k * 2]);
+  bendChain(S, c, c.tail, (j, k: number) => [0, (0.3 * hop - 0.2 * crouch) / k * 2]);
 }
 
-function runCharge(c, S, u) {
+function runCharge(c, S, u: number) {
   const H = c.H;
   const crouch = kf(u, [[0, 0], [0.18, 1], [0.46, 1], [0.58, 0], [1, 0]]);
   const coil = kf(u, [[0, 0], [0.4, 0], [0.5, 1], [0.55, 0], [1, 0]]);
@@ -431,11 +431,11 @@ function runCharge(c, S, u) {
   const sc = win(u, 0.1, 0.16, 0.38, 0.44);
   const ph = Math.sin(2 * Math.PI * 2.5 * (u - 0.1) / 0.3);
   for (const l of paw) S.leg(l, { off: [0, -0.07 * H * Math.max(0, ph) * sc, (0.03 - 0.07 * ph) * H * sc] });
-  prim(c).forEach((a, i) => S.aim(a, [armS(a, i) * 0.4, 0.3, 0.8], 0.4 * charge + 0.3 * crouch));
-  bendChain(S, c, c.tail, (j, k) => [0.3 * shake / k * 2, -0.35 * charge / k]);
+  prim(c).forEach((a, i: number) => S.aim(a, [armS(a, i) * 0.4, 0.3, 0.8], 0.4 * charge + 0.3 * crouch));
+  bendChain(S, c, c.tail, (j, k: number) => [0.3 * shake / k * 2, -0.35 * charge / k]);
 }
 
-function runWings(c, S, u) {
+function runWings(c, S, u: number) {
   const H = c.H;
   const open = kf(u, [[0, 0], [0.14, 1], [0.84, 1], [0.97, 0], [1, 0]]);
   const x = Math.max(0, (u - 0.14) / 0.7);
@@ -452,16 +452,16 @@ function runWings(c, S, u) {
   headRot(S, c, { pitch: -0.15 * open, floor: 0.5 });
   const air = ss((0.04 * open - 0.035 * bob - 0.015) / 0.04);
   for (const l of c.legs) S.leg(l, { air: cl(air) * 0.8, tuck: [0, -0.06 * H, -0.04 * H] });
-  prim(c).forEach((ar, i) => S.aim(ar, [armS(ar, i) * 0.5, 0.3, 0.7], 0.3 * open));
-  bendChain(S, c, c.tail, (j, k) => [0.2 * Math.sin(ph - j * 0.5) * act / k * 2, 0.2 * bob / k]);
+  prim(c).forEach((ar, i: number) => S.aim(ar, [armS(ar, i) * 0.5, 0.3, 0.7], 0.3 * open));
+  bendChain(S, c, c.tail, (j: number, k: number) => [0.2 * Math.sin(ph - j * 0.5) * act / k * 2, 0.2 * bob / k]);
 }
 
-function runCoil(c, S, u) {
+function runCoil(c, S, u: number) {
   const H = c.H, sp = c.spine, k = sp.length;
   const coil = kf(u, [[0, 0], [0.3, 1], [0.44, 1], [0.54, 0], [1, 0]]);
   const rear = kf(u, [[0, 0], [0.28, 0], [0.42, 1], [0.5, 1], [0.58, 0], [1, 0]]);
   const strike = kf(u, [[0, 0], [0.46, 0], [0.56, 1], [0.7, 1], [0.9, 0], [1, 0]]);
-  bendChain(S, c, sp, (j) => [
+  bendChain(S, c, sp, (j: number) => [
     (1.1 * Math.sin(2 * Math.PI * (1.4 * j / k) - 4 * u) * coil + 0.15 * Math.sin(2 * Math.PI * 3 * (u - 0.58)) * win(u, 0.58, 0.62, 0.8, 0.92)) * 1.0,
     (0.4 * rear - 0.45 * strike) * (j < k * 0.6 ? 1 : 0.4),
   ].map((v) => v * Math.min(0.9, 4 / k)), 0.8);
@@ -469,10 +469,10 @@ function runCoil(c, S, u) {
   if (c.torso !== sp[0]) lean(S, c, { pitch: -0.2 * rear + 0.25 * strike, floor: 0.6 });
   headRot(S, c, { pitch: -0.2 * rear + 0.3 * strike, floor: 0.7 });
   for (const w of c.wings) S.aim(w, [w.s * 0.9, -0.4 * rear, -0.1], 0.6 * (rear + 0.5 * strike));
-  prim(c).forEach((a, i) => S.aim(a, [armS(a, i) * 0.6, 0.1, 0.5], 0.4 * strike));
+  prim(c).forEach((a, i: number) => S.aim(a, [armS(a, i) * 0.6, 0.1, 0.5], 0.4 * strike));
 }
 
-function runSkitter(c, S, u) {
+function runSkitter(c, S, u: number) {
   const H = c.H;
   const legs = [...c.legs].sort((a, b) => b.frontness - a.frontness);
   const gate = win(u, 0.08, 0.16, 0.84, 0.92);
@@ -488,12 +488,12 @@ function runSkitter(c, S, u) {
   S.shift([H * 0.05 * sway * gate, -H * 0.02 * Math.abs(Math.sin(2 * Math.PI * cyc)) * gate, 0]);
   lean(S, c, { yaw: 0.2 * sway * gate, roll: -0.1 * sway * gate, pitch: 0.06 * gate, floor: 0.5 });
   headRot(S, c, { pitch: 0.12 * Math.sin(2 * Math.PI * cyc * 2) * gate, yaw: -0.15 * sway * gate, floor: 0.5 });
-  prim(c).forEach((a, i) => S.aim(a, [armS(a, i) * (0.35 + 0.35 * Math.sin(2 * Math.PI * cyc * 2 + i)), 0.1, 0.9], 0.55 * gate));
+  prim(c).forEach((a, i: number) => S.aim(a, [armS(a, i) * (0.35 + 0.35 * Math.sin(2 * Math.PI * cyc * 2 + i)), 0.1, 0.9], 0.55 * gate));
   for (const w of c.wings) S.aim(w, [w.s * 0.9, -0.5 + 0.3 * Math.sin(2 * Math.PI * cyc * 4), -0.1], 0.45 * gate);
-  bendChain(S, c, c.tail, (j, k) => [0.3 * Math.sin(2 * Math.PI * cyc - j * 0.6) * gate / k * 2, 0]);
+  bendChain(S, c, c.tail, (j: number, k: number) => [0.3 * Math.sin(2 * Math.PI * cyc - j * 0.6) * gate / k * 2, 0]);
 }
 
-function runTaunt(c, S, u) {
+function runTaunt(c, S, u: number) {
   const H = c.H;
   const gate = win(u, 0.08, 0.2, 0.82, 0.94);
   const x = (u - 0.12) / 0.76;
@@ -503,24 +503,24 @@ function runTaunt(c, S, u) {
   S.shift([H * 0.03 * sw, -H * 0.02 * bounce, 0]);
   lean(S, c, { pitch: -0.14 * gate, roll: 0.14 * sw, yaw: 0.1 * hs, floor: 0.5 });
   headRot(S, c, { yaw: 0.5 * hs, pitch: -0.1 * gate, roll: 0.1 * hs, floor: 0.9 });
-  prim(c).forEach((a, i) => {
+  prim(c).forEach((a, i: number) => {
     const s = armS(a, i), ph = Math.sin(2 * Math.PI * 3 * x + (i ? Math.PI : 0)) * gate;
     S.aim(a, [s * 0.9, -0.2 - 0.6 * ph, 0.5], 0.75 * gate);
   });
   for (const w of c.wings) S.aim(w, [w.s * 0.9, -0.4 - 0.3 * bounce, -0.1], 0.6 * gate);
-  bendChain(S, c, c.tail, (j, k) => [0.5 * Math.sin(2 * Math.PI * 3 * x - j * 0.6) * gate / k * 2, 0.15 * gate / k]);
+  bendChain(S, c, c.tail, (j: number, k: number) => [0.5 * Math.sin(2 * Math.PI * 3 * x - j * 0.6) * gate / k * 2, 0.15 * gate / k]);
 }
 
 // ───────────────────────────── catalogue ─────────────────────────────
-const legsN = (c, n) => c.legs.filter((l) => l.chain.length >= 2).length >= n;
+const legsN = (c, n: number) => c.legs.filter((l) => l.chain.length >= 2).length >= n;
 const M = [
   { id: "rear-roar", name: "Rear Up and Roar", ticks: 64, run: runRear,
     description: "Dips, rears the chest back about the hips, head thrown up and shaking, arms flung out; a four-legged body lifts its forelegs off the ground.",
     needs: ["torso", "head", "legs>=2"], bodyPlans: ["biped-upright", "biped-hunched", "quadruped", "winged-biped", "winged-quadruped", "multi-armed", "other"],
-    can: (c) => (c.head == null ? "no head bone" : !legsN(c, 2) ? "needs two legs to rear on" : null) },
+    can: (c: { head: null; }) => (c.head == null ? "no head bone" : !legsN(c, 2) ? "needs two legs to rear on" : null) },
   { id: "lunge-strike", name: "Lunge and Double Strike", ticks: 64, run: runLunge,
     description: "Winds back, then lunges forward with the feet planted and strikes with each arm in turn (an armless body headbutts).",
-    needs: ["torso"], bodyPlans: "any", can: (c) => (c.torso == null ? "no torso" : null) },
+    needs: ["torso"], bodyPlans: "any", can: (c: { torso: null; }) => (c.torso == null ? "no torso" : null) },
   { id: "tail-sweep", name: "Tail Sweep", ticks: 56, run: runTail,
     description: "Torso winds against the tail, the tail whips across in a travelling wave, the body counter-turns.",
     needs: ["tail"], bodyPlans: "any", can: (c) => (c.tail.length < 1 ? "no tail chain in the bone map" : null) },
@@ -535,7 +535,7 @@ const M = [
   { id: "crouch-charge", name: "Crouch and Charge", ticks: 72, run: runCharge,
     description: "Drops head-low and paws the ground with a forefoot, coils back, then drives forward head-first and shakes off.",
     needs: ["head", "legs>=2"], bodyPlans: ["quadruped", "winged-quadruped", "biped-hunched", "insectoid", "other"],
-    can: (c) => (c.head == null ? "no head bone" : !legsN(c, 2) ? "needs two legs" : null) },
+    can: (c: { head: null; }) => (c.head == null ? "no head bone" : !legsN(c, 2) ? "needs two legs" : null) },
   { id: "wing-flap", name: "Wing Spread and Flap", ticks: 64, run: runWings,
     description: "Spreads the wings, beats them three times while the body rises and sinks and the feet lift.",
     needs: ["wings"], bodyPlans: ["winged-biped", "winged-quadruped", "insectoid", "floating", "multi-armed", "biped-upright"],
@@ -550,7 +550,7 @@ const M = [
     can: (c) => (!legsN(c, 3) ? "needs three or more legs" : null) },
   { id: "taunt-shake", name: "Taunt Shake", ticks: 64, run: runTaunt,
     description: "Leans back and swaggers: head shakes, shoulders roll, arms and wings beckon, tail wags. Feet stay planted.",
-    needs: ["torso"], bodyPlans: "any", can: (c) => (c.torso == null ? "no torso" : null) },
+    needs: ["torso"], bodyPlans: "any", can: (c: { torso: null; }) => (c.torso == null ? "no torso" : null) },
 ];
 
 export const GENERIC_MOTIONS = M.map(({ id, name, description, needs, bodyPlans }) => ({ id, name, description, needs, bodyPlans }));
@@ -566,7 +566,7 @@ export function listGenericMotions(model) {
   });
 }
 
-export function bakeGenericMotion(model, id, { offset = 8000 } = {}) {
+export function bakeGenericMotion(model: MotionBonesOut, id: string, { offset = 8000 } = {}) {
   try {
     const m = M.find((x) => x.id === id);
     if (!m) return { ok: false, reason: `unknown motion ${id}` };
@@ -598,9 +598,9 @@ export function bakeGenericMotion(model, id, { offset = 8000 } = {}) {
     }
     const out = {
       ...model,
-      bones: model.bones.map((b, i) => {
-        const own2 = (b.anim?.ch2 ?? []).filter((r) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
-        const own1 = (b.anim?.ch1 ?? []).filter((r) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
+      bones: model.bones.map((b, i: string | number) => {
+        const own2 = (b.anim?.ch2 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
+        const own1 = (b.anim?.ch1 ?? []).filter((r: number[]) => r[3] !== 30000 && r[3] < offset).map((r) => r.slice());
         const l2 = keys2[i][T - 1], l1 = keys1[i][T - 1];
         return { ...b, anim: { ...(b.anim || {}), ch2: [...own2, ...keys2[i], [l2[0], l2[1], l2[2], 30000]], ch1: [...own1, ...keys1[i], [l1[0], l1[1], l1[2], 30000]] } };
       }),

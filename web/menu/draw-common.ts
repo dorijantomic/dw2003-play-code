@@ -23,7 +23,7 @@ export const gold = { kind: 3 };
 
 // Right-anchored value text (the ーー placeholder fields end AT their x —
 // "150/ 150" lines up cur flush against the baked "/" at x=61).
-export function valueText(ctx, str, xEnd, y, opts = gold) {
+export function valueText(ctx: CanvasRenderingContext2D | null | undefined, str: string | number, xEnd: number, y: number | undefined, opts = gold) {
   // alignRight: the same pixels (x = xEnd - width), and the run keeps its right edge (look C reads card numbers by it)
   drawText(ctx, String(str), xEnd, y, { ...opts, kind: opts.kind ?? 3, alignRight: true });
 }
@@ -52,7 +52,7 @@ export const SHEET_CLUT_MARKED = 6;
 // same thirteen widgets (ststatus F0x8008C460's six `li $a1, 0x1` / five
 // `li $a1, 0x5` marks), so painting 6 for every change showed grey where the
 // original shows the gym's rose/blue pair.
-export function sheetPreviewFace(before, after) {
+export function sheetPreviewFace(before: number, after: number) {
   const clut = sheetDeltaClut(before, after);
   return clut ? { kind: SHEET_VALUE_KIND, clut } : white;
 }
@@ -60,7 +60,7 @@ export function sheetPreviewFace(before, after) {
 // One party card: CMFONTCS chrome (LV/HP/MP letters baked in), animated
 // pedestal portrait, name + values at the decoded label-table positions.
 // Cards fold open around (0x7c, card center) — F0x800946bc sp9C(v,v)/spA4.
-export function _drawCard(ctx, p, y0, t, fold = null, key = null, opts = null) {
+export function _drawCard(ctx: CanvasRenderingContext2D | null | undefined, p, y0: number, t: number, fold = null, key = null, opts = null) {
   const sh = MS.UI.screens.shared;
   // The card is NOT one folding sprite. F0x8008c954 draws it under two
   // different scale/pivot pairs: the frame pieces (clips 0x15/0x17) unroll
@@ -71,7 +71,7 @@ export function _drawCard(ctx, p, y0, t, fold = null, key = null, opts = null) {
     side: { pivot_x: 0, dy: 0x25, axis: "x" },
     plate: { pivot_x: sh.card_pivot_x ?? 0x7C, dy: 0x27, axis: "xy" },
   };
-  const piece = (i) => () => {
+  const piece = (i: number) => () => {
     const c = sh.card_chrome[i];
     // First START has no glass pedestal (cmfont 22/23). Overlay home keeps them.
     if (!c || (opts?.skipPortrait && (c.clip === 22 || c.clip === 23))) return;
@@ -90,8 +90,8 @@ export function _drawCard(ctx, p, y0, t, fold = null, key = null, opts = null) {
   };
   let done = 1;
   if (fold && key) {
-    const side = (fn) => fold(key, CF.side.pivot_x, y0 + CF.side.dy, CF.side.axis, fn);
-    const plate = (fn) => fold(key, CF.plate.pivot_x, y0 + CF.plate.dy, CF.plate.axis, fn);
+    const side = (fn: { (): void; (): void; }) => fold(key, CF.side.pivot_x, y0 + CF.side.dy, CF.side.axis, fn);
+    const plate = (fn: { (): void; (): void; }) => fold(key, CF.plate.pivot_x, y0 + CF.plate.dy, CF.plate.axis, fn);
     done = side(piece(0));
     plate(piece(1));
     side(piece(2));
@@ -106,11 +106,11 @@ export function _drawCard(ctx, p, y0, t, fold = null, key = null, opts = null) {
     if (text) drawText(ctx, text, lab.x, lab.y + y0, gold);
   }
   const vals = [p?.level ?? 1, p?.hp ?? 0, p?.maxHp ?? 0, p?.mp ?? 0, p?.maxMp ?? 0];
-  L.values.forEach((v, i) => valueText(ctx, vals[i], v.x, v.y + y0));
+  L.values.forEach((v: { x: number; y: number; }, i: string | number) => valueText(ctx, vals[i], v.x, v.y + y0));
 }
 
 // The orange selection corners: CLUT-row-cycled ststat clip 0x1e ("30#k").
-function _drawSelection(ctx, idx, t, locked = false) {
+function _drawSelection(ctx: CanvasRenderingContext2D | null | undefined, idx: number, t: number, locked = false) {
   const sel = MS.UI.screens.shared.selection;
   const k = locked ? 8 : Math.floor(t * VSYNC / MS.UI.timings_vsync.selection_clut_cycle) % 8;
   drawClipAtPaletteRow(ctx, ststat, sel.clip, k, sel.x, sel.y_base + idx * sel.pitch);
@@ -122,7 +122,7 @@ function _drawSelection(ctx, idx, t, locked = false) {
 // (pick, cursor) cases; all six reduce to one bracket spanning the pair:
 // it is drawn on the UPPER of the two rows, clip 41 when the rows are
 // neighbours and the taller clip 40 when they are two apart.
-export function sortSwapBracket(pick, cursor) {
+export function sortSwapBracket(pick: number | null, cursor: number | null) {
   const S = MS.UI.screens.sort.swap_marker;
   if (pick == null || cursor == null || pick === cursor) return null;
   const top = Math.min(pick, cursor);
@@ -130,7 +130,7 @@ export function sortSwapBracket(pick, cursor) {
   return { clip, x: S.x, y: top === 0 ? S.y_high : S.y_low };
 }
 
-export function _drawSwapBracket(ctx, m: MenuState, t) {
+export function _drawSwapBracket(ctx: CanvasRenderingContext2D, m: MenuState, t: number) {
   const b = sortSwapBracket(m.sortPick, m.statusCursor);
   if (!b) return;
   const S = MS.UI.screens.sort.swap_marker;
@@ -138,15 +138,15 @@ export function _drawSwapBracket(ctx, m: MenuState, t) {
   drawClipAtPaletteRow(ctx, ststat, b.clip, k, b.x, b.y);
 }
 
-export function _drawSidebar(ctx, roster, m: MenuState, t, selIdx = -1, lockedIdx = null, fold = null, opts = null) {
+export function _drawSidebar(ctx: CanvasRenderingContext2D, roster, m: MenuState, t: number, selIdx = -1, lockedIdx = null, fold = null, opts = null) {
   const pitch = MS.UI.screens.shared.card_pitch;
-  roster.forEach((p, i) => _drawCard(ctx, p, i * pitch, t, fold, `card${i}`, opts));
-  const cardReady = (i) => (m._animP?.(`card${i}`) ?? 1) >= 1;
+  roster.forEach((p, i: number) => _drawCard(ctx, p, i * pitch, t, fold, `card${i}`, opts));
+  const cardReady = (i: number) => (m._animP?.(`card${i}`) ?? 1) >= 1;
   if (lockedIdx != null && cardReady(lockedIdx)) _drawSelection(ctx, lockedIdx, t, true);
   if (selIdx >= 0 && selIdx < roster.length && cardReady(selIdx)) _drawSelection(ctx, selIdx, t);
 }
 
-export function _drawHeader(ctx, text, fold = null) {
+export function _drawHeader(ctx: CanvasRenderingContext2D, text: string, fold = null) {
   const h = MS.UI.screens.shared.header;
   const [px, py] = h.pivot ?? [0x140, 0x19];
   const plate = () => drawClip(ctx, cmfont, h.clip, h.x, h.y);
@@ -165,7 +165,7 @@ export function _drawHeader(ctx, text, fold = null) {
 // BIT count right-anchored before the "BIT" label at (300,212), and the
 // CLUT-blinking page arrow (cmfont 0x0a) at (291,214). Overlay SORT /
 // TECHNIQUES / STATUS-pick have no footer BIT (pause-sort-who-2026-08-20).
-export function _drawFooter(ctx, state, t, line1, line2, fold = null, opts = null) {
+export function _drawFooter(ctx: CanvasRenderingContext2D, state, t: number, line1: string | undefined, line2: string | null, fold = null, opts = null) {
   const sh = MS.UI.screens.shared;
   const [fpx, fpy] = sh.footer.pivot ?? [0, 0xD3];
   const p = fold
@@ -185,7 +185,7 @@ export function _drawFooter(ctx, state, t, line1, line2, fold = null, opts = nul
 
 // Resident/overlay home BIT sits at the foot of the card stack
 // (status_ui.json topmenu.bit_*; rig d2_home.png / s6_home.png).
-export function _drawHomeBit(ctx, state) {
+export function _drawHomeBit(ctx: CanvasRenderingContext2D, state) {
   const TM = MS.UI.screens.topmenu;
   if (!TM?.bit_value) return;
   valueText(ctx, state.bits ?? 0, TM.bit_value.x, TM.bit_value.y);
@@ -196,7 +196,7 @@ export function _drawHomeBit(ctx, state) {
 // (F0x800121b4: rows x=189 from y=49 at pitch 14, cursor x=176) — the list is
 // not in the ststatus overlay at all. The window sprite behind them is not
 // decoded, so it reuses the overlay's right-pane window and its clip table.
-export function _drawHome(ctx, m, t, fold = null, labels = null) {
+export function _drawHome(ctx: CanvasRenderingContext2D, m: MenuState, t: number, fold = null, labels = null) {
   const H = MS.UI.screens.techniques;
   const TM = MS.UI.screens.topmenu;
   const rows = labels ?? topItems(m);
@@ -223,7 +223,7 @@ export function _drawHome(ctx, m, t, fold = null, labels = null) {
 // CARD FOLDERS panel — its own decoded geometry (ststat clip 0x3a @ (168,40),
 // header (178,42), rows (197, 58+14i), cursor x=184: F0x80083c94 / F0x80083680,
 // cursor placement confirmed by F0x80084238 state 0xA).
-export function _drawCardFolder(ctx, m, t, fold = null) {
+export function _drawCardFolder(ctx: CanvasRenderingContext2D, m: MenuState, t: number, fold = null) {
   const C = MS.UI.screens.cardfolder;
   const win = () => drawClip(ctx, ststat, C.window.clip, C.window.x, C.window.y);
   const [cpx, cpy] = C.window.pivot ?? [0x140, 0x40];
@@ -240,7 +240,7 @@ export function _drawCardFolder(ctx, m, t, fold = null) {
 // Digivolve Demo setup. Two rows in the small right-hand panel, like Card
 // Folders. The original's own geometry for this screen is NOT decoded — nothing
 // reaches it, so no capture of it exists — so it borrows that panel's.
-export function _drawDemoSetup(ctx, m, t, fold = null) {
+export function _drawDemoSetup(ctx: CanvasRenderingContext2D, m: MenuState, t: number, fold = null) {
   const C = MS.UI.screens.cardfolder;
   const win = () => drawClip(ctx, ststat, C.window.clip, C.window.x, C.window.y);
   const [dpx, dpy] = C.window.pivot ?? [0x140, 0x40];

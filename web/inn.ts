@@ -14,7 +14,7 @@ export function applyInnRest(state, before, after) {
   const chars = state?.party;
   if (!Array.isArray(chars) || !chars.length) return;
   const stats = Array.isArray(state.partyStats) ? state.partyStats : [];
-  after.forEach((m, i) => {
+  after.forEach((m, i: number) => {
     let target = i === 0 ? state.partnerStats : stats[i];
     if (!target) { target = {}; stats[i] = target; }
     if (Array.isArray(state.partyStats)) state.partyStats[i] = target;

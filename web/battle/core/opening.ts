@@ -230,7 +230,7 @@ async function _init3DRenderer(b) {
    * frozen while this runs — the capture is 14 s of cinematic with no input and
    * no turn progress.
    */
-  function advanceBlastPresentation(b, dt) {
+  function advanceBlastPresentation(b, dt: number) {
     const show = b.blastShow;
     // An entrance first has its entering fighter's model loaded (the original adds it hidden in state 0 before
     // anything shows): the presentation clock does not start until the folder is resolved and preloaded.
@@ -410,7 +410,7 @@ async function _init3DRenderer(b) {
    * team with its hp). The entering enemy's name page (kind 0xD, substate 4) waits for the child slot, which holds the
    * entrance task, so it is made when the task is gone (ENTRANCE_TASK_END_FRAME, f301); reading it ends the turn.
    */
-  function startEnemySelfTag(b, tag) {
+  function startEnemySelfTag(b, tag: { slot: number; stage: string; }) {
     const next = B.enemyTeamRecord(b, tag.slot);
     if (!next) { b._selfTag = null; B.queueAfterAction(b, "enemy"); return; }
     const nextName = enemyMsgName(next, "");

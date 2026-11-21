@@ -1,5 +1,7 @@
 import { SLOW_MO_PUBLISH_AT, SLOW_MO_ACCUM_COST, slowMotionStep, arenaPlacement } from "../vendor/engine.js";
 import { rotMatrixYXZ, rotApply } from "../fight/battle-camera.js";
+import type { PlacementRecord } from "../types/battle3d.js";
+import type { PlacementTable } from "../types/battle3d.js";
 
 // op5 sub=0 camera presets — CAPTURED LIVE from the game (2026-07-06, Renamon-vs-Woodmon
 // savestate, RAM read of the fight camera-preset tables via the op5 handler F0x8008c004 →
@@ -61,7 +63,7 @@ export function attackReachZ(ops, homeZ = 0, mirrored = false) {
 }
 
 /** 0..1: the share of its run an attacker has made, from its forward travel (moveDelta z) over the clip's reach. */
-export function attackLateralFraction(moveZ, reach) {
+export function attackLateralFraction(moveZ: number | undefined, reach: number) {
   return reach > 0 ? Math.min(1, Math.abs(moveZ) / reach) : 0;
 }
 
@@ -71,7 +73,7 @@ export function attackLateralFraction(moveZ, reach) {
  * its high nibble selects the side (claim terra-037-speaker16-enemy-side-20260906).
  * Accepts the numeric id or the "player"/"enemy" side name.
  */
-export function faceCamSideFor(speaker) {
+export function faceCamSideFor(speaker: string) {
   const id = typeof speaker === "number" ? speaker : (speaker === "enemy" ? 0x10 : 0);
   return (id & 0x10) ? "enemy" : "player";
 }
@@ -208,7 +210,7 @@ export const LOSS_CAM = {
  * through levels 0/1/3 exactly as the original does (only level 2 ever advances it, and
  * the setter zeroes it), where the old copy reset it to 0 on those levels.
  */
-export function slowMoStep(level, delta, acc = 0) {
+export function slowMoStep(level: number, delta: number, acc = 0) {
   return slowMotionStep(level, delta, acc);
 }
 
@@ -218,7 +220,7 @@ export function slowMoStep(level, delta, acc = 0) {
  * from `[0x8004df9c]()` — 1 a frame, 2 units, 0.176 degrees. `gameDelta` is the delta
  * the orbit has been given, so at full speed a frame's worth is one.
  */
-export function lossCamYawUnits(gameDelta) {
+export function lossCamYawUnits(gameDelta: number | undefined) {
   const n = (gameDelta | 0) * LOSS_CAM.yawUnitsPerDelta;
   return ((n % LOSS_CAM.turnUnits) + LOSS_CAM.turnUnits) % LOSS_CAM.turnUnits;
 }
@@ -227,7 +229,7 @@ export function lossCamYawUnits(gameDelta) {
  *  frame's Y angle, in PS1 units. eye and target are both relative to that frame, and the
  *  matrix is the game's own RotMatrixYXZ (F0x8002b65c) with the other two angles at zero,
  *  so the sign of the swing is the one the original uses and not a mirrored guess. */
-export function rotateShotYaw(eye, target, yawUnits) {
+export function rotateShotYaw(eye, target, yawUnits: number) {
   const R = rotMatrixYXZ(0, yawUnits, 0);
   return { eye: rotApply(R, eye), target: rotApply(R, target) };
 }
@@ -236,7 +238,7 @@ export function rotateShotYaw(eye, target, yawUnits) {
  *  ±(0x1400+standoff) z with the near side negated — is the ported FIGHTSTG_F0x80087F38
  *  placement (engine/dw3/battle-presentation.ts `arenaPlacement`), not a second copy: the
  *  near slot id 0 and the far slot id 0x10 select the two sides. */
-export function arenaSlot(record, side) {
+export function arenaSlot(record: PlacementRecord | null, side: string) {
   const standoff = record?.standoff | 0;
   const hover = record?.hover | 0;
   const far = side === "enemy";
@@ -245,7 +247,7 @@ export function arenaSlot(record, side) {
 }
 
 /** Same, looked up by pack folder. An absent record falls back to a bare stand-off of 0. */
-export function arenaSlotFor(folder, side, table) {
+export function arenaSlotFor(folder: string | null | undefined, side: string, table: PlacementTable | null | undefined) {
   const key = modelKeyFromFolder(folder);
   return arenaSlot((key && table) ? table[key] : null, side);
 }

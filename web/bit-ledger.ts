@@ -25,13 +25,13 @@
 /** The wallet ceiling, in the disc's own hex: 0x98967F = 9,999,999 BIT. */
 export const MONEY_CAP = 0x98967f;
 
-const whole = (v) => {
+const whole = (v: number) => {
     const n = Math.trunc(Number(v));
     return Number.isFinite(n) ? Math.max(0, n) : 0;
 };
 
 /** The rows behind `{ items: [...] }`, a bare array, or nothing. */
-function tableRows(data, key) {
+function tableRows(data, key: string) {
     if (Array.isArray(data)) return data;
     return data && Array.isArray(data[key]) ? data[key] : [];
 }
@@ -46,7 +46,7 @@ function tableRows(data, key) {
  *           { screen, bits }
  */
 export function payoutStats(rewards) {
-    const paid = [];
+    const paid: { screen: number; bits: number; }[] = [];
     tableRows(rewards, "battle_rewards").forEach((row, screen) => {
         const bits = Array.isArray(row) ? whole(row[2]) : whole(row && row.bits);
         if (bits > 0) paid.push({ screen, bits });
@@ -145,7 +145,7 @@ export function sellShelf(effects) {
 }
 
 /** Can a wallet of `bits` pay `price`? Exactly enough is enough — the inn's own rule. */
-export function afford(bits, price) {
+export function afford(bits: number, price) {
     return Number(bits) >= Number(price);
 }
 
@@ -154,7 +154,7 @@ export function afford(bits, price) {
  * below zero as well (the subtract arm floors at 0), so a spend can empty the
  * wallet but never overdraw it.
  */
-export function capAdd(bits, add) {
+export function capAdd(bits: number, add: number) {
     const sum = whole(bits) + Math.trunc(Number(add) || 0);
     return Math.max(0, Math.min(MONEY_CAP, sum));
 }

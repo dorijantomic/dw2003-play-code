@@ -34,7 +34,7 @@ class SimplexNoise {
     for (let i = 0; i < 512; i++) { this.perm[i] = this.p[i & 255]; this.permMod12[i] = this.perm[i] % 12; }
     this.grad3 = new Float32Array([1,1,0, -1,1,0, 1,-1,0, -1,-1,0, 1,0,1, -1,0,1, 1,0,-1, -1,0,-1, 0,1,1, 0,-1,1, 0,1,-1, 0,-1,-1]);
   }
-  noise3D(xin, yin, zin) {
+  noise3D(xin: number, yin: number, zin: number) {
     let n0, n1, n2, n3;
     const s = (xin + yin + zin) * F3;
     const i = Math.floor(xin + s), j = Math.floor(yin + s), k = Math.floor(zin + s);
@@ -64,7 +64,7 @@ class SimplexNoise {
     if (t3 < 0) n3 = 0; else { const a = pm[ii + 1 + pr[jj + 1 + pr[kk + 1]]] * 3; t3 *= t3; n3 = t3 * t3 * (g[a]*x3 + g[a+1]*y3 + g[a+2]*z3); }
     return 32 * (n0 + n1 + n2 + n3);
   }
-  fbm(x, y, z, octaves = 4) {
+  fbm(x: number, y: number, z: number, octaves = 4) {
     let sum = 0, amp = 1, freq = 1;
     for (let i = 0; i < octaves; i++) { sum += amp * this.noise3D(x * freq, y * freq, z * freq); freq *= 2.05; amp *= 0.5; }
     return sum;
@@ -72,7 +72,7 @@ class SimplexNoise {
 }
 const noise = new SimplexNoise(777);
 
-const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const mulberry = (a: number) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 
 // ---------------------------------------------------------------- 2. limestone texture (the reference's, 1024 canvas)
 function createRockTexture(size = 1024) {
@@ -94,7 +94,7 @@ function createRockTexture(size = 1024) {
 }
 
 // ---------------------------------------------------------------- 3. the fluted spire (reference geometry, base at y 0)
-function createSpire(height, radiusBottom, flutes, segR, segH, seed) {
+function createSpire(height: number | undefined, radiusBottom: number | undefined, flutes: number | undefined, segR: number | undefined, segH: number | undefined, seed: number) {
   const geo = new THREE.CylinderGeometry(0.12, radiusBottom, height, segR, segH, true);
   const pos = geo.attributes.position, n = pos.count;
   const ao = new Float32Array(n), rnd = mulberry(seed);
@@ -131,7 +131,7 @@ function createSpire(height, radiusBottom, flutes, segR, segH, seed) {
 }
 
 // ---------------------------------------------------------------- 4. materials
-function rockMaterial(S, tex) {
+function rockMaterial(S, tex: THREE.CanvasTexture) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uMap: { value: tex }, uBump: { value: 26 }, uTexRep: { value: 1 } }),
     vertexShader: /* glsl */`
@@ -194,7 +194,7 @@ function drawLeafAtlas() {          // 2 x 2 cells, each one pointed leaf with a
   return t;
 }
 
-function shrubMaterial(S, tex) {
+function shrubMaterial(S, tex: THREE.CanvasTexture) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uLeafTex: { value: tex }, uAlpha: { value: 0.5 }, uTrans: { value: 0.55 }, uNormMix: { value: 0.8 } }),
     vertexShader: /* glsl */`
@@ -260,10 +260,10 @@ export function createGeminiSpires(ctx, groups) {
   const front = G.FRONT.map(([r, h, f], i) => createSpire(G.H, G.RB, f, r, h, 11 + i * 17));
   const back = G.BACK.map(([r, h, f], i) => createSpire(G.H, G.RB, f, r, h, 71 + i * 13));
   // instance counts
-  const pillarsOf = (g) => g.parts.filter((p) => p.type === "pillar");
+  const pillarsOf = (g) => g.parts.filter((p: { type: string; }) => p.type === "pillar");
   let nFront = 0, nBack = 0;
   for (const g of groups) { const n = pillarsOf(g).length; nFront += n; if (g.kind === "wall") nBack += n; }
-  const mk = (geo, count, mat, name) => {
+  const mk = (geo: THREE.BufferGeometry | undefined, count: number, mat: THREE.Material | THREE.Material[] | undefined, name: string) => {
     const m = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
     m.name = name; m.userData.kind = "spire"; m.userData.gemini = true; m.frustumCulled = false; m.count = 0;
     m.setColorAt(0, new THREE.Color(1, 1, 1));
@@ -293,7 +293,7 @@ export function createGeminiSpires(ctx, groups) {
   const tints = G.TINTS.map((h) => new THREE.Color(h));
   const stat = { leaves: 0, pillars: 0, layoutMs: 0, layouts: 0 } as BuiltGeminiStats;
 
-  function instanceMatrix(p, g, H, sxz, tpl, rowBack, out) {
+  function instanceMatrix(p, g, H: number, sxz: number, tpl: THREE.CylinderGeometry | undefined, rowBack: boolean, out: THREE.Matrix4) {
     const ax = Math.sin(p.az), az = Math.cos(p.az), tx = Math.cos(p.az), tz = -Math.sin(p.az);
     const depth = rowBack ? G.BACK_DEPTH_K * p.R : 0;
     let cx = p.cx + g.dx, cz = p.cz + g.dz;
@@ -316,7 +316,7 @@ export function createGeminiSpires(ctx, groups) {
     return out;
   }
 
-  function clump(mesh, n, anchorW, nor, cr, rnd, ledge, tint?: any) {
+  function clump(mesh, n: number, anchorW: THREE.Vector3, nor, cr: number, rnd: { (): number; (): number; }, ledge, tint?: any) {
     const Cc = anchorW.clone().addScaledVector(nor, 0.35 * cr);
     T1.set(nor.y, -nor.x, 0); if (T1.lengthSq() < 1e-4) T1.set(0, nor.z, -nor.y); T1.normalize();
     T2.crossVectors(nor, T1);
@@ -347,10 +347,10 @@ export function createGeminiSpires(ctx, groups) {
     const t = performance.now();
     const cf = fMesh.map(() => 0), cb = bMesh.map(() => 0);
     let leaves = 0, pillars = 0;
-    groups.forEach((g, gi) => {
+    groups.forEach((g, gi: string | number) => {
       const sh = shrubs[gi]; let n = 0;
       if (!g.hidden) {
-        pillarsOf(g).forEach((p, k) => {
+        pillarsOf(g).forEach((p: { R: number; H: number; }, k: number) => {
           pillars++;
           const rnd = mulberry(g.id * 1009 + k * 31 + 7);
           const vi = (g.id + k) % front.length, tpl = front[vi];
@@ -361,7 +361,7 @@ export function createGeminiSpires(ctx, groups) {
           cf[vi]++;
           // shrubs: the pillar's own summit / crevice anchors
           NM.getNormalMatrix(PM);
-          const pick = (arr, cnt) => { const out = [], used = new Set(); for (let i = 0; i < cnt && arr.length; i++) { let j = Math.floor(rnd() * arr.length), tr = 0; while (used.has(j) && tr++ < 8) j = Math.floor(rnd() * arr.length); used.add(j); out.push(arr[j]); } return out; };
+          const pick = (arr, cnt: number) => { const out = [], used = new Set(); for (let i = 0; i < cnt && arr.length; i++) { let j = Math.floor(rnd() * arr.length), tr = 0; while (used.has(j) && tr++ < 8) j = Math.floor(rnd() * arr.length); used.add(j); out.push(arr[j]); } return out; };
           const jobs = [...pick(tpl.userData.summit, G.CLUMP_SUMMIT).map((a) => [a, false]), ...pick(tpl.userData.crevice, G.CLUMP_CREVICE).map((a) => [a, true])];
           for (const [a, ledge] of jobs) {
             V.fromArray(a.p).applyMatrix4(PM);

@@ -132,7 +132,7 @@ export async function initEngine() {
         "$roster.owned",
         rosterMaskForParty(Number(state._rosterOwned) || 0, state.party ?? []),
     );
-    S.engine.state.vars.onChange((n, _o, v) => {
+    S.engine.state.vars.onChange((n: string, _o, v) => {
         if (n === "$story.ordinal")
             localStorage.setItem("progressOrdinal", String(v));
         else if (n === "$party.bit") {
@@ -206,15 +206,15 @@ export async function initEngine() {
     // It applies erec.sets but NOT the ordinal, so the playEvent wrapper advances it (the
     // legacy storyVM relied on playStoryEvent doing this).
     S.engineTriggerSystem = createTriggerSystem({
-        getProgram: (mapId) =>
+        getProgram: (mapId: string) =>
             state.storySteps?.[mapId.replace(/^s/, "")] || null,
-        getGrid: (mapId) => state.storyGrids?.[mapId.replace(/^s/, "")] || null,
+        getGrid: (mapId: string) => state.storyGrids?.[mapId.replace(/^s/, "")] || null,
         // The EXACT per-pixel zones (the disc's zonecheck(7,x,y), run-decimised).
         // When present the trigger system reads the step byte from the player's
         // PIXEL and never consults the 32 px grid above — that grid fires a step
         // up to a cell early, which put the Protocol Ruins tunnel hide before the
         // passage and its restore past where the original restores.
-        getZoneRuns: (mapId) => state.storyZones?.[mapId.replace(/^s/, "")] || null,
+        getZoneRuns: (mapId: string) => state.storyZones?.[mapId.replace(/^s/, "")] || null,
         // The engine's StepEnableTable is {rows}; state.stepEnableTable holds the rows
         // themselves (web/game.js:1641). Handing the bare array over left the port's own
         // cone gate inert — it fell back to "live" for every facing and only the
@@ -225,14 +225,14 @@ export async function initEngine() {
         // not unique inside a stage — the Master Room's records for events 965 and 1450
         // share 012e000a (wstag305.s:3699-3708), so the old flag_key lookup could hand the
         // step path the wrong scene. flag_key stays the fallback.
-        getEventById: (mapId, id) =>
+        getEventById: (mapId: string | number, id) =>
             (state.wstag[mapId] || []).find((e) => e.id === id) || null,
-        getEventByKey: (mapId, fk) =>
+        getEventByKey: (mapId: string | number, fk) =>
             (state.wstag[mapId] || []).find((e) => e.flag_key === fk) || null,
         flags: storyFlags,
         hostCompletesEvent: true,
-        done: (fk) => !!state.flags["evt_" + fk],
-        markDone: (fk) => {
+        done: (fk: string) => !!state.flags["evt_" + fk],
+        markDone: (fk: string) => {
             state.flags["evt_" + fk] = true;
             localStorage.setItem("flags", JSON.stringify(state.flags));
         },

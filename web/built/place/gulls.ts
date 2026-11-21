@@ -13,7 +13,7 @@ export function plan(pctx) {
   const reach = verticalReach();
   const r = rng(GULL.SEED);
   const copiesOf = (c) => Math.max(1, Math.round(c.copies || 1));
-  const gulls = [], cardCopies = [];
+  const gulls = [], cardCopies: number[] = [];
   cards.forEach((c, ci) => {
     const copies = c.dir ? copiesOf(c) : 1, dir = c.dir || [0, 0];   // no dir = no way to split the card: one bird
     cardCopies.push(copies);
@@ -23,7 +23,7 @@ export function plan(pctx) {
     for (let k = 0; k < copies; k++) {
       const off = ((k + 0.5) / copies - 0.5) * c.w;              // copy k's centre along the card's own dir
       const cx = c.base[0] + off * dir[0], cz = c.base[2] + off * dir[1];
-      const lerp = (a) => a[0] + (a[1] - a[0]) * r();
+      const lerp = (a: number[]) => a[0] + (a[1] - a[0]) * r();
       gulls.push({ i: gulls.length, card: ci, copy: k, copies, piece: c.piece, cw,
                    R: Math.hypot(cx, cz), az0: Math.atan2(cx, cz), yc, hs, y0: c.base[1], y1: c.base[1] + c.h,
                    bob: GULL.BOB_K * Math.max(0, room), w: lerp(GULL.ORBIT_W), bw: lerp(GULL.BOB_W), bph: r() * 6.2832,
@@ -31,7 +31,7 @@ export function plan(pctx) {
     }
   });
   /** where gull q is at time t (s): centre and yaw */
-  const at = (q, t) => {
+  const at = (q: { az0: number; w: number; R: number; yc: number; bob: number; bw: number; bph: number; }, t: number) => {
     const az = q.az0 + q.w * t;
     return { c: [q.R * Math.sin(az), q.yc + q.bob * Math.sin(t * q.bw + q.bph), q.R * Math.cos(az)], yaw: az + Math.PI / 2, az };
   };
@@ -43,11 +43,11 @@ export function plan(pctx) {
     data: { gulls, cards: cards.length, cardCopies, reach, at, keep, colours: { p90: c0.p90, green: c0.green || c0.all, p10: c0.p10, accent: c0.accent },
             band: { r: [Math.min(...gulls.map((q) => q.R)), Math.max(...gulls.map((q) => q.R))],
                     y: [Math.min(...pieces.map((p) => p.ymin ?? Infinity)), Math.max(...pieces.map((p) => p.ymax ?? -Infinity))] } },
-    motion: (t, i) => { const q = gulls[i]; if (!q) return null; const a = at(q, t); return { p: a.c, yaw: a.yaw, h: q.hs, hidden: q.hidden }; },
+    motion: (t: number, i: string | number) => { const q = gulls[i]; if (!q) return null; const a = at(q, t); return { p: a.c, yaw: a.yaw, h: q.hs, hidden: q.hidden }; },
     place(st) {   // keep-out over the whole orbit: one sphere per sample holding the gull and its bob range
       st = st || {};
       const fightR = st.fightR ?? 0;
-      const M2 = Math.max(0, ...(st.rings || []).map((g) => g.r), ...(st.fighters || []).map((f) => Math.hypot(f.c[0], f.c[2]) + f.r));
+      const M2 = Math.max(0, ...(st.rings || []).map((g) => g.r), ...(st.fighters || []).map((f: { c: number[]; r: number; }) => Math.hypot(f.c[0], f.c[2]) + f.r));
       let exact = 0;
       for (const q of gulls) {
         const rho = q.hs * 1.05 + q.bob;   // the wing reach is < 1 half span in every direction (+5 %)

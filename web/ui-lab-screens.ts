@@ -11,11 +11,11 @@
 // Keys: Enter = cross (confirm), Escape = back, K = circle, V = square, I = start, E = R1, Q = L1.
 // Pause home rows: 0 ITEMS, 1 SORT, 2 MAP, 3 TECHNIQUES, 4 STATUS, 5 CARD FOLDERS, 6 QUESTS, 7 GLOSSARY, 8 OPTIONS.
 
-const open = (js) => ["eval", js];
-const press = (key, n = 1) => ["press", key, n];
-const wait = (ms) => ["wait", ms];
+const open = (js: string) => ["eval", js];
+const press = (key: string, n = 1) => ["press", key, n];
+const wait = (ms: number) => ["wait", ms];
 /** Open the pause home and go to a row: __labOpen('menu'), the cursor down `row` times, Enter. */
-const home = (row) => [open("__labOpen('menu')"), wait(700), ...(row ? [press("ArrowDown", row)] : []), press("Enter")];
+const home = (row: number | undefined) => [open("__labOpen('menu')"), wait(700), ...(row ? [press("ArrowDown", row)] : []), press("Enter")];
 
 /** Field techniques for the lead partner (form 30 equipped, Small Heal 0xb8 + Mega Heal 0xb9 in its ledger slots). */
 const TECH_SEED = "Object.assign(__state.partnerStats, { formLedger: [{ id: 30, formLevel: 5, dvexp: 0, techSlots: [0xb8, 0xb9, 0, 0, 0, 0] }], equippedForms: [30] })";
@@ -134,7 +134,7 @@ export const LAB_SCREENS = Object.freeze([
 ]);
 
 /** The steps of a row, its parents' first. Returns null when any step of the chain is not scripted. */
-export function stepsFor(id, table = LAB_SCREENS) {
+export function stepsFor(id: string, table = LAB_SCREENS) {
     const byId = new Map(table.map((r) => [r.id, r]));
     const chain = [];
     for (let r = byId.get(id), guard = 0; r && guard < 12; r = r.parent ? byId.get(r.parent) : null, guard++) {
@@ -145,9 +145,9 @@ export function stepsFor(id, table = LAB_SCREENS) {
 }
 
 /** The seeds a row (and its parents) need, in order, without repeats. */
-export function needsFor(id, table = LAB_SCREENS) {
+export function needsFor(id: string, table = LAB_SCREENS) {
     const byId = new Map(table.map((r) => [r.id, r]));
-    const out = [];
+    const out: string[] = [];
     for (let r = byId.get(id), guard = 0; r && guard < 12; r = r.parent ? byId.get(r.parent) : null, guard++) for (const n of r.needs ?? []) if (!out.includes(n)) out.push(n);
     return out;
 }

@@ -9,7 +9,7 @@ export function createBlankBook({ title = "GLOSSARY" } = {}) {
         windows: ["title", "body", "footer"],
         wall: true,
         act(buttons) { return buttons.has(WORD.back) ? "back" : null; },
-        draw(ctx, view) {
+        draw(ctx: CanvasRenderingContext2D | null | undefined, view: { progress: (arg0: string) => number; }) {
             drawHeader(ctx, view.progress("title"), title);
             // eight 40 px columns = the full 320 px, seven bands = 140 px tall, between the header and the footer
             withFold(ctx, view.progress("body"), 160, 118, "x", () => drawPanel(ctx, 0, 48, 8, 7));

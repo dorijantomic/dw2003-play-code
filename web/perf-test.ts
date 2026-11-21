@@ -100,11 +100,11 @@ const NOOP_WHEN_OFF = new Set(["noGrass", "noWater", "noFilter", "noHeat"]);
 
 // ---- small helpers
 const $ = (id: string): any => document.getElementById(id);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number | undefined) => new Promise((r) => setTimeout(r, ms));
 const logEl = () => $("log");
-function log(msg) { const el = logEl(); el.textContent += msg + "\n"; el.scrollTop = el.scrollHeight; }
-function status(msg) { $("status").textContent = msg; }
-async function waitFor(fn, ms, what) {
+function log(msg: string) { const el = logEl(); el.textContent += msg + "\n"; el.scrollTop = el.scrollHeight; }
+function status(msg: string) { $("status").textContent = msg; }
+async function waitFor(fn, ms: number, what: string) {
     const t0 = performance.now();
     for (;;) {
         let v = null;
@@ -119,11 +119,11 @@ function stats(arr) {
     if (!n) return { n: 0 };
     const s = Float64Array.from(arr).sort();
     const sum = s.reduce((a, b) => a + b, 0);
-    const at = (p) => s[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))];
-    const r = (v) => Math.round(v * 1000) / 1000;
+    const at = (p: number) => s[Math.min(n - 1, Math.max(0, Math.ceil(p * n) - 1))];
+    const r = (v: number | undefined) => Math.round(v * 1000) / 1000;
     return { n, avg: r(sum / n), median: r(n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2), p95: r(at(0.95)), p99: r(at(0.99)), worst: r(s[n - 1]), best: r(s[0]), sum: r(sum) };
 }
-function browserName(ua) {
+function browserName(ua: string) {
     if (/Firefox\//.test(ua)) return "firefox";
     if (/Edg\//.test(ua)) return "edge";
     if (/Chrome\//.test(ua)) return "chrome";
@@ -162,7 +162,7 @@ function restoreBackup() {
     return true;
 }
 const LEAD = { digimonId: 1, level: 20, xp: 0, tp: 10, hp: 900, maxHp: 900, mp: 300, maxMp: 300, stats: { str: 99, def: 99, spt: 99, wis: 99, spd: 99, chr: 99 }, bonuses: {}, elemBonuses: {} };
-function seedStorage(mode) {
+function seedStorage(mode: string) {
     localStorage.clear();
     localStorage.setItem("assetMode", mode);
     localStorage.setItem("engineSchema", "2");
@@ -179,13 +179,13 @@ const run = { iw: null, frame: null, rec: null, frameTimes: null, prevT: 0, walk
 // ---- stall guard. A hidden / covered / minimised window makes the browser stop (or nearly stop) requestAnimationFrame while timers
 // still run. The page's own rAF loop keeps `stamps` (performance.now() of each frame, last 3 s) and a watchdog timer checks it.
 const STALL_GAP_MS = 250, STALL_FPS = 20, FLOW_FPS = 50, FLOW_MS = 2000, MAX_TRIES = 3, FLOW_GIVEUP_MS = 600000;
-function rafFpsOver(ms) {
+function rafFpsOver(ms: number) {
     const now = performance.now();
     let n = 0;
     for (let i = run.stamps.length - 1; i >= 0 && now - run.stamps[i] <= ms; i--) n++;
     return n / (ms / 1000);
 }
-function rafLoop(now) {
+function rafLoop(now: number) {
     if (run.prevT && run.frameTimes) run.frameTimes.push(now - run.prevT);
     if (run.layerFrames) {   // battle 3D layer canvas (web/battle-layer.js sets dataset.battleLayer = "1"): shown / hidden / missing at this rAF
         let c = null;
@@ -202,7 +202,7 @@ function rafLoop(now) {
     while (run.stamps.length && t - run.stamps[0] > 3000) run.stamps.shift();
     requestAnimationFrame(rafLoop);
 }
-function guardStart(label) {
+function guardStart(label: string) {
     const g = { label, stalled: false, reason: null, t0: performance.now(), timer: null };
     g.timer = setInterval(() => {
         if (g.stalled || QUICK) return;   // quick run: a slow game is the measurement, not a stall
@@ -218,7 +218,7 @@ function guardStart(label) {
 }
 function guardStop(g) { clearInterval(g.timer); if (run.guard === g) run.guard = null; }
 // wait until rAF runs at >= FLOW_FPS for FLOW_MS (a window that is hidden may never come back: gives up after FLOW_GIVEUP_MS)
-async function waitForFlow(why) {
+async function waitForFlow(why: string) {
     if (QUICK) return;
     const t0 = performance.now();
     let announced = false;
@@ -260,7 +260,7 @@ function hookContextTypes(iw) {
     } catch { /* window not ready yet: the poller tries again */ }
 }
 // after the iframe is pointed at the game: poll (every ms) for the new window and hook it before its modules run; stops when the load event fired
-function watchFrameForEarlyHook(frame) {
+function watchFrameForEarlyHook(frame: HTMLIFrameElement) {
     let on = true;
     const tick = () => {
         if (!on) return;
@@ -276,13 +276,13 @@ function watchFrameForEarlyHook(frame) {
 
 function installHooks(iw) {
     hookContextTypes(iw);   // late safety net: no-op when the early hook already ran on this window
-    iw.__perfHook = (u, r) => {
+    iw.__perfHook = (u: number, r: number) => {
         const rec = run.rec; if (!rec) return;
         const t = performance.now();
         if (rec.last) rec.gap.push(t - rec.last);
         rec.last = t; rec.upd.push(u); rec.ren.push(r);
     };
-    iw.__perfHook3d = (name, ms, n) => {
+    iw.__perfHook3d = (name: string | number, ms: number, n: number) => {
         const rec = run.rec; if (!rec) return;
         const h = rec.h3[name] || (rec.h3[name] = { ms: [], n: [] });
         h.ms.push(ms); h.n.push(n);
@@ -370,7 +370,7 @@ async function probeCalls(iw) {
     if (fdesc) Object.defineProperty(proto, "filter", fdesc);
     const per = {};
     for (const n of Object.keys(counts)) per[n + "_perGameFrame"] = frames ? Math.round(counts[n] / frames * 10) / 10 : null;
-    const r2 = (x) => Math.round(x * 100) / 100;
+    const r2 = (x: number) => Math.round(x * 100) / 100;
     const msPer = {};
     for (const n of names) msPer[n + "_msPerGameFrame"] = frames ? r2(ms[n] / frames) : null;
     const drawImageBySource = Object.entries(bySrc).map(([k, b]) => ({ source: k, callsPerGameFrame: frames ? r2(b.calls / frames) : null, msPerGameFrame: frames ? r2(b.ms / frames) : null }))
@@ -389,15 +389,15 @@ async function probeCalls(iw) {
 const FX_KEYS = ["grass", "water", "sway", "heat", "wetlook", "mirror", "reflect", "rain", "sand", "tod", "lamps", "fog", "weatherMode", "todMode", "widefield", "hd2d", "battleatmos", "battlepano"];
 // Settings go into the running game only. setFxMany() (web/ambience.js) also writes localStorage "dw.fx.v1"; that key is removed
 // again at once, and the whole localStorage is wiped/restored by this page anyway, so nothing reaches the player's saved settings.
-function applySettings(iw, name) {
+function applySettings(iw: { __setFxMany: (arg0: { [x: string]: string | boolean; }) => void; localStorage: { removeItem: (arg0: string) => void; }; }, name: string) {
     iw.__setFxMany({ ...VARIANTS[name].values });
     iw.localStorage.removeItem("dw.fx.v1");
 }
 function applyScene(iw, scene) {
     const undo = [];
     const fx = iw.__fx;
-    const setFx = (k, v) => { const old = fx[k]; fx[k] = v; undo.push(() => { fx[k] = old; }); };
-    const setWin = (k, v) => { const had = Object.prototype.hasOwnProperty.call(iw, k), old = iw[k]; iw[k] = v; undo.push(() => { if (had) iw[k] = old; else delete iw[k]; }); };
+    const setFx = (k: string, v: boolean) => { const old = fx[k]; fx[k] = v; undo.push(() => { fx[k] = old; }); };
+    const setWin = (k: string, v: number | boolean) => { const had = Object.prototype.hasOwnProperty.call(iw, k), old = iw[k]; iw[k] = v; undo.push(() => { if (had) iw[k] = old; else delete iw[k]; }); };
     if (scene.weather) setFx("weatherMode", scene.weather);
     if (scene.cut != null) setWin("__perfCut", scene.cut);   // #cut: game.js render() stops at that checkpoint
     if (!run.noPin) setWin("__todForce", 0);   // day, so the clock does not change the scene
@@ -436,7 +436,7 @@ function startWalking(iw) {
     if (!$("walk").checked) return;
     let dir = 0;
     const keys = ["ArrowRight", "ArrowLeft"];
-    const send = (type, key) => iw.dispatchEvent(new iw.KeyboardEvent(type, { key, code: key, bubbles: true }));
+    const send = (type: string, key: string | undefined) => iw.dispatchEvent(new iw.KeyboardEvent(type, { key, code: key, bubbles: true }));
     const step = () => { if (run.walk?.held) send("keyup", run.walk.held); const key = keys[dir++ % 2]; run.walk.held = key; send("keydown", key); };
     run.walk = { held: null, timer: setInterval(step, 1500) };
     step();
@@ -461,7 +461,7 @@ function censusStart(iw) {
         const kind = g === "createLinearGradient" ? "linear" : "radial";
         proto[g] = function (...a) { const r = o.apply(this, a); try { st.gradTag.set(r, kind); } catch { /* not an object */ } return r; };
     }
-    const styleKind = (v) => {
+    const styleKind = (v: WeakKey) => {
         if (typeof v === "string") return "color";
         const t = st.gradTag.get(v); if (t) return "CanvasGradient(" + t + ")";
         return (v && v.constructor && v.constructor.name) || "?";
@@ -496,10 +496,10 @@ function censusStart(iw) {
     }
     return st;
 }
-function censusStop(st, frames) {
+function censusStop(st, frames: number) {
     for (const n of CENSUS_METHODS) st.proto[n] = st.orig[n];
     for (const g of Object.keys(st.gradOrig)) st.proto[g] = st.gradOrig[g];
-    const f = Math.max(1, frames), r = (v) => Math.round(v / f * 1000) / 1000;
+    const f = Math.max(1, frames), r = (v: number) => Math.round(v / f * 1000) / 1000;
     return { frames, totalPerFrame: r(st.total), census: [...st.counts].map(([key, c]) => ({ key, perFrame: r(c) })).sort((a, b) => b.perFrame - a.perFrame).slice(0, 150) };
 }
 
@@ -569,7 +569,7 @@ async function measureScene(iw, scene, extra: PerfTestSceneExtra = {}) {
 }
 
 // run one scene up to MAX_TRIES times; a stalled try waits for frames to flow again, then reruns
-async function measureGuarded(iw, scene, extra) {
+async function measureGuarded(iw, scene, extra: PerfTestSceneExtra | undefined) {
     let out = null, tries = 0;
     const tryLog = [];
     while (tries < MAX_TRIES) {
@@ -590,7 +590,7 @@ async function measureGuarded(iw, scene, extra) {
     return out;
 }
 
-async function loadGame(map) {
+async function loadGame(map: string) {
     status("loading game on " + map);
     log("loading game, map " + map);
     stopWalking(run.iw);
@@ -618,7 +618,7 @@ async function loadGame(map) {
     return iw;
 }
 
-async function startBattle(iw, mapId) {
+async function startBattle(iw, mapId: string) {
     status("starting battle on " + mapId);
     log("starting battle on arena of " + mapId);
     stopWalking(iw);
@@ -627,7 +627,7 @@ async function startBattle(iw, mapId) {
     await waitFor(() => iw.__battle.isActive() && iw.__battleB?.(), 30000, "battle active");
     // INTRO = 1, PLAYER_MENU = 2 (web/battle.js ST): confirm the intro lines until the command menu is up
     let reached = false;
-    const press = (type) => iw.dispatchEvent(new iw.KeyboardEvent(type, { key: "Enter", code: "Enter", bubbles: true }));
+    const press = (type: string) => iw.dispatchEvent(new iw.KeyboardEvent(type, { key: "Enter", code: "Enter", bubbles: true }));
     while (performance.now() - t0 < 45000) {
         const st = iw.__battleB?.()?.state;
         if (st === 2) { reached = true; break; }

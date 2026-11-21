@@ -46,7 +46,7 @@ export function namesForPack(modelMap) {
 // Roster: all packs, labeled with their known names.
 export function buildRoster({ index, modelMap }) {
   const rev = namesForPack(modelMap);
-  return (index || []).map((pack) => ({
+  return (index || []).map((pack: string | number) => ({
     pack,
     names: rev[pack] || [],
     label: (rev[pack] || []).join(" / ") || pack,
@@ -61,7 +61,7 @@ export function speciesForPack(pack, { modelMap, digimon, enemies }) {
     .map(([n]) => n);
   const out = [];
   for (const name of names) {
-    const prof = (digimon?.digimon || []).find((d) => d.name === name);
+    const prof = (digimon?.digimon || []).find((d: { name: string; }) => d.name === name);
     if (prof) {
       out.push({
         name,
@@ -70,7 +70,7 @@ export function speciesForPack(pack, { modelMap, digimon, enemies }) {
         techs: (prof.techs || []).filter((t) => t && t !== prof.tech_basic),
       });
     }
-    const en = (enemies?.enemies || []).find((e) => e.enemy_id === name);
+    const en = (enemies?.enemies || []).find((e: { enemy_id: string; }) => e.enemy_id === name);
     if (en) {
       out.push({
         name,
@@ -89,7 +89,7 @@ function skillName(id, digimon) {
 }
 
 // One op10 row: resolve the sound (or the contact marker) to a named sample.
-function op10Row(type, duration, { op10Map, manifest }) {
+function op10Row(type: number, duration: number, { op10Map, manifest }) {
   const key = op10Map?.[String(type)] || null;
   const meta = key ? manifest?.[key] : null;
   return {
@@ -115,7 +115,7 @@ export function clipRows(ops, resolutions, data) {
         contact: type === 99 ? "final strike" : "combo hit",
         type,
         duration,
-        resolutions: (resolutions || []).map((r) => ({
+        resolutions: (resolutions || []).map((r: { contactType: null; }) => ({
           ...r,
           row: r.contactType != null ? op10Row(r.contactType, duration, data) : null,
         })),
@@ -152,7 +152,7 @@ export function resolveModel(pack, anim, data) {
   const basics = species
     .filter((s) => s.basic)
     .map((s) => ({ name: s.name, kind: s.kind, techId: s.basic }));
-  if (actions[5]?.ops?.some((o) => o.op === 10)) {
+  if (actions[5]?.ops?.some((o: { op: number; }) => o.op === 10)) {
     coveredClips.add(5);
     sections.push({
       title: "Basic attack — clip 5",
@@ -172,7 +172,7 @@ export function resolveModel(pack, anim, data) {
       const rec = data.techTable?.[String(techId)] || null;
       const clip = rec?.clip;
       const ops = clip != null ? actions[clip]?.ops : null;
-      if (!ops?.some((o) => o.op === 10)) continue;
+      if (!ops?.some((o: { op: number; }) => o.op === 10)) continue;
       coveredClips.add(clip);
       const nm = skillName(techId, data.digimon);
       sections.push({
@@ -187,7 +187,7 @@ export function resolveModel(pack, anim, data) {
 
   // Reactions: clip 2 (survive) and clip 3 (death) — the sounds it emits when hit.
   for (const clip of [2, 3]) {
-    if (actions[clip]?.ops?.some((o) => o.op === 10)) {
+    if (actions[clip]?.ops?.some((o: { op: number; }) => o.op === 10)) {
       coveredClips.add(clip);
       sections.push({
         title: `${clipLabel(clip)} — clip ${clip}`,
@@ -200,7 +200,7 @@ export function resolveModel(pack, anim, data) {
   // Everything else that makes noise — nothing hidden.
   for (let clip = 0; clip < actions.length; clip++) {
     if (coveredClips.has(clip)) continue;
-    if (!actions[clip]?.ops?.some((o) => o.op === 10)) continue;
+    if (!actions[clip]?.ops?.some((o: { op: number; }) => o.op === 10)) continue;
     sections.push({
       title: `${clipLabel(clip)} — clip ${clip}`,
       clip,

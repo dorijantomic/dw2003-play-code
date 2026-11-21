@@ -8,13 +8,13 @@ import type { GenericOpts, UiTextOpts } from "./types.js";
 /** The native rect of a claimed clip through the matrix of its draw call. */
 export const clipRect = (p) => applyRel({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 }, p.rel);
 
-const KIND_ROLE = (r) => (r.kind === 3 ? (r.right != null ? "number" : "label") : "label");
+const KIND_ROLE = (r: { kind: number; right: null; }) => (r.kind === 3 ? (r.right != null ? "number" : "label") : "label");
 
 /**
  * One run -> a text descriptor. `o` may carry { role, sizeDp, color, rect } to override the defaults (kind 1 = label 24 dp, kind 3 =
  * small label 16 dp / right-anchored number 22 dp). Native text rows are 9 high; the DOM line is centred on them.
  */
-export function runText(r, key, rel, o: UiTextOpts = {}) {
+export function runText(r, key: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, o: UiTextOpts = {}) {
     const role = o.role ?? KIND_ROLE(r);
     const small = r.kind === 3 && o.sizeDp === undefined;
     const sizeDp = o.sizeDp ?? (role === "number" ? 22 : small ? 16 : role === "body" ? 26 : 24);
@@ -27,7 +27,7 @@ export function runText(r, key, rel, o: UiTextOpts = {}) {
 }
 
 /** Every run not in `used` as a text part. */
-export function restOfRuns(runs, used, rel, out, prefix = "t", pick: (r: any) => any = () => ({})) {
+export function restOfRuns(runs, used: Set<unknown> | null, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out, prefix = "t", pick: (r: any) => any = () => ({})) {
     const seen = new Map();
     runs.forEach((r) => {
         if (used?.has(r)) return;

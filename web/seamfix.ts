@@ -15,7 +15,7 @@ const MAX_AREA = 80;       // any enclosed hole this small is a seam
 const MAX_CRACK = 6000;    // a crack longer than this is treated as real art
 const patches = new Map(); // stageId -> { canvas, regions, pixels } | null
 
-export function seamPatchFor(stageId, img) {
+export function seamPatchFor(stageId, img: HTMLImageElement) {
     let p = patches.get(stageId);
     if (p !== undefined) return p;
     p = build(img);
@@ -40,7 +40,7 @@ function build(img) {
     const stack = [];
     const fix = [];                     // pixel indices to fill
     let regions = 0;
-    const thick = (i) => {              // is the 5x5 window around i all see-through?
+    const thick = (i: number) => {              // is the 5x5 window around i all see-through?
         const x = i % W, y = (i / W) | 0;
         if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) return false;
         for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!hole[i + dy * W + dx]) return false;
@@ -73,7 +73,7 @@ function build(img) {
     const out = new Uint8ClampedArray(W * H * 4);
     const known = new Uint8Array(W * H);
     for (let i = 0, n = W * H; i < n; i++) if (!hole[i]) known[i] = 1;
-    const col = (i) => (out[i * 4 + 3] ? out : src);
+    const col = (i: number) => (out[i * 4 + 3] ? out : src);
     let todo = fix;
     for (let pass = 0; pass < 40 && todo.length; pass++) {
         const rest = [], paint = [];

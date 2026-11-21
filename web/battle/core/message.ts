@@ -19,7 +19,7 @@ import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeMessage(B: BattleContext) {
-function tickBattleMessage(b, dt) {
+function tickBattleMessage(b, dt: number) {
     const frames = B.advanceDisplayFrames(dt);
     b._displayFrames = frames;
     // While the opening machine has not yet armed the line (its phases 0..4) there is no
@@ -79,7 +79,7 @@ function tickBattleMessage(b, dt) {
    * the current actor and a party record (FIGHTSTG_F0x80098d14) — 0 for the enemy
    * or the digivolving Digimon, as the original's own sites write it.
    */
-  function sayOriginal(b, spec, walker) {
+  function sayOriginal(b, spec, walker: string) {
     b.message = walker;
     b._msgSpec = spec;
     // The spec only belongs to this one sentence: any other site that overwrites
@@ -107,7 +107,7 @@ function tickBattleMessage(b, dt) {
    * empty here", and the census in
    * docs/research/battle/battle-message-page-kinds-2026-10-04.md counts the two apart.
    */
-  function clearBattleLine(b) {
+  function clearBattleLine(b: { message: string; _msgSpec: null; _msgSpecFor: null; }) {
     b.message = "";
     b._msgSpec = null;
     b._msgSpecFor = null;
@@ -140,13 +140,13 @@ function tickBattleMessage(b, dt) {
    */
   function startLossSession(b) {
     const session = new ui.BattleLossSession({
-      playSound: (id) => { if ((id >>> 0) === 0x60040008) B.bgm?.play("gameover"); },
+      playSound: (id: number) => { if ((id >>> 0) === 0x60040008) B.bgm?.play("gameover"); },
       armDefeatEffect: () => { B.renderer3d?.setCameraMode?.(B.lossCameraMode()); return 0; },
       turnDefeatCamera: () => {},
       // The port owns the level's arming and lowering, the renderer draws the
       // quarter-speed result.
       slowMotion: (level) => B.renderer3d?.setSlowMotion?.(level),
-    }, { onLaunch: (code) => { b._lossLaunch = code >>> 0; } });
+    }, { onLaunch: (code: number) => { b._lossLaunch = code >>> 0; } });
     session.begin();
     b._lossSession = session;
     const opened = session.messages[session.messages.length - 1];
@@ -158,7 +158,7 @@ function tickBattleMessage(b, dt) {
     return session;
   }
 /** The one place the battle is lost: the shared loss sequence starts here. */
-  function enterLossState(b) {
+  function enterLossState(b: { state: number; _lossSession: null; }) {
     b.state = ST.LOSE;
     b._lossSession = null;
     startLossSession(b);
@@ -225,7 +225,7 @@ function tickBattleMessage(b, dt) {
    * @param {{id: number}} item the item the player chose
    * @returns {{kind: number, payload: number[], name: string, slots: string[]}}
    */
-  function itemAnnouncementSpec(b, item) {
+  function itemAnnouncementSpec(b, item: { id: number | undefined; }) {
     return itemAnnouncementPage(
       b.player.profile.name, item.id, battleMsgText(ui.BATTLE_MESSAGE_BANK_FIELD, item.id));
   }
@@ -271,7 +271,7 @@ function msgHoldsTurn(b) {
   //   5 frameCameraOrOpenLine      no line -> camera beat + EXIT; line -> arm the window.
   //   6 awaitLineThenHandOff       the window is up until the player reads the line, then
   //                                EXIT (top state 1) -> the walker's PLAYER_MENU.
-  function armIntroLine(b) {
+  function armIntroLine(b: { _introLineArmed: boolean; }) {
     // The original's own opener: phase 5 makes the window (F0x8009a298) and writes kind 1,
     // payload 7 (wfightmn.s .L0x000012f8) — one line, "Ambush!".
     sayOriginal(b, { kind: MSG_KIND.ONE_LINE, payload: [MSG.AMBUSH] }, "Ambush!");
@@ -311,7 +311,7 @@ function msgHoldsTurn(b) {
 function openingPorts(b) {
     return {
       assembleBattleObjects() {},
-      loadEncounterAndFighters(state) {
+      loadEncounterAndFighters(state: { introVariant: number; specialMode4: boolean; }) {
         const ans = introVariantFor(Number(b.screenId) || 0, Number(String(b.mapId ?? "").replace(/^s/, "")) || 0);
         state.introVariant = ans.variant;
         state.specialMode4 = ans.specialMode4;
@@ -320,7 +320,7 @@ function openingPorts(b) {
       },
       introLinePending: () => introLinePendingFor(b),
       queueBattleOverlay: () => (B.wfightNative.isOpen() ? 1 : 0),
-      overlayPending: (handle) => handle !== 0 && B.wfightNative.isOpen() && !B.wfightNative.diagnostics?.().failed,
+      overlayPending: (handle: number) => handle !== 0 && B.wfightNative.isOpen() && !B.wfightNative.diagnostics?.().failed,
       sweepActionQueue() {},
       frameCamera() {},
       frameCameraAndOpenLine: () => armIntroLine(b),
@@ -382,13 +382,13 @@ function openingPorts(b) {
    * constants and the two stores. The technique word the record machine runs is read back out
    * of the port's +0x54 store, so the id the machine sees is the one the original stored.
    */
-  function spawnFightTaskFor(side, techniqueId) {
+  function spawnFightTaskFor(side: number, techniqueId: number) {
     const spawn = (method, size, flags) => {
       const cell = { method, size, flags, side: 0, technique: 0 };
       return {
         cell,
-        write8: (off, v) => { if (off === FIGHT_TASK_ARG_BYTE_OFF) cell.side = v & 0xff; },
-        write32: (off, v) => { if (off === FIGHT_TASK_ARG_WORD_OFF) cell.technique = v | 0; },
+        write8: (off: number, v: number) => { if (off === FIGHT_TASK_ARG_BYTE_OFF) cell.side = v & 0xff; },
+        write32: (off: number, v: number) => { if (off === FIGHT_TASK_ARG_WORD_OFF) cell.technique = v | 0; },
       };
     };
     return spawnFightTask(spawn, side & 0xff, techniqueId | 0).cell;

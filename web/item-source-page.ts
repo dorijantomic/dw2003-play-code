@@ -3,9 +3,9 @@
 // the price table) and draws them, never a hand-written answer.
 import { indexRows, sourcesFor, priceWord, nothingLine } from "./item-source.js";
 
-const $ = (id) => document.getElementById(id);
-const load = (url) => fetch(url).then((r) => (r.ok ? r.json() : null));
-const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $ = (id: string) => document.getElementById(id);
+const load = (url: string | URL | Request) => fetch(url).then((r) => (r.ok ? r.json() : null));
+const escapeHtml = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const [index, shops, merchants, effects] = await Promise.all([
     load("assets/data/item_obtain_index.json"),

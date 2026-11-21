@@ -7,8 +7,8 @@ import * as S from "../shared.js";
 import { GRASS, groundAlbedo } from "../grass.js";
 import { itemsFrom, composeYaw } from "../slots.js";
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export function plan(pctx) {
   const { rec, info } = pctx, t0 = performance.now();
@@ -43,7 +43,7 @@ export function plan(pctx) {
   if (!tris.length) { info.grass = { blades: 0, note: "no grass surface in this arena" }; return null; }
   const cum = new Float64Array(tris.length); let tot = 0;
   tris.forEach((t, i) => { tot += t.area; cum[i] = tot; });
-  const pickTri = (x) => { let lo = 0, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < x) lo = m + 1; else hi = m; } return lo; };
+  const pickTri = (x: number) => { let lo = 0, hi = cum.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (cum[m] < x) lo = m + 1; else hi = m; } return lo; };
 
   // blades per unit of surface, so a small surface (a beach's green fringe) gets a proportional count, not 450k
   const N = Math.min(GRASS.COUNT, Math.max(GRASS.MIN_COUNT, Math.round(GRASS.DENSITY * effArea)));
@@ -90,7 +90,7 @@ export function plan(pctx) {
     maskAt.set([m.dirt, m.rock, m.path, m.ao], made * 4);
     made++;
   }
-  const cut = (a, k) => a.subarray(0, made * k);
+  const cut = (a: Float32Array<ArrayBuffer>, k: number) => a.subarray(0, made * k);
   const items = { n: made, p: cut(pp, 3), yaw: cut(yawA, 1), h: cut(hA, 1), rad: cut(radA, 1), m: cut(mats, 16),
                   attrs: { aRoot: { size: 3, array: cut(root, 3) }, aMid: { size: 3, array: cut(mid, 3) }, aTip: { size: 3, array: cut(tip, 3) },
                            aGroundN: { size: 3, array: cut(gn, 3) }, aBlade: { size: 3, array: cut(blade, 3) } } };

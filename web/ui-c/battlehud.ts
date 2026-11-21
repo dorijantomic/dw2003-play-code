@@ -32,9 +32,9 @@ export const DOCK = Object.freeze({
     main: { frac: 0.30, maxW: 0.36, margin: 8 },
     mini: { fracs: [0.6, 0.5], tallFracs: [0.58, 0.46], gap: 4 },
 });
-export function dockLayout(stage) {
+export function dockLayout(stage: { x0: number; y0: number; x1: number; y1: number; }) {
     const S = stage ?? { x0: 0, y0: 0, x1: 320, y1: 240 }, pad = 1, { main: m, mini: o } = DOCK, W = S.x1 - S.x0, H = S.y1 - S.y0;
-    const box = (x, y, side) => ({ x, y, w: side, h: side, cx: x + side / 2, cy: y + side / 2, R: side / 2 });
+    const box = (x: number, y: number, side: number) => ({ x, y, w: side, h: side, cx: x + side / 2, cy: y + side / 2, R: side / 2 });
     const side = Math.max(8, Math.min(m.frac * H, m.maxW * W, W - 2 * pad, H - 2 * pad));
     const main = box(S.x0 + m.margin, S.y1 - m.margin - side, side);
     if (main.x < S.x0 + pad) main.x = S.x0 + pad;
@@ -52,18 +52,18 @@ const CAP = Object.freeze({ top: 15, inX: 8, gap: 8, sizeDp: 26, lineDp: 34, per
  * ONE data shape, N bars: `foes` = [{ name, level, hp, maxHp }]. A narrow (phone) stage uses the width left of the turn arc instead. Native units, pure.
  */
 export const FOE = Object.freeze({ wFrac: 0.38, wFrac2: 0.46, gap: 4, nameH: 9, barDy: 10, barH: 1.6, pipDy: 13.6, pipH: 3, blockH: 18, arcW: 34, narrowW: 220 });
-export function foeLayout(S, n = 1) {
+export function foeLayout(S: { x1: number; x0: number; y0: number; }, n = 1) {
     const W = S.x1 - S.x0, narrow = W < FOE.narrowW, cnt = Math.max(1, n | 0);
     const total = narrow ? W - 2 * CAP.inX - FOE.arcW : (cnt > 1 ? FOE.wFrac2 : FOE.wFrac) * W, gap = cnt > 1 ? FOE.gap : 0;
     const w = (total - gap * (cnt - 1)) / cnt, x0 = narrow ? S.x0 + CAP.inX : S.x0 + (W - total) / 2;
     return Array.from({ length: cnt }, (_, i) => ({ x: x0 + i * (w + gap), y: S.y0 + CAP.top, w }));
 }
 /** The bar's colour state: green, yellow below 50 %, red below 25 %. */
-export const foeState = (ratio) => (ratio < 0.25 ? "low" : ratio < 0.5 ? "mid" : "ok");
+export const foeState = (ratio: number) => (ratio < 0.25 ? "low" : ratio < 0.5 ? "mid" : "ok");
 const FOE_GRAD = { ok: "linear-gradient(90deg, var(--c-hp-a), var(--c-hp-b))", mid: "linear-gradient(90deg, var(--c-foe-mid-a), var(--c-foe-mid-b))", low: "linear-gradient(90deg, var(--c-foe-low-a), var(--c-foe-low-b))" };
 
 /** The turn arc (top right): who acts now (biggest, the bottom of the arc), then who follows. `now` = "player" | "enemy"; three nodes: now, the other, and the next round's first. Pure. */
-export function turnArc(S, now, pName, eName) {
+export function turnArc(S: { x1: number; x0: number; y0: number; }, now: string, pName, eName: string) {
     const W = S.x1 - S.x0, k = Math.max(0.6, Math.min(1, W / 240)), other = now === "enemy" ? "player" : "enemy";
     const seq = [now, other, now], turns = ["now", "next", "later"], rad = [6.4, 4.6, 3.5].map((r) => r * k);
     const yBase = S.y0 + CAP.top + 5 + rad[0] * 2 * 0 + 28 * k, cx = S.x1 - 4 - 8.2 * k;
@@ -82,7 +82,7 @@ export function classifyCounter(line, who, note) {
     return { kind: "counter", side: by === who.player ? "enemy" : "player", n: +m[1], tag: "COUNTER", evt: `c${note?.seq ?? 0}:${t}` };
 }
 const POP_STATUS: [string, RegExp, string][] = [["poison", /poison/i, "POISON"], ["frozen", /frozen|paraly[sz]/i, "FROZEN"], ["confuse", /confus/i, "CONFUSED"], ["sleep", /asleep|sleep/i, "SLEEP"]];
-const statusOf = (t) => { for (const [k, re, tag] of POP_STATUS) if (re.test(t)) return { status: k, tag }; return null; };
+const statusOf = (t: string) => { for (const [k, re, tag] of POP_STATUS) if (re.test(t)) return { status: k, tag }; return null; };
 /**
  * What the pop is, from the game's own line and the read-only hit note (battle.js noteHit): { kind: dmg | heal | miss | counter | status, side (who it lands on), n, tone, tag, status, evt } or null.
  * A flag (crit / weak / resist) is used only when the note is the blow that line names (the note's damage equals the line's figure); every case shows only when the game really made it.
@@ -90,7 +90,7 @@ const statusOf = (t) => { for (const [k, re, tag] of POP_STATUS) if (re.test(t))
 export function classifyPop(line, who, note) {
     const t = String(line ?? "").replace(/\s+/g, " ").trim();
     if (!t) return null;
-    const sideOf = (nm) => (nm && nm === who.enemy ? "enemy" : nm && nm === who.player ? "player" : null);
+    const sideOf = (nm: string) => (nm && nm === who.enemy ? "enemy" : nm && nm === who.player ? "player" : null);
     const named = [who.player, who.enemy].filter(Boolean).find((nm) => t.startsWith(nm + " ")) ?? null;
     let m;
     if ((m = t.match(/(\d+)\s*damage/i))) {
@@ -119,9 +119,9 @@ export function classifyPop(line, who, note) {
     return null;
 }
 /** A slim caption: the text wrapped to the width (at most 3 lines, the size steps down for long text), a thin cyan tick at the left. Native units. */
-function captionLines(text, x, y, w) {
+function captionLines(text: string, x: number, y: number, w: number) {
     if (!text) return [];
-    const wrap = (size) => {
+    const wrap = (size: number) => {
         const per = Math.max(8, Math.floor(w / (size / 3 * 0.5))), words = text.split(" "), lines = [];
         let cur = "";
         for (const wd of words) { if (cur && (cur + " " + wd).length > per) { lines.push(cur); cur = wd; } else cur = cur ? cur + " " + wd : wd; }
@@ -134,14 +134,14 @@ function captionLines(text, x, y, w) {
     lines.forEach((t, i) => out.push(textPart(`cap.l${i}`, "body", t, { x, y: y + i * h, w, h }, size, line, { color: "#eef4ff", maxDp: Math.round(w * 3), spacing: 0, cls: "uic-cap" })));
     return out;
 }
-const inside = (r, x, y) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+const inside = (r, x: number, y: number) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 /** The centre of a run's glyph row (native text rows are 9 high). */
 const runAt = (m) => ({ x: (m.right != null ? m.right - (m.w ?? 0) / 2 : m.x + (m.w ?? 0) / 2), y: m.y + 4.5 });
 /** Raw native rect of a part (its draw position + the clip's pixel bounds), before its matrix. */
 const raw = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
 
 /** The free runs whose centre lies in `r` (raw native), taken out of the pool. */
-function take(runs, used, r) {
+function take(runs, used: Set<unknown>, r) {
     const got = [];
     for (const m of runs) {
         if (used.has(m) || m.text === "") continue;
@@ -152,7 +152,7 @@ function take(runs, used, r) {
 }
 
 /** A row label (Russo 28 / 51, or the given sizes) at native x, filling the row's height. */
-const rowLabel = (key, m, x, row, right, rel, on, o: UiTextOpts = {}) => textPart(key, "label", m.text,
+const rowLabel = (key: string, m, x: number, row, right: number, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, on: boolean, o: UiTextOpts = {}) => textPart(key, "label", m.text,
     applyRel({ x, y: row.y + row.h / 2 - N(o.lineDp ?? BATTLE.labelLineDp) / 2, w: Math.max(8, right - x), h: N(o.lineDp ?? BATTLE.labelLineDp) }, rel),
     o.sizeDp ?? BATTLE.labelDp, o.lineDp ?? BATTLE.labelLineDp, { color: on ? "var(--c-orange-ink)" : (m.face ?? null), rel, maxDp: Math.max(24, Math.round((right - x) * 3)) });
 
@@ -174,19 +174,19 @@ export function joinNumbers(list) {
     return out;
 }
 /** Runs inside a box that are not row labels: numbers stay numbers (amber), small labels dim, as generic.runText does. */
-const boxRuns = (key, list, rel, out, on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
+const boxRuns = (key: string, list, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }>, out, on = false) => joinNumbers(list).forEach((m, i) => out.push(runText(m, `${key}.t${i}`, rel, on ? { color: "var(--c-orange-ink)" } : {})));
 
 /**
  * The battle screen. `cfg.view` = the close-up's window (native, BATTLE_UI_LAYOUT.portraitView): the bezel leaves it open.
  */
 export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; view?: UiRect; } = {}) {
-    const out = [], used = new Set();
+    const out: UiPart[] = [], used = new Set();
     const S = stage ?? cfg.stage ?? { x0: 0, y0: 0, x1: 320, y1: 240 };
-    const data = parts.find((p) => p.part === "battleData") ?? null;     // the owner's read-only "battleData" part (battle.js drawBattleHud): the numbers the rings show
+    const data = parts.find((p: { part: string; }) => p.part === "battleData") ?? null;     // the owner's read-only "battleData" part (battle.js drawBattleHud): the numbers the rings show
     const fullScreen = !!data && (data.st === 13 || data.st === 15);       // the DV / DNA pickers are whole screens of their own: no rings over them
     const lay = data ? dockLayout(S) : null;
     const ringRight = lay ? lay.main.x + lay.main.w + 4 : 0;
-    const arcList = !!data && !fullScreen && parts.some((p) => p.part === "listWin" || p.part === "tagRow");
+    const arcList = !!data && !fullScreen && parts.some((p: { part: string; }) => p.part === "listWin" || p.part === "tagRow");
     const listRows = [];
     const pager = runs.some((m) => PAGE_KEY.test(String(m.text).trim()));
     const foeList = !data ? [] : (data.foes ?? (data.enemy ? [data.enemy] : []));        // ONE data shape, N bars
@@ -198,10 +198,10 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     const actor = !data ? null : (data.st === 6 ? "enemy" : [2, 3, 4, 5, 11, 13, 15].includes(data.st) ? "player" : null);
     // keep clear of the ring: a plate that would start inside it starts right of it
     const clear = (r) => (lay && r.x < ringRight ? { ...r, x: ringRight, w: Math.max(8, r.w - (ringRight - r.x)) } : r);
-    const focus = parts.filter((p) => p.part === "focus").map((p) => ({ p, at: { x: p.x + p.w / 2, y: p.y + p.h / 2 }, hit: false }));
+    const focus = parts.filter((p: { part: string; }) => p.part === "focus").map((p: { x: number; w: number; y: number; h: number; }) => ({ p, at: { x: p.x + p.w / 2, y: p.y + p.h / 2 }, hit: false }));
     const isOn = (r) => { let on = false; for (const f of focus) if (inside(r, f.at.x, f.at.y)) { f.hit = true; on = true; } return on; };
     const tracks = {};
-    let heldBar = null, banner = null, counterLine = null;
+    let heldBar = null, banner: string | null = null, counterLine: string | null = null;
 
     // the page keys (L1 / R1 under a list or a stat panel) are chips wherever they are drawn
     runs.forEach((m, i) => {
@@ -214,7 +214,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
     });
 
     const cmds = [];
-    const oldRow = (p, r, on, k, rel) => {
+    const oldRow = (p, r, on: boolean, k: string, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined) => {
         const R = (q) => applyRel(q, rel);
         const row = { x: r.x, y: r.y, w: r.w, h: BATTLE.rowH };
         keyBox(`${k}.key`, R({ x: r.x, y: r.y, w: BATTLE.keyW, h: BATTLE.rowH }), on, rel, out);
@@ -312,8 +312,8 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
             // the technique / item window: one row per 12 x 12 selector box of the sheet, the row line (132 x 1) gives the row's width
             const r = raw(p);
             if (!arcList) out.push(plate(`${k}.win`, "listWindow", R(r), rel, { edge: HUD.edge, body: HUD.body, shadow: 6 }));
-            const boxes = (p.layers ?? []).filter((l) => l.w === 12 && l.h === 12).sort((a, b) => a.y - b.y);
-            const line = (p.layers ?? []).find((l) => l.h === 1 && l.w >= 60);
+            const boxes = (p.layers ?? []).filter((l: { w: number; h: number; }) => l.w === 12 && l.h === 12).sort((a: { y: number; }, b: { y: number; }) => a.y - b.y);
+            const line = (p.layers ?? []).find((l: { h: number; w: number; }) => l.h === 1 && l.w >= 60);
             const lineEnd = line ? p.x + line.x + line.w : r.x + r.w - 6;
             if (arcList) {                     // the rows go to the arc: the game's own runs, plus the tech cost and element from battleData
                 boxes.forEach((b, j) => {
@@ -341,7 +341,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         case "mpPlate": {
             // the MP plate: its sheet pieces below y 18 are the plate, the 8 px strip at x 0 is the connector up to the HP plate
             const ls = p.layers ?? [];
-            const body = ls.filter((l) => l.y >= 18);
+            const body = ls.filter((l: { y: number; }) => l.y >= 18);
             if (!body.length) break;
             const x0 = Math.min(...body.map((l) => l.x)), y0 = Math.min(...body.map((l) => l.y));
             const x1 = Math.max(...body.map((l) => l.x + l.w)), y1 = Math.max(...body.map((l) => l.y + l.h));
@@ -406,15 +406,15 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         if (at >= 0 && rows[at].cost > 0) spend = rows[at].cost;
     } else cmds.forEach((c) => oldRow(c.p, c.r, c.on, c.k, c.rel));
     if (data) {
-        const one = (key, variant, rect, v, menu, o: UiRingOpts = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect, variant, v, o)); };
+        const one = (key: string, variant: string, rect: { x: number; y: number; w: number; h: number; cx: number; cy: number; R: number; } | undefined, v, menu: boolean | undefined, o: UiRingOpts = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect, variant, v, o)); };
         if (!fullScreen) {
             one("ring.main", "main", lay.main, data, dockOn || (arcList && listRows.length > 0), { act: actor === "player", mpPrev: spend, real: data.hpReal, eReal: data.eHpReal });
-            (data.others ?? []).slice(0, 2).forEach((o, i) => one(`ring.o${i + 1}`, "mini", lay.others[i], o, false));
+            (data.others ?? []).slice(0, 2).forEach((o, i: number) => one(`ring.o${i + 1}`, "mini", lay.others[i], o, false));
         }
         if (actor === "player" && !fullScreen) out.push({ ...triangle("act.player", lay.main.cx, lay.main.y + lay.main.h + 3, "up", ID, "var(--c-cyan)"), nb: true });      // nb: a marker in the side area never bleeds to the screen edge
         // the enemy block at the top centre: the name with a small LV over a thin HP bar (green, yellow below 50 %, red below 25 %), no number; the team's pips under it. N foes = N bars side by side.
         const hot = actor === "enemy", eN = String(foeList[0]?.name ?? "");
-        foeList.forEach((f, i) => {
+        foeList.forEach((f, i: string | number) => {
             const B = foeBox[i];
             out.push(textPart(`foe${i}.name`, "label", String(f.name ?? ""), { x: B.x, y: B.y, w: Math.max(8, B.w - 26), h: FOE.nameH }, 21, 27, { color: hot ? "var(--c-hot-ink)" : "#fff", maxDp: Math.round((B.w - 26) * 3), spacing: 0 }));
             out.push(textPart(`foe${i}.lv`, "number", `LV ${f.level ?? ""}`, { x: B.x + B.w - 24, y: B.y + 1.5, w: 24, h: 7 }, 15, 21, { color: "var(--c-num)", align: "right", maxDp: 72 }));
@@ -447,7 +447,7 @@ export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; vi
         }
         // the damage pop: ONE per hit event, typed from the game's own line and the read-only hit note
         const names = { player: String(data.name ?? ""), enemy: eN, actor: actor ?? bannerNow ?? "player" };
-        const popRect = (side) => {
+        const popRect = (side: string) => {
             if (side === "player") return { x: lay.main.x + lay.main.w + 4, y: lay.main.cy - 26, w: 70, h: 44 };
             const sw = S.x1 - S.x0, pw = 76, ph = 56, sc = data.eScr, floor = S.y0 + CAP.top + FOE.blockH + 1;
             let pr = { x: S.x0 + (sw - pw) / 2, y: floor + 2, w: pw, h: ph };       // without the renderer's projection: under the enemy block

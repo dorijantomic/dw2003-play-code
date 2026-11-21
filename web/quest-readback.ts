@@ -20,7 +20,7 @@ export const KINDS = [
 // The game's facing index (cutscene-manager DIR8), the same list web/quest-scenes.js turns a name into.
 const DIRS = ["down", "down-left", "left", "up-left", "up", "up-right", "right", "down-right"];
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
-const cap = (s) => (typeof s === "string" && s.length ? s[0].toUpperCase() + s.slice(1) : s);
+const cap = (s: string | string[]) => (typeof s === "string" && s.length ? s[0].toUpperCase() + s.slice(1) : s);
 
 /** The name tab for an npc id: the scene's own `name`, else opts.names, else "npc 27". "player" is the player label. */
 function nameOf(who, opts) {
@@ -32,7 +32,7 @@ function nameOf(who, opts) {
     if (v && typeof v === "object") v = v.name;
     return typeof v === "string" && v.trim() ? v.trim() : `npc ${who}`;
 }
-const actorOf = (who, opts) => cap(nameOf(who, opts));
+const actorOf = (who, opts: QuestReadbackOpts) => cap(nameOf(who, opts));
 
 /** The sheet a step names (its `sheet`, else the instance name), looked up in opts.sheets. */
 const sheetOf = (s, opts) => {
@@ -75,17 +75,17 @@ function placeText(at, opts) {
 }
 
 /** 30 frames -> "half a second"; 60 -> "one second". */
-function framesText(n) {
+function framesText(n: number) {
     if (n === 60) return "one second";
     if (n === 30) return "half a second";
     if (n % 60 === 0) return `${n / 60} seconds`;
     return `${(n / 60).toFixed(1)} seconds`;
 }
 
-const dirOf = (v) => (typeof v === "string" && DIRS.includes(v) ? v : DIRS[num(v, 0) & 7]);
+const dirOf = (v: string) => (typeof v === "string" && DIRS.includes(v) ? v : DIRS[num(v, 0) & 7]);
 
 /** A say as the game's box will show it: wrapped at 22, 3 lines a page, a blank line between pages. */
-function speech(text, label) {
+function speech(text, label: string) {
     return `${label}: ${paginate(String(text)).map((page) => page.join("\n")).join("\n\n")}`;
 }
 
@@ -114,20 +114,20 @@ const WEATHER_WORDS = {
 export function readBack(steps, opts: QuestReadbackOpts = {}) {
     const o = opts ?? {};
     const title = `## ${o.mapName ?? o.maps?.[o.mapId] ?? o.mapId ?? "unknown map"}`;
-    const blocks = [], problems = [];
+    const blocks = [], problems: string[] = [];
     if (!Array.isArray(steps) || !steps.length) {
         problems.push("a scene needs at least one step");
         return { title, blocks, problems };
     }
-    const add = (step, kind, text) => blocks.push({ step, kind, text });
+    const add = (step: number, kind: string, text: string) => blocks.push({ step, kind, text });
     steps.forEach((s, index) => {
         const n = index + 1;
-        const bad = (why) => problems.push(`step ${n}: ${why}`);
+        const bad = (why: string) => problems.push(`step ${n}: ${why}`);
         if (s == null || typeof s !== "object" || Array.isArray(s)) {
             bad("not an object");
             return add(n, "unknown", "This step is not an object, so there is nothing to read.");
         }
-        const actor = (who) => actorOf(who, o);
+        const actor = (who: string | number) => actorOf(who, o);
         if ("walk" in s) {
             let text;
             if (s.path != null && s.to == null) {
@@ -415,7 +415,7 @@ export function diffReadback(a, b) {
     }
     const lines = [];
     let added = 0, removed = 0, same = 0, i = 0, j = 0;
-    const take = (block, type) => {
+    const take = (block, type: string) => {
         lines.push({ type, step: block.step, kind: block.kind, text: block.text });
         if (type === "added") added++;
         else if (type === "removed") removed++;

@@ -53,7 +53,7 @@ export function diveDemoReady() {
  * Every clip in both packs is flagged opaque in the source data, so there is no
  * blended pass here — unlike the particles, which are additive.
  */
-export function drawDiveDemoCells(ctx, mode, cells, viewW, viewH) {
+export function drawDiveDemoCells(ctx, mode, cells, viewW: number, viewH: number) {
     if (!packs || !cells?.length) return;
     const pack = packs[DEMO_PACK[mode]];
     const sheet = sheets[DEMO_PACK[mode]];
@@ -88,6 +88,6 @@ export function drawDiveDemoCells(ctx, mode, cells, viewW, viewH) {
  * freezes the last on-screen position and keeps passing it; whether the native
  * fields are screen- or world-space is recorded unresolved as DIVE-Q006.
  */
-export function drawDiveParticles(ctx, cells, x, y) {
+export function drawDiveParticles(ctx, cells, x: number, y: number) {
     for (const cell of cells) drawFieldcomIcon(ctx, 1, cell, x, y);
 }

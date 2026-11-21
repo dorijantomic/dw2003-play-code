@@ -80,7 +80,7 @@ export const MSG_KIND = Object.freeze({
  * acting Digimon's name on the first and `jokeFlavorMessageId(jokeIndex, bit)` — the phrase
  * F0x8009a734 reads off its own table at 0x800a35e4 — on the second.
  */
-export function jokeGagMessageSpec(playerName, jokeIndex, bit) {
+export function jokeGagMessageSpec(playerName, jokeIndex: number, bit: number) {
   return {
     kind: MSG_KIND.JOKE_GAG,
     payload: [jokeFlavorMessageId(jokeIndex | 0, bit | 0)],
@@ -145,7 +145,7 @@ const FACE_BOX_MENU_STATES = new Set([
  * "a battle line is showing" predicate — the battle loop passes msgHoldsTurn, so the box and
  * the turn are held by the same fact.
  */
-export function faceBoxHudEvents(b, lineUp) {
+export function faceBoxHudEvents(b: { state: number; }, lineUp: boolean) {
   return {
     hudUp: FACE_BOX_HUD_STATES.has(b.state),
     menuUp: FACE_BOX_MENU_STATES.has(b.state),
@@ -159,7 +159,7 @@ const PROFILE_NAME_ALIASES = Object.freeze({
   ImperialdramonPM: "Imperialdramon-P",
 });
 
-export function canonicalProfileName(name) { return PROFILE_NAME_ALIASES[name] ?? name; }
+export function canonicalProfileName(name: string | number) { return PROFILE_NAME_ALIASES[name] ?? name; }
 
 // ── The DNA fusion's form, from the disc's own Jogress director scripts ──
 // Module-level and pure so tests/lane-b/jogress-scripts.test.js can run it over
@@ -184,7 +184,7 @@ export function canonicalProfileName(name) { return PROFILE_NAME_ALIASES[name] ?
 // `.L0x8008bac0`, `[+0x184](manager, slot, model, 0)`). The anchor is action 374:
 // Stingmon's copy decodes op-for-op onto the 94 operations captured from RAM
 // (docs/research/battle/captures/dna-2026-07-14/clip12-full-script.md).
-export function dnaFusedForm(scripts, profiles, actionId, digimon) {
+export function dnaFusedForm(scripts, profiles, actionId: number, digimon) {
   const row = scripts?.actions?.[String(actionId)];
   if (!row) return null;
   let profile = null;
@@ -212,7 +212,7 @@ export function dnaFusedForm(scripts, profiles, actionId, digimon) {
  * own arms — and it states no number the game never shows. What the arm changed is on
  * `plan` for the tests to read.
  */
-export function scriptedWalkerSentence(plan, skill, who) {
+export function scriptedWalkerSentence(plan, skill, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   const statName = ["attack", "defense", "speed"][
     (plan?.stats?.[0]?.stat ?? 0) | 0] ?? "stat";
@@ -250,7 +250,7 @@ export function scriptedWalkerSentence(plan, skill, who) {
  * 2026-10-04 reading: it states no number the game never shows, and the byte and the
  * multiplier it buys are on the plan for the tests to read.
  */
-export function chargeWalkerSentence(charge, skill, who) {
+export function chargeWalkerSentence(charge, skill, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   if (!charge?.charged) return `${name} No effect!`;
   return `${name} The next attack hits harder!`;
@@ -269,12 +269,12 @@ export function chargeWalkerSentence(charge, skill, who) {
  * read that way: `li $s0, 0x8` (:13579) and `li $s0, 0x9` (:13553) are branch DELAY slots,
  * which run whether or not the branch is taken.
  */
-export function restoreWalkerSentence(plan, skill, who) {
+export function restoreWalkerSentence(plan, skill, who: string) {
   const name = skill?.name ? `${who} uses ${skill.name}!` : `${who} acts!`;
   const parts = [];
   const noEffect = (plan?.page?.payload?.[0] | 0) === DAMAGE_TERM_NO_EFFECT_WORD;
   if (!noEffect) {
-    const healed = (plan.heal || []).reduce((a, v) => a + (v | 0), 0);
+    const healed = (plan.heal || []).reduce((a: number, v: number) => a + (v | 0), 0);
     if (healed > 0) parts.push(`${healed} HP restored`);
     const cured = (plan.cure || []).reduce((a, v) => a + ((v & 0x07) ? 1 : 0), 0);
     if (cured > 0) parts.push(cured > 1 ? "ailments cured" : "ailment cured");

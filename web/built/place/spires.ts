@@ -13,7 +13,7 @@ import type { BuiltSpiresStats } from "./types.js";
 /** A piece's wall lean, measured from its own triangles: the slope of the minimum-radius envelope (the nearest wall
  *  face) across the piece's wall height. The minimum is always the wall - the sea cards of the same piece sit farther
  *  out - so this reads the wall's batter without guessing. */
-function measuredLean(piece, baseY, topY) {
+function measuredLean(piece, baseY: number, topY: number) {
   const a = piece.pos || [];
   if (!a.length || !(topY > baseY)) return 0;
   const NB = 6, lo = new Array(NB).fill(Infinity);
@@ -40,7 +40,7 @@ function prepare(pctx) {
   const ground = pctx.groundMeshes();
 
   // ---- the water and the sea, measured (their surface, their floors, and the triangles the island test reads) ----
-  const waterPieces = (pctx.rec?.pieces || []).filter((p) => p.kind === "water" || p.kind === "sea");
+  const waterPieces = (pctx.rec?.pieces || []).filter((p: { kind: string; }) => p.kind === "water" || p.kind === "sea");
   let waterTop = -Infinity, waterFloor = Infinity, seaFloor = Infinity;
   const waterTris = [];
   for (const w of waterPieces) {
@@ -57,7 +57,7 @@ function prepare(pctx) {
   const floorY = Number.isFinite(waterFloor) ? waterFloor : (Number.isFinite(seaFloor) ? seaFloor : null);
 
   /** the highest sand/shore vertex within rad of (x, z): what the arena's own ground reaches at this spot */
-  function groundPatch(x, z, rad) {
+  function groundPatch(x: number, z: number, rad: number) {
     let n = 0, top = -Infinity;
     for (const m of ground) {
       const a = m.geometry?.attributes?.position; if (!a) continue;
@@ -70,11 +70,11 @@ function prepare(pctx) {
     return { n, top };
   }
   /** xz distance from (x, z) to the nearest water/sea triangle: 0 inside one, else the nearest edge */
-  function waterDist(x, z) {
+  function waterDist(x: number, z: number) {
     let best = Infinity;
     for (const t of waterTris) {
       const ax = t[0], az = t[1], bx = t[2], bz = t[3], cx = t[4], cz = t[5];
-      const side = (px, pz, qx, qz) => (x - qx) * (pz - qz) - (px - qx) * (z - qz);
+      const side = (px: number, pz: number, qx: number, qz: number) => (x - qx) * (pz - qz) - (px - qx) * (z - qz);
       const d1 = side(ax, az, bx, bz), d2 = side(bx, bz, cx, cz), d3 = side(cx, cz, ax, az);
       if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return 0;   // inside a water triangle
       for (let k = 0; k < 3; k++) {
@@ -103,7 +103,7 @@ function prepare(pctx) {
     // the piece's wall height range: its tallest card base up to that card's top
     const baseYs = cards.map((c) => c.base[1]);
     const wallBase = Math.max(...baseYs);
-    const wallTop = Math.max(...cards.filter((c) => c.base[1] === wallBase).map((c) => c.base[1] + c.h));
+    const wallTop = Math.max(...cards.filter((c: { base: number[]; }) => c.base[1] === wallBase).map((c) => c.base[1] + c.h));
     const lean = measuredLean(p, wallBase, wallTop);
 
     for (const [ci, card] of cards.entries()) {
@@ -180,7 +180,7 @@ function prepare(pctx) {
   // into the rock and card buffers (Float32Array(NaN) silently becomes a 0-length buffer, and 24 mass cards wrote
   // NaN positions), so they are counted here and reported, never assumed ----
   const problems = [];
-  const chk = (g, k, v) => { if (!Number.isFinite(v)) problems.push(`${g.kind} ${g.piece} card ${g.card}: ${k} = ${v}`); };
+  const chk = (g, k: string, v) => { if (!Number.isFinite(v)) problems.push(`${g.kind} ${g.piece} card ${g.card}: ${k} = ${v}`); };
   for (const g of groups) {
     for (const k of ["az", "r0", "r", "baseY", "H", "R", "Rmax", "pitch", "n", "span", "skirt", "cx0", "cz0", "lean"]) chk(g, k, g[k]);
     for (const p of g.parts) {

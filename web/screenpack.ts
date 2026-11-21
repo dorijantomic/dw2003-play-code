@@ -53,7 +53,7 @@ export function packReady(p) { return !!(p.img && p.ids); }
  * Used by the battle HUD read-out so a check can ask what the player actually sees
  * in a rectangle rather than only which cel was asked for.
  */
-export function clipSize(p, id) {
+export function clipSize(p, id: string) {
   const clip = p?.ids?.[String(id)];
   if (!clip || !Array.isArray(clip.layers)) return null;
   let w = 0, h = 0;
@@ -107,7 +107,7 @@ export function drawClip(ctx, p, id, x, y, scale = 1) {
  * tail asks for the raw art. See
  * docs/research/ui/dialogue-window-placement-decoded-2026-07-02.md.
  */
-export function drawClipOpaque(ctx, p, id, x, y, scale = 1) {
+export function drawClipOpaque(ctx, p, id: number, x: number, y: number, scale = 1) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClipOpaque(c, p, id, x, y, scale))) return true;
   const clip = p?.ids?.[String(id)];
   if (!clip || !p.img) return false;
@@ -124,7 +124,7 @@ export function drawClipOpaque(ctx, p, id, x, y, scale = 1) {
  * (the source rectangle is clipped, never scaled). Used by the DV/Blast gauge,
  * whose sprite is an authored 40x8 fill revealed up to the gauge's own width.
  */
-export function drawClipWidth(ctx, p, id, x, y, width) {
+export function drawClipWidth(ctx, p, id: string, x, y, width: number | null | undefined) {
   if (clipHook(ctx, p, id, x, y, (c) => drawClipWidth(c, p, id, x, y, width), width)) return true;
   const clip = p.ids?.[String(id)];
   if (!clip || !p.img || !(width > 0)) return false;
@@ -177,7 +177,7 @@ export function paletteClipId(id, row = 0) {
  * the variant was never cut, so a screen that asks for a row the extractor does
  * not hold still draws rather than vanishing.
  */
-export function drawClipAtPaletteRow(ctx, p, id, row, x, y, scale = 1) {
+export function drawClipAtPaletteRow(ctx: CanvasRenderingContext2D | null | undefined, p, id, row, x: number, y: number, scale = 1) {
   const shifted = paletteClipId(id, row);
   if (p.ids?.[shifted]) return drawClip(ctx, p, shifted, x, y, scale);
   return drawClip(ctx, p, id, x, y, scale);
@@ -220,7 +220,7 @@ export function drawClipAtPaletteRow(ctx, p, id, row, x, y, scale = 1) {
  * The card duel is the one exception and is NOT routed here: its tiles are
  * 64×64 with a 0x40 wrap, and web/cardduel-native.js already draws it correctly.
  */
-export function drawPackBackdrop(ctx, p, clipId, viewW, viewH, timeSec) {
+export function drawPackBackdrop(ctx: CanvasRenderingContext2D, p, clipId: number, viewW: number, viewH: number, timeSec: number) {
   const grid = p.ids?.[String(clipId)];
   if (!grid || !p.img) return false;
   if (!p.patterns) p.patterns = {};

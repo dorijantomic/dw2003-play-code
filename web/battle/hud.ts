@@ -50,13 +50,13 @@ export function partyPipCels(b) {
 let hudLabelsCache = null;
 
 /** The leading `u16` of record `index` — the word F0x8009b864's scan matches. */
-function enemyStatReadId(index) {
+function enemyStatReadId(index: string | number) {
   const r = S.enemyStatRecords?.[index];
   return r ? (r.id & 0xffff) : 0;
 }
 
 /** The original's id→record scan over the decoded table. Returns the index, or -1. */
-function enemyStatIndexForName(name) {
+function enemyStatIndexForName(name: string) {
   if (!S.enemyStatRecords || !S.enemyStatIdByName) return -1;
   const id = S.enemyStatIdByName[String(name ?? "")];
   if (id == null) return -1;
@@ -68,7 +68,7 @@ function enemyStatIndexForName(name) {
  * (FIGHTSTG_F0x8009b864/F0x8009b8d0) rather than a name-keyed object map. Returns null
  * when the name has no runtime id or the scan misses, exactly as the resolver returns 0.
  */
-export function enemyStatRecordFor(name) {
+export function enemyStatRecordFor(name: string) {
   const i = enemyStatIndexForName(name);
   return i >= 0 ? S.enemyStatRecords[i] : null;
 }
@@ -137,7 +137,7 @@ export function battleHudPlateLabelsFor(b) {
  * own "No techs!"/"No items!" lines, `web/battle.js` confirmCommand). The timed action phases
  * are held by `msgHoldsTurn` instead.
  */
-export function commandPhaseWaitsForLine(line, state) {
+export function commandPhaseWaitsForLine(line, state: number) {
   if (!line?.active || line.finished) return false;
   return state === ST.INTRO || state === ST.PLAYER_MENU;
 }
@@ -160,7 +160,7 @@ export function lowHpStance(c) {
 // HP; every other fighter and phase keeps the quarter-HP rule. Claims
 // wfightmn-endweakness-and-weaken-chain-2026-10-10 (verified), BATTLE-C009,
 // low-hp-resting-stance-threshold-2026-08-19.
-export function fighterBaseStance(b, side) {
+export function fighterBaseStance(b, side: string) {
   if (side === "enemy" && battleKindOf(b) === 6) return !!b?._bossPhaseDone;
   return lowHpStance(side === "enemy" ? b?.enemy : b?.player);
 }
@@ -205,7 +205,7 @@ export function hpBarLength(cur, max) {
  * F0x800934f0 HP-fill quad. Partner grows right from 0xAF; enemy shrinks left
  * from 0x8F. @returns {{x:number,y:number,w:number,h:number}}
  */
-export function hpBarFillRect(side, cur, max) {
+export function hpBarFillRect(side: string, cur, max) {
   const len = hpBarLength(cur, max);
   const B = BATTLE_UI_LAYOUT.hpBar;
   if (side === "enemy") return { x: B.enemyRight - len, y: B.y, w: len, h: B.h };
@@ -222,7 +222,7 @@ export function hpBarColors(cur, max) {
  * FIGHTSTG_F0x800934f0 DV fill: gauge/100 levels while below 1000, a separate
  * full state at 1000. Returns 0..10 tenths of the bar.
  */
-export function dvGaugeLength(gauge) {
+export function dvGaugeLength(gauge: number) {
   const g = normalizeDvGauge(gauge);
   return g >= DV_GAUGE_MAX ? 10 : Math.trunc(g / 100);
 }
@@ -233,12 +233,12 @@ export function dvGaugeLength(gauge) {
 // draw lands at (0x109, 0x3E) and its width is gauge/25 pixels, i.e. 0..40.
 export const DV_GAUGE_ANCHOR = Object.freeze({ x: 0x109, y: 0x3e, w: 40, h: 8 });
 
-export function dvGaugeCel(gauge, phase) {
+export function dvGaugeCel(gauge: number, phase: number) {
   const g = normalizeDvGauge(gauge);
   const p = ((Math.trunc(phase) || 0) % 4 + 4) % 4;
   return (g >= DV_GAUGE_MAX ? 0x37 : 0x33) + p;
 }
 
-export function dvGaugeWidth(gauge) {
+export function dvGaugeWidth(gauge: number) {
   return Math.trunc(normalizeDvGauge(gauge) / 25);
 }

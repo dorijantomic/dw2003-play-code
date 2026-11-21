@@ -19,14 +19,14 @@ const FOLDER_NUMBER = /^m(\d{3})/;
 
 /** The clip slots a pack actually carries (present: true), ascending. */
 const presentClipsOf = (pack) =>
-  (pack?.clips ?? []).filter((c) => c?.present).map((c) => c.index | 0).sort((a, b) => a - b);
+  (pack?.clips ?? []).filter((c) => c?.present).map((c: { index: number; }) => c.index | 0).sort((a: number, b: number) => a - b);
 
 /** How many timeline tables carry frames (an empty table is not a motion). */
 const tableCountOf = (pack) =>
   (pack?.timeline ?? []).filter((t) => Array.isArray(t?.table) && t.table.length > 0).length;
 
 /** The donor row for a folder/clip from ANIM_DONOR_GAPS (or any map of the same shape). */
-const donorRowFor = (donors, folder, clip) => donors?.[folder]?.[clip] ?? null;
+const donorRowFor = (donors, folder: string | number, clip: number) => donors?.[folder]?.[clip] ?? null;
 
 /**
  * One row per DNA action.
@@ -36,13 +36,13 @@ const donorRowFor = (donors, folder, clip) => donors?.[folder]?.[clip] ?? null;
  * @param {object} donors  ANIM_DONOR_GAPS: folder -> clip -> donor row
  * @param {object} bodies  folder -> that pack's parsed anim.json
  */
-export function fusionForms(jogress, index, donors, bodies) {
+export function fusionForms(jogress: { actions: {}; }, index, donors, bodies) {
   const actions = jogress?.actions ?? {};
   const folders = Array.isArray(index) ? index : [];
   const folderSet = new Set(folders);
   // The model number of a pack is the three digits in its folder name (model_id_map.json's rule).
   const modelNumbers = new Set(folders.map((f) => FOLDER_NUMBER.exec(f)?.[1]).filter(Boolean).map(Number));
-  const packFor = (folder) => bodies?.[folder] ?? null;
+  const packFor = (folder: string | number) => bodies?.[folder] ?? null;
   const rows = [];
   for (const key of Object.keys(actions).sort((a, b) => Number(a) - Number(b))) {
     const action = actions[key];
@@ -55,16 +55,16 @@ export function fusionForms(jogress, index, donors, bodies) {
     // fault list can tell "covered by a donor" from "nothing at all".
     const gaps = REQUIRED_CLIPS.filter((clip) => !presentClips.includes(clip)).map((clip) => {
       const row = donorRowFor(donors, folder, clip);
-      const donorTables = Array.isArray(row?.t) ? row.t.map((t) => t | 0) : [];
+      const donorTables = Array.isArray(row?.t) ? row.t.map((t: number) => t | 0) : [];
       const covered = !!row && donorTables.some((t) => ownTables.has(t));
       return { clip, donor: row?.d ?? null, method: row?.m ?? null, tables: donorTables, covered };
     });
-    const partners = Array.isArray(action?.partnerModels) ? action.partnerModels.map((n) => n | 0) : [];
+    const partners = Array.isArray(action?.partnerModels) ? action.partnerModels.map((n: number) => n | 0) : [];
     rows.push({
       actionId: action?.actionId ?? Number(key),
       clip: action?.clip ?? null,
       partners,
-      missingPartners: partners.filter((n) => !modelNumbers.has(n)),
+      missingPartners: partners.filter((n: number) => !modelNumbers.has(n)),
       fusedModel: action?.fusedModel ?? null,
       folder,
       exists: !!folder && folderSet.has(folder) && !!pack,
@@ -97,7 +97,7 @@ export function fusionFaults(rows) {
     } else {
       const unplayable = REQUIRED_CLIPS.filter((clip) => {
         if (row.presentClips.includes(clip)) return false;
-        const gap = row.gaps.find((g) => g.clip === clip);
+        const gap = row.gaps.find((g: { clip: number; }) => g.clip === clip);
         return !(gap && gap.covered);
       });
       if (unplayable.length) {

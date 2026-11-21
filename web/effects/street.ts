@@ -36,7 +36,7 @@ export function streetScreenProbe(stageId) {
     return streetScreenDraws(stageId);
 }
 
-export function drawStreetScreens(ctx, stageId, camX, camY, drawables, quads) {
+export function drawStreetScreens(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], quads) {
     if (!quads?.length) return;
     ensureScreenAtlas(stageId);
     const screen = screenAtlases[stageId];
@@ -63,11 +63,11 @@ export function streetGlowProbe(stageId) {
 }
 
 /** One clip at one map pixel, on the shared point-sprite sheet. */
-function drawClip(ctx, sheet, semiSheet, layers, x, y) {
+function drawClip(ctx, sheet: HTMLImageElement, semiSheet, layers, x: number, y: number) {
     drawSprite(ctx, sheet, layers, x, y, semiSheet);
 }
 
-export function drawStreetGlows(ctx, stageId, camX, camY, drawables) {
+export function drawStreetGlows(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     if (nativeStage(stageId)) return;
     const s = S.data?.[stageId];
     if (!s) return;
@@ -106,7 +106,7 @@ export function stingerPopupProbe(stageId) {
     return stingerPopupDraws(stageId);
 }
 
-export function drawStingerPopup(ctx, stageId, camX, camY, drawables) {
+export function drawStingerPopup(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     if (nativeStage(stageId)) return;
     const entries = stingerPopupDraws(stageId);
     if (!entries?.length) return;
@@ -149,7 +149,7 @@ export function drawStingerPopup(ctx, stageId, camX, camY, drawables) {
 // leaves the packet list untouched.
 //
 // Decode: docs/research/field/draw-context-service-2026-10-04.md
-export function drawAnnotatorShapes(ctx, stageId, camX, camY, drawables, requests) {
+export function drawAnnotatorShapes(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], requests) {
     if (!requests?.length) return;
     const s = S.data?.[stageId];
     if (!s) return;
@@ -187,11 +187,11 @@ export function drawAnnotatorShapes(ctx, stageId, camX, camY, drawables, request
 // (bucket 7) and behind every entity, so this is the under-map pass (painted
 // before the base map). The parallax term is the base tick's own:
 // `(context scroll - base) >> shift`, scroll in whole pixels.
-export function stageOverlayShapeProbe(stageId) {
+export function stageOverlayShapeProbe(stageId: string | number) {
     return S.overlayShapeData?.[stageId] ?? null;
 }
 
-export function drawStageOverlayShapes(ctx, stageId, camX, camY) {
+export function drawStageOverlayShapes(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number) {
     const info = S.overlayShapeData?.[stageId];
     if (!info) return;
     const s = S.data?.[stageId];
@@ -209,7 +209,7 @@ export function drawStageOverlayShapes(ctx, stageId, camX, camY) {
     }
 }
 
-export function drawStreetVehicles(ctx, stageId, camX, camY, drawables) {
+export function drawStreetVehicles(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[]) {
     const draws = streetVehicleDraws(stageId);
     if (!draws.length) return;
     const s = S.data?.[stageId];
@@ -229,7 +229,7 @@ export function drawStreetVehicles(ctx, stageId, camX, camY, drawables) {
 /** One captured GPU quad: map texture (u,v) to the quad's screen parallelogram
  *  and blit the baked page under the primitive's ABR mode (cmd 0x2E = ABR on;
  *  the texpage word's bits 5-6 select the mode, 0 = B/2+F/2). */
-export function drawScreenQuad(ctx, sheet, combo, q, camX, camY) {
+export function drawScreenQuad(ctx, sheet, combo, q, camX: number, camY: number) {
     const du = q.u[1] - q.u[0];
     const dv = q.v[2] - q.v[0];
     if (!du || !dv) return;

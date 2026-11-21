@@ -59,7 +59,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
     const folds = Object.fromEntries(names.map((n) => [n, createFold(steps)]));
     let phase = "shut";
     let at = 0;
-    const start = (i, opening) => { folds[names[i]][opening ? "open" : "close"](); onStart(names[i], opening); };
+    const start = (i: number, opening: boolean) => { folds[names[i]][opening ? "open" : "close"](); onStart(names[i], opening); };
     return {
         folds,
         phase: () => phase,
@@ -69,7 +69,7 @@ export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} 
         },
         close() {
             if (phase === "shut" || phase === "closing") return;
-            const last = names.map((n) => folds[n].state()).map((s) => s !== "shut").lastIndexOf(true);
+            const last = names.map((n: string | number) => folds[n].state()).map((s: string) => s !== "shut").lastIndexOf(true);
             if (last < 0) { phase = "shut"; return; }
             phase = "closing"; at = last; start(at, false);
         },
@@ -130,7 +130,7 @@ export function drawPanel(ctx, x, y, cols, bands, pack = cmfont) {
 }
 
 /** x of each tab label: starts at `startX`, `gap` pixels between labels. `widthOf(label)` is textWidth in the real build. */
-export function layoutTabs(labels, widthOf, startX, gap) {
+export function layoutTabs(labels, widthOf, startX: number, gap: number) {
     const out = [];
     let x = startX;
     for (const label of labels) { out.push(x); x += widthOf(label) + gap; }
@@ -138,7 +138,7 @@ export function layoutTabs(labels, widthOf, startX, gap) {
 }
 
 /** Header plate with a title on the left and, optionally, section tabs (the active one in the white face, the rest dim, clut row 7). */
-export function drawHeader(ctx, progress, title, tabs = [], active = 0, { tabStart = null, gap = 12 } = {}) {
+export function drawHeader(ctx: CanvasRenderingContext2D | null | undefined, progress: number, title: string, tabs = [], active = 0, { tabStart = null, gap = 12 } = {}) {
     withFold(ctx, progress, HEADER.pivot[0], HEADER.pivot[1], "x", () => drawClip(ctx, cmfont, HEADER.clip, HEADER.x, HEADER.y));
     if (progress < 1) return;
     if (!tabs.length) { drawText(ctx, title, HEADER.textX, HEADER.textY); return; }
@@ -148,7 +148,7 @@ export function drawHeader(ctx, progress, title, tabs = [], active = 0, { tabSta
 }
 
 /** Footer plate with up to two text lines. */
-export function drawFooter(ctx, progress, line1 = "", line2 = "") {
+export function drawFooter(ctx: CanvasRenderingContext2D | null | undefined, progress: number, line1 = "", line2 = "") {
     withFold(ctx, progress, FOOTER.pivot[0], FOOTER.pivot[1], "x", () => drawClip(ctx, ststat, FOOTER.clip, FOOTER.x, FOOTER.y));
     if (progress < 1) return;
     if (line1) drawText(ctx, line1, FOOTER.textX, FOOTER.textY);
@@ -158,13 +158,13 @@ export function drawFooter(ctx, progress, line1 = "", line2 = "") {
 // ---------------------------------------------------------------- small pieces
 
 /** Pixels of a `w` px bar that `value` of `max` fills (0 when max is not a positive number). */
-export function barFill(value, max, w) {
+export function barFill(value: number, max: number, w: number) {
     if (!(max > 0) || !(value > 0)) return 0;
     return Math.max(0, Math.min(w, Math.round((value / max) * w)));
 }
 
 /** A flat bar drawn with the frame blue of the pause windows (web/uiRects.js): no new art. */
-export function drawBar(ctx, x, y, w, h, value, max) {
+export function drawBar(ctx: CanvasRenderingContext2D | undefined, x: number, y: number, w: number, h: number, value: number, max: number) {
     // inside a look C scope (web/ui-c/books.js) the bar is a C card bar: the same rect and fill ratio, nothing painted here
     if (partHook(ctx, { part: "bookBar", x, y, w, h, ratio: w > 0 ? barFill(value, max, w) / w : 0 })) return;
     ctx.fillStyle = "rgb(0, 0, 32)";
@@ -174,7 +174,7 @@ export function drawBar(ctx, x, y, w, h, value, max) {
 }
 
 /** The field behind a book, dimmed. `padL` is the wide-screen pad on each side (web/game.js wideField.padL), in canvas pixels. */
-export function dimField(ctx, viewW, viewH, padL = 0, alpha = 0.5) {
+export function dimField(ctx, viewW: number, viewH, padL = 0, alpha = 0.5) {
     ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
     ctx.fillRect(0 - padL, 0, viewW + 2 * padL, viewH);
 }
@@ -196,10 +196,10 @@ export function drawListWindow(ctx, progress, rows) {
 }
 
 /** y of row `i` of a list. */
-export const listRowY = (i) => LIST_WINDOW.textY + LIST_WINDOW.pitch * i;
+export const listRowY = (i: number) => LIST_WINDOW.textY + LIST_WINDOW.pitch * i;
 
 /** The description band with `text` wrapped by measured width to at most two lines (the second cut to fit). */
-export function drawHelpBox(ctx, progress, text) {
+export function drawHelpBox(ctx: CanvasRenderingContext2D | null | undefined, progress: number, text: string) {
     const lines = wrapByWidth(text, (s) => textWidth(s), BAND_TEXT_W);
     drawFooter(ctx, progress, lines[0] ?? "", lines[1] ? fitByWidth(lines.slice(1).join(" "), (s) => textWidth(s), BAND_TEXT_W) : "");
 }

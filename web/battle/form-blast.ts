@@ -40,7 +40,7 @@ export function applyFormLearnPass(record, formProfile) {
 
 // Sequential boss party: after the member at `index` is defeated, decide whether the next
 // member steps in (gauntlet) or the whole party is down. Pure.
-export function gauntletNext(party, index) {
+export function gauntletNext(party, index: number) {
   const next = index + 1;
   if (!party || next >= party.length) return { done: true };
   return { done: false, index: next, entry: party[next] };
@@ -50,7 +50,7 @@ export function gauntletNext(party, index) {
 // A boss-party entry may carry `size`: a multiplier on the fighter's shipped body size. The
 // field is read ONLY when the toggle is on; with it off the entries come back with no `size`
 // key at all and the renderer is never called, so every battle draws exactly as before.
-export function partyEntriesWithSize(entries, fxOn, k = 1) {
+export function partyEntriesWithSize(entries, fxOn: boolean, k = 1) {
   const mul = Number.isFinite(k) && k > 0 ? k : 1;
   return (entries || []).map((entry) => {
     const { size, ...rest } = entry;
@@ -63,7 +63,7 @@ export function partyEntriesWithSize(entries, fxOn, k = 1) {
  * shipped MODEL_SCALE. ON: our side takes `playerK` (part 2's slider; 1 until it exists) and
  * the enemy takes the current party entry's `size` (1 when it carries none).
  */
-export function applyGiantScales(renderer, entry, fxOn, playerK = 1) {
+export function applyGiantScales(renderer: { setFighterScale: (arg0: string, arg1: number) => void; }, entry, fxOn: boolean, playerK = 1) {
   if (!renderer || typeof renderer.setFighterScale !== "function") return false;
   if (!fxOn) return false;
   renderer.setFighterScale("player", clampFighterScale(playerK));
@@ -97,7 +97,7 @@ export function battleKindOf(b) {
  * cue test can walk the boundary; the battle closure counts and calls it (see
  * noteFinalBossPhaseDamage).
  */
-export function finalBossPhaseSwitchesTrack(specialMode, battleKind, landedCount) {
+export function finalBossPhaseSwitchesTrack(specialMode: number, battleKind: number, landedCount: number) {
   return specialMode === 4 && battleKind === 6 && landedCount >= 3;
 }
 
@@ -181,13 +181,13 @@ export function equippedTriple(forms) {
  * acts on: F0x800A69F0's flag stores are indexed by it, and its lookups resolve
  * that position to the member's own equipped triple.
  */
-function formChangeView(b, position, profile = null) {
+function formChangeView(b, position: number, profile = null) {
   return {
     activeSlot: () => position,
-    liveFormId: (slot) => Number(b.playerRecords[slot]?.profile?.id ?? -1),
+    liveFormId: (slot: string | number) => Number(b.playerRecords[slot]?.profile?.id ?? -1),
     // record +0x00: the form id, which the caller has already resolved to the
     // profile object the Digimon is taking.
-    writeLiveFormId: (slot, id) => {
+    writeLiveFormId: (slot: string | number, id) => {
       const target = b.playerRecords[slot];
       if (!target || !profile || Number(id) !== Number(profile?.id)) return;
       setLiveBattleForm(target, profile);
@@ -195,20 +195,20 @@ function formChangeView(b, position, profile = null) {
     // record +0x1A: the reserved second form is Blast's own writer (ledger
     // BLAST-9767), and the walker keeps Blast's state where the flag lives.
     reservedSecondForm: (slot) => (Number(slot) === position && b.blast?.active ? 1 : 0),
-    reservedFormId: (slot) => Number(b.playerRecords[slot]?.rosterSpeciesId ?? 0),
+    reservedFormId: (slot: string | number) => Number(b.playerRecords[slot]?.rosterSpeciesId ?? 0),
     clearReservedSecondForm: () => releaseReservedSecondForm(b),
     // 0x80042B84 + position*4 + k. The original sets byte 6 on every form change
     // and byte 7 + the equipped row for the form just taken; the reader is the
     // report's DVEXP scan (stfgtrep.s state 0x14 arm, file 0x12C0), which pays
     // the gain and the form-level ladder for every marked row.
-    setFormFlag: (slot, k, value) => {
+    setFormFlag: (slot: string | number, k: string | number, value: number) => {
       b.formFlags ??= [];
       const flags = b.formFlags[slot] ?? (b.formFlags[slot] = new Array(10).fill(0));
       flags[k] = value & 0xff;
     },
     // [0x80042B1C + rosterKey*2 + 0x58] is the roster slot's DV gauge; the
     // walker's per-record gauge is the same value.
-    clearFormGauge: (rosterKey) => {
+    clearFormGauge: (rosterKey: string | number) => {
       const target = b.playerRecords[rosterKey] ?? b.player;
       if (!target) return;
       target.gauge = 0;
@@ -218,11 +218,11 @@ function formChangeView(b, position, profile = null) {
     // through; the walker models no timeline records, so it answers "none".
     findTimelineIndex: () => -1,
     clearTimelineCounter: () => {},
-    rosterKey: (slot) => Number(b.playerRecords[slot]?.rosterIndex ?? slot),
+    rosterKey: (slot: string | number) => Number(b.playerRecords[slot]?.rosterIndex ?? slot),
     // get_equipped's contract: fill `dest` with the three rows and return the
     // count of valid entries (F0x800A69F0 scans dest and leaves on the first
     // match).
-    equippedForms: (slot, dest) => {
+    equippedForms: (slot: string | number, dest: (number | undefined)[]) => {
       const triple = equippedTriple(b.playerRecords[slot]?.statsRecord?.equippedForms);
       for (let i = 0; i < 3; i++) dest[i] = triple[i];
       return triple.filter((id) => id !== -1).length;
@@ -232,7 +232,7 @@ function formChangeView(b, position, profile = null) {
     // is `rosterSpecies == live form` (wfightmn.s .L0x00000CA8), so the
     // comparison is against that rookie, never against the form the member is
     // configured to stand in.
-    rosterSpecies: (slot) => Number(b.playerRecords[slot]?.rookieId ?? -1),
+    rosterSpecies: (slot: string | number) => Number(b.playerRecords[slot]?.rookieId ?? -1),
   };
 }
 
@@ -256,7 +256,7 @@ export function markFormTaken(b, position, speciesId) {
  * In the walker's id space the rookies are 1..8, so `> 8` is the same guard.
  */
 export function markedEquippedForms(flags, equipped) {
-  const out = [];
+  const out: (number | undefined)[] = [];
   const triple = equippedTriple(equipped);
   for (let i = 0; i < 3; i++) {
     if (!Number(flags?.[7 + i] ?? 0)) continue;
@@ -354,7 +354,7 @@ export function releaseReservedSecondForm(b, persist = true) {
  * Exported so a headless check can pin the rule with the very call `endBattle`
  * makes. Returns true when the release ran.
  */
-export function battleOutcomeRelease(b, result) {
+export function battleOutcomeRelease(b, result: string) {
   if (!b?.blast?.active) return false;
   return releaseReservedSecondForm(b, result !== "lose");
 }

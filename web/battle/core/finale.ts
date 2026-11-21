@@ -134,7 +134,7 @@ export function makeFinale(B: BattleContext) {
    * closest equivalent; the predicate (player side, kind 4, the row's own filter)
    * is the engine's port.
    */
-  function recordFinaleTechnique(b, techniqueId) {
+  function recordFinaleTechnique(b: { _finaleRecordedTechId: number; }, techniqueId: number) {
     const row = B.fightTechDB?.[String(techniqueId | 0)] ?? null;
     if (!finaleRecordsTechnique(battleKindOf(b), 0, row)) return;
     b._finaleRecordedTechId = techniqueId | 0;

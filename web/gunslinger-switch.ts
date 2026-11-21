@@ -58,7 +58,7 @@ export const GUNSLINGER_SWITCHES = [
 ];
 
 /** The swap event a native event id carries on a stage, or null. */
-export function gunslingerSwitchCommand(stage, eventId) {
+export function gunslingerSwitchCommand(stage: string, eventId: number) {
     return GUNSLINGER_SWITCHES.find(
         (c) => c.stage === stage && c.eventId === eventId) ?? null;
 }
@@ -68,7 +68,7 @@ export function gunslingerSwitchCommand(stage, eventId) {
  * which layout does it install. Mirrors the branch and the two stores exactly; a
  * gate that fails is the body's own early return — it registers nothing.
  */
-export function applyGunslingerSwitch(latch, cmd) {
+export function applyGunslingerSwitch(latch: number, cmd) {
     const acts = cmd.needsLatchNonZero ? latch !== 0 : latch === 0;
     if (!acts) return { fires: false, latch, layout: null };
     return { fires: true, latch: cmd.latchAfter, layout: cmd.layout };
@@ -84,6 +84,6 @@ export function applyGunslingerSwitch(latch, cmd) {
  * re-entered room keeps the phase the last swap left it in, and the first visit
  * starts in layout 0.
  */
-export function gunslingerLatchIsSecondLayout(latch) {
+export function gunslingerLatchIsSecondLayout(latch: number) {
     return latch !== 0;
 }

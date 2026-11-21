@@ -35,10 +35,10 @@ const ROWS = [
 ];
 
 /** The table row a launch code names (low byte minus one). */
-const rowIndexOf = (code) => (code & 0xff) - 1;
+const rowIndexOf = (code: number) => (code & 0xff) - 1;
 
 /** The manifest record for a disc movie row, by the disc file index the two share. */
-function shippedRecord(manifest, row) {
+function shippedRecord(manifest, row: { fileIndex: number | undefined; }) {
     const movies = manifest?.movies ?? manifest ?? {};
     if (!row) return null;
     for (const [key, record] of Object.entries(movies as Record<string, CinemaManifestRecord>)) {
@@ -76,6 +76,6 @@ export function cinemaRows(manifest, movieRows) {
  * The row a launch code names. Without a list this is the authored row (key,
  * label, code, adapter); pass the list `cinemaRows` returned for the full row.
  */
-export function rowFor(code, rows = ROWS) {
+export function rowFor(code: number, rows = ROWS) {
     return rows.find((row) => row.code === code) ?? null;
 }

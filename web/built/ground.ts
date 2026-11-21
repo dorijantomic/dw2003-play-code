@@ -60,10 +60,10 @@ export const GROUND = {
            HAZE: [0.12, 0.30, 0.50], SEED: 77 },
 };
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const smooth01 = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const b8 = (x) => Math.max(0, Math.min(255, Math.round(x * 255)));
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smooth01 = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const b8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255)));
 
 // palette, mask bake and the boulder candidates are PLACEMENT (web/built/place/ground.js), re-exported for older importers
 export { groundPalette, bakeArenaMask, rockCandidates } from "./place/ground.js";
@@ -244,7 +244,7 @@ function hillMaterial({ mask, gp }) {
 // ---------------- geometry ----------------
 /** Boulder hull: 20 points on a jittered sphere -> ConvexGeometry -> exactly 36 triangles (Euler: F = 2V - 4).
  *  Normalised to width 1, height 0.78 of the width, centred on its own bounding box (its widest ring at y = 0). */
-function boulderHull(seed) {
+function boulderHull(seed: number) {
   const r = rng(seed), n = GROUND.ROCKS.HULL_PTS, pts = [], ga = Math.PI * (3 - Math.sqrt(5));
   for (let i = 0; i < n; i++) {
     const y = 1 - (i + 0.5) * 2 / n, rad = Math.sqrt(Math.max(0, 1 - y * y)), th = i * ga + (r() - 0.5) * 0.25;
@@ -340,7 +340,7 @@ const withTex = (D) => { maskTexture(D.mask); return { mask: D.mask, gp: D.gp };
  *  apron under the tree ring). One mesh per piece, named as the piece. */
 export function buildFloor(slot, { materials = [] } = {}) {
   const D = slot.data, { mask, gp } = withTex(D);
-  const meshes = [];
+  const meshes: THREE.Mesh[] = [];
   let soilInfo = null, soilMat = null;
   for (const p of D.pieces) {
     const g = new THREE.BufferGeometry();
@@ -415,7 +415,7 @@ export function buildHills(slot, { materials = [] } = {}) {
 
 /** ASSET mod.ground_rocks: one boulder hull (width 1) in the ground's rock + moss shader, instanced (instanceColor =
  *  tone, rock mix, 1). In another arena (no ground mask) the mask reads as clean ground. */
-export function rockPart(env, slot) {
+export function rockPart(env: { materials: THREE.ShaderMaterial[]; }, slot) {
   const D = slot?.default === "mod.ground_rocks" ? slot.data : null;
   const mask = D ? maskTexture(D.mask) && D.mask : { texture: null, span: 2 * GROUND.MASK_EXTENT };
   const gp = D ? D.gp : groundPalette({ pieces: [] });

@@ -17,7 +17,7 @@ import { READY_MS } from "./command.js";
 import type { MpNetFighter, MpNetHost } from "./types.js";
 
 // ------------------------------------------------------------ starting, joining, finishing
-async function begin(setup, isHost, hostId, done) {
+async function begin(setup, isHost: boolean, hostId, done) {
     if (MB.F) return false;
     const kit = await MB.A.getKit();
     const party = kit.party();
@@ -77,7 +77,7 @@ export function mpbHost({ foes, ids, label, screenId, challenge, done, bots = []
 }
 
 /** Messages of a fight from the relay. */
-export function mpbMessage(from, d) {
+export function mpbMessage(from: string, d) {
     if (!d || typeof d !== "object") return;
     if (d.k === "setup") {
         if (MB.F || !MB.A.canJoin()) { MB.A.send([from], { k: "decline", fid: d.fid }); return; }
@@ -97,7 +97,7 @@ export function mpbMessage(from, d) {
             const list = MB.F.H.res.get(from) ?? [];
             const i = Math.max(1, Math.min(2, d.i | 0));
             list[i - 1] = d.rec; MB.F.H.res.set(from, list);
-        } else if (d.k === "decline") { MB.F.ids = MB.F.ids.filter((x) => x !== from); if (MB.F.H.P.size >= MB.F.ids.length) hostBegin(); }
+        } else if (d.k === "decline") { MB.F.ids = MB.F.ids.filter((x: string) => x !== from); if (MB.F.H.P.size >= MB.F.ids.length) hostBegin(); }
         else if (d.k === "cmd") hostCommand(from, d);
         else if (d.k === "back") hostBack(from);
     } else if (from === MB.F.hostId) {
@@ -109,7 +109,7 @@ export function mpbMessage(from, d) {
 }
 
 /** The relay says someone's link dropped but their seat is kept. Referee: wait for that guest. Guest: if it is the referee, wait for it. */
-export function mpbPeerAway(id) {
+export function mpbPeerAway(id: string) {
     if (!MB.F) return;
     if (!MB.F.isHost) { if (id === MB.F.hostId) { MB.F.link.refWait(); render(); } return; }
     if (MB.F.H?.arena) hostAway(id); else mpbPeerGone(id);        // before the fight starts there is nothing to wait for: as a left player
@@ -142,14 +142,14 @@ export function mpbLinkBack(resumed) {
 }
 
 /** Someone left the room mid-fight. */
-export function mpbPeerGone(id) {
+export function mpbPeerGone(id: string) {
     if (!MB.F) return;
     if (!MB.F.isHost && id === MB.F.hostId) { finish(false, { fled: true, hostLeft: true }); return; }
     if (MB.F.isHost && MB.F.H?.arena) hostGone(id);
-    if (MB.F.isHost && MB.F.H && !MB.F.H.started) { MB.F.ids = MB.F.ids.filter((x) => x !== id); if (MB.F.H.P.size >= MB.F.ids.length) hostBegin(); }
+    if (MB.F.isHost && MB.F.H && !MB.F.H.started) { MB.F.ids = MB.F.ids.filter((x: string) => x !== id); if (MB.F.H.P.size >= MB.F.ids.length) hostBegin(); }
 }
 
-export function finish(won, { fled = false, hostLeft = false } = {}) {
+export function finish(won: boolean, { fled = false, hostLeft = false } = {}) {
     const f = MB.F; if (!f) return;
     for (const t of f.timers ?? []) clearTimeout(t);
     clearTimeout(f.H?.readyTimer); clearTimeout(f.H?.turnTimer);

@@ -43,7 +43,7 @@ const refbox = document.getElementById("refbox");
 // the rig and registered under web/assets/ref/native/ (see the ui-lab skill).
 // Captured originals are listed in assets/ref/native/index.json, so a screen
 // without a capture never requests a missing file.
-let refIndex = null;
+let refIndex: {} | null = null;
 async function loadRefIndex() {
     if (refIndex) return refIndex;
     try {
@@ -55,7 +55,7 @@ async function loadRefIndex() {
     return refIndex;
 }
 
-async function setReference(moduleId) {
+async function setReference(moduleId: string | number) {
     refbox.style.display = "none";
     refimg.removeAttribute("src");
     const index = await loadRefIndex();
@@ -87,7 +87,7 @@ let lastRt = null;
 // a number of whatever the monitor managed: at 120 Hz a one-frame press arrived
 // on one blank out of 120 rather than one out of 50, and a hold crossed the
 // 16-blank repeat at half the time it should.
-const pad = createNativeScreenPadInput({ publish: (held, port) => setNativeScreenPad(held, port) });
+const pad = createNativeScreenPadInput({ publish: (held, port: number | undefined) => setNativeScreenPad(held, port) });
 pad.attach(window);
 
 // The console's vertical blanks, through the SAME clock the production host
@@ -100,7 +100,7 @@ pad.attach(window);
 // game cannot drift apart.
 const blanks = new NativeVblankClock();
 
-function start(moduleId, opts: { rootCtor?: number; bridge?: boolean } = {}) {
+function start(moduleId: string, opts: { rootCtor?: number; bridge?: boolean } = {}) {
     cancelAnimationFrame(raf);
     // A screen whose manifest ctor is not the scene the player meets boots the
     // override (web/native-screen-roots.js), so a capture here matches
@@ -211,7 +211,7 @@ window.__nativeScreenRef = () => ({
     width: refimg.naturalWidth,
     height: refimg.naturalHeight,
 });
-window.__nativeScreenBoot = (id, opts) => {
+window.__nativeScreenBoot = (id: string, opts) => {
     start(id, opts ?? {});
     return nativeScreenState();
 };

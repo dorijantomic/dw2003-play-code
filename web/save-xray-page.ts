@@ -11,15 +11,15 @@ const metaEl = $("meta");
 const diffSel = $("diffSlot");
 const diffRowsEl = $("diffRows");
 
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = (s: string) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hex4 = (n) => "0x" + Number(n).toString(16).padStart(4, "0");
 const hexBytes = (bytes) => Array.from(bytes, (b) => Number(b).toString(16).padStart(2, "0")).join(" ");
-const playTime = (seconds) => {
+const playTime = (seconds: number) => {
   const s = Math.max(0, Math.floor(Number(seconds) || 0));
   return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
-const num = (n) => Number(n).toLocaleString("en-US");
-const showValue = (v) => (Array.isArray(v) ? hexBytes(v) : String(v ?? ""));
+const num = (n: number) => Number(n).toLocaleString("en-US");
+const showValue = (v: number | undefined) => (Array.isArray(v) ? hexBytes(v) : String(v ?? ""));
 const chips = (rows) => `<div class="chips">${rows.map(([k, v]) => `<span class="chip">${esc(k)} <b>${esc(v)}</b></span>`).join("")}</div>`;
 
 // The one store read: the three slot entries the memory-card screen / card driver
@@ -42,7 +42,7 @@ function rosterBody(roster) {
     const forms = rec.forms.map((cell) =>
       `<tr><td class="num">${cell.index}</td><td class="num">${cell.id}</td><td class="num">${cell.level}</td>` +
       `<td class="num">${cell.preserved}</td><td class="num">${cell.dvexp}</td>` +
-      `<td>${cell.tech.map((t) => t.toString(16).padStart(4, "0")).join(" ")}</td></tr>`).join("");
+      `<td>${cell.tech.map((t: { toString: (arg0: number) => string; }) => t.toString(16).padStart(4, "0")).join(" ")}</td></tr>`).join("");
     const retained = rec.retained.map((gap) =>
       `<div class="none">retained +${hex4(gap.offset)} (${gap.length} bytes): ${esc(hexBytes(gap.bytes))}</div>`).join("");
     return `<details><summary>${esc(head)}</summary>` +
@@ -56,14 +56,14 @@ function rosterBody(roster) {
   }).join("");
 }
 
-function sectionValue(name, x) {
+function sectionValue(name: string, x) {
   switch (name) {
     case "header checksum": return `checksum byte <b>${x.header.checksum}</b>`;
     case "header format": return `format byte <b>${x.header.format}</b>`;
     case "clock": return `<b>${playTime(x.clock.totalSeconds)}</b> · ${x.clock.hours} h ${x.clock.minutes} m ${x.clock.seconds} s`;
     case "name": return `<b>${esc(x.name.text || "(empty)")}</b> · ${hexBytes(x.name.bytes)}`;
     case "bits": return `<b>${num(x.bits)}</b> BIT`;
-    case "party": return chips(x.party.map((slot, i) => [`party ${i}`, slot < 0 ? "empty (-1)" : slot]));
+    case "party": return chips(x.party.map((slot: number, i) => [`party ${i}`, slot < 0 ? "empty (-1)" : slot]));
     case "held": return bag(x.items.held);
     case "worn": return bag(x.items.worn);
     case "card counts":
@@ -75,7 +75,7 @@ function sectionValue(name, x) {
     case "folders":
       return x.folders.map((f) =>
         `<div>folder ${f.index + 1} “${esc(f.name.text || "")}” · ${f.cards.filter((n) => n).length} cards</div>` +
-        chips(f.cards.map((n, i) => [`card ${i + 1}`, n ? `#${n}` : "—"]))).join("");
+        chips(f.cards.map((n, i: number) => [`card ${i + 1}`, n ? `#${n}` : "—"]))).join("");
     case "roster": return rosterBody(x.roster);
     case "pack": return `<b>${["A", "B", "C"][x.packId] ?? x.packId}</b> (raw ${x.packId})`;
     case "flags":

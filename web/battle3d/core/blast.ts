@@ -17,9 +17,9 @@ function dnaFusionStart() {
   }
 function dnaPresentationStop() { B$.dnaPresentation = null; B$.dnaOrbs = null; }
 /** The renderer's arenaTint sink: r,g,b are PS1 view-colour bytes (0..255). */
-  function setArenaTint(r, g, b) {
+  function setArenaTint(r: number | null, g: number, b: number) {
     if (r == null) { B$.arenaTint = null; return null; }
-    const c = (v) => Math.max(0, Math.min(1, (v | 0) / 255));
+    const c = (v: number) => Math.max(0, Math.min(1, (v | 0) / 255));
     B$.arenaTint = [c(r), c(g), c(b), 1];
     return B$.arenaTint.slice();
   }
@@ -28,7 +28,7 @@ function dvHome() {
   }
 // `entrance` = { folder }: the model folder of the fighter that enters (entrance.c key1), for the programs
   // BLAST_REVERT (player side, key2 0) and ENTRANCE_ENEMY (enemy side, key2 0x10).
-  function blastPresentationSet(state, program, skipped = false, weak = false, entrance = null) {
+  function blastPresentationSet(state, program: string | null, skipped = false, weak = false, entrance = null) {
     B$.blastState = state || null;
     B$.entranceMotionTry();
     // "Digivolve Demo: OFF": the end state of the original presentation in one step.
@@ -83,7 +83,7 @@ function blastPresentationStop() { B$.dvCam?.stop(); B$.dvCam = null; B$.blastSt
     // Fallback only; every shipped caller passes the decoded record above.
     return B$.effectPlayer.spawn(type, { x: 160, y: 120, z: 32767 }, "player");
   }
-function dnaOrbIgnite(key) {
+function dnaOrbIgnite(key: string | number) {
     // Register a parent orb (1005/1006 ignitions during the parent phase). The converging
     // orbit itself starts when dnaOrbsPath() is called at the fusion segment.
     if (!B$.dnaOrbs) B$.dnaOrbs = { orbs: {}, u: 0, dur: B$.DNA_ORB_TICKS, orbiting: false };
@@ -104,7 +104,7 @@ function dnaOrbsClear() { B$.dnaOrbs = null; }
 // Sample an authored program record without creating an op3 object. The DNA
   // presentation owner uses this to restart its looping backdrop and to place
   // its fusion pair at the native screen sentinel.
-  function _sampleEffectRecord(type, recordIndex, tick, pos, loop = false) {
+  function _sampleEffectRecord(type: number, recordIndex: number, tick: number, pos: { x: number; y: number; z: number; }, loop = false) {
     const typeRec = B$.effectAssets?.manifest?.types?.[String(type)];
     const rec = typeRec?.records?.[recordIndex];
     if (!rec || rec.duration <= 0) return null;

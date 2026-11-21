@@ -15,7 +15,7 @@ export function makeNative(B: BattleContext) {
   // nine-sliced here, which visibly stretched its diagonal ornament across
   // the list.  Draw the measured native polygons and reserve atlas sampling
   // for the actual textured widgets (buttons, selectors, HP and DV frames).
-  function drawFightPane(x, y, w, h, angled = false) {
+  function drawFightPane(x: number, y: number, w: number, h: number, angled = false) {
     const cut = angled ? 7 : 0;
     B.ctx.save();
     B.ctx.beginPath();
@@ -43,7 +43,7 @@ export function makeNative(B: BattleContext) {
   }
 // ── Draw ──
 
-  function nativeText(text, x, y, opts: NativeTextOptions = {}) {
+  function nativeText(text, x: number, y: number, opts: NativeTextOptions = {}) {
     if (uiFontReady()) return uiDrawText(B.ctx, String(text), x, y, opts);
     B.ctx.fillStyle = opts.color ?? "#f2f2f2";
     B.ctx.font = `${opts.kind === 3 ? 8 : 10}px monospace`;
@@ -51,7 +51,7 @@ export function makeNative(B: BattleContext) {
     B.ctx.textBaseline = "top";
     B.ctx.fillText(String(text), x, y);
   }
-function nativePanelPath(x, y, w, h, notch = 5) {
+function nativePanelPath(x: number, y: number, w: number, h: number, notch = 5) {
     B.ctx.beginPath();
     B.ctx.moveTo(x, y);
     B.ctx.lineTo(x + w - notch, y);
@@ -61,7 +61,7 @@ function nativePanelPath(x, y, w, h, notch = 5) {
     B.ctx.lineTo(x, y + h);
     B.ctx.closePath();
   }
-function drawNativePanel(x, y, w, h, fill = "rgba(3,5,62,0.92)") {
+function drawNativePanel(x: number, y: number, w: number, h: number, fill = "rgba(3,5,62,0.92)") {
     nativePanelPath(x, y, w, h);
     B.ctx.fillStyle = fill;
     B.ctx.fill();
@@ -72,7 +72,7 @@ function drawNativePanel(x, y, w, h, fill = "rgba(3,5,62,0.92)") {
     B.ctx.strokeStyle = "#2459d8";
     B.ctx.stroke();
   }
-function fillHpBar(x, y, w, h, cur, max) {
+function fillHpBar(x: number, y: number, w: number, h: number, cur, max) {
     const [top, bottom] = hpBarColors(cur, max);
     const grad = B.ctx.createLinearGradient(x, y, x, y + h);
     grad.addColorStop(0, top);
@@ -80,14 +80,14 @@ function fillHpBar(x, y, w, h, cur, max) {
     B.ctx.fillStyle = grad;
     B.ctx.fillRect(x, y, Math.round(w * hpBarLength(cur, max) / 128), h);
   }
-function drawNativeBar(x, y, w, h, cur, max) {
+function drawNativeBar(x: number, y: number, w: number, h: number, cur, max) {
     B.ctx.fillStyle = "#d8d8d8";
     B.ctx.fillRect(x, y, w, h);
     B.ctx.fillStyle = "#060812";
     B.ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
     fillHpBar(x + 3, y + 3, w - 6, Math.max(1, h - 6), cur, max);
   }
-function drawPips(def, active = 0) {
+function drawPips(def: { count: number; x: number; step: number; y: number; }, active = 0) {
     for (let i = 0; i < def.count; i++) {
       const x = def.x + i * def.step;
       B.ctx.fillStyle = "#061139";
@@ -101,7 +101,7 @@ function drawPips(def, active = 0) {
 function chromeReady() {
     return !!fightUiAtlas;
   }
-function drawChrome(name, x, y, w = null, h = null) {
+function drawChrome(name: string | number, x: number, y: number, w = null, h = null) {
     const clip = FIGHT_UI_CLIPS[name];
     if (!fightUiAtlas || !clip) return false;
     const [sx, sy, sw, sh] = clip;
@@ -117,7 +117,7 @@ function drawChrome(name, x, y, w = null, h = null) {
   function pDispShown(cur) {
     return cur._hpPlate ? hpPlateShown(cur._hpPlate, 0) : Number(cur.player?.hp ?? 0);
   }
-function paintHpBar(x, y, w, h, cur, max, side = 0) {
+function paintHpBar(x: number, y: number, w: number, h: number, cur, max, side = 0) {
     // Look C (web/ui-c/battlehud.js): the bar is a C part -- its length against the full length, and the game's own two colours.
     const sideName = side ? "enemy" : "player";
     if (uiCPart(B.ctx, { part: "hpBar", side: sideName, x, y, w: Math.max(0, w), h, full: hpBarFillRect(sideName, max, max).w,

@@ -64,7 +64,7 @@ export function battleAilmentByte(member) {
 export function createBattleCommandTranslated(sfx = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ pack: "pgfgc00", packs: PACKS },
-            (directory) => PACKS[directory >>> 16] ?? null),
+            (directory: number) => PACKS[directory >>> 16] ?? null),
         sfx,
         options,
         load: () => loadData(),
@@ -78,7 +78,7 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
 
         /** Open at `initialRow`; `seed` carries the acting party slot, its ailment byte
          *  and, when the acting Digimon is confused, the shuffle's six joke indices. */
-        seed: (r, initialRow = 0, seed: BattleCommandSeed = {}) => {
+        seed: (r: { _row: number; }, initialRow = 0, seed: BattleCommandSeed = {}) => {
             r._row = Math.max(0, Math.min(5, Number(initialRow) | 0));
             const joke = seed.jokeIndices ?? null;
             return {
@@ -88,7 +88,7 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
             };
         },
 
-        onOpen: (r) => { r._pulseTicks = 0; },
+        onOpen: (r: { _pulseTicks: number; }) => { r._pulseTicks = 0; },
 
         start: (r, data, language, playSound) => {
             const joke = r._seed.jokeIndices;

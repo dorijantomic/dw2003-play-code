@@ -16,7 +16,7 @@ import { assignAssetImage } from "./assets.js";
 // the others). Clips carry their native scene draw offsets (ox,oy); anim
 // script 0 is the looping workout cycle, durations in vsyncs.
 const TRANIN_CACHE = {};
-export function traninEntry(key) {
+export function traninEntry(key: string | number) {
   let e = TRANIN_CACHE[key];
   if (e) return e;
   e = TRANIN_CACHE[key] = { img: new Image(), meta: null };
@@ -61,12 +61,12 @@ export const TR_INTRO = 0, TR_WINDUP = 1, TR_HIT = 2, TR_MISS = 3, TR_WIN = 4, T
 // UNCALIBRATED and fall back to the Punch value — calibrate each with one
 // real capture in web/gym-lab.html.
 export const TRANIN_ANCHORS = { default: [82, 31], "03": [79, 24], "14": [47, 35] };
-export function traninAnchors(fam) {
+export function traninAnchors(fam: string | number) {
   return TRANIN_ANCHORS[fam] ?? TRANIN_ANCHORS.default;
 }
 
 // Total run length of one anim script, in ms (PAL vsync = 20ms/step). 0 if absent.
-export function traninScriptMs(e, idx) {
+export function traninScriptMs(e, idx: string | number) {
   const steps = traninReady(e) && e.meta.anims[idx];
   if (!steps?.length) return 0;
   return steps.reduce((s, x) => s + x.dur, 0) * 20;
@@ -80,7 +80,7 @@ export function traninScriptMs(e, idx) {
 // sheets carry d&3=2, which as ABR would be subtractive black snow — the
 // runtime frames show white; do not wire d&3 as ABR without per-mode runtime
 // comparison).
-function drawClipCell(ctx, e, clip, ax, ay) {
+function drawClipCell(ctx, e, clip: string | number, ax, ay) {
   const c = e.meta.clips[clip];
   if (!c) return false;
   if (c.w) ctx.drawImage(e.img, c.x, c.y, c.w, c.h, ax + c.ox, ay + c.oy, c.w, c.h);
@@ -97,7 +97,7 @@ function drawClipCell(ctx, e, clip, ax, ay) {
 // Resolve which step of an anim script is showing at an absolute elapsed time.
 // `loop` cycles forever; otherwise the script plays once and holds the final
 // frame (so a resolved punch/pose stays put until the state machine advances).
-function traninResolve(e, idx, elapsedMs, loop) {
+function traninResolve(e, idx: string | number, elapsedMs: number, loop: boolean) {
   if (!traninReady(e)) return null;
   let steps = e.meta.anims[idx];
   if (!steps?.length) steps = e.meta.anims[TR_INTRO];
@@ -117,7 +117,7 @@ function traninResolve(e, idx, elapsedMs, loop) {
 // say is what draws (the wide props panoramas already contain every prop,
 // and the Yoga spotlight clip contains the meditating trainee).
 // digiOff is the gym-lab exploration offset (0 in the game).
-export function drawTraninScene(ctx, digi, props, idx, elapsedMs, ax, ay, loop = false, digiOff = null) {
+export function drawTraninScene(ctx, digi, props, idx: string | number, elapsedMs: number, ax: number, ay: number, loop = false, digiOff = null) {
   const dF = traninResolve(digi, idx, elapsedMs, loop);
   const pF = traninResolve(props, idx, elapsedMs, loop);
   if (dF) drawClipCell(ctx, digi, dF.clip,

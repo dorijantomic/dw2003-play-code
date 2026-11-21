@@ -93,7 +93,7 @@ function makeRules(overrides) {
 
 /** The one seeded generator. mulberry32: 32-bit state, uniform floats, no
  *  dependency on Math.random, identical in node and in a browser. */
-function mulberry32(seed) {
+function mulberry32(seed: number) {
   let a = seed >>> 0;
   return function next() {
     a = (a + 0x6D2B79F5) >>> 0;
@@ -105,10 +105,10 @@ function mulberry32(seed) {
 }
 
 const emptyEnergy = () => Object.fromEntries(ENERGY_COLOURS.map((colour) => [colour, 0]));
-const refuse = (reason) => ({ ok: false, reason });
+const refuse = (reason: string) => ({ ok: false, reason });
 
 /** Which DuelSide is slot `side` of the table. */
-function sideOf(duel, side) {
+function sideOf(duel, side: number) {
   return side === 0 ? duel.player : duel.opponent;
 }
 
@@ -133,7 +133,7 @@ function turnOf(host) {
 // Per-side snapshot
 // ---------------------------------------------------------------------------
 
-function sideSnapshot(host, side) {
+function sideSnapshot(host, side: number) {
   const duel = host.duel;
   const s = duel ? sideOf(duel, side) : null;
   return {
@@ -359,7 +359,7 @@ function drawIntoHand(host, s) {
   return true;
 }
 
-function doHello(host, side, cmd) {
+function doHello(host, side: number, cmd) {
   const name = String(cmd.name ?? '').trim().slice(0, 16) || `Player ${side}`;
   host.names[side] = name;
   if (host.duel) sideOf(host.duel, side).name = name;
@@ -367,7 +367,7 @@ function doHello(host, side, cmd) {
   return { ok: true };
 }
 
-function doFolder(host, side, cmd) {
+function doFolder(host, side: string | number, cmd) {
   if (host.duel) return refuse('already_started');
   const problem = folderProblem(host, cmd.cards);
   if (problem) return refuse(problem);
@@ -377,7 +377,7 @@ function doFolder(host, side, cmd) {
   return { ok: true, started };
 }
 
-function doMulligan(host, side) {
+function doMulligan(host, side: number) {
   const duel = host.duel;
   if (!duel || host.status !== 'playing') return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
@@ -412,7 +412,7 @@ function doMulligan(host, side) {
   return { ok: true, hand: s.hand.slice() };
 }
 
-function doPlay(host, side, cmd) {
+function doPlay(host, side: number, cmd) {
   const duel = host.duel;
   if (!duel) return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
@@ -435,7 +435,7 @@ function doPlay(host, side, cmd) {
   return refuse('wrong_phase');
 }
 
-function doPass(host, side) {
+function doPass(host, side: number) {
   const duel = host.duel;
   if (!duel) return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
@@ -457,7 +457,7 @@ function doPass(host, side) {
   return refuse('wrong_phase');
 }
 
-function doAttack(host, side) {
+function doAttack(host, side: string | number) {
   const duel = host.duel;
   if (!duel) return refuse('no_duel');
   if (host.status === 'done' || duel.outcome) return refuse('duel_over');
@@ -483,7 +483,7 @@ function doResult(host) {
  *  the reply. Sequence numbers are per side: a command whose `seq` is at or
  *  below the last one accepted from that side has already been applied and is
  *  acknowledged without touching the duel. */
-export function applyCommand(host, side, cmd) {
+export function applyCommand(host, side: number, cmd) {
   if (!host || !Array.isArray(host.seq)) return refuse('bad_host');
   if (side !== 0 && side !== 1) return refuse('bad_side');
   if (!cmd || typeof cmd !== 'object' || typeof cmd.type !== 'string') return refuse('bad_command');

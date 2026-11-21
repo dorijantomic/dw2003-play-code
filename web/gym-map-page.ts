@@ -18,7 +18,7 @@ const STAT_WORDS = {
     str: "strength", def: "defence", spt: "spirit", wis: "wisdom", spd: "speed", chr: "charisma",
     maxHp: "max HP", maxMp: "max MP",
 };
-const statWord = (id) => {
+const statWord = (id: number) => {
     const key = gymStatForId(id);
     return key ? STAT_WORDS[key] ?? key : null;
 };
@@ -74,7 +74,7 @@ export function mapSummary(rows, menus) {
     };
 }
 
-const tag = (doc, text, className) => {
+const tag = (doc: Document, text: string, className: string) => {
     const span = doc.createElement("span");
     if (className) span.className = className;
     span.textContent = text;
@@ -82,7 +82,7 @@ const tag = (doc, text, className) => {
 };
 
 /** Draw the map into the page: one section per gym, one block per ladder rung. */
-export function renderGymMap(doc, { rows, menus, names, characters, maps }) {
+export function renderGymMap(doc: Document, { rows, menus, names, characters, maps }) {
     const summaryEl = doc.getElementById("summary");
     if (summaryEl) {
         const summary = mapSummary(rows, menus);
@@ -105,7 +105,7 @@ export function renderGymMap(doc, { rows, menus, names, characters, maps }) {
         order.className = "order";
         order.textContent = "Checked in this order — the first rung your ID cards satisfy is the menu this greeter opens.";
         section.append(heading, greeter, order);
-        row.options.forEach((option, index) => {
+        row.options.forEach((option, index: number) => {
             const rung = doc.createElement("div");
             rung.className = "rung";
             rung.dataset.group = String(option.group);
@@ -133,13 +133,13 @@ export function renderGymMap(doc, { rows, menus, names, characters, maps }) {
     }
 }
 
-const getJson = (url) => fetch(url).then((response) => {
+const getJson = (url: string | URL | Request) => fetch(url).then((response) => {
     if (!response.ok) throw new Error(`${url}: ${response.status}`);
     return response.json();
 });
 
 /** Load the shipped tables and draw the page. Called once, by gym-map.html. */
-export async function loadAndRender(doc) {
+export async function loadAndRender(doc: Document) {
     const target = doc ?? document;
     const [ranks, progression, items, manifest] = await Promise.all([
         getJson("assets/data/gym_ranks.json"),

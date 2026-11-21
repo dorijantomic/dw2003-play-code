@@ -47,7 +47,7 @@ const FIELD_WORDS = Object.freeze({
  * The word a field prints, or null when there is no such field (no field at all,
  * or a name the disc's seven words do not cover).
  */
-export function fieldName(element) {
+export function fieldName(element: string | number) {
   return FIELD_WORDS[element] ?? null;
 }
 

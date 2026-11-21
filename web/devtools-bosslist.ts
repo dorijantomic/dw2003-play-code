@@ -49,7 +49,7 @@ export function scriptedScreensByStage(stageEnc: StageEncoding) {
 
 // [name]X[name] speakers of one esdmg entry, minus the player. Trimmed, de-duplicated, in order.
 export function speakersOf(entry) {
-  const seen = [];
+  const seen: string[] = [];
   for (const s of entry?.strings ?? []) {
     for (const m of String(s).matchAll(/\[name\](.*?)\[name\]/g)) {
       const name = m[1].trim();
@@ -98,7 +98,7 @@ export function buildBossList({ stageEnc, fieldEnc, scripted, esdmgByStage, mani
   const opponents = opponentsByScreen(scripted, esdmgByStage);
   const mapName = (stageKey) => {
     const id = `s${stageKey}`;
-    return stageNames?.[id] ?? (manifestMaps ?? []).find((m) => m.id === id)?.name ?? "";
+    return stageNames?.[id] ?? (manifestMaps ?? []).find((m: { id: string; }) => m.id === id)?.name ?? "";
   };
   const rows = [];
   for (const [screenId, stageKeys] of screens) {
@@ -122,7 +122,7 @@ export function buildBossList({ stageEnc, fieldEnc, scripted, esdmgByStage, mani
 }
 
 // The searchable text of a row: every visible field plus all places and speakers.
-export function rowText(row) {
+export function rowText(row: BossListRow) {
   return [
     row.opponent,
     ...row.places.map((p) => `${p.mapId} ${p.mapName}`),
@@ -136,7 +136,7 @@ export function rowText(row) {
 export function filterBossList(rows, query) {
   const words = String(query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return rows;
-  return rows.filter((r) => words.every((w) => r.text.includes(w)));
+  return rows.filter((r: { text: string | string[]; }) => words.every((w) => r.text.includes(w)));
 }
 
 // Click handler body: the normal startScreen path with the OPPONENT'S WHOLE PARTY

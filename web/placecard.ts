@@ -44,7 +44,7 @@ export async function loadPlaceCard() {
 }
 
 /** The two names for a walker map id, or null if the table does not name it. */
-export function placeCardNames(mapId) {
+export function placeCardNames(mapId: number) {
     return data?.stages?.[mapId] ?? null;
 }
 

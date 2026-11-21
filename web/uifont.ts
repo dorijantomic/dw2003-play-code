@@ -69,7 +69,7 @@ export const NUMBER_FONT_KIND = 3;
  * without a DOM. Row 0 is the face the glyphs are baked with, so it is the
  * colour a number element actually shows.
  */
-export function clutRow(cluts, kind, row = 0) {
+export function clutRow(cluts, kind: number, row = 0) {
   return cluts?.[String(kind)]?.rows?.[String(row)] ?? null;
 }
 
@@ -89,7 +89,7 @@ export function glyphPaint(opts: UiFontPaintOpts = {}) {
 }
 
 /** Bake a copy of the sheet with this kind's CLUT offset applied. */
-function sheetForClut(kind, clut) {
+function sheetForClut(kind: number | undefined, clut: number | undefined) {
   if (!clut) return img;
   const key = `${kind}:${clut}`;
   if (clutSheets[key]) return clutSheets[key];
@@ -137,7 +137,7 @@ function sheetFor(color) {
   return tinted[color];
 }
 
-function glyphFor(kind, ch) {
+function glyphFor(kind: number, ch: string | number) {
   const c = map.chars[ch];
   if (!c) return null;
   const tbl = c.t === "b" ? "basic" : "ext";
@@ -202,7 +202,7 @@ export function textWidth(text, kind = 1) {
  * original never draws (debug overlays). A widget the original builds gets its
  * colour from `clut`, which is +0xC0: pass nothing for the face's own row.
  */
-export function drawText(ctx, text, x, y, opts: UiTextDrawOpts = {}) {
+export function drawText(ctx: CanvasRenderingContext2D | null | undefined, text: string | undefined, x: number, y: number | undefined, opts: UiTextDrawOpts = {}) {
   // TRIGGER AUDIT HOOK. A headless run sets globalThis.__uiTextTrace to a Set
   // and every string the game actually draws lands in it, so a decoded text id
   // that renders NOWHERE becomes measurable instead of assumed. Costs one
@@ -244,7 +244,7 @@ export function drawText(ctx, text, x, y, opts: UiTextDrawOpts = {}) {
  * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The look C overlay (web/ui-c) places one smooth glyph at
  * each of these pens, so its spacing is the game's own. [] until the font has loaded.
  */
-export function layoutGlyphs(text, x, opts: UiTextDrawOpts = {}) {
+export function layoutGlyphs(text: string | undefined, x, opts: UiTextDrawOpts = {}) {
   if (!fontReady()) return [];
   const { kind = 1, scale = 1, cellWidth = null, glyphMetrics = null } = opts;
   const out = [];
@@ -264,7 +264,7 @@ export function fontClutRow(kind, row = 0) {
 }
 
 /** Draw a named icon glyph (str/def/.../dark). Returns false until loaded. */
-export function drawIconGlyph(ctx, name, x, y, scale = 1) {
+export function drawIconGlyph(ctx: CanvasRenderingContext2D | undefined, name: string, x: number, y: number, scale = 1) {
   if (!fontReady()) return false;
   const r = map.icons?.[name];
   if (!r) return false;
@@ -295,7 +295,7 @@ export const CURSOR_STEP_VSYNC = 6;    // F0x8001b364 unk78
 const CURSOR_CYCLE_VSYNC = CURSOR_REST_VSYNC + CURSOR_STEP_VSYNC * 4;
 
 /** The cursor glyph token for a whole-cycle position measured in vsyncs. */
-export function cursorFrame(vsyncs) {
+export function cursorFrame(vsyncs: number) {
   const k = ((Math.floor(vsyncs) % CURSOR_CYCLE_VSYNC) + CURSOR_CYCLE_VSYNC)
     % CURSOR_CYCLE_VSYNC;
   if (k < CURSOR_REST_VSYNC) return CURSOR_FRAMES[0];
@@ -303,6 +303,6 @@ export function cursorFrame(vsyncs) {
 }
 
 /** Draw the animated list cursor. `vsyncs` is the screen clock in vsyncs. */
-export function drawCursor(ctx, vsyncs, x, y, opts = {}) {
+export function drawCursor(ctx, vsyncs: number, x: number, y: number, opts = {}) {
   return drawText(ctx, cursorFrame(vsyncs), x, y, opts);
 }

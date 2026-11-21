@@ -27,7 +27,7 @@ export const foldElemBonuses = engineFoldElemBonuses;
 
 export const effStats = engineEffStats;
 
-export const noteHit = (kind, r) => { S.hitNote = { seq: ++S.hitSeq, kind, hit: !!r.hit, dmg: r.dmg | 0, heal: r.heal | 0, crit: !!r.crit, eff: Number.isFinite(r.eff) ? r.eff : 1 }; return r; };
+export const noteHit = (kind: string, r) => { S.hitNote = { seq: ++S.hitSeq, kind, hit: !!r.hit, dmg: r.dmg | 0, heal: r.heal | 0, crit: !!r.crit, eff: Number.isFinite(r.eff) ? r.eff : 1 }; return r; };
 
 export const lastHitNote = () => S.hitNote;
 
@@ -50,7 +50,7 @@ export const applyAilment = engineApplyAilment;
  * `text` is only the walker's own fragment for instant death, which is not one of the
  * four ailments and has no ailment page.
  */
-export function tryInflict(skill, defender, defenderName, attacker) {
+export function tryInflict(skill, defender, defenderName: string, attacker) {
   const ail = engineTryInflict(skill, defender, defenderName, attacker);
   return { text: engineTryInstantDeath(skill, defender, defenderName, attacker), ail };
 }
@@ -124,7 +124,7 @@ export function attackPageSpec(name) {
  * Digimon's name, line 2 the game's one word ("Poisoned!" / "Frozen!" / "Confused!" /
  * "Sleep!", `esmfight` 0x1e..0x21, written by FIGHTSTG_F0x80091534's applier arms).
  */
-export function ailmentBoxPage(name, ail) {
+export function ailmentBoxPage(name: string, ail: string | null) {
   if (!ail) return null;
   const spec = engineAilmentInflictMessageSpec(name, ail);
   return spec ? { text: `${name} ${engineAilmentInflictWord(ail)}`, spec } : null;
@@ -137,7 +137,7 @@ export function ailmentBoxPage(name, ail) {
  * for the legacy box, and `ail` is the ailment key that landed, which the caller puts up
  * as its own page the way a skill's ailment is (`ailmentBoxPage`).
  */
-export function applyWeaponSecondary(attacker, defender, defenderName, damage = 0, attackerName = "") {
+export function applyWeaponSecondary(attacker, defender: { hp: number; }, defenderName: string, damage = 0, attackerName = "") {
   const sec = engineWeaponSecondaryProc(attacker, defender, attacker.rightWeapon, RAND_U16);
   const drain = sec ? 0 : engineWeaponDrainHeal(attacker, attacker.rightWeapon, damage, RAND_U16);
   if (drain > 0) {
@@ -220,7 +220,7 @@ export const processTurnStart = engineProcessTurnStart;
  * power, element, accuracy byte (+0x06), family and scalar. Category 4 (375, full restore
  * + cure all) is a heal, so `restore` is true and the resolver is never entered.
  */
-export function dnaResultAttack(resultId, rec, fallbackTech, elementName) {
+export function dnaResultAttack(resultId: number, rec, fallbackTech, elementName: string) {
   const category = rec?.category ?? fallbackTech?.category;
   return {
     restore: (category | 0) === 4,

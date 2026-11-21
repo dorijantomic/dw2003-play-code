@@ -138,7 +138,7 @@ const CLIP_LABELS = {
 };
 
 /** The plain name of one engine action slot; an unknown slot says its own number. */
-export function clipLabel(clip) {
+export function clipLabel(clip: number) {
   const n = Number(clip);
   if (Number.isInteger(n) && Object.hasOwn(CLIP_LABELS, n)) return CLIP_LABELS[n];
   return `clip ${clip}`;

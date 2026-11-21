@@ -24,7 +24,7 @@ export const mpbActive = () => !!MB.F;
 export const mpbVisible = () => !!MB.F || (!!MB.A?.ui && MB.A.ui.root.style.display === "flex");
 
 // ------------------------------------------------------------ my turn: the command menu
-const itemTargets = (item) => {
+const itemTargets = (item: { effect: string; id: number; }) => {
     if (!item) return { allies: true, foes: false };
     if (["hp", "mp", "full_hp"].includes(item.effect) && !(item.id >= 66 && item.id <= 90)) return { allies: true, foes: false };
     return item.id >= 85 && item.id !== 84 ? { allies: false, foes: true } : { allies: true, foes: false };
@@ -59,7 +59,7 @@ export function renderCmd() {
         btn("Item", () => { MB.F.items = MB.F.kit.items(); MB.F.cmd = { stage: "item" }; renderCmd(); }, !MB.F.kit.items().length);
         const forms = MB.F.kit.forms(MB.F.me);
         if (forms.length) btn("Digivolve", () => { MB.F.cmd = { stage: "dv" }; renderCmd(); }, !!MB.F.me.cantDigivolve);
-        if (MB.F.party.length > 1) btn("Tag", () => { MB.F.cmd = { stage: "tag" }; renderCmd(); }, !MB.F.party.some((m, i) => i !== MB.F.act && m.rec.hp > 0));
+        if (MB.F.party.length > 1) btn("Tag", () => { MB.F.cmd = { stage: "tag" }; renderCmd(); }, !MB.F.party.some((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0));
         btn("Run", () => { MB.F.cmd = { stage: "run" }; renderCmd(); });
         bar.append(mk("span", "hint", `HP ${MB.F.me.hp}/${MB.F.me.maxHp}   MP ${MB.F.me.mp}/${MB.F.me.maxMp}`));
     } else if (cmd.stage === "run") {
@@ -98,7 +98,7 @@ export function renderCmd() {
 }
 
 /** Ask for a target on the screen: { foes, allies } say which plates may be picked. Only one choice? it is taken for me. */
-function askTarget(spec, done, label) {
+function askTarget(spec, done, label: string) {
     const options = [];
     if (spec.allies) for (const p of MB.F.S.P) if (!p.ko || spec.revive) options.push("p" + p.id);
     if (spec.foes) for (const e of MB.F.S.E) if (!e.ko) options.push("e" + e.i);
@@ -109,7 +109,7 @@ function askTarget(spec, done, label) {
     renderCmd();
 }
 
-export function onPick(key) {
+export function onPick(key: string) {
     if (!MB.F || MB.F.cmd?.stage !== "target" || !MB.F.cmd.options.includes(key)) return;
     const done = MB.F.cmd.done;
     MB.F.cmd = null;
@@ -118,7 +118,7 @@ export function onPick(key) {
 }
 
 /** A pad button (keyboard, the on-screen pad, a gamepad): it drives the game's menu, or moves the target mark. */
-export function mpbKey(btn) {
+export function mpbKey(btn: string | undefined) {
     if (!MB.F?.nat || !btn) return;
     const cmd = MB.F.cmd;
     if (cmd?.stage === "target") {
@@ -134,7 +134,7 @@ export function mpbKey(btn) {
 }
 
 /** My turn, through the game's own screens: the command list, then TECH / ITEM / Digivolve / TAG, then a target. */
-export function driveNative(dt) {
+export function driveNative(dt: number) {
     const N = MB.F.nat, S = MB.F.S;
     const myId = MB.A.myId(), myKey = "p" + myId;
     const mine = S?.P.find((p) => p.id === myId);
@@ -157,7 +157,7 @@ export function driveNative(dt) {
         else if (stage === "tag") {
             const seed = MB.F.kit.tagSeed(MB.F.party.map((m) => m.member), MB.F.party.map((m) => m.rec), MB.F.act);
             seed.interactive = forced ? 0 : 1;
-            if (forced) seed.cursorRow = Math.max(0, MB.F.party.findIndex((m, i) => i !== MB.F.act && m.rec.hp > 0));
+            if (forced) seed.cursorRow = Math.max(0, MB.F.party.findIndex((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0));
             N.open("tag", seed);
         }
     }
@@ -165,9 +165,9 @@ export function driveNative(dt) {
     if (res) onNativeResult(res, forced, mine);
 }
 
-function notice(text) { MB.F.nat.say([text], { ms: 1100 }); MB.F.cmd = { stage: "notice" }; }
+function notice(text: string) { MB.F.nat.say([text], { ms: 1100 }); MB.F.cmd = { stage: "notice" }; }
 
-function onNativeResult(res, forced, mine) {
+function onNativeResult(res, forced: boolean, mine) {
     if (res.failed) { console.warn("[mpbattle] a native screen failed; using buttons"); MB.F.ui.nat = null; MB.F.nat = null; MB.F.ui.root.classList.remove("nat"); MB.F.cmd = null; renderCmd(); return; }
     const v = res.value;
     if (res.mode === "cmd") {
@@ -175,13 +175,13 @@ function onNativeResult(res, forced, mine) {
         if (v === 0) askTarget({ foes: true }, (k) => send({ k: "fight", t: Number(k.slice(1)) }), "Choose a target.");
         else if (v === 1) { if (MB.F.techs.length) MB.F.cmd = { stage: "tech" }; else notice("No techs!"); }
         else if (v === 2) { if (MB.F.kit.forms(MB.F.me).length && !MB.F.me.cantDigivolve) MB.F.cmd = { stage: "dv" }; else notice("Cannot digivolve."); }
-        else if (v === 3) { if (MB.F.party.some((m, i) => i !== MB.F.act && m.rec.hp > 0)) MB.F.cmd = { stage: "tag" }; else notice("Cannot tag."); }
+        else if (v === 3) { if (MB.F.party.some((m: { rec: { hp: number; }; }, i) => i !== MB.F.act && m.rec.hp > 0)) MB.F.cmd = { stage: "tag" }; else notice("Cannot tag."); }
         else if (v === 4) { if (MB.F.kit.items().length) MB.F.cmd = { stage: "item" }; else notice("No items!"); }
         else if (v === 5) send({ k: "run" });
         else MB.F.cmd = { stage: "menu" };
     } else if (res.mode === "tech") {
         if (v === -2) { MB.F.cmd = { stage: "menu" }; return; }
-        const t = MB.F.techs.find((x) => (x.id | 0) === (v | 0));
+        const t = MB.F.techs.find((x: { id: number; }) => (x.id | 0) === (v | 0));
         if (!t) { MB.F.cmd = { stage: "menu" }; return; }
         const spread = t.type === "attack" && isSpread(t.skill);
         if (spread) send({ k: "tech", sk: t.id, tw: t.tw, t: -1 });
@@ -189,7 +189,7 @@ function onNativeResult(res, forced, mine) {
         else askTarget({ allies: true, foes: true }, (k) => send({ k: "tech", sk: t.id, tw: t.tw, t: k[0] === "e" ? Number(k.slice(1)) : k }), `Choose a target for ${t.name}.`);
     } else if (res.mode === "item") {
         if (v === -2) { MB.F.cmd = { stage: "menu" }; return; }
-        const it = MB.F.kit.items().find((x) => (x.id | 0) === (v | 0));
+        const it = MB.F.kit.items().find((x: { id: number; }) => (x.id | 0) === (v | 0));
         if (!it) { MB.F.cmd = { stage: "menu" }; return; }
         const tg = itemTargets(ITEM_BY_ID[it.id] ?? it);
         askTarget({ ...tg, revive: it.id === 70 || it.id === 67 }, (k) => {

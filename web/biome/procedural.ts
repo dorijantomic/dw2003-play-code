@@ -5,14 +5,14 @@ import * as THREE from "three";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
 import { toonify, toonMat, rng, U, noiseTexture, light } from "./toolkit.js";
 
-const canvasTex = (w, h, draw, srgb = true) => {
+const canvasTex = (w: number, h: number, draw, srgb = true) => {
   const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); draw(g, w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 };
-const prep = (geo) => { geo.computeBoundingSphere(); return geo; };
+const prep = (geo: { computeBoundingSphere: () => void; }) => { geo.computeBoundingSphere(); return geo; };
 
 // ------------------------------------------------------------------ leaf textures (grey-white painted, tinted by colour)
-function leafPath(g, kind, w, h) {
+function leafPath(g: { beginPath: () => void; lineTo: (arg0: number, arg1: number) => void; moveTo: (arg0: number, arg1: number) => void; closePath: () => void; }, kind: string, w: number, h: number) {
   g.beginPath();
   if (kind === "ivy") {   // five-lobed ivy leaf, tip up
     const P = [[0.5, 0.02], [0.62, 0.3], [0.95, 0.34], [0.72, 0.55], [0.86, 0.86], [0.52, 0.72], [0.5, 0.98], [0.48, 0.72], [0.14, 0.86], [0.28, 0.55], [0.05, 0.34], [0.38, 0.3]];
@@ -27,9 +27,9 @@ function leafPath(g, kind, w, h) {
   g.closePath();
 }
 const _leafTex = {};
-export function leafTexture(kind) {
+export function leafTexture(kind: string) {
   if (_leafTex[kind]) return _leafTex[kind];
-  return (_leafTex[kind] = canvasTex(128, 128, (g, w, h) => {
+  return (_leafTex[kind] = canvasTex(128, 128, (g, w: number, h: number) => {
     g.clearRect(0, 0, w, h);
     leafPath(g, kind, w, h);
     const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, "#c9c9c9"); gr.addColorStop(1, "#ffffff"); g.fillStyle = gr; g.fill();
@@ -42,11 +42,11 @@ export function leafTexture(kind) {
 
 // ------------------------------------------------------------------ mushrooms (lathe cap + stem, painted texture)
 const _mushTex = {};
-function mushTexture(kind) {
+function mushTexture(kind: string) {
   if (_mushTex[kind]) return _mushTex[kind];
   const pal = { agaric: ["#d3342a", "#f5eede", "#fff8e8"], brown: ["#8a5a35", "#d9c7a3", "#e8dcc0"], glow: ["#37c9c6", "#bff7f0", "#e6fffb"] }[kind];
   const r = rng(11);
-  return (_mushTex[kind] = canvasTex(256, 128, (g, w, h) => {
+  return (_mushTex[kind] = canvasTex(256, 128, (g, w: number, h: number) => {
     g.fillStyle = pal[2]; g.fillRect(0, 0, w, h * 0.46);        // stem + gills (bottom of the profile = low v at bottom of canvas)
     g.fillStyle = pal[0]; g.fillRect(0, h * 0.46, w, h * 0.54);   // cap
     if (kind === "agaric") { g.fillStyle = pal[1]; for (let i = 0; i < 26; i++) { g.beginPath(); g.ellipse(r() * w, h * (0.52 + r() * 0.44), 6 + r() * 7, 4 + r() * 5, 0, 0, 7); g.fill(); } }
@@ -80,7 +80,7 @@ export function mushroomParts(kind = "agaric", seed = 5) {
 }
 
 // ------------------------------------------------------------------ ivy on a trunk + hanging vines
-function leafQuad(c, n, s, rollR, rnd, up = 1) {
+function leafQuad(c, n: { y: number; }, s: number, rollR: number, rnd: { (): number; (): number; (): number; }, up = 1) {
   // quad centred at c, facing n (unit), size s, rotated randomly about n
   const t = new THREE.Vector3(0, 1, 0); if (Math.abs(n.y) > 0.9) t.set(1, 0, 0);
   const a = new THREE.Vector3().crossVectors(t, n).normalize(), b = new THREE.Vector3().crossVectors(n, a);
@@ -89,17 +89,17 @@ function leafQuad(c, n, s, rollR, rnd, up = 1) {
   const v = [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]].map(([u, w]) => c.clone().addScaledVector(ax, u * s).addScaledVector(bx, (w - 0.3) * s * 1.1));
   return v;
 }
-function quadsGeometry(quads, uvs, normals, cols) {
-  const pos = [], nor = [], uv = [], col = [], idx = []; let base = 0;
-  quads.forEach((q, i) => {
-    q.forEach((p, k) => { pos.push(p.x, p.y, p.z); nor.push(normals[i].x, normals[i].y, normals[i].z); uv.push([0, 1, 1, 0][k], [0, 0, 1, 1][k]); col.push(cols[i][0], cols[i][1], cols[i][2]); });
+function quadsGeometry(quads, uvs, normals, cols: number[][]) {
+  const pos = [], nor = [], uv: (number | undefined)[] = [], col = [], idx: number[] = []; let base = 0;
+  quads.forEach((q, i: string | number) => {
+    q.forEach((p, k: string | number) => { pos.push(p.x, p.y, p.z); nor.push(normals[i].x, normals[i].y, normals[i].z); uv.push([0, 1, 1, 0][k], [0, 0, 1, 1][k]); col.push(cols[i][0], cols[i][1], cols[i][2]); });
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3); base += 4;
   });
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); return g;
 }
-function tube(path, r0, r1, sides = 5) {
+function tube(path, r0: number, r1: number, sides = 5) {
   const pos = [], idx = [], nor = [], uv = []; const N = path.length;
   for (let i = 0; i < N; i++) {
     const p = path[i], q = path[Math.min(N - 1, i + 1)], o = path[Math.max(0, i - 1)], tg = new THREE.Vector3().subVectors(q, o).normalize();
@@ -110,8 +110,8 @@ function tube(path, r0, r1, sides = 5) {
   for (let i = 0; i < N - 1; i++) for (let k = 0; k < sides; k++) { const a = i * sides + k, b = i * sides + (k + 1) % sides; idx.push(a, b, a + sides, b, b + sides, a + sides); }
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); return g;
 }
-const solid = (g, rgb) => { const n = g.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { c[i * 3] = rgb[0]; c[i * 3 + 1] = rgb[1]; c[i * 3 + 2] = rgb[2]; } g.setAttribute("color", new THREE.BufferAttribute(c, 3)); return g; };
-function leafMaterial(kind, o = {}) {
+const solid = (g, rgb: number[]) => { const n = g.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { c[i * 3] = rgb[0]; c[i * 3 + 1] = rgb[1]; c[i * 3 + 2] = rgb[2]; } g.setAttribute("color", new THREE.BufferAttribute(c, 3)); return g; };
+function leafMaterial(kind: string, o = {}) {
   const m = new THREE.MeshLambertMaterial({ map: leafTexture(kind), vertexColors: true, side: THREE.DoubleSide, alphaTest: 0.5, alphaToCoverage: true });
   m.userData.tag = "leaf" + kind; return toonify(m, Object.assign({ shadeK: 0.7, trans: 0.4 }, o));
 }

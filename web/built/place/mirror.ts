@@ -11,7 +11,7 @@ const M = 400;
 
 export function plan(pctx) {
   const { rec, info } = pctx;
-  const col = (kind) => { const p = pctx.pieces(kind)[0]; return p ? { name: p.name, colours: p.colours } : null; };
+  const col = (kind: string) => { const p = pctx.pieces(kind)[0]; return p ? { name: p.name, colours: p.colours } : null; };
   const pine = col("pine_mirror"), rock = col("rock_mirror");
   if (!pine && !rock) return null;
   const fp = pctx.pieces("far_pines")[0] || null;
@@ -26,7 +26,7 @@ export function plan(pctx) {
   // the copies are made from the bound tree / far-pine / boulder meshes: rebuild after any of those slots changes
   // (with the real lake the planar reflection already renders what is bound, nothing to rebuild)
   const SOURCES = /^(trees\.|boulders\.)/;
-  if (!real) pctx.slots.on((id) => { if (SOURCES.test(id) && pctx.slots.get(slot.id)?.inst) pctx.slots.rebuild(slot.id); });
+  if (!real) pctx.slots.on((id: string) => { if (SOURCES.test(id) && pctx.slots.get(slot.id)?.inst) pctx.slots.rebuild(slot.id); });
   const inst = () => pctx.slots.instanceOf(slot.id) || {};
   const layer = {
     get meshes() { return pctx.slots.meshesOf(slot.id); },

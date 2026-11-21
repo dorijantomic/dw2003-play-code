@@ -2,7 +2,7 @@
 // the whole pack (not only Digimon that were tagged into the fight), while EXP
 // is added only to the participants selected by the reward resolver.
 export function buildFightReportRows(roster, records, profiles, rewardXpByIndex = {}) {
-  return (roster ?? []).slice(0, 3).map((member, index) => {
+  return (roster ?? []).slice(0, 3).map((member, index: string | number) => {
     const stats = member?.stats ?? records?.[index]?.statsRecord ?? {};
     const rookieId = Number(member?.rookieId ?? records?.[index]?.rookieId ?? 0);
     const rewardXp = Number(rewardXpByIndex[index] ?? 0);
@@ -36,7 +36,7 @@ export function buildFightReportRows(roster, records, profiles, rewardXpByIndex 
 
 // One vsync of the EXP odometer (F0x80083d9c). After 10 vsyncs the original
 // snaps to the target instead of crawling.
-export function expCountStep(displayed, target) {
+export function expCountStep(displayed: number, target: number) {
   let digits = 0;
   let rest = target;
   let place = 10;
@@ -54,7 +54,7 @@ export function expCountStep(displayed, target) {
   return next;
 }
 
-export function expCountDisplayed(start, target, frames) {
+export function expCountDisplayed(start, target, frames: number) {
   const from = Number(start) || 0;
   const to = Number(target) || 0;
   if (frames >= 10 || from === to) return to;
@@ -190,7 +190,7 @@ export function fightReportGroupGeom(layout, groupIndex = 0) {
 // The portrait's frame. One step every 13 vsyncs, then back to the start --
 // the table's own -1 marks where each rookie's loop ends, and the sequences are
 // already trimmed to it. PAL runs at 50 Hz.
-export function fightReportPortraitClip(portrait, rookieId, seconds) {
+export function fightReportPortraitClip(portrait, rookieId, seconds: number) {
   const seq = portrait?.frames?.[String(rookieId)];
   if (!seq?.length) return null;
   const step = (portrait.stepVsync ?? 13) / 50;
@@ -199,7 +199,7 @@ export function fightReportPortraitClip(portrait, rookieId, seconds) {
 
 // The mark over the partner the page is about: four colours, one step every
 // five vsyncs, looping. PAL runs at 50 Hz.
-export function fightReportCycleRow(entry, seconds) {
+export function fightReportCycleRow(entry, seconds: number) {
   const n = entry?.frames ?? 4;
   const step = (entry?.stepVsync ?? 5) / 50;
   return Math.floor(Math.max(0, seconds) / step) % n;
@@ -207,7 +207,7 @@ export function fightReportCycleRow(entry, seconds) {
 
 // The level arrow, and the plate under it: the colour RAMPS and then STOPS.
 // It does not loop back to the start.
-export function fightReportRampRow(entry, seconds) {
+export function fightReportRampRow(entry, seconds: number) {
   const n = entry?.rampSteps ?? 11;
   const step = (entry?.stepVsync ?? 3) / 50;
   return Math.min(n - 1, Math.floor(Math.max(0, seconds) / step));

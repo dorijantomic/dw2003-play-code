@@ -18,7 +18,7 @@ const PAGE_W = 64;       // a texture page is 64 VRAM halfwords wide (256 four-b
 const PAGE_H = 256;
 
 /** The halfword at VRAM (x, y) from the most recent upload covering it, or -1. */
-function vramHalf(vram, x, y) {
+function vramHalf(vram, x: number, y: number) {
     const image = vram.find(x, y);
     if (!image) return -1;
     const i = ((y - image.y) * image.w + (x - image.x)) * 2;
@@ -30,7 +30,7 @@ export function createGymPrimPainter(getVram) {
     const stats = { sprites: 0, quads: 0, pixels: 0, skipped: 0 };
 
     /** The texel colour (a 16-bit value) for page-relative (u, v), or -1 for a missing texel. */
-    function texel(vram, page, clut, u, v) {
+    function texel(vram, page: number, clut: number, u: number, v: number) {
         const depth = (page >> 7) & 3;
         const baseX = (page & 15) * PAGE_W;
         const baseY = ((page >> 4) & 1) * PAGE_H + ((page >> 11) & 1) * 512;
@@ -51,7 +51,7 @@ export function createGymPrimPainter(getVram) {
         return vramHalf(vram, clutX + index, clutY);
     }
 
-    function blend(back, front, mode) {
+    function blend(back: number, front: number, mode: number) {
         switch (mode) {
             case 0: return (back + front) >> 1;
             case 1: return Math.min(255, back + front);
@@ -64,7 +64,7 @@ export function createGymPrimPainter(getVram) {
      * Fill the device rectangle of a logical box. `sample(lx, ly)` -> colour half or -1 for a
      * transparent / missing texel. `semi` blends the stp-flagged texels with mode `abr`.
      */
-    function fill(ctx, box, semi, abr, sample) {
+    function fill(ctx, box, semi: boolean, abr: number, sample) {
         const m = ctx.getTransform();
         const sx = m.a, sy = m.d, tx = m.e, ty = m.f;
         const canvas = ctx.canvas;
@@ -97,7 +97,7 @@ export function createGymPrimPainter(getVram) {
         stats.pixels += painted;
     }
 
-    const s16 = (v) => (v << 16) >> 16;
+    const s16 = (v: number) => (v << 16) >> 16;
 
     return {
         stats,
@@ -114,7 +114,7 @@ export function createGymPrimPainter(getVram) {
                 const X = s16(x), Y = s16(y);
                 const page = tpage;
                 const semi = code === 0x66;
-                fill(ctx, { x0: X, y0: Y, x1: X + w, y1: Y + h }, semi, (page >> 5) & 3, (lx, ly) => {
+                fill(ctx, { x0: X, y0: Y, x1: X + w, y1: Y + h }, semi, (page >> 5) & 3, (lx: number, ly: number) => {
                     const tu = (u + Math.floor(lx - X)) & 255;
                     const tv = (v + Math.floor(ly - Y)) & 255;
                     return texel(vram, page, clut, tu, tv);
@@ -130,7 +130,7 @@ export function createGymPrimPainter(getVram) {
                 if (maxX <= minX || maxY <= minY) { stats.skipped++; return; }
                 const semi = code === 0x2e;
                 // Corners 0 (top-left) and 3 (bottom-right) carry the texel rectangle.
-                fill(ctx, { x0: minX, y0: minY, x1: maxX, y1: maxY }, semi, (page >> 5) & 3, (lx, ly) => {
+                fill(ctx, { x0: minX, y0: minY, x1: maxX, y1: maxY }, semi, (page >> 5) & 3, (lx: number, ly: number) => {
                     const tx = (lx - minX) / (maxX - minX);
                     const ty = (ly - minY) / (maxY - minY);
                     const tu = Math.round(us[0] + tx * (us[3] - us[0])) & 255;

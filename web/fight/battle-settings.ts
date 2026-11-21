@@ -19,7 +19,7 @@ export const CORE_STORE_KEY = "dw.fx.v1";
 // these headless defaults stay off so the Node tools and tests keep the disc motion. Without the DW2 extras the swap falls back to the disc motion.)
 const DEFAULTS = { ownclips: false, dw2motion: false, smoothanim: false };
 
-export function battleSetting(key) {
+export function battleSetting(key: string) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;
   if (isInstalledBuild()) { const f = shipForced(key); if (f !== null) return f; }   // installed copy: a save can not change it
   if (typeof localStorage !== "undefined") {
@@ -33,7 +33,7 @@ export function battleSetting(key) {
   return !!DEFAULTS[key];
 }
 
-export function setBattleSetting(key, value) {
+export function setBattleSetting(key: string, value) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULTS, key)) return false;
   if (typeof window !== "undefined" && typeof window.__setFx === "function") {
     window.__setFx(key, !!value);          // ambience's panel: updates fx, saves, refreshes the panel

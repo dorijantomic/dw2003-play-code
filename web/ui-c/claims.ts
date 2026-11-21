@@ -9,14 +9,14 @@
 //   cmfont 26      : the money band
 export const PAUSE_PANEL_ROWS = Object.freeze({ 0x1c: 5, 0x1b: 6, 0x19: 7 });
 export const PAUSE_PANEL_EXTRA_BASE = 0x100;
-const panelRows = (id) => (PAUSE_PANEL_ROWS[id] ?? (id > PAUSE_PANEL_EXTRA_BASE + 7 && id <= PAUSE_PANEL_EXTRA_BASE + 12 ? id - PAUSE_PANEL_EXTRA_BASE : 0));
+const panelRows = (id: number) => (PAUSE_PANEL_ROWS[id] ?? (id > PAUSE_PANEL_EXTRA_BASE + 7 && id <= PAUSE_PANEL_EXTRA_BASE + 12 ? id - PAUSE_PANEL_EXTRA_BASE : 0));
 
 // Pages with the party sidebar (T1 leftovers + T2): ststat 29 = the scrolling diamond backdrop (its x = y = the scroll counter), 30 = the
 // orange highlight (card edge, name plate corners, portrait corners; drawn at the selected card, a second one while SORT holds a partner),
 // 32 = the footer band, 58 = the CARD FOLDERS window (title + rows); cmfont 22 = the portrait plate; the portrait pictures themselves
 // (ststat 7, 8, 17, 18, 21, 22 ...) are 32 x 32 sprites = art by size.
 // Lab, gym and shop screens (own packs): backdrop, header plate, window, hint plates, capsule window, info card, stat window.
-const PL = (part, shape, o = {}) => ({ part, shape, layer: "under", ...o });
+const PL = (part: string, shape: string, o = {}) => ({ part, shape, layer: "under", ...o });
 const BACKDROP = { part: "backdrop", layer: "under" };
 const ART = { part: "art", layer: "art" };
 // T3 lists and grids (lists.js): a claim with keepArt records the part AND draws the clip's own pixels (a frame goes under the picture)
@@ -51,7 +51,7 @@ for (const id of [60, 61, 62, 63, 64, 70, 71, 72, 44, 45, 46, 47, 48, 77, 78, 79
 // technique and item list windows (42, 39: the row boxes are 12 x 12 sheet layers), the MP plate (41: plate in its layers below y 18), the
 // item count plate (40), the Digivolve stat panel (37), the DNA species strip (43), the message / description pane (49). The page arrows
 // (31, 32, 8 x 8) are pictures.
-const PGF = (part, o = {}) => ({ part, layer: "under", ...o });
+const PGF = (part: string, o = {}) => ({ part, layer: "under", ...o });
 const PGFGC00 = {
     0: PGF("hudPlate", { side: "enemy" }), 1: PGF("hudPlate", { side: "player" }), 10: PGF("bezel", { layer: "over" }),
     30: PGF("dvFrame"), 11: PGF("dvInner"),
@@ -224,15 +224,15 @@ export const CLAIMS = Object.freeze({
 });
 
 /** Packs that are pictures through and through: the pause MAP page's map and its area pieces (stwmp<n>map / stwmp<n>area). */
-export const isPicturePack = (pack) => /^stwmp\d+(map|area)$/.test(String(pack ?? ""));
+export const isPicturePack = (pack: string) => /^stwmp\d+(map|area)$/.test(String(pack ?? ""));
 
 /** T9 our own book screens (OPTIONS, GLOSSARY, map book, fly book): the list panels web/ui-kit.js builds from the pause list's tiles and
  *  registers in cmfont as "kit-<cols>x<bands>" (web/panel-kit.js). One C window each; books.js composes their rows. */
 export const KIT_PANEL = Object.freeze({ part: "window", layer: "under" });
-export const isKitPanel = (pack, id) => pack === "cmfont" && /^kit-\d+x\d+$/.test(String(id));
+export const isKitPanel = (pack: string, id: string | number) => pack === "cmfont" && /^kit-\d+x\d+$/.test(String(id));
 
 /** The claim for a clip: { part, layer, rows? } or null (art). `id` may be "n#row" (a palette variant of clip n). */
-export function claimFor(pack, id) {
+export function claimFor(pack: string, id: string | number) {
     if (isKitPanel(pack, id)) return KIT_PANEL;
     const base = Number(String(id).split("#")[0]);
     if (isPicturePack(pack)) return ART;
@@ -259,7 +259,7 @@ export const CMFONT_DIR = 0x286, STSTAT_DIR = 0x404;
 /** The status sheet family (status, See Digivolve, See Equipment, the equipment item grid): any of its own clips is drawn. */
 export const STATUS_CLIPS = Object.freeze([31, 33, 36, 39, 42, 44, 60]);
 /** Does the frame draw clip `id` of the pack directory `dir`? */
-export const hasClip = (calls, dir, id) => calls.some((c) => c.method === "drawSprite" && ((c.args[0] >>> 16) & 0xffff) === dir && Number(c.args[1]) === id);
+export const hasClip = (calls, dir: number, id: number) => calls.some((c) => c.method === "drawSprite" && ((c.args[0] >>> 16) & 0xffff) === dir && Number(c.args[1]) === id);
 
 /** The party sidebar pages (picker, items categories, folders, demo): the party cards with their portrait plates. */
 export const isSidebarPage = (calls = []) => hasClip(calls, CMFONT_DIR, 21) && hasClip(calls, CMFONT_DIR, 22);

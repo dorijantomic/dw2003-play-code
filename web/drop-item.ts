@@ -2,7 +2,7 @@
 // keyed by display name ("Armor Chip"). This finds the item for either spelling. The compact
 // name is the display name without spaces/punctuation (checked against items.json catalog for
 // all 78 drops in tests/drop-item-resolver.test.js). "Null" and unknown names give null.
-const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+const norm = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
 const cache = new WeakMap();
 
 export function itemForDropName(name, byName = window.__ITEM_BY_NAME, byId = window.__ITEM_BY_ID) {

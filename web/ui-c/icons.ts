@@ -23,8 +23,8 @@ const BADGES = Object.freeze({
     "[square]": `<circle cx="18" cy="18" r="16" fill="#3a0e30" stroke="#f05ac8" stroke-width="2"/><rect x="11" y="11" width="14" height="14" fill="none" stroke="#f05ac8" stroke-width="3"/>`,
 });
 /** SVG for a button token, or null (unknown token: the caller falls back to the old canvas glyph). */
-export const badgeSvg = (tok) => (BADGES[tok] ? `<svg aria-hidden="true" width="100%" height="100%" viewBox="0 0 36 36">${BADGES[tok]}</svg>` : null);
-export const hasBadge = (tok) => Object.prototype.hasOwnProperty.call(BADGES, tok);
+export const badgeSvg = (tok: string) => (BADGES[tok] ? `<svg aria-hidden="true" width="100%" height="100%" viewBox="0 0 36 36">${BADGES[tok]}</svg>` : null);
+export const hasBadge = (tok: string) => Object.prototype.hasOwnProperty.call(BADGES, tok);
 
 /** Split a run's text into [{ tok }] and [{ txt }] pieces at the game's bracket tokens ([triangle], [enter]...). */
 export function splitTokens(text) {

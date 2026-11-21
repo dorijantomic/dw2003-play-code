@@ -65,7 +65,7 @@ export class TimelinePlayer {
     }
   }
 
-  step(speed) {
+  step(speed: number) {
     if (this.ended) return;
     this.looped = false;
     const before = this._s.playhead;
@@ -83,7 +83,7 @@ export class TimelinePlayer {
   lookaheadHold(maxRun = 96) {
     const t = this.table, n = this.table.length, p = this._s.playhead;
     if (!t || p < 0 || p >= n) return null;
-    const frameOf = (e) => {
+    const frameOf = (e: { value: number; loop_target: number; }) => {
       if (!e) return null;
       const v = e.value | 0;
       if (v === 0xffff) return null;
@@ -132,7 +132,7 @@ export class PlaylistPlayer {
     this.justLooped = false;
   }
 
-  step(speed) {
+  step(speed: number) {
     if (this.ended || !this.cur) return;
     this.cur.step(speed);
     this.frame = this.cur.currentFrame();

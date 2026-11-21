@@ -23,7 +23,7 @@ const QUESTION = [
     "..aaab...",
     "...cbc...",
 ];
-let questionCanvas = null;
+let questionCanvas: HTMLCanvasElement | null = null;
 function questionSprite() {
     if (questionCanvas) return questionCanvas;
     const c = document.createElement("canvas");
@@ -39,7 +39,7 @@ function questionSprite() {
 }
 
 /** kind: "offer" (a job to give: "?") or "turnin" (a finished job to take: "!"). (x, y) is the balloon anchor above the character. */
-export function drawQuestMark(ctx, kind, x, y, tick = 0) {
+export function drawQuestMark(ctx: CanvasRenderingContext2D | null, kind: string, x: number, y: number, tick = 0) {
     const bob = Math.round(Math.sin(tick / 9) * 1.5);       // a gentle hover so it reads as a marker
     if (kind === "turnin") drawFieldcomIcon(ctx, 0, 0, x, y + bob);
     else if (kind === "offer") {

@@ -28,7 +28,7 @@ export function techRecordAccuracy(rec) {
  * `useDiscAcc` off -> exactly today's `{...skill, effect_id, effect_power}` (no base_acc key).
  * `useDiscAcc` on  -> also carries `base_acc`, the record's own +0x06 byte.
  */
-export function mergeTechRecord(skill, rec, { useDiscAcc = false } = {}) {
+export function mergeTechRecord(skill: TechRecordMerged, rec, { useDiscAcc = false } = {}) {
   if (!rec) return skill;
   const merged = { ...skill, effect_id: rec.dispatch, effect_power: rec.crit } as TechRecordMerged;
   if (useDiscAcc) merged.base_acc = techRecordAccuracy(rec);
@@ -36,12 +36,12 @@ export function mergeTechRecord(skill, rec, { useDiscAcc = false } = {}) {
 }
 
 /** True when one RAND_U16 word passes the disc's `rate % 1024` drop roll (wfightmn 0x1f84). */
-export function dropRoll(rate, draw) {
+export function dropRoll(rate: number, draw: number) {
   return (draw % 1024) < ((rate | 0) + 1);
 }
 
 /** Draw once from the shared stream and run the drop roll. */
-export function dropPasses(rate, rng) {
+export function dropPasses(rate: number, rng: { (): number | undefined; (): number; (): number | undefined; (): number; (): number; }) {
   return dropRoll(rate, rng());
 }
 
@@ -52,8 +52,8 @@ export function dropPasses(rate, rng) {
  * pick's `RAND % 1024 < drop_rate + 1` roll (0x1f9c-0x1fcc). Returns the picked record's
  * item or null. At most one item, always two draws in that order.
  */
-export function rollBattleDrop(candidates, rng) {
-  const list = (candidates ?? []).filter((e) => e && e.drop_item && e.drop_item !== "Null");
+export function rollBattleDrop(candidates, rng: { (): number | undefined; (): number; }) {
+  const list = (candidates ?? []).filter((e: { drop_item: string; }) => e && e.drop_item && e.drop_item !== "Null");
   if (list.length === 0) return null;
   const pick = list[rng() % list.length];
   return dropPasses(pick.drop_rate, rng) ? pick.drop_item : null;

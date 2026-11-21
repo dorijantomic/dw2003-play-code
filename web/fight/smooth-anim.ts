@@ -12,7 +12,7 @@
 export const CORE_STORE_KEY = "dw.fx.v1";
 export const SMOOTH_SETTING = "smoothanim";
 
-let override = null;                                  // null = follow the player's setting
+let override: boolean | null = null;                                  // null = follow the player's setting
 export function setSmoothAnim(v) { override = v == null ? null : !!v; }
 
 /** Read the developer override out of a query string: `?smooth=1` turns the mode on. */
@@ -42,7 +42,7 @@ function storedSetting() {
 // The renderer asks once per actor per drawn frame; the store is a JSON blob, so the answer is
 // cached briefly. 250 ms is short enough that flipping the switch in the panel shows up while the
 // fight is still on screen.
-let cached = null, cachedAt = -1e9;
+let cached: boolean | null = null, cachedAt = -1e9;
 export function smoothAnimEnabled() {
   if (override != null) return override;
   if (URL_ON || ENV_ON) return true;

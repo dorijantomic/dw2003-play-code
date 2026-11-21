@@ -2,7 +2,7 @@ import { RAND_U16 } from "../vendor/engine.js";
 import { CORE_STATS } from "./progress.js";
 
 // Gym drill catalog for a gym rank (1..14): [{ drill, primary, secondary }].
-export function gymDrillsForRank(rank, gym) {
+export function gymDrillsForRank(rank: number, gym) {
   return gym.rank_menus[Math.min(Math.max(rank, 1), gym.rank_menus.length) - 1] ?? [];
 }
 
@@ -15,7 +15,7 @@ const GYM_ELEM_STATS = [null, null, null, null, null, null, null, null,
 // screen needs the same mapping to pick which of its result messages to say
 // (each message index is a base plus the id). One table, exported, rather than
 // a second copy in web/gym.js.
-export function gymStatForId(id) {
+export function gymStatForId(id: number) {
   if (id >= 1 && id <= 5) return GYM_CORE_STATS[id];
   if (id >= 8 && id <= 14) return GYM_ELEM_STATS[id];
   if (id === 15) return "maxHp";
@@ -33,7 +33,7 @@ export function gymTrainingResult(drillEntry, tpChoice, ultra, dig, gym, rng = R
   const superDrill = drillEntry.drill >= 13;
   const variant = !ultra ? 0 : superDrill ? 2 : 1; // elem/hpmp row variant
   const effects = [];
-  const applyEffect = (id, isPrimary) => {
+  const applyEffect = (id: number, isPrimary: boolean) => {
     if (!id) return;
     if (id >= 1 && id <= 5) {
       if (isPrimary) { // core gain (0x8008c304): (super?6:0) + ultra*3 + tpChoice
@@ -79,7 +79,7 @@ export function gymRepPercent(equip) {
 // while a SUPER drill (id >= 13, unk60 >= 0xD) that did NOT sweep extends to a 5-rep round
 // (unk18 2→4 at 0x71fc). Basic drills always stop at three. Returns the per-rep results for
 // the rep-marker row (F0x80086c0c: hit → ring clip 0x45, miss → X clip 0x46).
-export function gymRepResults(percent, superDrill = false, rng = RAND_U16) {
+export function gymRepResults(percent: number, superDrill = false, rng = RAND_U16) {
   const reps = [0, 1, 2].map(() => rng() % 100 <= percent);
   if (superDrill && !reps.every(Boolean)) {
     reps.push(rng() % 100 <= percent, rng() % 100 <= percent);
@@ -108,7 +108,7 @@ export function ultraChanceRoll(drill, lastUltraDrill, rng = RAND_U16) {
 // "Failed..." (estraini 71, F0x80087334 `arg4==0 && arg5==0` branch).
 //   repResults   = the ordinary reps (3, or 5 for a super/starred drill or an "As is" pick)
 //   challengeWon = null (no bonus rep) | true (won → +1 ultra roll) | false (lost → nothing)
-export function gymSessionResult(drillEntry, tpChoice, repResults, challengeWon, dig, gym, rng = RAND_U16) {
+export function gymSessionResult(drillEntry, tpChoice, repResults, challengeWon: boolean, dig, gym, rng = RAND_U16) {
   const totals = new Map();
   const add = (fx) => { for (const { stat, delta } of fx) totals.set(stat, (totals.get(stat) ?? 0) + delta); };
   for (const ok of repResults) if (ok) add(gymTrainingResult(drillEntry, tpChoice, false, dig, gym, rng).effects);
@@ -118,7 +118,7 @@ export function gymSessionResult(drillEntry, tpChoice, repResults, challengeWon,
 
 // Apply gymTrainingResult effects to the stored-stat block (store semantics as the
 // level-up rolls: maxHp/maxMp cap 9999, core/elems cap 999, core loss floors at 0).
-export function applyGymEffects(ps, effects, lu) {
+export function applyGymEffects(ps, effects, lu: { hpmp_cap: number; stat_cap: number; }) {
   const hpmpCap = lu?.hpmp_cap ?? 9999;
   const statCap = lu?.stat_cap ?? 999;
   ps.stats ??= {};

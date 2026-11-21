@@ -18,7 +18,7 @@ function loadData() {
     dataPromise ??= fetchJson(`${LOADER_DIR}/manifest.json`, DATA_LABEL).then(async (manifest) => {
         const shipped = manifest.resources.filter((r) => r.file);
         const files = await Promise.all(shipped.map((r) => fetchBytes(`${LOADER_DIR}/${r.file}`, DATA_LABEL)));
-        return { manifest, packs: new Map(shipped.map((r, i) => [r.id, files[i]])) };
+        return { manifest, packs: new Map(shipped.map((r, i: string | number) => [r.id, files[i]])) };
     }).catch((error) => { dataPromise = null; throw error; });
     return dataPromise;
 }

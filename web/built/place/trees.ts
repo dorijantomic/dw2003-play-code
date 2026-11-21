@@ -8,6 +8,7 @@
 // keep-out, only reported (keepOutTouching).
 import { rng, itemsFrom, composeYaw } from "../slots.js";
 import { WALL, GROVE, SHRUB, PINE, FAR, GUST } from "../trees.js";
+import type { BuiltSlotItem } from "../types.js";
 const M = 400;
 
 /** The ring's plan, in render units: every card above the floor merged by ground spot (the recipe cuts some cards
@@ -26,7 +27,7 @@ export function planRing(pieces) {
   for (const [ci, cd] of cards.entries()) {
     const r = Math.hypot(cd.c[0], cd.c[1]) || 1, u = [cd.c[0] / r, cd.c[1] / r];
     const R = rng(1008 + ci * 131);
-    const at = (t, dr) => [cd.c[0] + cd.dir[0] * t * cd.w + u[0] * dr * M, cd.c[1] + cd.dir[1] * t * cd.w + u[1] * dr * M];
+    const at = (t: number, dr: number) => [cd.c[0] + cd.dir[0] * t * cd.w + u[0] * dr * M, cd.c[1] + cd.dir[1] * t * cd.w + u[1] * dr * M];
     const wM = cd.w / M;
     if (cd.kind === "cypress_wall") {
       const S = WALL, n = Math.max(1, Math.round(wM / S.spacing));
@@ -51,7 +52,7 @@ export function planRing(pieces) {
 }
 
 /** The top height (m) of the pine at azimuth az (rad, atan2(x, z)); S (web/built/shared.js) supplies the shared noise. */
-export function farTop(az, S) {
+export function farTop(az: number, S) {
   const c = Math.cos(az), s = Math.sin(az);
   const g = S.fbm3JS(c * 2.6, 1.7, s * 2.6);                 // groups of tall / short trees
   const w = S.noise3JS(c * 7.7 - 2.3, 5.5, s * 7.7 + 4.1);   // one slower wobble
@@ -63,7 +64,7 @@ export function farTop(az, S) {
 export function planFar(piece, S) {
   const cards = piece.cards || [];
   const hasRing = piece.rmax != null && piece.ymax != null;
-  const R = hasRing ? piece.rmax : Math.max(...cards.map((c) => Math.hypot(c.base[0], c.base[2])));
+  const R = hasRing ? piece.rmax : Math.max(...cards.map((c: { base: number[]; }) => Math.hypot(c.base[0], c.base[2])));
   const Rm = R / 400;
   const rows = (piece.rows || []).map((r) => (r ? r.rgb : null));   // top first: 0 sky .. 2 lit tips .. 6 darkest .. 7 foot
   const greens = rows.length >= 8 && rows[2] && rows[4] && rows[6]
@@ -92,7 +93,7 @@ export function planFar(piece, S) {
 }
 
 
-const sectorOf = (x, z) => { const az = Math.atan2(z, x); return ((Math.floor((az + Math.PI) / (Math.PI / 2)) % 4) + 4) % 4; };
+const sectorOf = (x: number, z: number) => { const az = Math.atan2(z, x); return ((Math.floor((az + Math.PI) / (Math.PI / 2)) % 4) + 4) % 4; };
 
 export function plan(pctx) {
   const { S, pieces: P, slots: api } = pctx;
@@ -104,14 +105,14 @@ export function plan(pctx) {
   const ring = planRing(pieces);
   const lin = (c) => S.srgb(c);
   const midOf = (p) => lin(p.colours.green || p.colours.all);
-  const first = (kind) => pieces.find((p) => p.kind === kind);
+  const first = (kind: string) => pieces.find((p) => p.kind === kind);
   const ratio = (p, base) => { const a = midOf(p), b = midOf(base); return [a.r / b.r, a.g / b.g, a.b / b.b]; };
   const byPiece = Object.fromEntries(pieces.map((p) => [p.name, p]));
   const group = pctx.newGroup("builtTreeRing");   // the ring's one parent
   const wallP = first("cypress_wall"), groveP = first("cypress_grove");
   const instances = [];
   /** items of one species: by 90 deg sector, the exact transform made for the default asset's geometry */
-  function ringItems(name, list, base, geoRm, inst = [name]) {
+  function ringItems(name: string, list, base, geoRm: number, inst = [name]) {
     const sectors = [[], [], [], []];
     for (const it of list) sectors[sectorOf(it.xz[0], it.xz[1])].push(it);
     const out = [];
@@ -127,7 +128,7 @@ export function plan(pctx) {
   }
   const geoRm = (sh) => { const k = 1 / (sh.H0 + sh.HR / 2); return sh.Rm * k; };   // cypressGeometry's userData.Rm
   const partName = (name, pi) => (pi ? (pi > 1 ? "core" + pi : "core") : name);
-  const ringSlot = (name, label, items, colours) => ({
+  const ringSlot = (name: string, label: string, items: BuiltSlotItem, colours) => ({
     id: "trees." + name, label, kind: name === "shrub" ? "bush" : "tree", layer: "ring_" + name, parent: group, default: "mod." + (name === "shrub" ? "shrub" : "cypress_" + name),
     items, data: { colours },
     meshName: (g, part, pi) => `ring_${partName(name, pi)}_s${g}`,
@@ -183,10 +184,10 @@ export function plan(pctx) {
     for (const id of ringIds) { const a = api.get(id).asset; const nm = id.slice(6); (a?.parts || []).forEach((p, pi) => { species[partName(nm, pi)] = p.geo; }); }
     let far = null;
     if (fplan) {
-      const tops = fplan.trees.map((t) => t.H).sort((a, b) => a - b);
-      const q = (p) => +tops[Math.min(tops.length - 1, Math.floor(p * tops.length))].toFixed(3);
+      const tops = fplan.trees.map((t) => t.H).sort((a: number, b: number) => a - b);
+      const q = (p: number) => +tops[Math.min(tops.length - 1, Math.floor(p * tops.length))].toFixed(3);
       const geos = (farA?.variants || [farA?.parts || []]).map((v) => v[0]?.geo).filter(Boolean);
-      far = { trees: fplan.trees.length, tris: fm.reduce((s, m) => s + m.count * triOf(m.geometry), 0),
+      far = { trees: fplan.trees.length, tris: fm.reduce((s: number, m) => s + m.count * triOf(m.geometry), 0),
               trisPerTree: geos.map((g) => g.userData?.tris), whorls: geos.map((g) => g.userData?.whorls),
               r: +fplan.Rm.toFixed(3), tops: { min: q(0), p10: q(0.1), median: q(0.5), p90: q(0.9), max: q(0.999999) },
               draws: fm.length, greens: fplan.greens, source: fplan.greens.source };

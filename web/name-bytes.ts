@@ -12,7 +12,7 @@
 
 /** Encode a display name into the screen text codec, capped at `maxBytes`
  *  (default 23 = the roster record's name field). */
-export function encodeNativeScreenText(s, maxBytes = 23) {
+export function encodeNativeScreenText(s: string, maxBytes = 23) {
     const out = [];
     for (const ch of String(s ?? "")) {
         const c = ch.charCodeAt(0);

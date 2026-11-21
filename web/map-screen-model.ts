@@ -7,7 +7,7 @@
 // area you have not visited as a "???" box (its name stays hidden). Regions with no visited area are not listed.
 
 /** The region a manifest name belongs to: "Central Sector — Asuka City" -> "Central Sector"; a name without a dash is its own region. */
-export function regionOf(name) {
+export function regionOf(name: string | undefined) {
     const s = String(name ?? "");
     const i = s.indexOf(" — ");
     return i > 0 ? s.slice(0, i) : s;
@@ -29,7 +29,7 @@ export function buildLinks(maps, scenes) {
 }
 
 /** { regions: [{ name, ids }] in manifest order, regionIndex(id), nameOf(id), neighbours(id) }. */
-export function buildGraph(maps, scenes) {
+export function buildGraph(maps: MapScreenRecord[], scenes) {
     const regions = [], byName = new Map(), regionOfId = new Map(), names = new Map(), adj = new Map();
     for (const m of maps) {
         const r = regionOf(m.name);
@@ -55,10 +55,10 @@ export function buildGraph(maps, scenes) {
  * What one region shows: `nodes` = [{ id, seen }] (visited first, then the "???" ones beside them) and `edges` = [[a, b]],
  * both only among the shown nodes. `seen(id)` = the flag question; the current map always counts as visited.
  */
-export function regionView(graph, regionIdx, seen, currentId) {
+export function regionView(graph, regionIdx: string | number, seen, currentId: string | null) {
     const region = graph.regions[regionIdx];
     if (!region) return { nodes: [], edges: [], visited: 0, total: 0 };
-    const isSeen = (id) => id === currentId || !!seen(id);
+    const isSeen = (id: string | null) => id === currentId || !!seen(id);
     const visited = region.ids.filter(isSeen);
     const shown = new Set(visited);
     const frontier = [];
@@ -74,9 +74,9 @@ export function regionView(graph, regionIdx, seen, currentId) {
 }
 
 /** The regions with at least one visited area, as indexes into graph.regions (the list the L1 / R1 buttons walk). */
-export function openRegions(graph, seen, currentId) {
+export function openRegions(graph, seen, currentId: string | null) {
     const out = [];
-    graph.regions.forEach((r, i) => { if (r.ids.some((id) => id === currentId || seen(id))) out.push(i); });
+    graph.regions.forEach((r: { ids: (string | null)[]; }, i) => { if (r.ids.some((id: string | null) => id === currentId || seen(id))) out.push(i); });
     return out;
 }
 
@@ -93,7 +93,7 @@ export interface RegionView {
     total: number;
 }
 
-export function layoutNodes(view: RegionView, rootId, w, h, size = 8) {
+export function layoutNodes(view: RegionView, rootId: string, w: number, h: number, size = 8) {
     const ids = view.nodes.map((n) => n.id);
     if (!ids.length) return new Map();
     const adj = new Map<string, string[]>(ids.map((id) => [id, []] as [string, string[]]));
@@ -125,7 +125,7 @@ export function layoutNodes(view: RegionView, rootId, w, h, size = 8) {
 }
 
 /** The node nearest to `from` in direction `dir` ("up" | "down" | "left" | "right"), or null when none lies that way. A cone: the sideways gap counts double. */
-export function nearestInDirection(pos, from, dir) {
+export function nearestInDirection(pos, from: string, dir: string) {
     const p = pos.get(from);
     if (!p) return null;
     let best = null, bestCost = Infinity;
@@ -157,7 +157,7 @@ export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w:
     const graph = buildGraph(maps, scenes);
     const listed = openRegions(graph, seen, currentId);
     let at = Math.max(0, listed.indexOf(graph.regionIndex(currentId)));
-    let view = null, pos = null, cursor = null;
+    let view: RegionView | null = null, pos = null, cursor: string | null = null;
     const build = () => {
         view = regionView(graph, listed[at], seen, currentId);
         const root = view.nodes.some((n) => n.id === currentId) ? currentId : (view.nodes[0]?.id ?? null);
@@ -190,14 +190,14 @@ export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w:
             return s.here ? `${s.name} (You are here)` : s.name;
         },
         /** "up" | "down" | "left" | "right": the cursor goes to the nearest box that way. Returns "move" or null (nothing that way). */
-        move(dir) {
+        move(dir: string) {
             if (!cursor) return null;
             const n = nearestInDirection(pos, cursor, dir);
             if (n === null) return null;
             cursor = n; return "move";
         },
         /** d = -1 / +1: the previous / next region that has a visited area. */
-        switchRegion(d) {
+        switchRegion(d: number) {
             const next = Math.min(listed.length - 1, Math.max(0, at + d));
             if (next === at || !listed.length) return null;
             at = next; build(); return "move";

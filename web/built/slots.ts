@@ -28,11 +28,11 @@ import type { BuiltSlotInstances, BuiltSlotItem, BuiltSlotsOptions } from "./typ
 const MAXN = 20000;   // most instances a FOREIGN asset draws in one slot (grass blades: 450 000 -> every k-th)
 const FIT_R = 3.5;    // a foreign asset's footprint may be this many slot radii wide before the height fit gives way
 
-export const rng = (seed) => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
+export const rng = (seed: number) => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 
 /** THREE: Matrix4.compose(p, Quaternion.setFromAxisAngle((0, 1, 0), yaw), (sx, sy, sz)), the same float maths, no
  *  objects (placement data stays plain numbers; a matrix made here is bit-identical to the one three would make) */
-export function composeYaw(p, yaw, sx, sy = sx, sz = sx) {
+export function composeYaw(p, yaw: number, sx: number, sy = sx, sz = sx) {
   const h = yaw / 2, sn = Math.sin(h);
   const x = 0 * sn, y = 1 * sn, z = 0 * sn, w = Math.cos(h);
   const x2 = x + x, y2 = y + y, z2 = z + z, xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2;
@@ -75,13 +75,13 @@ export function itemsOnTriangles(posList, n = 400, seed = 7, size = 400) {
   return itemsFrom(out);
 }
 /** n points on a ring of radius R at height y (sky, clouds, horizon). */
-export function itemsOnRing(n, R, y, size) {
+export function itemsOnRing(n: number, R: number | undefined, y: number, size: number | undefined) {
   return itemsFrom(Array.from({ length: n }, (_, k) => { const a = k / n * Math.PI * 2; return { p: [Math.sin(a) * R, y, Math.cos(a) * R], yaw: a + Math.PI, h: size, rad: size * 0.5 }; }));
 }
 
 /** B.layers entry of a placement: reads through to what the default asset of its slot(s) built (meshes, info, ...). */
-export function layerFacade(slotsApi, ...ids) {
-  const pick = (k) => { for (const id of ids) { const inst = slotsApi.instanceOf(id); if (inst && k in inst) return inst[k]; } return undefined; };
+export function layerFacade(slotsApi, ...ids: string[]) {
+  const pick = (k: string | symbol) => { for (const id of ids) { const inst = slotsApi.instanceOf(id); if (inst && k in inst) return inst[k]; } return undefined; };
   return new Proxy({}, { get: (t, k) => (k in t ? t[k] : pick(k)), has: (t, k) => k in t || pick(k) !== undefined });
 }
 /** keep-out shape of a parts asset, in its own units: one sphere round every triangle (+ wind room), grouped in 4
@@ -91,7 +91,7 @@ export function shapeOfParts(parts, windShare = 0.04) {
   const pa = geo.attributes.position.array, ix = geo.index ? geo.index.array : null, nT = Math.floor((ix ? ix.length : pa.length / 3) / 3);
   const b = new THREE.Box3().setFromBufferAttribute(geo.attributes.position), y0 = b.min.y, y1 = b.max.y, NB = 4;
   const bands = Array.from({ length: NB }, () => []);
-  const vi = (t, k) => (ix ? ix[t * 3 + k] : t * 3 + k);
+  const vi = (t: number, k: number) => (ix ? ix[t * 3 + k] : t * 3 + k);
   for (let t = 0; t < nT; t++) {
     const v = [0, 1, 2].map((k) => [pa[vi(t, k) * 3], pa[vi(t, k) * 3 + 1], pa[vi(t, k) * 3 + 2]]);
     const c = [0, 1, 2].map((k) => (v[0][k] + v[1][k] + v[2][k]) / 3);
@@ -110,11 +110,11 @@ export function shapeOfParts(parts, windShare = 0.04) {
   };
 }
 /** a shape scaled by k (a foreign asset's shape in the slot's native units) */
-function scaleShape(sh, k) {
+function scaleShape(sh, k: number) {
   if (!sh || k === 1) return sh;
-  const t = (o) => ({ c: o.c.map((v) => v * k), r: o.r * k });
-  return { ...sh, bands: sh.bands.map((b) => ({ ...t(b), tris: b.tris.map(t) })), box: { min: sh.box.min.map((v) => v * k), max: sh.box.max.map((v) => v * k) },
-           maxRad: sh.maxRad * k, bottomVerts: sh.bottomVerts.map((v) => v.map((x) => x * k)) };
+  const t = (o) => ({ c: o.c.map((v: number) => v * k), r: o.r * k });
+  return { ...sh, bands: sh.bands.map((b) => ({ ...t(b), tris: b.tris.map(t) })), box: { min: sh.box.min.map((v: number) => v * k), max: sh.box.max.map((v: number) => v * k) },
+           maxRad: sh.maxRad * k, bottomVerts: sh.bottomVerts.map((v) => v.map((x: number) => x * k)) };
 }
 
 export function createSlots({ world, scene, env, colourFit = null, pack = "", file = null, choices = null, fileResetAt = 0, onChange = () => {} }: BuiltSlotsOptions) {
@@ -128,26 +128,26 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
   let pending = 0, keep = null;
   const waiters = [];
   const flush = () => { if (pending === 0) while (waiters.length) waiters.shift()(); };
-  const emit = (id) => { for (const f of listeners) { try { f(id); } catch (e) { console.warn("[slots] listener", e); } } };
+  const emit = (id: string) => { for (const f of listeners) { try { f(id); } catch (e) { console.warn("[slots] listener", e); } } };
   const ctx = { ...env, world, scene };
 
   // ---------------- the instancer (every parts asset, any slot) ----------------
   const _M = new THREE.Matrix4(), _Q = new THREE.Quaternion(), _P = new THREE.Vector3(), _S = new THREE.Vector3(), _Y = new THREE.Vector3(0, 1, 0);
   const nativeOf = (s, asset) => s.native || { h: asset.h, r: asset.r };
   /** a foreign asset's scale at the slot's native size (per item it is (h / native h) x this) */
-  const fitOf = (s, asset) => { const N = nativeOf(s, asset); return Math.min(N.h / asset.h, FIT_R * N.r / asset.r); };
+  const fitOf = (s, asset: { h: number; r: number; }) => { const N = nativeOf(s, asset); return Math.min(N.h / asset.h, FIT_R * N.r / asset.r); };
   const useNative = (asset, items) => !!(asset.native && items.m);
   const itemScale = (s, asset, items, i) => Math.max(1e-6, Math.min(items.h[i] / asset.h, FIT_R * items.rad[i] / asset.r));
   function instanceMatrices(s, asset, items, idx) {
     const out = new Float32Array(idx.length * 16), native = useNative(asset, items);
-    idx.forEach((i, j) => {
+    idx.forEach((i, j: number) => {
       if (native) { out.set(items.m.subarray(i * 16, i * 16 + 16), j * 16); return; }
       _Q.setFromAxisAngle(_Y, items.yaw[i]); _P.set(items.p[i * 3], items.p[i * 3 + 1], items.p[i * 3 + 2]); _S.setScalar(itemScale(s, asset, items, i));
       _M.compose(_P, _Q, _S).toArray(out as unknown as number[], j * 16);
     });
     return out;
   }
-  function groupsOf(items, cap) {   // [[g, idx[]]] in group order; a foreign asset draws at most `cap` of them
+  function groupsOf(items, cap: number) {   // [[g, idx[]]] in group order; a foreign asset draws at most `cap` of them
     const n = items.n, stride = cap && n > cap ? Math.ceil(n / cap) : 1, by = new Map();
     for (let i = 0; i < n; i += stride) { const g = items.grp ? items.grp[i] : 0; (by.get(g) || by.set(g, []).get(g)).push(i); }
     return [...by.entries()].sort((a, b) => a[0] - b[0]);
@@ -161,20 +161,20 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     const groups = groupsOf(items, native ? 0 : MAXN);
     const np = variants[0].length;
     const lod = asset.lod && s.lodM ? asset.lod : null;
-    const nameOf = (g, part, pi) => (s.meshName ? s.meshName(g, part, pi, np, asset) : `${s.layer}_s${g}${np > 1 ? "_" + pi : ""}`);
+    const nameOf = (g, part, pi: string | number) => (s.meshName ? s.meshName(g, part, pi, np, asset) : `${s.layer}_s${g}${np > 1 ? "_" + pi : ""}`);
     for (let pi = 0; pi < np; pi++) {          // parts outer, groups inner: a composite keeps its parts' draws together
       for (const [g, idx] of groups) {
         const parts = variants.length > 1 ? variants[native ? Math.min(g, variants.length - 1) : (g % variants.length)] : variants[0];
         const part = parts[pi]; if (!part) continue;
         const mats = instanceMatrices(s, asset, items, idx);
-        const mk = (geo, name) => {
+        const mk = (geo, name: string) => {
           let gg = geo;
           const own = native ? items.attrs : null;
           if (own || part.attrs) {   // per-instance attributes: the slot's own (placement data) or the asset's constants
             gg = geo.clone();
             for (const [nm, a] of Object.entries(own || {}) as [string, any][]) {
               const arr = new Float32Array(idx.length * a.size);
-              idx.forEach((i, j) => { for (let c = 0; c < a.size; c++) arr[j * a.size + c] = a.array[i * a.size + c]; });
+              idx.forEach((i: number, j: number) => { for (let c = 0; c < a.size; c++) arr[j * a.size + c] = a.array[i * a.size + c]; });
               gg.setAttribute(nm, new THREE.InstancedBufferAttribute(arr, a.size));
             }
             for (const [nm, [size, fill]] of Object.entries(part.attrs || {}) as [string, [number, any]][]) {
@@ -188,7 +188,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
           m.instanceMatrix.array.set(mats);
           if (items.col) {
             const c = new Float32Array(idx.length * 3);
-            idx.forEach((i, j) => { c[j * 3] = items.col[i * 3]; c[j * 3 + 1] = items.col[i * 3 + 1]; c[j * 3 + 2] = items.col[i * 3 + 2]; });
+            idx.forEach((i: number, j: number) => { c[j * 3] = items.col[i * 3]; c[j * 3 + 1] = items.col[i * 3 + 1]; c[j * 3 + 2] = items.col[i * 3 + 2]; });
             m.instanceColor = new THREE.InstancedBufferAttribute(c, 3);
           }
           m.name = name;
@@ -218,20 +218,20 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     }
     return { objects: parent ? [parent] : meshes.filter((m) => !m.parent), meshes, parent, instanced: true };
   }
-  function lodStep(s, eye, force) {
+  function lodStep(s, eye: { x: number; z: number; } | null, force: boolean) {
     const L = lodSets.get(s.id); if (!L || !eye) return;
     const near = s.lodM * 400, nearIdx = [], farIdx = []; let mask = "";
-    L.idx.forEach((i, j) => { const n = Math.hypot(L.items.p[i * 3] - eye.x, L.items.p[i * 3 + 2] - eye.z) < near; (n ? nearIdx : farIdx).push(j); mask += n ? "1" : "0"; });
+    L.idx.forEach((i: number, j) => { const n = Math.hypot(L.items.p[i * 3] - eye.x, L.items.p[i * 3 + 2] - eye.z) < near; (n ? nearIdx : farIdx).push(j); mask += n ? "1" : "0"; });
     if (!force && mask === L.mask) return;
     L.mask = mask;
     for (const [m, list] of [[L.near, nearIdx], [L.far, farIdx]]) {
-      list.forEach((src, j) => { m.instanceMatrix.array.set(L.mats.subarray(src * 16, src * 16 + 16), j * 16); m.instanceColor.setXYZ(j, L.cols[src * 3], L.cols[src * 3 + 1], L.cols[src * 3 + 2]); });
+      list.forEach((src: number, j: number) => { m.instanceMatrix.array.set(L.mats.subarray(src * 16, src * 16 + 16), j * 16); m.instanceColor.setXYZ(j, L.cols[src * 3], L.cols[src * 3 + 1], L.cols[src * 3 + 2]); });
       m.count = list.length; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
     }
     s.lodInfo = { near: nearIdx.length, far: farIdx.length };
   }
-  function buildSurface(s, asset) {   // a surface asset on a SURFACE slot: the slot's own outline triangles, the asset's material
-    const meshes = s.surface.pos.map((pos, k) => {
+  function buildSurface(s, asset: { surfaceMat: THREE.Material | THREE.Material[] | undefined; }) {   // a surface asset on a SURFACE slot: the slot's own outline triangles, the asset's material
+    const meshes = s.surface.pos.map((pos: Iterable<number>, k) => {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(pos instanceof Float32Array ? pos : Float32Array.from(pos), 3));
       g.computeVertexNormals();
@@ -242,7 +242,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     });
     return { objects: meshes, meshes, dispose() { for (const m of meshes) m.geometry.dispose(); } };
   }
-  function moveForeign(s, t) {   // a moving slot (gulls) carries ANY asset along its paths
+  function moveForeign(s, t: number) {   // a moving slot (gulls) carries ANY asset along its paths
     for (const m of s.inst.meshes) {
       for (let i = 0; i < m.count; i++) {
         const q = s.motion(t, i); if (!q) continue;
@@ -324,7 +324,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     if (s.inst?.place) { s.cur = items; s.inst.place(state, items); return; }   // a procedural asset re-lays itself out
     apply(s, s.asset, items);
   }
-  function update(camera, ms) {
+  function update(camera: { position: { x: number; z: number; }; }, ms: number) {
     const sc = world.scale.x || 1, eye = camera ? { x: camera.position.x / sc, z: camera.position.z / sc } : null;
     for (const s of slots.values()) {
       if (!s.inst) continue;
@@ -336,14 +336,14 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     if (tk) { tk.light?.dir?.copy?.(env.S.U.uSunDir.value); tk.tickUniforms?.(camera, ms / 1000); }
   }
 
-  async function bind(id, assetId) {
+  async function bind(id: string, assetId: string) {
     const s = slots.get(id); if (!s) throw new Error("no slot " + id);
     if (!assetId || assetId === "default") return reset(id);
     await bindNow(s, assetId);
     view.choices[id] = assetId; wanted.set(id, assetId); onChange(api.choices());
     return true;
   }
-  async function reset(id, { remember = true } = {}) {
+  async function reset(id: string | number, { remember = true } = {}) {
     const s = slots.get(id); if (!s) return false;
     wanted.delete(id);
     if (remember) view.choices[id] = "default";
@@ -356,7 +356,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     onChange(api.choices());
     for (const s of slots.values()) if (s.bound !== s.default) await bindNow(s, s.default);
   }
-  function setVisible(id, v) { const s = slots.get(id); if (!s) return; s.visible = !!v; for (const o of s.inst?.objects || []) o.visible = !!v; for (const m of s.inst?.meshes || []) m.visible = !!v; }
+  function setVisible(id, v: boolean) { const s = slots.get(id); if (!s) return; s.visible = !!v; for (const o of s.inst?.objects || []) o.visible = !!v; for (const m of s.inst?.meshes || []) m.visible = !!v; }
 
   const api = {
     env: ctx, pack, slots,
@@ -371,7 +371,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     meshesOf: (id) => slots.get(id)?.inst?.meshes || [],
     instanceOf: (id) => slots.get(id)?.inst || null,
     /** "change" listener: f(slotId) after every (re)build of a slot */
-    on: (f) => { listeners.add(f); return () => listeners.delete(f); },
+    on: (f: { (id: string): void; (id: string): void; }) => { listeners.add(f); return () => listeners.delete(f); },
     choices: () => ({ ...view.choices }),
     idle: () => (pending === 0 ? Promise.resolve() : new Promise((r) => waiters.push(r))),
     pending: () => pending,

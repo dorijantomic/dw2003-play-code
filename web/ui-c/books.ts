@@ -25,10 +25,10 @@ export const BOOK = Object.freeze({ titleDp: 26, titleLineDp: 36, tabDp: 20, tab
 const DIM = "var(--c-dim-label)";
 
 /** The game font's dim row (clut 7): inactive tabs, unknown species, "No picture", headings of the GLOSSARY pages. */
-export const isDimRun = (r) => (r.clut | 0) === 7;
+export const isDimRun = (r: { clut: number; }) => (r.clut | 0) === 7;
 
 /** The ◀ ▶ ▲ ▼ glyph runs as C triangles, centred on the glyph the game drew. */
-export function composeGlyphArrows(runs, used, out, prefix = "arrow") {
+export function composeGlyphArrows(runs, used: Set<unknown>, out, prefix = "arrow") {
     runs.forEach((r) => {
         const dir = TRIANGLE[String(r.text).trim()];
         if (!dir || used.has(r)) return;
@@ -38,15 +38,15 @@ export function composeGlyphArrows(runs, used, out, prefix = "arrow") {
 }
 
 /** The header plate with its title, tabs and L1 / R1 chips (see the file header). */
-export function composeBookHeader(p, runs, used, out) {
+export function composeBookHeader(p, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p), mid = r.y + r.h / 2;
     out.push(plate("book.header", "header", r, rel, { shape: "sl" }));
-    const mine = runs.filter((m) => !used.has(m) && !isCursorToken(m.text) && m.y + 4.5 >= r.y && m.y + 4.5 < r.y + r.h).sort((a, b) => a.x - b.x);
+    const mine = runs.filter((m) => !used.has(m) && !isCursorToken(m.text) && m.y + 4.5 >= r.y && m.y + 4.5 < r.y + r.h).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x);
     const isPage = (m) => PAGE_KEY.test(String(m.text).trim());
     // an L1 / R1 chip, centred on the game's word but kept inside x 318: a plate that reaches the screen edge bleeds to it
     const chipX = (m) => Math.min(m.x + Math.max(6, m.w ?? 8) / 2 - BOOK.chipW / 2, BOOK.chipMaxX - BOOK.chipW);
-    const startOf = (m) => (isPage(m) ? Math.min(m.x, chipX(m)) : m.x);
-    mine.forEach((m, k) => {
+    const startOf = (m: { x: number; }) => (isPage(m) ? Math.min(m.x, chipX(m)) : m.x);
+    mine.forEach((m, k: number) => {
         used.add(m);
         const key = `book.hdr${k}`, next = mine[k + 1] ? startOf(mine[k + 1]) : r.x + r.w, room = Math.max(8, next - m.x - 2), w = Math.max(6, m.w ?? 8);
         if (isPage(m)) {
@@ -75,7 +75,7 @@ export function composeBookHeader(p, runs, used, out) {
 /** One panel: a C window; a list when the cursor is in it (see the file header). `i` = the part's index (keys). */
 export function composeBookPanel(p, i, runs, used, out, cfg: BookOpts = {}) {
     const r = clipRect(p);
-    const inside = runs.filter((m) => !used.has(m) && runIn(m, r));
+    const inside = runs.filter((m: { x: number; y: number; }) => !used.has(m) && runIn(m, r));
     const cur = inside.find((m) => isCursorToken(m.text));
     if (cur && cfg.rows !== false) {
         inside.filter((m) => !isCursorToken(m.text) && m.x < cur.x - 0.5).forEach((m, k) => { used.add(m); out.push(runText(m, `win${i}.head${k}`, ID, { color: DIM })); });
@@ -91,9 +91,9 @@ export function composeBookPanel(p, i, runs, used, out, cfg: BookOpts = {}) {
 }
 
 /** A line of `w` native from (x0, y0) to (x1, y1) as a filled quad, in native units relative to (ox, oy). */
-export function linkQuad([x0, y0, x1, y1], ox, oy, w = BOOK.link) {
+export function linkQuad([x0, y0, x1, y1], ox: number, oy: number, w = BOOK.link) {
     const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, nx = (-dy / len) * (w / 2), ny = (dx / len) * (w / 2);
-    const f = (n) => +n.toFixed(3);
+    const f = (n: number) => +n.toFixed(3);
     return `M${f(x0 - ox + nx)} ${f(y0 - oy + ny)}L${f(x1 - ox + nx)} ${f(y1 - oy + ny)}L${f(x1 - ox - nx)} ${f(y1 - oy - ny)}L${f(x0 - ox - nx)} ${f(y0 - oy - ny)}Z`;
 }
 
@@ -124,7 +124,7 @@ export function composeMapNode(p, i, out) {
 export function composeBook({ parts, runs }, cfg: BookOpts = {}) {
     const out = [], used = new Set();
     if (cfg.dimClut) for (const r of runs) if (isDimRun(r) && !r.face) r.face = DIM;
-    const of = (n) => parts.filter((p) => p.part === n);
+    const of = (n: string) => parts.filter((p: { part: string; }) => p.part === n);
     const back = of("backdrop")[0];
     if (back) {
         out.push(stripes(back.x));

@@ -38,12 +38,12 @@ export const CODE_OK = 0;
 export const CODE_FILE_NOT_FOUND = 5;
 export const CODE_CARD_ERROR = 8;
 
-const plainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const intIn = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+const plainObject = (v: ArrayLike<unknown> | { [s: string]: unknown; } | null) => v !== null && typeof v === "object" && !Array.isArray(v);
+const intIn = (v, lo: number, hi: number) => Number.isInteger(v) && v >= lo && v <= hi;
 const OK = (empty = false) => ({
   ok: true, code: empty ? CODE_FILE_NOT_FOUND : CODE_OK, empty, why: "",
 });
-const BAD = (why) => ({ ok: false, code: CODE_CARD_ERROR, empty: false, why });
+const BAD = (why: string) => ({ ok: false, code: CODE_CARD_ERROR, empty: false, why });
 
 /**
  * The 0x26C4 image: a list of exactly IMAGE_SIZE byte values. The length is the
@@ -99,7 +99,7 @@ export function checkRecord(record) {
 }
 
 /** The store snapshot the slot restores: a plain object of raw string values. */
-function checkData(data) {
+function checkData(data: ArrayLike<unknown> | { [s: string]: unknown; }) {
   if (!plainObject(data)) return BAD("data is not an object");
   for (const [key, value] of Object.entries(data)) {
     if (typeof value !== "string") return BAD(`data.${key} is not a string`);
@@ -112,7 +112,7 @@ function checkData(data) {
  * code (0 success, 5 file not found, 8 card error). Empty is not damaged: an
  * entry that carries neither record nor image is the card's own "no data" row.
  */
-export function checkSlot(entry) {
+export function checkSlot(entry: { record: null | undefined; image: null | undefined; residentImageVersion: number; data: ArrayLike<unknown> | { [s: string]: unknown; }; } | null | undefined) {
   if (entry === null || entry === undefined) return OK(true);
   if (!plainObject(entry)) return BAD("entry is not an object");
   const hasRecord = entry.record !== null && entry.record !== undefined;

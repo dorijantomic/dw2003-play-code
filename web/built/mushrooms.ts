@@ -80,11 +80,11 @@ export function mushroomGeometry(THREE0 = THREE, segments = MUSH.SEGMENTS) {
   return g;
 }
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // ---------------- mushroom material: toon light + emission AFTER it, band-limited gills ----------------
-const f = (x) => x.toFixed(4);
+const f = (x: number | undefined) => x.toFixed(4);
 export function mushroomMaterial(S, col, uni) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith(uni),
@@ -258,7 +258,7 @@ export function buildMushrooms(slot, env) {
   // ---- one InstancedMesh for every stem (1 draw call) ----
   const geo = mushroomGeometry(THREE, MUSH.SEGMENTS);
   const phaseA = new Float32Array(stems.length), fadeA = new Float32Array(stems.length).fill(1);
-  stems.forEach((st, i) => { phaseA[i] = st.phase; });
+  stems.forEach((st: { phase: number; }, i: string | number) => { phaseA[i] = st.phase; });
   geo.setAttribute("aPhase", new THREE.InstancedBufferAttribute(phaseA, 1));
   const fadeAttr = new THREE.InstancedBufferAttribute(fadeA, 1);
   geo.setAttribute("aFade", fadeAttr);
@@ -269,7 +269,7 @@ export function buildMushrooms(slot, env) {
 
   const Y = new THREE.Vector3(0, 1, 0), AX = new THREE.Vector3();
   const Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), Ql = new THREE.Quaternion(), Pv = new THREE.Vector3(), Sv = new THREE.Vector3();
-  stems.forEach((st, i) => {
+  stems.forEach((st: { leanAz: number; yaw: number; lean: number; c: [number, number, number]; h: number; }, i: number) => {
     AX.set(Math.cos(st.leanAz), 0, -Math.sin(st.leanAz)).normalize();   // cross(Y, leanDir): tilts +Y toward it
     Q.setFromAxisAngle(Y, st.yaw);
     Ql.setFromAxisAngle(AX, st.lean).multiply(Q);
@@ -288,7 +288,7 @@ export function buildMushrooms(slot, env) {
   const halos = new THREE.InstancedMesh(haloGeo, haloMat, stems.length);
   halos.name = "builtMushroomHalos"; halos.userData.kind = "mushroom"; halos.frustumCulled = false;
   halos.renderOrder = 2;
-  stems.forEach((st, i) => {
+  stems.forEach((st: { c: number[]; h: number; }, i: number) => {
     halos.setMatrixAt(i, Mx.makeTranslation(st.c[0], st.h * 0.80, st.c[2]));
   });
   halos.instanceMatrix.needsUpdate = true;
@@ -301,7 +301,7 @@ export function buildMushrooms(slot, env) {
   const pools = new THREE.InstancedMesh(poolGeo, poolMat, clusters.length);
   pools.name = "builtMushroomPools"; pools.userData.kind = "mushroom"; pools.frustumCulled = false;
   pools.renderOrder = 1;
-  clusters.forEach((cl, i) => {
+  clusters.forEach((cl: { w: number; c: number[]; }, i: number) => {
     const R = MUSH.POOL_R * cl.w;
     pools.setMatrixAt(i, Mx.compose(Pv.set(cl.c[0], MUSH.POOL_Y, cl.c[2]), Q.identity(), Sv.set(R * 2, 1, R * 2)));
   });
@@ -327,7 +327,7 @@ export function buildMushrooms(slot, env) {
   // ---- per frame: pulse clock, the light mode, the near-eye fade, the point projection scale ----
   const eye = new THREE.Vector3();
   let glowMode = null;
-  function update(camera, timeMs) {
+  function update(camera, timeMs: number) {
     const t = (timeMs ?? performance.now()) / 1000;
     uni.uMusTime.value = t;
     const mode = S.light?.mode || "day";
@@ -344,7 +344,7 @@ export function buildMushrooms(slot, env) {
         // from 9 m out — which is where the fight camera's chords sit (10.9-22.5 m, mushrooms.md §1.4)
         cl.fade = smooth(MUSH.NEAR[0], MUSH.NEAR[1], d);
       }
-      stems.forEach((st, i) => { st.fade = clusters[st.cluster].fade; fadeA[i] = st.fade; });
+      stems.forEach((st: { fade: number; cluster: string | number; }, i: string | number) => { st.fade = clusters[st.cluster].fade; fadeA[i] = st.fade; });
       fadeAttr.needsUpdate = true;
     }
   }
@@ -357,7 +357,7 @@ export function buildMushrooms(slot, env) {
             y: [0, Math.max(...clusters.map((c) => c.cardH))] },
     cards: clusters.map((c) => ({ piece: c.piece, az: +c.az.toFixed(2), r: +c.r.toFixed(1), cardH: +c.cardH.toFixed(1),
                                   w: +c.w.toFixed(1), phase: +c.phase.toFixed(3),
-                                  heights: c.stems.map((s) => +s.h.toFixed(1)) })),
+                                  heights: c.stems.map((s: { h: number; }) => +s.h.toFixed(1)) })),
     values: MUSH, buildMs: Math.round(performance.now() - t0),
   };
   env.info && (env.info.mushrooms = info2);

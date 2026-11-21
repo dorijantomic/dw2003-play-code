@@ -47,7 +47,7 @@ export function makeRecords(B: BattleContext) {
 
     // FIGHTSTG_F0x8009ec94 scales the resolved species primary stats by the
     // encounter enemy-struct +0x0a halfword / 16. A value of 16 is identity.
-    const scaledEnemyStat = (name) => eStats
+    const scaledEnemyStat = (name: string) => eStats
       ? scaleEnemyStat(eStats[name], enemyStatScale)
       : scaledStat(enemyProf, name, enemyLevel);
     return {
@@ -95,9 +95,9 @@ export function makeRecords(B: BattleContext) {
     const partyIds = Array.isArray(state.party) && state.party.length
       ? state.party : (leadChar ? [leadChar] : []);
     if (!Array.isArray(state.partyStats) || state.partyStats.length !== partyIds.length)
-      state.partyStats = partyIds.map((_, i) => i === 0 ? state.partnerStats : null);
+      state.partyStats = partyIds.map((_, i: number) => i === 0 ? state.partnerStats : null);
     state.partyStats[0] = state.partnerStats;
-    return partyIds.map((charId, index) => {
+    return partyIds.map((charId: string | number, index: number) => {
       const rookieId = Number(CHARID_TO_DIGID[charId]);
       const rookie = B.digimonDB[rookieId];
       if (index > 0 && !state.partyStats[index])
@@ -252,7 +252,7 @@ export function makeRecords(B: BattleContext) {
   }
 /** Slot i's record: the active one is b.enemy; the others are built once (full hp) and kept, so a member that tagged
    *  out keeps its hp, mp and ailments. null for a slot the party does not have or whose species does not resolve. */
-  function enemyTeamRecord(b, i) {
+  function enemyTeamRecord(b, i: number) {
     if (i === b.partyIndex) return b.enemy;
     const entry = b.party?.[i];
     if (!entry) return null;
@@ -283,7 +283,7 @@ export function makeRecords(B: BattleContext) {
   function profileById(id) {
     return B.digimonDB?.[Number(id)] ?? null;
   }
-function profileByName(name) {
+function profileByName(name: string | number) {
     if (!B.digimonDB) return null;
     if (!B._profileByName) {
       B._profileByName = {};
@@ -315,7 +315,7 @@ function profileByName(name) {
     const rookie = B.digimonDB?.[rookieId];
     if (!rookie) return null;
     if (!Array.isArray(state.partyStats) || state.partyStats.length !== (state.party?.length ?? 1))
-      state.partyStats = (state.party ?? [charId]).map((_, i) => i === 0 ? state.partnerStats : null);
+      state.partyStats = (state.party ?? [charId]).map((_, i: number) => i === 0 ? state.partnerStats : null);
     if (rosterIndex > 0 && !state.partyStats[rosterIndex])
       state.partyStats[rosterIndex] = baseStatsFor(rookie);
     const stats = rosterIndex === 0 ? state.partnerStats : state.partyStats[rosterIndex];
@@ -327,7 +327,7 @@ function profileByName(name) {
   }
 function initializePartyStats(state) {
     if (!Array.isArray(state?.party) || !state.party.length) return false;
-    state.partyStats = state.party.map((charId) =>
+    state.partyStats = state.party.map((charId: string | number) =>
       baseStatsFor(B.digimonDB?.[Number(CHARID_TO_DIGID[charId])]),
     );
     state.partnerStats = state.partyStats[0];
@@ -335,7 +335,7 @@ function initializePartyStats(state) {
     localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
     return !!state.partnerStats;
   }
-function applyEvolution(toName, state = B.getState(), rosterIndex = 0) {
+function applyEvolution(toName: string | number, state = B.getState(), rosterIndex = 0) {
     const prof = profileByName(toName);
     const member = partyFormState(state, rosterIndex);
     const ps = member?.stats;
@@ -375,7 +375,7 @@ function applyEvolution(toName, state = B.getState(), rosterIndex = 0) {
     const level = ps.level ?? 1;
     const b = ps.bonuses ?? {};
     const st = ensureStoredStats(ps, B.digimonDB?.[CHARID_TO_DIGID[state?.party?.[0]]] ?? prof);
-    const stat = (k) => st[k] + (b[k] ?? 0);
+    const stat = (k: string) => st[k] + (b[k] ?? 0);
     // DV (form) level: derived from the current form's DVEXP bank (fn 0x800865c0).
     const formCap = prof.dv_cap ?? 100;
     const dvexp = ps.dvexpByForm?.[prof.id] ?? ps.dvexp ?? 0;
@@ -396,7 +396,7 @@ function applyEvolution(toName, state = B.getState(), rosterIndex = 0) {
     if (!member?.stats) return [];
     const out = [];
     const seen = new Set();
-    const add = (prof, entry) => {
+    const add = (prof, entry: { to: null; equipped: boolean; }) => {
       if (!prof || seen.has(prof.id) || out.length >= 3) return;
       seen.add(prof.id);
       out.push({ ...entry, to: prof.name, formId: prof.id });

@@ -240,7 +240,7 @@ export function createMenu(sfx = null) {
 
   // digimon.json is small and menu-only (battle.js keeps its own copy for battle
   // maths); fetch once, lazily, so party/status/techniques screens have real profiles.
-  let dataPromise = null;
+  let dataPromise: Promise<void> | null = null;
   m.ensureData = () => {
     if (!dataPromise) {
       dataPromise = fetch("assets/data/digimon.json").then((r) => r.json()).then((dj) => {
@@ -293,7 +293,7 @@ export function createMenu(sfx = null) {
       state.partyStats = state.party.map(() => null);
     }
     let changed = false;
-    state.party.forEach((charId, i) => {
+    state.party.forEach((charId: string | number, i: number) => {
       if (i === 0) return; // lead uses live partnerStats
       if (!state.partyStats[i]) {
         const prof = m.digimonDB?.[CHARID_TO_DIGID[charId]];
@@ -311,12 +311,12 @@ export function createMenu(sfx = null) {
 
   // The LIVE stat block behind roster index i (the roster view is a copy).
   // Index 0 is the battle-tracked lead; the rest have their own persisted slot.
-  function statBlock(state, i) {
+  function statBlock(state, i: number) {
     ensurePartyStats(state);
     return i === 0 ? state.partnerStats : state.partyStats?.[i];
   }
 
-  function persistStats(state, i) {
+  function persistStats(state, i: number) {
     if (i === 0) localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
     localStorage.setItem("partyStats", JSON.stringify(state.partyStats ?? []));
   }
@@ -357,7 +357,7 @@ export function createMenu(sfx = null) {
     if (!caster || !skill) { m.showFeedback("No technique."); return; }
 
     const idxs = target === null ? view.map((_, i) => i) : [target];
-    const blocks = idxs.map((i) => statBlock(state, i)).filter(Boolean);
+    const blocks = idxs.map((i: number) => statBlock(state, i)).filter(Boolean);
     // The scaling stat is read off the caster; HEAL_SCALE_STAT names which one
     // so a correction is a single edit in engine/dw3/field-techniques.ts.
     const scale = view[casterIdx]?.stats?.[HEAL_SCALE_STAT]
@@ -367,7 +367,7 @@ export function createMenu(sfx = null) {
     m.showFeedback(r.msg);
     if (!r.ok) { sfx?.play(failSound); return; }
     sfx?.play("recovery"); // 0x40014 — the applied-heal cue
-    idxs.forEach((i) => persistStats(state, i));
+    idxs.forEach((i: number) => persistStats(state, i));
     persistStats(state, casterIdx);
   };
 
@@ -563,7 +563,7 @@ export function createMenu(sfx = null) {
       // `do { ... } while (arg0->unk84 == temp)` loops in states 6 and 7.
       // The cues are the party-card pair: cursor 0x4001B (:21228, :21408),
       // confirm 0x4001C (:21249, :21429).
-      const step = (from, d) => {
+      const step = (from: number, d: number) => {
         let i = from;
         do { i = (i + d + n) % n; } while (m.sortPick != null && i === m.sortPick);
         return i;
@@ -776,7 +776,7 @@ export function createMenu(sfx = null) {
       };
       // The technique explanation: the panel slides 34px up, the footer plate
       // opens under it, and the highlighted slot's text and MP cost appear.
-      const openExplanation = (closeKey, backStep) => {
+      const openExplanation = (closeKey: string, backStep: string) => {
         m._foldClose(closeKey);
         m.detailStep = "closing";
         m._after([closeKey], () => m._slideStart(0, MS.UI.screens.see_digivolve.panel_slide?.to ?? -34));
@@ -907,7 +907,7 @@ export function createMenu(sfx = null) {
         const slots = m.dvBackStep === "dvaction" && target
           ? formTechSlots(statBlock(state, m.detailIdx), target.formId, m.digimonDB)
           : ownTechSlots(r?.profile);
-        const step = (from, d) => {
+        const step = (from: number, d: number) => {
           for (let i = from + d; i >= 0 && i < 6; i += d) if (slots[i] > 0) return i;
           return from;
         };
@@ -924,7 +924,7 @@ export function createMenu(sfx = null) {
 
     if (m.screen === "equip") {
       if (m._seq.length) return;   // a fold is running: the original reads no pad
-      const apply = (choice, slotKey) => {
+      const apply = (choice, slotKey: string | undefined) => {
         ensureEquipment(state);
         // Build the new slot map on a COPY, then hand both to the store's one
         // record writer: it moves the worn byte by the difference the record gained
@@ -1112,7 +1112,7 @@ export function createMenu(sfx = null) {
     // starts shutting. Ramp and pivot transform come from the shared fold
     // class; the SFX gate stays here because the sound belongs to the screen's
     // own behaviour, not to the tween's arithmetic.
-    const fold = (key, px, py, axis, fn) => {
+    const fold = (key: string, px: number, py: number, axis: string, fn: () => void) => {
       const a = m._anim[key];
       const tr = m._foldTr(key, px, py, axis);
       // A window that has finished SHUTTING is gone; one that has finished

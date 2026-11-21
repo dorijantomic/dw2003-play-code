@@ -119,7 +119,7 @@ export const TAG_PRESENTATION = Object.freeze({
 export function dnaClip12Chunks(segs, dna: BattleDnaPresentation) {
   if (!Array.isArray(segs) || segs.length !== 5) return null;
   const s2 = segs[2];
-  const cut = s2.findIndex((r) => r.op === 2 && (r.words?.[0] | 0) === 2 && (r.words?.[1] | 0) === 2);
+  const cut = s2.findIndex((r: { op: number; words: number[]; }) => r.op === 2 && (r.words?.[0] | 0) === 2 && (r.words?.[1] | 0) === 2);
   if (cut < 0) return null;
   // Runtime replay (2026-07-15, state-9, orbtrace/orb4 frames): each flight segment OPENS
   // with its parent model in close-up (op2 [1,slot] show + mode-3 teleport near the staging
@@ -165,7 +165,7 @@ export function dnaClip12Chunks(segs, dna: BattleDnaPresentation) {
 // (0x1F / 0x20) are page-gated, and then only behind bit 4 of [0x8004DF98](),
 // the same display counter the arrows blink on (FIGHTSTG_F0x80095E40,
 // fightstg.s:19786-19810; FIGHTSTG_F0x8009543C, :19136-19150).
-export function listPageHint(l1, r1) {
+export function listPageHint(l1: { x: number; y: number; }, r1: { x: number; y: number; }) {
   return Object.freeze({ kind: 3, clut: 2, l1: Object.freeze(l1), r1: Object.freeze(r1) });
 }
 
@@ -176,10 +176,10 @@ export function listPageHint(l1, r1) {
  * so those are final screen coordinates. The row art's cel components already
  * sit at (16, 109+19i) and (32, 106+19i).
  */
-export function commandLabelPos(index, C = BATTLE_UI_LAYOUT.commands) {
+export function commandLabelPos(index: number, C = BATTLE_UI_LAYOUT.commands) {
   return { x: C.boxX, y: C.y + (index | 0) * C.rowH };
 }
 
-export function normalizeDvGauge(value) {
+export function normalizeDvGauge(value: number) {
   return Math.min(DV_GAUGE_MAX, Math.max(0, Math.trunc(Number(value) || 0)));
 }

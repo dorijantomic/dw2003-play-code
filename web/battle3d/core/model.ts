@@ -13,12 +13,12 @@ import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeModel(B$: Battle3DContext) {
-function contactSoundTypeFor(techId) {
+function contactSoundTypeFor(techId: number) {
     const rec = techRecord(techId);
     if (!rec) return (techId >= 1 && techId <= 52) ? 30 : null;
     return (rec.effect === 0 && rec.clip === 5) ? 30 : rec.motion;
   }
-function loadProjMesh(id) {
+function loadProjMesh(id: number) {
     if (B$.projCache.has(id)) return;
     B$.projCache.set(id, "loading");
     fetch(`${B$.PROJ_BASE}/${id}.json`).then(r => (r.ok ? r.json() : null)).then(def => {
@@ -172,7 +172,7 @@ function freeSkelBufs(bufs) {
     actorTeardown({
       // The browser tears its actor down when it is replaced, which is the original's state 3.
       getState: () => ACTOR_TEARDOWN_STATE,
-      getResource: (off) => slots[ACTOR_RES_OFFSETS.indexOf(off)] ?? 0,
+      getResource: (off: number) => slots[ACTOR_RES_OFFSETS.indexOf(off)] ?? 0,
     }, (ptr) => {
       const i = slots.indexOf(ptr);
       if (i < 0) return;
@@ -189,7 +189,7 @@ function freeSkelBufs(bufs) {
     loadAssetImage(`assets/battle/textures/${folder}.png`).catch(() => null);
     return loadSkeletalModel(folder).then((m) => !!m);
   }
-function setPlayerDigimon(folder) {
+function setPlayerDigimon(folder: string | null | undefined) {
     if (folder === B$.playerFolder) return Promise.resolve(!!B$.playerModel);
     B$.playerFolder = folder;
     B$.playerPatches = null; B$.playerPage = null;
@@ -217,7 +217,7 @@ function setPlayerDigimon(folder) {
       return false;
     });
   }
-function setEnemyDigimon(folder) {
+function setEnemyDigimon(folder: string | null | undefined) {
     if (folder === B$.enemyFolder) return;
     B$.enemyFolder = folder;
     B$.enemyPatches = null; B$.enemyPage = null;
@@ -245,7 +245,7 @@ function setEnemyDigimon(folder) {
   // the original plays for a badly hurt Digimon. Every action script's trailing "return to base"
   // record and every action->idle return play this table, so setting it here is what makes the
   // hurt stance appear ONLY while the Digimon is actually hurt.
-  function setFighterBaseIdle(side, low) {
+  function setFighterBaseIdle(side: string, low) {
     const a = side === "enemy" ? B$.enemyAnim8r : B$.playerAnim8r;
     if (a) a.baseTable = low ? 1 : 0;
   }

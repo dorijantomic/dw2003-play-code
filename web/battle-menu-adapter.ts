@@ -28,7 +28,7 @@ export const BATTLE_QUEUE_LIMIT = 16;
  * with the original's seven-language range. Every battle screen resolves it the
  * same way; only the error's wording names the screen.
  */
-export function battleMenuLanguage(options, errorText) {
+export function battleMenuLanguage(options, errorText: string | undefined) {
     const state = options?.getState?.() ?? {};
     const selected = state.languageByte;
     const value = Number.isInteger(selected) ? selected : 2;
@@ -37,7 +37,7 @@ export function battleMenuLanguage(options, errorText) {
 }
 
 /** The 16bpp strip the marker blit copies from, as an opaque canvas. */
-export function stripCanvas(bytes, w, h) {
+export function stripCanvas(bytes: number[], w: number, h: number) {
     if (typeof document === "undefined") return null;
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -61,7 +61,7 @@ export function stripCanvas(bytes, w, h) {
  * strip is what the battle boot loader uploaded to VRAM; when no loader ran, the
  * identical bytes come from the data build.
  */
-export function paintStripMoves(ctx, state: BattleMenuAdapterState, moves) {
+export function paintStripMoves(ctx: CanvasRenderingContext2D, state: BattleMenuAdapterState, moves) {
     const info = state._data?.manifest?.strip;
     if (!info) return;
     const [vx, vy] = info.vram;
@@ -176,7 +176,7 @@ export function createBattleMenuAdapter(spec) {
         while (r._queue.length > queueLimit) r._queue.shift();
     };
 
-    function buttonsForTick(held) {
+    function buttonsForTick(held: Iterable<unknown> | null | undefined) {
         // A queued press becomes its own edge: one tick down, then one tick up, so
         // two presses never merge into one held stretch. The actor's first tick
         // builds the list, so presses wait until it reads the pad.

@@ -39,7 +39,7 @@ export function makeCounter(B: BattleContext) {
    * stays the EARLY commit, so every technique that has one still lands its page at the
    * strike.
    */
-  function armPendingImpact(b, commit) {
+  function armPendingImpact(b: { _pendingImpact: { (): void; (): void; } | null; }, commit: () => void) {
     // Whichever way the result lands — the contact or the end of the action — the
     // armed slot is cleared, so an early contact cannot leave a second commit pending.
     const armed = () => {
@@ -65,10 +65,10 @@ export function makeCounter(B: BattleContext) {
    * and the intermediates are capped so the victim is still standing for the strike
    * that carries the death reaction.
    */
-  function armContactDamage(target, total, dmgPerHit, attempts) {
+  function armContactDamage(target: { hp: number; }, total, dmgPerHit, attempts) {
     return contactDamager({
       total, perHit: dmgPerHit, hits: attempts, hp: target.hp,
-      pay: (amount) => { target.hp = Math.max(0, target.hp - amount); },
+      pay: (amount: number) => { target.hp = Math.max(0, target.hp - amount); },
     });
   }
 /**
@@ -78,7 +78,7 @@ export function makeCounter(B: BattleContext) {
    * the swing is queued: when the provoking action's animation is over the defender plays its own basic attack
    * toward the attacker, and the HP comes off at that attack's contact. `from` is the countering side.
    */
-  function queueCounter(b, from, { dmg, hit = true, techId }) {
+  function queueCounter(b, from: string, { dmg, hit = true, techId }) {
     b._counter = { from, dmg: Math.max(0, dmg | 0), hit, techId, phase: "wait", applied: false };
   }
 function applyCounter(b, c) {
@@ -98,7 +98,7 @@ function applyCounter(b, c) {
       const attack = c.from === "player" ? B.renderer3d?.playerAttack : B.renderer3d?.enemyAttack;
       const started = attack?.call(B.renderer3d, c.techId, {
         lethal: c.hit && c.dmg >= target.hp, miss: !c.hit,
-        onHit: (rec) => { if (rec.type === 99) applyCounter(b, c); },
+        onHit: (rec: { type: number; }) => { if (rec.type === 99) applyCounter(b, c); },
       });
       c.phase = "run";
       if (started) return true;              // the swing is playing; its contact lands the damage
@@ -130,7 +130,7 @@ function applyCounter(b, c) {
    * (.L0x80086e84-.L0x80086ea0) — the only battle-side boss-track play in the whole
    * game (sound-system.md 2026-07-03h).
    */
-  function noteFinalBossPhaseDamage(b) {
+  function noteFinalBossPhaseDamage(b: { _bossPhaseDone: boolean; _bossPhaseCount: number; specialMode: number; _battleTrack: string; }) {
     if (b._bossPhaseDone) return;
     // The wrapper's own kind gate: +0xda counts only while the head stands. The walker's
     // three call sites are the player's own landed damaging commits (basic, technique,
@@ -203,7 +203,7 @@ function applyCounter(b, c) {
   }
 // Our Digimon swings back (Counter Crest). The outcome is decided here, so the page can name it; the
   // swing itself is queued and plays after the enemy's blow (queueCounter), where the damage lands at its contact.
-  function triggerPlayerCounter(b, attacker, defender, damage, attackerName, defenderName) {
+  function triggerPlayerCounter(b, attacker, defender, damage: number, attackerName, defenderName) {
     if (!defender.counterCrest || defender.hp <= 0 || damage <= 0 ||
         !counterCrestProc(damage, defender.maxHp, RAND_U16)) return "";
     const basic = B.skillDB[defender.profile?.tech_basic];
@@ -240,7 +240,7 @@ function applyCounter(b, c) {
    * no row and never counters — never the 0x58-byte player profile's bytes at +0x42..+0x44,
    * which are growth fields (`phase2-rtarget.md` 2.2).
    */
-  function triggerEnemyCounterRow(b, attacker, defender, damage, attackerName, defenderName) {
+  function triggerEnemyCounterRow(b, attacker: { hp: number; }, defender, damage: number, attackerName, defenderName) {
     if (damage <= 0 || defender.hp <= 0) return "";
     // Gate 2 (fightstg.s:12433-12440, .L0x8008ef14-.L0x8008ef40): a Frozen defender whose Frozen roll
     // F0x800a19d8 returns non-zero starts no reaction. Gate 4: comparator 0 means NO counter, never "always".

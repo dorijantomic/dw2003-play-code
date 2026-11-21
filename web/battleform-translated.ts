@@ -45,7 +45,7 @@ function loadData() {
 export function createBattleFormTranslated(sfx = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
-            (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
+            (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
         sfx,
         options,
         load: () => loadData(),

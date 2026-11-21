@@ -16,6 +16,7 @@ import { itemForDropName } from "../../drop-item.js";
 import { battleMsgText } from "../../battlemsg-translated.js";
 import { winBattleRewards, paidParticipants } from "../progress.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { BattleEndContext } from "./types.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeLoad(B: BattleContext) {
@@ -76,10 +77,10 @@ async function loadFusionData() {
     };
   }
 // HP formula for wild enemies: calibrated so Apemon (str=128) at level 10 ≈ 360 HP.
-  function enemyHp(eStats, level) {
+  function enemyHp(eStats: { str: number; }, level: number) {
     return Math.max(30, Math.round(eStats.str * 2.5 + level * 5));
   }
-function enemyMp(eStats, level) {
+function enemyMp(eStats: { spt: number; }, level: number) {
     return Math.max(10, Math.round(eStats.spt * 1.5 + level * 3));
   }
 // Map charId → digimon id (matches packs.js charId values)
@@ -145,7 +146,7 @@ function enemyMp(eStats, level) {
   // has no per-enemy EXP rule, so a battle with no record pays 0 (winBattleRewards).
   // The divisor is the number of participants STILL STANDING at the outcome, which is
   // what stfgtrep's flagged-row count divides by (.L0x00002c68).
-  function winRewards(b, rosterIndex = b.activePlayerIndex ?? 0) {
+  function winRewards(b: BattleEndContext, rosterIndex = b.activePlayerIndex ?? 0) {
     return winBattleRewards({
       screenId: b.screenId,
       participants: Math.max(1, paidParticipants(b).length),

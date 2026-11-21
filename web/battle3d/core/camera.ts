@@ -23,6 +23,7 @@ import { createIdleDirector } from "../../fight/battle-idle-director.js";
 import { createBattleOpenCamera, setSlowMotion as engineSetSlowMotion } from "../../vendor/engine.js";
 import { authoredSide, mirrorCameraWords, mirrorPresetShot } from "../../fight/side-mirror.js";
 import type { BattleOpenCameraArgs, Battle3DContext, CameraModeOptions } from "../../types/battle3d.js";
+import type { ActorAnimator } from "../../fight/actor-animator.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeCamera(B$: Battle3DContext) {
@@ -51,7 +52,7 @@ export function makeCamera(B$: Battle3DContext) {
   // fighter's record before models->setId): near shot 10 of the incoming partner form, far shot 2 of the incoming
   // enemy. Until the swap `folder` is not the live model, so the record is read by its key; once swapped it is
   // the live model and cannedShotSlot answers (the fitted near table for a model without its own).
-  function entranceShot(side, folder, index) {
+  function entranceShot(side, folder: string | null | undefined, index) {
     const name = side ? "enemy" : "player";
     if (!folder || folder === (side ? B$.enemyFolder : B$.playerFolder)) return cannedShotSlot(name, index);
     const key = modelKeyFromFolder(folder);
@@ -146,7 +147,7 @@ function playerNearCamera() {
   }
 // The face-box shot for an enemy-only model on our side, fitted from Agumon's (null for a
   // partner, which reads its own record).
-  function fittedFaceShot(side) {
+  function fittedFaceShot(side: string | number) {
     playerNearCamera();
     return B$.fittedNearCam?.folder === B$.playerFolder ? B$.fittedNearCam.face?.[side] ?? null : null;
   }
@@ -157,7 +158,7 @@ function applyArenaShot() {
     B$.camRec.cut(fieldsFromShot(shot), { issuer: "battle" });
     return shot;
   }
-function setCameraMode(m, opts: CameraModeOptions = {}) {
+function setCameraMode(m: string, opts: CameraModeOptions = {}) {
     // Who owns the camera this frame. `scriptOwnsCamera` is the original's own arbitration: the
     // battle's camera director (F0x8008718c) re-publishes its own record through the cut [0xf8]
     // on every tick it runs (fightstg.s:5096-5105), so while a script's op5 owns the record the
@@ -217,7 +218,7 @@ function getCameraMode() { return B$.camMode; }
   // 0 = normal (raw delta), 1 = frozen, 2 = one animation unit per four accumulated,
   // 3 = double. Only the loss effect's phase 0 uses 2, and nothing on the loss path
   // lowers it again (F0x8008c93c's phase 3 would, but no writer of phase 3 was found).
-  function setSlowMotion(level) {
+  function setSlowMotion(level: number) {
     const lv = level | 0;
     B$.slowMoLevel = lv;
     B$.slowMoAcc = 0;
@@ -235,7 +236,7 @@ function getCameraMode() { return B$.camMode; }
   // Plus which clip each fighter is playing — the walker's motion id IS the timeline table
   // index and its `animId` is that plus one (F0x80083a54 plays directory member animId - 1).
   function getAnimationReadout() {
-    const side = (a) => (a ? {
+    const side = (a: ActorAnimator | null | undefined) => (a ? {
       clip: a._clip | 0,
       table: a.timelineTable,
       animId: a.animationId,
@@ -253,7 +254,7 @@ function getCameraMode() { return B$.camMode; }
       enemy: side(B$.enemyAnim8r),
     };
   }
-function setGameCamParam(k, v) { if (k in B$.gameCam) { B$.gameCam[k] = +v; return true; } return false; }
+function setGameCamParam(k: string, v: string | number) { if (k in B$.gameCam) { B$.gameCam[k] = +v; return true; } return false; }
 function getCameraInfo() { return B$.lastCamInfo ? { ...B$.lastCamInfo, params: { ...B$.gameCam } } : null; }
 function getFaceCamRect() { return B$.faceCamRect; }
 /** A presentation owns the screen: suppress the inset until it says otherwise. The
@@ -344,7 +345,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
   // the real canned camera shots read live from the game's fight camera-preset tables
   // (OP5_PRESETS above). Reaction clips issue these presets — the real game's "cut to the
   // struck Digimon as the hit lands".
-  function _camHookFor(side) {
+  function _camHookFor(side: string) {
     // An enemy-only species the player owns stands on the near side with scripts authored for a far-side attacker: its
     // camera operands name the OPPOSING fighter as "the near one", which from our side is itself (side-mirror.js).
     const standsNearEnemyAuthored = () => {
@@ -440,7 +441,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
   //
   // This readout is what the probes and __dnaDebug report as each fighter's clip-10 camera; the
   // attack path no longer installs it.
-  function _reactionCamFor(side) {
+  function _reactionCamFor(side: string) {
     const model = side === "enemy" ? B$.enemyModel : B$.playerModel;
     return reactionCamFromActions(model?.actions);
   }
@@ -453,7 +454,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
     const e = extra || {};
     return {
       ...e,
-      onHit: (rec) => {
+      onHit: (rec: { type: number; }) => {
         e.onHit?.(rec);
         if (rec.type === 99) B$.effectPlayer?.landProjectiles();   // bullet impact syncs with the cut
       },

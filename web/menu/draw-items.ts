@@ -48,7 +48,7 @@ import {
 import type { MenuState } from "./types.js";
 
 // ITEMS: "Which one?" category picker, then the 8x2 bag (F0x80092fac).
-export function _drawItems(ctx, state, m: MenuState, roster, t, fold = null) {
+export function _drawItems(ctx: CanvasRenderingContext2D, state, m: MenuState, roster, t: number, fold = null) {
   const I = MS.UI.screens.items;
   if (m.itemMode === "use_target") {
     _drawHeader(ctx, "Use it on who?", fold);
@@ -148,7 +148,7 @@ export function _drawItems(ctx, state, m: MenuState, roster, t, fold = null) {
 // footer plate with item desc + wield-slot line. Grey = native palette+0xb0.
 export const GREY = { color: "rgb(136,136,152)" };
 
-export function _drawEquip(ctx, state, m, p, t, fold) {
+export function _drawEquip(ctx: CanvasRenderingContext2D, state, m: MenuState, p, t: number, fold) {
   const E = MS.UI.screens.equip;
   const sh = MS.UI.screens.shared;
   const D = MS.UI.screens.detail;

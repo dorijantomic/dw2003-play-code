@@ -42,7 +42,7 @@ const PLACEMENTS: [string, string[] | null, string, boolean][] = [
   ["foliage", null, "./built/place/foliage.js", false],
 ];
 
-export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {}) {
+export async function createArenaBuilt(canvas: { width: number; height: number; }, pack, opts: ArenaBuiltOptions = {}) {
   const res = await fetch(`assets-hd/battle/built/${pack}.json`, { cache: "no-store" });
   if (!res.ok) return { missing: true, pack };
   const rec = await res.json();
@@ -73,7 +73,7 @@ export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {
   function keepOutChanged(k) {
     if (!k?.fighters?.length) return false;
     let changed = false;
-    const far = Math.max(...k.fighters.map((f) => Math.hypot(f.c[0], f.c[2])));
+    const far = Math.max(...k.fighters.map((f: { c: number[]; }) => Math.hypot(f.c[0], f.c[2])));
     if (ko.farthest == null || far > ko.farthest + 0.5) { ko.farthest = Math.max(far, ko.farthest ?? 0); changed = true; }
     for (const f of k.fighters) {
       const near = ko.fighters.find((g) => g.side === f.side && Math.hypot(g.c[0] - f.c[0], g.c[1] - f.c[1], g.c[2] - f.c[2]) < 100);
@@ -87,9 +87,9 @@ export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {
     return changed;
   }
   // a thing's keep-out spheres in the world: shape (slots.js shapeOfParts), position p, uniform scale s, yaw about +Y
-  function worldBands(sp, p, s, yaw) {
+  function worldBands(sp, p: number[], s: number, yaw: number) {
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
-    const tf = (o) => ({ c: [p[0] + s * (cs * o.c[0] + sn * o.c[2]), p[1] + s * o.c[1], p[2] + s * (-sn * o.c[0] + cs * o.c[2])], r: s * o.r });
+    const tf = (o: { c: number[]; r: number; }) => ({ c: [p[0] + s * (cs * o.c[0] + sn * o.c[2]), p[1] + s * o.c[1], p[2] + s * (-sn * o.c[0] + cs * o.c[2])], r: s * o.r });
     return sp.bands.map((b) => ({ ...tf(b), tris: b.tris.map(tf) }));
   }
   function rejectReason(bands) {
@@ -110,7 +110,7 @@ export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {
   const groundSlots = [];
   const groundMeshes = () => groundSlots.flatMap((id) => slots.meshesOf(id).filter((m) => m.isMesh && !m.userData?.notGround));
   const ray = new (THREE.Raycaster as any)(), down = new THREE.Vector3(0, -1, 0);
-  function groundHeight(x, z) {
+  function groundHeight(x: number | undefined, z: number | undefined) {
     ray.set(new THREE.Vector3(x, 1e5, z), down);
     const hit = ray.intersectObjects(groundMeshes(), false)[0];
     return hit ? hit.point.y : null;
@@ -125,12 +125,12 @@ export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {
     pieces: (kind) => rec.pieces.filter((p) => p.kind === kind),
     ko: { groundHeight, rejectReason, worldBands, state: ko },
     groundMeshes, addGround: (id) => groundSlots.push(id),
-    newGroup: (name) => { const g = new THREE.Group(); g.name = name; world.add(g); return g; },   // a parent for a placement's slots
+    newGroup: (name: string) => { const g = new THREE.Group(); g.name = name; world.add(g); return g; },   // a parent for a placement's slots
     layer: (id) => layers.find((l) => l.id === id) || null,
   };
   const layers = [], missing = [], plans: Record<string, any> = {};
   for (const [id, kinds, mod, extra] of PLACEMENTS) {
-    if (kinds && !rec.pieces.some((p) => kinds.includes(p.kind))) continue;
+    if (kinds && !rec.pieces.some((p: { kind: string; }) => kinds.includes(p.kind))) continue;
     try {
       const plan = await (await import(mod)).plan(pctx);
       if (!plan) continue;

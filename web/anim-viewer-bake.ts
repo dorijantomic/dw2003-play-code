@@ -31,18 +31,18 @@ const BAKE_FOLDER = /^(m\d{3}[a-z0-9]*)-(?:dw2|gen)([A-Z])\d*[a-z]?$/;
 /** The 5 bakes K21d wrote (BRIEF15's inputs) — the picker's fallback when no manifest is served. */
 export const K21D_BAKES = ["m009mera-dw2I", "m009mera-dw2K", "m050coca-dw2F", "m050coca-dw2G", "m050coca-dw2H"];
 
-export const isBakeFolder = (folder) => BAKE_FOLDER.test(String(folder || ""));
+export const isBakeFolder = (folder: string | undefined) => BAKE_FOLDER.test(String(folder || ""));
 /** `m050coca-dw2F` -> `m050coca` (null when the id is not a bake). */
-export function bakeRealFolder(id) {
+export function bakeRealFolder(id: string | undefined) {
   const m = BAKE_FOLDER.exec(String(id || ""));
   return m ? m[1] : null;
 }
 /** `m050coca-dw2F` -> `F` (null when the id is not a bake). */
-export function bakeLetter(id) {
+export function bakeLetter(id: string | undefined) {
   const m = BAKE_FOLDER.exec(String(id || ""));
   return m ? m[2] : null;
 }
-export const bakeUrl = (id, root = BAKE_ROOT) => `${root}/${id}.json`;
+export const bakeUrl = (id: string | undefined, root = BAKE_ROOT) => `${root}/${id}.json`;
 export const bakeIndexUrl = (root = BAKE_ROOT) => `${root}/index.json`;
 
 // ── the asset-URL rewrite (pure) ────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ export function mapBakeAssetUrl(url) {
 
 // A bake file is never inside `assets/` — it is served from the dw2-models mount, next to the page.
 // Keep the ORIGIN of the original URL (an absolute request must stay absolute) and drop the path.
-function bakePathPrefix(prefix) {
+function bakePathPrefix(prefix: string | undefined) {
   const abs = /^(https?:\/\/[^/]+)\//.exec(prefix || "");
   return abs ? `${abs[1]}/` : "";
 }
@@ -118,14 +118,14 @@ export function bakeRows(manifest) {
 }
 
 /** One row from the id alone (no numbers): what a deep link to an un-manifested bake still gets. */
-export function bakeStubRow(id) {
+export function bakeStubRow(id: string | undefined) {
   const folder = bakeRealFolder(id);
   if (!folder) return null;
   return { id, folder, letter: bakeLetter(id), table: null, clip: null, frames: null, stub: true };
 }
 
 /** The script that plays ONE timeline table through the actor's own ActionVM (op2 [0,0,table]). */
-export function bakeScript(table) {
+export function bakeScript(table: number | null) {
   return table == null
     ? { ops: [], overrun: false, buildKind: "bake" }
     : { ops: [{ op: 2, words: [0, 0, table | 0] }, { op: 255, words: [] }], overrun: false, buildKind: "bake" };
@@ -152,7 +152,7 @@ export function bakeActions(row, { group = "A/B: DW2 motion vs its own clip" } =
   return out;
 }
 
-const h = (v, d = 3) => (v == null || Number.isNaN(+v) ? null : +(+v).toFixed(d));
+const h = (v: string | number | null, d = 3) => (v == null || Number.isNaN(+v) ? null : +(+v).toFixed(d));
 
 /**
  * The K21d numbers for one bake, as [key, value, class] rows for the Info tab. Null entries are

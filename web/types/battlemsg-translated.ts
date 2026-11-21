@@ -3,5 +3,5 @@
 export interface BattleMsgBankFile {
   file: string;
   what: string;
-  promise?: Promise<any> | null;
+  promise?: Promise<unknown> | null;
 }

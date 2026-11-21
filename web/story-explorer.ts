@@ -25,15 +25,15 @@ const storage = (() => {
   try { return typeof window !== "undefined" ? window.localStorage : null; } catch { return null; }
 })();
 
-const storageGet = (key) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };
+const storageGet = (key: string) => { try { return storage?.getItem(key) ?? null; } catch { return null; } };
 
-function idFromKey(key) {
+function idFromKey(key: string) {
   if (/^0x[0-9a-f]+$/i.test(key)) return Number(key);
   if (/^\d+$/.test(key)) return Number(key);
   return null;
 }
 
-function popcount(byte) {
+function popcount(byte: number) {
   let n = 0;
   for (let v = byte; v; v >>= 1) n += v & 1;
   return n;
@@ -42,7 +42,7 @@ function popcount(byte) {
 /** Decode the two save strings the game keeps: engineFlags banks (base64 bitmaps) and `flags`
  *  (text markers plus, if a build ever left them, numeric ids). Pure: the tests drive it with
  *  a hand-built save. */
-export function decodeSave(engineFlagsRaw, flagsRaw) {
+export function decodeSave(engineFlagsRaw: string | null, flagsRaw: string | null) {
   const banks = new Map();
   let hasEngineFlags = false;
   let bitsSet = 0;
@@ -85,7 +85,7 @@ export function decodeSave(engineFlagsRaw, flagsRaw) {
 
 /** The stored-bit reader over a decoded save: `0 | 1` per id, never a guess. */
 export function makeReader(decoded) {
-  return (id) => {
+  return (id: number) => {
     if (decoded.numeric.has(id)) return decoded.numeric.get(id);
     const bank = (id >> 8) & 0xfe;
     const bit = id & 0x1ff;
@@ -102,12 +102,12 @@ let readBit = makeReader(save);
 
 /** The stored-bit reader over the saved banks, with numeric `flags` keys as an overlay. */
 const backend = {
-  get: (id) => readBit(id),
+  get: (id: number) => readBit(id),
   set() {}, // the page never writes a flag
 };
 
 // ── the manual values that are not flags ────────────────────────────────────────────────────
-const readNumber = (input) => {
+const readNumber = (input: { value: string; }) => {
   const text = input.value.trim();
   if (text === "") return null;
   const n = Number(text);
@@ -133,7 +133,7 @@ function rebuildStore() {
 const getCond = (id) => store.get(id);
 
 // ── data ────────────────────────────────────────────────────────────────────────────────────
-async function fetchJson(path) {
+async function fetchJson(path: string | URL | Request) {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return res.json();
@@ -148,7 +148,7 @@ const dialogueCache = new Map();
 
 const ui = { groupKey: null, recordId: null };
 
-function stageName(stage) {
+function stageName(stage: string) {
   const row = placeCard?.stages?.[stage];
   if (!row) return stage;
   const where = [row.area, row.place].filter(Boolean).join(" · ");
@@ -159,7 +159,7 @@ function playerName() {
   return storageGet("playerName") || "you";
 }
 
-function stripTags(raw) {
+function stripTags(raw: string) {
   return raw
     .replace(/\[player_name2?\]/gi, playerName())
     .replace(/\[name\]/gi, "\n")
@@ -167,7 +167,7 @@ function stripTags(raw) {
     .replace(/\[pause\]/gi, " ")
     .replace(/\[[a-z0-9_]+\]/gi, "")
     .split("\n")
-    .map((s) => s.trim())
+    .map((s: string) => s.trim())
     .filter(Boolean)
     .join("\n");
 }
@@ -199,7 +199,7 @@ function el(tag: string, className?: string, text?: any): any {
 }
 
 /** One gate list as spans, each marked unknown when the save cannot answer it. */
-function gateNode(list, empty) {
+function gateNode(list, empty: string) {
   const box = el("div", "gate");
   const conds = list ?? [];
   if (!conds.length) { box.append(el("span", "muted", empty)); return box; }
@@ -278,7 +278,7 @@ function renderCensus() {
   const records = scene.npcs ?? [];
   if (!records.length) { box.textContent = "this stage ships no NPC records"; return; }
   const census = stageCensus(records, currentChapter(), getCond);
-  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   box.append(el("div", null,
     `${count(census.records, "NPC record", "NPC records")} · ` +
     `${count(census.slots, "spawn slot", "spawn slots")} · ` +
@@ -382,7 +382,7 @@ function renderStates() {
   const box = $("states");
   box.replaceChildren();
   const group = groups.find((g) => g.key === ui.groupKey);
-  const record = group?.records.find((r) => r.id === ui.recordId);
+  const record = group?.records.find((r: { id: null; }) => r.id === ui.recordId);
   if (!record) {
     $("statesTitle").textContent = "Dialogue states";
     box.className = "muted";

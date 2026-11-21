@@ -27,7 +27,7 @@ import { ensureDw2Picks } from "./dw2-picks.js";
 import { isInstalledBuild } from "../ship-list.js";
 import type { Dw2FightCh1, Dw2FightCh2, Dw2Motion } from "./types.js";
 
-let override = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
+let override: boolean | null = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
 let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
 let castTypesPromise = null;
 
@@ -95,7 +95,7 @@ export async function ensureCastTypes() {
 }
 export function setCastTypes(json) { castTypes = json?.bySkill ? json : null; }
 /** The DW2 cast type (0/1/2) of a DW3 technique, or null when the table is not loaded. */
-export function castTypeFor(techId) {
+export function castTypeFor(techId: number | null) {
   if (!castTypes || techId == null) return null;
   const v = castTypes.bySkill?.[String(techId | 0)];
   return v == null ? null : (v | 0);
@@ -109,7 +109,7 @@ const TERM = 30000;
  * Returns { table, letter, kind } on success, null when the motion is unusable for this model
  * (no keys, or the table index is already taken by the model's own data).
  */
-export function applyMotion(model, letter, motion: Dw2Motion) {
+export function applyMotion(model, letter: string, motion: Dw2Motion) {
   if (!model || !motion || !motion.keys || !Object.keys(motion.keys).length) return null;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return null;
   if (!model.timeline) model.timeline = [];
@@ -157,7 +157,7 @@ function rootIndexOf(model, motion: Dw2Motion) {
 }
 
 /** Merge every motion the generated file marks `used` into the model. Idempotent per model. */
-export function applyDw2Motion(model, data) {
+export function applyDw2Motion(model, data: { motions: {}; }) {
   if (!model || !data || model.__dw2Applied) return model?.dw2Motion ?? null;
   const motions = data.motions || {};
   for (const letter of DW2_MOTION_LETTERS) {
@@ -192,7 +192,7 @@ export async function prepareDw2Motion(model) {
  * and the signature slot need it: they pick F/G/H by the technique's DW2 cast type, and the
  * signature slot takes the melee clip for a physical technique).
  */
-export function dw2MotionFor(model, clip, { tech = null, magical = false } = {}) {
+export function dw2MotionFor(model, clip: number | null, { tech = null, magical = false } = {}) {
   if (!dw2MotionEnabled() || !model?.dw2Motion || clip == null) return null;
   const row = DW2_CLIP_MAP[clip];
   if (!row) return null;
@@ -208,7 +208,7 @@ export function dw2SlotCount(model) {
   let n = 0;
   for (const slot of Object.keys(DW2_CLIP_MAP)) {
     const row = DW2_CLIP_MAP[slot];
-    if (row.letters.some((L) => model.dw2Motion[L])) n++;
+    if (row.letters.some((L: string | number) => model.dw2Motion[L])) n++;
   }
   return n;
 }

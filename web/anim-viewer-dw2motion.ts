@@ -43,7 +43,7 @@ export const slotLabel = (slot) => SLOT_LABELS[slot] || `clip ${slot}`;
 
 // ── the file, as rows ────────────────────────────────────────────────────────────────────────────
 /** True when the baked keys never change — the motion plays but holds one pose (a defect in the file). */
-export function motionIsStatic(m) {
+export function motionIsStatic(m: { keys: ArrayLike<unknown> | { [s: string]: unknown; }; ch1: ArrayLike<unknown> | { [s: string]: unknown; }; }) {
   if (!m?.keys || !Object.keys(m.keys).length) return true;
   let spread = 0;
   for (const rows of Object.values(m.keys)) {
@@ -68,7 +68,7 @@ export function motionIsStatic(m) {
 }
 
 /** The motions that fill `slot`: gate-passed, and the build says this slot is one of its gaps. */
-export function fillersFor(data, slot) {
+export function fillersFor(data, slot: number | undefined) {
   const row = DW2_CLIP_MAP[slot];
   if (!row || !row.letters.length) return [];
   if (data?.ownedSlots?.includes(slot) || !data?.gapSlots?.includes(slot)) return [];
@@ -83,7 +83,7 @@ export function fillersFor(data, slot) {
 }
 
 /** Why a gap slot has no DW2 motion: the gate keys the file's own numbers fail, or "not baked". */
-export function refusalFor(data, slot) {
+export function refusalFor(data, slot: number) {
   const row = DW2_CLIP_MAP[slot];
   if (!row || !row.letters.length) return [{ letter: null, keys: ["no donor motion for this clip kind"], notes: [] }];
   const kind = kindOfSlot(slot);
@@ -92,7 +92,7 @@ export function refusalFor(data, slot) {
     const m = data?.motions?.[letter];
     if (!m) { out.push({ letter, keys: ["not baked for this body"], notes: [] }); continue; }
     if (m.used) continue;
-    let keys = [], notes = [];
+    let keys = [], notes: string[] = [];
     try {
       const j = judgeNumbers(m.gate || {}, kind, { bars: WORLD_BARS[kind] || null });
       keys = j.keys || [];
@@ -110,7 +110,7 @@ export function refusalFor(data, slot) {
  *   "owned"   — the body plays its OWN clip here; DW2 never replaces an authored clip
  *   "none"    — clip 12 (the presentation actor's), or a slot with no donor motion at all
  */
-export function dw2Rows(data) {
+export function dw2Rows(data: { ownedSlots: number[]; gapSlots: number[]; }) {
   const rows = [];
   for (let slot = 0; slot <= 17; slot++) {
     if (slot === 12) { rows.push({ slot, status: "none", letters: [], refused: [], label: slotLabel(slot) }); continue; }
@@ -147,7 +147,7 @@ export function tableFor(tables, slot, letter, data) {
 
 // ── the hand picks (web/dw2-motion-picks.json; the game reads it through web/fight/dw2-picks.js) ──
 /** Every gate-passed DW2 motion for `slot`, owned slot or not (a hand pick may override ownership). */
-export function pickLetters(data, slot) {
+export function pickLetters(data, slot: number | undefined) {
   const row = DW2_CLIP_MAP[slot];
   if (!row || !row.letters.length) return [];
   const out = [];
@@ -159,7 +159,7 @@ export function pickLetters(data, slot) {
   return out;
 }
 /** One row per slot a pick can change: it has a DW2 motion. `rule` = what the automatic rule plays there. */
-export function pickRows(data) {
+export function pickRows(data: { ownedSlots: number[]; }) {
   const out = [];
   for (let slot = 0; slot <= 17; slot++) {
     if (slot === 12) continue;
@@ -184,15 +184,15 @@ export function freeTable(model, taken = new Set()) {
   return i;
 }
 
-function appendRows(rows, into) {
+function appendRows(rows, into: number[][] | undefined) {
   if (!Array.isArray(rows) || !rows.length) return into;
-  const own = (into ?? []).filter((r) => r[3] !== TERM).map((r) => r.slice());
+  const own = (into ?? []).filter((r: number[]) => r[3] !== TERM).map((r) => r.slice());
   const last = rows[rows.length - 1];
   return [...own, ...rows.map((r) => r.slice()), [last[0], last[1], last[2], TERM]];
 }
 
 /** Merge one motion into `model` in place, at `table`. Mirrors web/fight/dw2-motion.js's applyMotion. */
-export function mergeMotion(model, letter, motion: Dw2Motion, table) {
+export function mergeMotion(model, letter: string, motion: Dw2Motion, table: number | undefined) {
   if (!model || !motion?.keys || !Object.keys(motion.keys).length) return false;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return false;
   if (!Array.isArray(model.timeline)) model.timeline = [];
@@ -226,7 +226,7 @@ export function mergeMotion(model, letter, motion: Dw2Motion, table) {
  */
 export function buildClone(raw, data: Dw2SwapData) {
   const model = JSON.parse(JSON.stringify(raw || {}));
-  const tables = {}, failed = {}, filled = [], taken = new Set();
+  const tables = {}, failed = {}, filled: string[] = [], taken = new Set();
   if (!model || !data?.motions) return { model, tables, failed, filled };
   for (const [letter, m] of Object.entries(data.motions)) {
     if (!m?.used) { failed[letter] = { keys: refusalForLetter(data, letter) }; continue; }
@@ -240,7 +240,7 @@ export function buildClone(raw, data: Dw2SwapData) {
   return { model, tables, failed, filled };
 }
 
-function refusalForLetter(data, letter) {
+function refusalForLetter(data: Dw2SwapData, letter: string) {
   for (let slot = 0; slot <= 17; slot++) {
     for (const r of refusalFor(data, slot)) if (r.letter === letter && r.keys?.length) return r.keys;
   }
@@ -308,7 +308,7 @@ export function installDw2Fetch(store, target = globalThis) {
  * HEAD every folder's generated file and report the ones that exist. Bounded concurrency; a server
  * that refuses HEAD is retried with a ranged GET. Resolves to the number found.
  */
-export async function probeFolders(folders, onFound, { root = DW2_ROOT, concurrency = 6, fetchImpl = null, signal = null } = {}) {
+export async function probeFolders(folders, onFound: (arg0: unknown) => void, { root = DW2_ROOT, concurrency = 6, fetchImpl = null, signal = null } = {}) {
   const f = fetchImpl || (typeof fetch === "function" ? fetch : null);
   if (!f) return 0;
   const list = [...new Set((folders || []).filter(Boolean))];
@@ -495,7 +495,7 @@ export function renderDw2Panel(box, v) {
 
   // ── filled: clickable, one button per (slot), sub-buttons per cast letter
   const filledRow = h("div", { className: "actList", id: "dw2Fill" });
-  const filled = v.rows.filter((r) => r.status === "filled");
+  const filled = v.rows.filter((r: { status: string; }) => r.status === "filled");
   if (!filled.length) filledRow.append(h("span", { className: "dim" }, "no slot is filled on this body."));
   for (const r of filled) {
     const sel = v.played?.slot === r.slot;
@@ -512,7 +512,7 @@ export function renderDw2Panel(box, v) {
       for (const f of r.letters) {
         const s = h("button", { className: "dw2Letter" + (v.played?.slot === r.slot && v.played?.letter === f.letter ? " sel" : ""), type: "button", textContent: f.letter, title: `play the DW2 ${f.letter} motion (table ${f.table})` });
         s.dataset.letter = f.letter; s.dataset.slot = String(r.slot);
-        s.onclick = (e) => { e.stopPropagation(); v.onPlay(r.slot, f.letter); };
+        s.onclick = (e: { stopPropagation: () => void; }) => { e.stopPropagation(); v.onPlay(r.slot, f.letter); };
         b.append(s);
       }
     }
@@ -549,7 +549,7 @@ export function renderDw2Panel(box, v) {
   }
 
   // ── refused + owned, as compact lines
-  const refused = v.rows.filter((r) => r.status === "refused");
+  const refused = v.rows.filter((r: { status: string; }) => r.status === "refused");
   if (refused.length) {
     const line = h("div", { className: "rowline dim", id: "dw2Refused" }, h("span", {}, "gate refused: "));
     for (const r of refused) {
@@ -559,7 +559,7 @@ export function renderDw2Panel(box, v) {
     }
     box.append(line);
   }
-  const owned = v.rows.filter((r) => r.status === "owned");
+  const owned = v.rows.filter((r: { status: string; }) => r.status === "owned");
   if (owned.length) {
     box.append(h("div", { className: "rowline dim", id: "dw2Owned" },
       `owns its own clip, not replaced: ${owned.map((r) => `${r.slot} ${r.label}`).join(" · ")}`));

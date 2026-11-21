@@ -12,9 +12,9 @@ import {
     capAdd,
 } from "./bit-ledger.js";
 
-const $ = (id) => document.getElementById(id);
-const load = (url) => fetch(url).then((r) => (r.ok ? r.json() : null));
-const bit = (n) => Number(n).toLocaleString("en-US");
+const $ = (id: string) => document.getElementById(id);
+const load = (url: string | URL | Request) => fetch(url).then((r) => (r.ok ? r.json() : null));
+const bit = (n: number) => Number(n).toLocaleString("en-US");
 
 const [progression, grantFile, shopFile, innFile, effectFile] = await Promise.all([
     load("assets/data/progression.json"),

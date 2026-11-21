@@ -25,7 +25,7 @@ export const fetchBytes = async (path, label) => {
 };
 
 /** Fetch assets/data/<path> as JSON. `label` names the screen in the error. */
-export const fetchJson = async (path, label) => {
+export const fetchJson = async (path: string, label: string) => {
     const response = await fetch(`assets/data/${path}`);
     if (!response.ok) throw new Error(`${label} ${path}: ${response.status}`);
     return response.json();
@@ -54,7 +54,7 @@ export const loadResidentResources = () => {
 
 const fileCache = new Map();
 /** The bytes of dialogue-box/<file>.bin. Cached; a failure clears that file's entry. */
-export const loadDialogueFile = (file, label) => {
+export const loadDialogueFile = (file: string | undefined, label: string) => {
     const name = `dialogue-box/${file}.bin`;
     if (!fileCache.has(name)) fileCache.set(name, fetchBytes(name, label).catch((e) => { fileCache.delete(name); throw e; }));
     return fileCache.get(name);
@@ -75,7 +75,7 @@ const PROFILE_RECORDS = 0x37;
 const PROFILE_STRIDE = 0x58;
 let profilePromise = null;
 /** The 55 profile records, 0x58 bytes each, for every screen that shows a Digimon. Cached; a failure clears the cache. */
-export const loadProfileRecords = (label) => {
+export const loadProfileRecords = (label: string) => {
     profilePromise ??= fetchBytes("digimon_profiles.bin", label)
         .then((records) => {
             if (records.length !== PROFILE_RECORDS * PROFILE_STRIDE) {
@@ -88,7 +88,7 @@ export const loadProfileRecords = (label) => {
 };
 
 /** One entry of an ESDMG file (the cutscene SAY bank): [u32 entry offsets], each entry a [count][offsets] pack. */
-export const loadEsdmgEntry = async (file, entry, label) => {
+export const loadEsdmgEntry = async (file: string, entry: number | undefined, label: string) => {
     const data = await loadDialogueFile(file, label);
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const entries = view.getUint32(0, true) / 4;

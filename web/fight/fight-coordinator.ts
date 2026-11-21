@@ -17,6 +17,7 @@ import {
   dispatchSubordinateActor, SUBORDINATE_MODE_SINGLE, SUBORDINATE_MODE_MULTI_HIT,
 } from "../vendor/engine.js";
 import type { FightActionHooks } from "./types.js";
+import type { ActorAnimator } from "./actor-animator.js";
 
 // The actor/context fields FIGHTSTG_F0x8008b69c reads and writes (offsets off the attacker
 // action actor and its owner context). Kept as named constants so the port's inputs are the
@@ -34,11 +35,11 @@ const CONTEXT_CHILD = 0x3c;   // the owner's live subordinate child
 const PARENT = 0x100, CTX = 0x200, MODE_CELL = 0x300, CHILD = 0x400;
 
 /** A word memory backed by a Map, seeded with the parent actor's fields. */
-function dispatchMemory(w) {
+function dispatchMemory(w: Map<number, number>) {
   return {
-    read32: (a) => w.get(a) | 0,
-    read16s: (a) => { const v = w.get(a) | 0; return (v << 16) >> 16; },
-    write32: (a, v) => { w.set(a, v | 0); },
+    read32: (a: number) => w.get(a) | 0,
+    read16s: (a: number) => { const v = w.get(a) | 0; return (v << 16) >> 16; },
+    write32: (a: number, v: number) => { w.set(a, v | 0); },
   };
 }
 
@@ -66,7 +67,7 @@ export class FightCoordinator {
   // hooks = optional extra hooks merged onto the attacker (e.g. FX/sound onHit from battle.js).
   // `defenderHooks`: hooks threaded into the defender's REACTION script (reaction clips carry
   // their own op10[99] received-impact effect + op5 impact-camera presets — decode 2026-07-05).
-  attack(attacker, defender, techId, hooks: FightActionHooks = {}, { lethal = false, miss = false, defenderHooks = {} } = {}) {
+  attack(attacker: ActorAnimator, defender: ActorAnimator, techId: number, hooks: FightActionHooks = {}, { lethal = false, miss = false, defenderHooks = {} } = {}) {
     this._defender = defender;
     this._reacted = false;
 
@@ -85,7 +86,7 @@ export class FightCoordinator {
 
     // Run one op1 mode word through the ported handler and return the child action index it
     // selected (0 when the mode is a no-op).
-    const dispatch = (mode) => {
+    const dispatch = (mode: number) => {
       // The op1 handler reads the mode word at the parent's IP; the caller (here the
       // coordinator, standing in for the dispatcher) points the IP at the mode word for
       // this call, exactly as the dispatcher's own IP would point at the live opcode.
@@ -100,7 +101,7 @@ export class FightCoordinator {
       onHit: (rec) => {
         hooks.onHit?.(rec);
       },
-      onAuxAction: (rec) => {
+      onAuxAction: (rec: { mode: number; }) => {
         hooks.onAuxAction?.(rec);
         const mode = rec.mode | 0;
         if (mode === SUBORDINATE_MODE_MULTI_HIT) {

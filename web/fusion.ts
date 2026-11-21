@@ -51,7 +51,7 @@ export function blendStats(...rows) {
  * `max(10, round(spt * 1.5 + level * 3))` web/battle.js's enemyMp uses. Kept here so the
  * fused record needs no battle closure.
  */
-function enemyMpFor(row, level) {
+function enemyMpFor(row, level: number) {
   const spt = Number(row?.spt ?? 0) || 0;
   const lv = Number(level ?? 1) || 1;
   return Math.max(10, Math.round(spt * 1.5 + lv * 3));
@@ -211,7 +211,7 @@ export function enemyDisplayName(en) {
  * same line the HUD plate reads), else the enemy table's species key. The numbered
  * records (Goburimon2, Cardmon3, ...) carry the plain species line on the disc.
  */
-export function enemyMessageName(en, record, nameBank, fallback = "") {
+export function enemyMessageName(en, record: { nameId: number | null; }, nameBank, fallback = "") {
   if (en?.displayName != null) return String(en.displayName);
   const line = record?.nameId == null ? null : nameBank?.[record.nameId | 0];
   if (typeof line === "string" && line !== "") return line;
@@ -225,7 +225,7 @@ export function enemyMessageName(en, record, nameBank, fallback = "") {
  * nothing authored, so the battle's skill table is exactly today's. Keys stay the
  * technique ids the battle already indexes by.
  */
-export function mergeFusionSkills(skillDB, skills, fxOn = false) {
+export function mergeFusionSkills(skillDB, skills: ArrayLike<unknown> | { [s: string]: unknown; }, fxOn = false) {
   if (!fxOn || !skills) return skillDB;
   const rows = Array.isArray(skills) ? skills : Object.values(skills);
   if (!rows.length) return skillDB;
@@ -254,7 +254,7 @@ interface LabBossRecord { id: string; hp?: any; moves?: any[]; model?: string }
 export function labBossValid(rec) {
   return !!rec && typeof rec === "object"
     && typeof rec.id === "string" && rec.id !== ""
-    && Array.isArray(rec.halves) && rec.halves.length >= 1 && rec.halves.every((h) => typeof h === "string" && h !== "")
+    && Array.isArray(rec.halves) && rec.halves.length >= 1 && rec.halves.every((h: string) => typeof h === "string" && h !== "")
     && typeof rec.body === "string" && rec.body !== ""
     && typeof rec.modelFolder === "string" && LAB_MODEL_RE.test(rec.modelFolder)
     && Number(rec.hp) > 0 && Array.isArray(rec.moves) && rec.moves.length === 3;
@@ -264,7 +264,7 @@ export function labBossValid(rec) {
  * Add the Lab bosses to the authored table. An authored id is never replaced, a record
  * that is not valid is skipped. `table` is returned as it is when nothing is added.
  */
-export function mergeLabBosses(table, lab) {
+export function mergeLabBosses(table, lab: { bosses: { [s: string]: LabBossRecord; } | ArrayLike<LabBossRecord>; }) {
   const rows = (lab?.bosses && typeof lab.bosses === "object" ? Object.values(lab.bosses) : []) as LabBossRecord[];
   const good = rows.filter(labBossValid);
   if (!good.length) return table;

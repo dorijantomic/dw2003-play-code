@@ -103,7 +103,7 @@ export function battleStatusEventAdvance(b, playerSpd) {
       const amount = enginePoisonTimelineDamage(
         target.maxHp, target.ailments.poison?.power ?? 0, fields.water, fields.poisonResistance);
       target.hp = Math.max(0, target.hp - amount);
-      const entry = pool.find((e) => e.code === 0x09
+      const entry = pool.find((e: { code: number; side: number; slot: number; }) => e.code === 0x09
         && (e.side | 0) === (expiry.side | 0) && (e.slot | 0) === (expiry.slot | 0));
       if (entry) entry.time = 1000;
       b._poisonTick = { combatant: target, amount };
@@ -123,7 +123,7 @@ export function battleStatusEventAdvance(b, playerSpd) {
 }
 
 /** The combatant a pool entry names, or null when the walker's one-per-side model has none. */
-function battleAilmentTarget(b, side, slot) {
+function battleAilmentTarget(b, side: number, slot: number) {
   void slot;
   if ((side | 0) < 1) return b?.player ?? null;
   return b?.enemy ?? null;
@@ -144,7 +144,7 @@ function poisonDefenceFieldsOf(c) {
  * Every line here is the record offset the arm's instruction stream writes; which arm
  * writes what is `category5Plan`'s decision, not this function's.
  */
-export function applyCategory5Plan(b, plan, ctx) {
+export function applyCategory5Plan(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, plan, ctx) {
   const { playerRec, targetRec, targets } = ctx;
   // Each change names ITS OWN slot: the party arm writes every living record of the side
   // (`.L0x800903f4`'s walk, `:13857 addiu $s1, 0x1` / `:13858 slti $v0, $s1, 0x3`), so a
@@ -298,7 +298,7 @@ export function applyPostHitDispatch(b, record, options: PostHitDispatchOptions 
  * units on the PLAYER's active slot, the flee bit (+0x1c bit 0x10) is set, and the page is esmfight[0x44]
  * "Can't run away!". The pool's expiry clears the bit (wfightmn.s:2925-2948). `options.rng` is a 16-bit draw.
  */
-function applyFleeLockDispatch(b, record, options: PostHitDispatchOptions = {}) {
+function applyFleeLockDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, record: { f8: number; }, options: PostHitDispatchOptions = {}) {
   const rng = options.rng ?? RAND_U16;
   if (!damageTermFleeLockRoll(record?.f8 | 0, rng)) return { dispatch: 13, landed: false, page: null };
   const slot = activeSlotOf(b, 0);

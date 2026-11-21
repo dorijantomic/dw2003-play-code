@@ -39,7 +39,7 @@ export function _mapMove(m: MenuState, C, dx, dy) {
   }
 }
 
-export function _stepHeldLists(m: MenuState, state, sfx) {
+export function _stepHeldLists(m: MenuState, state, sfx: { play: (arg0: string) => void; } | null) {
   const keys = state.keys;
   if (!keys) return;
   const vsync = 1 / VSYNC;
@@ -112,7 +112,7 @@ function _stepMapHeld(m: MenuState, C, state) {
   }
 }
 
-export function _drawMapPane(ctx, state, m: MenuState, t, sfx = null) {
+export function _drawMapPane(ctx: CanvasRenderingContext2D, state, m: MenuState, t: number, sfx = null) {
   const M = MS.UI.screens.map;
   const C = M.cursor;
   // walker map id -> {ps1, server, loc} (composed through screen_table).
@@ -191,7 +191,7 @@ export function _drawMapPane(ctx, state, m: MenuState, t, sfx = null) {
     const bottom = m.mapHoverY < 0x78;
     drawClip(ctx, ststat, HV.window.clip, 0, bottom ? HV.window.y_bottom : HV.window.y_top);
     const name = M.location_names[server ? "amaterasu" : "asuka"][hov.loc] ?? "";
-    name.split("\\n").forEach((line, i) =>
+    name.split("\\n").forEach((line, i: number) =>
       drawText(ctx, line, HV.text.x, (bottom ? HV.text.y_bottom : HV.text.y_top) + i * 11));
   }
 }
@@ -204,7 +204,7 @@ export function _drawMapPane(ctx, state, m: MenuState, t, sfx = null) {
 // slots; the species' own list is NOT what the original reads). A Digimon that
 // knows none gets the real "Hasn't learned a technique." line, not a blank
 // window.
-export function _drawTechniques(ctx, rows, m, t) {
+export function _drawTechniques(ctx: CanvasRenderingContext2D, rows, m: MenuState, t: number) {
   const T = MS.UI.screens.techniques;
   // The window RESIZES with the row count: F0x800946bc picks its clip from the
   // 0x8009a950 table indexed by (rows - 1), so one to five heals get five
@@ -219,7 +219,7 @@ export function _drawTechniques(ctx, rows, m, t) {
     drawText(ctx, "a technique.", T.menu_rows.x, T.menu_rows.y_base + T.menu_rows.pitch);
     return;
   }
-  rows.forEach((techId, i) => {
+  rows.forEach((techId: string | number, i: number) => {
     const skill = m.skillDB?.[techId];
     const y = T.menu_rows.y_base + i * T.menu_rows.pitch;
     if (i === m.techCursor) drawCursor(ctx, t * VSYNC, T.cursor_x, y, gold);

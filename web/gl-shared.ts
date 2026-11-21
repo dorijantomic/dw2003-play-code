@@ -15,7 +15,7 @@ let failed = false;
 let factory = null;     // tests only
 
 /** The shared renderer sized w x h (device px), or null (no WebGL / lost). */
-export function getSharedRenderer(w, h) {
+export function getSharedRenderer(w: number, h: number) {
     if (lost || failed) return null;
     if (!renderer) {
         try {

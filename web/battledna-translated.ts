@@ -93,7 +93,7 @@ function loadData(language) {
 export function createBattleDnaTranslated(sfx = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
-            (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
+            (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
         sfx,
         options,
         state: { _answer: null, _species: null, _language: 2 },
@@ -135,7 +135,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
             })),
         }),
 
-        onOpen: (r) => {
+        onOpen: (r: { _answer: null; _species: null; _ticks: number; }) => {
             r._answer = null;
             r._species = null;
             r._ticks = 0;
@@ -178,8 +178,8 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
         },
 
         // The pane keeps reading the pad after its confirm, until it is done.
-        canQueue: (r, session) => !!session && session.step() !== "done",
-        done: (session) => session.step() === "done",
+        canQueue: (r, session: { step: () => string; }) => !!session && session.step() !== "done",
+        done: (session: { step: () => string; }) => session.step() === "done",
         paintTarget: (r) => (r._session.step() === "pane" ? r._session.pane : r._session.list),
 
         /**

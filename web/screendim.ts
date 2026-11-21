@@ -28,10 +28,10 @@
 
 import { noteBackdropBlend } from "./battle-layer.js";
 
-let layerCanvas = null;   // the dim shape, on black
-let minCanvas = null;     // min(screen, dim)
+let layerCanvas: HTMLCanvasElement | null = null;   // the dim shape, on black
+let minCanvas: HTMLCanvasElement | null = null;     // min(screen, dim)
 
-function scratch(w, h) {
+function scratch(w: number, h: number) {
   if (!layerCanvas || layerCanvas.width !== w || layerCanvas.height !== h) {
     layerCanvas = document.createElement("canvas");
     minCanvas = document.createElement("canvas");
@@ -52,7 +52,7 @@ function scratch(w, h) {
  * caller's transform. Anything it leaves black subtracts nothing, so a shape
  * may be painted without masking the rest of the screen.
  */
-export function subtractLayer(ctx, x, y, w, h, paintLayer) {
+export function subtractLayer(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, paintLayer) {
   if (w <= 0 || h <= 0) return;
   noteBackdropBlend();   // it reads the canvas under it (web/battle-layer.js)
   if (typeof document === "undefined") { paintLayer(ctx, w, h); return; }
@@ -105,7 +105,7 @@ export function subtractLayer(ctx, x, y, w, h, paintLayer) {
  * context to the painter, so the same call records this style and a test can
  * read the level back out of it.
  */
-export function dimFillStyle(level) {
+export function dimFillStyle(level: number) {
   const k = Math.max(0, Math.min(255, Math.round(level)));
   return `rgb(${k},${k},${k})`;
 }
@@ -115,7 +115,7 @@ export function dimFillStyle(level) {
  * 0..255, the published high byte of the ramp. `w` and `h` are the caller's own
  * coordinates — a screen passes its native 320 by 240.
  */
-export function paintScreenDim(ctx, level, w, h) {
+export function paintScreenDim(ctx: CanvasRenderingContext2D, level: number, w: number, h: number) {
   const k = Math.max(0, Math.min(255, Math.round(level)));
   if (k <= 0) return;
   if (k >= 255) {
@@ -130,7 +130,7 @@ export function paintScreenDim(ctx, level, w, h) {
     ctx.restore();
     return;
   }
-  subtractLayer(ctx, 0, 0, w, h, (layer) => {
+  subtractLayer(ctx, 0, 0, w, h, (layer: { fillStyle: string; fillRect: (arg0: number, arg1: number, arg2: number, arg3: number) => void; }) => {
     layer.fillStyle = dimFillStyle(k);
     layer.fillRect(0, 0, w, h);
   });
@@ -146,7 +146,7 @@ export function paintScreenDim(ctx, level, w, h) {
  * hardware's corner interpolation: that is an approximation of the shading, not
  * of the geometry and not of the subtraction.
  */
-export function paintTitleVignette(ctx, level, centre, edges, edgeLevel, w, h) {
+export function paintTitleVignette(ctx: CanvasRenderingContext2D, level: number, centre, edges, edgeLevel: number, w: number, h: number) {
   const k = Math.max(0, Math.min(255, Math.round(level)));
   if (k <= 0) return;
   const outer = Math.max(0, Math.min(255, Math.round(edgeLevel)));

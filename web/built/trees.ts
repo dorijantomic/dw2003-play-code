@@ -64,10 +64,10 @@ const SIDES = 12, ROWS = 22, LOBES = 5, LOBE_AMP = 0.16, NORMAL_SOFT = 0.5;
 const JAG = 0.20;        // PICKED: leafy broken outline - each ring vertex's radius is pushed +-JAG by a seeded hash, alternate sides in/out (USER: smooth sticks on poles)
 export const GUST = 0.25;   // the shared ring gust depth (board: amp *= 1 + 0.25 x ring)
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 /** crown radius (m) at height y (m) of a tree with shape S and height H; 0 above the top. */
-export function crownRadius(S, H, y) {
+export function crownRadius(S: { cb: number; tm: number; Rm: number; b0: number; p: number; trunk: number; }, H: number, y: number) {
   if (y < 0 || y > H) return 0;
   let r = 0;
   if (y >= S.cb) {
@@ -78,13 +78,13 @@ export function crownRadius(S, H, y) {
 }
 
 // ---- cypress geometry: height 1, base at the origin, radius in units of the reference height ----
-export function cypressGeometry(THREE, S, Href, seed) {
+export function cypressGeometry(THREE, S, Href: number, seed: number) {
   const R = rng(seed), ph = Array.from({ length: 4 }, () => R() * Math.PI * 2);
-  const k = 1 / Href, cb = S.cb * k, pos = [], nor = [], hgt = [], kind = [], idx = [];
-  const prof = (t) => crownRadius(S, Href, cb * Href + t * (Href - S.cb)) * k;   // t 0..1 up the crown
+  const k = 1 / Href, cb = S.cb * k, pos = [], nor = [], hgt = [], kind: number[] = [], idx = [];
+  const prof = (t: number) => crownRadius(S, Href, cb * Href + t * (Href - S.cb)) * k;   // t 0..1 up the crown
   // rows: denser toward the top (the taper), t = 1 - (1 - s)^1.4
   const ts = Array.from({ length: ROWS + 1 }, (_, i) => 1 - Math.pow(1 - i / ROWS, 1.4));
-  const ring = (y, rr, t, lobed) => {
+  const ring = (y: number, rr: number | undefined, t: number, lobed: boolean) => {
     const base = pos.length / 3;
     for (let s = 0; s <= SIDES; s++) {
       const sm = s % SIDES, a = sm / SIDES * Math.PI * 2;
@@ -271,12 +271,12 @@ export const FAR = {
 };
 
 /** One pine, height 1 (y 0..1), crown radius PINE.RM, base at the origin. kind 0 = needle limb, 1 = bark. */
-export function pineGeometry(THREE, seed) {
+export function pineGeometry(THREE, seed: number) {
   const Rn = rng(seed);
-  const pos = [], aUV = [], aH = [], aK = [], idx = [];
-  const V = (p, u, v, h, k) => { pos.push(p[0], p[1], p[2]); aUV.push(u, v); aH.push(h); aK.push(k); return pos.length / 3 - 1; };
+  const pos = [], aUV: number[] = [], aH: number[] = [], aK: number[] = [], idx = [];
+  const V = (p, u: number, v: number, h: number, k: number) => { pos.push(p[0], p[1], p[2]); aUV.push(u, v); aH.push(h); aK.push(k); return pos.length / 3 - 1; };
   const lean = [(Rn() - 0.5) * 0.03, (Rn() - 0.5) * 0.03];
-  const ctr = (y) => [lean[0] * y * y, lean[1] * y * y];
+  const ctr = (y: number) => [lean[0] * y * y, lean[1] * y * y];
   // trunk: 5 rings x 6 sides, tapered, flared at the foot, leaning a little
   { const ys = [0, 0.1, 0.35, 0.65, 0.97], SIDES = 6, base = [];
     for (const [i, y] of ys.entries()) {
@@ -287,23 +287,23 @@ export function pineGeometry(THREE, seed) {
     }
     for (let i = 0; i < base.length - 1; i++) for (let s = 0; s < SIDES; s++) idx.push(base[i] + s, base[i] + s + 1, base[i + 1] + s + 1, base[i] + s, base[i + 1] + s + 1, base[i + 1] + s);
   }
-  const add = (a, b, c) => [a[0] + b[0] * c, a[1] + b[1] * c, a[2] + b[2] * c];
-  const norm = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const add = (a, b: number[], c: number) => [a[0] + b[0] * c, a[1] + b[1] * c, a[2] + b[2] * c];
+  const norm = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   // a flat-diamond ring: corners +side, +up, -side, -up. v = across (1 at the side corners, 0 on the ridge / keel)
-  const ring = (c, s, u, w, th, uu, h) => [
+  const ring = (c, s: number[] | undefined, u: number[] | undefined, w: number, th: number, uu: number, h: number) => [
     V(add(c, s, w), uu, 1, h, 0), V(add(c, u, th), uu, 0, h, 0), V(add(c, s, -w), uu, -1, h, 0), V(add(c, u, -th), uu, 0, h, 0)];
   const join = (A, B) => { for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; idx.push(A[i], A[j], B[j], A[i], B[j], B[i]); } };
-  const cap = (A, tip) => { for (let i = 0; i < 4; i++) idx.push(A[i], A[(i + 1) % 4], tip); };
-  const limb = (t, az, reach, k) => {
+  const cap = (A, tip: number) => { for (let i = 0; i < 4; i++) idx.push(A[i], A[(i + 1) % 4], tip); };
+  const limb = (t: number, az: number, reach: number, k: number) => {
     const o = [Math.sin(az), 0, Math.cos(az)], L = reach / 0.8;
     const c0 = ctr(t), P0 = [c0[0] + o[0] * 0.004, t, c0[1] + o[2] * 0.004];
     const e0 = -0.12 + 0.57 * k + (Rn() - 0.5) * 0.12, e1 = e0 - (0.30 - 0.15 * k) - Rn() * 0.1, e2 = e1 + 0.5;
-    const dir = (e) => [Math.cos(e) * o[0], Math.sin(e), Math.cos(e) * o[2]];
+    const dir = (e: number) => [Math.cos(e) * o[0], Math.sin(e), Math.cos(e) * o[2]];
     const P1 = add(P0, dir(e0), 0.5 * L), P2 = add(P1, dir(e1), 0.5 * L), A = add(P2, dir(e2), 0.22 * L);
     P2[1] = Math.max(P2[1], 0.02); A[1] = Math.max(A[1], 0.012);   // no needle under the ground
     const w = 0.21 * L, th = 0.3 * w;
-    const side = norm(cross([0, 1, 0], o)), frame = (d) => { const s = norm(cross(d, [0, 1, 0]).every((x) => Math.abs(x) < 1e-6) ? side : cross([0, 1, 0], d)); return [s, norm(cross(d, s))]; };
+    const side = norm(cross([0, 1, 0], o)), frame = (d: number[]) => { const s = norm(cross(d, [0, 1, 0]).every((x) => Math.abs(x) < 1e-6) ? side : cross([0, 1, 0], d)); return [s, norm(cross(d, s))]; };
     const d0 = norm([P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]]), d1 = norm([P2[0] - P0[0], P2[1] - P0[1], P2[2] - P0[2]]), d2 = norm([A[0] - P1[0], A[1] - P1[1], A[2] - P1[2]]);
     const [s0, u0] = frame(d0), [s1, u1] = frame(d1), [s2, u2] = frame(d2);
     const r0 = ring(P0, s0, u0, 0.35 * w, 0.35 * th, 0.0, t), r1 = ring(P1, s1, u1, w, th, 0.42, t), r2 = ring(P2, s2, u2, 0.55 * w, 0.6 * th, 0.78, t);
@@ -342,7 +342,7 @@ export function pineGeometry(THREE, seed) {
 }
 
 export function pineMaterial(THREE, S, greens) {
-  const v3 = (c) => { const q = S.srgb(c); return new THREE.Vector3(q.r, q.g, q.b); };
+  const v3 = (c: number[]) => { const q = S.srgb(c); return new THREE.Vector3(q.r, q.g, q.b); };
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({
       uPineLo: { value: v3(greens.lo) }, uPineMid: { value: v3(greens.mid) }, uPineHi: { value: v3(greens.hi) },
@@ -408,7 +408,7 @@ export function shrubSpecies(THREE, S, c) {
     // the cards round the low clumps reach under the floor: lift the shrub so its lowest vertex is 0.01 below y 0
     // and scale it to height 1 (the instance scale is then the shrub height in metres x 400)
     let lo = Infinity, hi = -Infinity; for (let i = 1; i < part.pos.length; i += 3) { lo = Math.min(lo, part.pos[i]); hi = Math.max(hi, part.pos[i]); }
-    const k = 1 / (hi - lo), sh = (x, i) => (i % 3 === 1 ? (x - lo) * k - 0.01 : x * k);
+    const k = 1 / (hi - lo), sh = (x: number, i: number) => (i % 3 === 1 ? (x - lo) * k - 0.01 : x * k);
     part.pos = part.pos.map(sh);
     part.clump = part.clump.map((x, i) => (i % 4 === 1 ? (x - lo) * k - 0.01 : x * k));
     for (const q of clumps) { q.c = q.c.map((x, i) => (i === 1 ? (x - lo) * k - 0.01 : x * k)); q.R *= k; }
@@ -425,7 +425,7 @@ export function cypressCols(S, colours) {
   return { bottom: lin(colours.bottom || colours.all), top: lin(colours.top || colours.all), tip: lin(colours.p90 || colours.all), mid: lin(colours.green || colours.all) };
 }
 /** the asset parts of the ring's slots (registry mod.cypress_wall / mod.cypress_grove / mod.shrub / mod.far_pines) */
-export function cypressAsset(THREE, S, which, colours) {
+export function cypressAsset(THREE, S, which: string, colours) {
   const sh = which === "wall" ? WALL : GROVE, Href = sh.H0 + sh.HR / 2;
   return { geo: cypressGeometry(THREE, sh, Href, which === "wall" ? 31 : 47), mat: cypressMaterial(THREE, S, cypressCols(S, colours)) };
 }

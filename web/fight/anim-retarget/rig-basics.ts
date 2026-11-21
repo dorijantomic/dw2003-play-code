@@ -1,7 +1,7 @@
 import type { K16Rig, RigBasicsModel, RigSampleOut } from "./types.js";
 export const TAU = (Math.PI * 2) / 4096;
 
-export function sample(ch, frame) {
+export function sample(ch, frame: number) {
   if (!ch || !ch.length) return [0, 0, 0];
   let lo = ch[0], hi = ch[0];
   for (const rec of ch) {
@@ -13,7 +13,7 @@ export function sample(ch, frame) {
   return [lo[0] + t * (hi[0] - lo[0]), lo[1] + t * (hi[1] - lo[1]), lo[2] + t * (hi[2] - lo[2])];
 }
 
-function mat3Mul(a, b) {
+function mat3Mul(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
     let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + r] * b[c * 3 + k];
@@ -22,7 +22,7 @@ function mat3Mul(a, b) {
   return o;
 }
 
-function ps1Mat3(ax, ay, az) {
+function ps1Mat3(ax: number, ay: number, az: number) {
   const cx = Math.cos(ax * TAU), sx = Math.sin(ax * TAU);
   const cy = Math.cos(ay * TAU), sy = Math.sin(ay * TAU);
   const cz = Math.cos(az * TAU), sz = Math.sin(az * TAU);
@@ -32,7 +32,7 @@ function ps1Mat3(ax, ay, az) {
   return mat3Mul(Rz, mat3Mul(Ry, Rx));
 }
 
-function compose(a, b) {
+function compose(a: number[], b) {
   const o = new Array(9).fill(0);
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
     let s = 0; for (let k = 0; k < 3; k++) s += a[k * 3 + j] * b[i * 3 + k];
@@ -41,7 +41,7 @@ function compose(a, b) {
   return o;
 }
 
-function applyRot(R, v) {
+function applyRot(R: number[], v) {
   return [R[0] * v[0] + R[3] * v[1] + R[6] * v[2],
           R[1] * v[0] + R[4] * v[1] + R[7] * v[2],
           R[2] * v[0] + R[5] * v[1] + R[8] * v[2]];
@@ -51,7 +51,7 @@ function applyRot(R, v) {
 export function restPose(model, frame = 0) {
   const n = model.num_bones ?? model.bones.length;
   const rot = new Array(n).fill(null), pos = new Array(n).fill(null);
-  const proc = (i) => {
+  const proc = (i: number) => {
     const b = model.bones[i], anim = b.anim || {};
     const c2 = sample(anim.ch2, frame), c1 = sample(anim.ch1, frame);
     const R = ps1Mat3(c2[2], c2[1], c2[0]);
@@ -66,7 +66,7 @@ export function restPose(model, frame = 0) {
   return { rot, pos };
 }
 
-function meshBox(model, i, pose) {
+function meshBox(model, i: number, pose) {
   const b = model.bones[i], vs = b.verts || [];
   if (!vs.length) return null;
   const R = pose.rot[i], t = pose.pos[i];
@@ -211,11 +211,11 @@ export function rolesOf(model, { limbRoots = false } = {}) {
  */
 export function normaliseRoots(rig: K16Rig, model) {
   const n = rig.n ?? model.num_bones ?? model.bones.length;
-  const parentOf = (i) => { const p = (model.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
+  const parentOf = (i: number) => { const p = (model.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
   let roots = (rig.roots ?? []).filter((i) => i >= 0 && i < n).slice();
   if (!roots.length) { for (let i = 0; i < n; i++) if (parentOf(i) < 0) roots.push(i); }
   if (!roots.length) roots = [0];
-  const under = (bone, root) => {
+  const under = (bone: number | undefined, root: number) => {
     let i = bone;
     for (let step = 0; step <= n && i >= 0; step++) { if (i === root) return true; i = parentOf(i); }
     return false;
@@ -324,19 +324,19 @@ export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {
   for (const o of src.ops) {
     if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tableIdx.push(o.words[2] | 0);
   }
-  const table = src.ops.find((o) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
+  const table = src.ops.find((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
   if (!table) return null;
   const srcTable = source.timeline?.[table]?.table;
   if (!Array.isArray(srcTable) || !srcTable.length) return null;
   const model = {
     ...target,
-    bones: target.bones.map((b, i) => {
+    bones: target.bones.map((b, i: string | number) => {
       const m = map[i];
       const srcBone = m >= 0 ? source.bones[m] : null;
       const ch2 = srcBone?.anim?.ch2;
       if (!ch2 || !ch2.length) return { ...b, anim: { ...(b.anim || {}) } };
       // keep the target's own keys (its other clips use them), then append the donor keys past `offset`
-      const own = (b.anim?.ch2 ?? []).filter((r) => r[3] !== 30000).map((r) => r.slice());
+      const own = (b.anim?.ch2 ?? []).filter((r: number[]) => r[3] !== 30000).map((r) => r.slice());
       const moved = [];
       for (const r of ch2) {
         if (r[3] === 30000) continue;

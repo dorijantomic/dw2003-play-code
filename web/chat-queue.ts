@@ -18,7 +18,7 @@ export function createChatQueue({ gap = 650, now = () => performance.now(), send
     let nextAt = -Infinity;             // when the next line may leave; the first one never waits
     const waiting = [];                 // { text, meta }, oldest first
 
-    const push = (text, meta) => {
+    const push = (text: string, meta) => {
         const t = now();
         if (t >= nextAt) {
             if (send(text, meta) === false) return false;    // refused: not sent, not queued, not counted

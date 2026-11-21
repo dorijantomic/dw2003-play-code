@@ -31,7 +31,7 @@ import { weaponSecondary, weaponCritByte, WEAPON_LADDER_BY_ID } from "./vendor/e
  * for drain. Instant KO carries no value byte (it is always 0), so it prints
  * only the proc.
  */
-function statusLine(kind, proc, value) {
+function statusLine(kind: string, proc: number, value: number) {
     if (kind === "ko") return `On hit: instant KO (${proc}/128)`;
     if (kind === "drain") return `On hit: drain (${proc}/128, ratio ${value}/128)`;
     return `On hit: ${kind} (${proc}/128, magnitude ${value})`;
@@ -43,7 +43,7 @@ function statusLine(kind, proc, value) {
  * byte is 0 (ShockHorn) says "none" rather than disappearing, so the footer
  * still tells the player why that horn is special.
  */
-export function weaponEffectLine(weaponId) {
+export function weaponEffectLine(weaponId: string | number | null) {
     if (weaponId == null) return null;
     if (!WEAPON_LADDER_BY_ID[weaponId]) return null;   // an ordinary item: no third line
     const secondary = weaponSecondary(weaponId);

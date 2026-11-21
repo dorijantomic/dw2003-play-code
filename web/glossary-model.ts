@@ -12,7 +12,7 @@ export function createGlossaryModel({ count }) {
         top = Math.max(0, Math.min(top, Math.max(0, last + 1 - VISIBLE)));
     };
     const changed = () => { line = 0; shown = 0; };
-    const go = (to) => {
+    const go = (to: number) => {
         const t = Math.max(0, Math.min(last, to));
         if (t === index || count <= 0) return false;
         index = t; settle(); changed();
@@ -20,17 +20,17 @@ export function createGlossaryModel({ count }) {
     };
     return {
         index: () => index, top: () => top, page: () => page, line: () => line,
-        move: (d) => go(index + d),
-        jump: (d) => go(index + d),
-        setPage(p, allowed = true) { if (p === page || (p === 1 && !allowed)) return false; page = p; changed(); return true; },
-        scrollLine(d, lineCount) {
+        move: (d: number) => go(index + d),
+        jump: (d: number) => go(index + d),
+        setPage(p: number, allowed = true) { if (p === page || (p === 1 && !allowed)) return false; page = p; changed(); return true; },
+        scrollLine(d: number, lineCount: number) {
             const t = Math.max(0, Math.min(Math.max(0, lineCount - 1), line + d));
             if (t === line) return false;
             line = t;
             return true;
         },
         resetCard: changed,
-        reveal: (total) => Math.min(total, Math.floor(shown / REVEAL_EVERY)),
+        reveal: (total: number) => Math.min(total, Math.floor(shown / REVEAL_EVERY)),
         tickReveal() { shown++; },
     };
 }

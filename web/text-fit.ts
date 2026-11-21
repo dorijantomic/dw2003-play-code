@@ -5,7 +5,7 @@
 // right edge; the font is proportional, so a character count is wrong in both directions.
 
 /** Longest start of `text` that fits `maxW` px, cut at a word end when one fits (never an ellipsis: the pause font has none). */
-export function fitByWidth(text, widthOf, maxW) {
+export function fitByWidth(text: string, widthOf, maxW: number) {
     const s = String(text ?? "").trim();
     if (widthOf(s) <= maxW) return s;
     const words = s.split(/\s+/);
@@ -22,7 +22,7 @@ export function fitByWidth(text, widthOf, maxW) {
 }
 
 /** `text` broken into lines no wider than `maxW` px, on spaces. A word wider than the box gets a line of its own, cut to fit. */
-export function wrapByWidth(text, widthOf, maxW) {
+export function wrapByWidth(text: string, widthOf, maxW: number) {
     const out = [];
     let line = "";
     for (const word of String(text ?? "").split(/\s+/).filter(Boolean)) {
@@ -39,7 +39,7 @@ export function wrapByWidth(text, widthOf, maxW) {
 export const BAND_TEXT_W = 280;
 
 /** `text` as at most `n` lines of `maxW` px (the help box has two): wrapped, and only if it still needs more is the last line cut. */
-export function wrapToLines(text, widthOf, maxW, n = 2) {
+export function wrapToLines(text: string, widthOf, maxW: number, n = 2) {
     const lines = wrapByWidth(text, widthOf, maxW);
     if (lines.length <= n) return lines;
     return [...lines.slice(0, n - 1), fitByWidth(lines.slice(n - 1).join(" "), widthOf, maxW)];

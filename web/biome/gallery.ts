@@ -34,10 +34,10 @@ controls.target.set(0, 1.8, 0); controls.enableDamping = true; controls.dampingF
 
 const state = { tab: "forest", mode: "grid", page: 0, cat: "All", PAGE: 12, busy: false, spin: true, anime: false } as BiomeGalleryState;   // anime = "Use anime set" (Biome mode, default OFF)
 let animeInfo = null;
-let scene = new THREE.Scene(), biome = null, gridItems = [], frameNo = 0, gridFloor = null;
+let scene = new THREE.Scene(), biome = null, gridItems = [], frameNo = 0, gridFloor: { visible: boolean; } | null = null;
 const made = new Map();     // entry id -> { obj, stats, error }
 const buildStats = {};      // "tab/mode" -> {ms, ...}
-const log = (...a) => { $("log").textContent = a.join(" "); };
+const log = (...a: string[]) => { $("log").textContent = a.join(" "); };
 const stoneMat = toonMat({ color: 0x8c9199 }, { shadeK: 0.7, rim: 0.1 });
 const padGeo = new THREE.CylinderGeometry(1.5, 1.65, 0.28, 44);
 
@@ -56,7 +56,7 @@ async function realise(e) {
 
 // ------------------------------------------------------------------ grid
 function clearScene() { scene.traverse((o) => { if (o.parent && o.userData.tmp) o.parent.remove(o); }); }
-function baseScene(tabKey, fog) {
+function baseScene(tabKey: string, fog: boolean) {
   const t = TABS[tabKey], sc = new THREE.Scene();
   const sky = skyDome({ zenith: t.sky.zenith, mid: t.sky.mid, horizon: t.sky.horizon, clouds: fog });   // clouds only in biome mode
   sc.add(sky); sc.userData.sky = sky;
@@ -64,7 +64,7 @@ function baseScene(tabKey, fog) {
 }
 async function showGrid() {
   state.busy = true;
-  const t = TABS[state.tab], list = t.entries.filter((e) => state.cat === "All" || e.cat === state.cat);
+  const t = TABS[state.tab], list = t.entries.filter((e: { cat: string; }) => state.cat === "All" || e.cat === state.cat);
   const pages = Math.max(1, Math.ceil(list.length / state.PAGE)); state.page = Math.min(state.page, pages - 1);
   const slice = list.slice(state.page * state.PAGE, state.page * state.PAGE + state.PAGE);
   scene = baseScene(state.tab, false); scene.fog = null;
@@ -142,7 +142,7 @@ $("next").addEventListener("click", () => { state.page++; setView(); });
 
 // ------------------------------------------------------------------ detail view: one grid object alone, close up
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), box3 = new THREE.Box3(), corner = new THREE.Vector3();
-function pickGrid(clientX, clientY) {
+function pickGrid(clientX: number, clientY: number) {
   const r = renderer.domElement.getBoundingClientRect(), px = clientX - r.left, py = clientY - r.top;
   ndc.set((px / r.width) * 2 - 1, -(py / r.height) * 2 + 1); camera.updateMatrixWorld();
   try {
@@ -193,7 +193,7 @@ function exitDetail() {
 }
 let down = null;
 renderer.domElement.addEventListener("pointerdown", (ev) => { down = ev.button === 0 ? { x: ev.clientX, y: ev.clientY, t: performance.now() } : null; });
-renderer.domElement.addEventListener("pointerup", (ev) => {
+renderer.domElement.addEventListener("pointerup", (ev: { button: number; clientX: number; clientY: number; }) => {
   const d = down; down = null;
   if (!d || ev.button !== 0 || state.detail || state.mode !== "grid") return;
   if (Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 5 || performance.now() - d.t > 500) return;   // a drag (orbit) is not a click
@@ -204,8 +204,8 @@ window.addEventListener("keydown", (ev) => { if (ev.key === "Escape") exitDetail
 
 // ------------------------------------------------------------------ loop
 const tmpV = new THREE.Vector3();
-let lastT = performance.now(), hudAcc = 0, finishMode = false, finishMs = [];
-function frame(now) {
+let lastT = performance.now(), hudAcc = 0, finishMode = false, finishMs: number[] = [];
+function frame(now: number) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
   controls.update();
@@ -233,7 +233,7 @@ function hud() {
 
 // ------------------------------------------------------------------ test API (tools/verify_biome_gallery.mjs)
 const VIEWS = [
-  (t) => { camera.position.set(0, t.view[1] + 2.2, t.view[0]); controls.target.set(0, t.view[1] * 0.7, 0); },
+  (t: { view: number[]; }) => { camera.position.set(0, t.view[1] + 2.2, t.view[0]); controls.target.set(0, t.view[1] * 0.7, 0); },
   (t) => { camera.position.set(9, 1.5, -8); controls.target.set(-6, 3.5, 12); },
   (t) => { camera.position.set(-24, 26, 24); controls.target.set(0, 0, 0); },
 ];
@@ -241,15 +241,15 @@ window.__gallery = {
   state, TABS, loadStats, buildStats,
   setView,
   /** detail view test API: open grid item i (index on the page), close, and read what is shown */
-  openDetail(i) { enterDetail(gridItems[i]); return !!state.detail; },
+  openDetail(i: string | number) { enterDetail(gridItems[i]); return !!state.detail; },
   closeDetail: exitDetail,
   detailInfo() { const d = state.detail; if (!d) return null; return { name: d.item.e.name, text: $("detail-text").textContent, camDist: camera.position.distanceTo(controls.target), visibleCells: gridItems.filter((g) => g.cell.visible).length, floorVisible: gridFloor ? gridFloor.visible : null, page: state.page }; },
-  pickAt: (x, y) => { const g = pickGrid(x, y); return g ? gridItems.indexOf(g) : -1; },
+  pickAt: (x: number, y: number) => { const g = pickGrid(x, y); return g ? gridItems.indexOf(g) : -1; },
   /** "Use anime set" toggle (Biome mode); rebuilds the biome */
   async setAnime(on) { state.anime = !!on; await setView(); },
   animeInfo: () => animeInfo,
   /** realise every entry of a tab: counts + per-asset stats */
-  async loadAll(tab) {
+  async loadAll(tab: string | number) {
     const out = { tab, total: 0, ok: 0, failed: [], assets: [] };
     for (const e of TABS[tab].entries) {
       const rec = await realise(e); out.total++;
@@ -258,7 +258,7 @@ window.__gallery = {
     }
     return out;
   },
-  setCamera(i) { const t = TABS[state.tab]; if (t.view) { VIEWS[i](t); controls.update(); camera.updateMatrixWorld(); if (biome) biome.update(camera, 0); } },
+  setCamera(i: string | number) { const t = TABS[state.tab]; if (t.view) { VIEWS[i](t); controls.update(); camera.updateMatrixWorld(); if (biome) biome.update(camera, 0); } },
   /** average ms over `frames` rendered frames: GPU timer when present, and render+gl.finish() wall time (always) */
   async measure(frames = 120, warm = 30) {
     for (let i = 0; i < warm; i++) await new Promise((r) => requestAnimationFrame(r));

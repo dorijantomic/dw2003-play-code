@@ -142,7 +142,7 @@ export const EXPADAPTER_ID = 321; // accessory: +20% EXP  (stfgtrep 0x1dd0 check
 export const BITADAPTER_ID = 322; // accessory: +20% Bits (stfgtrep 0x26c0 check)
 
 // Total EXP that must be EXCEEDED (strict >) to reach `nextLevel`.
-export function levelUpThreshold(growthXp, nextLevel, lu) {
+export function levelUpThreshold(growthXp: number, nextLevel: number, lu) {
   if (nextLevel >= 100) return Infinity;
   const bounds = lu.exp_tier_bounds; // [5, 20, 40, 100]
   let tier = bounds.length - 1;
@@ -152,14 +152,14 @@ export function levelUpThreshold(growthXp, nextLevel, lu) {
 }
 
 // Level after banking `exp` total EXP (may gain several levels; cap 99).
-export function levelForExp(currentLevel, exp, growthXp, lu) {
+export function levelForExp(currentLevel, exp: number, growthXp: number, lu) {
   let lv = currentLevel;
   while (lv < (lu.level_cap ?? 99) && exp > levelUpThreshold(growthXp, lv + 1, lu)) lv++;
   return lv;
 }
 
 // Reward share per recipient: solo 100%, pair 60% each, 3+ splits evenly.
-export function expShare(base, participants) {
+export function expShare(base: number, participants: number) {
   if (participants <= 1) return base;
   if (participants === 2) return Math.floor(base * 6 / 10);
   return Math.floor(base / participants);
@@ -168,7 +168,7 @@ export function expShare(base, participants) {
 // battle_rewards[screen_id] = [dvexp_base, exp_base, bits_base]; all-zero record = none.
 // A battle with no id pays nothing (the disc's own record 0 is all-zero), so a missing id
 // is a bug in the route that started the fight — say so rather than paying a guess.
-export function battleRewardFor(screenId, rewards) {
+export function battleRewardFor(screenId: string | number | null | undefined, rewards: { [x: string]: null; }) {
   if (screenId == null) {
     console.warn("[battle] battle started without a screenId: no EXP/BIT record, so it pays 0");
     return null;
@@ -185,7 +185,7 @@ export function battleRewardFor(screenId, rewards) {
 export function winBattleRewards({ screenId, participants = 1, equipment = {}, rewards }: WinBattleRewardsArgs) {
   const rw = battleRewardFor(screenId, rewards);
   const share = Math.max(1, participants);
-  const boost = (v, id) => (equipment.acc0 === id || equipment.acc1 === id) ? v + Math.floor(v / 5) : v;
+  const boost = (v: number, id: number | undefined) => (equipment.acc0 === id || equipment.acc1 === id) ? v + Math.floor(v / 5) : v;
   return {
     xp:    boost(expShare(rw?.exp ?? 0, share), EXPADAPTER_ID),
     bits:  boost(rw?.bits ?? 0, BITADAPTER_ID),
@@ -195,7 +195,7 @@ export function winBattleRewards({ screenId, participants = 1, equipment = {}, r
 
 // Per-form DVEXP gain: level-scaled from the battle's dvexp base, then the party share,
 // min 1, capped 10 below the form's DV-level cap (profile byte +0x3c) and 50 at/past it.
-export function dvexpGain(base, partnerLevel, participants, formLevel, formCap) {
+export function dvexpGain(base: number, partnerLevel: number, participants: number, formLevel: number, formCap: number) {
   const div = Math.min(Math.max(partnerLevel, 1), 50);
   let amt = expShare(Math.floor(base * 10 / div), participants);
   if (amt <= 0) amt = 1;
@@ -205,10 +205,10 @@ export function dvexpGain(base, partnerLevel, participants, formLevel, formCap) 
 // One level-up's random stat gains (rolled at the NEW level). The shipped game applies
 // these to stored current stats, and so does the walker's stored-stat model below
 // (applyLevelUpGains) — joined to stfgtrep 0x80085e3c in STAT-Q002-LEVELUP-STATROLL-JOIN-001.
-export function rollLevelUpGains(profile, newLevel, lu, rng = RAND_U16) {
+export function rollLevelUpGains(profile, newLevel: number, lu, rng = RAND_U16) {
   const g = profile.growth ?? {};
   const tier4 = newLevel < 5 ? 0 : newLevel < 20 ? 1 : newLevel < 40 ? 2 : 3;
-  const hpmp = (growth) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng() % 9];
+  const hpmp = (growth: number) => growth - lu.hpmp_tier_adj[tier4] + lu.hpmp_rand9[rng() % 9];
   const bounds = lu.core_tier_bounds; // [5, 20, 40, 60, 80]
   let tier6 = bounds.length;
   for (let i = 0; i < bounds.length; i++) if (newLevel < bounds[i]) { tier6 = i; break; }
@@ -264,7 +264,7 @@ export function ensureStoredStats(ps, profile) {
 
 // Apply one level-up's rolled gains in place (fn 0x80085e3c store semantics: plain adds,
 // clamp maxHP/maxMP at 9999 and core/elems at 999; there is NO lower clamp).
-export function applyLevelUpGains(ps, gains, lu) {
+export function applyLevelUpGains(ps, gains, lu: { hpmp_cap: number; stat_cap: number; }) {
   const hpmpCap = lu?.hpmp_cap ?? 9999;
   const statCap = lu?.stat_cap ?? 999;
   ps.maxHp = Math.min((ps.maxHp ?? 0) + gains.hp, hpmpCap);
@@ -292,7 +292,7 @@ export function applyLevelUpGains(ps, gains, lu) {
 // `growthProfile` is the row the disc's rolls read: the member's STARTER species'
 // (levelUpGrowthProfile), never the active form's. `prof` stays the active form only
 // for the no-progression-table branch, which has no disc counterpart.
-export function applyLevelUp(ps, prof, oldLevel, newLevel, lu, growthProfile = prof) {
+export function applyLevelUp(ps, prof, oldLevel: number, newLevel: number, lu, growthProfile = prof) {
   ps.level = newLevel;
   if (lu) {
     ensureStoredStats(ps, growthProfile);
@@ -331,9 +331,9 @@ export function levelUpGrowthProfile(player, profiles) {
 
 // DV form level from banked DVEXP (fn 0x800865c0): while L<99 and dvexp >= thr(L), L+=1;
 // thr(L) = 10·L below the profile's DV cap, then 10·(cap−1) + 50·(L−cap+1) past it.
-export function dvLevelForExp(dvexp, dvCap, levelCap = 99) {
+export function dvLevelForExp(dvexp: number, dvCap: number, levelCap = 99) {
   let lv = 0;
-  const thr = (L) => L < dvCap ? 10 * L : 10 * (dvCap - 1) + 50 * (L - dvCap + 1);
+  const thr = (L: number) => L < dvCap ? 10 * L : 10 * (dvCap - 1) + 50 * (L - dvCap + 1);
   while (lv < levelCap && dvexp >= thr(lv)) lv++;
   return lv;
 }
@@ -344,7 +344,7 @@ export function dvLevelForExp(dvexp, dvCap, levelCap = 99) {
 // (stfgtrep.s file 0x3994 `slti $v0, 0x63` / file 0x399C `j 0x800866f0` jumps to the
 // epilogue, skipping the [0x8004B480] store at file 0x3A28), so a maxed form banks
 // NOTHING and its DVEXP total freezes. Returns true when the form gained a level.
-export function bankFormDvexp(record, gain, formCap, dvexpCap = 9999999) {
+export function bankFormDvexp(record: { formLevel: number; dvexp: number; }, gain: number, formCap: number, dvexpCap = 9999999) {
   const oldLevel = record.formLevel ?? 1;
   if (oldLevel >= 99) return false;
   record.dvexp = Math.min(Number(record.dvexp ?? 0) + gain, dvexpCap);
@@ -363,7 +363,7 @@ export function bankFormDvexp(record, gain, formCap, dvexpCap = 9999999) {
 // passes that count (file 0x1368 `lw $a3, 0x70($v1)`, v1 = the row's +0x50 parent).
 // A form taken mid-battle is a second mark on the same row, so it enlarges the
 // divisor: a solo lead that DV'd once splits its DVEXP two ways (60% each), not 100%.
-export function dvexpShareCount(formFlags, indices) {
+export function dvexpShareCount(formFlags, indices: number[]) {
   let marks = 0;
   for (const index of indices ?? []) {
     const flags = formFlags?.[index];

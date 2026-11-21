@@ -25,7 +25,7 @@ export function makeReport(B: BattleContext) {
   //
   // The portrait animates: one frame every 13 vsyncs, from the table read off
   // the running game (claim FIGHT-REPORT-PORTRAIT-FRAMES-001).
-  function drawFightReportGroup(ctx, G, row, opts: ReportGroupOptions = {}) {
+  function drawFightReportGroup(ctx: CanvasRenderingContext2D | undefined, G, row, opts: ReportGroupOptions = {}) {
     if (!G || !row) return;
     const t = opts.seconds ?? 0;
     // The plate is drawn plain. The screen's own code hands it the arrow's
@@ -52,7 +52,7 @@ export function makeReport(B: BattleContext) {
     const xp = opts.countingXp ?? row.xp ?? 0;
     uiDrawText(ctx, String(xp), G.xpValue.x, G.xpValue.y, { kind: 3, alignRight: true });
     uiDrawText(ctx, G.xpLabel.str, G.xpLabel.x, G.xpLabel.y, { kind: 3 });
-    G.slots.forEach((slot, j) => {
+    G.slots.forEach((slot, j: string | number | null | undefined) => {
       const barMarked = opts.markedSlot === j;
       if (barMarked) {
         // The bar picture is drawn plain, for the same reason as the plate.
@@ -128,7 +128,7 @@ function drawFightReport(b) {
           { kind: CB.value.kind, alignRight: true });
         uiDrawText(B.ctx, CB.label.str, CB.label.x, CB.label.y, { kind: CB.label.kind });
       }
-      (b._winReportRows ?? []).slice(0, groups.length).forEach((row, i) => {
+      (b._winReportRows ?? []).slice(0, groups.length).forEach((row, i: string | number) => {
         const g = groups[i];
         drawFightReportGroup(B.ctx, g, row, {
           seconds: b.timer,
@@ -144,7 +144,7 @@ function drawFightReport(b) {
       });
       const message = page.message ?? `${page.label}:\n${page.value ?? ""}`;
       const chars = Math.max(0, Math.floor((b.timer - 0.55) * 18));
-      message.slice(0, chars).split("\n").forEach((line, i) =>
+      message.slice(0, chars).split("\n").forEach((line: string | undefined, i: number) =>
         uiDrawText(B.ctx, line, MSG.x, MSG.y + i * 13, { kind: MSG.kind }));
     } else {
       B.ctx.fillStyle = "#fff";

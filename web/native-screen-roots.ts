@@ -14,6 +14,6 @@ export const NATIVE_ROOT_CTORS = {
     "pro/stitshop": 0x8008c118,
 };
 
-export function nativeRootCtorFor(moduleId) {
+export function nativeRootCtorFor(moduleId: string | number) {
     return NATIVE_ROOT_CTORS[moduleId];
 }

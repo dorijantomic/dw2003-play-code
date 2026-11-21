@@ -17,26 +17,26 @@ export const VSYNC_MS = 20;
 export const VSYNC_S = VSYNC_MS / 1000;
 
 /** The step a ramp of `frames` vsyncs stores at +0x60: 0xFF00 / frames, truncated. */
-export function leaveFadeStep(frames) {
+export function leaveFadeStep(frames: number) {
   return Math.trunc(LEAVE_FADE_MAX / frames) | 0;
 }
 
 /** Whole vsyncs since `t0`, on a clock counted in milliseconds (performance.now). */
-export function leaveFadeFramesMs(nowMs, t0Ms) {
+export function leaveFadeFramesMs(nowMs: number, t0Ms: number) {
   return Math.max(0, Math.floor((nowMs - t0Ms) / VSYNC_MS));
 }
 
 /** The same on a clock counted in seconds (the screen's own simulation time). */
-export function leaveFadeFrames(nowS, t0S) {
+export function leaveFadeFrames(nowS: number, t0S: number) {
   return Math.max(0, Math.floor((nowS - t0S) / VSYNC_S));
 }
 
 /** The dim level 0..1 after `frames` vsyncs of a ramp stepping by `step`. */
-export function leaveFadeLevel(frames, step) {
+export function leaveFadeLevel(frames: number, step: number) {
   return Math.min(255, (frames * step) >> 8) / 255;
 }
 
 /** The ramp has landed: the screen can close. */
-export function leaveFadeDone(frames, step) {
+export function leaveFadeDone(frames: number, step: number) {
   return frames * step >= LEAVE_FADE_MAX;
 }

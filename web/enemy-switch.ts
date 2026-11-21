@@ -28,7 +28,7 @@ export const ENEMY_SWITCH_MSG_FAILED = 0x8e;
 export const ENTRANCE_TASK_END_FRAME = 301;
 
 /** Table action kind -> EnemyTurn.target (enemy_turn.c:456-466): 5 -> -2 (slot 0), 6 -> -3, 7 -> -4, 8 -> -5 (random other). */
-export function enemySwitchTarget(kind) {
+export function enemySwitchTarget(kind: number) {
   const k = kind | 0;
   return k >= 5 && k <= 8 ? -(k - 3) : 0;
 }
@@ -39,8 +39,8 @@ export function enemySwitchTarget(kind) {
  *   -2/-3/-4: slot 0/1/2, unless its id equals the active slot's id (:17,:25,:33 break), when it has hp;
  *   else (-5): the slots != active with id != 0 and hp != 0; none -> -1, one -> it, two -> found[rand() & 1].
  */
-export function pickEnemySwitch(slots, active, target, rand) {
-  const at = (i) => slots?.[i] ?? { id: 0, hp: 0 };
+export function pickEnemySwitch(slots, active: number, target: number, rand: () => number) {
+  const at = (i: number) => slots?.[i] ?? { id: 0, hp: 0 };
   const named = target === -2 ? 0 : target === -3 ? 1 : target === -4 ? 2 : -1;
   if (named >= 0) {
     if (at(named).id === at(active).id) return -1;
@@ -59,7 +59,7 @@ export function pickEnemySwitch(slots, active, target, rand) {
  * The enemy's whole self-tag decision once the table row is chosen: null when the row is not a switch (kinds 5..8),
  * else the slot to switch to or -1 ("Switch failed!"). One call = the original's one pickEnemySwitch.
  */
-export function enemySelfTagPick(move, slots, active, rand) {
+export function enemySelfTagPick(move: { action: number; }, slots: { id: number; speciesId: number; hp: number; }[], active: number, rand: () => number | undefined) {
   const target = enemySwitchTarget(move?.action);
   if (target === 0) return null;
   return pickEnemySwitch(slots, active, target, rand);

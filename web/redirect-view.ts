@@ -36,7 +36,7 @@ function mapIds(scenes) {
 }
 
 /** The npc records of one room. */
-function npcsOf(scenes, mapId) {
+function npcsOf(scenes, mapId: string) {
   if (!scenes) return [];
   const scene = scenes instanceof Map ? scenes.get(mapId) : scenes[mapId];
   return scene && Array.isArray(scene.npcs) ? scene.npcs : [];
@@ -102,7 +102,7 @@ export function redirectFor(id) {
 }
 
 /** The pairs one room carries — both ids of the pair in that room's cast. */
-export function pairsOnMap(mapId, scenes, pairs = confirmRedirectPairs()) {
+export function pairsOnMap(mapId: string, scenes, pairs = confirmRedirectPairs()) {
   const cast = new Set(npcsOf(scenes, mapId).map((rec) => rec && rec.npc_id));
   return (pairs || [])
     .filter(([from, to]) => cast.has(from) && cast.has(to))

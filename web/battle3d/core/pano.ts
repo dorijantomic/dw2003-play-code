@@ -14,7 +14,7 @@ import type { Battle3DContext, PanoProjectOptions, PanoState } from "../../types
 
 // moved by tools/rewrite/split-closure.mjs
 export function makePano(B$: Battle3DContext) {
-function _panoTex(px, repeat) {
+function _panoTex(px, repeat: boolean) {
     const tex = B$.gl.createTexture();
     B$.gl.bindTexture(B$.gl.TEXTURE_2D, tex);
     B$.gl.texImage2D(B$.gl.TEXTURE_2D, 0, B$.gl.RGBA, px.width, px.height, 0, B$.gl.RGBA, B$.gl.UNSIGNED_BYTE, new Uint8Array(px.data.buffer, px.data.byteOffset, px.data.length));
@@ -33,7 +33,7 @@ function _panoActive() {
     if (B$.pano?.key !== key) {
       const me = B$.pano = { key, id: mapId, tex: null, px: null, ground: null, mesh: null, missing: false } as PanoState;
       const tries = [mapId, B$.activeArena?.name].filter(Boolean);
-      const load = (id) => {
+      const load = (id: string | undefined) => {
         loadTexturePixels(`assets-hd/battle/panoramas/${id}.png`).then((px) => {
           if (B$.pano !== me) return;
           if (!px || px.width > B$.gl.getParameter(B$.gl.MAX_TEXTURE_SIZE)) { if (tries.length) load(tries.shift()); else me.missing = true; return; }
@@ -45,7 +45,7 @@ function _panoActive() {
             });
           }).catch(() => {});
           loadTexturePixels(`assets-hd/battle/panoramas/${id}_ground.png`).then((g) => {
-            const pow2 = (n) => n > 0 && (n & (n - 1)) === 0;
+            const pow2 = (n: number) => n > 0 && (n & (n - 1)) === 0;
             if (B$.pano === me && g && pow2(g.width) && pow2(g.height)) me.ground = _panoTex(g, true);
           });
           const base = `assets-hd/battle/panoramas/${id}_depth`;
@@ -70,7 +70,7 @@ function _paintFloorMask(g) {
     }
     return (g.paintFloor = m);
   }
-function _drawArenaPaint(p, mvp, world, atm) {
+function _drawArenaPaint(p, mvp: Iterable<number>, world: Iterable<number>, atm: { gradeSub: Iterable<number>; }) {
     if (!B$.panoPaintProg) {
       const pr = createProgram(B$.gl, `
 attribute vec3 aPos;
@@ -133,7 +133,7 @@ void main() {
     B$.gl.enable(B$.gl.BLEND); B$.gl.blendFunc(B$.gl.SRC_ALPHA, B$.gl.ONE_MINUS_SRC_ALPHA);
     B$.panoLog.paint = { floorTris, otherTris };
   }
-function _panoBufs(pos, uv, idx) {
+function _panoBufs(pos: number[], uv: number[], idx) {
     const vbo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, vbo); B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(pos), B$.gl.STATIC_DRAW);
     const ubo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, ubo); B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(uv), B$.gl.STATIC_DRAW);
     const ibo = B$.gl.createBuffer(); B$.gl.bindBuffer(B$.gl.ELEMENT_ARRAY_BUFFER, ibo); B$.gl.bufferData(B$.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), B$.gl.STATIC_DRAW);
@@ -165,7 +165,7 @@ function _panoBufs(pos, uv, idx) {
     for (let j = 0; j < SR; j++) for (let i = 0; i < SA; i++) { const a = j * (SA + 1) + i, b = a + SA + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
     return (B$.panoDisk = _panoBufs(pos, uv, idx));
   }
-function _panoGround(bdPV, tex, atm) {
+function _panoGround(bdPV: Iterable<number>, tex: WebGLTexture | null, atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
     if (!B$.panoGroundProg) {
       const p = createProgram(B$.gl, `
 attribute vec3 aPos;
@@ -205,11 +205,11 @@ void main() {
     B$.gl.drawElements(B$.gl.TRIANGLES, b.indexCount, B$.gl.UNSIGNED_SHORT, 0);
   }
 // the picture's texel along unit direction d (the dome is centred on the eye); sky only
-  function _panoTexel(p, eye, d) {
+  function _panoTexel(p, eye, d: number[]) {
     if (d[1] <= 0) return null;
     return { px: p.px, u: 0.5 + Math.atan2(d[0], -d[2]) / (2 * Math.PI), v: 0.5 - Math.asin(Math.min(1, d[1])) / Math.PI };
   }
-function _panoMeshBuild(meta, vals) {
+function _panoMeshBuild(meta, vals: number[] | Float32Array<ArrayBuffer>) {
     const C = meta.cols, R = meta.rows, k = B$.PANO_UNIT_M, EYE = meta.cameraHeightM * k, FLAT_Y = B$.PANO_FLAT_M * k;
     const pos = new Float32Array(C * R * 3), uv = new Float32Array(C * R * 2), dist = new Float32Array(C * R), skyF = new Uint8Array(C * R);
     for (let j = 0; j < R; j++) {
@@ -226,7 +226,7 @@ function _panoMeshBuild(meta, vals) {
       }
     }
     const idx = []; let torn = 0;
-    const P = (n) => [pos[n * 3], pos[n * 3 + 1], pos[n * 3 + 2]];
+    const P = (n: number | undefined) => [pos[n * 3], pos[n * 3 + 1], pos[n * 3 + 2]];
     for (let j = 0; j < R - 1; j++) for (let i = 0; i < C - 1; i++) {
       const q = [j * C + i, j * C + i + 1, (j + 1) * C + i, (j + 1) * C + i + 1];
       if (q.some((n) => !(dist[n] > 0))) continue;
@@ -248,7 +248,7 @@ function _panoMeshBuild(meta, vals) {
     return { vbo, ubo, ibo, indexCount: idx.length, pos, idx, torn, scale: k };
   }
 /** (checks) height of the painted place's mesh straight under (x, z), render space; null = no mesh or nothing under. */
-  function probePanoGround(x, z) {
+  function probePanoGround(x: number, z: number) {
     const m = B$.pano?.mesh; if (!m) return null;
     let best = null; const p = m.pos, I = m.idx;
     for (let t = 0; t < I.length; t += 3) {
@@ -262,7 +262,7 @@ function _panoMeshBuild(meta, vals) {
     }
     return best;
   }
-function _drawPano(p, bdPV, eye, atm) {
+function _drawPano(p, bdPV, eye: number[], atm: { gradeSub: Iterable<number>; fogCol: Iterable<number>; fogP: Iterable<number>; }) {
     const M = new Float32Array([B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, 0, 0, 0, B$.PANO_R, 0, eye[0], eye[1], eye[2], 1]);
     const depth = B$.gl.isEnabled(B$.gl.DEPTH_TEST);
     B$.gl.disable(B$.gl.DEPTH_TEST); B$.gl.depthMask(false); B$.gl.disable(B$.gl.BLEND);
@@ -349,7 +349,7 @@ function getPanorama() { return { ...B$.panoLog, on: !!window.__fx?.battlepano, 
       [-0.5, 0, -0.5], [0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5],
     ], [[0, 0], [1, 0], [1, 1], [0, 1]]);
   }
-function drawViewerGrid(pv) {
+function drawViewerGrid(pv: number[] | Float32Array<ArrayBuffer>) {
     const box = B$.isolatedSide === "enemy" ? B$.eAABBLast : B$.pAABB;
     if (!box) return;
     ensureViewerGrid();

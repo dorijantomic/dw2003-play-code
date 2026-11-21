@@ -37,7 +37,7 @@ export function digivolveDemoOn() {
   try { return localStorage.getItem("digivolveDemo") !== "0"; } catch { return true; }
 }
 
-export function setDigivolveDemo(on) {
+export function setDigivolveDemo(on: boolean) {
   try { localStorage.setItem("digivolveDemo", on ? "1" : "0"); } catch { /* ignore */ }
 }
 
@@ -53,7 +53,7 @@ export const NATIVE_W = 320;
 export const NATIVE_H = 240;
 
 /** The 320x240 game area inside a device-pixel canvas. */
-export function nativeRect(w, h) {
+export function nativeRect(w: number, h: number) {
   const scale = Math.min(w / NATIVE_W, h / NATIVE_H);
   return { scale, x: (w - NATIVE_W * scale) / 2, y: (h - NATIVE_H * scale) / 2 };
 }
@@ -67,7 +67,7 @@ export function nativeRect(w, h) {
  * halfword, so the CLOSE and OPEN points are captured and the ramp between them
  * is a WALKER VISUAL.
  */
-export function curtainClosed(s) {
+export function curtainClosed(s: { voidAlpha: number; }) {
   if (!s) return 0;
   // Closed across the vortex, the transformation and the resolve; open again by
   // the time the camera returns.
@@ -82,7 +82,7 @@ export function curtainClosed(s) {
  * The E000EVOL sprites are NOT drawn here; they go through the effect player and
  * are composited by the op3 path in battle.js draw().
  */
-export function drawBlastCurtain(ctx, s, w, h) {
+export function drawBlastCurtain(ctx: CanvasRenderingContext2D | undefined, s, w: number, h: number) {
   // Deliberately draws NOTHING, and that is a finding rather than a stub.
   //
   // The controller's +0x60..+0x6E halfwords are not black bars: they are the
@@ -103,7 +103,7 @@ export function drawBlastCurtain(ctx, s, w, h) {
   void ctx; void s; void w; void h;
 }
 
-export function drawBlastFlash(ctx, s, w, h) {
+export function drawBlastFlash(ctx: CanvasRenderingContext2D | undefined, s: { flashAlpha: number; flashLevel: undefined; }, w: number, h: number) {
   if (!s || s.flashAlpha <= 0) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);

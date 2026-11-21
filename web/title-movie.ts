@@ -38,7 +38,7 @@ export function createTitleMoviePlayer(onEnd, onError = console.error, createVid
   };
   const lastPictureShown = () => frames > 0 && picturesShown() >= frames;
 
-  const finish = (why) => {
+  const finish = (why: string) => {
     if (!active) return;
     const finishedCode = code;
     endedBy = why;
@@ -59,7 +59,7 @@ export function createTitleMoviePlayer(onEnd, onError = console.error, createVid
   });
 
   const player = {
-    async open(launchCode) {
+    async open(launchCode: number) {
       const token = ++generation;
       video.pause();
       active = true;

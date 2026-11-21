@@ -59,7 +59,7 @@ export function installPlayApi(P: AudioEngine) {
           src.loopEnd = meta.loop.end;
         }
         src.connect(P.gain);
-        let timer = null;
+        let timer: string | number | NodeJS.Timeout | null | undefined = null;
         const clear = () => {
           if (timer) { clearTimeout(timer); timer = null; }
           if (P.battleSrc[side] === src) { P.battleSrc[side] = null; P.battleName[side] = null; P.battleVoice[side] = -1; }

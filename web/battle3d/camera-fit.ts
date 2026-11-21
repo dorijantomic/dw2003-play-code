@@ -25,8 +25,8 @@ import type { GiantShotOptions, PlacementTable } from "../types/battle3d.js";
  * the same on its one (.L0x800923f0), and no writer ever clears the record. So before this
  * predicate is true there is no record to draw through and nothing to fall back to.
  */
-export function stagingRecordsReady(placementTable, playerFolder, enemyFolder) {
-  const has = (folder) => {
+export function stagingRecordsReady(placementTable: PlacementTable | null | undefined, playerFolder: string | null | undefined, enemyFolder: string | null | undefined) {
+  const has = (folder: string) => {
     const key = modelKeyFromFolder(folder);
     return !!(key != null && placementTable && placementTable[key]);
   };
@@ -47,7 +47,7 @@ export function stagingRecordsReady(placementTable, playerFolder, enemyFolder) {
  * out of whatever the staging block's neighbours happen to hold, which is not a behaviour to
  * reproduce, so this returns null and the caller keeps the last record instead of cutting one.
  */
-export function arenaShotFor(placementTable, playerFolder, enemyFolder, nearCamOverride = null) {
+export function arenaShotFor(placementTable, playerFolder: string | null | undefined, enemyFolder, nearCamOverride = null) {
   const nearCam = nearCamOverride ?? nearCameraFor(placementTable, modelKeyFromFolder(playerFolder));
   const far = placementTable?.[modelKeyFromFolder(enemyFolder)] ?? null;
   const index = (far?.shot | 0) - 1;
@@ -70,7 +70,7 @@ export function arenaShotFor(placementTable, playerFolder, enemyFolder, nearCamO
  */
 const _nearCamCache = new WeakMap();
 
-export function nearCameraFor(placementTable: PlacementTable, key) {
+export function nearCameraFor(placementTable: PlacementTable, key: string | null) {
   const rec = key != null ? placementTable?.[key] : null;
   if (!rec) return null;
   if ((rec.camera?.eye?.length | 0) >= 12) return rec.camera;
@@ -112,9 +112,9 @@ export function closestCameraRef(sizes: Record<string, [number, number]>, rest: 
  * so the framing is the reference partner's — Agumon's close-up of Agumon becomes the same
  * close-up of Kunemon, however big or small Kunemon is.
  */
-export function fitNearCamera(refCam, refSlot, ownSlot, k) {
+export function fitNearCamera(refCam, refSlot, ownSlot, k: number) {
   if (!refCam) return null;
-  const fit = (p) => p && [
+  const fit = (p: number[]) => p && [
     ownSlot.x + (p[0] - refSlot.x) * k,
     ownSlot.y + (p[1] - refSlot.y) * k,
     ownSlot.z + (p[2] - refSlot.z) * k,
@@ -192,7 +192,7 @@ const PS1_UP = [0, -1, 0];              // PS1 Y is DOWN
 /** One Digimon's rest-pose body as a box standing in `slot`, PS1 units: the fit's subject. The
  *  extractor only measures height and width from the front, so the depth is half the width —
  *  the near face is what a camera beside the fighter sees first. */
-export function bodyBoxCorners(rest, slot) {
+export function bodyBoxCorners(rest: { h: number; w: number; }, slot: { x: number; y: number; z: number; }) {
   const h = rest?.h > 0 ? rest.h : 0, w = rest?.w > 0 ? rest.w : 0;
   const out = [];
   for (const x of [-0.5 * w, 0.5 * w])
@@ -204,7 +204,7 @@ export function bodyBoxCorners(rest, slot) {
 /** Project one PS1 point through one PS1 shot into normalized device coordinates (|x|,|y| <= 1 is
  *  on screen), or null when the point is behind the eye. The projection is the one render()
  *  builds: fovY = 2 atan(120/H) (fovYFromH) and the horizontal from the frame aspect. */
-export function shotPointNdc(shot, p, aspect = GIANT_FIT_ASPECT) {
+export function shotPointNdc(shot, p: number[], aspect = GIANT_FIT_ASPECT) {
   if (!shot?.eye || !shot?.target || !(shot.H > 0)) return null;
   const fwd = normalize(sub3(shot.target, shot.eye));
   const back = [-fwd[0], -fwd[1], -fwd[2]];           // camera space looks down −z
@@ -249,7 +249,7 @@ export function shotBodyBounds(shot, slot, rest, target = null, aspect = GIANT_F
  * (`changed: false`) when it already frames the body, which is the identity every small model
  * takes. `target` is a CONSTRAINT (the opposing fighter must stay on screen), never the aim.
  */
-export function giantShotFor(refShot, slot, rest, target = null, opts: GiantShotOptions = {}) {
+export function giantShotFor(refShot, slot: { x: number; y: number; z: number; }, rest: { h: number; }, target = null, opts: GiantShotOptions = {}) {
   const fill = opts.fill ?? GIANT_FRAME_FILL;
   const hMin = opts.hMin ?? GIANT_H_MIN;
   const pullMax = opts.pullMax ?? GIANT_PULL_MAX;
@@ -298,7 +298,7 @@ export function giantShotFor(refShot, slot, rest, target = null, opts: GiantShot
 /** A fitted near-shot table (fitNearCamera) refitted for a giant: per shot, `giantShotFor`. Returns
  *  the same `cam` object and `changed: false` when every shot already framed the body, so a model
  *  the reference framing holds is untouched. */
-export function fitGiantNearCamera(cam, slot, rest, target = null, opts = {}) {
+export function fitGiantNearCamera(cam, slot, rest: { h: number; w: number; } | null, target = null, opts = {}) {
   if (!cam?.eye?.length) return { cam, shots: [], changed: false };
   const shots = [];
   let changed = false;
@@ -312,9 +312,9 @@ export function fitGiantNearCamera(cam, slot, rest, target = null, opts = {}) {
   if (!changed) return { cam, shots, changed: false };
   return {
     cam: {
-      eye: cam.eye.map((e, i) => shots[i]?.changed ? shots[i].eye : e),
-      look: cam.look.map((p, i) => shots[i]?.changed ? shots[i].target : p),
-      view: cam.view.map((v, i) => shots[i]?.changed ? shots[i].H : v),
+      eye: cam.eye.map((e, i: string | number) => shots[i]?.changed ? shots[i].eye : e),
+      look: cam.look.map((p, i: string | number) => shots[i]?.changed ? shots[i].target : p),
+      view: cam.view.map((v, i: string | number) => shots[i]?.changed ? shots[i].H : v),
     },
     shots, changed: true,
   };
@@ -335,7 +335,7 @@ export const GIANT_FIT_K = 1.6;         // a normal body this many times its siz
 export const GIANT_FIT_MIN_K = 0.7;     // a giant shrunk below this loses the fit (ordinary path)
 
 /** A fighter's size multiplier, clamped to the band the renderer can draw. */
-export function clampFighterScale(k) {
+export function clampFighterScale(k: number) {
   const n = Number(k);
   if (!Number.isFinite(n) || n <= 0) return 1;
   return Math.min(FIGHTER_SCALE_MAX, Math.max(FIGHTER_SCALE_MIN, n));
@@ -344,20 +344,20 @@ export function clampFighterScale(k) {
 /** The per-side scale store, pure so node tests can pin it without a WebGL context. */
 export function createFighterScaleState() {
   const scales = { player: 1, enemy: 1 };
-  const sideOf = (side) => (side === "enemy" ? "enemy" : "player");
+  const sideOf = (side: string) => (side === "enemy" ? "enemy" : "player");
   return {
     scales,
-    setFighterScale(side, k) {
+    setFighterScale(side: string, k: number) {
       const s = sideOf(side);
       scales[s] = clampFighterScale(k);
       return scales[s];
     },
-    fighterScale(side) { return scales[sideOf(side)]; },
+    fighterScale(side: string) { return scales[sideOf(side)]; },
   };
 }
 
 /** One Digimon's rest-pose body, grown by its own scale, for the camera fit's body box. */
-export function scaledRest(rest, k) {
+export function scaledRest(rest, k: number) {
   if (!rest) return null;
   const m = clampFighterScale(k);
   return { h: (rest.h ?? 0) * m, w: (rest.w ?? 0) * m };
@@ -365,7 +365,7 @@ export function scaledRest(rest, k) {
 
 /** Whether our near camera needs the giant refit for this body: a giant at its own size (or
  *  nearly — below 0.7x it is ordinary), or a normal body drawn at 1.6x or more. */
-export function usesGiantFit(folder, k = 1) {
+export function usesGiantFit(folder: string | null | undefined, k = 1) {
   const m = clampFighterScale(k);
   return isGiant(folder) ? m >= GIANT_FIT_MIN_K : m >= GIANT_FIT_K;
 }

@@ -74,13 +74,13 @@ export const MAP_FOREGROUND_BUCKET = 3;
  * a stage's own step program can move the player behind the ground. This is the
  * one rule that decides which side of the ground the actor lands on.
  */
-export function actorDrawsUnderMap(bucket) {
+export function actorDrawsUnderMap(bucket: number) {
     return bucket >= UNDER_MAP_BUCKET;
 }
 
 // Debug-only: producers record what they submit when a verifier arms the log,
 // so an assertion can read the band each producer chose without pixel-probing.
-let orderLog = null;
+let orderLog: { key: number; tag: null; parts: number; }[] | null = null;
 export function beginDrawOrderLog() { orderLog = []; }
 export function takeDrawOrderLog() { const l = orderLog; orderLog = null; return l; }
 
@@ -97,7 +97,7 @@ export function takeDrawOrderLog() { const l = orderLog; orderLog = null; return
  * interleave with other objects -- the fault this replaces, where six
  * hand-written producers each pushed their sub-parts at an invented y.
  */
-export function pushComposite(drawables, key, parts, tag = null) {
+export function pushComposite(drawables: { y: number; draw: () => void; }[], key: number, parts: (() => void)[], tag = null) {
     const draws = (Array.isArray(parts) ? parts : [parts]).filter((d) => typeof d === "function");
     if (!draws.length) return;
     if (orderLog) orderLog.push({ key, tag, parts: draws.length });
@@ -130,7 +130,7 @@ export function pushComposite(drawables, key, parts, tag = null) {
  * bucket-2 records and glows), so they are left in insertion order.
  */
 export function sortDrawables(drawables) {
-    drawables.sort((a, b) => (a.y - b.y) || 0);
+    drawables.sort((a: { y: number; }, b: { y: number; }) => (a.y - b.y) || 0);
     for (let i = 0, n = drawables.length; i < n; ) {
         let j = i + 1;
         while (j < n && drawables[j].y === drawables[i].y) j += 1;

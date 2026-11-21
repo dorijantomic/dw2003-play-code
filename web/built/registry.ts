@@ -9,6 +9,7 @@
 // Sources: (1) built  = our own pieces of web/built/*.js and web/arena-built.js (geometry + material factories, same code the
 // arena modules call); (2) biome  = the gallery entries web/biome/*.js (Quaternius CC0, Poly Haven CC0, KayKit, OGA, Sketchfab
 // anime CC-BY, procedural); (3) surface = plain painted surfaces (ground, water, sky gradients); (4) none = draw nothing.
+import type { ConvexGeometry } from "../lib3d/addons/ConvexGeometry.js";
 import * as THREE from "../lib3d/three.module.js";
 import type { BuiltCoverCache, BuiltLeafCache } from "./types.js";
 
@@ -34,7 +35,7 @@ export function normaliseParts(parts, { assume = false } = {}) {
 
 // ------------------------------------------------------------------ plain toon material (built light, instanced, no wind)
 /** One flat painted colour through the shared toon light + aerial haze. col = linear THREE.Color. */
-export function plainMaterial(S, col, { name = "plain", rim = 0.3 } = {}) {
+export function plainMaterial(S, col: THREE.Color, { name = "plain", rim = 0.3 } = {}) {
   const m = new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uBase: { value: new THREE.Vector3(col.r, col.g, col.b) } }),
     vertexShader: /* glsl */`
@@ -69,7 +70,7 @@ export function plainMaterial(S, col, { name = "plain", rim = 0.3 } = {}) {
   return m;
 }
 /** A sky gradient seen from inside: horizon -> zenith by the view direction (linear THREE.Color). */
-export function skyGradientMaterial(S, horizon, mid, zenith, name = "skyGradient") {
+export function skyGradientMaterial(S: { srgb: (arg0: number[] | null) => THREE.Color; }, horizon: { r: number | undefined; g: number | undefined; b: number | undefined; }, mid: { r: number | undefined; g: number | undefined; b: number | undefined; }, zenith: { r: number | undefined; g: number | undefined; b: number | undefined; } | undefined, name = "skyGradient") {
   return new THREE.ShaderMaterial({
     name, uniforms: { uH: { value: new THREE.Vector3(horizon.r, horizon.g, horizon.b) }, uM: { value: new THREE.Vector3(mid.r, mid.g, mid.b) }, uZ: { value: new THREE.Vector3(zenith.r, zenith.g, zenith.b) } },
     vertexShader: /* glsl */`varying vec3 vD; void main() { mat4 im = mat4(1.0);
@@ -88,19 +89,19 @@ export function skyGradientMaterial(S, horizon, mid, zenith, name = "skyGradient
 
 // ------------------------------------------------------------------ built entries
 const lin = (env, c, k = 1) => env.S.srgb(c, k);
-const firstPiece = (env, kind) => env.rec?.pieces?.find((p) => p.kind === kind);
+const firstPiece = (env, kind: string) => env.rec?.pieces?.find((p: { kind: string; }) => p.kind === kind);
 /** cypress colours: the arena's own piece when it has one, else the palette's crown colours */
-function cypCols(env, kind) {
+function cypCols(env, kind: string) {
   const p = firstPiece(env, kind), { pal } = env;
   if (p?.colours) { const c = p.colours; return { bottom: lin(env, c.bottom || c.all), top: lin(env, c.top || c.all), tip: lin(env, c.p90 || c.all), mid: lin(env, c.green || c.all) }; }
   return { bottom: pal.crownShade, top: pal.crownMid, tip: pal.crownLit, mid: pal.crownMid };
 }
 const toSrgb255 = (c) => { const q = c.clone().convertLinearToSRGB(); return [q.r * 255, q.g * 255, q.b * 255]; };
-const one = (geo, mat, extra = {}) => ({ parts: [{ geo, mat, ...extra }], assume: true });
+const one = (geo: THREE.BufferGeometry, mat: THREE.ShaderMaterial, extra = {}) => ({ parts: [{ geo, mat, ...extra }], assume: true });
 
 function builtDefs() {
   const L = [];
-  const add = (id, name, kinds, make, source = "Built (our code)", licence = "own code") => L.push({ id, name, kinds, source, licence, group: "built", make });
+  const add = (id: string, name: string, kinds: string[], make, source = "Built (our code)", licence = "own code") => L.push({ id, name, kinds, source, licence, group: "built", make });
   // --- trees (web/arena-built.js, web/built/trees.js)
   add("built.broadleaf", "Fluffy broadleaf tree (ez-tree boughs + fluffytree crown)", ["tree", "broadleaf"], async (env) => {
     const A = await import("../arena-built.js"), geo = A.broadleafGeometry(21, env.pal);
@@ -108,7 +109,7 @@ function builtDefs() {
     const hiTint = ["r", "g", "b"].map((c) => hi[0][c] / Math.max(hi[1][c], 1e-4));
     return one(geo, A.foliageMaterial(A.leafClumpTexture(), geo.userData.crown, hiTint));
   }, "Built: ez-tree (MIT) + fluffytree (MIT)", "MIT");
-  add("built.bush", "Fluffy bush", ["bush", "shrub"], async (env) => {
+  add("built.bush", "Fluffy bush", ["bush", "shrub"], async (env: { pal: { bushLit: { [x: string]: number; }; bushMid: { [x: string]: number; }; }; }) => {
     const A = await import("../arena-built.js"), geo = A.bushGeometry(7, env.pal);
     const hiTint = ["r", "g", "b"].map((c) => env.pal.bushLit[c] / Math.max(env.pal.bushMid[c], 1e-4));
     const r = one(geo, A.foliageMaterial(A.leafClumpTexture(), geo.userData.crown, hiTint)); return r;
@@ -137,7 +138,7 @@ function builtDefs() {
   });
   // --- MODULE DEFAULT ASSETS: what each placement slot of web/built/place/*.js draws by default (the arena modules'
   //     own factories; geometry + material only). Each also works in any other slot (instanced parts).
-  const mod = (id, name, kinds, make, source = "Built (our code)", licence = "own code") => L.push({ id, name, kinds, source, licence, group: "module", make });
+  const mod = (id: string, name: string | string[] | undefined, kinds: string | string[] | undefined, make, source = "Built (our code)", licence = "own code") => L.push({ id, name, kinds, source, licence, group: "module", make });
   for (const [sp, nm, kinds] of [["broadleaf", "Fluffy broadleaf (arena default)", ["tree", "broadleaf"]], ["pine", "Cone-stack pine (arena default)", ["tree", "pine", "conifer"]], ["bush", "Fluffy bush (arena default)", ["bush", "shrub"]]])
     mod("mod." + sp, nm, kinds, async (env) => {
       const Fo = await import("./foliage.js");
@@ -146,7 +147,7 @@ function builtDefs() {
       env.materials?.push(a.mat);
       return { parts: [{ geo: a.geo, mat: a.mat }], assume: true };
     }, "Built: ez-tree (MIT) + fluffytree (MIT)", "MIT");
-  mod("mod.boulder_piles", "Boulder piles (arena default)", ["rock", "boulder"], async (env, slot) => {
+  mod("mod.boulder_piles", "Boulder piles (arena default)", ["rock", "boulder"], async (env, slot: { data: { pieces: { colours: null | undefined; }[]; }; }) => {
     const B = await import("./boulders.js");
     return { build: (s, ctx) => B.buildBoulders(s, ctx), parts: [B.boulderPart(env, slot?.data?.pieces?.[0]?.colours)], assume: true };
   });
@@ -175,7 +176,7 @@ function builtDefs() {
   });
   // the tree ring of a forest-and-lake arena (web/built/trees.js); colours = the slot's measured piece colours in its own
   // slot, the palette's crown colours anywhere else
-  const ringCols = (env, slot, id) => (slot?.default === id && slot.data?.colours) || null;
+  const ringCols = (env, slot, id: string) => (slot?.default === id && slot.data?.colours) || null;
   const palCols = (env) => { const q = (c) => toSrgb255(c); return { bottom: q(env.pal.crownShade), top: q(env.pal.crownMid), all: q(env.pal.crownMid), p90: q(env.pal.crownLit), green: q(env.pal.crownMid) }; };
   for (const which of ["wall", "grove"])
     mod("mod.cypress_" + which, `Cypress ${which} (arena default)`, ["tree", "cypress", "conifer"], async (env, slot) => {
@@ -196,7 +197,7 @@ function builtDefs() {
     return { variants: a.geos.map((geo) => [{ geo, mat: a.mat }]), assume: true };
   });
   for (const kind of ["fern", "clover", "tuft", "litter", "twig", "pebble"])
-    mod("mod.fc_" + kind, `Forest floor ${kind} (arena default)`, kind === "pebble" ? ["rock", "litter"] : kind === "litter" || kind === "twig" ? ["litter"] : ["plant", "ground cover"], async (env) => {
+    mod("mod.fc_" + kind, `Forest floor ${kind} (arena default)`, kind === "pebble" ? ["rock", "litter"] : kind === "litter" || kind === "twig" ? ["litter"] : ["plant", "ground cover"], async (env: { shared: BuiltCoverCache; materials: THREE.ShaderMaterial[]; }) => {
       const F = await import("./floorcover.js");
       env.shared ||= {} as BuiltCoverCache;
       const a = F.coverAsset(kind, (env.shared.fcUniforms ||= F.coverUniforms()));
@@ -205,28 +206,28 @@ function builtDefs() {
     });
   // surfaces of the arena modules: build() from their own slot's data; any other surface slot gets a plain material
   // of their measured colour, any other slot a flat disc of it
-  const surfMod = (id, name, kinds, file, fn, colOf) => mod(id, name, ["surface", ...kinds], async (env, slot) => {
+  const surfMod = (id: string, name: string, kinds: string[], file: string, fn: string, colOf) => mod(id, name, ["surface", ...kinds], async (env, slot) => {
     const Mo = await import(file), mat = plainMaterial(env.S, colOf(Mo, env, slot), { name: id, rim: 0.0 });
     return { build: (s, ctx) => Mo[fn](s, ctx), parts: [{ geo: new THREE.CylinderGeometry(1, 1, 0.04, 28, 1), mat }], surfaceMat: mat, assume: true };
   });
   surfMod("mod.sand", "Beach sand + shore band (arena default)", ["ground", "sand"], "./sand.js", "buildSand",
-    (Mo, env, slot) => Mo.sandSurfaceMaterial(slot?.default === "mod.sand" ? slot.data?.pieces?.find((p) => p.kind === "sand")?.colours : null));
+    (Mo, env, slot) => Mo.sandSurfaceMaterial(slot?.default === "mod.sand" ? slot.data?.pieces?.find((p: { kind: string; }) => p.kind === "sand")?.colours : null));
   surfMod("mod.water", "Sea / lake surface with its horizon band (arena default)", ["water"], "./water.js", "buildWater",
     (Mo, env, slot) => env.S.srgb(slot?.default === "mod.water" && slot.data?.anchors?.shallow || [52, 110, 150]));
   surfMod("mod.ground", "Arena ground: painted grass / forest soil (arena default)", ["ground"], "./ground.js", "buildFloor",
     (Mo, env, slot) => env.S.srgb((slot?.default === "mod.ground" && slot.data?.gp?.src?.grassLo) || [96, 124, 70]));
   surfMod("mod.bank", "Bank strips, bottom -> top gradient (arena default)", ["ground", "bank"], "./ground.js", "buildBank",
     (Mo, env, slot) => env.S.srgb((slot?.default === "mod.bank" && slot.data?.gp?.src?.dirt) || [136, 99, 81]));
-  mod("mod.hills", "Distant hill ribbons (arena default)", ["hill", "surface"], async (env) => {
+  mod("mod.hills", "Distant hill ribbons (arena default)", ["hill", "surface"], async (env: { S: { srgb: (arg0: number[]) => THREE.Color; }; }) => {
     const G = await import("./ground.js");
     // any other slot: one low hill cone in the grass colour
     return { build: (s, ctx) => G.buildHills(s, ctx), parts: [{ geo: new THREE.ConeGeometry(1, 0.5, 24, 1), mat: plainMaterial(env.S, env.S.srgb([96, 124, 70]), { name: "mod.hills" }) }], assume: true };
   });
-  mod("mod.ground_rocks", "Half-buried boulder, rock + moss (arena default)", ["rock", "boulder"], async (env, slot) => {
+  mod("mod.ground_rocks", "Half-buried boulder, rock + moss (arena default)", ["rock", "boulder"], async (env: { materials: THREE.ShaderMaterial[]; }, slot) => {
     const G = await import("./ground.js");
     return { parts: [G.rockPart(env, slot)], assume: true };
   });
-  mod("mod.grass", "Grass blades: twist, curl, wind waves (arena default)", ["grass"], async (env, slot) => {
+  mod("mod.grass", "Grass blades: twist, curl, wind waves (arena default)", ["grass"], async (env: { materials: THREE.ShaderMaterial[]; }, slot) => {
     const Gr = await import("./grass.js");
     return { parts: [Gr.grassAsset(env, slot)], assume: true };
   }, "Built: ideas after al-ro's grass (re-written)", "own code");
@@ -234,7 +235,7 @@ function builtDefs() {
     const Sp = await import("./spires.js");
     return { build: (s, ctx) => Sp.buildSpires(s, ctx), parts: [Sp.pillarPart(env.S)], assume: true };
   });
-  mod("mod.mirror", "Lake bank + mirrored copies (arena default)", ["bank", "water"], async (env) => {
+  mod("mod.mirror", "Lake bank + mirrored copies (arena default)", ["bank", "water"], async (env: { S: { srgb: (arg0: number[]) => THREE.Color; }; }) => {
     const Mi = await import("./mirror.js");
     // any other slot: a low grass mound in the bank's colour
     return { build: (s, ctx) => Mi.buildMirror(s, ctx), parts: [{ geo: new THREE.CylinderGeometry(0.6, 1, 0.35, 16, 1), mat: plainMaterial(env.S, env.S.srgb(Mi.BANK.COL), { name: "mod.mirror" }) }], assume: true };
@@ -242,11 +243,11 @@ function builtDefs() {
   mod("mod.sky", "Sky dome: measured ring gradient, day / night (arena default)", ["surface", "sky"], async (env, slot) => {
     const Sk = await import("./sky.js");
     // any other surface slot: a gradient of the measured ring colours (else the day gradient)
-    const c = (slot?.default === "mod.sky" && slot.data?.sky?.colours) || null, q = (a, d) => env.S.srgb(a || d);
+    const c = (slot?.default === "mod.sky" && slot.data?.sky?.colours) || null, q = (a, d: number[]) => env.S.srgb(a || d);
     const mat = skyGradientMaterial(env.S, q(c?.bottom || c?.all, [214, 232, 246]), q(c?.all, [140, 186, 232]), q(slot?.data?.bg || c?.top, [60, 112, 196]), "mod.sky");
     return { build: (s, ctx) => Sk.buildSky(s, ctx), parts: [{ geo: new THREE.CylinderGeometry(1, 1, 0.04, 28, 1), mat }], surfaceMat: mat, assume: true };
   });
-  mod("mod.clouds", "3D cumulus banks in the sky ring (arena default)", ["cloud", "sky"], async (env) => {
+  mod("mod.clouds", "3D cumulus banks in the sky ring (arena default)", ["cloud", "sky"], async (env: { S: { srgb: (arg0: number[]) => THREE.Color; }; }) => {
     const Sk = await import("./sky.js");
     // any other slot: one white lobe cluster
     return { build: (s, ctx) => Sk.buildClouds(s, ctx), parts: [{ geo: new THREE.IcosahedronGeometry(1, 2), mat: plainMaterial(env.S, env.S.srgb([236, 236, 244]), { name: "mod.clouds", rim: 0.2 }) }], assume: true };
@@ -265,7 +266,7 @@ function builtDefs() {
     return { parts: [{ geo: g, mat: plainMaterial(env.S, new THREE.Color(0.22, 0.19, 0.17), { name: "builtPillar" }) }] };
   });
   // --- forest floor + mushrooms + gulls (module geometry + module material)
-  const fc = async (kind, fn) => {
+  const fc = async (kind: string, fn: string) => {
     const F = await import("./floorcover.js");
     const shared = { uFcWind: { value: F.COVER.WIND_K }, uFcFar0: { value: 1e6 }, uFcFar1: { value: 2e6 }, uFcGain: { value: 1.0 }, uFcRootK: { value: 0.72 }, uFcTipK: { value: 1.18 }, uFcDim: { value: 1.0 } };
     return one(F[fn](), F.coverMaterial(shared, "uFcDens" + kind, "builtFloorcover_" + kind.toLowerCase()));
@@ -290,7 +291,7 @@ function builtDefs() {
     return one(geo, G.gullMaterial(env.S, col), { attrs: { aGull: [3, 0.5] } });
   });
   // --- surfaces: plain painted ground, water, sky (a surface slot takes the material; any other slot gets a flat disc of it)
-  const surf = (id, name, kinds, col, extra: { sky?: number[][] } = {}) => add(id, name, ["surface", ...kinds], async (env) => {
+  const surf = (id: string | undefined, name: string, kinds: string[], col: number[] | null, extra: { sky?: number[][] } = {}) => add(id, name, ["surface", ...kinds], async (env: { S: { srgb: (arg0: number[] | null) => THREE.Color; }; }) => {
     const mat = extra.sky ? skyGradientMaterial(env.S, ...extra.sky.map((c) => env.S.srgb(c)) as [any, any, any], id) : plainMaterial(env.S, env.S.srgb(col), { name: id, rim: 0.0 });
     const disc = new THREE.CylinderGeometry(1, 1, 0.04, 28, 1);
     return { parts: [{ geo: disc, mat }], assume: true, surfaceMat: mat };
@@ -380,7 +381,7 @@ async function makeBiome(e, env) {
     if (!geo) continue;
     // the toon fade (scale to zero beyond a few metres) must not fire at 400 units per metre
     const prev = mat.onBeforeCompile;
-    mat.onBeforeCompile = (sh, r) => { prev?.call(mat, sh, r); if (sh.uniforms.uFade) sh.uniforms.uFade.value.set(1e9, 2e9); };
+    mat.onBeforeCompile = (sh: { uniforms: { uFade: { value: { set: (arg0: number, arg1: number) => void; }; }; }; }, r) => { prev?.call(mat, sh, r); if (sh.uniforms.uFade) sh.uniforms.uFade.value.set(1e9, 2e9); };
     mat.needsUpdate = true;
     parts.push({ geo, mat });
   }
@@ -397,7 +398,7 @@ export async function listAllAssets() { ensureBuilt(); await loadBiome(); return
 /** The asset `id` made for one SLOT of one arena (cached per arena + slot: every slot gets its own materials, so the
  *  colour fit, which patches a material once by its mesh's layer name, fits each slot on its own).
  *  -> { id, parts?, variants?, lod?, build?, h, r, native (= the slot's default asset: its exact matrices apply), ... } */
-export function getAsset(id, env, pack = "", slot = null) {
+export function getAsset(id: string, env, pack = "", slot = null) {
   ensureBuilt();
   const k = pack + "|" + (slot?.id ?? "") + "|" + id;
   if (!cache.has(k)) cache.set(k, (async () => {
@@ -414,4 +415,4 @@ export function getAsset(id, env, pack = "", slot = null) {
   })());
   return cache.get(k);
 }
-export function dropCache(key) { for (const k of [...cache.keys()]) if (k.startsWith(key + "|")) cache.delete(k); }
+export function dropCache(key: string) { for (const k of [...cache.keys()]) if (k.startsWith(key + "|")) cache.delete(k); }

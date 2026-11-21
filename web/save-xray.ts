@@ -158,10 +158,10 @@ const asBytes = (image) => {
   throw new Error("save X-ray: an image must be bytes (the card driver's 0x26C4 block)");
 };
 
-const viewOf = (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+const viewOf = (bytes: Uint8Array<ArrayBufferLike>) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
 /** Printable text for a name field; a non-printable byte shows as a middle dot. */
-function textOf(bytes, at, length) {
+function textOf(bytes: Uint8Array<ArrayBufferLike>, at: number, length: number) {
   let out = "";
   for (let i = 0; i < length; i++) {
     const b = bytes[at + i];
@@ -171,15 +171,15 @@ function textOf(bytes, at, length) {
   return out;
 }
 
-function hexOf(bytes, at, length) {
+function hexOf(bytes: Uint8Array<ArrayBufferLike>, at: number, length: number) {
   return Array.from(bytes.subarray(at, at + length), (b: any) => b.toString(16).padStart(2, "0")).join(" ");
 }
 
-function readRosterRecord(bytes, view, slot) {
+function readRosterRecord(bytes: Uint8Array<ArrayBufferLike>, view: DataView<ArrayBufferLike>, slot: number) {
   const base = OFF_ROSTER + slot * ROSTER_STRIDE;
-  const u8 = (off) => view.getUint8(base + off);
-  const u16 = (off) => view.getUint16(base + off, true);
-  const u32 = (off) => view.getUint32(base + off, true);
+  const u8 = (off: number) => view.getUint8(base + off);
+  const u16 = (off: number) => view.getUint16(base + off, true);
+  const u32 = (off: number) => view.getUint32(base + off, true);
   const forms = Array.from({ length: RESIDENT_FORM_COUNT }, (_, index) => {
     const at = base + R.forms + index * RESIDENT_FORM_SIZE;
     return {
@@ -244,15 +244,15 @@ function readRosterRecord(bytes, view, slot) {
  *   pack     the starter pack id
  *   retained namedBytes + unexplainedBytes + the retained spans
  */
-export function xray(image) {
+export function xray(image: Uint8Array<ArrayBuffer>) {
   const bytes = asBytes(image);
   if (bytes.length !== RESIDENT_SAVE_SIZE) {
     throw new Error(`save X-ray: expected ${RESIDENT_SAVE_SIZE} bytes, got ${bytes.length}`);
   }
   const view = viewOf(bytes);
-  const u8 = (off) => view.getUint8(off);
-  const u16 = (off) => view.getUint16(off, true);
-  const u32 = (off) => view.getUint32(off, true);
+  const u8 = (off: number) => view.getUint8(off);
+  const u16 = (off: number) => view.getUint16(off, true);
+  const u32 = (off: number) => view.getUint32(off, true);
 
   const held = Array.from({ length: HELD_BYTES }, (_, id) => u8(OFF_HELD + id));
   const worn = Array.from({ length: WORN_BYTES }, (_, id) => u8(OFF_WORN + id));
@@ -314,7 +314,7 @@ export function xray(image) {
 }
 
 /** Name a named field's bytes as a display value: number, text or hex. */
-function fieldValue(bytes, name, at, length) {
+function fieldValue(bytes: Uint8Array<ArrayBufferLike>, name: string, at: number, length: number) {
   if (name.endsWith(".name") || name === "name") return textOf(bytes, at, length);
   if (length === 1) return bytes[at];
   if (length === 2) return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(at, true);
@@ -327,9 +327,9 @@ function fieldValue(bytes, name, at, length) {
   return hexOf(bytes, at, length);
 }
 
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: string | number | undefined, b: string | number | undefined) => JSON.stringify(a) === JSON.stringify(b);
 
-function pushRow(rows, field, a, b) {
+function pushRow(rows: { field: string; a: string | number | undefined; b: string | number | undefined; }[], field: string, a: string | number | undefined, b: string | number | undefined) {
   if (!same(a, b)) rows.push({ field, a, b });
 }
 
@@ -339,14 +339,14 @@ function pushRow(rows, field, a, b) {
  * whole bag), and every differing byte inside a retained gap gets its own
  * `retained +0x<offset>` row. Identical images -> an empty list.
  */
-export function diffSlots(a, b) {
+export function diffSlots(a: Uint8Array<ArrayBuffer> | null, b: Uint8Array<ArrayBuffer> | null) {
   const A = asBytes(a);
   const B = asBytes(b);
   if (A.length !== RESIDENT_SAVE_SIZE || B.length !== RESIDENT_SAVE_SIZE) {
     throw new Error(`save X-ray: both images must be ${RESIDENT_SAVE_SIZE} bytes`);
   }
-  const rows = [];
-  const at = (atA, name, length) => {
+  const rows: { field: string; a: number | undefined; b: number | undefined; }[] = [];
+  const at = (atA: number | undefined, name: string, length: number) => {
     const va = fieldValue(A, name, atA, length);
     const vb = fieldValue(B, name, atA, length);
     pushRow(rows, name, va, vb);
@@ -416,7 +416,7 @@ export function diffSlots(a, b) {
 
 /** The three card slots the driver writes (web/save.js SLOT_KEY / SLOT_COUNT). */
 export const SLOT_COUNT = 3;
-export const slotKey = (i) => `mcardSlot${i}`;
+export const slotKey = (i: number) => `mcardSlot${i}`;
 
 /**
  * Raw slot entries -> page rows. `raw` is what the browser store held: three
@@ -424,7 +424,7 @@ export const slotKey = (i) => `mcardSlot${i}`;
  * carries an `image` of the right length; an empty slot or one written before the
  * card driver existed has `xray: null` and is never read as a block.
  */
-export function decodeSlots(raw) {
+export function decodeSlots(raw: (string | null)[]) {
   const list = Array.isArray(raw) ? raw : [];
   return Array.from({ length: SLOT_COUNT }, (_, slot) => {
     const entry = parseEntry(list[slot]);
@@ -444,7 +444,7 @@ export function decodeSlots(raw) {
   });
 }
 
-function parseEntry(raw) {
+function parseEntry(raw: string) {
   if (!raw) return null;
   if (typeof raw === "string") {
     try { return JSON.parse(raw); } catch { return null; }

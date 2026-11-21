@@ -76,7 +76,7 @@ export function makeMenus(B: BattleContext) {
     B.sayOriginal(b, B.itemAnnouncementSpec(b, item), `Used ${item.name}!`);
   }
 /** The technique id the screen answered with, resolved through the same list. */
-  function confirmTech(b, id) {
+  function confirmTech(b, id: number) {
     const skill = B.playerTechs().find((entry) => (Number(entry.techWord ?? 0) & 0x1fff) === id);
     if (!skill) { b.state = ST.PLAYER_MENU; return; }
     b.techSel = Math.max(0, B.playerTechs().indexOf(skill));
@@ -171,7 +171,7 @@ export function makeMenus(B: BattleContext) {
    * at :16392-16410). The picked row only chooses which of that joke's two lines is
    * printed (:24738-24754). Shared by the ported list and the hand-drawn fallback.
    */
-  function confirmJokePick(b, row) {
+  function confirmJokePick(b, row: string | number) {
     const joke = b.confusedMenu?.[row] ?? b.confusedMenu?.[0];
     const magnitude = b.player.ailments.confuse?.power ?? 0;
     // The gag's wind term is the block F0x8009EC94 has just rebuilt

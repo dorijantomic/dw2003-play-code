@@ -32,7 +32,7 @@ export const SPEEDS = Object.freeze([1, 1.5, 2, 3]);
  * even at x3. With x1 and a normal 60 Hz frame the frame is handed through
  * unchanged.
  */
-export function battleDelta(dt, speed, capSeconds = 0.05) {
+export function battleDelta(dt: number, speed, capSeconds = 0.05) {
   const wanted = Number(speed);
   const s = Number.isFinite(wanted) ? Math.min(SPEEDS[SPEEDS.length - 1], Math.max(SPEEDS[0], wanted)) : 1;
   return Math.min(dt * s, capSeconds);
@@ -44,6 +44,6 @@ export function battleDelta(dt, speed, capSeconds = 0.05) {
  * an old save or a missing settings object behaves exactly like the setting has
  * never existed.
  */
-export function battleSpeedOn(fx) {
+export function battleSpeedOn(fx: { battlespeed: boolean; }) {
   return fx?.battlespeed === true;
 }

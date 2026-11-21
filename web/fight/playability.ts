@@ -61,14 +61,14 @@ export function kitTechIds(species, dedupe = true) {
 }
 
 /** A folder's present-clip indices as a Set (an array from anim.json, or a Set from a caller). */
-export function presentClips(present, folder) {
+export function presentClips(present, folder: string | number) {
   const v = folder ? present?.[folder] : null;
   if (!v) return new Set();
   return v instanceof Set ? v : new Set(v);
 }
 
 /** The donor row for (folder, clip) from a lookup function (donorRow) or a plain table, or null. */
-export function donorOf(donors, folder, clip) {
+export function donorOf(donors, folder: string | number, clip) {
   if (!donors || !folder || !Number.isInteger(clip)) return null;
   let row = null;
   try {

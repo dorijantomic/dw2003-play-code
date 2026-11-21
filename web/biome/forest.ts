@@ -8,17 +8,17 @@ import type { LODLevel, SpeciesAddOpts, ToonLoadOpts } from "./types.js";
 
 export const ASSETS = new URL("./assets/", import.meta.url).href;
 const QS = "Quaternius Stylized Nature MegaKit (Standard)", QU = "https://quaternius.com/packs/stylizednaturemegakit.html";
-const PS = "Poly Haven (decimated, 1K albedo)", PU = (id) => `https://polyhaven.com/a/${id}`;
+const PS = "Poly Haven (decimated, 1K albedo)", PU = (id: string | undefined) => `https://polyhaven.com/a/${id}`;
 const CC0 = "CC0 1.0";
 
 // ------------------------------------------------------------------ entry helpers (shared with the Shared tab)
-export const q = (id, cat, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "q_" + id, cat, name: o.name || id.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
+export const q = (id: string | undefined, cat: string, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "q_" + id, cat, name: o.name || id.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
   make: async () => partsGroup((await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
-export const ph = (id, cat, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "ph_" + id, cat, name: o.name || id.replace(/_/g, " "), source: PS, licence: CC0, url: PU(id),
+export const ph = (id: string, cat: string, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "ph_" + id, cat, name: o.name || id.replace(/_/g, " "), source: PS, licence: CC0, url: PU(id),
   make: async () => partsGroup((await loadToon(`${ASSETS}polyhaven/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
-export const proc = (id, cat, name, make, e = {}) => ({ id: "proc_" + id, cat, name, source: "Procedural (our code)", licence: "own code", url: "web/biome/procedural.js", make, ...e });
+export const proc = (id: string, cat: string, name: string, make, e = {}) => ({ id: "proc_" + id, cat, name, source: "Procedural (our code)", licence: "own code", url: "web/biome/procedural.js", make, ...e });
 /** photoreal texture on a round ground disc through the toon ground material (does not spin: world-space mapping) */
-export const texDisc = (id, cat, name, o: { tile?: number } = {}) => ({ id: "tex_" + id, cat, name, source: PS + " texture", licence: CC0, url: PU(id), noSpin: true,
+export const texDisc = (id: string | undefined, cat: string, name: string | undefined, o: { tile?: number } = {}) => ({ id: "tex_" + id, cat, name, source: PS + " texture", licence: CC0, url: PU(id), noSpin: true,
   make: async () => {
     const t = await loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
     const m = groundMaterial([t, t, t, t], { tile: o.tile || 1.1, splat: [2, 2, 0, 9] });
@@ -27,7 +27,7 @@ export const texDisc = (id, cat, name, o: { tile?: number } = {}) => ({ id: "tex
 
 // ------------------------------------------------------------------ EZ-Tree trees (MIT): birch, oak
 function setDeep(o, m) { for (const [k, v] of Object.entries(m) as [string, any][]) (v && typeof v === "object" && !v.isColor ? setDeep(o[k], v) : (o[k] = v)); }
-export function ezTreeParts(preset, seed, over, height) {
+export function ezTreeParts(preset: string, seed: number | undefined, over: { leaves: { type: string; tint: number; count: number; size: number; } | { tint: number; count: number; size: number; } | { type: string; tint: number; count: number; size: number; } | { type: string; tint: number; count: number; size: number; } | { tint: number; } | { tint: number; } | { tint: number; }; bark?: { type: string; tint: number; } | { type: string; tint: number; } | { type: string; tint: number; } | { tint: number; } | { tint: number; } | { tint: number; }; }, height: number | undefined) {
   const t = new Tree();
   t.options.copy(structuredClone(TreePreset[preset]));
   setDeep(t.options, over || {});
@@ -124,7 +124,7 @@ export const entries = [
 ];
 
 // ---- grid helpers
-async function litterPile(kind) {
+async function litterPile(kind: string | undefined) {
   const parts = P.litterParts(kind, 0.4), n = 60, r = rng(4), m = new Float32Array(n * 16);
   for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 1.1; composeTRS(m, i, Math.cos(a) * d, 0.01 + i * 0.0006, Math.sin(a) * d, r() * 6.28, 0.8 + r() * 0.7); }
   const g = instancedParts(parts, m, n);
@@ -153,13 +153,13 @@ export function grassPatch() {
 
 // ------------------------------------------------------------------ the assembled forest
 const HALF = 110;
-function vnoise(x, z, f, s = 0) { // cheap smooth value noise 0..1
+function vnoise(x: number | undefined, z: number | undefined, f: number, s = 0) { // cheap smooth value noise 0..1
   const X = x * f + s * 17.3, Z = z * f + s * 9.1, xi = Math.floor(X), zi = Math.floor(Z), fx = X - xi, fz = Z - zi;
-  const h = (i, j) => { const n = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const h = (i: number, j: number) => { const n = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
   const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
   return (h(xi, zi) * (1 - sx) + h(xi + 1, zi) * sx) * (1 - sz) + (h(xi, zi + 1) * (1 - sx) + h(xi + 1, zi + 1) * sx) * sz;
 }
-function dart(n, seed, minD, ok) {
+function dart(n: number, seed: number, minD: number, ok) {
   const r = rng(seed), cell = minD, grid = new Map(), out = []; let tries = 0;
   while (out.length < n && tries++ < n * 60) {
     const x = (r() * 2 - 1) * HALF, z = (r() * 2 - 1) * HALF; if (ok && !ok(x, z, r)) continue;
@@ -173,8 +173,8 @@ function dart(n, seed, minD, ok) {
 /** returns { root, update(camera, frame), info } ; info.species = [{name, count, tris}] */
 export async function buildForest(ctx) {
   const { renderer, tune = {} } = ctx;
-  const root = new THREE.Group(), lods = [], cull = new CullSet(), info = { species: [], impostors: 0 };
-  const note = (name, n, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a, p) => a + tris(p.geo), 0) : 0 });
+  const root = new THREE.Group(), lods: LODSpecies[] = [], cull = new CullSet(), info = { species: [], impostors: 0 };
+  const note = (name: string, n: number, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0) : 0 });
   // ---- ground
   const tex = await Promise.all(["forest_ground_04", "forest_leaves_02", "brown_mud_leaves_01", "wood_chip_path"].map((n) => loadTex(`${ASSETS}polyhaven/tex/${n}_diff_1k.jpg`)));
   const gg = new THREE.PlaneGeometry(HALF * 2.6, HALF * 2.6, 110, 110); gg.rotateX(-Math.PI / 2);
@@ -185,27 +185,27 @@ export async function buildForest(ctx) {
 
   // ---- trees (dart throwing: no overlaps) ----
   const clearing = 5.5;
-  const pts = dart(tune.trees ?? 300, 21, 3.4, (x, z) => Math.hypot(x, z) > clearing + 1 && vnoise(x, z, 0.03, 1) > 0.18);
+  const pts = dart(tune.trees ?? 300, 21, 3.4, (x: number, z: number) => Math.hypot(x, z) > clearing + 1 && vnoise(x, z, 0.03, 1) > 0.18);
   const B = [], Pn = [], Bi = [], D = [];
   for (const [x, z] of pts) { const n = vnoise(x, z, 0.022, 2), r2 = vnoise(x * 7.1, z * 3.3, 1, 5); (n > 0.62 ? Pn : n < 0.38 ? Bi : (r2 > 0.8 ? D : B)).push([x, z]); }
   // top up: some dead trees, birch groves, a few broadleaf among pines
-  const treeGrid = new Map(); const gk = (x, z) => Math.floor(x / 4) + "," + Math.floor(z / 4);
+  const treeGrid = new Map(); const gk = (x: number | undefined, z: number | undefined) => Math.floor(x / 4) + "," + Math.floor(z / 4);
   for (const [x, z] of pts) { const k = gk(x, z); if (!treeGrid.has(k)) treeGrid.set(k, []); treeGrid.get(k).push([x, z]); }
-  const nearTree = (x, z, d) => { const cx = Math.floor(x / 4), cz = Math.floor(z / 4), R = Math.ceil(d / 4); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) for (const p of treeGrid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < d) return true; return false; };
+  const nearTree = (x: number, z: number, d: number) => { const cx = Math.floor(x / 4), cz = Math.floor(z / 4), R = Math.ceil(d / 4); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) for (const p of treeGrid.get((cx + i) + "," + (cz + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < d) return true; return false; };
 
   const species = async (name, urls, positions, o) => {
     if (!positions.length) return null;
     const l0 = urls.l0 ? await urls.l0() : null, l1 = urls.l1 ? await urls.l1() : null;
     const obj = partsGroup(l0.parts); const imp = bakeImpostor(renderer, obj, 8, 256);
     const r = rng(name.length * 977 + positions.length), mats = new Float32Array(positions.length * 16);
-    positions.forEach(([x, z], i) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, (o.scale || [0.8, 1.25])[0] + ((o.scale || [0.8, 1.25])[1] - (o.scale || [0.8, 1.25])[0]) * r(), 0.03 * r(), r() * 6.28));
+    positions.forEach(([x, z], i: number) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, (o.scale || [0.8, 1.25])[0] + ((o.scale || [0.8, 1.25])[1] - (o.scale || [0.8, 1.25])[0]) * r(), 0.03 * r(), r() * 6.28));
     const levels: LODLevel[] = [{ parts: l0.parts }]; if (l1) levels.push({ parts: l1.parts }); levels.push({ impostor: imp.factory });
     const dist = l1 ? [o.d0 ?? 26, o.d1 ?? 70] : [o.d1 ?? 55];
     const sp = new LODSpecies(name, levels, mats, positions.length, dist); lods.push(sp); root.add(sp.group); note(name, positions.length, l0.parts); info.impostors++;
     return { l0, positions };
   };
-  const qT = (id, t) => ({ l0: () => loadToon(`${ASSETS}quaternius/${id}.glb`, t), l1: () => loadToon(`${ASSETS}quaternius/${id}_lod1.glb`, t) });
-  const spread = (arr, k) => arr.filter((_, i) => i % k.m === k.i);
+  const qT = (id: string | undefined, t: ToonLoadOpts | undefined) => ({ l0: () => loadToon(`${ASSETS}quaternius/${id}.glb`, t), l1: () => loadToon(`${ASSETS}quaternius/${id}_lod1.glb`, t) });
+  const spread = (arr, k) => arr.filter((_, i: number) => i % k.m === k.i);
   const bT = { wind: 0.35, flutter: 0.9, trans: 0.4 }, pT = { wind: 0.3, flutter: 0.5, trans: 0.2 };
   const bSpecies = ["CommonTree_1", "CommonTree_2", "CommonTree_3", "CommonTree_4", "TwistedTree_1", "TwistedTree_2"];
   const broadInfo = [];
@@ -217,13 +217,13 @@ export async function buildForest(ctx) {
     const pos = spread(Bi, { m: 2, i: s }); if (!pos.length) continue;
     const parts = ezTreeParts("Aspen Medium", [3, 11][s], BIRCH, [10, 8.5][s]);
     const obj = partsGroup(parts), imp = bakeImpostor(renderer, obj, 8, 256), r = rng(50 + s), mats = new Float32Array(pos.length * 16);
-    pos.forEach(([x, z], i) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, 0.8 + 0.45 * r(), 0.03 * r(), r() * 6.28));
+    pos.forEach(([x, z], i: number) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, 0.8 + 0.45 * r(), 0.03 * r(), r() * 6.28));
     const sp = new LODSpecies("birch" + s, [{ parts }, { impostor: imp.factory }], mats, pos.length, [45]); lods.push(sp); root.add(sp.group); note("EZ birch " + "AB"[s], pos.length, parts); info.impostors++;
   }
   for (let s = 0; s < 3; s++) {
     const pos = spread(D, { m: 3, i: s }); const id = "DeadTree_" + (s + 1); if (!pos.length) continue;
     const l0 = await loadToon(`${ASSETS}quaternius/${id}.glb`, { wind: 0.05 }), l1 = await loadToon(`${ASSETS}quaternius/${id}_lod1.glb`, { wind: 0.05 }), r = rng(70 + s), mats = new Float32Array(pos.length * 16);
-    pos.forEach(([x, z], i) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, 0.8 + 0.4 * r(), 0.05 * r(), r() * 6.28));
+    pos.forEach(([x, z], i: number) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, 0.8 + 0.4 * r(), 0.05 * r(), r() * 6.28));
     const sp = new LODSpecies(id, [{ parts: l0.parts }, { parts: l1.parts }], mats, pos.length, [50]); lods.push(sp); root.add(sp.group); note(id, pos.length, l0.parts);
   }
   // ez oak among broadleaf stands
@@ -239,21 +239,21 @@ export async function buildForest(ctx) {
   const FD = [30, 52];
   const area = [0, 0, HALF, HALF];
   const dens = {
-    open: (x, z) => (Math.hypot(x, z) < 3 ? 0.15 : 0.5 + 0.5 * vnoise(x, z, 0.09, 3)),
-    patchy: (x, z, s = 4, f = 0.06) => Math.pow(vnoise(x, z, f, s), 2.2) * 1.8,
-    underTree: (x, z) => (nearTree(x, z, 3.2) ? 1 : 0.12),
-    nearTrunk: (x, z) => (nearTree(x, z, 1.8) ? 1 : 0),
+    open: (x: number, z: number) => (Math.hypot(x, z) < 3 ? 0.15 : 0.5 + 0.5 * vnoise(x, z, 0.09, 3)),
+    patchy: (x: number | undefined, z: number | undefined, s = 4, f = 0.06) => Math.pow(vnoise(x, z, f, s), 2.2) * 1.8,
+    underTree: (x: number, z: number) => (nearTree(x, z, 3.2) ? 1 : 0.12),
+    nearTrunk: (x: number, z: number) => (nearTree(x, z, 1.8) ? 1 : 0),
   };
-  const add = async (name, loader, n, density, sc, extra: SpeciesAddOpts = {}) => {
+  const add = async (name, loader, n: number, density, sc: number[], extra: SpeciesAddOpts = {}) => {
     const parts = Array.isArray(loader) ? loader : (await loader).parts;
-    const s = scatter(n, name.length * 31 + n, area, (x, z) => (Math.hypot(x, z) < 1.2 ? 0 : density(x, z)), { scale: sc, tilt: extra.tilt || 0, yOffset: extra.y || 0 });
+    const s = scatter(n, name.length * 31 + n, area, (x: number, z: number) => (Math.hypot(x, z) < 1.2 ? 0 : density(x, z)), { scale: sc, tilt: extra.tilt || 0, yOffset: extra.y || 0 });
     const g = extra.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name); g.name = name; root.add(g); note(name, s.count, parts);
     if (extra.colors) for (const im of g.children) { const r = rng(5); for (let i = 0; i < s.count; i++) im.setColorAt(i, extra.colors[Math.floor(r() * extra.colors.length)]); im.instanceColor.needsUpdate = true; }
     return { g, s, parts };
   };
-  const L = (id, t) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
-  const H = (id, t) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
-  const scaleTune = tune.density ?? 1, N = (n) => Math.round(n * scaleTune);
+  const L = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
+  const H = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
+  const scaleTune = tune.density ?? 1, N = (n: number) => Math.round(n * scaleTune);
 
   await add("grass blades", P.grassClumpParts({ seed: 7, blades: 4, segs: 3, fade: [24, 44] }), N(14000), (x, z) => dens.patchy(x, z, 4, 0.05) * 0.9 + 0.1, [0.8, 1.5]);
   await add("grass tall blades", P.grassClumpParts({ seed: 13, blades: 4, segs: 3, h: [0.7, 1.2], w: 0.045, fade: [24, 44], tipCol: [0.72, 0.8, 0.28] }), N(2500), (x, z) => dens.patchy(x, z, 6, 0.04), [0.9, 1.6]);
@@ -289,7 +289,7 @@ export async function buildForest(ctx) {
   await add("root cluster 01", H("root_cluster_01", { grade: true }), N(22), dens.nearTrunk, [0.9, 1.4], { y: -0.05 });
   await add("root cluster 02", H("root_cluster_02", { grade: true }), N(22), dens.nearTrunk, [0.9, 1.4], { y: -0.05 });
   await add("single root", H("single_root", { grade: true }), N(40), dens.nearTrunk, [0.9, 1.5], { y: -0.03 });
-  const mossy = async (p, m) => { for (const x of p.parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = "moss"; } return p; };
+  const mossy = async (p, m: number) => { for (const x of p.parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = "moss"; } return p; };
   await add("fallen log 01", mossy(await H("dead_tree_trunk", { grade: true, fade: [60, 90] }), 0.8), N(12), dens.underTree, [0.9, 1.4]);
   await add("fallen log 02", mossy(await H("dead_tree_trunk_02", { grade: true, fade: [60, 90] }), 0.8), N(12), dens.underTree, [0.9, 1.4]);
   await add("stump 01", mossy(await H("tree_stump_01", { grade: true, fade: [60, 90] }), 0.9), N(9), dens.open, [0.9, 1.4]);
@@ -301,7 +301,7 @@ export async function buildForest(ctx) {
   await add("stone 01", mossy(await H("stone_01", { grade: true }), 0.7), N(40), dens.open, [0.8, 1.6]);
   await add("rock moss set 01", H("rock_moss_set_01", { grade: true, fade: [70, 100] }), N(12), dens.open, [0.8, 1.4]);
   await add("rock moss set 02", H("rock_moss_set_02", { grade: true, fade: [70, 100] }), N(12), dens.open, [0.8, 1.4]);
-  await add("boulder 01", mossy(await H("boulder_01", { grade: true, fade: [90, 130] }), 0.85), N(3), (x, z) => (Math.hypot(x, z) > 12 ? 1 : 0), [1.0, 1.8]);
+  await add("boulder 01", mossy(await H("boulder_01", { grade: true, fade: [90, 130] }), 0.85), N(3), (x: number, z: number) => (Math.hypot(x, z) > 12 ? 1 : 0), [1.0, 1.8]);
   for (const n of ["Round_Small_1", "Round_Small_2", "Square_Small_1", "Square_Small_3"]) await add("RockPath_" + n, L("RockPath_" + n, { h: 0.1 }), N(60), dens.open, [0.9, 1.5]);
   for (const n of ["Pebble_Round_1", "Pebble_Round_3", "Pebble_Square_1", "Pebble_Square_4"]) await add(n, L(n, { h: 0.06 }), N(160), dens.open, [0.7, 1.5]);
   // moss patches and mushrooms
@@ -333,7 +333,7 @@ export async function buildForest(ctx) {
   const lodCamera = new THREE.Vector3(1e9, 0, 0);
   return {
     root, info,
-    update(camera, frame) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
+    update(camera, frame: number) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
     lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 }; for (const s of lods) { const c = s.counts(), L = c.length; t.lod0 += c[0]; if (L === 3) t.lod1 += c[1]; t.far += L === 3 ? c[2] : c[1]; } return t; },
     totals() { let t = 0, n = 0; for (const s of info.species) { t += s.tris; n += s.n; } return { species: info.species.length, instances: n }; },
   };

@@ -41,9 +41,9 @@ interface NewMapPack {
 }
 
 /** Add the records to a manifest (never replaces a disc map). Returns the ids added. */
-export function mergeNewMaps(manifest, nm: NewMapPack) {
+export function mergeNewMaps(manifest: { maps: { id: string; }[]; }, nm: NewMapPack) {
     const have = new Set(manifest.maps.map((m) => m.id));
-    const added = [];
+    const added: string[] = [];
     for (const r of nm.records) {
         if (have.has(r.id)) continue;
         manifest.maps.push(r);
@@ -55,12 +55,12 @@ export function mergeNewMaps(manifest, nm: NewMapPack) {
 }
 
 /** The scene of a new map, or null when `id` is not one. */
-export function newMapScene(nm, id) {
+export function newMapScene(nm, id: string | number) {
     return nm?.scenes?.[id] ?? null;
 }
 
 /** Put the exits that lead into new maps onto a neighbour's scene (once; safe to call again). */
-export function addNewMapExits(nm, mapId, scene) {
+export function addNewMapExits(nm, mapId: string | number, scene) {
     const list = nm?.exits?.[mapId];
     if (!list?.length) return;
     scene.exits = scene.exits ?? [];

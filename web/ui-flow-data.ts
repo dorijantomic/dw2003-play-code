@@ -267,7 +267,7 @@ export const UI_FLOWS = [
 
 /** Classification and source for one visible node. Browser code is not evidence
  *  of the original behavior; the two dimensions deliberately stay separate. */
-export function classifyFlowNode(flow, node) {
+export function classifyFlowNode(flow, node: { id: string; }) {
   const surfaces = Object.entries(flow.ownershipSurfaces as Record<string, string[]>)
     .filter(([, ids]) => ids.includes(node.id)).map(([name]) => name);
   if (surfaces.length !== 1) throw new Error(`${flow.id}/${node.id}: expected one ownership surface, got ${surfaces.length}`);

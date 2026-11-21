@@ -5,13 +5,13 @@
 import { fitRun, measureText, FACE } from "./text.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const el = (cls, parent, tag = "div") => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
+const el = (cls: string, parent: HTMLElement, tag = "div") => { const e = document.createElement(tag); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
 const F_LABEL = FACE.label;
 
 /** A text element with its fit rule (the same fitRun the other parts use); `max` = widest allowed px. */
-function txt(parent, cls, text, sizePx, max, family = F_LABEL, weight = 400, spacing = 0) {
+function txt(parent: HTMLElement, cls: string, text: string, sizePx: number, max: number, family = F_LABEL, weight = 400, spacing = 0) {
     const e = el(cls, parent, "span");
-    const fit = fitRun((s, sp) => measureText(String(text), family, weight, s, sp), sizePx, spacing, max);
+    const fit = fitRun((s: number, sp: number) => measureText(String(text), family, weight, s, sp), sizePx, spacing, max);
     e.textContent = String(text);
     e.dataset.uicText = String(text); e.dataset.uicFits = fit.fits ? "1" : "0";
     e.style.fontSize = `${+fit.size.toFixed(2)}px`; e.style.letterSpacing = `${+fit.spacing.toFixed(2)}px`;
@@ -19,29 +19,29 @@ function txt(parent, cls, text, sizePx, max, family = F_LABEL, weight = 400, spa
     return e;
 }
 /** A counting number: its final value is the text (data), the CSS counter animates 0 -> value once. */
-function count(parent, cls, value, sizePx, max, prefix = "") {
+function count(parent: HTMLElement, cls: string, value: number, sizePx: number, max: number, prefix = "") {
     const e = el(`cnt ${cls}`, parent, "b");
     e.style.setProperty("--n", String(Math.round(value)));
     e.dataset.uicText = `${prefix}${Math.round(value)}`; e.dataset.uicFits = "1";
     e.dataset.prefix = prefix;
-    const fit = fitRun((s, sp) => measureText(`${prefix}${Math.round(value)}`.replace(/\d/g, "0"), F_LABEL, 400, s, sp), sizePx, 0, max);
+    const fit = fitRun((s: number, sp: number) => measureText(`${prefix}${Math.round(value)}`.replace(/\d/g, "0"), F_LABEL, 400, s, sp), sizePx, 0, max);
     e.style.fontSize = `${+fit.size.toFixed(2)}px`; e.style.setProperty("--pre", `"${prefix}"`);
     e.style.maxWidth = `${Math.round(max)}px`;
     return e;
 }
-const ringSvg = (a, b) => {
-    const circ = (cls, r, w, ex = "") => `<circle class="${cls}" cx="150" cy="150" r="${r}" stroke-width="${w}" fill="none" ${ex}/>`;
-    const arc = (cls, d0, d1) => `<circle class="${cls}" cx="150" cy="150" r="120" stroke-width="16" fill="none" pathLength="100" transform="rotate(-90 150 150)" style="--a:${d0};--d:${d1};stroke-dasharray:${cls === "old" ? `${d0} 100` : `0 ${d0} ${d1} 100`}"/>`;
+const ringSvg = (a: number, b: number) => {
+    const circ = (cls: string, r: number, w: number, ex = "") => `<circle class="${cls}" cx="150" cy="150" r="${r}" stroke-width="${w}" fill="none" ${ex}/>`;
+    const arc = (cls: string, d0: number, d1: number) => `<circle class="${cls}" cx="150" cy="150" r="120" stroke-width="16" fill="none" pathLength="100" transform="rotate(-90 150 150)" style="--a:${d0};--d:${d1};stroke-dasharray:${cls === "old" ? `${d0} 100` : `0 ${d0} ${d1} 100`}"/>`;
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" aria-hidden="true"><g class="rot">${circ("tk", 142, 6, 'pathLength="360" stroke-dasharray=".9 5.1"')}</g>${circ("trk", 120, 16)}${circ("thin", 98, 1.5)}${arc("old", a, 0)}${arc("new", a, Math.max(0, b - a))}</svg>`;
 };
-const line = (parent, text, sizePx, max, right = false) => {
+const line = (parent: HTMLElement, text: string, sizePx: number, max: number, right = false) => {
     const w = el(`vl-wrap${right ? " r" : ""}`, parent);
     el("vl", w, "i"); txt(w, "vl-t", text, sizePx, max, F_LABEL, 400, sizePx * 0.4); el("vl r", w, "i");
     return w;
 };
 
 /** A learned line under a ring: a tech in bright cyan-white, a digivolve as a highlighted gold pill with a NEW tag (never dark ink on the blue). */
-function learnLine(root, text, digi, D, x, y) {
+function learnLine(root: HTMLElement, text: string, digi: boolean, D: number, x: number, y: number) {
     const c = el(`lrn${digi ? " d" : ""}`, root);
     c.style.cssText = `left:${Math.round(x)}px;top:${Math.round(y)}px;width:${Math.round(D * 1.2)}px`;
     if (digi) { const nw = el("nw", c, "i"); nw.textContent = "NEW"; nw.style.fontSize = `${Math.round(D * 0.045)}px`; }
@@ -50,7 +50,7 @@ function learnLine(root, text, digi, D, x, y) {
 }
 
 /** Build / rebuild the page for `desc` (descriptor from sheets.js composeVictory). */
-export function fillVic(root, desc, g) {
+export function fillVic(root: HTMLElement, desc, g) {
     const r = g.rect, W = r.width, H = r.height, k = Math.min(W / 1280, H / 720);
     root.className = "uic-part uic-vic";
     root.dataset.uicPart = desc.part;
@@ -58,13 +58,13 @@ export function fillVic(root, desc, g) {
     root.style.cssText = `position:absolute;left:${Math.round(r.left)}px;top:${Math.round(r.top)}px;width:${Math.round(r.width)}px;height:${Math.round(r.height)}px`;
     root.replaceChildren();
     el("vic-bg", root);
-    const px = (n) => n * k;
+    const px = (n: number) => n * k;
     if (desc.page === "exp") {
         const n = Math.max(1, desc.rings.length), D = Math.min(H * 0.4, W / (n * 1.3), 340 * k * 1.15), gap = Math.min(D * 0.45, (W - n * D) / (n + 1));
         const x0 = (W - (n * D + (n - 1) * gap)) / 2, y0 = H * 0.2;
         const title = el("vic-ttl", root); line(title, desc.up ? "LEVEL UP" : "EXPERIENCE", px(desc.up ? 70 : 26), W * 0.5);
         title.style.top = `${Math.round(H * (desc.up ? 0.045 : 0.06))}px`;
-        desc.rings.forEach((p, i) => {
+        desc.rings.forEach((p, i: number) => {
             const rg = el(`vr${p.up ? " k" : ""}${p.gain > 0 || p.up ? "" : " z"}`, root);       // z = nothing gained: calmer ring, the name stays bright
             rg.style.cssText = `left:${Math.round(x0 + i * (D + gap))}px;top:${Math.round(y0)}px;width:${Math.round(D)}px;height:${Math.round(D)}px;--i:${i}`;
             rg.innerHTML = ringSvg(Math.round(p.a * 100), Math.round(p.b * 100));

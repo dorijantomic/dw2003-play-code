@@ -68,7 +68,7 @@ export function diffSnapshots(a, b) {
     const picksA = isObject(A.picks) ? A.picks : {}, picksB = isObject(B.picks) ? B.picks : {};
     const visitedA = listOf(A.visited), visitedB = listOf(B.visited);
     const metA = listOf(A.met), metB = listOf(B.met);
-    const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+    const has = (o, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
     const addedActive = Object.keys(activeB).filter((id) => !has(activeA, id));
     const removedActive = Object.keys(activeA).filter((id) => !has(activeB, id));

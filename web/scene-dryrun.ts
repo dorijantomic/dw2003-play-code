@@ -59,6 +59,7 @@ import { createCutscene } from "../engine/systems/cutscene-manager.ts";
 import { FIELD_TICK_RATE, FIELD_WALK_MAGNITUDE } from "../engine/systems/field-movement.ts";
 import { castOf, compileScene } from "./quest-scenes.js";
 import { questGrid, questStandFree, questWalkLegs } from "./quest-walk.js";
+import type { QuestSceneCompileOpts } from "./types/quest-scenes.ts";
 import type { SceneDryRunOpts, SceneDryrunRecord } from "./types/scene-dryrun.js";
 
 /** One stall: the same pc and the same wait mode for this many step() calls (the spec's fixed rule). */
@@ -71,15 +72,15 @@ export const DEFAULT_MAX_SECONDS = 120;
 export const WALK_SPEED = (FIELD_WALK_MAGNITUDE / 0x100) * FIELD_TICK_RATE;
 
 /** The stall rule: a wait state that has not changed for `frames` steps is one stall. */
-export function stallAt(sinceFrame, frame, frames = STALL_FRAMES) {
+export function stallAt(sinceFrame: number, frame: number, frames = STALL_FRAMES) {
     return frame - sinceFrame >= frames;
 }
 
-const num = (v, fallback) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
-const list = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+const num = (v: number | undefined, fallback: number) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
+const list = (v: string | number | (string | number)[] | null | undefined) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 
 /** The entity the VM will move: the caller's own record when it has a position, so the caller sees where it ended. */
-function entityOf(record) {
+function entityOf(record: { id?: number; x: number; y: number; dir?: string; } | undefined) {
     if (record && typeof record === "object") {
         if (!Number.isFinite(Number(record.x))) record.x = 0;
         if (!Number.isFinite(Number(record.y))) record.y = 0;
@@ -133,7 +134,7 @@ export function castFromPosts(sceneJson, extraNpcsJson, mapId) {
 }
 
 /** The scene each step emits, as opcode and event index spans: prefix compiles, so the mapping is the compiler's own. */
-function stepSpans(steps, compileOpts) {
+function stepSpans(steps, compileOpts: QuestSceneCompileOpts | undefined) {
     const spans = [];
     let opcode = 0;
     let event = 0;
@@ -173,12 +174,12 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     const moving = new Set(castOf(sceneSteps));
     const others = [...cast.entries()].filter(([id]) => !moving.has(id)).map(([, e]) => e);
     const free = grid
-        ? (x, y) => questStandFree(grid, x, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30)
+        ? (x: number, y: number) => questStandFree(grid, x, y) && !others.some((n) => Math.hypot(n.x - x, n.y - y) < 30)
         : null;
-    const walkRouter = grid ? (ax, ay, bx, by) => questWalkLegs(grid, ax, ay, bx, by) : null;
+    const walkRouter = grid ? (ax: number | undefined, ay: number | undefined, bx: number | undefined, by: number | undefined) => questWalkLegs(grid, ax, ay, bx, by) : null;
     const compileOpts = {
         playerId,
-        pos: (id) => {
+        pos: (id: number) => {
             if (id === playerId) return { x: player.x, y: player.y };
             const e = cast.get(Number(id));
             return e ? { x: e.x, y: e.y } : null;
@@ -191,22 +192,22 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     const spans = stepSpans(sceneSteps, compileOpts);
     const errors = [...compiled.errors];
 
-    const stepOfOpcode = (index) => spans.find((s) => index >= s.start && index < s.end)?.step ?? spans[spans.length - 1]?.step ?? 0;
-    const stepOfEvent = (index) => spans.find((s) => index >= s.firstEvent && index < s.endEvent)?.step ?? 0;
+    const stepOfOpcode = (index: number) => spans.find((s) => index >= s.start && index < s.end)?.step ?? spans[spans.length - 1]?.step ?? 0;
+    const stepOfEvent = (index: number) => spans.find((s) => index >= s.firstEvent && index < s.endEvent)?.step ?? 0;
     const chaseSteps = sceneSteps.map((s, i) => (s && typeof s === "object" && "chase" in s ? i + 1 : 0)).filter(Boolean);
 
     const says = [];
     const answers = [];
-    const events = [];
+    const events: SceneDryrunRecord[] = [];
     const walks = [];
-    const camera = [];
+    const camera: { at: number; kind: string; actor: number | null; x: number | null; y: number | null; mode: string; }[] = [];
     const handoffs = [];
     const stalls = [];
     let pendingFollowUp = null;
 
     const holdSay = new Set(list(opts.holdSay).map(Number).filter(Number.isFinite));
     const holdEvent = list(opts.holdEvent);
-    const answerFor = (n) => {
+    const answerFor = (n: number) => {
         const a = opts.answer;
         if (typeof a === "function") return num(a(n), 0);
         if (Array.isArray(a)) return num(a[n - 1], 0);
@@ -220,7 +221,7 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
         const n = Number(key);
         const line = compiled.speech[key];
         hooks.afterSay[n] = line?.ask
-            ? (resume) => {
+            ? (resume: () => void) => {
                 const answer = answerFor(n);
                 answers.push({ say: n, answer, at: vm.clock() });
                 resume();
@@ -230,7 +231,7 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     }
 
     let vm = null;
-    const sceneEvent = (index, resume) => {
+    const sceneEvent = (index: number, resume) => {
         const spec = compiled.events[index];
         if (!spec) return resume();
         const at = vm.clock();
@@ -274,7 +275,7 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     );
 
     /** The opcodes this frame executed, noted for the timeline (they are not looped back over). */
-    const noteOpcode = (index) => {
+    const noteOpcode = (index: number) => {
         const op = compiled.opcodes[index];
         if (!op) return;
         const parts = op.split(" ");
@@ -378,7 +379,7 @@ export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     const timeout = !ended && stalls.length === 0;
 
     // Which steps never played. A step that emits no opcode is "played" once the pc has reached its own boundary.
-    const played = (span) => (span.end === span.start ? maxPc >= span.end : maxPc > span.start);
+    const played = (span: { step: number; start: number; end: number; firstEvent: number; endEvent: number; } | undefined) => (span.end === span.start ? maxPc >= span.end : maxPc > span.start);
     const unreachableTail = pendingFollowUp ? [] : spans.filter((s) => !played(s)).map((s) => s.step);
     const conditionalTail = chaseSteps
         .filter((step) => played(spans[step - 1]))

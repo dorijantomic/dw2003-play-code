@@ -11,13 +11,13 @@
 // clears, ArrowDown moves into the list. The selected option is never filtered away, so the closed
 // select never goes blank.
 
-const norm = (s) => (s || "").toLowerCase();
+const norm = (s: string) => (s || "").toLowerCase();
 
 /** Does this option match every term? */
-function matches(opt, terms) {
+function matches(opt: HTMLOptionElement, terms) {
   if (!terms.length) return true;
   const hay = norm(opt.textContent) + " " + norm(opt.value);
-  return terms.every((t) => hay.includes(t));
+  return terms.every((t: string) => hay.includes(t));
 }
 
 /**

@@ -50,7 +50,7 @@ export function techGroup(skill) {
   return hit || { key: `${base}?`, type, clip, multi, label: `Other (${type}, clip ${clip})` };
 }
 
-export const groupOrder = (g) => GROUP_ORDER.get(g?.key) ?? 99;
+export const groupOrder = (g: { key: string; type: string; clip: number; multi: boolean; label: string; } | null) => GROUP_ORDER.get(g?.key) ?? 99;
 
 // Three display names differ from their model_map key; the same three that battle3d.js's
 // canonicalModelName() rewrites before resolveModelFolder (the pause/report screens print the
@@ -60,10 +60,10 @@ export const CANONICAL_NAME = {
   "Imperialdramon-F": "ImperialdramonFM",
   "Imperialdramon-P": "ImperialdramonPM",
 };
-export const canonicalName = (name) => CANONICAL_NAME[name] ?? name;
+export const canonicalName = (name: string | number) => CANONICAL_NAME[name] ?? name;
 
 /** Ownership class from the species id, exactly as the data splits it. */
-export function ownershipOf(id) {
+export function ownershipOf(id: number) {
   if (id <= 55) return "original";
   if (id >= 191) return "new";
   return "enemy";
@@ -99,7 +99,7 @@ export function buildModelIndex({ digimon, extraSpecies, extraCanon = null, mode
       family: s.family ?? m.family ?? null,
       tier: c.tier ?? m.tier ?? null,
       ownership: ownershipOf(s.id | 0),
-      techs: Array.isArray(s.techs) ? s.techs.filter((t) => t > 0) : [],
+      techs: Array.isArray(s.techs) ? s.techs.filter((t: number) => t > 0) : [],
       isStarter: !!(extraSpecies?.starters || []).some((x) => x.name === s.name),
       gaps: folder ? Object.keys(gaps[folder] || {}).map(Number).sort((a, b) => a - b) : [],
       source: s._kind,
@@ -122,7 +122,7 @@ export function buildModelIndex({ digimon, extraSpecies, extraCanon = null, mode
 }
 
 /** Case-insensitive substring search over the name and the folder. */
-export function matchesQuery(entry, query) {
+export function matchesQuery(entry, query: string) {
   const q = String(query || "").trim().toLowerCase();
   if (!q) return true;
   return entry.name.toLowerCase().includes(q) || String(entry.folder || "").toLowerCase().includes(q);
@@ -151,7 +151,7 @@ export function filterModels(list, { query = "", family = "", tier = "", element
  * A species with no technique rows (a folder-only variant) still gets reactions + idle.
  */
 export function actionsFor(entry, skills) {
-  const byId = skills instanceof Map ? skills : new Map((skills || []).map((s) => [s.id | 0, s]));
+  const byId = skills instanceof Map ? skills : new Map((skills || []).map((s: { id: number; }) => [s.id | 0, s]));
   const seen = new Set();
   const out = [];
   for (const id of entry?.techs || []) {
@@ -190,7 +190,7 @@ export function groupActions(actions) {
     if (!buckets.has(key)) buckets.set(key, { key, label: a.group?.label || key, actions: [] });
     buckets.get(key).actions.push(a);
   }
-  const order = (b) => {
+  const order = (b: { key: string; }) => {
     if (b.key.startsWith("bake|")) return -1;   // K21f: the A/B pair sits above every authored action
     if (b.key.startsWith("dw2|")) return -0.5;  // K25: the DW2 motion pair sits just below the bake pair
     const g = TECH_GROUPS.find((t) => t.key === b.key);
@@ -205,7 +205,7 @@ export function groupActions(actions) {
 
 /** Elements a species can show (the elements of its own techniques). */
 export function elementsOf(entry, skills) {
-  const byId = skills instanceof Map ? skills : new Map((skills || []).map((s) => [s.id | 0, s]));
+  const byId = skills instanceof Map ? skills : new Map((skills || []).map((s: { id: number; }) => [s.id | 0, s]));
   const set = new Set();
   for (const id of entry?.techs || []) {
     const s = byId.get(id | 0);
@@ -221,7 +221,7 @@ export function gateFor(gate, folder, clip) {
 }
 
 /** The contract's per (folder, clip, side) verdict from web/anim-contract-index.json. */
-export function contractFor(index, folder, clip, side) {
+export function contractFor(index, folder: string | number, clip, side: string | number) {
   const f = index?.byFolder?.[folder];
   if (!f) return null;
   const c = f[String(clip)];
@@ -249,7 +249,7 @@ export function describeScript(script, { folder, clip, donorRow = null, castBake
 }
 
 /** Merge a played action's clip with the model's resolved-script facts, for the info panel. */
-export function actionIsBuilt(entry, clip, gaps = {}) {
+export function actionIsBuilt(entry: { folder: string | number; }, clip, gaps = {}) {
   return !!(entry?.folder && gaps[entry.folder] && gaps[entry.folder][String(clip)]);
 }
 

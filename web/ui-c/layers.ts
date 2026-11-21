@@ -10,7 +10,7 @@ const scopes = new Map();     // key -> { el, c: { under, over, text }, art, art
 
 const hasDom = () => typeof document !== "undefined";
 
-export function ensureRoot(stage) {
+export function ensureRoot(stage: { appendChild: (arg0: HTMLDivElement) => void; }) {
     if (root && root.isConnected) return root;
     root = document.createElement("div");
     root.id = "ui-c-root";
@@ -19,7 +19,7 @@ export function ensureRoot(stage) {
 }
 
 /** The page rects of the current frame: the canvas content box, the bleed limit (stage when it fills the window, else the canvas). */
-export function frameGeometry(canvas, stage) {
+export function frameGeometry(canvas, stage: HTMLElement | null) {
     const cr = canvas.getBoundingClientRect();
     const box = { left: cr.left + canvas.clientLeft, top: cr.top + canvas.clientTop, width: canvas.clientWidth, height: canvas.clientHeight };
     const fills = document.documentElement.classList.contains("window-fill") || !!document.fullscreenElement;
@@ -28,7 +28,7 @@ export function frameGeometry(canvas, stage) {
     return { box, limit, stageRect: sr };
 }
 
-function scopeFor(key) {
+function scopeFor(key: string | undefined) {
     let s = scopes.get(key);
     if (s) return s;
     const el = document.createElement("div");
@@ -46,7 +46,7 @@ function scopeFor(key) {
 }
 
 /** Called at scope start: size the root and the art canvas for this frame; returns the art-context getter. */
-export function prepare(key, stage, canvas) {
+export function prepare(key: string | undefined, stage: HTMLElement | null, canvas) {
     ensureRoot(stage);
     const g = frameGeometry(canvas, stage);
     const rs = root.style;
@@ -65,14 +65,14 @@ const KIND_LAYER = { text: "text", type: "under" };
 export const NO_BLEED = new Set(["text", "type", "chevron", "icon", "bar", "corners", "bracket", "balloon", "ring", "dock", "pop", "node", "svg-nb"]);
 
 /** A page rect (relative to the root) as a CSS inset() over the root's `limit` box. */
-export const clipInset = (c, limit) => {
+export const clipInset = (c, limit: { width: number; height: number; }) => {
     const r = Math.max(0, limit.width - c.left - c.width), b = Math.max(0, limit.height - c.top - c.height);
     return `inset(${Math.max(0, c.top)}px ${r}px ${b}px ${Math.max(0, c.left)}px)`;
 };
 
 /** Write the descriptors of one scope. `pl` = placement, `geo` = frameGeometry, `dim` = 0..1, `clip` = a native rect the whole layer is
  *  cut to (the place card's slit), null = none. */
-export function commit(key, descs, pl, geo, dim, clip = null) {
+export function commit(key: string | undefined, descs, pl, geo, dim: number, clip = null) {
     const s = scopeFor(key);
     s.seen = performance.now();
     s.seenFrame = frameNo;
@@ -103,7 +103,7 @@ export function commit(key, descs, pl, geo, dim, clip = null) {
     for (const layer of ["under", "over", "text"]) {
         const cont = s.c[layer], keep = new Set(order[layer].map((o) => o.key));
         for (const [k, rec] of s.maps[layer]) if (!keep.has(k)) { rec.el.remove(); s.maps[layer].delete(k); }
-        order[layer].forEach((o, i) => { if (cont.children[i] !== o.el) cont.insertBefore(o.el, cont.children[i] ?? null); });
+        order[layer].forEach((o, i: string | number) => { if (cont.children[i] !== o.el) cont.insertBefore(o.el, cont.children[i] ?? null); });
     }
     const cp = clip ? clipInset(snapRect(clip, pl, origin, limitRel, true), geo.limit) : "";
     if (s.el.style.clipPath !== cp) s.el.style.clipPath = cp;

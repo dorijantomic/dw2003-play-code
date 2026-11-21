@@ -38,7 +38,7 @@ export function walkMeshDisplayList(bytes, node) {
  * mode). A caller holding the raw stream drives its draw groups from this instead
  * of the extractor's flat `pr.abr`.
  */
-export function meshPrimitiveStates(bytes, node?: any) {
+export function meshPrimitiveStates(bytes: Uint8Array<ArrayBuffer>, node?: any) {
   const { steps }: { steps: any[] } = runDisplayList(bytes, node ? { node } : {});
   return steps
     .filter((s) => s.kind === "mesh" && s.mesh)

@@ -28,7 +28,7 @@ export function driDigimonAt(state, index, digimonById) {
   return digimonById[stats?.digimonId ?? CHARID_TO_DIGID[state.party[index]]];
 }
 
-export function driStarterAt(state, index, digimonById) {
+export function driStarterAt(state: { party: { [x: string]: string | number; }; }, index: string | number, digimonById) {
   return digimonById[CHARID_TO_DIGID[state.party[index]]];
 }
 
@@ -79,7 +79,7 @@ function ensureEquippedForms(stats, digimonById) {
 }
 
 export function driRoster(state, digimonById) {
-  return (state.party ?? []).map((charId, index) => {
+  return (state.party ?? []).map((charId: string | number, index) => {
     const stats = driStatsAt(state, index, digimonById) ?? {};
     const profile = driDigimonAt(state, index, digimonById);
     return {
@@ -110,7 +110,7 @@ export function driSwitchSlots(state, digimonById) {
   return slots;
 }
 
-export function swapDriFormation(state, a, b) {
+export function swapDriFormation(state, a: string | number, b: string | number) {
   if (a === b) return false;
   if (!state.partyStats) state.partyStats = (state.party ?? []).map(() => null);
   state.partyStats[0] = state.partnerStats;
@@ -159,7 +159,7 @@ export function driReserve(state, digimonById) {
 // places: the outgoing member keeps its stats and gear in the reserve store, so
 // switching it back in later returns the Digimon you had, not a fresh one. Deploying
 // does not change ownership — both partners stay in `rosterOwned`.
-export function switchInReservePartner(state, index, charId, digimonById) {
+export function switchInReservePartner(state, index: number | null, charId: string | number | undefined, digimonById) {
   const party = state.party ?? [];
   // The original's Switch confirm writes party[chosen pedestal] = candidate and
   // then re-packs (F0x8008b798 case 8 -> lab_count_and_pack_party), and the
@@ -211,7 +211,7 @@ export function switchInReservePartner(state, index, charId, digimonById) {
 // The lab's "{name} digivolve" list writes current form only — equipped[cursor]
 // or 0 (rookie / "Do nothing."). It does not unlock a form and does not reroll
 // HP/MP; those happen on the fight report (DIGI decoded §7, PLAIN §8).
-export function setStandingForm(state, index, formId, digimonById) {
+export function setStandingForm(state, index: number, formId, digimonById) {
   const stats = driStatsAt(state, index, digimonById);
   const starter = driStarterAt(state, index, digimonById);
   if (!stats || !starter) return false;
@@ -273,12 +273,12 @@ export function standingChoices(state, index, digimonById) {
 
 // Change-type: write one of the three equipped slots. Duplicate ids are
 // refused. A form that is the one they are standing as is refused ("can't").
-export function setEquippedForm(stats, slot, formId, currentFormId) {
+export function setEquippedForm(stats, slot: number, formId, currentFormId) {
   if (!stats || slot < 0 || slot > 2) return "invalid";
   const equipped = ensureEquippedForms(stats, {});
   while (equipped.length < 3) equipped.push(0);
   const id = Number(formId) || 0;
-  if (id && equipped.some((held, i) => i !== slot && Number(held) === id)) return "duplicate";
+  if (id && equipped.some((held, i: number) => i !== slot && Number(held) === id)) return "duplicate";
   if (id && currentFormId && id === Number(currentFormId) && Number(equipped[slot]) !== id)
     return "current";
   equipped[slot] = id;
@@ -294,7 +294,7 @@ export function firstOpenEquipSlot(stats) {
 
 // Kept for callers that still pass a species name. The lab no longer restats
 // or unlocks here — it only changes who they are standing as.
-export function applyDriEvolution(state, index, target, digimonById) {
+export function applyDriEvolution(state, index: number, target: string, digimonById) {
   const profile = (Object.values(digimonById) as { id: any; name: string }[]).find((d) => d.name === target);
   if (!profile) return false;
   return setStandingForm(state, index, profile.id, digimonById);
@@ -322,7 +322,7 @@ export function toggleDriLoadedTech(stats, techId) {
   return "loaded";
 }
 
-export function toggleLedgerTech(record, slot, load) {
+export function toggleLedgerTech(record: { techSlots: number[]; }, slot: number, load) {
   if (!record || slot < 0 || slot >= 6) return "invalid";
   const word = Number(record.techSlots?.[slot] ?? 0);
   if (!word) return "unavailable";
@@ -337,7 +337,7 @@ export function toggleLedgerTech(record, slot, load) {
   if (!load) return "unloaded";
   if (word & 0x8000) return "unavailable";
   if (!(word & 0x2000)) return "not-ready";
-  const loaded = record.techSlots.filter((v) => v & 0x4000).length;
+  const loaded = record.techSlots.filter((v: number) => v & 0x4000).length;
   if (loaded >= 3) return "full";
   record.techSlots[slot] = word | 0x4000;
   return "loaded";

@@ -132,9 +132,9 @@ import { Tree, TreePreset } from "../lib3d/ez-tree.es.js";
 import type { BuiltSpiresCounts, BuiltSpiresInfo } from "./types.js";
 
 const TAU = Math.PI * 2;
-const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
-const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const fract = (x) => x - Math.floor(x);
+const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const smooth = (a: number | undefined, b: number | undefined, x: number | undefined) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const fract = (x: number) => x - Math.floor(x);
 
 export const SPIRE = {
   // ---------------- the pillars ----------------
@@ -237,7 +237,7 @@ export const SPIRE = {
 
 // ============================================================================================ one pillar's maths
 /** A pillar's radius profile at height fraction u (0 = foot, 1 = crown), as a share of its radius R. */
-export function profileAt(u) {
+export function profileAt(u: number | undefined) {
   const P = SPIRE;
   const talus = 1 + P.TALUS * (1 - smooth(0, P.TALUS_U, u));                 // the flare at the foot
   const stem = 1 - P.STEM * Math.exp(-(((u - P.STEM_U) / P.STEM_W) ** 2));   // the undercut above it
@@ -252,7 +252,7 @@ export function profileAt(u) {
 
 /** The bedding sawtooth at u: 0 just above a shelf, LEDGE_DEPTH x R just below it. So every shelf faces UP (and
  *  catches the light and holds the shrubs) and the step back down is the overhang that shades the band above it. */
-export function beddingAt(u) {
+export function beddingAt(u: number | undefined) {
   const P = SPIRE;
   if (u <= P.BED_U0 || u >= P.CROWN_U) return 0;
   const band = (P.CROWN_U - P.BED_U0) / P.LEDGES;
@@ -261,7 +261,7 @@ export function beddingAt(u) {
 
 /** The two joint families at azimuth th (0..TAU) and height u: 1 on a ridge, 0 at the bottom of a groove. th = 0 is
  *  the pillar's outward direction, so the grooves facing +-PI/2 are the cracks towards its neighbours in the row. */
-export function jointsAt(th, u, seed) {
+export function jointsAt(th: number, u: number | undefined, seed: number) {
   const P = SPIRE;
   const drift = u * P.JOINT_DRIFT + seed * 0.11;
   const a = Math.abs(Math.sin(((th / TAU) * P.FLUTE_N + drift * 0.55 + seed * 0.37) * Math.PI));
@@ -272,11 +272,11 @@ export function jointsAt(th, u, seed) {
 /** One pillar's unit template: every radius <= 1 (exactly, after normalisation), height 0..1, base at y 0, the cracks
  *  towards its neighbours at th = +-PI/2. Deterministic in `seed`; returns positions, baked AO, indices, the
  *  ring/sector grid, and the ring indices the bushes are planted on. */
-export function makePillar(seed, kind = "wall") {
+export function makePillar(seed: number, kind = "wall") {
   const P = SPIRE;
   const sec = kind === "wall" ? P.SECTORS : P.ISLAND_SECTORS;
   const ledges = kind === "wall" ? P.LEDGES : P.ISLAND_LEDGES;
-  const us = [];
+  const us: number[] = [];
   for (const u of [0, 0.012, 0.03, 0.05, 0.075, 0.11, 0.155, P.BED_U0]) us.push(u);   // foot: talus, stem, shoulder
   const band = (P.CROWN_U - P.BED_U0) / ledges;
   const shelfRings = [];
@@ -344,7 +344,7 @@ export function makePillar(seed, kind = "wall") {
   for (let k = 0; k < sec; k++) idx.push(last + k, last + (k + 1) % sec, capV);   // the crown's cap, facing up
 
   // ---- the scrape pass (gl-rock): flatten SCRAPES near-vertical planes into the flanks, inward only ----
-  const rnd = (i) => S0.noise3JS(i * 1.7 + seed * 3.1, i * 0.9 + seed, i * 2.3 + 0.5);
+  const rnd = (i: number) => S0.noise3JS(i * 1.7 + seed * 3.1, i * 0.9 + seed, i * 2.3 + 0.5);
   for (let s = 0; s < P.SCRAPES; s++) {
     const a0 = rnd(s + 1), a1 = rnd(s + 41), a2 = rnd(s + 91);
     const i0 = Math.min(rings - 2, Math.max(1, Math.round((0.10 + 0.80 * a0) * (rings - 2))));
@@ -373,7 +373,7 @@ export function makePillar(seed, kind = "wall") {
   for (let v = 0; v < rings * sec; v++) { pos[v * 3] *= kk; pos[v * 3 + 2] *= kk; }
 
   return { pos, ao, idx: Uint16Array.from(idx), rings, sec, vcount: nv, icount: idx.length, shelfRings, capV,
-           ringY: (i) => (i === rings - 1 ? 1 : us[i]) };
+           ringY: (i: number) => (i === rings - 1 ? 1 : us[i]) };
 }
 
 // ============================================================================================ the recipe layout
@@ -406,7 +406,7 @@ function emitRock(groups, buf) {
     for (const p of g.parts) {
       p.v0 = v; p.i0 = ii;
       const tone = p.tone;
-      const put = (x, y, z, a) => {
+      const put = (x, y: number, z, a: number) => {
         pos[v * 3] = x; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z;
         ao[v] = a; vv[v] = p.vvar;
         rock[v * 3] = tone[0]; rock[v * 3 + 1] = tone[1]; rock[v * 3 + 2] = tone[2];
@@ -466,12 +466,12 @@ function emitRock(groups, buf) {
 }
 
 // ============================================================================================ vegetation
-function setDeep(o, m) { for (const [k, v] of Object.entries(m)) (typeof v === "object" ? setDeep(o[k], v) : (o[k] = v)); }
+function setDeep(o, m: object | null) { for (const [k, v] of Object.entries(m)) (typeof v === "object" ? setDeep(o[k], v) : (o[k] = v)); }
 
 /** ez-tree's own bush, baked to a unit geometry: height 1, base at y 0, xz centred, aLeaf = 1 on the leaf cards. The
  *  bush presets are 5k-16k triangles at full detail; BUSH_LOD cuts them to a few hundred, which is all a 15-40 pixel
  *  shrub can show. Returns the geometry plus its width (in units of its height). */
-function bakeBush(preset, seed) {
+function bakeBush(preset: string, seed: number) {
   const t = new Tree();
   t.options.copy(structuredClone(TreePreset[preset]));
   setDeep(t.options, SPIRE.BUSH_LOD);
@@ -516,7 +516,7 @@ function bakeBush(preset, seed) {
 }
 
 /** The far-card alpha: a clump of bush blobs drawn white on clear (no image file, our own code). */
-function drawBushCard(doc, size = 128, seed = 7) {
+function drawBushCard(doc: Document, size = 128, seed = 7) {
   const c = doc.createElement("canvas"); c.width = c.height = size;
   const g = c.getContext("2d"), r = F.rng(seed);
   g.clearRect(0, 0, size, size);
@@ -533,7 +533,7 @@ function drawBushCard(doc, size = 128, seed = 7) {
 
 /** Every bush instance: planted on the exact vertices the rock mesh draws (a ledge's lip or a crown), sunk into it.
  *  Positions are stored relative to the group's axis so a moved group carries its plants along. */
-function bushSpots(groups, rockGeo) {
+function bushSpots(groups, rockGeo: THREE.BufferGeometry) {
   const P = SPIRE, pos = rockGeo.attributes.position.array, nor = rockGeo.attributes.normal.array;
   const spots = [], rnd = F.rng(P.SEED + 17);
   for (const g of groups) for (const p of g.parts) {
@@ -565,7 +565,7 @@ function bushSpots(groups, rockGeo) {
   return spots;
 }
 
-function spot(g, p, vi, pos, nor, rnd) {
+function spot(g, p: { pitch: number; }, vi: number, pos: number[], nor, rnd: { (): number; (): number; (): number; }) {
   const P = SPIRE;
   return { g: g.id, vi, x: pos[vi * 3] - g.dx, y: pos[vi * 3 + 1], z: pos[vi * 3 + 2] - g.dz,
            s: p.pitch * (P.BUSH_K[0] + rnd() * (P.BUSH_K[1] - P.BUSH_K[0])), variant: Math.floor(rnd() * 3),
@@ -616,7 +616,7 @@ function cardSpots(groups) {
   return spots;
 }
 
-function card(g, az, rad, y, rnd) {
+function card(g, az: number, rad: number, y, rnd: { (): number; (): number; (): number; (): number; }) {
   const P = SPIRE;
   const w = (g.pitch || 400) * (P.CARD_K[0] + rnd() * (P.CARD_K[1] - P.CARD_K[0]));
   const j = 0.86 + rnd() * 0.28;
@@ -683,7 +683,7 @@ export const ROCK_GLSL = /* glsl */`
   }
 `;
 
-export function rockMaterial(S) {
+export function rockMaterial(S: typeof S0) {
   const P = SPIRE;
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({
@@ -735,7 +735,7 @@ export function rockMaterial(S) {
   });
 }
 
-function bushMaterial(S, leafTex) {
+function bushMaterial(S: typeof S0, leafTex: THREE.CanvasTexture) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({
       uLeafTex: { value: leafTex }, uLeafAlpha: { value: SPIRE.LEAF_ALPHA },
@@ -786,7 +786,7 @@ function bushMaterial(S, leafTex) {
   });
 }
 
-function cardMaterial(S, cardTex) {
+function cardMaterial(S: typeof S0, cardTex: THREE.CanvasTexture) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uCardTex: { value: cardTex }, uCardAlpha: { value: 0.5 } }),
     vertexShader: /* glsl */`
@@ -819,7 +819,7 @@ function cardMaterial(S, cardTex) {
 /** ASSET: the cliff from the slot's data (web/built/place/spires.js: groups, their pillars and keep-out offsets): one
  *  merged rock mesh (ROCK_GLSL), three instanced ez-tree shrubs on its ledges, far bush cards. inst.place(state, items)
  *  rebuilds the buffers when the keep-out moved a group. */
-export function buildSpires(slot, ctx) {
+export function buildSpires(slot, ctx: { S: typeof S0; materials: THREE.ShaderMaterial[]; info: { spires: BuiltSpiresInfo; }; }) {
   const S = ctx.S || S0, P = SPIRE;
   const t0 = performance.now();
   const L = slot.data;
@@ -834,7 +834,7 @@ export function buildSpires(slot, ctx) {
                 mid: new Float32Array(plan.nv * 3), dark: new Float32Array(plan.nv * 3), green: new Float32Array(plan.nv * 3),
                 vvar: new Float32Array(plan.nv), idx: new Uint32Array(plan.ni) };
   const rockGeo = new THREE.BufferGeometry();
-  const dyn = (name, arr, n) => { const a = new THREE.BufferAttribute(arr, n); a.setUsage(THREE.DynamicDrawUsage); rockGeo.setAttribute(name, a); };
+  const dyn = (name: string, arr: Float32Array<ArrayBuffer>, n: number) => { const a = new THREE.BufferAttribute(arr, n); a.setUsage(THREE.DynamicDrawUsage); rockGeo.setAttribute(name, a); };
   dyn("position", buf.pos, 3); dyn("aAO", buf.ao, 1); dyn("aRock", buf.rock, 3); dyn("aMid", buf.mid, 3);
   dyn("aDark", buf.dark, 3); dyn("aGreen", buf.green, 3); dyn("aVar", buf.vvar, 1);
   rockGeo.setIndex(new THREE.BufferAttribute(buf.idx, 1));
@@ -868,7 +868,7 @@ export function buildSpires(slot, ctx) {
   rockGeo.attributes.position.needsUpdate = true;
   rockGeo.computeVertexNormals();
   spots = bushSpots(groups, rockGeo);
-  groups.forEach((g, i) => { g.dx = off[i][0]; g.dz = off[i][1]; });
+  groups.forEach((g, i: string | number) => { g.dx = off[i][0]; g.dz = off[i][1]; });
   const perVariant = [0, 0, 0];
   for (const s of spots) perVariant[s.variant]++;
   const bushPer = new Array(groups.length).fill(0);
@@ -970,7 +970,7 @@ export function buildSpires(slot, ctx) {
   } as BuiltSpiresInfo;
   // ---- option: Gemini spires (web/built/spires_gemini.js), OFF by default, built lazily on the first switch-on ----
   let gem = null, geminiOn = false, gemDirty = false, gemBusy = null;
-  async function setGemini(on) {
+  async function setGemini(on: boolean) {
     on = !!on;
     if (on && !gem) {
       gemBusy ||= import("./spires_gemini.js").then((m) => { gem = m.createGeminiSpires(ctx, groups); info.gemini = gem.stat; });
@@ -1004,23 +1004,23 @@ export function buildSpires(slot, ctx) {
     info.shown = stats.accepted; info.wallsShown = shownWalls.length; info.islandsShown = shownIsles.length;
     info.keepOut = stats;
     info.nan = nan;   // refilled by rebuild(): 0/0 on every build that went through
-    info.walls.forEach((w, i) => { w.cx = walls[i].dx + walls[i].cx0; w.cz = walls[i].dz + walls[i].cz0; w.hidden = walls[i].hidden; w.push = walls[i].push; });
-    info.islands.forEach((w, i) => { w.cx = islands[i].dx + islands[i].cx0; w.cz = islands[i].dz + islands[i].cz0; w.hidden = islands[i].hidden; w.push = islands[i].push; });
+    info.walls.forEach((w, i: string | number) => { w.cx = walls[i].dx + walls[i].cx0; w.cz = walls[i].dz + walls[i].cz0; w.hidden = walls[i].hidden; w.push = walls[i].push; });
+    info.islands.forEach((w, i: string | number) => { w.cx = islands[i].dx + islands[i].cx0; w.cz = islands[i].dz + islands[i].cz0; w.hidden = islands[i].hidden; w.push = islands[i].push; });
     return stats;
   }
 
   // ---- the numbers the checker and the viewer read ----
   const shapes = (g) => ({ piece: g.piece, card: g.card, az: +(g.az * 180 / Math.PI).toFixed(2), r: Math.round(g.r0),
-                           baseY: +g.baseY.toFixed(2), h: +g.H.toFixed(1), pillars: g.parts.filter((p) => p.type === "pillar").length,
+                           baseY: +g.baseY.toFixed(2), h: +g.H.toFixed(1), pillars: g.parts.filter((p: { type: string; }) => p.type === "pillar").length,
                            R: +g.R.toFixed(1), pitch: +g.pitch.toFixed(1), spanDeg: +(g.span * 180 / Math.PI).toFixed(2),
                            top: +(g.baseY + g.H).toFixed(1), lean: +(g.lean * 1000).toFixed(1), skirt: +g.skirt.toFixed(0),
                            cx: +g.cx0.toFixed(1), cz: +g.cz0.toFixed(1), hidden: false, push: 0 });
   info.walls = walls.map(shapes); info.islands = islands.map(shapes);
   // every group (panel or island) as the checker reads it: its own slice of the merged buffers, its pillars, its
   // plants and cards. `info.walls` / `info.islands` stay the display list; this is the proof list.
-  info.groups = groups.map((g, i) => ({ i, kind: g.kind, piece: g.piece, card: g.card, az: +(g.az * 180 / Math.PI).toFixed(2),
+  info.groups = groups.map((g, i: string | number) => ({ i, kind: g.kind, piece: g.piece, card: g.card, az: +(g.az * 180 / Math.PI).toFixed(2),
     r: Math.round(g.r0), baseY: +g.baseY.toFixed(2), H: +g.H.toFixed(1), R: +g.R.toFixed(1), Rmax: +g.Rmax.toFixed(1),
-    pillars: g.parts.filter((p) => p.type === "pillar").length, pitch: +g.pitch.toFixed(1), n: g.n,
+    pillars: g.parts.filter((p: { type: string; }) => p.type === "pillar").length, pitch: +g.pitch.toFixed(1), n: g.n,
     spanDeg: +(g.span * 180 / Math.PI).toFixed(2), top: +(g.baseY + g.H).toFixed(1), skirt: +g.skirt.toFixed(0),
     skirtY: +(g.baseY - g.skirt).toFixed(1), v0: g.v0 ?? 0, vn: g.vn ?? 0, i0: g.i0 ?? 0, in: g.in ?? 0,
     bushes: bushPer[i] || 0, cards: cardPer[i] || 0, hidden: !!g.hidden, push: g.push || 0 }));
@@ -1055,7 +1055,7 @@ export function pillarPart(S = S0, colours = null) {
   const pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { pos[i * 3] = t.pos[i * 3]; pos[i * 3 + 1] = t.pos[i * 3 + 1] * H; pos[i * 3 + 2] = t.pos[i * 3 + 2]; }
   const g = new THREE.BufferGeometry();
-  const fill = (col) => { const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([col.r, col.g, col.b], i * 3); return a; };
+  const fill = (col: THREE.Color) => { const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([col.r, col.g, col.b], i * 3); return a; };
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   g.setAttribute("aAO", new THREE.BufferAttribute(Float32Array.from(t.ao.subarray ? t.ao.subarray(0, n) : t.ao.slice(0, n)), 1));
   g.setAttribute("aVar", new THREE.BufferAttribute(new Float32Array(n), 1));

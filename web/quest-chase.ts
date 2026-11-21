@@ -18,7 +18,7 @@
 // a chase about to be lost looks different from one being kept.
 
 /** The face a walker shows along (dx, dy): the field's own direction names. */
-export function chaseFacing(dx, dy) {
+export function chaseFacing(dx: number, dy: number) {
     const x = dx > 0.5 ? 1 : dx < -0.5 ? -1 : 0;
     const y = dy > 0.5 ? 1 : dy < -0.5 ? -1 : 0;
     if (y > 0) return x < 0 ? "down-left" : x > 0 ? "down-right" : "down";

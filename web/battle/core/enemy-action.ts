@@ -49,6 +49,7 @@ import {
   levelUpThreshold,
 } from "../progress.js";
 import type { BattleContext } from "../../types/battle.js";
+import type { BattleEndContext } from "./types.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeEnemyAction(B: BattleContext) {
@@ -328,7 +329,7 @@ function applyEnemyAction() {
       B.renderer3d?.enemyAttack(skill?.id ?? en.profile?.tech_basic, { miss: true });
     }
   }
-function applyParticipantProgress(b, rosterIndex) {
+function applyParticipantProgress(b, rosterIndex: number | undefined) {
     const player = b.playerRecords[rosterIndex];
     const ps = player.statsRecord;
     const prof = player.profile;
@@ -458,7 +459,7 @@ function applyParticipantProgress(b, rosterIndex) {
     }
 
     // read-only look data for the victory rings (web/ui-c): how far through its level the EXP stood before and stands after
-    const levelFrac = (xp, lv) => {
+    const levelFrac = (xp: number, lv: number) => {
       if (!lu) return 0;
       const g = growthProfile.growth_xp ?? 8, lo = lv <= 1 ? 0 : levelUpThreshold(g, lv, lu), hi = levelUpThreshold(g, lv + 1, lu);
       return Number.isFinite(hi) && hi > lo ? Math.max(0, Math.min(1, (xp - lo) / (hi - lo))) : 1;

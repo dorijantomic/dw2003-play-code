@@ -35,8 +35,9 @@
 /** The four statuses of a quest as the layer reports them (web/quests.js statusOf); "locked" is not a gate a trigger may name. */
 export const TRIGGER_STATUSES = ["available", "active", "ready", "done"];
 
+import type { QuestSnapshot } from "./types/quest-shelf.js";
 import type { QuestTriggerContext } from "./types/quest-triggers.js";
-const inRect = (r, x, y) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
+const inRect = (r, x: number, y: number) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
 const read = (v) => (typeof v === "function" ? v() : v);
 
 /**
@@ -52,7 +53,7 @@ const read = (v) => (typeof v === "function" ? v() : v);
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the trigger to play, or null
  */
-export function enterTrigger(triggers, mapId, prev, now, state, ctx) {
+export function enterTrigger(triggers, mapId, prev, now, state, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId || !prev || !now) return null;
     if (!Number.isFinite(prev.x) || !Number.isFinite(prev.y) || !Number.isFinite(now.x) || !Number.isFinite(now.y)) return null;
@@ -90,7 +91,7 @@ export function enterTrigger(triggers, mapId, prev, now, state, ctx) {
  * @param ctx       { enabled(), statusOf(id), idle(), dialogBusy, battle } — read-only questions
  * @returns the arrival row to play, or null
  */
-export function arrivalTrigger(triggers, mapId, state, ctx) {
+export function arrivalTrigger(triggers, mapId, state, ctx: QuestTriggerContext) {
     if (!read(ctx?.enabled)) return null;                        // the F2 switch: read before anything else
     if (!Array.isArray(triggers) || !mapId) return null;
     if (!read(ctx.idle)) return null;                            // a battle, a cutscene, a menu, a fade

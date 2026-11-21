@@ -90,18 +90,18 @@ export const REFL = {
   BAND_TOP: [4.75, 7.30],   // MEASURE 2c pine silhouette min/max above the water (m) — the mirrored band's jagged edge
 };
 
-const toLin = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+const toLin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
 
 /** The measured reflection tint (MEASURE.md 2e) applied to a piece's measured sRGB colour -> linear THREE.Color. */
-export function reflectColour(rgb255, k = REFL.K, c = REFL.C) {
-  const out = rgb255.map((v, i) => Math.min(255, Math.max(0, k[i] * v + c[i])) / 255);
+export function reflectColour(rgb255: number[], k = REFL.K, c = REFL.C) {
+  const out = rgb255.map((v: number, i: string | number) => Math.min(255, Math.max(0, k[i] * v + c[i])) / 255);
   return new THREE.Color().setRGB(...out.map(toLin) as [number, number, number]);
 }
 
 // ------------------------------------------------------------------ the lake surface
 /** The water runs (render units, along the ray) at azimuth az, as the complement of soil.js's land intervals.
  *  Pure numbers; the checker re-uses it against soilLand(). */
-export function waterRuns(land, azDeg, R = LAKE.R_OUT) {
+export function waterRuns(land, azDeg: number, R = LAKE.R_OUT) {
   const k = Math.round(((azDeg + 180) % 360 + 360) % 360 / land.outline.stepDeg) % land.outline.intervals.length;
   const iv = land.outline.intervals[k] || [];
   const runs = [];
@@ -163,7 +163,7 @@ export function makeWaterNormalData(size = 256, seed = 20261030) {
   for (const [per, amp] of oct) {
     const lat = new Float32Array(per * per);
     for (let i = 0; i < lat.length; i++) lat[i] = rnd();
-    const at = (x, y) => lat[((y % per) + per) % per * per + ((x % per) + per) % per];
+    const at = (x: number, y: number) => lat[((y % per) + per) % per * per + ((x % per) + per) % per];
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const fx = x / size * per, fy = y / size * per, ix = Math.floor(fx), iy = Math.floor(fy);
       const tx = fx - ix, ty = fy - iy, ux = tx * tx * (3 - 2 * tx), uy = ty * ty * (3 - 2 * ty);
@@ -174,7 +174,7 @@ export function makeWaterNormalData(size = 256, seed = 20261030) {
   let lo = Infinity, hi = -Infinity;
   for (const v of H) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   const data = new Uint8Array(size * size * 4);
-  const h = (x, y) => H[((y + size) % size) * size + ((x + size) % size)];
+  const h = (x: number, y: number) => H[((y + size) % size) * size + ((x + size) % size)];
   const K = 3.2;   // slope gain before the shader's own strength
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const dx = (h(x + 1, y) - h(x - 1, y)) * K * size / 64, dy = (h(x, y + 1) - h(x, y - 1)) * K * size / 64;
@@ -185,7 +185,7 @@ export function makeWaterNormalData(size = 256, seed = 20261030) {
   }
   return { size, data, range: [lo, hi] };
 }
-let _wn = null;
+let _wn: THREE.DataTexture | null = null;
 function waterNormalTexture() {
   if (_wn) return _wn;
   const { size, data } = makeWaterNormalData();
@@ -583,7 +583,7 @@ export function buildMirror(slot, ctx) {
   // copies below remain the fallback for a build without water.js.
   const REAL = D.real;
   const group = new T.Group(); group.name = "builtLake";
-  const meshes = [], out = {} as BuiltMirrorOut, own = [];
+  const meshes = [], out = {} as BuiltMirrorOut, own: (THREE.BufferGeometry | null)[] = [];
 
   // ---- the surface: the land's own outline (soil.js), the water outside it
   const land = D.land;
@@ -591,7 +591,7 @@ export function buildMirror(slot, ctx) {
   own.push(lakeGeo);
   // the water's own colours: linear THREE.Colors made from the sRGB numbers in LAKE (one shared object, so the copies
   // fade toward the SAME water the surface draws)
-  const lin = (c) => SH.srgb(c);
+  const lin = (c: number[]) => SH.srgb(c);
   const lakeMid = lin(LAKE.NEAR.map((v, i) => (v + LAKE.FAR[i]) / 2));
   const lakeU = {
     uWN: { value: waterNormalTexture() },
@@ -630,7 +630,7 @@ export function buildMirror(slot, ctx) {
     const bySpecies = new Map();
     for (const m of ring) { const sp = m.userData.species || "ring"; if (!bySpecies.has(sp)) bySpecies.set(sp, []); bySpecies.get(sp).push(m); }
     // the piece each species is built from (trees.js: wall <- cypress_wall, the rest <- cypress_grove)
-    const pieceOf = (sp) => D.ringColours[sp === "wall" ? "wall" : "grove"] || null;
+    const pieceOf = (sp: string) => D.ringColours[sp === "wall" ? "wall" : "grove"] || null;
     const near = { meshes: 0, tris: 0, instances: 0, species: {} };
     for (const [sp, list] of bySpecies) {
       const cols = pieceOf(sp);
@@ -719,7 +719,7 @@ export function buildMirror(slot, ctx) {
   const fp = D.farPines;
   const rowsFP = fp?.rows || [];
   const foot = rowsFP.length > 2 ? rowsFP[rowsFP.length - 1]?.rgb : null, above = rowsFP.length > 2 ? rowsFP[rowsFP.length - 2]?.rgb : null;
-  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   if (foot && above && lum(foot) > 2.0 * lum(above) && foot[1] >= foot[0]) {
     const bg = bankGeometry(T); own.push(bg);
     const bankCol = lin(foot);
@@ -746,7 +746,7 @@ export function buildMirror(slot, ctx) {
   }
 
   // ---- the boulder piles' copy (wall_04): the rock module's own mesh if it is there, else the original's two quads
-  let rockAdopt = null;
+  let rockAdopt: (() => void) | null = null;
   if (rock && !REAL) {
     const u = { uTint: { value: SH.srgb(rock.colours.all) }, uTintLo: { value: SH.srgb(rock.colours.p10 || rock.colours.all) },
                 uTintHi: { value: SH.srgb(rock.colours.p90 || rock.colours.all) },
@@ -800,11 +800,11 @@ export function buildMirror(slot, ctx) {
     // the checker's handles: the surface mesh, the mirrored copies, and the probe for their measured colour
     lake: meshes.find((m) => m.userData.part === "surface") || null,
     reflections: meshes.filter((m) => m.userData.part !== "surface" && m.userData.part !== "bank"),
-    probeMaterial: (mesh, cols, rows) => mirrorProbeMaterial(mesh.material.uniforms, cols, rows),
+    probeMaterial: (mesh, cols: number | undefined, rows: number | undefined) => mirrorProbeMaterial(mesh.material.uniforms, cols, rows),
     update(camera, ms) {   // nothing per frame (the ripple rides the shared uWindTime); only the rock hand-off waits
       if (rockAdopt) { rockAdopt(); rockAdopt = null; }
     },
-    setVisible(v) { visible = v; for (const m of meshes) m.visible = v; return visible; },
+    setVisible(v: boolean) { visible = v; for (const m of meshes) m.visible = v; return visible; },
     place(state) {   // report only; also the one moment a late-loading rock module can hand its mesh over
       if (rockAdopt) { rockAdopt(); rockAdopt = null; }
       out.keepOutTouching = 0; out.keepOutFightR = Math.round(state?.fightR ?? 0);

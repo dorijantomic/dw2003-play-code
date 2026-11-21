@@ -60,7 +60,7 @@ function drawBattleHud(b) {
       { activePlayerIndex: b.activePlayerIndex ?? 0, activeEnemyIndex: hudTeam ? (b.partyIndex ?? 0) : 0,
         mode: battleKindOf(b) });
     const pipReady = packReady(pgfgc00);
-    const drawPip = (cel, x, y) => {
+    const drawPip = (cel: number | null | undefined, x: number, y: number) => {
       if (pipReady && cel != null) { B.hudClip(cel, x, y); return; }
       if (originalChrome) { B.drawChrome("square", x, y, 12, 9); return; }
       B.ctx.fillStyle = "#061139";
@@ -141,9 +141,9 @@ function drawBattleHud(b) {
     if (uiC.capturing()) {
       const act = b.activePlayerIndex ?? 0;
       const roster = b.playerRoster ?? [];
-      const nameOf = (i) => roster[i]?.name ?? b.playerRecords?.[i]?.profile?.name ?? "";
+      const nameOf = (i: string | number) => roster[i]?.name ?? b.playerRecords?.[i]?.profile?.name ?? "";
       const others = [];
-      (b.playerRecords ?? []).slice(0, 3).forEach((rec, i) => {
+      (b.playerRecords ?? []).slice(0, 3).forEach((rec, i: string | number) => {
         if (i !== act && rec) others.push({ name: nameOf(i), hp: rec.hp, maxHp: rec.maxHp, mp: rec.mp, maxMp: rec.maxMp });
       });
       uiCPart(B.ctx, { part: "battleData", x: 0, y: 0, w: 0, h: 0,
@@ -283,7 +283,7 @@ function drawCommandMenu(b) {
     }
     drawMenuNotice(b);
   }
-function drawListSelector(x, y, selected) {
+function drawListSelector(x: number, y: number, selected: boolean) {
     if (!B.drawChrome("square", x, y, 13, 13)) {
       B.ctx.fillStyle = "#050638";
       B.ctx.fillRect(x, y, 13, 13);
@@ -317,7 +317,7 @@ function drawDescription(text, mp = null) {
       B.nativeText(String(mp), 300, 211, { kind: 3, alignRight: true });
     }
   }
-function visibleList(rows, selected) {
+function visibleList(rows, selected: number) {
     const visible = 6;
     const top = Math.max(0, Math.min(selected - visible + 1, rows.length - visible));
     return { visible, top };
@@ -351,7 +351,7 @@ function drawTechMenu(b) {
         : 0,
     );
   }
-function drawItemMenu(b) {
+function drawItemMenu(b: { itemSel: number; }) {
     const L = BATTLE_UI_LAYOUT.list;
     const items = B.usableItems();
     const { visible, top } = visibleList(items, b.itemSel);
@@ -371,7 +371,7 @@ function drawItemMenu(b) {
     B.nativeText(`X ${selected?.qty ?? 0}`, Q.x + 5, Q.y + 5, { kind: 1 });
     drawDescription(selected?.desc ?? selected?.description ?? "");
   }
-function drawTagMenu(b) {
+function drawTagMenu(b: { tagSel: number; }) {
     const T = BATTLE_UI_LAYOUT.tag;
     const members = B.tagMembers();
     for (let i = 0; i < members.length; i++) {
@@ -389,7 +389,7 @@ function drawTagMenu(b) {
       });
     }
   }
-function drawFormMenu(b, rosterIndex, title) {
+function drawFormMenu(b, rosterIndex: number, title) {
     const forms = B.formOptionsFor(rosterIndex);
     const member = b.playerRoster[rosterIndex];
     const L = BATTLE_UI_LAYOUT.list;

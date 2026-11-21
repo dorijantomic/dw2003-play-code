@@ -96,7 +96,7 @@ const GRID_COLS = shopLayout.chrome.list.cell.cols;
 const COL_W = 0x83;    // 131 (decoded column stride)
 // F0x80087cfc.c:12-24 selects 8 BUY entries and 14 SELL entries per page;
 // F0x80087428.c:12-25 creates fourteen two-column row positions.
-const pageSize = (mode) => shopLayout.chrome.list.cell.per_page[mode === 0 ? "buy" : "sell"];
+const pageSize = (mode: number) => shopLayout.chrome.list.cell.per_page[mode === 0 ? "buy" : "sell"];
 
 // rig-sampled value colors for the effect cards
 const COL_UP = "rgb(96,176,248)";
@@ -126,7 +126,7 @@ fetch("assets/data/digimon.json")
   .catch(() => {});
 
 // stat key -> uifont icon-glyph name ("elem_fire" -> "fire")
-const iconNameFor = (stat) => (stat.startsWith("elem_") ? stat.slice(5) : stat);
+const iconNameFor = (stat: string) => (stat.startsWith("elem_") ? stat.slice(5) : stat);
 
 export function createShop(sfx = null) {
   const sh = {
@@ -226,7 +226,7 @@ export function createShop(sfx = null) {
     return leaveFadeLevel(frames, LEAVE_FADE_DELTA);
   }
 
-  function paintLeaveFade(ctx) {
+  function paintLeaveFade(ctx: CanvasRenderingContext2D) {
     const a = leaveFadeAlpha();
     if (a <= 0) return;
     paintScreenDim(ctx, a * 255, NATIVE_W, 240);
@@ -468,7 +468,7 @@ export function createShop(sfx = null) {
     // system06, dead moves are silent; X assigns with system07 and shows
     // "Equipped.", then offers the next member; TRIANGLE cancels to the list.
     const cards = sh._equipCards(state);
-    const canWear = (i) => !!cards[i]?.preview?.slot && !!cards[i]?.accessible;
+    const canWear = (i: number) => !!cards[i]?.preview?.slot && !!cards[i]?.accessible;
     const cur = sh.equipWhoIdx;
     if (key === "left" || key === "right") {
       const dir = key === "right" ? 1 : -1;
@@ -504,15 +504,15 @@ export function createShop(sfx = null) {
 
     const mgr = createShopManager({
       getGold: () => state.bits,
-      setGold: (n) => {
+      setGold: (n: number) => {
         state.bits = Math.max(0, Math.min(MONEY_CAP, n));
         if (typeof localStorage !== "undefined") localStorage.setItem("bits", String(state.bits));
       },
       // The merchant's own commit is the original's: both directions go through
       // the shared store, so the 99 cap and the remove floor are the store's and
       // not a second copy of them.
-      addItem: (id, n) => storeAddItem(state, id, n),
-      removeItem: (id, n) => storeRemoveItem(state, id, n),
+      addItem: (id, n: number | undefined) => storeAddItem(state, id, n),
+      removeItem: (id, n: number | undefined) => storeRemoveItem(state, id, n),
     });
 
     if (sh.mode === 0) {
@@ -620,7 +620,7 @@ export function createShop(sfx = null) {
     const cards = partyRosterView(
       state.party, state.partnerStats, state.partyStats, digimonDB ?? {}, state.digimonNames,
     ).slice(0, 3);
-    return cards.map((member, i) => {
+    return cards.map((member, i: string | number) => {
       const base = {};
       for (const k of ["str", "def", "spt", "wis", "spd", "chr"]) {
         base[k] = member.stats?.[k] ?? member.profile?.[k] ?? 0;
@@ -669,13 +669,13 @@ export function createShop(sfx = null) {
 
     ctx.save();
     ctx.scale(s, s);
-    const text = (str, x, y, gold = false) => drawText(ctx, String(str), x, y, { kind: gold ? 3 : 1 });
+    const text = (str: string, x: number, y: number, gold = false) => drawText(ctx, String(str), x, y, { kind: gold ? 3 : 1 });
     // The list cursor slides right-and-back 1px @ ~6 vsync/step (PS1-style;
     // rig stills caught it mid-slide).
     // Cursor slide from the shared class (engine/dw3/ui/cursor.ts): the same
     // [0,1,2,1] ping-pong, now at the decoded 6 vsyncs per step rather than a
     // local 8-per-second constant. At PAL 50Hz those differ by 4%.
-    const cursorAt = (x, y) => text(CURSOR, x + ui.cursorOffsetAtTime(sh.time), y, true);
+    const cursorAt = (x: number, y: number) => text(CURSOR, x + ui.cursorOffsetAtTime(sh.time), y, true);
     // Decoded window fold: sp9C x/y scale ramp 0..0x1000 around the spA4
     // pivot; returns progress so labels can wait for window-ready (p>=1).
     // The ramp and the pivot transform now come from the shared fold class
@@ -683,7 +683,7 @@ export function createShop(sfx = null) {
     // While leaving, every open window folds SHUT (progress 1 -> 0 over the
     // first 5 frames — the decoded double-speed close) before the dim runs.
     const leaving = sh.fadeLeaving && sh.leaveFoldT0 != null;
-    const fold = (key, px, py, axis, fn) => {
+    const fold = (key: string, px: number, py: number, axis: string, fn: { (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): boolean; (): void; }) => {
       const start = leaving
         ? sh.time - (1 - leaveFoldP()) * ANIM_T
         : (sh._anim[key] ?? null);
@@ -858,7 +858,7 @@ export function createShop(sfx = null) {
       const roster = partyRosterView(
         state.party, state.partnerStats, state.partyStats, digimonDB ?? {}, state.digimonNames,
       ).slice(0, 3);
-      roster.forEach((member, i) => {
+      roster.forEach((member, i: number) => {
         const x0 = 0x0B + 0x63 * i;
         // per-card y-fold, pivot (60+99i, 192) — decoded F0x8008a450
         if (fold("cards", 0x3C + 0x63 * i, 0xC0, "y",

@@ -90,7 +90,7 @@ const count = (value) => {
  */
 export function poolFrom(bag, worn) {
   const rows = new Map();
-  const put = (id, key, n) => {
+  const put = (id: number, key: string, n: number) => {
     const at = rows.get(id) ?? { held: 0, worn: 0 };
     at[key] = Math.max(at[key], n);
     rows.set(id, at);
@@ -128,7 +128,7 @@ function lineSlotOf(member, rules?: { lineSlot?: number; }) {
  *
  * `member` = `{ lineSlot, equipment }`; `rules` may override `lineSlot`.
  */
-export function slotOptions(member, pool, items, rules) {
+export function slotOptions(member, pool, items, rules: { lineSlot?: number; } | undefined) {
   const lookup = itemMap(items);
   const lineSlot = lineSlotOf(member, rules);
   const out = Object.fromEntries(EQUIP_SLOTS.map((slot) => [slot, []]));
@@ -152,7 +152,7 @@ export function slotOptions(member, pool, items, rules) {
 }
 
 /** The worn record as the six slots, with a two-handed weapon folded onto `right`. */
-function wornSlots(member, lookup) {
+function wornSlots(member: { equipment: {}; }, lookup) {
   const out = {} as QuartermasterPick;
   const equipment = member?.equipment ?? {};
   for (const slot of EQUIP_SLOTS) {
@@ -274,7 +274,7 @@ function bestOf(ids, lookup) {
  * The answer is a pure function of the pool's numbers: pieces are ranked by
  * contribution, ties by lower id, so insertion order never matters.
  */
-export function bestLoadout(member, pool, items, rules) {
+export function bestLoadout(member, pool, items, rules: { lineSlot?: number; } | undefined) {
   const lookup = itemMap(items);
   const lineSlot = lineSlotOf(member, rules);
   const at = { lineSlot, equipment: member?.equipment ?? {} };
@@ -291,8 +291,8 @@ export function bestLoadout(member, pool, items, rules) {
   // Hands: enumerate the legal pairs. A two-handed piece is canonicalised into
   // `right` with `left` empty, because that is the one worn piece the store
   // counts; a Left-or-Right sword may fill either hand.
-  const hands = [];
-  const pushHands = (right, left) => {
+  const hands: { right: number; left: number; }[] = [];
+  const pushHands = (right: number, left: number) => {
     if (!legalCombo({ right, left }, items, at)) return;
     hands.push({ right, left });
   };
@@ -315,7 +315,7 @@ export function bestLoadout(member, pool, items, rules) {
   // Accessories: two separate rows, one copy per id, no same-bank descriptor-8
   // pair. Both rows admit the same classes, so the best legal pair is just the
   // two best different copies.
-  const byScore = (a, b) => weigh(lookup.get(b)) - weigh(lookup.get(a)) || a - b;
+  const byScore = (a: number, b: number) => weigh(lookup.get(b)) - weigh(lookup.get(a)) || a - b;
   const first = options.acc0.slice().sort(byScore)[0] ?? 0;
   pick.acc0 = first;
   pick.acc1 = options.acc1

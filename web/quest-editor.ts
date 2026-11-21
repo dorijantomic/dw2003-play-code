@@ -21,14 +21,14 @@ let drawMode = false, addMode = false;
 let drag: QuestEditorDrag | null = null;
 const grids = new Map<string, QuestWalkGrid | null>();
 
-const say = (text, kind = "note") => { const m = $("msg"); m.textContent = text; m.className = "msg " + kind; };
+const say = (text: string, kind = "note") => { const m = $("msg"); m.textContent = text; m.className = "msg " + kind; };
 const isDirty = () => !!work && JSON.stringify(work) !== saved;
 const refreshDirty = () => { $("dirty").textContent = isDirty() ? "(unsaved changes)" : ""; };
-const charOf = (id) => work.characters.find((c) => c.npc_id === id);
-const residentOn = (ch, map) => ch.residents.find((r) => r.map === map);
+const charOf = (id: number | null) => work.characters.find((c) => c.npc_id === id);
+const residentOn = (ch, map: string) => ch.residents.find((r: { map: string; }) => r.map === map);
 
 // ---------------------------------------------------------------------------------------------------- loading
-async function fetchGrid(id) {
+async function fetchGrid(id: string) {
     if (grids.has(id)) return grids.get(id);
     let g = null;
     try {
@@ -73,7 +73,7 @@ async function load() {
     refreshDirty();
 }
 
-async function showMap(id) {
+async function showMap(id: string | undefined) {
     id = String(id || "").trim();
     const g = await fetchGrid(id);
     if (!g) { say(`No walk data for map "${id}".`, "bad"); return; }
@@ -190,7 +190,7 @@ function renderLists() {
 }
 
 // "not walkable" in a list row is judged only for maps whose grid is already loaded (the current one and visited ones)
-function fetchedBad(r) {
+function fetchedBad(r: QuestResident) {
     const g = grids.get(r.map);
     return g ? !walkable(g, r.x, r.y) : false;
 }
@@ -268,13 +268,13 @@ window.addEventListener("mouseup", () => {
     const d = drag; drag = null;
     const cur = d.kind === "res" ? [d.r.x, d.r.y] : work.paths[d.name].points[d.i];
     const p = snapPoint(grid, cur[0], cur[1]);
-    const put = (pt) => { if (d.kind === "res") { d.r.x = pt[0]; d.r.y = pt[1]; } else work.paths[d.name].points[d.i] = pt; };
+    const put = (pt: number[]) => { if (d.kind === "res") { d.r.x = pt[0]; d.r.y = pt[1]; } else work.paths[d.name].points[d.i] = pt; };
     if (!p) { put(d.from); say(`Not walkable and nothing walkable within 24 px of ${Math.round(cur[0])}, ${Math.round(cur[1])}: it went back.`, "bad"); }
     else { put(p); say(`Now at ${p[0]}, ${p[1]}.`, "ok"); }
     renderLists(); draw();
 });
 
-$("view").addEventListener("contextmenu", (e) => {
+$("view").addEventListener("contextmenu", (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     if (drawMode && selPath && work.paths[selPath].points.length) {
         work.paths[selPath].points.pop();
@@ -282,7 +282,7 @@ $("view").addEventListener("contextmenu", (e) => {
     }
 });
 
-function placeResident(x, y) {
+function placeResident(x: number | undefined, y: number | undefined) {
     addMode = false;
     const ch = charOf(selChar);
     if (!ch) return;
@@ -297,7 +297,7 @@ function placeResident(x, y) {
 $("dir").innerHTML = DIRS.map((d) => `<option>${d}</option>`).join("");
 $("dir").onchange = () => { const r = residentOn(charOf(selChar), mapId); if (r) { r.dir = $("dir").value; renderLists(); } };
 $("go").onclick = () => showMap($("mapId").value);
-$("mapId").onkeydown = (e) => { if (e.key === "Enter") showMap($("mapId").value); };
+$("mapId").onkeydown = (e: { key: string; }) => { if (e.key === "Enter") showMap($("mapId").value); };
 $("zoom").onchange = () => { Z = Number($("zoom").value); showMap(mapId); };
 $("showGround").onchange = $("showMap").onchange = draw;
 $("addRes").onclick = () => {

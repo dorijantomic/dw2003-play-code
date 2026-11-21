@@ -15,7 +15,7 @@ const FRAMES = 3;
 
 const records = new Map(); // charId -> extra_partners.json record
 const cache = new Map();   // slot -> { canvas } | { pending: true } | { none: true }
-let loading = null;
+let loading: Promise<void> | null = null;
 
 function loadRecords() {
   if (loading) return loading;
@@ -31,7 +31,7 @@ export function isPartnerPicture(id) {
   return Number.isInteger(id) && id >= BASE && id <= LAST;
 }
 
-function build(slot) {
+function build(slot: number) {
   const partner = newPartnerOfSlot(slot);
   const rec = partner ? records.get(partner.charId) : null;
   const idle = rec?.art && rec.clips?.["1"]?.["down-left"];
@@ -77,7 +77,7 @@ function build(slot) {
  * while the sprite is still loading or when the partner has no sprite yet (the cell stays empty,
  * as before).
  */
-export function drawPartnerPicture(ctx, id, x, y) {
+export function drawPartnerPicture(ctx, id: number, x, y) {
   if (!isPartnerPicture(id)) return false;
   const slot = 8 + ((id - BASE) >> 4);
   const frame = (id - BASE) & 0xf;

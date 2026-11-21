@@ -27,7 +27,7 @@ import { drawScreenQuad } from "./street.js";
 // stage).  The step itself is the engine's `tickPointSpriteRecords` --
 // F0x80089038's per-record body including its two gates (the live active byte
 // and the camera cull), so the browser wrapper owns only the freeze hook.
-function tick(records, rt, f) {
+function tick(records, rt, f: {} | undefined) {
     // Verification hook, same family as window.__hideProps: freeze every record
     // on the frame it is showing. A capture of an animated scene is otherwise
     // dominated by animation phase, which makes a before/after pixel diff
@@ -44,7 +44,7 @@ function tick(records, rt, f) {
 // per TEXEL, not per sprite: the plain pass writes every non-STP texel opaque
 // (that is what stops the cars looking like glass), and only the STP texels
 // are re-drawn under the clip's blend mode. semi == -1 means no blend at all.
-export function drawSprite(ctx, sheet, layers, x, y, semiSheet) {
+export function drawSprite(ctx, sheet: HTMLImageElement, layers, x: number, y: number, semiSheet) {
     for (const l of layers) {
         ctx.drawImage(sheet, l.x, l.y, l.w, l.h,
             x + l.dx, y + l.dy, l.w, l.h);
@@ -84,7 +84,7 @@ export function drawSprite(ctx, sheet, layers, x, y, semiSheet) {
  *   "sorted"         the entity bucket, y-sorted among the player and NPCs
  *   "over-entities"  in front of every entity
  */
-export function bucketPass(layer) {
+export function bucketPass(layer: number) {
     if (layer >= UNDER_MAP_BUCKET) return "under-map";
     if (layer < 4) return "over-entities";
     if (layer === 4) return "sorted";
@@ -101,7 +101,7 @@ let preparedFrame = null;
 // which sprite it shows. Ticks animation, so call it once per frame. `view` is
 // the camera rect ({x, y, w, h}, map pixels) the disc's cull tests against;
 // a caller with no camera passes nothing and no record is culled.
-function prepareEffects(stageId, view = null) {
+function prepareEffects(stageId: string, view = null) {
     const s = S.data?.[stageId];
     if (!s) return null;
     const rt = stageRuntime(stageId, s.records);
@@ -220,7 +220,7 @@ function prepareEffects(stageId, view = null) {
 /** The cull rect for a draw call's camera: the visible map-pixel window, the
  *  walker's stand-in for the 0x1002 layer's screen rect (ctx+0x128).  No view
  *  dimensions (a caller without a camera) -> null, and nothing is culled. */
-function viewRect(camX, camY, viewW, viewH, pad = 0) {
+function viewRect(camX: number, camY, viewW: number, viewH: number, pad = 0) {
     // `pad`: the HD Remaster wide overworld's extra map pixels on each side (web/field-view.js).
     return viewW > 0 && viewH > 0
         ? { x: camX - pad, y: camY, w: viewW + 2 * pad, h: viewH }
@@ -231,11 +231,11 @@ function viewRect(camX, camY, viewW, viewH, pad = 0) {
 // buckets 8 and above. Call this immediately BEFORE the base map is drawn; the
 // map art then covers them, which is what the console does. It also ticks the
 // frame, so drawEffects must follow it on the same frame.
-export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH, pad = 0) {
+export function drawEffectsUnderMap(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, viewW: number, viewH: number, pad = 0) {
     const f = prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
     preparedFrame = f;
     if (!f) return;
-    eachRecord(f, ctx, camX, camY, (r, draw) => {
+    eachRecord(f, ctx, camX, camY, (r, draw: () => void) => {
         if (bucketPass(r.layer) === "under-map") draw();
     });
 }
@@ -246,13 +246,13 @@ export function drawEffectsUnderMap(ctx, stageId, camX, camY, viewW, viewH, pad 
 // them. Coordinates are map-space; ctx is already camera-translated by the
 // caller passing camX/camY. Records at UNDER_MAP_BUCKET and above were already
 // painted by drawEffectsUnderMap and are skipped here.
-export function drawEffects(ctx, stageId, camX, camY, drawables, viewW, viewH, pad = 0) {
+export function drawEffects(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables, viewW: number, viewH: number, pad = 0) {
     const f = preparedFrame?.stageId === stageId
         ? preparedFrame
         : prepareEffects(stageId, viewRect(camX, camY, viewW, viewH, pad));
     preparedFrame = null; // one frame's preparation is good for one frame
     if (!f) return;
-    eachRecord(f, ctx, camX, camY, (r, draw, py, pysort) => {
+    eachRecord(f, ctx, camX, camY, (r, draw: () => void, py, pysort) => {
         // The record's `layer` byte (record byte+3) is the GPU ordering-table
         // BUCKET the draw is submitted to, and LOWER means NEARER the camera.
         //
@@ -302,7 +302,7 @@ export function drawEffects(ctx, stageId, camX, camY, drawables, viewW, viewH, p
 // Walk one prepared frame's live records, handing each one a painter bound to
 // this context and camera. Both passes share it so they cannot disagree about
 // which records are live or where they are.
-function eachRecord(f, ctx, camX, camY, visit) {
+function eachRecord(f, ctx, camX: number, camY: number, visit) {
     const { s, rt, sheet, semiSheet } = f;
     for (let i = 0; i < s.records.length; i++) {
         const r = s.records[i];
@@ -347,7 +347,7 @@ function eachRecord(f, ctx, camX, camY, visit) {
 // are y-sorted, not painted flat: the controller gives each component its own
 // baseline offset — one 240px ABOVE the Digimon, so it sorts behind everything,
 // and one +20 below, so it sorts in front. See engine/systems/fire-trap.ts.
-export function drawFireTrapBursts(ctx, stageId, camX, camY, drawables, trap) {
+export function drawFireTrapBursts(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], trap) {
     const s = S.data?.[stageId];
     if (!s || !trap) return;
     const sheet = ensureSheet(stageId);
@@ -357,7 +357,7 @@ export function drawFireTrapBursts(ctx, stageId, camX, camY, drawables, trap) {
         // Each component carries its OWN decoded y-sort baseline (one 240px
         // above the Digimon, one +20 below), so the two are separate ordering
         // keys -- submit each through the one push at its own key.
-        burst.sprites.forEach((sprite, i) => {
+        burst.sprites.forEach((sprite, i: string | number) => {
             if (sprite == null) return;
             const layers = s.sprites[String(sprite)];
             if (!layers) return;
@@ -372,7 +372,7 @@ export function drawFireTrapBursts(ctx, stageId, camX, camY, drawables, trap) {
 // stage atlas the point records use, so a rock is blitted with the same blend
 // handling and y-sorts at its own y exactly as the native drawSprite path did.
 // `entries` are {clip, x, y} in map coordinates.
-export function drawStageObjectSprites(ctx, stageId, camX, camY, drawables, entries) {
+export function drawStageObjectSprites(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables, entries) {
     const s = S.data?.[stageId];
     if (!s || !entries?.length) return;
     const sheet = Object.keys(s.sprites).length ? ensureSheet(stageId) : null;
@@ -400,7 +400,7 @@ export function drawStageObjectSprites(ctx, stageId, camX, camY, drawables, entr
 //   setScale(-0x1000, ...)  → x-flip until the next drawSprite
 //   drawSprite(sub, spriteId, x, y) → stage-atlas sprite at map coords (x,y)
 // (the s780 cars). Sprites y-sort at their own y so entities walk around them.
-export function drawNativeIntents(ctx, stageId, camX, camY, drawables) {
+export function drawNativeIntents(ctx: CanvasRenderingContext2D | null, stageId: string, camX: number, camY: number, drawables) {
     const native = nativeStage(stageId);
     const s = S.data?.[stageId];
     if (!native || !s) return;

@@ -8,9 +8,9 @@
 // scripts, so its shots flew back at itself. The arena is symmetric about the origin (home z is +-(0x1400+standoff)),
 // so turning a script around is x -> -x, z -> -z, plus half a turn on a projectile's yaw.
 
-const SCREEN_Z = (z) => z === 32767 || z === -1 || Math.abs(z) > 20000;   // screen-space effects, not arena positions
+const SCREEN_Z = (z: number) => z === 32767 || z === -1 || Math.abs(z) > 20000;   // screen-space effects, not arena positions
 const HALF_TURN = 2048;                                                    // PS1 angle units, 4096 = 360 degrees
-const wrap = (a) => (((a + HALF_TURN) % 4096) + 4096) % 4096;
+const wrap = (a: number) => (((a + HALF_TURN) % 4096) + 4096) % 4096;
 
 const cache = new WeakMap();
 /** "player" when the model's scripts aim down +z, "enemy" when down -z. */
@@ -75,7 +75,7 @@ export function mirrorCameraWords(words) {
  * fighter's three shots, the attacker's own shots (5-7) read the near fighter's closer shots 8-10.
  * Returns { side, index } like op5ShotSlot, or null for a preset that names no slot (0 and >= 8).
  */
-export function mirrorPresetShot(preset) {
+export function mirrorPresetShot(preset: number) {
   const p = preset | 0;
   if (p >= 1 && p <= 4) return { side: "enemy", index: Math.min(p - 1, 2) };
   if (p >= 5 && p <= 7) return { side: "player", index: p + 3 };
@@ -86,8 +86,8 @@ export function mirrorPresetShot(preset) {
 export function mirrorHooks(h) {
   return {
     ...h,
-    onMove: (rec) => h.onMove?.(rec?.kind === "to" ? { ...rec, x: -rec.x, z: -rec.z } : rec),
-    onEffect: (rec) => h.onEffect?.(SCREEN_Z(rec.z | 0) ? rec : { ...rec, x: -rec.x, z: -rec.z }),
+    onMove: (rec: { kind: string; x: number; z: number; }) => h.onMove?.(rec?.kind === "to" ? { ...rec, x: -rec.x, z: -rec.z } : rec),
+    onEffect: (rec: { z: number; x: number; }) => h.onEffect?.(SCREEN_Z(rec.z | 0) ? rec : { ...rec, x: -rec.x, z: -rec.z }),
     setLunge: (l) => h.setLunge?.(l?.sub === 0 && l.from
       ? { ...l, from: [-l.from[0], l.from[1], -l.from[2]], to: [l.to[0], wrap(l.to[1]), l.to[2]] }
       : l),

@@ -42,12 +42,12 @@ const BANKS = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, 
 /** What the fight report is handed when it opens: the fight it reports on, the party in it, and what to call on the way out. */
 interface FightReportOpts {
     onClose?: (() => void) | null;
-    gameState?: any;
-    participants?: { pos?: number; name?: string; level?: number; preExp?: any; participated?: boolean }[];
+    gameState?: unknown;
+    participants?: { pos?: number; name?: string; level?: number; preExp?: unknown; participated?: boolean }[];
     dropItemId?: number;
     battleId?: number;
     activePos?: number;
-    view?: { progress?: any[]; reward?: any };
+    view?: { progress?: unknown[]; reward?: any };
 }
 
 const DATA_LABEL = "Fight report data";

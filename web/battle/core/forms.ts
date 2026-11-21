@@ -61,7 +61,7 @@ export function makeForms(B: BattleContext) {
    * `0x8003EF5C` are the eight starters, so both screens list the member's own
    * starter species first and its equipped forms after it.
    */
-  function partyRosterSlot(b, position) {
+  function partyRosterSlot(b, position: number) {
     return partyPositionRosterSlot(b?.playerRoster ?? [], position | 0);
   }
 /**
@@ -70,7 +70,7 @@ export function makeForms(B: BattleContext) {
    * 22 stat halfwords. F0x800953E4 opens the SAME panel in both screens, so the
    * data is built once here rather than per screen.
    */
-  function formPanelMemberSeed(b, index, rec) {
+  function formPanelMemberSeed(b, index: number, rec) {
     const forms = B.formOptionsFor(index, b);
     const elems = B.FORM_ELEMENTS;
     // The panel's own seven numbers are the F0x80017174 scratch's +0x18..+0x24:
@@ -78,7 +78,7 @@ export function makeForms(B: BattleContext) {
     // resist. `rec.elemBonuses` already holds the last two (buildPlayerRecord
     // folds the equipment's elemResists in), so the shared helper reads it as
     // the original does.
-    const elemValue = (profile, points, key) => elementValue(profile, points, key);
+    const elemValue = (profile, points, key: string) => elementValue(profile, points, key);
     // F0x80017A1C copies the roster's own 0x14-byte technique block for a form:
     // its level byte at +0x02 and its six entry words at +0x08. The walker's form
     // ledger holds the same six words, and battleFormLevel the same level, so the
@@ -112,7 +112,7 @@ export function makeForms(B: BattleContext) {
    * DV path (web/battle.js applyDvAction): one turn, the form written, the
    * Digivolved scene. The screen itself only reports the choice.
    */
-  function confirmDvForm(b, speciesId) {
+  function confirmDvForm(b, speciesId: number) {
     const forms = B.formOptionsFor(b.activePlayerIndex);
     const row = forms.findIndex((form) => (form.id & 0xffff) === (speciesId & 0xffff));
     if (row < 0) { b.state = ST.PLAYER_MENU; return; }
@@ -134,7 +134,7 @@ export function makeForms(B: BattleContext) {
    * form, which is the same number for most of a battle and wrong after either of
    * those two.
    */
-  function liveFormId(b, slot) {
+  function liveFormId(b, slot: number) {
     const record = b.playerRecords?.[slot];
     const member = b.playerRoster?.[slot];
     const id = Number(record?.profile?.id ?? member?.id ?? member?.rookieId ?? record?.rookieId ?? 0);

@@ -44,12 +44,12 @@ export const SOIL = {
          credit: "Poly Haven brown_mud_leaves_01 (Rob Tuytel), CC0 (polyhaven.com/a/brown_mud_leaves_01) - 2K diffuse + nor_gl" },
 };
 
-const lumaLin = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-const toLin = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
-const linOf = (rgb) => rgb.map((v) => toLin(v / 255));
+const lumaLin = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const toLin = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+const linOf = (rgb: number[]) => rgb.map((v: number) => toLin(v / 255));
 
 // ---------------- the CC0 photo (loaded once) ----------------
-let TEX = null;
+let TEX: { albedo: null; normal: null; loaded: boolean; mean: null; px: number; readMs: number; pixels: null; credit: string; error: null; } | null = null;
 /** albedo (sRGB) + normal (linear), RepeatWrapping, mipmaps, anisotropy 8. When both are in: the albedo's linear mean
  *  RGB (full-size image, one pass) and a 1024-bin histogram of its luma per channel weight, kept so the contrast can be
  *  solved for any tint (soilTone()). `loaded` flips when both images are in (the checker waits on it). */
@@ -82,7 +82,7 @@ export function soilTextures() {
     } catch (e) { st.error = "unreadable: " + String(e?.message || e).slice(0, 120); }
     st.loaded = true;
   };
-  const mk = (file, srgb) => {
+  const mk = (file: string | null, srgb: boolean) => {
     const t = loader.load(SOIL.TEX.dir + file, () => { if (--left <= 0) finish(); },
                           undefined, () => { st.error = file; if (--left <= 0) finish(); });
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = SOIL.ANISO;
@@ -109,7 +109,7 @@ export function soilTone(tex, colours) {
   const L = new Float32Array(tex.pixels.length / 3);
   for (let i = 0, j = 0; i < tex.pixels.length; i += 3, j++) L[j] = 0.2126 * tex.pixels[i] * tint[0] + 0.7152 * tex.pixels[i + 1] * tint[1] + 0.0722 * tex.pixels[i + 2] * tint[2];
   L.sort();
-  const q = (p) => L[Math.min(L.length - 1, Math.floor(p * (L.length - 1)))];
+  const q = (p: number) => L[Math.min(L.length - 1, Math.floor(p * (L.length - 1)))];
   const photoSpan = q(0.9) - q(0.1), target = lumaLin(hi) - lumaLin(lo);
   const contrast = photoSpan > 1e-6 ? target / photoSpan : 1;
   return { tint, contrast, all, target: { p10: lumaLin(lo), p90: lumaLin(hi), span: target },
@@ -156,7 +156,7 @@ const FLAT_VS = /* glsl */`
     gl_Position = projectionMatrix * viewMatrix * w;
   }`;
 
-function setTone(u, tex, colours, info) {
+function setTone(u, tex, colours, info: BuiltSoilInfo) {
   if (!tex.loaded || !tex.mean || !tex.pixels) return false;
   const t = soilTone(tex, colours);
   u.uSoilTint.value.set(...t.tint);

@@ -17,8 +17,8 @@ import type { UiPopOpts } from "./types.js";
 /** The native rect of a part's pixels (draw position + the clip's bounds), before its matrix. */
 const nat = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
 const rel = (p) => p.rel ?? ID;
-const R = (r, p) => applyRel(r, rel(p));
-const of = (parts, n) => parts.filter((p) => p.part === n);
+const R = (r, p: { x: number; y: number; }) => applyRel(r, rel(p));
+const of = (parts, n: string) => parts.filter((p: { part: string; }) => p.part === n);
 
 /** C7 sizes in native units: title plate 63 dp tall, title text 36 dp in; portrait frame 108 x 105; slot 45 x 51; key 38 x 50 inset 2 dp;
  *  key pitch 14 x 18 (the game's grid); button 2 native narrower than its clip, 17 tall; keyboard window 783 x 411. */
@@ -53,7 +53,7 @@ const glyphsOf = (r) => (r.glyphs?.length ? r.glyphs : [...String(r.text)].map((
 /** The keyboard's grid cells from the clip's own sheet layers: each 72-wide block of 18-tall rows = 5 columns x (h / 18) rows. */
 export function keyCells(p) {
     const cells = [];
-    const blocks = (p.layers ?? []).filter((l) => l.w === C7.gridW && l.h >= C7.pitchY && l.h % C7.pitchY === 0).sort((a, b) => a.x - b.x || a.y - b.y);
+    const blocks = (p.layers ?? []).filter((l: { w: number; h: number; }) => l.w === C7.gridW && l.h >= C7.pitchY && l.h % C7.pitchY === 0).sort((a: { x: number; y: number; }, b: { x: number; y: number; }) => a.x - b.x || a.y - b.y);
     for (const b of blocks) for (let r = 0; r < b.h / C7.pitchY; r++) for (let c = 0; c < 5; c++) {
         const nx = p.x + b.x + c * C7.pitchX, ny = p.y + b.y + r * C7.pitchY;
         cells.push({ nx, ny, rect: { x: nx + C7.keyIn, y: ny + C7.keyIn, w: C7.keyW, h: C7.keyH } });
@@ -62,17 +62,17 @@ export function keyCells(p) {
 }
 
 /** The name slots from the clip's sheet layers (one 20 x 20 piece per letter), left to right. */
-export const slotRects = (p) => (p.layers ?? []).filter((l) => l.w <= 24 && l.h <= 24).sort((a, b) => a.x - b.x)
+export const slotRects = (p) => (p.layers ?? []).filter((l: { w: number; h: number; }) => l.w <= 24 && l.h <= 24).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x)
     .map((l) => ({ nx: p.x + l.x, ny: p.y + l.y, rect: { x: p.x + l.x, y: p.y + l.y, w: C7.slotW, h: C7.slotH } }));
 
 /** The glyph the key shows (the game's katakana middle dot is the dot key). */
-const keyGlyph = (ch) => (ch === "・" ? "·" : ch);
+const keyGlyph = (ch: string) => (ch === "・" ? "·" : ch);
 
 /** A left / right arrow in a 14 x 12 box (the C7 "<-" / "->" buttons). */
 const ARROW = Object.freeze({ "[arrow-left]": "M0 6L6 0V4H14V8H6V12Z", "[arrow-right]": "M14 6L8 0V4H0V8H8V12Z" });
 
 /** The C7 title plate (a family C window 63 dp tall) and its title run, 36 dp in, in the game's face colour (green when the game tints it). */
-function composeTitle(p, i, runs, used, out) {
+function composeTitle(p: { x: number; y: number; }, i: string, runs, used: Set<unknown>, out) {
     const n = nat(p), r = { x: n.x, y: n.y, w: n.w, h: C7.hdrH };
     out.push(cWindow(`hdr${i}`, R(r, p), rel(p), { part: "header" }));
     for (const m of takeIn(runs, n, used)) {
@@ -95,7 +95,7 @@ export function composeNameEntry({ parts, runs }, cfg: { word?: string | null; }
     }
     // the wizard's step digits first: they sit inside the title plate's rect and must not become its title text
     const chips = of(parts, "wizSteps").flatMap((p, i) => composeSteps(p, i, parts, runs, used, out));
-    of(parts, "nameHdr").forEach((p, i) => composeTitle(p, i, runs, used, out));
+    of(parts, "nameHdr").forEach((p: { x: number; y: number; }, i: string) => composeTitle(p, i, runs, used, out));
     out.push(...chips);
     of(parts, "hint").forEach((p, i) => composeHint(p, `n${i}`, runs, used, out));
     // the portrait frame (the portrait itself is art over its body)
@@ -111,10 +111,10 @@ export function composeNameEntry({ parts, runs }, cfg: { word?: string | null; }
         for (const r of mine) for (const g of glyphsOf(r)) {
             if (!g.ch.trim()) continue;
             let best = -1, bd = 10;
-            slots.forEach((s, k) => { const d = Math.abs(s.nx - g.x); if (d < bd) { bd = d; best = k; } });
+            slots.forEach((s: { nx: number; }, k: number) => { const d = Math.abs(s.nx - g.x); if (d < bd) { bd = d; best = k; } });
             if (best >= 0) letters[best] += g.ch;
         }
-        slots.forEach((s, k) => nameSlot(`slot${i}.${k}`, R(s.rect, p), letters[k], !!slotCur && Math.abs(slotCur.x - s.nx) < 3 && Math.abs(slotCur.y - s.ny) < 3, rel(p), out));
+        slots.forEach((s, k: string | number) => nameSlot(`slot${i}.${k}`, R(s.rect, p), letters[k], !!slotCur && Math.abs(slotCur.x - s.nx) < 3 && Math.abs(slotCur.y - s.ny) < 3, rel(p), out));
     });
     // the keyboard: window, key grid (cells from the clip's layers), letters from the runs by glyph x, the key cursor (39) = focus
     const keyCur = of(parts, "keyCursor")[0];
@@ -157,9 +157,9 @@ export function composeNameEntry({ parts, runs }, cfg: { word?: string | null; }
  * The partner chooser rows (stdgnm 30): a family C row plate, the portrait frame inside it, the name (Russo) with the game's underline;
  * the row under the game's cursor frame (32) gets the orange edge, corners and the chevron left of it.
  */
-function composeChooser(parts, runs, used, out) {
+function composeChooser(parts, runs, used: Set<unknown>, out) {
     const pick = of(parts, "pickCursor")[0];
-    of(parts, "pickRow").forEach((p, i) => {
+    of(parts, "pickRow").forEach((p: { x: number; y: number; }, i) => {
         const row = { x: p.x - 4, y: p.y - 4, w: 160, h: 40 }, on = !!pick && Math.abs(pick.y - row.y) < 3 && Math.abs(pick.x - row.x) < 3, rl = rel(p);
         out.push(cWindow(`pick${i}`, R(row, p), rl, { part: "pickRow", edge: on ? "var(--c-orange)" : FAMILY_C.edge }));
         out.push(plate(`pick${i}.portrait`, "portrait", R({ x: p.x + 2, y: p.y + 2, w: 36, h: 36 }, p), rl, { shape: "key", underEdge: "all", edge: on ? "var(--c-orange)" : FAMILY_C.keyEdge, body: FAMILY_C.body, shadow: 0 }));
@@ -180,20 +180,20 @@ function composeChooser(parts, runs, used, out) {
 /** The thin pieces of a clip's line art (dividers, outlines: one side 8 native or less), merged along a row; the other pieces = boxes. */
 export function lineArt(p, skipSizes = []) {
     const L = (p.layers ?? []).filter((l) => !skipSizes.some(([w, h]) => l.w === w && l.h === h));
-    const thin = L.filter((l) => Math.min(l.w, l.h) <= 8 && Math.max(l.w, l.h) >= 12);
-    const boxes = L.filter((l) => Math.min(l.w, l.h) > 8 && Math.min(l.w, l.h) < 30);
+    const thin = L.filter((l: { w: number; h: number; }) => Math.min(l.w, l.h) <= 8 && Math.max(l.w, l.h) >= 12);
+    const boxes = L.filter((l: { w: number; h: number; }) => Math.min(l.w, l.h) > 8 && Math.min(l.w, l.h) < 30);
     const rows = [];
-    for (const l of thin.filter((t) => t.w > t.h).sort((a, b) => a.y - b.y || a.x - b.x)) {
+    for (const l of thin.filter((t: { w: number; h: number; }) => t.w > t.h).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x)) {
         const q = rows.find((r) => r.y === l.y && r.h === l.h && l.x <= r.x + r.w + 1 && l.x + l.w >= r.x - 1);
         if (q) { const x1 = Math.max(q.x + q.w, l.x + l.w); q.x = Math.min(q.x, l.x); q.w = x1 - q.x; } else rows.push({ ...l });
     }
-    const cols = thin.filter((t) => t.w <= t.h).map((l) => ({ ...l }));
+    const cols = thin.filter((t: { w: number; h: number; }) => t.w <= t.h).map((l) => ({ ...l }));
     return { rows, cols, boxes };
 }
 
 /** The panel body: the union of the clip's tall pieces (its frame columns), relative to the draw position. */
 const panelBody = (p) => {
-    const tall = (p.layers ?? []).filter((l) => l.h >= 100);
+    const tall = (p.layers ?? []).filter((l: { h: number; }) => l.h >= 100);
     if (!tall.length) return { x: p.bx ?? 0, y: p.by ?? 0, w: p.w ?? 0, h: p.h ?? 0 };
     const x0 = Math.min(...tall.map((l) => l.x)), y0 = Math.min(...tall.map((l) => l.y));
     return { x: x0, y: y0, w: Math.max(...tall.map((l) => l.x + l.w)) - x0, h: Math.max(...tall.map((l) => l.y + l.h)) - y0 };
@@ -209,7 +209,7 @@ export function composeMemcard({ parts, runs }) {
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x));
     // the pipe behind the panel: a C column (edge + body), composed before the panel so the panel covers it
-    of(parts, "mcPipe").forEach((p, i) => out.push(plate(`mc${i}.pipe`, "pipe", R(nat(p), p), rel(p), { shape: "frame", shadow: 0 })));
+    of(parts, "mcPipe").forEach((p: { x: number; y: number; }, i) => out.push(plate(`mc${i}.pipe`, "pipe", R(nat(p), p), rel(p), { shape: "frame", shadow: 0 })));
     of(parts, "mcPanel").forEach((p, i) => {
         const b = panelBody(p), body = { x: p.x + b.x, y: p.y + b.y, w: b.w, h: b.h }, rl = rel(p);
         out.push(plate(`mc${i}.panel`, "window", R(body, p), rl, { shape: "ch" }));
@@ -270,8 +270,8 @@ export function composeMemcard({ parts, runs }) {
  * focus colour, a short rule between them. Positions are the clip's own pieces (its 96 x 28 piece holds the three: pitch 28, 16 wide).
  * Returns the chips: the caller adds them AFTER the title plate (plates stack in the order they are pushed).
  */
-function composeSteps(p, i, parts, runs, used, out) {
-    const step = (p.base ?? Number(p.id)) - 12, big = (p.layers ?? []).find((l) => l.w === 96 && l.h === 28), chips = [];
+function composeSteps(p, i, parts: { part: string; }[], runs, used: Set<unknown>, out) {
+    const step = (p.base ?? Number(p.id)) - 12, big = (p.layers ?? []).find((l: { w: number; h: number; }) => l.w === 96 && l.h === 28), chips = [];
     if (!big) return chips;
     const ox = p.x + big.x, oy = p.y + big.y, rl = rel(p);
     for (let k = 0; k < 3; k++) {
@@ -282,19 +282,19 @@ function composeSteps(p, i, parts, runs, used, out) {
     }
     // the pack list and the confirm page have no title clip of their own: the step clip's left pieces ARE the title band (x 0..176, then
     // under the chips), so the C title plate sits on them (the name keyboard has its own, namedt 29)
-    if (!parts.some((q) => q.part === "nameHdr")) composeTitle({ ...p, bx: 0, by: 0, w: 272, h: 21 }, `w${i}`, runs, used, out);
+    if (!parts.some((q: { part: string; }) => q.part === "nameHdr")) composeTitle({ ...p, bx: 0, by: 0, w: 272, h: 21 }, `w${i}`, runs, used, out);
     return chips;
 }
 
 /** The starter pack list (stnmet 7): the C window on the clip's frame columns, its rules from the clip's thin pieces, the A / B / C tabs
  *  (the chosen one = the game's marker clip 50, orange). The partner pedestals and the partners stay pictures. */
-function composePackWin(p, i, parts, runs, used, out) {
+function composePackWin(p, i, parts, runs, used: Set<unknown>, out) {
     const b = panelBody(p), body = { x: p.x + b.x, y: p.y + b.y, w: b.w, h: b.h }, rl = rel(p);
     out.push(cWindow(`pk${i}.win`, R(body, p), rl, { part: "window" }));
     for (const l of lineArt(p, [[48, 32]]).rows.filter((q) => q.x >= b.x + 4 && q.y >= b.y + 4 && q.y + q.h <= b.y + b.h - 2))
         out.push(rule(`pk${i}.rule${l.y}`, R({ x: p.x + l.x, y: p.y + l.y + l.h - N(4), w: l.w, h: N(4) }, p), "var(--c-under)", rl));
     const sel = of(parts, "packSel")[0];
-    (p.layers ?? []).filter((l) => l.x === 0 && l.w === 28 && l.h === 20).sort((a, c) => a.y - c.y).forEach((l, k) => {
+    (p.layers ?? []).filter((l: { x: number; w: number; h: number; }) => l.x === 0 && l.w === 28 && l.h === 20).sort((a: { y: number; }, c: { y: number; }) => a.y - c.y).forEach((l, k) => {
         const r = { x: p.x + l.x, y: p.y + l.y, w: l.w, h: l.h };
         const on = !!sel && Math.abs(sel.x - r.x) < 3 && Math.abs(sel.y - r.y) < 3;
         nameSlot(`pk${i}.tab${k}`, R(r, p), takeIn(runs, r, used)[0]?.text ?? "", on, rl, out);
@@ -304,8 +304,8 @@ function composePackWin(p, i, parts, runs, used, out) {
 /** The confirm page's name window (stnmet 2 + its portrait frame 6) and pack window (9). */
 function composeConfirmBoxes(parts, out) {
     of(parts, "cfPortrait").forEach((p, i) => out.push(plate(`cf${i}.portrait`, "portrait", R({ x: p.x, y: p.y, w: 36, h: 36 }, p), rel(p), { shape: "key", underEdge: "all", edge: FAMILY_C.edge, body: FAMILY_C.body, shadow: 0 })));
-    of(parts, "cfName").forEach((p, i) => out.push(cWindow(`cfn${i}`, R({ x: p.x + 36, y: p.y + 15, w: 176, h: 21 }, p), rel(p), { shape: "frame" })));
-    of(parts, "cfPack").forEach((p, i) => {
+    of(parts, "cfName").forEach((p: { x: number; y: number; }, i) => out.push(cWindow(`cfn${i}`, R({ x: p.x + 36, y: p.y + 15, w: 176, h: 21 }, p), rel(p), { shape: "frame" })));
+    of(parts, "cfPack").forEach((p: { x: number; y: number; }, i) => {
         const r = { x: p.x, y: p.y, w: 212, h: 62 };
         out.push(cWindow(`cfp${i}`, R(r, p), rel(p), { shape: "frame" }));
         out.push(rule(`cfp${i}.rule`, R({ x: p.x + 7, y: p.y + 21, w: 198, h: N(4) }, p), "var(--c-under)", rel(p)));
@@ -319,14 +319,14 @@ export function composeNet({ parts, runs }) {
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x, "backdrop.stripes", { light: FAMILY_C.stripe, dark: FAMILY_C.stripeDark }));
     const chips = of(parts, "wizSteps").flatMap((p, i) => composeSteps(p, i, parts, runs, used, out));
-    of(parts, "nameHdr").forEach((p, i) => composeTitle(p, i, runs, used, out));
+    of(parts, "nameHdr").forEach((p: { x: number; y: number; }, i: string) => composeTitle(p, i, runs, used, out));
     out.push(...chips);
     of(parts, "packWin").forEach((p, i) => composePackWin(p, i, parts, runs, used, out));
     composeConfirmBoxes(parts, out);
     of(parts, "netWin").forEach((p, i) => {
         // stnmet 15 (the message window): every piece but the 56 wide wires; stnmet 1 (the wire band holding the Register box): the 54 tall
         // box pieces only (its 16 wide pieces join the wires to the box, outside it)
-        const body = (p.layers ?? []).filter((l) => (p.base === 1 ? l.h === 54 : l.w < 56 || l.x >= 0 && l.x + l.w <= 208 && l.w !== 56));
+        const body = (p.layers ?? []).filter((l: { h: number; w: number; x: number; }) => (p.base === 1 ? l.h === 54 : l.w < 56 || l.x >= 0 && l.x + l.w <= 208 && l.w !== 56));
         if (!body.length) return;
         const x0 = Math.min(...body.map((l) => l.x)), y0 = Math.min(...body.map((l) => l.y));
         const r = { x: p.x + x0, y: p.y + y0, w: Math.max(...body.map((l) => l.x + l.w)) - x0, h: Math.max(...body.map((l) => l.y + l.h)) - y0 };
@@ -352,14 +352,14 @@ export function composeNet({ parts, runs }) {
 
 /** The registration wizard (one session, scope "ui-pack"): the message window, then the name keyboard, then the pack list and the confirm. */
 export function composeWizard(c) {
-    if (c.parts.some((p) => p.part === "keyboard")) return composeNameEntry(c, { word: null });
+    if (c.parts.some((p: { part: string; }) => p.part === "keyboard")) return composeNameEntry(c, { word: null });
     return composeNet(c);
 }
 
 /** The pause MAP page: the place-name window (family A, the chamfered C frame) and its name in Russo 30. The map is the game's picture. */
 export function composeMapPage({ parts, runs }) {
     const out = [], used = new Set();
-    of(parts, "mapName").forEach((p, i) => {
+    of(parts, "mapName").forEach((p: { x: number; y: number; }, i) => {
         // the frame without the clip's own drop shadow (measured on the game's pixels: frame 10..246 x 20..56 of the 9..253 x 20..60 clip)
         const n = nat(p), r = { x: n.x + 1, y: n.y, w: n.w - 8, h: n.h - 4 };
         // over the art: the map under it is a picture, and art sits above the under layer
@@ -382,8 +382,8 @@ export function composeLanguage({ parts, runs }) {
     const back = of(parts, "backdrop")[0];
     if (back) out.push(stripes(back.x, "backdrop.stripes", { light: FAMILY_C.stripe, dark: FAMILY_C.stripeDark }));
     // the game's order: the logo band under the column, the header band over both
-    for (const n of ["langBand", "langColumn", "langHeader"]) of(parts, n).forEach((p, i) => out.push(cWindow(`${n}${i}`, R(nat(p), p), rel(p), { part: n, shape: "frame" })));
-    of(parts, "langCursor").forEach((p, i) => {
+    for (const n of ["langBand", "langColumn", "langHeader"]) of(parts, n).forEach((p: { x: number; y: number; }, i) => out.push(cWindow(`${n}${i}`, R(nat(p), p), rel(p), { part: n, shape: "frame" })));
+    of(parts, "langCursor").forEach((p: { x: number; y: number; }, i) => {
         const r = R(nat(p), p);
         out.push(plate(`lang${i}.on`, "langCursor", r, rel(p), { shape: "ch", edge: "var(--c-orange)", body: FAMILY_C.slotOn, shadow: 0 }));
         out.push(corners(`lang${i}.corners`, r, "var(--c-orange)", rel(p)));

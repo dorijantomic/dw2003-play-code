@@ -53,14 +53,14 @@ export function launchPadDebug() {
  *  cursor at entry 0), so they pulse in step until a launch rewinds one. */
 const padIdle = {}; // stageId -> [PadCursor] parallel to launchPads(stageId)
 
-function padIdleScript(stageId) {
+function padIdleScript(stageId: string | number) {
     const entries = S.padData?.[String(stageId).replace(/^s/, "")]?.idleScript
         ?.entries;
     return entries?.length ? entries : PAD_IDLE_SCRIPT;
 }
 
 /** Advance every pad's idle colour cursor one rendered frame (= one tick). */
-function tickPadIdle(stageId, pads, launch) {
+function tickPadIdle(stageId: string | number, pads, launch) {
     const script = padIdleScript(stageId);
     let cur = padIdle[stageId];
     if (!cur || cur.length !== pads.length) {
@@ -83,7 +83,7 @@ function tickPadIdle(stageId, pads, launch) {
     return out;
 }
 
-export function drawLaunchPads(ctx, stageId, camX, camY, drawables, launch) {
+export function drawLaunchPads(ctx: CanvasRenderingContext2D | null, stageId, camX: number, camY: number, drawables: { y: number; draw: () => void; }[], launch) {
     if (!padsEnabled) return;
     const pads = launchPads(stageId);
     if (!pads.length) return;

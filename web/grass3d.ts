@@ -134,7 +134,7 @@ function bladeGeometry() {
 }
 
 // Deterministic PRNG so a stage's grass is identical every visit.
-function rng(seed) {
+function rng(seed: number) {
     let s = seed >>> 0 || 1;
     return () => {
         s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0;
@@ -142,7 +142,7 @@ function rng(seed) {
     };
 }
 
-function isGrassBase(r, g, b) {
+function isGrassBase(r: number, g: number, b: number) {
     return g >= 105 && g > r * 1.22 && g > b * 1.7 && g - b >= 55;
 }
 
@@ -158,7 +158,7 @@ const STRICT_GRASS_STAGES = new Set([
     "s200", "s201", "s202", "s203", "s218", "s219", "s920", "s921",   // Asuka / Amaterasu City
     "s420",                                                           // Seiryu City
 ]);
-function isGrassStrict(r, g, b) {
+function isGrassStrict(r: number, g: number, b: number) {
     return g >= 110 && g > r * 1.5 && g > b * 2.0 && g - b >= 70;
 }
 const WET_R = 15;            // grass in a patch mostly surrounded by water is a reed bed
@@ -174,11 +174,11 @@ function pixelsOf(img) {
 
 // clsImg decides WHERE grass goes (the base map for a day/night variant);
 // mapImg, the map on screen, decides what COLOUR each blade is.
-function buildStage(stageId, mapImg, clsImg) {
+function buildStage(stageId: string, mapImg: HTMLImageElement, clsImg: HTMLImageElement) {
     const W = mapImg.naturalWidth, H = mapImg.naturalHeight;
     const data = pixelsOf(clsImg);
     const colorData = clsImg === mapImg ? data : pixelsOf(mapImg);
-    const rand = rng(stageId.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
+    const rand = rng(stageId.split("").reduce((a: number, c: string) => a * 31 + c.charCodeAt(0), 7));
     const isGrass = STRICT_GRASS_STAGES.has(stageId) ? isGrassStrict : isGrassBase;
 
     // Solid-patch test. Tree canopies, leaves and mossy stone have grass-green
@@ -201,28 +201,28 @@ function buildStage(stageId, mapImg, clsImg) {
             wsat[(y + 1) * SW + (x + 1)] = wsat[y * SW + (x + 1)] + wrun;
         }
     }
-    const boxSum = (t, x, y, r) => {
+    const boxSum = (t: number[] | Int32Array<ArrayBuffer>, x: number, y: number, r: number) => {
         const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
         const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
         return [t[y1 * SW + x1] - t[y0 * SW + x1] - t[y1 * SW + x0] + t[y0 * SW + x0],
                 (x1 - x0) * (y1 - y0)];
     };
-    const solid = (x, y) => {
+    const solid = (x: number, y: number) => {
         const [n, area] = boxSum(sat, x, y, STRICT_GRASS_STAGES.has(stageId) ? 9 : SOLID_R);
         return n >= SOLID_MIN * area;
     };
-    const nearWater = (x, y) => boxSum(wsat, x, y, WATER_GAP)[0] > 0;
+    const nearWater = (x: number, y: number) => boxSum(wsat, x, y, WATER_GAP)[0] > 0;
 
     const bandCount = Math.ceil(H / BAND_H);
     const perBand = Array.from({ length: bandCount }, () => []);
     let total = 0;
-    const sample = (x, y) => {
+    const sample = (x: number, y: number) => {
         x = Math.min(W - 1, Math.max(0, x | 0));
         y = Math.min(H - 1, Math.max(0, y | 0));
         const o = (y * W + x) * 4;
         return [data[o], data[o + 1], data[o + 2]];
     };
-    const sampleColor = (x, y) => {
+    const sampleColor = (x: number, y: number) => {
         x = Math.min(W - 1, Math.max(0, x | 0));
         y = Math.min(H - 1, Math.max(0, y | 0));
         const o = (y * W + x) * 4;
@@ -274,7 +274,7 @@ function buildStage(stageId, mapImg, clsImg) {
 
 // Render the grass for the current camera. Returns the hidden canvas (always
 // VIEW_W*PX by VIEW_H*PX, camera-relative) or null when there is no grass.
-export function renderGrass(stageId, mapImg, camX, camY, timeSec) {
+export function renderGrass(stageId: string, mapImg: HTMLImageElement, camX: number, camY: number, timeSec: number) {
     if (NO_GRASS_STAGES.has(stageId)) return null;
     if (!(mapImg instanceof Image) || !mapImg.complete || !mapImg.naturalWidth) return null;
     if (!ensureRenderer()) return null;

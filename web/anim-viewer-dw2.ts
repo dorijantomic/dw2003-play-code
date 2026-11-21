@@ -14,6 +14,7 @@
 //
 // Pure parts (index building, glTF parsing, clip sampling, bounds) are importable in node so
 // tests/anim-viewer-dw2.test.js can prove them without a browser. Only createDw2Renderer touches WebGL.
+import type { WithImplicitCoercion } from "node:buffer";
 import type { Dw2LoadedModel, Dw2Pose, PoseBounds } from "./types/anim-viewer-dw2.js";
 
 export const DW2_DEFAULT_ROOT = "dw2-models";
@@ -41,14 +42,14 @@ export function buildDw2Index(inv, { root = null } = {}) {
       anims: Array.isArray(m.anims) ? m.anims.slice() : [],
       durs: Array.isArray(m.durs) ? m.durs.slice() : [],
     }))
-    .sort((a, b) => a.stage.localeCompare(b.stage) || a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
+    .sort((a: { stage: string; name: string; path: string; }, b) => a.stage.localeCompare(b.stage) || a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
   const stages = {};
   for (const m of models) stages[m.stage] = (stages[m.stage] || 0) + 1;
   return { root: root || inv?.root || "extract", count: models.length, stages, models };
 }
 
 /** Case-insensitive substring search over the display name, the folder and the file code. */
-export function matchesDw2Query(entry, query) {
+export function matchesDw2Query(entry, query: string) {
   const q = String(query || "").trim().toLowerCase();
   if (!q) return true;
   return `${entry.name} ${entry.path} ${entry.code || ""}`.toLowerCase().includes(q);
@@ -56,7 +57,7 @@ export function matchesDw2Query(entry, query) {
 
 /** The list's filters: free-text query + stage. */
 export function filterDw2(models, { query = "", stage = "" } = {}) {
-  return (models || []).filter((m) => (stage ? m.stage === stage : true) && matchesDw2Query(m, query));
+  return (models || []).filter((m: { stage: string; }) => (stage ? m.stage === stage : true) && matchesDw2Query(m, query));
 }
 
 // ── glTF decoding ───────────────────────────────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ function walkParents(json, idx, parent, out) {
 }
 
 /** Read one accessor into a typed array (de-interleaving when byteStride says so). */
-export function readAccessor(model, idx) {
+export function readAccessor(model, idx: string | number | null) {
   if (idx == null) return null;
   model.accessors ||= new Map();
   const hit = model.accessors.get(idx);
@@ -262,7 +263,7 @@ export function composeTRS(t, r, s, out = new Float32Array(16)) {
 }
 
 /** Column-major 4x4 product a·b. */
-export function mat4Mul(a, b, out = new Float32Array(16)) {
+export function mat4Mul(a: number[], b: number[] | Float32Array<ArrayBuffer>, out = new Float32Array(16)) {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0;
     for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
@@ -271,7 +272,7 @@ export function mat4Mul(a, b, out = new Float32Array(16)) {
   return out;
 }
 
-const point = (m, x, y, z) => [
+const point = (m: number[], x: number, y: number, z: number) => [
   m[0] * x + m[4] * y + m[8] * z + m[12],
   m[1] * x + m[5] * y + m[9] * z + m[13],
   m[2] * x + m[6] * y + m[10] * z + m[14],
@@ -281,7 +282,7 @@ const point = (m, x, y, z) => [
 export function bindPose(model) {
   const n = model.json.nodes.length;
   const pose = { model, t: new Float32Array(n * 3), r: new Float32Array(n * 4), s: new Float32Array(n * 3), n } as Dw2Pose;
-  model.json.nodes.forEach((node, i) => {
+  model.json.nodes.forEach((node: { translation: number[]; rotation: number[]; scale: number[]; }, i: number) => {
     const t = node.translation || [0, 0, 0];
     const r = node.rotation || [0, 0, 0, 1];
     const s = node.scale || [1, 1, 1];
@@ -293,7 +294,7 @@ export function bindPose(model) {
 }
 
 /** Sample one channel at `time` (seconds) into the pose's local arrays. */
-function applyChannel(pose, ch, time) {
+function applyChannel(pose: Dw2Pose, ch, time: number) {
   const { times, values, comps, interp } = ch;
   const n = times.length;
   if (!n) return;
@@ -355,7 +356,7 @@ function worldMatrices(pose) {
  * Pose the model at `timeSec` of `clipIndex` (-1 = the bind pose). Returns the pose object with
  * `world` filled in; meshes draw with `pose.world[nodeIndex * 16 …]`.
  */
-export function samplePose(model, clipIndex, timeSec) {
+export function samplePose(model, clipIndex: number | null, timeSec) {
   const pose = bindPose(model);                    // fresh local TRS every call: a channel only touches its own node
   if (clipIndex != null && clipIndex >= 0 && model.anims[clipIndex]) {
     for (const ch of model.anims[clipIndex].channels) applyChannel(pose, ch, Math.max(0, timeSec || 0));
@@ -367,7 +368,7 @@ export function samplePose(model, clipIndex, timeSec) {
 /** World-space AABB of a pose (mesh-local boxes through each mesh node's world matrix). */
 export function poseBounds(model, pose, out: PoseBounds = {}) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-  model.json.nodes.forEach((node, i) => {
+  model.json.nodes.forEach((node: { mesh: string | number | null; }, i: number) => {
     if (node.mesh == null) return;
     const mesh = model.meshes[node.mesh];
     if (!mesh) return;
@@ -404,7 +405,7 @@ export function groundPose(model, pose, { centerXZ = true } = {}) {
 }
 
 /** What the Info tab says about a file (all numbers measured, no labels invented). */
-export function modelStats(model) {
+export function modelStats(model: Dw2LoadedModel) {
   let prims = 0, tris = 0, verts = 0, textured = 0;
   for (const mesh of model.meshes) for (const p of mesh.prims) {
     prims++; tris += p.count / 3; verts += p.count;
@@ -421,8 +422,8 @@ export function modelStats(model) {
     clips: model.anims.length,
     roots: model.roots.length,
     joints: model.json.skins?.[0]?.joints?.length ?? 0,
-    hasIndices: (model.json.meshes || []).some((m) => (m.primitives || []).some((p) => p.indices != null)),
-    hasSkinAttrs: (model.json.meshes || []).some((m) => (m.primitives || []).some((p) => p.attributes?.JOINTS_0 != null)),
+    hasIndices: (model.json.meshes || []).some((m) => (m.primitives || []).some((p: { indices: null; }) => p.indices != null)),
+    hasSkinAttrs: (model.json.meshes || []).some((m) => (m.primitives || []).some((p: { attributes: { JOINTS_0: null; }; }) => p.attributes?.JOINTS_0 != null)),
   };
 }
 
@@ -456,7 +457,7 @@ void main() {
   gl_FragColor = vec4(rgb, c.a);
 }`;
 
-function compile(gl, type, src) {
+function compile(gl, type, src: string) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
@@ -497,7 +498,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
     return b;
   };
 
-  function makeTexture(img) {
+  function makeTexture(img: HTMLImageElement) {
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -509,7 +510,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
     return tex;
   }
 
-  async function loadImage(uri) {
+  async function loadImage(uri: string) {
     if (!uri) return null;
     const img = new Image();
     img.src = uri;
@@ -541,7 +542,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
       // geometry: one buffer set per primitive, the draw list flattened
       model.draws = [];
       model.meshes.forEach((mesh, mi) => {
-        model.json.nodes.forEach((node, ni) => {
+        model.json.nodes.forEach((node: { mesh: number; }, ni) => {
           if (node.mesh !== mi) return;
           for (const p of mesh.prims) {
             p.gpu = {
@@ -625,13 +626,13 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
   return renderer;
 }
 
-function depthOf(pose, d, eye) {
+function depthOf(pose, d: { node: number; }, eye) {
   const m = pose.world;
   const x = m[d.node * 16 + 12] - eye[0], y = m[d.node * 16 + 13] - eye[1], z = m[d.node * 16 + 14] - eye[2];
   return x * x + y * y + z * z;
 }
 
-function hexRgb(hex) {
+function hexRgb(hex: string) {
   const s = String(hex || "#000").replace("#", "");
   const n = parseInt(s.length === 3 ? s.split("").map((c) => c + c).join("") : s, 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];

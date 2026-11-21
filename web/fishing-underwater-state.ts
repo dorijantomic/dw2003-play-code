@@ -44,7 +44,7 @@ export function phaseFor(f) {
     }
 }
 
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /**
  * 0..1 progress of the current phase, from the game's own counters:
@@ -86,14 +86,14 @@ export const THEMES = {
 export const DEFAULT_THEME = "lake";
 
 /** Theme id of a stage from the extras table (fishing_extras.json), falling back to the default. */
-export function themeIdFor(extrasData, stage) {
+export function themeIdFor(extrasData, stage: string | number) {
     const rec = extrasData?.stages?.[stage];
     const area = rec ? (extrasData.areas ?? []).find((a) => a.id === rec.area) : null;
     return area && THEMES[area.theme] ? area.theme : DEFAULT_THEME;
 }
 
 /** The theme record of a stage. */
-export function themeFor(extrasData, stage) {
+export function themeFor(extrasData, stage: string | number) {
     return THEMES[themeIdFor(extrasData, stage)];
 }
 
@@ -105,7 +105,7 @@ export function themeFor(extrasData, stage) {
 export function createBudgetGuard(frames = 30, limitMs = 4, skip = 2) {
     let n = 0, sum = 0, skipped = 0, tripped = false, lastAvg = 0;
     return {
-        record(ms) {
+        record(ms: number) {
             if (tripped) return true;
             if (skipped < skip) { skipped++; return false; }
             sum += ms; n++;

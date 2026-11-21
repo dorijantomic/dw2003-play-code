@@ -54,7 +54,7 @@ export const SWAP_SLOTS = Object.freeze({
 const SLOT_KIND = new Map();
 for (const [kind, slots] of Object.entries(SWAP_SLOTS)) for (const s of slots) SLOT_KIND.set(s, kind);
 /** The kind of a DW3 clip slot, or null for a slot no rule covers. */
-export function kindOfSlot(slot) {
+export function kindOfSlot(slot: number) {
   return SLOT_KIND.get(slot | 0) ?? null;
 }
 
@@ -95,17 +95,17 @@ export const SWAP_NEEDS = Object.freeze({ idle: "all", hit: "all", death: "legs"
 
 // ── measuring ─────────────────────────────────────────────────────────────────────────────────────────
 
-const ROT_STEP = (A, B) => {
+const ROT_STEP = (A: number[], B: number[]) => {
   let d = 0;
   for (let k = 0; k < 9; k++) d += A[k] * B[k];
   return Math.acos(Math.max(-1, Math.min(1, (d - 1) / 2)));
 };
-const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-const unit = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-const angleDeg = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * 180 / Math.PI;
-const pick = (a, n) => (a.length <= n ? a.slice() : Array.from({ length: n }, (_, k) => a[Math.round(((a.length - 1) * k) / (n - 1))]));
+const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const unit = (a: number[]) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const angleDeg = (a: number[], b: number[]) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) * 180 / Math.PI;
+const pick = (a, n: number) => (a.length <= n ? a.slice() : Array.from({ length: n }, (_, k) => a[Math.round(((a.length - 1) * k) / (n - 1))]));
 /** The frames a timeline table plays, in order (0x8000+ entries are LOOP markers, not frames). */
-export function playedFrames(model, table) {
+export function playedFrames(model, table: number) {
   const out = [];
   for (const e of model?.timeline?.[table]?.table ?? []) {
     const v = e?.value | 0;
@@ -148,7 +148,7 @@ export function ownNumbers(model, { samples = 6, penFrames = 1, slots = null }: 
     const frames = playedFrames(model, slot);
     if (frames.length < 2) continue;
     out.clips++;
-    const pose = (f) => poseFromChannels(model, f);
+    const pose = (f: number | undefined) => poseFromChannels(model, f);
     const first = pose(frames[0]), last = pose(frames[frames.length - 1]);
     for (let k = 1; k < frames.length; k++) {
       const a = pose(frames[k - 1]).rot, b = pose(frames[k]).rot;
@@ -193,8 +193,8 @@ export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts
   const frames = playedFrames(baked, bake.table);
   if (frames.length < 2) return null;
   const lo = frames[0], hi = frames[frames.length - 1];
-  const poseT = (f) => poseFromChannels(baked, f);
-  const poseS = (f) => poseFromChannels(source, f - off);
+  const poseT = (f: number | undefined) => poseFromChannels(baked, f);
+  const poseS = (f: number | undefined) => poseFromChannels(source, f - off);
   const sampleT = pick(frames, samples);
   const first = poseT(lo), last = poseT(hi);
 
@@ -259,11 +259,11 @@ export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts
   // fidelity: hand travel + direction, whole-body energy and motion, per-frame speed vs the donor.
   // The donor's "hand" is the bone the MAP pairs with the target's hand - comparing against the
   // donor's own right arm instead measures a different limb and reported the control as 154 deg off.
-  const hand = (T.props.find((p) => p.side === "right") ?? T.props[0])?.bone
-    ?? (T.arms.find((a) => a.side === "right") ?? T.arms[0])?.chain.slice(-1)[0];
+  const hand = (T.props.find((p: { side: string; }) => p.side === "right") ?? T.props[0])?.bone
+    ?? (T.arms.find((a: { side: string; }) => a.side === "right") ?? T.arms[0])?.chain.slice(-1)[0];
   const mappedHand = hand != null && bake.map[hand] >= 0 ? bake.map[hand] : null;
-  const donorHand = mappedHand ?? ((S.props.find((p) => p.side === "right") ?? S.props[0])?.bone
-    ?? (S.arms.find((a) => a.side === "right") ?? S.arms[0])?.chain.slice(-1)[0]);
+  const donorHand = mappedHand ?? ((S.props.find((p: { side: string; }) => p.side === "right") ?? S.props[0])?.bone
+    ?? (S.arms.find((a: { side: string; }) => a.side === "right") ?? S.arms[0])?.chain.slice(-1)[0]);
   let handRatio = null, dir = null, handTravel = null, donorTravel = null;
   if (hand != null && donorHand != null) {
     const p0 = first.pos[hand], s0 = poseS(lo).pos[donorHand];
@@ -305,7 +305,7 @@ export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts
   }
   return {
     frames: frames.length, range: [lo, hi], table: bake.table,
-    covered: +(+bake.covered).toFixed(3), mapped: bake.map.filter((m) => m >= 0).length,
+    covered: +(+bake.covered).toFixed(3), mapped: bake.map.filter((m: number) => m >= 0).length,
     bones: baked.bones.length, height: Math.round(H), donorHeight: Math.round(HD), sizeRatio: +(H / HD).toFixed(2),
     mirror: !!bake.mirror, ik: bake.method === "geometry" ? "geometry" : (bake.metrics?.ikSolved != null || bake.ik !== false ? "role+ik" : "role"),
     ikClamped: bake.metrics?.ikClamped ?? null,
@@ -325,7 +325,7 @@ export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts
 
 // ── judging ──────────────────────────────────────────────────────────────────────────────────────────
 
-const over = (v, bar) => v != null && bar != null && v > bar;
+const over = (v: number | null, bar: number | null) => v != null && bar != null && v > bar;
 
 /**
  * The verdict for ONE measured swap. `numbers` is measureSwap()'s output; `own` is ownNumbers() of the
@@ -337,7 +337,7 @@ export function judgeNumbers(numbers, kind, { own = null, bars = null, needs = n
   if (!B) return { pass: false, keys: ["kind"], numbers, bars: null, notes: ["no bars for kind " + kind] };
   const keys = [], notes = [];
   const N = numbers;
-  const uses = (name, v, bar) => { if (over(v, bar)) { keys.push(name); return `${name} ${v} > ${bar}`; } return null; };
+  const uses = (name: string, v: number, bar: number) => { if (over(v, bar)) { keys.push(name); return `${name} ${v} > ${bar}`; } return null; };
   // 1. coverage of the limbs the kind needs
   if (N.limbs) {
     const wantArms = (needs ?? SWAP_NEEDS[kind]) === "all";
@@ -346,7 +346,7 @@ export function judgeNumbers(numbers, kind, { own = null, bars = null, needs = n
   }
   if (N.covered < 0.55) keys.push("coverage");
   // 2. shape, with the body's own repertoire as the floor of the bar
-  const shapeBar = (k) => Math.max(B[k] ?? 0, own?.[k] ?? 0);
+  const shapeBar = (k: string) => Math.max(B[k] ?? 0, own?.[k] ?? 0);
   uses("ankle", N.ankle, shapeBar("ankle"));
   uses("step", N.step, Math.max(B.step, own?.step ?? 0));
   uses("pen", N.pen, shapeBar("pen"));
@@ -410,12 +410,12 @@ export function swapLadder(target, source, clip, kind, {
 }
 
 // the ladder's default candidates, in the order they are tried
-function bakeRole(target, source, clip, offset, ik, method) {
+function bakeRole(target, source, clip, offset, ik, method: string) {
   const bake: RetargetBake = bakeRetargetByRole(target, source, clip, { offset, ik });
   if (bake) { bake.source = source; bake.method = method; bake.ik = ik; }
   return bake;
 }
-function bakeGeometry(target, source, clip, offset, method) {
+function bakeGeometry(target, source, clip, offset, method: string) {
   const bake: RetargetBake = bakeRetargetGeometry(target, source, clip, { offset });
   if (bake) { bake.source = source; bake.method = method; }
   return bake;
@@ -458,7 +458,7 @@ export const WORLD_BARS_SOURCE = Object.freeze({
 });
 
 /** max rotation gap of a pose against another frame's pose, over the mapped bones. */
-function gapToFrame(model, pose, frame, map?: any[] | null) {
+function gapToFrame(model, pose, frame: number, map?: any[] | null) {
   const ref = poseFromChannels(model, frame);
   let v = 0;
   for (let i = 0; i < model.bones.length; i++) {
@@ -472,7 +472,7 @@ function gapToFrame(model, pose, frame, map?: any[] | null) {
  * The verdict for a FILL of `slot` on `model` (the target as it was before the bake) by a world bake.
  * Returns { pass, keys, numbers, bars, notes, kind, slot, owned }.
  */
-export function judgeFill(bake, slot, model = null, opts: SwapJudgeOpts = {}) {
+export function judgeFill(bake, slot: number, model = null, opts: SwapJudgeOpts = {}) {
   const kind = kindOfSlot(slot);
   const target = model ?? bake?.model;
   const B = WORLD_BARS[kind] ?? opts.bars ?? null;
@@ -497,7 +497,7 @@ export function judgeFill(bake, slot, model = null, opts: SwapJudgeOpts = {}) {
   if (startGap > B.start) keys.push("start");
   if (kind !== "death" && endGap > (B.end ?? 0.25)) keys.push("end");
   if (numbers.covered < 0.55) keys.push("coverage");
-  const over = (name, v, bar) => { if (v != null && bar != null && v > bar) keys.push(name); };
+  const over = (name: string, v: number | null | undefined, bar: number | null) => { if (v != null && bar != null && v > bar) keys.push(name); };
   over("step", numbers.step, B.step);
   over("ankle", numbers.ankle, B.ankle);
   over("groundBelow", numbers.groundBelow, B.groundBelow);
@@ -518,7 +518,7 @@ export function judgeFill(bake, slot, model = null, opts: SwapJudgeOpts = {}) {
  * THE FILL LADDER: a world bake first, then the K16 role candidates as a fallback, then the current
  * behaviour (a slot the model does not own keeps whatever clip-fallback.js builds today).
  */
-export function fillLadder(target, source, clip, slot, { offset = 6000, build = null, ownIdle = null, judgeOpts = {} } = {}) {
+export function fillLadder(target, source, clip, slot: number, { offset = 6000, build = null, ownIdle = null, judgeOpts = {} } = {}) {
   const kind = kindOfSlot(slot);
   const idle = ownIdle ?? ownNumbers(target, { slots: [0] });
   const steps = [];

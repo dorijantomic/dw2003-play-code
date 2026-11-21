@@ -11,6 +11,7 @@ Short pointers to knowledge that is easy to lose. Read the linked file before to
 - Edit the `.ts`; `npm run build:web` writes the `.js` beside it (git-ignored). Types live in `web/types/<module>.ts` and folder `types.ts`.
 - After any type edit: `node tools/rewrite/same-js.mjs` (must say all same) and `npm run check:types` (web/ is at 0 tsc errors).
   Type syntax only; no `@ts-ignore`; class fields only as `declare x: T;`.
+  Strict ratchet: `check:types` also runs tsconfig.web.strict.json against tools/rewrite/ts-strict-baseline.json (per-file strict errors and explicit any may only go down; `ts-ratchet.mjs --update` lowers it). `node tools/rewrite/strict-count.mjs` prints the numbers; `infer-types.mjs` and `any-to-unknown.mjs` are the machine passes.
 
 ## Extra quests and new characters (a layer on top of the game, never part of the story)
 

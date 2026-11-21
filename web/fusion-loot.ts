@@ -26,7 +26,7 @@ const isRealDrop = (item) => typeof item === "string" && item.length > 0 && item
  * built by web/battle.js from data/enemies.json); the raw parsed data file (`{enemies:
  * [...]}`) and a bare row array are accepted too, so a checker can hand over either.
  */
-function rowFor(enemies, name) {
+function rowFor(enemies, name: string | number) {
   if (!enemies || typeof name !== "string" || !name) return null;
   if (Array.isArray(enemies)) return enemies.find((row) => row?.enemy_id === name) ?? null;
   const direct = enemies[name];
@@ -76,7 +76,7 @@ export function fusionDrops(halves, body, enemies) {
  * `disc` picks the arithmetic of the live roll: the float roll can pass at most every
  * time (rate 255+), the disc's own word at rate 1023+, so neither reads over 100%.
  */
-export function dropChanceText(rate, disc = false) {
+export function dropChanceText(rate: number, disc = false) {
   const r = Math.max(0, Number(rate) || 0);
   const percent = disc
     ? (Math.min(r + 1, 1024) / 1024) * 100
@@ -102,7 +102,7 @@ export function fusionLootRows(halves, body, enemies, disc = false) {
  *
  * @returns {string[]} the item names that dropped, in row order
  */
-export function rollFusionDrops(halves, body, enemies, rng, disc = false) {
+export function rollFusionDrops(halves, body, enemies, rng: { (): number | undefined; (): number; }, disc = false) {
   const dropped = [];
   for (const { item, rate } of fusionDrops(halves, body, enemies)) {
     const live = disc ? dropPasses(rate, rng) : rng() * 255 < rate;

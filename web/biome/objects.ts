@@ -10,7 +10,7 @@ export const catalog = await fetch(BASE + "objects.json").then((r) => (r.ok ? r.
 /** longest extent in metres for the preview, per kind (default 2) */
 const SIZE = { rock: 1.2, tree: 8, bush: 1.4, plant: 0.9, other: 2 };
 const cap = (s) => String(s || "objects").replace(/^./, (c) => c.toUpperCase());
-async function toonOf(it) {
+async function toonOf(it: { rel: string; kind: string | number; }) {
   const url = BASE + it.rel, raw = await loadRaw(url, true), ext = Math.max(raw.size.x, raw.size.y, raw.size.z);
   return loadToon(url, { scale: (SIZE[it.kind] || SIZE.other) / Math.max(ext, 1e-3), shadeK: 0.86, rim: 0.16, vertexColors: true });
 }

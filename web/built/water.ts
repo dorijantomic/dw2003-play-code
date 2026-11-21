@@ -153,7 +153,7 @@ export const SHORE = {
 };
 
 // ---------------- the bake: ONE waterline, ONE distance field ----------------
-const key2 = (x, z) => `${x.toFixed(3)},${z.toFixed(3)}`;
+const key2 = (x: number, z: number) => `${x.toFixed(3)},${z.toFixed(3)}`;
 
 /** The sand piece's boundary in XZ: every triangle edge used by exactly one triangle of the piece. */
 export function sandOutline(pos) {
@@ -217,7 +217,7 @@ export function smoothWaterline(outline, P = SHORE) {
     raw[k] = best;
   }
   const sig = P.SMOOTH;
-  const gauss = (v, width) => {               // circular Gaussian in arc length (units) at each sample's own radius
+  const gauss = (v: number[] | Float64Array<ArrayBuffer>, width: number) => {               // circular Gaussian in arc length (units) at each sample's own radius
     const o = new Float64Array(n);
     for (let k = 0; k < n; k++) {
       const K = Math.min(n >> 1, Math.ceil((3 * width) / Math.max(raw[k] * da, 1)));
@@ -251,7 +251,7 @@ export function smoothWaterline(outline, P = SHORE) {
 }
 
 /** The smooth waterline's radius at an azimuth (radians, az = atan2(x, z)), linear between its samples. */
-export function smoothWaterlineAt(sm, az) {
+export function smoothWaterlineAt(sm, az: number) {
   const TWO = Math.PI * 2, a = ((az + Math.PI) % TWO + TWO) % TWO;
   const u = (a / TWO) * sm.n, i = Math.floor(u) % sm.n, j = (i + 1) % sm.n, f = u - Math.floor(u);
   return sm.r[i] + (sm.r[j] - sm.r[i]) * f;
@@ -259,7 +259,7 @@ export function smoothWaterlineAt(sm, az) {
 
 /** Exact euclidean distance transform of a binary grid (Felzenszwalb & Huttenlocher 1982, the 1D lower envelope,
  *  run on every row and then every column). zero = the texels the distance is measured FROM. Squared texels out. */
-function edt1d(f, n, d, v, z) {
+function edt1d(f, n: number, d, v, z: number[] | Float64Array<ArrayBuffer>) {
   let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
   for (let q = 1; q < n; q++) {
     let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
@@ -269,7 +269,7 @@ function edt1d(f, n, d, v, z) {
   k = 0;
   for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
 }
-function edt2d(zero, size) {
+function edt2d(zero, size: number) {
   const g = new Float32Array(size * size);
   const INF = 1e20;
   for (let i = 0; i < size * size; i++) g[i] = zero[i] ? 0 : INF;
@@ -288,7 +288,7 @@ function edt2d(zero, size) {
 }
 
 /** Rasterise a piece's triangles into a mask (texel centre inside a triangle's XZ footprint). */
-function rasterise(pos, mask, size, span, upx) {
+function rasterise(pos, mask: number[] | Uint8Array<ArrayBuffer>, size: number, span: number, upx: number) {
   for (let t = 0; t < pos.length / 9; t++) {
       const xs = [pos[t * 9], pos[t * 9 + 3], pos[t * 9 + 6]], zs = [pos[t * 9 + 2], pos[t * 9 + 5], pos[t * 9 + 8]];
       const i0 = Math.max(0, Math.floor((Math.min(...xs) + span) / upx)), i1 = Math.min(size - 1, Math.ceil((Math.max(...xs) + span) / upx));
@@ -315,7 +315,7 @@ function rasterise(pos, mask, size, span, upx) {
  *                           A = distance to the nearest SHORE (bank) texel (0 on the bank; SPAN x 4 if no bank) */
 function bakeShore(rec) {
   const t0 = performance.now();
-  const sand = (rec.pieces || []).find((p) => p.kind === "sand");
+  const sand = (rec.pieces || []).find((p: { kind: string; }) => p.kind === "sand");
   const banks = (rec.pieces || []).filter((p) => p.kind === "shore" && p.pos);
   const P = SHORE, size = P.SIZE, span = P.SPAN, upx = (2 * span) / size, N = size * size;
   const onSand = new Uint8Array(N), onBank = new Uint8Array(N), inside = new Uint8Array(N);
@@ -340,7 +340,7 @@ function bakeShore(rec) {
   // the swash band by +-16 units); blended into the EDT between 0.75 and 1 x EXACT
   const ptsX = sm ? Float64Array.from(sm.r, (r, k) => Math.sin(sm.az[k]) * r) : null;
   const ptsZ = sm ? Float64Array.from(sm.r, (r, k) => Math.cos(sm.az[k]) * r) : null;
-  const exactAt = (x, z, de) => {
+  const exactAt = (x: number, z: number, de: number) => {
     const rho = Math.hypot(x, z), a = Math.atan2(x, z), n = sm.n, da = (Math.PI * 2) / n;
     const win = Math.min(n >> 1, Math.ceil(Math.asin(Math.min(1, (Math.abs(de) + 2 * upx) / Math.max(rho, 1))) / da) + 2);
     const k0 = Math.floor((a + Math.PI) / da);
@@ -390,7 +390,7 @@ export function shoreField(rec) {
 
 /** The waterline radius at an azimuth (radians, az = atan2(x, z)) — the JS twin of the shader's own lookup, used by
  *  the sea's inner ring and by the checkers. */
-export function waterlineAt(field, az) {
+export function waterlineAt(field, az: number) {
   const { r, az: A } = field.wl, n = r.length;
   const TWO = Math.PI * 2, a = ((az + Math.PI) % TWO + TWO) % TWO - Math.PI;   // [-pi, pi)
   const u = (a + Math.PI) / TWO * n;
@@ -632,14 +632,14 @@ export const SEA_GLSL = /* glsl */`
 // ---------------- uniforms ----------------
 const bytes = (c) => (Array.isArray(c) ? c.map((v) => Math.max(0, Math.min(255, Math.round(v)))) : null);
 const mean = (list) => [0, 1, 2].map((i) => list.reduce((s, c) => s + c[i], 0) / list.length);
-const lift = (c, k) => [0, 1, 2].map((i) => c[i] + (255 - c[i]) * k);
+const lift = (c: number[], k: number) => [0, 1, 2].map((i) => c[i] + (255 - c[i]) * k);
 const rows8 = (p) => Array.from({ length: WATER.ROWS }, (_, k) => (p.rows?.[k]?.rgb) || p.rows?.find(Boolean)?.rgb || p.colours?.all);
 
 /** The measured anchors: the recipe's own rows / percentiles, averaged over the pieces of each kind. */
 export function anchors(rec) {
   const P = rec.pieces || [];
-  const water = P.filter((p) => p.kind === "water"), sea = P.filter((p) => p.kind === "sea");
-  const sand = P.find((p) => p.kind === "sand");
+  const water = P.filter((p: { kind: string; }) => p.kind === "water"), sea = P.filter((p: { kind: string; }) => p.kind === "sea");
+  const sand = P.find((p: { kind: string; }) => p.kind === "sand");
   const near = [...water, ...sea].map((p) => rows8(p)[WATER.ROWS - 1]).filter(Boolean);
   const p90s = [...water, ...sea].map((p) => bytes(p.colours?.p90)).filter(Boolean);
   const deepPiece = sea[0] || water[0] || null;
@@ -873,8 +873,8 @@ function bandMaterial(P) {
 // ======================================================================================================
 export function waterPreset(rec) {
   const P = rec?.pieces || [];
-  if (P.some((p) => p.kind === "sea" || p.kind === "water")) return "ocean";
-  if (P.some((p) => p.kind === "pine_mirror" || p.kind === "rock_mirror")) return "lake";
+  if (P.some((p: { kind: string; }) => p.kind === "sea" || p.kind === "water")) return "ocean";
+  if (P.some((p: { kind: string; }) => p.kind === "pine_mirror" || p.kind === "rock_mirror")) return "lake";
   return null;
 }
 
@@ -930,7 +930,7 @@ function bakeLakeField(rec, P) {
   const er = P.ERODE / upx, br = Math.max(1, Math.round(P.BLUR / upx));
   let a = new Float32Array(N); for (let i = 0; i < N; i++) a[i] = Math.sqrt(dE[i]) > er ? 1 : 0;
   let b2 = new Float32Array(N);
-  const box = (src, dst, horiz) => {
+  const box = (src: number[] | Float32Array<ArrayBuffer>, dst: number[] | Float32Array<ArrayBuffer>, horiz: boolean) => {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       let sum = 0; for (let k = -br; k <= br; k++) { const xx = horiz ? Math.min(size - 1, Math.max(0, x + k)) : x, yy = horiz ? y : Math.min(size - 1, Math.max(0, y + k)); sum += src[yy * size + xx]; }
       dst[y * size + x] = sum / (2 * br + 1);
@@ -961,13 +961,13 @@ export function lakeField(rec, P = LAKE_PRESET) {
 
 /** The two normal maps (Water_1_M_Normal / Water_2_M_Normal), loaded once. Until a file is in, a flat 1x1 normal stands
  *  in (no ripple), so a missing file never breaks the frame. `ready()` is true when both are in or failed. */
-let LAKE_NMAPS = null;
+let LAKE_NMAPS: BuiltWaterAssets | null = null;
 function lakeNormalMaps(P) {
   if (LAKE_NMAPS) return LAKE_NMAPS;
   const flat = () => { const t = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, THREE.RGBAFormat); t.needsUpdate = true; return t; };
   const st = { a: { value: flat() }, b: { value: flat() }, left: P.NORMAL_FILES.length, failed: [], files: P.NORMAL_FILES } as BuiltWaterAssets;
   const loader = new THREE.TextureLoader();
-  P.NORMAL_FILES.forEach((f, i) => {
+  P.NORMAL_FILES.forEach((f: string, i) => {
     loader.load(f, (t) => {
       t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 8;
       t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.needsUpdate = true;
@@ -1046,7 +1046,7 @@ export function createPlanarReflection(P, { hide = () => [] }: { hide?: (scene: 
 }
 
 // the lake's surface shader: the ocean's GLSL libraries (shore field, depth-graded body, light, haze, sky) with a calm main
-function lakeMaterial(field, P, A, nmaps, refl) {
+function lakeMaterial(field, P, A, nmaps, refl: BuiltWaterReflection) {
   const uniforms = S.uniformsWith({
     ...shoreUniforms(field, P),
     uRamp: { value: A.ramp.map((c) => S.srgb(c)) }, uRampM: { value: rampTangents(A.ramp.map((c) => S.srgb(c))) },
@@ -1131,7 +1131,7 @@ function lakeMaterial(field, P, A, nmaps, refl) {
 }
 
 export function lakeAnchors(P) {
-  const ease = (f) => f * f * (3 - 2 * f);
+  const ease = (f: number) => f * f * (3 - 2 * f);
   const ramp = Array.from({ length: P.ROWS }, (_, k) => { const f = ease(k / (P.ROWS - 1)); return [0, 1, 2].map((i) => Math.round(P.SHALLOW[i] + (P.DEEP[i] - P.SHALLOW[i]) * f)); });
   return { ramp, rampFrom: "lake preset (picked)", deep: P.DEEP, shallow: P.SHALLOW, foam: [200, 205, 210], bed: P.SHALLOW, near: [], p90: [], rows: [] };
 }
@@ -1157,7 +1157,7 @@ function buildLake(slot, { materials = [], info = {} as BuiltLakeInfo }) {
     objects: meshes, meshes, materials: [mat, bandMat], field,
     place(k) { info.water.keepOut = { fightR: k?.fightR ?? null }; },
     update() { info.water.time = S.U.uWindTime.value; info.water.reflection.passes = refl.passes; info.water.reflection.lastMs = +refl.lastMs.toFixed(3); },
-    setLayer(name, on) { if (name === "water" || name === "sea") { for (const m of meshes) m.visible = on; return true; } return false; },
+    setLayer(name: string, on) { if (name === "water" || name === "sea") { for (const m of meshes) m.visible = on; return true; } return false; },
     lake: { ready: () => nmaps.ready(), reflection: refl, normalMaps: nmaps },
     info: null,
   };
@@ -1207,7 +1207,7 @@ export function buildWater(slot, ctx) {
     materials: mats,
     field,             // the one baked shore field these materials read (the checkers probe it, never re-bake it)
     /** the keep-out state from arena-built: only recorded - the sea is outside the fight by construction */
-    place(k) {
+    place(k: { fightR: null; }) {
       state.fightR = k?.fightR ?? null;
       info.water.keepOut = { fightR: state.fightR, waterlineMin: Math.round(rMin), clear: state.fightR == null ? null : Math.round(rMin - state.fightR) };
     },
@@ -1216,7 +1216,7 @@ export function buildWater(slot, ctx) {
       info.water.time = S.U.uWindTime.value;
     },
     /** the layer switch: "water" and "sea" both belong to this module's two meshes */
-    setLayer(name, on) {
+    setLayer(name: string, on: boolean) {
       if (name === "water" || name === "sea") { for (const m of meshes) m.visible = on; return true; }
       return false;
     },

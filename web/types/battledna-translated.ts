@@ -9,7 +9,7 @@ export interface BattleDnaMemberSeed {
   maxMp?: number;
   status?: number;
   blast?: boolean;
-  panel?: any;
+  panel?: unknown;
   /** the member's equipped form ids */
   forms?: number[];
   preselected?: number;

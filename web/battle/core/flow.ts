@@ -38,7 +38,7 @@ export function makeFlow(B: BattleContext) {
   }
 // playerSpd: the player speed the delay is read with when it is not the live active fighter's
   // (Tag: menu.c:312 asks getDelay at command time, before WFIGHTMN_tag swaps active[0]).
-  function queueAfterAction(b, acted, playerSpd?: any) {
+  function queueAfterAction(b, acted: string, playerSpd?: any) {
     // A new turn on the shared timeline, so the command phase's Frozen gate rolls again
     // (F0x800a7418 step 1 runs once per player turn, `wfightmn.s:1494-1540`).
     b._turnSeq = (b._turnSeq ?? 0) + 1;
@@ -291,7 +291,7 @@ export function makeFlow(B: BattleContext) {
     // so keep the walker's own `kind 4` line rather than inventing a category.
     return { kind: MSG_KIND.DAMAGE, payload: [0, total], name, slots: [String(total)] };
   }
-function elementNameForElem1(elem1) {
+function elementNameForElem1(elem1: number) {
     if (!B.elem1NameCache) {
       B.elem1NameCache = {};
       for (const id of Object.keys(B.skillDB || {})) {
@@ -307,7 +307,7 @@ function elementNameForElem1(elem1) {
    * technique record: the browser's own port (`magicalBase` + `resolveDamage`) on the
    * disc's record for `slotTechId`.
    */
-  function slotDamage(slotTechId, atk, def, rng, field) {
+  function slotDamage(slotTechId: number, atk, def, rng: () => number | undefined, field) {
     const rec = B.fightTechDB?.[String(slotTechId | 0)];
     if (!rec) return 0;
     const sk = {
@@ -347,14 +347,14 @@ function elementNameForElem1(elem1) {
     const damages = [0, 0];
     const slotViews = [0, 1].map((i) => ({
       setFlag: () => {},
-      setCaption: (v) => { damages[i] = v | 0; },
+      setCaption: (v: number) => { damages[i] = v | 0; },
     }));
     const manager = {
       // The manager's predicate is the MAGICAL accuracy leaf (+0xa0), read
       // unconditionally by F0x8009ddd8 (:28224 `lw $v0, 0xa0($s3)`) — not the
       // physical +0x9c entry.
       predicate: () => (rollMagicHit(atk, def, skill, RAND_U16) ? 1 : 0),
-      produce: (_side, slotTechId) => slotDamage(slotTechId, atk, def, RAND_U16, field),
+      produce: (_side, slotTechId: number) => slotDamage(slotTechId, atk, def, RAND_U16, field),
     };
     const state = { count: 0, total: 0, done: 0 };
     multiHitReset(slotViews, { side: () => sideByte, id: () => skill?.id ?? 0 }, manager, state);
@@ -494,7 +494,7 @@ function elementNameForElem1(elem1) {
   function advanceDisplayFrames(dt) {
     return B.msgClock.advance(dt);
   }
-function tickHudEase(dt) {
+function tickHudEase(dt: number) {
     const b = B.battle;
     b._hudClock = (b._hudClock || 0) + dt;
     B.tickBattleMessage(b, dt);

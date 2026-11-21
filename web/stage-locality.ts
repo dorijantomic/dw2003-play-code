@@ -3,7 +3,7 @@ export const FIELD_LOCATION_KEY = "fieldLocation";
 export const FIELD_LOCATION_VERSION = 1;
 
 /** Return the unique, valid stages directly reachable from one scene. */
-export function directStageNeighbors(stageId, scenes, knownStageIds = null) {
+export function directStageNeighbors(stageId: string | number, scenes, knownStageIds = null) {
   const known = knownStageIds ? new Set(knownStageIds) : null;
   const result = [];
   const seen = new Set([stageId]);
@@ -17,7 +17,7 @@ export function directStageNeighbors(stageId, scenes, knownStageIds = null) {
 }
 
 /** Current stage first, followed by the stages worth keeping warm. */
-export function stageWorkingSet(stageId, scenes, knownStageIds = null) {
+export function stageWorkingSet(stageId: string | number, scenes, knownStageIds = null) {
   return [stageId, ...directStageNeighbors(stageId, scenes, knownStageIds)];
 }
 
@@ -45,7 +45,7 @@ export function encodeFieldLocation(location) {
 }
 
 /** Parse a saved position defensively; stale/corrupt saves fall back to null. */
-export function decodeFieldLocation(raw, knownStageIds) {
+export function decodeFieldLocation(raw: string | null, knownStageIds) {
   if (!raw) return null;
   try {
     const value = JSON.parse(raw);

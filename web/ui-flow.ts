@@ -11,9 +11,9 @@ const empty = document.getElementById("empty");
 const graphScroller = document.getElementById("graphScroller");
 const query = new URLSearchParams(location.search);
 let flow: any = UI_FLOWS.find((item) => item.id === query.get("flow")) ?? UI_FLOWS[0];
-let selected = flow.nodes.find((item) => item.id === query.get("screen"))?.id ?? flow.nodes[0].id;
+let selected = flow.nodes.find((item: { id: string | null; }) => item.id === query.get("screen"))?.id ?? flow.nodes[0].id;
 
-const nodeById = (id) => flow.nodes.find((node) => node.id === id);
+const nodeById = (id: string | undefined) => flow.nodes.find((node: { id: string | undefined; }) => node.id === id);
 const labels = {
   runtime: { ours: "Our code", mixed: "MIPS + ours" },
   research: { compared: "Original captured", mapped: "Research mapped", partial: "Gaps remain" },
@@ -23,9 +23,9 @@ const researchText = {
   mapped: "Research notes describe this route; this step has not been fully checked in the browser.",
   partial: "Some behavior is documented, but gaps remain for this step or its route.",
 };
-const nodeElement = (id) => [...columns.querySelectorAll<HTMLElement>(".node")].find((el) => el.dataset.node === id);
-const incoming = (id) => flow.edges.filter((edge) => edge[1] === id);
-const outgoing = (id) => flow.edges.filter((edge) => edge[0] === id);
+const nodeElement = (id: string | undefined) => [...columns.querySelectorAll<HTMLElement>(".node")].find((el) => el.dataset.node === id);
+const incoming = (id: string | undefined) => flow.edges.filter((edge: (string | undefined)[]) => edge[1] === id);
+const outgoing = (id: string | undefined) => flow.edges.filter((edge: (string | undefined)[]) => edge[0] === id);
 const el = (tag: string, className?: string, value?: any): any => {
   const result = document.createElement(tag);
   if (className) result.className = className;
@@ -76,12 +76,12 @@ function drawWires() {
     marker.append(arrow); defs.append(marker);
   }
   wires.append(defs);
-  const point = (node, side) => {
+  const point = (node: HTMLElement, side: string) => {
     const box = node.getBoundingClientRect();
     return { x: (side === "right" ? box.right : box.left) - bounds.left,
       y: box.top + box.height / 2 - bounds.top };
   };
-  const path = (from, to, isBack = false) => {
+  const path = (from: string | undefined, to: string | undefined, isBack = false) => {
     const left = nodeElement(from), right = nodeElement(to);
     if (!left || !right) return;
     const a = point(left, isBack ? "left" : "right");
@@ -101,7 +101,7 @@ function drawWires() {
   if (target && target !== "—" && nodeById(target)) path(selected, target, true);
 }
 
-function select(id) {
+function select(id: string | undefined) {
   selected = id;
   for (const button of columns.querySelectorAll<HTMLElement>(".node")) {
     button.classList.toggle("active", button.dataset.node === id);

@@ -32,9 +32,9 @@ export function listGenericMotions(model) {
   });
 }
 
-const plainFrames = (t) => (t?.table || []).filter((e) => e && e.value !== 0xFFFF && !(e.value & 0x8000)).map((e) => e.value);
+const plainFrames = (t) => (t?.table || []).filter((e: { value: number; }) => e && e.value !== 0xFFFF && !(e.value & 0x8000)).map((e) => e.value);
 
-export function bakeGenericMotion(model, id, { offset = 8000 } = {}) {
+export function bakeGenericMotion(model, id: string, { offset = 8000 } = {}) {
   const idx = GENERIC_MOTIONS.findIndex((m) => m.id === id);
   if (idx < 0) return { ok: false, reason: `unknown motion ${id}` };
   const listed = listGenericMotions(model).find((m) => m.id === id);

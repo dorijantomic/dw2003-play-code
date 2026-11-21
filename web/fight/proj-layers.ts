@@ -41,7 +41,7 @@ export function mat4Identity() {
   return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
 }
 
-export function mat4Mul(a, b) {
+export function mat4Mul(a: number[] | Float32Array<ArrayBuffer>, b: number[] | Float32Array<ArrayBuffer>) {
   const out = new Float32Array(16);
   for (let r = 0; r < 4; r++)
     for (let c = 0; c < 4; c++)
@@ -50,13 +50,13 @@ export function mat4Mul(a, b) {
   return out;
 }
 
-export function mat4Translate(tx, ty, tz) {
+export function mat4Translate(tx: number, ty: number | undefined, tz: number) {
   const m = mat4Identity();
   m[12]=tx; m[13]=ty; m[14]=tz;
   return m;
 }
 
-export function mat4Scale(sx, sy, sz) {
+export function mat4Scale(sx: number, sy: number, sz: number) {
   const m = mat4Identity();
   m[0]=sx; m[5]=sy; m[10]=sz;
   return m;
@@ -82,8 +82,8 @@ export function mat4Scale(sx, sy, sz) {
  * spriteMatrix2x2 in effect-player.js). The EXE has two distinct matrix builders and the
  * mesh path and the sprite path use different ones; do not unify them.
  */
-export function mat4RotPSX(ax, ay, az) {
-  const q = (a) => (a / 4096) * Math.PI * 2;
+export function mat4RotPSX(ax: number, ay: number, az: number) {
+  const q = (a: number) => (a / 4096) * Math.PI * 2;
   const [cx, sx] = [Math.cos(q(ax)), Math.sin(q(ax))];
   const [cy, sy] = [Math.cos(q(ay)), Math.sin(q(ay))];
   const [cz, sz] = [Math.cos(q(az)), Math.sin(q(az))];
@@ -126,7 +126,7 @@ export function sampleTrack(keys, t, dflt) {
  * show a layer the game hides. When the test fails the original writes 0 to the layer's
  * visible flag at +0x0c and jumps past the whole matrix build.
  */
-export function layerVisible(scale) {
+export function layerVisible(scale: number[]) {
   return (((scale[0] | 0) | (scale[1] | 0) | (scale[2] | 0)) >= 0x31);
 }
 
@@ -179,7 +179,7 @@ export function layerVisible(scale) {
  * the transparent 0x0000 entry, and **not one** has STP clear. Zero primitives mix the two
  * classes. Measured, not assumed.
  */
-export function meshAbrMode(n) {
+export function meshAbrMode(n: number) {
   const v = n | 0;
   return v === 0 ? null : (v - 1) & 3;
 }
@@ -213,7 +213,7 @@ export function clipStreamLength(clip) {
 }
 
 /** Frame held at stream index `i`, or the terminator value past the end. */
-function clipEntry(clip, i) {
+function clipEntry(clip, i: number) {
   let k = i;
   for (const [first, count] of clip.segments) {
     if (k < count) return first + k;
@@ -237,7 +237,7 @@ export function clipTicks(clip) {
  * last frame once the stream is exhausted rather than running off it, so a caller that
  * over-runs the lifetime degrades to a freeze instead of to garbage.
  */
-export function clipFrameAt(clip, t) {
+export function clipFrameAt(clip, t: number) {
   if (!clip || !clip.segments || !clip.segments.length) return t;   // undecoded clip: 1:1
   const last = clipStreamLength(clip) - 2;                          // index of the final frame
   const i = Math.min(Math.max(0, Math.floor(t)) + 1, Math.max(0, last));
@@ -277,7 +277,7 @@ function localMatrix(layer, t) {
  * reproduced here as a pure function of `t` — a hidden layer resolves to the most recent
  * earlier tick at which it was visible — so the result does not depend on frame pacing.
  */
-export function projLayerWorlds(layers, t, root) {
+export function projLayerWorlds(layers, t: number, root: Float32Array<ArrayBuffer>) {
   const n = layers.length;
   const world = new Array(n + 1);
   const shown = new Array(n + 1);
@@ -285,14 +285,14 @@ export function projLayerWorlds(layers, t, root) {
   shown[0] = true;
 
   const tick = Math.max(0, Math.floor(t));
-  const visibleAt = (i, k) =>
+  const visibleAt = (i: number, k: number) =>
     layerVisible(sampleTrack((layers[i].tracks || {}).s, k, [0x1000, 0x1000, 0x1000]));
 
   // Matrix of layer index `idx` (1-based; 0 = root) as of tick `k`, following the stale
   // rule for any hidden layer on the way up. Parents always precede their children in the
   // table (verified: 0 forward references across all 572 shipped rows), so a plain
   // walk up the chain terminates.
-  const matrixAt = (idx, k) => {
+  const matrixAt = (idx: number, k: number) => {
     if (idx === 0) return root;
     const L = layers[idx - 1];
     let eff = k;

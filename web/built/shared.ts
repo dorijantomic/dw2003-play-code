@@ -25,7 +25,7 @@ import type { BuiltDayLight } from "./types.js";
 export const UNITS_PER_M = 400;
 
 // ---------------- noise ----------------
-export function makePerm(seed) {
+export function makePerm(seed: number) {
   let s = (seed >>> 0) || 1;
   const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   const p = new Uint8Array(256);
@@ -34,25 +34,25 @@ export function makePerm(seed) {
   return p;
 }
 let PERM = makePerm(1);
-const wrap = (v) => ((v % 256) + 256) % 256;
-const h3 = (x, y, z) => PERM[wrap(PERM[wrap(PERM[wrap(x)] + y)] + z)] / 255;
-const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
-const lerp = (a, b, t) => a + (b - a) * t;
-export function noise3JS(x, y, z) {
+const wrap = (v: number) => ((v % 256) + 256) % 256;
+const h3 = (x: number, y: number, z: number) => PERM[wrap(PERM[wrap(PERM[wrap(x)] + y)] + z)] / 255;
+const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+export function noise3JS(x: number, y: number, z: number) {
   const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
   const fx = fade(x - ix), fy = fade(y - iy), fz = fade(z - iz);
   const X = wrap(ix), Y = wrap(iy), Z = wrap(iz), X1 = wrap(ix + 1), Y1 = wrap(iy + 1), Z1 = wrap(iz + 1);
   return lerp(lerp(lerp(h3(X, Y, Z), h3(X1, Y, Z), fx), lerp(h3(X, Y1, Z), h3(X1, Y1, Z), fx), fy),
               lerp(lerp(h3(X, Y, Z1), h3(X1, Y, Z1), fx), lerp(h3(X, Y1, Z1), h3(X1, Y1, Z1), fx), fy), fz);
 }
-export function fbm3JS(x, y, z) {
+export function fbm3JS(x: number, y: number, z: number) {
   let v = 0, a = 0.5;
   for (let k = 0; k < 4; k++) { v += a * noise3JS(x, y, z); x *= 2.03; y *= 2.03; z *= 2.03; a *= 0.5; }
   return v;
 }
 const permTex = new THREE.DataTexture(new Uint8Array(256), 256, 1, THREE.RedFormat, THREE.UnsignedByteType);
 permTex.magFilter = permTex.minFilter = THREE.NearestFilter; permTex.generateMipmaps = false;
-export function initNoise(seed) {
+export function initNoise(seed: number) {
   PERM = makePerm(seed);
   permTex.image.data.set(PERM); permTex.needsUpdate = true;
   U.uNoiseSeed.value = seed;
@@ -73,8 +73,8 @@ export const NOISE_GLSL = /* glsl */`
 `;
 
 // ---------------- the ONE shared uniform object ----------------
-const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
-const col = (r, g, b) => new THREE.Color(r, g, b);
+const v3 = (x: number | undefined, y: number | undefined, z: number | undefined) => new THREE.Vector3(x, y, z);
+const col = (r: string | number | THREE.Color | undefined, g: number | undefined, b: number | undefined) => new THREE.Color(r, g, b);
 export const U = {
   uPerm: { value: permTex }, uNoiseSeed: { value: 1 },
   // light
@@ -237,12 +237,12 @@ export const uniformsWith = (own = {}) => Object.assign({}, U, SKY_U, own);
 export const srgb = (c, k = 1) => new THREE.Color().setRGB(c[0] / 255 * k, c[1] / 255 * k, c[2] / 255 * k, THREE.SRGBColorSpace);
 /** Colours measured by tools/arena_built_recipe.py (sRGB 0-255), converted to linear once, into named slots. */
 export function makePalette(rec) {
-  const by = (kind) => rec.pieces.filter((p) => p.kind === kind);
-  const one = (kind) => by(kind)[0]?.colours;
+  const by = (kind: string) => rec.pieces.filter((p: { kind: string; }) => p.kind === kind);
+  const one = (kind: string) => by(kind)[0]?.colours;
   const bg = rec.bg || [96, 88, 200];
   const sky = one("sky"), haze = one("haze"), grass = one("grass"), tree = one("tree") || one("treeline"),
         line = one("treeline") || tree, pine = one("pine") || tree, bank = one("bank");
-  const pick = (c, k, d) => c?.[k] || d;
+  const pick = (c, k: string, d: number[]) => c?.[k] || d;
   const pal = {
     skyZenith: srgb(bg), skyHorizon: srgb(pick(sky, "bottom", bg)), cloud: srgb(pick(sky, "p90", bg)),
     cloudShade: srgb(pick(sky, "top", bg), 0.85), haze: srgb(pick(haze, "all", bg)),
@@ -288,15 +288,15 @@ const DAY_LIGHT: BuiltDayLight = { dir: U.uSunDir.value.clone(), colour: [1, 1, 
                     rim: [1, 0.95, 0.85], unlit: [1, 1, 1] };
 /** The light state now (for checks): mode, whether the sky got the night grade, the numbers written. */
 export const light = { mode: "day", skyGraded: false, gradedFor: null };
-const lumaJS = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-function gradeNight(c) {   // forced-night sky grade, in place, on a THREE.Color
+const lumaJS = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+function gradeNight(c: THREE.Color) {   // forced-night sky grade, in place, on a THREE.Color
   const l = lumaJS(c), s = NIGHT_LIGHT.SKY_SAT, g = NIGHT_LIGHT.SKY_GAIN;
   c.setRGB((l + (c.r - l) * s) * g[0], (l + (c.g - l) * s) * g[1], (l + (c.b - l) * s) * g[2]);
 }
 /** Light the built world from the sky's mode. skyNight = the sky's info.night ({mode, measured}); call it after every
  *  sky (re)build. Day writes today's values back; night lights from the moon. A night FORCED on a measured-day arena
  *  also darkens and cools the freshly calibrated sky stops and the haze (once per sky build: skyInfo is the key). */
-export function setBuiltLight(skyNight, skyInfo = null) {
+export function setBuiltLight(skyNight: { mode: string; measured: string; }, skyInfo = null) {
   const night = skyNight?.mode === "night";
   const N = NIGHT_LIGHT;
   if (night) {
@@ -334,7 +334,7 @@ export function setBuiltLight(skyNight, skyInfo = null) {
   light.mode = night ? "night" : "day"; light.skyGraded = grade;
   return light;
 }
-const enc = (v) => (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
+const enc = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
 /** The same light for battle3d's Digimon (they shade sRGB texels): the direction (render space = this world's), the
  *  lit multiplier and the shade multiplier, both as toonLight makes them on a white albedo, sRGB-encoded. */
 export function modelLight() {
@@ -436,7 +436,7 @@ export const WIND_GLSL = /* glsl */`
 // ---------------- wind object (ticked once per frame) ----------------
 export const wind = {
   t0: null,
-  tick(nowMs) {
+  tick(nowMs: number | null) {
     if (this.t0 == null) this.t0 = nowMs;
     U.uWindTime.value = (nowMs - this.t0) / 1000;
   },
@@ -446,7 +446,7 @@ export const wind = {
 /** Does a sphere (centre c, radius rho) touch the view cone from eye e to the fighter sphere (f, R)? The cone is the
  *  convex hull of the eye and the fighter's sphere (tangent lines from the eye, closed by the sphere), so only what
  *  stands BETWEEN the eye and the fighter counts. Worked in the plane of the axis: a = along, d = off the axis. */
-export function inViewCone(c, rho, e, f, R) {
+export function inViewCone(c: number[], rho: number, e, f: number[], R: number) {
   const ax = [f[0] - e[0], f[1] - e[1], f[2] - e[2]], L = Math.hypot(...ax);
   const v = [c[0] - e[0], c[1] - e[1], c[2] - e[2]];
   if (Math.hypot(c[0] - f[0], c[1] - f[1], c[2] - f[2]) <= R + rho) return true;   // touches the fighter's sphere

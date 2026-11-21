@@ -65,7 +65,7 @@ export class TexturePatchAnimator {
    * blinkVariant picks from the disc jump table and reloads the pause when its entry-0 arm runs,
    * and cycleVariant is the free-running body cycle.
    */
-  update(delta, state = 1) {
+  update(delta: number, state = 1) {
     let blink = eyePatchVariant(state);
     if (blink !== 0) {
       this.blinkTimer = 0;                       // 0x8008b31c

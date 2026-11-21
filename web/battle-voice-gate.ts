@@ -7,12 +7,12 @@ export function battleVoiceGate() {
   const busy = { player: false, enemy: false };
   return {
     /** true if the caller may start a voice on `side` (and claims the slot). */
-    acquire(side) {
+    acquire(side: string | number) {
       if (busy[side]) return false;
       busy[side] = true;
       return true;
     },
     /** the voice on `side` ended — free the slot. */
-    release(side) { busy[side] = false; },
+    release(side: string | number) { busy[side] = false; },
   };
 }

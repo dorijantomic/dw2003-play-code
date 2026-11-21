@@ -35,14 +35,14 @@ import type { MenuState } from "./types.js";
 //
 // The candidate's name at form_name is NOT on screen while the list is up:
 // F0x8008886c fills and hides it in the same call as the two action rows.
-export function _drawSeeDigivolve(ctx, p, m: MenuState, state, t, fold = null) {
+export function _drawSeeDigivolve(ctx: CanvasRenderingContext2D, p, m: MenuState, state, t: number, fold = null) {
   const S = MS.UI.screens.see_digivolve;
   const evos = window.__battle?.availableEvolutions?.(state, m.detailIdx) ?? [];
   const step = m.detailStep;
   // Which of the two right-hand windows is up. The candidate list and the
   // action pair are DIFFERENT windows over the same corner (clips 0x24 and
   // 0x26); the screen shuts one before it opens the other.
-  const win = (key, node, axis, fn) => (fold
+  const win = (key: string, node, axis: string, fn) => (fold
     ? fold(key, node.pivot?.[0] ?? 0, node.pivot?.[1] ?? 0, axis ?? "x", fn)
     : (fn(), 1));
   // The whole lower panel — its band, its icon column and every widget on it —
@@ -114,7 +114,7 @@ export function _drawSeeDigivolve(ctx, p, m: MenuState, state, t, fold = null) {
     const slots = sel
       ? formTechSlots(stats, sel.formId, m.digimonDB)
       : ownTechSlots(p?.profile);
-    slots.slice(0, S.tech_rows.n).forEach((id, i) => {
+    slots.slice(0, S.tech_rows.n).forEach((id: string | number, i: number) => {
       if (!id) return;
       const tech = m.skillDB?.[id];
       const y = S.tech_rows.y_base + i * S.tech_rows.pitch + dy;
@@ -135,7 +135,7 @@ export function _drawSeeDigivolve(ctx, p, m: MenuState, state, t, fold = null) {
   if (win("dvList", S.window, "x",
       () => drawClip(ctx, ststat, S.window.clip, S.window.x, S.window.y)) >= 1
       && m._isOpen("dvList")) {
-    evos.slice(0, S.list_rows.n).forEach((e, i) => {
+    evos.slice(0, S.list_rows.n).forEach((e, i: number) => {
       const y = S.list_rows.y_base + i * S.list_rows.pitch;
       if (!m.dvHome && i === m.detailSel) drawCursor(ctx, t * VSYNC, S.list_rows.cursor_x, y, gold);
       // NOT gold for being the current form. Capture 03-choose-digivolve.png
@@ -201,13 +201,13 @@ export function _drawSeeDigivolve(ctx, p, m: MenuState, state, t, fold = null) {
 // x=50/x=91 (y=91+14i), TP plate 0x3c @ (0,196) value @ (45,203), Digivolve
 // window 0x22 @ (160,53) rows @ (178,71+14i), Equip window 0x23 @ (160,119)
 // rows @ (192,137+14i). (F0x8008c954 / F0x8008b520.)
-export function _drawDetail(ctx, p, m: MenuState, state, t, fold = null) {
+export function _drawDetail(ctx: CanvasRenderingContext2D, p, m: MenuState, state, t: number, fold = null) {
   const D = MS.UI.screens.detail;
   const sh = MS.UI.screens.shared;
   // Every panel on this sheet is its own folding window, opened in pairs by
   // F0x8008d684: card + name tab, then EXP plate + Digivolve panel, then stat
   // window + Equip panel. `win` draws one of them through its decoded pivot.
-  const win = (key, node, fn) => (fold
+  const win = (key: string, node, fn) => (fold
     ? fold(key, node.pivot?.[0] ?? 0, node.pivot?.[1] ?? 0, "x", fn)
     : (fn(), 1));
 
@@ -278,7 +278,7 @@ export function _drawDetail(ctx, p, m: MenuState, state, t, fold = null) {
   if (win("shDv", D.digivolve_window,
       () => drawClip(ctx, ststat, D.digivolve_window.clip, D.digivolve_window.x, D.digivolve_window.y)) >= 1) {
     drawText(ctx, "Digivolve", D.digivolve_header.x, D.digivolve_header.y);
-    evos.slice(0, D.digivolve_rows.n).forEach((e, i) => {
+    evos.slice(0, D.digivolve_rows.n).forEach((e, i: number) => {
       const y = D.digivolve_rows.y_base + i * D.digivolve_rows.pitch;
       drawText(ctx, e.to ?? "", D.digivolve_rows.x, y);   // see _drawSeeDigivolve: not gold
     });
@@ -304,7 +304,7 @@ export function _drawDetail(ctx, p, m: MenuState, state, t, fold = null) {
   // (172, 19+14i), cursor at (152, 19+14i). It is filled once the Digivolve
   // panel is up and hidden the moment the sheet starts to shut.
   if (m.detailStep === "prompt" && D.prompt && m._foldReady("shDv")) {
-    D.prompt.rows.forEach((label, i) => {
+    D.prompt.rows.forEach((label: string | undefined, i: number) => {
       const y = D.prompt.y_base + i * D.prompt.pitch;
       if (i === m.detailFocus) drawCursor(ctx, t * VSYNC, D.prompt.cursor_x, y, gold);
       drawText(ctx, label, D.prompt.x, y);

@@ -1,8 +1,15 @@
 // The per-frame code the translated screen adapters share: painting a session's frame,
 // and the update loop of the screens whose session starts once their data has loaded.
 
+import type { FightReportSession } from "../engine/dw3/ui/fight-report-session.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { paintScreenDim } from "./screendim.js";
+import type { NativeScreenRenderStats } from "./types/native-screen-render.js";
+import type { EndscreenScreen, EndCardData } from "./types/endscreen-translated.js";
+import type { FightReportScreen } from "./types/fightreport-translated.js";
+import type { GymScreen } from "./types/gym-translated.js";
+import type { LabScreen } from "./types/lab-translated.js";
+import type { SaveScreen } from "./types/save-translated.js";
 import * as uiC from "./ui-c/index.js";
 
 /**
@@ -39,7 +46,7 @@ export function paintNativeSession(ctx, renderer, session, { fade = true, reveal
  * "BIT gained" page is up) can mirror that into the walker's state on the very frame the original
  * pays it.
  */
-export function updateNativeSession(screen, dt, { ready, start, held, fail, onFrame = null }) {
+export function updateNativeSession(screen, dt: number, { ready, start, held, fail, onFrame = null }) {
     if (!screen._open || screen._failed) return;
     if (!screen._session) {
         if (!ready()) return;

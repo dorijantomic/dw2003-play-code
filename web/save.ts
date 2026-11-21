@@ -49,27 +49,27 @@ export function __setLayout(json) { LAYOUT = json; }
  * snapshot is given, including keys no screen understands, must round-trip
  * unchanged — so the test needs raw string access, not parsed values.
  */
-export function __setStoreItem(k, v) { store.setItem(k, String(v)); }
-export function __getStoreItem(k) { return store.getItem(k); }
+export function __setStoreItem(k: string, v) { store.setItem(k, String(v)); }
+export function __getStoreItem(k: string) { return store.getItem(k); }
 export function __clearStore() {
   for (let i = store.length - 1; i >= 0; i--) store.removeItem(store.key(i));
   memoryStore.clear();
 }
-export function __readSlotRaw(i) { return store.getItem(SLOT_KEY(i)); }
+export function __readSlotRaw(i: number) { return store.getItem(SLOT_KEY(i)); }
 
 // Slot storage. Falls back to an in-memory map outside a browser so the
 // save/load round trip is unit-testable.
 const memoryStore = new Map();
 const store = typeof localStorage !== "undefined" ? localStorage : {
   get length() { return memoryStore.size; },
-  key: (i) => [...memoryStore.keys()][i] ?? null,
+  key: (i: string | number) => [...memoryStore.keys()][i] ?? null,
   getItem: (k) => (memoryStore.has(k) ? memoryStore.get(k) : null),
   setItem: (k, v) => { memoryStore.set(k, String(v)); },
   removeItem: (k) => { memoryStore.delete(k); },
 };
 
 export const SLOT_COUNT = 3;
-const SLOT_KEY = (i) => `mcardSlot${i}`;
+const SLOT_KEY = (i: number) => `mcardSlot${i}`;
 const LAST_SLOT_KEY = "mcardLastSlot";
 const BLOCK_SLOT_KEY = "mcardBlockSlot";
 
@@ -106,7 +106,7 @@ function restoreStorage(data) {
  *            native route's load path hands it back through the card host)
  *   data   — the localStorage snapshot the slot restores on load
  */
-export function writeSlot(i, { record, image = null, data = null, playSeconds = null, residentImageVersion = 0, state = null }: SaveSlotWrite = {}) {
+export function writeSlot(i: number, { record, image = null, data = null, playSeconds = null, residentImageVersion = 0, state = null }: SaveSlotWrite = {}) {
   if (!(i >= 0 && i < SLOT_COUNT)) return false;
   // The name on a save is the tamer's registered name — the account name the
   // player typed at the Online Center clerk (web/game.js takes it from the
@@ -140,7 +140,7 @@ export function writeSlot(i, { record, image = null, data = null, playSeconds = 
 }
 
 /** Restore a slot's localStorage snapshot into the live store. */
-export function restoreSlotData(i, profiles = null) {
+export function restoreSlotData(i: number, profiles = null) {
   const slot = readSlot(i);
   if (!slot) return false;
   // With the switch on, the entry is checked once more before restoreStorage
@@ -166,7 +166,7 @@ function saveVerifyOn() {
 }
 
 // The last refused check, so a load's caller can record the disc's code.
-let lastRefusal = null;
+let lastRefusal: { ok: boolean; code: number; empty: boolean; why: string; slot: number; } | null = null;
 /** {slot, ok, code, empty, why} of the last refused entry, or null. */
 export function lastSlotRefusal() { return lastRefusal; }
 
@@ -175,7 +175,7 @@ export function lastSlotRefusal() { return lastRefusal; }
 // scan, so a hit on the same raw text skips both the parse and the check.
 const checkedRaw = new Map();    // slot -> {raw, entry, check}  (entry null = refused)
 
-function refuseSlot(i, check, raw) {
+function refuseSlot(i: number, check: { ok: boolean; code: number; empty: boolean; why: string; }, raw: string) {
   lastRefusal = { slot: i, ...check };
   if (typeof raw !== "string") return;
   try {
@@ -188,7 +188,7 @@ function refuseSlot(i, check, raw) {
   } catch { /* storage blocked or full: the refusal itself still stands */ }
 }
 
-export function readSlot(i) {
+export function readSlot(i: number) {
   let raw = null;
   try {
     raw = store.getItem(SLOT_KEY(i));

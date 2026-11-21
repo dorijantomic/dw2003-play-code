@@ -56,11 +56,11 @@ export function createAddPicker({ getBuilt, onPick }) {
     <select id="addKind"><option value="">all kinds</option></select><select id="addSrc"><option value="">all sources</option></select>
     <span id="addCount"></span><span id="addMsg" style="color:#e88"></span><span style="flex:1"></span><button id="addClose">close</button></header><div class="grid" id="addGrid">loading ...</div>`;
   document.body.appendChild(gal);
-  const $ = <T extends HTMLElement = HTMLElement>(id) => gal.querySelector<T>("#" + id);
-  let entries = null, io = null;
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => gal.querySelector<T>("#" + id);
+  let entries = null, io: IntersectionObserver | null = null;
   const cache = new Map();      // asset id -> dataURL | "fail"
   const queue = [];             // card elements waiting for a preview (one at a time)
-  let busy = false, rend = null, scene = null, cam = null;
+  let busy = false, rend = null, scene: THREE.Scene | null = null, cam = null;
 
   function setup() {
     if (rend) return;
@@ -103,7 +103,7 @@ export function createAddPicker({ getBuilt, onPick }) {
     }
     busy = false;
   }
-  function lazy(card) {
+  function lazy(card: HTMLDivElement) {
     io ||= new IntersectionObserver((ents) => {
       for (const e of ents) if (e.isIntersecting) { io.unobserve(e.target); queue.push(e.target); }
       pump();
@@ -142,7 +142,7 @@ export function createAddPicker({ getBuilt, onPick }) {
   function close() { gal.style.display = "none"; queue.length = 0; }
   for (const id of ["addSearch", "addKind", "addSrc"]) $(id).oninput = () => entries && draw();
   $("addClose").onclick = close;
-  const onEsc = (e) => { if (e.key === "Escape" && gal.style.display !== "none") close(); };
+  const onEsc = (e: { key: string; }) => { if (e.key === "Escape" && gal.style.display !== "none") close(); };
   addEventListener("keydown", onEsc);
   return { open, close, previewOf, get isOpen() { return gal.style.display !== "none"; }, get entries() { return entries; },
     destroy() { close(); removeEventListener("keydown", onEsc); gal.remove(); st.remove(); rend?.dispose(); } };

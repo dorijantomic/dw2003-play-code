@@ -26,7 +26,7 @@ const SECTOR_PREFIX = /^(Central|East|South|West|North) Sector\s*—\s*/;
 const MAX_PLACES = 6;
 
 /** The rendered stem a play id names: `bank` for sequence 0, `bank_<seq>` otherwise. */
-export function stemOfPlayId(playId, archiveToBank) {
+export function stemOfPlayId(playId: string, archiveToBank) {
     const word = typeof playId === "string" ? parseInt(playId, 16) : playId;
     if (!Number.isFinite(word)) return null;
     const bank = archiveToBank ? archiveToBank[packedArchive(word)] : null;
@@ -36,7 +36,7 @@ export function stemOfPlayId(playId, archiveToBank) {
 }
 
 /** Field and battle themes are held by the game; a jingle rings out once. */
-export function playMode(kind) {
+export function playMode(kind: string) {
     return kind === "field" || kind === "battle" ? "loop" : "jingle";
 }
 
@@ -44,7 +44,7 @@ function placeName(name) {
     return name ? String(name).replace(SECTOR_PREFIX, "") : "";
 }
 
-function fieldLabel(stages, nameOf) {
+function fieldLabel(stages, nameOf: Map<unknown, unknown>) {
     const places = [];
     for (const stage of stages) {
         const place = placeName(nameOf.get(stage)) || stage;
@@ -55,7 +55,7 @@ function fieldLabel(stages, nameOf) {
     return shown.join(" · ") + (more > 0 ? ` +${more} more` : "");
 }
 
-const count = (n, thing) => `${n} ${thing}${n === 1 ? "" : "s"}`;
+const count = (n: number, thing: string) => `${n} ${thing}${n === 1 ? "" : "s"}`;
 
 /**
  * Every track of the disc as one row: `{ track, kind, label, stages, screens }`.

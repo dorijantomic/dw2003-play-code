@@ -16,7 +16,7 @@ function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv
     B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv), B$.gl.STATIC_DRAW);
     return { page: g.page, spinDeg: g.spinDeg || 0, vbo, ubo, count: g.pos.length / 3 };
   }
-function loadBackdropPack(packName) {
+function loadBackdropPack(packName: string | number) {
     if (!packName) return null;
     let pk = B$.backdropPacks[packName];
     if (pk) return pk;
@@ -75,7 +75,7 @@ function armThrowBackdrop(sig) {
     B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null;
   }
 /** The acting clip's op4 motion, straight from the VM: 0 = return to the arena, else the pack. */
-  function dataFieldMotion(motion) {
+  function dataFieldMotion(motion: number) {
     if (!B$.dataFieldArmed) return;
     const m = motion | 0;
     if (m === 0) { B$.dataFieldOn = false; syncSpecialLoop(false); }
@@ -93,7 +93,7 @@ function armThrowBackdrop(sig) {
     B$.specialLoopKey = entry.sound >= 0 ? (B$.specialLoopMap[String(entry.sound)] || null) : null;
   }
 // Hold the element loop for exactly as long as the backdrop is up.
-  function syncSpecialLoop(active) {
+  function syncSpecialLoop(active: boolean) {
     if (active && B$.specialLoopKey && !B$.specialLoopOn) {
       B$.specialLoopOn = true;
       B$.sfx?.playEffectLoop?.(B$.specialLoopKey);
@@ -126,7 +126,7 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
     if (assetMode() === "hd" && Array.isArray(g.uv)) {
       const half = 0.5 / TEXTURE_PAGE_TEXELS;
       B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, b.ubo);
-      B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv.map((t) => t + half)), B$.gl.STATIC_DRAW);
+      B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.uv.map((t: number) => t + half)), B$.gl.STATIC_DRAW);
     }
     b.clut = Array.isArray(g.clut) ? g.clut : null;   // the layer's palette group (col,row)
     b.degenerate = !!g.degenerate;     // blank CLUT slot: the original only culls these away
@@ -152,7 +152,7 @@ function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (stat
     if (!pk.tex[file]) pk.tex[file] = loadTexture(B$.gl, `assets/battle/arenas/${pk.name}/${file}`);
     return pk.tex[file];
   }
-function loadArenaPack(packName) {
+function loadArenaPack(packName: string) {
     if (!packName) return null;
     let pk = B$.arenaPacks[packName];
     if (pk) return pk;
@@ -166,7 +166,7 @@ function loadArenaPack(packName) {
   }
 // The arena id for a battle started on `mapId` with encounter `screenId`: the record's own
   // param, else the stage's default, else the fallback. null when the stage is unknown.
-  function arenaIdFor(mapId, screenId) {
+  function arenaIdFor(mapId: number | null | undefined, screenId: number | null | undefined) {
     if (!B$.arenaManifest || mapId == null) return null;
     const stage = String(mapId).replace(/^s/, "");
     const e = B$.arenaManifest.byStage?.[stage];
@@ -214,7 +214,7 @@ function _freeFaceBoxBuffers(gl) {
     if (B$.playerBoxBufs?.vbo) gl.deleteBuffer(B$.playerBoxBufs.vbo);
     B$.playerBoxBufs = null;
   }
-function patchState(side) {
+function patchState(side: string) {
     const hold = side === "enemy" ? B$.enemyPatchHold : B$.playerPatchHold;
     if (hold !== null) return hold;
     const a = side === "enemy" ? B$.enemyAnim8r : B$.playerAnim8r;
@@ -222,7 +222,7 @@ function patchState(side) {
   }
 // Start (or clear) a fighter's patch animation. Both halves land asynchronously and
   // either may arrive first, so this is called again when the placement table lands.
-  function setupTexturePatches(side, folder) {
+  function setupTexturePatches(side: string, folder: string | null | undefined) {
     const entries = B$.placementTable[modelKeyFromFolder(folder)]?.texture_anim;
     const animator = entries && entries.length ? new TexturePatchAnimator(entries) : null;
     if (side === "player") B$.playerPatches = animator; else B$.enemyPatches = animator;
@@ -236,7 +236,7 @@ function patchState(side) {
   // its destination — the walker's stand-in for the original's per-frame VRAM copy.
   // Nothing is uploaded unless the chosen picture actually changed, which is also how
   // the original behaves: it caches the last variant per entry.
-  function blitTexturePatch(tex, page, entry) {
+  function blitTexturePatch(tex: WebGLTexture | null, page, entry) {
     if (!tex || !page) return false;
     const r = texturePatchRect(entry, page.scale);
     if (r.w <= 0 || r.h <= 0 || r.x0 + r.w > page.width || r.y0 + r.h > page.height) return false;

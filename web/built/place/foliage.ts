@@ -65,7 +65,7 @@ export function plan(pctx) {
     id: "foliage." + name, label, kind, layer: name, parent: pctx.foliageGroup, default: "mod." + name,
     items: itemsFrom([]), native: null, wantsShape: true, windShare: 0.04, placeOrder: 1,
     meshName: (g) => `${name}_s${g}`,
-    meshData: (g, idx) => { const it = slotRef[name].cur; return { kind: "foliage", species: name, sector: g, at: idx.map((i) => [it.p[i * 3], it.p[i * 3 + 1], it.p[i * 3 + 2]]), scale: idx.map((i) => it.list[i].s), onGround: idx.map((i) => it.list[i].onGround) }; },
+    meshData: (g, idx) => { const it = slotRef[name].cur; return { kind: "foliage", species: name, sector: g, at: idx.map((i: number) => [it.p[i * 3], it.p[i * 3 + 1], it.p[i * 3 + 2]]), scale: idx.map((i: string | number) => it.list[i].s), onGround: idx.map((i: string | number) => it.list[i].onGround) }; },
     data: { candidates: candidates[name] },
     place(state, shape) {
       if (!shape) return null;
@@ -119,7 +119,7 @@ export function plan(pctx) {
     info.foliage = {
       species: Object.fromEntries(SPECIES.filter(([n]) => species[n]).map(([n]) => { const sp = species[n]; return [n, { trisPerPlant: sp.tris, cards: sp.geo.userData.cards, bands: sp.bands.map((g) => ({ c: g.c, r: g.r, tris: g.tris.length })), box: sp.box }]; })),
       meshes: meshes.length,
-      triangles: meshes.reduce((s, m) => s + m.count * (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3, 0),
+      triangles: meshes.reduce((s: number, m) => s + m.count * (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3, 0),
     };
   }
   return { slots, candidates, stats, resetStats, report, species };

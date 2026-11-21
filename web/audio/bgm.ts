@@ -25,7 +25,7 @@ export function createExclusiveRegister() {
      * holder is stopped through its owner's stop entry first, then this id
      * takes the register — stop-before-take, as the play body orders it.
      */
-    begin(key, name, stop) {
+    begin(key: string, name: string, stop: () => void) {
       if (held && held.key === key) return false;
       const previous = held;
       held = null;
@@ -34,7 +34,7 @@ export function createExclusiveRegister() {
       return true;
     },
     /** F0x800202d4 / F0x8002037c: clear iff the named id is the holder. */
-    releaseName(name) { if (held && held.name === name) held = null; },
+    releaseName(name: string) { if (held && held.name === name) held = null; },
     /** F0x80020204 (`stopAll`) clears the register outright. */
     clear() { held = null; },
     /**
@@ -63,7 +63,7 @@ export function createBgmPlayer(register = createExclusiveRegister()) {
   // replacement stops a registered track through it (and clears `current`,
   // so the same track can start again from the top later — the digivolution
   // replay needs exactly that).
-  const stopCurrent = (trackId) => {
+  const stopCurrent = (trackId: string | null) => {
     if (player.current === trackId) { player.current = null; el.pause(); }
   };
 

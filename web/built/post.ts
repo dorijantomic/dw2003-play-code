@@ -94,13 +94,13 @@ const SRGB_GLSL = /* glsl */`
 // ---------------- JS twins (the same maths, for the checks and for CPU work) ----------------
 const IN = [[0.59719, 0.35458, 0.04823], [0.07600, 0.90834, 0.01566], [0.02840, 0.13383, 0.83777]];
 const OUT = [[1.60475, -0.53108, -0.07367], [-0.10208, 1.10813, -0.00605], [-0.00327, -0.07276, 1.07602]];
-const mul3 = (m, v) => m.map((r) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const lumaOf = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const mul3 = (m: number[][], v: number[]) => m.map((r: number[]) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smoothstep = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const lumaOf = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 
 /** three r186 ACESFilmicToneMapping. */
-export function acesJS(c, exposure = 1) {
+export function acesJS(c: number[], exposure = 1) {
   let v = [c[0] * exposure / 0.6, c[1] * exposure / 0.6, c[2] * exposure / 0.6];
   v = mul3(IN, v);
   v = v.map((x) => (x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.4329510) + 0.238081));
@@ -108,29 +108,29 @@ export function acesJS(c, exposure = 1) {
   return v.map(clamp01);
 }
 /** the sRGB OETF (three r186 SRGBTransfer). */
-export function srgbJS(c) {
-  return c.map((v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055));
+export function srgbJS(c: number[]) {
+  return c.map((v: number) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055));
 }
-export function bayer8JS(x, y) {
-  const b2 = (ax, ay) => { ax = Math.floor(ax); ay = Math.floor(ay); const f = ax * 0.5 + ay * ay * 0.75; return f - Math.floor(f); };
-  const b4 = (ax, ay) => b2(ax * 0.5, ay * 0.5) * 0.25 + b2(ax, ay);
+export function bayer8JS(x: number, y: number) {
+  const b2 = (ax: number, ay: number) => { ax = Math.floor(ax); ay = Math.floor(ay); const f = ax * 0.5 + ay * ay * 0.75; return f - Math.floor(f); };
+  const b4 = (ax: number, ay: number) => b2(ax * 0.5, ay * 0.5) * 0.25 + b2(ax, ay);
   return b4(x * 0.5, y * 0.5) * 0.25 + b2(x, y);
 }
 /** split tone: cool shadows, warm highlights, both masks 0 at luma 0.5. */
-export function splitToneJS(c, g = SETTINGS.grade) {
+export function splitToneJS(c: number[], g = SETTINGS.grade) {
   const l = lumaOf(c);
   const sh = 1 - smoothstep(0, 0.5, l), hi = smoothstep(0.5, 1, l);
-  return c.map((v, k) => v * (sh > 0 ? 1 + (g.shadow[k] - 1) * sh * g.amount : 1) * (hi > 0 ? 1 + (g.highlight[k] - 1) * hi * g.amount : 1));
+  return c.map((v: number, k: string | number) => v * (sh > 0 ? 1 + (g.shadow[k] - 1) * sh * g.amount : 1) * (hi > 0 ? 1 + (g.highlight[k] - 1) * hi * g.amount : 1));
 }
 /** the dither stored into 8 bits: gated off within 1.2/255 of 0 and 1 so solid black/white stay exact. */
-export function ditherJS(e, x, y, amp = SETTINGS.dither) {
-  return e.map((v) => {
+export function ditherJS(e: number[], x: number, y: number, amp = SETTINGS.dither) {
+  return e.map((v: number) => {
     const gate = smoothstep(0, 0.0047, v) * (1 - smoothstep(0.9953, 1.0, v));
     return clamp01(v + (bayer8JS(x, y) - 0.5) * amp * gate);
   });
 }
 /** The whole chain for one linear colour at one pixel (x, y in gl_FragCoord terms), 0-1 sRGB out. */
-export function chainJS(c, x = 0, y = 0, s = SETTINGS) {
+export function chainJS(c: number[], x = 0, y = 0, s = SETTINGS) {
   const t = splitToneJS(c, s.grade), a = acesJS(t, s.exposure), m = s.toneMix ?? 1;
   const mapped = m >= 1 ? a : a.map((v, k) => v * m + clamp01(t[k]) * (1 - m));   // toneMix 1 = ACES, 0 = no tone map
   return ditherJS(srgbJS(mapped), x, y, s.dither);
@@ -249,7 +249,7 @@ const EDGE_FRAG = /* glsl */`
 // ---------------- how many tone maps are there in this chain ----------------
 // A tone-map site is a CALL of the ACES fit in a shader that writes the frame; the definition alone is not a
 // site. Counted from the sources above so the checker reads a number, not a promise.
-function countToneMapSites(sources) {
+function countToneMapSites(sources: string[]) {
   let calls = 0, defs = 0;
   for (const s of sources) {
     calls += (s.match(/acesFilmic\s*\(/g) || []).length;
@@ -264,7 +264,7 @@ function countToneMapSites(sources) {
  * @param {number} height
  * @param {{canvas?: HTMLCanvasElement, settings?: object}} [opts]
  */
-export function createPost(width, height, opts: BuiltPostOpts = {}) {
+export function createPost(width: number | undefined, height: number | undefined, opts: BuiltPostOpts = {}) {
   const S = Object.assign({}, SETTINGS, opts.settings || {});
   S.bloom = Object.assign({}, SETTINGS.bloom, opts.settings?.bloom || {});
   S.grade = Object.assign({}, SETTINGS.grade, opts.settings?.grade || {});
@@ -311,7 +311,7 @@ export function createPost(width, height, opts: BuiltPostOpts = {}) {
   const passMesh = new THREE.Mesh(quadGeo, null);
   passMesh.frustumCulled = false;
   passScene.add(passMesh as any);
-  const pass = (mat, to) => { passMesh.material = mat; renderer.setRenderTarget(to); renderer.render(passScene, passCam); };
+  const pass = (mat: THREE.Material | THREE.Material[], to: THREE.WebGLRenderTarget | null) => { passMesh.material = mat; renderer.setRenderTarget(to); renderer.render(passScene, passCam); };
 
   // ---- UVs and uniforms ----
   const U = {
@@ -363,14 +363,14 @@ export function createPost(width, height, opts: BuiltPostOpts = {}) {
   });
 
   // ---- the two source canvases, as sRGB textures the GPU decodes on sample ----
-  let worldTex = null, fighterTex = null;
-  const makeTex = (image) => {
+  let worldTex: THREE.DataTexture | THREE.CanvasTexture | null = null, fighterTex: THREE.DataTexture | THREE.CanvasTexture | null = null;
+  const makeTex = (image: HTMLCanvasElement | undefined) => {
     const t = new THREE.CanvasTexture(image);
     t.colorSpace = THREE.SRGBColorSpace;
     t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;
     return t;
   };
-  function setSource(kind, image) {
+  function setSource(kind: string, image) {
     const cur = kind === "world" ? worldTex : fighterTex;
     if (cur && cur.image === image) { cur.needsUpdate = true; return cur; }
     cur?.dispose();
@@ -436,7 +436,7 @@ export function createPost(width, height, opts: BuiltPostOpts = {}) {
     depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
   scratch.texture.generateMipmaps = false;
   /** Copy a render target into a float target and read it back (works for HalfFloat targets too). */
-  function readRT(rt, rw = rt.width, rh = rt.height) {
+  function readRT(rt: THREE.WebGLRenderTarget, rw = rt.width, rh = rt.height) {
     copyMat.uniforms.tSrc.value = rt.texture;
     const s = (rw === scratch.width && rh === scratch.height) ? scratch : new THREE.WebGLRenderTarget(rw, rh, {
       type: THREE.FloatType, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false });
@@ -490,7 +490,7 @@ export function createPost(width, height, opts: BuiltPostOpts = {}) {
   }
 
   /** One bloom level, read back (checks only): its size and its pixels. */
-  function readLevel(i) {
+  function readLevel(i: string | number) {
     const L = levels[i];
     return { w: L.w, h: L.h, px: readRT(L.rt, L.w, L.h) };
   }

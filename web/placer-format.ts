@@ -10,13 +10,13 @@ export function normaliseData(raw, pack) {
   d.added = d.added.filter((a) => a && (isAssetEntry(a) ? okM(a.m) && typeof a.id === "string" : true));
   return d;
 }
-export const newAssetEntry = (id, asset, m) => ({ id, asset, m: Array.from(m) });
+export const newAssetEntry = (id: string, asset: string | undefined, m: Iterable<unknown> | ArrayLike<unknown>) => ({ id, asset, m: Array.from(m) });
 
 /** The picker list: every registry asset that can stand as an object (all but "none" and "default"), sorted by source, then name. */
 export function pickerEntries(assets) {
-  return assets.filter((a) => a && a.id && a.id !== "none" && a.id !== "default")
+  return assets.filter((a: { id: string; }) => a && a.id && a.id !== "none" && a.id !== "default")
     .map((a) => ({ id: a.id, name: a.name || a.id, source: a.sourceGroup || a.source || "?", licence: a.licence || "?", kinds: a.kinds || [] }))
-    .sort((x, y) => x.source.localeCompare(y.source) || x.name.localeCompare(y.name));
+    .sort((x: { source: string; name: string; }, y: { source: string; name: string; }) => x.source.localeCompare(y.source) || x.name.localeCompare(y.name));
 }
 
 /** Where a ray meets the ground. Ray o + t*d (arrays [x,y,z], d need not be unit); heightFn(x, z) -> ground y or null.

@@ -52,7 +52,7 @@ import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
 export function makeEnd(B: BattleContext) {
-function endBattle(result) {
+function endBattle(result: string) {
     const b = B.battle;
     const state = B.getState();
     battleOutcomeRelease(b, result);
@@ -171,7 +171,7 @@ async function mpKit() {
       if (state.partyStats) localStorage.setItem("partyStats", JSON.stringify(state.partyStats));
       localStorage.setItem("bits", String(state.bits | 0));
     };
-    const basic = (rec) => {
+    const basic = (rec: { profile: { tech_basic: string | number; }; }) => {
       const s = B.skillDB[rec?.profile?.tech_basic];
       return s ? { ...s, basic_attack: true } : null;
     };
@@ -197,7 +197,7 @@ async function mpKit() {
       forms: (rec) => battleFormIds(Number(rec?.profile?.id), rec?.statsRecord ?? {})
         .map((id) => B.digimonDB[id]).filter((p) => p && p.id !== rec?.profile?.id).map((p) => ({ id: p.id, name: p.name })),
       /** A manual digivolve: the record takes the form; the numbers it fights with are re-derived from it, as in the game. */
-      digivolve: (rec, id) => { const p = B.digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
+      digivolve: (rec, id: string | number) => { const p = B.digimonDB[id]; if (!p) return false; setLiveBattleForm(rec, p); return true; },
       /** A plain-data copy of a fighter record, to hand to the referee. */
       pack: (rec) => JSON.parse(JSON.stringify(rec)),
       /** My techniques: [{ id, name, cost, tw, type, magical, power, skill }]. type is "attack", "heal" or "support". */
@@ -208,7 +208,7 @@ async function mpKit() {
         const r = n > 1 ? resolveMultiHit(att, def, skill, n, RAND_U16, null) : resolveAttack(att, def, skill, RAND_U16, null);
         return { hit: !!r.hit, dmg: r.dmg | 0, landed: r.landed ?? (r.hit ? 1 : 0), attempts: n, crit: !!r.crit, eff: r.eff ?? 1 };
       },
-      skillOf: (id) => B.skillDB[id] ?? null,
+      skillOf: (id: string | number) => B.skillDB[id] ?? null,
       /** What an enemy can do: its basic attack, and its two moves when they are attack techniques. */
       foeMoves: (en) => {
         const out = [];
@@ -265,10 +265,10 @@ async function mpKit() {
       },
       /** The data tables the rules read: technique rows, the decoded technique records, and the item menu. */
       skillDB: () => B.skillDB,
-      techRecord: (id) => B.fightTechDB?.[String(id | 0)] ?? null,
+      techRecord: (id: number) => B.fightTechDB?.[String(id | 0)] ?? null,
       items: () => B.usableItems(),
       /** The disc's battle track for this fight (the name `bgm.play` takes). */
-      musicFor: (screenId, mapId) => B.musicForScreen(screenId, mapId),
+      musicFor: (screenId: number, mapId: string | number) => B.musicForScreen(screenId, mapId),
       /** Use an item from my bag: take it out through the shared store, as the one-on-one battle does. */
       spendItem: (id) => { storeRemoveItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
       /** Leave my Digimon as the fight left it (the field's own write-back: KO -> 1 HP). */
@@ -276,7 +276,7 @@ async function mpKit() {
       /** My whole party, lead first: [{ member, rec }] (member = the roster entry the game's screens read). */
       party: () => {
         const roster = B.buildPlayerRoster(state), prof = B.getPlayerProfile(state);
-        return roster.map((member, i) => ({ member, rec: B.buildPlayerRecord(member, i === 0 && prof ? prof.id : null) }));
+        return roster.map((member, i: number) => ({ member, rec: B.buildPlayerRecord(member, i === 0 && prof ? prof.id : null) }));
       },
       /** The profile Blast would turn this Digimon into at its level, or null. */
       blastForm: (rec) => blastTargetProfile(rec, B.digimonDB),
@@ -301,9 +301,9 @@ async function mpKit() {
       },
       /** An item into my bag (a stolen one), through the shared store. */
       giveItem: (id) => { storeAddItem(state, id, 1); localStorage.setItem("inventory", JSON.stringify(state.inventory)); },
-      itemName: (id) => battleMsgText(0x6a, id | 0) || window.__ITEM_BY_ID?.[id]?.name || "",
+      itemName: (id: number) => battleMsgText(0x6a, id | 0) || window.__ITEM_BY_ID?.[id]?.name || "",
       // the seeds the game's own translated screens are opened with (the same shapes the one-on-one battle hands them)
-      techSeed: (rec, free = false) => {
+      techSeed: (rec: { mp: number; maxMp: number; }, free = false) => {
         const list = mpKitTechs(rec, free);
         return { activeIndex: 0, mp: rec.mp | 0, maxMp: rec.maxMp | 0, noCharge: free ? 1 : 0, techniques: list.map((t) => ({ word: t.tw & 0xffff, cost: t.cost })) };
       },
@@ -314,12 +314,12 @@ async function mpKit() {
   }
 // EXPERIMENT (multiplayer co-op, web/mpsocial.js): two players fight the same enemy on their own screens and share its HP.
   // These three are only used while a co-op fight is on; they change nothing for a normal fight.
-  async function rollEncounter(mapId, x, y) {
+  async function rollEncounter(mapId: string | number, x: number | undefined, y: number | undefined) {
     await B.loadData();
     const roll = B.pickEnemy(mapId, x, y);
     return roll ? { party: roll.party, screen: roll.screen } : null;
   }
-function coopSetEnemyHp(index, hp) {
+function coopSetEnemyHp(index: number, hp: number) {
     if (B.battle?.enemy && (B.battle.partyIndex | 0) === index && hp < B.battle.enemy.hp) B.battle.enemy.hp = Math.max(0, hp | 0);
   }
 // The current enemy reached 0 HP: bank its drop, then either bring in the next boss-party

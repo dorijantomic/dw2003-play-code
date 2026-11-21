@@ -92,9 +92,9 @@ export const CAST_GATE = {
 
 const TAU_R = (Math.PI * 2) / 4096;
 
-const angOf = (ch2, frame) => sample(ch2, frame).map((v) => v * TAU_R);
+const angOf = (ch2, frame: number | undefined) => sample(ch2, frame).map((v) => v * TAU_R);
 
-const angBetween = (a, b) => {
+const angBetween = (a: number[], b: number[]) => {
   let d = 0;
   for (let i = 0; i < 3; i++) {
     let x = a[i] - b[i];
@@ -170,8 +170,8 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
   // coverage: the bones every cast needs, plus the share the map covers
   const need = [];
   for (const side of ["left", "right"]) {
-    const ta = T.arms.find((a) => a.side === side), sa = S.arms.find((a) => a.side === side);
-    const tl = T.legs.find((l) => l.side === side), sl = S.legs.find((l) => l.side === side);
+    const ta = T.arms.find((a: { side: string; }) => a.side === side), sa = S.arms.find((a: { side: string; }) => a.side === side);
+    const tl = T.legs.find((l: { side: string; }) => l.side === side), sl = S.legs.find((l: { side: string; }) => l.side === side);
     if (ta) need.push({ kind: "arm", side, mapped: !!sa });
     if (tl) need.push({ kind: "leg", side, mapped: !!sl });
   }
@@ -183,16 +183,16 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
   const covered = bake.covered;
 
   // per-frame poses
-  const chainOf = (roles2, kind, side) =>
-    (kind === "arm" ? roles2.arms : roles2.legs).find((c) => c.side === side)?.chain ?? null;
+  const chainOf = (roles2, kind: string, side: string) =>
+    (kind === "arm" ? roles2.arms : roles2.legs).find((c: { side: string; }) => c.side === side)?.chain ?? null;
   let speedWorst = 0, ankleDrift = 0, motionT = 0, motionS = 0, returnGap = 0;
   let folds = 0, movedBones = 0, energyT = 0, energyS = 0;
   const baseT = new Map(), baseS = new Map(), rotPrev = new Map(), rotPrevS = new Map();
-  const handBone = T.props.length ? (T.props.find((p) => p.side === "right") ?? T.props[0]).bone
-    : (T.arms.find((a) => a.side === "right") ?? T.arms[0])?.chain.slice(-1)[0];
+  const handBone = T.props.length ? (T.props.find((p: { side: string; }) => p.side === "right") ?? T.props[0]).bone
+    : (T.arms.find((a: { side: string; }) => a.side === "right") ?? T.arms[0])?.chain.slice(-1)[0];
   // the donor's own casting hand: its prop on the same side, else its arm tip - whichever bone the map used
-  const donorHand = (S.props.find((p) => p.side === "right") ?? S.props[0])?.bone
-    ?? (S.arms.find((a) => a.side === "right") ?? S.arms[0])?.chain.slice(-1)[0];
+  const donorHand = (S.props.find((p: { side: string; }) => p.side === "right") ?? S.props[0])?.bone
+    ?? (S.arms.find((a: { side: string; }) => a.side === "right") ?? S.arms[0])?.chain.slice(-1)[0];
   let handT = 0, handS = 0;
   const handBaseT = [], handBaseS = [];
   for (let k = 0; k < frames.length; k++) {
@@ -221,7 +221,7 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
       if (k === frames.length - 1) { energyT += dt; energyS += ds; }
       // a joint never folds back onto its own parent segment
       const par = (baked.bones[i].parent_slot ?? 0) - 1;
-      const kids = baked.bones.map((b, j) => ((b.parent_slot ?? 0) - 1 === i ? j : -1)).filter((j) => j >= 0);
+      const kids = baked.bones.map((b, j) => ((b.parent_slot ?? 0) - 1 === i ? j : -1)).filter((j: number) => j >= 0);
       if (par >= 0 && kids.length === 1) {
         const u = [Tp.pos[i][0] - Tp.pos[par][0], Tp.pos[i][1] - Tp.pos[par][1], Tp.pos[i][2] - Tp.pos[par][2]];
         const v = [Tp.pos[kids[0]][0] - Tp.pos[i][0], Tp.pos[kids[0]][1] - Tp.pos[i][1], Tp.pos[kids[0]][2] - Tp.pos[i][2]];
@@ -292,7 +292,7 @@ export function castGate(bake, { samples = CAST_GATE.samples } = {}) {
  * null when the pair's retarget is not used (the caller keeps the planted own-body cast).
  * The bake is memory only: the model object is a per-load copy, never written to disk.
  */
-export function applyCastBake(target, source, clip, { offset = null } = {}) {
+export function applyCastBake(target, source, clip: number, { offset = null } = {}) {
   const from = Math.max(0, (target.timeline?.length ?? 0));
   let table = Math.max(62, from);
   while (target.timeline?.[table]?.table) table++;

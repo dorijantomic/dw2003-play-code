@@ -54,7 +54,7 @@ let shown = [];
 /** The solid foot boxes of those props (empty when none is solid). */
 let boxes = [];
 /** The map those boxes belong to, so a frame between a map change and the next tick cannot use another map's boxes. */
-let boxesMap = null;
+let boxesMap: string | null = null;
 /** Sheets that were named but are not in web/extra_fx yet: asked for once each, never once per frame. */
 const asked = new Set();
 
@@ -122,7 +122,7 @@ export function normalize(onThisMap) {
 }
 
 /** A sheet's frame width, for the solid box: from the loaded sheet, else the default every sheet we ship is near. */
-function sheetWidth(sheet) {
+function sheetWidth(sheet: string) {
     const info = questFxSheetInfo(sheet);
     const w = Number(info?.frame?.[0]);
     return w > 0 ? w : CELL_FALLBACK;
@@ -132,14 +132,14 @@ function sheetWidth(sheet) {
  * The solid footprint of one prop: a small box centred on its feet, SOLID_DEPTH px deep (the player's own foot box is
  * 12 x 8, so a prop blocks like a person standing there). Exported pure for the lab and the tests.
  */
-export function propFootBox(prop, frameW = CELL_FALLBACK) {
+export function propFootBox(prop: QuestProp, frameW = CELL_FALLBACK) {
     const w = Number(frameW) > 0 ? Number(frameW) : CELL_FALLBACK;
     const halfW = Math.max(SOLID_HALF_MIN, Math.min(SOLID_HALF_MAX, Math.round(w * SOLID_WIDTH_SHARE)));
     return { x: Number(prop?.x) || 0, y: Number(prop?.y) || 0, halfW, depth: SOLID_DEPTH };
 }
 
 /** True when a world point lies inside a box (`y` is its feet line; the box stands up from there). */
-export function boxHolds(box, px, py) {
+export function boxHolds(box: { x: number; halfW: number; y: number; depth: number; }, px: number, py: number) {
     return px >= box.x - box.halfW && px <= box.x + box.halfW && py <= box.y + 2 && py >= box.y - box.depth;
 }
 
@@ -153,7 +153,7 @@ export function boxHolds(box, px, py) {
  * must not use the old map's boxes. (A night/story variant of a place is its own map id here, and the tick uses whichever
  * one the player is standing on -- quests.js has already matched the prop to it.)
  */
-export function questPropSolidAt(mapId, px, py) {
+export function questPropSolidAt(mapId, px: number, py: number) {
     if (!boxes.length) return false;
     if (mapId != null && boxesMap != null && String(mapId) !== boxesMap) return false;
     for (const b of boxes) if (boxHolds(b, px, py)) return true;

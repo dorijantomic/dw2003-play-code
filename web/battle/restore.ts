@@ -21,7 +21,7 @@ import {
 import { activeSlotOf, encounterGateBytes, setStatModifier, statModifier, statValue } from "./plans.js";
 import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
 
-export function battleRestoreParty(b, side) {
+export function battleRestoreParty(b, side: number) {
   if ((side | 0) < 1) {
     const records = b?.playerRecords ?? [];
     return [0, 1, 2].map((i) => {
@@ -38,7 +38,7 @@ export function battleRestoreParty(b, side) {
 }
 
 /** The walker's own records for one side, in the original's slot order. */
-export function battleRestoreTargets(b, side) {
+export function battleRestoreTargets(b, side: number) {
   if ((side | 0) < 1) {
     const records = b?.playerRecords ?? [];
     return [0, 1, 2].map((i) => records[i] ?? null);
@@ -55,7 +55,7 @@ export function battleRestoreTargets(b, side) {
  * walker keeps ailments by name AND, when a record carries them, the raw `+0x1c` byte in
  * `statusBits` — so both are cleared here, or the two representations would drift apart.
  */
-function clearRestoreAilments(rec, mask) {
+function clearRestoreAilments(rec, mask: number) {
   if (!rec || !mask) return;
   const a = rec.ailments;
   if (a) {
@@ -73,7 +73,7 @@ function clearRestoreAilments(rec, mask) {
  * The plan is the port's, so this only translates the port's per-slot numbers back into
  * the walker's records. Returns the slot indices whose HP actually rose.
  */
-export function applyBattleRestorePlan(b, side, plan) {
+export function applyBattleRestorePlan(b, side: number, plan) {
   const targets = battleRestoreTargets(b, side);
   const healed = [];
   const pool = b?.statusEvents;
@@ -142,7 +142,7 @@ export function applyBattleRestorePlan(b, side, plan) {
 /** The pool stagers take a draw in [0,1) (they scale it to 16 bits); RAND_U16 is the integer draw itself (battle-combat.ts:637 wraps it the same way). */
 export const RAND_FRAC = () => (RAND_U16() % 0x10000) / 0x10000;
 
-function startAutoRecover(b, side, rec) {
+function startAutoRecover(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, side: number, rec: { autoRecover: boolean; }) {
   if (!rec) return;
   const pool = b.statusEvents ?? (b.statusEvents = emptyStatusEventPool());
   const sideDir = (side | 0) < 1 ? 0 : 0x10;
@@ -158,7 +158,7 @@ function startAutoRecover(b, side, rec) {
  * (clamped 0x7fff) that zeroes both words (`:14068`-`:14074`; consumer wfightmn.s:2469-2498).
  * A new field tech replaces the field and rewrites the timer.
  */
-export function castFieldTechnique(b, side, record, _techElementName) {
+export function castFieldTechnique(b, side: number, record: { crit: number; }, _techElementName: string) {
   // The stored element is record byte +0x04 (the category, 6 for every field tech), NOT the tech own
   // element (+0x07, which only picks the message page): measured in the game, rig-field-and-scale.md.
   // Element id 6 is "thunder" in the engine table (battle-formulas.ts ELEMENT_ID).
@@ -179,7 +179,7 @@ export function castFieldTechnique(b, side, record, _techElementName) {
  * skipped when the PLAYER acts and encounter gate byte 0x80042b62 is non-zero (`:27840`-`:27850`).
  * Returns the change or null.
  */
-export function applyStatDebuffDispatch(b, actingSide, record, names: StatDebuffNames = {}) {
+export function applyStatDebuffDispatch(b: { statusEvents: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[]; }, actingSide: number, record, names: StatDebuffNames = {}) {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch !== 26 && dispatch !== 27) return null;
   const stat = dispatch === 26 ? 0 : 1;
@@ -229,7 +229,7 @@ export function applyStatDebuffDispatch(b, actingSide, record, names: StatDebuff
  *
  * Returns the byte that was cleared, exactly as `consumeAffinity` does.
  */
-export function clearActionAffinity(b, side) {
+export function clearActionAffinity(b, side: number) {
   const s = (side | 0) < 1 ? 0 : 1;
   const activeSlot = s < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
   const rec = battleRestoreTargets(b, s)[activeSlot];
@@ -242,7 +242,7 @@ export function clearActionAffinity(b, side) {
  * Returns null when the technique is not a category-4 member, so a caller can use it as
  * the gate: that null IS the "this technique is an ordinary attack" answer.
  */
-export function battleRestorePlanFor(b, side, record, techniqueId, options: RestorePlanOptions = {}) {
+export function battleRestorePlanFor(b, side: number, record: { category: number; }, techniqueId: number, options: RestorePlanOptions = {}) {
   if ((record?.category | 0) !== 4) return null;
   // The record machine's state-1 sub-state-0 clear runs BEFORE this category handler and
   // has no category test (`pro/fightstg.s:13092 sh $zr, 0xe($v0)`), so a heal throws the

@@ -17,7 +17,15 @@
 // --update is additive by design: it adds every web .ts that is now at 0 errors, and drops
 // entries for files that no longer exist. It never removes a file that still has errors, because
 // that file got dirty and the failure is the point.
+//
+// Second gate, the strict ratchet: tsconfig.web.strict.json (strict + noUncheckedIndexedAccess +
+// exactOptionalPropertyTypes + noImplicitOverride + noFallthroughCasesInSwitch) is also run. Per-file
+// strict error counts and per-file explicit-`any` counts are stored in tools/rewrite/ts-strict-baseline.json
+// and may only go down: a file with more strict errors or more `any` than its baseline fails, and a
+// file not in the baseline must have none. --update lowers the baseline to today's numbers (it
+// refuses to raise any number; first run with no baseline file creates it).
 import { execFileSync } from "node:child_process";
+import { countAny, runStrict } from "./strict-count.mjs";
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,6 +93,45 @@ function parse(text) {
   return { byFile, other };
 }
 
+// ---- strict ratchet ----
+const BASELINE = join(HERE, "ts-strict-baseline.json");
+function strictGate(updating) {
+  const started = Date.now();
+  const r = runStrict("tsconfig.web.strict.json");
+  const any = countAny();
+  const now = {};
+  for (const f of new Set([...r.files.keys(), ...any.keys()])) now[f] = { errors: r.files.get(f) ?? 0, any: any.get(f) ?? 0 };
+  const sum = (o, k) => Object.values(o).reduce((n, v) => n + v[k], 0);
+  console.log(`ts-ratchet: strict ${TSCONFIG_STRICT}: ${r.total} errors, ${sum(now, "any")} explicit any, in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  const had = existsSync(BASELINE);
+  const base = had ? JSON.parse(readFileSync(BASELINE, "utf8")).files : {};
+  const worse = [];
+  for (const [f, v] of Object.entries(now)) {
+    const b = base[f] ?? { errors: 0, any: 0 };
+    if (!had) break;
+    if (v.errors > b.errors) worse.push(`${f}: strict errors ${b.errors} -> ${v.errors}`);
+    if (v.any > b.any) worse.push(`${f}: explicit any ${b.any} -> ${v.any}`);
+  }
+  if (!had || (updating && !worse.length)) {
+    const files = {};
+    for (const f of Object.keys(now).sort()) if (now[f].errors || now[f].any) files[f] = now[f];
+    writeFileSync(BASELINE, `${JSON.stringify({ total: r.total, any: sum(now, "any"), files }, null, 1)}\n`);
+    console.log(`ts-ratchet: wrote strict baseline ${relative(ROOT, BASELINE)} (${r.total} errors, ${sum(now, "any")} any)`);
+    return false;
+  }
+  if (worse.length) {
+    console.log(`ts-ratchet: FAIL strict ratchet, ${worse.length} file numbers went up:`);
+    for (const w of worse.slice(0, 20)) console.log(`  ${w}`);
+    if (worse.length > 20) console.log(`  ... ${worse.length - 20} more`);
+    if (updating) console.log("ts-ratchet: --update refuses to raise the strict baseline");
+    return true;
+  }
+  const baseTotal = Object.values(base).reduce((n, v) => n + v.errors, 0);
+  console.log(`ts-ratchet: strict ok (baseline ${baseTotal} errors; run --update to lower it)`);
+  return false;
+}
+const TSCONFIG_STRICT = "tsconfig.web.strict.json";
+
 const { out, status, ms } = typecheck();
 const { byFile, other } = parse(out);
 
@@ -110,7 +157,7 @@ if (update) {
   writeFileSync(CLEAN, `${JSON.stringify(next, null, 2)}\n`);
   const added = next.length - kept.length;
   console.log(`ts-ratchet: wrote ${next.length} clean files to ${relative(ROOT, CLEAN)} (+${added})`);
-  process.exit(0);
+  process.exit(strictGate(true) ? 1 : 0);
 }
 
 const listed = readClean();
@@ -137,7 +184,8 @@ if (stale.length) {
   for (const f of stale) console.log(`  ${f}`);
   console.log(`  run: node tools/rewrite/ts-ratchet.mjs --update`);
 }
-if (regressions.length || stale.length) process.exit(1);
+const strictFailed = strictGate(false);
+if (regressions.length || stale.length || strictFailed) process.exit(1);
 
 if (other.length) {
   console.log(`ts-ratchet: ${other.length} tsc lines that are not per-file errors (ignored):`);

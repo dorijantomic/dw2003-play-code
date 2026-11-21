@@ -39,7 +39,7 @@ export function pathOf(o, root) {
   for (let x = o; x && x !== root; x = x.parent) p.unshift(seg(x));
   return p.join("/");
 }
-export function findByPath(root, path) {
+export function findByPath(root, path: string | undefined) {
   let x = root;
   for (const s of path.split("/")) {
     const m = /^(.*?)(?:#(\d+))?$/.exec(s), label = m[1], want = +(m[2] || 0);
@@ -57,8 +57,8 @@ const idb = () => new Promise<IDBDatabase>((ok, no) => {
   r.onupgradeneeded = () => r.result.createObjectStore("kv");
   r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
 });
-async function idbGet(k) { try { const d = await idb(); return await new Promise<FileSystemDirectoryHandle>((ok) => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); }); } catch { return null; } }
-async function idbSet(k, v) { try { const d = await idb(); await new Promise((ok) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = ok; t.onerror = ok; }); } catch {} }
+async function idbGet(k: IDBValidKey | IDBKeyRange) { try { const d = await idb(); return await new Promise<FileSystemDirectoryHandle>((ok) => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); }); } catch { return null; } }
+async function idbSet(k: IDBValidKey | undefined, v: PickedDirectory) { try { const d = await idb(); await new Promise((ok) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = ok; t.onerror = ok; }); } catch {} }
 
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 const tmpM = new THREE.Matrix4();
@@ -69,7 +69,7 @@ const tmpM = new THREE.Matrix4();
  * returns { tick() after each built.render, setUI(on, container), data(), destroy() }
  */
 export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
-  let built = null, world = null, pack = null, data: ArenaPlacements = null, rebuilds = null, loading = null;
+  let built = null, world = null, pack = null, data: ArenaPlacements = null, rebuilds = null, loading: Promise<void> | null = null;
   let orig = new Map();          // "<path>|inst" -> the matrix before any edit (to reset / un-hide)
   let addedObjs = new Map();     // added id -> its mesh
   let ui = null, tc = null, sel = null, pickGround = false, gen = 0, picker = null;
@@ -138,7 +138,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     return g;
   }
   const ADD_SCALE = 800;   // a registry asset is normalised to height <= 1: 800 render units = 2 m tall to start with (scale it with key 3)
-  async function addAsset(assetId) {
+  async function addAsset(assetId: string | undefined) {
     if (!ui || !built) throw new Error("placer is off");
     const cam = built.camera, f = new THREE.Vector3(); cam.getWorldDirection(f);
     const at = cam.position.clone().addScaledVector(f.setY(0).normalize(), 4000 * world.scale.x);
@@ -234,14 +234,14 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     data.unsaved = true; const s: [any, any] = [sel.obj, sel.inst]; deselect(); select(...s); draftSave();
   }
   // world-group-local matrix of the selected thing (an instance: through its mesh)
-  function localMatrixOf(o, inst) {
+  function localMatrixOf(o, inst: number | null) {
     const w = new THREE.Matrix4().copy(world.matrixWorld).invert();
     o.updateMatrixWorld(true);
     const m = new THREE.Matrix4().multiplyMatrices(w, o.matrixWorld);
     if (inst != null && o.isInstancedMesh) { o.getMatrixAt(inst, tmpM); m.multiply(tmpM); }
     return m;
   }
-  function copyOf(o, inst, at = null) {
+  function copyOf(o: { userData: { placed: string | null; }; }, inst: number | null, at = null) {
     const ent = o.userData?.placed != null ? data.added.find((a) => a.id === o.userData.placed) : null;
     if (ent && isAssetEntry(ent)) {   // a copy of an added registry asset: a second entry of the same asset, beside it
       const m = localMatrixOf(o, null), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); m.decompose(p, q, s);
@@ -271,7 +271,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   // ---------------------------------------------------------------- picking (a click, not a drag)
   let down = null;
   const onDown = (e) => { down = [e.clientX, e.clientY]; };
-  const onUp = (e) => {
+  const onUp = (e: { clientX: number; clientY: number; button: number; }) => {
     if (!ui || !down || !built || tc?.dragging) return;
     const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]); down = null;
     if (moved > 4 || e.button !== 0) return;
@@ -287,13 +287,13 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   };
   // ---------------------------------------------------------------- drag along the ground (move mode, the selected thing, not on a gizmo handle)
   let drag = null;
-  const groundAt = (e, h0) => {
+  const groundAt = (e: { clientX: number; clientY: number; }, h0: number | undefined) => {
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), built.camera);
     const o = ray.ray.origin, d = ray.ray.direction;
     return groundPoint([o.x, o.y, o.z], [d.x, d.y, d.z], (x, z) => built.groundHeight?.(x, z) ?? null, h0);
   };
-  const onDragMove = (e) => {
+  const onDragMove = (e: { clientX: number; clientY: number; }) => {
     if (!drag) return;
     const gp = groundAt(e, drag.lastY); if (!gp) return;
     drag.lastY = gp.y;
@@ -308,7 +308,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     const fc = getFreeCam(); if (fc) fc.controls.enabled = true;
     draftSave();
   };
-  const onDragDown = (e) => {
+  const onDragDown = (e: { button: number; clientX: number; clientY: number; stopImmediatePropagation: () => void; preventDefault: () => void; }) => {
     if (!ui || !sel || !built || e.button !== 0 || tc?.dragging || tc?.axis || (tc && tc.mode !== "translate")) return;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), built.camera);
@@ -325,7 +325,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointerup", onUp);
   const typing = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || "") || e.ctrlKey || e.metaKey || e.altKey;
-  const onKey = (e) => {
+  const onKey = (e: { key: string; preventDefault: () => void; }) => {
     if (!ui || typing(e)) return;
     const k = e.key.toLowerCase();
     if (k === "1") tc?.setMode("translate"); else if (k === "2") tc?.setMode("rotate"); else if (k === "3") tc?.setMode("scale");
@@ -387,7 +387,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     try { localStorage.removeItem(DRAFT(pack)); } catch {}
     status();
   }
-  function setUI(on, container?) {
+  function setUI(on: boolean, container?: { appendChild: (arg0: HTMLDivElement) => void; } | undefined) {
     if (!on) { picker?.close(); deselect(); tc?.getHelper().removeFromParent(); tc?.dispose(); tc = null; ui?.el.remove(); ui = null; return; }
     if (ui) return;
     const el = document.createElement("div");
@@ -422,7 +422,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
       else if (a === "save") saveFile();
       else if (a === "undoAll") { try { localStorage.removeItem(DRAFT(pack)); } catch {} ; deselect(); restoreAll(); built = null; }   // tick() reloads from the file
     };
-    ui.q("#plGround").onchange = (e) => { pickGround = e.target.checked; };
+    ui.q("#plGround").onchange = (e: { target: { checked: boolean; }; }) => { pickGround = e.target.checked; };
     makeGizmo(); fillList(); status();
   }
 
@@ -444,7 +444,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   return {
     tick, setUI,
     data: () => data, selection: () => sel,
-    select: (path, inst = null) => select(findByPath(built.scene, path), inst),   // for checkers
+    select: (path: string | undefined, inst = null) => select(findByPath(built.scene, path), inst),   // for checkers
     destroy() { setUI(false); canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointerdown", onDragDown, true); onDragEnd(); picker?.destroy(); picker = null; canvas.removeEventListener("pointerup", onUp); removeEventListener("keydown", onKey); },
   };
 }

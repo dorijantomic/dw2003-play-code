@@ -38,8 +38,8 @@ export const GRASS = { COUNT: 450000, RADIUS: 4000, EDGE: 0.85, H: [55, 115], W:
                        WAVE_LIFT: 0.18, WIND_GAIN: 6, FADE: [6000, 8200], RING: 2.0, RULE: 0.03, SAFETY: 0.8,
                        MASK_EDGE: [0.30, 0.48], GREEN_MIN: 0.5, GREEN_FULL: 0.8, DENSITY: 0.01, MIN_COUNT: 4000, SEED: 2002 };
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 // one blade, FLAT and unit size: x = signed half-width share, y = height fraction (0 root .. 1 tip). The shader bends
 // it (curl along an arc, twist round the spine) after scaling, so the bend keeps its shape whatever the width/height.
@@ -161,7 +161,7 @@ function grassMaterial() {
 /** Ground colour of the built ground's GRASS step (ground.js groundPaint: mix(uA, uB, smoothstep(.35,.65,fbm3(w*0.0016))))
  *  at a world point, through the shared noise's JS twin. */
 export const GROUND_SCALE = 0.0016;
-export function groundAlbedo(a, b, p) {
+export function groundAlbedo(a: THREE.Color, b: THREE.Color, p: number[]) {
   const t = smooth(0.35, 0.65, S.fbm3JS(p[0] * GROUND_SCALE, p[1] * GROUND_SCALE, p[2] * GROUND_SCALE));
   return [a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t];
 }
@@ -173,10 +173,10 @@ export function groundMaskReader(groundMesh) {
   const tex = u?.uMask?.value, data = tex?.image?.data, N = tex?.image?.width;
   if (!data || !N || !u.uMaskSpan) return null;
   const span = u.uMaskSpan.value;
-  const at = (i, j) => (Math.max(0, Math.min(N - 1, j)) * N + Math.max(0, Math.min(N - 1, i))) * 4;
+  const at = (i: number, j: number) => (Math.max(0, Math.min(N - 1, j)) * N + Math.max(0, Math.min(N - 1, i))) * 4;
   return {
     span, aoAmt: u.uAOAmt?.value ?? 0, cliffLo: u.uCliffLo?.value ?? 1,
-    sample(x, z) {
+    sample(x: number, z: number) {
       const uu = (x / span + 0.5) * N - 0.5, vv = (z / span + 0.5) * N - 0.5;
       const i = Math.floor(uu), j = Math.floor(vv), fu = uu - i, fv = vv - j, out = [0, 0, 0, 0];
       const a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1);
@@ -190,7 +190,7 @@ export function groundMaskReader(groundMesh) {
  *  gives each blade its matrix and its per-instance colours (aRoot / aMid / aTip, aGroundN, aBlade); in any other slot
  *  the blades take neutral constants. Every frame the fighters' height caps and the eye are set from this frame's
  *  camera (slot.data.fighters(): the battle renderer's fighter boxes). */
-export function grassAsset(env, slot) {
+export function grassAsset(env: { materials: THREE.ShaderMaterial[]; }, slot) {
   const geo = bladeGeometry(), mat = grassMaterial();
   env?.materials?.push(mat);
   const U = mat.uniforms, PV = new THREE.Matrix4(), V4 = new THREE.Vector4();

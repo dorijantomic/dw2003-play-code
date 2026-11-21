@@ -49,7 +49,7 @@ export const CLIP_KINDS = {
   9: "spell cast", 10: "item use", 11: "signature", 12: "DNA presentation",
   13: "volley cast", 14: "item arm", 15: "field cast", 16: "throw cast", 17: "item arm",
 };
-export function clipKind(clip) {
+export function clipKind(clip: number) {
   const n = Number(clip);
   return CLIP_KINDS[n] ?? `clip ${n}`;
 }
@@ -59,7 +59,7 @@ export function clipKind(clip) {
 export const ATTACK_CLIPS = [5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17];
 const IS_ATTACK_CLIP = new Set(ATTACK_CLIPS);
 
-const num = (v) => Number(v) | 0;
+const num = (v: number) => Number(v) | 0;
 
 /**
  * One clip's loadout, from the body's own action script. Pure.
@@ -72,7 +72,7 @@ const num = (v) => Number(v) | 0;
  *   effects (the op3 sprite types it spawns), contacts (every op10 cue id),
  *   strike (does it mark 98/99 at all).
  */
-export function loadoutFor(anim, clip) {
+export function loadoutFor(anim, clip: number) {
   const index = num(clip);
   const ops = anim?.actions?.[index]?.ops ?? [];
   const out = {
@@ -116,8 +116,8 @@ export function loadoutFor(anim, clip) {
 
 /** A species' technique ids in play order: basic, signature, then the six slots, deduped. */
 export function techniqueIds(species) {
-  const ids = [];
-  const add = (id) => {
+  const ids: number[] = [];
+  const add = (id: number) => {
     const n = num(id);
     if (n > 0 && !ids.includes(n)) ids.push(n);
   };
@@ -127,10 +127,10 @@ export function techniqueIds(species) {
   return ids;
 }
 
-const tableRow = (table, id) =>
+const tableRow = (table, id: string | number) =>
   table instanceof Map ? table.get(id) ?? table.get(String(id)) : table?.[id] ?? table?.[String(id)];
 
-const skillRow = (skills, id) => {
+const skillRow = (skills, id: number) => {
   if (!skills) return null;
   if (skills instanceof Map) return skills.get(id) ?? skills.get(String(id)) ?? null;
   if (Array.isArray(skills)) return skills.find((s) => num(s?.id) === id) ?? null;
@@ -138,7 +138,7 @@ const skillRow = (skills, id) => {
 };
 
 /** A loadout the caller already computed for `clip`, a function of it, or the body's own. */
-function loadoutAt(loadout, anim, clip) {
+function loadoutAt(loadout, anim, clip: number) {
   if (typeof loadout === "function") return loadout(clip) ?? loadoutFor(anim, clip);
   if (loadout instanceof Map) {
     const hit = loadout.get(clip) ?? loadout.get(String(clip));
@@ -191,7 +191,7 @@ export function moveRows(species, techTable, anim, loadout = null, skills = null
 function makeReader(present) {
   if (typeof present === "function") return (folder) => present(folder) ?? null;
   if (present instanceof Map) return (folder) => present.get(folder) ?? null;
-  if (present && typeof present === "object") return (folder) => present[folder] ?? null;
+  if (present && typeof present === "object") return (folder: string | number) => present[folder] ?? null;
   return () => null;
 }
 
@@ -225,7 +225,7 @@ function sharedMeshOf(rows, folder, speciesName) {
  * species whose own body launches `mesh` on a clip that its techniques read with different
  * `elem1` values. `present` is the model reader (folder -> anim.json). Pure.
  */
-export function sharedMeshCases(speciesList, techTable, modelMap, present) {
+export function sharedMeshCases(speciesList, techTable, modelMap: { [x: string]: null; }, present) {
   const read = makeReader(present);
   const cases = [];
   for (const sp of speciesList ?? []) {
@@ -260,7 +260,7 @@ export function silentClips(folders, present) {
       if (!list[i]?.present) continue;
       const ops = acts[i]?.ops ?? [];
       if (!ops.length) continue;
-      const strike = ops.some((o) => o?.op === 10 && (num(o.words?.[0]) === 98 || num(o.words?.[0]) === 99));
+      const strike = ops.some((o: { op: number; words: number[]; }) => o?.op === 10 && (num(o.words?.[0]) === 98 || num(o.words?.[0]) === 99));
       if (!strike) clips.push({ folder, clip: i, cast: i === 9 || i === 11, kind: clipKind(i) });
     }
   }
@@ -288,13 +288,13 @@ export const CORPUS_FACTS = {
 
 // ── the page's lines ─────────────────────────────────────────────────────────────
 
-const soundName = (sounds, id) => {
+const soundName = (sounds, id: number) => {
   if (id === 98) return "98 contact";
   if (id === 99) return "99 strike";
   const name = sounds?.[String(id)] ?? sounds?.[id];
   return name ? `${id} ${name}` : `${id} (not in the sound table)`;
 };
-const effectName = (type) => (type === 9999 ? "9999 the technique's own effect" : String(type));
+const effectName = (type: number) => (type === 9999 ? "9999 the technique's own effect" : String(type));
 
 /**
  * The LOADOUT tab's text, as plain lines (the draw wraps them; tests read them directly).

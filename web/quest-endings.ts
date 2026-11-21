@@ -37,7 +37,7 @@ const sayLines = (steps) => (Array.isArray(steps) ? steps : [])
 const payOf = (rw) => ({ bits: Math.max(0, Number(rw?.bits) || 0), items: Array.isArray(rw?.items) ? rw.items : [] });
 const itemsText = (items) => items.map((it) => `${it?.count ?? 1} x ${it?.name ?? "?"}`);
 const payText = (pay) => [pay.bits ? `${pay.bits} BIT` : "", ...itemsText(pay.items)].filter(Boolean).join(", ") || "nothing";
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Every scene a def can play, in play order, with the slot name tools/scene_readback.mjs also uses:
@@ -45,7 +45,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
  */
 function sceneSlots(def) {
     const out = [];
-    const push = (slot, steps) => { if (Array.isArray(steps) && steps.length) out.push({ slot, steps }); };
+    const push = (slot: string, steps) => { if (Array.isArray(steps) && steps.length) out.push({ slot, steps }); };
     push("offer", def?.offer?.scene);
     push("accept", def?.acceptScene);
     push("done", def?.doneScene);
@@ -59,7 +59,7 @@ function offerRows(def) {
     if (!def?.offer) return { rows: [], skipAsk: null };
     const scene = sceneSlots(def).find((x) => x.slot === "offer") ?? null;
     // the scene's answer is the last ask answered (web/game.js playQuestScene: `answer = i` on every ask)
-    const askIndexes = (scene?.steps ?? []).map((s, i) => (isAskStep(s) ? i : -1)).filter((i) => i >= 0);
+    const askIndexes = (scene?.steps ?? []).map((s, i) => (isAskStep(s) ? i : -1)).filter((i: number) => i >= 0);
     const pick = askIndexes.length ? askIndexes[askIndexes.length - 1] : -1;
     const askStep = pick >= 0 ? scene.steps[pick] : null;
     const ask = String(askStep?.ask ?? def.offer.ask ?? DEFAULT_ASK);
@@ -89,7 +89,7 @@ function askRows(def, skipAsk) {
             if (!isAskStep(step)) return;
             if (skipAsk && skipAsk.slot === slot && skipAsk.index === index) return;
             const ask = String(step.ask ?? DEFAULT_ASK);
-            step.options.forEach((option, i) => {
+            step.options.forEach((option, i: number) => {
                 rows.push({
                     kind: "ask", slot, choice: String(option), lines: [ask], pay: null,
                     note: chase && i === 1 ? CHASE_LOST : "spoken; changes nothing",
@@ -107,7 +107,7 @@ function verdictRows(def) {
     const base = payOf(def.reward);
     const pays = Array.isArray(v.pay) ? v.pay : [];
     const after = Array.isArray(v.after) ? v.after : [];
-    return v.options.map((option, i) => {
+    return v.options.map((option, i: string | number) => {
         const own = payOf(pays[i]);
         const pay = { bits: base.bits + own.bits, items: [...base.items, ...own.items] };
         const lines = Array.isArray(after[i]) ? after[i].map(String) : [];
@@ -125,7 +125,7 @@ function verdictRows(def) {
 function chaseRows(def) {
     const rows = [];
     for (const { slot, steps } of sceneSlots(def)) {
-        steps.forEach((step, index) => {
+        steps.forEach((step, index: number) => {
             if (!isChaseStep(step)) return;
             const after = sayLines(steps.slice(index + 1));
             rows.push({ kind: "chase", slot, choice: "kept up", lines: after.length ? after : ["The scene goes on."], pay: null, note: after.length ? "" : "no words follow the chase" });
@@ -139,7 +139,7 @@ function chaseRows(def) {
 function battleRows(def) {
     const rows = [];
     for (const { slot, steps } of sceneSlots(def)) {
-        steps.forEach((step, index) => {
+        steps.forEach((step, index: number) => {
             if (!isBattleStep(step)) return;
             const after = sayLines(steps.slice(index + 1));
             rows.push({ kind: "battle", slot, choice: "win or flee", lines: after.length ? after : ["The scene goes on."], pay: null, note: "a win and a flee both go on" });
@@ -199,23 +199,23 @@ export function endingsProblem(def) {
     if (v) {
         const options = Array.isArray(v.options) ? v.options : [];
         const after = Array.isArray(v.after) ? v.after : [];
-        const missing = options.map((_, i) => i).filter((i) => !Array.isArray(after[i]) || !after[i].length);
+        const missing = options.map((_, i) => i).filter((i: string | number) => !Array.isArray(after[i]) || !after[i].length);
         if (missing.length) {
             problems.push(missing.length === 1
                 ? `verdict: option ${missing[0] + 1} has no after lines`
-                : `verdict: options ${missing.map((i) => i + 1).join(", ")} have no after lines`);
+                : `verdict: options ${missing.map((i: number) => i + 1).join(", ")} have no after lines`);
         }
         const pays = Array.isArray(v.pay) ? v.pay : [];
-        options.forEach((_, i) => {
+        options.forEach((_, i: number) => {
             const p = pays[i];
             if (!p || (!p.bits && !(Array.isArray(p.items) && p.items.length))) problems.push(`verdict: pay ${i + 1} has no bits and no items`);
         });
-        options.forEach((o, i) => {
+        options.forEach((o, i: number) => {
             if (String(o).length > VERDICT_OPTION_MAX) problems.push(`verdict: option ${i + 1} is ${String(o).length} characters (the limit is ${VERDICT_OPTION_MAX})`);
         });
     }
     for (const { slot, steps } of sceneSlots(def)) {
-        steps.forEach((s, i) => {
+        steps.forEach((s, i: number) => {
             if (isStep(s) && "ask" in s && (!Array.isArray(s.options) || s.options.length < 2)) problems.push(`${slot}: ask step ${i + 1} has fewer than 2 options`);
         });
     }

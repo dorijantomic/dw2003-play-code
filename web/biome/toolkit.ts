@@ -19,7 +19,7 @@ import type { GroundOpts, LODLevel, ScatterOpts, SkyOpts, ToonMatParams, ToonOpt
 export { THREE };
 
 // ------------------------------------------------------------------ random + noise
-export function rng(seed) {
+export function rng(seed: number) {
   let s = (seed >>> 0) || 1;
   return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
 }
@@ -30,9 +30,9 @@ export function noiseTexture() {
   const N = 256, d = new Uint8Array(N * N * 4);
   for (let c = 0; c < 4; c++) {
     const r = rng(1234 + c * 77), G = 16 << (c & 1), lat = new Float32Array(G * G).map(() => r()), lat2 = new Float32Array(G * 2 * G * 2).map(() => r());
-    const sm = (t) => t * t * (3 - 2 * t);
-    const samp = (L, g, u, v) => { const x = u * g, y = v * g, xi = Math.floor(x), yi = Math.floor(y), fx = sm(x - xi), fy = sm(y - yi);
-      const h = (i, j) => L[((j % g + g) % g) * g + ((i % g + g) % g)];
+    const sm = (t: number) => t * t * (3 - 2 * t);
+    const samp = (L, g: number, u: number, v: number) => { const x = u * g, y = v * g, xi = Math.floor(x), yi = Math.floor(y), fx = sm(x - xi), fy = sm(y - yi);
+      const h = (i: number, j: number) => L[((j % g + g) % g) * g + ((i % g + g) % g)];
       return (h(xi, yi) * (1 - fx) + h(xi + 1, yi) * fx) * (1 - fy) + (h(xi, yi + 1) * (1 - fx) + h(xi + 1, yi + 1) * fx) * fy; };
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) d[(j * N + i) * 4 + c] = Math.min(255, 255 * (0.65 * samp(lat, G, i / N, j / N) + 0.35 * samp(lat2, G * 2, i / N, j / N)));
   }
@@ -40,7 +40,7 @@ export function noiseTexture() {
   t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true; _noiseTex = t; return t;
 }
 /** terrain height in metres (same function for ground mesh and scatter) */
-export function terrainH(x, z, amp = 1) {
+export function terrainH(x: number, z: number, amp = 1) {
   const r = Math.hypot(x, z), flat = THREE.MathUtils.smoothstep(r, 6, 18);
   return amp * flat * (1.3 * Math.sin(x * 0.045 + 1) * Math.cos(z * 0.05) + 0.55 * Math.sin(x * 0.13 + z * 0.11) + 0.25 * Math.sin(x * 0.31 - z * 0.27));
 }
@@ -59,7 +59,7 @@ export const U = {
   uCam: { value: new THREE.Vector3() },
 };
 export const light = { dir: new THREE.Vector3(0.45, 0.78, 0.35).normalize() };   // world sun direction (towards the sun)
-export function tickUniforms(camera, t) {
+export function tickUniforms(camera, t: number) {
   camera.updateMatrixWorld(); camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
   U.uTime.value = t;
   U.uSunV.value.copy(light.dir).transformDirection(camera.matrixWorldInverse);
@@ -167,11 +167,11 @@ export function toonMat(o: ToonMatParams = {}, t: ToonOpts = {}) {
 export const GRADE_PHOTO = { sat: 1.38, post: 0.35 };    // photoreal albedo -> painted: saturate + posterise 35 %
 
 // ------------------------------------------------------------------ geometry helpers
-export function tris(geo) { return geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3; }
+export function tris(geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }) { return geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3; }
 /** keep only position/normal/uv (+color if all have it) so geometries from different files merge */
 export function normaliseGeo(g, keepColor = false) {
   // one attribute layout for every source (so merges never fail): plain Float32 position / normal / uv, always indexed
-  const f32 = (at, n) => {
+  const f32 = (at, n: number) => {
     if (at && !at.isInterleavedBufferAttribute && at.array instanceof Float32Array && at.itemSize === n && !at.normalized) return at;
     const out = new Float32Array((at ? at.count : 0) * n); if (at) for (let i = 0; i < at.count; i++) { out[i * n] = at.getX(i); if (n > 1) out[i * n + 1] = at.getY(i); if (n > 2) out[i * n + 2] = at.getZ(i); }
     return new THREE.BufferAttribute(out, n);
@@ -199,7 +199,7 @@ export function objStats(obj) {
 
 // ------------------------------------------------------------------ instancing + scatter
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
-export function composeTRS(out, i, x, y, z, yaw, sc, tilt = 0, tiltDir = 0, sy = null) {
+export function composeTRS(out: Float32Array<ArrayBuffer>, i: number, x: number | undefined, y: number, z: number | undefined, yaw: number, sc: number, tilt = 0, tiltDir = 0, sy = null) {
   _e.set(Math.sin(tiltDir) * tilt, yaw, Math.cos(tiltDir) * tilt, "YXZ"); _q.setFromEuler(_e);
   _p.set(x, y, z); _s.set(sc, sy == null ? sc : sy, sc);
   _m.compose(_p, _q, _s); out.set(_m.elements, i * 16);
@@ -208,7 +208,7 @@ export function composeTRS(out, i, x, y, z, yaw, sc, tilt = 0, tiltDir = 0, sy =
  * scatter: returns Float32Array of n matrices. area = [cx, cz, halfW, halfD]; density(x,z) -> 0..1 (rejection);
  * ok(x,z) optional hard filter. opts: scale [min,max], tilt (rad), yOffset, sink.
  */
-export function scatter(n, seed, area, density, opts: ScatterOpts = {}) {
+export function scatter(n: number, seed, area, density, opts: ScatterOpts = {}) {
   const r = rng(seed), [cx, cz, hw, hd] = area, out = new Float32Array(n * 16), pos = [];
   const sc = opts.scale || [0.9, 1.2], tilt = opts.tilt || 0;
   let i = 0, tries = 0;
@@ -223,7 +223,7 @@ export function scatter(n, seed, area, density, opts: ScatterOpts = {}) {
 }
 
 /** An InstancedMesh of merged parts (parts: [{geo, mat}]). One mesh per part. */
-export function instancedParts(parts, mats, count, name = "") {
+export function instancedParts(parts, mats: Float32Array<ArrayBuffer>, count: number, name = "") {
   const g = new THREE.Group(); g.name = name;
   for (const p of parts) {
     const im = new THREE.InstancedMesh(p.geo, p.mat, Math.max(1, count));
@@ -313,7 +313,7 @@ export class LODSpecies {
   declare mats: any;
   declare n: any;
   declare name: any;
-  constructor(name, levels: LODLevel[], mats, count, dist) {
+  constructor(name: string, levels: LODLevel[], mats: number[] | Float32Array<ArrayBuffer>, count: number, dist) {
     this.name = name; this.mats = mats; this.n = count; this.dist = dist; this.group = new THREE.Group(); this.group.name = name;
     this.levels = levels.map((lv) => {
       const meshes = (lv.parts || []).map((p) => { const im = new THREE.InstancedMesh(p.geo, p.mat, count); im.frustumCulled = false; im.count = 0; this.group.add(im); return im; });

@@ -25,12 +25,12 @@ export function theatreCameraModes() {
  *   techs = the species' non-zero tech_basic / tech_signature that the fight table carries,
  *   sorted and deduped; missing = [name] when no model folder exists for it.
  */
-export function theatrePlan({ digimon, modelMap, models, techTable }, name) {
+export function theatrePlan({ digimon, modelMap, models, techTable }, name: string | number) {
     // digimon is digimon.json itself ({ digimon: [...], skills: [...] }); accept the bare
     // species array too so the caller does not have to unwrap it.
     const speciesList = Array.isArray(digimon) ? digimon : (digimon?.digimon ?? []);
-    const species = speciesList.find((d) => d?.name === name) ?? null;
-    const techs = [];
+    const species = speciesList.find((d: { name: string | number; }) => d?.name === name) ?? null;
+    const techs: number[] = [];
     if (species) {
         for (const column of [species.tech_basic, species.tech_signature]) {
             const id = Number(column) | 0;

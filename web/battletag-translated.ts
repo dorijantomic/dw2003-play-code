@@ -49,7 +49,7 @@ function loadData() {
 export function createBattleTagTranslated(sfx = null, options: BattleTagOptions = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
-            (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
+            (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
         sfx,
         options,
         load: () => loadData(),
@@ -86,7 +86,7 @@ export function createBattleTagTranslated(sfx = null, options: BattleTagOptions 
         },
 
         /** The list resets its chosen row with the rest of the screen. */
-        onOpen: (r) => { r._row = null; },
+        onOpen: (r: { _row: null; }) => { r._row = null; },
 
         start: (r, data, language, playSound) => new ui.FightTagSession(language, {
             activeIndex: r._seed.activeIndex,

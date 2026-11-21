@@ -65,9 +65,9 @@ export const KNOWN_FIRES = Object.freeze({
     EAUCTION: "the auction — engine/systems/auction.ts plays the scene but asks for no sound",
 });
 
-const lower = (v) => String(v ?? "").toLowerCase();
+const lower = (v: string) => String(v ?? "").toLowerCase();
 
-function wordOf(id) {
+function wordOf(id: string) {
     const n = parseInt(String(id), 16);
     return Number.isFinite(n) ? n >>> 0 : null;
 }
@@ -84,7 +84,7 @@ function idsOf(rows) {
  * jingle if the word has one, else the bank name for seq 0 and "<bank>_<seq>" for
  * every other sequence.
  */
-export function stemForWord(word, bank, startWords: Record<string, string> = START_WORDS) {
+export function stemForWord(word: number | null, bank: string, startWords: Record<string, string> = START_WORDS) {
     const named = startWords?.[packedKey(word >>> 0)];
     if (named) return named;
     const seq = (word >>> 0) & 0xffff;
@@ -173,13 +173,13 @@ export function coverage({ catalogue, common, area, stems, startWords = START_WO
 export function bankGaps(archives, area, catalogue) {
     const built = new Set(Object.keys(area ?? {}).map(lower));
     const stageBanks = new Set(Object.values(archives ?? {} as Record<string, any>).map((rec: any) => lower(rec?.bank)).filter(Boolean));
-    const categories = (catalogue?.categories ?? []).map((c) => lower(c.name));
-    const missing = categories.filter((name) => !built.has(name));
-    const stage = missing.filter((name) => stageBanks.has(name));
+    const categories = (catalogue?.categories ?? []).map((c: { name: string; }) => lower(c.name));
+    const missing = categories.filter((name: string) => !built.has(name));
+    const stage = missing.filter((name: string) => stageBanks.has(name));
     return {
         missing,
         stageBanks: stage,
-        other: missing.filter((name) => !stageBanks.has(name)),
+        other: missing.filter((name: string) => !stageBanks.has(name)),
         count: missing.length,
         stageCount: stage.length,
         banked: categories.length - missing.length,
@@ -207,7 +207,7 @@ export function themeGaps(archives, maps) {
 export function movieGaps(rows, shipped) {
     const keys = Array.isArray(shipped) ? shipped.slice() : Object.keys(shipped ?? {});
     const have = new Set(keys.map(lower));
-    const missing = (rows ?? []).map(String).filter((name) => !have.has(lower(name)));
+    const missing = (rows ?? []).map(String).filter((name: string) => !have.has(lower(name)));
     // The manifest keys are the disc's own names lowercased; the table's names are
     // upper case, so the shipped rows are named the way the table names them.
     const shippedRows = keys.map((key) => String(key).toUpperCase());

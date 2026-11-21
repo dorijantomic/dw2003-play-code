@@ -8,16 +8,16 @@ import { grassClumpParts } from "./procedural.js";
 import type { GroundDetailOpts } from "./types.js";
 
 // ------------------------------------------------------------------ shore law (JS) + same in GLSL
-export const shoreZ = (x) => -12 + 3.0 * Math.sin(x * 0.031 + 0.7) + 1.4 * Math.sin(x * 0.083 + 2.1);
-export const seaDepth = (e) => Math.min(0.07 * e + 0.0018 * e * e, 14);
+export const shoreZ = (x: number | undefined) => -12 + 3.0 * Math.sin(x * 0.031 + 0.7) + 1.4 * Math.sin(x * 0.083 + 2.1);
+export const seaDepth = (e: number) => Math.min(0.07 * e + 0.0018 * e * e, 14);
 export const GLSL_SHORE = /* glsl */`
 float bShoreZ(float x){ return -12.0 + 3.0 * sin(x * 0.031 + 0.7) + 1.4 * sin(x * 0.083 + 2.1); }
 float bDepth(float e){ return min(0.07 * e + 0.0018 * e * e, 14.0); }
 `;
-const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-function vnoise(x, z, f, s = 0) {
+const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function vnoise(x: number, z: number, f: number, s = 0) {
   const X = x * f + s * 17.3, Z = z * f + s * 9.1, xi = Math.floor(X), zi = Math.floor(Z), fx = X - xi, fz = Z - zi;
-  const h = (i, j) => { const n = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
+  const h = (i: number, j: number) => { const n = Math.sin(i * 127.1 + j * 311.7 + s * 74.7) * 43758.5453; return n - Math.floor(n); };
   const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
   return (h(xi, zi) * (1 - sx) + h(xi + 1, zi) * sx) * (1 - sz) + (h(xi, zi + 1) * (1 - sx) + h(xi + 1, zi + 1) * sx) * sz;
 }
@@ -25,7 +25,7 @@ export { vnoise, sstep };
 /** tide pools: [x, z, radius] (placed on the right rock shelf) */
 export const POOLS = [[50, 0, 2.3], [58.5, 4.5, 1.9], [45, 6.5, 1.6]].map(([x, dd, r]) => [x, shoreZ(x) + 7 + dd, r]);
 /** terrain height (m). Sea level is y = 0. */
-export function beachH(x, z) {
+export function beachH(x: number, z: number) {
   const d = z - shoreZ(x);
   if (d < 0) return -seaDepth(-d);
   let h = 0.045 * Math.min(d, 26);
@@ -46,9 +46,9 @@ class GB {
   declare p: any[];
   declare u: any[];
   constructor() { this.p = []; this.c = []; this.u = []; this.i = []; }
-  v(x, y, z, r = 1, g = 1, b = 1, u = 0, w = 0) { this.p.push(x, y, z); this.c.push(r, g, b); this.u.push(u, w); return this.p.length / 3 - 1; }
-  quad(a, b, c, d) { this.i.push(a, b, c, a, c, d); }
-  tri(a, b, c) { this.i.push(a, b, c); }
+  v(x: number, y: number, z: number, r = 1, g = 1, b = 1, u = 0, w = 0) { this.p.push(x, y, z); this.c.push(r, g, b); this.u.push(u, w); return this.p.length / 3 - 1; }
+  quad(a: number | undefined, b: number | undefined, c: number | undefined, d: number | undefined) { this.i.push(a, b, c, a, c, d); }
+  tri(a: number | undefined, b: number | undefined, c: number | undefined) { this.i.push(a, b, c); }
   geo(color = true) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.p, 3));
@@ -57,14 +57,14 @@ class GB {
     g.setIndex(this.i); g.computeVertexNormals(); g.computeBoundingSphere(); return g;
   }
 }
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
-function addGeo(gb, geo, m, colFn) {   // append a three geometry (transformed) into gb with vertex colours
+const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+function addGeo(gb: GB, geo, m, colFn) {   // append a three geometry (transformed) into gb with vertex colours
   const g = geo.index ? geo : geo.toNonIndexed(), P = g.attributes.position, N = P.count, base = gb.p.length / 3, v = new THREE.Vector3();
   for (let i = 0; i < N; i++) { v.fromBufferAttribute(P, i); if (m) v.applyMatrix4(m); const c = colFn ? colFn(v, i) : [1, 1, 1]; gb.v(v.x, v.y, v.z, c[0], c[1], c[2]); }
   if (g.index) for (let i = 0; i < g.index.count; i++) gb.i.push(base + g.index.getX(i)); else for (let i = 0; i < N; i++) gb.i.push(base + i);
 }
 /** tube along points P with radii R; colFn(ringIndex, sideFraction, angle) -> rgb; caps = cone cap at the ends */
-function tube(gb, P, R, sides, colFn, caps = [true, true]) {
+function tube(gb: GB, P, R: number[], sides: number, colFn, caps = [true, true]) {
   const n = P.length, rings = []; let pn = null;
   for (let i = 0; i < n; i++) {
     const T = P[Math.min(n - 1, i + 1)].clone().sub(P[Math.max(0, i - 1)]).normalize();
@@ -78,12 +78,12 @@ function tube(gb, P, R, sides, colFn, caps = [true, true]) {
     rings.push({ ring, T });
   }
   for (let i = 0; i < n - 1; i++) for (let j = 0; j < sides; j++) { const a = rings[i].ring[j], b = rings[i].ring[(j + 1) % sides], c = rings[i + 1].ring[(j + 1) % sides], d = rings[i + 1].ring[j]; gb.quad(a, d, c, b); }
-  const cap = (k, dir) => { const e = rings[k], c = colFn ? colFn(k, 0, 0) : [1, 1, 1], ap = gb.v(P[k].x + e.T.x * R[k] * 0.35 * dir, P[k].y + e.T.y * R[k] * 0.35 * dir, P[k].z + e.T.z * R[k] * 0.35 * dir, c[0] * 0.8, c[1] * 0.8, c[2] * 0.8);
+  const cap = (k: number, dir: number) => { const e = rings[k], c = colFn ? colFn(k, 0, 0) : [1, 1, 1], ap = gb.v(P[k].x + e.T.x * R[k] * 0.35 * dir, P[k].y + e.T.y * R[k] * 0.35 * dir, P[k].z + e.T.z * R[k] * 0.35 * dir, c[0] * 0.8, c[1] * 0.8, c[2] * 0.8);
     for (let j = 0; j < sides; j++) { const a = e.ring[j], b = e.ring[(j + 1) % sides]; if (dir > 0) gb.tri(a, ap, b); else gb.tri(a, b, ap); } };
   if (caps[0]) cap(0, -1); if (caps[1]) cap(n - 1, 1);
 }
 /** flat ribbon along points P (side direction S) with half width fn */
-function ribbon(gb, P, S, hw, colFn) {
+function ribbon(gb: GB, P, S, hw, colFn) {
   const n = P.length, ids = [];
   for (let i = 0; i < n; i++) {
     const w = hw(i / (n - 1)), c = colFn(i / (n - 1));
@@ -91,16 +91,16 @@ function ribbon(gb, P, S, hw, colFn) {
   }
   for (let i = 0; i < n - 1; i++) gb.quad(ids[i][0], ids[i][1], ids[i + 1][1], ids[i + 1][0]);
 }
-const canvasTex = (w, h, draw) => {
+const canvasTex = (w: number, h: number, draw) => {
   const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); draw(g, w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 };
-const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const mixc = (a, b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
 // ------------------------------------------------------------------ PALMS
 let _frondTex = null, _fanTex = null, _leafTex = null;
 function frondTexture() {
-  return _frondTex || (_frondTex = canvasTex(128, 256, (g, w, h) => {
+  return _frondTex || (_frondTex = canvasTex(128, 256, (g, w, h: number) => {
     g.clearRect(0, 0, w, h); g.lineCap = "round";
     g.strokeStyle = "#35602a"; g.lineWidth = 3.4; g.beginPath(); g.moveTo(64, h); g.lineTo(64, 4); g.stroke();
     const N = 44;
@@ -115,7 +115,7 @@ function frondTexture() {
   }));
 }
 function fanTexture() {
-  return _fanTex || (_fanTex = canvasTex(128, 128, (g, w, h) => {
+  return _fanTex || (_fanTex = canvasTex(128, 128, (g, w, h: number) => {
     g.clearRect(0, 0, w, h); const N = 19;
     for (let i = 0; i < N; i++) {
       const a = -Math.PI / 2 + (-1 + (2 * i) / (N - 1)) * 1.12, a2 = a + 0.5 * (2.24 / (N - 1)), len = 122, ox = 64, oy = h - 2;
@@ -134,7 +134,7 @@ function roundLeafTexture() {
   }));
 }
 /** one frond (or fan leaf) card along a drooping arc */
-function frondGeo(gb, o) {
+function frondGeo(gb: GB, o) {
   const { origin, yaw, pitch, droop, L, W, segs, fold = 0.32, fan = false, three = true } = o;
   const hx = Math.cos(yaw), hz = Math.sin(yaw), sx = -hz, sz = hx;
   let x = origin.x, y = origin.y, z = origin.z; const rows = [];
@@ -168,7 +168,7 @@ export function palmParts(kind = "coconut", seed = 1, lod = 0) {
     R.push((K.r1 + (K.r0 - K.r1) * Math.pow(1 - t, 1.2) + K.r0 * 0.55 * Math.exp(-t * K.H * 1.6)) * (1 + 0.22 * sstep(0.9, 1, t)));
   }
   const bark = kind === "fan" ? [0.50, 0.40, 0.30] : [0.56, 0.45, 0.33];
-  tube(gb, P, R, sides, (i, f, a) => {
+  tube(gb, P, R, sides, (i: number, f, a: number) => {
     const t = i / S, band = i % 2 ? 0.78 : 1.0, st = 0.93 + 0.07 * Math.sin(a * 5 + i * 1.7);
     let c = bark.map((v) => v * band * st * (0.92 + 0.2 * t)); if (t > 0.94) c = mixc(c, [0.38, 0.52, 0.2], 0.8); return c;
   }, [false, true]);
@@ -186,7 +186,7 @@ export function palmParts(kind = "coconut", seed = 1, lod = 0) {
   if (K.nuts) {
     const ico = new THREE.IcosahedronGeometry(0.11, lod ? 0 : 1);
     for (let i = 0; i < K.nuts; i++) { const a = r() * 6.28, m = new THREE.Matrix4().compose(top.clone().add(V(Math.cos(a) * 0.2, -0.12 - r() * 0.12, Math.sin(a) * 0.2)), new THREE.Quaternion(), V(1, 1.15, 1));
-      addGeo(gb, ico, m, (v) => (v.y > top.y - 0.13 ? [0.34, 0.44, 0.16] : [0.40, 0.46, 0.18])); }
+      addGeo(gb, ico, m, (v: { y: number; }) => (v.y > top.y - 0.13 ? [0.34, 0.44, 0.16] : [0.40, 0.46, 0.18])); }
   }
   const H = K.H + K.L * 0.5;
   const key = kind + lod;
@@ -251,10 +251,10 @@ export function seaOatsParts(seed = 2) {
   for (let s = 0; s < n; s++) {
     const a = r() * 6.28, rad = r() * 0.1, H = 0.9 + 0.5 * r(), lean = 0.12 + 0.2 * r(), P = [], Rr = [];
     for (let i = 0; i <= 4; i++) { const t = i / 4; P.push(V(Math.cos(a) * (rad + lean * t * t * H), H * t, Math.sin(a) * (rad + lean * t * t * H))); Rr.push(0.008 * (1 - t * 0.5)); }
-    tube(gb, P, Rr, 4, (i) => mixc([0.38, 0.45, 0.16], [0.82, 0.74, 0.4], i / 4), [false, false]);
+    tube(gb, P, Rr, 4, (i: number) => mixc([0.38, 0.45, 0.16], [0.82, 0.74, 0.4], i / 4), [false, false]);
     const tip = P[4], d = P[4].clone().sub(P[3]).normalize();    // plume
     const pl = [tip, tip.clone().addScaledVector(d, 0.1), tip.clone().addScaledVector(d, 0.2)];
-    tube(gb, pl, [0.022, 0.03, 0.006], 5, (i) => (i === 1 ? [0.92, 0.82, 0.48] : [0.85, 0.76, 0.42]), [false, true]);
+    tube(gb, pl, [0.022, 0.03, 0.006], 5, (i: number) => (i === 1 ? [0.92, 0.82, 0.48] : [0.85, 0.76, 0.42]), [false, true]);
   }
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); m.userData.tag = "oats";
   return [{ geo: gb.geo(true), mat: toonify(m, { wind: 0.9, height: 1.4, flutter: 0.3, fade: [28, 50], shadeK: 0.78, rim: 0.2, trans: 0.3 }) }];
@@ -264,7 +264,7 @@ export function seaOatsParts(seed = 2) {
 export function driftwoodParts(seed = 1, kind = 0) {
   const r = rng(seed * 13 + kind * 3 + 1), gb = new GB();
   const L = [1.8, 2.5, 1.2][kind % 3], R0 = [0.09, 0.075, 0.13][kind % 3], n = 9;
-  const col = (i, f, a) => { const g = 0.88 + 0.12 * Math.sin(a * 4 + i * 0.9) * Math.cos(i * 0.5), b = [0.74, 0.68, 0.58]; return b.map((v) => v * g * (0.92 + 0.14 * ((i * 7 + Math.floor(f * 8)) % 3) / 2)); };
+  const col = (i: number, f: number, a: number) => { const g = 0.88 + 0.12 * Math.sin(a * 4 + i * 0.9) * Math.cos(i * 0.5), b = [0.74, 0.68, 0.58]; return b.map((v) => v * g * (0.92 + 0.14 * ((i * 7 + Math.floor(f * 8)) % 3) / 2)); };
   const P = [], Rr = [], wob = r() * 6;
   for (let i = 0; i < n; i++) { const t = i / (n - 1); P.push(V((t - 0.5) * L, 0.07 + 0.09 * Math.sin(t * 3 + wob) + 0.03 * r(), 0.12 * Math.sin(t * 4 + wob * 2))); Rr.push(R0 * (1.15 - 0.45 * t) * (0.88 + 0.28 * r()) * (i === 3 ? 1.25 : 1)); }
   tube(gb, P, Rr, 7, col, [true, true]);
@@ -300,16 +300,16 @@ export function shellParts(kind = "scallop", seed = 1) {
     for (const side of [0, 1]) {
       const sp = new THREE.SphereGeometry(0.5, 12, 6, 0, 2 * Math.PI, 0, Math.PI / 2), P = sp.attributes.position;
       const m = new THREE.Matrix4().compose(V(0, side ? 0.012 : 0, 0), new THREE.Quaternion().setFromEuler(new THREE.Euler(side ? Math.PI + 0.38 : 0, 0, 0)), V(0.09, 0.034, 0.07));
-      addGeo(gb, sp, m, (v) => { const rho = Math.hypot(v.x, v.z) / 0.09, ring = Math.floor(rho * 8) % 2; return ring ? [0.88, 0.84, 0.78] : [0.74, 0.62, 0.5]; });
+      addGeo(gb, sp, m, (v: { x: number; z: number; }) => { const rho = Math.hypot(v.x, v.z) / 0.09, ring = Math.floor(rho * 8) % 2; return ring ? [0.88, 0.84, 0.78] : [0.74, 0.62, 0.5]; });
     }
   } else if (kind === "cowrie") {
     const sp = new THREE.SphereGeometry(0.5, 12, 8), m = new THREE.Matrix4().makeScale(0.075, 0.048, 0.05);
-    addGeo(gb, sp, m, (v) => (v.y < -0.012 && Math.abs(v.z) < 0.012 ? [0.95, 0.9, 0.82] : mixc([0.78, 0.55, 0.36], [0.55, 0.34, 0.2], (Math.sin(v.x * 140) * Math.cos(v.z * 160) + 1) / 2 * 0.6)));
+    addGeo(gb, sp, m, (v: { y: number; z: number; x: number; }) => (v.y < -0.012 && Math.abs(v.z) < 0.012 ? [0.95, 0.9, 0.82] : mixc([0.78, 0.55, 0.36], [0.55, 0.34, 0.2], (Math.sin(v.x * 140) * Math.cos(v.z * 160) + 1) / 2 * 0.6)));
     gb.p = gb.p.map((v, i) => (i % 3 === 1 ? v + 0.024 : v));
   } else {   // sand dollar
     const pr = [[0, 0.016], [0.02, 0.0165], [0.04, 0.0145], [0.058, 0.009], [0.068, 0.003], [0.07, 0]].map(([x, y]) => new THREE.Vector2(x, y));
     const lg = new THREE.LatheGeometry(pr, 20), m = new THREE.Matrix4();
-    addGeo(gb, lg, m, (v) => { const a = Math.atan2(v.z, v.x), rho = Math.hypot(v.x, v.z), pet = Math.pow(Math.max(0, Math.cos(2.5 * a * 2 * 0.5 + 0.0)), 6); const pa = Math.pow(Math.cos(a * 5 * 0.5) ** 2, 3); return rho > 0.012 && rho < 0.05 && pa > 0.5 ? [0.72, 0.68, 0.6] : [0.88, 0.85, 0.78]; });
+    addGeo(gb, lg, m, (v: { z: number; x: number; }) => { const a = Math.atan2(v.z, v.x), rho = Math.hypot(v.x, v.z), pet = Math.pow(Math.max(0, Math.cos(2.5 * a * 2 * 0.5 + 0.0)), 6); const pa = Math.pow(Math.cos(a * 5 * 0.5) ** 2, 3); return rho > 0.012 && rho < 0.05 && pa > 0.5 ? [0.72, 0.68, 0.6] : [0.88, 0.85, 0.78]; });
   }
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); m.userData.tag = "shell";
   return [{ geo: gb.geo(true), mat: toonify(m, { fade: [28, 48], shadeK: 0.82, rim: 0.12, height: 0.1 }) }];
@@ -322,7 +322,7 @@ export function wrackParts(seed = 1) {
     const yaw = r() * 6.28, len = 0.35 + 0.5 * r(), ox = (r() - 0.5) * 0.35, oz = (r() - 0.5) * 0.35, ph = r() * 6, P = [], S = [];
     for (let i = 0; i < 9; i++) { const t = i / 8, x = t * len, z = 0.07 * Math.sin(t * 9 + ph) * len * 3; P.push(V(ox + Math.cos(yaw) * x - Math.sin(yaw) * z, 0.012 + 0.012 * Math.sin(t * 6 + ph) + 0.015 * s / n, oz + Math.sin(yaw) * x + Math.cos(yaw) * z)); S.push(V(-Math.sin(yaw + 1.57) * 0, 0.0, 0).set(Math.sin(yaw), 0, -Math.cos(yaw))); }
     const kind = s % 3, base = kind === 0 ? [0.34, 0.3, 0.1] : kind === 1 ? [0.2, 0.32, 0.12] : [0.4, 0.22, 0.1];
-    ribbon(gb, P, S, (t) => 0.022 * (1 + 0.5 * Math.sin(t * 22 + ph)) * (1 - 0.5 * t) + 0.004, (t) => mixc(base, [base[0] * 0.55, base[1] * 0.6, base[2] * 0.5], t));
+    ribbon(gb, P, S, (t: number) => 0.022 * (1 + 0.5 * Math.sin(t * 22 + ph)) * (1 - 0.5 * t) + 0.004, (t: number) => mixc(base, [base[0] * 0.55, base[1] * 0.6, base[2] * 0.5], t));
     if (kind === 0) for (let b = 0; b < 3; b++) { const p = P[2 + b * 2]; addGeo(gb, new THREE.IcosahedronGeometry(0.018, 0), new THREE.Matrix4().makeTranslation(p.x, p.y + 0.012, p.z), () => [0.5, 0.42, 0.12]); }
   }
   for (let s = 0; s < 2; s++) {   // sea lettuce sheet
@@ -337,7 +337,7 @@ export function kelpParts(seed = 1) {
   for (let s = 0; s < 4; s++) {
     const yaw = r() * 6.28, H = 1.0 + 0.8 * r(), ox = (r() - 0.5) * 0.3, oz = (r() - 0.5) * 0.3, ph = r() * 6, P = [], S = [];
     for (let i = 0; i <= 8; i++) { const t = i / 8; P.push(V(ox + Math.cos(yaw) * 0.12 * t * H * Math.sin(t * 2 + ph), H * t, oz + Math.sin(yaw) * 0.12 * t * H * Math.sin(t * 2 + ph))); S.push(V(Math.sin(yaw), 0, -Math.cos(yaw))); }
-    ribbon(gb, P, S, (t) => 0.06 * (0.8 + 0.3 * Math.sin(t * 17 + ph)) * (1 - 0.6 * t) + 0.01, (t) => mixc([0.32, 0.28, 0.1], [0.5, 0.45, 0.14], t));
+    ribbon(gb, P, S, (t: number) => 0.06 * (0.8 + 0.3 * Math.sin(t * 17 + ph)) * (1 - 0.6 * t) + 0.01, (t: number) => mixc([0.32, 0.28, 0.1], [0.5, 0.45, 0.14], t));
   }
   const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }); m.userData.tag = "kelp";
   return [{ geo: gb.geo(true), mat: toonify(m, { wind: 1.0, height: 1.9, flutter: 0.5, fade: [30, 50], shadeK: 0.8 }) }];
@@ -369,7 +369,7 @@ export function seaStackParts(seed = 1, H = 12, R = 3) {
 const FOGV = THREE.UniformsLib.fog;
 const live = (u, shared) => Object.assign(u, shared);   // UniformsUtils.merge clones numbers/textures: re-attach the shared live uniform objects
 export function oceanMaterial() {
-  const C = (h) => new THREE.Color(h);
+  const C = (h: number) => new THREE.Color(h);
   const m = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, fog: true, side: THREE.DoubleSide,
     uniforms: live(THREE.UniformsUtils.merge([FOGV, { uC0: { value: C(0x92e8d8) }, uC1: { value: C(0x45c4c8) }, uC2: { value: C(0x2594c4) }, uC3: { value: C(0x1d6aac) }, uC4: { value: C(0x174a88) } }]),
@@ -421,7 +421,7 @@ void main(){
 }
 /** tide pool water disc (radius R): hard bands from the rim to the centre, sparkle */
 export function poolMaterial(R = 2) {
-  const C = (h) => new THREE.Color(h);
+  const C = (h: number) => new THREE.Color(h);
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, fog: true,
     uniforms: live(THREE.UniformsUtils.merge([FOGV, { uR: { value: R }, uC0: { value: C(0x9be7b0) }, uC1: { value: C(0x4cc7b4) }, uC2: { value: C(0x2a93b4) } }]),
@@ -447,7 +447,7 @@ void main(){
   });
 }
 /** sea spray / surf mist: n soft billboard puffs pulsing along the waterline */
-export function seaSpray(xs, seed = 3, zOf = (x) => shoreZ(x) - 0.4) {
+export function seaSpray(xs, seed = 3, zOf = (x: number | undefined) => shoreZ(x) - 0.4) {
   const r = rng(seed), n = xs.length, m = new THREE.Matrix4();
   const geo = new THREE.PlaneGeometry(1, 1);
   const mat = new THREE.ShaderMaterial({
@@ -474,7 +474,7 @@ void main(){ float rr = length(vUv - 0.5) * 2.0; float n = texture2D(uNoise, vUv
 
 // ------------------------------------------------------------------ ground shader: 4-layer sand splat + wet line + ripples + underwater tint
 /** texs = [dry, patch1, patch2, rock]; wetTex = damp sand. o.disc = thumbnail disc (wet gradient across the disc instead of the world shore) */
-export function beachGround(texs, wetTex, o: GroundDetailOpts = {}) {
+export function beachGround(texs: unknown[], wetTex, o: GroundDetailOpts = {}) {
   const m = groundMaterial(texs, { tile: o.tile || 3.0, tints: o.tints || [[1.04, 1.0, 0.93], [1.0, 0.98, 0.92], [1.05, 1.02, 0.97], [0.95, 0.93, 0.9]], splat: o.splat || [0.62, 0.66, 0, 9], grade: o.grade });
   m.userData.tag = "beachground" + (o.disc ? "D" : "");
   const prev = m.onBeforeCompile;
@@ -509,7 +509,7 @@ ${GLSL_SHORE}`)
 export function algaeify(parts, amt = 0.9, col = [0.1, 0.4, 0.2]) {
   for (const p of parts) {
     p.mat.userData.toon.moss = amt; p.mat.userData.tag = "algae";
-    const prev = p.mat.onBeforeCompile; p.mat.onBeforeCompile = (sh) => { prev(sh); sh.uniforms.uMossCol.value.set(col[0], col[1], col[2]); };
+    const prev = p.mat.onBeforeCompile; p.mat.onBeforeCompile = (sh: { uniforms: { uMossCol: { value: { set: (arg0: number | undefined, arg1: number | undefined, arg2: number | undefined) => void; }; }; }; }) => { prev(sh); sh.uniforms.uMossCol.value.set(col[0], col[1], col[2]); };
     p.mat.needsUpdate = true;
   }
   return parts;

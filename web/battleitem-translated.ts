@@ -51,7 +51,7 @@ function loadData() {
 export function createBattleItemTranslated(sfx = null, options = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
-            (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
+            (directory: number) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
         sfx,
         options,
         load: () => loadData(),
@@ -95,7 +95,7 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
             vsync: r._session?.vsyncInstalled() ?? false,
             moves: r._session?.moves.map((m) => ({ ...m })) ?? [],
             sounds: r._session?.sounds ?? [],
-            icons: r._seed?.items.map((item) => ({ id: item.id, clip: itemIconClip(item.id) })) ?? [],
+            icons: r._seed?.items.map((item: { id: string | number; }) => ({ id: item.id, clip: itemIconClip(item.id) })) ?? [],
         }),
     });
 }

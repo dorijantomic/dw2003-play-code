@@ -19,7 +19,7 @@ export const TAILS = Object.freeze({
  * The C tail for tail clip `id` drawn at native rect `r`: the tip where the clip's tip is (3 px in from its tip side, on its far edge), the
  * base along the body edge over the clip's wide part, widened MSG.tailWiden each side (C6 draws a fuller tail than the 10 px pixel one).
  */
-export function tailGeometry(id, r, body) {
+export function tailGeometry(id: string | number, r, body) {
     const d = TAILS[id];
     if (!d || !body || !r) return null;
     const left = d.tip === "left";
@@ -33,7 +33,7 @@ export const moreBox = (p) => (p.box ? applyRel({ x: p.x + p.box[0], y: p.y + p.
 
 /** The band halves (cmfont 8 / 9) through their wipe matrices; halves that touch or overlap become one band. */
 export function bandRects(parts) {
-    const list = parts.filter((p) => p.part === "msgBand").map((p) => ({ r: clipRect(p), rel: p.rel ?? ID })).filter((b) => b.r.w > 0 && b.r.h > 0).sort((a, b) => a.r.x - b.r.x);
+    const list = parts.filter((p: { part: string; }) => p.part === "msgBand").map((p) => ({ r: clipRect(p), rel: p.rel ?? ID })).filter((b: { r: { w: number; h: number; }; }) => b.r.w > 0 && b.r.h > 0).sort((a: { r: { x: number; }; }, b: { r: { x: number; }; }) => a.r.x - b.r.x);
     const out = [];
     for (const b of list) {
         const last = out[out.length - 1];
@@ -49,7 +49,7 @@ const centreIn = (r, rc) => r.y + 4.5 >= rc.y && r.y + 4.5 < rc.y + rc.h;
 
 /** The balloon body from its two pieces (cmfont 0 / 2): their union less the 2 px drop line on the right and the bottom. */
 export function balloonBody(parts) {
-    const caps = parts.filter((p) => p.part === "balloonCap").map(clipRect);
+    const caps = parts.filter((p: { part: string; }) => p.part === "balloonCap").map(clipRect);
     if (!caps.length) return null;
     const x0 = Math.min(...caps.map((c) => c.x)), x1 = Math.max(...caps.map((c) => c.x + c.w));
     const y0 = Math.min(...caps.map((c) => c.y)), y1 = Math.max(...caps.map((c) => c.y + c.h));
@@ -57,14 +57,14 @@ export function balloonBody(parts) {
 }
 
 /** The name tab over the balloon's top edge (left end; at the right end when a top tail would sit under it). */
-export function nameTab(body, tail, nameW) {
+export function nameTab(body, tail, nameW: number) {
     const w = Math.max(MSG.tabMinW, nameW * 1.15 + 18);
     let x = body.x + MSG.tabIn;
     if (tail?.side === "top" && Math.min(tail.b0, tail.tip[0]) < x + w + 4 && Math.max(tail.b1, tail.tip[0]) > x - 4) x = body.x + body.w - w - MSG.tabIn;
     return { x, y: body.y - MSG.tabUp, w, h: MSG.tabH14 };
 }
 
-function pushName(key, text, tab, rel, out) {
+function pushName(key: string, text: string, tab, rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined, out) {
     out.push(tabPlate(`${key}.tab`, tab, rel, { edge: "var(--c-bln-tab)", part: "nameTab" }));
     const w = tab.w - MSG.nameIn - 8;
     out.push(textPart(`${key}.name`, "label", text, { x: tab.x + MSG.nameIn, y: tab.y + (tab.h - N(MSG.nameLineDp)) / 2, w, h: N(MSG.nameLineDp) },
@@ -84,15 +84,15 @@ export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
         out.push(rule(`open${i}`, { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) + 1, h: Math.abs(y1 - y0) + 1 }, "var(--c-bln-edge)", ID, "under", "openLine"));
     });
     const body = opt.body ?? balloonBody(parts);
-    const capRel = parts.find((p) => p.part === "balloonCap")?.rel ?? ID;
+    const capRel = parts.find((p: { part: string; }) => p.part === "balloonCap")?.rel ?? ID;
     if (body) {
-        const tp = parts.find((p) => p.part === "balloonTail");
+        const tp = parts.find((p: { part: string; }) => p.part === "balloonTail");
         const tail = opt.tail ?? (tp ? tailGeometry(tp.base, clipRect(tp), body) : null);
         out.push(balloonPart("bln", body, tail, capRel));
-        const nameRun = opt.name !== undefined ? (opt.name ? { text: opt.name, w: opt.name.length * 6 } : null) : runs.find((r) => r.kind === 2) ?? null;
+        const nameRun = opt.name !== undefined ? (opt.name ? { text: opt.name, w: opt.name.length * 6 } : null) : runs.find((r: { kind: number; }) => r.kind === 2) ?? null;
         if (nameRun) used.add(nameRun);
         if (nameRun?.text) pushName("bln", nameRun.text, nameTab(body, tail, nameRun.w ?? nameRun.text.length * 6), capRel, out);
-        runs.filter((r) => !used.has(r) && r.kind !== 2 && centreIn(r, body)).sort((a, b) => a.y - b.y || a.x - b.x).forEach((r, k) => {
+        runs.filter((r) => !used.has(r) && r.kind !== 2 && centreIn(r, body)).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x).forEach((r, k) => {
             used.add(r);
             if (isCursorToken(r.text)) return;
             const x = r.x + MSG.textIn, w = Math.max(8, body.x + body.w - x - 4);
@@ -104,7 +104,7 @@ export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
     bands.forEach((b, i) => {
         messageBand(`band${i}`, b.r, b.rel, out);
         const right = Math.min(320, b.r.x + b.r.w) - 4;
-        runs.filter((r) => !used.has(r) && centreIn(r, b.r)).sort((a, c) => a.y - c.y || a.x - c.x).forEach((r, k) => {
+        runs.filter((r) => !used.has(r) && centreIn(r, b.r)).sort((a: { y: number; x: number; }, c: { y: number; x: number; }) => a.y - c.y || a.x - c.x).forEach((r, k) => {
             used.add(r);
             if (!isCursorToken(r.text)) out.push(bandLine(`band${i}.l${k}`, r, right, ID));
         });
@@ -123,7 +123,7 @@ export function composeBandWindow(p, i, runs, used, out) {
     const r = clipRect(p), rel = p.rel ?? ID;
     messageBand(`mw${i}`, r, rel, out);
     const right = Math.min(320, r.x + r.w) - 4;
-    runs.filter((m) => !used.has(m) && centreIn(m, r) && m.x >= r.x - 1).sort((a, b) => a.y - b.y || a.x - b.x).forEach((m, k) => {
+    runs.filter((m) => !used.has(m) && centreIn(m, r) && m.x >= r.x - 1).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x).forEach((m, k) => {
         used.add(m);
         if (!isCursorToken(m.text)) out.push(bandLine(`mw${i}.l${k}`, m, right, rel));
     });
@@ -133,10 +133,10 @@ export function composeBandWindow(p, i, runs, used, out) {
  * Parts every screen shares, added after the screen's own composer when it did not draw them: the "more" marker (cmfont 7 / 10) as the C
  * arrow, a message band half (cmfont 8 / 9) as the C band. A screen that has its own variant (the balloon) already emitted them.
  */
-export function composeShared(parts, descs) {
-    if (!descs.some((d) => d.part === "more")) parts.forEach((p, i) => { if (p.part === "more") descs.push(moreArrow(`more${i}`, moreBox(p), p.rel ?? ID)); });
+export function composeShared(parts, descs: { key: string; kind: string; part: string; layer: string; vw: number; vh: number; d: string; fill: string; rect: { x: number; y: number; w: number; h: number; }; sx: 1; sy: 1; }[]) {
+    if (!descs.some((d: { part: string; }) => d.part === "more")) parts.forEach((p, i) => { if (p.part === "more") descs.push(moreArrow(`more${i}`, moreBox(p), p.rel ?? ID)); });
     // only the field window's halves (cmfont 8 / 9): the fight report claims its own cyan band (stfrpt 29) under the same part name
-    if (!descs.some((d) => d.part === "msgBand")) bandRects(parts.filter((p) => p.pack === "cmfont")).forEach((b, i) => messageBand(`band${i}`, b.r, b.rel, descs));
+    if (!descs.some((d: { part: string; }) => d.part === "msgBand")) bandRects(parts.filter((p: { pack: string; }) => p.pack === "cmfont")).forEach((b, i) => messageBand(`band${i}`, b.r, b.rel, descs));
     return descs;
 }
 
@@ -146,7 +146,7 @@ const PC_COLOURS = Object.freeze({ "0,0,128": "var(--c-pc-navy)", "62,62,200": "
 export const pcColour = (c) => PC_COLOURS[`${c[0]},${c[1]},${c[2]}`] ?? `rgb(${c[0]},${c[1]},${c[2]})`;
 export const PLACE = Object.freeze({ thin: 2, line: N(8), lineIn: N(4), narrow: 10, tabW: N(24), tabH: N(54), areaDp: 32, areaLineDp: 44, placeDp: 44, placeLineDp: 58, areaMaxY: 48 });
 const isNavy = (q) => pcColour(q.c) === "var(--c-pc-navy)", isBlue = (q) => pcColour(q.c) === "var(--c-pc-blue)";
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /**
  * The card's bar quads (the game's own rects and paint order, every frame of the slide) as C parts: the full-width navy band with the
@@ -154,12 +154,12 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * narrower than 10 native, as C6b draws the line in the left blue bar; always kept inside the bar they sit in), the orange tab where the left blue bar crosses the band (C6b).
  */
 export function placeCardBars(quads, out = []) {
-    const qs = quads.filter((q) => q.w > 0 && q.h > 0).map((q) => ({ x: q.x, y: q.y, w: q.w, h: q.h, c: q.colour ?? q.color ?? [0, 0, 0] }));
+    const qs = quads.filter((q: { w: number; h: number; }) => q.w > 0 && q.h > 0).map((q) => ({ x: q.x, y: q.y, w: q.w, h: q.h, c: q.colour ?? q.color ?? [0, 0, 0] }));
     qs.forEach((q, i) => {
         let r = { x: q.x, y: q.y, w: q.w, h: q.h };
         if (Math.min(q.w, q.h) <= PLACE.thin) {
             const vertical = q.h > q.w;
-            const box = qs.find((o) => o !== q && o.x <= q.x && o.y <= q.y && o.x + o.w >= q.x + q.w && o.y + o.h >= q.y + q.h && (vertical ? o.w > q.w : o.h > q.h));
+            const box = qs.find((o: { x: number; y: number; w: number; h: number; }) => o !== q && o.x <= q.x && o.y <= q.y && o.x + o.w >= q.x + q.w && o.y + o.h >= q.y + q.h && (vertical ? o.w > q.w : o.h > q.h));
             if (vertical) {
                 const w = box ? (box.w < PLACE.narrow ? PLACE.lineIn : PLACE.line) : PLACE.line;
                 const x = box ? clamp(q.x + q.w / 2 - w / 2, box.x, box.x + box.w - w) : q.x + q.w / 2 - w / 2;
@@ -175,10 +175,10 @@ export function placeCardBars(quads, out = []) {
         else if (isNavy(q) && q.h >= 10 && q.w >= 10) out.push(plate(`pc.q${i}`, "pcPlate", r, ID, { shape: "ch", edge: col, body: null, shadow: 0 }));
         else out.push(rule(`pc.q${i}`, r, col, ID, "under", "pcBar"));
     });
-    const band = qs.find((q) => isNavy(q) && q.h >= 10 && q.w >= 300);
-    const bar = band && qs.find((q) => isBlue(q) && q.h >= 100 && q.w >= 4 && q.y <= band.y && q.y + q.h >= band.y + band.h);
+    const band = qs.find((q: { h: number; w: number; }) => isNavy(q) && q.h >= 10 && q.w >= 300);
+    const bar = band && qs.find((q: { h: number; w: number; y: number; }) => isBlue(q) && q.h >= 100 && q.w >= 4 && q.y <= band.y && q.y + q.h >= band.y + band.h);
     if (band && bar) {
-        const stripe = qs.filter((q) => isBlue(q) && q.w >= 300 && q.y > band.y && q.y < band.y + band.h).sort((a, b) => a.y - b.y)[0];
+        const stripe = qs.filter((q: { w: number; y: number; }) => isBlue(q) && q.w >= 300 && q.y > band.y && q.y < band.y + band.h).sort((a: { y: number; }, b: { y: number; }) => a.y - b.y)[0];
         const h = Math.min(PLACE.tabH, (stripe ? stripe.y : band.y + band.h) - band.y);
         if (h > 0) out.push(rule("pc.tab", { x: bar.x + bar.w / 2 - PLACE.tabW / 2, y: band.y, w: PLACE.tabW, h }, "var(--c-orange)", ID, "under", "pcTab"));
     }
@@ -194,7 +194,7 @@ export function composePlaceCard({ runs }, scene: PlaceCardScene = {}) {
     const out = placeCardBars(scene.quads ?? []);
     const plates = (scene.quads ?? []).filter((q) => q.w > 0 && q.h >= 10 && q.w < 300);
     const names = (scene.names ?? runs ?? []).filter((n) => n.text && !isCursorToken(n.text));
-    names.forEach((n, k) => {
+    names.forEach((n: { y: number; x: number; text: string; }, k) => {
         const area = n.y < PLACE.areaMaxY;
         const size = area ? PLACE.areaDp : PLACE.placeDp, line = area ? PLACE.areaLineDp : PLACE.placeLineDp;
         const host = area ? plates.find((q) => n.x >= q.x && n.x < q.x + q.w && n.y + 4.5 >= q.y && n.y + 4.5 < q.y + q.h) : null;

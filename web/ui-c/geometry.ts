@@ -12,13 +12,13 @@ export const BLEED_MARGIN = 1e5;
  * { w, h } the canvas pixel size, `box` = { left, top, width, height } the canvas content box in page px. Returns { s, ox, oy }:
  * s = page px per native px, (ox, oy) = the page px of native (0,0).
  */
-export function placement(m0, canvas, box) {
+export function placement(m0: { a: number; d: number; e: number; f: number; }, canvas, box) {
     const kx = box.width / canvas.w, ky = box.height / canvas.h;
     return { s: m0.a * kx, sy: m0.d * ky, ox: box.left + m0.e * kx, oy: box.top + m0.f * ky };
 }
 
 /** The transform of a draw relative to the scope start: m = m0 * rel, so a native point p lands at rel.a * p + rel.e. Pure scale + translate. */
-export function relative(m0, m) {
+export function relative(m0: { a: number; d: number; e: number; f: number; }, m: { a: number; d: number; e: number; f: number; }) {
     const a = m.a / m0.a, d = m.d / m0.d;
     return { a, d, e: (m.e - m0.e) / m0.a, f: (m.f - m0.f) / m0.d };
 }
@@ -38,7 +38,7 @@ export function bleedFlags(r) {
  * Native rect -> whole page px rect { left, top, right, bottom, width, height } relative to the overlay root.
  * `rootOrigin` = page px of the root's top-left, `limit` = { left, top, right, bottom } the bleed limit relative to the root.
  */
-export function snapRect(r, pl, rootOrigin, limit, bleed = true) {
+export function snapRect(r, pl: { ox: number; s: number; oy: number; sy: number; }, rootOrigin, limit, bleed = true) {
     const fl = bleed ? bleedFlags(r) : { left: false, right: false };
     const x0 = pl.ox - rootOrigin.x + r.x * pl.s, x1 = pl.ox - rootOrigin.x + (r.x + r.w) * pl.s;
     const y0 = pl.oy - rootOrigin.y + r.y * pl.sy, y1 = pl.oy - rootOrigin.y + (r.y + r.h) * pl.sy;
@@ -49,7 +49,7 @@ export function snapRect(r, pl, rootOrigin, limit, bleed = true) {
 }
 
 /** The sizes every part shares, in page px for `s` page px per native px. e1 = edge, e2 = under-edge, sh = drop shadow, d = px per design px. */
-export function edges(s) {
+export function edges(s: number) {
     return { u: s, d: s / 3, e1: Math.max(1, Math.round(s * 4 / 3)), e2: Math.max(1, Math.round(s * 2 / 3)), sh: Math.round(2 * s) };
 }
 
@@ -68,5 +68,5 @@ export function visibleNative(pl, limit) {
 }
 
 /** Design px (the C files, drawn at 3 px per native px on a 1280x720 page with the native box at x 160) -> native units. */
-export const dx = (px) => (px - 160) / 3;
-export const dy = (px) => px / 3;
+export const dx = (px: number | undefined) => (px - 160) / 3;
+export const dy = (px: number) => px / 3;

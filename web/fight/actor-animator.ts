@@ -49,7 +49,7 @@ const HANDOFF_TICKS = 10;
 // play-table records (op2[mode=0, slot, table]) in script order; table 0 (idle/rest) is excluded
 // by the `> 0` test. Exported as the SINGLE source of truth so the renderer (_clipTableSeq) and the
 // Fight Action Lab cross-check both derive the script's sequence the exact same way.
-export function clipTableSeq(model, clip) {
+export function clipTableSeq(model, clip: string | number) {
   const ops = model?.actions?.[clip]?.ops;
   if (!Array.isArray(ops)) return [];
   const seq = [];
@@ -73,7 +73,7 @@ export function clipTableSeq(model, clip) {
 const _idleHiddenCache = new WeakMap();
 
 /** Linear read of a ch3 scale channel ([x,y,z,frame] keys, 4096 = 1.0) at `frame`. */
-function interpCh(ch, frame) {
+function interpCh(ch, frame: number) {
   if (!Array.isArray(ch) || !ch.length) return [4096, 4096, 4096];
   let prev = null;
   for (const k of ch) {
@@ -93,7 +93,7 @@ export function idleHiddenParts(model) {
   if (!model || !model.bones) return [];
   if (_idleHiddenCache.has(model)) return _idleHiddenCache.get(model);
   const tab = model.timeline?.[0]?.table ?? [];
-  const frames = tab.filter((e) => (e.value | 0) < 0x8000).map((e) => e.value | 0);
+  const frames = tab.filter((e: { value: number; }) => (e.value | 0) < 0x8000).map((e: { value: number; }) => e.value | 0);
   const at = frames.length ? frames : [0];
   const out = [];
   for (let b = 0; b < model.bones.length; b++) {
@@ -111,7 +111,7 @@ export function idleHiddenParts(model) {
 }
 
 /** Does the model's OWN action for `clip` draw `bone` (ch3 scale >= 0.05 anywhere in its tables)? */
-function ownClipShowsPart(model, clip, bone) {
+function ownClipShowsPart(model, clip: string | number, bone: string | number) {
   const act = model?.actions?.[clip];
   const ops = act?.ops;
   if (!Array.isArray(ops)) return false;
@@ -133,10 +133,10 @@ function ownClipShowsPart(model, clip, bone) {
 }
 
 /** The idle-hidden parts a synthesized `clip` must not draw, or null when there are none to hide. */
-export function hiddenPartsFor(model, clip) {
+export function hiddenPartsFor(model, clip: string | number | null) {
   const hid = idleHiddenParts(model);
   if (!hid.length) return null;
-  const out = hid.filter((b) => !ownClipShowsPart(model, clip, b));
+  const out = hid.filter((b: string | number) => !ownClipShowsPart(model, clip, b));
   return out.length ? out : null;
 }
 
@@ -166,7 +166,7 @@ export class ActorAnimator {
   declare model: any;
   declare rotationBase: number;
   declare vm: ActionVM;
-  constructor(model) {
+  constructor(model: { clips: { start_frame: number; }[]; }) {
     this.model = model;
     this.vm = null;                          // active ActionVM, or null while idle
     this._clip = 0;                          // clip index of the active action (drives its motion table)
@@ -233,7 +233,7 @@ export class ActorAnimator {
   // stores (x, -y, -z) with no side test at all. The absolute targets are authored per side
   // in the data, exactly as the op3 effect and op6 projectile coordinates are — claim
   // fight-world-effect-coordinates-are-not-mirrored-per-side-2026-08-18.
-  _onMove(rec) {
+  _onMove(rec: { tween: number; }) {
     const h = this.homeSlot;
     if (!h) return;
     // FIGHTSTG_F0x8008b7f4's movement arms, ported: mode 3 (arena-absolute, "to"), mode 7
@@ -255,17 +255,17 @@ export class ActorAnimator {
       owner: this,
       getY: () => m.cur[1], getZ: () => m.cur[2],
     // A motion object owns the slot outright — cancel any mode-3 tween still running into it.
-      setY: (v) => { m.cur[1] = v; m.target = null; },
-      setZ: (v) => { m.cur[2] = v; m.target = null; },
+      setY: (v: number) => { m.cur[1] = v; m.target = null; },
+      setZ: (v: number) => { m.cur[2] = v; m.target = null; },
     };
   }
 
-  _stepMove(speed) {
+  _stepMove(speed: number) {
     const m = this._move;
     if (!m.target) return;
     m.t += speed;
     const a = Math.min(1, m.t / m.ticks);
-    m.cur = m.from.map((v, i) => v + (m.target[i] - v) * a);
+    m.cur = m.from.map((v: number, i: string | number) => v + (m.target[i] - v) * a);
     if (a >= 1) { m.cur = m.target; m.target = null; }
   }
 
@@ -314,7 +314,7 @@ export class ActorAnimator {
   // Carries the OUTGOING table's current frame into the new player so a leading aux=0xffff ease-in
   // blends from the previous pose instead of snapping at the boundary (see TimelinePlayer ctor). On
   // the first bind there's no outgoing player (vm.player null) -> no carry, which is correct.
-  _playerForTable(i) {
+  _playerForTable(i: number | undefined) {
     this._timelineTable = i | 0;
     const tl = this.model?.timeline;
     // Carry the outgoing pose: an op2 rebind eases from the previous table's frame; the FIRST table of
@@ -330,7 +330,7 @@ export class ActorAnimator {
   // The ordered list of timeline tables a clip plays, read straight from its action script's op2
   // play-table records (op2[mode=0, slot, table>0]) in script order. DISC-faithful, per-model.
   // Used to SEED the slot with the clip's first table; the VM rebinds the rest as it executes.
-  _clipTableSeq(clip) {
+  _clipTableSeq(clip: string | number) {
     return clipTableSeq(this.model, clip);
   }
 
@@ -383,7 +383,7 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip, hooks: FightActionHooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+  setAction(clip: number | null, hooks: FightActionHooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
     // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js);
     // a heal/support technique or an item use (target "self") gets the calm self-cast build instead of an attack body
     const script = (clip != null) ? resolveClipScript(this.model, clip, { element, target, hits, planted, tech }) : null;
@@ -398,12 +398,12 @@ export class ActorAnimator {
       this._holdFinalPose = !!holdFinalPose;
       const h2 = {
         ...hooks,
-        onMove: (rec) => { this._onMove(rec); hooks.onMove?.(rec); },
+        onMove: (rec: { tween: number; }) => { this._onMove(rec); hooks.onMove?.(rec); },
         onRotate: (rec) => {
           this._rotation = [rec.x, rec.y, rec.z];
           hooks.onRotate?.(rec);
         },
-        onMotion: (motion) => {
+        onMotion: (motion: number) => {
         // op4 motion 0 is the authored return-to-base command at the end of attacks/techs.
         // Bind the BASE table immediately instead of leaving the prior table visible — base, not
         // table 0, so a badly hurt fighter returns to its low-HP stance (see baseTable).
@@ -412,7 +412,7 @@ export class ActorAnimator {
         },
       };
       this.vm = new ActionVM(script, {
-        timelineForTable: (i) => this._playerForTable(i), hooks: this._standsOnOtherSide() ? mirrorHooks(h2) : h2, currentEffect, currentMotion,
+        timelineForTable: (i: number | undefined) => this._playerForTable(i), hooks: this._standsOnOtherSide() ? mirrorHooks(h2) : h2, currentEffect, currentMotion,
         baseTable: () => this.baseTable | 0,
         slot: this._slotAdapter(),
       });
@@ -436,12 +436,12 @@ export class ActorAnimator {
     this._hidden = null;
     const h2 = {
       ...hooks,
-      onMove: (rec) => { this._onMove(rec); hooks.onMove?.(rec); },
+      onMove: (rec: { tween: number; }) => { this._onMove(rec); hooks.onMove?.(rec); },
       onRotate: (rec) => {
         this._rotation = [rec.x, rec.y, rec.z];
         hooks.onRotate?.(rec);
       },
-      onMotion: (motion) => {
+      onMotion: (motion: number) => {
       // Some presentation actors receive their action stream externally, so
       // there is no model-local op2 table bind.  Preserve the verified op4
       // timing by binding its extracted motion table only when op4 executes.
@@ -451,7 +451,7 @@ export class ActorAnimator {
       },
     };
     this.vm = new ActionVM(script, {
-      timelineForTable: (i) => this._playerForTable(i), hooks: h2, currentEffect,
+      timelineForTable: (i: number | undefined) => this._playerForTable(i), hooks: h2, currentEffect,
       baseTable: () => this.baseTable | 0,
       slot: this._slotAdapter(),
     });
@@ -467,7 +467,7 @@ export class ActorAnimator {
   // `motion` overrides the record's motion (item 84's rand_u16()%7 roll is resolved by the
   // caller, which owns the RNG and the element draw it shares). No record -> false, so the
   // caller keeps the default-arm clip-10 entry.
-  setAnimByThrowItem(itemId, hooks = {}, { branch = null, motion = undefined } = {}) {
+  setAnimByThrowItem(itemId: number, hooks = {}, { branch = null, motion = undefined } = {}) {
     const rec = throwItemEffect(itemId);
     if (!rec) return false;
     const effect = (branch != null && rec.effect_branch && rec.effect_branch[branch] != null)
@@ -481,7 +481,7 @@ export class ActorAnimator {
   // effect", resolved by op3's 9999 sentinel). Both come from the extracted tech table;
   // techEffectType applies the F0x8008ee84 fallback (a zero +0x0e on a clip-5 basic plays
   // the fixed 0x2e effect).
-  setAnimByTech(techId, hooks = {}) {
+  setAnimByTech(techId: number | null, hooks = {}) {
     const rec = techRecord(techId);
     // The technique's own hit count: the record's +0x0A dispatch byte over the SKILLS row, which is the
     // row that carries `hits` (digimon.json "skills"). Feeding the extracted table row alone read its
@@ -509,7 +509,7 @@ export class ActorAnimator {
   // clip 10's op3 9999 spawn resolves (pro/fightstg.s .L0x8008d8c0). Both come from the
   // extracted item-use table; an item with no record leaves the effect unset (no write), as
   // the original leaves the fresh actor's field alone.
-  setAnimByItem(itemId, hooks = {}) {
+  setAnimByItem(itemId: number, hooks = {}) {
     const rec = itemUseEffect(itemId);
     return this.setAction(ITEM_USE_CLIP, hooks, { currentEffect: rec?.effect ?? null, target: itemTargetClass(itemId) });
   }
@@ -580,7 +580,7 @@ export class ActorAnimator {
   // Returns the (possibly fractional) frame delta this tick produced, for the snap test. An authored
   // blend entry — this.blend set by the player/idle/handoff — is never touched: the disc already has
   // an ease there, and the mode's whole point is to add dobbing where the disc has none.
-  _smoothTick(pf, d) {
+  _smoothTick(pf: number | null, d: number) {
     if (this.blend) { this._hold = null; this._cut = null; return d; }
     // 1. A held pose: a run of entries naming the same frame. Spread the move to the next distinct
     //    frame evenly across the run, so the pose never stands still and then jumps.

@@ -10,18 +10,18 @@ import type { BiomeLakeTerrain, GroundDetailOpts, LODLevel, SpeciesLODOpts, Toon
 
 const { lakeH, lakeD, polar, vnoise, LAKE_C } = L;
 const PS = "Poly Haven (decimated, 1K albedo)", CC0 = "CC0 1.0", OWN = "Procedural (our code)", EZ = "EZ-Tree by Daniel Greenheck (generated live)";
-const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const T = (id) => loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
-let _gt = null;
+const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const T = (id: string) => loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
+let _gt: Promise<unknown[]> | null = null;
 const groundTex = () => _gt || (_gt = Promise.all(["grass_ground", "aerial_grass_rock", "brown_mud_leaves_01", "rocky_terrain", "brown_mud_02", "river_small_rocks"].map(T)));
-const groundMat = async (o) => { const t = await groundTex(); return L.lakeGround(t.slice(0, 4), t[4], t[5], o); };
+const groundMat = async (o: GroundDetailOpts | undefined) => { const t = await groundTex(); return L.lakeGround(t.slice(0, 4), t[4], t[5], o); };
 const part = (parts) => partsGroup(parts);
 const TH0 = Math.PI / 2;                                                    // the near bank (+z), open pebble beach + pier
-const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; };
-const beachMask = (th, e = 0) => 1 - Math.exp(-((angDiff(th, TH0) / 0.34) ** 2)) * (1 - sstep(6, 11, e));   // 0 on the open beach (near the water), 1 elsewhere
+const angDiff = (a: number, b: number) => { let d = a - b; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; };
+const beachMask = (th: number, e = 0) => 1 - Math.exp(-((angDiff(th, TH0) / 0.34) ** 2)) * (1 - sstep(6, 11, e));   // 0 on the open beach (near the water), 1 elsewhere
 
 // ------------------------------------------------------------------ terrain tiles + water (real world coordinates, so the shore law of the shaders applies)
-function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => number, hf = lakeH) {
+function tile(mat, x0: number, x1: number, z0: number, z1: number, cell: number, extra?: (x: number, z: number) => number, hf = lakeH) {
   const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, Math.max(2, Math.round(w / cell)), Math.max(2, Math.round(d / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.attributes.position;
@@ -29,12 +29,12 @@ function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => numbe
   g.computeVertexNormals(); g.computeBoundingBox();
   const m = new THREE.Mesh(g, mat); m.name = "ground"; return m;
 }
-function waterPlane(x0, x1, z0, z1, cell) {
+function waterPlane(x0: number, x1: number, z0: number, z1: number, cell: number) {
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.max(1, Math.round((x1 - x0) / cell)), Math.max(1, Math.round((z1 - z0) / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const m = new THREE.Mesh(g, L.lakeWaterMaterial()); m.renderOrder = 5; m.frustumCulled = false; m.name = "lake water"; return m;
 }
-async function shoreTile(x0, x1, z0, z1, cell, water = true) {
+async function shoreTile(x0: number, x1: number, z0: number, z1: number, cell: number, water = true) {
   const grp = new THREE.Group(); grp.add(tile(await groundMat({}), x0, x1, z0, z1, cell)); if (water) grp.add(waterPlane(x0, x1, z0, z1, cell * 1.5)); return grp;
 }
 const ZS = polar(TH0, 0)[1];                                                // z of the shore at x = 0
@@ -45,18 +45,18 @@ async function bankDisc(o: { mud?: any; peb?: any; g?: GroundDetailOpts; water?:
   return grp;
 }
 // ------------------------------------------------------------------ small display fields for the grid
-function fld(parts, n, rad, sc, seed, base = 0x5c6b3e, y = 0.04) {
+function fld(parts, n: number, rad: number, sc: number[], seed: number, base = 0x5c6b3e, y = 0.04) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16), b = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.05, rad * 1.05, 0.05, 44), toonMat({ color: base }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
   for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, y, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
 function waterBlock(rad = 1.3) { const b = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 1.0, 56), toonMat({ color: 0x3b8f9c }, { shadeK: 0.85, rim: 0 })); b.position.y = -0.47; return b; }
-function floatField(parts, n, rad, sc, seed) {
+function floatField(parts, n: number, rad: number, sc: number[], seed: number) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16); g.add(waterBlock(rad + 0.1));
   for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad * 0.85; composeTRS(m, i, Math.cos(a) * d, 0.03, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
   g.add(instancedParts(parts, m, n)); return g;
 }
-const mossy = (parts, m) => { for (const x of parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = (x.mat.userData.tag || "") + "moss"; } return parts; };
+const mossy = (parts, m: number) => { for (const x of parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = (x.mat.userData.tag || "") + "moss"; } return parts; };
 /** rock / log / stump sunk into a water block with the waterline look (object-space level in the grid) */
 async function sunk(res, frac = 0.3, moss = 0.8, extra?: (g: any) => void) {
   const h = res.height ?? 1; mossy(res.parts, moss); L.waterlineify(res.parts, { mode: "object", level: frac * h });
@@ -67,13 +67,13 @@ async function sunk(res, frac = 0.3, moss = 0.8, extra?: (g: any) => void) {
 const cat = { water: "Lake water", shore: "Shore: mud, pebbles, wet bank", terr: "Lake terrain", reeds: "Reeds, cattails, rushes, sedges", marsh: "Marsh grass and meadow flowers", edge: "Water iris, horsetail, loosestrife",
   ferns: "Ferns and bank plants", lily: "Water lilies, lotus, floating mats", sub: "Submerged plants", willow: "Willow (weeping)", trees: "Alder, birch and bank trees", over: "Overhanging branches",
   logs: "Fallen logs, stumps, roots", rocks: "Rocks (half-submerged, moss)", steps: "Stepping stones", peb: "Pebbles", pier: "Pier", air: "Mist, light motes, sky" };
-const lp = (id, c, name, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/lakeproc.js", ...extra });
-const tex = (ids, c) => ids.map(([id, n]) => texDisc(id, c, n));
-const phw = (id, c, name, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "phw_" + id, cat: c, name, source: PS + " + our waterline shader", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false,
+const lp = (id: string, c: string, name: string, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/lakeproc.js", ...extra });
+const tex = (ids, c: string) => ids.map(([id, n]) => texDisc(id, c, n));
+const phw = (id: string, c: string, name: string, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "phw_" + id, cat: c, name, source: PS + " + our waterline shader", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false,
   make: async () => sunk(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.frac ?? 0.3, o.moss ?? 0.8) });
-const qw = (id, c, name, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "qw_" + id, cat: c, name, source: "Quaternius Stylized Nature MegaKit (Standard) + our waterline shader", licence: CC0, url: "https://quaternius.com/packs/stylizednaturemegakit.html", noSpin: false,
+const qw = (id: string, c: string, name: string, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "qw_" + id, cat: c, name, source: "Quaternius Stylized Nature MegaKit (Standard) + our waterline shader", licence: CC0, url: "https://quaternius.com/packs/stylizednaturemegakit.html", noSpin: false,
   make: async () => sunk(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.frac ?? 0.3, o.moss ?? 0.9) });
-const ez = (id, c, name, preset, seed, over, h) => ({ id: "ez_" + id, cat: c, name, source: EZ, licence: "MIT", url: "https://github.com/dgreenheck/ez-tree", noSpin: false, make: async () => part(ezTreeParts(preset, seed, over, h)) });
+const ez = (id: string, c: string, name: string, preset: string, seed: number, over: { bark: { type: string; tint: number; } | { type: string; tint: number; }; leaves: { type: string; tint: number; count: number; size: number; } | { type: string; tint: number; count: number; size: number; }; }, h: number) => ({ id: "ez_" + id, cat: c, name, source: EZ, licence: "MIT", url: "https://github.com/dgreenheck/ez-tree", noSpin: false, make: async () => part(ezTreeParts(preset, seed, over, h)) });
 const BIRCH = { bark: { type: "birch", tint: 0xffffff }, leaves: { type: "aspen", tint: 0xb9d96a, count: 5, size: 2.0 } };
 const ALDER = { bark: { type: "oak", tint: 0x8a7868 }, leaves: { type: "ash", tint: 0x4f8a3c, count: 5, size: 2.4 } };
 
@@ -183,7 +183,7 @@ const rawEntries = [
 ];
 export const entries = rawEntries.map((e) => ({ ...e, id: "l_" + e.id }));
 
-function subField(parts, n, rad, sc, seed) {
+function subField(parts, n: number, rad: number, sc: number[], seed: number) {
   const g = new THREE.Group(), r = rng(seed), m = new Float32Array(n * 16);
   const bed = new THREE.Mesh(new THREE.CylinderGeometry(rad * 1.2, rad * 1.2, 0.08, 44), toonMat({ color: 0x6b5d45 }, { shadeK: 0.8, rim: 0 })); bed.position.y = 0.04; g.add(bed);
   for (let i = 0; i < n; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * rad; composeTRS(m, i, Math.cos(a) * d, 0.08, Math.sin(a) * d, r() * 6.28, sc[0] + (sc[1] - sc[0]) * r()); }
@@ -207,7 +207,7 @@ function hillsRing() {
 
 // ------------------------------------------------------------------ the assembled lake
 const HALF = 112;
-function dartPolar(n, seed, minD, eRange, ok) {
+function dartPolar(n: number, seed: number, minD: number, eRange: number[], ok) {
   const r = rng(seed), cell = minD, grid = new Map(), out = []; let tries = 0;
   while (out.length < n && tries++ < n * 60) {
     const th = r() * 6.2832, e = eRange[0] + (eRange[1] - eRange[0]) * r(), [x, z] = polar(th, e); if (ok && !ok(x, z, e, th, r)) continue;
@@ -219,9 +219,9 @@ function dartPolar(n, seed, minD, eRange, ok) {
 }
 export async function buildLake(ctx) {
   const { renderer, scene, tune = {} } = ctx;
-  const root = new THREE.Group(), lods = [], cull = new CullSet(), info = { species: [], impostors: 0 };
-  const note = (name, n, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a, p) => a + tris(p.geo), 0) : 0 });
-  const N = (n) => Math.round(n * (tune.density ?? 1));
+  const root = new THREE.Group(), lods: LODSpecies[] = [], cull = new CullSet(), info = { species: [], impostors: 0 };
+  const note = (name: string, n: number, parts) => info.species.push({ name, n, tris: parts ? parts.reduce((a: number, p: { geo: { index: { count: number; }; attributes: { position: { count: number; }; }; }; }) => a + tris(p.geo), 0) : 0 });
+  const N = (n: number) => Math.round(n * (tune.density ?? 1));
   const refl = (obj) => obj.traverse((o) => o.layers.enable(1));
   if (scene && scene.userData.sky) scene.userData.sky.layers.enable(1);
   const reflector = new L.LakeReflector(renderer);
@@ -229,8 +229,8 @@ export async function buildLake(ctx) {
   // ---- ground: fine near tile, coarse far tile, coarse mirror tiles (layer 1 only) + water with the mirror pass in onBeforeRender
   const gmat = await groundMat({});
   const near = tile(gmat, -HALF, HALF, -122, 114, 1.5); near.name = "ground near"; root.add(near);
-  const farX = (x, z) => Math.max(0, 1 - sstep(HALF - 8, HALF + 24, Math.max(Math.abs(x), Math.abs(z + 4) * 0.96)));
-  const farH = (x, z) => lakeH(x, z) + sstep(130, 420, Math.hypot(x, z + 26)) * (24 * vnoise(x, z, 0.0045, 7) + 14 * vnoise(x, z, 0.011, 8)) - 0.9 * farX(x, z);
+  const farX = (x: number, z: number) => Math.max(0, 1 - sstep(HALF - 8, HALF + 24, Math.max(Math.abs(x), Math.abs(z + 4) * 0.96)));
+  const farH = (x: number, z: number) => lakeH(x, z) + sstep(130, 420, Math.hypot(x, z + 26)) * (24 * vnoise(x, z, 0.0045, 7) + 14 * vnoise(x, z, 0.011, 8)) - 0.9 * farX(x, z);
   const far = tile(gmat, -560, 560, -560, 560, 28, null, farH); far.name = "ground far"; root.add(far);
   note("ground near (fine 224x236 m, 1.5 m cells)", 1, [{ geo: near.geometry }]); note("ground far (coarse hills)", 1, [{ geo: far.geometry }]);
   const mirror = tile(gmat, -HALF, HALF, -122, 114, 4, null, (x, z) => Math.max(0, lakeH(x, z))); mirror.layers.set(1); mirror.name = "ground mirror"; root.add(mirror);
@@ -240,8 +240,8 @@ export async function buildLake(ctx) {
   root.add(water); note("lake water (toon bands, caustics, ripples, foam, sparkle, mirror pass 384x288)", 1, [{ geo: water.geometry }]);
 
   // ---- scatter helper on polar coordinates around the lake: e metres inland of the shore (negative = in the water)
-  const patch = (x, z, s = 4, f = 0.06) => Math.pow(vnoise(x, z, f, s), 2.0) * 1.9;
-  function lscatter(n, seed, o) {
+  const patch = (x: number, z: number, s = 4, f = 0.06) => Math.pow(vnoise(x, z, f, s), 2.0) * 1.9;
+  function lscatter(n: number, seed: number, o) {
     const r = rng(seed), out = new Float32Array(n * 16), sc = o.scale || [0.9, 1.2]; let i = 0, tries = 0;
     while (i < n && tries++ < n * 90) {
       const th = r() * 6.2832, e = o.e[0] + (o.e[1] - o.e[0]) * Math.pow(r(), o.skew || 1), [x, z] = polar(th, e);
@@ -252,7 +252,7 @@ export async function buildLake(ctx) {
     }
     return { mats: out.subarray(0, i * 16), count: i };
   }
-  const add = (name, parts, n, o) => {
+  const add = (name, parts, n: number, o) => {
     const s = lscatter(n, name.length * 31 + n, o);
     const g = o.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name);
     g.name = name; root.add(g); note(name, s.count, parts); if (o.refl) refl(g);
@@ -260,8 +260,8 @@ export async function buildLake(ctx) {
     return s;
   };
   const FD = [34, 60], FDS = [70, 100];
-  const Lq = (id, t) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
-  const H = (id, t) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
+  const Lq = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}quaternius/${id}.glb`, { fade: FD, ...t });
+  const H = (id: string, t: ToonLoadOpts | undefined) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
   const wl = (res, frac = 0, moss = 0.8) => { mossy(res.parts, moss); L.waterlineify(res.parts); return res; };
 
   // ---- emergent plants (reeds, cattails, bulrush, rushes, sedges): water side to bank
@@ -311,7 +311,7 @@ export async function buildLake(ctx) {
   await add("pondweed", L.pondweedParts(1), N(150), { e: [-8, -1.2], prob: (x, z) => patch(x, z, 39, 0.07), scale: [0.9, 1.4], beach: 1 });
 
   // ---- rocks (half-submerged, moss, waterline), logs, stumps, roots, pebbles
-  const rock = async (name, res, n, e, sc, refl_) => add(name, wl(res).parts, N(n), { e, prob: (x, z) => 0.1 + 0.9 * patch(x, z, name.length + 40, 0.04), scale: sc, y: -0.12, beach: 1, refl: refl_ });
+  const rock = async (name, res, n: number, e: number[], sc: number[], refl_: boolean) => add(name, wl(res).parts, N(n), { e, prob: (x, z) => 0.1 + 0.9 * patch(x, z, name.length + 40, 0.04), scale: sc, y: -0.12, beach: 1, refl: refl_ });
   await rock("boulder_01", await H("boulder_01", { grade: true, fade: [90, 130] }), 2, [-1.5, 3], [0.9, 1.4], true);   // 54k tris asset (from the forest set): two only
   await rock("rock_07", await H("rock_07", { grade: true, fade: FDS }), 8, [-1.5, 4], [0.8, 1.5], true);
   await rock("rock_09", await H("rock_09", { grade: true, fade: FDS }), 8, [-1.5, 4], [0.8, 1.5], true);
@@ -321,7 +321,7 @@ export async function buildLake(ctx) {
   for (const id of ["02", "03", "04"]) await rock("namaqualand_boulder_" + id, await H("namaqualand_boulder_" + id, { grade: true, fade: [90, 130] }), 6, [-1.8, 3], [0.9, 1.7], true);
   await rock("namaqualand_stones_01", await H("namaqualand_stones_01", { grade: true, fade: FDS }), 18, [-2, 2.5], [0.9, 1.6], false);
   for (let i = 1; i <= 3; i++) await rock("Rock_Medium_" + i, await loadToon(`${ASSETS}quaternius/Rock_Medium_${i}.glb`, { fade: [90, 130] }), 8, [-1.5, 5], [0.5, 1.1], true);
-  const log = async (name, res, n, sc) => add(name, wl(res, 0, 0.8).parts, N(n), { e: [-2.6, 0.6], prob: (x, z) => 0.2 + 0.8 * patch(x, z, name.length + 50, 0.05), scale: sc, y: -0.08, tilt: 0.04, beach: 0.7, refl: true });
+  const log = async (name, res, n: number, sc: number[]) => add(name, wl(res, 0, 0.8).parts, N(n), { e: [-2.6, 0.6], prob: (x, z) => 0.2 + 0.8 * patch(x, z, name.length + 50, 0.05), scale: sc, y: -0.08, tilt: 0.04, beach: 0.7, refl: true });
   await log("fallen log A (Poly Haven)", await H("dead_tree_trunk", { grade: true, fade: [90, 130] }), 3, [0.9, 1.4]);
   await log("fallen log B (Poly Haven)", await H("dead_tree_trunk_02", { grade: true, fade: [90, 130] }), 3, [0.9, 1.4]);
   for (let s = 1; s <= 3; s++) { const parts = L.logParts(s); L.waterlineify(parts); for (const p of parts) p.mat.userData.toon.fade = [90, 130]; await add("fallen log " + "ABC"[s - 1] + " (procedural)", parts, N(2), { e: [-2.4, 0.4], scale: [0.9, 1.4], y: 0.12, beach: 0.7, refl: true }); }
@@ -331,7 +331,7 @@ export async function buildLake(ctx) {
   await add("root_cluster_02", (await H("root_cluster_02", { grade: true })).parts, N(10), { e: [0, 4], scale: [0.9, 1.5], y: -0.05 });
   await add("single_root", (await H("single_root", { grade: true })).parts, N(16), { e: [0, 5], scale: [0.9, 1.5], y: -0.03 });
   await add("dry branches", (await H("dry_branches_medium_01", { grade: true })).parts, N(24), { e: [0.2, 12], prob: (x, z) => patch(x, z, 62, 0.05), scale: [0.7, 1.3] });
-  const pebZone = (x, z, e) => (e > -1.2 && e < 6 ? (0.25 + 0.75 * patch(x, z, 63, 0.06)) * (0.45 + 0.55 * sstep(-0.5, 0.5, e) * (1 - sstep(2.5, 6, e))) : 0);
+  const pebZone = (x, z, e: number) => (e > -1.2 && e < 6 ? (0.25 + 0.75 * patch(x, z, 63, 0.06)) * (0.45 + 0.55 * sstep(-0.5, 0.5, e) * (1 - sstep(2.5, 6, e))) : 0);
   for (const id of ["Pebble_Round_1", "Pebble_Round_3", "Pebble_Square_1", "Pebble_Square_4"]) await add(id, wl(await Lq(id, { h: 0.1, tint: [1.3, 1.25, 1.15], fade: [26, 46] })).parts, N(330), { e: [-1.2, 6], prob: pebZone, scale: [0.6, 1.6], y: 0.0, beach: 1 });
 
   // ---- stepping stones across the shallows at the beach (hand placed along a wavering line) + pier
@@ -358,12 +358,12 @@ export async function buildLake(ctx) {
     const rs = new LODSpecies(name + " (mirror)", [{ impostor: imp.factory }], mats, pos.length, [0]); rs.group.traverse((x) => x.layers.set(1)); rs.update({ position: new THREE.Vector3(0, 0, 0) }, true); root.add(rs.group);
   };
   const hero = [[TH0 + 0.62, 2.6, 1, 1.35], [TH0 - 0.7, 3.4, 2, 1.2], [TH0 + 1.35, 3.0, 1, 1.4]].map(([th, e, s, sc]) => [...polar(th, e), th, e, sc]);
-  const okTree = (x, z, e, th) => beachMask(th) > 0.35 && vnoise(x, z, 0.03, 1) > 0.12;
-  const willowPos = [...hero, ...dartPolar(N(5), 91, 12, [1.5, 8], (x, z, e, th) => beachMask(th) > 0.6 && !hero.some((h) => Math.hypot(h[0] - x, h[1] - z) < 14))];
+  const okTree = (x: number, z: number, e: number, th: number) => beachMask(th) > 0.35 && vnoise(x, z, 0.03, 1) > 0.12;
+  const willowPos = [...hero, ...dartPolar(N(5), 91, 12, [1.5, 8], (x: number, z: number, e, th: number) => beachMask(th) > 0.6 && !hero.some((h) => Math.hypot(h[0] - x, h[1] - z) < 14))];
   species("willow A", L.willowParts(1, 0), L.willowParts(1, 1), willowPos.filter((_, i) => i % 2 === 0), { scale: [1.0, 1.4], d0: 24, d1: 70 });
   species("willow B", L.willowParts(2, 0), L.willowParts(2, 1), willowPos.filter((_, i) => i % 2 === 1), { scale: [1.0, 1.4], d0: 24, d1: 70 });
-  const treePos = dartPolar(N(150), 21, 5.6, [4, 90], (x, z, e, th) => okTree(x, z, e, th) && !willowPos.some((h) => Math.hypot(h[0] - x, h[1] - z) < 9) && (e < 24 || vnoise(x, z, 0.05, 3) > 0.22) && Math.hypot(x - 0, z - 26) > 6);
-  const bucket = (k, m) => treePos.filter((_, i) => i % m === k);
+  const treePos = dartPolar(N(150), 21, 5.6, [4, 90], (x: number, z: number, e: number, th) => okTree(x, z, e, th) && !willowPos.some((h) => Math.hypot(h[0] - x, h[1] - z) < 9) && (e < 24 || vnoise(x, z, 0.05, 3) > 0.22) && Math.hypot(x - 0, z - 26) > 6);
+  const bucket = (k: number, m: number) => treePos.filter((_, i) => i % m === k);
   species("birch A", ezTreeParts("Aspen Medium", 3, BIRCH, 10), null, bucket(0, 5), { d1: 45 });
   species("birch B", ezTreeParts("Aspen Medium", 11, BIRCH, 8.5), null, bucket(1, 5), { d1: 45 });
   species("alder A", ezTreeParts("Ash Medium", 5, ALDER, 9), null, bucket(2, 5), { d1: 45 });
@@ -375,13 +375,13 @@ export async function buildLake(ctx) {
   }
   // leaning bank trees with a branch out over the water (z+ points to the lake)
   {
-    const pos = dartPolar(N(13), 301, 11, [0.6, 2.2], (x, z, e, th) => beachMask(th) > 0.7), ov = [L.overhangParts(1), L.overhangParts(2), L.overhangParts(3)];
+    const pos = dartPolar(N(13), 301, 11, [0.6, 2.2], (x, z, e, th: number) => beachMask(th) > 0.7), ov = [L.overhangParts(1), L.overhangParts(2), L.overhangParts(3)];
     for (const [k, parts] of ov.entries()) {
       const mine = pos.filter((_, i) => i % 3 === k); if (!mine.length) continue; const m = new Float32Array(mine.length * 16), r = rng(310 + k);
       mine.forEach(([x, z, th], j) => { const sc = 1.0 + 0.5 * r(), yaw = Math.atan2(-Math.cos(th), -Math.sin(th)); composeTRS(m, j, x, lakeH(x, z) - 0.1, z, yaw + (r() - 0.5) * 0.3, sc, 0, 0); });
       const g = cull.add(parts, m, mine.length, "overhanging branch " + (k + 1), 24); root.add(g); refl(g); note("leaning tree + branch over water " + (k + 1), mine.length, parts);
     }
-    const t = { grade: true, wind: 0.3, flutter: 0.6, trans: 0.3 }, dp = dartPolar(N(12), 311, 10, [6, 40], (x, z, e, th) => beachMask(th) > 0.5 && e > 4);
+    const t = { grade: true, wind: 0.3, flutter: 0.6, trans: 0.3 }, dp = dartPolar(N(12), 311, 10, [6, 40], (x, z, e: number, th: number) => beachMask(th) > 0.5 && e > 4);
     if (dp.length) { const res = await loadToon(`${ASSETS}polyhaven/tree_small_02.glb`, t); species("tree_small_02", res.parts, null, dp, { scale: [1.2, 2.0], d1: 40 }); }
   }
 
@@ -391,7 +391,7 @@ export async function buildLake(ctx) {
 
   return {
     root, info, cull, reflector,
-    update(camera, frame) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
+    update(camera, frame: number) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
     lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 } as BiomeLakeTerrain; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; t.reflMs = +reflector.ms.toFixed(2); return t; },
   };
 }

@@ -17,7 +17,7 @@ export function makeUpdate(B: BattleContext) {
    * scales that dt here -- and only here -- so a battle at x2 really is two
    * battle-frames per frame while the field and cutscenes keep the game's own dt.
    */
-  function update(dt) {
+  function update(dt: number) {
     if (battleSpeedOn(window.__fx)) dt = battleDelta(dt, window.__fx.battleSpeed);
     if (!B.battle) return;
     const b = B.battle;

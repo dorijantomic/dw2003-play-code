@@ -45,7 +45,7 @@ const PACK_NAMES = {
     [BATTLE_MESSAGE_PROMPT_PACK]: "cmfont",
 };
 
-export function battleMsgPackName(handle) {
+export function battleMsgPackName(handle: number) {
     return PACK_NAMES[handle >>> 0] ?? null;
 }
 
@@ -76,7 +76,7 @@ const loadedBanks = Object.create(null);
 
 function bankTable(data) {
     const table = Object.create(null);
-    (data?.strings ?? []).forEach((text, index) => { table[index] = String(text); });
+    (data?.strings ?? []).forEach((text, index: string | number) => { table[index] = String(text); });
     return Object.freeze(table);
 }
 
@@ -103,14 +103,14 @@ export function battleMsgSetBank(table, bank = BATTLE_MESSAGE_BANK) {
 }
 
 /** The bank lookup the ports call. Unknown banks and indices read as the empty string. */
-export function battleMsgText(bank, index) {
+export function battleMsgText(bank: number, index: number | undefined) {
     const table = loadedBanks[bank | 0];
     if (!table) return "";
     return table[index | 0] ?? "";
 }
 
 /** The item-name bank's string for an ItemId, the way kind 14's slot 1 is filled. */
-export function battleMsgItemName(itemId) {
+export function battleMsgItemName(itemId: number) {
     return battleMsgText(BATTLE_MESSAGE_BANK_FIELD, itemId | 0);
 }
 
@@ -124,16 +124,16 @@ for (const bank of Object.keys(BANK_FILES)) {
 /** The widget-method calls a session records, in the original's order. */
 function methodHost(log) {
     return {
-        createTextElement(target, kind, x, y) {
+        createTextElement(target: number, kind: number, x: number, y: number) {
             log.push(["create", target | 0, kind | 0, x | 0, y | 0]);
             return 0x80180000 + ((x + y) % 16) * 0x100;
         },
-        bankGet(bank) { log.push(["bank", bank | 0]); return bank | 0; },
-        callMethod(element, slot, args) {
-            log.push(["method", element | 0, slot, ...args.map((a) => a | 0)]);
+        bankGet(bank: number) { log.push(["bank", bank | 0]); return bank | 0; },
+        callMethod(element: number, slot, args: number[]) {
+            log.push(["method", element | 0, slot, ...args.map((a: number) => a | 0)]);
         },
-        packResolve(handle) { log.push(["pack", handle >>> 0]); return handle >>> 0; },
-        drawSprite(pack, cel, frame, x, y) {
+        packResolve(handle: number) { log.push(["pack", handle >>> 0]); return handle >>> 0; },
+        drawSprite(pack: number, cel: number, frame: number, x: number, y: number) {
             log.push(["sprite", pack >>> 0, cel | 0, frame | 0, x | 0, y | 0]);
         },
     };
@@ -201,7 +201,7 @@ export function battleMsgGeometry() {
  * has let through, and the blinking prompt. `nativeText` is web/battle.js's own text
  * helper, passed in so this file does not import the battle renderer.
  */
-export function battleMsgPaint(ctx, frame, nativeText, packs) {
+export function battleMsgPaint(ctx: CanvasRenderingContext2D | undefined, frame, nativeText, packs) {
     const panel = packs?.[battleMsgPackName(BATTLE_MESSAGE_PANEL_PACK)];
     if (panel && packReady(panel)) {
         drawClip(ctx, panel, String(frame.panel.cel), frame.panel.x, frame.panel.y);
@@ -211,7 +211,7 @@ export function battleMsgPaint(ctx, frame, nativeText, packs) {
         ctx.fillStyle = "rgba(0,4,45,0.94)";
         ctx.fillRect(frame.panel.x, frame.panel.y, frame.panel.w, frame.panel.h);
     }
-    frame.lines.forEach((text, i) => {
+    frame.lines.forEach((text, i: number) => {
         if (!text) return;
         const at = i === 0 ? BATTLE_MESSAGE_LINE1 : BATTLE_MESSAGE_LINE2;
         nativeText(text, at.x, at.y, { kind: BATTLE_MESSAGE_FONT_KIND });

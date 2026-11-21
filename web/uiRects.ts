@@ -12,7 +12,7 @@
 // Generic system window (menus, shop, item list, Yes/No choice prompt) — sampled from
 // the "Download your partner Digimon now?" screenshot: near-black navy fill, thin
 // blue-violet border line, full-width bottom-anchored in its original context.
-export function drawWindow(ctx, img, _rects, x, y, w, h) {
+export function drawWindow(ctx: CanvasRenderingContext2D, img, _rects, x: number, y: number, w: number, h: number) {
   ctx.save();
 
   ctx.fillStyle = "rgb(0, 0, 32)";
@@ -42,7 +42,7 @@ const TALK = {
   chamfer: 10,
 };
 
-function roundedChamferedPath(ctx, x, y, w, h, chamfer) {
+function roundedChamferedPath(ctx, x: number, y: number, w: number, h: number, chamfer: number) {
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.lineTo(x + w, y);
@@ -54,7 +54,7 @@ function roundedChamferedPath(ctx, x, y, w, h, chamfer) {
 
 // x,y,w,h describe the body box; nameW/nameH describe the name tab sitting on top
 // (nameW <= w). Pass nameH=0 to draw a plain chamfered box (used for smaller popups).
-export function drawTalkWindow(ctx, x, y, w, h, nameW = 0, nameH = 0) {
+export function drawTalkWindow(ctx, x: number, y: number, w: number, h: number, nameW = 0, nameH = 0) {
   ctx.save();
 
   // Drop shadow first (offset down+right, solid).
@@ -112,7 +112,7 @@ export function drawTalkWindow(ctx, x, y, w, h, nameW = 0, nameH = 0) {
 
 // The blinking "advance" chevron indicator, bottom-right of a talk box (sampled: solid
 // orange, stacked downward chevrons).
-export function drawAdvanceCursor(ctx, x, y, t = 0) {
+export function drawAdvanceCursor(ctx, x: number, y: number, t = 0) {
   ctx.save();
   ctx.fillStyle = "rgb(230, 140, 20)";
   const bob = Math.sin(t * 6) * 2;

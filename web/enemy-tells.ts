@@ -30,7 +30,7 @@ export function everyNthRows(rows) {
  * `(value - (nextTurnNumber % value)) % value`. `value 0` divides by zero on the
  * disc (the port says never), so it promises no turn at all: null.
  */
-export function turnsUntil(nextTurnNumber, value) {
+export function turnsUntil(nextTurnNumber: number, value: number) {
   const v = Math.trunc(value);
   if (!v) return null;
   return (v - (Math.trunc(nextTurnNumber) % v)) % v;

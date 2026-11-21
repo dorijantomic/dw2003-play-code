@@ -32,6 +32,6 @@ export function bubbleFor(i) {
 
 /** The FIELDCOM program clock from a page clock: 60 frames a second, ten engine ticks a frame (web/fieldcom.js TICKS_PER_FRAME).
  *  Written as ms * 60 / 1000 (not nowMs / (1000 / 60)) so exactly 1000 ms is exactly 60 frames — the division rounds to 59.999… */
-export function bubbleTick(nowMs) {
+export function bubbleTick(nowMs: number) {
     return Math.floor(nowMs * 60 / 1000) * 10;
 }

@@ -225,7 +225,7 @@ const CELL_ORDER = ["hH","fH","lH","handHH","handFH","backH","upH","windup","fli
  * quantile has to be mapped onto those keys — the previous lookup indexed the records with the raw number
  * ("0.9") and silently returned the median every time.
  */
-const quantKey = (quantile) => { const p = Math.round(Number(quantile) * 100); return p === 10 ? "p10" : p === 90 ? "p90" : "p50"; };
+const quantKey = (quantile: number) => { const p = Math.round(Number(quantile) * 100); return p === 10 ? "p10" : p === 90 ? "p90" : "p50"; };
 
 /** A compact class x size cell ([p10,p50,p90] triples) as the same {p10,p50,p90} records. */
 function fullCell(cell) {
@@ -239,7 +239,7 @@ function fullCell(cell) {
  * least `minCell` casts, MERGED over the class record (the cell wins where it has a measure), else the
  * class record alone. Returns null for an unknown class.
  */
-export function motionFor(emitterClass, sizeClass = null, { minCell = 4 } = {}) {
+export function motionFor(emitterClass: string, sizeClass = null, { minCell = 4 } = {}) {
   if (!VALID_CLASSES.has(emitterClass)) return null;
   // An EYE emitter has no spell cast of its own in the corpus (2 throws only): it is a head-front
   // emitter, so the mouth record is its data. Resolve it here so a solver never gets null for a class
@@ -263,7 +263,7 @@ export function releasePoint({ emitterClass, sizeClass = null, bodyHeight, quant
   const H = Number(bodyHeight);
   if (!m || !(H > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, fallback) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   return {
     height: pick(m.hH, 0) * H, forward: pick(m.fH, 0) * H, lateral: pick(m.lH, 0) * H,
     source: m.source, quantile: q, unit: "body",
@@ -281,7 +281,7 @@ export function handPoint({ emitterClass, sizeClass = null, bodyHeight, quantile
   if (!m || !(H > 0)) return null;
   if (m.handHH == null) return { ...releasePoint({ emitterClass, sizeClass, bodyHeight, quantile }), source: (m.source ?? "class") + ":emitter" };
   const q = quantKey(quantile);
-  const pick = (a, fallback) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   return {
     height: pick(m.handHH, 0) * H, forward: pick(m.handFH, 0) * H, lateral: pick(m.handLH, 0) * H,
     source: m.source, quantile: q, unit: "body",
@@ -298,7 +298,7 @@ export function armShape({ emitterClass, sizeClass = null, armLength, quantile =
   const L = Number(armLength);
   if (!m || !(L > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, fallback) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
+  const pick = (a, fallback: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : fallback);
   const Hk = hand ? "handHL" : "hL", Fk = hand ? "handFL" : "fL";
   if (m[Hk] == null || m[Fk] == null) return null;
   return { above: pick(m[Hk], 0) * L, forward: pick(m[Fk], 0) * L, source: m.source, quantile: q };
@@ -313,7 +313,7 @@ export function windupFor({ emitterClass, sizeClass = null, bodyHeight, quantile
   const H = Number(bodyHeight);
   if (!m || !(H > 0)) return null;
   const q = quantKey(quantile);
-  const pick = (a, f) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : f);
+  const pick = (a, f: number) => (a && a[q] != null ? a[q] : a && a.p50 != null ? a.p50 : f);
   return {
     back: pick(m.backH, 0) * H, up: pick(m.upH, 0) * H, travel: pick(m.travelH, 0) * H,
     speed: pick(m.speedH, 0) * H,

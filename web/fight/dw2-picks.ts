@@ -8,8 +8,8 @@
 export const DW2_PICKS_URL = "dw2-motion-picks.json";
 export const PICK_VALUES = ["dw2", "dw3"];
 
-let picks = null;              // folder -> { slot: "dw2"|"dw3" }, null until loaded
-let loading = null;
+let picks: {} | null = null;              // folder -> { slot: "dw2"|"dw3" }, null until loaded
+let loading: Promise<{}> | null = null;
 
 /** Keep only well-formed rows (a hand-edited or old file can never break a fight). */
 export function cleanPicks(raw) {
@@ -55,7 +55,7 @@ export async function ensureDw2Picks() {
 export function setDw2Picks(raw) { picks = cleanPicks(raw); loading = Promise.resolve(picks); }
 
 /** "dw2" | "dw3" | null for one body's clip slot. */
-export function dw2Pick(folder, slot) {
+export function dw2Pick(folder: string | number, slot: number | null) {
   if (!picks || !folder || slot == null) return null;
   return picks[folder]?.[String(slot | 0)] ?? null;
 }

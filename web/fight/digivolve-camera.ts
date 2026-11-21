@@ -40,7 +40,7 @@ import { fieldsFromShot, CAMERA_FRAME_DELTA } from "./battle-camera.js";
  * @param {{preStep:Function, elapsed:Function, update:Function, owns:Function}} cam
  * @param {number} frame   the presentation frame
  */
-export function stepFormChangeFrame(camRec, cam, frame) {
+export function stepFormChangeFrame(camRec, cam, frame: number | undefined) {
   cam.preStep(frame);                                 // work armed before the presentation's f0
   const n = cam.elapsed(frame);                       // presentation frames since the last step
   if (n > 0) camRec.tick(n * CAMERA_FRAME_DELTA);     // 1) the camera task
@@ -60,7 +60,7 @@ export function stepFormChangeFrame(camRec, cam, frame) {
  * @param {() => ({eye:number[],target:number[],H:number,roll?:number}|null)} arena  the enemy view
  * @param {(visible:boolean) => void} setEnemyVisible
  */
-export function skipFormChange(camRec, cam, arena, setEnemyVisible) {
+export function skipFormChange(camRec, cam: { stop: () => void; }, arena, setEnemyVisible: ((visible: boolean) => void) | undefined) {
   cam?.stop();
   const target = arena();
   if (target) camRec.cut(fieldsFromShot(target), { issuer: DV_ISSUER });
@@ -74,7 +74,7 @@ export function skipFormChange(camRec, cam, arena, setEnemyVisible) {
  */
 function makeStepper(first = -1) {
   let stepped = first;
-  return (frame) => {
+  return (frame: number) => {
     const f = frame | 0;
     const n = Math.max(0, f - stepped);
     stepped = Math.max(stepped, f);
@@ -96,7 +96,7 @@ export const DV_ISSUER = "digivolve";
  * `-homePos.z` added to the eye z and the look z. `homeZ` is the partner's home slot z in the
  * same PS1 units as the shot (near side: -(0x1400 + standoff)).
  */
-export function shotNineWithHomeOffset(shot, homeZ) {
+export function shotNineWithHomeOffset(shot, homeZ: number) {
   const fields = fieldsFromShot(shot);
   const z = -(homeZ | 0);
   fields[2] += z;   // vpz
@@ -131,7 +131,7 @@ export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule
   const elapsed = makeStepper((schedule.taskStartFrame ?? 0) - 1);
   const fadeFrame = schedule.fadeFrame ?? schedule.returnFrame + DV_RETURN_FADE_DELAY;
 
-  const cutShotNine = (withOffset) => {
+  const cutShotNine = (withOffset: boolean) => {
     const shot = shotNine();
     if (!shot) return false;
     const fields = withOffset ? shotNineWithHomeOffset(shot, homeZ()) : fieldsFromShot(shot);
@@ -145,9 +145,9 @@ export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule
      * Run every camera event whose frame lies in (previous call, frame]. Events run in the
      * original's order: start, swap, then the return cut followed by the fade.
      */
-    update(frame) {
+    update(frame: number) {
       const f = frame | 0;
-      const due = (at) => last < at && at <= f;
+      const due = (at: number) => last < at && at <= f;
       // The start cut fires on the first call that has a shot 9 to cut to.
       if (!started && f >= schedule.startFrame && cutShotNine(true)) {
         started = true;
@@ -233,7 +233,7 @@ export const REVERT_WEAK_MOTION = 2;
  *   f113, f114 : 255 (4 * 64 = 256 >= 0xFF clamps; the entrance cuts on f114).
  *   f115..177 : 255 - 4 * (f - 114)  (endWhiteFlash(60) on e126; 251 .. 3).   f >= 178 : 0 (KILL).
  */
-export function revertFlashLevel(frame) {
+export function revertFlashLevel(frame: number) {
   const f = Math.floor(frame);
   if (f < 50 || f >= 178) return 0;
   if (f < 113) return 4 * (f - 49);
@@ -254,7 +254,7 @@ export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyV
      * record. Arm it here (before the frame's camera run) and run the frames that already passed
      * (fadeFrame+1 .. -1); the frame's own camera run is the step after this.
      */
-    preStep(frame) {
+    preStep(frame: number) {
       const f = frame | 0;
       if (started || f < schedule.fadeFrame) return;
       const shot = shotTen();
@@ -264,9 +264,9 @@ export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyV
       started = true;
     },
     elapsed,
-    update(frame) {
+    update(frame: number) {
       const f = frame | 0;
-      const due = (at) => last < at && at <= f;
+      const due = (at: number) => last < at && at <= f;
       if (started && !returned) {
         if (!hidden && f >= schedule.hideFrame) { hidden = true; setEnemyVisible(false); }
         if (due(schedule.cutFrame)) {

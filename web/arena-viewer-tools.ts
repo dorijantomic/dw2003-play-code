@@ -31,8 +31,8 @@ export function createFreeCam({ r, canvas, init }) {
   controls.update();
   const keys = new Set();
   const typing = (e) => /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName || "") || e.ctrlKey || e.metaKey || e.altKey;
-  const down = (e) => { if (typing(e)) return; const k = e.key.toLowerCase(); if ("wasdqe".includes(k) && k.length === 1) { keys.add(k); e.preventDefault(); } if (e.key === "Shift") keys.add("shift"); };
-  const up = (e) => { keys.delete(e.key.toLowerCase()); if (e.key === "Shift") keys.delete("shift"); };
+  const down = (e: { key: string; preventDefault: () => void; }) => { if (typing(e)) return; const k = e.key.toLowerCase(); if ("wasdqe".includes(k) && k.length === 1) { keys.add(k); e.preventDefault(); } if (e.key === "Shift") keys.add("shift"); };
+  const up = (e: { key: string; }) => { keys.delete(e.key.toLowerCase()); if (e.key === "Shift") keys.delete("shift"); };
   const blur = () => keys.clear();
   addEventListener("keydown", down); addEventListener("keyup", up); addEventListener("blur", blur);
   const SPEED = 1500;   // render units per second (400 units ~ 1 m)
@@ -40,7 +40,7 @@ export function createFreeCam({ r, canvas, init }) {
   return {
     camera, controls, start: { eye: [...c.eye], look: [...c.look], up: [...c.up], fovDeg: camera.fov },
     /** move with the held keys; dt in seconds */
-    step(dt) {
+    step(dt: number) {
       if (!keys.size || !(dt > 0)) return;
       f.subVectors(controls.target, camera.position).normalize();
       s.crossVectors(f, camera.up).normalize();
@@ -53,7 +53,7 @@ export function createFreeCam({ r, canvas, init }) {
       camera.position.add(mv); controls.target.add(mv); controls.update();
     },
     /** put the camera at eye looking at look (render space), as a mouse drag would leave it */
-    set(eye, look) { camera.position.fromArray(eye); controls.target.fromArray(look); controls.update(); },
+    set(eye, look: number[]) { camera.position.fromArray(eye); controls.target.fromArray(look); controls.update(); },
     /** the view battle3d draws through (setFreeCameraView): render space */
     view() {
       return { eye: camera.position.toArray(), look: controls.target.toArray(), up: camera.up.toArray(), fovDeg: camera.fov };
@@ -97,7 +97,7 @@ const kindOf = (v) => typeof v === "number" ? "num" : v?.isColor ? "col"
   : (v?.isVector2 || v?.isVector3 || v?.isVector4) ? "vec" : null;
 const snap = (v) => typeof v === "number" ? v : v.clone();
 const same = (a, b) => typeof a === "number" ? a === b : a.equals(b);
-function range(v) {
+function range(v: number) {
   if (v > 0) return [0, v <= 0.5 ? 1 : 2 * v];
   if (v < 0) return [2 * v, -2 * v];
   return [0, 1];
@@ -123,7 +123,7 @@ export function createTuner(opts) {
     // own uniforms: folder -> name -> [{u, mat}]
     const own = new Map();
     const seenMat = new Set();
-    const addOwn = (folder, name, u, label) => {
+    const addOwn = (folder: string, name: string, u: ArenaUniform, label: string) => {
       if (!own.has(folder)) own.set(folder, new Map());
       const f = own.get(folder); if (!f.has(name)) f.set(name, []);
       if (!f.get(name).some((t) => t.u === u)) f.get(name).push({ u, label });
@@ -211,7 +211,7 @@ export function createTuner(opts) {
         const [lo, hi] = range(e.start);
         e.ctls.push(f.add(params, e.id, lo, hi, (hi - lo) / 1000).name(label).onChange((v) => write(e, v)));
       } else if (e.kind === "col") {
-        e.ctls.push(f.addColor(params, e.id).name(label).onChange((hex) =>
+        e.ctls.push(f.addColor(params, e.id).name(label).onChange((hex: string) =>
           write(e, new THREE.Color().setStyle(hex).multiplyScalar(e.name === "uLightColor" ? params.lightStrength ?? 1 : 1))));
       } else if (e.dir) {
         const apply = () => {
@@ -274,7 +274,7 @@ export function createTuner(opts) {
     const out = {};
     for (const e of entries) {
       if (e.live || !changed(e)) continue;
-      const enc = (v) => typeof v === "number" ? +v.toPrecision(6) : v.isColor ? { srgb: "#" + v.getHexString(), linear: v.toArray().map((x) => +x.toPrecision(6)) } : v.toArray().map((x) => +x.toPrecision(6));
+      const enc = (v) => typeof v === "number" ? +v.toPrecision(6) : v.isColor ? { srgb: "#" + v.getHexString(), linear: v.toArray().map((x: number) => +x.toPrecision(6)) } : v.toArray().map((x: number) => +x.toPrecision(6));
       (out[e.folder] ||= {})[e.name + (e.mats[0] === "shared" ? "" : ` (${e.mats.join(" + ")})`)] = { from: enc(e.start), to: enc(current(e)), on: e.mats };
     }
     return out;
@@ -339,7 +339,7 @@ export function createTuner(opts) {
   const api = {
     gui, entries, build, reset, touchedValues, applyTouched, lightStrength, copy, changes, afterRebuild, frameTick, lastCopy: null,
     /** for checkers: set a control by its id (as a user drag would) */
-    set(id, v) {
+    set(id: string, v) {
       build();
       const c = gui.controllersRecursive().find((k) => k.property === id);
       if (!c) return false;

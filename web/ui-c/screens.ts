@@ -18,7 +18,7 @@ export const STATUS_WORD = Object.freeze({ word: "STATUS", at: Object.freeze({ x
  * page is the EXP plate here (the money plate sits at the bottom of the other sidebar pages).
  */
 export function composeStatusPage({ parts, runs }) {
-    const sheet = parts.map((p) => (p.part === "money" && p.y < 120 ? { ...p, part: "expPlate" } : p));
+    const sheet = parts.map((p: { part: string; y: number; }) => (p.part === "money" && p.y < 120 ? { ...p, part: "expPlate" } : p));
     return composePausePage({ parts: sheet, runs }, {
         word: STATUS_WORD.word, wordAt: STATUS_WORD.at, wordDp: STATUS_WORD.sizeDp, wall: false,
         extra: (ps, rs, used, out) => composeSheetParts(ps, rs, used, out),
@@ -29,7 +29,7 @@ export function composeStatusPage({ parts, runs }) {
  * The pause screen that is up: { id, compose } or null (a page not finished yet stays pixel). Decided from the frame's own draw calls
  * only: `entry` (the page the menu was opened on) is not a test, so backing out of any page to the home keeps look C.
  */
-export function pickPauseScreen(calls, _entry) {
+export function pickPauseScreen(calls, _entry: string | null) {
     if (isPauseHome(calls)) return { id: "home", compose: composePauseHome };
     // the ITEMS bag: the full-width list window (ststat 46), no party cards
     if (hasClip(calls, STSTAT_DIR, 46)) return { id: "bag", compose: (c) => composeListPage(c, { word: "ITEMS" }) };
@@ -56,7 +56,7 @@ export { composeCapsule };
 /** Name entry: the partner chooser and the keyboard (NAME word). */
 export const composeName = (c) => composeNameEntry(c, { word: "NAME" });
 /** The deck screens: the folder rename is the name keyboard (a keyboard part), every other deck page the window page. */
-export const composeDeck = (c) => (c.parts.some((p) => p.part === "keyboard") ? composeNameEntry(c, { word: "NAME" }) : composeWindow(c));
+export const composeDeck = (c) => (c.parts.some((p: { part: string; }) => p.part === "keyboard") ? composeNameEntry(c, { word: "NAME" }) : composeWindow(c));
 /** The language page: its frames and backdrop claimed (claims.js cntselwn), the flags and words the game's pictures. */
 export { composeMemcard, composeNet, composeWizard, composeMapPage, composeEnd, composeLanguage };
 

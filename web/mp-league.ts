@@ -190,7 +190,7 @@ export function standings(lg) {
     if (!lg) return [];
     const rows = lg.ids.map((id) => {
         let wins = 0, losses = 0, games = 0, round = -1;
-        lg.rounds.forEach((matches, r) => {
+        lg.rounds.forEach((matches, r: number) => {
             for (const m of matches) {
                 if (m.bye || (m.a !== id && m.b !== id)) continue;
                 round = Math.max(round, r);
@@ -250,7 +250,7 @@ export function unpackLeague(wire) {
         rounds: [],
     };
     for (const round of Array.isArray(wire.R) ? wire.R : []) {
-        lg.rounds.push(round.map((row) => {
+        lg.rounds.push(round.map((row: [(null | undefined)?, (null | undefined)?, (null | undefined)?, ...any[]]) => {
             const [a = null, b = null, w = null, ...g] = Array.isArray(row) ? row : [];
             const m = { a, b, w, g } as MpLeagueState;
             if (b == null && a != null) m.bye = true;                       // a first-round bye

@@ -95,7 +95,7 @@ import type { ScriptedPlanOptions } from "./core/types.js";
  * `null` means "this technique is not a category-5 member", so a caller can use it as the
  * gate the way `battleRestorePlanFor` is used for category 4.
  */
-export function battleScriptedPlanFor(b, side, record, techniqueId, options: ScriptedPlanOptions = {}) {
+export function battleScriptedPlanFor(b, side: number, record, techniqueId: number, options: ScriptedPlanOptions = {}) {
   const id = techniqueId | 0;
   if ((record?.category | 0) !== 5) return null;
   const arm = damageTermCategory5Arm(id);
@@ -190,7 +190,7 @@ export function battleScriptedPlanFor(b, side, record, techniqueId, options: Scr
  * measured. It returns null for every other category-5 arm, which is exactly the
  * question it was written to answer: "does this technique charge anybody?"
  */
-export function battleAffinityPlanFor(b, side, record, techniqueId, options = {}) {
+export function battleAffinityPlanFor(b, side: number, record, techniqueId: number, options = {}) {
   const plan = battleScriptedPlanFor(b, side, record, techniqueId, options);
   if (!plan) return null;
   return plan.effect === "affinity" || plan.effect === "healCharge" ? plan : null;
@@ -219,7 +219,7 @@ export function encounterGateBytes(b) {
  * effective value each row needs is the target's own `effStats()` for that stat, which is
  * the block the arm reads at `+0x02 + 2 * .L0x800a4694[stat]`.
  */
-function category5Targets(b, targetSide, arm, techniqueId) {
+function category5Targets(b, targetSide: number, arm, techniqueId: number) {
   const stat = damageTermStatRowId(arm, techniqueId);
   if (stat === null) return [];
   const slots = arm.effect === "statParty" ? [0, 1, 2] : [activeSlotOf(b, targetSide)];
@@ -250,7 +250,7 @@ export function forcedDedigivolveLanded(plan) {
   return plan?.effect === "statusOnly" && plan.rollLanded === true;
 }
 
-export function activeSlotOf(b, side) {
+export function activeSlotOf(b, side: number) {
   return (side | 0) < 1 ? ((b?.activePlayerIndex ?? 0) | 0) : 0;
 }
 
@@ -267,26 +267,26 @@ function playerActiveIsRookie(b) {
 }
 
 /** The acting side's active fighter's WIS, the getter's own second operand. */
-function actingFighterWisdom(b, actingSide) {
+function actingFighterWisdom(b, actingSide: number) {
   const slot = activeSlotOf(b, actingSide);
   const rec = battleRestoreTargets(b, actingSide)[slot];
   return rec ? engineEffStats(rec).wis : 0;
 }
 
 /** The stat index the arm's row addresses, or null when the arm has no row. */
-function damageTermStatRowId(arm, techniqueId) {
+function damageTermStatRowId(arm: { ids: number[]; }, techniqueId: number) {
   // The row is the technique id's own (the two stat tables are indexed by id), never the arm's first.
   const row = DAMAGE_TERM_STAT_ROWS.find((r) => r.id === (techniqueId | 0) && arm.ids.includes(r.id));
   return row ? row.stat : null;
 }
 
 /** The row this arm's technique id addresses, or null when it has none. */
-function category5Row(arm, techniqueId) {
+function category5Row(arm, techniqueId: number) {
   return DAMAGE_TERM_STAT_ROWS.find((r) => r.id === (techniqueId | 0)) ?? null;
 }
 
 /** The stat the arm changes, 0 attack / 1 defense / 2 speed, for one record. */
-export function statValue(rec, stat) {
+export function statValue(rec, stat: number) {
   const values = engineEffStats(rec);
   return [values.str, values.def, values.spd][stat] | 0;
 }
@@ -308,11 +308,11 @@ export function effectiveSpd(rec) {
 }
 
 /** One record's own modifier for that stat — the walker's `statMods`, absent is 0. */
-export function statModifier(rec, stat) {
+export function statModifier(rec, stat: number) {
   return [rec?.statMods?.str ?? 0, rec?.statMods?.def ?? 0, rec?.statMods?.spd ?? 0][stat] | 0;
 }
 
-export function setStatModifier(rec, stat, value) {
+export function setStatModifier(rec: { statMods: { str: number; def: number; spd: number; }; }, stat: number, value: number) {
   if (!rec) return;
   const key = ["str", "def", "spd"][stat];
   const mods = rec.statMods ?? { str: 0, def: 0, spd: 0 };

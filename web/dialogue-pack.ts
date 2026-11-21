@@ -24,10 +24,10 @@ export function encodeChar(ch) {
     return PUNCT[ch] ?? [];
 }
 
-const encodeText = (s) => [...s].flatMap(encodeChar);
+const encodeText = (s: string) => [...s].flatMap(encodeChar);
 
 /** Wrap one paragraph into lines of at most `width` characters (words are never split unless longer than a line). */
-export function wrap(text, width = 22) {
+export function wrap(text: string, width = 22) {
     const lines = [];
     let line = "";
     for (const word of String(text).split(/\s+/).filter(Boolean)) {
@@ -41,7 +41,7 @@ export function wrap(text, width = 22) {
 }
 
 /** Text -> pages of at most `perPage` lines each: [[line, ...], ...]. A blank line starts a new page; a single newline breaks the line. */
-export function paginate(text, { width = 22, perPage = 3 } = {}) {
+export function paginate(text: string, { width = 22, perPage = 3 } = {}) {
     const pages = [];
     for (const para of String(text).split(/\n\s*\n/)) {
         const lines = para.split("\n").flatMap((l) => wrap(l, width));     // a single newline is a hard line break
@@ -51,18 +51,18 @@ export function paginate(text, { width = 22, perPage = 3 } = {}) {
 }
 
 /** Pages -> the bytes of one line (name tab + text). */
-export function encodeLine(name, pages) {
+export function encodeLine(name, pages: string[][]) {
     const out = [0x02, 0x07, ...encodeText(String(name ?? "").slice(0, 20)), 0x02, 0x07];
-    pages.forEach((page, p) => {
+    pages.forEach((page: string[], p: number) => {
         if (p > 0) out.push(0x02, 0x02, 0x02, 0x02, 0x03);
-        page.forEach((line, i) => { if (i > 0) out.push(0x02, 0x01); out.push(...encodeText(line)); });
+        page.forEach((line: string, i: number) => { if (i > 0) out.push(0x02, 0x01); out.push(...encodeText(line)); });
     });
     out.push(0x02, 0x02, 0x02, 0x00);
     return Uint8Array.from(out);
 }
 
 /** A whole pack holding that one line as entry 0 (the form `dialogueBox.open({ pack, index: 0 }, ...)` takes). */
-export function buildPack(name, pages) {
+export function buildPack(name, pages: string[][]) {
     const line = encodeLine(name, pages);
     const first = 4 + 4 * 2;                         // count, then two offsets
     const bytes = new Uint8Array(first + line.length);

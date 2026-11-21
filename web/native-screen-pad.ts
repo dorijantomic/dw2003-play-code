@@ -97,7 +97,7 @@ export function createNativeScreenPadInput({ publish = null, port = 0 } = {}) {
     /** A test's explicit held word, or null when the keyboard decides. Kept so
      *  the debug hook `window.__nativeScreenPad(word)` and the keyboard share
      *  ONE publication per frame instead of fighting over the same record. */
-    let override = null;
+    let override: number | null = null;
     /** Buttons `releaseAfter` has promised to let go of, and the publications each
      *  has left. A player holding a key is in none of these. */
     const dueOut = new Map();
@@ -138,7 +138,7 @@ export function createNativeScreenPadInput({ publish = null, port = 0 } = {}) {
      *  frame of auto-repeat debt, whatever the browser's frame rate is. Returns
      *  how many buttons it armed, so a caller whose key never arrived hears so
      *  instead of waiting for a release that cannot come. */
-    function releaseAfter(publications) {
+    function releaseAfter(publications: number) {
         const frames = Math.max(1, (publications | 0) || 1);
         dueOut.clear();
         let armed = 0;

@@ -30,7 +30,7 @@
 export function profileTechSlots(profile) {
   if (Array.isArray(profile?.tech_slots)) return profile.tech_slots.slice(0, 6).map(Number);
   const slots = [0, 0, 0, 0, 0, 0];
-  (profile?.techs ?? []).slice(2, 7).forEach((id, i) => { if (i < 5) slots[i] = Number(id) || 0; });
+  (profile?.techs ?? []).slice(2, 7).forEach((id, i: number) => { if (i < 5) slots[i] = Number(id) || 0; });
   slots[5] = Number(profile?.tech_signature ?? 0) || 0;
   return slots;
 }
@@ -65,7 +65,7 @@ export function profileLoadLevels(profile) {
  * marked loadable in a fight. Battle rewards use learnOneTechnique /
  * markOneLoadable below.
  */
-export function applyFormTechGates(record, profile, formLevel) {
+export function applyFormTechGates(record, profile, formLevel: number) {
   const slots = profileTechSlots(profile);
   const learn = profileLearnLevels(profile);
   const load = profileLoadLevels(profile);

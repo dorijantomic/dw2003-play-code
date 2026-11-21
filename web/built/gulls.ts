@@ -38,12 +38,12 @@ export const GULL = {
   ACCENT_FALLBACK: [248, 232, 136],   // measured on meft1002's floor_07 picture (its 2 yellow texels of 68)
 };
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
 // one gull, unit half span, forward +Z, up +Y, span along X. aSeg: 0 body/tail, 1 inner wing, 2 outer wing.
 export function gullGeometry() {
   const pos = [], seg = [];
-  const tri = (a, b, c, s) => { pos.push(...a, ...b, ...c); seg.push(s, s, s); };
+  const tri = (a: number[], b: number[], c: number[], s: number) => { pos.push(...a, ...b, ...c); seg.push(s, s, s); };
   const nose = [0, 0, 0.30], tail = [0, 0.01, -0.30];
   const R = [0.065, 0, 0.04], L = [-0.065, 0, 0.04], Up = [0, 0.055, 0.04], Dn = [0, -0.05, 0.04];
   tri(nose, R, Up, 0); tri(nose, Up, L, 0); tri(nose, L, Dn, 0); tri(nose, Dn, R, 0);
@@ -51,7 +51,7 @@ export function gullGeometry() {
   tri([0, 0, -0.20], [0.09, 0, -0.40], [-0.09, 0, -0.40], 0);
   const { ROOT, ELBOW } = GULL;
   for (const sx of [1, -1]) {
-    const v = (x, z) => [sx * x, 0, z];
+    const v = (x: number, z: number) => [sx * x, 0, z];
     tri(v(ROOT, 0.12), v(ROOT, -0.12), v(ELBOW, 0.10), 1);
     tri(v(ELBOW, 0.10), v(ROOT, -0.12), v(ELBOW, -0.10), 1);
     tri(v(ELBOW, 0.10), v(ELBOW, -0.10), v(1.0, -0.14), 2);
@@ -65,7 +65,7 @@ export function gullGeometry() {
 
 // The one place a gull vertex's flapped position is made (material and the checker's GPU probe both call it).
 // g = per-gull (flap phase, envelope phase, envelope speed), t seconds.
-const f = (x) => x.toFixed(4);
+const f = (x: number | undefined) => x.toFixed(4);
 export const GULL_GLSL = /* glsl */`
   vec2 gullAngles(vec3 g, float t) {
     float env = smoothstep(${f(GULL.ENV[0])}, ${f(GULL.ENV[1])}, 0.5 + 0.5 * sin(t * g.z + g.y));
@@ -87,9 +87,9 @@ export const GULL_GLSL = /* glsl */`
     return vec3(side * x, p.y + y, p.z);
   }
 `;
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smooth = (a: number | undefined, b: number | undefined, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 /** JS twin of gullFlap (position only), for the bob room and the checker. */
-export function gullFlapJS(p, seg, g, t) {
+export function gullFlapJS(p, seg: number, g: number[], t: number) {
   if (seg < 0.5) return [...p];
   const env = smooth(GULL.ENV[0], GULL.ENV[1], 0.5 + 0.5 * Math.sin(t * g[2] + g[1])), w = GULL.FLAP_HZ * 2 * Math.PI;
   const a1 = GULL.A1 + env * GULL.F1 * Math.sin(t * w + g[0]) + GULL.BREATHE * Math.sin(t * GULL.BREATHE_W + g[0]);
@@ -120,7 +120,7 @@ export function verticalReach() {
   return { up, dn };
 }
 
-export function gullMaterial(S, col) {
+export function gullMaterial(S: typeof S0, col) {
   return new THREE.ShaderMaterial({
     uniforms: S.uniformsWith({ uGullTime: { value: 0 }, uWhite: { value: col.white }, uShade: { value: col.shade },
       uTip: { value: col.tip }, uBeak: { value: col.beak } }),
@@ -167,14 +167,14 @@ export function gullMaterial(S, col) {
 
 /** the default asset of the slot gulls.flock: the flock drawn from the slot's gull records (web/built/place/gulls.js).
  *  Returns { objects, meshes, place, update, info, ... }. */
-export function buildGulls(slot, env) {
+export function buildGulls(slot, env: { S: typeof S0; materials: THREE.ShaderMaterial[]; info: { gulls: BuiltGullInfo; }; }) {
   const S = env.S || S0;
   const D = slot.data, gulls = D.gulls, c0 = D.colours, reach = D.reach, cards = { length: D.cards }, cardCopies = D.cardCopies;
   const col = { white: S.srgb(c0.p90 || [247, 245, 250]), shade: S.srgb(c0.green || [196, 200, 241]),
                 tip: S.srgb(c0.p10 || [15, 19, 29]), beak: S.srgb(c0.accent || GULL.ACCENT_FALLBACK) };
   const n = gulls.length;
   const geo = gullGeometry();
-  const ga = new Float32Array(n * 3); gulls.forEach((q, i) => ga.set(q.g, i * 3));
+  const ga = new Float32Array(n * 3); gulls.forEach((q: { g: ArrayLike<number>; }, i: number) => ga.set(q.g, i * 3));
   geo.setAttribute("aGull", new THREE.InstancedBufferAttribute(ga, 3));
   const mat = gullMaterial(S, col); env.materials?.push(mat);
   const mesh = new THREE.InstancedMesh(geo, mat, n);
@@ -185,7 +185,7 @@ export function buildGulls(slot, env) {
   Qr.setFromAxisAngle(Z, -GULL.BANK);   // +X (the inner wing) dips toward the centre
   const at = D.at;   // where gull q is at time t (s): the placement's orbit; the same numbers set the instance matrix
   let tNow = 0;
-  function setTime(t) {
+  function setTime(t: number) {
     tNow = t; mat.uniforms.uGullTime.value = t;
     for (const q of gulls) {
       const a = at(q, t);
@@ -215,7 +215,7 @@ export function buildGulls(slot, env) {
   const api = {
     objects: [mesh], meshes: [mesh], info, place,
     update(camera, timeMs) { setTime((timeMs ?? performance.now()) / 1000); },
-    setTime, at: (i, t) => at(gulls[i], t), gulls, geo, mesh, GULL_GLSL,
+    setTime, at: (i: string | number, t) => at(gulls[i], t), gulls, geo, mesh, GULL_GLSL,
   };
   mesh.userData.gulls = api;   // for the checker
   return api;

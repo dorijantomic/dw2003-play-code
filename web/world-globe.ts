@@ -10,10 +10,10 @@ const statusEl = $("status"), tip = $("tip"), info = $("info"), cv = $("cv");
 const MAX_TEX_W = 8192;
 const SEA = "#0a1d33";
 
-const say = (t) => { statusEl.textContent = t; };
-const fetchJson = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); };
-const hueOf = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; };
-const regionColor = (r) => `hsl(${hueOf(r)} 70% 60%)`;
+const say = (t: string) => { statusEl.textContent = t; };
+const fetchJson = async (url: string | URL | Request) => { const r = await fetch(url); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); };
+const hueOf = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360; };
+const regionColor = (r: string) => `hsl(${hueOf(r)} 70% 60%)`;
 
 function makeRenderer() {
     let renderer;
@@ -30,7 +30,7 @@ function makeRenderer() {
     return { renderer, gpu: name };
 }
 
-function loadImage(src) {
+function loadImage(src: string) {
     return new Promise<HTMLImageElement | null>((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
 }
 
@@ -44,7 +44,7 @@ async function main() {
     const variants = await fetchJson("map-variants.json").catch(() => ({}));
     const maps = manifest.maps;
     const scenes = {};
-    await Promise.all(maps.map(async (m) => { scenes[m.id] = await fetchJson(`assets/scenes/${m.id}.json`).catch(() => ({ exits: [] })); }));
+    await Promise.all(maps.map(async (m: { id: string | number; }) => { scenes[m.id] = await fetchJson(`assets/scenes/${m.id}.json`).catch(() => ({ exits: [] })); }));
 
     const world = buildWorld({ maps, scenes, variants });
     const maxTex = Math.min(MAX_TEX_W, renderer.capabilities.maxTextureSize);
@@ -79,7 +79,7 @@ async function main() {
     scene.add(globe);
 
     // pins: same equirectangular mapping as three's SphereGeometry (u = phi / 2pi, theta = (1 - v) * pi)
-    const toSphere = (u, v, r) => {
+    const toSphere = (u: number, v: number, r: number) => {
         const phi = u * Math.PI * 2, theta = (1 - v) * Math.PI;
         return new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), r * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta));
     };
@@ -113,7 +113,7 @@ async function main() {
 
     // picking: ray -> sphere -> uv -> texture pixel -> world pixel -> place / pin
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
-    const pick = (ev) => {
+    const pick = (ev: PointerEvent) => {
         const r = cv.getBoundingClientRect();
         ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -(((ev.clientY - r.top) / r.height) * 2 - 1));
         ray.setFromCamera(ndc, camera);
@@ -127,7 +127,7 @@ async function main() {
         if (h.pin && pinPts.visible) return h.pin.names.slice(0, 6).join("\n") + (h.pin.names.length > 6 ? `\n+${h.pin.names.length - 6} more` : "");
         return h.place ? h.place.names.join(" / ") : "";
     };
-    cv.addEventListener("pointermove", (ev) => {
+    cv.addEventListener("pointermove", (ev: PointerEvent) => {
         if (ev.buttons) { tip.style.display = "none"; return; }
         const t = label(pick(ev));
         if (!t) { tip.style.display = "none"; return; }

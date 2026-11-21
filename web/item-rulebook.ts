@@ -57,13 +57,13 @@ function row(r) {
  */
 export function ruleRows(effects) {
     const rows = itemRows(effects).map(row);
-    const byId = (a, b) => a.id - b.id;
+    const byId = (a: { id: number; }, b: { id: number; }) => a.id - b.id;
     return {
-        hp: rows.filter((r) => r.effect === "hp").sort(byId),
-        tp: rows.filter((r) => r.effect === "tp").sort(byId),
-        stat: rows.filter((r) => r.effect.startsWith("stat_")).sort(byId),
-        elem: rows.filter((r) => r.effect.startsWith("elem_")).sort(byId),
-        battle: rows.filter((r) => r.effect === "battle").sort(byId),
+        hp: rows.filter((r: { effect: string; }) => r.effect === "hp").sort(byId),
+        tp: rows.filter((r: { effect: string; }) => r.effect === "tp").sort(byId),
+        stat: rows.filter((r: { effect: string; }) => r.effect.startsWith("stat_")).sort(byId),
+        elem: rows.filter((r: { effect: string; }) => r.effect.startsWith("elem_")).sort(byId),
+        battle: rows.filter((r: { effect: string; }) => r.effect === "battle").sort(byId),
     };
 }
 
@@ -98,15 +98,15 @@ export function capWords(effect, value) {
  * Both lists carry the whole row, sorted by item id.
  */
 export function sellSheet(effects) {
-    const rows = itemRows(effects).map(row).filter((r) => r.sell > 0);
-    const byId = (a, b) => a.id - b.id;
+    const rows = itemRows(effects).map(row).filter((r: { sell: number; }) => r.sell > 0);
+    const byId = (a: { id: number; }, b: { id: number; }) => a.id - b.id;
     return {
-        neverSold: rows.filter((r) => r.buy === 0).sort(byId),
-        notHalf: rows.filter((r) => r.buy !== 2 * r.sell).sort(byId),
+        neverSold: rows.filter((r: { buy: number; }) => r.buy === 0).sort(byId),
+        notHalf: rows.filter((r: { buy: number; sell: number; }) => r.buy !== 2 * r.sell).sort(byId),
     };
 }
 
 /** The 25 items the decoded FIGHTSTG jump table dispatches: ids 66..90. */
 export function battleOnly(effects) {
-    return itemRows(effects).map(row).filter((r) => r.effect === "battle").sort((a, b) => a.id - b.id);
+    return itemRows(effects).map(row).filter((r: { effect: string; }) => r.effect === "battle").sort((a: { id: number; }, b: { id: number; }) => a.id - b.id);
 }

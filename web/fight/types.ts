@@ -258,22 +258,22 @@ export interface MotionTreeContext {
   legs: any[];
   mainRoot: any;
   model: any;
-  n: any;
-  notes: any[];
-  order: any[];
+  n: unknown;
+  notes: unknown[];
+  order: unknown[];
   own: Map<any, any>;
-  par: any;
-  plan: any;
-  Pr: any[];
+  par: unknown;
+  plan: unknown;
+  Pr: unknown[];
   quad: boolean;
-  rig: any;
-  spine: any[];
-  tail: any[];
-  torso: any;
-  upper: any[];
+  rig: unknown;
+  spine: unknown[];
+  tail: unknown[];
+  torso: unknown;
+  upper: unknown[];
   W: number;
-  wings: any[];
-  Wr: any[];
+  wings: unknown[];
+  Wr: unknown[];
 }
 
 export interface MotionBonesOut {

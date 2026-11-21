@@ -16,9 +16,9 @@ import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
-export const runIn = (r, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
-const lbl = (key, str, rect, sizeDp, lineDp, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
-export const takeIn = (runs, rc, used, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
+export const runIn = (r: { x: number; y: number; }, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
+const lbl = (key: string, str: string | undefined, rect, sizeDp: number, lineDp: number, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
+export const takeIn = (runs, rc, used: Set<unknown>, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
 
 // ------------------------------------------------------------------------------------------------ backdrop, footer, hints
@@ -40,15 +40,15 @@ export { tokenLine };
  *  a word the game draws past the divider (the demo page's "BIT"). */
 /** A footer number (digits with their separators); a right-anchored run with letters is a word. */
 const FOOT_NUMBER = /^[0-9][0-9,./ ]*$/;
-const footRight = (lineRuns, j) => (lineRuns[j + 1] ? lineRuns[j + 1].x - 1 : j ? 318 : dx(1060));
+const footRight = (lineRuns, j: number) => (lineRuns[j + 1] ? lineRuns[j + 1].x - 1 : j ? 318 : dx(1060));
 
-export function composeFooter(foot, runs, used, out) {
+export function composeFooter(foot, runs, used: Set<unknown>, out) {
     const rel = foot.rel, r = clipRect(foot);
     out.push({ key: "footer.plate", kind: "band", part: "footer", layer: "under", rect: r, edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     out.push(solid("footer.tab", applyRel({ x: dx(0), y: r.y, w: N(206), h: N(4) }, rel), "var(--c-orange)", rel));
     out.push(solid("footer.div1", applyRel({ x: dx(206), y: r.y + N(4), w: N(4), h: r.h - N(8) }, rel), "var(--c-under)", rel));
     out.push(solid("footer.div2", applyRel({ x: dx(1068), y: r.y + N(4), w: N(4), h: r.h - N(8) }, rel), "var(--c-under)", rel));
-    const mine = takeIn(runs, { x: -9999, y: r.y, w: 99999, h: r.h }, used).sort((a, b) => a.y - b.y || a.x - b.x);
+    const mine = takeIn(runs, { x: -9999, y: r.y, w: 99999, h: r.h }, used).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
     const lines = [];
     for (const m of mine) { const l = lines.find((q) => Math.abs(q.y - m.y) <= 2); if (l) l.runs.push(m); else lines.push({ y: m.y, runs: [m] }); }
     // one or two lines: 12 dp from the top, 44 dp apart; more (the QUESTS description band has three): spread evenly inside the band
@@ -75,12 +75,12 @@ export function composeFooter(foot, runs, used, out) {
  * The item detail line (C3): a full-width band 58 dp tall centred on the game's clip, dividers at 206 / 624 / 846 dp; the item name in
  * Russo 22, the cell labels ("Equip", "Items") dim 18, their numbers Chakra Petch 700 26 right-anchored. The item icon stays art.
  */
-export function composeDetail(p, runs, used, out) {
+export function composeDetail(p, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p), h = N(58), y = r.y + (r.h - h) / 2;
     out.push({ key: "detail.band", kind: "band", part: "detail", layer: "under", rect: applyRel({ x: 0, y, w: 320, h }, rel), edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const [k, d] of [[1, 206], [2, 624], [3, 846]]) out.push(solid(`detail.div${k}`, applyRel({ x: dx(d), y: y + N(4), w: N(4), h: h - N(8) }, rel), "var(--c-under)", rel));
     const mine = takeIn(runs, { x: -9999, y: r.y, w: 99999, h: r.h }, used);
-    detailTexts(mine, y + h / 2, rel, out, "detail", (m) => m.x > dx(624));
+    detailTexts(mine, y + h / 2, rel, out, "detail", (m: { x: number; }) => m.x > dx(624));
 }
 
 /**
@@ -88,7 +88,7 @@ export function composeDetail(p, runs, used, out) {
  * the cell labels ("Equip", "Items") dim Russo 18, the item name Russo 22; all centred on `mid` (native). `isCellLabel(run)` says which
  * plain runs are cell labels (the rest is the name).
  */
-export function detailTexts(mine, mid, rel, out, k, isCellLabel) {
+export function detailTexts(mine, mid: number, rel, out, k: string, isCellLabel) {
     for (const m of [...mine].sort((a, b) => a.x - b.x)) {
         const isNum = m.right != null || /^[0-9]+$/.test(m.text);
         if (isNum) {
@@ -106,7 +106,7 @@ export function detailTexts(mine, mid, rel, out, k, isCellLabel) {
  * The navy arrow tree of "Switch with who?" as a path in native units relative to the tree piece: an up arrow under each top cell, a
  * bar joining them, a down arrow to each bottom cell. `cxs` / `downs` = arrow centre x (native, relative to the tree), `h` = tree height.
  */
-export function switchTreePath(cxs, downs, h) {
+export function switchTreePath(cxs, downs, h: number) {
     if (!cxs.length) return "";
     const lo = Math.min(...cxs, ...downs), hi = Math.max(...cxs, ...downs), barTop = Math.round(h * 0.38), barBot = barTop + 6;
     let d = `M${lo - 3} ${barTop}H${hi + 3}V${barBot}H${lo - 3}Z`;
@@ -123,17 +123,17 @@ export function switchTreePath(cxs, downs, h) {
 export function composeSwitchWindow(p, i, out) {
     const rel = p.rel, r = clipRect(p), L = p.layers ?? [];
     out.push({ key: `sw${i}.plate`, kind: "plate", part: "window", layer: "under", rect: r, shape: "ch", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
-    const cells = L.filter((l) => l.w >= 30 && l.w <= 60 && l.h >= 50 && l.h < p.h - 4);
-    const tree = L.find((l) => l.w >= 80 && l.h <= 40);
+    const cells = L.filter((l: { w: number; h: number; }) => l.w >= 30 && l.w <= 60 && l.h >= 50 && l.h < p.h - 4);
+    const tree = L.find((l: { w: number; h: number; }) => l.w >= 80 && l.h <= 40);
     cells.forEach((c, k) => out.push({ key: `sw${i}.cell${k}`, kind: "plate", part: "cell", layer: "under", rect: applyRel({ x: p.x + c.x, y: p.y + c.y, w: c.w, h: c.h }, rel), shape: "frame", edge: "var(--c-under)", body: "var(--c-body)", shadow: 0, sx: rel.a, sy: rel.d }));
     if (tree) {
-        const mid = (c) => c.x + c.w / 2 - tree.x;
-        const ups = cells.filter((c) => c.y < tree.y).map(mid), downs = cells.filter((c) => c.y > tree.y).map(mid);
+        const mid = (c: { x: number; w: number; }) => c.x + c.w / 2 - tree.x;
+        const ups = cells.filter((c: { y: number; }) => c.y < tree.y).map(mid), downs = cells.filter((c: { y: number; }) => c.y > tree.y).map(mid);
         out.push({ key: `sw${i}.tree`, kind: "svg", part: "tree", layer: "under", rect: applyRel({ x: p.x + tree.x, y: p.y + tree.y, w: tree.w, h: tree.h }, rel), vw: tree.w, vh: tree.h, d: switchTreePath(ups, downs, tree.h), fill: "var(--c-under)", sx: rel.a, sy: rel.d });
     }
 }
 
-const isNumText = (t) => /^[0-9]+$/.test(t);
+const isNumText = (t: string) => /^[0-9]+$/.test(t);
 
 /**
  * Read the info card's runs (lab / gym partner pickers): rows grouped by pen y; a row whose first word is LV / HP / MP is a stat row,
@@ -164,7 +164,7 @@ export function readInfoRuns(runs) {
  * dim labels with a bar (ratio from the two numbers the game drew) and "cur/max" right-anchored in amber (MP light blue). A row the game
  * draws with placeholders ("----") is shown as its own text, no bar.
  */
-export function composeInfoCard(p, i, runs, used, out) {
+export function composeInfoCard(p, i, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used);
@@ -187,15 +187,15 @@ export function composeInfoCard(p, i, runs, used, out) {
             continue;
         }
         // placeholders or an unknown row: the game's own strings, left to right
-        s.raw.forEach((m, j) => out.push(lbl(`${k}.${s.id}.${j}`, m.text, applyRel({ x: m.x, y: mid - N(12), w: N(Math.max(40, (m.w ?? 8) * 3.5)), h: N(24) }, rel), 18, 24, { color: j === 0 ? "var(--c-dim-label)" : "var(--c-num)", rel })));
+        s.raw.forEach((m, j: number) => out.push(lbl(`${k}.${s.id}.${j}`, m.text, applyRel({ x: m.x, y: mid - N(12), w: N(Math.max(40, (m.w ?? 8) * 3.5)), h: N(24) }, rel), 18, 24, { color: j === 0 ? "var(--c-dim-label)" : "var(--c-num)", rel })));
     }
 }
 
 /** A hint plate ("Button: Back"): chamfered frame, bleeding to the screen edge, the game's text with its button badge. */
-export function composeHint(p, i, runs, used, out) {
+export function composeHint(p, i, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
-    const mine = takeIn(runs, r, used).sort((a, b) => a.y - b.y || a.x - b.x);
+    const mine = takeIn(runs, r, used).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
     // one line per pen line: runs on the same line (the gym's "TP 1  TP 5  TP10" choices) stay side by side at the game's own x
     const lines = [];
     for (const m of mine) { const l = lines.find((q) => Math.abs(q[0].y - m.y) <= 2); if (l) l.push(m); else lines.push([m]); }
@@ -214,11 +214,11 @@ export function composeHint(p, i, runs, used, out) {
  * "Not enough BIT." over the buy list): the plate goes over the list (layer "over", above the item icons), its text is the leftmost run
  * column only, and the list texts under it are taken (covered) -- the disc overprints them, unreadable.
  */
-export function composeHeaderPlate(p, i, runs, used, out, cover = false) {
+export function composeHeaderPlate(p, i, runs, used: Set<unknown>, out, cover = false) {
     const rel = p.rel, r = clipRect(p);
     out.push(cover ? { ...platePart(p, i), layer: "over" } : platePart(p, i));
     let mine = takeIn(runs, r, used);
-    if (cover && mine.length) { const x0 = Math.min(...mine.map((m) => m.x)); mine = mine.filter((m) => Math.abs(m.x - x0) <= 2); }
+    if (cover && mine.length) { const x0 = Math.min(...mine.map((m) => m.x)); mine = mine.filter((m: { x: number; }) => Math.abs(m.x - x0) <= 2); }
     for (const m of mine) {
         if (isCursorToken(m.text)) continue;
         const price = /^([0-9]+) (BIT)$/.exec(m.text);
@@ -241,7 +241,7 @@ export const WIN_TITLE = Object.freeze({ bodyDy: 9, tabDx: N(18) });
  * The window of rows: the window plate, one plate per label (pitch read from the labels), the cursor row orange and pushed out, the
  * chevron in the pose the game's cursor glyph says. `win` is the claimed window part; labels = the runs inside it below `titleH`.
  */
-export function composeRows(win, i, runs, used, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
+export function composeRows(win, i: string | number, runs, used: Set<unknown>, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
     const rel = win.rel, wr = clipRect(win), titleH = opt.titleH ?? 0;
     const body = { x: wr.x, y: wr.y + titleH, w: wr.w, h: wr.h - titleH };
     // a titled window (CARD FOLDERS, the techniques list, the equipment item grid) = the C4 tab panel: the window from WIN_TITLE.bodyDy below
@@ -258,11 +258,11 @@ export function composeRows(win, i, runs, used, out, opt: { titleH?: number; con
     }
     const inside = takeIn(runs, body, used);
     const cur = inside.find((r) => isCursorToken(r.text));
-    const plain = inside.filter((r) => !isCursorToken(r.text) && r.right == null).sort((a, b) => a.y - b.y || a.x - b.x);
+    const plain = inside.filter((r) => !isCursorToken(r.text) && r.right == null).sort((a: { y: number; x: number; }, b: { y: number; x: number; }) => a.y - b.y || a.x - b.x);
     // one row per pen line: the leftmost run is its label, any other run on the same line (the "X 1" count of an item row) is drawn in it
     const rows = [], extras = [];
     for (const r of plain) (rows.some((q) => Math.abs(q.y - r.y) <= 2) ? extras : rows).push(r);
-    const onRowY = (r) => rows.some((q) => Math.abs(q.y - r.y) <= 2);
+    const onRowY = (r: { y: number; }) => rows.some((q) => Math.abs(q.y - r.y) <= 2);
     inside.filter((r) => !isCursorToken(r.text) && r.right != null).forEach((r) => { if (onRowY(r)) extras.push(r); else used.delete(r); });   // other numbers stay generic text
     // a question box (C9: the field Yes / No, the choice box): the top line without the cursor is the prompt, Russo 26 / 36 at the game's x
     if (opt.question && rows.length > 1 && !(cur && Math.abs(rows[0].y - cur.y) <= 2)) {
@@ -298,7 +298,7 @@ export function composeRows(win, i, runs, used, out, opt: { titleH?: number; con
  * The number spinner ("X 1" under "How many?"): the C ch box with the orange live edge, "X" dim Russo 26 at the game's x, the count
  * Chakra Petch 700 40 right-anchored on the game's right edge; both centred on the box. The count is the game's run, never state.
  */
-export function composeSpinner(p, i, runs, used, out) {
+export function composeSpinner(p, i, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p), mid = r.y + r.h / 2;
     out.push(spinnerPlate(`spin${i}.plate`, applyRel(r, rel), rel, true));
     for (const m of takeIn(runs, r, used)) {
@@ -313,8 +313,8 @@ export function composeSpinner(p, i, runs, used, out) {
 }
 
 /** The spinner's up / down arrows: the game draws them while the count can change; the C triangles on its x, centred on the spinner box. */
-export function composeSpinArrows(p, i, parts, out) {
-    const r = clipRect(p), box = parts.filter((q) => q.part === "spinner").map(clipRect).find((b) => r.x >= b.x - 4 && r.x < b.x + b.w + 4 && r.y >= b.y - 4 && r.y < b.y + b.h + 4);
+export function composeSpinArrows(p: { rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, parts, out) {
+    const r = clipRect(p), box = parts.filter((q: { part: string; }) => q.part === "spinner").map(clipRect).find((b) => r.x >= b.x - 4 && r.x < b.x + b.w + 4 && r.y >= b.y - 4 && r.y < b.y + b.h + 4);
     out.push(spinArrows(`spin${i}.arrows`, r.x + r.w / 2, box ? box.y + box.h / 2 : r.y + r.h / 2, p.rel));
 }
 
@@ -335,7 +335,7 @@ export const LOCKED_ROW = 8;
 export function cardStates(cards, highlights) {
     const st = cards.map(() => "normal");
     for (const h of highlights) {
-        const i = cards.findIndex((c) => Math.abs(c.y - h.y) < 3);
+        const i = cards.findIndex((c: { y: number; }) => Math.abs(c.y - h.y) < 3);
         if (i < 0) continue;
         st[i] = (h.row | 0) === LOCKED_ROW ? "locked" : "on";
     }
@@ -343,10 +343,10 @@ export function cardStates(cards, highlights) {
 }
 
 /** The cursor highlight's colour for palette row 0..7: orange, brightening to amber and back (the game's 8-step cycle, about 4 frames a step). */
-export function cyclePulse(row) {
+export function cyclePulse(row: number) {
     const r = ((row | 0) % 8 + 8) % 8, t = r <= 4 ? r / 4 : (8 - r) / 4;      // 0 -> 1 -> 0
-    const mix = (a, b) => Math.round(a + (b - a) * t);
-    const hex = (n) => n.toString(16).padStart(2, "0");
+    const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+    const hex = (n: number) => n.toString(16).padStart(2, "0");
     return `#${hex(mix(0xf8, 0xff))}${hex(mix(0x98, 0xd2))}${hex(mix(0x00, 0x6a))}`;
 }
 
@@ -359,9 +359,9 @@ export function composeBracket(p, out) {
     out.push({ key: "swap.bracket", kind: "bracket", part: "swapBracket", layer: "over", rect: r, arrows: [7 * p.rel.d, r.h - 8 * p.rel.d], color: "var(--c-orange)", sx: p.rel.a, sy: p.rel.d });
 }
 
-function composePickerCard(i, card, namePart, portrait, state, runs, used, out, hl = null) {
+function composePickerCard(i, card, namePart, portrait, state: string, runs, used, out, hl = null) {
     const Y = card.y, rel = card.rel, f = inCard(rel, card.x, Y), c = COLORS[state], k = `card${i}`;
-    runs.filter((m) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
+    runs.filter((m: { x: number; y: number; }) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
     partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker as unknown as typeof CARD_VARIANTS.home, c);
     if (portrait) {
         out.push(plate(`${k}.portrait`, "portrait", f(469, 3, 128, 128), rel, { edge: c.edge }));
@@ -371,7 +371,7 @@ function composePickerCard(i, card, namePart, portrait, state, runs, used, out, 
 }
 
 /** The header of the sidebar pages (C2): plate 664 x 69 slanted left, the game's title in Russo One 30. */
-function composePageHeader(part, runs, used, out) {
+function composePageHeader(part, runs, used: Set<unknown>, out) {
     const rel = part.rel, f = at(rel, part.x - 34, part.y - 13);
     out.push({ key: "header.plate", kind: "plate", part: "header", layer: "under", rect: f(616, 39, 664, 69), shape: "sl", edge: "var(--c-edge)", body: "var(--c-body)", shadow: 6, sx: rel.a, sy: rel.d });
     for (const m of takeIn(runs, { x: 100, y: part.y, w: 300, h: 22 }, used)) tokenLine("header.t", m.text, dx(676), N(53) + (part.y - 13), rel, out, { role: "label", sizeDp: 30, lineDp: 40, w: 150 });
@@ -384,24 +384,24 @@ function composePageHeader(part, runs, used, out) {
  */
 export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
     const out = [], used = cfg.used ?? new Set();
-    const of = (n) => parts.filter((p) => p.part === n);
+    const of = (n: string) => parts.filter((p) => p.part === n);
     const back = of("backdrop")[0], panel = of("panel")[0], folder = of("folderWin")[0], header = of("header")[0], money = of("money")[0], foot = of("footer")[0];
-    const cards = of("card").sort((a, b) => a.y - b.y), names = of("cardName"), portraits = of("portrait");
+    const cards = of("card").sort((a: { y: number; }, b: { y: number; }) => a.y - b.y), names = of("cardName"), portraits = of("portrait");
     if (back) composeBackdropPart(back, { wall: cfg.wall ?? (!panel && !folder), word: panel || folder ? null : cfg.word, wordAt: cfg.wordAt, wordDp: cfg.wordDp }, out);
     if (cfg.extra) cfg.extra(parts, runs, used, out);
     if (panel) {
-        const mine = runs.filter((r) => r.x >= panel.x && r.y >= panel.y && r.y < 160);
+        const mine = runs.filter((r: { x: number; y: number; }) => r.x >= panel.x && r.y >= panel.y && r.y < 160);
         composePanel(panel, mine, out, cfg.word ?? "MENU");
         mine.forEach((r) => used.add(r));
     }
     if (folder) composeRows(folder, 0, runs, used, out, { titleH: 17 });
     if (header) composePageHeader(header, runs, used, out);
     const highlights = of("highlight"), states = cardStates(cards, highlights);
-    cards.forEach((c, i) => composePickerCard(i, c, names.find((n) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i], runs, used, out,
-        highlights.find((h) => Math.abs(h.y - c.y) < 3) ?? null));
+    cards.forEach((c: { y: number; }, i: string | number) => composePickerCard(i, c, names.find((n: { y: number; }) => Math.abs(n.y - c.y) < 1) ?? null, portraits.find((p: { y: number; }) => Math.abs(p.y - c.y - 2) < 3) ?? null, states[i], runs, used, out,
+        highlights.find((h: { y: number; }) => Math.abs(h.y - c.y) < 3) ?? null));
     for (const b of of("bracket")) composeBracket(b, out);
     for (const d of of("detail")) composeDetail(d, runs, used, out);
-    if (money) { composeMoney(money, runs, out); runs.filter((r) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r) => used.add(r)); }
+    if (money) { composeMoney(money, runs, out); runs.filter((r: { x: number; y: number; }) => r.x < 110 && r.y >= money.y && r.y < money.y + 22).forEach((r) => used.add(r)); }
     if (foot) composeFooter(foot, runs, used, out);
     composeLists(parts, runs, used, out, { skip: folder ? [clipRect(folder)] : [], pulse: cyclePulse });
     restOfRuns(runs, used, ID, out, "page");
@@ -413,7 +413,7 @@ export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
 export function composeWindowPage({ parts, runs }, cfg: { wash?: boolean; messageWindow?: boolean; word?: string | null; } = {}) {
     const out = [], used = new Set();
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
-    const lists = parts.filter((p) => p.part === "listWin").map(clipRect);
+    const lists = parts.filter((p: { part: string; }) => p.part === "listWin").map(clipRect);
     const overList = (p) => { const r = clipRect(p); return lists.some((l) => r.x < l.x + l.w && l.x < r.x + r.w && r.y < l.y + l.h && l.y < r.y + r.h); };
     parts.forEach((p, i) => {
         if (p.part === "backdrop") composeBackdropPart(p, {}, out);
@@ -446,14 +446,14 @@ export function composeWindowPage({ parts, runs }, cfg: { wash?: boolean; messag
         else if (p.part === "folder") composeFolderPlate(p, i, out);
         else if (p.shape) out.push(platePart(p, i));
     });
-    composeLists(parts, runs, used, out, { skip: parts.filter((p) => p.part === "window").map(clipRect), pulse: cyclePulse });
+    composeLists(parts, runs, used, out, { skip: parts.filter((p: { part: string; }) => p.part === "window").map(clipRect), pulse: cyclePulse });
     composeArrows(runs, used, out);
     restOfRuns(runs, used, ID, out, "w");
     return out;
 }
 
 /** A deck folder row (card shop / deck editor): the C frame, orange edge on the cursor's folder, cyan while it is held for the actions. */
-function composeFolderPlate(p, i, out) {
+function composeFolderPlate(p: { state: string; }, i, out) {
     const edge = p.state === "on" ? "var(--c-orange)" : p.state === "held" ? "var(--c-cyan)" : "var(--c-edge)";
     out.push({ ...platePart(p, i), edge });
 }
@@ -467,7 +467,7 @@ export const composeListPage = (c, cfg: { word?: string | null; } = {}) => compo
  */
 export function shopDetailRects(layers) {
     if (!layers.length) return [];
-    const tall = layers.filter((l) => l.h > 30).sort((a, b) => a.x - b.x);
+    const tall = layers.filter((l: { h: number; }) => l.h > 30).sort((a: { x: number; }, b: { x: number; }) => a.x - b.x);
     const right = Math.max(...layers.map((l) => l.x + l.w)), top = Math.min(...layers.map((l) => l.h));
     const full = Math.max(...layers.map((l) => l.h));
     if (tall.length < 2) return [{ x: 0, y: 0, w: right, h: full, shape: "ch" }];
@@ -479,24 +479,24 @@ export function shopDetailRects(layers) {
     ];
 }
 
-function composeShopDetail(p, i, runs, used, out) {
+function composeShopDetail(p, i, runs, used: Set<unknown>, out) {
     const rel = p.rel, rects = shopDetailRects(p.layers ?? []);
     rects.forEach((r, k) => out.push(plate(`p${i}.detail${k}`, "detail", applyRel({ x: p.x + r.x, y: p.y + r.y, w: r.w, h: r.h }, rel), rel, { shape: r.shape })));
     // the name block and the Equip / Items block (the top row): C3 detail texts; the price plate under them keeps the generic money text
     if (rects.length < 2) return;
     const top = rects[0], native = { x: p.x, y: p.y + top.y, w: rects[1].x + rects[1].w, h: top.h };
     const mine = takeIn(runs, native, used);
-    detailTexts(mine, p.y + top.y + top.h / 2, rel, out, `p${i}.detail`, (m) => m.x >= p.x + rects[1].x);
+    detailTexts(mine, p.y + top.y + top.h / 2, rel, out, `p${i}.detail`, (m: { x: number; }) => m.x >= p.x + rects[1].x);
 }
 
 /** The shop partner-card cursor frame: C corner brackets in the cursor's colour cycle (the game's palette row). */
-function composePickHighlight(p, i, out) {
+function composePickHighlight(p: { row: number; rel: Readonly<{ a: 1; d: 1; e: 0; f: 0; }> | undefined; }, i, out) {
     out.push(corners(`p${i}.pick`, clipRect(p), cyclePulse(p.row), p.rel));
 }
 
 /** The game's stat-change arrow token ("48 [arrow-right] 62") as a small orange chevron at the token's pen position. */
-export function composeArrows(runs, used, out) {
-    runs.forEach((r, k) => {
+export function composeArrows(runs: { text: string; x: number; y: number; }[], used: Set<unknown>, out) {
+    runs.forEach((r: { text: string; x: number; y: number; }, k) => {
         if (used.has(r) || r.text !== "[arrow-right]") return;
         used.add(r);
         const w = N(24), h = N(18);
@@ -505,11 +505,11 @@ export function composeArrows(runs, used, out) {
 }
 
 /** The money plate of the shop screens: the game's amount (right-anchored, Chakra Petch 700) and its unit in orange. */
-function composeMoneyPlate(p, i, runs, used, out) {
+function composeMoneyPlate(p, i, runs, used: Set<unknown>, out) {
     const rel = p.rel, r = clipRect(p);
     out.push(platePart(p, i));
     const mine = takeIn(runs, r, used);
-    const amount = mine.find((m) => m.right != null || /^[0-9,.]+$/.test(m.text)), unit = mine.find((m) => m !== amount);
+    const amount = mine.find((m: { right: null; text: string; }) => m.right != null || /^[0-9,.]+$/.test(m.text)), unit = mine.find((m) => m !== amount);
     const top = r.y + (r.h - N(42)) / 2;
     const edge = amount ? (amount.right ?? amount.x + (amount.w ?? 20)) : 0;
     if (amount) out.push(lbl(`money${i}.amount`, amount.text, applyRel({ x: edge - N(140) - 2, y: top, w: N(140), h: N(42) }, rel), 32, 42, { role: "number", align: "right", rel, maxDp: 140 }));

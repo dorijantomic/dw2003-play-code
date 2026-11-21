@@ -58,7 +58,7 @@ let duel = null;
 let ticks = 0, intro = true, auto = false;
 let cursor = 0, marks = new Set(), ask = 0, confirm = false;
 let banner = "Card Battle", stage = "intro";
-let introCards = [], lastLand = new Set();
+let introCards: { si: number; i: number; start: number; land: number; flip: number; }[] = [], lastLand = new Set();
 let flights = [], prevHand = { player: [], opponent: [] }, prevField = { player: 0, opponent: 0 };
 let choiceCursor = 0;
 
@@ -104,7 +104,7 @@ function introEnd() { return 5 * DEAL_STAGGER + DEAL_DURATION + 5 * DEAL_FLIP_ST
 // clock + controller
 
 let last = 0, acc = 0;
-function loop(now) {
+function loop(now: number) {
   if (!last) last = now;
   acc += Math.min(120, now - last); last = now;
   const frame = 1000 / 50; // PAL 50 Hz
@@ -244,7 +244,7 @@ function drawBoardSlots() {
   }
 }
 
-function drawNumber(value, x, y, width, pad = false) {
+function drawNumber(value: number, x: number, y, width: number, pad = false) {
   const { base, advance } = UI.digits;
   let v = Math.max(0, Math.floor(value));
   for (let k = 0; k < width; k++) {
@@ -255,7 +255,7 @@ function drawNumber(value, x, y, width, pad = false) {
   }
 }
 
-function drawIcon(id, x, y) {
+function drawIcon(id: number, x: number, y: number) {
   if (!catalog.icons || !icons || !icons.complete || !id) return false;
   const ic = catalog.icons, idx = id - 1;
   if (idx < 0) return false;
@@ -264,9 +264,9 @@ function drawIcon(id, x, y) {
   return true;
 }
 
-function cardById(id) { return catalog.cards.find((c) => c.id === id) ?? null; }
+function cardById(id: number) { return catalog.cards.find((c: { id: number; }) => c.id === id) ?? null; }
 
-function drawCard(id, x, y, { back = false, dim = false, glow = false } = {}) {
+function drawCard(id: number | null, x: number | undefined, y: number | undefined, { back = false, dim = false, glow = false } = {}) {
   const f = UI.face;
   if (glow) { drawClipAtPaletteRow(ctx, board, 8, UI.select_clut_cycle[Math.floor((ticks % 24) / 4)], x - 2, y - 2); }
   if (back || id == null) {
@@ -291,7 +291,7 @@ function drawCard(id, x, y, { back = false, dim = false, glow = false } = {}) {
   drawNumber(rec.hp, x + st.hp[0], y + st.hp[1], 2);
 }
 
-function drawPlayerStrip(p) {
+function drawPlayerStrip(p: number) {
   const rec = UI.players[p];
   const [ox, oy] = STRIP_ORIGIN()[p];
   const side = p === 0 ? duel.player : duel.opponent;
@@ -326,16 +326,16 @@ function drawPlayerStrip(p) {
   drawNumber(side.trash.length, ax + rec.alt.alt_number[0], ay + rec.alt.alt_number[1], 2, true);
 }
 
-function handX(count, i) { return DUEL_BOARD.rowX + (cardFanOut(count, i) >> 8); }
+function handX(count, i: number) { return DUEL_BOARD.rowX + (cardFanOut(count, i) >> 8); }
 
 function drawHands() {
   const n = duel.player.hand.length;
   // opponent stays face-down
-  duel.opponent.hand.forEach((id, i) => {
+  duel.opponent.hand.forEach((id: number | null, i: number) => {
     if (intro) return;
     drawCard(id, handX(duel.opponent.hand.length, i), DUEL_BOARD.oppHandY, { back: true });
   });
-  duel.player.hand.forEach((id, i) => {
+  duel.player.hand.forEach((id: number | null, i) => {
     const target = handX(n, i);
     if (intro) {
       const c = introCards.find((x) => x.si === 0 && x.i === i);
@@ -388,14 +388,14 @@ function drawTurnMarker() {
   drawClipAtPaletteRow(ctx, board, 14, row, ox + rec.marker_b[0], oy + rec.marker_b[1]);
 }
 
-function isLegal(slot) {
+function isLegal(slot: number) {
   if (stage === "summon") { const id = duel.player.hand[slot]; return id != null && canSummon(duel, duel.player, id); }
   const id = duel.player.hand[slot];
   const rec = cardById(id);
   return !!rec && rec.kind === "program" && canPlayProgram(duel, duel.player, EFFECTS.get(id));
 }
 
-function drawWindow(x, y, w, h) {
+function drawWindow(x: number, y: number, w: number, h: number) {
   ctx.fillStyle = "rgba(8,10,24,0.94)";
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = "#c8cede";

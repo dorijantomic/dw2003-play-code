@@ -19,7 +19,7 @@ export function createStatusBackdrop() {
     },
     reset() { time = 0; },
     time: () => time,
-    draw(ctx, viewW, viewH) {
+    draw(ctx: CanvasRenderingContext2D, viewW: number, viewH: number) {
       ctx.fillStyle = STATUS_BACKDROP_FILL;
       ctx.fillRect(0, 0, viewW, viewH);
       return drawPackBackdrop(ctx, pack, STATUS_BACKDROP_CLIP, viewW, viewH, time);

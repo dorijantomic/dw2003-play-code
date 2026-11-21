@@ -13,7 +13,7 @@ export const FAMILY_TO_CLIP = {
 };
 
 // 129781 -> "129'781" — the real BIT display separator (rig-verified).
-export function formatBits(n) {
+export function formatBits(n: number) {
   const s = String(Math.max(0, Math.floor(n)));
   return s.replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 }

@@ -31,9 +31,9 @@ import type { NativeScreenRenderStats } from "./types/native-screen-render.js";
 // pageY = ((tpage >> 4) & 1) * 256, 8-bit texels (two per VRAM halfword),
 // clutX = (clut & 0x3F) * 16, clutY = (clut >> 6) & 0x1FF, colour 0 = clear.
 const CARD_SPRITE = 32;
-let vramScratch = null;
+let vramScratch: HTMLCanvasElement | null = null;
 
-function drawVramSprite(ctx, vram, prim) {
+function drawVramSprite(ctx: CanvasRenderingContext2D, vram, prim: { tpage: number; clut: number; u: number; v: number; cmd: number; x: number; y: number; }) {
     if (!vram || !vram.loads || vram.loads.length === 0) return false;
     const pageX = (prim.tpage & 0xf) * 64;
     const pageY = ((prim.tpage >> 4) & 1) * 256;
@@ -81,9 +81,9 @@ function drawVramSprite(ctx, vram, prim) {
 /** Paint a Gouraud quad whose colour runs from corner 0 to corner 1 (corners 2 and
  *  3 repeat them), which is how the registering progress bar is built. A general
  *  four-colour quad needs a triangle rasteriser this renderer does not have. */
-function paintGouraudQuad(ctx, a) {
+function paintGouraudQuad(ctx: CanvasRenderingContext2D, a) {
     const [x0, y0, x1, y1, x2, y2, x3, y3] = a;
-    const rgb = (o) => `rgb(${a[o]},${a[o + 1]},${a[o + 2]})`;
+    const rgb = (o: number) => `rgb(${a[o]},${a[o + 1]},${a[o + 2]})`;
     const gradient = ctx.createLinearGradient(x0, y0, x1 === x0 ? x0 + 1 : x1, y1);
     gradient.addColorStop(0, rgb(8));
     gradient.addColorStop(1, rgb(11));
@@ -104,7 +104,7 @@ function paintGouraudQuad(ctx, a) {
  *  one colour triple and 1/3 from another (UI-STGMCARD-TRANSITION-QUAD-2026-08-14),
  *  so the shade runs linearly along the v0->v1 edge and a two-stop linear
  *  gradient between those corners reproduces it exactly. */
-function paintPolyG4(ctx, intent) {
+function paintPolyG4(ctx: CanvasRenderingContext2D, intent) {
     const { x, y, rgb } = intent;
     const degenerate = x[1] === x[0] && y[1] === y[0];
     const gradient = ctx.createLinearGradient(x[0], y[0], degenerate ? x[0] + 1 : x[1], y[1]);
@@ -129,7 +129,7 @@ function paintPolyG4(ctx, intent) {
  *  max(0, c - k), NOT an alpha blend toward black. Applied per device pixel over
  *  the quad's area, with the corners mapped through the live transform so the
  *  320x240 picture scales into whatever canvas the caller draws on. */
-function paintDimQuad(ctx, intent) {
+function paintDimQuad(ctx: CanvasRenderingContext2D, intent) {
     const k = Math.round((intent.rgb[0] + intent.rgb[1] + intent.rgb[2]) / 3);
     if (k <= 0) return true; // level 0 at the ramp's start: a no-op, but still drawn
     const m = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
@@ -176,7 +176,7 @@ function paintDimQuad(ctx, intent) {
 
 /** Built-in painting for raw primitives captured by engine/native/raw-prims.ts.
  *  A screen-specific `options.paintRaw` runs first and may claim a kind. */
-function paintRawPrimitive(ctx, raw) {
+function paintRawPrimitive(ctx: CanvasRenderingContext2D, raw) {
     if (raw.kind === "polyG4") return paintPolyG4(ctx, raw.intent);
     if (raw.kind === "dimQuad") return paintDimQuad(ctx, raw.intent);
     return false;
@@ -213,7 +213,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
     /** Name a clip the renderer could not paint. A drop is either an id the
      *  extracted pack does not hold or a pack whose image never arrived, and
      *  the two need different answers, so record which one it was. */
-    const noteSkip = (frame, reason, d, name) => {
+    const noteSkip = (frame: number, reason: string, d, name) => {
         if (stats.skippedList.length < 64) {
             stats.skippedList.push({
                 frame, reason, id: d?.id ?? null, dir: d?.dir ?? null, pack: name ?? null,
@@ -234,7 +234,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
         /** Paint one frame's recorded picture intents and VRAM sprites; (0,0) is
          *  screen top-left. The clip path and the VRAM path are independent: a
          *  picture-empty root still paints its card faces if it has any. */
-        draw(ctx, drawCalls, vram, cardPrims, ctxMarkers, rawIntents?) {
+        draw(ctx: CanvasRenderingContext2D, drawCalls, vram, cardPrims, ctxMarkers, rawIntents?) {
             stats.frames += 1;
             for (const prim of cardPrims ?? []) {
                 if (drawVramSprite(ctx, vram, prim)) stats.cards += 1;
@@ -260,7 +260,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options: Nativ
             // `at` = the call index they were queued at; they join the draw list in that order.
             const raws = rawIntents ?? [];
             let ri = 0;
-            const flushRaw = (upTo) => {
+            const flushRaw = (upTo: number) => {
                 while (ri < raws.length && raws[ri].at <= upTo) {
                     const raw = raws[ri];
                     // The original selected the block's depth bucket through the

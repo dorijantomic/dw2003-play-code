@@ -24,10 +24,10 @@ const COMPONENT_GAP = 96;
 const PIN_MERGE = 24;
 
 const OPP = { E: "W", W: "E", N: "S", S: "N" };
-const horiz = (d) => d === "E" || d === "W";
+const horiz = (d: string) => d === "E" || d === "W";
 
 /** Nearest edge of a w x h map to the point, with distance / size (0 = on the edge). */
-export function nearestSide(x, y, w, h) {
+export function nearestSide(x: number, y: number, w: number, h: number) {
     const c: [string, number][] = [["W", x / w], ["E", (w - x) / w], ["N", y / h], ["S", (h - y) / h]];
     c.sort((a, b) => a[1] - b[1]);
     return { side: c[0][0], score: Math.max(0, c[0][1]) };
@@ -63,7 +63,7 @@ export function buildPlaces(maps, scenes, variants = {}) {
     const parent = new Map(open.map((m) => [m.id, m.id]));
     const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
     const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(rb, ra); };
-    const exitsOf = (id): any[] => scenes?.[id]?.exits ?? [];
+    const exitsOf = (id: string | number): any[] => scenes?.[id]?.exits ?? [];
     const bySig = new Map();
     for (const m of open) {
         const ex = exitsOf(m.id);
@@ -71,7 +71,7 @@ export function buildPlaces(maps, scenes, variants = {}) {
         const sig = `${m.width}x${m.height}|` + ex.map((e) => [e.x, e.y, e.w, e.h].join(",")).sort().join(";");
         if (bySig.has(sig)) union(bySig.get(sig), m.id); else bySig.set(sig, m.id);
     }
-    const near = (ea, eb) => ea.every((x) => eb.some((y) => Math.hypot(x.x + x.w / 2 - y.x - y.w / 2, x.y + x.h / 2 - y.y - y.h / 2) <= 64));
+    const near = (ea, eb) => ea.every((x: { x: number; w: number; y: number; h: number; }) => eb.some((y: { x: number; w: number; y: number; h: number; }) => Math.hypot(x.x + x.w / 2 - y.x - y.w / 2, x.y + x.h / 2 - y.y - y.h / 2) <= 64));
     const openById = new Map<any, any>(open.map((m) => [m.id, m]));
     for (const m of open) {
         const b = openById.get(variants[m.id]);
@@ -83,7 +83,7 @@ export function buildPlaces(maps, scenes, variants = {}) {
     for (const m of open) { const r = find(m.id); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(m); }
     const places = [], memberOf = new Map();
     for (const list of groups.values()) {
-        const bases = list.filter((m) => !variants[m.id]);
+        const bases = list.filter((m: { id: string | number; }) => !variants[m.id]);
         const pick = (bases.length ? bases : list).slice().sort((a, b) => idNum(a.id) - idNum(b.id))[0];
         const names = [...new Set(list.map((m) => m.name))];
         const place = {
@@ -123,7 +123,7 @@ function collectRelations(places, memberOf, scenes, byKey) {
     return rel;
 }
 
-function freeAt(rect, placed, ignore, tol) {
+function freeAt(rect, placed, ignore, tol: number | undefined) {
     for (const r of placed) if (r !== ignore && overlaps(rect, r, tol)) return false;
     return true;
 }
@@ -158,14 +158,14 @@ function tryPlace(p, q, cands, placed) {
     return null;
 }
 
-function pushOutward(q, from, dir, placed) {
+function pushOutward(q, from, dir: string, placed) {
     const r = { x: from.x, y: from.y, w: q.w, h: q.h };
     const dx = dir === "E" ? 1 : dir === "W" ? -1 : 0, dy = dir === "S" ? 1 : dir === "N" ? -1 : 0;
     for (let i = 0; i < 400 && !freeAt(r, placed, null, PLACE_TOL); i++) { r.x += dx * SLIDE_STEP; r.y += dy * SLIDE_STEP; }
     return { x: r.x, y: r.y };
 }
 
-function sectorDir(sector) {
+function sectorDir(sector: string) {
     if (/^East/.test(sector)) return "E";
     if (/^West/.test(sector)) return "W";
     if (/^North/.test(sector)) return "N";
@@ -257,7 +257,7 @@ export function buildWorld({ maps, scenes, variants = {} }) {
             let best = null;
             for (const pk of done) for (const qk of nbr.get(pk)) {
                 if (done.has(qk)) continue;
-                const cands = rel.get(`${pk}|${qk}`).slice().sort((a, b) => a.score - b.score);
+                const cands = rel.get(`${pk}|${qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score);
                 if (!best || cands[0].score < best.score || (cands[0].score === best.score && idNum(qk) < idNum(best.qk))) best = { pk, qk, score: cands[0].score };
             }
             const q = byKey.get(best.qk);
@@ -265,12 +265,12 @@ export function buildWorld({ maps, scenes, variants = {} }) {
             const order = [best.pk, ...[...done].filter((k) => k !== best.pk && nbr.get(k).has(best.qk))];
             let res = null, from = null;
             for (const pk of order) {
-                const cands = rel.get(`${pk}|${best.qk}`).slice().sort((a, b) => a.score - b.score);
+                const cands = rel.get(`${pk}|${best.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score);
                 res = tryPlace(byKey.get(pk), q, cands, placed);
                 if (res) { from = pk; break; }
             }
             if (!res) {
-                const pk = best.pk, c = rel.get(`${pk}|${best.qk}`).slice().sort((a, b) => a.score - b.score)[0];
+                const pk = best.pk, c = rel.get(`${pk}|${best.qk}`).slice().sort((a: { score: number; }, b: { score: number; }) => a.score - b.score)[0];
                 const p = byKey.get(pk);
                 res = { ...pushOutward(q, flush(p, q, c), c.dir, placed), adjacent: false };
                 from = pk;
@@ -290,7 +290,7 @@ export function buildWorld({ maps, scenes, variants = {} }) {
     // components: the biggest one (most places) is the main land; the rest go on the side their sector name says
     const orderC = compInfo.slice().sort((a, b) => b.members.length - a.members.length || a.index - b.index);
     const main = orderC[0];
-    const moveComp = (c, dx, dy) => { for (const k of c.members) { const p = byKey.get(k); p.x += dx; p.y += dy; } c.box.x += dx; c.box.y += dy; };
+    const moveComp = (c, dx: number, dy: number) => { for (const k of c.members) { const p = byKey.get(k); p.x += dx; p.y += dy; } c.box.x += dx; c.box.y += dy; };
     const compRects = (c) => c.members.map((k) => byKey.get(k));
     moveComp(main, -main.box.x, -main.box.y);
     const settled = [main];
@@ -352,7 +352,7 @@ export function buildWorld({ maps, scenes, variants = {} }) {
 }
 
 /** How the world fits a texW x texH canvas: uniform scale (never above 1), centred, with a margin. */
-export function fitWorld(bounds, texW, texH, margin = 0.04) {
+export function fitWorld(bounds, texW: number, texH: number, margin = 0.04) {
     const scale = Math.min(1, (texW * (1 - 2 * margin)) / bounds.w, (texH * (1 - 2 * margin)) / bounds.h);
     return { scale, ox: (texW - bounds.w * scale) / 2 - bounds.x * scale, oy: (texH - bounds.h * scale) / 2 - bounds.y * scale, texW, texH };
 }
@@ -364,11 +364,11 @@ export function textureSize(bounds, maxW = 8192, margin = 0.04) {
     return { w, h: w / 2 };
 }
 
-export function worldToTex(fit, wx, wy) { return { x: wx * fit.scale + fit.ox, y: wy * fit.scale + fit.oy }; }
-export function texToWorld(fit, tx, ty) { return { x: (tx - fit.ox) / fit.scale, y: (ty - fit.oy) / fit.scale }; }
+export function worldToTex(fit, wx: number, wy: number) { return { x: wx * fit.scale + fit.ox, y: wy * fit.scale + fit.oy }; }
+export function texToWorld(fit, tx: number, ty: number) { return { x: (tx - fit.ox) / fit.scale, y: (ty - fit.oy) / fit.scale }; }
 
 /** What is at world point (x, y): { place, pin } (pin = nearest pin within `pinRadius` world px, on top of the place). */
-export function hitTest(world, x, y, pinRadius = 12) {
+export function hitTest(world, x: number, y: number, pinRadius = 12) {
     let pin = null, best = pinRadius;
     for (const p of world.pins) { const d = Math.hypot(p.wx - x, p.wy - y); if (d <= best) { best = d; pin = p; } }
     const place = world.places.find((p) => x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h) ?? null;

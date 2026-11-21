@@ -38,7 +38,7 @@ export const DW2_CAST_LETTERS = ["F", "G", "H"];
 /** The DW2 motion letter for a DW3 clip slot, or null when the slot has no donor motion.
  *  `castType` is the technique's DW2 cast type (0/1/2); `magical` picks the cast family for the
  *  signature slot 11, whose body is a melee swing for a physical technique. */
-export function dw2LetterForSlot(slot, { castType = 0, magical = false } = {}) {
+export function dw2LetterForSlot(slot: string | number, { castType = 0, magical = false } = {}) {
   const row = DW2_CLIP_MAP[slot];
   if (!row || !row.letters.length) return null;
   if (row.letters.length === 1) return row.letters[0];

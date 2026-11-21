@@ -7,64 +7,64 @@ export { EMITTERS, EMITTER_KINDS, EMITTER_PARTS, SHOTS, SHOT_MODES } from "./dig
 export { ARM_EQUIP, ARM_EQUIP_CLASSES } from "./digimon-anatomy/arm-data.js";
 
 // ---------------------------------------------------------------- lookups
-export function anatomy(folder) {
+export function anatomy(folder: string) {
   return (folder && ANATOMY[folder]) || null;
 }
 
-export function has(folder) {
+export function has(folder: string | number) {
   return !!(folder && ANATOMY[folder]);
 }
 
-export function modelName(folder) {
+export function modelName(folder: string) {
   const a = anatomy(folder);
   return a ? a.n : null;
 }
 
-export function bodyPlan(folder) {
+export function bodyPlan(folder: string) {
   const a = anatomy(folder);
   return a ? a.plan : null;
 }
 
-export function bodyFamily(folder) {
+export function bodyFamily(folder: string) {
   const a = anatomy(folder);
   return a ? a.fam : null;
 }
 
-export function speciesType(folder) {
+export function speciesType(folder: string) {
   const a = anatomy(folder);
   return a ? a.t : null;
 }
 
-export function sizeClass(folder) {
+export function sizeClass(folder: string) {
   const a = anatomy(folder);
   return a ? a.size : null;
 }
 
 // The declared weapons, body-located ones included (a mouth cannon is armament too).
-export function armament(folder) {
+export function armament(folder: string) {
   const a = anatomy(folder);
   if (!a) return [];
   return a.armament.map((m) => ({ where: m[0], kind: m[1], what: m[2] }));
 }
 
 // Weapons that ARE a limb (built-in): arm chains that must animate as weapons, not hands.
-export function builtInWeapons(folder) {
+export function builtInWeapons(folder: string) {
   const a = anatomy(folder);
   if (!a) return [];
-  return a.arm.filter((x) => x[2] && x[1] !== "hand").map((x) => ({ side: x[0], kind: x[1] }));
+  return a.arm.filter((x: string[]) => x[2] && x[1] !== "hand").map((x) => ({ side: x[0], kind: x[1] }));
 }
 
-export function dominantSide(folder) {
+export function dominantSide(folder: string) {
   const a = anatomy(folder);
   return a ? a.side : null;
 }
 
-export function techKey(techName) {
+export function techKey(techName: string | null) {
   return String(techName == null ? "" : techName).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 // Which arm side fires this move, reduced to 'left' | 'right' | 'both' | null.
-export function firingSide(folder, techName) {
+export function firingSide(folder: string, techName) {
   const p = firingPart(folder, techName);
   if (p.mode === "left-arm") return "left";
   if (p.mode === "right-arm") return "right";
@@ -104,7 +104,7 @@ export function firingPart(folder, techName) {
       source: "tech-prior",
     };
   }
-  const armWeapon = a.armament.find((m) => m[0] === "left-arm" || m[0] === "right-arm" || m[0] === "both-arms");
+  const armWeapon = a.armament.find((m: string[]) => m[0] === "left-arm" || m[0] === "right-arm" || m[0] === "both-arms");
   if (armWeapon) {
     const mode = armWeapon[0] === "both-arms" ? "both-arms"
       : armWeapon[0] === "left-arm" ? "left-arm" : "right-arm";
@@ -126,17 +126,17 @@ export function firingPart(folder, techName) {
 // Anatomy-only resemblance, 0..1, deterministic. K13 ranks donors with this: same body family
 // first, then the firing side, then armament, size, species.
 // similarity(a, b) accepts model folders OR raw records.
-export function similarity(a, b) {
+export function similarity(a: string, b: string) {
   return similarityDetail(a, b).score;
 }
 
-export function similarityDetail(a, b) {
+export function similarityDetail(a: string, b: string) {
   const A = resolve(a);
   const B = resolve(b);
   if (!A || !B) return { score: 0, reasons: ["unknown model"] };
   const reasons = [];
   let score = 0;
-  const add = (pts, why) => {
+  const add = (pts: number, why: string) => {
     score += pts;
     reasons.push((pts < 0 ? "-" : "+") + Math.abs(pts).toFixed(2) + " " + why);
   };
@@ -165,7 +165,7 @@ export function similarityDetail(a, b) {
 }
 
 // Rank candidate donors for a target folder. `candidates` defaults to every model.
-export function rankDonors(target, candidates, limit) {
+export function rankDonors(target: string, candidates, limit: number | undefined) {
   const out = [];
   const pool = candidates && candidates.length ? candidates : FOLDERS;
   for (const f of pool) {
@@ -177,7 +177,7 @@ export function rankDonors(target, candidates, limit) {
   return limit ? out.slice(0, limit) : out;
 }
 
-function resolve(x) {
+function resolve(x: string) {
   if (!x) return null;
   return typeof x === "string" ? anatomy(x) : x;
 }
@@ -197,7 +197,7 @@ function armTokens(a) {
   return t;
 }
 
-export function emitters(folder) {
+export function emitters(folder: string | number) {
   const rows = EMITTERS[folder];
   if (!rows) return [];
   return rows.map((r) => ({
@@ -205,13 +205,13 @@ export function emitters(folder) {
   }));
 }
 
-export function primaryEmitter(folder) {
+export function primaryEmitter(folder: string | number) {
   return emitters(folder).find((e) => e.primary) || null;
 }
 
 // Total number of projectile launch points the body carries.
-export function launchPoints(folder) {
-  return emitters(folder).filter((e) => e.kind !== "melee")
+export function launchPoints(folder: string | number) {
+  return emitters(folder).filter((e: { kind: string; }) => e.kind !== "melee")
     .reduce((n, e) => n + e.count, 0);
 }
 
@@ -222,11 +222,11 @@ export function launchPoints(folder) {
 //   per-limb-contact multi-hit contact: the striking limbs, used in turn (not shots)
 // opts.volley = true lets a caller that knows the disc's volley clip force the one-per-emitter
 // reading even where the research text stayed silent (BRIEF5 K14: clip 13 is a volley).
-export function shotsFor(folder, techName, opts?: any) {
+export function shotsFor(folder: string | number, techName: string | null, opts?: any) {
   const k = techKey(techName);
   const rule = (SHOTS[folder] || {})[k];
   const all = emitters(folder);
-  const launch = all.filter((e) => e.kind !== "melee");
+  const launch = all.filter((e: { kind: string; }) => e.kind !== "melee");
   if (!rule) {
     const p = all.find((e) => e.primary);
     if (!p) return { mode: "none", emitters: [], shots: 0, basis: "unknown technique, no emitter" };
@@ -255,7 +255,7 @@ export function shotsFor(folder, techName, opts?: any) {
 }
 
 // The data verdict for one arm. Always returns an object (unknown model -> class "none").
-export function armEquip(folder, side) {
+export function armEquip(folder: string | number, side: string) {
   const row = ((ARM_EQUIP[folder] || {})[side]) || null;
   if (!row) {
     return { side, class: "none", confidence: "low", source: "none", bone: null,
@@ -274,12 +274,12 @@ export function armEquip(folder, side) {
 }
 
 // Both arms at once, for a caller that compares the two sides.
-export function armEquipSides(folder) {
+export function armEquipSides(folder: string | number) {
   return { left: armEquip(folder, "left"), right: armEquip(folder, "right") };
 }
 
 // Does this arm carry a weapon-like extension (or is it a weapon limb)? `bare` is false.
-export function armArmed(folder, side) {
+export function armArmed(folder: string | number, side: string) {
   const c = armEquip(folder, side).class;
   return c === "elongated" || c === "flat" || c === "bulky";
 }

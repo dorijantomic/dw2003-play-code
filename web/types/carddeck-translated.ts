@@ -24,7 +24,7 @@ export interface CardDeckScreen {
   _onClose: (() => void) | null;
   _open: boolean;
   /** the native screen renderer object createNativeScreenRenderer() returns */
-  _renderer: any;
+  _renderer: unknown;
   _request: number;
   /** vendor object: the engine's FolderSession */
   _session: any;

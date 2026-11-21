@@ -9,19 +9,20 @@ import { GROUND } from "../ground.js";
 import { soilLand, apronOutline } from "./land.js";
 import { itemsFrom, itemsOnTriangles, itemsOnRing, composeYaw } from "../slots.js";
 import type { BuiltGroundInfo, BuiltGroundPalette, BuiltGroundStats } from "./types.js";
+import type { BuiltSlotItem } from "../types.js";
 
-function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const smooth01 = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const b8 = (x) => Math.max(0, Math.min(255, Math.round(x * 255)));
+function rng(seed: number) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const smooth01 = (a: number | undefined, b: number | undefined, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const b8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255)));
 
 // ---------------- palette: the recipe's measured colours, sRGB -> linear once ----------------
 /** dirt / path / rock from the bank strips' own measured colours, grass from the ground piece's p10/p90 (the same
  *  two entries grass.js bakes blades against). `src` keeps the measured sRGB bytes for the checks. */
 export function groundPalette(rec): BuiltGroundPalette {
-  const one = (kind) => rec.pieces.find((p) => p.kind === kind)?.colours || {};
+  const one = (kind: string) => rec.pieces.find((p: { kind: string; }) => p.kind === kind)?.colours || {};
   const g = one("grass"), b = one("bank");
-  const pick = (c, k, d) => (Array.isArray(c?.[k]) ? c[k] : d);
+  const pick = (c, k: string, d: number[]) => (Array.isArray(c?.[k]) ? c[k] : d);
   const src = {
     grassLo: pick(g, "p10", [91, 127, 54]), grassHi: pick(g, "p90", [110, 156, 85]),
     dirt: pick(b, "other", [136, 99, 81]), path: pick(b, "p90", [195, 155, 113]),
@@ -36,9 +37,9 @@ export function groundPalette(rec): BuiltGroundPalette {
 // ---------------- the mask: one baked byte grid over the ground ----------------
 /** Height of the ground's own triangles over the mask grid (NaN = no ground): a raster of the triangles (flat
  *  position arrays, world units), barycentric per texel centre, the highest triangle wins. */
-function rasterHeight(posList, N, E) {
+function rasterHeight(posList, N: number, E: number) {
   const h = new Float32Array(N * N).fill(NaN), span = 2 * E;
-  const toTex = (v) => (v + E) / span * N;
+  const toTex = (v: number) => (v + E) / span * N;
   for (const P of posList) {
     const V = [0, 1, 2].map(() => ({ x: 0, y: 0, z: 0 }));
     for (let t = 0; t + 8 < P.length; t += 9) {
@@ -101,8 +102,8 @@ export function bakeArenaMask(posList) {
     }
   }
   // the JS twin of the shader's read: the SAME bytes, bilinear, same uv mapping
-  const at = (i, j) => { const k = ((j < 0 ? 0 : j > N - 1 ? N - 1 : j) * N + (i < 0 ? 0 : i > N - 1 ? N - 1 : i)) * 4; return [data[k] / 255, data[k + 1] / 255, data[k + 2] / 255, data[k + 3] / 255]; };
-  function sample(x, z) {
+  const at = (i: number, j: number) => { const k = ((j < 0 ? 0 : j > N - 1 ? N - 1 : j) * N + (i < 0 ? 0 : i > N - 1 ? N - 1 : i)) * 4; return [data[k] / 255, data[k + 1] / 255, data[k + 2] / 255, data[k + 3] / 255]; };
+  function sample(x: number, z: number) {
     const u = (x + E) / span * N - 0.5, v = (z + E) / span * N - 0.5;
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
     const a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1), out = [0, 0, 0, 0];
@@ -110,10 +111,10 @@ export function bakeArenaMask(posList) {
     return { dirt: out[0], rock: out[1], path: out[2], ao: out[3] };
   }
   /** the ground's own height where the AO raster saw it (null off the ground) — the mask is over the ground */
-  function heightAt(x, z) {
+  function heightAt(x: number, z: number) {
     const u = (x + E) / span * N - 0.5, v = (z + E) / span * N - 0.5;
     const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j;
-    const get = (a, b) => { const ii = Math.max(0, Math.min(N - 1, a)), jj = Math.max(0, Math.min(N - 1, b)); const y = hgt[jj * N + ii]; return Number.isNaN(y) ? 0 : y; };
+    const get = (a: number, b: number) => { const ii = Math.max(0, Math.min(N - 1, a)), jj = Math.max(0, Math.min(N - 1, b)); const y = hgt[jj * N + ii]; return Number.isNaN(y) ? 0 : y; };
     return (get(i, j) * (1 - fu) + get(i + 1, j) * fu) * (1 - fv) + (get(i, j + 1) * (1 - fu) + get(i + 1, j + 1) * fu) * fv;
   }
   const info = { res: N, extent: E, texel: span / N, channels: "R dirt, G rock, B path, A ao", groundTexels: baked,
@@ -125,10 +126,10 @@ export function bakeArenaMask(posList) {
  *  centres at +0.5, clamped) + the ground paint's AO amount and cliff slope: what grass.js grows blades against. */
 export function maskReader(mask) {
   const data = mask.data, N = mask.res, span = mask.span;
-  const at = (i, j) => (Math.max(0, Math.min(N - 1, j)) * N + Math.max(0, Math.min(N - 1, i))) * 4;
+  const at = (i: number, j: number) => (Math.max(0, Math.min(N - 1, j)) * N + Math.max(0, Math.min(N - 1, i))) * 4;
   return {
     span, aoAmt: GROUND.AO_AMT, cliffLo: GROUND.CLIFF_LO,
-    sample(x, z) {
+    sample(x: number, z: number) {
       const uu = (x / span + 0.5) * N - 0.5, vv = (z / span + 0.5) * N - 0.5;
       const i = Math.floor(uu), j = Math.floor(vv), fu = uu - i, fv = vv - j, out = [0, 0, 0, 0];
       const a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1);
@@ -166,7 +167,7 @@ export function rockCandidates(rec) {
 export function plan(pctx) {
   const { rec, pal, info } = pctx, t0 = performance.now(), P = GROUND;
   // 1. the arena's own ground triangles (the fighters stand on exactly these)
-  const pieces = rec.pieces.filter((p) => p.kind === "grass" || p.kind === "soil").map((p) => {
+  const pieces = rec.pieces.filter((p: { kind: string; }) => p.kind === "grass" || p.kind === "soil").map((p) => {
     info.pieces[p.name] = { kind: p.kind, tris: p.tris };
     return { name: p.name, kind: p.kind, pos: new Float32Array(p.pos), colours: p.colours || {} };
   });
@@ -174,7 +175,7 @@ export function plan(pctx) {
   const mask = bakeArenaMask(pieces.map((q) => q.pos));
   const gp = groundPalette(rec);
   gp.haze = pal.haze.clone(); gp.skyHorizon = pal.skyHorizon.clone();   // the hills paint with the sky's own haze
-  const soilGround = pieces.some((q) => q.kind === "soil");   // forest floor on a lake: no hills, no scattered boulders
+  const soilGround = pieces.some((q: { kind: string; }) => q.kind === "soil");   // forest floor on a lake: no hills, no scattered boulders
   const hasGround = pieces.length > 0;
   // the soil apron under the tree ring (one outline from the land, soil.js)
   let apron = null;
@@ -184,7 +185,7 @@ export function plan(pctx) {
               landEnd: land.outline.landEnd, floorEnd: land.outline.floorEnd, ms: land.ms } };
   }
   // 3. the bank strips: positions and per-vertex bottom / top colours (linear)
-  const bank = rec.pieces.filter((p) => p.kind === "bank").map((p) => {
+  const bank = rec.pieces.filter((p: { kind: string; }) => p.kind === "bank").map((p) => {
     info.pieces[p.name] = { kind: "bank", tris: p.tris };
     const pos = new Float32Array(p.pos), ys = [];
     for (let i = 1; i < pos.length; i += 3) ys.push(pos[i]);
@@ -211,8 +212,8 @@ export function plan(pctx) {
   const cands = rockCandidates(rec);
   const trisPerRock = 2 * P.ROCKS.HULL_PTS - 4;
   let rockInfo = null;
-  const groundHeight = (x, z) => pctx.ko.groundHeight(x, z);
-  function rejectRock(c, rho, ko) {
+  const groundHeight = (x, z: number) => pctx.ko.groundHeight(x, z);
+  function rejectRock(c, rho: number, ko) {
     if (Math.hypot(c[0], c[2]) - rho < ko.fightR) return "fight";
     for (const f of ko.fighters) for (const g of ko.rings) {
       for (let a = 0; a < 360; a += 3) {
@@ -292,7 +293,7 @@ export function plan(pctx) {
   if (scatter) slots.push({
     id: "ground.rocks", label: "Scattered boulders", kind: "rock", layer: "builtBoulders", default: "mod.ground_rocks", placeOrder: 0, data,
     items: itemsFrom([]), meshName: () => "builtBoulders",
-    meshData: (g, idx) => { const it = rocksSlot().cur; return { kind: "rocks", at: idx.map((i) => it.list[i].at), scale: idx.map((i) => it.list[i].s) }; },
+    meshData: (g, idx) => { const it = rocksSlot().cur; return { kind: "rocks", at: idx.map((i: string | number) => it.list[i].at), scale: idx.map((i: string | number) => it.list[i].s) }; },
     place(state, shape, asset) { const it = placeRocks(state, asset); report(); return it; },
   });
   /** no scattered boulders here (no hillside / a forest floor): the numbers say so on every keep-out round */
@@ -305,7 +306,7 @@ export function plan(pctx) {
   }
   const rocksSlot = () => pctx.slots.get("ground.rocks");
 
-  const meshesOf = (id) => pctx.slots.meshesOf(id);
+  const meshesOf = (id: string) => pctx.slots.meshesOf(id);
   const floorMeshes = () => meshesOf("ground.floor").filter((m) => m.isMesh);
   const layer = {
     get ground() { return floorMeshes(); }, mask, palette: gp,
@@ -321,7 +322,7 @@ export function plan(pctx) {
   const partsInfo = () => {
     const fl = floorMeshes(), hm = meshesOf("ground.hills")[0];
     return {
-      ground: { tris: fl.reduce((s, m) => s + m.geometry.attributes.position.count / 3, 0), meshes: fl.length },
+      ground: { tris: fl.reduce((s: number, m: { geometry: { attributes: { position: { count: number; }; }; }; }) => s + m.geometry.attributes.position.count / 3, 0), meshes: fl.length },
       bank: { tris: bankTris, meshes: meshesOf("ground.bank").length ? 1 : 0 },
       rocks: rockInfo ? { count: rockInfo.accepted, trisPerRock: rockInfo.trisPerRock, tris: rockInfo.triangles } : { count: 0, tris: 0 },
       hills: hm ? { ribbons: GROUND.HILLS.R.length, tris: triOf(hm) }

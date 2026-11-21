@@ -77,40 +77,40 @@ export interface BuiltMirrorUniforms {
   uLakeMid: { value: any; };
   uRipple: { value: number; };
   uSkyline: { value: any; };
-  uTint: { value: any; };
-  uTintHi: { value: any; };
-  uTintLo: { value: any; };
+  uTint: { value: unknown; };
+  uTintHi: { value: unknown; };
+  uTintLo: { value: unknown; };
 }
 
 export interface BuiltLeafCache {
   /** the shared leaf-clump THREE.CanvasTexture */
-  leafTex?: any;
+  leafTex?: unknown;
 }
 
 export interface BuiltCoverCache {
-  fcUniforms?: any;
+  fcUniforms?: unknown;
 }
 
 export interface BuiltSkyState {
-  cloudInst?: any;
-  clouds: any;
-  data: any;
+  cloudInst?: unknown;
+  clouds: unknown;
+  data: unknown;
   dispose?: () => void;
-  info: any;
-  material: any;
-  mesh: any;
-  noise: any;
-  opts: any;
-  pal?: any;
-  rec?: any;
-  scene: any;
-  worldScale: any;
+  info: unknown;
+  material: unknown;
+  mesh: unknown;
+  noise: unknown;
+  opts: unknown;
+  pal?: unknown;
+  rec?: unknown;
+  scene: unknown;
+  worldScale: unknown;
 }
 
 export interface BuiltSlotItem {
   moved?: boolean;   // stats.rebuilt: did the keep-out move this item
-  stats?: any;       // the keep-out numbers of the pass that made the items
-  attrs?: any;
+  stats?: unknown;       // the keep-out numbers of the pass that made the items
+  attrs?: unknown;
   col?: Float32Array<ArrayBuffer>;
   grp?: Int32Array<ArrayBuffer>;
   /** one height per chosen point */
@@ -125,13 +125,13 @@ export interface BuiltSlotItem {
 }
 
 export interface BuiltSlotInstances {
-  meshes: any[];
-  objects: any[];
-  update?: (cam: any, ms: number) => any;
+  meshes: unknown[];
+  objects: unknown[];
+  update?: (cam: unknown, ms: number) => unknown;
 }
 
 export interface BuiltGeminiStats {
-  anchors?: any[][];
+  anchors?: unknown[][];
   backInstances?: number;
   buildMs?: number;
   drawCalls?: number;
@@ -149,21 +149,21 @@ export interface BuiltSpiresInfo {
   buildMs?: number;
   bushes: any;
   cards: number;
-  gemini?: any;
+  gemini?: unknown;
   geometry?: { verts: number; tris: number; };
-  groups: any;
+  groups: unknown;
   islands: any;
-  islandsShown?: any;
+  islandsShown?: unknown;
   keepOut?: BuiltSpiresCounts;
-  measured: any;
+  measured: unknown;
   meshes: number;
   ms: number;
   nan?: number;
   problems?: string[];
   shown?: number;
-  skipped: any;
+  skipped: unknown;
   triangles: number;
-  values: any;
+  values: unknown;
   walls: any;
   wallsShown?: number;
 }
@@ -213,14 +213,14 @@ export interface BuiltDayLight {
 
 /** buildSand()'s info out-param: the numbers measured for the sand field */
 export interface BuiltSandInfo {
-  sand?: any;
+  sand?: unknown;
 }
 
 /** soilMaterial()'s info out-param: the tone it fitted and the colour measurements behind it */
 export interface BuiltSoilInfo {
   /** the texture's attribution line */
   credit?: string;
-  measured?: any;
+  measured?: unknown;
   /** what the tone fit found: the tint, the contrast, the photo mean it was fitted to */
   tone?: Record<string, unknown>;
 }

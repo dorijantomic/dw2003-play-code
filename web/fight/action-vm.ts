@@ -57,7 +57,7 @@ import {
 // them (below) instead of hand-counting its own wait and ramp state.
 export { rampCurve, RAMP_TARGET };
 
-const TERM = (op) => op === 0 || op === 255;          // shared terminator path (finding f)
+const TERM = (op: number) => op === 0 || op === 255;          // shared terminator path (finding f)
 const STRIKE_TYPE = 99;                               // op10 type 0x63 = the damage strike (finding e)
 const EFFECT_CURRENT = 9999;                          // op3 type 0x270f = actor's current-effect (+0x6c)
 const OP_BUDGET = 256;                                // defensive cap on ops/tick (no terminator/wait)
@@ -66,7 +66,7 @@ const HOLD_CAP = 600;                                 // max ticks to hold on th
 // disc table 0x800a365c; MOVE_SPEED no longer drives the ramp. Kept so
 // battle3d's debugSetMoveSpeed / the action lab keep working.
 export let MOVE_SPEED = 64;
-export function setMoveSpeed(n) { MOVE_SPEED = Math.max(1, n | 0); return MOVE_SPEED; }
+export function setMoveSpeed(n: number) { MOVE_SPEED = Math.max(1, n | 0); return MOVE_SPEED; }
 
 // Slot stand-in for a VM with no actor attached (tests, the action lab). The live game passes the
 // ActorAnimator's adapter so the motion object writes the fighter's real arena offset.
@@ -75,7 +75,7 @@ function detachedSlot() {
   return {
     sideSign: 1,
     getY: () => st.y, getZ: () => st.z,
-    setY: (v) => { st.y = v; }, setZ: (v) => { st.z = v; },
+    setY: (v: number) => { st.y = v; }, setZ: (v: number) => { st.z = v; },
   };
 }
 
@@ -281,7 +281,7 @@ export class ActionVM {
     if (mode === 4) {
       // Slot secondary transform vector (+0x22/+0x24/+0x26). The handler
       // copies X and negates Y/Z; these are PS1 rotation angles (4096=360°).
-      const neg = (v) => v ? -v : 0;
+      const neg = (v: number) => v ? -v : 0;
       this.hooks.onRotate?.({ x: words[2] | 0, y: neg(words[3] | 0), z: neg(words[4] | 0) });
       return true;
     }
@@ -327,7 +327,7 @@ export class ActionVM {
   // The factory, the distance arithmetic and the amp/rate table are the port's; `param` is
   // meaningful for kind 4 only. The object starts in state 0 and its first tick runs the
   // state-0 fall-through.
-  _armRamp(kind, param) {
+  _armRamp(kind: number, param: number) {
     const k = slotMotionKind(kind);
     if (!k) { this._ramp = null; return; }
     this._ramp = armSlotMotion(kind, param, this._motionSlot());
@@ -339,7 +339,7 @@ export class ActionVM {
   // pose and finishes (state 3). This is the FIX for the documented one-tick release
   // divergence — the browser used to advance its timer first and release one call late.
   // The object is KEPT after it finishes (state 3), like the original's context+0x4 slot.
-  _stepRamp(delta) {
+  _stepRamp(delta: number) {
     const r = this._ramp;
     if (!r || (r.state | 0) >= 3) return;
     stepSlotMotion(r, this._motionSlot(), delta);
@@ -359,23 +359,23 @@ export class ActionVM {
   _portMem(rec) {
     const OP = 0x30000000, ACT = 0x30010000, CTX = 0x30020000;
     const ops = rec.words, actor = this._pActor, ctx = this._pCtx;
-    const arr = (a) => (a >= ACT && a < CTX ? actor : ctx);
-    const idx = (a) => ((a >= ACT ? a - ACT : a - CTX) >>> 2) & 0x3f;
-    const half = (a) => {
+    const arr = (a: number) => (a >= ACT && a < CTX ? actor : ctx);
+    const idx = (a: number) => ((a >= ACT ? a - ACT : a - CTX) >>> 2) & 0x3f;
+    const half = (a: number) => {
       const arr2 = arr(a), w = arr2[idx(a)] | 0;
       return ((w >>> ((a & 2) ? 16 : 0)) & 0xffff) << 16 >> 16;
     };
     return {
-      read16s: (a) => {
+      read16s: (a: number) => {
         if (a >= OP && a < OP + 0x40) { const w = (a - OP) >>> 1; return (((ops[w] ?? 0) & 0xffff) << 16) >> 16; }
         return half(a);
       },
-      read32: (a) => (a >= OP && a < OP + 0x40) ? 0 : (arr(a)[idx(a)] | 0),
-      write32: (a, v) => { if (a < OP || a >= OP + 0x40) arr(a)[idx(a)] = v | 0; },
+      read32: (a: number) => (a >= OP && a < OP + 0x40) ? 0 : (arr(a)[idx(a)] | 0),
+      write32: (a: number, v: number) => { if (a < OP || a >= OP + 0x40) arr(a)[idx(a)] = v | 0; },
     };
   }
 
-  _portHost(rec, slotBase = 0) {
+  _portHost(rec: { words: number[]; }, slotBase = 0) {
     const self = this;
     const fx = () => { self._effect(rec.words); };
     const playMotion = () => { self.lastMotion = rec.words[1]; self.hooks.onMotion?.(rec.words[1]); };
@@ -409,7 +409,7 @@ export class ActionVM {
     return host;
   }
 
-  _drivePort(name, rec) {
+  _drivePort(name: string, rec: { words: number[]; }) {
     const OP = 0x30000000, ACT = 0x30010000, CTX = 0x30020000;
     this._pActor.fill(0); this._pCtx.fill(0);
     const mem = this._portMem(rec);
@@ -432,7 +432,7 @@ export class ActionVM {
   // +0x98/+0x9c wait state machine; it returns false while the wait is armed (the caller
   // rewinds the record cursor) and true in the tick it releases (continue). The browser's
   // `delta` is the per-tick frame step the original reads at D0x8004df9c.
-  _driveWait(rec, delta) {
+  _driveWait(rec: { words: number[]; }, delta: number) {
     const a = { ip: 0, waitFlag: this._waitFlag | 0, waitCount: this._waitCount | 0 };
     const released = op11Wait(a, rec.words[0] | 0, delta | 0, 1);
     this._waitFlag = a.waitFlag | 0;
@@ -443,7 +443,7 @@ export class ActionVM {
   // op2 mode 5 sub 0 F0x8008b7f4 — the record BLOCK, driven by the port. With a slot-motion
   // object armed (ctx+0x4), the port's op2Handler returns cont 0 (yield + rewind to the opcode
   // word) while the object's state +0xc < 2 and cont 1 when it releases. Returns true to continue.
-  _portOp2Wait(rec) {
+  _portOp2Wait(rec: { words: number[]; }) {
     const OP = 0x30000000, ACT = 0x30010000, CTX = 0x30020000;
     this._pActor.fill(0); this._pCtx.fill(0);
     const mem = this._portMem(rec);
@@ -457,7 +457,7 @@ export class ActionVM {
   // mode-0 arm (op2Handler) reads the anim slot's own done-flag at +0x10; while it is zero it
   // returns cont 0 and rewinds to the record's opcode word. The browser supplies the flag's
   // value: its motion sampler sets it when the bound timeline table finishes (`player.ended`).
-  _portOp2BoundWait(rec) {
+  _portOp2BoundWait(rec: { words: number[]; }) {
     const OP = 0x30000000, ACT = 0x30010000, CTX = 0x30020000;
     this._pActor.fill(0); this._pCtx.fill(0);
     const mem = this._portMem(rec);
@@ -474,7 +474,7 @@ export class ActionVM {
   // actor+0x58/+0x5c/+0x60 and adds 1. Those source fields are populated by
   // the owning battle state, so expose the replacement request to that owner.
   // All other modes are native no-ops.
-  _auxAction(words) {
+  _auxAction(words: number[]) {
     const mode = words[0] | 0;
     if (mode === 0 || mode === 5) this.hooks.onAuxAction?.({ mode });
   }
@@ -498,7 +498,7 @@ export class ActionVM {
   // but surfaced for the lab); sub=0 [sub,type,x,y,z] = spawn at an actor-relative position.
   // type 9999 = the actor's current-effect field +0x6c (the tech record's effect type).
   // z = 32767 / -1 → screen-space draw (F0x8008921c), else world-space via the battle camera.
-  _effect(words) {
+  _effect(words: number[]) {
     const sub = words[0] | 0;
     let type = words[1] | 0;
     if (type === -1) return;
@@ -513,7 +513,7 @@ export class ActionVM {
   // op6 sub=0: [sub,id, x,y,z, x2,y2,z2]; the handler negates Y,Z of each vector
   // (PS1 Y-down/Z convention). sub=1 is the auto-target path (no explicit vectors).
   _lunge(words) {
-    const neg = (v) => (v === 0 ? 0 : -v);   // avoid -0 leaking into offsets
+    const neg = (v: number) => (v === 0 ? 0 : -v);   // avoid -0 leaking into offsets
     if (words[0] === 0 && words.length >= 8) {
       return {
         sub: 0,

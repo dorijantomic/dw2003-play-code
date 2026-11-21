@@ -2,6 +2,7 @@ import { screenIdForStage, listScrollbarThumb } from "../vendor/engine.js";
 import { loadPack } from "../screenpack.js";
 import { MS } from "./state.js";
 import type { MapSeenRow, MenuState } from "./types.js";
+import type { GameState } from "../game/types.js";
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
 // is string 11, the 6th entry, gated by the card-game unlock. UNKNOWN U-04:
@@ -60,7 +61,7 @@ export const SORT_HEADERS = Object.freeze({ pick: "Switch who?", with: "Switch w
 // the 5 is the `>= 5` compare in that input fn (ststatus overlay write-up).
 export const MAP_HOLD_FRAMES = 5;
 
-export function mapHoldSpeed(framesHeld, C = { speed_initial: 2, speed_max: 4 }) {
+export function mapHoldSpeed(framesHeld: number | undefined, C = { speed_initial: 2, speed_max: 4 }) {
   if (!(framesHeld > 0)) return 0;
   return framesHeld >= MAP_HOLD_FRAMES ? C.speed_max : C.speed_initial;
 }
@@ -68,7 +69,7 @@ export function mapHoldSpeed(framesHeld, C = { speed_initial: 2, speed_max: 4 })
 /** A walker map id ("s205", 205) as the key the decoded walker_map table uses. */
 const stageKey = (stage) => String(Number(String(stage ?? "").replace(/\D/g, "")) || 0);
 
-export function mapPs1Id(state, ui = MS.UI) {
+export function mapPs1Id(state: GameState, ui = MS.UI) {
   const walkerStage = stageKey(state?.manifest?.maps?.[state?.mapIdx]?.id);
   const wm = ui?.screens?.map?.walker_map?.[walkerStage];
   return wm?.ps1 ?? 0x200;
@@ -80,7 +81,7 @@ export function mapPs1Id(state, ui = MS.UI) {
  *  screen id (0x200..0x2EE in data/screen_table.json) those two spellings are the
  *  same number, so one bank-0x20 bit per place answers both. The page's own scan
  *  only reaches 0x2D6 — MAP is refused from 0x2D7 up (mapUnavailable). */
-export const mapSeenFlag = (ps1) => 0x2000 | (ps1 & 0xff);
+export const mapSeenFlag = (ps1: number | undefined) => 0x2000 | (ps1 & 0xff);
 
 /** The PS1 stage ids the flag store says you have walked into. `hasFlag` is the
  *  engine's banked store — the same store the field entry writes. Without one (the
@@ -126,11 +127,11 @@ export function migrateVisitedMaps(visited, table, flags) {
   }
 }
 
-export function mapUnavailable(state, ui = MS.UI) {
+export function mapUnavailable(state: GameState, ui = MS.UI) {
   return mapPs1Id(state, ui) >= 0x2D7;
 }
 
-export function bagCursorStep(cursor, key, listLength, perPage) {
+export function bagCursorStep(cursor: number, key: string, listLength: number, perPage: number) {
   const pageStart = Math.floor((listLength ? cursor : 0) / perPage) * perPage;
   const pageEnd = Math.min(Math.max(0, listLength - 1), pageStart + perPage - 1);
   if (key === "up") return Math.max(pageStart, cursor - 2);
@@ -155,7 +156,7 @@ export const SHEET_CLUT_UP = 1;
 
 export const SHEET_CLUT_DOWN = 5;
 
-export function sheetDeltaClut(before, after) {
+export function sheetDeltaClut(before: number, after: number) {
   const b = Math.min(999, Number(before) || 0);
   const a = Math.min(999, Number(after) || 0);
   if (b < a) return SHEET_CLUT_UP;
@@ -171,7 +172,7 @@ export const EQUIP_SCROLLBAR = Object.freeze({
 // The bag bar is the shared list bar (SCREEN-OBJECT-NAME-AUDIT-001): the same
 // four setters as the lab desk's digivolve list and the folder editor's swap
 // list. The arithmetic lives in the engine so all three screens share it.
-export function equipScrollbarThumb(bagLength, index, geom = EQUIP_SCROLLBAR) {
+export function equipScrollbarThumb(bagLength: number, index: number, geom = EQUIP_SCROLLBAR) {
   return listScrollbarThumb(bagLength, index, geom);
 }
 

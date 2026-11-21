@@ -282,18 +282,18 @@ export const BONEMAP = {
 export const FOLDERS = Object.keys(BONEMAP).sort();
 
 export function has(folder) { return Object.prototype.hasOwnProperty.call(BONEMAP, folder); }
-export function boneMap(folder) { return BONEMAP[folder] || null; }
-export function sideConfidence(folder) { return (BONEMAP[folder] || {}).sc || null; }
+export function boneMap(folder: string | number) { return BONEMAP[folder] || null; }
+export function sideConfidence(folder: string | number) { return (BONEMAP[folder] || {}).sc || null; }
 
 // role: 'root' | 'torso' | 'head' | 'mouth' | 'eyes' | 'chest' | 'back'
-export function roleBone(folder, role) {
+export function roleBone(folder: string | number, role: string | number) {
   const m = BONEMAP[folder];
   if (!m) return null;
   const key = { root: "r", torso: "t", head: "h", mouth: "m", eyes: "e", chest: "t", back: "t" }[role];
   return key && m[key] != null ? m[key] : null;
 }
 
-export function armChain(folder, side, n = 0) {
+export function armChain(folder: string | number, side: string, n = 0) {
   const m = BONEMAP[folder];
   if (!m) return null;
   const c = side === "left" ? (n === 0 ? m.aL : (m.aLe || [])[n - 1]) : (n === 0 ? m.aR : (m.aRe || [])[n - 1]);
@@ -302,7 +302,7 @@ export function armChain(folder, side, n = 0) {
 
 // Every arm chain of that side: the primary hand first, then the extra arms of a four- or
 // six-armed design (K14's `left-arm-2` / `right-arm-2` emitters are armChains(f, side)[1], ...).
-export function armChains(folder, side) {
+export function armChains(folder: string | number, side: string) {
   const out = [];
   for (let n = 0; ; n++) {
     const c = armChain(folder, side, n);
@@ -312,7 +312,7 @@ export function armChains(folder, side) {
   return out;
 }
 
-export function legChains(folder) {
+export function legChains(folder: string | number) {
   const m = BONEMAP[folder];
   if (!m) return [];
   const out = [];
@@ -321,7 +321,7 @@ export function legChains(folder) {
   return out;
 }
 
-export function wingChains(folder) {
+export function wingChains(folder: string | number) {
   const m = BONEMAP[folder];
   if (!m) return [];
   const out = [];
@@ -330,19 +330,19 @@ export function wingChains(folder) {
   return out;
 }
 
-export function tailChain(folder) {
+export function tailChain(folder: string | number) {
   const m = BONEMAP[folder];
   return m && m.tl && m.tl.length ? m.tl.slice() : null;
 }
 
-export function locomotionBones(folder) {
+export function locomotionBones(folder: string | number) {
   const m = BONEMAP[folder];
   return m && m.loc ? m.loc.slice() : [];
 }
 
 // Every bone that fires this emitter mode: 'both-arms' returns the two hands, 'wings' all wing
 // tips, every other mode a one-element list. 'self' returns [] - it has no launcher.
-export function firingBones(folder, mode) {
+export function firingBones(folder: string | number, mode: string) {
   const m = BONEMAP[folder];
   if (!m || !m.f) return [];
   if (mode === "both-arms") return (m.fb || [m.f["both-arms"]]).filter((x) => x != null);
@@ -350,17 +350,17 @@ export function firingBones(folder, mode) {
   return m.f[mode] != null ? [m.f[mode]] : [];
 }
 
-export function firingBone(folder, mode) {
+export function firingBone(folder: string | number, mode: string) {
   const b = firingBones(folder, mode);
   return b.length ? b[0] : null;
 }
 
 // The role a bone index plays in this model ('head', 'arm:left', 'leg:right', 'wing:left',
 // 'tail', 'root', 'torso', 'extra' or null when nothing claimed it).
-export function roleOfBone(folder, index) {
+export function roleOfBone(folder: string | number, index: number) {
   const m = BONEMAP[folder];
   if (!m) return null;
-  const has_ = (c) => Array.isArray(c) && c.indexOf(index) >= 0;
+  const has_ = (c: number[]) => Array.isArray(c) && c.indexOf(index) >= 0;
   if (has_(m.aL)) return "arm:left";
   if (has_(m.aR)) return "arm:right";
   for (const c of m.aLe || []) if (has_(c)) return "arm:left";
@@ -384,11 +384,11 @@ export function roleOfBone(folder, index) {
 //   side (dom), then its right arm, then its left arm;
 //   any other missing emitter (no mouth/tail/wing bone) -> the whole body (root), then the torso.
 // `null` only for a `self` move (no launcher) or an unknown model.
-export function launchBone(folder, techName) {
+export function launchBone(folder: string | number, techName) {
   const m = BONEMAP[folder];
   if (!m) return null;
   const p = firingPart(folder, techName);
-  const one = (mode) => (m.f && m.f[mode] != null ? m.f[mode] : null);
+  const one = (mode: string) => (m.f && m.f[mode] != null ? m.f[mode] : null);
   if (p.mode === "self") return { mode: p.mode, bone: null, source: "self" };
   let bone = one(p.mode);
   if (bone != null) return { mode: p.mode, bone, source: p.source === "annotation" ? "annotation" : p.source };

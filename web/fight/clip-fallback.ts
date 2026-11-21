@@ -177,18 +177,18 @@ const CLIP_CONTACT_VARIANTS = {
  * disc presents with no contact (15).
  */
 export function clipContacts(clip, hits = null) {
-  const variants = (CLIP_CONTACT_VARIANTS[clip] ?? [1]).filter((n) => n > 0);
+  const variants = (CLIP_CONTACT_VARIANTS[clip] ?? [1]).filter((n: number) => n > 0);
   if (!variants.length) return 0;
   const h = hits != null ? hits | 0 : 0;
   if (h <= 0) return variants.includes(1) ? 1 : variants[0];
-  return variants.find((n) => n >= h) ?? variants[variants.length - 1];
+  return variants.find((n: number) => n >= h) ?? variants[variants.length - 1];
 }
 
 import { authoredSide, mirrorOps } from "./side-mirror.js";
 import type { LaunchSpec } from "./types.js";
 
 const hasOps = (script) => !!script && Array.isArray(script.ops) && script.ops.length > 0;
-const hasTable = (model, t) => !!model?.timeline?.[t]?.table?.length;
+const hasTable = (model, t: number) => !!model?.timeline?.[t]?.table?.length;
 const cloneOp = (o) => ({ ...o, words: o.words ? o.words.slice() : [] });
 const turnedOps = (ops, turn) => (turn ? mirrorOps(ops) : ops).map(cloneOp);
 
@@ -220,7 +220,7 @@ export function selfAnchor(model) {
 }
 
 /** One op3 spawn of `type` at `anchor` (the victim's point by default, the caster's for a self cast). */
-function strikeFx(model, type, anchor = victimAnchor(model)) {
+function strikeFx(model, type: number, anchor = victimAnchor(model)) {
   const a = anchor;
   return { op: 3, words: [0, type, a.x, a.y, a.z] };
 }
@@ -243,7 +243,7 @@ function strikeFx(model, type, anchor = victimAnchor(model)) {
  */
 function withReactions(ops) {
   const contacts = [];
-  ops.forEach((o, i) => {
+  ops.forEach((o: { op: number; words: number[]; }, i) => {
     if (o.op === 10 && [CONTACT_TYPE, STRIKE_TYPE].includes(o.words?.[0] | 0)) contacts.push(i);
   });
   if (!contacts.length) return ops;
@@ -283,7 +283,7 @@ export function scriptTableSeq(script) {
 }
 
 /** The frame range a timeline table plays (op11 waits are authored in the same frame units, delta-scaled). */
-function tableFrames(model, t) {
+function tableFrames(model, t: number) {
   const tab = model?.timeline?.[t]?.table;
   if (!Array.isArray(tab) || !tab.length) return 0;
   let lo = Infinity, hi = -1;
@@ -305,7 +305,7 @@ function tableFrames(model, t) {
  * 14 = ONE frame) the built body stood still while its effect played — A11's C7 measured 0.005 of the
  * model's own basic-attack motion. Choosing by motion is a property of the data, not of a species.
  */
-function tableMotion(model, t) {
+function tableMotion(model, t: string | number) {
   const tab = model?.timeline?.[t]?.table;
   if (!Array.isArray(tab) || !tab.length) return 0;
   const seen = new Set();
@@ -314,7 +314,7 @@ function tableMotion(model, t) {
 }
 
 /** The model's base tables: 0 is the idle loop, 1 the return-to-base every authored script binds. */
-const isBaseTable = (t) => (t | 0) <= 1;
+const isBaseTable = (t: number) => (t | 0) <= 1;
 
 /** The indices of a model's timeline tables (an array on a loaded pack, a map in a synthetic test). */
 function tableIndices(model) {
@@ -323,7 +323,7 @@ function tableIndices(model) {
 }
 
 /** `list` ordered by how much motion the table holds (widest first), tables that cannot move dropped. */
-function byMotion(model, list) {
+function byMotion(model, list: number[]) {
   return (list || [])
     .filter((t) => tableMotion(model, t) >= 2)
     .sort((a, b) => tableMotion(model, b) - tableMotion(model, a));
@@ -341,9 +341,9 @@ function ownProjectile(model) {
 // EVERY authored clip-9/13 script in the 249 packs launches a projectile (op6 mode 0) - a clip that does
 // not is melee-like and keeps the attack build. That is the whole rule: no species, no ids.
 const RANGED_CLIPS = new Set([9, 13]);
-function isRangedClip(clip, script = null) {
+function isRangedClip(clip: number, script = null) {
   if (RANGED_CLIPS.has(clip)) return true;
-  return (script?.ops ?? []).some((o) => o.op === 6 && (o.words?.[0] | 0) === 0);
+  return (script?.ops ?? []).some((o: { op: number; words: number[]; }) => o.op === 6 && (o.words?.[0] | 0) === 0);
 }
 // The actor's own home line in the pack's authored frame: the mirror of victimAnchor(). A player-authored
 // pack stands at -z and aims +z (its victim line is +5120); an enemy-authored one the other way round.
@@ -363,7 +363,7 @@ const homeZ = (model) => homeLine(model);
  *     when its own clip 9 names one.
  * The op-word signs are the disc's: the decoder negates y and z (battle-action-opcodes.ts op6Handler).
  */
-function projectileOps(model, donorOps, table, element, launch: LaunchSpec = {}) {
+function projectileOps(model, donorOps, table: number | null, element: number, launch: LaunchSpec = {}) {
   const src = (donorOps ?? []).find((o) => o.op === 6 && (o.words?.[0] | 0) === 0 && (o.words?.length ?? 0) >= 8);
   const sprite = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? (src ? (src.words[1] | 0) : null);
   if (sprite == null) return src ? [cloneOp(src)] : [];
@@ -418,7 +418,7 @@ function reprojectLaunch(model, ops, element, launch: LaunchSpec = {}) {
  * op1 [0] for the outcome clip). The effect is placed in WORLD space on the victim line, never as the
  * screen-centre spark (A7b), so it lands on the defender whatever the camera does.
  */
-function contactProgram(model, hits) {
+function contactProgram(model, hits: number) {
   const out = [];
   for (let i = 1; i < Math.max(1, hits | 0); i++) {
     out.push({ op: 10, words: [CONTACT_TYPE, 0] }, strikeFx(model, SPARK_TYPE), { op: 1, words: [5] }, { op: 11, words: [8] });
@@ -438,8 +438,8 @@ function contactProgram(model, hits) {
  */
 function withHits(ops, model, contactCount) {
   const n = Math.max(0, contactCount | 0);
-  const strikeIdx = ops.findIndex((o) => o.op === 10 && (o.words?.[0] | 0) === STRIKE_TYPE);
-  const cut = ops.filter((o) => o.op !== 10 && o.op !== 1);
+  const strikeIdx = ops.findIndex((o: { op: number; words: number[]; }) => o.op === 10 && (o.words?.[0] | 0) === STRIKE_TYPE);
+  const cut = ops.filter((o: { op: number; }) => o.op !== 10 && o.op !== 1);
   if (!cut.length) return ops;
   // ticks (op11 waits, the authored unit) before each remaining op
   const ticks = [];
@@ -456,7 +456,7 @@ function withHits(ops, model, contactCount) {
   // a body with no damage strike of its own: the contact program goes where its last beat ends — before the
   // terminator, never after it (a contact appended past op255 never runs: the VM ends first)
   if (strikeIdx < 0) {
-    const term = cut.findIndex((o) => o.op === 0 || o.op === 255);
+    const term = cut.findIndex((o: { op: number; }) => o.op === 0 || o.op === 255);
     before = term < 0 ? cut.length : term;
   }
   if (n === 0) {
@@ -482,7 +482,7 @@ function withHits(ops, model, contactCount) {
   const beatOps = () => [{ op: 10, words: [CONTACT_TYPE, 0] }, strikeFx(model, SPARK_TYPE), { op: 1, words: [5] }];
   // enough authored stream before the strike to space the beats there, or the beats must bring their own room
   const room = atTick >= n * BEAT_TICKS;
-  const beatAt = (k) => (room ? Math.round(((atTick - BEAT_TICKS) * k) / Math.max(1, n - 1)) : 0);
+  const beatAt = (k: number) => (room ? Math.round(((atTick - BEAT_TICKS) * k) / Math.max(1, n - 1)) : 0);
   let placed = 1;
   let finalPlaced = false;
   for (let i = 0; i < cut.length; i++) {
@@ -535,7 +535,7 @@ function physicalFromBasic(model, basic, donor, { clip = 5, hits = null, planted
  * the absolute leap (mode 3). A mode-5 release that loses its arm becomes a short fixed beat, otherwise it
  * would wait on a motion that was never armed.
  */
-function stripMovement(ops, giant) {
+function stripMovement(ops, giant: boolean) {
   if (!giant) return ops.map(cloneOp);
   const out = [];
   for (const o of ops) {
@@ -553,11 +553,11 @@ function stripMovement(ops, giant) {
 
 /** Does an authored script move the slot at all (op2 modes 3 the leap, 5 a ramp arm, 8 the dash)? */
 function hasLocomotion(script) {
-  return (script?.ops ?? []).some((o) => o.op === 2 && [3, 5, 8].includes(o.words?.[0] | 0));
+  return (script?.ops ?? []).some((o: { op: number; words: number[]; }) => o.op === 2 && [3, 5, 8].includes(o.words?.[0] | 0));
 }
 
 /** The donor's cast, aimed with this model's own spell sprite: its op6 spawn record, or null. */
-function donorShot(donorOps, model, element) {
+function donorShot(donorOps, model, element: string | number) {
   const o = donorOps.find((x) => x.op === 6 && x.words?.[0] === 0 && x.words.length >= 8);
   if (!o) return null;
   const shot = cloneOp(o);
@@ -572,7 +572,7 @@ function donorShot(donorOps, model, element) {
  * screen-space inside its own victim preset) while a built body keeps the point the model's own strike is at.
  */
 function donorStrikeFx(donorOps, model) {
-  const o = (donorOps ?? []).find((x) => x.op === 3 && x.words?.[0] === 0 && (x.words[1] | 0) === EFFECT_CURRENT);
+  const o = (donorOps ?? []).find((x: { op: number; words: number[]; }) => x.op === 3 && x.words?.[0] === 0 && (x.words[1] | 0) === EFFECT_CURRENT);
   return strikeFx(model, o ? (o.words[1] | 0) : EFFECT_CURRENT);
 }
 
@@ -618,8 +618,8 @@ function spellFromBasic(model, basic, donorScript, { clip = 9, turn, giant, elem
   // a body with no strike record: the projectiles and the effect still have to fire before the end
   if (!placedProj && ranged) ops.push(...projectileOps(model, donorScript.ops, null, element, { ...launch, tables: launchTables }));
   const final = withHits(ops, model, clipContacts(clip, hits));
-  if (!final.some((o) => o.op === 3 && (o.words?.[0] | 0) === 0 && (o.words[1] | 0) === EFFECT_CURRENT)) {
-    const at = final.findIndex((o) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) === 1);
+  if (!final.some((o: { op: number; words: number[]; }) => o.op === 3 && (o.words?.[0] | 0) === 0 && (o.words[1] | 0) === EFFECT_CURRENT)) {
+    const at = final.findIndex((o: { op: number; words: number[]; }) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) === 1);
     final.splice(at < 0 ? final.length : at, 0, cloneOp(fx));
   }
   return { ...donorScript, ops: final, synthesized: true, camAuthored: "own", buildKind: ranged ? "cast" : "attack" };
@@ -675,7 +675,7 @@ function castFromDonor(model, clip, gap, { turn, element, hits, launch = {} }) {
       ops.splice(where, 0, ...recs);
     }
   }
-  const preloads = donorOps.filter((o) => (o.op === 3 || o.op === 6) && (o.words?.[0] | 0) === 1);
+  const preloads = donorOps.filter((o: { op: number; words: number[]; }) => (o.op === 3 || o.op === 6) && (o.words?.[0] | 0) === 1);
   if (preloads.length) ops.unshift(...preloads.map(cloneOp));
   const final = withHits(stripMovement(ops, true), model, clipContacts(clip, hits));
   return { ...gap.script, ops: final, synthesized: true, camAuthored: turn ? "donor" : "own", buildKind: "cast",
@@ -695,7 +695,7 @@ function castFromDonor(model, clip, gap, { turn, element, hits, launch = {} }) {
  * victim and need no cut. Both the spark and the reaction are what make the blow readable on the defender:
  * without the op1 records the enemy took damage and never played its death clip (BRIEF4 Phase 4c).
  */
-function bodyFromTable(model, table, donorScript, { turn, element, clip, hits = null, launch = {} }) {
+function bodyFromTable(model, table: number, donorScript, { turn, element, clip, hits = null, launch = {} }) {
   const frames = tableFrames(model, table);
   // op11 counts FRAMES and the action tick advances 2 of them (op11Wait, engine.js:20520): a wind-up of
   // ~half the table and a follow-through of one full table length play the body once, at an authored pace.
@@ -794,7 +794,7 @@ function calmBodyTable(model, row) {
  * of the attack records. op3 9999 is resolved by the animator to the technique's own effect —
  * or, on the item path, to the used item's record effect (actor+0x6c).
  */
-function buildSelfScript(model, row) {
+function buildSelfScript(model, row: { m: string; d: string; t: number[]; }) {
   const body = calmBodyTable(model, row);
   if (!body) return null;
   const hold = body.hold == null ? Math.min(120, Math.max(45, Math.round(tableFrames(model, body.table) * 0.85))) : body.hold;
@@ -819,7 +819,7 @@ function buildSelfScript(model, row) {
   return { ops, synthesized: true, camAuthored: "donor", buildKind: "self", selfCast: true };
 }
 
-function buildGapScript(model, clip, row, gap, element, target, hits = null, planted = false, tech = null) {
+function buildGapScript(model, clip: number, row: { m: string; d: string; t: number[]; }, gap, element: number, target: string, hits = null, planted = false, tech = null) {
   const targetSide = authoredSide(model);
   const turn = !!gap.side && !!targetSide && gap.side !== targetSide;
   if (target === "self") return buildSelfScript(model, row);   // heal/support/item: never an attack body
@@ -846,21 +846,21 @@ function buildGapScript(model, clip, row, gap, element, target, hits = null, pla
  */
 function builtPresentation(model, script) {
   if (!script || !Array.isArray(script.ops)) return script;
-  const screenZ = (z) => z === 32767 || z === -1 || Math.abs(z | 0) > 20000;
+  const screenZ = (z: number) => z === 32767 || z === -1 || Math.abs(z | 0) > 20000;
   // our own strike spawns sit exactly on the fighter lines (victimAnchor / selfAnchor, y = -896); a body's
   // wind-up puff sits at an odd offset on its OWN side and has no place in a script whose cut we removed
-  const onLine = (o) => Math.abs(o.words?.[4] | 0) === VICTIM_LINE && (o.words?.[3] | 0) === -896;
-  const ops = script.ops.filter((o) => o.op !== 5).filter((o) => {
+  const onLine = (o: { words: number[]; }) => Math.abs(o.words?.[4] | 0) === VICTIM_LINE && (o.words?.[3] | 0) === -896;
+  const ops = script.ops.filter((o: { op: number; }) => o.op !== 5).filter((o) => {
     if (o.op !== 3 || (o.words?.[0] | 0) !== 0) return true;      // preloads/motions stay
     return !screenZ(o.words?.[4]) && onLine(o);
   });
-  const hasVictimFx = ops.some((o) => o.op === 3 && (o.words?.[0] | 0) === 0 && (o.words[1] | 0) === EFFECT_CURRENT);
+  const hasVictimFx = ops.some((o: { op: number; words: number[]; }) => o.op === 3 && (o.words?.[0] | 0) === 0 && (o.words[1] | 0) === EFFECT_CURRENT);
   if (!hasVictimFx) {
     let at = -1;
-    ops.forEach((o, i) => { if (o.op === 10 && (o.words?.[0] | 0) === STRIKE_TYPE) at = i; });
+    ops.forEach((o: { op: number; words: number[]; }, i: number) => { if (o.op === 10 && (o.words?.[0] | 0) === STRIKE_TYPE) at = i; });
     const fx = strikeFx(model, EFFECT_CURRENT);
     if (at < 0) {
-      const term = ops.findIndex((o) => o.op === 0 || o.op === 255);
+      const term = ops.findIndex((o: { op: number; }) => o.op === 0 || o.op === 255);
       if (term < 0) ops.push(fx); else ops.splice(term, 0, fx);
     } else ops.splice(at + 1, 0, fx);
   }
@@ -878,7 +878,7 @@ function builtPresentation(model, script) {
  * Tick arithmetic: a playlist entry is one action tick, and op11 waits count ticks, so the release lands on
  * the tick the plan says and the strike on launch+flight (A16's rule, from the disc's own gap).
  */
-function solvedCastScript(model, clip, solved, { turn, element, hits, launch = {} }: { turn: any; element: any; hits: any; launch?: LaunchSpec }) {
+function solvedCastScript(model, clip: number, solved, { turn, element, hits, launch = {} }: { turn: any; element: any; hits: any; launch?: LaunchSpec }) {
   const table = solved.table;
   // K19f: the shot leaves from where the SOLVED pose holds the emitter at the release frame, not from
   // whichever frame of the table reaches furthest forward (which for a generated table is its first).
@@ -905,9 +905,9 @@ function solvedCastScript(model, clip, solved, { turn, element, hits, launch = {
   };
 }
 
-function buildEnemyScript(model, clip, row, gap, element, hits, planted, turn, launch: LaunchSpec = {}) {
+function buildEnemyScript(model, clip, row, gap, element, hits, planted: boolean, turn, launch: LaunchSpec = {}) {
   // the model's own body tables for this row, the ones that actually MOVE first (tableMotion)
-  const body = byMotion(model, (row.t || []).filter((t) => hasTable(model, t)));
+  const body = byMotion(model, (row.t || []).filter((t: number) => hasTable(model, t)));
   // A12: an ENEMY-targeted technique may never be presented with a SELF-shaped script. The disc writes the
   // item pose into clip 10 and some enemy packs put their second attack there; when the donor's script for
   // that clip asks for no defender reaction, launches nothing and spawns its effect in screen space over the
@@ -975,7 +975,7 @@ const finalBeat = (model) => [
  * around it survives) - the same shape withHits builds, but anchored on the body's own moments rather
  * than on a fixed 10-tick spacing from the strike.
  */
-function withOwnClip(model, clip, plan, { element = 1, hits = null } = {}) {
+function withOwnClip(model, clip: number, plan, { element = 1, hits = null } = {}) {
   const src = model?.actions?.[plan.slot];
   if (!hasOps(src)) return null;
   const contacts = clipContacts(clip, hits);
@@ -1026,7 +1026,7 @@ function withOwnClip(model, clip, plan, { element = 1, hits = null } = {}) {
   // prefix fires before the body has moved (a wind-up spark), so it is the last resort, not the first
   const late = firstBeat >= 0 ? pre.filter((m) => m.at >= firstBeat) : [];
   const pool = late.length ? late : pre;
-  const chosen = [];
+  const chosen: ({ at: number; type: number; contact: boolean; } | undefined)[] = [];
   if (need > 0 && pool.length) {
     if (need <= pool.length) {
       for (let i = 0; i < need; i++) {
@@ -1075,14 +1075,14 @@ function withOwnClip(model, clip, plan, { element = 1, hits = null } = {}) {
   const cls = classifyOwnScript(model, src);
   const travelsOut = cls.ramp4 > 0 || cls.leap3 > 0 || cls.dash8 > 0;
   if (travelsOut && !cls.returnsHome) {
-    let term = built.ops.findIndex((o) => o.op === 0 || o.op === 255);
+    let term = built.ops.findIndex((o: { op: number; }) => o.op === 0 || o.op === 255);
     if (term < 0) term = built.ops.length;
     built.ops.splice(term, 0, { op: 2, words: [7, 0, 0] });
   }
   return built;
 }
 
-function donorPayload(model, clip, row) {
+function donorPayload(model, clip: string | number, row) {
   const prepared = model.donorClips?.[clip];
   if (prepared) return prepared;
   const anim = donorAnims.get(row.d);
@@ -1141,7 +1141,7 @@ export function resolveClipScript(model, clip, opts = {}) {
  * the whole DW2 motion plays: a reaction has no strike to be late for, and a death that stops
  * three frames in reads as a freeze. Nothing else is touched.
  */
-export function withDw2Body(model, base, clip, { tech = null, element = 1, force = false } = {}) {
+export function withDw2Body(model, base, clip: number, { tech = null, element = 1, force = false } = {}) {
   // THE USER RULE: DW2 motion only FILLS a slot the DW3 model does not own. A slot with an own action
   // script is authored data and is returned untouched — no DW2 body ever replaces a clip the model
   // already plays (its own attack, death, idle, reactions all stay exactly as the disc wrote them).
@@ -1155,7 +1155,7 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1, force
   // op4 motion envelope with no op2 body bind (the item/throw clips 14/15/17 do this on several packs)
   // has no place to put the DW2 motion: binding one in front of an envelope that immediately returns to
   // base would declare a table the actor never gets a frame to play (C7 measures exactly that).
-  const hasBodyBind = base.ops.some((o) => o.op === 2 && (o.words?.[0] | 0) === 0 && (o.words?.[2] | 0) > 1);
+  const hasBodyBind = base.ops.some((o: { op: number; words: number[]; }) => o.op === 2 && (o.words?.[0] | 0) === 0 && (o.words?.[2] | 0) > 1);
   if (!hasBodyBind) return base;
   const bodyTable = dw2.table;
   const ops = [];
@@ -1182,7 +1182,7 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1, force
   // added in front of the strike, or the waits before it are shortened. Every later op keeps its distance to the first strike.
   if (strikeKinds.has(dw2.kind) && Number.isInteger(dw2.hit)) {
     const bind = ops.findIndex((o) => o.op === 2 && (o.words?.[2] | 0) === bodyTable);
-    const isStrike = (o) => (o.op === 6 && (o.words?.[0] | 0) === 0) || (o.op === 10 && [98, 99].includes(o.words?.[0] | 0));
+    const isStrike = (o: { op: number; words: number[]; }) => (o.op === 6 && (o.words?.[0] | 0) === 0) || (o.op === 10 && [98, 99].includes(o.words?.[0] | 0));
     const first = ops.findIndex((o, i) => i > bind && isStrike(o));
     if (bind >= 0 && first > bind) {
       // the strike waits for the BODY: drop the fixed waits and the whole-table waits ([0,s,0], [5,s,0] with no ramp armed)
@@ -1231,7 +1231,7 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1, force
   // they are re-projected onto this model's own emitter bones at the new table (K13's plan is the
   // authority for where a technique launches from, and C11 measures the record against the bone tip).
   // Their BEAT is untouched: only the coordinates are re-measured, so launch timing stays today's.
-  const hadShot = base.ops.some((o) => o.op === 6 && (o.words?.[0] | 0) === 0);
+  const hadShot = base.ops.some((o: { op: number; words: number[]; }) => o.op === 6 && (o.words?.[0] | 0) === 0);
   let finalOps = ops;
   if (hadShot && tech != null) {
     const reproj = reprojectLaunch(model, ops, element, { tech, volley: (clip | 0) === 13, tables: [bodyTable] });
@@ -1241,7 +1241,7 @@ export function withDw2Body(model, base, clip, { tech = null, element = 1, force
   return { ...base, ops: finalOps, dw2Motion: { letter: dw2.letter, table: bodyTable, kind: dw2.kind, slot: dw2.slot } };
 }
 
-export function resolveClipScriptBase(model, clip, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+export function resolveClipScriptBase(model, clip: number | null, { element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
   const own = model?.actions?.[clip];
   if (hasOps(own) && (target !== "self" || scriptIsSelfCast(own))) return own;
   if (clip == null || !model) return null;

@@ -20,7 +20,7 @@ import { FIELD_VIEW_W, FIELD_VIEW_PAD } from "./field-view.js";
 
 const stages = new Map();    // stageId -> built data | null (nothing to sway)
 
-const isFoliage = (r, g, b) => g > 40 && g > r * 1.06 && g > b * 1.06;
+const isFoliage = (r: number | undefined, g: number | undefined, b: number | undefined) => g > 40 && g > r * 1.06 && g > b * 1.06;
 
 function pixels(img) {
     const cv = document.createElement("canvas");
@@ -30,7 +30,7 @@ function pixels(img) {
     return { cv, cx, data: cx.getImageData(0, 0, cv.width, cv.height).data, w: cv.width, h: cv.height };
 }
 
-function build(stageId, fgImg, baseImg) {
+function build(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
     const t0 = performance.now();
     const fg = pixels(fgImg), W = fg.w, H = fg.h;
     if (baseImg.naturalWidth !== W || baseImg.naturalHeight !== H) return null;
@@ -74,7 +74,7 @@ function build(stageId, fgImg, baseImg) {
         dest[o] = d[o]; dest[o + 1] = d[o + 1]; dest[o + 2] = d[o + 2]; dest[o + 3] = d[o + 3];
         if (dest === tree.data) { mask[i] = 1; occ[((i / W / CELL_H) | 0) * cols + (((i % W) / CELL_W) | 0)] = 1; }
     }
-    const mk = (img) => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.getContext("2d").putImageData(img, 0, 0); return cv; };
+    const mk = (img: ImageData) => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; cv.getContext("2d").putImageData(img, 0, 0); return cv; };
     const treeCv = mk(tree), restCv = mk(rest);
 
     // 3. fill the base picture under the removed canopies from the ground around them
@@ -119,14 +119,14 @@ function build(stageId, fgImg, baseImg) {
     return out;
 }
 
-function get(stageId, fgImg, baseImg) {
+function get(stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement) {
     let b = stages.get(stageId);
     if (b === undefined) { b = build(stageId, fgImg, baseImg); stages.set(stageId, b); }
     return b;
 }
 
 // the filler for the original canopy pixels, drawn over the base picture (under every sprite)
-export function drawTreePatch(ctx, stageId, fgImg, baseImg, camX, camY) {
+export function drawTreePatch(ctx: CanvasRenderingContext2D | null, stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement, camX: number, camY: number) {
     if (!(fgImg instanceof Image) || !(baseImg instanceof Image)) return false;
     const b = get(stageId, fgImg, baseImg);
     if (!b) return false;
@@ -135,7 +135,7 @@ export function drawTreePatch(ctx, stageId, fgImg, baseImg, camX, camY) {
 }
 
 // the foreground layer, with the canopies swaying; false when this map has none
-export function drawSwayingForeground(ctx, stageId, fgImg, baseImg, camX, camY, now, gust, calm = 1) {
+export function drawSwayingForeground(ctx: CanvasRenderingContext2D | null, stageId, fgImg: HTMLImageElement, baseImg: HTMLImageElement, camX: number, camY: number, now: number, gust: { x: number; s: number; } | null, calm = 1) {
     if (!(fgImg instanceof Image) || !(baseImg instanceof Image)) return false;
     const b = get(stageId, fgImg, baseImg);
     if (!b) return false;
@@ -163,4 +163,4 @@ export function drawSwayingForeground(ctx, stageId, fgImg, baseImg, camX, camY, 
     }
     return true;
 }
-window.__treeSwayInfo = (id) => { const b = stages.get(id); return b ? { canopies: b.comps.filter((c, i) => i && b.isTree[i]).length } : b; };
+window.__treeSwayInfo = (id) => { const b = stages.get(id); return b ? { canopies: b.comps.filter((c, i: string | number) => i && b.isTree[i]).length } : b; };

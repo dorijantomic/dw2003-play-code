@@ -93,7 +93,7 @@ function tagMembers() {
         rosterIndex: index,
       }));
   }
-function formOptionsFor(rosterIndex, bb = B.battle) {
+function formOptionsFor(rosterIndex: number, bb = B.battle) {
     const member = bb?.playerRoster?.[rosterIndex];
     if (!member) return [];
     // The list starts at the form the member is in NOW, not at its base form:
@@ -103,7 +103,7 @@ function formOptionsFor(rosterIndex, bb = B.battle) {
     return battleFormIds(B.liveFormId(bb, rosterIndex), member.stats)
       .map((id) => B.digimonDB[id]).filter(Boolean);
   }
-function battleFormLevel(rosterIndex, formId, bb = B.battle) {
+function battleFormLevel(rosterIndex: number, formId, bb = B.battle) {
     const member = bb?.playerRoster?.[rosterIndex];
     const record = member?.stats?.formLedger?.find((r) => Number(r.id) === Number(formId));
     return Number(record?.formLevel ?? (Number(formId) === B.liveFormId(bb, rosterIndex)
@@ -123,7 +123,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
       [DNA_SPECIES_TABLE, species],
       ...(techniques ? [[DNA_PRICES, techniques]] : []),
     ];
-    const byte = (addr) => {
+    const byte = (addr: number) => {
       for (const [base, bytes] of ranges) {
         const at = addr - base;
         if (at >= 0 && at < bytes.length) return bytes[at];
@@ -131,8 +131,8 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
       return 0;
     };
     return {
-      read8: (addr) => byte(addr) & 0xff,
-      read16: (addr) => (byte(addr) | (byte(addr + 1) << 8)) & 0xffff,
+      read8: (addr: number) => byte(addr) & 0xff,
+      read16: (addr: number) => (byte(addr) | (byte(addr + 1) << 8)) & 0xffff,
     };
   }
 /**
@@ -149,7 +149,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
    * the row's own `value0` halfword -> the row the species getter [0x8005CCA0]
    * would answer for that form id. One rule for both id spaces.
    */
-  function dnaProfileRecord(reader, profile) {
+  function dnaProfileRecord(reader: { read8: (addr: number) => number; read16: (addr: number) => number; }, profile) {
     const row = walkerProfileRow(reader, Number(profile?.id ?? 0));
     return row < 0 ? 0 : (DNA_SPECIES_TABLE + DNA_COMBATANT_STRIDE * row) >>> 0;
   }
@@ -164,7 +164,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
    * roster row carrying it is found by reading the same table the pairing rule
    * uses — no name table, no transcription.
    */
-  function jogressFused(actionId, profiles) {
+  function jogressFused(actionId: number, profiles) {
     return dnaFusedForm(B.jogressDB, profiles, actionId, B.digimonDB);
   }
 /**
@@ -198,7 +198,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
    * mesh is missing; the presentation falls back to the acting form for those three
    * and says nothing different about it.
    */
-  function dnaChoiceFor(rosterIndex, partnerProfile) {
+  function dnaChoiceFor(rosterIndex: string | number, partnerProfile) {
     const b = B.battle;
     const tables = B.dnaNative?.tables?.();
     if (!b || !partnerProfile || !tables) return null;
@@ -238,7 +238,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
    * otherwise, rather than inventing a bit-to-ailment mapping the evidence does
    * not support.
    */
-  function dnaParticipantsFor(b, rosterIndex) {
+  function dnaParticipantsFor(b, rosterIndex: string | number) {
     const partner = b.playerRecords?.[rosterIndex];
     return {
       activeMp: Number(b.player?.mp ?? 0),
@@ -278,13 +278,13 @@ function startDnaChunk(b, dna: BattleDnaPresentation) {
       // whole orb-merge / reveal / result-attack sequence (dnau_0400–0650).
       // 1005/1006 = the parent-orb ignition bursts: the persistent orb overlay takes
       // over from the 42-tick effect objects (runtime decode 2026-07-15).
-      onEffect: (rec) => {
+      onEffect: (rec: { type: number; }) => {
         if (rec.type === 1004) B.renderer3d?.dnaPresentationStart?.();
         else if (rec.type === 1005) B.renderer3d?.dnaOrbIgnite?.("A");
         else if (rec.type === 1006) B.renderer3d?.dnaOrbIgnite?.("B");
       },
       // op7 type 0 = the fusion white-out; the orbs end in its flare.
-      onOverlay: (rec) => {
+      onOverlay: (rec: { type: number; }) => {
         if (rec.type === 0) {
           B.renderer3d?.dnaOrbsClear?.();
           B.renderer3d?.dnaFusionStart?.();
@@ -298,7 +298,7 @@ function startDnaChunk(b, dna: BattleDnaPresentation) {
       },
     });
   }
-function applyDnaAction(action) {
+function applyDnaAction(action: { rosterIndex: string | number; formId: string | number; }) {
     const b = B.battle;
     const partner = b.playerRecords[action.rosterIndex];
     const partnerProfile = B.digimonDB[action.formId];

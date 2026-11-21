@@ -34,7 +34,7 @@ void main() {
 }
 `;
 const MAIN_RE = /void\s+main\s*\(\s*(?:void)?\s*\)/;
-const wrap = (src) => (MAIN_RE.test(src) ? src.replace(MAIN_RE, "void fitOrigMain()") + WRAP_TAIL : src);
+const wrap = (src: string) => (MAIN_RE.test(src) ? src.replace(MAIN_RE, "void fitOrigMain()") + WRAP_TAIL : src);
 
 function patchMaterial(mat, U) {
   if (!mat || mat.userData.fitPatched || mat.isRawShaderMaterial) return false;
@@ -62,7 +62,7 @@ export async function loadColourFit(pack) {
 }
 
 /** scene: the THREE.Scene of the built arena; fit: the loaded file or null; tool: true when tools/fit_built_colours.mjs drives it. */
-export function createColourFit(scene, fit, tool = false) {
+export function createColourFit(scene: THREE.Scene, fit, tool = false) {
   const state = new Map();   // id -> { objs: [], U, patched: n }
   const active = !!fit || tool;
   function discover() {

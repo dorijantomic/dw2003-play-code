@@ -118,7 +118,7 @@ export function firePointRecordStageObject(stageId, id, sub) {
  * after it.  At or above the bound the stage builds nothing and the SETANIM
  * event constructs the parent itself -- unbuilt, and it draws nothing.
  */
-export function constructPointRecordStageObjects(stageId, ordinal = 0) {
+export function constructPointRecordStageObjects(stageId: string, ordinal = 0) {
     return constructPointRecordActors(stageId, ordinal);
 }
 
@@ -128,7 +128,7 @@ export function constructPointRecordStageObjects(stageId, ordinal = 0) {
  * imports this module), so the same number is handed over twice rather than a
  * second copy of it being read out of the story engine.
  */
-export function setPointRecordOrdinal(fn) {
+export function setPointRecordOrdinal(fn: { (): number; (): number; }) {
     S.readOrdinal = typeof fn === "function" ? fn : () => 0;
 }
 
@@ -169,7 +169,7 @@ export function setPointRecordActorMusic(fn) {
 }
 
 /** Debug dump for `window.__pointRecordActors`. */
-export function pointRecordActors(stageId) {
+export function pointRecordActors(stageId: number) {
     return pointRecordActorState(stageId);
 }
 
@@ -178,11 +178,11 @@ export function pointRecordActors(stageId) {
  * headless verifier can read the frames a decor driver put there (the same rows
  * `eachRecord` paints from).
  */
-export function pointSpriteProbe(stageId) {
+export function pointSpriteProbe(stageId: number) {
     const s = S.data?.[stageId];
     if (!s) return [];
     const rt = stageRuntime(stageId, s.records);
-    return rt.map((st, i) => ({
+    return rt.map((st, i: string | number) => ({
         index: i,
         atlasFlag: s.records[i].atlasFlag,
         active: st.active ?? s.records[i].active,
@@ -213,7 +213,7 @@ export function padRunSound(stageId) {
 // being kicked (fieldstg file 0x9f50-0x9fc0). Here that is one poke into the
 // same runtime slot the point renderer draws from, so the kicked palm animates
 // in place with no second renderer.
-export function setPointSprite(stageId, recIndex, spriteId) {
+export function setPointSprite(stageId: string | number, recIndex: string | number, spriteId: number) {
     const s = S.data?.[stageId];
     if (!s || !s.records[recIndex]) return;
     stageRuntime(stageId, s.records)[recIndex].sprite = spriteId;
@@ -229,10 +229,10 @@ export const actorPositions = {}; // stageId -> { recordIndex: {x, y, ysort} }
  * moves its three records onto -- plus a read side, because s790's reveal waits
  * on a record's live `ctr`.
  */
-function pointRecordHost(stageId, records) {
+function pointRecordHost(stageId: string | number, records) {
     const rt = stageRuntime(stageId, records);
     return {
-        write(index, patch) {
+        write(index: string | number, patch: { active: undefined; sprite: undefined; ctr: undefined; x: undefined; y: undefined; ysort: undefined; }) {
             const st = rt[index];
             if (!st) return;
             if (patch.active !== undefined) st.active = patch.active;
@@ -247,7 +247,7 @@ function pointRecordHost(stageId, records) {
                 };
             }
         },
-        read(index) {
+        read(index: string | number) {
             const st = rt[index];
             const rec = records[index];
             return {
@@ -294,7 +294,7 @@ function pointRecordHost(stageId, records) {
 }
 
 /** The stage's point-sprite records, for an actor claiming them by atlas byte. */
-export function pointSpriteRecords(stageId) {
+export function pointSpriteRecords(stageId: string | number) {
     return S.data?.[stageId]?.records ?? null;
 }
 
@@ -304,7 +304,7 @@ export function pointSpriteRecords(stageId) {
  * falling rocks and the street cars use, so a script's hold counts blanks
  * exactly as it did on the console.
  */
-export function tickPointRecordStageObjects(stageId, delta = 1) {
+export function tickPointRecordStageObjects(stageId: string | number, delta = 1) {
     const records = pointSpriteRecords(stageId);
     if (!actorData || !records) return 0;
     return tickPointRecordActors(stageId, pointRecordHost(stageId, records), delta);
@@ -333,7 +333,7 @@ export function pictureStepDraws(stageId) {
 // coordinates.
 const scrollSheets = {}; // sheet path -> Image | null
 
-function ensureScrollSheet(rel) {
+function ensureScrollSheet(rel: string) {
     if (rel in scrollSheets) return scrollSheets[rel];
     loadAssetImage(`assets/effects/${rel}`)
         .then((img) => (scrollSheets[rel] = img))
@@ -362,7 +362,7 @@ export function scrollLayerEntries(stageId) {
  * coordinates, drawn over the base backdrop and under the props/entities so the
  * platform and the point sprites stay in front of it.
  */
-export function drawScrollLayers(ctx, stageId) {
+export function drawScrollLayers(ctx: CanvasRenderingContext2D | null, stageId) {
     for (const d of engineScrollLayerDraws(stageId)) {
         const img = scrollSheets[d.sheet] ?? ensureScrollSheet(d.sheet);
         if (!(img instanceof Image)) continue;
@@ -384,12 +384,12 @@ export function clearPointRecordStageObjects(stageId) {
  * instead of inferring a clip cycle from averaged canvas pixels, which cannot
  * tell one script from another.
  */
-export function pointRecordProbe(stageId) {
+export function pointRecordProbe(stageId: string | number) {
     const records = S.data?.[stageId]?.records;
     if (!records) return null;
     const rt = stageRuntime(stageId, records);
     return {
-        records: records.map((r, i) => ({
+        records: records.map((r, i: string | number) => ({
             i,
             atlasFlag: r.atlasFlag,
             at: [r.x, r.y],
@@ -414,7 +414,7 @@ export function pointRecordProbe(stageId) {
  * the record renders exactly as before, so a member that never fires changes
  * nothing.
  */
-export function setPointSlot(stageId, recIndex, patch) {
+export function setPointSlot(stageId: string | number, recIndex: number, patch) {
     if (!(recIndex >= 0)) return;
     let m = slotWrites[stageId];
     if (!m) m = slotWrites[stageId] = new Map();
@@ -426,7 +426,7 @@ export function setPointSlot(stageId, recIndex, patch) {
 }
 
 /** Drop every translated slot write for a stage (or all stages). */
-export function clearPointSlots(stageId) {
+export function clearPointSlots(stageId: string | number | undefined) {
     if (stageId === undefined) {
         for (const k of Object.keys(slotWrites)) delete slotWrites[k];
     } else {
@@ -434,7 +434,7 @@ export function clearPointSlots(stageId) {
     }
 }
 
-export function ensureSheet(stageId) {
+export function ensureSheet(stageId: string | number) {
     if (sheets[stageId]) return sheets[stageId];
     sheets[stageId] = "loading";
     sheetPromises[stageId] = loadAssetImage(`assets/effects/${stageId}.png`)
@@ -470,7 +470,7 @@ export const screenAtlases = {}; // stageId -> {data, img} | null
 
 const screenAtlasPromises = {};
 
-export function ensureScreenAtlas(stageId) {
+export function ensureScreenAtlas(stageId: string) {
     if (stageId in screenAtlases) return screenAtlases[stageId];
     if (screenAtlasPromises[stageId]) return null; // in flight; next frame
     screenAtlasPromises[stageId] = (async () => {
@@ -522,7 +522,7 @@ export function retainPointSpriteStages(stageIds) {
  * stage actor still wins. `records` is the stage's point_sprites.json array in
  * memory order; `rt` is its runtime array.
  */
-export function applySceneVariantSlot(stageId, records, rt) {
+export function applySceneVariantSlot(stageId: string, records, rt) {
     const ordinal = S.readOrdinal();
     if (variantSlotApplied.get(stageId) === ordinal) return;
     variantSlotApplied.set(stageId, ordinal);
@@ -531,7 +531,7 @@ export function applySceneVariantSlot(stageId, records, rt) {
     rt[idx].active = sceneVariantSlotActive(ordinal);
 }
 
-export function stageRuntime(stageId, records) {
+export function stageRuntime(stageId: string | number, records) {
     let rt = runtime[stageId];
     if (!rt) {
         rt = records.map((r) => ({

@@ -4,8 +4,8 @@
 import { SOIL, APRON_KINDS } from "../soil.js";
 
 // ---------------- land: floor triangles + apron, and the shore outline ----------------
-const azOf = (x, z) => Math.atan2(x, z) * 180 / Math.PI;
-const wrapDeg = (a) => ((a + 180) % 360 + 360) % 360 - 180;
+const azOf = (x: number | undefined, z: number | undefined) => Math.atan2(x, z) * 180 / Math.PI;
+const wrapDeg = (a: number) => ((a + 180) % 360 + 360) % 360 - 180;
 const LAND = new WeakMap();
 
 /** Land of a soil arena from its recipe (cached per recipe object). */
@@ -26,7 +26,7 @@ export function soilLand(rec) {
     const z0 = Math.floor(Math.min(t[1], t[3], t[5]) / C), z1 = Math.floor(Math.max(t[1], t[3], t[5]) / C);
     for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const key = i * 100003 + j; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(ti); }
   }
-  function floorAt(x, z) {
+  function floorAt(x: number, z: number) {
     const list = cells.get(Math.floor(x / C) * 100003 + Math.floor(z / C));
     if (!list) return false;
     for (const ti of list) {
@@ -53,14 +53,14 @@ export function soilLand(rec) {
     }
   }
   /** where the ray at azimuth az (deg) meets a card line: r, or null */
-  const cardR = (cd, az) => {
+  const cardR = (cd: { b: number[]; a: number[]; }, az: number) => {
     const s = Math.sin(az * Math.PI / 180), c = Math.cos(az * Math.PI / 180);   // ray (x, z) = (s, c) * r
     const ex = cd.b[0] - cd.a[0], ez = cd.b[1] - cd.a[1], den = s * ez - c * ex;
     if (Math.abs(den) < 1e-9) return null;
     const r = (cd.a[0] * ez - cd.a[1] * ex) / den;
     return r > 0 ? r : null;
   };
-  function apronRange(az) {
+  function apronRange(az: number) {
     let lo = Infinity, hi = -Infinity;
     for (const cd of cards) {
       // 0.01 deg of slack at each end: card ends are rounded in the recipe (floor_02 ends at az 135.00 to 2 decimals)
@@ -70,8 +70,8 @@ export function soilLand(rec) {
     }
     return hi > lo ? [Math.max(0, lo), hi] : null;
   }
-  function apronAt(x, z) { const g = apronRange(azOf(x, z)), r = Math.hypot(x, z); return !!g && r >= g[0] && r <= g[1]; }
-  const landAt = (x, z) => floorAt(x, z) || apronAt(x, z);
+  function apronAt(x: number, z: number) { const g = apronRange(azOf(x, z)), r = Math.hypot(x, z); return !!g && r >= g[0] && r <= g[1]; }
+  const landAt = (x: number, z: number) => floorAt(x, z) || apronAt(x, z);
   // shore outline: per STEP_DEG of azimuth, the land intervals along the ray (STEP_R steps), first lake radius
   const SH = SOIL.SHORE, nb = Math.round(360 / SH.STEP_DEG);
   const outline = { stepDeg: SH.STEP_DEG, stepR: SH.STEP_R, az0: -180, landEnd: [], floorEnd: [], intervals: [] };
