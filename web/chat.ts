@@ -1,6 +1,7 @@
 // EXPERIMENT: type-to-chat. Press T, type a line, press Enter: the game's own speech balloon
 // (its balloon chrome, tail and bitmap font) shows it over your character for a few seconds.
 // Esc cancels. Purely visual: it never touches the story, dialogue or save state.
+import type { ChatPacket } from "./types/chat.js";
 const MAX_CHARS = 160;
 let box = null, input = null, hooks = null;
 
@@ -45,7 +46,7 @@ export function installChat(h) {
     // Capture phase, so the game's own key handler never sees the T that opens the box.
     window.addEventListener("keydown", (e) => {
         if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-        if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+        if (e.target && ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA")) return;
         // While a chat bubble is up, the usual dialogue keys dismiss it (next page, then close).
         if (hooks.bubbleOpen?.() && [" ", "Enter", "z", "Z", "x", "X", "Escape"].includes(e.key)) {
             e.preventDefault(); e.stopImmediatePropagation();
@@ -89,7 +90,7 @@ export function buildChatPack(text, name = "") {
     });
     body.push(2, 2, 2, 0, 0, 0, 0, 0);
     while ((12 + body.length) % 4) body.push(0);
-    const out = new Uint8Array(12 + body.length), dv = new DataView(out.buffer);
+    const out: ChatPacket = new Uint8Array(12 + body.length), dv = new DataView(out.buffer);
     dv.setUint32(0, 1, true); dv.setUint32(4, 12, true); dv.setUint32(8, out.length, true);
     out.set(body, 12);
     out.pages = pages;

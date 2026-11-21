@@ -8,6 +8,7 @@ import { SPIRE } from "../spires.js";
 import * as S0 from "../shared.js";
 import * as F from "../../lib3d/fluffytree/fluffy.js";   // rng only
 import { itemsFrom } from "../slots.js";
+import type { BuiltSpiresStats } from "./types.js";
 
 /** A piece's wall lean, measured from its own triangles: the slope of the minimum-radius envelope (the nearest wall
  *  face) across the piece's wall height. The minimum is always the wall - the sea cards of the same piece sit farther
@@ -214,7 +215,7 @@ function keepOut(L, st, test, first) {
   const ringMax = Math.max(0, ...(st?.rings || []).map((g) => g.r));
   const nearMin = Math.max(fightR + P.NEAR_CLEAR, farSurf + P.NEAR_CLEAR, Number.isFinite(recipeRmin) ? recipeRmin : 0);
   const stats = { fightR: Math.round(fightR), farSurf: Math.round(farSurf), ringMax: Math.round(ringMax),
-                  nearMin: Math.round(nearMin), pushed: 0, dropped: 0, proved: 0, byReason: {} };
+                  nearMin: Math.round(nearMin), pushed: 0, dropped: 0, proved: 0, byReason: {} } as BuiltSpiresStats;
   let moved = first;
   for (const g of groups) {
     let ok = null, why = null;

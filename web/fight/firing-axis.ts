@@ -332,7 +332,7 @@ export function emitterClass(folder, emitterId) {
   if (!m) return { cls: null, bone: null, reason: "no-model" };
   const id = String(emitterId || "");
   const part = id.replace(/-\d+$/, "");
-  const armSite = /^(left-arm|right-arm)(-\d+)?$/.exec(id);
+  const armSite = /^(left-arm|right-arm)(-\d+)?$/.exec(id) as RegExpExecArray & { [n: number]: any };
   if (armSite || part === "both-arms") {
     // which arm chain: the site's own side, else the model's dominant side, else the first arm it has
     let side = armSite ? armSite[1].slice(0, -4) : null;
@@ -575,7 +575,7 @@ export function armAxisCandidates(model, folder, emitterId, pose) {
 
 /** Both hand-class candidates, so a caller (or the calibration) can compare them. */
 export function axisVariants(model, folder, emitterId, pose, { rest = null } = {}) {
-  const out = {};
+  const out: Record<string, any> = {};
   for (const v of ["push", "palm"]) out[v] = firingAxis(model, folder, emitterId, pose, { rest, variant: v });
   return { push: out.push, palm: out.palm };
 }

@@ -10,6 +10,7 @@ import * as THREE from "../../lib3d/three.module.js";   // maths only (Euler -> 
 import { itemsFrom } from "../slots.js";
 import { COVER, MEAS } from "../floorcover.js";
 import { soilLand } from "./land.js";
+import type { BuiltFloorcoverApi, BuiltFloorcoverInfo, BuiltSlotRef } from "./types.js";
 const M = 400;
 
 function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -87,8 +88,8 @@ export function plan(pctx) {
   if (!pctx.pieces("soil").length) return null;
   const land = soilLand(pctx.rec);
   const group = pctx.newGroup("builtFloorcover");
-  const api = { group, built: null, clearR: 0, sig: "", visible: true };
-  const info_ = { types: {}, tris: 0, instances: 0, drawCallsMax: 0, buildMs: 0, builds: 0, clearM: 0, shared: [] };
+  const api = { group, built: null, clearR: 0, sig: "", visible: true } as BuiltFloorcoverApi;
+  const info_ = { types: {}, tris: 0, instances: 0, drawCallsMax: 0, buildMs: 0, builds: 0, clearM: 0, shared: [] } as BuiltFloorcoverInfo;
   const per = {};
   let dirty = false, t0 = 0;
   const sigOf = (st) => st ? `${Math.round(st.fightR / COVER.REBUILD_STEP)}|${st.fighters?.length || 0}|${st.rings?.length || 0}` : "none";
@@ -112,7 +113,7 @@ export function plan(pctx) {
     return itemsFrom(list);
   }
   const clear0 = COVER.CLEAR_DEFAULT_M * M;
-  const slots = Object.keys(TYPES).map((kind) => {
+  const slots: BuiltSlotRef[] = Object.keys(TYPES).map((kind) => {
     const fern = kind === "fern";
     return {
       id: "floorcover." + kind, label: LABEL[kind], kind: kind === "pebble" ? "rock" : kind === "litter" || kind === "twig" ? "litter" : "plant",

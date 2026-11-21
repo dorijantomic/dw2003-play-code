@@ -107,7 +107,7 @@ export function replayRows(mapId, wstag, ladder, ordinal) {
   const { byStage, names } = ladderParts(ladder);
   const reached = Number(ordinal) || 0;
   const rows = [];
-  for (const [stageId, events] of Object.entries(wstag ?? {})) {
+  for (const [stageId, events] of Object.entries(wstag ?? {}) as [string, any[]][]) {
     const beats = byStage[stageId];
     if (!beats || !beats.length) continue;
     if (!beats.some((beat) => beat <= reached)) continue;   // the stage's first beat is still ahead
@@ -139,6 +139,8 @@ export function elsewhereNotice(row) {
 }
 
 // ── the panel ──────────────────────────────────────────────────────────────────────────────
+import type { ReplayView } from "./types/replay-theatre.js";
+
 const S = {
   open: false,
   wasOn: false,    // the F2 flag last frame: the page opens on its rising edge only
@@ -171,7 +173,7 @@ export function replayReset() {
 }
 
 /** Open on a prepared view: `{ place, here, elsewhere }` (rows from replayRows). */
-export function openReplay(view = {}) {
+export function openReplay(view: ReplayView = {}) {
   S.place = view?.place ?? "";
   S.here = Array.isArray(view?.here) ? view.here : [];
   S.elsewhere = Array.isArray(view?.elsewhere) ? view.elsewhere : [];

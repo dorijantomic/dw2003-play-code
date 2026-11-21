@@ -5,12 +5,13 @@
  */
 
 import { packedSampleResolver } from "../packed-sound.js";
+import type { AudioEngine } from "../types/audio.js";
 
 // The methods attach themselves to the `player` object the caller hands in,
 // so this module needs nothing from createSfxPlayer but the shared context P.
 // Split out of web/audio.ts; every call into the rest of the player goes through
 // P (the tool rewrote the names when the helpers moved to audio/playback.ts).
-export function installPlayApi(P) {
+export function installPlayApi(P: AudioEngine) {
   const { bufferFor, releaseExclusiveByName, startPhrase, startVoice, whenPhraseRow } = P;
 
   // `name` = lowercased soundtst name, a key in manifest.json (common bank).

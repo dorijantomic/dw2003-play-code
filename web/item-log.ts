@@ -9,6 +9,7 @@
 // Nothing is cached in memory: every call reads the key, changes it and writes it back (a slot load rewrites localStorage
 // under a running game).
 import { ITEM_ID_MAX } from "./vendor/engine.js";
+import type { GameState } from "./game/types.js";
 
 export const ITEM_LOG_KEY = "dw.glossary.v1";
 export const ITEM_MAX_ID = ITEM_ID_MAX;    // the shipped item catalogue ends at 402 (engine item-directories)
@@ -67,7 +68,7 @@ export function createItemLog(storage = defaultStorage()) {
  * `push`) is logged as owned, and so is every slot of a bag assigned to `state.inventory` (load, duel restore). Raising the
  * count of a slot already in the bag needs no hook: that item is owned already. The bag in `state` at call time is synced.
  */
-export function watchBag(state, log) {
+export function watchBag(state: GameState, log) {
     const mine = new WeakSet();     // the proxies made here: assigning one back (state.inventory = state.inventory) must not wrap it again
     const wrap = (bag) => {
         if (!Array.isArray(bag) || mine.has(bag)) return bag;

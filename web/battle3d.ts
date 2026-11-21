@@ -127,6 +127,7 @@ import { makeFighters } from "./battle3d/core/fighters.js";
 import { makeAtmos } from "./battle3d/core/atmos.js";
 import { makePano } from "./battle3d/core/pano.js";
 import { makeRender } from "./battle3d/core/render.js";
+import type { Battle3DContext, Battle3DInitOptions, CaptureCanvas, SkelBufs } from "./types/battle3d.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export {
   LOSS_CAM,
@@ -234,10 +235,10 @@ export function resolveContactSoundType(type, contactType, evaded) {
   return evaded ? CONTACT_EVADE_TYPE : contactType;
 }
 
-export function createBattle3D(canvas, sfx = null, opts = {}) {
+export function createBattle3D(canvas, sfx = null, opts: Battle3DInitOptions = {}) {
   // opts.alpha (Arena Viewer "built" look only): a see-through canvas, so a three.js world drawn on another canvas
   // shows under the fighters. Every other caller keeps the opaque canvas.
-  const B$ = {};
+  const B$ = {} as Battle3DContext;
   B$.canvas = canvas;
   B$.sfx = sfx;
   B$.opts = opts;
@@ -1137,9 +1138,9 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
           if (page.data[from + i] !== got[row * w * 4 + i]) mismatched++;
       }
       // Hand the pixels back as an image so a capture can show the actual eye.
-      const canvas = typeof OffscreenCanvas !== "undefined"
+      const canvas = (typeof OffscreenCanvas !== "undefined"
         ? new OffscreenCanvas(w, h)
-        : Object.assign(document.createElement("canvas"), { width: w, height: h });
+        : Object.assign(document.createElement("canvas"), { width: w, height: h })) as CaptureCanvas;
       const ctx = canvas.getContext("2d");
       ctx.putImageData(new ImageData(new Uint8ClampedArray(got), w, h), 0, 0);
       return {
@@ -1272,7 +1273,7 @@ export function createBattle3D(canvas, sfx = null, opts = {}) {
     /** For checks: the light now, and per side the share of faces whose normal points away from the mesh centre. */
     getSceneLight() {
       const out = { light: B$.sceneLight, winding: SCENE_LIGHT_WINDING };
-      for (const [side, bufs] of [["player", B$.playerSkelBufs], ["enemy", B$.enemySkelBufs]]) {
+      for (const [side, bufs] of [["player", B$.playerSkelBufs], ["enemy", B$.enemySkelBufs]] as [string, SkelBufs][]) {
         const p = bufs?.lastPos; if (!p) continue;
         // signed volume (divergence theorem): > 0 when the normals point out of the closed surface, whatever its shape;
         // per bone piece too (each piece about its own centre), so a mixed winding would show

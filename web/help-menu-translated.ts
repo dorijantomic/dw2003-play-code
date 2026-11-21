@@ -11,6 +11,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { HelpMenuScreen } from "./types/help-menu-translated.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -19,7 +20,7 @@ const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
  * Cancel bit is the one the Yes/No box does not need: the help menu closes on it (wstag210
  * F0x800A5E74 step 2).
  */
-const KEY_BITS = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13], ["cross", 1 << 14]];
+const KEY_BITS: [string, number][] = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13], ["cross", 1 << 14]];
 
 const DATA_LABEL = "Help menu data";
 
@@ -27,7 +28,7 @@ export function createHelpMenuTranslated(sfx = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null, _pad: null,
         _ticks: 0, _request: 0, _closes: 0, _sounds: [], _packed: {}, _primed: false, _row: null,
-    };
+    } as HelpMenuScreen;
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Abandoned by the caller, the menu disposes its session and runs nothing, as web/help-menu.js

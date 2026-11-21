@@ -25,6 +25,7 @@
 // A league object is plain JSON (it travels in one relay message, so it stays small): short keys on a match
 // are `a`/`b` the two tamers, `w` its winner, `g` the game winners in order, and the flags `bye` (a first-round
 // bye), `wo` (a walkover) and `dead` (nobody left to play it).
+import type { MpLeagueState } from "./types/mp-league.js";
 
 export const MIN_TAMERS = 2;
 export const MAX_TAMERS = 8;
@@ -34,7 +35,7 @@ const isTamer = (id) => Number.isInteger(id) && id > 0;
 const has = (list, id) => Array.isArray(list) && list.includes(id);
 
 /** A new night: the first round drawn (with the byes the bracket needs) and the folder closed until its first fight. */
-export function newLeague({ ids, bestOf = DEFAULT_BEST_OF } = {}) {
+export function newLeague({ ids, bestOf = DEFAULT_BEST_OF }: { ids?: number[]; bestOf?: number } = {}) {
     const list = Array.isArray(ids) ? ids.slice() : [];
     if (list.length < MIN_TAMERS || list.length > MAX_TAMERS) throw new Error(`a night needs ${MIN_TAMERS}..${MAX_TAMERS} tamers`);
     if (!list.every(isTamer) || new Set(list).size !== list.length) throw new Error("tamers are distinct positive ids");
@@ -251,7 +252,7 @@ export function unpackLeague(wire) {
     for (const round of Array.isArray(wire.R) ? wire.R : []) {
         lg.rounds.push(round.map((row) => {
             const [a = null, b = null, w = null, ...g] = Array.isArray(row) ? row : [];
-            const m = { a, b, w, g };
+            const m = { a, b, w, g } as MpLeagueState;
             if (b == null && a != null) m.bye = true;                       // a first-round bye
             else if (a == null && b == null) m.dead = true;                 // nobody left to play it
             else if (w != null && g.length === 0) m.wo = true;              // the opponent left: a walkover

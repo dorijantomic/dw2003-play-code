@@ -1,4 +1,5 @@
 import { stageCast, fieldDirectionIndex, rectBlocked, parseEntry } from "../vendor/engine.js";
+import type { SpeechBeat } from "./types.js";
 import { mountActorHidden } from "../mount.js";
 import { questNeededNpcs } from "../quests.js";
 import { questStandFree, standInSpot, questWalkLegs } from "../quest-walk.js";
@@ -196,7 +197,7 @@ export function openTalkLine(ref, onClose, npc, legacyAnchor) {
  * (web/dialogue-pack.js). With the NPC on this map it is their balloon, otherwise the plain bottom window. Resolves on close.
  */
 export function questSpeak(npcId, name, text) {
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
         const pages = paginate(text);
         const scene = state.scenes[currentMap()?.id];
         const npc = npcId != null && scene ? sceneCast(scene).find((n) => n.npc_id === npcId && !n.cutsceneOnly) : null;
@@ -250,7 +251,7 @@ export async function playQuestScene(steps) {
         for (const npc of scene.npcs) if (!npc._ephemeral) { npc._origX = npc.x; npc._origY = npc.y; }
         const hooks = { afterSay: {}, sceneEvent: (index, resume) => runQuestSceneEvent(S.questSceneEvents[index], resume) };
         let answer = null;
-        for (const [n, s] of Object.entries(speech)) {
+        for (const [n, s] of Object.entries(speech) as [string, SpeechBeat][]) {
             hooks.afterSay[n] = s.ask
                 ? (resume) => choice.open(s.ask, s.options, (i) => { answer = i; resume(); })
                 : (resume) => { questSpeak(s.who === "player" ? null : s.who, s.name || (s.who === "player" ? String(state.playerName || "") : ""), s.text).then(resume); };

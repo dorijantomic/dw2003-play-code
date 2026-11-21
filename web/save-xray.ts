@@ -172,7 +172,7 @@ function textOf(bytes, at, length) {
 }
 
 function hexOf(bytes, at, length) {
-  return Array.from(bytes.subarray(at, at + length), (b) => b.toString(16).padStart(2, "0")).join(" ");
+  return Array.from(bytes.subarray(at, at + length), (b: any) => b.toString(16).padStart(2, "0")).join(" ");
 }
 
 function readRosterRecord(bytes, view, slot) {
@@ -376,7 +376,7 @@ export function diffSlots(a, b) {
     at(base + R.currentForm, `${p}.currentForm`, 4);
     at(base + R.name, `${p}.name`, 24);
     at(base + R.xp, `${p}.xp`, 4);
-    for (const [key, off] of [["level", R.level], ["tp", R.tp], ["hp", R.hp], ["maxHp", R.maxHp], ["mp", R.mp], ["maxMp", R.maxMp]]) {
+    for (const [key, off] of [["level", R.level], ["tp", R.tp], ["hp", R.hp], ["maxHp", R.maxHp], ["mp", R.mp], ["maxMp", R.maxMp]] as [string, number][]) {
       at(base + off, `${p}.${key}`, 2);
     }
     for (let i = 0; i < 6; i++) at(base + R.core + i * 2, `${p}.core[${CORE_SLOTS[i]}]`, 2);

@@ -180,7 +180,14 @@ export function nothingLine(record) {
  * files parse. An id the index does not hold returns null: the book never
  * invents a row for an item the disc does not have.
  */
-export function sourcesFor(id, data = {}) {
+/** The tables the source list reads: the item index, and what the shops and their merchants carry. */
+interface SourceTables {
+    index?: any;
+    shops?: any;
+    merchants?: any;
+}
+
+export function sourcesFor(id, data: SourceTables = {}) {
     const itemId = Number(id);
     const items = itemMap(data.index);
     const record = items[String(itemId)];

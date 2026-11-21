@@ -6,7 +6,7 @@ export function createRetryLoader(load, { retryMs = 5000, now = () => performanc
         get() {
             if (data === null && pending === null && now() - failedAt >= retryMs) {
                 const fail = () => { failedAt = now(); pending = null; return null; };
-                pending = Promise.resolve().then(load).then((d) => {
+                pending = Promise.resolve().then(load).then((d: any) => {
                     if (!d) return fail();
                     data = d; pending = null; return d;
                 }, fail);

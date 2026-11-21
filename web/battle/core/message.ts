@@ -15,9 +15,10 @@ import {
 } from "../../vendor/engine.js";
 import { attackPageSpec, evadePageSpec } from "../hit-results.js";
 import { createHpPlateState } from "../hud.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeMessage(B) {
+export function makeMessage(B: BattleContext) {
 function tickBattleMessage(b, dt) {
     const frames = B.advanceDisplayFrames(dt);
     b._displayFrames = frames;

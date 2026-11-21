@@ -1,0 +1,1 @@
+const data = load(raw);

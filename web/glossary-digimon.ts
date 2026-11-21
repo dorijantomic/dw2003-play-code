@@ -13,6 +13,7 @@ import { plannerRows, requirementText } from "./evolution-planner.js";
 import { scaledHp, scaledMp, scaledStat } from "./battle.js";
 import { scaleEnemyStat } from "./enemy-stats.js";
 import { elementValue } from "./vendor/engine.js";
+import type { GlossaryDigimonOut } from "./types/glossary-digimon.js";
 
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -85,7 +86,7 @@ export const rangeText = (lo, hi) => (lo === hi ? String(lo) : `${lo}-${hi}`);
  */
 export function wildAsFought(rawStats, rows) {
     if (!rows?.length || !rawStats) return null;
-    const out = {};
+    const out = {} as GlossaryDigimonOut;
     for (const k of WILD_KEYS) {
         const v = rows.map((r) => scaleEnemyStat(rawStats[k], r.statScale > 0 ? r.statScale : 16));
         out[k] = { lo: Math.min(...v), hi: Math.max(...v) };
@@ -125,7 +126,17 @@ function lineIndex(evolutions) {
     return { lines, reach, rootSlot };
 }
 
-export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = null, encounters = {} } = {}) {
+/** The game's own tables the species page is built from: the digimon tables, the evolution lines, the wild
+ *  rows, the model map, and where each species is met. */
+interface SpeciesTables {
+    digimon?: { digimon?: any[]; skills?: any[] } | null;
+    evolutions?: any[] | null;
+    enemies?: { enemies?: any[] } | null;
+    modelMap?: any;
+    encounters?: { stages?: any; screens?: any; maps?: any } | null;
+}
+
+export function buildSpecies({ digimon, evolutions = null, enemies, modelMap = null, encounters = {} }: SpeciesTables = {}) {
     const profiles = Array.isArray(digimon?.digimon) ? digimon.digimon : [];
     const skills = Array.isArray(digimon?.skills) ? digimon.skills : [];
     const skillById = new Map(skills.map((s) => [s.id, s]));

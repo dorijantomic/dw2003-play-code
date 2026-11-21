@@ -51,6 +51,7 @@ const FLY_SHARE = 0.5;                          // a thrown copy's pivot travel 
 // the same for the Node tools; setOwnClipsEnabled(v) pins it for a test or a lab.
 import { battleSetting } from "./battle-settings.js";
 import { isInstalledBuild } from "../ship-list.js";
+import type { OwnClipInventory, OwnClipRec } from "./types.js";
 let override = null;          // null = follow the player's setting
 export function setOwnClipsEnabled(v) { override = v == null ? null : !!v; }
 export function ownClipsEnabled() { if (isInstalledBuild()) return false; return override == null ? battleSetting("ownclips") : override; }   // installed copy: out, no flag or setter turns it on
@@ -149,11 +150,11 @@ export function classifyOwnScript(model, script) {
 const INV = new WeakMap();     // model -> inventory (rebuilt only when the model object is new)
 
 /** Every own action script of a model, classified, plus the flag this rule needs. */
-export function ownClipInventory(model) {
+export function ownClipInventory(model): OwnClipInventory {
   if (!model) return { slots: {}, height: 0, throws: false, throwsWhy: [] };
   if (INV.has(model)) return INV.get(model);
-  const slots = {};
-  for (const k of Object.keys(model.actions || {})) {
+  const slots: Record<string, OwnClipRec> = {};
+  for (const k of Object.keys(model.actions || {}) as any[]) {
     const s = model.actions[k];
     if (!hasOps(s)) continue;
     const rec = classifyOwnScript(model, s);
@@ -178,7 +179,7 @@ export function ownClipInventory(model) {
  *                   ticks 36..224, the lid's op6 launch is at tick 55).
  * A whole-body vanish (a bone whose sub-tree holds >= half the model) is NOT a throw and is skipped.
  */
-function detectThrow(model, slots, H) {
+function detectThrow(model, slots: Record<string, OwnClipRec>, H) {
   const why = [];
   if (!(H > 0) || !model?.bones?.length) return { throws: false, why };
   const idleFrames = tableFrames(model, 0);

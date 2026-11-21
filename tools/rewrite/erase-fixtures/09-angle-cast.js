@@ -1,0 +1,1 @@
+const raw = window.thing;

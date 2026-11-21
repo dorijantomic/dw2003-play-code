@@ -31,6 +31,7 @@
 import * as THREE from "../lib3d/three.module.js";
 import * as S from "./shared.js";
 import { soilLand } from "./soil.js";
+import type { BuiltMirrorOut, BuiltMirrorUniforms } from "./types.js";
 
 const M = S.UNITS_PER_M;   // 400 render units = 1 m
 
@@ -94,7 +95,7 @@ const toLin = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2
 /** The measured reflection tint (MEASURE.md 2e) applied to a piece's measured sRGB colour -> linear THREE.Color. */
 export function reflectColour(rgb255, k = REFL.K, c = REFL.C) {
   const out = rgb255.map((v, i) => Math.min(255, Math.max(0, k[i] * v + c[i])) / 255);
-  return new THREE.Color().setRGB(...out.map(toLin));
+  return new THREE.Color().setRGB(...out.map(toLin) as [number, number, number]);
 }
 
 // ------------------------------------------------------------------ the lake surface
@@ -403,7 +404,7 @@ const SHARED_FS = /* glsl */`
     #include <colorspace_fragment>
   }`;
 
-function reflectionMaterial(THREE, own = {}, defines = {}) {
+function reflectionMaterial(THREE, own = {}, defines: { MIRROR_BAND?: string; MIRROR_CARDS?: string; MIRROR_SHARED?: string } = {}) {
   const m = new THREE.ShaderMaterial({
     uniforms: S.uniformsWith(own),
     vertexShader: defines.MIRROR_SHARED ? SHARED_VS : REFL_VS,
@@ -582,7 +583,7 @@ export function buildMirror(slot, ctx) {
   // copies below remain the fallback for a build without water.js.
   const REAL = D.real;
   const group = new T.Group(); group.name = "builtLake";
-  const meshes = [], out = {}, own = [];
+  const meshes = [], out = {} as BuiltMirrorOut, own = [];
 
   // ---- the surface: the land's own outline (soil.js), the water outside it
   const land = D.land;
@@ -659,7 +660,7 @@ export function buildMirror(slot, ctx) {
                 uTintHi: { value: SH.srgb(pine.colours.p90 || pine.colours.all) },
                 uAlpha: { value: REFL.ALPHA }, uFadeK: { value: REFL.FADE }, uFadeMax: { value: REFL.FADE_MAX },
                 uAlphaK: { value: REFL.ALPHA_K }, uDeep: { value: 7.41 }, uRipple: { value: REFL.RIPPLE }, uLakeMid: lakeMidU,
-                uSkyline: { value: new T.Vector2(...REFL.BAND_TOP) } };
+                uSkyline: { value: new T.Vector2(...REFL.BAND_TOP) } } as BuiltMirrorUniforms;
     // trees.js's REAL 3D far pines (wall_00, InstancedMesh userData.kind "farPines", one per variant): the SAME geometry
     // and instance matrices drawn again under scale.y = -1 with the washed-out wall_01 tint (reflection material);
     // [build-trees2]. When they are absent: the painted band / the old procedural band below.

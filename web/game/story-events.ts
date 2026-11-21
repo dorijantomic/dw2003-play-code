@@ -1,3 +1,4 @@
+import type { NameEntryOptions } from "./types.js";
 import {
   cardDuelCloseWrites,
   talkLaunchEventForBit,
@@ -184,7 +185,7 @@ export function applyCardDuelCloseHousekeeping(won) {
 
 /** Open the naming screen (pro/stdgname). The screen reads the pad
  *  from `state.keys` each frame, so the returned object needs no per-key calls. */
-export function openNameEntry(opts = {}) {
+export function openNameEntry(opts: NameEntryOptions = {}) {
     nameEntryNative.open({ initial: opts.initial ?? "", state });
     return nameEntryNative;
 }

@@ -23,6 +23,7 @@
 //   everything" time (fileResetAt, ms) is ignored, so the page's Reset clears file bindings too.
 import * as THREE from "../lib3d/three.module.js";
 import * as REG from "./registry.js";
+import type { BuiltSlotInstances, BuiltSlotItem, BuiltSlotsOptions } from "./types.js";
 
 const MAXN = 20000;   // most instances a FOREIGN asset draws in one slot (grass blades: 450 000 -> every k-th)
 const FIT_R = 3.5;    // a foreign asset's footprint may be this many slot radii wide before the height fit gives way
@@ -40,7 +41,7 @@ export function composeYaw(p, yaw, sx, sy = sx, sz = sx) {
 }
 /** Columnar items from records [{ p, yaw, h, rad, m?, col?, grp? }] (the placement helper). */
 export function itemsFrom(list, { attrs = null } = {}) {
-  const n = list.length, it = { n, p: new Float64Array(n * 3), yaw: new Float64Array(n), h: new Float64Array(n), rad: new Float64Array(n), list };
+  const n = list.length, it = { n, p: new Float64Array(n * 3), yaw: new Float64Array(n), h: new Float64Array(n), rad: new Float64Array(n), list } as BuiltSlotItem;
   const hasM = n && list[0].m, hasC = n && list[0].col, hasG = n && list[0].grp != null;
   if (hasM) it.m = new Float32Array(n * 16);
   if (hasC) it.col = new Float32Array(n * 3);
@@ -116,14 +117,14 @@ function scaleShape(sh, k) {
            maxRad: sh.maxRad * k, bottomVerts: sh.bottomVerts.map((v) => v.map((x) => x * k)) };
 }
 
-export function createSlots({ world, scene, env, colourFit = null, pack = "", file = null, choices = null, fileResetAt = 0, onChange = () => {} }) {
+export function createSlots({ world, scene, env, colourFit = null, pack = "", file = null, choices = null, fileResetAt = 0, onChange = () => {} }: BuiltSlotsOptions) {
   const slots = new Map();           // id -> slot (the placement's data + its binding)
   const wanted = new Map();          // slot id -> asset id (file, then the viewer's choices)
   const fileAt = file?.at || {};
   for (const [k, v] of Object.entries(file?.bind || {})) if (!(fileResetAt > 0) || (fileAt[k] || 0) > fileResetAt) wanted.set(k, v);
   for (const [k, v] of Object.entries(choices || {})) { if (v === "default") wanted.delete(k); else wanted.set(k, v); }
   const view = { choices: { ...(choices || {}) } };
-  const listeners = new Set();
+  const listeners = new Set<(id: string) => void>();
   let pending = 0, keep = null;
   const waiters = [];
   const flush = () => { if (pending === 0) while (waiters.length) waiters.shift()(); };
@@ -142,7 +143,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     idx.forEach((i, j) => {
       if (native) { out.set(items.m.subarray(i * 16, i * 16 + 16), j * 16); return; }
       _Q.setFromAxisAngle(_Y, items.yaw[i]); _P.set(items.p[i * 3], items.p[i * 3 + 1], items.p[i * 3 + 2]); _S.setScalar(itemScale(s, asset, items, i));
-      _M.compose(_P, _Q, _S).toArray(out, j * 16);
+      _M.compose(_P, _Q, _S).toArray(out as unknown as number[], j * 16);
     });
     return out;
   }
@@ -171,12 +172,12 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
           const own = native ? items.attrs : null;
           if (own || part.attrs) {   // per-instance attributes: the slot's own (placement data) or the asset's constants
             gg = geo.clone();
-            for (const [nm, a] of Object.entries(own || {})) {
+            for (const [nm, a] of Object.entries(own || {}) as [string, any][]) {
               const arr = new Float32Array(idx.length * a.size);
               idx.forEach((i, j) => { for (let c = 0; c < a.size; c++) arr[j * a.size + c] = a.array[i * a.size + c]; });
               gg.setAttribute(nm, new THREE.InstancedBufferAttribute(arr, a.size));
             }
-            for (const [nm, [size, fill]] of Object.entries(part.attrs || {})) {
+            for (const [nm, [size, fill]] of Object.entries(part.attrs || {}) as [string, [number, any]][]) {
               if (gg.attributes[nm]) continue;
               const arr = new Float32Array(idx.length * size);
               for (let j = 0; j < idx.length; j++) for (let c = 0; c < size; c++) arr[j * size + c] = Array.isArray(fill) ? fill[c] : fill;
@@ -211,7 +212,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
           const m = mk(part.geo, nameOf(g, part, pi));
           m.computeBoundingSphere();
           meshes.push(m);
-          if (parent) parent.add(m);
+          if (parent) parent.add(m as any);
         }
       }
     }
@@ -275,7 +276,7 @@ export function createSlots({ world, scene, env, colourFit = null, pack = "", fi
     teardown(s);
     s.bound = asset.id; s.asset = asset; s.error = null;
     if (asset.native && !s.native && asset.parts?.length) s.native = { h: asset.h, r: asset.r };   // the units of the slot's exact matrices
-    if (asset.none) { s.inst = { objects: [], meshes: [] }; s.cur = s.items; emit(s.id); return; }
+    if (asset.none) { s.inst = { objects: [], meshes: [] } as BuiltSlotInstances; s.cur = s.items; emit(s.id); return; }
     const items = (s.cur = given || itemsNow(s, asset));
     if (asset.build && (asset.native || !asset.parts?.length)) s.inst = asset.build(s, ctx, items) || { objects: [], meshes: [] };
     else if (s.surface?.pos && asset.surfaceMat) s.inst = buildSurface(s, asset);

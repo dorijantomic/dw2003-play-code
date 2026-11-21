@@ -34,6 +34,7 @@ import {
   packCount, grantPack, openPack, CARDS_PER_PACK, PACK_STOCK_CAP,
   bindBoosterStock, BOOSTER_ITEM_IDS,
 } from "./vendor/engine.js";
+import type { GameState } from "./game/types.js";
 
 let CATALOG = null;
 let catalogPromise = null;
@@ -133,7 +134,7 @@ function persistInventory() {
   if (inventoryState && typeof localStorage !== "undefined")
     localStorage.setItem("inventory", JSON.stringify(inventoryState.inventory));
 }
-export function bindCardInventory(state) {
+export function bindCardInventory(state: GameState) {
   inventoryState = state;
   bindBoosterStock(collection, state, BOOSTER_ITEM_IDS);
   persistInventory();

@@ -1,4 +1,5 @@
 import { questDone } from "../quests.js";
+import type { FieldMovieHost, FightReportOptions } from "../types/u-core.js";
 import { FLY_QUEST, flyBlock, FLY_POINTS, flyCopyFor, arrivalSpot } from "../fly-points.js";
 import {
   rosterSlotOfCharId,
@@ -59,7 +60,7 @@ export function openFly(row) {
         const chosen = S.flyChosen; S.flyChosen = null;
         if (!chosen) { pauseHome(row); return; }
         flyTo(chosen.id).then((r) => { if (r !== "ok") questSpeak(null, "", "Not now."); });
-    }, state.keys);
+    }, state.keys as any);
 }
 
 /** Fly to a fly point: resolves "ok" or why not. Every rule is re-checked here, whoever asks (the book, the window.__fly hook). */
@@ -80,7 +81,7 @@ export async function flyTo(id) {
 /** Open the post-fight results screen. The walker's report data (rows built by
  *  web/battle.js buildFightReportRows, plus pages) is translated into the
  *  overlay's RAM contract (the 0x80042b84 workspace + roster records). */
-export function openFightReport(opts = {}) {
+export function openFightReport(opts: FightReportOptions = {}) {
     const rows = opts.rows ?? [];
     const party = Array.isArray(state.party) ? state.party : [];
     const partySlots = rows.map((row) => rosterSlotOfCharId(party[row.index ?? 0]));
@@ -155,8 +156,8 @@ export async function playMovieChain(launchCode) {
     let selector = launchCode | 0;
     for (let step = 0; step < ENDING_CHAIN_MAX_STEPS; step++) {
         if (movieRow(selector) == null) break;
-        await new Promise((resolve) => {
-            S.fieldMovieDone = resolve;
+        await new Promise<void>((resolve) => {
+            (S as FieldMovieHost).fieldMovieDone = resolve;
             fieldMovie.open(selector).then((row) => {
                 if (!row) { S.fieldMovieDone = null; resolve(); } // unknown code: never strand
             });

@@ -1,3 +1,4 @@
+import type { K16Rig, RigBasicsModel, RigSampleOut } from "./types.js";
 export const TAU = (Math.PI * 2) / 4096;
 
 export function sample(ch, frame) {
@@ -208,7 +209,7 @@ export function rolesOf(model, { limbRoots = false } = {}) {
  * (5..10 roots) has no single leg root and keeps whatever root it names. Nothing here is species-specific:
  * the inputs are the rig's own chains.
  */
-export function normaliseRoots(rig, model) {
+export function normaliseRoots(rig: K16Rig, model) {
   const n = rig.n ?? model.num_bones ?? model.bones.length;
   const parentOf = (i) => { const p = (model.bones[i]?.parent_slot ?? 0) - 1; return p >= 0 && p < n ? p : -1; };
   let roots = (rig.roots ?? []).filter((i) => i >= 0 && i < n).slice();
@@ -296,7 +297,7 @@ export function buildBoneMap(target, source) {
  */
 export function shiftPlaylistEntry(e, offset) {
   const v = e.value | 0;
-  const out = { ...e };
+  const out = { ...e } as RigSampleOut;
   const loopIndex = v === 0x8000;                 // a playhead index, not a frame
   if (v === 0xffff) out.value = v;                // end marker
   else if (v & 0x8000) out.value = 0x8000 | (v & 0x7fff);
@@ -346,7 +347,7 @@ export function bakeRetargetGeometry(target, source, clip, { offset = 6000 } = {
       const merged = [...own, ...moved, [last ? last[0] : 0, last ? last[1] : 0, last ? last[2] : 0, 30000]];
       return { ...b, anim: { ...(b.anim || {}), ch2: merged } };
     }),
-  };
+  } as RigBasicsModel;
   // the shifted playlist: the source's frames re-based into the target's appended key range.
   model.timeline = (target.timeline ? target.timeline.slice() : []);
   model.timeline[table] = { table: srcTable.map((e) => shiftPlaylistEntry(e, offset)) };

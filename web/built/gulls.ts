@@ -29,6 +29,7 @@
 //   room in the card, wing tip dark beyond 0.86, beak beyond z 0.24.
 import * as THREE from "../lib3d/three.module.js";
 import * as S0 from "./shared.js";
+import type { BuiltGullInfo } from "./types.js";
 
 export const GULL = {
   SPAN_K: 0.96, ROOT: 0.06, ELBOW: 0.42, A1: 0.28, A2: -0.62, F1: 0.55, F2: 0.35, LAG: 0.9, FLAP_HZ: 2.4,
@@ -190,7 +191,7 @@ export function buildGulls(slot, env) {
       const a = at(q, t);
       Qy.setFromAxisAngle(Y, a.yaw).multiply(Qr);
       const s = q.hidden ? 0 : q.hs;
-      M.compose(P.set(...a.c), Qy, Sc.set(s, s, s));
+      M.compose(P.set(...a.c as [number, number, number]), Qy, Sc.set(s, s, s));
       mesh.setMatrixAt(q.i, M);
     }
     mesh.instanceMatrix.needsUpdate = true;
@@ -207,7 +208,7 @@ export function buildGulls(slot, env) {
     gulls: gulls.map((q) => ({ card: q.card, copy: q.copy, copies: q.copies, cw: +q.cw.toFixed(1), R: +q.R.toFixed(1),
                                yc: +q.yc.toFixed(1), y: [q.y0, +q.y1.toFixed(1)], hs: +q.hs.toFixed(1), bob: +q.bob.toFixed(1), w: +q.w.toFixed(4) })),
     values: GULL,
-  };
+  } as BuiltGullInfo;
   env.info && (env.info.gulls = info);
   setTime(0);
   place();

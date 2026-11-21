@@ -17,6 +17,7 @@ import {
   confirmRedirectPairs,
   NPC_CONFIRM_REDIRECT_TABLE_RAM,
 } from "./vendor/engine.js";
+import type { RedirectViewOut } from "./types/redirect-view.js";
 
 // The address is the engine's own constant, re-exported so the page can print it
 // without typing the number a second time.
@@ -53,7 +54,7 @@ function firstRecords(npcs) {
 
 /** One standing spot: the record's x/y and, only when the record has one, its sprite. */
 function spot(rec) {
-  const out = { x: rec.x, y: rec.y };
+  const out = { x: rec.x, y: rec.y } as RedirectViewOut;
   if (typeof rec.sprite === "string" && rec.sprite) out.sprite = rec.sprite;
   return out;
 }

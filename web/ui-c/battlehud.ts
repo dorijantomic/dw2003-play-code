@@ -6,6 +6,7 @@
 // menu-adapter.js), so the overlay never keeps a cursor of its own.
 import { applyRel, dx, dy } from "./geometry.js";
 import { clipRect, runText, restOfRuns } from "./generic.js";
+import type { UiPart, UiRect, UiRingOpts, UiStage, UiTextOpts } from "./types.js";
 import { N, ID, textPart, plate, rowPlate, chip, corners, messageBand, bandLine, HUD, keyBox, rowChevron, ringFrame, hudBar, PAGE_KEY, ringPart, ringTexts, dockPart, popPart, turnNode, triangle } from "./base.js";
 
 /**
@@ -80,7 +81,7 @@ export function classifyCounter(line, who, note) {
     if (!by) return null;
     return { kind: "counter", side: by === who.player ? "enemy" : "player", n: +m[1], tag: "COUNTER", evt: `c${note?.seq ?? 0}:${t}` };
 }
-const POP_STATUS = [["poison", /poison/i, "POISON"], ["frozen", /frozen|paraly[sz]/i, "FROZEN"], ["confuse", /confus/i, "CONFUSED"], ["sleep", /asleep|sleep/i, "SLEEP"]];
+const POP_STATUS: [string, RegExp, string][] = [["poison", /poison/i, "POISON"], ["frozen", /frozen|paraly[sz]/i, "FROZEN"], ["confuse", /confus/i, "CONFUSED"], ["sleep", /asleep|sleep/i, "SLEEP"]];
 const statusOf = (t) => { for (const [k, re, tag] of POP_STATUS) if (re.test(t)) return { status: k, tag }; return null; };
 /**
  * What the pop is, from the game's own line and the read-only hit note (battle.js noteHit): { kind: dmg | heal | miss | counter | status, side (who it lands on), n, tone, tag, status, evt } or null.
@@ -129,7 +130,7 @@ function captionLines(text, x, y, w) {
     };
     let size = CAP.sizeDp, lines = wrap(size);
     while (lines.length > 3 && size > 17) { size -= 3; lines = wrap(size); }
-    const line = Math.round(size * CAP.lineDp / CAP.sizeDp), h = N(line), out = [plate("cap.tick", "capTick", { x: x - 4, y: y + 0.5, w: 1.4, h: h * lines.length - 1 }, ID, { shape: "key", edge: "var(--c-cyan)", body: null, shadow: 0, layer: "over" })];
+    const line = Math.round(size * CAP.lineDp / CAP.sizeDp), h = N(line), out: UiPart[] = [plate("cap.tick", "capTick", { x: x - 4, y: y + 0.5, w: 1.4, h: h * lines.length - 1 }, ID, { shape: "key", edge: "var(--c-cyan)", body: null, shadow: 0, layer: "over" })];
     lines.forEach((t, i) => out.push(textPart(`cap.l${i}`, "body", t, { x, y: y + i * h, w, h }, size, line, { color: "#eef4ff", maxDp: Math.round(w * 3), spacing: 0, cls: "uic-cap" })));
     return out;
 }
@@ -151,7 +152,7 @@ function take(runs, used, r) {
 }
 
 /** A row label (Russo 28 / 51, or the given sizes) at native x, filling the row's height. */
-const rowLabel = (key, m, x, row, right, rel, on, o = {}) => textPart(key, "label", m.text,
+const rowLabel = (key, m, x, row, right, rel, on, o: UiTextOpts = {}) => textPart(key, "label", m.text,
     applyRel({ x, y: row.y + row.h / 2 - N(o.lineDp ?? BATTLE.labelLineDp) / 2, w: Math.max(8, right - x), h: N(o.lineDp ?? BATTLE.labelLineDp) }, rel),
     o.sizeDp ?? BATTLE.labelDp, o.lineDp ?? BATTLE.labelLineDp, { color: on ? "var(--c-orange-ink)" : (m.face ?? null), rel, maxDp: Math.max(24, Math.round((right - x) * 3)) });
 
@@ -178,7 +179,7 @@ const boxRuns = (key, list, rel, out, on = false) => joinNumbers(list).forEach((
 /**
  * The battle screen. `cfg.view` = the close-up's window (native, BATTLE_UI_LAYOUT.portraitView): the bezel leaves it open.
  */
-export function composeBattle({ parts, runs, stage }, cfg = {}) {
+export function composeBattle({ parts, runs, stage }, cfg: { stage?: UiStage; view?: UiRect; } = {}) {
     const out = [], used = new Set();
     const S = stage ?? cfg.stage ?? { x0: 0, y0: 0, x1: 320, y1: 240 };
     const data = parts.find((p) => p.part === "battleData") ?? null;     // the owner's read-only "battleData" part (battle.js drawBattleHud): the numbers the rings show
@@ -405,7 +406,7 @@ export function composeBattle({ parts, runs, stage }, cfg = {}) {
         if (at >= 0 && rows[at].cost > 0) spend = rows[at].cost;
     } else cmds.forEach((c) => oldRow(c.p, c.r, c.on, c.k, c.rel));
     if (data) {
-        const one = (key, variant, rect, v, menu, o = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect, variant, v, o)); };
+        const one = (key, variant, rect, v, menu, o: UiRingOpts = {}) => { out.push(ringPart(key, rect, variant, v, menu, o), ...ringTexts(key, rect, variant, v, o)); };
         if (!fullScreen) {
             one("ring.main", "main", lay.main, data, dockOn || (arcList && listRows.length > 0), { act: actor === "player", mpPrev: spend, real: data.hpReal, eReal: data.eHpReal });
             (data.others ?? []).slice(0, 2).forEach((o, i) => one(`ring.o${i + 1}`, "mini", lay.others[i], o, false));

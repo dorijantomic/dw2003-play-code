@@ -235,6 +235,7 @@ import { makeNative } from "./battle/core/native.js";
 import { makeHud } from "./battle/core/hud.js";
 import { makeReport } from "./battle/core/report.js";
 import { makeDraw } from "./battle/core/draw.js";
+import type { BattleContext } from "./types/battle.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export {
   BATTLE_COMMANDS,
@@ -456,7 +457,7 @@ export { damageTermCategory4Arm as category4ArmFor };
 
 export { AILMENT_INFLICT };
 export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
-  const B = {};
+  const B = {} as BattleContext;
   B.canvas = canvas;
   B.ctx = ctx;
   B.getState = getState;
@@ -691,7 +692,7 @@ export function createBattle(canvas, ctx, getState, sfx = null, bgm = null) {
     // pools); where a name is not in a pool the id falls back to the record at the same
     // enemies.json index, so no name loses its id and the resolver never regresses.
     const nameToId = {};
-    for (const party of Object.values(fej?.screens ?? {})) {
+    for (const party of Object.values(fej?.screens ?? {}) as any[]) {
       for (const e of party ?? []) if (e?.name != null && e.id != null) nameToId[e.name] = e.id | 0;
     }
     emj.enemies.forEach((e, i) => {

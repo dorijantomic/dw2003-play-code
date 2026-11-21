@@ -1,5 +1,6 @@
 import { unlockedTreeRecords, firstUnlockedTreeRecord, RAND_U16, scaledStat } from "../vendor/engine.js";
 import { evolvedMaxStats } from "../battle.js";
+import type { BattleEndContext, WinBattleRewardsArgs } from "./core/types.js";
 
 /**
  * The Digimon a won battle PAYS — the set the reward is split between. One
@@ -34,7 +35,7 @@ import { evolvedMaxStats } from "../battle.js";
  * A marked position with no resident record cannot have been knocked out by the
  * fight, so it stays in rather than silently vanishing from the payout.
  */
-export function paidParticipants(b) {
+export function paidParticipants(b: BattleEndContext) {
   const marked = b?.participantIndices;
   if (!marked?.size) return [];
   const out = [];
@@ -181,7 +182,7 @@ export function battleRewardFor(screenId, rewards) {
 // share is 100% solo / 60% each for two / one third each for three (stfgtrep 0x2ce0-0x2d54)
 // and the EXP/BIT Adapter accessories add x/5 (0x1dd0 / 0x26c0). No record means 0 EXP and
 // 0 BIT — the original awards per BATTLE, never per enemy.
-export function winBattleRewards({ screenId, participants = 1, equipment = {}, rewards }) {
+export function winBattleRewards({ screenId, participants = 1, equipment = {}, rewards }: WinBattleRewardsArgs) {
   const rw = battleRewardFor(screenId, rewards);
   const share = Math.max(1, participants);
   const boost = (v, id) => (equipment.acc0 === id || equipment.acc1 === id) ? v + Math.floor(v / 5) : v;

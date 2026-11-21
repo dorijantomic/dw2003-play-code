@@ -21,6 +21,7 @@
 import { drawWindow } from "./uiRects.js";
 import * as uiC from "./ui-c/index.js";
 import { composeWindow } from "./ui-c/screens.js";
+import type { ChoicePrompt, ChoiceRun } from "./types/choice.js";
 
 let choiceCount = 0;
 
@@ -35,11 +36,11 @@ export const CHOICE_CONFIRM_SOUND = 0x8004503c;
  * the bottom stays at 222. Pure: { parts, runs } for the look C composer (a "question" part, as claims.js gives cmfont 69).
  */
 export const CHOICE_BOX = Object.freeze({ x: 0, bottom: 222, w: 320, pad: 4, pitch: 14, promptX: 18, optionX: 28, cursorX: 18 });
-export function choiceScene(ch) {
+export function choiceScene(ch: ChoicePrompt) {
   const B = CHOICE_BOX, n = ch.options.length, h = B.pad * 2 + B.pitch * (n + 1), y = B.bottom - h;
   const rel = { a: 1, d: 1, e: 0, f: 0 };
   const parts = [{ part: "question", layer: "over", rows: 0, pack: "choice", id: "box", x: B.x, y, bx: 0, by: 0, w: B.w, h, rel }];
-  const runs = [{ text: ch.prompt, x: B.promptX, y: y + B.pad, kind: 1 }];
+  const runs: ChoiceRun[] = [{ text: ch.prompt, x: B.promptX, y: y + B.pad, kind: 1 }];
   ch.options.forEach((o, i) => runs.push({ text: o, x: B.optionX, y: y + B.pad + B.pitch * (i + 1), kind: 1 }));
   runs.push({ text: "[enter]", x: B.cursorX, y: y + B.pad + B.pitch * (ch.cursorIdx + 1), kind: 1 });
   return { parts, runs };
@@ -52,7 +53,7 @@ export function createChoice(sfx = null) {
     options: [],
     cursorIdx: 0,
     _onSelect: null,
-  };
+  } as ChoicePrompt;
 
   ch.isOpen = () => ch._onSelect !== null;
 

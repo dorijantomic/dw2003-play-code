@@ -1,8 +1,10 @@
 // System Status page. Reads web/system-status.json, which
 // tools/build_system_status.mjs generates from the research records.
-const data = await (await fetch("system-status.json")).json();
+import type { SystemStatusPage } from "./types/systems.js";
 
-const $ = (id) => document.getElementById(id);
+const data: SystemStatusPage = await (await fetch("system-status.json")).json();
+
+const $ = (id: string): any => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const CLAIM_KEYS = ["verified", "partially_verified", "candidate", "contradicted"];
 const CLAIM_WORDS = { verified: "proven", partially_verified: "partly proven", candidate: "unproven reading", contradicted: "disproved" };

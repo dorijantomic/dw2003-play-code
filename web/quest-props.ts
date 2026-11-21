@@ -36,6 +36,7 @@
 import {
     questFxSpawn, questFxGet, questFxRemove, questFxSheetInfo, loadQuestFxSheets,
 } from "./quest-fx.js";
+import type { QuestProp } from "./types/quest-props.js";
 
 const LAYERS = ["entity", "behind", "front"];
 /** Every prop's effect name carries this prefix, so it can never collide with a scene's effect name. */
@@ -111,7 +112,7 @@ export function normalize(onThisMap) {
         const key = String(p.key ?? `${sheet}@${Math.round(x)},${Math.round(y)}`);
         if (seen.has(key)) continue;                    // one place per key: a duplicate can never stack
         seen.add(key);
-        const r = { key, name: PREFIX + key, sheet, x, y };
+        const r = { key, name: PREFIX + key, sheet, x, y } as QuestProp;
         if (p.clip != null && p.clip !== "") r.clip = String(p.clip);
         if (LAYERS.includes(p.layer)) r.layer = p.layer;
         if (p.solid === true) r.solid = true;

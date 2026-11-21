@@ -1,4 +1,5 @@
 import { createExclusiveRegister, createBgmPlayer, createSfxPlayer } from "../audio.js";
+import type { Closeable } from "../types/u-core.js";
 import { createItemLog } from "../item-log.js";
 import { createSpeciesLog } from "../species-log.js";
 import { createRetryLoader } from "../retry-loader.js";
@@ -79,6 +80,7 @@ import { openFly } from "./ui-openers.js";
 import { checkStageCutscene, storyDbg } from "./story-events.js";
 import { runQuestSceneEvent, sceneCast } from "./quest-scenes.js";
 import { dispatchInput } from "./input.js";
+import type { Follower, GameState } from "./types.js";
 
 // D0x80055c34 is ONE register in the original, so both players share one
 // instance here: a track or jingle started on either side first ends whatever
@@ -226,7 +228,7 @@ export const PLAYER_ENTITY_KIND = 2;
 // Ledger: digi-egg-traversal-form-step-sound.
 export const DIGMON_SPRITE_ID = 326;
 
-export const canvas = document.getElementById("game");
+export const canvas = document.getElementById("game") as HTMLCanvasElement;
 
 export const ctx = canvas.getContext("2d");
 
@@ -274,7 +276,7 @@ export const textbox = new Proxy(fallbackTextbox, {
             if (yesNoWindowUp() || helpMenuWindowUp()) return; // these boxes read the pad themselves
             return dialogueBox.isOpen() ? dialogueBox.pressConfirm() : target.advance();
         };
-        if (prop === "close") return () => { if (dialogueBox.isOpen()) dialogueBox.close(); target.close?.(); };
+        if (prop === "close") return () => { if (dialogueBox.isOpen()) dialogueBox.close(); (target as Closeable).close?.(); };
         return target[prop];
     },
     set(target, prop, value) { target[prop] = value; return true; },
@@ -745,7 +747,7 @@ export const state = {
     // (web/omen.js). Read-only: nothing outside the cue reads it, and the counter above is
     // never written except by the driver's own two lines further down.
     _encLevel: 0,
-};
+} as GameState;
 
 // Decoded field assets are intentionally bounded to the current stage and its
 // direct exits. Browser HTTP caching still makes revisits cheap, while dropping
@@ -768,11 +770,11 @@ export const retainedSpriteIds = new Set();
 // ring buffer. followers[0] = the LEAD (= `partner`, the battle-active one);
 // followers[1..] = the other pack members. Each
 // samples the history at an increasing lag (lead closest).
-const partner = { x: 0, y: 0, dir: "down", animTime: 0, stopping: false, stopTime: 0 };
+const partner: Follower = { x: 0, y: 0, dir: "down", animTime: 0, stopping: false, stopTime: 0 };
 
 export const MAX_FOLLOWERS = 3;
 
-export const followers = [
+export const followers: Follower[] = [
     partner,
     { x: 0, y: 0, dir: "down", animTime: 0, stopping: false, stopTime: 0 },
     { x: 0, y: 0, dir: "down", animTime: 0, stopping: false, stopTime: 0 },

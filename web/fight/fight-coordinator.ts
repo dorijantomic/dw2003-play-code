@@ -16,6 +16,7 @@ import {
 import {
   dispatchSubordinateActor, SUBORDINATE_MODE_SINGLE, SUBORDINATE_MODE_MULTI_HIT,
 } from "../vendor/engine.js";
+import type { FightActionHooks } from "./types.js";
 
 // The actor/context fields FIGHTSTG_F0x8008b69c reads and writes (offsets off the attacker
 // action actor and its owner context). Kept as named constants so the port's inputs are the
@@ -42,6 +43,11 @@ function dispatchMemory(w) {
 }
 
 export class FightCoordinator {
+  declare _defender: any;
+  declare _reacted: boolean;
+  declare enemy: any;
+  declare extraActors: any;
+  declare player: any;
   constructor(player, enemy) {
     this.player = player;        // ActorAnimator (our fighter)
     this.enemy = enemy;          // ActorAnimator (opponent)
@@ -60,7 +66,7 @@ export class FightCoordinator {
   // hooks = optional extra hooks merged onto the attacker (e.g. FX/sound onHit from battle.js).
   // `defenderHooks`: hooks threaded into the defender's REACTION script (reaction clips carry
   // their own op10[99] received-impact effect + op5 impact-camera presets — decode 2026-07-05).
-  attack(attacker, defender, techId, hooks = {}, { lethal = false, miss = false, defenderHooks = {} } = {}) {
+  attack(attacker, defender, techId, hooks: FightActionHooks = {}, { lethal = false, miss = false, defenderHooks = {} } = {}) {
     this._defender = defender;
     this._reacted = false;
 

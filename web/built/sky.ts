@@ -60,6 +60,7 @@ import { SKY_U, SKY_GLSL } from "./shared.js";
 
 export { SKY_U, SKY_GLSL };
 import { skyData as skyDataOf } from "./place/sky.js";
+import type { BuiltSkyState } from "./types.js";
 
 const RING_MAX = S.SKY_RING_MAX;   // profile points the shader takes
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -753,7 +754,7 @@ function createClouds(scene, sky, c, worldScale) {
     }),
     vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG,
   });
-  const mesh = new THREE.Mesh(g, mat);
+  const mesh: any = new THREE.Mesh(g, mat);   // the vendored build types Mesh without its Object3D members
   mesh.name = "builtClouds"; mesh.userData.kind = "clouds"; mesh.userData.role = "banks"; mesh.frustumCulled = false;
   mesh.scale.setScalar(worldScale() || 1);
   // the ring is in recipe units: follow the arena group's scale (set before this frame's draw, as the dome's eye is)
@@ -910,7 +911,7 @@ function bakeNoise(seed, N, billow) {
     R[j * N + i] = billow ? 1 - fbm(u, v, 4, 5, 0, true) : fbm(u, v, 4, 5, 0, false);
     A[j * N + i] = fbm(u, v, billow ? 8 : 2, billow ? 4 : 3, 6, false);
   }
-  const equalise = (F) => {   // rank -> [0, 1]: a coverage threshold cov then leaves exactly (1 - cov) of the tile above it
+  const equalise = (F: Float32Array) => {   // rank -> [0, 1]: a coverage threshold cov then leaves exactly (1 - cov) of the tile above it
     const ix = Array.from(F.keys()).sort((a, b) => F[a] - F[b]), out = new Float32Array(F.length);
     ix.forEach((k, r) => { out[k] = r / (F.length - 1); });
     return out;
@@ -960,10 +961,10 @@ export function buildSky(slot, ctx) {
   if (night.mode === "night") {
     // the moon stands AGAINST the light: the sun's elevation, the opposite side of the sky (plan: disc vs light split)
     SKY_U.uMoonDir.value.set(-sd.x, sd.y, -sd.z).normalize();
-    SKY_U.uMoonColor.value.setRGB(...NIGHT.MOON_COLOR);
+    SKY_U.uMoonColor.value.setRGB(...NIGHT.MOON_COLOR as [number, number, number]);
     SKY_U.uMoonRadius.value = NIGHT.MOON_RADIUS; SKY_U.uMoonAmt.value = 1;
     SKY_U.uGlowDir.value.copy(SKY_U.uMoonDir.value);                       // the glow is the moon's halo
-    SKY_U.uSunGlowColor.value.setRGB(...NIGHT.GLOW_COLOR);
+    SKY_U.uSunGlowColor.value.setRGB(...NIGHT.GLOW_COLOR as [number, number, number]);
     SKY_U.uSunGlow.value = NIGHT.GLOW; SKY_U.uSunGlowPower.value = NIGHT.GLOW_POWER; SKY_U.uBroadGlow.value = NIGHT.BROAD;
     SKY_U.uHazeWarmK.value = NIGHT.HAZE_WARM_K;
     SKY_U.uCloudLit.value.copy(S.srgb(NIGHT.CLOUD_LIT));                    // moonlit decks (PICKED)
@@ -971,9 +972,9 @@ export function buildSky(slot, ctx) {
     SKY_U.uCloudDark.value.copy(S.srgb(NIGHT.CLOUD_DARK));
     const m = bakeStars(1013, NIGHT.STAR_MAP[0], NIGHT.STAR_MAP[1], NIGHT.STAR_TIERS, SKY_U.uMoonDir.value.toArray(), NIGHT.MOON_RADIUS);
     SKY_U.uStarTex.value = m.tex; SKY_U.uStarAmt.value = NIGHT.STAR_AMP;
-    SKY_U.uStarTint0.value.setRGB(...NIGHT.STAR_TIERS[0].tint);
-    SKY_U.uStarTint1.value.setRGB(...NIGHT.STAR_TIERS[1].tint);
-    SKY_U.uStarTint2.value.setRGB(...NIGHT.STAR_TIERS[2].tint);
+    SKY_U.uStarTint0.value.setRGB(...NIGHT.STAR_TIERS[0].tint as [number, number, number]);
+    SKY_U.uStarTint1.value.setRGB(...NIGHT.STAR_TIERS[1].tint as [number, number, number]);
+    SKY_U.uStarTint2.value.setRGB(...NIGHT.STAR_TIERS[2].tint as [number, number, number]);
     current.stars = m;
   } else {   // day: everything the night branch touches goes back to the day values, so a rebuild is not sticky
     SKY_U.uMoonAmt.value = 0; SKY_U.uStarAmt.value = 0; SKY_U.uStarTex.value = null;
@@ -1015,7 +1016,7 @@ export function buildSky(slot, ctx) {
     // the measured colours ARE the stops (no solve): bottom quarter / median / top quarter of the band picture at
     // band share BAND_BOTTOM_SHARE / 0.5 / 0.875; the sun glow is off (BAND.GLOW_K) so the dome shows exactly them
     const tM = lin(c.all), tT = lin(c.top || c.all);
-    SKY_U.uHorizon.value.setRGB(...tH); SKY_U.uMid.value.setRGB(...tM); SKY_U.uZenith.value.setRGB(...tT);
+    SKY_U.uHorizon.value.setRGB(...tH as [number, number, number]); SKY_U.uMid.value.setRGB(...tM as [number, number, number]); SKY_U.uZenith.value.setRGB(...tT as [number, number, number]);
     SKY_U.uBandMix.value = 1;
     SKY_U.uBandBelow.value = BAND.BELOW; SKY_U.uBandSoft.value = BAND.SOFT_M * S.UNITS_PER_M;
     SKY_U.uBandFade.value = BAND.FADE_SHARE * (sky.ymax - sky.ymin);
@@ -1040,7 +1041,7 @@ export function buildSky(slot, ctx) {
   SKY_U.uNoiseA.value = A?.tex ?? null; SKY_U.uNoiseC.value = C?.tex ?? null; SKY_U.uGradS.value = C?.G ?? 1;
   // dome
   const mat = skyMaterial();
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+  const mesh: any = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
   mesh.name = "builtSky"; mesh.renderOrder = -1000; mesh.frustumCulled = false;
   const tmpH = new THREE.Vector2();
   mesh.onBeforeRender = (renderer, _scene, camera) => {
@@ -1078,7 +1079,7 @@ export function buildSky(slot, ctx) {
   const mats = ctx.materials, prev = current.sky?.scene === scene ? current.sky.material : null, k = mats && prev ? mats.indexOf(prev) : -1;
   if (k >= 0) mats[k] = mat; else mats?.push(mat);
   if (ctx.info) ctx.info.sky = info;
-  current.sky = { mesh, material: mat, info, scene, worldScale, noise, clouds, opts, data: D };
+  current.sky = { mesh, material: mat, info, scene, worldScale, noise, clouds, opts, data: D } as BuiltSkyState;
   return { objects: [mesh], meshes: [mesh], dome: mesh, material: mat, info,
            dispose() { mesh.geometry.dispose(); mat.dispose(); for (const t of noise) t.dispose(); stars?.tex?.dispose(); } };
 }

@@ -31,7 +31,7 @@ const basicTokens = {};
 fetch("assets/ui/uifont.json")
     .then((r) => r.json())
     .then((j) => {
-        for (const [token, info] of Object.entries(j.chars || {})) {
+        for (const [token, info] of Object.entries((j.chars || {}) as Record<string, { t?: string; i?: number }>)) {
             if (!info) continue;
             if (info.t === "e") extTokens[info.i] = token;
             else if (info.t === "b") basicTokens[info.i] = token;
@@ -223,7 +223,14 @@ export function decodeWidgetLine(w, line, slots = [], { revealWindow = false } =
  * box); without it, the whole of line 0 is painted (the other screens). Returns counters plus the
  * decoded texts so a check can assert real strings, not just call counts.
  */
-export function drawNativeTextWidgets(ctx, widgets, opts = {}) {
+/** What the text drawing can be told: which widgets to skip or take, and whether the window is revealed. */
+interface NativeTextOpts {
+    skip?: (w: any) => boolean;
+    only?: (w: any) => boolean;
+    revealWindow?: boolean;
+}
+
+export function drawNativeTextWidgets(ctx, widgets, opts: NativeTextOpts = {}) {
     const stats = { ready: fontReady(), widgets: widgets.length, lines: 0, drawn: 0, unknown: 0, texts: [] };
     if (!fontReady()) return stats;
     if (capturing()) {
@@ -290,7 +297,7 @@ export function runFace(kind, clut, rowOf = fontClutRow) {
  * glyph ({ text, kind, clut, x, y, glyphs: [{ ch, x, dx }] }). The look C overlay (web/ui-c) draws these with a smooth
  * font at the game's own pens. Same decode, same reveal window, same positions; nothing is invented here.
  */
-export function collectNativeTextRuns(widgets, opts = {}) {
+export function collectNativeTextRuns(widgets, opts: NativeTextOpts = {}) {
     const runs = [];
     if (!fontReady()) return runs;
     for (const w of widgets) {

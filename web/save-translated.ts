@@ -22,6 +22,7 @@ import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./tran
 import { buildDirectoryBlock, slotForFile } from "./memcard.js";
 import { buildRecord, readSlot, restoreSlotData, writeSlot, lastSlotRefusal } from "./save.js";
 import { fetchBytes, fetchJson, loadResidentResources, loadProfileRecords } from "./resident-data.js";
+import type { SaveResult, SaveScreen } from "./types/save-translated.js";
 
 /** The card art: 0x029D0000 is disc index 669 (STMCRDCS), 0x02860000 is 646 (CMFONT). */
 const PACKS = { 669: "stmcrd", 646: "cmfont" };
@@ -53,7 +54,7 @@ export function createSaveTranslated(sfx = null) {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null,
         _state: null, _mode: "save", _opts: {}, _onClose: null, _clock: null, _ticks: 0, _request: 0,
         _card: null, _commit: null, _summary: null, _lastDiagnostic: null,
-    };
+    } as SaveScreen;
     const renderer = createNativeScreenRenderer({ pack: "stmcrd", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
     const playSound = (id) => { sfx?.playPacked(id); };
@@ -184,7 +185,7 @@ export function createSaveTranslated(sfx = null) {
     function commit() {
         const card = r._card;
         const session = r._session;
-        const result = { saved: [], loadedSlot: null };
+        const result = { saved: [], loadedSlot: null } as SaveResult;
         if (!card || !session) return result;
         for (const item of card.saved) {
             writeSlot(item.slot, {

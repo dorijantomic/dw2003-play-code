@@ -11,6 +11,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
+import type { BattleTechSeed } from "./types/battletech-translated.js";
 
 // The row icon is pack handle 0x00286000 (CMFONT, the resident UI glyphs) and
 // the chrome is 0x00455000 (PGFGTC00, disc 1109). The original builds both
@@ -48,7 +49,7 @@ export function createBattleTechTranslated(sfx = null, options = {}) {
         languageError: "Battle tech language index is invalid",
 
         /** Open on the party member's technique list. */
-        seed: (r, seed = {}) => ({
+        seed: (r, seed: BattleTechSeed = {}) => ({
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             mp: Number(seed.mp ?? 0) & 0xffff,
             maxMp: Number(seed.maxMp ?? 0) & 0xffff,

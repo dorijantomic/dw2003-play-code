@@ -7,6 +7,7 @@
     "test:translations": "node tools/test_translations.mjs",
     "test:engine": "node --test 'tests/engine/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
+    "check:types": "node tools/rewrite/ts-ratchet.mjs",
     "build:web": "node tools/rewrite/build-web.mjs",
     "build:engine": "node tools/build_engine_bundles.mjs",
     "build:content": "node tools/engine-convert/convert.ts",

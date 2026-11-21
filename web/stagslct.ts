@@ -32,6 +32,7 @@
 // the launchable rows, the window centred on the cursor, no stored state.
 
 import { drawText } from "./uifont.js";
+import type { StageSelectState } from "./types/stagslct.js";
 
 let DATA = null;
 if (typeof fetch !== "undefined" && typeof location !== "undefined") {
@@ -118,7 +119,7 @@ export function clampScroll(cursor, scroll, rows = VISIBLE_ROWS) {
 }
 
 export function createStagslctMenu(data = null) {
-  const d = { open: false, cursor: 0, scroll: 0, onPick: null };
+  const d = { open: false, cursor: 0, scroll: 0, onPick: null } as StageSelectState;
   const src = () => (data && typeof data === "object" ? data : DATA);
 
   d.show = (onPick) => {

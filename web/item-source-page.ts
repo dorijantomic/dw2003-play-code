@@ -16,7 +16,7 @@ const [index, shops, merchants, effects] = await Promise.all([
 
 const listEl = $("list");
 const detailEl = $("detail");
-const queryEl = $("q");
+const queryEl = $("q") as HTMLInputElement;
 const countEl = $("count");
 
 if (!index || !index.items) {
@@ -74,7 +74,7 @@ if (!index || !index.items) {
         elements = shown.map((row) => {
             const el = document.createElement("div");
             el.className = "item";
-            el.dataset.id = row.id;
+            el.dataset.id = row.id as any;
             el.innerHTML =
                 `<span class="id">#${row.id}</span>` +
                 `<span class="name">${escapeHtml(row.name)}</span>` +

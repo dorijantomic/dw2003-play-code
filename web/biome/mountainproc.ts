@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { toonify, rng, U, noiseTexture, light } from "./toolkit.js";
 import { GB, tube, ribbon, canvasTex, mixc, V } from "./beachproc.js";
 import * as M from "./mtlaw.js";
+import type { CloudDeckOpts, MountainGroundOpts, SnowPointsOpts, WeatherOpts } from "./types.js";
 
 const { sstep, vnoise } = M;
 const fr = (x) => x - Math.floor(x);
@@ -46,7 +47,7 @@ const arc = (ox, oz, a, H, lean, n = 5) => { const P = []; for (let i = 0; i < n
 
 // ------------------------------------------------------------------ WEATHER hook: snow dust on up-facing surfaces + lichen patches on any toon material
 /** o: { snow 0..1 coverage, snowAlt world y where snow starts (default everywhere), lichen 0..1 } */
-export function weather(parts, o = {}) {
+export function weather(parts, o: WeatherOpts = {}) {
   const wx = [o.snow ?? 0, o.snowAlt ?? -1e4, o.lichen ?? 0];
   for (const p of parts) {
     const prev = p.mat.onBeforeCompile, tag = (p.mat.userData.tag || "") + "wx" + (wx[0] > 0 ? "s" : "") + (wx[2] > 0 ? "l" : ""); p.mat.userData.tag = tag;
@@ -69,7 +70,7 @@ export function weather(parts, o = {}) {
 
 // ------------------------------------------------------------------ TERRAIN GROUND: altitude / slope splat with toon bands
 /** T = { grass, rock, scree, snow, lichen } textures. o: { tile m, snowline m } */
-export function mountainGround(T, o = {}) {
+export function mountainGround(T, o: MountainGroundOpts = {}) {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
   m.userData.tag = "mtground";
   toonify(m, { grade: o.grade || { sat: 1.12, post: 0.5 }, shadeK: 0.78, rim: 0 });
@@ -281,7 +282,7 @@ void main(){ vec3 n = normalize(cross(dFdx(vW), dFdy(vW))); if (n.y < 0.0) n = -
 }
 
 // ------------------------------------------------------------------ CLOUD DECKS / CLOUD SEA: toon layers (3 steps), invisible near the camera, anchored in world space
-export function cloudDeck(o = {}) {
+export function cloudDeck(o: CloudDeckOpts = {}) {
   const ys = o.y || [14], size = o.size || 900, col = o.col || [0.97, 0.98, 1.0], sh = o.shade || [0.66, 0.74, 0.9];
   const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
     uniforms: { uTime: U.uTime, uNoise: { value: noiseTexture() }, uCam: U.uCam, uCol: { value: new THREE.Vector3(...col) }, uSh: { value: new THREE.Vector3(...sh) }, uNear: { value: o.near ?? 140 }, uFar: { value: o.far ?? 300 }, uCov: { value: o.cover ?? 0.5 }, uSize: { value: size }, uSun: { value: light.dir }, uScale: { value: o.scale ?? 0.0045 } },
@@ -305,7 +306,7 @@ void main(){ vec2 p = vW.xz * uScale + vec2(uTime * 0.004, uTime * 0.0022) + vW.
 
 // ------------------------------------------------------------------ BLOWING SNOW + SPINDRIFT (GPU points, no CPU work)
 /** kind "blow": a wrap-around box (w x h x w) of fine flakes streaming along the wind around the camera. kind "spindrift": plumes streaming off crest points downwind. */
-export function snowPoints(kind = "blow", o = {}) {
+export function snowPoints(kind = "blow", o: SnowPointsOpts = {}) {
   const r = rng(o.seed || 9), n = o.n || (kind === "blow" ? 1400 : 1800), pos = new Float32Array(n * 3), ph = new Float32Array(n * 2);
   const crests = o.crests || [[0, 0, 0]];
   for (let i = 0; i < n; i++) {
@@ -346,7 +347,7 @@ const strataCol = (band, f, y) => { const k = hash1(band * 3.7 + 0.5), b = k < 0
 
 // ------------------------------------------------------------------ CRAGS and SPIRES (strata-banded, ridged, ledges), CLIFF FACES
 const ridged = (x, y, z, f, s) => 1 - Math.abs(2 * vnoise(x * f + y * f * 0.7, z * f - y * f * 0.9, 1, s) - 1);
-export function cragParts(seed = 1, o = {}) {
+export function cragParts(seed = 1, o: { h?: number; w?: number; detail?: number } = {}) {
   const r = rng(seed * 71 + 5), H = o.h ?? (4.5 + 3 * r()), W = o.w ?? (1.1 + 0.6 * r()), lean = (r() - 0.5) * 0.5, gb = new GB(), sd = seed * 13;
   addBlob(gb, o.detail ?? 4, V(0, H * 0.5, 0), [W, H * 0.5, W * (0.8 + 0.3 * r())], (x, y, z) => {
     const yn = (y + 1) / 2, taper = 1 - 0.55 * Math.pow(yn, 1.25);
@@ -372,7 +373,7 @@ export function spireCluster(seed = 1) {
   const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(P, 3)); geo.setAttribute("normal", new THREE.BufferAttribute(N, 3)); geo.setAttribute("color", new THREE.BufferAttribute(C, 3)); geo.setAttribute("uv", new THREE.BufferAttribute(UV, 2)); geo.setIndex(I); geo.computeBoundingSphere();
   return [{ geo, mat: vcSolid("spire", { height: 8, shadeK: 0.74, rim: 0.12, grade: { sat: 1.12, post: 0.3 } }) }];
 }
-export function cliffParts(seed = 1, o = {}) {
+export function cliffParts(seed = 1, o: { w?: number; h?: number } = {}) {
   const W = o.w ?? 12, Hc = o.h ?? 9, sx = 60, sy = 44, gb = new GB(), sd = seed * 7;
   const ids = [];
   for (let j = 0; j <= sy; j++) { const row = []; for (let i = 0; i <= sx; i++) {

@@ -10,6 +10,7 @@ import { loadToon, loadRaw, partsGroup } from "./loader.js";
 import { beachH, shoreZ, POOLS } from "./beachproc.js";
 import { lakeH, lakeD } from "./lakeproc.js";
 import * as M from "./mtlaw.js";
+import type { ToonLoadOpts } from "./types.js";
 
 const ASSETS = new URL("./assets/", import.meta.url).href;
 export const catalog = await fetch(ASSETS + "anime.json").then((r) => (r.ok ? r.json() : [])).catch(() => []);
@@ -27,7 +28,7 @@ const SIZE = { tree: ["h", 8], pine: ["h", 9], snowtree: ["h", 8], cherry: ["h",
   flower: ["m", 0.45], seaweed: ["h", 0.8], mushroom: ["m", 0.3], lily: ["m", 0.9], reed: ["h", 1.6], rock: ["m", 1.2], cliff: ["m", 6], mountain: ["m", 40], wood: ["m", 2.2], shell: ["m", 0.2], kit: ["m", 3], other: ["m", 2] };
 const PAINT = { shadeK: 0.86, rim: 0.16 };           // gentle toon band, painted albedo untouched (no grade)
 
-async function toonOf(it, o = {}) {
+async function toonOf(it, o: ToonLoadOpts & { mul?: number } = {}) {
   const url = ASSETS + it.rel, raw = await loadRaw(url), [how, v] = SIZE[it.kind] || ["m", 1];
   const ext = how === "h" ? raw.size.y : Math.max(raw.size.x, raw.size.y, raw.size.z);
   return loadToon(url, { scale: v / Math.max(ext, 1e-3) * (o.mul || 1), ...PAINT, ...o });

@@ -5,6 +5,7 @@
 // giant mode, battle camera/backdrops), sound (boss music), field warnings (omen, enemy tells: they show information, they
 // decide nothing) and info pages (blast ladder) are not.
 import { DIAL_MODES } from "./encounter-dial.js";
+import type { AmbienceSettings } from "./types/ambience.js";
 
 /** Key -> kind of value. "bool" = a switch, "dial" = one of DIAL_MODES, "speed" = a number 1..3 (the Faster battles slider). */
 export const HOST_RULES = Object.freeze({
@@ -54,7 +55,7 @@ export function pickRules(fx) {
  *   locked(key)   true while the host decides this key
  *   canSave(key)  false for a locked key
  */
-export function createRuleOverride(fx) {
+export function createRuleOverride(fx: AmbienceSettings) {
     const own = new Map();       // key -> the player's own value, taken the moment the key was locked
     const host = new Map();      // key -> the host's value
     const unlock = (k) => { fx[k] = own.get(k); own.delete(k); host.delete(k); };

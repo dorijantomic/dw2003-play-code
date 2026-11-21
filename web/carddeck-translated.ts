@@ -9,6 +9,7 @@ import { paintNativeSession } from "./native-session.js";
 import { composeDeck } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards, persistCollection, loadCatalog, catalog, loadCardIcons, drawCardIcon } from "./cardstate.js";
+import type { CardDeckScreen } from "./types/carddeck-translated.js";
 
 // 1904 = namedt: the folder rename is the name keyboard (without it every keyboard clip was skipped, text only)
 const PACKS = { 1598: "stcdsp", 1904: "namedt" };
@@ -83,7 +84,7 @@ export function createCardDeckTranslated(sfx = null, _options = {}) {
   const deck = {
     _open: false, _session: null, _state: null, _onClose: null,
     _renderer: null, _clock: null, _error: null, _request: 0,
-  };
+  } as CardDeckScreen;
   const renderer = createNativeScreenRenderer({ pack: "stcdsp", packs: PACKS },
     (directory) => PACKS[directory >>> 16] ?? null, {
       // the grid cell's card picture (same painter as the card shop)

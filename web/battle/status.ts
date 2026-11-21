@@ -21,6 +21,7 @@ import {
 } from "../vendor/engine.js";
 import { activeSlotOf, effectiveSpd, setStatModifier } from "./plans.js";
 import { RAND_FRAC, battleRestoreTargets } from "./restore.js";
+import type { PostHitDispatchOptions } from "./core/types.js";
 
 /**
  * Advance the battle's status-event pool by one action and apply every expiry.
@@ -258,7 +259,7 @@ export function applyCategory5Plan(b, plan, ctx) {
  * else `{ dispatch, landed, queueWord, penalty }`. `penalty` is the record's three
  * halfwords after the arm ran.
  */
-export function applyPostHitDispatch(b, record, options = {}) {
+export function applyPostHitDispatch(b, record, options: PostHitDispatchOptions = {}) {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch === 13) return applyFleeLockDispatch(b, record, options);
   if (dispatch === 29) return applyMpAbsorbDispatch(b, record, options);
@@ -297,7 +298,7 @@ export function applyPostHitDispatch(b, record, options = {}) {
  * units on the PLAYER's active slot, the flee bit (+0x1c bit 0x10) is set, and the page is esmfight[0x44]
  * "Can't run away!". The pool's expiry clears the bit (wfightmn.s:2925-2948). `options.rng` is a 16-bit draw.
  */
-function applyFleeLockDispatch(b, record, options = {}) {
+function applyFleeLockDispatch(b, record, options: PostHitDispatchOptions = {}) {
   const rng = options.rng ?? RAND_U16;
   if (!damageTermFleeLockRoll(record?.f8 | 0, rng)) return { dispatch: 13, landed: false, page: null };
   const slot = activeSlotOf(b, 0);
@@ -318,7 +319,7 @@ function applyFleeLockDispatch(b, record, options = {}) {
  * current MP, and the enemy's active fighter gains it (clamped at its own maximum). Page: kind 18 with payload
  * word 2 = 1, "{1} MP absorbed!" (esmfight[0x8f]), the amount in slot 1.
  */
-function applyMpAbsorbDispatch(b, record, options = {}) {
+function applyMpAbsorbDispatch(b, record, options: PostHitDispatchOptions = {}) {
   const src = battleRestoreTargets(b, 0)[activeSlotOf(b, 0)] ?? null;
   const dst = battleRestoreTargets(b, 1)[activeSlotOf(b, 1)] ?? null;
   if (!src || !dst) return { dispatch: 29, landed: false, page: null };

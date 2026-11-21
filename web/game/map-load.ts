@@ -73,7 +73,7 @@ function updateHud() {
         const sheet = state.charImgs[pc.id];
         partnerRow.style.display = "flex";
         document.getElementById("hud-partner-name").textContent = pc.name;
-        const icon = document.getElementById("hud-icon");
+        const icon = document.getElementById("hud-icon") as HTMLCanvasElement;
         const ictx = icon.getContext("2d");
         ictx.imageSmoothingEnabled = false;
         ictx.clearRect(0, 0, 32, 32);
@@ -99,7 +99,7 @@ export function setCharacter(i) {
     state.charIdx =
         (i + state.manifest.characters.length) %
         state.manifest.characters.length;
-    document.getElementById("charSelect").selectedIndex = state.charIdx;
+    (document.getElementById("charSelect") as HTMLSelectElement).selectedIndex = state.charIdx;
     const c = state.manifest.characters[state.charIdx];
     if (c) {
         state.charId = c.id;
@@ -537,7 +537,7 @@ export function setMap(i, spawn = null) {
     // An op-14 hold belongs to the stage you are leaving: the disc's load happens
     // with the countdown already spent, so nothing can carry across the change.
     state.handoffHold = null;
-    document.getElementById("mapSelect").selectedIndex = state.mapIdx;
+    (document.getElementById("mapSelect") as HTMLSelectElement).selectedIndex = state.mapIdx;
     const m = currentMap();
     // The stage's spawn loop runs on arrival: rebuild the cast from the flags as
     // they stand NOW (sceneCast snapshots it lazily on first read). A flag written
@@ -649,7 +649,7 @@ export function setMap(i, spawn = null) {
     // Visited-map tracking needs nothing here: the engine's loadStage already set the
     // bit the pause-menu MAP page reads (set_flag(0x1E00 + screen id, 1), fieldstg
     // .L0x00008008-.L0x00008028), and the page reads that same bit back.
-    const musicSelect = document.getElementById("musicSelect");
+    const musicSelect = document.getElementById("musicSelect") as HTMLSelectElement;
     if (musicSelect && currentMap().music)
         musicSelect.value = currentMap().music;
     updateHud();

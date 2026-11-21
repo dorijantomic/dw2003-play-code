@@ -7,6 +7,7 @@
 // the canvas backing store follows its displayed CSS size * devicePixelRatio,
 // and one transform maps logical drawing coordinates into those device pixels.
 
+import type { CanvasBacking } from "./types/canvas-resolution.js";
 export const FIELD_LOGICAL_WIDTH = 640;
 export const FIELD_LOGICAL_HEIGHT = 480;
 export const MAX_BACKING_DIMENSION = 4096;
@@ -87,13 +88,13 @@ export function createCanvasResolutionController(
   const view = canvas.ownerDocument?.defaultView ?? globalThis;
   let dirty = true;
   let lastHd = null;
-  let current = {
+  let current = ({
     width: canvas.width,
     height: canvas.height,
     scaleX: canvas.width / logicalWidth,
     scaleY: canvas.height / logicalHeight,
     hd: false,
-  };
+  }) as CanvasBacking;
 
   const markDirty = () => { dirty = true; };
   const Observer = view.ResizeObserver ?? globalThis.ResizeObserver;

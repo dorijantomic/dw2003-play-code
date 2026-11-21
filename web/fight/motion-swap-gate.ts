@@ -38,6 +38,8 @@
 import { rigOf, bakeRetargetByRole, bakeRetargetGeometry, bakeRetargetWorld } from "./anim-retarget.js";
 import { penetration, clearanceTolerance } from "./anim-collision.js";
 import { poseFromChannels } from "./firing-axis.js";
+import type { RetargetBake } from "./anim-retarget/types.js";
+import type { SwapJudgeOpts, SwapNumbers } from "./types.js";
 
 /** The clip kinds a swap is judged by. Slot -> kind is the engine's own clip use (fight-tables.js). */
 export const SWAP_KINDS = Object.freeze(["idle", "hit", "death", "attack", "cast", "item"]);
@@ -132,7 +134,7 @@ const OWN = new WeakMap();
  * What the body itself does, over every clip it owns: the worst value of each metric. This is the
  * per-model half of the shape bars - a swap may not exceed the body's own repertoire.
  */
-export function ownNumbers(model, { samples = 6, penFrames = 1, slots = null } = {}) {
+export function ownNumbers(model, { samples = 6, penFrames = 1, slots = null }: SwapJudgeOpts = {}) {
   if (!model) return null;
   if (!slots) { const hit = OWN.get(model); if (hit) return hit; }
   const rig = rigOf(model);
@@ -182,7 +184,7 @@ export function ownNumbers(model, { samples = 6, penFrames = 1, slots = null } =
  * Every number a verdict uses, for one retarget bake (`bake` = bakeRetargetByRole / bakeRetargetGeometry
  * with `.source` set). The donor is sampled at `frame - bake.offset`, the target at the baked table.
  */
-export function measureSwap(bake, { samples = 12, penFrames = 3 } = {}) {
+export function measureSwap(bake, { samples = 12, penFrames = 3 }: SwapJudgeOpts = {}) {
   const baked = bake?.model, source = bake?.source;
   if (!baked || !source || !Array.isArray(bake.map)) return null;
   const off = bake.offset | 0;
@@ -370,7 +372,7 @@ export function judgeNumbers(numbers, kind, { own = null, bars = null, needs = n
 }
 
 /** The verdict for one bake. `model` = the target as it was before the bake (for its own repertoire). */
-export function judge(bake, kind, model = null, opts = {}) {
+export function judge(bake, kind, model = null, opts: SwapJudgeOpts = {}) {
   const numbers = measureSwap(bake, opts);
   if (!numbers) return { pass: false, keys: ["empty"], numbers: null, bars: SWAP_BARS[kind] ?? null, notes: ["no table / no map"] };
   const own = opts.own ?? ownNumbers(model ?? bake.model, opts);
@@ -409,12 +411,12 @@ export function swapLadder(target, source, clip, kind, {
 
 // the ladder's default candidates, in the order they are tried
 function bakeRole(target, source, clip, offset, ik, method) {
-  const bake = bakeRetargetByRole(target, source, clip, { offset, ik });
+  const bake: RetargetBake = bakeRetargetByRole(target, source, clip, { offset, ik });
   if (bake) { bake.source = source; bake.method = method; bake.ik = ik; }
   return bake;
 }
 function bakeGeometry(target, source, clip, offset, method) {
-  const bake = bakeRetargetGeometry(target, source, clip, { offset });
+  const bake: RetargetBake = bakeRetargetGeometry(target, source, clip, { offset });
   if (bake) { bake.source = source; bake.method = method; }
   return bake;
 }
@@ -456,7 +458,7 @@ export const WORLD_BARS_SOURCE = Object.freeze({
 });
 
 /** max rotation gap of a pose against another frame's pose, over the mapped bones. */
-function gapToFrame(model, pose, frame, map) {
+function gapToFrame(model, pose, frame, map?: any[] | null) {
   const ref = poseFromChannels(model, frame);
   let v = 0;
   for (let i = 0; i < model.bones.length; i++) {
@@ -470,11 +472,11 @@ function gapToFrame(model, pose, frame, map) {
  * The verdict for a FILL of `slot` on `model` (the target as it was before the bake) by a world bake.
  * Returns { pass, keys, numbers, bars, notes, kind, slot, owned }.
  */
-export function judgeFill(bake, slot, model = null, opts = {}) {
+export function judgeFill(bake, slot, model = null, opts: SwapJudgeOpts = {}) {
   const kind = kindOfSlot(slot);
   const target = model ?? bake?.model;
   const B = WORLD_BARS[kind] ?? opts.bars ?? null;
-  const numbers = bake ? measureSwap(bake, opts) : null;
+  const numbers: SwapNumbers = bake ? measureSwap(bake, opts) : null;
   const keys = [], notes = [];
   const owned = !!target && playedFrames(target, slot).length >= 2;
   if (!B || !numbers) return { pass: false, keys: ["kind", ...(owned ? ["owned"] : [])], numbers, bars: B, notes: ["no bars / no numbers"], kind, slot, owned };
@@ -521,7 +523,7 @@ export function fillLadder(target, source, clip, slot, { offset = 6000, build = 
   const idle = ownIdle ?? ownNumbers(target, { slots: [0] });
   const steps = [];
   const cands = build ? build({ target, source, clip, slot })
-    : [() => { const b = bakeRetargetWorld(target, source, clip, { offset }); if (b) { b.source = source; b.method = "world"; } return b; },
+    : [() => { const b: RetargetBake = bakeRetargetWorld(target, source, clip, { offset }); if (b) { b.source = source; b.method = "world"; } return b; },
        () => bakeRole(target, source, clip, offset, true, "role+ik"),
        () => bakeRole(target, source, clip, offset, false, "role")];
   for (const make of cands) {

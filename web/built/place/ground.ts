@@ -8,6 +8,7 @@ import * as S from "../shared.js";
 import { GROUND } from "../ground.js";
 import { soilLand, apronOutline } from "./land.js";
 import { itemsFrom, itemsOnTriangles, itemsOnRing, composeYaw } from "../slots.js";
+import type { BuiltGroundInfo, BuiltGroundPalette, BuiltGroundStats } from "./types.js";
 
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
@@ -17,7 +18,7 @@ const b8 = (x) => Math.max(0, Math.min(255, Math.round(x * 255)));
 // ---------------- palette: the recipe's measured colours, sRGB -> linear once ----------------
 /** dirt / path / rock from the bank strips' own measured colours, grass from the ground piece's p10/p90 (the same
  *  two entries grass.js bakes blades against). `src` keeps the measured sRGB bytes for the checks. */
-export function groundPalette(rec) {
+export function groundPalette(rec): BuiltGroundPalette {
   const one = (kind) => rec.pieces.find((p) => p.kind === kind)?.colours || {};
   const g = one("grass"), b = one("bank");
   const pick = (c, k, d) => (Array.isArray(c?.[k]) ? c[k] : d);
@@ -265,7 +266,7 @@ export function plan(pctx) {
   function placeRocks(ko, asset) {
     const t = performance.now(), sh = rockShape(asset);
     const st = { fightR: Math.round(ko.fightR || 0), candidates: cands.length, accepted: 0, rejectedAtSpot: 0,
-                 pushed: 0, dropped: 0, byReason: { fight: 0, cone: 0, steep: 0, offGround: 0 }, list: [] };
+                 pushed: 0, dropped: 0, byReason: { fight: 0, cone: 0, steep: 0, offGround: 0 }, list: [] } as BuiltGroundStats;
     const picked = [];
     for (const it of cands) {
       const res = placeRock(it, ko, sh);
@@ -335,7 +336,7 @@ export function plan(pctx) {
       triangles: p.ground.tris + p.bank.tris + p.rocks.tris + p.hills.tris,
       ms: Math.round(performance.now() - t0), rocks: rockInfo,
       cliff: { slopeLo: GROUND.CLIFF_LO, slopeHi: GROUND.CLIFF_HI, stepPx: GROUND.STEP_W },
-    };
+    } as BuiltGroundInfo;
     if (soil) info.ground.soil = soil;
   }
   return { slots, layer, data, after, afterPlace: (st) => { if (!scatter) skipRocks(st); } };

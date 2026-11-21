@@ -24,7 +24,10 @@ function matches(opt, terms) {
  * Attach a filter box to one <select>. Returns a handle with refresh()/detach(), or null if the
  * element already has one.
  */
-export function makeFilterable(select, { placeholder = "filter…", width = "112px" } = {}) {
+/** A <select> the harness may already have given a filter box to. */
+type FilterableSelect = HTMLSelectElement & { __labFilter?: unknown };
+
+export function makeFilterable(select: FilterableSelect, { placeholder = "filter…", width = "112px" }: { placeholder?: string; width?: string } = {}) {
   if (!select || select.__labFilter) return null;
 
   const input = document.createElement("input");

@@ -6,6 +6,7 @@
 // like the battle/menu/shop code paths do.
 import { heldCount, ITEMS, storeAddItem } from "./vendor/engine.js";
 import { scaledStat } from "./battle.js";
+import type { DebugPanelState } from "./types/debugPanel.js";
 
 const FISHING_POLE_ID = 5;
 const TREE_BOOTS_ID = 4;
@@ -25,7 +26,7 @@ export function grantTreeBoots(state) {
 }
 
 export function createDebugPanel() {
-  const d = { enabled: false, sel: 0, itemIdx: 0, evoIdx: 0, msg: null };
+  const d = { enabled: false, sel: 0, itemIdx: 0, evoIdx: 0, msg: null } as DebugPanelState;
 
   // Evolution targets the partner currently qualifies for (level/form/stat-gated). Recomputed
   // live so editing Level/stats above immediately changes what's offered here.

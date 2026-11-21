@@ -32,6 +32,7 @@
 // (docs/research/overlays/stdwtitl.md rows 0-11). The page carries the seven row
 // names it needs and never reads that folder at run time.
 import { packedIsMusicStart, packedKey } from "./packed-sound.js";
+import type { CoverageTables } from "./types/silence-report.js";
 
 /** Music-start words whose stem is named after the record (build_music.py's jingles). */
 export const START_WORDS = Object.freeze({
@@ -74,7 +75,7 @@ function wordOf(id) {
 /** The packed ids a built manifest holds, lowercased, so a catalogue row can ask it. */
 function idsOf(rows) {
     const out = new Set();
-    for (const meta of Object.values(rows ?? {})) if (meta?.id) out.add(lower(meta.id));
+    for (const meta of Object.values(rows ?? {}) as any[]) if (meta?.id) out.add(lower(meta.id));
     return out;
 }
 
@@ -83,7 +84,7 @@ function idsOf(rows) {
  * jingle if the word has one, else the bank name for seq 0 and "<bank>_<seq>" for
  * every other sequence.
  */
-export function stemForWord(word, bank, startWords = START_WORDS) {
+export function stemForWord(word, bank, startWords: Record<string, string> = START_WORDS) {
     const named = startWords?.[packedKey(word >>> 0)];
     if (named) return named;
     const seq = (word >>> 0) & 0xffff;
@@ -100,7 +101,7 @@ export function stemForWord(word, bank, startWords = START_WORDS) {
  * `fires` / `how` for the two the original really plays), the `themes` rows served
  * by a bank theme, and the full `marks` list.
  */
-export function coverage({ catalogue, common, area, stems, startWords = START_WORDS } = {}) {
+export function coverage({ catalogue, common, area, stems, startWords = START_WORDS }: CoverageTables = {}) {
     const haveStem = new Set((stems ?? []).map(lower));
     const commonIds = idsOf(common);
     const areaIds = new Map();
@@ -171,7 +172,7 @@ export function coverage({ catalogue, common, area, stems, startWords = START_WO
  */
 export function bankGaps(archives, area, catalogue) {
     const built = new Set(Object.keys(area ?? {}).map(lower));
-    const stageBanks = new Set(Object.values(archives ?? {}).map((rec) => lower(rec?.bank)).filter(Boolean));
+    const stageBanks = new Set(Object.values(archives ?? {} as Record<string, any>).map((rec: any) => lower(rec?.bank)).filter(Boolean));
     const categories = (catalogue?.categories ?? []).map((c) => lower(c.name));
     const missing = categories.filter((name) => !built.has(name));
     const stage = missing.filter((name) => stageBanks.has(name));
@@ -225,13 +226,13 @@ export function movieGaps(rows, shipped) {
  * alternate may target a different bank than the stage's own) and the stem list to
  * say whether the build really has it.
  */
-export function altGaps(archives, catalogue = [], stems = []) {
+export function altGaps(archives, catalogue: any = [], stems = []) {
     const have = new Set((stems ?? []).map(lower));
     const cats = Array.isArray(catalogue) ? catalogue : catalogue?.categories ?? [];
     const bankOf = {};
     for (const c of cats) bankOf[c.archive_id] = lower(c.name);
     const rows = [];
-    for (const [stage, rec] of Object.entries(archives ?? {})) {
+    for (const [stage, rec] of Object.entries(archives ?? {}) as [string, any][]) {
         for (const word of rec?.alt_play_ids ?? []) {
             const packed = wordOf(word);
             const bank = packed === null ? null : bankOf[(packed >>> 18) & 0x7f] ?? null;

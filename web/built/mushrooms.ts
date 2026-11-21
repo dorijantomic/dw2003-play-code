@@ -273,7 +273,7 @@ export function buildMushrooms(slot, env) {
     AX.set(Math.cos(st.leanAz), 0, -Math.sin(st.leanAz)).normalize();   // cross(Y, leanDir): tilts +Y toward it
     Q.setFromAxisAngle(Y, st.yaw);
     Ql.setFromAxisAngle(AX, st.lean).multiply(Q);
-    Mx.compose(Pv.set(...st.c), Ql, Sv.set(st.h, st.h, st.h));
+    Mx.compose(Pv.set(...st.c as [number, number, number]), Ql, Sv.set(st.h, st.h, st.h));
     mesh.setMatrixAt(i, Mx);
   });
   mesh.instanceMatrix.needsUpdate = true;
@@ -314,7 +314,7 @@ export function buildMushrooms(slot, env) {
   spGeo.setAttribute("aPhase", new THREE.BufferAttribute(spPhase, 1));
   spGeo.setAttribute("aSize", new THREE.BufferAttribute(spSize, 1));
   const spMat = sporeMaterial(S, uni); materials?.push(spMat);
-  const spores = new THREE.Points(spGeo, spMat);
+  const spores: any = new THREE.Points(spGeo, spMat);
   spores.name = "builtMushroomSpores"; spores.userData.kind = "mushroom"; spores.frustumCulled = false;
   spores.renderOrder = 3;
   // the point size is in PIXELS, so it needs the drawing buffer's height: read it at draw time (as grass.js does),

@@ -16,10 +16,10 @@ const GROUPS = [
 
 const countEl = $("count");
 const capsEl = $("caps");
-const bookEl = $("rulebook");
+const bookEl = $("rulebook") as HTMLElement;
 const sheetEl = $("sheet");
 const noteEl = $("sheetnote");
-const queryEl = $("q");
+const queryEl = $("q") as HTMLInputElement;
 
 capsEl.innerHTML =
     `<div class="cap"><b>${CAPS.hpMp}</b><span>HP and MP stop here</span></div>` +
@@ -90,9 +90,9 @@ if (!effects || !Array.isArray(effects.items)) {
     queryEl.addEventListener("input", () => {
         const q = queryEl.value.trim().toLowerCase();
         let shown = 0;
-        for (const body of bookEl.querySelectorAll("tbody.group")) {
+        for (const body of bookEl.querySelectorAll<HTMLElement>("tbody.group")) {
             let any = false;
-            for (const tr of body.querySelectorAll("tr[data-id]")) {
+            for (const tr of body.querySelectorAll<HTMLTableRowElement>("tr[data-id]")) {
                 const hit = !q || tr.dataset.name.includes(q) || tr.dataset.id === q || tr.dataset.id === q.replace(/^#/, "");
                 tr.hidden = !hit;
                 if (hit) any = true;

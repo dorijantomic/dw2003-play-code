@@ -13,6 +13,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter, battleMenuLanguage } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
+import type { BattleDnaSeed } from "./types/battledna-translated.js";
 
 // The chrome is 0x00455000 (PGFGTC00, disc 1109). The original builds the
 // handle with `lui $a0, 0x455` (fightstg.s:21516).
@@ -112,7 +113,7 @@ export function createBattleDnaTranslated(sfx = null, options = {}) {
          * shared partner list in DNA mode, "pane" (the default) opens the pane on
          * the partner the caller already picked.
          */
-        seed: (r, seed = {}) => ({
+        seed: (r, seed: BattleDnaSeed = {}) => ({
             step: seed.step === "list" ? "list" : "pane",
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             partnerIndex: Math.max(0, Math.min(2, Number(seed.partnerIndex ?? 1) | 0)),

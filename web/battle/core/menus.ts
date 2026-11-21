@@ -15,9 +15,10 @@ import { activeSlotOf, effectiveSpd } from "../plans.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
 import { persistPlayerGauge } from "../form-blast.js";
 import { releaseBattleLayer } from "../../battle-layer.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeMenus(B) {
+export function makeMenus(B: BattleContext) {
 // ── Input ──
 
   /**

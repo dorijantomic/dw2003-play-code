@@ -66,6 +66,7 @@ import {
 } from "./draw-common.js";
 import { _drawEquip, _drawItems } from "./draw-items.js";
 import { _drawDetail, _drawSeeDigivolve } from "./draw-digivolve.js";
+import type { MenuState } from "./types.js";
 
 export function createMenu(sfx = null) {
   const backdrop = createStatusBackdrop();
@@ -124,7 +125,7 @@ export function createMenu(sfx = null) {
     feedbackTimer: 0,
     digimonDB: null,
     skillDB: null,
-  };
+  } as MenuState;
 
   // ── window fold animation (decoded tween F0x80099d5c / F0x80099df0) ────
   // Opening ramps the window's scale 0 -> 0x1000 over the slot's `steps` and

@@ -16,6 +16,7 @@
 // index into the manifest.
 
 /** The launch code family every movie launch word carries. */
+import type { CinemaManifestRecord } from "./types/cinema.js";
 export const MOVIE_LAUNCH_FAMILY = 0xe00;
 
 /**
@@ -40,7 +41,7 @@ const rowIndexOf = (code) => (code & 0xff) - 1;
 function shippedRecord(manifest, row) {
     const movies = manifest?.movies ?? manifest ?? {};
     if (!row) return null;
-    for (const [key, record] of Object.entries(movies)) {
+    for (const [key, record] of Object.entries(movies as Record<string, CinemaManifestRecord>)) {
         if (record && record.index === row.fileIndex) return { key, record };
     }
     return null;

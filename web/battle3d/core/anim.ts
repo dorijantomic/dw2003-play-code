@@ -1,8 +1,9 @@
 import { itemUseEffect, throwItemEffect } from "../../fight/fight-tables.js";
 import { RAND_U16 } from "../../vendor/engine.js";
+import type { AttackOptions, Battle3DContext, PlayScriptOptions, ThrowItemOptions } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeAnim(B$) {
+export function makeAnim(B$: Battle3DContext) {
 function _applyNamed(anim8r, name, hooks) {
     if (!anim8r) return;
     if (name === "idle" || name == null) anim8r.setIdle();
@@ -79,7 +80,7 @@ function playPlayerActionClip(clip, hooks = {}) {
   // backdrop's rule (armDataField above). `branch` picks item 88's STR/DEF effect/sound pair;
   // `elementIndex` supplies item 84's rolled element (the draw the engine's handler already made)
   // so the motion, the pack and the field all agree on one roll.
-  function playPlayerThrowItem(itemId, { branch = null, elementIndex = null, hooks = {} } = {}) {
+  function playPlayerThrowItem(itemId, { branch = null, elementIndex = null, hooks = {} }: ThrowItemOptions = {}) {
     const rec = throwItemEffect(itemId);
     if (!rec) return false;   // table not loaded -> the caller keeps the default clip-10 entry
     B$.playerAnim = `throw:${itemId}`;
@@ -105,7 +106,7 @@ function playPlayerActionClip(clip, hooks = {}) {
   // the next segment on its own and this needs no per-presentation flag.
   function playPlayerScript(script, {
     initialTable = null, motionTables = {}, rotationBase = 0, ...hooks
-  } = {}) {
+  }: PlayScriptOptions = {}) {
     B$.playerAnim = "external-script";
     const overlayHooks = {
       ...hooks,
@@ -143,7 +144,7 @@ function setEnemyAnimByTech(techId, hooks) {
 // Coordinated attacks (Phase E entry points for battle.js): the attacker plays techId's clip;
   // on its type-99 strike the defender plays its hit-reaction. The PLAYER attacker also drives the
   // op5 script camera (_playerHooks). hooks = optional extra (e.g. a hit-spark/sound onHit).
-  function playerAttack(techId, opts = {}) {
+  function playerAttack(techId, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.playerAnim = `tech:${techId}`; B$.enemyAnim = `hit`;
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack
@@ -155,7 +156,7 @@ function setEnemyAnimByTech(techId, hooks) {
       B$._playerHooks(B$._fxHooks("player", B$._impactContact({ ...hooks, onMotion: B$.dataFieldMotion }))),
       { lethal, miss, defenderHooks: B$._enemyHooks(B$._fxHooks("enemy")) });
   }
-function enemyAttack(techId, opts = {}) {
+function enemyAttack(techId, opts: AttackOptions = {}) {
     if (!B$.playerAnim8r || !B$.enemyAnim8r) return false;
     B$.enemyAnim = `tech:${techId}`; B$.playerAnim = "hit";
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }   // clear any sustained voice from the last attack

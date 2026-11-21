@@ -186,7 +186,15 @@ export function fusionBossFor(fuseInto, bosses = null) {
  *
  * Returns `{ fuse: false }`, or `{ fuse: true, hp, boss }` with the authored record.
  */
-export function fusionOnDefeat({ party, partyIndex = 0, fxOn = false, bosses = null } = {}) {
+/** What a battle hand-off asks: the party as it stands, which body fell, the fusion switch, and the Lab's boss table. */
+interface FusionDefeatArgs {
+  party?: { fuseInto?: any; hp?: any }[];
+  partyIndex?: number;
+  fxOn?: boolean;
+  bosses?: Record<string, any> | null;
+}
+
+export function fusionOnDefeat({ party, partyIndex = 0, fxOn = false, bosses = null }: FusionDefeatArgs = {}) {
   if (!fxOn || !Array.isArray(party) || !party.length) return { fuse: false };
   if (partyIndex !== party.length - 1) return { fuse: false };
   const boss = fusionBossFor(party[partyIndex]?.fuseInto, bosses);
@@ -245,6 +253,9 @@ export function mergeFusionSkills(skillDB, skills, fxOn = false) {
 /** A Fusion Lab model folder (m800lab1, m990fus1, ...): nothing else is ever fetched. */
 export const LAB_MODEL_RE = /^m[0-9]{3}[a-z0-9_]+$/;
 
+/** A Lab boss record as fusion_lab_bosses.json carries it: the fused body and its numbers. */
+interface LabBossRecord { id: string; hp?: any; moves?: any[]; model?: string }
+
 /** Is this a usable Lab boss record? (Shape only; the numbers are the helper's.) */
 export function labBossValid(rec) {
   return !!rec && typeof rec === "object"
@@ -260,7 +271,7 @@ export function labBossValid(rec) {
  * that is not valid is skipped. `table` is returned as it is when nothing is added.
  */
 export function mergeLabBosses(table, lab) {
-  const rows = lab?.bosses && typeof lab.bosses === "object" ? Object.values(lab.bosses) : [];
+  const rows = (lab?.bosses && typeof lab.bosses === "object" ? Object.values(lab.bosses) : []) as LabBossRecord[];
   const good = rows.filter(labBossValid);
   if (!good.length) return table;
   const out = { ...(table ?? {}) };

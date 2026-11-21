@@ -87,6 +87,7 @@
 import * as THREE from "../lib3d/three.module.js";
 import * as S from "./shared.js";
 import { soilLand } from "./soil.js";
+import type { BuiltLakeInfo, BuiltWaterAssets, BuiltWaterReflection } from "./types.js";
 
 const M = S.UNITS_PER_M;   // 400
 
@@ -964,7 +965,7 @@ let LAKE_NMAPS = null;
 function lakeNormalMaps(P) {
   if (LAKE_NMAPS) return LAKE_NMAPS;
   const flat = () => { const t = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, THREE.RGBAFormat); t.needsUpdate = true; return t; };
-  const st = { a: { value: flat() }, b: { value: flat() }, left: P.NORMAL_FILES.length, failed: [], files: P.NORMAL_FILES };
+  const st = { a: { value: flat() }, b: { value: flat() }, left: P.NORMAL_FILES.length, failed: [], files: P.NORMAL_FILES } as BuiltWaterAssets;
   const loader = new THREE.TextureLoader();
   P.NORMAL_FILES.forEach((f, i) => {
     loader.load(f, (t) => {
@@ -982,9 +983,9 @@ function lakeNormalMaps(P) {
  *  plane (Lengyel 2005, so nothing under the surface is drawn), and the water shader looks the target up with a texture
  *  matrix. It runs from the water mesh's onBeforeRender, once per drawn frame per camera. Anything in `hide()` and the water
  *  itself are skipped; the sky dome (parked on the camera) is moved to the mirrored eye for that pass. */
-export function createPlanarReflection(P, { hide = () => [] } = {}) {
-  const R = { enabled: true, scale: P.REFL_SCALE, target: null, matrix: new THREE.Matrix4(), size: [0, 0], passes: 0, lastMs: 0, skipped: 0, uniforms: null };
-  const vcam = new THREE.PerspectiveCamera(); vcam.userData.isReflection = true;
+export function createPlanarReflection(P, { hide = () => [] }: { hide?: (scene: any) => any[] } = {}) {
+  const R = { enabled: true, scale: P.REFL_SCALE, target: null, matrix: new THREE.Matrix4(), size: [0, 0], passes: 0, lastMs: 0, skipped: 0, uniforms: null } as BuiltWaterReflection;
+  const vcam: any = new THREE.PerspectiveCamera(); vcam.userData.isReflection = true;
   const plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4();
   const wp = new THREE.Vector3(), cp = new THREE.Vector3(), nrm = new THREE.Vector3(0, 1, 0), view = new THREE.Vector3(), tgt = new THREE.Vector3(), look = new THREE.Vector3(), rot = new THREE.Matrix4(), v2 = new THREE.Vector2();
   const bias = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
@@ -1136,7 +1137,7 @@ export function lakeAnchors(P) {
 }
 
 /** The lake preset: surface (the soil-bound shore field), the horizon band, the planar reflection. */
-function buildLake(slot, { materials = [], info = {} }) {
+function buildLake(slot, { materials = [], info = {} as BuiltLakeInfo }) {
   const t0 = performance.now();
   const { P, field, anchors: A } = slot.data;
   const nmaps = lakeNormalMaps(P);
@@ -1144,7 +1145,7 @@ function buildLake(slot, { materials = [], info = {} }) {
     hide: (scene) => { const l = []; scene.traverse((o) => { if ((o.isMesh || o.isPoints) && P.HIDE_IN_REFLECTION.includes(o.userData?.kind)) l.push(o); }); return l; },
   });
   const geo = seaGeometry(field, P), mat = lakeMaterial(field, P, A, nmaps, refl);
-  const sea = new THREE.Mesh(geo, mat);
+  const sea: any = new THREE.Mesh(geo, mat);
   sea.name = "sea_surface"; sea.userData.kind = "sea"; sea.userData.preset = "lake"; sea.frustumCulled = false;
   sea.onBeforeRender = (renderer, scene, camera) => refl.render(renderer, scene, camera, sea);
   const bandGeo = bandGeometry(P), bandMat = bandMaterial(P);

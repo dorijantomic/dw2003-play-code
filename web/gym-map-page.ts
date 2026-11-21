@@ -55,7 +55,7 @@ export function gateText(gates = [], names = new Map()) {
  * 50% loss roll (battle.js gymTrainingResult's secondary branch); a second element or
  * max HP/MP row is another gain, so the two read differently.
  */
-export function drillText(drill = {}) {
+export function drillText(drill: { primary?: any; secondary?: any } = {}) {
     const primary = statWord(drill.primary) ?? `stat ${drill.primary}`;
     const secondary = drill.secondary ? statWord(drill.secondary) : null;
     if (!secondary) return primary;

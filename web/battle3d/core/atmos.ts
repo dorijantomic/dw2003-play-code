@@ -1,9 +1,10 @@
 import { MODEL_SCALE } from "../math.js";
 import { loadTexturePixels, createProgram } from "../gl.js";
 import { VERT_COL_SRC, FRAG_COL_SRC } from "../shaders.js";
+import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeAtmos(B$) {
+export function makeAtmos(B$: Battle3DContext) {
 function _atmosFrame(eye, look) {
     if (!window.__fx?.battleatmos) return null;
     const a = window.__battleAtmos?.();

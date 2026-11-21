@@ -33,6 +33,7 @@ import {
   resolveDamage,
   formulas,
 } from "./vendor/engine.js";
+import type { DamageLabAttacker, DamageLabFighter, DamageLabSkill, DamageLabStages } from "./types/damage-lab.js";
 
 export { physicalBase, magicalBase, resolveDamage };
 
@@ -58,13 +59,13 @@ const num = (value) => {
  * The walk mirrors `resolveDamage` line for line; tests/damage-lab.test.js holds the
  * two together for every one of the disc's 443 technique records.
  */
-export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng = Math.random, multiCrest = false } = {}) {
-  const A = { ...atk };
+export function damageStages({ atk = {}, def = {}, skill = {}, field = null, rng = Math.random, multiCrest = false }: DamageLabStages = {}) {
+  const A = { ...atk } as DamageLabAttacker;
   for (const key of ["str", "def", "spt", "wis", "spd"]) if (A[key] == null) A[key] = 0;
   A.multiAttack = atk?.multiAttack ?? (multiCrest === true);
-  const D = { ...def };
+  const D = { ...def } as DamageLabFighter;
   for (const key of ["str", "def", "spt", "wis", "spd"]) if (D[key] == null) D[key] = 0;
-  const S = { ...skill };
+  const S = { ...skill } as DamageLabSkill;
   const power = num(S.power);
   const magical = !!S.magical;
   const base = magical ? magicalBase(A, D, power) : physicalBase(A, D, power);

@@ -20,6 +20,7 @@
 //            (sakura's applySkyAerial / aerialAt, MIT; k = 0.0022 per metre).
 //   arenaMask is NOT here yet: it is a baked ground texture and belongs to Step 3 (ground, rocks, bank).
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltDayLight } from "./types.js";
 
 export const UNITS_PER_M = 400;
 
@@ -283,7 +284,7 @@ export const NIGHT_LIGHT = {
   // multiplied by SKY_GAIN (both PICKED), the moon glow scaled with it, so it reads as night, not as a blue day
   SKY_SAT: 0.35, SKY_GAIN: [0.10, 0.13, 0.26],
 };
-const DAY_LIGHT = { dir: U.uSunDir.value.clone(), colour: [1, 1, 1], ambient: [1, 1, 1], bounce: [0.07, 0.045, 0.02],
+const DAY_LIGHT: BuiltDayLight = { dir: U.uSunDir.value.clone(), colour: [1, 1, 1], ambient: [1, 1, 1], bounce: [0.07, 0.045, 0.02],
                     rim: [1, 0.95, 0.85], unlit: [1, 1, 1] };
 /** The light state now (for checks): mode, whether the sky got the night grade, the numbers written. */
 export const light = { mode: "day", skyGraded: false, gradedFor: null };
@@ -305,7 +306,7 @@ export function setBuiltLight(skyNight, skyInfo = null) {
     U.uAmbient.value.setRGB(N.AMBIENT_K, N.AMBIENT_K, N.AMBIENT_K);
     U.uShadowTint.value.copy(srgb(N.SHADOW_TINT));
     U.uSkyFill.value.copy(srgb(N.SKY_FILL));
-    U.uGroundBounce.value.set(...DAY_LIGHT.bounce.map((v) => v * N.BOUNCE_K));
+    U.uGroundBounce.value.set(...DAY_LIGHT.bounce.map((v) => v * N.BOUNCE_K) as [number, number, number]);
     U.uRimColor.value.copy(hue).multiplyScalar(N.RIM_K);
     U.uUnlitK.value.copy(hue).multiplyScalar(N.UNLIT_K);
   } else {

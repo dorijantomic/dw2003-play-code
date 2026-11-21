@@ -6,9 +6,10 @@
 // The viewer's "sky time" switch (sky.js setBuiltSkyMode) sets data.mode and rebuilds both slots.
 import { current } from "../sky.js";
 import { itemsOnRing } from "../slots.js";
+import type { BuiltSlotRef } from "./types.js";
 
 /** the sky numbers of a recipe (also used by sky.js createBuiltSky, the checkers' stand-alone sky) */
-export function skyData(rec, opts = {}) {
+export function skyData(rec, opts: { band?: boolean; clouds?: boolean; mode?: string } = {}) {
   const p = rec.pieces.find((q) => q.kind === "sky");
   if (!p) return null;
   const sky = { kind: "sky", name: p.name, colours: p.colours, profile: p.profile, ymin: p.ymin, ymax: p.ymax, rmin: p.rmin, rmax: p.rmax, md: p.md, pos: p.pos };
@@ -21,7 +22,7 @@ export function plan(pctx) {
   const D = skyData(pctx.rec);
   if (!D) return null;
   const { sky } = D;
-  const slots = [{
+  const slots: BuiltSlotRef[] = [{
     id: "sky.dome", label: "Sky dome", kind: "sky", layer: "builtSky", parent: "world", default: "mod.sky", data: D,
     surface: sky.pos?.length ? { pos: [Float32Array.from(sky.pos)], renderOrder: -1000 } : null,
     items: itemsOnRing(12, sky.rmax || 20000, sky.ymax || 4000, 4000),

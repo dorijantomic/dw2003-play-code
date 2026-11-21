@@ -35,6 +35,7 @@ import { ensureFormLedger } from "./dri-model.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
+import type { LabScreen } from "./types/lab-translated.js";
 
 /** The lab's picture handles: the stdglabo archive (chrome and the chart's portraits) and CMFONT. */
 const PACK_NAMES = { 0x02c50000: "stdglabo", 0x02c50001: "stdglabo_portraits", 0x02860000: "cmfont" };
@@ -80,7 +81,7 @@ const loadBanks = (manifest, language) => {
     if (!banksByLanguage.has(language)) {
         const wanted = [{ id: 0x39 + language, path: `lab/${0x39 + language}.bin` }];
         for (const { offset, dir } of manifest.sharedBanks) wanted.push({ id: offset + language, path: `${SHARED_DIRS[dir]}/${offset + language}.bin` });
-        banksByLanguage.set(language, Promise.all(wanted.map(async ({ id, path }) => [id, await fetchBytes(path, DATA_LABEL)]))
+        banksByLanguage.set(language, Promise.all(wanted.map(async ({ id, path }) => [id, await fetchBytes(path, DATA_LABEL)] as [number, Uint8Array]))
             .then((entries) => new Map(entries))
             .catch((error) => { banksByLanguage.delete(language); throw error; }));
     }
@@ -94,7 +95,7 @@ export function createLabTranslated(sfx = null) {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null, _state: null,
         _onClose: null, _clock: null, _ticks: 0, _request: 0, _members: [], _seededParty: [], _summary: null,
         _lastDiagnostic: null, _committed: 0, _banks: null, _packed: {}, _ledgerPages: 1,
-    };
+    } as LabScreen;
     const renderer = createNativeScreenRenderer(
         { pack: "stdglabo", packs: { "709:0": "stdglabo", "709:1": "stdglabo_portraits", "646:0": "cmfont" } }, packName);
 
@@ -145,7 +146,7 @@ export function createLabTranslated(sfx = null) {
         const party = Array.from({ length: PARTY_SLOTS }, (_, i) => (state.party?.[i] ? slotOfChar(state.party[i]) : -1));
         g._seededParty = party.slice();
         g._members = [];
-        const members = ownedSlots(state).map((slot) => {
+        const members = ownedSlots(state).map((slot: number) => {
             const charId = ROSTER_SLOT_CHARIDS[slot];
             const starterId = rosterSlotDigimonId(slot);
             const stats = slotStats(state, slot) ?? baseStatsFor(db[starterId]) ?? {};

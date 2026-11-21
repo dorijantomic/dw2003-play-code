@@ -38,6 +38,7 @@ import {
 } from "./battle.js";
 import { battleAilmentByte } from "./battlecmd-translated.js";
 import { battleMsgText } from "./battlemsg-translated.js";
+import type { MpAttackResult, MpEnemyAttackResult, MpRunResult, MpTagResult } from "./types/mpbattle-rules.js";
 
 export const SPREAD_FACTOR = 0.65;
 export const SPREAD_MP = 40;                 // a magical technique that costs at least this much hits everyone
@@ -65,6 +66,17 @@ const itemWord = (page, name) => {
 const SIDE_PLAYER = 0, SIDE_FOE = 0x10;
 
 export class Arena {
+  declare E: any;
+  declare field: { element: any; power: any; };
+  declare kit: any;
+  declare lastTarget: Map<any, any>;
+  declare P: any;
+  declare pool: { code: number; time: number; side: number; slot: number; payload: number; payload2: number; }[];
+  declare rng: () => number;
+  declare screenId: any;
+  declare time: Map<any, any>;
+  declare wave: number;
+  declare waveSize: number;
     /**
      * players: [{ id, name, rec }]   foes: [{ name, rec }]   (rec = a fighter record, the engine's own shape)
      * waveSize: how many enemies stand at once
@@ -289,8 +301,8 @@ export class Arena {
     }
 
     /** The common middle of an attack: the caster uses `skill` on `targets`; works for both sides. */
-    #damageAction(caster, skill, targets, defenders) {
-        const res = { lines: [], rows: [], a: caster.key, sk: skill.id | 0, kind: "atk" };
+    #damageAction(caster, skill, targets, defenders?) {
+        const res = { lines: [], rows: [], a: caster.key, sk: skill.id | 0, kind: "atk" } as MpAttackResult;
         const spread = targets.length > 1;
         for (const t of targets) {
             const out = this.#strike(caster.rec, caster.name, t.rec, t.name, skill, spread);
@@ -404,7 +416,7 @@ export class Arena {
 
     // Tag: another of the player's Digimon takes the fight; the one that was out goes to the reserves
     #tag(me, cmd) {
-        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "tag" };
+        const res = { lines: [], rows: [], a: me.key, sk: 0, kind: "tag" } as MpTagResult;
         const forced = me.needTag;
         const slot = cmd.k === "tag" ? cmd.slot | 0 : -1;
         const inc = me.party[slot];
@@ -436,7 +448,7 @@ export class Arena {
     }
 
     #run(me) {
-        const res = { lines: [`${me.name}: ${T(MSG.RUN)}`], rows: [], a: me.key, sk: 0, kind: "run" };
+        const res = { lines: [`${me.name}: ${T(MSG.RUN)}`], rows: [], a: me.key, sk: 0, kind: "run" } as MpRunResult;
         const foes = this.aliveFoes();
         const lvl = foes.length ? foes.reduce((s, f) => s + (f.rec.level | 0), 0) / foes.length : 1;
         const spd = this.#avgSpd(foes);
@@ -481,7 +493,7 @@ export class Arena {
             activeEnemyIndex: Math.max(0, alive.indexOf(foe)),
         };
         const move = (moves?.length ? pickEnemyAiMove(moves, en, this.rng, target.rec, context) : null) ?? { action: 1 };
-        const res = { lines: [], rows: [], a: key, sk: 0, kind: "atk" };
+        const res = { lines: [], rows: [], a: key, sk: 0, kind: "atk" } as MpEnemyAttackResult;
         if (move.action === 4) {                                    // the flee action
             if (enemyFleeProc(target.rec.spd, en.spd, target.rec.binderCrest, this.rng, battleAilmentByte(en))) {
                 foe.fled = true; en.hp = 0;

@@ -13,6 +13,7 @@ import { partyRosterView, storedNumbers, syncLeadEquipBonuses } from "./party.js
 import { ensureStoredStats } from "./battle.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
 import { composeWindow } from "./ui-c/screens.js";
+import type { ShopOpenOpts, ShopTranslatedOptions, ShopTranslatedScreen } from "./types/shop-translated.js";
 
 const BANK_OFFSETS = [0x63, 0x6a, 0x71, 0x94];
 const PACKS = { 646: "cmfont", 1026: "stshop" };
@@ -66,16 +67,16 @@ function saveSeed(state, db) {
   };
 }
 
-export function createShopTranslated(sfx = null, options = {}) {
+export function createShopTranslated(sfx = null, options: ShopTranslatedOptions = {}) {
   const shop = {
     _open: false, _session: null, _state: null, _onClose: null,
     _renderer: null, _clock: null, _error: null, _request: 0,
-  };
+  } as ShopTranslatedScreen;
   const renderer = createNativeScreenRenderer({ pack: "stshop", packs: PACKS },
     (directory) => PACKS[directory >>> 16] ?? null);
   shop._renderer = renderer;
 
-  shop.open = (_stock, onClose = null, opts = {}) => {
+  shop.open = (_stock, onClose = null, opts: ShopOpenOpts = {}) => {
     const id = Number(opts.shopId);
     if (!Number.isInteger(id) || id < 0 || id >= 30) {
       throw new Error("Merchant has no decoded shop id");
@@ -89,7 +90,7 @@ export function createShopTranslated(sfx = null, options = {}) {
       const selectedLanguage = shop._state?.languageByte;
       const language = Number.isInteger(selectedLanguage) ? selectedLanguage : 2;
       if (language < 0 || language > 6) throw new Error("Merchant language index is invalid");
-      const banks = new Map(await Promise.all(BANK_OFFSETS.map(async (offset) => {
+      const banks = new Map(await Promise.all(BANK_OFFSETS.map(async (offset): Promise<[number, any]> => {
         const bank = offset + language;
         return [bank, await readBytes(`shop-banks/${bank}.bin`)];
       })));

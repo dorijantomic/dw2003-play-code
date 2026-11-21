@@ -94,7 +94,7 @@ function build() {
     scene.add(ambient, sun);
 
     // Back wall: a depth gradient so the open water is never a flat colour.
-    const wall = new THREE.Mesh(
+    const wall: any = new THREE.Mesh(
         new THREE.PlaneGeometry(90, 50),
         new THREE.ShaderMaterial({
             uniforms: { uTop, uDeep, uFog },
@@ -131,7 +131,7 @@ function build() {
     // Rocks (instanced, laid out once; the theme sets how many show and their colour).
     rockMat = new THREE.MeshLambertMaterial({ color: 0x777777 });
     rocks = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), rockMat, 10);
-    const dummy = new THREE.Object3D();
+    const dummy: any = new THREE.Object3D();
     for (let i = 0; i < 10; i++) {
         const x = -7 + ((i * 37) % 15) + (i % 3) * 0.4;
         const z = -5 + ((i * 53) % 9) - 1;
@@ -147,7 +147,7 @@ function build() {
     // The underside of the water surface.
     const sg = new THREE.PlaneGeometry(70, 50);
     sg.rotateX(Math.PI / 2);
-    const surface = new THREE.Mesh(
+    const surface: any = new THREE.Mesh(
         sg,
         new THREE.ShaderMaterial({
             uniforms: { uTime, uFog, uTop, uLight, uDensity },
@@ -178,7 +178,7 @@ function build() {
     });
     shafts = new THREE.Group();
     for (let i = 0; i < SHAFT_COUNT; i++) {
-        const m = new THREE.Mesh(shg, shMat);
+        const m: any = new THREE.Mesh(shg, shMat);
         m.position.set(-8 + i * 4.6, SURFACE_Y, -3 + (i % 3) * 2);
         shaftBase[i] = 0.22 + (i % 2) * 0.12;
         m.rotation.z = shaftBase[i];
@@ -219,11 +219,11 @@ function build() {
 
     // The lure on its line, and the float at the surface.
     lureGroup = new THREE.Group();
-    const lureBody = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
+    const lureBody: any = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
     lureBody.scale.set(1, 1.7, 1);
-    const lureCap = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2d0 }));
+    const lureCap: any = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff2d0 }));
     lureCap.position.y = 0.17;
-    const hook = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.014, 6, 12, Math.PI * 1.4), new THREE.MeshBasicMaterial({ color: 0xcfd8dc }));
+    const hook: any = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.014, 6, 12, Math.PI * 1.4), new THREE.MeshBasicMaterial({ color: 0xcfd8dc }));
     hook.position.y = -0.2;
     hook.rotation.z = Math.PI * 0.8;
     lureGroup.add(lureBody, lureCap, hook);
@@ -240,19 +240,19 @@ function build() {
     // The fish: a stylised silhouette (body, tail on a pivot, two fins, an eye for the bite).
     fishMat = new THREE.MeshBasicMaterial({ color: 0x0b2630 });
     fishGroup = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), fishMat);
+    const body: any = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), fishMat);
     body.scale.set(1, 0.42, 0.28);
     tailPivot = new THREE.Group();
     tailPivot.position.x = -0.85;
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 3), fishMat);
+    const tail: any = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 3), fishMat);
     tail.rotation.z = Math.PI / 2;   // apex points +x (into the body), base at -x
     tail.position.x = -0.35;
     tail.scale.set(1, 1, 0.35);
     tailPivot.add(tail);
-    const dorsal = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 3), fishMat);
+    const dorsal: any = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 3), fishMat);
     dorsal.position.set(-0.1, 0.42, 0);
     dorsal.scale.set(1.6, 1, 0.3);
-    const belly = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 3), fishMat);
+    const belly: any = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 3), fishMat);
     belly.position.set(0.1, -0.36, 0);
     belly.rotation.z = Math.PI;
     belly.scale.set(1.4, 1, 0.3);

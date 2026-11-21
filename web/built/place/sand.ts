@@ -6,6 +6,7 @@
 import { SAND, rowValue } from "../sand.js";
 import { shoreField, anchors } from "../water.js";
 import { itemsOnTriangles } from "../slots.js";
+import type { BuiltSandOut } from "./types.js";
 
 export function plan(pctx) {
   const { rec, info } = pctx;
@@ -15,7 +16,7 @@ export function plan(pctx) {
   const list = pieces.map((p) => {
     const n = p.pos.length / 3, row = new Float32Array(n);
     if (p.uvr) row.set(p.uvr.slice(0, n));
-    const out = { name: p.name, kind: p.kind, pos: new Float32Array(p.pos), row, colours: p.colours, tris: p.tris };
+    const out = { name: p.name, kind: p.kind, pos: new Float32Array(p.pos), row, colours: p.colours, tris: p.tris } as BuiltSandOut;
     if (p.kind === "shore" && p.rows?.some(Boolean)) {
       out.rows = Array.from({ length: SAND.ROWS }, (_, k) => (p.rows[k] || p.rows.find(Boolean)).rgb);
       out.green = new Float32Array(n);

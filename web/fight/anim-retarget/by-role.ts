@@ -25,6 +25,7 @@ import {
   shouldMirror,
 } from "./k16-rig.js";
 import { sample, shiftPlaylistEntry } from "./rig-basics.js";
+import type { RetargetChannels, RetargetModel } from "./types.js";
 
 /**
  * The K16 bake: per-frame conjugation in the target's rest frame, root translation scaled, arm/leg
@@ -290,7 +291,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
       if (!moved && !wantRoot) return b;
       const own2 = (b.anim?.ch2 ?? []).filter((r) => r[3] !== 30000).map((r) => r.slice());
       const ch2 = moved ? [...own2, ...moved, [moved[moved.length - 1][0], moved[moved.length - 1][1], moved[moved.length - 1][2], 30000]] : (b.anim?.ch2 ?? []);
-      const anim = { ...(b.anim || {}), ch2 };
+      const anim = { ...(b.anim || {}), ch2 } as RetargetChannels;
       if (wantRoot) {
         const own1 = (b.anim?.ch1 ?? []).filter((r) => r[3] !== 30000).map((r) => r.slice());
         const l1 = rootKeys[rootKeys.length - 1];
@@ -298,7 +299,7 @@ export function bakeRetargetByRole(target, source, clip, { offset = 6000, mirror
       }
       return { ...b, anim };
     }),
-  };
+  } as RetargetModel;
   // the shifted playlist, exactly as the geometry bake does it (one shared shiftPlaylistEntry)
   model.timeline = (target.timeline ? target.timeline.slice() : []);
   model.timeline[table] = { table: srcTable.map((e) => shiftPlaylistEntry(e, offset)) };

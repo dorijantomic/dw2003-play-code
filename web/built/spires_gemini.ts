@@ -14,10 +14,15 @@
 //        translucency, alphaTest leaf atlas, one InstancedMesh per wall panel so frustum culling works).
 //        No wind yet (recipe item 6 not done).
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltGeminiStats } from "./types.js";
 
 // ---------------------------------------------------------------- 1. simplex noise (verbatim algorithm of the reference)
 const F3 = 1 / 3, G3 = 1 / 6;
 class SimplexNoise {
+  declare grad3: Float32Array<ArrayBuffer>;
+  declare p: Uint8Array<ArrayBuffer>;
+  declare perm: Uint8Array<ArrayBuffer>;
+  declare permMod12: Uint8Array<ArrayBuffer>;
   constructor(seed = 5555) {
     this.p = new Uint8Array(256);
     for (let i = 0; i < 256; i++) this.p[i] = i;
@@ -262,7 +267,7 @@ export function createGeminiSpires(ctx, groups) {
     const m = new THREE.InstancedMesh(geo, mat, Math.max(1, count));
     m.name = name; m.userData.kind = "spire"; m.userData.gemini = true; m.frustumCulled = false; m.count = 0;
     m.setColorAt(0, new THREE.Color(1, 1, 1));
-    root.add(m); return m;
+    root.add(m as any); return m;   // the vendored build types Object3D as empty, so Group.add rejects its own meshes
   };
   const fMesh = front.map((g, i) => mk(g, Math.ceil(nFront / front.length) + 2, rockMat, `builtSpireGeminiF${i}`));
   const bMesh = back.map((g, i) => mk(g, Math.ceil(nBack / back.length) + 2, rockMat, `builtSpireGeminiB${i}`));
@@ -278,7 +283,7 @@ export function createGeminiSpires(ctx, groups) {
     m.geometry.setAttribute("aAO", new THREE.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage));
     m.geometry.setAttribute("aCell", new THREE.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage));
     m.setColorAt(0, new THREE.Color(1, 1, 1));
-    root.add(m); return m;
+    root.add(m as any); return m;
   });
   ctx.world.add(root);
 
@@ -286,7 +291,7 @@ export function createGeminiSpires(ctx, groups) {
         T1 = new THREE.Vector3(), T2 = new THREE.Vector3(), Q = new THREE.Quaternion(), Q2 = new THREE.Quaternion(),
         Z = new THREE.Vector3(0, 0, 1), C = new THREE.Color(), SC = new THREE.Vector3(), ONE = new THREE.Vector3(1, 1, 1);
   const tints = G.TINTS.map((h) => new THREE.Color(h));
-  const stat = { leaves: 0, pillars: 0, layoutMs: 0, layouts: 0 };
+  const stat = { leaves: 0, pillars: 0, layoutMs: 0, layouts: 0 } as BuiltGeminiStats;
 
   function instanceMatrix(p, g, H, sxz, tpl, rowBack, out) {
     const ax = Math.sin(p.az), az = Math.cos(p.az), tx = Math.cos(p.az), tz = -Math.sin(p.az);
@@ -311,7 +316,7 @@ export function createGeminiSpires(ctx, groups) {
     return out;
   }
 
-  function clump(mesh, n, anchorW, nor, cr, rnd, ledge, tint) {
+  function clump(mesh, n, anchorW, nor, cr, rnd, ledge, tint?: any) {
     const Cc = anchorW.clone().addScaledVector(nor, 0.35 * cr);
     T1.set(nor.y, -nor.x, 0); if (T1.lengthSq() < 1e-4) T1.set(0, nor.z, -nor.y); T1.normalize();
     T2.crossVectors(nor, T1);

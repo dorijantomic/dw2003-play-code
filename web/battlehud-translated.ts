@@ -27,6 +27,7 @@ import { fetchBytes } from "./resident-data.js";
 // One builder for the record's +0x1c ailment byte: the command rows and this marker
 // loop read the same field, so the byte is built in one place (battlecmd-translated.js).
 import { battleAilmentByte } from "./battlecmd-translated.js";
+import type { BattleHudPipsOptions, RecordMemory } from "./types/battlehud-translated.js";
 
 const {
   BATTLE_HUD_ACTIVE_SLOT, BATTLE_HUD_BANK_SEPARATOR, BATTLE_HUD_DV_FILL_CEL_FILLING,
@@ -86,8 +87,8 @@ function writeRecord(mem, sideIndex, slot, member) {
  * Run the ported marker loop and return the markers the original would have drawn:
  * `{side, index, cel, x, y}` per member, in the original's order.
  */
-export function battleHudPartyPips(players, enemies, options = {}) {
-    const mem = recordStore();
+export function battleHudPartyPips(players, enemies, options: BattleHudPipsOptions = {}) {
+    const mem = recordStore() as RecordMemory;
     mem.write8 = (addr, value) => mem.write16(addr, value & 0xffff);
     players.forEach((m, i) => writeRecord(mem, 0, i, m));
     enemies.forEach((m, i) => writeRecord(mem, 1, i, m));
@@ -180,7 +181,7 @@ export function battleHudBarPolygonCode(semiTransparent = false) {
  * index it keeps its gauge in.
  */
 export function battleHudDvFrame({ gauge = 0, tick = 0, slot = 0 } = {}) {
-    const mem = recordStore();
+    const mem = recordStore() as RecordMemory;
     mem.write8 = (addr, value) => mem.write16(addr, value & 0xffff);
     const index = Math.max(0, Math.trunc(slot) || 0);
     mem.write16(BATTLE_HUD_DV_GAUGE_TABLE + index * BATTLE_HUD_DV_GAUGE_STRIDE
@@ -386,7 +387,7 @@ export function battleHudPlateLabels({
     activePlayerIndex = 0, activeEnemyIndex = 0, playerName = "", enemyName = "",
     enemyNameId = null, enemyId = 0, rosterSlot = null, language = 2,
 } = {}) {
-    const mem = recordStore();
+    const mem = recordStore() as RecordMemory;
     mem.write8 = (addr, value) => mem.write16(addr, value & 0xffff);
     mem.write32(BATTLE_HUD_STRING_BASE, language);
     mem.write32(BATTLE_HUD_ACTIVE_SLOT, activePlayerIndex);

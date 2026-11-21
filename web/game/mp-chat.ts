@@ -22,6 +22,7 @@ import { loadCollisionForStage } from "./map-load.js";
 import { runStageHandoff } from "./transitions.js";
 import { S } from "./state.js";
 import { currentMap } from "./session.js";
+import type { ChatPack, GameState } from "./types.js";
 
 // EXPERIMENT (multiplayer): the chat / feed / players / inspect / trade box. It reads the game's state and moves items only
 // through the game's own item store; it never writes a story flag.
@@ -63,7 +64,7 @@ export function chatSay(text) {
     S.chatShownAt = performance.now() / 1000;
     S.chatPresses = 0;
     chatActor.x = Math.round(state.x); chatActor.y = Math.round(state.y);
-    const pack = buildChatPack(text, String(state.playerName || ""));
+    const pack = buildChatPack(text, String(state.playerName || "")) as ChatPack;
     S.chatPages = pack.pages;
     chatBox.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: chatActor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
@@ -76,7 +77,7 @@ export function mpBalloonSay(id, name, text) {
     b.at = performance.now() / 1000;
     const at = id === myId() ? state : multiplayerGhosts(currentMap().id).find((g) => g.id === id);
     if (at) { b.actor.x = Math.round(at.x); b.actor.y = Math.round(at.y); }   // open over the speaker, not at the map corner
-    const pack = buildChatPack(text, String(name || ""));
+    const pack = buildChatPack(text, String(name || "")) as ChatPack;
     b.pages = pack.pages; b.presses = 0;
     b.box.open({ pack, index: 0 }, { kind: "say", plain: false, balloonMode: 0, actor: b.actor }, null,
         (x, y) => ({ sx: (x - lastCam.x) * ZOOM * (320 / VIEW_W), sy: (y - lastCam.y) * ZOOM * (240 / VIEW_H) }));
@@ -121,7 +122,7 @@ export function chatTick(dt) {
     }
 }
 
-export function tickFootstep(holder, dt) {
+export function tickFootstep(holder: GameState, dt) {
     const form = state.diveForm;
     const isDigmon = form?.spriteId === DIGMON_SPRITE_ID;
     const interval = (isDigmon ? 32 : 8) * FIELD_TICK_SECONDS;

@@ -21,6 +21,7 @@
 //
 // Pure functions only; the DOM/renderer wiring lives in anim-viewer.html (tests/anim-viewer-bake.test.js).
 
+import type { AnimBakeQuery, BakeFetch } from "./types/anim-viewer-bake.js";
 export const BAKE_ROOT = "dw2-models/converted/bakes";
 
 // A bake folder: the DW3 folder, a dash, `dw2`, the DW2 clip letter (Kokatorimon F/G/H, Meramon I/K).
@@ -86,7 +87,7 @@ function bakePathPrefix(prefix) {
 export function installBakeFetch(target = globalThis) {
   const orig = target.fetch;
   if (typeof orig !== "function") return null;
-  if (orig.__bakeShim) return orig;
+  if ((orig as BakeFetch).__bakeShim) return orig;
   const shim = (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
     const mapped = mapBakeAssetUrl(url);
@@ -197,7 +198,7 @@ export function bakeInfoRows(row) {
 }
 
 /** The deep link for one bake (`?bake=<id>&table=<n>`), without touching the camera hash. */
-export function bakeQuery({ id, table = null, clip = null } = {}) {
+export function bakeQuery({ id, table = null, clip = null }: AnimBakeQuery = {}) {
   const q = new URLSearchParams();
   if (!id) return "";
   q.set("bake", id);

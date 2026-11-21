@@ -120,7 +120,7 @@ export function shotNineWithHomeOffset(shot, homeZ) {
  * @param {boolean|(() => boolean)} [deps.weak]  the partner's idleMotion != 0 (the low-HP stance), read on f651
  */
 export function createDigivolveCamera({ camRec, shotNine, arena, homeZ, schedule, modelKey = () => null,
-  setEnemyVisible = null, setMotion = null, weak = false }) {
+  setEnemyVisible = null, setMotion = null, weak = false as boolean | (() => boolean) }) {
   let last = -1;
   let keyAtCut = null;   // the model the last shot-9 cut was made for
   let started = false;
@@ -241,7 +241,7 @@ export function revertFlashLevel(frame) {
   return 0xFF - 4 * (f - 114);
 }
 
-export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyVisible, setMotion, weak = false }) {
+export function createRevertCamera({ camRec, shotTen, arena, schedule, setEnemyVisible, setMotion, weak = false as boolean | (() => boolean) }) {
   let last = -1;
   let started = false;
   let hidden = false;

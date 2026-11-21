@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "./lib3d/addons/OrbitControls.js";
 import { buildWorld, fitWorld, textureSize, worldToTex, texToWorld, hitTest } from "./world-globe-layout.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 const statusEl = $("status"), tip = $("tip"), info = $("info"), cv = $("cv");
 const MAX_TEX_W = 8192;
 const SEA = "#0a1d33";
@@ -31,7 +31,7 @@ function makeRenderer() {
 }
 
 function loadImage(src) {
-    return new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+    return new Promise<HTMLImageElement | null>((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
 }
 
 async function main() {

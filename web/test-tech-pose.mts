@@ -32,7 +32,7 @@ for (let i = 0; i < options.length; i++) {
   }
 }
 await page.evaluate((idx) => {
-  document.querySelector("#playerSel").selectedIndex = idx;
+  document.querySelector<HTMLSelectElement>("#playerSel").selectedIndex = idx;
 }, renamonIdx);
 
 // Trigger form refresh
@@ -52,7 +52,7 @@ for (let i = 0; i < eOptions.length; i++) {
   }
 }
 await page.evaluate((idx) => {
-  document.querySelector("#enemySel").selectedIndex = idx;
+  document.querySelector<HTMLSelectElement>("#enemySel").selectedIndex = idx;
 }, agumonIdx);
 
 // Click Start Battle
@@ -86,7 +86,7 @@ await new Promise(r => setTimeout(r, 2000));
 await page.screenshot({ path: `${out}/after-enter.png`, fullPage: false });
 
 // Check what's on screen
-const status = await page.$eval("#status", el => el.innerText);
+const status = await page.$eval<string, HTMLElement>("#status", el => el.innerText);
 console.log("Status:", status);
 
 // Try to access renderer3d to see what's happening

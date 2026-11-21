@@ -10,11 +10,13 @@ import {
 import { ST } from "../messages.js";
 import { effectiveSpd } from "../plans.js";
 import { markFormTaken, battleKindOf, partyEntriesWithSize, giantModeOn } from "../form-blast.js";
+import type { BattleStartArgs, StartPartyOptions, StartScreenOptions } from "./types.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
 import { fusionEnabled, partyEntriesFor } from "../../fusion.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeStart(B) {
+export function makeStart(B: BattleContext) {
 async function swapPlayerModel(name) {
     if (!B.renderer3d) return false;
     const folder = await resolveModelFolder(name);
@@ -46,7 +48,7 @@ async function swapPlayerModel(name) {
     }
     return "batl00";
   }
-async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, party, screenId, mapId, onWin, onFlee, onLose }) {
+async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, party, screenId, mapId, onWin, onFlee, onLose }: BattleStartArgs) {
     await B.loadData();
     // NEW content (F2 -> Extras -> "Fusion bosses"): every battle opens with the game's own
     // untinted colour on both sides; the fusion tints the enemy when it happens.
@@ -256,7 +258,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
   // resolves the party itself and then starts the battle therefore silently
   // does nothing on the first fight of a session. This awaits the load first,
   // which is the only safe order for a caller holding just a screen id.
-  async function startScreen(screenId, onWin, onFlee, onLose, { mapId, lead = true } = {}) {
+  async function startScreen(screenId, onWin, onFlee, onLose, { mapId, lead = true }: StartScreenOptions = {}) {
     await B.loadData();
     const party = partyForScreen(screenId);
     if (!party || !party.length) {
@@ -266,7 +268,7 @@ async function start({ enemyId, enemyLevel, enemyHp: realHp, enemyMp: realMp, pa
     return startParty(lead ? [party[0]] : party, onWin, onFlee, onLose, { screenId, mapId });
   }
 // Start a battle from a resolved party array (1v1: take the lead, as startRandom).
-  async function startParty(party, onWin, onFlee, onLose, { screenId, mapId } = {}) {
+  async function startParty(party, onWin, onFlee, onLose, { screenId, mapId }: StartPartyOptions = {}) {
     await B.loadData();
     if (!party || !party.length) return false;
     // F0x8008B798: the field's handoff runs its pre-battle presentation first —

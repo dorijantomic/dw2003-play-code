@@ -48,7 +48,7 @@ const blanks = new NativeVblankClock();
  * same blanks. `seconds` is the frame's elapsed time; without it the clock
  * reads `performance.now()`.
  */
-export function advanceFieldBlanks(seconds) {
+export function advanceFieldBlanks(seconds?) {
     return typeof seconds === "number"
         ? blanks.advance(seconds)
         : blanks.advanceFromStamp(typeof performance !== "undefined" ? performance.now() : 0);
@@ -69,7 +69,7 @@ export async function loadNativeStages() {
     exeTables = t;
     fieldstg = new Uint8Array(f);
     await Promise.all(
-        Object.entries(m)
+        Object.entries(m as Record<string, { root_ctor: number }>)
             .filter(([, e]) => e.root_ctor >= 0)
             .map(([id]) =>
                 fetch(`assets/native/${id}.bin`)

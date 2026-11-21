@@ -4,9 +4,17 @@ import { WORD } from "./ui-kit-input.js";
 import { LIST_WINDOW, drawHeader, drawHelpBox, drawListWindow, listRowY } from "./ui-kit.js";
 import { drawCursor, drawText } from "./uifont.js";
 import { FLY_ROW_LABEL, NO_PLACE_LINE, createFlyModel } from "./fly-points.js";
+import type { FlyPlace } from "./fly-points.js";
+
+/** What the book is handed: the sound kit, `data()` for the places, `choose(place)` for the pick. */
+interface FlyBookArgs {
+    sfx?: { play?: (name: string) => void } | null;
+    data: () => { places: FlyPlace[] };
+    choose?: (place: FlyPlace) => void;
+}
 
 /** `data()` = { places } read when it opens; `choose(place)` is called with the chosen { id, label } just before the book shuts. */
-export function createFlyBook({ sfx = null, data, choose } = {}) {
+export function createFlyBook({ sfx = null, data, choose }: FlyBookArgs = {} as FlyBookArgs) {
     const model = createFlyModel(data().places);
     return {
         windows: ["title", "list", "help"],

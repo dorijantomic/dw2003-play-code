@@ -56,7 +56,7 @@ let triggerRunner = null;                                    // walk-in quest tr
 let variants = {};
 let mapNames = {};
 let lastMap = null, lastX = 0, lastY = 0;
-let toastEl = null, toastTimer = 0;
+let toastEl = null, toastTimer: number | ReturnType<typeof setTimeout> = 0;
 
 function freshState() { return { v: 1, active: {}, done: {}, visited: [], met: [], duelWins: 0, announced: {}, seen: {}, triggers: {}, gen: { n: 0, def: null } }; }
 function loadState() {
@@ -468,7 +468,7 @@ async function loadRoam() {
         if (!fieldEnc) fieldEnc = (await fetch("assets/data/field_encounters.json").then((r) => r.json())).screens;
         const se = (await fetch("assets/data/stage_encounters.json").then((r) => r.json())).stages;
         roam = {};
-        for (const [stage, v] of Object.entries(se)) {
+        for (const [stage, v] of Object.entries(se) as [string, any][]) {
             for (const z of v.zones ?? []) {
                 if (!((z.rate_level ?? 0) > 0)) continue;
                 for (const scr of z.slots ?? []) {
@@ -604,7 +604,7 @@ export async function openLog() {
             const options = [...buckets.map(([n, l]) => `${n} (${l.length})`), "Reset quests", "Close"];
             const pick = await ask("Quests", options);
             if (pick < buckets.length) {
-                const [name, list] = buckets[pick];
+                const [name, list] = buckets[pick] as [string, any[]];
                 if (name === "Elsewhere") {                                  // by place, so the player can see where jobs are waiting
                     const places = [...new Set(list.map(placeOf))].sort();
                     for (;;) {
@@ -755,7 +755,7 @@ export async function installQuests({ stageEl, giveItem, giveBits, startBattle, 
     installUi(stageEl);
     let triggerDefs = [];
     try {
-        const [q, v, m] = await Promise.all([
+        const [q, v, m]: [any, any, any] = await Promise.all([
             fetch("quests.json").then((r) => r.json()),
             fetch("map-variants.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
             fetch("assets/manifest.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),

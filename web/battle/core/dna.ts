@@ -22,9 +22,11 @@ import { resolveModelFolder } from "../../battle3d.js";
 import { battleRestorePlanFor, applyStatDebuffDispatch } from "../restore.js";
 import { enemyMsgName } from "../hud.js";
 import { finalizePlayerDamage } from "../../battle.js";
+import type { BattleDnaPresentation } from "./types.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeDna(B) {
+export function makeDna(B: BattleContext) {
 function playerTechs() {
     if (!B.battle) return [];
     const partner = B.battle.player.statsRecord;
@@ -116,7 +118,7 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
    * table rather than two copies of two. `techniques` is left out by the one
    * caller that only asks which profile row a form sits in.
    */
-  function dnaTableReader(species, techniques) {
+  function dnaTableReader(species, techniques?: any) {
     const ranges = [
       [DNA_SPECIES_TABLE, species],
       ...(techniques ? [[DNA_PRICES, techniques]] : []),
@@ -247,10 +249,10 @@ function battleFormLevel(rosterIndex, formId, bb = B.battle) {
       partnerStatus: Number(partner?.statusBits ?? battleAilmentByte(partner)),
     };
   }
-function dnaScriptChunks(dna) {
+function dnaScriptChunks(dna: BattleDnaPresentation) {
     return dnaClip12Chunks(B.dnaResultScript?.fullScript?.segments, dna);
   }
-function startDnaChunk(b, dna) {
+function startDnaChunk(b, dna: BattleDnaPresentation) {
     const c = dna.chunks[dna.chunk];
     if (!c || !B.renderer3d) return;
     if (c.show) B.renderer3d.setPlayerVisible(true);   // seg 4: the original actor returns
@@ -341,7 +343,7 @@ function applyDnaAction(action) {
       restoreRecord: dnaIsRestore ? dnaRecord : null,
       record: dnaRecord,
       resultId: choice.resultId | 0,
-    };
+    } as BattleDnaPresentation;
     // The authentic clip-12 frames keep the normal HUD but suppress the
     // separate slot-7 face viewport until the battle presentation returns.
     B.renderer3d?.setFaceCamVisible?.(false);

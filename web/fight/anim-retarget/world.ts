@@ -12,6 +12,7 @@ import {
   k16tr,
 } from "./k16-rig.js";
 import { sample, shiftPlaylistEntry } from "./rig-basics.js";
+import type { RetargetWorldModel } from "./types.js";
 
 /**
  * K23 — the WORLD-SPACE bake: every part's motion is transferred as a rotation in WORLD space, and the parts are
@@ -82,7 +83,7 @@ export function k23Cloud(model, pose) {
   return { parts, mx: cnt ? sx / cnt : 0, mz: cnt ? sz / cnt : 0, H: Math.max(1, floor - top), floor };
 }
 
-export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "auto", restS = 0, restT = null, matchMax = K23.matchMax, transport = false, delta = false } = {}) {
+export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "auto" as number | "auto", restS = 0, restT = null, matchMax = K23.matchMax, transport = false, delta = false } = {}) {
   const src = source?.actions?.[clip];
   if (!src || !src.ops?.length) return null;
   const table = src.ops.find((o) => o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1)?.words[2] | 0;
@@ -134,7 +135,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
     return out;
   };
   const chT = chainsOf(target), chS = chainsOf(source);
-  const featOf = (chain, c, P, Z, D, deg) => {
+  const featOf = (chain, c, P, Z, D, deg?: number) => {
     const pts = chain.filter((i) => P[i]);
     if (!pts.length) return null;
     const cen = [0, 0, 0], lo3 = [Infinity, Infinity, Infinity], hi3 = [-Infinity, -Infinity, -Infinity];
@@ -322,7 +323,7 @@ export function bakeRetargetWorld(target, source, clip, { offset = 6000, yaw = "
       const l2 = k2[k2.length - 1], l1 = k1[k1.length - 1];
       return { ...b, anim: { ...(b.anim || {}), ch2: [...own2, ...k2, [l2[0], l2[1], l2[2], 30000]], ch1: [...own1, ...k1, [l1[0], l1[1], l1[2], 30000]] } };
     }),
-  };
+  } as RetargetWorldModel;
   model.timeline = (target.timeline ? target.timeline.slice() : []);
   model.timeline[table] = { table: srcTable.map((e) => shiftPlaylistEntry(e, offset)) };
   const pairs = [];

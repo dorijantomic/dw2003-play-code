@@ -25,6 +25,9 @@
 
 import { setFlatReader } from "./battle-layer.js";
 
+/** One tile of a tiled 4x filter run: where it sits in the sheet, and how big it is. */
+interface GpuTile { x: number; y: number; w: number; h: number }
+
 export const GPU_FILTER_NAMES = ["bilinear", "epx", "mmpx", "xbr", "xbrblend"];
 const NATIVE_W = 320, NATIVE_H = 240;
 
@@ -224,7 +227,7 @@ function createPipeline(canvas) {
   // the 4x filter of a w x h texture, drawn into the canvas tile by tile (at most TILE px a side);
   // emit(tile) is called after each tile is drawn. False = the browser gave a smaller buffer than asked.
   const TILE = 2048;
-  const filter4 = (tex, w, h, name, emit = () => {}) => {
+  const filter4 = (tex, w, h, name, emit: (tile: GpuTile) => void = () => {}) => {
     const W = w * 4, H = h * 4;
     let src = tex, sw = w, sh = h, rule = 2, blend = name === "xbrblend" ? 1 : 0;
     if (name === "bilinear") rule = 8;

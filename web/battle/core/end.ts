@@ -47,9 +47,11 @@ import { resolveMultiHit, resolveAttack, effStats } from "../hit-results.js";
 import { CHARID_TO_DIGID } from "../../party.js";
 import { buildFightReportRows } from "../report.js";
 import { battleMsgText } from "../../battlemsg-translated.js";
+import type { BattleEndContext, FusionDefeatArgs } from "./types.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeEnd(B) {
+export function makeEnd(B: BattleContext) {
 function endBattle(result) {
     const b = B.battle;
     const state = B.getState();
@@ -246,7 +248,7 @@ async function mpKit() {
         const b = {
           screenId, playerRoster: party.map((m) => m.member), playerRecords: recs, participantIndices: new Set(took),
           activePlayerIndex: took[0] ?? 0, formFlags: [], _loot: { drops: [] }, player: recs[0], enemy: null,
-        };
+        } as BattleEndContext;
         for (const i of took) {
           const flags = (b.formFlags[i] = new Array(10).fill(0));
           const triple = equippedTriple(recs[i].statsRecord?.equippedForms);
@@ -364,7 +366,7 @@ function coopSetEnemyHp(index, hp) {
     // is the authored 2424, never the player's maximum.
     const fusion = fusionOnDefeat({
       party: b.party, partyIndex: b.partyIndex, fxOn: fusionEnabled(), bosses: B.fusionBossesDB,
-    });
+    } as FusionDefeatArgs);
     if (fusion.fuse) {
       B.fuseIntoBoss(b, fusion.boss);
       return;

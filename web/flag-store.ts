@@ -59,11 +59,14 @@
 // ownedSlots returns the obtained-partner bitmask (bit n = roster slot n obtained), the
 // walker's model of the original's `roster_owned[slot] != 0` (see dw3-config ROSTER_OWNED_VAR).
 import { partyCharismaMeets, routePairPredicate, isStoryCommandBank, flagConditionPasses, storyCommand, ordinalInRange } from "./vendor/engine.js";
+import type { StoryExplorerOpts } from "./types/story-explorer.js";
 
 const ITEM_BANKS = new Set([0x80, 0x82, 0x84, 0x86, 0x88, 0x8a, 0x8c, 0x8e]);
 const CARD_BANK = 0x92;
 const CHARISMA_BANK = 0x72;
-export function createFlagStore(backend, opts = {}) {
+/** The flags also report story commands (SET_FLAG on a command bank); the shared opts type has not caught up. */
+type FlagStoreOpts = Partial<StoryExplorerOpts> & { command?: (command: ReturnType<typeof storyCommand>) => void };
+export function createFlagStore(backend, opts: FlagStoreOpts = {}) {
   const {
     getOrdinal, rosterTable, hasItem, hasCard, packIndex, ownedSlots, routePair,
     partyCharisma, partnerLevels,

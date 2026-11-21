@@ -15,6 +15,7 @@ import { applyRel, dx } from "./geometry.js";
 import { isCursorToken } from "./icons.js";
 import { N, ID, textPart, plate, rule, rowPlate, cursor, corners, elementChip, ELEMENTS, stripes, TAB, tabPlate, tabTitle } from "./base.js";
 import { restOfRuns } from "./generic.js";
+import type { UiRect, UiSheetDef, UiTextOpts } from "./types.js";
 
 /** C4 sizes in native units: the header window starts at 616 dp; tab 390 x 46 dp; the panel body 18 dp right / 9 below the tab; rows 40 dp right / 17 below. */
 export const SHEET = Object.freeze({
@@ -30,8 +31,8 @@ const inside = (r, rc) => r.x >= rc.x - 1 && r.x < rc.x + rc.w && mid(r) >= rc.y
 const take = (runs, used, rc) => runs.filter((r) => !used.has(r) && inside(r, rc));
 
 // ------------------------------------------------------------------------------------------------ text helpers
-const label = (key, m, rect, rel, o = {}) => textPart(key, "label", m.text, applyRel(rect, rel), o.sizeDp ?? 24, o.lineDp ?? 36, { color: o.color ?? m.face ?? null, rel, maxDp: o.maxDp ?? 0 });
-const number = (key, m, right, y, h, rel, o = {}) => textPart(key, "number", m.text, applyRel({ x: right - N(o.wDp ?? 90), y, w: N(o.wDp ?? 90), h }, rel), o.sizeDp ?? 22, o.lineDp ?? Math.round(h * 3), { align: "right", color: o.color ?? m.face ?? "var(--c-ink)", rel, maxDp: o.wDp ?? 90 });
+const label = (key, m, rect, rel, o: UiTextOpts = {}) => textPart(key, "label", m.text, applyRel(rect, rel), o.sizeDp ?? 24, o.lineDp ?? 36, { color: o.color ?? m.face ?? null, rel, maxDp: o.maxDp ?? 0 });
+const number = (key, m, right, y, h, rel, o: UiTextOpts = {}) => textPart(key, "number", m.text, applyRel({ x: right - N(o.wDp ?? 90), y, w: N(o.wDp ?? 90), h }, rel), o.sizeDp ?? 22, o.lineDp ?? Math.round(h * 3), { align: "right", color: o.color ?? m.face ?? "var(--c-ink)", rel, maxDp: o.wDp ?? 90 });
 
 /** One text run placed in a row of `top` / `h` (native): numbers right-anchored at the game's right edge, the rest a label at the pen x. */
 function rowText(key, m, top, h, right, rel, ink, out) {
@@ -52,7 +53,7 @@ export function rowsFromRuns(runs, used, win) {
  * edge, under(k) (under-edge colour of plain row k), push (how far the cursor row is pushed out) }. The row holding the game's cursor glyph
  * is orange with the chevron in the glyph's pose. Takes the runs it draws.
  */
-export function linedWindow(key, win, tops, runs, used, out, rel = ID, o = {}) {
+export function linedWindow(key, win, tops, runs, used, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
     out.push(plate(`${key}.plate`, "window", applyRel(win, rel), rel, { shape: o.shape ?? "ch", edge: o.edge }));
     const mine = take(runs, used, win);
     const right = win.x + win.w, h = o.rowH ?? SHEET.rowH, push = o.push ?? SHEET.push;
@@ -73,7 +74,7 @@ export function linedWindow(key, win, tops, runs, used, out, rel = ID, o = {}) {
 }
 
 /** A lined window whose rows are its own text lines (row x = 8 native left of the leftmost text). */
-export function textWindow(key, win, runs, used, out, rel = ID, o = {}) {
+export function textWindow(key, win, runs, used, out, rel = ID, o: { shape?: string; edge?: string; rowH?: number; push?: number; rowX?: number; under?: (k: number) => string; } = {}) {
     const tops = rowsFromRuns(runs, used, win);
     const texts = take(runs, used, win).filter((m) => !isCursorToken(m.text));
     const x0 = texts.length ? Math.min(...texts.map((m) => m.x)) : win.x + 16;
@@ -120,7 +121,7 @@ export function statChips(key, win, runs, used, out, rel = ID) {
 }
 
 /** The solid orange EXP plate (C4): slanted right end, the game's number right-anchored and its label in dark ink. */
-export function expPlate(p, i, runs, used, out, o = {}) {
+export function expPlate(p, i, runs, used, out, o: { edge?: string; } = {}) {
     const rel = p.rel, r = localRect(p), k = `exp${i}`;
     out.push(plate(`${k}.plate`, "expPlate", applyRel(r, rel), rel, { shape: "sr", edge: o.edge ?? "var(--c-orange)", body: null }));
     const lineN = N(40), top = r.y + (r.h - lineN) / 2;
@@ -181,7 +182,7 @@ export function composeFormSheet(p, i, runs, used, out) {
     const nameTab = { x: b.x, y: b.y, w: F.nameW, h: F.tabH }, skillTab = toRight(b.x + F.skillX, b.y, F.tabH, b.x + b.w);
     out.push(plate(`${k}.name`, "nameTab", applyRel(nameTab, rel), rel, { shape: "sr" }));
     out.push(plate(`${k}.skill`, "skillTab", applyRel(skillTab, rel), rel, { shape: "sl" }));
-    for (const [rc, tag] of [[nameTab, "name"], [skillTab, "skill"]]) {
+    for (const [rc, tag] of [[nameTab, "name"], [skillTab, "skill"]] as [UiRect, string][]) {
         for (const m of take(runs, used, rc)) {
             used.add(m);
             if (isCursorToken(m.text)) continue;
@@ -298,7 +299,7 @@ export function composeVictory({ parts, runs, stage }, cfg) {
     runs.forEach((m) => used.add(m));                 // everything else of the native page is replaced by the part
     const head = lines[0] ?? "", rest = lines.slice(1).join(" ").trim();
     const num = (t) => Number(String(t).replace(/[^0-9]/g, "")) || 0;
-    const d = { key: "vic", kind: "vic", part: "vic", layer: "over", rect: { x: S.x0, y: S.y0, w: S.x1 - S.x0, h: S.y1 - S.y0 }, sx: 1, sy: 1, page: "text", big: lines.join(" "), small: "" };
+    const d = { key: "vic", kind: "vic", part: "vic", layer: "over", rect: { x: S.x0, y: S.y0, w: S.x1 - S.x0, h: S.y1 - S.y0 }, sx: 1, sy: 1, page: "text", big: lines.join(" "), small: "" } as UiSheetDef;
     if (/exp/i.test(head) && (v.partners ?? []).length) {
         const rows = v.rows ?? [];
         d.page = "exp";
@@ -328,7 +329,7 @@ export function composeVictory({ parts, runs, stage }, cfg) {
 }
 
 /** The fight report (STFRPT, cyan family). `pulse(row)` = the highlight colour cycle. */
-export function composeReport({ parts, runs, stage }, cfg = {}) {
+export function composeReport({ parts, runs, stage }, cfg: { view?: UiRect; pulse?: (row: number) => string; } = {}) {
     if (cfg.view) return composeVictory({ parts, runs, stage }, cfg);
     const out = [], used = new Set();
     parts.forEach((p, i) => {

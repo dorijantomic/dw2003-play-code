@@ -12,9 +12,11 @@ import {
   commitBattleFormChange,
 } from "../form-blast.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
+import type { EnemyStatBlock, FusedRecord } from "./types.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeFusion(B) {
+export function makeFusion(B: BattleContext) {
 /**
    * NEW content (F2 -> Extras -> "Fusion bosses"): the two halves fuse.
    *
@@ -31,14 +33,14 @@ export function makeFusion(B) {
     const bodyRow = B.enemiesDB?.[boss?.body] ?? boss?.rows?.[boss?.body] ?? null;
     if (!en || !bodyRow) return;
     const halves = (boss.halves ?? []).map((name) => B.enemiesDB?.[name] ?? boss.rows?.[name] ?? null).filter(Boolean);
-    const fused = fusedRecord({
+    const fused: FusedRecord = fusedRecord({
       halves, body: boss.body, level: boss.level, hp: boss.hp,
       statScale: boss.statScale, moves: boss.moves, aiFill: boss.aiFill === true,
     });
     // The body's own row with the fused attack, the two techniques and the AI rows on top;
     // its resistances, status bytes and drop stay the body's, because the fused fighter IS
     // that body.
-    const eStats = { ...bodyRow };
+    const eStats = { ...bodyRow } as EnemyStatBlock;
     eStats.attack = fused.attack;
     eStats.move_1 = fused.move_1;
     eStats.move_2 = fused.move_2;

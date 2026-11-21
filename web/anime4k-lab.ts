@@ -1,6 +1,7 @@
 // Anime4K on the GPU (WebGPU) for sprite-filter-lab.html only: runs a model on a crop and gives back
 // a 4x ImageData plus the time.  anime4k-webgpu 1.0.0 (MIT, Anime4K by bloc97, WebGPU port by
 // Anime4KWebBoost), loaded from the CDN only when the lab asks for it.
+import type { GpuNavigator } from "./types/anime4k-lab.js";
 const CDN = "https://cdn.jsdelivr.net/npm/anime4k-webgpu@1.0.0/lib/index.js";
 
 // WebGPU flag values from the spec (the repo's name check does not know the GPU* globals)
@@ -23,8 +24,8 @@ function loadLib() {
 /** { lib, device } or throws with a plain reason (no WebGPU, no adapter, CDN down). */
 export function anime4kReady() {
   ready ??= (async () => {
-    if (!navigator.gpu) throw new Error("this browser has no WebGPU");
-    const adapter = await navigator.gpu.requestAdapter();
+    if (!(navigator as GpuNavigator).gpu) throw new Error("this browser has no WebGPU");
+    const adapter = await (navigator as GpuNavigator).gpu.requestAdapter();
     if (!adapter) throw new Error("no WebGPU adapter");
     const device = await adapter.requestDevice();
     return { lib: await loadLib(), device };

@@ -38,9 +38,10 @@ import { battleRestorePlanFor, castFieldTechnique, applyStatDebuffDispatch } fro
 import { isThrowItem } from "../../fight/fight-tables.js";
 import { persistPlayerGauge } from "../form-blast.js";
 import { finalizePlayerDamage } from "../../battle.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makePlayerAction(B) {
+export function makePlayerAction(B: BattleContext) {
 function applyPlayerAction() {
     const b = B.battle;
     const action = b.pendingAction;
@@ -166,7 +167,7 @@ function applyPlayerAction() {
             record: B.fightTechDB?.[String(basicTechId)] ?? null,
             multiHit: attempts > 1,
             instantDeath: b.enemy.hp <= 0 && (inflicted.text !== "" || weapon.ko),
-            landed,
+            landed: landed as unknown as boolean,
             name: enemyName,
             damage: total,
           });
@@ -365,7 +366,7 @@ function applyPlayerAction() {
           const hitPages = [
             applyPostHitDispatch(b, restoreRecord, { lockRecord: B.fightTechDB?.[String(DAMAGE_TERM_FLEE_LOCK_RECORD)], playerName: pname, enemyName }),
             applyStatDebuffDispatch(b, 0, restoreRecord, { player: pname, enemy: enemyName }),
-          ].map((r) => r?.page ?? null);
+          ].map((r) => (r as { page?: any })?.page ?? null);
           if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._enemyFled = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c) — here the target is the enemy
           message += after.text;
           extra += after.text + weapon.text + stolen.text

@@ -19,6 +19,7 @@
 // Pure: no DOM and no fs (the CLI does the reading and the printing, the lab does the drawing). The words in a row
 // are the data's own; where a branch has no words at all the row says that in plain tool words.
 import { paginate } from "./dialogue-pack.js";
+import type { QuestEndingsOpts } from "./types/quest-endings.js";
 
 const DEFAULT_ASK = "Take the job?";                       // web/quests.js:433
 const DEFAULT_OPTIONS = ["I will do it", "Not now"];       // web/quests.js:433
@@ -252,7 +253,7 @@ export function endingsTable(defs) {
  * One plain page for one quest (or a markdown one with `{ markdown: true }`): a heading, one line per row, and
  * that row's own words under it. This is the same text the CLI prints and the lab shows.
  */
-export function endingsBlock(def, opts = {}) {
+export function endingsBlock(def, opts: QuestEndingsOpts = {}) {
     const md = opts.markdown === true;
     const rows = endingsOf(def);
     const problems = endingsProblem(def);

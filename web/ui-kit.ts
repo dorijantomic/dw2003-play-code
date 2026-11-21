@@ -13,6 +13,7 @@ import { drawText, textWidth } from "./uifont.js";
 import { buildPanelClip, tileFrames } from "./panel-kit.js";
 import { BAND_TEXT_W, fitByWidth, wrapByWidth } from "./text-fit.js";
 import { partHook } from "./ui-c/capture.js";
+import type { FoldChainOptions } from "./types/ui-kit.js";
 
 export const BOX_W = 320;
 export const BOX_H = 240;
@@ -54,7 +55,7 @@ export function createFold(steps = OPEN_STEPS) {
  * The windows of one screen, opened one after another in `names` order (each starts when the one before has landed) and
  * shut in the reverse order. `onStart(name, opening)` is where the open / close sound is played.
  */
-export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} } = {}) {
+export function createFoldChain(names, { steps = OPEN_STEPS, onStart = () => {} }: FoldChainOptions = {}) {
     const folds = Object.fromEntries(names.map((n) => [n, createFold(steps)]));
     let phase = "shut";
     let at = 0;

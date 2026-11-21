@@ -10,9 +10,10 @@ import {
 } from "../gl.js";
 import { MODEL_SCALE, mat4Perspective, mat4LookAt, ps1ToRenderMatrix } from "../math.js";
 import { mat4Mul, mat4Translate, mat4Scale } from "../../fight/proj-layers.js";
+import type { Battle3DContext, PanoProjectOptions, PanoState } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makePano(B$) {
+export function makePano(B$: Battle3DContext) {
 function _panoTex(px, repeat) {
     const tex = B$.gl.createTexture();
     B$.gl.bindTexture(B$.gl.TEXTURE_2D, tex);
@@ -30,7 +31,7 @@ function _panoActive() {
     // shared by every map that uses that arena. key = map + arena; id = the file actually used.
     const mapId = "s" + String(B$.arenaStageReq.mapId).replace(/^s/, ""), key = mapId + "|" + (B$.activeArena?.name ?? "");
     if (B$.pano?.key !== key) {
-      const me = B$.pano = { key, id: mapId, tex: null, px: null, ground: null, mesh: null, missing: false };
+      const me = B$.pano = { key, id: mapId, tex: null, px: null, ground: null, mesh: null, missing: false } as PanoState;
       const tries = [mapId, B$.activeArena?.name].filter(Boolean);
       const load = (id) => {
         loadTexturePixels(`assets-hd/battle/panoramas/${id}.png`).then((px) => {
@@ -120,7 +121,7 @@ void main() {
       B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, g.vbo); B$.gl.enableVertexAttribArray(g0.aPos); B$.gl.vertexAttribPointer(g0.aPos, 3, B$.gl.FLOAT, false, 0, 0);
       if (!g.paintIbo) g.paintIbo = B$.gl.createBuffer();
       B$.gl.bindBuffer(B$.gl.ELEMENT_ARRAY_BUFFER, g.paintIbo);
-      for (const [list, mode] of [[fl, 1], [ot, 0]]) {
+      for (const [list, mode] of [[fl, 1], [ot, 0]] as [any[], number][]) {
         if (!list.length) continue;
         B$.gl.uniform1f(g0.uMode, mode);
         B$.gl.bufferData(B$.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(list), B$.gl.DYNAMIC_DRAW);
@@ -280,7 +281,7 @@ function _drawPano(p, bdPV, eye, atm) {
   }
 // opts.ortho = half-size of a square straight view (no perspective) for the top-down floor; opts.far = how deep it
   // reaches from the eye (with ortho, everything above the eye is left out: walls cut at that height).
-  function captureArenaFace(eye, look, up, size = 1024, opts = {}) {
+  function captureArenaFace(eye, look, up, size = 1024, opts: PanoProjectOptions = {}) {
     if (!B$.activeArena?.groups?.length) return null;
     if (!B$._capFbo || B$._capFbo.size !== size) {
       const fb = B$.gl.createFramebuffer(), tx = B$.gl.createTexture(), rb = B$.gl.createRenderbuffer();

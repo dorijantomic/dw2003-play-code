@@ -71,7 +71,7 @@ function bank70Words(id, want) {
  * `expected` defaults to 1 — the game's get_flag default, and what an NPC spawn gate
  * means when the field is absent.
  */
-export function gateWords({ id, expected = 1 } = {}) {
+export function gateWords({ id, expected = 1 }: { id?: number; expected?: number } = {}) {
   const bank = (id >> 8) & 0xfe;
   const index = id & 0x1ff;
   const want = expected ? 1 : 0;

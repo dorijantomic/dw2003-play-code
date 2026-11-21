@@ -119,6 +119,7 @@
 // runs, plus the speech table the VM's after-say hooks read, plus the `events` table the host performs (each event opcode is
 // `SCENEEVENT <index>`). Walking, facing and the camera are therefore the same code the story cutscenes use. The only new
 // thing is that the words come from the quest, not from the disc's esdmg files.
+import type { QuestSceneChase, QuestSceneClip, QuestSceneCompileOpts, QuestSceneFade, QuestSceneFall, QuestSceneGhost, QuestSceneLightning, QuestSceneMotion, QuestSceneMove, QuestScenePlace, QuestSceneShake, QuestSceneTime, QuestSceneWeather } from "./types/quest-scenes.js";
 
 const isPlayer = (w) => w === "player";
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d);
@@ -174,7 +175,7 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
  * @param opts.pos       (actorId) -> { x, y } | null, the current place of a character (for "face" and for safe defaults)
  * @returns { opcodes, speech, errors }  speech[n] = { who, name, text } for the SAY opcode numbered n
  */
-export function compileScene(steps, opts = {}) {
+export function compileScene(steps, opts: QuestSceneCompileOpts = {}) {
     const playerId = opts.playerId ?? 2;
     const idOf = (w) => (isPlayer(w) ? playerId : Number(w));
     const opcodes = [], speech = {}, events = [], errors = [];
@@ -209,7 +210,7 @@ export function compileScene(steps, opts = {}) {
         if (!m || typeof m !== "object" || Array.isArray(m)) return `${kind} needs an object`;
         if (kind === "fall") {
             if (!Number.isFinite(Number(m.floor))) return "fall needs floor: the y it lands on";
-            spec.fall = { floor: num(m.floor), step: Math.max(0.05, Number(m.step) || 0.75) };
+            spec.fall = { floor: num(m.floor), step: Math.max(0.05, Number(m.step) || 0.75) } as QuestSceneFall;
             if (m.bounce === false) spec.fall.bounce = false;
             if (Number.isFinite(Number(m.v0))) spec.fall.v0 = Number(m.v0);
         } else if (kind === "slide") {
@@ -403,7 +404,7 @@ export function compileScene(steps, opts = {}) {
             if (!name) return bad("fx needs a name (the instance later steps use)");
             const at = point(s.at);
             if (!at) return bad("fx needs at: [x, y] or { near: <character>, dx, dy }");
-            const spec = { kind: "fx", name, sheet: typeof s.sheet === "string" ? s.sheet : name, x: at[0], y: at[1] };
+            const spec = { kind: "fx", name, sheet: typeof s.sheet === "string" ? s.sheet : name, x: at[0], y: at[1] } as QuestScenePlace;
             if (typeof s.clip === "string") spec.clip = s.clip;
             if (s.scale != null) {
                 const k = Number(s.scale);
@@ -420,13 +421,13 @@ export function compileScene(steps, opts = {}) {
         } else if ("fxplay" in s) {
             const name = typeof s.fxplay === "string" ? s.fxplay : "";
             if (!name || typeof s.clip !== "string") return bad("fxplay needs the effect's name and clip");
-            const spec = { kind: "fxplay", name, clip: s.clip };
+            const spec = { kind: "fxplay", name, clip: s.clip } as QuestSceneClip;
             if (typeof s.loop === "boolean") spec.loop = s.loop;
             event(spec);
         } else if ("fxmove" in s) {
             const name = typeof s.fxmove === "string" ? s.fxmove : "";
             if (!name) return bad("fxmove needs the effect's name");
-            const spec = { kind: "fxmove", name };
+            const spec = { kind: "fxmove", name } as QuestSceneMotion;
             const why = takeMotion(s, spec);
             if (why) return bad(`fxmove: ${why}`);
             if (!spec.fall && !spec.slide && !spec.rise) return bad("fxmove needs fall, slide or rise");
@@ -438,7 +439,7 @@ export function compileScene(steps, opts = {}) {
         } else if ("fxremove" in s) {
             const name = typeof s.fxremove === "string" ? s.fxremove : "";
             if (!name) return bad("fxremove needs the effect's name");
-            const spec = { kind: "fxremove", name };
+            const spec = { kind: "fxremove", name } as QuestSceneFade;
             if (s.fade != null) {
                 if (!(Number(s.fade) >= 0)) return bad("fxremove fade must be a number of frames");
                 spec.fade = Math.max(0, num(s.fade, 0));
@@ -484,7 +485,7 @@ export function compileScene(steps, opts = {}) {
             const amp = Number(s.shake);
             if (!(Number.isFinite(amp) && amp > 0 && amp <= 40)) return bad("shake needs an amplitude of 1 to 40 pixels");
             const frames = Math.max(1, num(s.frames, 20));
-            const spec = { kind: "shake", amp, frames };
+            const spec = { kind: "shake", amp, frames } as QuestSceneShake;
             if (s.decay === false) spec.decay = false;
             const times = s.times == null ? 1 : num(s.times, 1);
             if (!(times >= 1 && times <= 12)) return bad("shake times is 1 to 12 thuds");
@@ -499,19 +500,19 @@ export function compileScene(steps, opts = {}) {
                 kind: "weather", weather: w,
                 strength: clamp01(s.strength == null ? 0.75 : Number(s.strength)),
                 frames: Math.max(0, num(s.frames, 30)),
-            };
+            } as QuestSceneWeather;
             if (s.force === true) spec.force = true;
             event(spec);
         } else if ("time" in s) {
             const t = String(s.time);
             if (!TIMES.includes(t)) return bad(`time ${JSON.stringify(s.time)} is not one of ${TIMES.join(", ")}`);
-            const spec = { kind: "time", time: t, frames: Math.max(0, num(s.frames, 60)) };
+            const spec = { kind: "time", time: t, frames: Math.max(0, num(s.frames, 60)) } as QuestSceneTime;
             if (s.force === true) spec.force = true;
             event(spec);
         } else if ("lightning" in s) {
             const n = s.lightning === true ? 1 : num(s.lightning, 1);
             if (!(n >= 1 && n <= 6)) return bad("lightning is 1 to 6 flashes");
-            const spec = { kind: "lightning", count: n };
+            const spec = { kind: "lightning", count: n } as QuestSceneLightning;
             if (s.force === true) spec.force = true;      // show it even if the player switched lightning off in F2
             event(spec);
         } else if ("chase" in s) {
@@ -528,7 +529,7 @@ export function compileScene(steps, opts = {}) {
                 path: s.path.map((p) => [num(p[0]), num(p[1])]),
                 speed: Number.isFinite(Number(s.speed)) && Number(s.speed) > 0 ? Number(s.speed) : 130,
                 lose: Number.isFinite(Number(s.lose)) && Number(s.lose) > 0 ? Number(s.lose) : 90,
-            };
+            } as QuestSceneChase;
             if (s.frames != null) {
                 const frames = num(s.frames, 0);
                 if (!(frames >= 1)) return bad("chase frames is a time limit in frames");
@@ -542,7 +543,7 @@ export function compileScene(steps, opts = {}) {
             const t = s.ghost;
             const who = t === "player" ? "player" : Number(t);
             if (!(who === "player" || Number.isFinite(who))) return bad('ghost needs a character id or "player"');
-            const spec = { kind: "ghost", npc: who };
+            const spec = { kind: "ghost", npc: who } as QuestSceneGhost;
             if (s.off === true) {
                 spec.off = true;
             } else {
@@ -555,7 +556,7 @@ export function compileScene(steps, opts = {}) {
             }
             event(spec);
         } else if ("warp" in s) {
-            const w = s.warp, spec = { kind: "warp" };
+            const w = s.warp, spec = { kind: "warp" } as QuestSceneMove;
             if (typeof w === "string" || typeof w === "number") spec.to = w;
             else if (w && typeof w === "object") {
                 spec.to = w.map ?? w.to ?? w.screen ?? null;

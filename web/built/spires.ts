@@ -129,6 +129,7 @@ import * as THREE from "../lib3d/three.module.js";
 import * as S0 from "./shared.js";
 import * as F from "../lib3d/fluffytree/fluffy.js";
 import { Tree, TreePreset } from "../lib3d/ez-tree.es.js";
+import type { BuiltSpiresCounts, BuiltSpiresInfo } from "./types.js";
 
 const TAU = Math.PI * 2;
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -966,7 +967,7 @@ export function buildSpires(slot, ctx) {
   const info = {
     walls: [], islands: [], skipped, bushes: { ledger: 0 }, cards: 0, groups: groups.length,
     triangles: 0, meshes: 1 + bushMeshes.length + 1, ms: 0, values: P, measured: {},
-  };
+  } as BuiltSpiresInfo;
   // ---- option: Gemini spires (web/built/spires_gemini.js), OFF by default, built lazily on the first switch-on ----
   let gem = null, geminiOn = false, gemDirty = false, gemBusy = null;
   async function setGemini(on) {
@@ -985,7 +986,7 @@ export function buildSpires(slot, ctx) {
   function place(state, items = lastItems) {
     lastItems = items;
     const t = performance.now();
-    const stats = { ...(items.stats || {}) }, moved = !!items.moved || gemFirst;
+    const stats = { ...(items.stats || {}) } as BuiltSpiresCounts, moved = !!items.moved || gemFirst;
     gemFirst = false;
     if (moved) rebuild();
     const shownWalls = walls.filter((g) => !g.hidden), shownIsles = islands.filter((g) => !g.hidden);

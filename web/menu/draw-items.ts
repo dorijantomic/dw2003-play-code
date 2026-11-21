@@ -45,9 +45,10 @@ import {
   sheetStatValue,
   wieldNameFor,
 } from "./logic.js";
+import type { MenuState } from "./types.js";
 
 // ITEMS: "Which one?" category picker, then the 8x2 bag (F0x80092fac).
-export function _drawItems(ctx, state, m, roster, t, fold = null) {
+export function _drawItems(ctx, state, m: MenuState, roster, t, fold = null) {
   const I = MS.UI.screens.items;
   if (m.itemMode === "use_target") {
     _drawHeader(ctx, "Use it on who?", fold);

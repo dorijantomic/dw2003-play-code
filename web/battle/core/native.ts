@@ -5,9 +5,11 @@ import { partHook as uiCPart } from "../../ui-c/capture.js";
 import { battleHudBarColors } from "../../battlehud-translated.js";
 import { clipSize, drawClip } from "../../screenpack.js";
 import { fightUiAtlas, pgfgc00 } from "../../battle.js";
+import type { BattleContext } from "../../types/battle.js";
+import type { NativeTextOptions } from "./types.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeNative(B) {
+export function makeNative(B: BattleContext) {
 // The large battle panes are GPU polygons in the original overlay, not a
   // scalable bitmap window.  The atlas's 104x64 decoration was previously
   // nine-sliced here, which visibly stretched its diagonal ornament across
@@ -41,7 +43,7 @@ export function makeNative(B) {
   }
 // ── Draw ──
 
-  function nativeText(text, x, y, opts = {}) {
+  function nativeText(text, x, y, opts: NativeTextOptions = {}) {
     if (uiFontReady()) return uiDrawText(B.ctx, String(text), x, y, opts);
     B.ctx.fillStyle = opts.color ?? "#f2f2f2";
     B.ctx.font = `${opts.kind === 3 ? 8 : 10}px monospace`;

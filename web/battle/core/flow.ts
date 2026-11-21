@@ -20,9 +20,10 @@ import { setFighterTint, clampFighterScale } from "../../battle3d.js";
 import { effStats } from "../hit-results.js";
 import { persistPlayerGauge } from "../form-blast.js";
 import { releaseBattleLayer } from "../../battle-layer.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeFlow(B) {
+export function makeFlow(B: BattleContext) {
 // ── Public API ──
 
   function isActive() { return B.battle !== null; }
@@ -37,7 +38,7 @@ export function makeFlow(B) {
   }
 // playerSpd: the player speed the delay is read with when it is not the live active fighter's
   // (Tag: menu.c:312 asks getDelay at command time, before WFIGHTMN_tag swaps active[0]).
-  function queueAfterAction(b, acted, playerSpd) {
+  function queueAfterAction(b, acted, playerSpd?: any) {
     // A new turn on the shared timeline, so the command phase's Frozen gate rolls again
     // (F0x800a7418 step 1 runs once per player turn, `wfightmn.s:1494-1540`).
     b._turnSeq = (b._turnSeq ?? 0) + 1;
@@ -184,7 +185,7 @@ export function makeFlow(B) {
    * its own two lines for that page. `spec` (the third argument) is the shorthand for
    * "the first page's spec", for the callers that have one page and one arm.
    */
-  function setResultPages(b, pages, spec) {
+  function setResultPages(b, pages, spec?: any) {
     const list = (pages || []).filter(Boolean).map((page) => (
       page && typeof page === "object"
         ? { text: String(page.text ?? ""), spec: page.spec ?? null }

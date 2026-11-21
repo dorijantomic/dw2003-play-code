@@ -20,9 +20,10 @@ import { normalizeDvGauge } from "../layout.js";
 import { enemyTeamSlots } from "../../enemy-switch.js";
 import { canonicalProfileName } from "../messages.js";
 import { emit as emitGameEvent } from "../../gameEvents.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeRecords(B) {
+export function makeRecords(B: BattleContext) {
 // Build one enemy combat record from an encounter entry (enemyId name/id, level, and the
   // REAL per-encounter hp/mp). Reused for every member of a sequential boss party. Returns
   // null when the species can't be resolved.
@@ -142,7 +143,7 @@ export function makeRecords(B) {
     const st = ensureStoredStats(ps, starterProfile);
     const maxHp = Number(ps.maxHp ?? scaledHp(starterProfile, level));
     const maxMp = Number(ps.maxMp ?? scaledMp(starterProfile, level));
-    const accFx = {};
+    const accFx = {} as Record<string, number>;
     for (const f of eb.effects ?? []) accFx[f.kind] = (accFx[f.kind] ?? 0) + (f.amount || 1);
     // The MP proxies are slot-assigned, not cumulative: FIGHTSTG_F0x800a1d3c keeps
     // the LAST matching accessory slot (acc1 overwrites acc0), so both equipped
@@ -258,7 +259,7 @@ export function makeRecords(B) {
     b._team ??= [];
     if (b._team[i] === undefined) {
       const rec = buildEnemyRecord(entry);
-      if (rec) rec.statusImmunities = b.statusImmunities;
+      if (rec) (rec as { statusImmunities?: any }).statusImmunities = b.statusImmunities;
       b._team[i] = rec ?? null;
     }
     return b._team[i];

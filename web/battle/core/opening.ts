@@ -25,9 +25,10 @@ import { digivolveDemoOn } from "../../blast-presentation.js";
 import { lowHpStance, enemyMsgName } from "../hud.js";
 import { ENTRANCE_TASK_END_FRAME } from "../../enemy-switch.js";
 import { clearActionAffinity } from "../restore.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeOpening(B) {
+export function makeOpening(B: BattleContext) {
 function _battleTargetSize() {
     const stage = B.canvas.parentElement;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);

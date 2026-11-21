@@ -61,6 +61,10 @@ const pickW = (list, u) => { let tot = 0; for (const c of list) tot += c[3]; let
 /** Flat-shaded triangle soup builder. Normals are the face normal turned to point up, then 45 % pulled toward +y
  *  (soft light on small leaves); the material is two-sided and does not flip them. */
 class Soup {
+  declare l: any[];
+  declare n: any[];
+  declare p: any[];
+  declare t: any[];
   constructor() { this.p = []; this.n = []; this.t = []; this.l = []; }
   tri(a, b, c, ta, tb, tc, la = 1, lb = 1, lc = 1) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];

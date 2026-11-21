@@ -22,7 +22,8 @@
 import { createChatQueue } from "./chat-queue.js";
 import { drawIndicatorBubble } from "./fieldcom.js";
 import { bubbleFor, bubbleTick } from "./mp-emotes.js";   // F2 -> Extras -> "The game's own reaction bubbles"
-import { pickRules } from "./host-rules.js";          // the host's battle settings every guest plays by
+import { pickRules } from "./host-rules.js";
+import type { MultiplayerUi, MpListener, MpTimer } from "./types/multiplayer.js";          // the host's battle settings every guest plays by
 
 const PORT = 20031;             // the relay's port on the host's computer
 const KEY_ADDR = "dw.mp.addr";
@@ -41,13 +42,13 @@ const mp = {
     peers: new Map(),           // id -> { name, map, x, y, tx, ty, dir, mv, animTime, seen, emote, emoteIx, emoteUntil, say, sayUntil, card }
     me: { map: null, x: 0, y: 0, dir: "down", mv: 0, say: "", sayUntil: 0, emote: "", emoteIx: null, emoteUntil: 0 },
     sent: { map: null, x: 0, y: 0, dir: "", mv: 0, at: 0 },
-    retry: 0, retryTimer: 0, want: null, beat: 0, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
+    retry: 0, retryTimer: 0 as MpTimer, want: null, beat: 0 as MpTimer, hadWelcome: false, lost: false, autoTry: false, autoTried: false, defaultName: null,   // hadWelcome: this link has been in a room (one flag for every retry); lost: the link dropped and no welcome yet; autoTry: autoTried: the one page-start try
     ui: null, lastTick: 0,
     rules: null, rulesSent: "", rulesAt: 0,   // rules: the host's battle settings (what the relay last told me); rulesSent: what I last sent as host
 };
 
 // ------------------------------------------------------------ events for the social dock
-const listeners = new Set();
+const listeners = new Set<MpListener>();
 /** fn(type, data): "status" | "roster" | "chat" {id,name,text,self,mark} | "chatstate" {mark} | "feed" {id,name,kind,text} | "sys" {text} | "trade" {...} */
 export const mpOn = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
 const emit = (type, data = {}) => { for (const f of [...listeners]) { try { f(type, data); } catch (e) { console.warn("[multiplayer]", e); } } };
@@ -131,7 +132,7 @@ function sendRules() {
     if (sendRaw({ t: "rules", rules })) mp.rulesSent = json;
 }
 
-function setStatus(s, text) { mp.status = s; render(text); emit("status", { status: s }); }
+function setStatus(s, text?: string) { mp.status = s; render(text); emit("status", { status: s }); }
 
 /** want = { base: "ws://host:port", create: true } or { base, room: "ABCDE", key?: seat key } */
 export function connect(want) {
@@ -313,7 +314,7 @@ function chatQueue() {
             if (meta && (meta.queued || !ok)) { meta.queued = false; meta.dropped = !ok; emit("chatstate", { mark: meta }); }
             return ok;
         },
-    });
+    } as any);
     return chatQ;
 }
 /** How many of my lines are still waiting for their turn (0 with the switch off). */
@@ -432,14 +433,14 @@ export function drawGhostLabel(ctx, g, sx, headY) {
 }
 
 // ------------------------------------------------------------ the panel
-let toastEl = null, toastTimer = 0;
+let toastEl = null, toastTimer: MpTimer = 0;
 function toast(text) {
     if (!toastEl) return;
     toastEl.textContent = text; toastEl.style.opacity = "1";
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = "0"; }, 2200);
 }
 
-function render(note) {
+function render(note?: string) {
     const u = mp.ui; if (!u) return;
     const online = mp.status === "online";
     u.badge.hidden = !online;
@@ -459,7 +460,7 @@ function render(note) {
     }
 }
 
-function openPanel(show) {
+function openPanel(show?: boolean) {
     if (!mp.ui) return;
     mp.ui.panel.hidden = show === undefined ? !mp.ui.panel.hidden : !show;
     if (!mp.ui.panel.hidden) { mp.ui.fillName(); render(); }
@@ -515,15 +516,15 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     const placeBadge = () => { badge.style.top = (hudEl && hudEl.offsetHeight ? hudEl.offsetTop + hudEl.offsetHeight + 4 : 8) + "px"; };
     if (hudEl && typeof ResizeObserver === "function") new ResizeObserver(placeBadge).observe(hudEl);
     placeBadge();
-    const $ = (id) => panel.querySelector("#" + id);
-    mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") };
+    const $ = (id): HTMLElement => panel.querySelector("#" + id) as HTMLElement;
+    mp.ui = { panel, badge, off: $("mp-off"), on: $("mp-on"), msg: $("mp-msg"), code: $("mp-code"), roster: $("mp-roster"), tell: $("mp-tell"), addrs: $("mp-addrs") } as MultiplayerUi;
     mp.defaultName = defaultName;               // the first multiplayerTick uses it for the page-start rejoin
     EMOTES.forEach((t, i) => {
         const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.title = `Emote ${i + 1}`;
         b.onclick = () => sendEmote(i);
         $("mp-emotes").append(b);
     });
-    const nameBox = $("mp-name"), addrBox = $("mp-addr"), codeBox = $("mp-join-code");
+    const nameBox = $("mp-name") as HTMLInputElement, addrBox = $("mp-addr") as HTMLInputElement, codeBox = $("mp-join-code") as HTMLInputElement;
     // The name is the one the player gave their character (so SENIOR stays SENIOR); the box lets them change it for this room only.
     const readName = () => { mp.name = nameBox.value.trim().slice(0, 12) || defaultName(); };
     mp.ui.fillName = () => { if (mp.status === "off") nameBox.value = defaultName(); };   // not at install: the game's state does not exist yet
@@ -542,7 +543,7 @@ export function installMultiplayer({ stageEl, defaultName = () => "Tamer" }) {
     badge.onclick = () => openPanel(true);
     // typing in the panel must not move the character: stop key events before they reach the game's window handlers
     for (const type of ["keydown", "keyup", "keypress"]) {
-        panel.addEventListener(type, (e) => { if (e.key !== "F4" && e.key !== "Escape") e.stopPropagation(); });
+        panel.addEventListener(type, (e: KeyboardEvent) => { if (e.key !== "F4" && e.key !== "Escape") e.stopPropagation(); });
     }
     window.addEventListener("keydown", (e) => {
         if (e.key === "F4") { e.preventDefault(); openPanel(); }

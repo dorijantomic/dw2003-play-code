@@ -12,17 +12,18 @@ import { N, ID, plate, rule, rowPlate, cursor, corners, stripes, typeWord, token
 import { clipRect, platePart, restOfRuns } from "./generic.js";
 import { composeListWin, composeTabHeader, composeLists } from "./lists.js";
 import { composeBandWindow } from "./message.js";
+import type { PausePageOpts, UiTextOpts } from "./types.js";
 
 
 /** The run's text anchor (pen x, middle of the 9 native rows) lies inside the native rect. */
 export const runIn = (r, rc, pad = 0) => r.x >= rc.x - pad && r.x < rc.x + rc.w + pad && r.y + 4 >= rc.y - pad && r.y + 4 < rc.y + rc.h + pad;
-const lbl = (key, str, rect, sizeDp, lineDp, o = {}) => textPart(key, o.role ?? "label", str, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
+const lbl = (key, str, rect, sizeDp, lineDp, o: UiTextOpts = {}) => textPart(key, o.role ?? "label", str, rect, sizeDp, lineDp, { color: o.color ?? null, align: o.align ?? "left", maxDp: o.maxDp ?? 0, rel: o.rel, spacing: o.spacing });
 export const takeIn = (runs, rc, used, pad = 0) => { const r = runs.filter((x) => runIn(x, rc, pad) && !used.has(x)); r.forEach((x) => used.add(x)); return r; };
 const solid = rule;
 
 // ------------------------------------------------------------------------------------------------ backdrop, footer, hints
 /** The scrolling diamond field (stripes over the whole limit, the game's own scroll counter) and, when asked, the right-hand wall + big word. */
-export function composeBackdropPart(back, cfg, out) {
+export function composeBackdropPart(back, cfg: PausePageOpts, out) {
     out.push(stripes(back.x));
     if (cfg.wall) out.push({ key: "backdrop.wall", kind: "wall", shape: "wallL", part: "wall", layer: "under", rect: { x: dx(660), y: 0, w: N(620), h: 240 }, color: "var(--c-wall)", sx: 1, sy: 1 });
     if (cfg.word) { const wx = cfg.wordAt?.x ?? dx(640); out.push(typeWord("backdrop.type", cfg.word, { x: wx, y: cfg.wordAt?.y ?? N(400), w: Math.max(40, 320 - wx), h: N(cfg.wordDp ?? 140) }, ID, cfg.wordDp ?? 140, null, false, true)); }
@@ -240,7 +241,7 @@ export const WIN_TITLE = Object.freeze({ bodyDy: 9, tabDx: N(18) });
  * The window of rows: the window plate, one plate per label (pitch read from the labels), the cursor row orange and pushed out, the
  * chevron in the pose the game's cursor glyph says. `win` is the claimed window part; labels = the runs inside it below `titleH`.
  */
-export function composeRows(win, i, runs, used, out, opt = {}) {
+export function composeRows(win, i, runs, used, out, opt: { titleH?: number; confirm?: boolean; question?: boolean; } = {}) {
     const rel = win.rel, wr = clipRect(win), titleH = opt.titleH ?? 0;
     const body = { x: wr.x, y: wr.y + titleH, w: wr.w, h: wr.h - titleH };
     // a titled window (CARD FOLDERS, the techniques list, the equipment item grid) = the C4 tab panel: the window from WIN_TITLE.bodyDy below
@@ -361,7 +362,7 @@ export function composeBracket(p, out) {
 function composePickerCard(i, card, namePart, portrait, state, runs, used, out, hl = null) {
     const Y = card.y, rel = card.rel, f = inCard(rel, card.x, Y), c = COLORS[state], k = `card${i}`;
     runs.filter((m) => m.x < 116 && m.y >= Y - 1 && m.y < Y + 45).forEach((m) => used.add(m));
-    partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker, c);
+    partyCard(i, card, namePart, readCardRuns(runs, Y), out, CARD_VARIANTS.picker as unknown as typeof CARD_VARIANTS.home, c);
     if (portrait) {
         out.push(plate(`${k}.portrait`, "portrait", f(469, 3, 128, 128), rel, { edge: c.edge }));
         if (state !== "normal") out.push(corners(`${k}.corners`, f(469 + 4, 3 + 4, 120, 120), state === "on" && hl ? cyclePulse(hl.row) : c.edge, rel));
@@ -381,7 +382,7 @@ function composePageHeader(part, runs, used, out) {
  * (the screen's own parts, composed right after the backdrop: the status sheets, sheets.js) }. The right part follows the clips the game draws: the 5-row list (cmfont panel) gets the home list,
  * the folders page its title + rows window, the partner pickers the big wall and the faint word.
  */
-export function composePausePage({ parts, runs }, cfg = {}) {
+export function composePausePage({ parts, runs }, cfg: PausePageOpts = {}) {
     const out = [], used = cfg.used ?? new Set();
     const of = (n) => parts.filter((p) => p.part === n);
     const back = of("backdrop")[0], panel = of("panel")[0], folder = of("folderWin")[0], header = of("header")[0], money = of("money")[0], foot = of("footer")[0];
@@ -409,7 +410,7 @@ export function composePausePage({ parts, runs }, cfg = {}) {
 
 // ------------------------------------------------------------------------------------------------ one window + plates (lab, shop, inn, help, demo)
 /** Parts by claim: header / hint / name / money plates with their text, the window of rows, any other claimed plate plain. */
-export function composeWindowPage({ parts, runs }, cfg = {}) {
+export function composeWindowPage({ parts, runs }, cfg: { wash?: boolean; messageWindow?: boolean; word?: string | null; } = {}) {
     const out = [], used = new Set();
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
     const lists = parts.filter((p) => p.part === "listWin").map(clipRect);
@@ -458,7 +459,7 @@ function composeFolderPlate(p, i, out) {
 }
 
 /** The ITEMS bag (C3): stripes, the full-width list window with the faint word, the tab, item cells, pager, detail line, footer. */
-export const composeListPage = (c, cfg = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
+export const composeListPage = (c, cfg: { word?: string | null; } = {}) => composeWindowPage(c, { word: cfg.word ?? "ITEMS" });
 
 /**
  * The shop item line on "Equip who?" (one clip): name plate | Equip / Items plate, and the price plate under the right end. The split

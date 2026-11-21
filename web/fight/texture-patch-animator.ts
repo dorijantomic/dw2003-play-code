@@ -35,6 +35,10 @@ export const BLINK_RELOAD_MASK = BLINK_PAUSE_MASK;
 export const stateVariant = eyePatchVariant;
 
 export class TexturePatchAnimator {
+  declare blinkTimer: number;
+  declare cycleTime: any;
+  declare entries: any;
+  declare rng: () => number;
   /**
    * @param entries model_placement.json `texture_anim` rows for one Digimon.
    * @param rng the disc's own random source: `rand_u16` (0..0x0fff), the game's ONE stream. The

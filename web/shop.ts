@@ -53,6 +53,7 @@ import { drawItemIcon } from "./itemicons.js";
 import { formatBits } from "./itemicons-data.js";
 import { partyRosterView, syncLeadEquipBonuses } from "./party.js";
 import shopLayout from "./assets/data/shop_ui.json" with { type: "json" };
+import type { ShopOpenOpts, ShopScreen } from "./types/shop.js";
 
 const SELL_RATIO = 0.5; // fallback only — decoded items carry a real `sell` price
 const sellUnit = (item) => item?.sell ?? Math.floor((item?.price ?? 0) * SELL_RATIO);
@@ -150,7 +151,7 @@ export function createShop(sfx = null) {
     fadeLeaving: false,
     fadeT0: 0,
     onClose: null,
-  };
+  } as ShopScreen;
 
   sh.isOpen = () => sh._open;
 
@@ -168,7 +169,7 @@ export function createShop(sfx = null) {
   // window's open method on arg0+0x88).
   const backToList = () => { sh.screen = "list"; sh._animStart("list"); };
 
-  sh.open = (stock, onClose = null, opts = {}) => {
+  sh.open = (stock, onClose = null, opts: ShopOpenOpts = {}) => {
     sh._open = true;
     sh._anim = {};
     sh._animStart("rootName", "rootBit", "rootMenu", "rootFooter");

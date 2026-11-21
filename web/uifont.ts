@@ -36,6 +36,7 @@
 // that pair is written.
 
 import { capturingText, textRunHook, artHook } from "./ui-c/capture.js";
+import type { UiFontPaintOpts, UiTextDrawOpts } from "./types/uifont.js";
 import { assetImageScale, loadAssetImage, tagAssetSource } from "./assets.js";
 
 let img = null;
@@ -82,7 +83,7 @@ export function numberClutRow(cluts = map?.cluts, row = 0) {
  * (`clut`, the widget's +0xC0), or a flat `color` tint of the whole sheet.
  * Pure, so the decision is testable without a canvas.
  */
-export function glyphPaint(opts = {}) {
+export function glyphPaint(opts: UiFontPaintOpts = {}) {
   const { kind = 1, clut = 0, color = null } = opts;
   return color ? { source: "tint", color } : { source: "font", kind, clut };
 }
@@ -201,7 +202,7 @@ export function textWidth(text, kind = 1) {
  * original never draws (debug overlays). A widget the original builds gets its
  * colour from `clut`, which is +0xC0: pass nothing for the face's own row.
  */
-export function drawText(ctx, text, x, y, opts = {}) {
+export function drawText(ctx, text, x, y, opts: UiTextDrawOpts = {}) {
   // TRIGGER AUDIT HOOK. A headless run sets globalThis.__uiTextTrace to a Set
   // and every string the game actually draws lands in it, so a decoded text id
   // that renders NOWHERE becomes measurable instead of assumed. Costs one
@@ -243,7 +244,7 @@ export function drawText(ctx, text, x, y, opts = {}) {
  * drawing: [{ ch, x, dx }] with x = the pen before the glyph. The look C overlay (web/ui-c) places one smooth glyph at
  * each of these pens, so its spacing is the game's own. [] until the font has loaded.
  */
-export function layoutGlyphs(text, x, opts = {}) {
+export function layoutGlyphs(text, x, opts: UiTextDrawOpts = {}) {
   if (!fontReady()) return [];
   const { kind = 1, scale = 1, cellWidth = null, glyphMetrics = null } = opts;
   const out = [];

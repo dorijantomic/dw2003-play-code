@@ -15,6 +15,7 @@ import {
 } from "./pure.js";
 import { MS } from "./state.js";
 import { GREY } from "./draw-items.js";
+import type { MenuState } from "./types.js";
 
 // ── native drawing helpers (coordinates from status_ui.json / the decompile) ──
 
@@ -129,7 +130,7 @@ export function sortSwapBracket(pick, cursor) {
   return { clip, x: S.x, y: top === 0 ? S.y_high : S.y_low };
 }
 
-export function _drawSwapBracket(ctx, m, t) {
+export function _drawSwapBracket(ctx, m: MenuState, t) {
   const b = sortSwapBracket(m.sortPick, m.statusCursor);
   if (!b) return;
   const S = MS.UI.screens.sort.swap_marker;
@@ -137,7 +138,7 @@ export function _drawSwapBracket(ctx, m, t) {
   drawClipAtPaletteRow(ctx, ststat, b.clip, k, b.x, b.y);
 }
 
-export function _drawSidebar(ctx, roster, m, t, selIdx = -1, lockedIdx = null, fold = null, opts = null) {
+export function _drawSidebar(ctx, roster, m: MenuState, t, selIdx = -1, lockedIdx = null, fold = null, opts = null) {
   const pitch = MS.UI.screens.shared.card_pitch;
   roster.forEach((p, i) => _drawCard(ctx, p, i * pitch, t, fold, `card${i}`, opts));
   const cardReady = (i) => (m._animP?.(`card${i}`) ?? 1) >= 1;

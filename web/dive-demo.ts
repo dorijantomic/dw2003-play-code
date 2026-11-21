@@ -26,10 +26,13 @@ const AUTHORED_H = 240;
 let packs = null;
 let sheets = {};      // packName -> { opaque, semi }
 
+/** What assets/effects/dive/dive_demo.json says of a pack: its opaque sheet and its semi (additive) sheet. */
+interface DivePack { sheet: string; semiSheet: string }
+
 export async function loadDiveDemo(loadImage) {
     const base = "assets/effects/dive/";
     packs = await (await fetch(base + "dive_demo.json")).json();
-    const entries = await Promise.all(Object.entries(packs).map(async ([name, p]) => {
+    const entries = await Promise.all(Object.entries(packs as Record<string, DivePack>).map(async ([name, p]) => {
         const [opaque, semi] = await Promise.all([
             loadImage(base + p.sheet),
             loadImage(base + p.semiSheet),

@@ -9,9 +9,10 @@ import { loadSkeletalModel, buildSkeletalGLBuffers } from "../skeleton.js";
 import { ActorAnimator } from "../../fight/actor-animator.js";
 import { arenaSlotFor } from "../camera-shots.js";
 import { resolveContactSoundType } from "../../battle3d.js";
+import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeModel(B$) {
+export function makeModel(B$: Battle3DContext) {
 function contactSoundTypeFor(techId) {
     const rec = techRecord(techId);
     if (!rec) return (techId >= 1 && techId <= 52) ? 30 : null;
@@ -113,7 +114,7 @@ function loadProjMesh(id) {
     return ps1ToRender(pos, MODEL_SCALE);
   }
 // Effect-spawn hook for one side's action VM (op3 sub=0 → spawn at actor-relative pos).
-  function _fxHooks(side, extra) {
+  function _fxHooks(side, extra?: any) {
     const e = extra || {};
     return {
       ...e,

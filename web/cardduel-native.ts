@@ -27,6 +27,8 @@ import { createNativeAdapter } from "./native-screen-host.js";
 import { encodeNativeScreenText, nativeScreenObjects, nativeScreenRead } from "./native-screen.js";
 import { cards } from "./cardstate.js";
 import { emit as emitGameEvent } from "./gameEvents.js";
+import type { CardDuelHost } from "./types/cardduel-native.js";
+import type { CardDuelOptions } from "./types/cardduel-native.js";
 
 const MODULE_ID = "pro/cardgame";
 /** The duel's root tick F0x80095BFC (cardgame.s 0x00012f4c). */
@@ -58,7 +60,7 @@ function duelScreenClosed() {
     return (nativeScreenRead(root.addr + 0xc, 4) | 0) === 2;
 }
 
-export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
+export function createCardDuelNative(sfx = null, bgm = null, opts: CardDuelOptions = {}) {
     const d = {
         _open: false,
         _pending: false,
@@ -68,7 +70,7 @@ export function createCardDuelNative(sfx = null, bgm = null, opts = {}) {
         _onClose: null,
         _opponentId: null,
         _lastDiagnostic: null,
-    };
+    } as CardDuelHost;
 
     /** Walker state -> the RAM the screen reads. */
     function seed({ write }) {

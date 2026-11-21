@@ -37,7 +37,7 @@ export function contactTypeForTech(rec) {
 // Reverse the name->pack map: pack -> [names].
 export function namesForPack(modelMap) {
   const rev = {};
-  for (const [name, pack] of Object.entries(modelMap || {})) {
+  for (const [name, pack] of Object.entries(modelMap || {}) as [string, string][]) {
     (rev[pack] = rev[pack] || []).push(name);
   }
   return rev;

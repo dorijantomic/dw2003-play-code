@@ -10,11 +10,12 @@ import * as uiC from "./ui-c/index.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_SILENT, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { YesNoScreen } from "./types/yesno-translated.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
 /** Game key -> pad bit (identity logical-button map: Up 4, Down 6, confirm 13). */
-const KEY_BITS = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13]];
+const KEY_BITS: [string, number][] = [["up", 1 << 4], ["down", 1 << 6], ["circle", 1 << 13]];
 
 const DATA_LABEL = "YesNo data";
 let boxCount = 0;
@@ -24,7 +25,7 @@ export function createYesNoTranslated(sfx = null) {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null, _pad: null,
         _ticks: 0, _request: 0, _closes: 0, _events: [], _sounds: [], _packed: {}, _primed: false, _row: null,
         _key: `yesno${++boxCount}`,
-    };
+    } as YesNoScreen;
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Abandoned by the caller, the box disposes its session and runs nothing: the host's answer is

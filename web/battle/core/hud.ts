@@ -25,9 +25,10 @@ import { techniqueMpCost, faceBezelCelDraw } from "../../vendor/engine.js";
 import { drawIconGlyph } from "../../uifont.js";
 import { drawItemIcon } from "../../itemicons.js";
 import { BATTLE_UI_LAYOUT, pgfgc00, TECH_PAGE_HINT, ITEM_PAGE_HINT, FORM_PAGE_HINT } from "../../battle.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeHud(B) {
+export function makeHud(B: BattleContext) {
 function drawBattleHud(b) {
     B.hudCels = [];
     const L = BATTLE_UI_LAYOUT;

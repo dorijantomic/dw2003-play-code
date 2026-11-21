@@ -6,9 +6,11 @@ import { ActorAnimator } from "../../fight/actor-animator.js";
 import { TexturePatchAnimator } from "../../fight/texture-patch-animator.js";
 import { REACTION_DEATH_CLIP, REACTION_EVADE_CLIP, REACTION_HIT_CLIP } from "../../fight/fight-tables.js";
 import { buildBoneWorldMatrices } from "../rotation.js";
+import type { Battle3dFighter } from "./types.js";
+import type { AttackOptions, Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeFighters(B$) {
+export function makeFighters(B$: Battle3DContext) {
 function _layoutExtras() {
     if (!B$.multiCam) { B$.arenaScale = 1; for (const f of B$.extras.values()) { f.dxT = f.dx0; f.dz = 0; } return; }
     let scale = 1;
@@ -100,7 +102,7 @@ function addFighter(id, side, folder, dx = 0) {
     removeFighter(id);
     const f = { id, side, folder, dx: old ? old.dx : dx, dx0: dx, dxT: old ? old.dxT : dx, dz: old ? old.dz : 0, latz: 0, latzT: 0, restW: 0, born: null,
       lat: 0, latT: 0, follow: null, model: null, bufs: null, tex: null, anim8r: null, frame: 0,
-      visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null };
+      visible: true, phase: Math.random() * 6.28, pos: [0, 0, 0], aabb: null } as Battle3dFighter;
     B$.extras.set(id, f);
     f.tex = loadTexture(B$.gl, `assets/battle/textures/${folder}.png`);
     return loadSkeletalModel(folder).then((m) => {
@@ -169,7 +171,7 @@ function fighterVictory(id) {
   function fighterAttack(attId, defId, techId, opts = {}) {
     const A = B$.extras.get(attId), D = B$.extras.get(defId);
     if (!A?.anim8r || !D?.anim8r) return false;
-    const { lethal = false, miss = false, ...hooks } = opts;
+    const { lethal = false, miss = false, ...hooks } = opts as AttackOptions;
     if (B$.sfx) { B$.sfx.stopBattle("player"); B$.sfx.stopBattle("enemy"); }
     B$.contactSoundType[A.side] = B$.contactSoundTypeFor(techId);
     B$.contactEvade[A.side] = miss;

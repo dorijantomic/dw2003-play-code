@@ -15,6 +15,7 @@ import * as uiC from "./ui-c/index.js";
 import { pickPauseScreen } from "./ui-c/screens.js";
 import { dimOf } from "./ui-c/geometry.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
+import type { StatusScreen, StatusTranslatedOpts } from "./types/status-translated.js";
 
 // The picture handles the pages ask for: the pause chrome, the shared item/icon
 // sheet, and the MAP page's own three sheets per server. A handle is
@@ -71,7 +72,7 @@ export function mapSeenReader(context) {
     return (flagId) => flags.has(flagId);
 }
 
-export function createStatusTranslated(sfx = null, opts = {}) {
+export function createStatusTranslated(sfx = null, opts: StatusTranslatedOpts = {}) {
     const st = {
         _open: false, _session: null, _state: null, _onClose: null, _clock: null, _error: null,
         _request: 0, _entry: null, _lastDiagnostic: null, _packed: {},
@@ -83,7 +84,7 @@ export function createStatusTranslated(sfx = null, opts = {}) {
         // web/pause-home.js for the evidence.
         _returnClose: null,
         _uiKey: `pause${++pauseCount}`,
-    };
+    } as StatusScreen;
     const renderer = createNativeScreenRenderer({ pack: "ststat", packs: PACKS }, packNameFor);
     const playPackedSound = (id) => {
         const key = id >>> 0;

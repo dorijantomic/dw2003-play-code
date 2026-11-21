@@ -16,6 +16,7 @@
 // data actually has; elements are the elements of the techniques the species owns.
 
 import { clipLabel } from "./fight/clip-names.js";
+import type { ExtraSpeciesCanon, ScriptOrigin } from "./types/anim-viewer-data.js";
 
 // The 14 technique groups of /home/dorij/scratch-research/tech-groups.md, keyed by the three data
 // columns that define them (type, clip, multi-hit), in the doc's own order, labelled in plain words.
@@ -85,7 +86,7 @@ export function buildModelIndex({ digimon, extraSpecies, extraCanon = null, mode
     ...(digimon?.digimon || []).map((d) => ({ ...d, _kind: "digimon" })),
     ...(extraSpecies?.digimon || []).map((d) => ({ ...d, _kind: "extra" })),
   ];
-  const canon = new Map((extraCanon?.species || []).map((s) => [s.name, s]));
+  const canon = new Map<string, ExtraSpeciesCanon>((extraCanon?.species || []).map((s) => [s.name, s]));
   const meta = extraSpecies?.meta || {};
   for (const s of species) {
     const folder = modelMap[canonicalName(s.name)] || null;
@@ -229,7 +230,7 @@ export function contractFor(index, folder, clip, side) {
 }
 
 /** A one-line, all-data description of the script the animator resolved. */
-export function describeScript(script, { folder, clip, donorRow = null, castBake = null } = {}) {
+export function describeScript(script, { folder, clip, donorRow = null, castBake = null }: ScriptOrigin = {}) {
   if (!script) return { kind: "none", text: "no script (the fighter idles)", donor: null };
   const donor = donorRow?.d ?? null;
   const method = donorRow?.m ?? null;

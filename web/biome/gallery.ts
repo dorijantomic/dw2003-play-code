@@ -11,6 +11,7 @@ import * as Shared from "./sharedtab.js";
 import * as Anime from "./anime.js";
 import * as Objects from "./objects.js";
 import { frameSphere } from "./detailframe.js";
+import type { BiomeGalleryState } from "./types.js";
 
 const W = 960, H = 720;
 const TABS = {
@@ -21,7 +22,7 @@ const TABS = {
   shared: { label: "Shared", entries: [...Shared.entries, ...Anime.entries("shared")], build: Shared.buildShared, fog: { color: 0xd6e8f5, density: 0.0055 }, sky: { zenith: 0x4f86e8, mid: 0x8dc2ff, horizon: 0xd6e8f5 }, view: [16, 2.5] },
   objects: { label: "Objects", entries: Objects.entries, build: null, fog: { color: 0xd6e8f5, density: 0.0055 }, sky: { zenith: 0x4f86e8, mid: 0x8dc2ff, horizon: 0xd6e8f5 }, view: [16, 2.5] },   // own TripoSR objects (grid only)
 };
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);   // by-id lookups of the gallery page's own elements
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: false });
 renderer.setPixelRatio(1); renderer.setSize(W, H); $("view").appendChild(renderer.domElement);
@@ -31,7 +32,7 @@ camera.position.set(0, 4, 13);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1.8, 0); controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.495; controls.update();
 
-const state = { tab: "forest", mode: "grid", page: 0, cat: "All", PAGE: 12, busy: false, spin: true, anime: false };   // anime = "Use anime set" (Biome mode, default OFF)
+const state = { tab: "forest", mode: "grid", page: 0, cat: "All", PAGE: 12, busy: false, spin: true, anime: false } as BiomeGalleryState;   // anime = "Use anime set" (Biome mode, default OFF)
 let animeInfo = null;
 let scene = new THREE.Scene(), biome = null, gridItems = [], frameNo = 0, gridFloor = null;
 const made = new Map();     // entry id -> { obj, stats, error }
@@ -114,15 +115,15 @@ function buildCats() {
   const sel = $("cat"), t = TABS[state.tab], cats = ["All", ...new Set(t.entries.map((e) => e.cat))];
   sel.innerHTML = cats.map((c) => `<option>${c}</option>`).join(""); sel.value = state.cat;
 }
-export async function setView(tab, mode) {
+export async function setView(tab?: string, mode?: string) {
   exitDetail();
   if (tab) { if (tab !== state.tab) { state.cat = "All"; state.page = 0; } state.tab = tab; }
   if (mode) state.mode = mode;
-  document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === state.tab));
-  document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === state.mode));
+  document.querySelectorAll("[data-tab]").forEach((b: any) => b.classList.toggle("on", b.dataset.tab === state.tab));
+  document.querySelectorAll("[data-mode]").forEach((b: any) => b.classList.toggle("on", b.dataset.mode === state.mode));
   const t = TABS[state.tab];
   if (!t.build) state.mode = "grid";   // tabs without a biome (Objects)
-  document.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === state.mode));
+  document.querySelectorAll("[data-mode]").forEach((b: any) => b.classList.toggle("on", b.dataset.mode === state.mode));
   buildCats();
   $("grid-ui").style.display = state.mode === "grid" ? "" : "none";
   $("anime-ui").style.display = state.mode === "biome" ? "" : "none"; $("anime").checked = state.anime;
@@ -132,10 +133,10 @@ export async function setView(tab, mode) {
   if (state.mode === "grid") await showGrid(); else await showBiome();
   log(`${state.tab}/${state.mode} built in ${Math.round(performance.now() - t0)} ms`);
 }
-document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.tab, null)));
-document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setView(null, b.dataset.mode)));
-$("anime").addEventListener("change", (ev) => { state.anime = ev.target.checked; setView(); });
-$("cat").addEventListener("change", (ev) => { state.cat = ev.target.value; state.page = 0; setView(); });
+document.querySelectorAll("[data-tab]").forEach((b: any) => b.addEventListener("click", () => setView(b.dataset.tab, null)));
+document.querySelectorAll("[data-mode]").forEach((b: any) => b.addEventListener("click", () => setView(null, b.dataset.mode)));
+$("anime").addEventListener("change", (ev: any) => { state.anime = ev.target.checked; setView(); });
+$("cat").addEventListener("change", (ev: any) => { state.cat = ev.target.value; state.page = 0; setView(); });
 $("prev").addEventListener("click", () => { state.page = Math.max(0, state.page - 1); setView(); });
 $("next").addEventListener("click", () => { state.page++; setView(); });
 

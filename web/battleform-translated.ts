@@ -13,6 +13,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
+import type { BattleFormSeed } from "./types/battleform-translated.js";
 
 // The panel's chrome is pack handle 0x00455000 (PGFGTC00) and its icons
 // 0x00286000 (CMFONT); the list model's marker strip is the same one the TECH
@@ -58,7 +59,7 @@ export function createBattleFormTranslated(sfx = null, options = {}) {
         queueLimit: 2,
 
         /** Open on one party member's four forms. */
-        seed: (r, seed = {}) => ({
+        seed: (r, seed: BattleFormSeed = {}) => ({
             activeIndex: Math.max(0, Math.min(2, Number(seed.activeIndex ?? 0) | 0)),
             slotIndex: Number(seed.slotIndex ?? 0) | 0,
             currentSpecies: Number(seed.currentSpecies ?? 1) & 0xffff,

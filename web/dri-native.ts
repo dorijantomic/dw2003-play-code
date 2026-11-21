@@ -40,6 +40,8 @@ import { RECORD_EQUIP_OFFSETS, encodeNativeScreenText } from "./native-screen.js
 import { baseStatsFor, CHARID_TO_DIGID } from "./party.js";
 import { ensureFormLedger } from "./dri-model.js";
 import { persistDriState } from "./dri.js";
+import type { GameState } from "./game/types.js";
+import type { DriHost } from "./types/dri-native.js";
 
 const MODULE_ID = "pro/stgdglab";
 const SAVE_CONTEXT = 0x80048d34;
@@ -85,7 +87,7 @@ function rosterSlotFor(charId) {
  *  take their slot list from here. */
 export function ownedSlots(state, { includeParty = false } = {}) {
     const mask = Number(state?.rosterOwned) || 0;
-    const slots = new Set();
+    const slots = new Set<number>();
     for (let s = 0; s < ROSTER_SLOTS; s++) if (mask & (1 << s)) slots.add(s);
     if (includeParty) {
         for (const charId of state?.party ?? []) {
@@ -99,7 +101,7 @@ export function ownedSlots(state, { includeParty = false } = {}) {
 /** The walker's stats object for a roster slot: the deployed party's live
  *  block, or the reserve store keyed by character id. Shared with web/game.js
  *  (the bank-0x70 case-7 level predicate, flag 0x7095). */
-export function slotStats(state, slot) {
+export function slotStats(state: GameState, slot) {
     const charId = ROSTER_SLOT_CHARIDS[slot];
     const pos = (state.party ?? []).indexOf(charId);
     if (pos === 0) return state.partnerStats ?? null;
@@ -136,7 +138,7 @@ export function createDriNative(sfx = null) {
         _onClose: null,
         _packed: {},
         _lastDiagnostic: null,
-    };
+    } as DriHost & { _begin?: () => void };
     loadTables().catch(() => {});
     const playPackedSound = (id) => {
         const key = id >>> 0;
@@ -236,11 +238,11 @@ export function createDriNative(sfx = null) {
         const owned = ownedSlots(state);
         const statBySlot = new Map();
         const equipBySlot = new Map();
-        for (const slot of owned) {
+        for (const slot of owned as number[]) {
             statBySlot.set(slot, slotStats(state, slot) ?? {});
             equipBySlot.set(slot, slotEquipment(state, slot) ?? {});
         }
-        for (const slot of owned) {
+        for (const slot of owned as number[]) {
             const stats = statBySlot.get(slot);
             const rec = ROSTER + slot * ROSTER_STRIDE;
             const form = read(rec + CURRENT_FORM, 4) >>> 0;
@@ -296,7 +298,7 @@ export function createDriNative(sfx = null) {
         for (const charId of Object.keys(state.reserveEquipment)) {
             if (party.includes(charId)) delete state.reserveEquipment[charId];
         }
-        for (const slot of owned) {
+        for (const slot of owned as number[]) {
             if (deployed.has(slot)) continue;
             const charId = ROSTER_SLOT_CHARIDS[slot];
             state.reserveStats[charId] = statBySlot.get(slot);

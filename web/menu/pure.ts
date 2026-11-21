@@ -1,6 +1,7 @@
 import { screenIdForStage, listScrollbarThumb } from "../vendor/engine.js";
 import { loadPack } from "../screenpack.js";
 import { MS } from "./state.js";
+import type { MapSeenRow, MenuState } from "./types.js";
 
 // Real top-menu strings (lang_file/dw2003/eng/esstatus.toml 6-11). CARD FOLDERS
 // is string 11, the 6th entry, gated by the card-game unlock. UNKNOWN U-04:
@@ -39,7 +40,7 @@ function demoSetupRowEnabled() {
 }
 
 /** The visible top menu. CARD FOLDERS appears only once the player has cards. */
-export function topItems(m) {
+export function topItems(m: MenuState) {
   const rows = m?.cardFolderUnlocked?.() ? [...TOP_ITEMS_BASE, CARD_FOLDERS] : TOP_ITEMS_BASE;
   // Deliberately NOT authentic — see DEMO_SETUP_TITLE above. Off unless opted in.
   return demoSetupRowEnabled() ? [...rows, DEMO_SETUP_LABEL] : rows;
@@ -89,7 +90,7 @@ export function visitedPs1Stages(state, ui = MS.UI, hasFlag = null) {
   const walker = ui?.screens?.map?.walker_map ?? {};
   const seen = new Set();
   if (hasFlag) {
-    for (const row of Object.values(walker)) {
+    for (const row of Object.values(walker) as MapSeenRow[]) {
       if (Number.isInteger(row?.ps1) && hasFlag(mapSeenFlag(row.ps1))) seen.add(row.ps1);
     }
   } else {

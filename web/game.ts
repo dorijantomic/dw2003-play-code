@@ -9,6 +9,7 @@ import { openDamageLab } from "./damage-lab.js"; // EXPERIMENT: F2 -> Extras -> 
 import { openReplay, replayPress, replayTake, replayOpen, replayView } from "./replay-theatre.js"; // EXPERIMENT: F2 -> Extras -> Replay theatre (new; off by default)
 import { areaOf } from "./fishing-extras.js"; // fishing: rare extra rewards on top of a won catch (data/authored/web/assets/data/fishing_extras.json)
 import { underwaterInfo } from "./fishing-underwater.js"; // fishing: a 3D underwater inset while the line is in the water (reads state.fishing only)
+import type { Closeable, DevBattleOptions, FieldMovieHost, TransitionQuadScreen } from "./types/u-core.js";
 
 import { installFxPanel, ambienceSceneState, isOpenAirMapName } from "./ambience.js";
 import { loadTileIndex } from "./map-tiles.js";
@@ -412,16 +413,16 @@ menu.onCardDeck = () => { state.menuOpen = false; cardDeck.open(backToCardFolder
 // Dev / test hooks (nothing in the game reads these): window.__fly.places() lists what the book shows, .go(id) flies there.
 window.__fly = { places: () => currentFlyPlaces(), copy: (id) => flyCopyFor({ maps: state.manifest?.maps ?? [], scenes: state.scenes, currentId: currentMap()?.id, id }), go: (id) => flyTo(id), free: () => flyFree(), unlocked: () => questDone(FLY_QUEST) };
 // Dev hook for the screenshot tools: open a book straight from the field, only while its dev switch is on.
-window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys));
-window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys));
+window.__openMapScreen = () => !!(state.started && !state.menuOpen && !books.isOpen() && books.open("mapscreen", null, state.keys as any));
+window.__openBook = (name) => !!(window.__fx?.[name] === true && state.started && !state.menuOpen && !books.isOpen() && books.open(name, null, state.keys as any));
 // East Sector - Duel Island, the card-duel venue (docs/research/story-
 // progression/GAME_WALKTHROUGH.md).
 Promise.all([loadCatalog(), loadStarter()]).then(() => { ensureStarterFolder(); persistCollection(); });
 battle.setFieldMovieHandoff(async () => {
     const handoff = battleHandoff(state.progressOrdinal);
     if (!handoff.movie) return; // not ordinal 43: straight to the battle
-    await new Promise((resolve) => {
-        S.fieldMovieDone = resolve;
+    await new Promise<void>((resolve) => {
+        (S as FieldMovieHost).fieldMovieDone = resolve;
         fieldMovie.open(handoff.selector).then((row) => {
             if (!row) { S.fieldMovieDone = null; resolve(); } // unknown code: never strand the fight
         });
@@ -757,7 +758,7 @@ window.__labClose = () => {
     state.endScreen = null;
     state.titleScreen = null;
     state.menuOpen = false;
-    if (textbox?.isOpen?.()) textbox.close?.();
+    if (textbox?.isOpen?.()) (textbox as Closeable).close?.();
     if (dialogueBox.isOpen()) dialogueBox.close();
     if (status?.isOpen?.()) status.close?.();
     for (const ui of [shop, driMenu, gym, cardShop, cardAlbum, cardDeck, cardDuel, saveScreen, fightReport, inn, cntyselNative]) {
@@ -894,7 +895,7 @@ window.__labOpen = (name, arg) => {
         // be seen — see stgmcard_ui.json transition.quad.unwired_note.
         case "savequad":
             openMemoryCard("save");
-            if (saveScreen.showTransitionQuad) saveScreen.showTransitionQuad(true);
+            if ((saveScreen as TransitionQuadScreen).showTransitionQuad) (saveScreen as TransitionQuadScreen).showTransitionQuad!(true);
             break;
         case "load": openMemoryCard("load"); break;
         case "shop": {
@@ -1188,7 +1189,7 @@ window.__variantsAt = (x = state.x, y = state.y, r = 40) => {
 // flag-DERIVED chapter. Updates the HUD selector to match.
 window.__setChapter = (n) => {
     state.chapter = n == null ? null : Number(n);
-    const sel = document.getElementById("chapterSelect");
+    const sel = document.getElementById("chapterSelect") as HTMLSelectElement;
     if (sel) sel.value = String(state.chapter);
     console.log(
         "chapter ->",
@@ -1292,7 +1293,7 @@ window.__dev = {
     },
     // Start a battle with any enemy id from data/enemies.json, through the SAME
     // battle.start the field handoff and the battle lab use.
-    startBattle: (opts = {}) => battle.start({
+    startBattle: (opts: DevBattleOptions = {}) => battle.start({
         enemyId: opts.enemyId,
         enemyLevel: opts.enemyLevel ?? 5,
         party: opts.party ?? null,
@@ -1303,13 +1304,13 @@ window.__dev = {
         onLose: opts.onLose ?? null,
     }),
     // Start a battle from a global scripted screen id (field_encounters.json).
-    startScreenBattle: (screenId, opts = {}) => battle.startScreen(
+    startScreenBattle: (screenId, opts: DevBattleOptions = {}) => battle.startScreen(
         Number(screenId), opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
         { mapId: opts.mapId ?? currentMap().id, lead: opts.lead ?? true },
     ),
     // Start a battle from a resolved party (the same startParty the field uses): entries are
     // {name, level, hp, mp, stat_scale, fuseInto?}. Used by the dev toolset's Fusion Lab boss list.
-    startPartyBattle: (party, opts = {}) => battle.startParty(
+    startPartyBattle: (party, opts: DevBattleOptions = {}) => battle.startParty(
         party, opts.onWin ?? null, opts.onFlee ?? null, opts.onLose ?? null,
         { mapId: opts.mapId ?? currentMap().id },
     ),

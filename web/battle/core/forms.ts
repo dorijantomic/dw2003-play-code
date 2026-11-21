@@ -6,9 +6,10 @@ import {
 } from "../../vendor/engine.js";
 import { ST } from "../messages.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeForms(B) {
+export function makeForms(B: BattleContext) {
 /**
    * The seed the translated Digivolve form list needs (web/battleform-translated.js,
    * engine FightFormSession).

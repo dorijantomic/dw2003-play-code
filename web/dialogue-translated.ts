@@ -13,6 +13,7 @@ import { composeTalk } from "./ui-c/message.js";
 import { packReady } from "./screenpack.js";
 import { loadDialogueFile, loadEsdmgEntry, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { DialogueScreen } from "./types/dialogue-translated.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -72,7 +73,7 @@ export function createDialogueTranslated(sfx = null) {
     const g = {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _clock: null,
         _key: `dialogue${++boxCount}`, _ticks: 0, _request: 0, _onClose: null, _latched: false, _primed: false, _onFail: null, _packed: {}, _prevHeld: false, _closes: 0, _sounds: [],
-    };
+    } as DialogueScreen;
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName, { paintRaw, opaqueClips: true });
 
     // Closed by the caller, the box disposes its session and still runs onClose, as web/dialogue.js
@@ -102,7 +103,13 @@ export function createDialogueTranslated(sfx = null) {
      * Open a box. `source`: { file: "estalk00", index } or { esdmg: "esdmg400", entry, index } (raw disc banks) or { pack: Uint8Array, index: 0 }.
      * `mode`: { kind: "talk", npc: {x,y,facing,actorId} } or { kind: "say", plain, balloonMode, actor: {x,y,actorId} }.
      */
-    g.open = async (source, mode, onClose = null, project = (x, y) => ({ sx: x, sy: y }), opts = {}) => {
+/** What the dialogue box is handed: what to call when the text fails, and the player's name (control operand 8). */
+interface DialogueOpenArgs {
+    onFail?: (...args: any[]) => void;
+    playerNameBytes?: ArrayLike<number> | null;
+}
+
+    g.open = async (source, mode, onClose = null, project = (x, y) => ({ sx: x, sy: y }), opts: DialogueOpenArgs = {} as DialogueOpenArgs) => {
         const request = host.begin({ onClose });
         g._failed = false;
         g._error = null;

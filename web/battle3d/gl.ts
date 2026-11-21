@@ -3,6 +3,7 @@ import { changeStageMeshMatrix } from "../vendor/engine.js";
 import { mat4Identity } from "../fight/proj-layers.js";
 import { TEXTURE_PAGE_TEXELS, normalize } from "./math.js";
 import { S } from "./state.js";
+import type { ArenaCullLog } from "./types.js";
 
 // A fighter's colour is its own texture's colour, and that is a decoded fact rather than a
 // default. The fight-scene draw that submits a fighter's triangles is
@@ -131,9 +132,9 @@ export function loadTexturePixels(url) {
     .then((blob) => createImageBitmap(blob))
     .then((bitmap) => {
       const { width, height } = bitmap;
-      const canvas = typeof OffscreenCanvas !== "undefined"
+      const canvas = (typeof OffscreenCanvas !== "undefined"
         ? new OffscreenCanvas(width, height)
-        : Object.assign(document.createElement("canvas"), { width, height });
+        : Object.assign(document.createElement("canvas"), { width, height })) as HTMLCanvasElement;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(bitmap, 0, 0);
       bitmap.close?.();
@@ -143,7 +144,7 @@ export function loadTexturePixels(url) {
     .catch(() => null);
 }
 
-export function loadTexture(gl, url, onLoad) {
+export function loadTexture(gl, url, onLoad?: any) {
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   // 1×1 transparent placeholder
@@ -152,7 +153,7 @@ export function loadTexture(gl, url, onLoad) {
   // Use fetch + createImageBitmap so this works on both regular and OffscreenCanvas GL contexts.
   fetchAsset(url)
     .then(r => {
-      if (!r.ok) throw new Error(r.status);
+      if (!r.ok) throw new Error(r.status as any);
       const hd = new URL(r.url, location.href).pathname.includes("/assets-hd/");
       return r.blob().then(blob => ({ blob, hd }));
     })
@@ -284,7 +285,7 @@ export function drawProjLayer(gl, prog, mvp, layer, tex, alpha = 1.0, tint = nul
   gl.drawArrays(gl.TRIANGLES, 0, layer.count);
 }
 
-export const arenaCullLog = { kept: 0, total: 0 };
+export const arenaCullLog = { kept: 0, total: 0 } as ArenaCullLog;
 
 export function setArenaCullSign(s) { S.arenaCullSign = s < 0 ? -1 : 1; return S.arenaCullSign; }
 

@@ -1,7 +1,9 @@
 import { renderPhraseNote, PHRASE_SAMPLE_RATE as SAMPLE_RATE } from "../vendor/engine.js";
+import type { AudioEngine } from "../types/audio.js";
+import type { PhraseVoice } from "./types.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makePlayback(P) {
+export function makePlayback(P: AudioEngine) {
 function loadPhraseTable() {
     if (!P.phraseTablePromise) {
       P.phraseTablePromise = fetch("sfx-voice/phrases.json")
@@ -113,7 +115,7 @@ function bufferFor(name, bank = null) {
         if (P.player.muted || audios.some((a) => !a)) return null;
         if (P.ctx.state === "suspended") P.ctx.resume().catch(() => {});
         const t0 = P.ctx.currentTime + P.PHRASE_LEAD_S;
-        const units = new Set();          // the voices this phrase still holds
+        const units = new Set<PhraseVoice>();          // the voices this phrase still holds
         const timers = [];
         const phraseGain = P.ctx.createGain();
         if (phraseGain.gain) phraseGain.gain.value = 1;

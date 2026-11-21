@@ -2,9 +2,16 @@
 // 'web/x.js' (also an absolute path or a file: URL) returns web/x.ts followed by every
 // .ts file under the folder web/x/ (where the split parts of x live), if they exist.
 // Anything that is not web game code (assets, lib3d, vendor, json, ...) is read as is.
+//
+// The .ts text is put through eraseTypes first: the code was JavaScript before it was given
+// types, and the tests were written against that JavaScript (function bodies, call order,
+// literal text). Erasing the types here means a test never has to know whether a parameter
+// grew a ": number" or a file grew an interface block.
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { eraseTypes } from "../../tools/rewrite/erase-types.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SKIP = new Set(["lib3d", "vendor", "node_modules"]);
@@ -33,10 +40,12 @@ export function readSource(path, encoding = "utf8") {
   }
   const ts = `${m[1]}.${m[2]}ts`;
   if (!existsSync(ts)) return readFileSync(abs, encoding);
-  const parts = [readFileSync(ts, encoding)];
+  // types out: what the tests knew as JavaScript
+  const erased = (file) => eraseTypes(readFileSync(file, "utf8"), file);
+  const parts = [erased(ts)];
   const dir = m[1];
   if (existsSync(dir) && lstatSync(dir).isDirectory()) {
-    for (const f of tsFiles(dir)) parts.push(readFileSync(f, encoding));
+    for (const f of tsFiles(dir)) parts.push(erased(f));
   }
   return parts.join("\n");
 }

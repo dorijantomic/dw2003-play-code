@@ -13,6 +13,7 @@
 import * as THREE from "./lib3d/three.module.js";
 import { OrbitControls } from "./lib3d/addons/OrbitControls.js";
 import GUI from "./lib3d/lil-gui.esm.js";
+import type { ArenaToolsEntry, ArenaToolsParams, ArenaUniform } from "./types/arena-viewer-tools.js";
 
 // ---------------------------------------------------------------- free camera
 export function createFreeCam({ r, canvas, init }) {
@@ -21,7 +22,7 @@ export function createFreeCam({ r, canvas, init }) {
   const c = init ? { eye: init.eye, look: init.look, up: init.up, fovRad: init.fovDeg * Math.PI / 180, aspect: init.aspect }
     : r.getCameraInfo()?.render;
   if (!c) return null;
-  const camera = new THREE.PerspectiveCamera(c.fovRad * 180 / Math.PI, c.aspect, 1, 60000);
+  const camera = new THREE.PerspectiveCamera(c.fovRad * 180 / Math.PI, c.aspect, 1, 60000) as any;   // vendored three (lib3d is outside the tsconfig): position/up/fov are attached at runtime
   camera.position.fromArray(c.eye);
   camera.up.fromArray(c.up);                       // OrbitControls orbits about camera.up (read in its constructor)
   const controls = new OrbitControls(camera, canvas);
@@ -114,7 +115,7 @@ export function createTuner(opts) {
   gui.close();
   const entries = [];   // { id, folder, name, kind, targets: [uniform objects], start, ctl, live, mats: [names] }
   let ready = false, live = null;
-  const params = {};
+  const params = {} as ArenaToolsParams;
 
   function collect() {
     const shared = new Set([...Object.values(S.U), ...Object.values(S.SKY_U)]);
@@ -133,7 +134,7 @@ export function createTuner(opts) {
       for (const m of [].concat(o.material)) {
         if (!m.uniforms) continue;
         const label = o.name || m.name || o.userData.kind;
-        for (const [n, u] of Object.entries(m.uniforms)) {
+        for (const [n, u] of Object.entries(m.uniforms as Record<string, ArenaUniform>)) {
           if (shared.has(u) || SKIP.has(n) || !kindOf(u.value)) continue;
           // water.js gives the sea AND the sand the same shore uniforms (one waterline, one swash): one control
           const f = opts.shoreNames?.has(n) && (folder === "Water" || folder === "Sand") ? "Water" : folder;
@@ -142,12 +143,12 @@ export function createTuner(opts) {
         seenMat.add(m);
       }
     });
-    for (const m of post?.materials || []) for (const [n, u] of Object.entries(m.uniforms || {}))
+    for (const m of post?.materials || []) for (const [n, u] of Object.entries((m.uniforms || {}) as Record<string, ArenaUniform>))
       if (!SKIP.has(n) && kindOf(u.value) && !/^t[A-Z]/.test(n)) addOwn("Colour pass", n, u, "post");
     const out = [];
     // shared: Light, Wind, Sky / clouds (only the ones some built material really uses)
-    const used = new Set();
-    built.scene.traverse((o) => { for (const m of [].concat(o.material || [])) for (const u of Object.values(m.uniforms || {})) if (shared.has(u)) used.add(u); });
+    const used = new Set<ArenaUniform>();
+    built.scene.traverse((o) => { for (const m of [].concat(o.material || [])) for (const u of Object.values((m.uniforms || {}) as Record<string, ArenaUniform>)) if (shared.has(u)) used.add(u); });
     for (const u of used) {
       const n = sharedName.get(u);
       if (SKIP.has(n) || !kindOf(u.value)) continue;
@@ -164,13 +165,13 @@ export function createTuner(opts) {
     return out;
   }
 
-  function write(e, v) {
+  function write(e: ArenaToolsEntry, v) {
     for (const u of e.targets) {
       if (e.kind === "num") u.value = v; else u.value.copy(v);
     }
   }
-  function current(e) { return e.targets[0].value; }
-  function showFrom(e) {   // the control's displayed value from the uniform
+  function current(e: ArenaToolsEntry) { return e.targets[0].value; }
+  function showFrom(e: ArenaToolsEntry) {   // the control's displayed value from the uniform
     const v = current(e);
     if (e.kind === "num") params[e.id] = v;
     else if (e.kind === "col") params[e.id] = "#" + v.getHexString();
@@ -197,7 +198,7 @@ export function createTuner(opts) {
     for (const it of list) {
       let id = `${it.folder}/${it.mats.join("+")}/${it.name}`;
       for (let k = 2; entries.some((x) => x.id === id); k++) id = `${it.folder}/${it.mats.join("+")}#${k}/${it.name}`;
-      const e = { ...it, kind: kindOf(it.targets[0].value), id };
+      const e = { ...it, kind: kindOf(it.targets[0].value), id } as ArenaToolsEntry;
       e.dir = DIRS.has(e.name) && e.kind === "vec" && e.targets[0].value.isVector3;
       e.start = snap(current(e));
       showFrom(e);

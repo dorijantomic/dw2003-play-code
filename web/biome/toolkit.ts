@@ -14,6 +14,7 @@
 //   GpuTimer       EXT_disjoint_timer_query_webgl2 ring; falls back to CPU submit time when unavailable.
 import * as THREE from "three";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
+import type { GroundOpts, LODLevel, ScatterOpts, SkyOpts, ToonMatParams, ToonOpts } from "./types.js";
 
 export { THREE };
 
@@ -79,7 +80,7 @@ vec3 bGrade(vec3 c, float sat, float post){
  * opts: { wind: 0..1 amplitude as fraction of height, height (m), flutter 0..1, fade: [near, far] or null, grade: {sat, post}|null,
  *         tint: [r,g,b] multiplier on albedo, trans: 0..1 backlit translucency, shadeK (0.55..1), emissive: [r,g,b] added after light }
  */
-export function toonify(mat, opts = {}) {
+export function toonify(mat: any, opts: ToonOpts = {}) {
   const o = Object.assign({ wind: 0, height: 1, flutter: 0, fade: null, grade: null, tint: null, trans: 0, shadeK: 0.72, emissive: null, rim: 0.28, hang: 0, moss: 0 }, opts);
   mat.userData.toon = o;
   mat.onBeforeCompile = (sh) => {
@@ -158,7 +159,7 @@ ${GLSL_GRADE}`)
   return mat;
 }
 /** plain toon material from colour/map */
-export function toonMat(o = {}, t = {}) {
+export function toonMat(o: ToonMatParams = {}, t: ToonOpts = {}) {
   const m = new THREE.MeshLambertMaterial(o);
   if (o.alphaTest) { m.alphaToCoverage = true; }
   return toonify(m, t);
@@ -207,7 +208,7 @@ export function composeTRS(out, i, x, y, z, yaw, sc, tilt = 0, tiltDir = 0, sy =
  * scatter: returns Float32Array of n matrices. area = [cx, cz, halfW, halfD]; density(x,z) -> 0..1 (rejection);
  * ok(x,z) optional hard filter. opts: scale [min,max], tilt (rad), yOffset, sink.
  */
-export function scatter(n, seed, area, density, opts = {}) {
+export function scatter(n, seed, area, density, opts: ScatterOpts = {}) {
   const r = rng(seed), [cx, cz, hw, hd] = area, out = new Float32Array(n * 16), pos = [];
   const sc = opts.scale || [0.9, 1.2], tilt = opts.tilt || 0;
   let i = 0, tries = 0;
@@ -239,6 +240,14 @@ export function instancedParts(parts, mats, count, name = "") {
  * Cell test is conservative (sphere = cell box + biggest instance radius). Runs only when the camera moved/turned.
  */
 export class CullSet {
+  declare _fov: any;
+  declare _fr: any;
+  declare _m: any;
+  declare _p: any;
+  declare _q: any;
+  declare _s: any;
+  declare items: any[];
+  declare stats: { total: number; drawn: number; };
   constructor() { this.items = []; this._p = new THREE.Vector3(1e9, 0, 0); this._q = new THREE.Quaternion(); this._fr = new THREE.Frustum(); this._m = new THREE.Matrix4(); this._s = new THREE.Sphere(); this._fov = 0; this.stats = { total: 0, drawn: 0 }; }
   add(parts, mats, count, name = "", cell = 16) {
     let md = 0, gr = 0;
@@ -295,7 +304,16 @@ export class CullSet {
  * All instances share the matrices in `mats`. update(camera) re-bins; call every few frames.
  */
 export class LODSpecies {
-  constructor(name, levels, mats, count, dist) {
+  declare _last: any;
+  declare _pos: Float32Array<ArrayBuffer>;
+  declare dist: any;
+  declare group: any;
+  declare idx: any;
+  declare levels: any;
+  declare mats: any;
+  declare n: any;
+  declare name: any;
+  constructor(name, levels: LODLevel[], mats, count, dist) {
     this.name = name; this.mats = mats; this.n = count; this.dist = dist; this.group = new THREE.Group(); this.group.name = name;
     this.levels = levels.map((lv) => {
       const meshes = (lv.parts || []).map((p) => { const im = new THREE.InstancedMesh(p.geo, p.mat, count); im.frustumCulled = false; im.count = 0; this.group.add(im); return im; });
@@ -375,7 +393,7 @@ uniform vec3 uCam; uniform vec4 uQ;`)
 }
 
 // ------------------------------------------------------------------ ground splat
-export function groundMaterial(texs, o = {}) {
+export function groundMaterial(texs, o: GroundOpts = {}) {
   const noise = noiseTexture();
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
   m.userData.tag = "ground";
@@ -417,7 +435,7 @@ vec3 bGrade(vec3 c, float sat, float post){`)
 }
 
 // ------------------------------------------------------------------ sky
-export function skyMaterial(o = {}) {
+export function skyMaterial(o: SkyOpts = {}) {
   const cols = { zenith: new THREE.Color(o.zenith ?? 0x4f86e8), mid: new THREE.Color(o.mid ?? 0x8dc2ff), horizon: new THREE.Color(o.horizon ?? 0xd9ecff), sun: new THREE.Color(1.0, 0.95, 0.8) };
   const m = new THREE.ShaderMaterial({
     side: o.side ?? THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
@@ -463,6 +481,14 @@ export function skyDome(o = {}) {
 
 // ------------------------------------------------------------------ GPU timer
 export class GpuTimer {
+  declare active: any;
+  declare cpu: any[];
+  declare ext: any;
+  declare gl: any;
+  declare ms: any[];
+  declare pending: any;
+  declare supported: boolean;
+  declare t0: number;
   constructor(renderer) {
     this.gl = renderer.getContext(); this.ext = this.gl.getExtension("EXT_disjoint_timer_query_webgl2");
     this.ms = []; this.cpu = []; this.pending = null; this.active = null; this.supported = !!this.ext;

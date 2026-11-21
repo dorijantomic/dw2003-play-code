@@ -9,6 +9,7 @@
 //
 // web/glossary-digimon.js reads these rows; the future glossary ITEMS page reads the drop index.
 // The odds are the disc's, not a percentage: a rate byte of 128 means 129 in 1024 per win.
+import type { CodexRow, CodexSkill, StageEncounters } from "./types/codex-data.js";
 
 const DISC_LAST_ID = 55;          // digimon.json ships ids 1..55; extra_species.json starts at 56
 const ELEMENTS = ["fire", "water", "ice", "wind", "thunder", "machine", "dark"];
@@ -26,7 +27,7 @@ const pick = (source, keys) =>
 export function partnerRows(digimon, skills) {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   const skillList = Array.isArray(skills) ? skills : Array.isArray(digimon) ? [] : digimon?.skills ?? [];
-  const skillById = new Map(skillList.map((s) => [s.id, s]));
+  const skillById = new Map<number, CodexSkill>(skillList.map((s) => [s.id, s]));
   const nameById = new Map(profiles.map((p) => [p.id, p.name]));
   return profiles.map((p) => {
     const skill = skillById.get(p.tech_signature) ?? null;
@@ -136,14 +137,14 @@ function actionText(action, row) {
  * array (or the whole object) and resolves attack / move_1 / move_2 names; `models`
  * is model_map.json (species -> model folder). Pure.
  */
-export function wildRows(enemies, skills = [], models = null) {
+export function wildRows(enemies, skills: CodexSkill[] | Map<number, CodexSkill> | { skills?: CodexSkill[] } = [], models = null) {
   const list = Array.isArray(enemies) ? enemies : enemies?.enemies ?? [];
   const skillList = Array.isArray(skills)
     ? skills
     : skills instanceof Map
       ? [...skills.values()]
       : skills?.skills ?? [];
-  const skillById = new Map(skillList.map((s) => [s.id, s]));
+  const skillById = new Map<number, CodexSkill>(skillList.map((s) => [s.id, s]));
   const modelMap = models && typeof models === "object" ? models : null;
   const skill = (id) => {
     const n = Number(id) || 0;
@@ -167,7 +168,7 @@ export function wildRows(enemies, skills = [], models = null) {
       move2: skill(e.move_2),
       drop: e.drop_item ?? "Null",
       dropRate: Number(e.drop_rate) || 0,
-    };
+    } as CodexRow;
     row.aiRows = (Array.isArray(e.ai_moves) ? e.ai_moves : []).slice(0, 4).map((a, i) => {
       const action = Number(a?.action) || 0;
       const comparator = Number(a?.comparator) || 0;
@@ -238,7 +239,7 @@ export function encounterIndex(stages, screens, maps = null) {
   );
   const rows = [];
   const bySpecies = new Map();
-  for (const [key, stage] of Object.entries(stageTable)) {
+  for (const [key, stage] of Object.entries(stageTable as Record<string, StageEncounters>)) {
     const zones = Array.isArray(stage?.zones) ? stage.zones : null;
     const stageNo = Number(key);
     if (!zones || !Number.isFinite(stageNo)) continue;

@@ -200,7 +200,7 @@ function prepareEffects(stageId, view = null) {
     // record's position itself, so the draw position comes from the actor's own
     // write and not from the table. Every other arm leaves the record where the
     // disc put it, which is why the position patch is optional.
-    for (const [key, patch] of Object.entries(actorPositions[stageId] ?? {})) {
+    for (const [key, patch] of Object.entries(actorPositions[stageId] ?? {}) as [string, ActorPositionPatch][]) {
         const idx = Number(key);
         if (!s.records[idx]) continue;
         rt[idx].x = patch.x;
@@ -460,4 +460,10 @@ export function drawNativeIntents(ctx, stageId, camX, camY, drawables) {
             });
         }
     }
+}
+
+// One actor position the record-table patch writes: the point-record index it moves to.
+interface ActorPositionPatch {
+  x?: any;
+  y?: any;
 }

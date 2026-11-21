@@ -13,6 +13,7 @@ import {
   FACE_BOX_LAYER_KEY, FACE_BOX_TICK, FACE_BOX_WORKER_SIZE,
   faceBoxShotFromRows, faceBoxShotRead, faceBoxLookAt, faceBoxTick, faceBoxSpawn,
 } from "../vendor/engine.js";
+import type { ShotNode } from "./types.js";
 
 // camera_view_matrix ledger: F0x8002a1ac builds a STANDARD look-at view matrix (data-confirmed
 // to ~0.3 deg), with the eye/target/H living in the live cam struct D0x800a46d8. buildView here
@@ -325,7 +326,7 @@ export { faceBoxTick as faceBoxWorkerTick, faceBoxSpawn as faceBoxWorkerSpawn,
  */
 export function faceBoxScene({ backdropOnly = false, draws = true } = {}) {
   if (!draws) return [];
-  const scene = [{
+  const scene: ShotNode[] = [{
     what: "sky", mvp: "identity",
     tex: backdropOnly ? "void" : "sky",
     tint: backdropOnly ? [0, 0, 0, 1] : [1, 1, 1, 1],
@@ -447,7 +448,7 @@ export function rollRadians(rollDeg) {
  */
 export function composeShot(fields) {
   const anchor = [fields[6], fields[7], fields[8]];
-  const angles = [s16(fields[9]), s16(fields[10]), s16(fields[11])];
+  const angles = [s16(fields[9]), s16(fields[10]), s16(fields[11])] as [number, number, number];
   // W = T(anchor) . R(angles) is the shot's own coordinate frame; eye/target are stated inside
   // it. R is the identity for a shot that authors no angles, so this reduces to the anchor add.
   const R = (angles[0] || angles[1] || angles[2]) ? rotMatrixYXZ(...angles) : null;

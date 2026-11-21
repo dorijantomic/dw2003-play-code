@@ -13,6 +13,7 @@
 import * as THREE from "../lib3d/three.module.js";
 import { ConvexGeometry } from "../lib3d/addons/ConvexGeometry.js";
 import * as S from "./shared.js";
+import type { BuiltBoulderOut } from "./types.js";
 
 export const BOULDERS = {
   // USER (2026-10-30, comparing with the real game): "a stacked pile of brown/pink cobbles with dark cracks between the
@@ -118,8 +119,8 @@ function pilesGeometry(THREE_, pieces, cols) {
       const v = new THREE.Vector3(), nm = new THREE.Vector3();
       const invT = new THREE.Matrix3().getNormalMatrix(M4);
       for (let i = 0; i < src.length; i += 3) {
-        v.fromArray(src, i).applyMatrix4(M4); v.toArray(P, i);
-        nm.fromArray(nsrc, i).applyMatrix3(invT).normalize().toArray(N, i);
+        v.fromArray(src, i).applyMatrix4(M4); v.toArray(P as unknown as number[], i);
+        nm.fromArray(nsrc, i).applyMatrix3(invT).normalize().toArray(N as unknown as number[], i);
         for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], P[i + a]); hi[a] = Math.max(hi[a], P[i + a]); }
       }
       tris += src.length / 9;
@@ -241,7 +242,7 @@ export function buildBoulders(slot, env) {
   const t0 = performance.now();
   // the piece's own measured colours (p10 = crevice, median, p90 = lit face); the recipe reads them from the arena
   const lin = (c) => SH.srgb(c);
-  const out = { pieces: [], piles: [], tris: 0, meshes: 1, drawCalls: 1, buildMs: 0 };
+  const out = { pieces: [], piles: [], tris: 0, meshes: 1, drawCalls: 1, buildMs: 0 } as BuiltBoulderOut;
   let geo = null, mat = null;
   const meshes = [];
   for (const p of pieces) {

@@ -10,9 +10,10 @@ import {
 import { effectiveSpd } from "../plans.js";
 import { applyGiantScales, giantModeOn, battleKindOf } from "../form-blast.js";
 import { MSG_KIND, ST } from "../messages.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeFinale(B) {
+export function makeFinale(B: BattleContext) {
 /**
    * Run one beat of the finale's scripted sequence (FINALE_TAIL_DEFEAT_BEATS).
    *

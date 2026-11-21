@@ -12,6 +12,7 @@ import {
   k16tr,
 } from "./k16-rig.js";
 import { k23Cloud, k23NeutralFrame } from "./world.js";
+import type { RetargetBake } from "./types.js";
 
 /**
  * The retarget entry point. Candidates, best first:
@@ -27,7 +28,7 @@ export function bakeRetarget(target, source, clip, { offset = 6000, mirror = nul
   // A/B switch used by the K16 measurements (tools/check_cast_contract.mjs --geometry) and nothing else:
   // it reproduces the pre-K16 bake without touching any other module.
   if (typeof process !== "undefined" && process.env?.K16_MODE === "geometry") {
-    const g = bakeRetargetGeometry(target, source, clip, { offset });
+    const g: RetargetBake = bakeRetargetGeometry(target, source, clip, { offset });
     if (g) { g.source = source; g.method = "geometry"; }
     return g;
   }

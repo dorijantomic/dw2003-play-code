@@ -95,6 +95,15 @@ function evict() {
 }
 
 export class TiledMap {
+  declare gutter: any;
+  declare h: number;
+  declare info: any;
+  declare name: any;
+  declare scale: any;
+  declare skip: Set<unknown>;
+  declare splitMask: any;
+  declare tile: any;
+  declare w: number;
   constructor(name, info, tile, gutter, scale) {
     this.name = name;
     this.info = info;

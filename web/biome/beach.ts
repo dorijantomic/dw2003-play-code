@@ -6,6 +6,7 @@ import { loadToon, partsGroup, loadTex } from "./loader.js";
 import * as P from "./procedural.js";
 import * as B from "./beachproc.js";
 import { q, ph, proc, texDisc, ASSETS } from "./forest.js";
+import type { ScatterOpts, SpeciesAddOpts } from "./types.js";
 
 const { beachH, shoreZ, POOLS, vnoise, sstep } = B;
 const PS = "Poly Haven (decimated, 1K albedo)", CC0 = "CC0 1.0", OWN = "Procedural (our code)";
@@ -16,7 +17,7 @@ const sandMat = async (o) => { const t = await beachTex(); return B.beachGround(
 const SAND_TINT = [1.9, 1.6, 0.8];     // green grass -> dry sand-yellow dune grass
 
 // ------------------------------------------------------------------ terrain tiles + shore groups (real world coordinates, so the shader shore law applies)
-function tile(mat, x0, x1, z0, z1, cell, extra) {
+function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => number) {
   const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, Math.max(2, Math.round(w / cell)), Math.max(2, Math.round(d / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.attributes.position;
@@ -193,7 +194,7 @@ function dart(n, seed, minD, ok, xr = [-HALF, HALF], zr = [-12, 120]) {
   return out;
 }
 /** seeded rejection scatter on beachH. prob(x,z) -> 0..1. o: scale [a,b], y offset, tilt (random up to), tiltFix (always), sy (vertical stretch) */
-function bscatter(n, seed, area, prob, o = {}) {
+function bscatter(n, seed, area, prob, o: ScatterOpts = {}) {
   const r = rng(seed), [cx, cz, hw, hd] = area, out = new Float32Array(n * 16), sc = o.scale || [0.9, 1.2]; let i = 0, tries = 0;
   while (i < n && tries++ < n * 80) {
     const x = cx + (r() * 2 - 1) * hw, z = cz + (r() * 2 - 1) * hd; if (r() > prob(x, z)) continue;
@@ -226,7 +227,7 @@ export async function buildBeach(ctx) {
   note("tide pool water", POOLS.length, null);
 
   // ---- helpers for instanced species
-  const add = (name, parts, n, prob, o = {}) => {
+  const add = (name, parts, n, prob, o: SpeciesAddOpts = {}) => {
     const s = bscatter(n, name.length * 31 + n, o.area || [0, 55, HALF, 68], (x, z) => (nearPool(x, z) ? 0 : prob(x, z)), o);
     const g = o.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name); g.name = name; root.add(g); note(name, s.count, parts);
     if (o.colors) for (const im of g.children) { const r = rng(5); for (let i = 0; i < s.count; i++) im.setColorAt(i, o.colors[Math.floor(r() * o.colors.length)]); im.instanceColor.needsUpdate = true; }
@@ -241,9 +242,9 @@ export async function buildBeach(ctx) {
   const H = (id, t) => loadToon(`${ASSETS}polyhaven/${id}.glb`, { fade: FD, ...t });
 
   // ---- palms (hero palms near the start view + dart-thrown groves), LOD0 / LOD1 / impostor
-  const hero = [[-9, 4, "coconut", 1], [6, 8, "curved", 1], [14, 3, "young", 1], [-17, 10, "fan", 1], [2, 14, "coconut", 2], [-4, 21, "curved", 2], [22, 15, "coconut", 1], [-26, 6, "fan", 2], [30, 24, "young", 1]];
+  const hero: [number, number, string, number][] = [[-9, 4, "coconut", 1], [6, 8, "curved", 1], [14, 3, "young", 1], [-17, 10, "fan", 1], [2, 14, "coconut", 2], [-4, 21, "curved", 2], [22, 15, "coconut", 1], [-26, 6, "fan", 2], [30, 24, "young", 1]];
   const grove = dart(N(64), 21, 5.5, (x, z) => { const d = D(x, z); return d > 9 && d < 58 && vnoise(x, z, 0.035, 1) > 0.3 && !nearPool(x, z) && !hero.some((h) => Math.hypot(h[0] - x, h[1] - z) < 6); });
-  const kinds = [["coconut", 1, 3], ["coconut", 2, 2], ["curved", 1, 1], ["curved", 2, 1], ["young", 1, 2], ["fan", 1, 1], ["fan", 2, 1]], tot = kinds.reduce((a, k) => a + k[2], 0);
+  const kinds: [string, number, number][] = [["coconut", 1, 3], ["coconut", 2, 2], ["curved", 1, 1], ["curved", 2, 1], ["young", 1, 2], ["fan", 1, 1], ["fan", 2, 1]], tot = kinds.reduce((a, k) => a + k[2], 0);
   for (const [kind, seed, w] of kinds) {
     const pos = hero.filter((h) => h[2] === kind && h[3] === seed).map((h) => [h[0], h[1]]);
     grove.forEach((p, i) => { let a = i % tot, ki = 0; for (let k = 0; k < kinds.length; k++) { if (a < kinds[k][2]) { ki = k; break; } a -= kinds[k][2]; } if (kinds[ki][0] === kind && kinds[ki][1] === seed) pos.push(p); });
@@ -264,7 +265,7 @@ export async function buildBeach(ctx) {
   }
 
   // ---- big rock platforms, cliffs, sea stacks (single meshes)
-  const big = async (id, h, x, z, yaw, o = {}) => {
+  const big = async (id, h, x, z, yaw, o: { y?: number } = {}) => {
     const t = await loadToon(`${ASSETS}polyhaven/${id}.glb`, { h, grade: true, ...o }), g = partsGroup(t.parts);
     g.position.set(x, beachH(x, z) + (o.y || -0.3), z); g.rotation.y = yaw; root.add(g); note(id, 1, t.parts);
   };

@@ -89,7 +89,7 @@ export function buildUi() {
 
 const hue = (s) => { let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) >>> 0; return x % 360; };
 
-export const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+export const mk = (tag, cls?: any, text?: any) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 function makeCard(key, foe, small = false) {
     const root = mk("div", (small ? "plate " : "card ") + (foe ? "foe" : ""));

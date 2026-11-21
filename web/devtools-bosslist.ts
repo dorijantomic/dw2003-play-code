@@ -23,11 +23,13 @@
 //                      one speaker besides the player speaks in that cutscene;
 //                      otherwise the speakers are kept as `speakers` and the
 //                      opponent stays "unknown". No name is ever invented.
+import type { BossListRow, ScriptedStage } from "./types/devtools-bosslist.js";
+import type { StageEncoding } from "./types/codex-data.js";
 
 export const UNKNOWN = "unknown";
 
 // Nonzero slots of zone block 3 for every stage and group: Map<screenId, string[] stageKeys>.
-export function scriptedScreensByStage(stageEnc) {
+export function scriptedScreensByStage(stageEnc: StageEncoding) {
   const out = new Map();
   for (const [key, stage] of Object.entries(stageEnc?.stages ?? {})) {
     const groups = stage.groups;
@@ -59,7 +61,7 @@ export function speakersOf(entry) {
 
 // Which esdmg files the builder needs: the distinct `esdmg_stage` of every event that
 // is the PRE of a battle candidate. The page fetches exactly these.
-export function esdmgStagesNeeded(scripted) {
+export function esdmgStagesNeeded(scripted: Record<string, ScriptedStage>) {
   const need = new Set();
   for (const v of Object.values(scripted ?? {})) {
     for (const c of v.battle_candidates ?? []) {
@@ -71,7 +73,7 @@ export function esdmgStagesNeeded(scripted) {
 }
 
 // Opponent info per screen id: Map<screenId, { names: string[], speakers: string[] }>.
-function opponentsByScreen(scripted, esdmgByStage) {
+function opponentsByScreen(scripted: Record<string, ScriptedStage>, esdmgByStage) {
   const out = new Map();
   for (const v of Object.values(scripted ?? {})) {
     for (const c of v.battle_candidates ?? []) {
@@ -111,7 +113,7 @@ export function buildBossList({ stageEnc, fieldEnc, scripted, esdmgByStage, mani
       speakers: opp ? opp.speakers : [],
       places: stageKeys.map((k) => ({ mapId: `s${k}`, mapName: mapName(k) })),
       party: party.map((p) => ({ name: p.name, level: p.level })),
-    };
+    } as BossListRow;
     row.text = rowText(row);
     rows.push(row);
   }

@@ -10,6 +10,7 @@ import {
 import { battleRestoreTargets, clearActionAffinity } from "./restore.js";
 import { applyCategory5Plan } from "./status.js";
 import { effStats } from "./hit-results.js";
+import type { ScriptedPlanOptions } from "./core/types.js";
 
 /**
  * THE WHOLE CATEGORY-5 FAMILY — one call per technique, both sides of a battle.
@@ -94,7 +95,7 @@ import { effStats } from "./hit-results.js";
  * `null` means "this technique is not a category-5 member", so a caller can use it as the
  * gate the way `battleRestorePlanFor` is used for category 4.
  */
-export function battleScriptedPlanFor(b, side, record, techniqueId, options = {}) {
+export function battleScriptedPlanFor(b, side, record, techniqueId, options: ScriptedPlanOptions = {}) {
   const id = techniqueId | 0;
   if ((record?.category | 0) !== 5) return null;
   const arm = damageTermCategory5Arm(id);

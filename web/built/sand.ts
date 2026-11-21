@@ -49,6 +49,7 @@
 //   WET_BAND 900 (no longer read: the damp strip is water.js WATER.DAMP, one source), WET_DARK 0.55, WET_SAT 1.15 (the wet colour: darker and more saturated), FILM_FADE 120
 //   (3 cm: the film's front), FILM_BED 0.75, FOAM_K 0.85, UP 0.45 (the Oren-Nayar squash of the normal's y).
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltSandInfo } from "./types.js";
 import * as S from "./shared.js";
 import { shoreField, shoreUniforms, SHORE_GLSL, WATER_BODY_GLSL, anchors, WATER } from "./water.js";
 
@@ -356,7 +357,7 @@ export function rowValue(rows, row, get) {
 /** Build the sand and shore meshes. Returns { meshes, ground, shore, update, info }. */
 /** ASSET: the sand + shore surfaces from the slot's data (web/built/place/sand.js): one mesh per piece, named as the
  *  piece, the sand shader (shared waterline + water anchors) or the shore band's measured rows. */
-export function buildSand(slot, { materials = [], info = {} } = {}) {
+export function buildSand(slot, { materials = [], info = {} as BuiltSandInfo } = {}) {
   const t0 = performance.now();
   const meshes = [], shore = [];
   const { pieces, field, anchors: A, sandHi } = slot.data;

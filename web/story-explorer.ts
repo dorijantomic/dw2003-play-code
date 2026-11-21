@@ -16,8 +16,9 @@
 import { gateWords, liveStateIndex, stageCensus, hiddenRows } from "./gate-text.js";
 import { createFlagStore } from "./flag-store.js";
 import { deriveChapter, flagConditionPasses } from "./vendor/engine.js";
+import type { StoryExplorerOpts } from "./types/story-explorer.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 
 // ── localStorage: read-only, and only where the game keeps saves ────────────────────────────
 const storage = (() => {
@@ -118,7 +119,7 @@ let store = null;
 
 /** A fresh tri-state reader whenever a manual box changes; blank boxes stay unmodelled (null). */
 function rebuildStore() {
-  const opts = { rosterTable: rosterByKey };
+  const opts = { rosterTable: rosterByKey } as StoryExplorerOpts;
   const beat = readNumber($("beat"));
   if (beat != null) opts.getOrdinal = () => beat;
   const charisma = readNumber($("charisma"));
@@ -190,7 +191,7 @@ async function fillLine(node, ref) {
 }
 
 // ── rendering ──────────────────────────────────────────────────────────────────────────────
-function el(tag, className, text) {
+function el(tag: string, className?: string, text?: any): any {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
@@ -458,7 +459,7 @@ function renderBeats() {
   const box = $("beats");
   box.replaceChildren();
   const byOrdinal = new Map();
-  for (const [stage, ordinals] of Object.entries(progressOrdinal?.by_stage ?? {})) {
+  for (const [stage, ordinals] of Object.entries(progressOrdinal?.by_stage ?? {}) as [string, number[]][]) {
     for (const n of ordinals) {
       if (!byOrdinal.has(n)) byOrdinal.set(n, []);
       byOrdinal.get(n).push(`s${stage}`);

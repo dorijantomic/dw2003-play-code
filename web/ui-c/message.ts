@@ -7,6 +7,7 @@ import { applyRel } from "./geometry.js";
 import { N, ID, MSG, textPart, plate, rule, tabPlate, moreArrow, messageBand, bandLine, balloonPart } from "./base.js";
 import { clipRect, restOfRuns } from "./generic.js";
 import { isCursorToken } from "./icons.js";
+import type { PlaceCardScene, TalkOpts } from "./types.js";
 
 /** The four tail clips (one per balloon quadrant): which edge of the body they hang from and on which side their tip lies. */
 export const TAILS = Object.freeze({
@@ -75,7 +76,7 @@ function pushName(key, text, tab, rel, out) {
  * web/textbox.js). `opt` = { lines: the opening animation's outline lines [{ points }], body: a balloon rect when there are no piece clips,
  * name: the speaker's name when it is not a kind 2 run (null = none) }.
  */
-export function composeTalk({ parts, runs }, opt = {}) {
+export function composeTalk({ parts, runs }, opt: TalkOpts = {}) {
     const out = [], used = new Set();
     // the opening: the game grows outline boxes from the speaker to the balloon (raw line primitives) -- drawn as 1 native C edge lines
     (opt.lines ?? []).forEach((l, i) => {
@@ -189,7 +190,7 @@ export function placeCardBars(quads, out = []) {
  * (the translated card's widgets) or the names the plain-string card hands over; the upper one is the area (Russo 32 / 44), the lower
  * the place (Russo 44 / 58). The slit is the scope's clip (index.js), not a part.
  */
-export function composePlaceCard({ runs }, scene = {}) {
+export function composePlaceCard({ runs }, scene: PlaceCardScene = {}) {
     const out = placeCardBars(scene.quads ?? []);
     const plates = (scene.quads ?? []).filter((q) => q.w > 0 && q.h >= 10 && q.w < 300);
     const names = (scene.names ?? runs ?? []).filter((n) => n.text && !isCursorToken(n.text));

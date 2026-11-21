@@ -29,6 +29,7 @@
 // STEP 1 deg x 100 units, CARD_R_MAX 1.10 of the floor rim; shore outline 1 deg x 20 units (0.05 m, MEASURE.md's step).
 // MEASURED (per arena, at load): the tint target = the piece's `all`, the contrast target = its p10/p90 luma.
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltSoilInfo } from "./types.js";
 import * as S from "./shared.js";
 
 // Which recipe kinds may grow an apron under their cards: the TREE ring only (a fringe card stands in the lake).
@@ -167,7 +168,7 @@ function setTone(u, tex, colours, info) {
 
 /** The soil material for a piece's measured colours (sRGB 0-255 `all`, `p10`, `p90`). One material serves the floor
  *  AND the apron (same uniform objects). update() sets the tint/contrast once the photo is in. */
-export function soilMaterial(colours, info = {}) {
+export function soilMaterial(colours, info: BuiltSoilInfo = {}) {
   const tex = soilTextures();
   const u = {
     uSoilAll: { value: S.srgb(colours.all) }, uSoilTint: { value: new THREE.Vector3(1, 1, 1) }, uSoilOn: { value: 0 },

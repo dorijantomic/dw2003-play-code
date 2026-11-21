@@ -10,9 +10,10 @@ import { openingPhaseFor, OPENING_PHASE_COUNT, scriptedScreenId } from "../../ve
 import { currentMenuItems } from "../layout.js";
 import { commandPhaseWaitsForLine } from "../hud.js";
 import { BATTLE_UI_LAYOUT, pgfgc00, cmfont } from "../../battle.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeDraw(B) {
+export function makeDraw(B: BattleContext) {
 function draw() {
     if (!B.battle) return;
     const b  = B.battle;

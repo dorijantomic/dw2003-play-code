@@ -24,7 +24,7 @@ const isWaterPx = (r, g, b) => b >= 62 && b > r + 28 && b > g + 6 && r < 150;
 
 // ------------------------------------------------------------- time of day
 // Keyframes over one cycle: [phase, rgb]. Drawn as a multiply layer, so white = no change.
-const TOD = [
+const TOD: [number, number[]][] = [
     [0.00, [255, 255, 255]], [0.38, [255, 255, 255]], [0.52, [255, 196, 128]],
     [0.64, [255, 150, 86]], [0.77, [150, 132, 196]], [0.89, [255, 196, 148]], [1.00, [255, 255, 255]],
 ];

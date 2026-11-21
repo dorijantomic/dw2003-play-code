@@ -25,6 +25,7 @@ import { DW2_CLIP_MAP, dw2LetterForSlot, DW2_MOTION_LETTERS } from "./dw2-clip-m
 import { battleSetting } from "./battle-settings.js";
 import { ensureDw2Picks } from "./dw2-picks.js";
 import { isInstalledBuild } from "../ship-list.js";
+import type { Dw2FightCh1, Dw2FightCh2, Dw2Motion } from "./types.js";
 
 let override = null;                  // null = follow the player's F2 -> Battle -> DW2 motion switch
 let castTypes = null;                 // skillId -> 0|1|2, from the generated cast-types.json
@@ -108,17 +109,17 @@ const TERM = 30000;
  * Returns { table, letter, kind } on success, null when the motion is unusable for this model
  * (no keys, or the table index is already taken by the model's own data).
  */
-export function applyMotion(model, letter, motion) {
+export function applyMotion(model, letter, motion: Dw2Motion) {
   if (!model || !motion || !motion.keys || !Object.keys(motion.keys).length) return null;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return null;
   if (!model.timeline) model.timeline = [];
   const table = motion.table | 0;
   if (model.timeline[table]?.table?.length) return null;      // never overwrite the model's own table
-  for (const [idx, rows] of Object.entries(motion.keys)) {
+  for (const [idx, rows] of Object.entries(motion.keys) as [any, any[]][]) {
     const i = idx | 0;
     const bone = model.bones?.[i];
     if (!bone) continue;
-    const anim = { ...(bone.anim || {}) };
+    const anim = { ...(bone.anim || {}) } as Dw2FightCh2;
     const own = (anim.ch2 ?? []).filter((r) => r[3] !== TERM).map((r) => r.slice());
     anim.ch2 = [...own, ...rows.map((r) => r.slice()), [rows[rows.length - 1][0], rows[rows.length - 1][1], rows[rows.length - 1][2], TERM]];
     model.bones[i] = { ...bone, anim };
@@ -130,11 +131,11 @@ export function applyMotion(model, letter, motion) {
     const byBone = Array.isArray(motion.ch1)
       ? { [motion.rootBone ?? rootIndexOf(model, motion)]: motion.ch1 }
       : motion.ch1;
-    for (const [idx, rows] of Object.entries(byBone)) {
+    for (const [idx, rows] of Object.entries(byBone) as [any, any[]][]) {
       const i = idx | 0;
       if (!rows?.length || !model.bones[i]) continue;
       const bone = model.bones[i];
-      const anim = { ...(bone.anim || {}) };
+      const anim = { ...(bone.anim || {}) } as Dw2FightCh1;
       const own = (anim.ch1 ?? []).filter((r) => r[3] !== TERM).map((r) => r.slice());
       anim.ch1 = [...own, ...rows.map((r) => r.slice()), [rows[rows.length - 1][0], rows[rows.length - 1][1], rows[rows.length - 1][2], TERM]];
       model.bones[i] = { ...bone, anim };
@@ -148,8 +149,8 @@ export function applyMotion(model, letter, motion) {
 
 /** The bone the ch1 keys belong to: the one whose appended ch2 keys span the same frames (the bake
  *  writes both for the root only), else bone 0. */
-function rootIndexOf(model, motion) {
-  for (const [idx, rows] of Object.entries(motion.keys)) {
+function rootIndexOf(model, motion: Dw2Motion) {
+  for (const [idx, rows] of Object.entries(motion.keys) as [any, any[]][]) {
     if (rows.length && motion.ch1?.length && rows[0][3] === motion.ch1[0][3]) return idx | 0;
   }
   return 0;
@@ -216,7 +217,7 @@ export function dw2SlotCount(model) {
 export function clearDw2Motion(model) {
   if (!model) return;
   if (model.dw2Motion) {
-    for (const m of Object.values(model.dw2Motion)) {
+    for (const m of Object.values(model.dw2Motion) as Dw2Motion[]) {
       if (model.timeline?.[m.table]) delete model.timeline[m.table];
     }
   }

@@ -13,6 +13,7 @@ import { ui } from "./vendor/engine.js";
 import { paintNativeSession } from "./native-session.js";
 import { wfightLoaderRegion } from "./wfight-translated.js";
 import { capturing as uiCCapturing, partHook as uiCPart } from "./ui-c/capture.js";
+import type { BattleMenuAdapterState } from "./types/battle-menu-adapter.js";
 
 /** The buttons a queued press is allowed to carry. */
 export const BATTLE_PULSE_BUTTONS = new Set([
@@ -60,7 +61,7 @@ export function stripCanvas(bytes, w, h) {
  * strip is what the battle boot loader uploaded to VRAM; when no loader ran, the
  * identical bytes come from the data build.
  */
-export function paintStripMoves(ctx, state, moves) {
+export function paintStripMoves(ctx, state: BattleMenuAdapterState, moves) {
     const info = state._data?.manifest?.strip;
     if (!info) return;
     const [vx, vy] = info.vram;
@@ -115,7 +116,7 @@ export function createBattleMenuAdapter(spec) {
         // The screen's own fields (its chosen row, its answer word) start here so
         // diagnostics() answers them before the screen is ever opened.
         ...spec.state,
-    };
+    } as BattleMenuAdapterState;
     const renderer = spec.renderer;
     const queueLimit = spec.queueLimit ?? BATTLE_QUEUE_LIMIT;
     const pulseButtons = spec.pulseButtons ?? BATTLE_PULSE_BUTTONS;

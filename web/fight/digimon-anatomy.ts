@@ -222,7 +222,7 @@ export function launchPoints(folder) {
 //   per-limb-contact multi-hit contact: the striking limbs, used in turn (not shots)
 // opts.volley = true lets a caller that knows the disc's volley clip force the one-per-emitter
 // reading even where the research text stayed silent (BRIEF5 K14: clip 13 is a volley).
-export function shotsFor(folder, techName, opts) {
+export function shotsFor(folder, techName, opts?: any) {
   const k = techKey(techName);
   const rule = (SHOTS[folder] || {})[k];
   const all = emitters(folder);

@@ -30,6 +30,7 @@
 import { roleOfBone, armChains } from "./digimon-bonemap.js";
 import { armEquip } from "./digimon-anatomy.js";
 import { restPose } from "./anim-retarget.js";
+import type { FightCollisionOut } from "./types.js";
 
 // ---------------------------------------------------------------- the measured rule (R3)
 //
@@ -400,7 +401,7 @@ export function clearanceTolerance(model, folder = model?.folder, { samples = nu
   if (cached && cached.samples >= want) return cached;
   const rig = rigColliders(model, folder);
   const wins = authoredWindows(model, want);
-  const out = { samples: want, frames: 0, source: "none", floor: 0, byPair: new Map() };
+  const out = { samples: want, frames: 0, source: "none", floor: 0, byPair: new Map() } as FightCollisionOut;
   if (rig && wins.length) {
     const list = allowedPairs(rig);
     const min = new Array(list.length).fill(Infinity);

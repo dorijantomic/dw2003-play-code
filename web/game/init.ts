@@ -394,7 +394,7 @@ export async function init() {
             // Populate ordinal/roster tables in place (the flag store captured these references).
             state.progressTable = po ?? null;   // kept whole for the replay theatre's ladder
             if (po) {
-                const all = new Set();
+                const all = new Set<number>();
                 for (const b of po.ladder) {
                     state.ordinalByStage[b.stage] = b.ordinals; // full list (revisited stages)
                     for (const o of b.ordinals) all.add(o);
@@ -427,7 +427,7 @@ export async function init() {
             Object.assign(
                 EMOTE_KINDS,
                 Object.fromEntries(
-                    Object.entries(state.findings?.emotes ?? {}).map(
+                    (Object.entries(state.findings?.emotes ?? {}) as [string, { kind?: any }][]).map(
                         ([k, v]) => [Number(k), v.kind],
                     ),
                 ),
@@ -532,7 +532,7 @@ export async function init() {
         console.error("[engine] init FAILED — story will not run", err);
     }
 
-    const charSelectEl = document.getElementById("charSelect");
+    const charSelectEl = document.getElementById("charSelect") as HTMLSelectElement;
     for (const c of state.manifest.characters) {
         charSelectEl.add(new Option(c.name, c.id));
     }
@@ -541,7 +541,7 @@ export async function init() {
         charSelectEl.blur();
     };
 
-    const mapSelect = document.getElementById("mapSelect");
+    const mapSelect = document.getElementById("mapSelect") as HTMLSelectElement;
     for (const m of state.manifest.maps) {
         mapSelect.add(new Option(m.name, m.id));
     }
@@ -562,7 +562,7 @@ export async function init() {
 
     try {
         const tracks = await (await fetch("assets/music/index.json")).json();
-        const musicSelect = document.getElementById("musicSelect");
+        const musicSelect = document.getElementById("musicSelect") as HTMLSelectElement;
         for (const t of tracks) musicSelect.add(new Option(t, t));
         musicSelect.onchange = () => {
             bgm.play(musicSelect.value);
@@ -573,7 +573,7 @@ export async function init() {
         if (musicSelect) musicSelect.parentElement.hidden = true;
     }
 
-    const chapterSelect = document.getElementById("chapterSelect");
+    const chapterSelect = document.getElementById("chapterSelect") as HTMLSelectElement;
     chapterSelect.value = String(state.chapter);
     chapterSelect.onchange = () => {
         state.chapter = Number(chapterSelect.value);
@@ -786,7 +786,7 @@ export async function init() {
     // The translated controller lives in engine/dw3/ui/title-session.ts;
     // web/titlescreen.js paints its extracted pictures. If the art is missing,
     // the walker's heading and buttons remain available.
-    const titleCanvas = document.getElementById("title-canvas");
+    const titleCanvas = document.getElementById("title-canvas") as HTMLCanvasElement;
     const titleCtx = titleCanvas?.getContext("2d") ?? null;
     // The resident launcher's PREVIOUS screen code — the code of the screen a
     // launch replaces. The launcher records it on every screen change, and the

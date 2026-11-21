@@ -21,6 +21,7 @@ import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { applyInnRest } from "./inn.js";
 import { fetchBytes, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_ALWAYS, createTranslatedScreenHost } from "./translated-screen-host.js";
+import type { InnScreen } from "./types/inn-translated.js";
 
 const PACK_NAMES = { 0x02860000: "cmfont" };
 const packName = (handle) => PACK_NAMES[handle >>> 0] ?? null;
@@ -47,7 +48,7 @@ export function createInnTranslated(sfx = null, bgm = null) {
         _open: false, _failed: false, _error: null, _session: null, _clock: null, _state: null, _record: null,
         _party: [], _onClose: null, _queued: 0, _ticks: 0, _closes: 0, _sounds: [], _music: [], _request: 0,
         _bgm: bgm, time: 0,
-    };
+    } as InnScreen;
     const renderer = createNativeScreenRenderer({ pack: "cmfont", packs: { "646:0": "cmfont" } }, packName);
 
     // Taken away by the caller, the session is disposed before onClose runs, as this screen always
@@ -106,7 +107,14 @@ export function createInnTranslated(sfx = null, bgm = null) {
      * @param opts   { map, onClose } — `map` is the scene the player stands on ("s235" or 235).
      * @returns the quote, or null when that map has no inn.
      */
-    inn.open = async (state, opts = {}) => {
+/** What the inn is handed: the stage it is entered from, the party to quote for, and what to call on the way out. */
+interface InnOpenArgs {
+    map?: string | number;
+    party?: any[];
+    onClose?: (() => void) | null;
+}
+
+    inn.open = async (state, opts: InnOpenArgs = {} as InnOpenArgs) => {
         const record = innForStage(opts.map);
         if (!record) return null;
         const request = host.begin();

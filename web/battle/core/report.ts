@@ -10,9 +10,11 @@ import {
 } from "../report.js";
 import { drawText as uiDrawText, fontReady as uiFontReady } from "../../uifont.js";
 import { stfrptChrome, REPORT_LAYOUT } from "../../battle.js";
+import type { BattleContext } from "../../types/battle.js";
+import type { ReportGroupOptions } from "./types.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeReport(B) {
+export function makeReport(B: BattleContext) {
 // STFGTREP chrome from stfgtrep_ui.json. header.rowStepY (50) is page pitch
   // (F0x80083260 unk5C*0x32), not partner-card pitch. Walker draws one page
   // at base 0. victory_exact (2026-07-18) is not in this tree.
@@ -23,7 +25,7 @@ export function makeReport(B) {
   //
   // The portrait animates: one frame every 13 vsyncs, from the table read off
   // the running game (claim FIGHT-REPORT-PORTRAIT-FRAMES-001).
-  function drawFightReportGroup(ctx, G, row, opts = {}) {
+  function drawFightReportGroup(ctx, G, row, opts: ReportGroupOptions = {}) {
     if (!G || !row) return;
     const t = opts.seconds ?? 0;
     // The plate is drawn plain. The screen's own code hands it the arrow's

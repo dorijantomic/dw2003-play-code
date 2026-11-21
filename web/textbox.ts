@@ -3,6 +3,7 @@ import { drawTalkWindow, drawAdvanceCursor } from "./uiRects.js";
 import { loadPack, packReady, drawClip, drawClipOpaque } from "./screenpack.js";
 import * as uiC from "./ui-c/index.js";
 import { composeTalk } from "./ui-c/message.js";
+import type { TextboxState } from "./types/textbox.js";
 
 let boxCount = 0;
 
@@ -116,7 +117,7 @@ export function createTextbox(sfx = null) {
   const tb = {
     dialogue: null, pageIdx: 0, shown: 0, onClose: null, t: 0, openT: 0,
     anchor: null, _key: `textbox${++boxCount}`,
-  };
+  } as TextboxState;
   // look C (web/ui-c, task T6): this frame's box in native 320x240 units -- the balloon body / name / typed lines / more marker the
   // overlay draws (web/ui-c/message.js composeTalk). The real clips (tail, band halves) are drawn inside the scope and captured.
   let scene = null;

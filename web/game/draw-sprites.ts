@@ -1,3 +1,4 @@
+import type { WalkBlend } from "./types.js";
 import { questGhostImage } from "../quest-ghost.js";
 import { fieldShadowVisible, FIELD_IDLE_CLIP, clipFrame, FIELD_RUN_CLIP } from "../vendor/engine.js";
 import { drawFieldShadow } from "../fieldcom.js";
@@ -157,21 +158,21 @@ function _idleClipId(meta) {
 // can never show a mode that doesn't match the screen.
 // EXPERIMENT (ambience): the wet / dusty look and the reflection on water are applied here, so every
 // body that goes through this function (leader, partners, NPCs, ambient villagers) gets them.
-export function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest) {
+export function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest: SpriteFrameArgs) {
     const bf = window.__bodyFx;
     if (!bf) return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
     if (bf.reflect) {
         const a = bf.reflect(x, y);
         if (a > 0.02) {
             ctx.save();
-            ctx.globalAlpha = a; if (!window.__perfNoFilter) ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
+            ctx.globalAlpha = a; if (!(window as any).__perfNoFilter) ctx.filter = "brightness(0.78) saturate(0.85) blur(0.5px)";   // __perfNoFilter: dev-only, set by web/perf-test.js
             ctx.translate(0, 2 * (y - lastCam.y + 4)); ctx.scale(1, -1);
             _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
             ctx.restore();
         }
     }
     if (bf.filter) {
-        ctx.save(); if (!window.__perfNoFilter) ctx.filter = bf.filter;
+        ctx.save(); if (!(window as any).__perfNoFilter) ctx.filter = bf.filter;
         const r = _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
         ctx.restore();
         return r;
@@ -179,7 +180,7 @@ export function drawEntitySprite(meta, sheet, clipImg, x, y, ...rest) {
     return _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, ...rest);
 }
 
-function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null, walkBlend = false) {
+function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animTime, fallbackFrameIdx, isMoving, idleTime, movementClip = null, walkBlend: WalkBlend = false) {
     // walkBlend: false = off, else the seconds already elapsed inside the current field tick (walk-blend.js).
     if (clipImg) {
         const clipId = isMoving ? movementClip : (activeClip ?? _idleClipId(meta));
@@ -189,7 +190,7 @@ function _drawEntitySpriteRaw(meta, sheet, clipImg, x, y, dir, activeClip, animT
             drawClipFrame(meta, clipImg, x, y, resolved.col, resolved.mirror, resolved.bottom);
             // Leader / partners walking: fade the next walk frame in over the last part of this one.
             if (walkBlend !== false && isMoving && activeClip == null) {
-                const nb = walkBlendNext(meta.clips, clipId, dir, clipTime, walkBlend);
+                const nb = walkBlendNext(meta.clips, clipId, dir, clipTime, walkBlend as any);
                 if (nb) drawClipFrame(meta, clipImg, x, y, nb.col, nb.mirror, nb.bottom, nb.w);
             }
             return {
@@ -239,3 +240,8 @@ export function devSnapshot() {
         assetMode: document.documentElement.dataset.assetMode ?? null,
     };
 }
+
+// The trailing frame arguments drawEntitySprite forwards untouched: which clip a cutscene latched,
+// how far into it the draw is, the fallback frame, whether the body is moving, its idle clock and
+// the walk-blend seconds (false = off).
+type SpriteFrameArgs = [dir?: any, activeClip?: any, animTime?: any, fallbackFrameIdx?: any, isMoving?: any, idleTime?: any, movementClip?: any, walkBlend?: WalkBlend];

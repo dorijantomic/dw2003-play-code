@@ -7,6 +7,7 @@
 // isDone/diagnostics.
 import { ui } from "./vendor/engine.js";
 import { fetchBytes, fetchJson } from "./resident-data.js";
+import type { WfightLoaderOptions, WorldFightScreen } from "./types/wfight-translated.js";
 
 /** The loader's data directory under assets/data/. */
 const LOADER_DIR = "wfight";
@@ -33,11 +34,11 @@ export function wfightLoaderRegion(x, y, w, h) {
     return lastVram?.(x, y, w, h) ?? null;
 }
 
-export function createWfightTranslated(options = {}) {
+export function createWfightTranslated(options: WfightLoaderOptions = {}) {
     const w = {
         _open: false, _pending: false, _done: false, _failed: false, _session: null, _data: null,
         _clock: null, _ticks: 0, _error: null, _lastDiagnostic: null, _summary: null,
-    };
+    } as WorldFightScreen;
 
     const fail = (error) => {
         w._error = error;

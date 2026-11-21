@@ -10,6 +10,7 @@ import { makePlayback } from "./audio/playback.js";
 import { createExclusiveRegister } from "./audio/bgm.js";
 import { installPlayApi } from "./audio/player-play.js";
 import { installStopApi } from "./audio/player-stop.js";
+import type { AudioEngine, SfxPlayerContext } from "./types/audio.js";
 // moved by tools/rewrite/split.mjs: still exported from here
 export { createBgmPlayer, createExclusiveRegister } from "./audio/bgm.js";
 
@@ -20,7 +21,7 @@ export { createBgmPlayer, createExclusiveRegister } from "./audio/bgm.js";
 // per category -- a new same-category sound stops the one playing. Dedup:
 // skip retriggering while the SAME id is already playing in its category.
 export function createSfxPlayer(register = createExclusiveRegister()) {
-  const P = {};
+  const P = {} as AudioEngine;
   P.register = register;
   Object.assign(P, makePlayback(P));
   const { bufferFor, loadPhraseTable, startPhrase, startVoice, stopVoice, whenPhraseRow } = P;
@@ -30,7 +31,7 @@ export function createSfxPlayer(register = createExclusiveRegister()) {
   if (P.gain) { P.gain.gain.value = BASE_GAIN.effects; P.gain.connect(P.ctx.destination); }
   P.manifest = null;
   P.buffers = {}; // name -> AudioBuffer | Promise
-  P.player = { muted: false };
+  P.player = { muted: false } as SfxPlayerContext;
   /** OPTIONS sound volume, 0..1 (1 = today's 0.7): the master gain every effect voice goes through. */
   P.player.setVolume = (level) => { if (P.gain) P.gain.gain.value = scaleGain(BASE_GAIN.effects, level); };
   P.battleGate = battleVoiceGate();

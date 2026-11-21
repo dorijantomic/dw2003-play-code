@@ -1,7 +1,8 @@
 import { MODEL_SCALE } from "../math.js";
+import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeSmartcam(B$) {
+export function makeSmartcam(B$: Battle3DContext) {
 function _smartApply(base, p) {
     const v = [base.eye[0] - base.look[0], base.eye[1] - base.look[1], base.eye[2] - base.look[2]];
     const a = p.yaw * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);

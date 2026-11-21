@@ -192,7 +192,7 @@ function findLamps(S) {
         if (r >= 232 && g >= 185 && b >= 70 && b <= 165 && r >= g && r - b > 70) { cnt[((y / CELL) | 0) * cols + ((x / CELL) | 0)]++; warm++; }
     }
     if (warm > px.w * px.h * 0.03) return [];          // sand or a lit floor, not lamps
-    const seen = new Uint8Array(cols * rows), out = [], windows = [];
+    const seen = new Uint8Array(cols * rows), out: any = [], windows = [];
     let bx0 = 0, bx1 = 0, by0 = 0, by1 = 0;
     for (let i = 0; i < cnt.length; i++) {
         if (cnt[i] < 3 || seen[i]) continue;

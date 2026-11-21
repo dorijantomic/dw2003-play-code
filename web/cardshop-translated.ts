@@ -7,6 +7,9 @@ import { composeWindow } from './ui-c/screens.js';
 import { fetchJson, fetchBytes, loadResidentResources } from './resident-data.js';
 import { cards, persistCollection, loadCatalog, loadBoosters, loadCardPrices,
   loadCardShops, loadCardIcons, drawCardIcon } from './cardstate.js';
+import type { GameState } from "./game/types.js";
+import type { CardShopScreen } from "./types/cardshop-translated.js";
+import type { CardShopOptions } from "./types/cardshop-translated.js";
 
 const PACKS = { 646: 'cmfont', 1598: 'stcdsp' };
 let dataPromise;
@@ -26,7 +29,7 @@ async function loadPackData() {
   }).catch((error)=>{packDataPromise=null;throw error;});
   return packDataPromise;
 }
-export async function bindCardShopInventory(state) {
+export async function bindCardShopInventory(state: GameState) {
   const data=await loadPackData();ui.bindCardPacks(cards(),state,data.boosterItems);
 }
 async function loadData(language) {
@@ -50,8 +53,8 @@ async function loadData(language) {
     shops:shops.shops,prices:prices.prices,boosters:boosters.sets,cards:catalog.cards,
     ...packData };
 }
-export function createCardShopTranslated(sfx=null,options={}) {
-  const c={_open:false,_session:null,_error:null,_state:null,_clock:null,_request:0};
+export function createCardShopTranslated(sfx=null,options: CardShopOptions={}) {
+  const c={_open:false,_session:null,_error:null,_state:null,_clock:null,_request:0} as CardShopScreen;
   const renderer=createNativeScreenRenderer({pack:'stcdsp',packs:PACKS},
     (directory)=>PACKS[directory>>>16]??null, {
       paintPrim(ctx,call) {

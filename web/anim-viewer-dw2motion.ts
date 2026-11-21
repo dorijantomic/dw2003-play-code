@@ -25,6 +25,7 @@
 import { MODEL_ANIM, MODEL_TEXTURE } from "./anim-viewer-bake.js";
 import { DW2_CLIP_MAP } from "./fight/dw2-clip-map.js";
 import { kindOfSlot, judgeNumbers, WORLD_BARS } from "./fight/motion-swap-gate.js";
+import type { Dw2ActionsOptions, Dw2Fetch, Dw2Motion, Dw2MotionCh1, Dw2MotionCh2, Dw2Query, Dw2SwapData } from "./types/anim-viewer-dw2motion.js";
 
 export const DW2_ROOT = "assets/battle/dw2motion";
 export const dw2FileUrl = (folder, root = DW2_ROOT) => `${root}/${folder}.json`;
@@ -171,7 +172,7 @@ export function pickRows(data) {
 
 // ── the clone (the body's own anim.json + the DW2 keys in a free table) ─────────────────────────
 const TERM = 30000;
-const empty = (t) => ({ table: t || [] });
+const empty = (t?: number) => ({ table: t || [] });
 
 /** The first table index this model does not use AND no motion has taken yet. */
 export function freeTable(model, taken = new Set()) {
@@ -190,25 +191,25 @@ function appendRows(rows, into) {
 }
 
 /** Merge one motion into `model` in place, at `table`. Mirrors web/fight/dw2-motion.js's applyMotion. */
-export function mergeMotion(model, letter, motion, table) {
+export function mergeMotion(model, letter, motion: Dw2Motion, table) {
   if (!model || !motion?.keys || !Object.keys(motion.keys).length) return false;
   if (!Array.isArray(motion.playlist) || !motion.playlist.length) return false;
   if (!Array.isArray(model.timeline)) model.timeline = [];
   for (const [idx, rows] of Object.entries(motion.keys)) {
-    const i = idx | 0;
+    const i = (idx as unknown as number) | 0;
     const bone = model.bones?.[i];
     if (!bone) continue;
-    const anim = { ...(bone.anim || {}) };
+    const anim = { ...(bone.anim || {}) } as Dw2MotionCh2;
     anim.ch2 = appendRows(rows, anim.ch2);
     model.bones[i] = { ...bone, anim };
   }
   if (motion.ch1) {
     const byBone = Array.isArray(motion.ch1) ? { [motion.rootBone ?? 0]: motion.ch1 } : motion.ch1;
     for (const [idx, rows] of Object.entries(byBone)) {
-      const i = idx | 0;
+      const i = (idx as unknown as number) | 0;
       if (!rows?.length || !model.bones?.[i]) continue;
       const bone = model.bones[i];
-      const anim = { ...(bone.anim || {}) };
+      const anim = { ...(bone.anim || {}) } as Dw2MotionCh1;
       anim.ch1 = appendRows(rows, anim.ch1);
       model.bones[i] = { ...bone, anim };
     }
@@ -222,7 +223,7 @@ export function mergeMotion(model, letter, motion, table) {
  * A deep copy of `raw` with every gate-passed DW2 motion merged, each in a free timeline table.
  * Returns { model, tables: {letter: table}, failed: {letter: {keys}}, filled: [letters] }.
  */
-export function buildClone(raw, data) {
+export function buildClone(raw, data: Dw2SwapData) {
   const model = JSON.parse(JSON.stringify(raw || {}));
   const tables = {}, failed = {}, filled = [], taken = new Set();
   if (!model || !data?.motions) return { model, tables, failed, filled };
@@ -286,7 +287,7 @@ export function createDw2Store(limit = 6) {
 export function installDw2Fetch(store, target = globalThis) {
   const orig = target.fetch;
   if (typeof orig !== "function") return null;
-  if (orig.__dw2mShim) return orig;
+  if ((orig as Dw2Fetch).__dw2mShim) return orig;
   const shim = (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
     const hit = store.resolve(url);
@@ -328,7 +329,7 @@ export async function probeFolders(folders, onFound, { root = DW2_ROOT, concurre
 
 // ── actions + deep link ────────────────────────────────────────────────────────────────────────
 /** The A/B pair for one filled slot: the DW2 motion, and what that slot plays today. */
-export function dw2Actions(data, { folder = null, slot, letter = null, tables = null, any = false } = {}) {
+export function dw2Actions(data, { folder = null, slot, letter = null, tables = null, any = false }: Dw2ActionsOptions = {}) {
   // any: also an owned slot's DW2 motion (the hand-pick rows play those)
   const list = fillersFor(data, slot);
   const fill = (list.length || !any ? list : pickLetters(data, slot)).find((f) => !letter || f.letter === letter);
@@ -349,7 +350,7 @@ export function dw2Actions(data, { folder = null, slot, letter = null, tables = 
 }
 
 /** The deep link the K25 report documents. */
-export function dw2Query({ slot, folder, letter = null, ab = null } = {}) {
+export function dw2Query({ slot, folder, letter = null, ab = null }: Dw2Query = {}) {
   if (slot == null) return "";
   const q = new URLSearchParams();
   q.set("dw2fill", String(slot | 0));

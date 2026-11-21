@@ -31,12 +31,12 @@ import { decodeNativeText, drawNativeTextWidgets } from "./native-screen-text.js
 import { nativeRootCtorFor } from "./native-screen-roots.js";
 import { NativeVblankClock } from "./vendor/engine.js";
 
-const canvas = document.getElementById("c");
+const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
-const sel = document.getElementById("screen");
+const sel = document.getElementById("screen") as HTMLSelectElement;
 const status = document.getElementById("status");
 const reboot = document.getElementById("reboot");
-const refimg = document.getElementById("refimg");
+const refimg = document.getElementById("refimg") as HTMLImageElement;
 const refbox = document.getElementById("refbox");
 
 // The original console capture for this screen, when one has been taken with
@@ -100,7 +100,7 @@ pad.attach(window);
 // game cannot drift apart.
 const blanks = new NativeVblankClock();
 
-function start(moduleId, opts = {}) {
+function start(moduleId, opts: { rootCtor?: number; bridge?: boolean } = {}) {
     cancelAnimationFrame(raf);
     // A screen whose manifest ctor is not the scene the player meets boots the
     // override (web/native-screen-roots.js), so a capture here matches

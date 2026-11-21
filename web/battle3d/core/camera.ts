@@ -22,9 +22,10 @@ import { faceBoxSource, fieldsFromShot, applyOp5 } from "../../fight/battle-came
 import { createIdleDirector } from "../../fight/battle-idle-director.js";
 import { createBattleOpenCamera, setSlowMotion as engineSetSlowMotion } from "../../vendor/engine.js";
 import { authoredSide, mirrorCameraWords, mirrorPresetShot } from "../../fight/side-mirror.js";
+import type { BattleOpenCameraArgs, Battle3DContext, CameraModeOptions } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeCamera(B$) {
+export function makeCamera(B$: Battle3DContext) {
 // An op5 canned shot, read from the record of the Digimon standing in the slot the
   // preset names. Falls back to the captured Renamon/Woodmon table if that record is not
   // loaded yet.
@@ -156,7 +157,7 @@ function applyArenaShot() {
     B$.camRec.cut(fieldsFromShot(shot), { issuer: "battle" });
     return shot;
   }
-function setCameraMode(m, opts = {}) {
+function setCameraMode(m, opts: CameraModeOptions = {}) {
     // Who owns the camera this frame. `scriptOwnsCamera` is the original's own arbitration: the
     // battle's camera director (F0x8008718c) re-publishes its own record through the cut [0xf8]
     // on every tick it runs (fightstg.s:5096-5105), so while a script's op5 owns the record the
@@ -311,7 +312,7 @@ function getFaceCamRect() { return B$.faceCamRect; }
         const s = cannedShotSlot(side, index);
         return s ? fieldsFromShot(s) : null;
       },
-    });
+    } as BattleOpenCameraArgs);
   }
 /**
    * The opening machine's phase-1 slot-6 create, called through the machine's port. Idempotent,

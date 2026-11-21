@@ -4,7 +4,7 @@
 //  - assets/maps/sNNN.png : full-res image for stages built into the walker
 // Wiring lives in localStorage ("doorWiring") until exported.
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 
 const state = {
   data: {},     // extracted entities

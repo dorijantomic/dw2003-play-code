@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
 import { toonify, groundMaterial, rng, U, noiseTexture, light, GRADE_PHOTO } from "./toolkit.js";
 import { grassClumpParts } from "./procedural.js";
+import type { GroundDetailOpts } from "./types.js";
 
 // ------------------------------------------------------------------ shore law (JS) + same in GLSL
 export const shoreZ = (x) => -12 + 3.0 * Math.sin(x * 0.031 + 0.7) + 1.4 * Math.sin(x * 0.083 + 2.1);
@@ -40,6 +41,10 @@ export function beachH(x, z) {
 
 // ------------------------------------------------------------------ geometry builder
 class GB {
+  declare c: any[];
+  declare i: any[];
+  declare p: any[];
+  declare u: any[];
   constructor() { this.p = []; this.c = []; this.u = []; this.i = []; }
   v(x, y, z, r = 1, g = 1, b = 1, u = 0, w = 0) { this.p.push(x, y, z); this.c.push(r, g, b); this.u.push(u, w); return this.p.length / 3 - 1; }
   quad(a, b, c, d) { this.i.push(a, b, c, a, c, d); }
@@ -469,7 +474,7 @@ void main(){ float rr = length(vUv - 0.5) * 2.0; float n = texture2D(uNoise, vUv
 
 // ------------------------------------------------------------------ ground shader: 4-layer sand splat + wet line + ripples + underwater tint
 /** texs = [dry, patch1, patch2, rock]; wetTex = damp sand. o.disc = thumbnail disc (wet gradient across the disc instead of the world shore) */
-export function beachGround(texs, wetTex, o = {}) {
+export function beachGround(texs, wetTex, o: GroundDetailOpts = {}) {
   const m = groundMaterial(texs, { tile: o.tile || 3.0, tints: o.tints || [[1.04, 1.0, 0.93], [1.0, 0.98, 0.92], [1.05, 1.02, 0.97], [0.95, 0.93, 0.9]], splat: o.splat || [0.62, 0.66, 0, 9], grade: o.grade });
   m.userData.tag = "beachground" + (o.disc ? "D" : "");
   const prev = m.onBeforeCompile;

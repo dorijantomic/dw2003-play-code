@@ -27,6 +27,7 @@
 // Nothing here touches the built world's geometry, its canvases, or the battle renderer: builtCv and off keep
 // exactly the contents they had, and ?post=0 in the viewer skips this module completely.
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltPostOpts } from "./types.js";
 
 // ---------------- the look's numbers (every one of them in one place) ----------------
 export const SETTINGS = {
@@ -263,7 +264,7 @@ function countToneMapSites(sources) {
  * @param {number} height
  * @param {{canvas?: HTMLCanvasElement, settings?: object}} [opts]
  */
-export function createPost(width, height, opts = {}) {
+export function createPost(width, height, opts: BuiltPostOpts = {}) {
   const S = Object.assign({}, SETTINGS, opts.settings || {});
   S.bloom = Object.assign({}, SETTINGS.bloom, opts.settings?.bloom || {});
   S.grade = Object.assign({}, SETTINGS.grade, opts.settings?.grade || {});
@@ -271,7 +272,7 @@ export function createPost(width, height, opts = {}) {
 
   const canvas = opts.canvas || document.createElement("canvas");
   canvas.width = width; canvas.height = height;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, premultipliedAlpha: false });
+  const renderer: any = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, premultipliedAlpha: false });   // the vendored build types WebGLRenderer without info/stats
   renderer.setPixelRatio(1);
   renderer.setSize(width, height, false);
   // the one sRGB encode of the chain is in the final shader, and the one tone map too: keep the renderer's
@@ -309,7 +310,7 @@ export function createPost(width, height, opts = {}) {
   const passCam = new THREE.Camera();
   const passMesh = new THREE.Mesh(quadGeo, null);
   passMesh.frustumCulled = false;
-  passScene.add(passMesh);
+  passScene.add(passMesh as any);
   const pass = (mat, to) => { passMesh.material = mat; renderer.setRenderTarget(to); renderer.render(passScene, passCam); };
 
   // ---- UVs and uniforms ----
@@ -453,7 +454,7 @@ export function createPost(width, height, opts = {}) {
     vertexShader: EDGE_VERT, fragmentShader: EDGE_FRAG, depthTest: false, depthWrite: false,
   }));
   edgeMesh.frustumCulled = false;
-  edgeScene.add(edgeMesh);
+  edgeScene.add(edgeMesh as any);
   const edgeGeo = new THREE.BufferGeometry();
   // (u,v) = (-1,-1), (1,1), (-1,1): a right triangle whose hypotenuse runs corner to corner at 45 deg
   edgeGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
@@ -518,7 +519,7 @@ export function createPost(width, height, opts = {}) {
   function dispose() {
     target.dispose(); scratch.dispose();
     for (const L of levels) { L.rt.dispose(); L.tmp.dispose(); }
-    for (const m of [compositeMat, brightMat, downMat, blurMat, finalMat, copyMat, edgeMesh.material]) m.dispose();
+    for (const m of [compositeMat, brightMat, downMat, blurMat, finalMat, copyMat, edgeMesh.material] as any[]) m.dispose();
     quadGeo.dispose(); edgeGeo.dispose();
     worldTex?.dispose(); fighterTex?.dispose(); emptyTex.dispose();
     renderer.dispose();

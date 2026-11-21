@@ -66,15 +66,18 @@ export function packedIsMusicStart(packed) {
  *    keep resolving through the loaded bank in web/audio.js (playArea), as
  *    they always have.
  */
+/** One row of a packed sound manifest: the stem, and the record it was packed from. */
+type PackedRow = [string, { id?: any }];
+
 export function packedSampleResolver(commonManifest, areaManifest = null) {
-    const index = (rows) => {
-        const out = new Map();
+    const index = (rows: Record<string, { id?: any }>): Map<string, PackedRow> => {
+        const out = new Map<string, PackedRow>();
         for (const [stem, meta] of Object.entries(rows ?? {}))
             if (meta?.id) out.set(String(meta.id).toLowerCase(), [stem, meta]);
         return out;
     };
-    const common = index(commonManifest);
-    const banks = Object.entries(areaManifest ?? {}).map(([bank, rows]) => [bank, index(rows)]);
+    const common = index(commonManifest as Record<string, { id?: any }>);
+    const banks = Object.entries(areaManifest ?? {}).map(([bank, rows]) => [bank, index(rows as Record<string, { id?: any }>)] as [string, Map<string, PackedRow>]);
 
     return (id) => {
         const word = id >>> 0;

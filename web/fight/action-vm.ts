@@ -80,6 +80,28 @@ function detachedSlot() {
 }
 
 export class ActionVM {
+  declare _frame: number;
+  declare _holdTicks: number;
+  declare _pActor: Int32Array<ArrayBuffer>;
+  declare _pCtx: Int32Array<ArrayBuffer>;
+  declare _portDelta: number;
+  declare _ramp: any;
+  declare _terminating: boolean;
+  declare _waitCount: number;
+  declare _waitFlag: number;
+  declare baseTable: any;
+  declare currentEffect: any;
+  declare currentMotion: any;
+  declare ended: boolean;
+  declare hooks: any;
+  declare ip: number;
+  declare justHit: boolean;
+  declare lastMotion: any;
+  declare moveSpeed: number;
+  declare ops: any;
+  declare player: any;
+  declare slot: any;
+  declare timelineForTable: any;
   constructor(script, { timelineForTable = null, baseTable = null, moveSpeed = MOVE_SPEED, hooks = {}, currentEffect = null, currentMotion = null, slot = null } = {}) {
     this.ops = Array.isArray(script?.ops) ? script.ops : [];
     this.timelineForTable = timelineForTable;   // (tableIndex) -> TimelinePlayer | null  (op2 bind)

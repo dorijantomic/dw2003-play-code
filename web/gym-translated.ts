@@ -27,6 +27,7 @@ import { createGymPrimPainter } from "./gym-vram-paint.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { composeWindow } from "./ui-c/screens.js";
+import type { GymScreen } from "./types/gym-translated.js";
 
 /** The gym's picture handles: STTRNGCS sub-directories 0 (drill pictures) and 3 (chrome) and CMFONT. */
 const PACK_NAMES = { 0x028c0000: "sttrng0", 0x028c0003: "sttrng3", 0x02860000: "cmfont" };
@@ -82,7 +83,7 @@ export function createGymTranslated(sfx = null) {
         _open: false, _pending: false, _failed: false, _error: null, _session: null, _data: null, _state: null,
         _onClose: null, _group: 0, _stage: null, _clock: null, _ticks: 0, _request: 0, _seeded: [], _summary: null,
         _lastDiagnostic: null, _committed: 0,
-    };
+    } as GymScreen;
     let painter = null;
     const renderer = createNativeScreenRenderer({ pack: "sttrng3", packs: { "652:0": "sttrng0", "652:3": "sttrng3", "646:0": "cmfont" } },
         packName, { paintPrim: (ctx, call) => painter?.paint(ctx, call) });
@@ -175,7 +176,7 @@ export function createGymTranslated(sfx = null) {
         const session = g._session;
         if (!session || g._committed) return;
         g._committed++;
-        const touched = new Set();
+        const touched = new Set<string>();
         g._seeded.forEach(({ ps, member, bonus }, i) => {
             const rec = session.record(i);
             ps.tp = rec.tp;

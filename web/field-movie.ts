@@ -29,11 +29,14 @@ import { titleViewTransform } from "./titlescreen.js";
 const MANIFEST_URL = "assets/movie/manifest.json";
 const MOVIE_DIR = "assets/movie/";
 
+/** One row of assets/movie/manifest.json: the shipped file, and the disc file index it stands for. */
+interface MovieRecord { file: string; index: number }
+
 /** The shipped asset for a movie row, by the disc's own file index (the one
  *  identifier the row and the manifest share); the filename is the fallback. */
 export function movieRecordFor(manifest, row) {
   const movies = manifest?.movies ?? {};
-  const byIndex = Object.values(movies).find((m) => m.index === row.fileIndex);
+  const byIndex = (Object.values(movies) as MovieRecord[]).find((m) => m.index === row.fileIndex);
   if (byIndex) return byIndex;
   return movies[row.file.replace(/_STR$/, "").toLowerCase()] ?? null;
 }

@@ -19,6 +19,7 @@ import {
   category4RestorePlan,
 } from "../vendor/engine.js";
 import { activeSlotOf, encounterGateBytes, setStatModifier, statModifier, statValue } from "./plans.js";
+import type { RestorePlanOptions, StatDebuffNames } from "./core/types.js";
 
 export function battleRestoreParty(b, side) {
   if ((side | 0) < 1) {
@@ -178,7 +179,7 @@ export function castFieldTechnique(b, side, record, _techElementName) {
  * skipped when the PLAYER acts and encounter gate byte 0x80042b62 is non-zero (`:27840`-`:27850`).
  * Returns the change or null.
  */
-export function applyStatDebuffDispatch(b, actingSide, record, names = {}) {
+export function applyStatDebuffDispatch(b, actingSide, record, names: StatDebuffNames = {}) {
   const dispatch = Number(record?.dispatch) | 0;
   if (dispatch !== 26 && dispatch !== 27) return null;
   const stat = dispatch === 26 ? 0 : 1;
@@ -241,7 +242,7 @@ export function clearActionAffinity(b, side) {
  * Returns null when the technique is not a category-4 member, so a caller can use it as
  * the gate: that null IS the "this technique is an ordinary attack" answer.
  */
-export function battleRestorePlanFor(b, side, record, techniqueId, options = {}) {
+export function battleRestorePlanFor(b, side, record, techniqueId, options: RestorePlanOptions = {}) {
   if ((record?.category | 0) !== 4) return null;
   // The record machine's state-1 sub-state-0 clear runs BEFORE this category handler and
   // has no category test (`pro/fightstg.s:13092 sh $zr, 0xe($v0)`), so a heal throws the

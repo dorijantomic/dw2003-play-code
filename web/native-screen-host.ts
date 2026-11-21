@@ -34,6 +34,7 @@ import {
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { drawNativeTextWidgets } from "./native-screen-text.js";
 import { NativeVblankClock, maskFromButtons } from "./vendor/engine.js";
+import type { NativeScreenHost } from "./types/native-screen-host.js";
 
 /** Screen packs are extracted at the console's 320x240; the game canvas is
  *  640x480 and the field draws through the same 2x factor (ZOOM). */
@@ -89,7 +90,18 @@ export function nativeScreensReady() {
  * and retry (a native screen is a test failure, never a silent fallback to a
  * hand-authored module).
  */
-export function openNativeScreen(moduleId, opts = {}) {
+/** What opening a screen takes: the root ctor override, the audio hook, the RAM seed, and the pre-boot writes. */
+interface NativeScreenOpenOpts {
+    rootCtor?: number;
+    playPackedSound?: (id: any) => void;
+    seed?: (io: { read: typeof nativeScreenRead; write: typeof nativeScreenWrite; rt: any }) => void;
+    preBoot?: (io: { read: typeof nativeScreenRead; write: typeof nativeScreenWrite; rt: any }) => void;
+    memcard?: any;
+    rootArgs?: any[];
+    skipClip?: (name: string, id: any) => boolean;
+}
+
+export function openNativeScreen(moduleId, opts: NativeScreenOpenOpts = {}) {
     if (!nativeScreensReady()) return null;
     const entry = nativeScreenEntry(moduleId);
     if (!entry) return null;
@@ -193,7 +205,7 @@ export function openNativeScreen(moduleId, opts = {}) {
             host.rt = null;
             host.renderer = null;
         },
-    };
+    } as NativeScreenHost;
     opts.seed?.({ read: nativeScreenRead, write: nativeScreenWrite, rt });
     return host;
 }

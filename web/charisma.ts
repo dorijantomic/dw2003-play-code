@@ -17,6 +17,7 @@
 // walker's party into the shape it takes.
 import { partyCharismaTotal, scaledStat, equipmentBonuses } from "./vendor/engine.js";
 import { partyRosterView, CHARID_TO_DIGID } from "./party.js";
+import type { GameState } from "./game/types.js";
 
 let DB = null;
 let dbPromise = null;
@@ -79,7 +80,7 @@ export function partyCharismaFrom(view, equipment) {
   return partyCharismaTotal(view.map((m, i) => charismaMemberFor(m, equipment?.[i])));
 }
 
-export function partyCharisma(state) {
+export function partyCharisma(state: GameState) {
   if (!DB || !state?.party?.length) return null;
   const view = partyRosterView(
     state.party, state.partnerStats, state.partyStats, DB, state.digimonNames,

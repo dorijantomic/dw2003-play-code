@@ -16,7 +16,7 @@ export function regionOf(name) {
 /** Every link between two manifest maps, as a Set of "a|b" keys (a < b), from the scenes' exits and warps. Self links and unknown ids are dropped. */
 export function buildLinks(maps, scenes) {
     const known = new Set(maps.map((m) => m.id));
-    const links = new Set();
+    const links = new Set<string>();
     for (const m of maps) {
         const sc = scenes?.[m.id];
         if (!sc) continue;
@@ -85,10 +85,18 @@ export function openRegions(graph, seen, currentId) {
  * (a component that does not reach it starts a column of its own further right); a column with more nodes than rows fit is
  * split into more columns. Deterministic, and no two boxes overlap.
  */
-export function layoutNodes(view, rootId, w, h, size = 8) {
+/** What one region shows the book: the boxes (visited first, then the "???" ones), the links among them, and the counts. */
+export interface RegionView {
+    nodes: { id: string; seen: boolean }[];
+    edges: [string, string][];
+    visited: number;
+    total: number;
+}
+
+export function layoutNodes(view: RegionView, rootId, w, h, size = 8) {
     const ids = view.nodes.map((n) => n.id);
     if (!ids.length) return new Map();
-    const adj = new Map(ids.map((id) => [id, []]));
+    const adj = new Map<string, string[]>(ids.map((id) => [id, []] as [string, string[]]));
     for (const [a, b] of view.edges) { adj.get(a).push(b); adj.get(b).push(a); }
     const layers = [], done = new Set();
     const order = ids.includes(rootId) ? [rootId, ...ids.filter((i) => i !== rootId)] : ids;
@@ -134,7 +142,18 @@ export function nearestInDirection(pos, from, dir) {
 }
 
 /** The screen's state: which region, which node the cursor is on, and the text for the help band. */
-export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w: 252, h: 100 } }) {
+/** A manifest map as the map screen reads it: its stage id and its "Region — Town" name. */
+export interface MapRecord { id: string; name?: string }
+
+/** What the game hands the map screen: the maps, the scene routing data, the seen flag, and the map you are on. */
+export interface MapScreenData {
+    maps: MapRecord[];
+    scenes?: Record<string, any> | null;
+    seen: (id: string) => boolean;
+    currentId: string | null;
+}
+
+export function createMapScreenModel({ maps, scenes, seen, currentId, box = { w: 252, h: 100 } }: MapScreenData & { box?: { w: number; h: number } }) {
     const graph = buildGraph(maps, scenes);
     const listed = openRegions(graph, seen, currentId);
     let at = Math.max(0, listed.indexOf(graph.regionIndex(currentId)));

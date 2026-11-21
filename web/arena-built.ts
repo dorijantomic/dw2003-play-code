@@ -17,14 +17,15 @@
 import * as THREE from "./lib3d/three.module.js";
 import * as S from "./built/shared.js";
 import { loadColourFit, createColourFit } from "./built/colourfit.js";   // per-layer colour overrides (assets-hd/battle/built/<pack>.colours.json), generic
-import { createSlots } from "./built/slots.js";   // the binder (any registry asset into any slot), web/built/registry.js
+import { createSlots } from "./built/slots.js";
+import type { ArenaBuildInfo, ArenaBuiltOptions } from "./types/arena-built.js";   // the binder (any registry asset into any slot), web/built/registry.js
 
 // The foliage ASSETS (leaf texture, fluffy material, broadleaf / bush / pine geometry) live in web/built/foliage.js;
 // re-exported here for older importers.
 export { leafClumpTexture, foliageMaterial, buildGeometry, fluffyPart, broadleafGeometry, bushGeometry, pineGeometry } from "./built/foliage.js";
 
 // The placements, in build order: [id, recipe kinds that load it (null = every arena), module, extra layer?]
-const PLACEMENTS = [
+const PLACEMENTS: [string, string[] | null, string, boolean][] = [
   ["sky", null, "./built/place/sky.js", false],
   ["ground", null, "./built/place/ground.js", false],
   ["sand", ["sand", "shore"], "./built/place/sand.js", true],
@@ -41,17 +42,17 @@ const PLACEMENTS = [
   ["foliage", null, "./built/place/foliage.js", false],
 ];
 
-export async function createArenaBuilt(canvas, pack, opts = {}) {
+export async function createArenaBuilt(canvas, pack, opts: ArenaBuiltOptions = {}) {
   const res = await fetch(`assets-hd/battle/built/${pack}.json`, { cache: "no-store" });
   if (!res.ok) return { missing: true, pack };
   const rec = await res.json();
   const fitFile = await loadColourFit(pack);   // null for an arena without a colours file: then nothing below touches a material
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true }) as any;   // vendored three: lib3d is excluded from the tsconfig, so its classes type as members it attaches at runtime
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 1, 60000);
-  const world = new THREE.Group(); scene.add(world);
-  const info = { pack, pieces: {}, instances: {}, foliage: null, keepOut: null };
+  const camera = new THREE.PerspectiveCamera(45, canvas.width / canvas.height, 1, 60000) as any;
+  const world = new THREE.Group() as any; scene.add(world);
+  const info = { pack, pieces: {}, instances: {}, foliage: null, keepOut: null } as ArenaBuildInfo;
   const materials = [];
   const pal = S.makePalette(rec);
   S.initNoise(1013);
@@ -108,7 +109,7 @@ export async function createArenaBuilt(canvas, pack, opts = {}) {
   // the ground things stand on = the meshes of the slots that say so (the bound ground surfaces + sand), as bound now
   const groundSlots = [];
   const groundMeshes = () => groundSlots.flatMap((id) => slots.meshesOf(id).filter((m) => m.isMesh && !m.userData?.notGround));
-  const ray = new THREE.Raycaster(), down = new THREE.Vector3(0, -1, 0);
+  const ray = new (THREE.Raycaster as any)(), down = new THREE.Vector3(0, -1, 0);
   function groundHeight(x, z) {
     ray.set(new THREE.Vector3(x, 1e5, z), down);
     const hit = ray.intersectObjects(groundMeshes(), false)[0];
@@ -127,7 +128,7 @@ export async function createArenaBuilt(canvas, pack, opts = {}) {
     newGroup: (name) => { const g = new THREE.Group(); g.name = name; world.add(g); return g; },   // a parent for a placement's slots
     layer: (id) => layers.find((l) => l.id === id) || null,
   };
-  const layers = [], missing = [], plans = {};
+  const layers = [], missing = [], plans: Record<string, any> = {};
   for (const [id, kinds, mod, extra] of PLACEMENTS) {
     if (kinds && !rec.pieces.some((p) => kinds.includes(p.kind))) continue;
     try {

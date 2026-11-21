@@ -1,5 +1,6 @@
 import { boneMap as k16BoneMap } from "../digimon-bonemap.js";
 import { TAU, normaliseRoots, rolesOf, sample } from "./rig-basics.js";
+import type { K16Rig } from "./types.js";
 
 // ── K16: the math retarget — role based, scale aware, rest-frame conjugation, IK reach ───────────
 //
@@ -237,7 +238,7 @@ export function rigOf(model) {
     arms: [], legs: [], wings: [], tail: [],
     dom: bm ? (bm.dom ?? null) : null,
     sc: bm ? (bm.sc ?? null) : null,
-  };
+  } as K16Rig;
   if (bm) {
     for (const [k, side] of [["aL", "left"], ["aR", "right"]]) if (bm[k]?.length) rig.arms.push({ side, ordinal: 0, chain: bm[k].slice() });
     for (const [k, side] of [["aLe", "left"], ["aRe", "right"]]) (bm[k] ?? []).forEach((c, i) => { if (c?.length) rig.arms.push({ side, ordinal: i + 1, chain: c.slice() }); });
@@ -367,7 +368,7 @@ export function roleBoneMap(T, S, { mirror = false } = {}) {
 /** Which arm the donor's clip actually fires with: the arm whose tip travels most over the clip. */
 function k16FiringSide(S, source, lo, hi) {
   const a = k16Pose(source, lo), b = k16Pose(source, hi);
-  const travel = {};
+  const travel: Record<string, number> = {};
   for (const arm of S.arms.filter((x) => x.ordinal === 0)) {
     const tip = arm.chain[arm.chain.length - 1];
     travel[arm.side] = Math.hypot(...k16sub(b.P[tip], a.P[tip]));

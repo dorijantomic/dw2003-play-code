@@ -47,9 +47,10 @@ import {
 } from "../gl.js";
 import { effectLayer } from "../../fight/effect-player.js";
 import { drawUnderEffects } from "../../fight/effect-under-gl.js";
+import type { BackdropPack, Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeRender(B$) {
+export function makeRender(B$: Battle3DContext) {
 function render(dt) {
     B$.animTime += dt;
 
@@ -1068,7 +1069,7 @@ function drawShadow(gl, prog, mvp, pos, rx, ry) {
   }
 function destroy() {
     B$.clearFighters();
-    for (const pk of Object.values(B$.backdropPacks)) {
+    for (const pk of Object.values(B$.backdropPacks) as BackdropPack[]) {
       if (pk.floorTex) B$.gl.deleteTexture(pk.floorTex);
       if (pk.wallTex) B$.gl.deleteTexture(pk.wallTex);
       for (const g of pk.groups || [])

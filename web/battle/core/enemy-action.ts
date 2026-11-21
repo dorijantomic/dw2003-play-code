@@ -48,9 +48,10 @@ import {
   autoEquipForm,
   levelUpThreshold,
 } from "../progress.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeEnemyAction(B) {
+export function makeEnemyAction(B: BattleContext) {
 function applyEnemyAction() {
     const b  = B.battle;
     const en = b.enemy;
@@ -266,7 +267,7 @@ function applyEnemyAction() {
         const hitPages = [
           applyPostHitDispatch(b, restoreRecord, { lockRecord: B.fightTechDB?.[String(DAMAGE_TERM_FLEE_LOCK_RECORD)], playerName: pname, enemyName: name }),
           applyStatDebuffDispatch(b, 1, restoreRecord, { player: pname, enemy: name }),
-        ].map((r) => r?.page ?? null).filter(Boolean);
+        ].map((r) => (r as { page?: any })?.page ?? null).filter(Boolean);
         if ((restoreRecord?.dispatch | 0) === RESULT_QUEUE.CROSS_SLASH) b._forcedFlee = true; // Cross Slash (record +0x0a = 35): its result-queue slot 35 drains to "the target flees" (fightstg F0x80091a8c)
         b.message += inflicted.text;
         b.message = prefix + b.message;

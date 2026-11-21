@@ -6,6 +6,7 @@ import { loadToon, partsGroup, loadTex } from "./loader.js";
 import * as P from "./procedural.js";
 import * as L from "./lakeproc.js";
 import { q, ph, proc, texDisc, ASSETS, ezTreeParts } from "./forest.js";
+import type { BiomeLakeTerrain, GroundDetailOpts, LODLevel, SpeciesLODOpts, ToonLoadOpts } from "./types.js";
 
 const { lakeH, lakeD, polar, vnoise, LAKE_C } = L;
 const PS = "Poly Haven (decimated, 1K albedo)", CC0 = "CC0 1.0", OWN = "Procedural (our code)", EZ = "EZ-Tree by Daniel Greenheck (generated live)";
@@ -20,7 +21,7 @@ const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 6.2832; whil
 const beachMask = (th, e = 0) => 1 - Math.exp(-((angDiff(th, TH0) / 0.34) ** 2)) * (1 - sstep(6, 11, e));   // 0 on the open beach (near the water), 1 elsewhere
 
 // ------------------------------------------------------------------ terrain tiles + water (real world coordinates, so the shore law of the shaders applies)
-function tile(mat, x0, x1, z0, z1, cell, extra, hf = lakeH) {
+function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => number, hf = lakeH) {
   const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, Math.max(2, Math.round(w / cell)), Math.max(2, Math.round(d / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.attributes.position;
@@ -37,7 +38,7 @@ async function shoreTile(x0, x1, z0, z1, cell, water = true) {
   const grp = new THREE.Group(); grp.add(tile(await groundMat({}), x0, x1, z0, z1, cell)); if (water) grp.add(waterPlane(x0, x1, z0, z1, cell * 1.5)); return grp;
 }
 const ZS = polar(TH0, 0)[1];                                                // z of the shore at x = 0
-async function bankDisc(o = {}) {
+async function bankDisc(o: { mud?: any; peb?: any; g?: GroundDetailOpts; water?: boolean } = {}) {
   const t = await groundTex(), m = L.lakeGround(t.slice(0, 4), o.mud ?? t[4], o.peb ?? t[5], { disc: true, tile: 1.2, ...(o.g || {}) });
   const g = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.06, 64, 1), m); g.position.y = 0.03; const grp = new THREE.Group(); grp.add(g);
   if (o.water) { const w = new THREE.Mesh(new THREE.CircleGeometry(1.3, 56), L.lakeWaterMaterial({ disc: true })); w.rotation.x = -Math.PI / 2; w.position.y = 0.085; w.renderOrder = 5; grp.add(w); }
@@ -57,7 +58,7 @@ function floatField(parts, n, rad, sc, seed) {
 }
 const mossy = (parts, m) => { for (const x of parts) { x.mat.userData.toon.moss = m; x.mat.userData.tag = (x.mat.userData.tag || "") + "moss"; } return parts; };
 /** rock / log / stump sunk into a water block with the waterline look (object-space level in the grid) */
-async function sunk(res, frac = 0.3, moss = 0.8, extra) {
+async function sunk(res, frac = 0.3, moss = 0.8, extra?: (g: any) => void) {
   const h = res.height ?? 1; mossy(res.parts, moss); L.waterlineify(res.parts, { mode: "object", level: frac * h });
   const g = new THREE.Group(), body = part(res.parts); body.position.y = 0.04 - frac * h; g.add(waterBlock(Math.max(1.0, (res.size?.x ?? 1.5) * 0.75))); g.add(body); if (extra) extra(g); return g;
 }
@@ -68,9 +69,9 @@ const cat = { water: "Lake water", shore: "Shore: mud, pebbles, wet bank", terr:
   logs: "Fallen logs, stumps, roots", rocks: "Rocks (half-submerged, moss)", steps: "Stepping stones", peb: "Pebbles", pier: "Pier", air: "Mist, light motes, sky" };
 const lp = (id, c, name, make, extra = {}) => proc(id, c, name, make, { url: "web/biome/lakeproc.js", ...extra });
 const tex = (ids, c) => ids.map(([id, n]) => texDisc(id, c, n));
-const phw = (id, c, name, o = {}) => ({ id: "phw_" + id, cat: c, name, source: PS + " + our waterline shader", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false,
+const phw = (id, c, name, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "phw_" + id, cat: c, name, source: PS + " + our waterline shader", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false,
   make: async () => sunk(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.frac ?? 0.3, o.moss ?? 0.8) });
-const qw = (id, c, name, o = {}) => ({ id: "qw_" + id, cat: c, name, source: "Quaternius Stylized Nature MegaKit (Standard) + our waterline shader", licence: CC0, url: "https://quaternius.com/packs/stylizednaturemegakit.html", noSpin: false,
+const qw = (id, c, name, o: { t?: ToonLoadOpts; frac?: number; moss?: number } = {}) => ({ id: "qw_" + id, cat: c, name, source: "Quaternius Stylized Nature MegaKit (Standard) + our waterline shader", licence: CC0, url: "https://quaternius.com/packs/stylizednaturemegakit.html", noSpin: false,
   make: async () => sunk(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.frac ?? 0.3, o.moss ?? 0.9) });
 const ez = (id, c, name, preset, seed, over, h) => ({ id: "ez_" + id, cat: c, name, source: EZ, licence: "MIT", url: "https://github.com/dgreenheck/ez-tree", noSpin: false, make: async () => part(ezTreeParts(preset, seed, over, h)) });
 const BIRCH = { bark: { type: "birch", tint: 0xffffff }, leaves: { type: "aspen", tint: 0xb9d96a, count: 5, size: 2.0 } };
@@ -348,11 +349,11 @@ export async function buildLake(ctx) {
   }
 
   // ---- trees by LOD species: willow (hero + bank), birch, alder, bank trees; impostor atlas shared with a layer-1 reflection set
-  const species = (name, l0, l1, pos, o = {}) => {
+  const species = (name, l0: any, l1: any, pos: any[], o: SpeciesLODOpts = {}) => {
     if (!pos.length) return;
     const imp = bakeImpostor(renderer, partsGroup(l0), 8, 256), r = rng(name.length * 977 + pos.length), mats = new Float32Array(pos.length * 16), sc = o.scale || [0.85, 1.25];
     pos.forEach((p, i) => composeTRS(mats, i, p[0], lakeH(p[0], p[1]) - 0.05, p[1], r() * 6.28, (p[4] ?? (sc[0] + (sc[1] - sc[0]) * r())), 0.02 * r(), r() * 6.28));
-    const levels = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
+    const levels: LODLevel[] = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
     const sp = new LODSpecies(name, levels, mats, pos.length, l1 ? [o.d0 ?? 26, o.d1 ?? 70] : [o.d1 ?? 50]); lods.push(sp); root.add(sp.group); note(name, pos.length, l0); info.impostors++;
     const rs = new LODSpecies(name + " (mirror)", [{ impostor: imp.factory }], mats, pos.length, [0]); rs.group.traverse((x) => x.layers.set(1)); rs.update({ position: new THREE.Vector3(0, 0, 0) }, true); root.add(rs.group);
   };
@@ -391,6 +392,6 @@ export async function buildLake(ctx) {
   return {
     root, info, cull, reflector,
     update(camera, frame) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
-    lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 }; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; t.reflMs = +reflector.ms.toFixed(2); return t; },
+    lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 } as BiomeLakeTerrain; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; t.reflMs = +reflector.ms.toFixed(2); return t; },
   };
 }

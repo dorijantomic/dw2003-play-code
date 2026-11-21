@@ -4,6 +4,7 @@
 // tests/quest-editor.test.js check saved data with it. "Walkable" is exactly web/quest-walk.js: the player's own foot box
 // on web/assets/collision/<map>.json, and legs between two points are the wall routing the quest scenes use.
 import { questGrid, questStandFree, questFreeCellNear, questWalkLegs, questCellFree } from "./quest-walk.js";
+import type { QuestEditorWork, QuestWalkGrid } from "./types/quest-editor.js";
 
 export const DIRS = ["down", "down-left", "left", "right", "up-left", "up", "down-right", "up-right"];
 export const PATH_NAME = /^[a-z][a-z0-9_]*$/;
@@ -12,10 +13,10 @@ export const SNAP_LIMIT = 3;                         // cells (24 px): a drop fu
 export { questGrid };
 
 /** A walkable point's own standing spot for a cell: lower middle of the cell (the same point quest-walk.js uses). */
-export const cellSpot = (grid, c, r) => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
+export const cellSpot = (grid: QuestWalkGrid, c: number, r: number): number[] => [c * grid.cell + grid.cell / 2, r * grid.cell + grid.cell - 1];
 
 /** Whether a character may stand with its feet at (x, y). */
-export function walkable(grid, x, y) {
+export function walkable(grid: QuestWalkGrid | null, x: number, y: number): boolean {
     return !!grid && Number.isFinite(x) && Number.isFinite(y) && questStandFree(grid, Math.round(x), Math.round(y));
 }
 
@@ -23,7 +24,7 @@ export function walkable(grid, x, y) {
  * Where a dropped point lands: itself when walkable, else the closest walkable spot within SNAP_LIMIT cells, else null
  * (refused). Returns [x, y] in whole pixels.
  */
-export function snapPoint(grid, x, y) {
+export function snapPoint(grid: QuestWalkGrid | null, x: number, y: number): number[] | null {
     if (!grid) return null;
     const px = Math.round(x), py = Math.round(y);
     if (walkable(grid, px, py)) return [px, py];
@@ -32,7 +33,7 @@ export function snapPoint(grid, x, y) {
 }
 
 /** The walking legs of a path: from each point to the next, through the wall routing. [] when it has fewer than 2 points. */
-export function pathLegs(grid, points) {
+export function pathLegs(grid: QuestWalkGrid | null, points: number[][]): number[][][] {
     const out = [];
     for (let i = 1; i < points.length; i++) {
         const [ax, ay] = points[i - 1], [bx, by] = points[i];
@@ -46,7 +47,7 @@ export function pathLegs(grid, points) {
  * @param data      { characters: [{ npc_id, name, residents: [{map,x,y,dir}] }], paths: { name: { map, points } } }
  * @param gridOf    (mapId) -> grid in quest-walk.js shape, or null when the map has no collision data
  */
-export function checkData(data, gridOf) {
+export function checkData(data: QuestEditorWork, gridOf: (mapId: string) => QuestWalkGrid | null) {
     const bad = [];
     const ids = new Set();
     for (const ch of data.characters ?? []) {

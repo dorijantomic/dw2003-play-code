@@ -20,6 +20,7 @@ import { ui } from "./vendor/engine.js";
 import { packReady } from "./screenpack.js";
 import { drawClip } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
+import type { BattleMsgBankFile } from "./types/battlemsg-translated.js";
 
 const {
   BATTLE_MESSAGE_ARMS, BATTLE_MESSAGE_BANK, BATTLE_MESSAGE_BANK_FIELD,
@@ -66,7 +67,7 @@ export function battleMsgPackName(handle) {
  * sector count instead; the strings are the same table `engine/dw3/item-names.ts`
  * already carries, entry for entry.
  */
-const BANK_FILES = {
+const BANK_FILES: Record<number, BattleMsgBankFile> = {
     [BATTLE_MESSAGE_BANK]: { file: "battlecmd/esmfight.json", what: "Battle message bank" },
     [BATTLE_MESSAGE_BANK_FIELD]: { file: "battlecmd/esitmnam.json", what: "Battle item-name bank" },
 };

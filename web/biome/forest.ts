@@ -4,6 +4,7 @@ import { Tree, TreePreset } from "../lib3d/ez-tree.es.js";
 import { toonify, toonMat, groundMaterial, terrainH, scatter, composeTRS, instancedParts, LODSpecies, bakeImpostor, rng, tris, GRADE_PHOTO, U, noiseTexture, CullSet } from "./toolkit.js";
 import { loadToon, partsGroup, loadTex } from "./loader.js";
 import * as P from "./procedural.js";
+import type { LODLevel, SpeciesAddOpts, ToonLoadOpts } from "./types.js";
 
 export const ASSETS = new URL("./assets/", import.meta.url).href;
 const QS = "Quaternius Stylized Nature MegaKit (Standard)", QU = "https://quaternius.com/packs/stylizednaturemegakit.html";
@@ -11,13 +12,13 @@ const PS = "Poly Haven (decimated, 1K albedo)", PU = (id) => `https://polyhaven.
 const CC0 = "CC0 1.0";
 
 // ------------------------------------------------------------------ entry helpers (shared with the Shared tab)
-export const q = (id, cat, o = {}) => ({ id: "q_" + id, cat, name: o.name || id.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
+export const q = (id, cat, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "q_" + id, cat, name: o.name || id.replace(/_/g, " "), source: QS, licence: CC0, url: QU, noSpin: false,
   make: async () => partsGroup((await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
-export const ph = (id, cat, o = {}) => ({ id: "ph_" + id, cat, name: o.name || id.replace(/_/g, " "), source: PS, licence: CC0, url: PU(id),
+export const ph = (id, cat, o: { name?: string; t?: ToonLoadOpts; e?: object } = {}) => ({ id: "ph_" + id, cat, name: o.name || id.replace(/_/g, " "), source: PS, licence: CC0, url: PU(id),
   make: async () => partsGroup((await loadToon(`${ASSETS}polyhaven/${id}.glb`, o.t || {})).parts), ...(o.e || {}) });
 export const proc = (id, cat, name, make, e = {}) => ({ id: "proc_" + id, cat, name, source: "Procedural (our code)", licence: "own code", url: "web/biome/procedural.js", make, ...e });
 /** photoreal texture on a round ground disc through the toon ground material (does not spin: world-space mapping) */
-export const texDisc = (id, cat, name, o = {}) => ({ id: "tex_" + id, cat, name, source: PS + " texture", licence: CC0, url: PU(id), noSpin: true,
+export const texDisc = (id, cat, name, o: { tile?: number } = {}) => ({ id: "tex_" + id, cat, name, source: PS + " texture", licence: CC0, url: PU(id), noSpin: true,
   make: async () => {
     const t = await loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
     const m = groundMaterial([t, t, t, t], { tile: o.tile || 1.1, splat: [2, 2, 0, 9] });
@@ -25,7 +26,7 @@ export const texDisc = (id, cat, name, o = {}) => ({ id: "tex_" + id, cat, name,
   } });
 
 // ------------------------------------------------------------------ EZ-Tree trees (MIT): birch, oak
-function setDeep(o, m) { for (const [k, v] of Object.entries(m)) (v && typeof v === "object" && !(v.isColor) ? setDeep(o[k], v) : (o[k] = v)); }
+function setDeep(o, m) { for (const [k, v] of Object.entries(m) as [string, any][]) (v && typeof v === "object" && !v.isColor ? setDeep(o[k], v) : (o[k] = v)); }
 export function ezTreeParts(preset, seed, over, height) {
   const t = new Tree();
   t.options.copy(structuredClone(TreePreset[preset]));
@@ -198,7 +199,7 @@ export async function buildForest(ctx) {
     const obj = partsGroup(l0.parts); const imp = bakeImpostor(renderer, obj, 8, 256);
     const r = rng(name.length * 977 + positions.length), mats = new Float32Array(positions.length * 16);
     positions.forEach(([x, z], i) => composeTRS(mats, i, x, terrainH(x, z) - 0.05, z, r() * 6.28, (o.scale || [0.8, 1.25])[0] + ((o.scale || [0.8, 1.25])[1] - (o.scale || [0.8, 1.25])[0]) * r(), 0.03 * r(), r() * 6.28));
-    const levels = [{ parts: l0.parts }]; if (l1) levels.push({ parts: l1.parts }); levels.push({ impostor: imp.factory });
+    const levels: LODLevel[] = [{ parts: l0.parts }]; if (l1) levels.push({ parts: l1.parts }); levels.push({ impostor: imp.factory });
     const dist = l1 ? [o.d0 ?? 26, o.d1 ?? 70] : [o.d1 ?? 55];
     const sp = new LODSpecies(name, levels, mats, positions.length, dist); lods.push(sp); root.add(sp.group); note(name, positions.length, l0.parts); info.impostors++;
     return { l0, positions };
@@ -243,7 +244,7 @@ export async function buildForest(ctx) {
     underTree: (x, z) => (nearTree(x, z, 3.2) ? 1 : 0.12),
     nearTrunk: (x, z) => (nearTree(x, z, 1.8) ? 1 : 0),
   };
-  const add = async (name, loader, n, density, sc, extra = {}) => {
+  const add = async (name, loader, n, density, sc, extra: SpeciesAddOpts = {}) => {
     const parts = Array.isArray(loader) ? loader : (await loader).parts;
     const s = scatter(n, name.length * 31 + n, area, (x, z) => (Math.hypot(x, z) < 1.2 ? 0 : density(x, z)), { scale: sc, tilt: extra.tilt || 0, yOffset: extra.y || 0 });
     const g = extra.colors ? instancedParts(parts, s.mats, s.count, name) : cull.add(parts, s.mats, s.count, name); g.name = name; root.add(g); note(name, s.count, parts);

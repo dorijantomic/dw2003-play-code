@@ -23,6 +23,7 @@ import { ui, ROSTER_STRIDE } from "./vendor/engine.js";
 // before any screen boots, so boot and tick stay synchronous once loaded.
 import { loadNativeRuntime, nativeRuntime } from "./native-runtime.js";
 import { encodeNativeScreenText } from "./name-bytes.js";
+import type { NativeScreenFlags } from "./types/native-screen.js";
 
 const BASE = "assets/native/screens";
 
@@ -36,11 +37,41 @@ const state = {
     current: null,
 };
 
+/** One screen of the natives build: its overlay file, its root constructor, and the banks it uploads. */
+interface NativeScreenEntry { file: string; root_ctor?: number; bank_ids?: number[] }
+/** The natives manifest (tools/build_native_screens.py): one entry per screen module. */
+interface NativeScreenManifest { screens: Record<string, NativeScreenEntry> }
+/** One party record to seed: the roster slot it lands in, and the numbers its status sheet reads. */
+interface SeedRosterRow {
+    slot?: number;
+    starterSlot?: number;
+    exp?: number;
+    level?: number; tp?: number; hp?: number; maxHp?: number; mp?: number; maxMp?: number;
+    name?: string;
+    core?: number[]; elements?: number[];
+    forms?: any;
+    equipment?: { head?: number; body?: number; right?: number; left?: number; acc0?: number; acc1?: number };
+}
+/** The host save-context seed: the party map (roster slot per position, 0xffffffff = empty), and the records. */
+interface NativePartySeed { positions?: number[]; stats?: SeedRosterRow[] }
+/** What a boot may override on top of the manifest: the root constructor, the object lifecycle rule, the SFX hook,
+ *  the browser's card, the mixed-mode bridge, real root arguments, and the writes the constructor reads. */
+interface NativeBootOpts {
+    rootCtor?: number;
+    objectLifecycle?: boolean;
+    playPackedSound?: (id: any) => void;
+    memcard?: any;
+    bridge?: boolean;
+    rootArgs?: any[];
+    skipClip?: (name: string, id: any) => boolean;
+    preBoot?: (rt: any) => void;
+}
+
 export async function loadNativeScreens() {
     // Fetch the interpreter bundle first, so bootNativeScreen can stay
     // synchronous (its bank-transfer stub runs mid-tick and cannot await).
     await loadNativeRuntime();
-    const manifest = await (await fetch(`${BASE}/manifest.json`)).json();
+    const manifest: NativeScreenManifest = await (await fetch(`${BASE}/manifest.json`)).json();
     const resident = new Uint8Array(await (await fetch(`${BASE}/resident.bin`)).arrayBuffer());
     const overlays = {};
     await Promise.all(
@@ -87,7 +118,7 @@ export { encodeNativeScreenText };
  *  record+0x3C8 — the live store on the reference route puts an equipped item there
  *  (`sh $s4, 0x3c0($s1)`, ststatus file 0x17990 = RAM 0x8009A640). The documents
  *  that print `+0x3C0..+0x3CB` for these six are using the stat block's base. */
-export const RECORD_EQUIP_OFFSETS = [
+export const RECORD_EQUIP_OFFSETS: [string, number][] = [
     ["head", 0x3c8], ["body", 0x3ca], ["right", 0x3cc],
     ["left", 0x3ce], ["acc0", 0x3d0], ["acc1", 0x3d2],
 ];
@@ -103,7 +134,7 @@ export const RECORD_EQUIP_OFFSETS = [
  *  { positions: number[], stats: [{ slot, level, tp, hp, maxHp, mp, maxMp, exp,
  *    name?, core?: number[6], elements?: number[7],
  *    equipment?: { head?, body?, right?, left?, acc0?, acc1? } }] }. */
-export function seedNativeScreenParty(seed = {}) {
+export function seedNativeScreenParty(seed: NativePartySeed = {}) {
     const mem = state.current?.rt?.mem;
     if (!mem) return false;
     const PARTY = 0x80048d34 + 0x70;
@@ -189,7 +220,7 @@ export function nativeScreenList() {
  *  lifecycle-3 destroy rule (see engine/native/stubs.ts), which is what lets a
  *  scene return to its parent screen when a sub-screen closes.
  *  opts.playPackedSound — host audio forwarding for the runtime's SFX stub. */
-export function bootNativeScreen(moduleId, host = {}, opts = {}) {
+export function bootNativeScreen(moduleId, host = {}, opts: NativeBootOpts = {}) {
     state.current = null;
     resolverDirs.clear();
     const entry = state.manifest?.screens?.[moduleId];
@@ -209,7 +240,7 @@ export function bootNativeScreen(moduleId, host = {}, opts = {}) {
         // save screen's adapter). Absent = the retail no-card path.
         ...(opts.memcard ? { memcard: opts.memcard } : {}),
         ...host,
-    };
+    } as NativeScreenFlags;
     // The manifest stores root_ctor OVERLAY-RELATIVE (tools/build_native_screens.py
     // writes `ctor - load_base`, and the runtime boots overlayBase + root_ctor).
     // An explicit opts.rootCtor is absolute (the decomp's F0x8008xxxx form), so

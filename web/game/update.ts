@@ -459,7 +459,7 @@ function update(dt) {
         if (!cb.done) {
             // Debug hold (a verifier can freeze the wipe mid-run to capture it):
             // window.__wipe28Hold = true.
-            if (!window.__wipe28Hold)
+            if (!(window as any).__wipe28Hold)
                 for (let n = 0; n < 2 && !cb.done; n++) stepCheckerboard(cb, WIPE_A28_STEP_UNIT);
         } else {
             const p = cb.pending;

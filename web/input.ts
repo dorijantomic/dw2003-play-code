@@ -122,7 +122,7 @@ export function createGamepadReader(nav = typeof navigator !== "undefined" ? nav
  * held-button Set (`state.keys`), which the pad adds to and removes from
  * directly so movement polls it without knowing where the input came from.
  */
-export function attachGamepad({ onPress, heldKeys, nav, win }) {
+export function attachGamepad({ onPress, heldKeys, nav, win }: { onPress: (button: any) => void; heldKeys: Set<any>; nav?: any; win?: any }) {
   const reader = createGamepadReader(nav);
   const target = win ?? (typeof window !== "undefined" ? window : null);
   const onBlur = () => {

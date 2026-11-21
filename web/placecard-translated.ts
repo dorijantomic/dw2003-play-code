@@ -23,6 +23,7 @@ import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js
 // card is the plain-string one in web/placecard.js: the same bars, the same typewriter, hold and slit, drawn from
 // strings we hold. This instance hands it the screen while it plays, so game.js talks to one card either way.
 import { createPlaceCard as createTextPlaceCard } from "./placecard.js";
+import type { PlaceCardScreen } from "./types/placecard-translated.js";
 
 /** The framebuffer the card's coordinates are authored in. */
 const NATIVE_W = 320;
@@ -71,7 +72,7 @@ export function createPlaceCardTranslated() {
         _language: DEFAULT_LANGUAGE,
         _ticks: 0,
         _painted: [],
-    };
+    } as PlaceCardScreen;
 
     function fail(error) {
         card._error = error;

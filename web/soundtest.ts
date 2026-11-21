@@ -24,6 +24,7 @@
 
 import { drawText } from "./uifont.js";
 import { packedIsMusicStart, packedSampleResolver } from "./packed-sound.js";
+import type { SoundTestState } from "./types/soundtest.js";
 
 /** The overlay's window height (F0x8008443c, eight rows). */
 export const SOUNDTEST_ROWS = 8;
@@ -124,7 +125,7 @@ export function createSoundTest({ sfx = null, music = null } = {}) {
     const d = {
         open: false, stage: "categories", cursor: 0, scroll: 0,
         soundCursor: 0, soundScroll: 0, status: "", playing: null, ready: false,
-    };
+    } as SoundTestState;
     let catalogue = null;
     let playable = null;
     let resolvePacked = null;

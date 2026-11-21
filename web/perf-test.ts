@@ -13,6 +13,7 @@
 // SAFETY: the game writes its save into localStorage of this origin. This page copies ALL of localStorage first (sessionStorage +
 // the receiver's /backup file), seeds a throw-away party, and puts the copy back at the end (or on the next load of this page).
 // Open the page on a different host name than you play on (127.0.0.1 vs localhost) and your own save is never touched at all.
+import type { PerfResultsMeta, PerfTestCounts, PerfTestEnv, PerfTestGroup, PerfTestResult, PerfTestResults, PerfTestRun, PerfTestSceneExtra, PerfTestVariant } from "./types/perf-test.js";
 
 const WARM_MS = 2000;
 const MEASURE_MS = 10000;
@@ -90,7 +91,7 @@ const FIELD_B = {   // Pelche Oasis: sandy (heat shimmer + sepia wet look), wate
 const DETAIL_KEYS = ["sway", "grass", "grasspush", "water", "reflect", "mirror", "wetlook", "seam", "rain", "rainwater", "snow", "sand", "lightning", "gusts", "breath", "frost", "screenfx", "tod", "nightlight", "clouds", "lamps", "lightpool", "lightreveal", "indoor", "fog", "shafts", "heat", "sparkle", "pollen", "leaves", "fireflies", "devils", "steps", "puddles", "uisharp"];
 const EFFECT_ONLY_KEYS = ["sound", "ambience", "musicfx", "footsteps"];   // the Sound category of EFFECTS
 const QUEST_KEYS = ["quests", "questtriggers", "questemotes", "questplacecard", "questsecondjob"];   // OPTIONS -> GAME -> Quests
-const VARIANTS = {
+const VARIANTS: Record<string, PerfTestVariant> = {
     off: { label: "settings off (Detail Original, pixel filter off)", values: { ...Object.fromEntries(DETAIL_KEYS.map((k) => [k, false])), quality: "low", spriteFilter: "off" } },
     on: { label: "settings on (Detail High, all EFFECTS on, quality high, pixel filter xBR blended)", values: { ...Object.fromEntries([...DETAIL_KEYS, ...EFFECT_ONLY_KEYS, ...QUEST_KEYS].map((k) => [k, true])), quality: "high", spriteFilter: "xbrblend" } },
 };
@@ -98,7 +99,7 @@ const VARIANTS = {
 const NOOP_WHEN_OFF = new Set(["noGrass", "noWater", "noFilter", "noHeat"]);
 
 // ---- small helpers
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const logEl = () => $("log");
 function log(msg) { const el = logEl(); el.textContent += msg + "\n"; el.scrollTop = el.scrollHeight; }
@@ -130,10 +131,10 @@ function browserName(ua) {
     return "browser";
 }
 function glInfo() {
-    const out = { renderer: null, vendor: null, version: null, unmaskedRenderer: null, unmaskedVendor: null, webgl2: false };
+    const out = { renderer: null, vendor: null, version: null, unmaskedRenderer: null, unmaskedVendor: null, webgl2: false } as PerfTestEnv;
     try {
         const c = document.createElement("canvas");
-        let gl = c.getContext("webgl2"); out.webgl2 = !!gl;
+        let gl: WebGLRenderingContext | null = c.getContext("webgl2"); out.webgl2 = !!gl;
         if (!gl) gl = c.getContext("webgl");
         if (!gl) return out;
         out.renderer = gl.getParameter(gl.RENDERER); out.vendor = gl.getParameter(gl.VENDOR); out.version = gl.getParameter(gl.VERSION);
@@ -154,7 +155,7 @@ function takeBackup() {
 function restoreBackup() {
     const raw = sessionStorage.getItem(BACKUP_KEY);
     if (raw == null) return false;
-    const all = JSON.parse(raw);
+    const all: Record<string, string | null> = JSON.parse(raw);
     localStorage.clear();
     for (const [k, v] of Object.entries(all)) localStorage.setItem(k, v);
     sessionStorage.removeItem(BACKUP_KEY);
@@ -173,7 +174,7 @@ function seedStorage(mode) {
 }
 
 // ---- the run
-const run = { iw: null, frame: null, rec: null, frameTimes: null, prevT: 0, walk: null, cat: [], saved: null, stamps: [], lastRafAt: 0, guard: null, recv: "", minStep: Infinity, ctxTypes: new WeakMap(), gcHooked: new WeakSet(), layerFrames: null };
+const run = { iw: null, frame: null, rec: null, frameTimes: null, prevT: 0, walk: null, cat: [], saved: null, stamps: [], lastRafAt: 0, guard: null, recv: "", minStep: Infinity, ctxTypes: new WeakMap(), gcHooked: new WeakSet(), layerFrames: null } as PerfTestRun;
 
 // ---- stall guard. A hidden / covered / minimised window makes the browser stop (or nearly stop) requestAnimationFrame while timers
 // still run. The page's own rAF loop keeps `stamps` (performance.now() of each frame, last 3 s) and a watchdog timer checks it.
@@ -315,9 +316,9 @@ function canvasReport(iw) {
 async function probeCalls(iw) {
     const proto = iw.CanvasRenderingContext2D.prototype;
     const names = ["drawImage", "fillRect", "fill", "stroke", "createRadialGradient", "createLinearGradient", "getImageData", "putImageData", "save", "arc"];
-    const counts = {}, orig = {};
+    const counts = {} as PerfTestCounts, orig = {};
     const wgl = { calls: 0, ms: 0, worst: 0, sizes: new Map() }, unk = { calls: 0, sizes: new Map() }, decided = new WeakMap();
-    const ms = {}, bySrc = {};   // time spent per call name, and drawImage time per source kind/size/filter
+    const ms: Record<string, number> = {}, bySrc: Record<string, { calls: number; ms: number }> = {};   // time spent per call name, and drawImage time per source kind/size/filter
     const srcKind = (s) => {
         const c = s && s.constructor && s.constructor.name || "?";
         let ctx = "";
@@ -502,7 +503,7 @@ function censusStop(st, frames) {
     return { frames, totalPerFrame: r(st.total), census: [...st.counts].map(([key, c]) => ({ key, perFrame: r(c) })).sort((a, b) => b.perFrame - a.perFrame).slice(0, 150) };
 }
 
-async function measureScene(iw, scene, extra = {}) {
+async function measureScene(iw, scene, extra: PerfTestSceneExtra = {}) {
     const variant = extra.variant || "on";
     const sid = scene.id + "|" + variant;
     const vis0 = { visibility: document.visibilityState, hasFocus: document.hasFocus() };
@@ -550,7 +551,7 @@ async function measureScene(iw, scene, extra = {}) {
             ambienceProfile: iw.__ambienceProfile?.(extra.map) || null,
             battleState: { start: stateStart, end: iw.__battle?.isActive?.() ? iw.__battleB?.()?.state : null },
             ...extra.fields,
-        };
+        } as PerfTestResult;
         out.minStepSeenMs = Number.isFinite(run.minStep) ? run.minStep : null;
     } catch (e) {
         out = { id: sid, scene: scene.id, variant, label: scene.label, error: String(e && e.stack || e) };
@@ -600,7 +601,7 @@ async function loadGame(map) {
     let stopWatch = () => {};
     await new Promise((res) => { frame.addEventListener("load", res, { once: true }); frame.src = GAME_URL(map); stopWatch = watchFrameForEarlyHook(frame); });
     stopWatch();
-    const iw = frame.contentWindow;
+    const iw: any = frame.contentWindow;
     log("  early getContext hook on game window: " + run.gcHooked.has(iw));
     run.iw = iw;
     installHooks(iw);
@@ -640,7 +641,7 @@ async function startBattle(iw, mapId) {
 async function main() {
     $("start").disabled = true;
     logEl().textContent = "";
-    const results = { meta: null, groups: [], notes: [] };
+    const results = { meta: null, groups: [], notes: [] } as PerfTestResults;
     run.noPin = !$("pin").checked;
     const ua = navigator.userAgent;
     results.meta = {
@@ -652,7 +653,7 @@ async function main() {
         timerPrecision: timerPrecision(), visibilityAtStart: document.visibilityState, hasFocusAtStart: document.hasFocus(), autostart: AUTO,
         ...(CUT ? { cutLabels: CUT_LABELS } : {}),
         options: { assetMode: $("mode").value, walking: $("walk").checked, dayPinned: !run.noPin }, page: location.href,
-    };
+    } as PerfResultsMeta;
     log("browser " + results.meta.browser + ", GL renderer: " + results.meta.gl.renderString);
     const recv = $("recv").value.replace(/\/+$/, "");
     run.recv = recv;
@@ -682,7 +683,7 @@ async function main() {
             groups[0].battles = [];
         }
         for (const G of groups) {
-            const grp = { map: G.map, note: G.mapNote, scenes: [], error: null };
+            const grp = { map: G.map, note: G.mapNote, scenes: [], error: null } as PerfTestGroup;
             results.groups.push(grp);
             try {
                 let iw = null;

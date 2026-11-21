@@ -15,9 +15,10 @@ import { effStats } from "../hit-results.js";
 import { itemForDropName } from "../../drop-item.js";
 import { battleMsgText } from "../../battlemsg-translated.js";
 import { winBattleRewards, paidParticipants } from "../progress.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeLoad(B) {
+export function makeLoad(B: BattleContext) {
 async function loadFusionData() {
     if (B.fusionDataTried || !fusionEnabled()) return;
     B.fusionDataTried = true;

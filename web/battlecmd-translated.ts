@@ -19,6 +19,7 @@ import { ui } from "./vendor/engine.js";
 import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
+import type { BattleCommandSeed } from "./types/battlecmd-translated.js";
 
 /** The row picture pack: handle 0x04550000 is disc index 1109, PGFGTC00. */
 const PACKS = { 1109: "pgfgc00" };
@@ -77,7 +78,7 @@ export function createBattleCommandTranslated(sfx = null, options = {}) {
 
         /** Open at `initialRow`; `seed` carries the acting party slot, its ailment byte
          *  and, when the acting Digimon is confused, the shuffle's six joke indices. */
-        seed: (r, initialRow = 0, seed = {}) => {
+        seed: (r, initialRow = 0, seed: BattleCommandSeed = {}) => {
             r._row = Math.max(0, Math.min(5, Number(initialRow) | 0));
             const joke = seed.jokeIndices ?? null;
             return {

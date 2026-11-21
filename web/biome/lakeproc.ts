@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { toonify, groundMaterial, rng, U, noiseTexture, light } from "./toolkit.js";
 import { GB, tube, ribbon, canvasTex, mixc, V, addGeo } from "./beachproc.js";
 import { grassClumpParts } from "./procedural.js";
+import type { GroundDetailOpts, WaterlineOpts } from "./types.js";
 
 // ------------------------------------------------------------------ lake law
 export const LAKE_C = [0, -26];
@@ -54,7 +55,7 @@ export function floaty(m, tag, amp = 0.016) {
   return m;
 }
 /** waterline look for rocks / logs / posts: dark wet band, algae fringe and a teal tint below y = 0 (world space) */
-export function waterlineify(parts, o = {}) {
+export function waterlineify(parts, o: WaterlineOpts = {}) {
   const mode = o.mode === "object" ? 1 : 0, level = o.level || 0, col = o.algae || [0.10, 0.30, 0.12];
   for (const p of parts) {
     const prev = p.mat.onBeforeCompile, tag = (p.mat.userData.tag || "") + "wl"; p.mat.userData.tag = tag;
@@ -447,7 +448,7 @@ void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float a = smoothstep(1
 }
 
 // ------------------------------------------------------------------ LAKE GROUND: splat base + mud / pebble apron by distance to shore + wet bank + underwater tint
-export function lakeGround(texs, mud, peb, o = {}) {
+export function lakeGround(texs, mud, peb, o: GroundDetailOpts = {}) {
   const m = groundMaterial(texs, { tile: o.tile || 3.0, tints: o.tints || [[1.0, 1.04, 0.9], [1.0, 0.96, 0.86], [0.9, 1.0, 0.78], [0.96, 0.94, 0.9]], splat: o.splat || [0.5, 0.6, 0, 9] });
   m.userData.tag = "lakeground" + (o.disc ? "D" : "");
   const prev = m.onBeforeCompile;
@@ -479,7 +480,7 @@ ${GLSL_LAKE}`)
 // ------------------------------------------------------------------ LAKE WATER: depth colour bands, planar reflection (low-res mirror), ripples, caustics, soft shore foam, sparkle
 const FOGV = THREE.UniformsLib.fog;
 export const reflection = { tex: null, mat: new THREE.Matrix4(), on: { value: 0 } };
-export function lakeWaterMaterial(o = {}) {
+export function lakeWaterMaterial(o: { disc?: boolean } = {}) {
   const C = (h) => new THREE.Color(h);
   const uni = THREE.UniformsUtils.merge([FOGV, { uC0: { value: C(0xcfe8a0) }, uC1: { value: C(0x6fc0a0) }, uC2: { value: C(0x2f8f9a) }, uC3: { value: C(0x1f6782) }, uC4: { value: C(0x154a68) } }]);
   Object.assign(uni, { uTime: U.uTime, uNoise: { value: noiseTexture() }, uSunV: U.uSunV, uUpV: U.uUpV, uSkyCol: U.uSkyCol, uRefl: { value: reflection.tex }, uReflM: { value: reflection.mat }, uReflOn: reflection.on, uDisc: { value: o.disc ? 1 : 0 } });
@@ -538,6 +539,17 @@ void main(){
 }
 /** Planar reflection, low-res: renders only objects on layer 1 (sky, tree impostors, rocks, a coarse bank mesh) from the mirrored camera into a small target. */
 export class LakeReflector {
+  declare _cw: any;
+  declare _n: any;
+  declare _rm: any;
+  declare _t: any;
+  declare _u: any;
+  declare _v: any;
+  declare _z: any;
+  declare busy: boolean;
+  declare cam: any;
+  declare ms: number;
+  declare rt: any;
   constructor(renderer, w = 384, h = 288) {
     this.rt = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true, colorSpace: THREE.NoColorSpace });
     this.cam = new THREE.PerspectiveCamera(); this.cam.layers.set(1);

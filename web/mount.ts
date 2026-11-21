@@ -16,6 +16,7 @@
 // hides itself, the quest character included, and a press does nothing. Switched off, or not unlocked, normal play is
 // unchanged (tests/mount.test.js proves it position by position).
 import { MOUNT_VIEW, loadMountAsset, renderMount, mountSplit, mountRenderInfo, probeFramebuffer, renderSelfTest, sceneProbe } from "./mount3d.js";
+import type { GameState } from "./game/types.js";
 
 /**
  * The mount table. One row per rideable Digimon; adding a second mount is a new row plus the quest that
@@ -210,7 +211,7 @@ export const seatDefault = () => ({ dx: 0, dy: 0, cut: 0, layer: "auto" });
 let seatFile = {};
 export function loadSeats(url = "mount-seats.json") {
   return fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
-    .then((j) => { seatFile = j && typeof j === "object" ? j.seats ?? j : {}; return seatFile; });
+    .then((j: any) => { seatFile = j && typeof j === "object" ? j.seats ?? j : {}; return seatFile; });
 }
 export function seatSettings(id, dir) {
   let local = null;
@@ -344,7 +345,7 @@ export function mountUseAsset(asset) { S.asset = asset; S.rendererFailed = false
 /** The line shown when the ride button is pressed on an indoor map. */
 export const NO_ROOM_LINE = "No room to ride in here.";
 
-function startMount(state) {
+function startMount(state: GameState) {
   const def = unlockedDef();
   if (!def || S.rendererFailed) return false;     // no unlock, or the model could not be drawn: never an invisible mount
   if (host?.indoor?.()) { host?.say?.(NO_ROOM_LINE); return true; }   // no riding inside buildings: the press is used, nothing starts
@@ -359,7 +360,7 @@ function startMount(state) {
   return true;
 }
 
-function startDismount(state) {
+function startDismount(state: GameState) {
   if (S.mode !== "riding") return false;
   const spot = findDismountSpot(host?.canStand, state.x, state.y);
   if (spot) { state.x = spot.x; state.y = spot.y; }
@@ -382,7 +383,7 @@ export function mountForceDismount() {
 }
 
 /** The ride/dismount button. Returns true when the press was used. */
-export function mountPress(state) {
+export function mountPress(state: GameState) {
   if (!enabled()) return false;
   if (!host?.fieldReady?.()) return false;
   if (S.mode === "riding") return startDismount(state);
@@ -394,7 +395,7 @@ export function mountPress(state) {
  * Per-frame step. Returns true when the field's own input must be frozen for this frame (the climb on /
  * step off animation); false while riding, because the player keeps walking (faster) and the mount follows.
  */
-export function mountTick(dt, state, { mapId = null } = {}) {
+export function mountTick(dt, state: GameState, { mapId = null } = {}) {
   if (!enabled()) {
     if (S.mode !== "idle") mountForceDismount();
     return false;
@@ -497,7 +498,10 @@ export function mountDrawable(ctx, drawables, camX, camY, timeSec = 0) {
 
 // ── debug hooks (the verifier reads state, never pixels) ───────────────────────────────────────
 /** Render one frame off-screen and describe it in numbers (no picture is ever looked at). */
-function spriteStats(opts = {}) {
+/** The numbers one off-screen frame is described by: the facing, whether it walks, and the two phases compared. */
+interface SpriteStatsOpts { dir?: string; moving?: boolean; phaseA?: number; phaseB?: number }
+
+function spriteStats(opts: SpriteStatsOpts = {}) {
   if (!S.asset) return null;
   const draw = (phase) => renderMount(S.asset, {
     x: MOUNT_VIEW.w / 2, y: MOUNT_VIEW.h - 10, dir: opts.dir ?? "down", phase,

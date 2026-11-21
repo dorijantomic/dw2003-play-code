@@ -7,9 +7,10 @@ import { battleAilmentByte } from "../../battlecmd-translated.js";
 import { itemForDropName } from "../../drop-item.js";
 import { paidParticipants } from "../progress.js";
 import { buildFightReportRows, buildFightReportPages } from "../report.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeUpdate(B) {
+export function makeUpdate(B: BattleContext) {
 /**
    * The battle's whole frame: message clock, HP plate, blast cinematic and the 3D
    * scene, all stepped by one dt. "Faster battles" (F2 -> Extras, off by default)

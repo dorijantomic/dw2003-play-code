@@ -34,6 +34,7 @@ import { paintNativeSession, updateNativeSession } from "./native-session.js";
 import { composeEnd } from "./ui-c/screens.js";
 import { paletteClipId } from "./screenpack.js";
 import { fetchJson } from "./resident-data.js";
+import type { EndscreenScreen } from "./types/endscreen-translated.js";
 
 /** The framebuffer the card's coordinates are authored in. */
 const NATIVE_W = 320;
@@ -71,7 +72,14 @@ export async function loadEndCardTranslated() {
  * are what the UI lab and tools/verify_endscreen.mjs read, so a capture can be checked without
  * looking at the image.
  */
-export function createEndCardTranslated(options = {}) {
+/** What the end card is handed: the language of its pictures, and what to do on the way out. */
+interface EndCardOptions {
+    language?: number;
+    stopSound?: (() => void) | null;
+    onDone?: (() => void) | null;
+}
+
+export function createEndCardTranslated(options: EndCardOptions = {} as EndCardOptions) {
     const card = {
         _open: false,
         _session: null,
@@ -88,7 +96,7 @@ export function createEndCardTranslated(options = {}) {
         _launches: [],
         _stopSound: options.stopSound ?? null,
         _onDone: options.onDone ?? null,
-    };
+    } as EndscreenScreen;
 
     function fail(error) {
         card._error = error;

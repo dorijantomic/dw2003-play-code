@@ -8,6 +8,8 @@
 import { SPEEDS } from "./battle-speed.js";
 import { DETAIL_OFF_LOW, DETAIL_OFF_MEDIUM } from "./detail-presets.js";
 import { shipClass } from "./ship-list.js";
+import type { AmbienceSettings } from "./types/ambience.js";
+import type { OptionsHome } from "./types/options-model.js";
 
 // ---------------------------------------------------------------- key homes
 /** The 35 effect keys the one Detail choice sets (web/ambience.js groups Terrain, Weather, Atmosphere, Life, Ground, Screen). */
@@ -37,9 +39,9 @@ export const EXTRA_GROUPS = Object.freeze([
     { id: "online", label: "Online", keys: ["serverchamp", "mpbubbles", "mpcredit"], help: "League nights, reaction bubbles, and co-op wins that count for quests." },
 ]);
 /** One-time reset: older builds let the Battle ideas row switch practice2v2 on, which made every wild fight 2 vs 2. Returns true when practice2v2 must be turned off once (done = the stored marker). */
-export function needsPractice2v2Reset(fx, done) { return !done && !!fx?.practice2v2; }
+export function needsPractice2v2Reset(fx: AmbienceSettings, done) { return !done && !!fx?.practice2v2; }
 /** One-time reset: the Mount switch started out off (a dev switch); it is a game feature now and starts on. Returns true when an old save that holds it off must turn it on once (done = the stored marker). The player may switch it off again in OPTIONS and it stays off. */
-export function needsMountOnReset(fx, done) { return !done && fx?.mount !== true; }
+export function needsMountOnReset(fx: AmbienceSettings, done) { return !done && fx?.mount !== true; }
 export const SHOWN_EXTRAS = Object.freeze(["quests", "mount"]);
 const WIDE_KEYS = Object.freeze(["widefield", "battlewide"]);
 const TOON_KEYS = Object.freeze(["toonoutline", "toonshade"]);
@@ -110,7 +112,7 @@ export const LIST_ROWS = 9;
 
 /** Where each of the 98 keys lives: "detail", an OPTIONS row id, "effects:<category>", or "f2". (The two new dev switches `glossary` and `options` are F2 only too.) */
 export const OPTIONS_HOME = (() => {
-    const home = {};
+    const home = {} as OptionsHome;
     for (const k of DETAIL_KEYS) home[k] = "detail";
     home.battlespeed = "battleSpeed"; home.encounterdial = "randomFights";
     for (const k of [...WIDE_KEYS, "hd2d", ...TOON_KEYS]) home[k] = "f2";       // "auto" or "out" for players: no OPTIONS row

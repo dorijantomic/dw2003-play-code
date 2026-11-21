@@ -11,16 +11,17 @@
 import { mpOn, isOnline, myId, myName, peerList, peerOf, peerHere, playingCount, sendChat, sendFeed, sendCard, sendTrade, sendDuel, sendCoop, sendGoto, sendLeague, amHost, serverChampOn, chatPending, chatQueueOn } from "./multiplayer.js";
 import { GOTO_TIMEOUT_MS } from "./mp-goto.js";
 import { unpackLeague, matchScore, MAX_TAMERS } from "./mp-league.js";
+import type { MpRosterRow, MpSocialEls, MpTrade, MpTradeItem } from "./types/mpsocial.js";
 
 const MAX_LOG = 300;
 const S = { tab: "all", log: [], collapsed: false, unread: 0 };
-let api = null, dock = null, el = {}, trade = null, duel = null, go = null, inspectId = null;
+let api = null, dock = null, el = {} as MpSocialEls, trade = null as MpTrade, duel = null, go = null, inspectId = null;
 let prevParty = null, lastCardJson = "";
 let myMapSeen = null;                                        // the map my PLAYERS row was last drawn for
 let league = null, leaguePair = null, leagueGames = [], leagueKey = "", champOn = false;   // the Server Champ night (web/mp-league.js)
 
 // ------------------------------------------------------------ small helpers
-const h = (tag, cls, ...kids) => {
+const h = (tag, cls?, ...kids) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     for (const k of kids) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }
@@ -101,7 +102,7 @@ function drawPlayers() {
     sel.onchange = () => { try { localStorage.setItem(KEY_STR, sel.value); } catch { /* storage blocked */ } };
     el.players.append(h("div", "sub", "Co-op boss strength ", sel, partner != null ? `   Partner: ${peerOf(partner)?.name ?? "?"}` : ""));
     if (serverChampOn()) el.players.append(leagueStrip());
-    const rows = [{ id: myId(), name: myName(), map: here, card: api.card(), self: true }, ...peerList()];
+    const rows: MpRosterRow[] = [{ id: myId(), name: myName(), map: here, card: api.card(), self: true }, ...peerList()];
     for (const p of rows) {
         const nm = h("b", "nm", (p.id === partner ? "★ " : "") + p.name); nm.style.color = isChamp(p) ? "#ffd34d" : nameColor(p.name);
         const where = h("div", "sub", `${levelLine(p.card)}  ·  ${place(p.map)}${p.map && p.map === here ? "  ●" : ""}`);
@@ -173,8 +174,8 @@ function askTrade(id) {
 }
 
 function myOffer() {
-    const held = new Map(trade.bag.map((b) => [b.id, b]));
-    const items = [];
+    const held: Map<number, MpTradeItem> = new Map(trade.bag.map((b) => [b.id, b] as [number, MpTradeItem]));
+    const items: MpTradeItem[] = [];
     for (const [id, qty] of Object.entries(trade.mine.items)) {
         const b = held.get(+id);
         if (b && qty > 0) items.push({ id: +id, qty: Math.min(qty, b.qty), name: b.name });
@@ -183,7 +184,7 @@ function myOffer() {
 }
 function pushOffer() { trade.myOk = false; trade.theirOk = false; sendTrade({ op: "offer", ...myOffer() }); }
 
-function endTrade(msg) {
+function endTrade(msg?: string) {
     if (msg) note(msg);
     trade = null; if (el.trade) el.trade.hidden = true;
 }
@@ -309,7 +310,7 @@ function verdict() {
     endDuel(`Duel with ${n}: ${text}  (you ${pct(duel.mine)}; ${n} ${pct(duel.theirs)})`);
 }
 
-function endDuel(msg) {
+function endDuel(msg?: string) {
     const won = duel?.mine && duel?.theirs && (duel.mine.won ? 1 : 0) + duel.mine.hp > (duel.theirs.won ? 1 : 0) + duel.theirs.hp + 0.02;
     const n = peerOf(duel?.id)?.name;
     if (msg) note(msg);
@@ -365,7 +366,7 @@ export const coopReady = () => !!(isOnline() && partner != null && peerHere(part
 export function coopRolling(on) { rolling = !!on; }
 
 /** Offer a fight to my partner. `start(foes, partnerId)` runs it here (partnerId null = fight alone). Returns false when I have no partner (the caller just fights). */
-export function coopTry(foes, label, start, screens) {
+export function coopTry(foes, label, start, screens?: any) {
     if (!(isOnline() && partner != null && peerHere(partner) && !coop && !duel && !trade)) return false;   // (a pending roll is fine: that is us)
     rolling = false;
     const m = strength(), scaled = scaleFoes(foes, m);
@@ -462,7 +463,7 @@ function askGoto(id) {
     drawGoto();
 }
 
-function endGoto(msg) {
+function endGoto(msg?: string) {
     if (go) clearTimeout(go.timer);
     go = null; if (el.go) el.go.hidden = true;
     if (msg) note(msg);
@@ -716,7 +717,7 @@ export function installSocial({ stageEl, api: a }) {
     document.head.appendChild(css);
 
     dock = h("div"); dock.id = "mp-dock"; dock.style.display = "none";
-    const tabs = {};
+    const tabs = {} as Record<string, HTMLElement>;
     const top = h("div", "top");
     for (const [k, label] of [["all", "ALL"], ["chat", "CHAT"], ["events", "EVENTS"], ["players", "PLAYERS"]]) {
         tabs[k] = btn(label, () => { if (S.collapsed) toggleCollapse(); setTab(k); }); top.append(tabs[k]);

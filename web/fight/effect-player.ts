@@ -69,6 +69,11 @@ export function spriteMatrix2x2(rx, ry, rz) {
 const BURST_TICKS = 40;     // safety-ceiling lifetime; landProjectiles() clears it at the strike
 
 export class EffectPlayer {
+  declare _projRegistry: any;
+  declare instances: any[];
+  declare lastProjectile: { id: any; from: any; to: any; side: string; known: boolean; };
+  declare manifest: any;
+  declare projectiles: any[];
   constructor(manifest) {
     this.manifest = manifest || { types: {}, archives: {}, op10_sounds: {} };
     this.instances = [];
@@ -246,7 +251,7 @@ export class EffectPlayer {
 export async function loadEffectAssets(base = "assets/battle/effects") {
   const manifest = await (await fetch(`${base}/manifest.json`)).json();
   const images = {};
-  await Promise.all(Object.entries(manifest.archives).map(async ([a, rec]) => {
+  await Promise.all(Object.entries(manifest.archives).map(async ([a, rec]: [string, any]) => {
     try { images[a] = await loadAssetImage(`${base}/${rec.sheet}`); }
     catch { /* Missing optional effect sheets remain non-fatal. */ }
   }));

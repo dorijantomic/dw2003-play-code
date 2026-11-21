@@ -10,6 +10,7 @@
 // amplitude to zero at the first and last tick (idle -> motion -> idle).
 import { MOTION_KIT, rigOf } from "./anim-retarget.js";
 import { bodyPlan } from "./digimon-anatomy.js";
+import type { MotionBonesOut, MotionTreeContext } from "./types.js";
 
 const { sample, k16Pose, k16ToCh2, k16FromCh2, k16mul: mul, k16tr: tr, k16mv: mv, k16fromTo: fromTo,
   k16axisAngle: axAng, k16axisOf: axOf, k23Cloud, k23NeutralFrame, shiftPlaylistEntry } = MOTION_KIT;
@@ -85,7 +86,7 @@ function buildCtx(model) {
   while (par[mainRoot] >= 0) mainRoot = par[mainRoot];
   const torso = rig && Number.isInteger(rig.torso) && rig.torso >= 0 && rig.torso < n ? rig.torso : mainRoot;
   const head = rig && Number.isInteger(rig.head) && rig.head >= 0 && rig.head < n ? rig.head : null;
-  const mkLimb = (chain0, label, extra = {}) => {
+  const mkLimb = (chain0, label, extra: { side?: string; ordinal?: number } = {}) => {
     const chain = hierPrefix(par, chain0);
     if (!chain.length) return null;
     const root = chain[0], tip = chain[chain.length - 1];
@@ -151,7 +152,7 @@ function buildCtx(model) {
     mainRoot, torso, head, arms, legs, wings, tail, spine: tail.length >= 3 ? tail : (spineFree.length >= 3 ? spineFree : []),
     hips, upper, plan, own: new Map(),
     quad: legs.length >= 4 || /quadruped/.test(plan) || (zmax - zmin) > 1.0 * H,
-  };
+  } as MotionTreeContext;
   ctx.cap = (b, floor, ceil) => {
     let o = ctx.own.get(b);
     if (o === undefined) {
@@ -177,6 +178,12 @@ function getCtx(model) {
 
 // ───────────────────────────── pose spec + solver ─────────────────────────────
 class Spec {
+  declare ctx: any;
+  declare g: any;
+  declare legs: Map<any, any>;
+  declare reaches: Map<any, any>;
+  declare rot: Map<any, any>;
+  declare sh: number[] | any[];
   constructor(ctx, g) {
     this.ctx = ctx; this.g = g; this.sh = [0, 0, 0];
     this.rot = new Map(); this.legs = new Map(); this.reaches = new Map();
@@ -597,7 +604,7 @@ export function bakeGenericMotion(model, id, { offset = 8000 } = {}) {
         const l2 = keys2[i][T - 1], l1 = keys1[i][T - 1];
         return { ...b, anim: { ...(b.anim || {}), ch2: [...own2, ...keys2[i], [l2[0], l2[1], l2[2], 30000]], ch1: [...own1, ...keys1[i], [l1[0], l1[1], l1[2], 30000]] } };
       }),
-    };
+    } as MotionBonesOut;
     const tl = model.timeline ? model.timeline.slice() : [];
     let table = 62;
     while (tl[table] && (tl[table].table?.length ?? 0)) table++;

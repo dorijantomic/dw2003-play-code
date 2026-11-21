@@ -34,6 +34,7 @@
 // context; the browser hands it the real one.
 
 import { levelTier } from "./vendor/engine.js";
+import type { BlastProfile, BlastSkill } from "./types/blast-ladder.js";
 
 /**
  * The partner-level brackets, one per tier: [min, max], level 1..99.
@@ -78,8 +79,8 @@ export function bracketLabel(tier) {
 export function blastCards(digimon, skills) {
   const profiles = Array.isArray(digimon) ? digimon : digimon?.digimon ?? [];
   const skillList = Array.isArray(skills) ? skills : Array.isArray(digimon) ? [] : digimon?.skills ?? [];
-  const skillById = new Map(skillList.map((s) => [s.id, s]));
-  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const skillById = new Map<number, BlastSkill>(skillList.map((s) => [s.id, s]));
+  const profileById = new Map<number, BlastProfile>(profiles.map((p) => [p.id, p]));
   return profiles
     .filter((p) => p && p.is_starter)
     .slice()

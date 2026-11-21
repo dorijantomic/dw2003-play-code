@@ -38,7 +38,7 @@ export function createBookHost({ sfx = null, factories = {}, fx = () => (typeof 
     const host = {
         isOpen: () => book !== null,
         /** Open `name` (a key of `factories`). `held` is the pad set right now (the confirm that chose the row is still down). */
-        open(name, back = null, held = []) {
+        open(name, back = null, held: any = []) {
             const make = factories[name];
             if (!make || book) return false;
             book = make({ sfx, fx, setFx, setFxMany, host });

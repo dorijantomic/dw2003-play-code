@@ -8,6 +8,7 @@
 // Pure: no DOM and no fs (the CLI in tools/scene_readback.mjs does the reading and the printing). The wording
 // follows docs/quests-fx-brief.md and web/quest-scenes.js, which is the closed vocabulary this reads.
 import { paginate } from "./dialogue-pack.js";
+import type { QuestReadbackOpts } from "./types/quest-readback.js";
 
 /** Every step kind web/quest-scenes.js compiles, plus the approved registry step ({ scene: "<id>" }). */
 export const KINDS = [
@@ -110,7 +111,7 @@ const WEATHER_WORDS = {
  *               maps: map id -> place name (the CLI passes the manifest); playerLabel defaults to "you".
  * @returns { title, blocks: [{ step, kind, text }], problems }  step is 1-based, like the compiler's errors.
  */
-export function readBack(steps, opts = {}) {
+export function readBack(steps, opts: QuestReadbackOpts = {}) {
     const o = opts ?? {};
     const title = `## ${o.mapName ?? o.maps?.[o.mapId] ?? o.mapId ?? "unknown map"}`;
     const blocks = [], problems = [];

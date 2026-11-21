@@ -22,6 +22,7 @@
 import { drawClip, drawClipAtPaletteRow, loadPack, packReady } from "./screenpack.js";
 import { artHook } from "./ui-c/capture.js";
 import { drawPartnerPicture, isPartnerPicture } from "./partner-pictures.js";
+import type { NativeScreenRenderStats } from "./types/native-screen-render.js";
 
 // VRAM-backed sprites. The card class's +0x34 emit publishes a 32x32 textured
 // sprite whose texpage/clut words name a rectangle LoadImage wrote into the
@@ -181,7 +182,16 @@ function paintRawPrimitive(ctx, raw) {
     return false;
 }
 
-export function createNativeScreenRenderer(entry, packNameForDir, options = {}) {
+/** What a screen's renderer may override: its pack loader, the art hooks for VRAM and raw draws, and two draw rules. */
+interface NativeRendererOptions {
+    loadPack?: (name: string) => any;
+    paintPrim?: (ctx: any, call: any) => any;
+    paintRaw?: (ctx: any, raw: any, getPack: (name: string) => any) => boolean;
+    opaqueClips?: boolean;
+    skipClip?: (name: string, id: any) => boolean;
+}
+
+export function createNativeScreenRenderer(entry, packNameForDir, options: NativeRendererOptions = {}) {
     // A screen may draw from several packs (the item shop: STSHOPCS chrome +
     // CMFONTCS icons). entry.packs maps the requested LBA index to the extracted
     // pack; entry.pack is the single-pack fallback.
@@ -199,7 +209,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options = {}) 
      *  sheet is the larger of the pair, so "some" reported ready while the
      *  shop's own plates were still in flight and the frame painted short. */
     const allPacksReady = () => [...names].every((n) => packReady(getPack(n)));
-    const stats = { pack: entry ? entry.pack : null, packs: [...names], frames: 0, clips: 0, cards: 0, skipped: 0, seen: [], byPack: {}, last: null, paintOrder: [], skippedList: [], awaiting: 0, paintedFrames: 0, raw: 0, rawKinds: {} };
+    const stats = { pack: entry ? entry.pack : null, packs: [...names], frames: 0, clips: 0, cards: 0, skipped: 0, seen: [], byPack: {}, last: null, paintOrder: [], skippedList: [], awaiting: 0, paintedFrames: 0, raw: 0, rawKinds: {} } as NativeScreenRenderStats;
     /** Name a clip the renderer could not paint. A drop is either an id the
      *  extracted pack does not hold or a pack whose image never arrived, and
      *  the two need different answers, so record which one it was. */
@@ -224,7 +234,7 @@ export function createNativeScreenRenderer(entry, packNameForDir, options = {}) 
         /** Paint one frame's recorded picture intents and VRAM sprites; (0,0) is
          *  screen top-left. The clip path and the VRAM path are independent: a
          *  picture-empty root still paints its card faces if it has any. */
-        draw(ctx, drawCalls, vram, cardPrims, ctxMarkers, rawIntents) {
+        draw(ctx, drawCalls, vram, cardPrims, ctxMarkers, rawIntents?) {
             stats.frames += 1;
             for (const prim of cardPrims ?? []) {
                 if (drawVramSprite(ctx, vram, prim)) stats.cards += 1;

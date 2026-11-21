@@ -19,6 +19,16 @@ export const FLY_QUEST = "zz_fly";
 export const FLY_POINTS = Object.freeze(["s200", "s201", "s330", "s420"]);
 
 /** The pause list row. */
+/** A map record as the fly rules read it: its stage id, its name, and the size the twin signature compares. */
+export interface FlyMap { id: string; name?: string; width?: number; height?: number }
+/** A scene exit: the rectangle it covers, and the map it leads to. */
+export interface FlyExit { x?: number; y?: number; w?: number; h?: number; to?: string; _entranceReturn?: boolean }
+/** The scenes table (web/assets/scenes.json) as the fly rules read it: a map id's exits. */
+export type FlyScenes = Record<string, { exits?: FlyExit[] }>;
+
+/** A place the partner can fly to: the stage id the game warps to, and the label the list shows. */
+export interface FlyPlace { id: string; label: string }
+
 export const FLY_ROW_LABEL = "FLY";
 
 export const NO_AIR_LINE = "No room to take flight in here.";
@@ -77,7 +87,7 @@ function rankWorld(group, id) {
  * Underground / dig maps are not followed (they join the worlds). Pure; cached per `scenes` object.
  */
 const worldCache = new WeakMap();
-export function mapWorlds(maps, scenes) {
+export function mapWorlds(maps: FlyMap[], scenes: FlyScenes | null) {
     const hit = scenes && typeof scenes === "object" ? worldCache.get(scenes) : null;
     if (hit && hit.maps === maps) return hit.worlds;
     const twins = mapTwins(maps, scenes);
@@ -124,8 +134,16 @@ export const flyCopiesOf = (maps, scenes, id) => mapTwins(maps, scenes).get(id) 
  * `maps` = the manifest maps ({ id, name }); `seen(id)` = "have I walked into this map"; a point counts as visited when any of its
  * copies was. With `scenes`, a point whose copy cannot be resolved from where you stand is left out, and the label is the copy's.
  */
-export function flyPlaces({ maps = [], seen = () => false, currentId = null, points = FLY_POINTS, scenes = null } = {}) {
-    const byId = new Map(maps.map((m) => [m.id, m]));
+/** What the fly list is computed from: the maps, which copies were seen, where you stand, the points, and the scenes. */
+interface FlyPlacesArgs {
+    maps?: FlyMap[];
+    seen?: (id: string) => boolean;
+    currentId?: string | null;
+    points?: readonly string[];
+    scenes?: FlyScenes | null;
+}
+export function flyPlaces({ maps = [], seen = () => false, currentId = null, points = FLY_POINTS, scenes = null }: FlyPlacesArgs = {}) {
+    const byId = new Map<string, FlyMap>(maps.map((m) => [m.id, m] as [string, FlyMap]));
     const out = [], used = new Set();
     for (const id of points) {
         let m = byId.get(id);

@@ -24,7 +24,18 @@
 //                         carry no game state (PlaySparkle = the bank-0x70 op-0x50 acquisition
 //                         flourish). The script is resumed immediately, exactly as before;
 //                         an unhandled op is still just skipped.
-export function createEngineBridge({ engine, playCutscene, startBattle, doHandoff, nativeHandlers = {}, onPresentation = null, log = () => {} }) {
+/** What the presentation driver needs from the game: the headless engine, and the screens its script ops drive. */
+interface EngineBridgeArgs {
+    engine: any;                                                    // the headless GameEngine (web/vendor/engine)
+    playCutscene?: (flagKey: string, onDone: (handoff: any) => void) => void;
+    startBattle?: (screenId: any, onWin: () => void, onLose: () => void) => void;
+    doHandoff?: (handoff: any) => void;
+    nativeHandlers?: Record<string, (...args: any[]) => any>;
+    onPresentation?: ((op: string, args: any) => void) | null;
+    log?: (...args: any[]) => void;
+}
+
+export function createEngineBridge({ engine, playCutscene, startBattle, doHandoff, nativeHandlers = {}, onPresentation = null, log = () => {} }: EngineBridgeArgs) {
   let busy = false;
   // Did the last raise actually PRESENT something (cutscene / battle / native host routine), as
   // opposed to only running side-effect ops (SetFlag / GiveItem)? A pure flag-set event — e.g. an

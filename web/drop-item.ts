@@ -13,7 +13,7 @@ export function itemForDropName(name, byName = window.__ITEM_BY_NAME, byId = win
   let index = cache.get(byId);
   if (!index) {
     index = new Map();
-    for (const item of Object.values(byId)) {
+    for (const item of Object.values(byId) as { id?: number; name?: string }[]) {
       const key = norm(item?.name ?? "");
       if (key && !index.has(key)) index.set(key, item);
     }

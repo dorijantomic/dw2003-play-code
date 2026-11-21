@@ -1,8 +1,9 @@
 import { SCENE_LIGHT_WINDING, compileShader } from "../gl.js";
 import { TOON_HULL_VERT_SRC, TOON_HULL_FRAG_SRC } from "../shaders.js";
+import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeToon(B$) {
+export function makeToon(B$: Battle3DContext) {
 function _litNormals(model, bufs) {
     const pos = bufs?.lastPos; if (!model || !pos) return;
     const n = bufs.totalVerts;

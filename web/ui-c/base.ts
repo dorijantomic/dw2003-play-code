@@ -17,19 +17,20 @@
 //   keyBox / rowChevron / ringFrame / hudBar   the C8 battle HUD pieces (command key box, row chevron, the close-up bezel, HP bar)
 import { applyRel } from "./geometry.js";
 import { CURSOR_POSES, splitTokens, hasBadge, badgeSvg } from "./icons.js";
+import type { UiDockOpts, UiPart, UiPlateOpts, UiPopOpts, UiRingOpts, UiTextOpts } from "./types.js";
 
 export const N = (designPx) => designPx / 3;             // design px (3 per native) -> native units
 export const ID = Object.freeze({ a: 1, d: 1, e: 0, f: 0 });
 
 /** A text run. `o` = { color, align, spacing, maxDp, rel }. Labels get 2 dp letter spacing by default. */
-export const textPart = (key, role, str, rect, sizeDp, lineDp, o = {}) => ({
+export const textPart = (key, role, str, rect, sizeDp, lineDp, o: UiTextOpts = {}) => ({
     key, kind: "text", layer: "text", role, text: str, rect, sizeDp, lineDp,
     color: o.color ?? null, align: o.align ?? "left", spacingDp: o.spacing ?? (role === "label" ? 2 : 0), maxDp: o.maxDp ?? 0,
     sx: o.rel?.a ?? 1, sy: o.rel?.d ?? 1, ...(o.cls ? { cls: o.cls } : {}),
 });
 
 /** A plate. o = { shape ("ch"), edge, body, shadow (6), layer ("under"), underEdge }. */
-export const plate = (key, part, rect, rel = ID, o = {}) => ({
+export const plate = (key, part, rect, rel = ID, o: UiPlateOpts = {}) => ({
     key, kind: "plate", part, layer: o.layer ?? "under", rect, shape: o.shape ?? "ch",
     edge: o.edge ?? "var(--c-edge)", ...(o.body !== undefined ? { body: o.body } : { body: "var(--c-body)" }),
     shadow: o.shadow ?? 6, ...(o.underEdge ? { underEdge: o.underEdge } : {}), sx: rel.a, sy: rel.d,
@@ -39,7 +40,7 @@ export const plate = (key, part, rect, rel = ID, o = {}) => ({
 export const TAB = Object.freeze({ w: N(390), h: N(46), inset: N(36), sizeDp: 24, lineDp: 34 });
 
 /** A title tab plate (C4 #2c2c8a by default; o.edge = another tab colour, o.part = another part name). */
-export const tabPlate = (key, rect, rel = ID, o = {}) => plate(key, o.part ?? "tab", rect, rel, { shape: "tab", edge: o.edge ?? "var(--c-under)", layer: o.layer });
+export const tabPlate = (key, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "tab", rect, rel, { shape: "tab", edge: o.edge ?? "var(--c-under)", layer: o.layer });
 
 /** The title of a tab: the game's run `m`, never on the slant (at least TAB.inset in), centred in the tab (`tab` native, before `rel`). */
 export function tabTitle(key, m, tab, rel = ID) {
@@ -73,14 +74,14 @@ export const ROW_INK = Object.freeze({ on: "var(--c-orange-ink)" });
 
 /** A list row plate: plain = navy under-edge on the body, `on` = the focused row, solid orange. `under` = another under-edge colour for a plain
  *  row that stands out (the skill row of a Digivolve sheet: orange under-edge). */
-export const rowPlate = (key, rect, on, rel = ID, part = "row", under = "var(--c-under)") =>
+export const rowPlate = (key, rect, on, rel = ID, part = "row", under: string = "var(--c-under)") =>
     plate(key, part, rect, rel, { shape: on ? "rowSolid" : "row", edge: on ? "var(--c-orange)" : under, body: on ? null : "var(--c-body)" });
 
 /**
  * The C double chevron centred on (cx, cy) native, sized 10 x 20/3 native, in the pose of the game's cursor glyph `glyph` (the game swaps
  * four glyphs on its own timer; hidden pose = no part). Returns the descriptor or null.
  */
-export function cursor(key, glyph, cx, cy, rel = ID, fill = ROW_INK.on) {
+export function cursor(key, glyph, cx, cy, rel = ID, fill: string = ROW_INK.on) {
     const pose = CURSOR_POSES[glyph] ?? CURSOR_POSES["[enter]"];
     if (!pose || pose.hidden) return null;
     const w = 10 * pose.sx, h = N(20) * pose.sy;
@@ -107,7 +108,7 @@ export const triangle = (key, cx, cy, dir, rel = ID, fill = "var(--c-orange)") =
 export const corners = (key, rect, color = "var(--c-orange)", rel = ID, part = "selection") => ({ key, kind: "corners", part, layer: "over", rect, color, sx: rel.a, sy: rel.d });
 
 /** A small slanted chip (L1 / R1 page keys, small plates). `on` = the game draws the key's arrow (bright). */
-export const chip = (key, rect, rel = ID, o = {}) => plate(key, o.part ?? "pageChip", rect, rel, { shape: "chip", edge: o.edge ?? "var(--c-under)", body: o.body, shadow: 0, layer: o.layer ?? "over" });
+export const chip = (key, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "pageChip", rect, rel, { shape: "chip", edge: o.edge ?? "var(--c-under)", body: o.body, shadow: 0, layer: o.layer ?? "over" });
 
 /** The seven element colours of the C9 chips, in the order of the game's resistance rows (fire, water, ice, wind, thunder, machine, dark). */
 export const ELEMENTS = Object.freeze(["fire", "water", "ice", "wind", "thunder", "machine", "dark"].map((k) => `var(--c-el-${k})`));
@@ -117,13 +118,13 @@ export const ELEMENTS = Object.freeze(["fire", "water", "ice", "wind", "thunder"
  * chamfer (element chips). Returns the descriptors (the strip over the body).
  */
 export function elementChip(key, rect, cap = null, rel = ID) {
-    const out = [plate(key, "statChip", rect, rel, { shape: "chip", edge: "var(--c-chip)", body: null, shadow: 0 })];
+    const out: UiPart[] = [plate(key, "statChip", rect, rel, { shape: "chip", edge: "var(--c-chip)", body: null, shadow: 0 })];
     if (cap) out.push(rule(`${key}.cap`, { x: rect.x, y: rect.y + N(10) * rel.d, w: N(8) * rel.a, h: rect.h - N(10) * rel.d }, cap, rel, "under", "chipCap"));
     return out;
 }
 
 /** The scrolling diamond field over the whole limit; `scroll` = the game's own counter (the call's x). */
-export const stripes = (scroll, key = "backdrop.stripes", o = {}) => ({ key, kind: "stripes", part: "backdrop", layer: "under", full: true, scroll, ...(o.light ? { light: o.light, dark: o.dark } : {}) });
+export const stripes = (scroll, key = "backdrop.stripes", o: { light?: string; dark?: string } = {}) => ({ key, kind: "stripes", part: "backdrop", layer: "under", full: true, scroll, ...(o.light ? { light: o.light, dark: o.dark } : {}) });
 
 /** The big faint word behind a page (Russo One, `sizeDp` tall). `color` = a C variant (C3 bag uses a darker ink). */
 export const typeWord = (key, text, rect, rel = ID, sizeDp = 140, color = null, vertical = false, fit = false) => ({ key, kind: "type", part: "typeWord", layer: "under", text, rect, sizeDp, spacingDp: 6, sx: rel.a, sy: rel.d, ...(color ? { color } : {}), ...(vertical ? { vertical: true } : {}), ...(fit ? { fit: true } : {}) });
@@ -160,7 +161,7 @@ export function messageBand(key, rect, rel, out) {
 }
 
 /** A band text line: the game's run at its own pen, Chakra Petch 600 32 / 42, never wider than the band (`right` native). */
-export const bandLine = (key, r, right, rel = ID, o = {}) => textPart(key, "body", r.text,
+export const bandLine = (key, r, right, rel = ID, o: UiTextOpts = {}) => textPart(key, "body", r.text,
     { x: r.x, y: r.y + 4.5 - N(o.lineDp ?? MSG.bandLineDp) / 2, w: Math.max(8, right - r.x), h: N(o.lineDp ?? MSG.bandLineDp) },
     o.sizeDp ?? MSG.bandDp, o.lineDp ?? MSG.bandLineDp, { rel, color: o.color ?? null, maxDp: Math.round(Math.max(8, right - r.x) * 3) });
 
@@ -191,7 +192,7 @@ export function badgeText(str) {
 }
 
 /** One text line that may start with a button token: round badge + text. (x, y) = top-left of the line, native. */
-export function tokenLine(key, str, x, y, rel, out, o = {}) {
+export function tokenLine(key, str, x, y, rel, out, o: UiTextOpts = {}) {
     const sizeDp = o.sizeDp ?? 26, lineDp = o.lineDp ?? 36, role = o.role ?? "body";
     const { badge, txt } = badgeText(str);
     const lineN = N(lineDp);
@@ -213,7 +214,7 @@ export const FAMILY_C = Object.freeze({
 });
 
 /** A family C window (C7: 4 dp edge #2AA8FF, body #000818, chamfer 24 / 22, drop shadow 6). */
-export const cWindow = (key, rect, rel = ID, o = {}) => plate(key, o.part ?? "window", rect, rel, { shape: o.shape ?? "ch", edge: o.edge ?? FAMILY_C.edge, body: FAMILY_C.body, layer: o.layer });
+export const cWindow = (key, rect, rel = ID, o: UiPlateOpts = {}) => plate(key, o.part ?? "window", rect, rel, { shape: o.shape ?? "ch", edge: o.edge ?? FAMILY_C.edge, body: FAMILY_C.body, layer: o.layer });
 
 /**
  * One C7 key (38 x 50 dp, chamfer 8, 2 dp under-edge) with its letter (Russo 26 / 48, centred). state = "on" (the cursor's key: solid
@@ -290,7 +291,7 @@ export const RING = Object.freeze({
 });
 
 /** The ring as one part (parts.js builds it once and only moves the arcs afterwards). rect = native square. */
-export const ringPart = (key, rect, variant, v, menu = false, o = {}) => ({
+export const ringPart = (key, rect, variant, v, menu = false, o: UiRingOpts = {}) => ({
     key, kind: "ring", part: "ring", layer: "over", rect, variant, menu: !!menu,
     ...(o.act ? { act: true } : {}), ...(o.real != null ? { real: o.real, eReal: o.eReal } : {}), ...(o.mpPrev != null ? { mpPrev: frac(Math.max(0, v.mp - o.mpPrev), v.maxMp) } : {}),
     hp: frac(v.hp, v.maxHp), mp: frac(v.mp, v.maxMp), dv: variant === "main" ? frac(v.gauge, v.maxGauge ?? 1000) : 0,
@@ -298,9 +299,9 @@ export const ringPart = (key, rect, variant, v, menu = false, o = {}) => ({
 });
 
 /** The core text of a ring (name, LV, HP and MP numbers), native rects inside `rect`; the text shrinks with the ring (rel). */
-export function ringTexts(key, rect, variant, v, o = {}) {
+export function ringTexts(key, rect, variant, v, o: UiRingOpts = {}) {
     const g = RING[variant], u = rect.w / (g.vb / 3), rel = { a: u, d: u };
-    const row = (id, role, str, o = {}) => {
+    const row = (id, role, str, o: UiTextOpts = {}) => {
         const [x, y, w, h, size] = g.text[id];
         return textPart(`${key}.${id}`, role, str, { x: rect.x + x / 3 * u, y: rect.y + y / 3 * u, w: w / 3 * u, h: h / 3 * u }, size, h, { maxDp: w, rel, ...o });
     };
@@ -349,7 +350,7 @@ export function dockArc(hub, stage, count = 6, list = false) {
     return { hub: { x: hub.cx, y: hub.cy }, R, k: arcR / 330, arcR, dockR, dock, words, scale: sc, pitch, line };
 }
 /** The command dock as one part: `labels` = the words in row order, `on` = the focused index or -1, geometry from dockArc. */
-export const dockPart = (key, stage, hub, labels, on, o = {}) => {
+export const dockPart = (key, stage, hub, labels, on, o: UiDockOpts = {}) => {
     const S = stage ?? { x0: 0, y0: 0, x1: 320, y1: 240 }, a = dockArc(hub, S, labels.length, !!o.rows);
     const rows = o.rows;
     return { key, kind: "dock", part: "dock", layer: "over", rect: { x: S.x0, y: S.y0, w: S.x1 - S.x0, h: S.y1 - S.y0 }, hub: a.hub, k: a.k, R: a.R, dockR: a.dockR, dock: a.dock,
@@ -357,6 +358,6 @@ export const dockPart = (key, stage, hub, labels, on, o = {}) => {
         on, ...(rows ? { list: true, scale: a.scale, title: o.title ?? "", pager: !!o.pager } : {}), sx: 1, sy: 1 };
 };
 /** The damage number that pops at a hit: shown while the game's own "N damage!" line is up; `side` = who was hit. The DOM plays the CSS pop once per element. */
-export const popPart = (key, rect, n, side, o = {}) => ({ key, kind: "pop", part: "pop", layer: "over", rect, n, side, o, evt: o.evt ?? "", sx: 1, sy: 1 });
+export const popPart = (key, rect, n, side, o: UiPopOpts = {}) => ({ key, kind: "pop", part: "pop", layer: "over", rect, n, side, o, evt: o.evt ?? "", sx: 1, sy: 1 });
 /** One node of the turn arc (top right): `turn` = "now" | "next" | "later", `side` = "player" | "enemy", `letter` = the name's initial. */
 export const turnNode = (key, rect, o) => ({ key, kind: "node", part: "turnNode", layer: "over", rect, turn: o.turn, side: o.side, letter: o.letter, nb: false, sx: 1, sy: 1 });

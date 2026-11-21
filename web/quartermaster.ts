@@ -44,6 +44,7 @@ import {
   pauseEquipRowAdmits,
   wieldSlotsFor,
 } from "./vendor/engine.js";
+import type { QuartermasterPick } from "./types/quartermaster.js";
 
 /** The six pause rows, in the original's stored order. */
 export const EQUIP_SLOTS = ["head", "body", "right", "left", "acc0", "acc1"];
@@ -113,7 +114,7 @@ export function poolFrom(bag, worn) {
 }
 
 /** The roster line slot the wear mask is indexed by (rules wins over member). */
-function lineSlotOf(member, rules) {
+function lineSlotOf(member, rules?: { lineSlot?: number; }) {
   if (rules && rules.lineSlot !== undefined) return rules.lineSlot;
   const slot = member?.lineSlot ?? member?.rosterSlot;
   return slot === undefined ? null : slot;
@@ -152,7 +153,7 @@ export function slotOptions(member, pool, items, rules) {
 
 /** The worn record as the six slots, with a two-handed weapon folded onto `right`. */
 function wornSlots(member, lookup) {
-  const out = {};
+  const out = {} as QuartermasterPick;
   const equipment = member?.equipment ?? {};
   for (const slot of EQUIP_SLOTS) {
     const id = Number(equipment[slot]) || 0;

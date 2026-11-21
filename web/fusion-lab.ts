@@ -1,7 +1,8 @@
 // Fusion Lab (dev page). Talks to tools/fusion_lab_server.py on localhost:8791, which runs ~/dw3-fusion/tools/fuse.py.
+import type { FusionLabBody, FusionLabRow, FusionLabSelection } from "./types/fusion-lab.js";
 const API = "http://localhost:8791";
 const KINDS = ["arms", "legs", "head", "tail", "wings"];
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id) as any;
 
 let models = [];          // {id, name, rookie}
 let fusions = [];         // {id, name}
@@ -12,7 +13,7 @@ let bossIds = new Set();  // Lab bosses already written (ids "lab_<model>")
 let lastBuild = null;     // {model, recipe}
 const rows = [];
 
-async function api(path, body) {
+async function api(path, body?: FusionLabBody) {
   const r = await fetch(API + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
   return r.json();
 }
@@ -85,8 +86,8 @@ function candPicker(label, cands, onChange) {
   return { el: wrap, value: () => sel.value || null, missing: false, needs: true };
 }
 
-function addRow(init) {
-  const row = { part: null, donor: null, baseCands: null, donorCands: null };
+function addRow(init?) {
+  const row = { part: null, donor: null, baseCands: null, donorCands: null } as FusionLabRow;
   const el = document.createElement("div"); el.className = "row";
   const part = document.createElement("select");
   for (const k of KINDS) { const o = document.createElement("option"); o.value = k; o.textContent = k; part.appendChild(o); }
@@ -106,7 +107,7 @@ function addRow(init) {
   return row;
 }
 
-async function refreshRow(row) {
+async function refreshRow(row: FusionLabRow) {
   const token = (row.token = (row.token || 0) + 1);
   const kind = row.part.value, donorId = resolve(row.donor.value), baseId = resolve($("base").value);
   row.cands.textContent = ""; row.warn.textContent = "";
@@ -147,7 +148,7 @@ function recipe() {
   const ops = [];
   for (const r of rows) {
     const donor = resolve(r.donor.value);
-    const o = { part: r.part.value, donor };
+    const o = { part: r.part.value, donor } as FusionLabSelection;
     const dv = r.donorPick && r.donorPick.value(), bv = r.basePick && r.basePick.value();
     if (dv) o.donor_chain = dv;
     if (bv) o.base_chain = bv;
@@ -175,7 +176,7 @@ function problems(rc) {
 
 // ---- battle data (tools/fusion_battle.py, plain words)
 const STAT_WORDS = { str: "Strength", def: "Defence", spt: "Spirit", wis: "Wisdom", spd: "Speed" };
-function li(ul, text, cls) { const e = document.createElement("li"); e.textContent = text; if (cls) e.className = cls; ul.appendChild(e); return e; }
+function li(ul, text, cls?) { const e = document.createElement("li"); e.textContent = text; if (cls) e.className = cls; ul.appendChild(e); return e; }
 function heading(box, text) { const h = document.createElement("div"); h.className = "small"; h.style.marginTop = "8px"; h.style.color = "#9ec5ff"; h.textContent = text; box.appendChild(h); }
 
 function renderBattle(d) {
@@ -246,7 +247,7 @@ async function build() {
   if (p.length) { $("error").textContent = p.join("\n"); return; }
   $("build").disabled = true; $("save").disabled = true; $("status").textContent = "building (can take a minute)...";
   try {
-    const body = { base: rc.base, ops: rc.ops };
+    const body = { base: rc.base, ops: rc.ops } as FusionLabBody;
     if (window.__reuseOut) body.out = window.__reuseOut;
     const d = await api("/api/build", body);
     $("raw").textContent = (d.command ? d.command + "\n\n" : "") + (d.output || "");

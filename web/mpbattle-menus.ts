@@ -72,7 +72,7 @@ export function createMenus({ sfx = null, languageByte = () => 2 } = {}) {
         close() { if (mode) { widgets[mode].close(); mode = null; } },
         press(button) { if (mode) widgets[mode].press(button); },
         /** Show log lines in the window, a page each. opts.hold keeps the last page up. */
-        say(lines, opts = {}) {
+        say(lines, opts: { hold?: boolean; ms?: number } = {}) {
             pages = [].concat(lines).filter((l) => l != null && l !== "").map(pageOf);
             hold = !!opts.hold;
             page = null; pageLeft = 0;

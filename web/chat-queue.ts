@@ -12,7 +12,8 @@
 //
 // `push(text, meta)` passes `meta` through to `send(text, meta)`, so the caller can clear the "..." it put
 // on that line's local echo once the line really leaves.
-export function createChatQueue({ gap = 650, now = () => performance.now(), send } = {}) {
+import type { ChatQueueOptions } from "./types/chat-queue.js";
+export function createChatQueue({ gap = 650, now = () => performance.now(), send }: ChatQueueOptions = {}) {
     if (typeof send !== "function") throw new TypeError("createChatQueue needs a send(text) function");
     let nextAt = -Infinity;             // when the next line may leave; the first one never waits
     const waiting = [];                 // { text, meta }, oldest first

@@ -106,7 +106,7 @@ function mmpxRule(at, x, y) {
 // word as red, which is exactly a little-endian ImageData word, so the pixels go in as they are.
 let xbr4x = null;
 export async function ensureXbr() {
-  if (!xbr4x) xbr4x = (await import("https://cdn.jsdelivr.net/npm/xbr-js@2.0.1/dist/xBRjs.esm.js")).xbr4x;
+  if (!xbr4x) xbr4x = (await import("https://cdn.jsdelivr.net/npm/xbr-js@2.0.1/dist/xBRjs.esm.js" as string)).xbr4x;
   return xbr4x;
 }
 export function xbr(src, blendColors) {
@@ -142,7 +142,7 @@ async function run(img, name) {
     const out = name === "epx" ? epx4(src) : name === "mmpx" ? mmpx4(src) : xbr(src, name === "xbrblend");
     g.putImageData(out, 0, 0);
   }
-  const blob = await new Promise((ok) => c.toBlob(ok, "image/png"));
+  const blob = await new Promise<Blob>((ok) => c.toBlob(ok, "image/png"));
   const out = new Image();
   out.src = URL.createObjectURL(blob);
   await out.decode();

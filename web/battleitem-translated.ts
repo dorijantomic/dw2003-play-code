@@ -13,6 +13,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { fetchBytes, fetchJson, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
 import { itemIconClip } from "./itemicons.js";
+import type { BattleItemSeed } from "./types/battleitem-translated.js";
 
 // The row icon is pack handle 0x00286000 (CMFONT, the resident UI glyphs) and
 // the chrome is 0x00455000 (PGFGTC00, disc 1109): the original builds both
@@ -60,7 +61,7 @@ export function createBattleItemTranslated(sfx = null, options = {}) {
         languageError: "Battle item language index is invalid",
 
         /** Open on the carried items the original's own filter would offer. */
-        seed: (r, seed = {}) => ({
+        seed: (r, seed: BattleItemSeed = {}) => ({
             items: (seed.items ?? []).map((item) => ({
                 id: Number(item.id ?? 0) & 0xffff,
                 qty: Number(item.qty ?? 0) & 0xff,

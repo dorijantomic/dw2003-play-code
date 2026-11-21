@@ -1,3 +1,4 @@
+import type { StageLocalityResult, StageLocalityValue } from "./types/stage-locality.js";
 export const FIELD_LOCATION_KEY = "fieldLocation";
 export const FIELD_LOCATION_VERSION = 1;
 
@@ -38,7 +39,7 @@ export function encodeFieldLocation(location) {
     x: location.x,
     y: location.y,
     dir: location.dir,
-  };
+  } as StageLocalityValue;
   if (location.entranceReturn) value.entranceReturn = location.entranceReturn;
   return JSON.stringify(value);
 }
@@ -56,7 +57,7 @@ export function decodeFieldLocation(raw, knownStageIds) {
       !Number.isFinite(value.y) ||
       !["up", "down", "left", "right", "up-left", "up-right", "down-left", "down-right"].includes(value.dir)
     ) return null;
-    const result = { mapId: value.mapId, x: value.x, y: value.y, dir: value.dir };
+    const result = { mapId: value.mapId, x: value.x, y: value.y, dir: value.dir } as StageLocalityResult;
     const back = value.entranceReturn;
     if (back && known.has(back.to) && Number.isFinite(back.x) && Number.isFinite(back.y)
         && Number.isFinite(back.w) && Number.isFinite(back.h)

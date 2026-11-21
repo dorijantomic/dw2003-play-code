@@ -18,6 +18,7 @@ import { isCursorToken } from "./icons.js";
 import { N, ID, textPart, plate, cursor, chip, tabPlate, tokenLine, stripes, typeWord, cardBar, triangle, TRIANGLE, PAGE_KEY } from "./base.js";
 import { clipRect, restOfRuns, runText } from "./generic.js";
 import { composeRows, composeFooter, runIn } from "./pages.js";
+import type { BookOpts } from "./types.js";
 
 /** Sizes (design px unless named): title Russo 26 / 36, tabs 20 / 30, the L1 / R1 chip 52 x 32, a map link 0.8 native wide, a map box 8 native. */
 export const BOOK = Object.freeze({ titleDp: 26, titleLineDp: 36, tabDp: 20, tabLineDp: 30, tabIn: N(16), tabOut: N(26), chipW: N(52), chipH: N(32), chipMaxX: 318, link: 0.8 });
@@ -72,7 +73,7 @@ export function composeBookHeader(p, runs, used, out) {
 }
 
 /** One panel: a C window; a list when the cursor is in it (see the file header). `i` = the part's index (keys). */
-export function composeBookPanel(p, i, runs, used, out, cfg = {}) {
+export function composeBookPanel(p, i, runs, used, out, cfg: BookOpts = {}) {
     const r = clipRect(p);
     const inside = runs.filter((m) => !used.has(m) && runIn(m, r));
     const cur = inside.find((m) => isCursorToken(m.text));
@@ -120,7 +121,7 @@ export function composeMapNode(p, i, out) {
  * A book screen or the QUESTS page. cfg = { rows (false = a free cursor, the map book), word (the big faint word on the backdrop),
  * dimClut (true = the runs come from web/uifont.js drawText, where clut 7 is the dim face) }.
  */
-export function composeBook({ parts, runs }, cfg = {}) {
+export function composeBook({ parts, runs }, cfg: BookOpts = {}) {
     const out = [], used = new Set();
     if (cfg.dimClut) for (const r of runs) if (isDimRun(r) && !r.face) r.face = DIM;
     const of = (n) => parts.filter((p) => p.part === n);

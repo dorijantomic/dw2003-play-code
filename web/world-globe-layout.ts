@@ -28,7 +28,7 @@ const horiz = (d) => d === "E" || d === "W";
 
 /** Nearest edge of a w x h map to the point, with distance / size (0 = on the edge). */
 export function nearestSide(x, y, w, h) {
-    const c = [["W", x / w], ["E", (w - x) / w], ["N", y / h], ["S", (h - y) / h]];
+    const c: [string, number][] = [["W", x / w], ["E", (w - x) / w], ["N", y / h], ["S", (h - y) / h]];
     c.sort((a, b) => a[1] - b[1]);
     return { side: c[0][0], score: Math.max(0, c[0][1]) };
 }
@@ -63,7 +63,7 @@ export function buildPlaces(maps, scenes, variants = {}) {
     const parent = new Map(open.map((m) => [m.id, m.id]));
     const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
     const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(rb, ra); };
-    const exitsOf = (id) => scenes?.[id]?.exits ?? [];
+    const exitsOf = (id): any[] => scenes?.[id]?.exits ?? [];
     const bySig = new Map();
     for (const m of open) {
         const ex = exitsOf(m.id);
@@ -72,7 +72,7 @@ export function buildPlaces(maps, scenes, variants = {}) {
         if (bySig.has(sig)) union(bySig.get(sig), m.id); else bySig.set(sig, m.id);
     }
     const near = (ea, eb) => ea.every((x) => eb.some((y) => Math.hypot(x.x + x.w / 2 - y.x - y.w / 2, x.y + x.h / 2 - y.y - y.h / 2) <= 64));
-    const openById = new Map(open.map((m) => [m.id, m]));
+    const openById = new Map<any, any>(open.map((m) => [m.id, m]));
     for (const m of open) {
         const b = openById.get(variants[m.id]);
         if (!b || b.name !== m.name || b.width !== m.width || b.height !== m.height) continue;

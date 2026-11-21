@@ -118,7 +118,7 @@ export function createFishFinds(storage = typeof localStorage !== "undefined" ? 
  * An entry not found yet has label "???" and no percent; a found one is named
  * (item name, "N bits", or "Old bottle") with its percent.
  */
-export function extrasRows(data, found, itemNameOf = () => null) {
+export function extrasRows(data, found, itemNameOf: (item: any) => string | null = () => null) {
     const flags = found ?? {};
     return Object.keys(data?.stages ?? {}).sort().map((stage) => {
         const area = areaOf(data, stage);

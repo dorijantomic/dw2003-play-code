@@ -54,7 +54,7 @@ export function candidateLines(candidate) {
 /** The distinct flag ids one gate object's chain reads, in id order. Ordinal leaves
  *  are story beats, not flags, so they are not offered as flags to set. */
 export function flagChoices(chain) {
-  const ids = new Set();
+  const ids = new Set<number>();
   for (const c of chain?.candidates ?? []) {
     for (const path of c.paths ?? []) {
       for (const [id] of path) if (!isOrdinalLeaf(id)) ids.add(id);

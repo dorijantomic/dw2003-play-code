@@ -6,9 +6,10 @@ import {
   DV_SHOT_INDEX,
 } from "../../fight/digivolve-camera.js";
 import { FormChangeProgram, entranceCameraSchedule, formChangeCameraSchedule } from "../../vendor/engine.js";
+import type { Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeBlast(B$) {
+export function makeBlast(B$: Battle3DContext) {
 function dnaPresentationStart() { B$.dnaPresentation = { tick: 0, fusionTick: null }; }
 function dnaFusionStart() {
     if (!B$.dnaPresentation) dnaPresentationStart();
@@ -34,7 +35,7 @@ function dvHome() {
     if (skipped) { skipFormChange(B$.camRec, B$.dvCam, () => B$.introShot(), B$.setEnemyVisible); B$.dvCam = null; return; }
     const isRevert = program === FormChangeProgram.BLAST_REVERT || program === FormChangeProgram.ENTRANCE_ENEMY;
     const eSide = program === FormChangeProgram.ENTRANCE_ENEMY ? 1 : 0;
-    const schedule = state && !state.done && program != null
+    const schedule: { swapFrame: number; returnFrame: number; shotIndex?: number } | null = state && !state.done && program != null
       ? (isRevert ? entranceCameraSchedule(eSide) : formChangeCameraSchedule(program)) : null;
     if (!schedule) { B$.dvCam?.stop(); B$.dvCam = null; return; }
     B$.dvFrame = state.frame;

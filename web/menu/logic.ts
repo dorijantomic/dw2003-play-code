@@ -108,7 +108,7 @@ export function swapFormation(state, a, b) {
     state.charId = state.party?.[0] ?? state.charId;
     const nextIndex = state.manifest?.characters?.findIndex((c) => c.id === state.charId) ?? -1;
     if (nextIndex >= 0) state.charIdx = nextIndex;
-    const select = typeof document !== "undefined" ? document.getElementById("charSelect") : null;
+    const select = typeof document !== "undefined" ? document.getElementById("charSelect") as HTMLSelectElement | null : null;
     if (select && nextIndex >= 0) select.selectedIndex = nextIndex;
     localStorage.setItem("partnerStats", JSON.stringify(state.partnerStats));
     if (state.charId) localStorage.setItem("charId", state.charId);

@@ -117,14 +117,14 @@ export function stripesGradient(scroll, d, light = "var(--c-stripe)", dark = "va
 // ------------------------------------------------------------------------------------------------ the C balloon (C6)
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
 /** The line p + t * d moved by `e` along its normal towards `inside`: returns [point, dir]. */
-function offsetLine(p, q, inside, e) {
+function offsetLine(p, q, inside, e): [number[], number[]] {
     const d = sub(q, p), len = Math.hypot(d[0], d[1]) || 1;
     let n = [-d[1] / len, d[0] / len];
     const m = sub(inside, p);
     if (n[0] * m[0] + n[1] * m[1] < 0) n = [-n[0], -n[1]];
     return [[p[0] + n[0] * e, p[1] + n[1] * e], d];
 }
-function cross(a, b) {
+function cross(a: [number[], number[]], b: [number[], number[]]) {
     const [p, r] = a, [q, s] = b, den = r[0] * s[1] - r[1] * s[0];
     if (Math.abs(den) < 1e-9) return null;
     const t = ((q[0] - p[0]) * s[1] - (q[1] - p[1]) * s[0]) / den;
@@ -174,7 +174,7 @@ export function balloonShape(b, tail, e, c) {
 export const barFill = (ratio, w) => Math.max(0, Math.min(w, Math.round(w * Math.max(0, Math.min(1, ratio)))));
 
 // ------------------------------------------------------------------------------------------------ DOM
-const el = (cls, parent, tag = "div") => {
+const el = (cls, parent?: Element, tag = "div"): HTMLElement => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     if (parent) parent.appendChild(e);
@@ -210,7 +210,7 @@ function fillRing(root, desc, g) {
     root.style.position = "absolute"; setBox(root, r);
     if (root.dataset.uicRingV !== desc.variant) {
         const circ = (cls, rad, w, extra = "") => `<circle class="${cls}" cx="${c}" cy="${c}" r="${rad}" stroke-width="${w}" fill="none" ${extra}/>`;
-        const arc = (cls, rad, w, grad) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
+        const arc = (cls, rad, w, grad?) => circ(cls, rad, w, `pathLength="100" transform="rotate(-90 ${c} ${c})" style="stroke-dasharray:0 100"${grad ? ` stroke="url(#${id}${grad})"` : ""}`);
         const ticks = (list) => list.map(([rad, w, da, cls]) => circ(cls, rad, w, `pathLength="360" stroke-dasharray="${da}"${cls === "scan" ? ` stroke="url(#${id}s)"` : ""}`)).join("");
         const svg = (inner, cls = "") => `<svg ${SVGNS} class="${cls}" viewBox="0 0 ${sh.vb} ${sh.vb}" aria-hidden="true">${inner}</svg>`;
         const stop = (o, v) => `<stop offset="${o}" style="stop-color:${v}"/>`;
@@ -354,7 +354,7 @@ function fillPop(root, desc, g) {
     else if (kind === "status") shown = "";
     else if (kind === "heal") shown = `+${desc.n}`;
     else {
-        const ring = typeof document !== "undefined" ? document.querySelector(".uic-ring-main") : null, tag = desc.side === "player" ? "P" : "E";
+        const ring = typeof document !== "undefined" ? document.querySelector(".uic-ring-main") as HTMLElement : null, tag = desc.side === "player" ? "P" : "E";
         const seen = kind === "dmg" && ring && ring.dataset[`drop${tag}`] !== undefined && performance.now() - Number(ring.dataset[`drop${tag}T`]) < 20000 ? Number(ring.dataset[`drop${tag}`]) : null;
         shown = String(seen !== null && seen > 0 ? seen : desc.n);
     }

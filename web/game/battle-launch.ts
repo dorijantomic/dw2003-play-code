@@ -7,6 +7,7 @@ import { mountForceDismount } from "../mount.js";
 import { PRACTICE_BOT_ID, battle, choice, cutscene, fade, mpIdle, state, textbox } from "./vars.js";
 import { currentMap } from "./session.js";
 import { S } from "./state.js";
+import type { MpLaunchOptions, MpPracticeOptions, QuestBattleOptions } from "../types/u-core.js";
 
 // Encounter rate is now governed by the authentic data: stages with no zone pool
 // (city interiors, story maps) return no encounter, and a zone's empty slots are the
@@ -15,7 +16,7 @@ import { S } from "./state.js";
 // The fight-report overlay already showed EXP / Level / Tech / Digivolve learned.
 // A newly unlocked form is in the ledger (and auto-equipped if a slot was free);
 // the player turns it on from STATUS, not from a second field prompt.
-export function presentVictory(_res, after) {
+export function presentVictory(_res, after?: any) {
     after?.();
 }
 
@@ -43,7 +44,7 @@ export function startFieldBattle(run) {
 // through the same hand-off a random encounter uses, with the same guards. A LOSS returns to the field with the
 // party restored (see below) instead of going to the title screen, because the title route belongs to the
 // story's own fights.
-export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose } = {}) {
+export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose }: QuestBattleOptions = {}) {
     if (
         fieldPartySize(state.party) === 0 ||
         battle.isActive() ||
@@ -69,7 +70,7 @@ export function startQuestBattle(party, { screenId = null, onWin, onFlee, onLose
 }
 
 // EXPERIMENT (multiplayer): a many-vs-many fight. I am its host: it runs on the same field hand-off as any other fight.
-export function mpbLaunch({ foes, withId, label, screenId, challenge, opts }) {
+export function mpbLaunch({ foes, withId, label, screenId, challenge, opts }: MpLaunchOptions) {
     if (!mpIdle() || fieldPartySize(state.party) === 0) return false;
     const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
     startFieldBattle(() => {
@@ -78,7 +79,7 @@ export function mpbLaunch({ foes, withId, label, screenId, challenge, opts }) {
     return true;
 }
 
-export function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, opts } = {}) {
+export function mpbPractice({ foes, label = "Practice 2 vs 2", screenId = null, opts }: MpPracticeOptions = {}) {
     if (!mpIdle() || fieldPartySize(state.party) === 0 || !foes?.length) return false;
     const done = (r) => { if (r.fled) opts?.onFlee?.(); else if (r.won) opts?.onWin?.({ ...r }); else opts?.onLose?.(); };
     startFieldBattle(async () => {

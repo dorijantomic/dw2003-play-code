@@ -8,17 +8,18 @@ import * as P from "./procedural.js";
 import * as MP from "./mountainproc.js";
 import * as M from "./mtlaw.js";
 import { q, ph, proc, texDisc, ASSETS, ezTreeParts } from "./forest.js";
+import type { BiomeMountainTerrain, LODLevel, MountainGroundOpts, ScatterOpts, SpeciesAddOpts, SpeciesLODOpts, ToonLoadOpts, WeatherOpts } from "./types.js";
 
 const { mtH, mtInfo, waterDist, sstep, vnoise } = M;
 const PS = "Poly Haven (decimated, 1K albedo)", CC0 = "CC0 1.0", OWN = "Procedural (our code)", EZ = "EZ-Tree by Daniel Greenheck (generated live)";
 const T = (id) => loadTex(`${ASSETS}polyhaven/tex/${id}_diff_1k.jpg`);
 let _gt = null;
 const groundTex = () => _gt || (_gt = Promise.all(["aerial_grass_rock", "rock_face", "rocky_gravel", "snow_field_aerial", "lichen_rock"].map(T)).then(([grass, rock, scree, snow, lichen]) => ({ grass, rock, scree, snow, lichen })));
-const gmat = async (o) => MP.mountainGround(await groundTex(), o);
+const gmat = async (o: MountainGroundOpts) => MP.mountainGround(await groundTex(), o);
 const part = (parts) => partsGroup(parts);
 
 // ------------------------------------------------------------------ terrain tiles in real world coordinates
-function tile(mat, x0, x1, z0, z1, cell, extra) {
+function tile(mat, x0, x1, z0, z1, cell, extra?: (x: number, z: number) => number) {
   const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, Math.max(2, Math.round(w / cell)), Math.max(2, Math.round(d / cell)));
   g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const p = g.attributes.position;
@@ -33,7 +34,7 @@ function fld(parts, n, rad, sc, seed, base = 0x5c6b3e, y = 0.04) {
   g.add(instancedParts(parts, m, n)); return g;
 }
 const MEAD = 0x6a7f3c, ROCKB = 0x7d7a76, SNOWB = 0xe9f1fa, SCREEB = 0x8b8780;
-const wx = (res, o) => { MP.weather(res.parts, o); return res; };
+const wx = (res, o: WeatherOpts) => { MP.weather(res.parts, o); return res; };
 
 // ------------------------------------------------------------------ grid entries
 const cat = { terr: "Mountain terrain", snow: "Snow, ice, glacier", cliff: "Cliffs and rock faces", crag: "Crags, spires, boulders", scree: "Scree, talus, gravel", ground: "Rock and ground textures",
@@ -45,8 +46,8 @@ const SPRUCE = { bark: { tint: 0x5a4636 }, leaves: { tint: 0x2e5f4a } }, LARCH =
 const screeField = async () => { const g = new THREE.Group(), r = rng(3), b = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.05, 44), toonMat({ color: SCREEB }, { shadeK: 0.82, rim: 0 })); b.position.y = 0.025; g.add(b);
   for (let k = 1; k <= 2; k++) { const m = new Float32Array(9 * 16); for (let i = 0; i < 9; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * 1.1; composeTRS(m, i, Math.cos(a) * d, 0.05, Math.sin(a) * d, r() * 6.28, 0.9 + 0.5 * r()); } g.add(instancedParts(MP.screeParts(k), m, 9)); }
   return g; };
-const stoneRes = async (id, o = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w);
-const qRes = async (id, o = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w);
+const stoneRes = async (id, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}polyhaven/${id}.glb`, { grade: true, ...(o.t || {}) }), o.w);
+const qRes = async (id, o: { t?: ToonLoadOpts; w?: WeatherOpts } = {}) => wx(await loadToon(`${ASSETS}quaternius/${id}.glb`, o.t || {}), o.w);
 const rockEntry = (id, c, name, w = {}, t = {}) => ({ id: "mr_" + id, cat: c, name, source: PS + " + our weather shader (snow dust, lichen)", licence: CC0, url: `https://polyhaven.com/a/${id}`, noSpin: false, make: async () => part((await stoneRes(id, { w, t })).parts) });
 
 const rawEntries = [
@@ -151,7 +152,7 @@ export const entries = rawEntries.map((e) => ({ ...e, id: "m_" + e.id }));
 
 // ------------------------------------------------------------------ the assembled mountain
 const FOG = new THREE.Color(0xc9dcec);
-function scatterPts(n, seed, area, ok, o = {}) {
+function scatterPts(n, seed, area, ok, o: ScatterOpts = {}) {
   const r = rng(seed), out = [], sc = o.scale || [0.9, 1.2]; let tries = 0;
   while (out.length < n && tries++ < n * (o.tries || 60)) {
     const x = area[0] + (r() * 2 - 1) * area[2], z = area[1] + (r() * 2 - 1) * area[3], inf = mtInfo(x, z), pr = ok(x, z, inf.h, inf.ny);
@@ -160,7 +161,7 @@ function scatterPts(n, seed, area, ok, o = {}) {
   }
   return out;
 }
-const toMats = (pts, o = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p, i) => composeTRS(m, i, p.x, mtH(p.x, p.z) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
+const toMats = (pts, o: ScatterOpts = {}) => { const m = new Float32Array(pts.length * 16), r = rng(o.seed || 5); pts.forEach((p, i) => composeTRS(m, i, p.x, mtH(p.x, p.z) + (o.y || 0), p.z, p.yaw, p.s, o.tilt ? o.tilt * r() : 0, r() * 6.28, o.sy ? p.s * o.sy : null)); return m; };
 const patch = (x, z, s = 4, f = 0.05) => Math.pow(vnoise(x, z, f, s), 1.6) * 1.8;
 const valleyClear = (x, z) => sstep(10, 22, Math.hypot(x - 2, z - 6));            // keep the camera area open
 
@@ -189,7 +190,7 @@ export async function buildMountain(ctx) {
   const crests = []; { const r = rng(4); for (let k = 0; k < 400 && crests.length < 7; k++) { const x = -150 + r() * 300, z = -300 + r() * 170, h = mtH(x, z); if (h > 120 && crests.every((c) => Math.hypot(c[0] - x, c[2] - z) > 45)) crests.push([x, h + 1, z]); } }
   if (crests.length) { root.add(MP.snowPoints("spindrift", { n: crests.length * 220, crests, speed: 3.2, life: 8, seed: 12, scale: 620 })); note("spindrift plumes off the crests", crests.length * 220, null); }
 
-  const add = (name, parts, pts, o = {}) => {
+  const add = (name, parts, pts, o: SpeciesAddOpts = {}) => {
     if (!pts.length) return;
     const mats = toMats(pts, o), g = cull.add(parts, mats, pts.length, name, o.cell || 16); g.name = name; root.add(g); note(name, pts.length, parts); return g;
   };
@@ -231,7 +232,7 @@ export async function buildMountain(ctx) {
   add("scree shards B", MP.screeParts(2), scatterPts(N(2200), 41, AREA, scr, { scale: [1.0, 2.2] }), { y: -0.02 });
   for (const id of ["Pebble_Square_1", "Pebble_Square_3", "Pebble_Square_5", "Pebble_Round_2"]) add(id, (await Lq(id, { h: 0.14, tint: [1, 1, 1.05], fade: [28, 50] })).parts, scatterPts(N(500), 42 + id.length, AREA, scr, { scale: [0.8, 2.0] }), { y: -0.01 });
   const rk = (x, z, h, ny) => (ny > 0.55 && h > 4 && h < 140 ? (0.1 + 0.9 * patch(x, z, 50, 0.04)) * wd(x, z) * valleyClear(x, z) : 0);
-  const rockSp = async (name, res, n, sc, y = -0.15, fade) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
+  const rockSp = async (name, res, n, sc, y = -0.15, fade?: number[]) => add(name, res.parts, scatterPts(N(n), 50 + name.length, AREA, rk, { scale: sc }), { y, tilt: 0.1 });
   const alt = (h) => M.SNOWLINE - 12;                                                                              // snow dust from just below the snowline
   const RW = { lichen: 0.7, snow: 0.55, snowAlt: M.SNOWLINE - 18 };
   await rockSp("boulder_01", wx(await H("boulder_01", { grade: true, fade: [100, 150] }), RW), 8, [1.2, 2.2]);
@@ -257,10 +258,10 @@ export async function buildMountain(ctx) {
     add("glacier tongues", g, gp, { y: -0.1, cell: 64 }); }
 
   // ---- trees by LOD species with impostor atlas: spruce, larch, fir, pines (some snow-dusted), krummholz, snags
-  const species = (name, l0, l1, pts, o = {}) => {
+  const species = (name, l0: any, l1: any, pts: any[], o: SpeciesLODOpts = {}) => {
     if (!pts.length) return;
     const imp = bakeImpostor(renderer, partsGroup(l0), 8, 256), mats = toMats(pts, { seed: name.length });
-    const levels = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
+    const levels: LODLevel[] = [{ parts: l0 }]; if (l1) levels.push({ parts: l1 }); levels.push({ impostor: imp.factory });
     const sp = new LODSpecies(name, levels, mats, pts.length, l1 ? [o.d0 ?? 28, o.d1 ?? 90] : [o.d1 ?? 60]); lods.push(sp); root.add(sp.group); note(name, pts.length, l0); info.impostors++;
   };
   const forestP = (hmax = M.TREELINE) => (x, z, h, ny) => (ny > 0.62 && h > 1.5 && h < hmax + 6 ? (1 - sstep(hmax - 10, hmax + 6, h + 5 * (vnoise(x, z, 0.08, 3) - 0.5))) * (0.15 + 0.85 * Math.pow(vnoise(x, z, 0.018, 70), 1.3) * 1.8) * sstep(3, 8, waterDist(x, z)) * sstep(18, 40, Math.hypot(x - 2, z - 6)) : 0);
@@ -291,6 +292,6 @@ export async function buildMountain(ctx) {
   return {
     root, info, cull,
     update(camera, frame) { for (const s of lods) s.update(camera, frame === 0); cull.update(camera, frame === 0); },
-    lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 }; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; return t; },
+    lodCounts() { const t = { lod0: 0, lod1: 0, far: 0 } as BiomeMountainTerrain; for (const s of lods) { const c = s.counts(), n = c.length; t.lod0 += c[0]; if (n === 3) t.lod1 += c[1]; t.far += n === 3 ? c[2] : c[1] || 0; } t.cull = { ...cull.stats }; return t; },
   };
 }

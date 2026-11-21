@@ -1,4 +1,5 @@
 import * as uiC from "../ui-c/index.js";
+import type { FootPoint } from "./types.js";
 import { assetMode, ASSET_MODE_HD, isLoadedAsset } from "../assets.js";
 import {
   widePadFor,
@@ -598,7 +599,7 @@ export function render() {
             // which is exactly `progress` in all four phases.
             const climbGroundOffsetFixed = cl
                 && (cl.phase === "mount" || cl.phase === "dismount" || cl.phase === "climb")
-                && !window.__noClimbShadowOffset
+                && !(window as any).__noClimbShadowOffset
                 ? Math.round(cl.progress * 256) : 0;
             // EXPERIMENT (mounts): on the mount the rider casts no shadow of its own; the mount's lies on the ground
             if (!mountHidesRiderShadow()) drawActorShadow(
@@ -788,7 +789,7 @@ export function render() {
         for (const it of partyFollowerDraws()) drawPartyFollower(it);
     }
     // every body in view, for the ambience layer (breath, footprints, grass parting, footsteps)
-    const feetNow = [{ id: "leader", x: state.x, y: state.y, moving: !!(state.moving || state._cutTarget), dir: state.dir, leader: true }];
+    const feetNow = [{ id: "leader", x: state.x, y: state.y, moving: !!(state.moving || state._cutTarget), dir: state.dir, leader: true }] as FootPoint[];
     window.__feet = feetNow;
     for (const it of partyFollowerDraws()) {
         feetNow.push({ id: "f" + feetNow.length, x: it.f.x, y: it.f.y, moving: feetNow[0].moving, dir: state.dir });

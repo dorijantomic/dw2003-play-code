@@ -28,6 +28,7 @@ import { checkSlot } from "./slot-check.js";
 // flow have no walker equivalent and are not faked — their strings ship in the
 // layout json but the screen never enters those states.
 import { CHARID_TO_DIGID } from "./party.js";
+import type { SaveEntry, SaveRecordOpts, SaveSlotWrite } from "./types/save.js";
 
 let LAYOUT = null;
 // Guarded so this module stays importable under `node --test` (no DOM there) —
@@ -93,7 +94,7 @@ function restoreStorage(data) {
     const k = store.key(i);
     if (!NON_GAME_KEYS.has(k)) store.removeItem(k);
   }
-  for (const [k, v] of Object.entries(data ?? {})) store.setItem(k, v);
+  for (const [k, v] of Object.entries(data ?? {}) as [string, string][]) store.setItem(k, v);
 }
 
 /**
@@ -105,7 +106,7 @@ function restoreStorage(data) {
  *            native route's load path hands it back through the card host)
  *   data   — the localStorage snapshot the slot restores on load
  */
-export function writeSlot(i, { record, image = null, data = null, playSeconds = null, residentImageVersion = 0, state = null } = {}) {
+export function writeSlot(i, { record, image = null, data = null, playSeconds = null, residentImageVersion = 0, state = null }: SaveSlotWrite = {}) {
   if (!(i >= 0 && i < SLOT_COUNT)) return false;
   // The name on a save is the tamer's registered name — the account name the
   // player typed at the Online Center clerk (web/game.js takes it from the
@@ -119,7 +120,7 @@ export function writeSlot(i, { record, image = null, data = null, playSeconds = 
     record: record ?? null,
     data: data ?? snapshotStorage(),
     savedAt: Date.now(),
-  };
+  } as SaveEntry;
   if (state) {
     for (const key of ["playerName", "bits", "playSeconds", "rosterOwned", "progressOrdinal", "packId", "charId", "party", "partyStats", "partnerStats", "equipment", "reserveStats", "reserveEquipment", "digimonNames", "inventory", "worn"]) {
       const value = state[key];
@@ -226,7 +227,7 @@ export function readSlot(i) {
  *   +0x28/+0x2A/+0x2C play h/m/s, +0x30.. party starter types,
  *   +0x3C.. party levels.
  */
-export function buildRecord(state, opts = {}) {
+export function buildRecord(state, opts: SaveRecordOpts = {}) {
   const L = LAYOUT;
   const byType = L?.file_card?.party?.digimonIdByType ?? {};
   const typeOf = (digimonId) => {

@@ -34,8 +34,14 @@ export async function loadNewMaps(get, has) {
     return out;
 }
 
+/** A neighbours' pack: the map records to add, and the exits a neighbour gains ({ to } entries), per map id. */
+interface NewMapPack {
+    records: { id: string }[];
+    exits: Record<string, { to: string }[]>;
+}
+
 /** Add the records to a manifest (never replaces a disc map). Returns the ids added. */
-export function mergeNewMaps(manifest, nm) {
+export function mergeNewMaps(manifest, nm: NewMapPack) {
     const have = new Set(manifest.maps.map((m) => m.id));
     const added = [];
     for (const r of nm.records) {

@@ -14,6 +14,7 @@ import {
   people,
 } from "./host.js";
 import { READY_MS } from "./command.js";
+import type { MpNetFighter, MpNetHost } from "./types.js";
 
 // ------------------------------------------------------------ starting, joining, finishing
 async function begin(setup, isHost, hostId, done) {
@@ -29,8 +30,8 @@ async function begin(setup, isHost, hostId, done) {
         fid: setup.fid, isHost, hostId, ids: setup.ids.slice(), names: setup.names ?? {}, foes: setup.foes, label: setup.label || "Fight",
         screenId: setup.screenId ?? null, mapId: setup.mapId ?? MB.A.mapId?.() ?? null, challenge: setup.ch ?? null, kit, me, party, act: 0, erec, techs: kit.myTechs(me), items: [], done, S: null, cmd: null, waves: 1, nat: null,
         bots: new Set((setup.bots ?? []).map((b) => b.id)), snap: MB.A.snapshot(), timers: new Set(), ui: null, H: null, r3d: null, placed: new Set(), modelName: new Map(), waveKey: null, lastEv: null, cheered: false, iFled: false,
-        link: createLink({ onEnd: () => { if (MB.F) finish(false, { fled: true, hostLeft: true }); } }),
-    };
+        link: createLink({ onEnd: () => { if (MB.F) finish(false, { fled: true, hostLeft: true }); } } as LinkOptions),
+    } as MpNetFighter;
     emit("fightSeen", winEvent(MB.F.foes));            // only the species log listens (web/species-log.js): quests hear battleWon alone
     const U = MB.F.ui = MB.A.ui ?? (MB.A.ui = buildUi());
     U.cards.clear(); U.foes.replaceChildren(); U.mine.replaceChildren(); U.foeKeys = ""; U.bar.replaceChildren(); U.log.replaceChildren(); U.plateMap.clear(); U.plates.replaceChildren();
@@ -53,7 +54,7 @@ async function begin(setup, isHost, hostId, done) {
         MB.F.H = {
             P: new Map([[mePublic.id, { ...mePublic, rec: me, party: party.map((m) => m.rec) }]]), names: erec.map((r) => r.eStats?.digimon_id ?? r.profile?.name ?? "?"),
             arena: null, round: 0, turn: null, log: ["Waiting for everyone..."], started: false, res: new Map(), pause: createPause(),
-        };
+        } as MpNetHost;
         for (const b of setup.bots ?? []) {                    // a computer-played practice partner is ready at once
             const recs = b.party.map((r) => kit.pack(r));
             MB.F.H.P.set(b.id, { id: b.id, pn: String(b.name).slice(0, 12), n: recs[0].profile?.name ?? "?", lv: recs[0].level | 0, rec: recs[0], party: recs });
@@ -207,4 +208,12 @@ export function finish(won, { fled = false, hostLeft = false } = {}) {
         b.onclick = close; end.append(b);
         U.root.append(end); U.endEl = end;
     }, won ? 2800 : 1600);
+}
+
+// The hooks createLink (web/mpbattle-pause.ts) takes: the host-left callback and the timer pair
+// it replaced.
+interface LinkOptions {
+  onEnd?: any;
+  setT?: any;
+  clearT?: any;
 }

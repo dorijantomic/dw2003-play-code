@@ -3,10 +3,11 @@ import { assetMode } from "../../assets.js";
 import { TEXTURE_PAGE_TEXELS, texturePatchRect } from "../math.js";
 import { modelKeyFromFolder } from "../camera-shots.js";
 import { TexturePatchAnimator } from "../../fight/texture-patch-animator.js";
+import type { ArenaGroupBuf, Battle3DContext } from "../../types/battle3d.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeBackdrop(B$) {
-function _bdGroupBuf(g) {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
+export function makeBackdrop(B$: Battle3DContext) {
+function _bdGroupBuf(g): ArenaGroupBuf {   // {page, spinDeg, pos:[x,y,z...], uv:[u,v...]} → {page, spinDeg, vbo, ubo, count}
     const vbo = B$.gl.createBuffer();
     B$.gl.bindBuffer(B$.gl.ARRAY_BUFFER, vbo);
     B$.gl.bufferData(B$.gl.ARRAY_BUFFER, new Float32Array(g.pos), B$.gl.STATIC_DRAW);
@@ -116,7 +117,7 @@ function setArenaDebug(d) {
     }
     return B$.arenaDebug;
   }
-function _arenaGroupBuf(g) {   // same shape as _bdGroupBuf (static spinDeg == 0)
+function _arenaGroupBuf(g): ArenaGroupBuf {   // same shape as _bdGroupBuf (static spinDeg == 0)
     const b = _bdGroupBuf(g);
     // HD sheets are LINEAR-sampled. The pack's UVs are whole texel numbers (all 166002 of them, every pack): the
     // original's NEAREST read at u = 128.0 is texel 128, but a LINEAR read there is half texel 127, the NEXT picture

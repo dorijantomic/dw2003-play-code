@@ -46,6 +46,7 @@ import { motionFor, releasePoint, handPoint, windupFor } from "./motion-constant
 import { headCastFor, HEAD_CAST_JUMP, HEAD_CAST_IDLE } from "./head-cast-constants.js";
 import { bodyHeight, penetration, clearanceTolerance, rigColliders, poseCollider, pairClearance, allowedPairs } from "./anim-collision.js";
 import { sharedShotMode, sharedShotTargets, SHARED_SHOT } from "./anim-collision.js";
+import type { FightAimOffsets, FightChannels, FightGate, FightMetrics, FightPlan, FightSkeleton } from "./types.js";
 
 const TAU = (Math.PI * 2) / 4096;
 
@@ -303,7 +304,7 @@ export function headCastSchedule(h, t, ticks = Infinity) {
  * (a spell: windup ≈ 0.18 of the cast, flight ≈ 0.40 — K19a's numbers), and each class's own medians
  * override the excursion and the release point.
  */
-export function planCast(model, group, { tick = null, quantile = 0.5 } = {}) {
+export function planCast(model, group, { tick = null, quantile = 0.5 } = {}): FightPlan | { ok: false; reason: string; } {
   const folder = model.folder;
   const rig = rigOf(model);
   if (!rig || rig.source !== "bonemap") return { ok: false, reason: "no bone map for this rig" };
@@ -452,7 +453,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}) {
   const buildFrames = () => {
     frames.length = 0;
     for (let t = 0; t < ticks; t++) {
-      const f = { arms: { left: null, right: null }, aim: null };
+      const f = { arms: { left: null, right: null }, aim: null } as FightAimOffsets;
       // the effector path: rest -> apex (ease) -> hold -> drive to the release point -> overshoot -> rest
       const u = t <= windup * 0.6 ? smooth(t / Math.max(1, windup * 0.6))
         : t <= windup ? 1
@@ -513,7 +514,7 @@ export function planCast(model, group, { tick = null, quantile = 0.5 } = {}) {
     // the aim may start at (after the head has come back down, so the aim never eats the lift)
     head: headPlan, headSites, rootCap, aimStart: headPlan ? Math.min(windup, headPlan.rise + headPlan.hold + headPlan.fall) : 0,
     swing: { base: SOLVER.swingBase, cap: SOLVER.swingCap, scale: 1 },
-  };
+  } as FightPlan;
   /** Widen (or reset) the outward swing: the apex moves out on each site's own side, the release stays. */
   plan.setSwing = (scale) => {
     plan.swing.scale = scale;
@@ -682,7 +683,7 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
   }));
   const rootBone = rig.root;
   const keys = new Map(), prevKeys = new Map(), key1 = new Map();
-  const metrics = { ikClamped: 0, jointsClamped: 0, axisAim: 0, bones: 0, unreachable: 0 };
+  const metrics = { ikClamped: 0, jointsClamped: 0, axisAim: 0, bones: 0, unreachable: 0 } as FightMetrics;
   const trace = [];
 
   // world rotations for one tick, from the IDLE frame of that tick
@@ -1078,12 +1079,12 @@ export function bakeSolverPose(target, plan, { offset = SOLVER.offset, table = n
       const moved = keys.get(i);
       const trans = key1.get(i);
       if (!moved && !trans) return b;
-      const anim = { ...(b.anim || {}) };
+      const anim = { ...(b.anim || {}) } as FightChannels;
       if (moved) anim.ch2 = withHold(b.anim?.ch2, moved, offset);
       if (trans) anim.ch1 = withHold(b.anim?.ch1, trans, offset);
       return { ...b, anim };
     }),
-  };
+  } as FightSkeleton;
   const idx = table ?? (() => { let k = Math.max(62, model.timeline?.length ?? 0); while (model.timeline?.[k]?.table) k++; return k; })();
   model.timeline = (target.timeline ? target.timeline.slice() : []);
   model.timeline[idx] = { table: [
@@ -1348,7 +1349,7 @@ export function verifyBake(model, plan, bake, group) {
     gap: !(plan.mode === "spread" && plan.sites.length > 1) || gapMin >= minGap,
     motion: plannedMove >= SOLVER.motionFloor * plan.H && travel >= SOLVER.driveFloor * plannedMove,
     reachable: reach.every((r) => r.ok),
-  };
+  } as FightGate;
   // K20b's own rules apply to a head cast only; every other cast keeps exactly the gate it had.
   if (headGate) {
     gate.headPitch = headGate.ok;
@@ -1519,5 +1520,5 @@ function hdrRoot(model) {
 
 /** The report of every cast solved on a model (the viewer panel / the harness read this). */
 export function solverReportFor(model) {
-  return Object.entries(model?.solverCasts ?? {}).map(([tech, v]) => ({ tech, ...v }));
+  return Object.entries(model?.solverCasts ?? {} as Record<string, any>).map(([tech, v]: [string, any]) => ({ tech, ...v }));
 }

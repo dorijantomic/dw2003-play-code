@@ -295,7 +295,7 @@ export function firstOpenEquipSlot(stats) {
 // Kept for callers that still pass a species name. The lab no longer restats
 // or unlocks here — it only changes who they are standing as.
 export function applyDriEvolution(state, index, target, digimonById) {
-  const profile = Object.values(digimonById).find((d) => d.name === target);
+  const profile = (Object.values(digimonById) as { id: any; name: string }[]).find((d) => d.name === target);
   if (!profile) return false;
   return setStandingForm(state, index, profile.id, digimonById);
 }

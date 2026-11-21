@@ -10,6 +10,7 @@
 // arena modules call); (2) biome  = the gallery entries web/biome/*.js (Quaternius CC0, Poly Haven CC0, KayKit, OGA, Sketchfab
 // anime CC-BY, procedural); (3) surface = plain painted surfaces (ground, water, sky gradients); (4) none = draw nothing.
 import * as THREE from "../lib3d/three.module.js";
+import type { BuiltCoverCache, BuiltLeafCache } from "./types.js";
 
 export const REGISTRY = new Map();
 export function register(def) { REGISTRY.set(def.id, def); return def; }
@@ -140,7 +141,7 @@ function builtDefs() {
   for (const [sp, nm, kinds] of [["broadleaf", "Fluffy broadleaf (arena default)", ["tree", "broadleaf"]], ["pine", "Cone-stack pine (arena default)", ["tree", "pine", "conifer"]], ["bush", "Fluffy bush (arena default)", ["bush", "shrub"]]])
     mod("mod." + sp, nm, kinds, async (env) => {
       const Fo = await import("./foliage.js");
-      env.shared ||= {};
+      env.shared ||= {} as BuiltLeafCache;
       const a = Fo.speciesAsset(sp, env.pal, (env.shared.leafTex ||= Fo.leafClumpTexture()));
       env.materials?.push(a.mat);
       return { parts: [{ geo: a.geo, mat: a.mat }], assume: true };
@@ -197,7 +198,7 @@ function builtDefs() {
   for (const kind of ["fern", "clover", "tuft", "litter", "twig", "pebble"])
     mod("mod.fc_" + kind, `Forest floor ${kind} (arena default)`, kind === "pebble" ? ["rock", "litter"] : kind === "litter" || kind === "twig" ? ["litter"] : ["plant", "ground cover"], async (env) => {
       const F = await import("./floorcover.js");
-      env.shared ||= {};
+      env.shared ||= {} as BuiltCoverCache;
       const a = F.coverAsset(kind, (env.shared.fcUniforms ||= F.coverUniforms()));
       env.materials?.push(a.mat);
       return { parts: a.parts, lod: a.lod, update: a.update, assume: true };
@@ -289,8 +290,8 @@ function builtDefs() {
     return one(geo, G.gullMaterial(env.S, col), { attrs: { aGull: [3, 0.5] } });
   });
   // --- surfaces: plain painted ground, water, sky (a surface slot takes the material; any other slot gets a flat disc of it)
-  const surf = (id, name, kinds, col, extra = {}) => add(id, name, ["surface", ...kinds], async (env) => {
-    const mat = extra.sky ? skyGradientMaterial(env.S, ...extra.sky.map((c) => env.S.srgb(c)), id) : plainMaterial(env.S, env.S.srgb(col), { name: id, rim: 0.0 });
+  const surf = (id, name, kinds, col, extra: { sky?: number[][] } = {}) => add(id, name, ["surface", ...kinds], async (env) => {
+    const mat = extra.sky ? skyGradientMaterial(env.S, ...extra.sky.map((c) => env.S.srgb(c)) as [any, any, any], id) : plainMaterial(env.S, env.S.srgb(col), { name: id, rim: 0.0 });
     const disc = new THREE.CylinderGeometry(1, 1, 0.04, 28, 1);
     return { parts: [{ geo: disc, mat }], assume: true, surfaceMat: mat };
   }, "Built: plain painted surface", "own code");
@@ -324,7 +325,7 @@ const sourceGroup = (e) => {
 };
 const kindsOf = (e) => {
   const s = `${e.cat} ${e.name}`.toLowerCase(), k = new Set();
-  const rx = [["tree", /tree|pine|fir\b|birch|oak|palm|willow|cherry|spruce|cypress|trunk|snag|krummholz|juniper/], ["bush", /bush|shrub|hedge|heather|sage/], ["rock", /rock|boulder|stone|cliff|crag|spire|scree|pebble|gravel|glacier/],
+  const rx: [string, RegExp][] = [["tree", /tree|pine|fir\b|birch|oak|palm|willow|cherry|spruce|cypress|trunk|snag|krummholz|juniper/], ["bush", /bush|shrub|hedge|heather|sage/], ["rock", /rock|boulder|stone|cliff|crag|spire|scree|pebble|gravel|glacier/],
     ["grass", /grass|reed|sedge|rush|marram|oats|cattail|bulrush|horsetail|tuft/], ["plant", /plant|fern|flower|lily|iris|clover|moss|lichen|weed|kelp|ivy|vine|lotus|gentian|edelweiss/], ["mushroom", /mushroom|agaric/],
     ["wood", /wood|log|branch|twig|driftwood|stump/], ["surface", /sky|cloud|fog|mist|ground|floor|material|water|stream|sea|ocean|pool|snow drift|sand/], ["shell", /shell|coral|crab/]];
   for (const [t, r] of rx) if (r.test(s)) k.add(t);

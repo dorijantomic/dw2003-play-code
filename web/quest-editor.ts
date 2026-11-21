@@ -2,23 +2,24 @@
 // scenes walk. Walkable ground is web/quest-walk.js over web/assets/collision/<map>.json, the same test the game and the
 // build-time checker use (rules in web/quest-editor-lib.js). Load / save go through tools/quest_editor_server.py (port 8091).
 import { DIRS, PATH_NAME, questGrid, walkable, snapPoint, pathLegs, questCellFree } from "./quest-editor-lib.js";
+import type { QuestEditorWork, QuestWalkGrid, QuestEditorLoaded, QuestEditorSaveReply, QuestEditorPick, QuestEditorDrag, QuestResident } from "./types/quest-editor.js";
 
 const HELPER = `http://${location.hostname}:8091`;
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
-let saved = null;            // { characters: [{npc_id, name, residents}], paths } as of the last save (JSON string for compare)
-let work = null;             // the same, being edited
+let saved: string | null = null;            // { characters: [{npc_id, name, residents}], paths } as of the last save (JSON string for compare)
+let work: QuestEditorWork | null = null;             // the same, being edited
 let canSave = false;
-let allMaps = [];
+let allMaps: string[] = [];
 let mapId = "";
-let grid = null, mapImg = null, groundCanvas = null;
+let grid: QuestWalkGrid | null = null, mapImg: HTMLImageElement | null = null, groundCanvas: HTMLCanvasElement | null = null;
 let Z = 2;
-let selChar = null;          // npc_id
-let selPath = null;          // path name
+let selChar: number | null = null;          // npc_id
+let selPath: string | null = null;          // path name
 let drawMode = false, addMode = false;
-let drag = null;
-const grids = new Map();
+let drag: QuestEditorDrag | null = null;
+const grids = new Map<string, QuestWalkGrid | null>();
 
 const say = (text, kind = "note") => { const m = $("msg"); m.textContent = text; m.className = "msg " + kind; };
 const isDirty = () => !!work && JSON.stringify(work) !== saved;
@@ -77,7 +78,7 @@ async function showMap(id) {
     const g = await fetchGrid(id);
     if (!g) { say(`No walk data for map "${id}".`, "bad"); return; }
     mapId = id; grid = g; $("mapId").value = id;
-    mapImg = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = `assets/maps/${id}.png`; });
+    mapImg = await new Promise<HTMLImageElement | null>((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = `assets/maps/${id}.png`; });
     // the walkable cells once, as a tiny image scaled up when drawn
     const c = document.createElement("canvas");
     c.width = g.cols; c.height = g.rows;
@@ -97,7 +98,7 @@ async function showMap(id) {
 }
 
 // ---------------------------------------------------------------------------------------------------- drawing
-function marker(ctx, x, y, label, colour, big) {
+function marker(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, colour: string, big: boolean) {
     ctx.fillStyle = "rgba(0,0,0,.45)";
     ctx.beginPath(); ctx.ellipse(x * Z, y * Z, 9 * Z / 2, 4 * Z / 2, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = big ? 3 : 2;
@@ -218,7 +219,7 @@ const worldOf = (e) => {
     return [(e.clientX - b.left) / b.width * $("view").width / Z, (e.clientY - b.top) / b.height * $("view").height / Z];
 };
 
-function hit(x, y) {
+function hit(x: number, y: number): QuestEditorPick | null {
     const R = 10;
     // path points first (they sit on top), then characters
     for (const [name, p] of Object.entries(work.paths)) {

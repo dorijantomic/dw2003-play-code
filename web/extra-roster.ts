@@ -128,7 +128,7 @@ if (typeof window !== "undefined" && !/[?&]noextras=1\b/.test(window.location?.s
   window.__extraRosterInstalled = true;
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : input?.url ?? String(input);
+    const url = typeof input === "string" ? input : (input as Request)?.url ?? String(input);
     const hit = DATA.exec(url);
     if (!hit) return realFetch(input, init);
     const [res, extra] = await Promise.all([realFetch(input, init), loadExtraRoster(realFetch)]);

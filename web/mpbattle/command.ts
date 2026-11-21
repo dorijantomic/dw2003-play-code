@@ -49,7 +49,7 @@ export function renderCmd() {
         bar.append(mk("span", "hint", MB.F.iFled ? "You ran away. Watching the rest of the fight." : S?.ph === "play" ? (S.pz ? pzText(S.pz, S.P) : "Waiting...") : ""));
         return;
     }
-    const btn = (label, fn, disabled) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
+    const btn = (label, fn, disabled?: any) => { const b = mk("button", "", label); b.type = "button"; b.disabled = !!disabled; b.onclick = fn; bar.append(b); return b; };
     if (!MB.F.cmd) MB.F.cmd = { stage: "menu" };
     const cmd = MB.F.cmd;
     const back = () => btn("Back", () => { MB.F.cmd = { stage: "menu" }; renderCmd(); });

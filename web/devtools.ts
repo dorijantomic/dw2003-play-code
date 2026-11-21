@@ -16,8 +16,12 @@ import { assetMode, setAssetMode, assetRequest, hdAssetUrl,
          ASSET_MODE_AUTHENTIC, ASSET_MODE_HD } from "./assets.js";
 import { buildBossList, esdmgStagesNeeded, filterBossList, startBossBattle } from "./devtools-bosslist.js";
 import { labBossParty, labBossValid } from "./fusion.js";
+import type { DevtoolsData } from "./types/devtools.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id) as any;
+
+/** A Lab boss row as the Fusion Lab saves it: the fused body's name, halves, level and HP. */
+interface LabBossRow { id: string; displayName?: string; halves: string[]; level?: number; hp?: number }
 const el = (tag, props = {}, ...kids) => {
   const n = Object.assign(document.createElement(tag), props);
   for (const k of kids) if (k != null) n.append(k);
@@ -123,14 +127,14 @@ function postBoot() {
   }
 }
 
-function setReadyPill(ok, text) {
+function setReadyPill(ok, text?) {
   const p = $("readyPill");
   p.className = ok ? "pill good" : "pill warn";
   p.textContent = ok ? `game ready — ${win()?.__mapInfo?.().id ?? "?"}` : (text ?? "booting…");
 }
 
 // ── toolset data (the same files the game reads) ─────────────────────────────
-const DATA = {};
+const DATA = {} as DevtoolsData;
 async function loadData() {
   const j = (p) => fetch(p).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   // data/stage_names.json lives one level above web/. It loads when the server
@@ -169,7 +173,7 @@ function loadBossRows() {
     ]);
     if (!stageEnc || !fieldEnc) throw new Error("stage_encounters.json / field_encounters.json did not load");
     const esdmgByStage = {};
-    await Promise.all(esdmgStagesNeeded(scripted).map(async (n) => { esdmgByStage[n] = await j(`assets/events/esdmg${n}.json`); }));
+    await Promise.all(esdmgStagesNeeded(scripted).map(async (n: number) => { esdmgByStage[n] = await j(`assets/events/esdmg${n}.json`); }));
     return buildBossList({ stageEnc, fieldEnc, scripted: scripted ?? {}, esdmgByStage,
       manifestMaps: DATA.manifest.maps ?? [], stageNames: DATA.stageNames });
   })();
@@ -224,7 +228,7 @@ function renderLabBosses(pane) {
     box.textContent = "";
     if (!rows.length) { box.textContent = "none yet (Fusion Lab: save a favourite, then Make boss)."; return; }
     box.append(el("div", {}, "Needs F2 -> Extras -> Fusion bosses ticked. The body species fights first and fuses when it falls."));
-    for (const rec of rows) {
+    for (const rec of rows as LabBossRow[]) {
       const b = el("button", { className: "act", style: "display:block;width:100%;text-align:left;margin:2px 0",
         textContent: `${rec.displayName ?? rec.id} | ${rec.halves.join(" + ")} | L${rec.level} | ${rec.hp} HP` });
       b.addEventListener("click", async () => {
@@ -257,7 +261,7 @@ const PANES = { stages: "pane-stages", battles: "pane-battles", assets: "pane-as
 for (const b of document.querySelectorAll("#tabs button")) {
   b.addEventListener("click", () => {
     for (const o of document.querySelectorAll("#tabs button")) o.setAttribute("aria-selected", String(o === b));
-    for (const [tab, id] of Object.entries(PANES)) $(id).classList.toggle("on", tab === b.dataset.tab);
+    for (const [tab, id] of Object.entries(PANES)) $(id).classList.toggle("on", tab === (b as HTMLElement).dataset.tab);
   });
 }
 

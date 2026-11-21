@@ -18,7 +18,7 @@ export function cleanPicks(raw) {
   for (const [folder, slots] of Object.entries(src)) {
     if (!/^[A-Za-z0-9_]+$/.test(folder) || !slots || typeof slots !== "object") continue;
     const row = {};
-    for (const [slot, v] of Object.entries(slots)) {
+    for (const [slot, v] of Object.entries(slots) as [any, any][]) {
       if (/^\d{1,2}$/.test(slot) && PICK_VALUES.includes(v)) row[String(slot | 0)] = v;
     }
     if (Object.keys(row).length) out[folder] = row;

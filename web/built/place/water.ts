@@ -22,7 +22,7 @@ export function plan(pctx) {
   const preset = waterPreset(rec);
   if (!preset) return null;
   const P = preset === "lake" ? LAKE_PRESET : WATER;
-  const field = preset === "lake" ? lakeField(rec, P) : shoreField(rec);
+  const field = preset === "lake" ? lakeField(rec, P as typeof LAKE_PRESET) : shoreField(rec);
   const A = preset === "lake" ? lakeAnchors(P) : anchors(rec);
   const pieces = preset === "lake" ? [] : (rec.pieces || []).filter((p) => p.kind === "water" || p.kind === "sea").map((p) => {
     let pmin = Infinity, pmax = 0, ymin = Infinity, ymax = -Infinity;

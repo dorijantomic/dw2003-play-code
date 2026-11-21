@@ -35,6 +35,7 @@
 /** The four statuses of a quest as the layer reports them (web/quests.js statusOf); "locked" is not a gate a trigger may name. */
 export const TRIGGER_STATUSES = ["available", "active", "ready", "done"];
 
+import type { QuestTriggerContext } from "./types/quest-triggers.js";
 const inRect = (r, x, y) => x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3];
 const read = (v) => (typeof v === "function" ? v() : v);
 
@@ -119,7 +120,7 @@ export function arrivalTrigger(triggers, mapId, state, ctx) {
  * ctx = { enabled(), statusOf(id), idle(), dialogBusy, battle, state(), playScene(scene), save(), warn(msg) }
  * `tick` returns a promise only when a scene was started, so the caller can ignore it in the frame loop.
  */
-export function installTriggers(triggers, ctx = {}) {
+export function installTriggers(triggers, ctx: QuestTriggerContext = {}) {
     const byMap = new Map();
     for (const t of Array.isArray(triggers) ? triggers : []) {
         if (!t || typeof t.id !== "string" || typeof t.map !== "string") continue;

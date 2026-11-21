@@ -12,6 +12,7 @@ import { applyRel } from "./geometry.js";
 import { isCursorToken } from "./icons.js";
 import { clipRect } from "./generic.js";
 import { N, ID, textPart, plate, rule, rowPlate, cursor, corners, chip, typeWord, tabPlate, PAGE_KEY } from "./base.js";
+import type { UiRect } from "./types.js";
 
 /** List sizes (native, C3): row pitch 14, columns 131 apart, cell 120 x 12 (C3 360 x 36 dp) starting 14 dp left of the icon, cursor row pushed out 12. */
 export const LIST = Object.freeze({ pitch: 14, colPitch: 131, cellW: 120, cellH: 12, lead: N(14), push: 12 });
@@ -19,7 +20,7 @@ const isNum = (t) => /^[0-9][0-9,]*$/.test(String(t).trim());
 
 // ------------------------------------------------------------------------------------------------ window + tab
 /** The list window. Full width (>= 300 native) = the C3 band; narrower = the chamfered frame. `cfg.word` = the faint word inside it. */
-export function composeListWin(p, i, out, cfg = {}) {
+export function composeListWin(p, i, out, cfg: { word?: string | null; } = {}) {
     const rel = p.rel, r = clipRect(p);
     const band = (p.w ?? r.w) >= 300;
     out.push(plate(`lw${i}.plate`, "listWindow", r, rel, { shape: band ? "bandCh" : "ch" }));
@@ -52,7 +53,7 @@ export const cursorFor = (runs, u) => runs.find((r) => isCursorToken(r.text) && 
  * The slots of one list page: `lines` = the row underline parts (one per item the game shows), `pagerY` = the page counter's pen y (the
  * rows of a page end above it). Returns { cols, rows, y0, empty: [{ x, y }] } -- the positions of the page with no item.
  */
-export function pageSlots(lines, pagerY = null, twoCols = true) {
+export function pageSlots(lines: { x: number; y: number; }[], pagerY: number | null = null, twoCols: boolean = true) {
     if (!lines.length) return { cols: [], rows: 0, y0: 0, empty: [] };
     const x0 = Math.min(...lines.map((u) => u.x)), y0 = Math.min(...lines.map((u) => u.y));
     const cols = twoCols ? [x0, x0 + LIST.colPitch] : [...new Set(lines.map((u) => u.x))].sort((a, b) => a - b);
@@ -68,7 +69,7 @@ export function pageSlots(lines, pagerY = null, twoCols = true) {
  * The item cells (C3). `lines` = row underline parts; the runs on a row become its name (Russo One 22) and right-anchored numbers.
  * Returns the set of `on` cell rects (native) so the icon highlight can take the dark ink on orange.
  */
-export function composeItemCells(lines, runs, used, out, o = {}) {
+export function composeItemCells(lines, runs, used, out, o: { pagerY?: number | null; twoCols?: boolean; } = {}) {
     if (!lines.length) return [];
     const rel = lines[0].rel, ons = [];
     const slots = pageSlots(lines, o.pagerY ?? null, o.twoCols !== false);
@@ -196,7 +197,7 @@ export const LIST_PARTS = Object.freeze(["rowLine", "iconHl", "pageChip", "gridA
  * Everything list-like on a screen, after its plates: item cells (rows not inside `skip` windows), icon highlights, the pager, page chips,
  * grid frames, empty slots, cursor boxes, connectors. `o.pulse` = the colour cycle for palette rows.
  */
-export function composeLists(parts, runs, used, out, o = {}) {
+export function composeLists(parts, runs, used, out, o: { skip?: UiRect[]; twoCols?: boolean; pulse?: (row: number) => string; } = {}) {
     const skip = o.skip ?? [];
     const inSkip = (p) => skip.some((s) => p.x >= s.x && p.x < s.x + s.w && p.y >= s.y && p.y < s.y + s.h);
     let pagerRuns = null;

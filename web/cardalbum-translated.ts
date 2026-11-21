@@ -14,6 +14,7 @@ import { paintNativeSession } from "./native-session.js";
 import { composeWindow } from "./ui-c/screens.js";
 import { fetchJson, fetchBytes, loadResidentResources } from "./resident-data.js";
 import { cards } from "./cardstate.js";
+import type { CardAlbumScreen } from "./types/cardalbum-translated.js";
 
 const LABEL = "Card album";
 const PACKS = { 0x605: "stalbm" };
@@ -53,7 +54,7 @@ export function createCardAlbumTranslated(sfx = null) {
   const album = {
     _open: false, _session: null, _state: null, _onClose: null,
     _clock: null, _error: null, _request: 0,
-  };
+  } as CardAlbumScreen;
   const renderer = createNativeScreenRenderer({ pack: "stalbm", packs: PACKS },
     (directory) => PACKS[directory >>> 16] ?? null);
 

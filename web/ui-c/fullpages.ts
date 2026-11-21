@@ -12,6 +12,7 @@ import { N, ID, textPart, plate, rule, corners, cursor, stripes, typeWord, token
 import { restOfRuns } from "./generic.js";
 import { composeHint, composeRows, runIn, takeIn } from "./pages.js";
 import { isCursorToken } from "./icons.js";
+import type { UiPopOpts } from "./types.js";
 
 /** The native rect of a part's pixels (draw position + the clip's bounds), before its matrix. */
 const nat = (p) => ({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 });
@@ -85,7 +86,7 @@ function composeTitle(p, i, runs, used, out) {
  * Name entry (C7) and the partner chooser before it. `cfg.word` = the big faint word (NAME). The game's cursor clips say the focus: the key
  * cursor (39) its key, the slot cursor (40) its slot, a button drawn twice = the cursor's button, the chooser frame (32) its row.
  */
-export function composeNameEntry({ parts, runs }, cfg = {}) {
+export function composeNameEntry({ parts, runs }, cfg: { word?: string | null; } = {}) {
     const out = [], used = new Set();
     const back = of(parts, "backdrop")[0];
     if (back) {

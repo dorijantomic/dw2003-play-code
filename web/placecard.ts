@@ -27,6 +27,7 @@ import {
 import { drawText, fontReady } from "./uifont.js";
 import * as uiC from "./ui-c/index.js";
 import { composePlaceCard } from "./ui-c/message.js";
+import type { PlaceCard } from "./types/placecard.js";
 
 let cardCount = 0;
 
@@ -53,7 +54,7 @@ export function createPlaceCard() {
         _acc: 0,
         /** Set while the walker is still getting the stage on screen. */
         _held: false,
-    };
+    } as PlaceCard;
 
     /** Live state, for tests and the UI lab. */
     card.state = () => card._st;

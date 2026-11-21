@@ -185,6 +185,7 @@ export function clipContacts(clip, hits = null) {
 }
 
 import { authoredSide, mirrorOps } from "./side-mirror.js";
+import type { LaunchSpec } from "./types.js";
 
 const hasOps = (script) => !!script && Array.isArray(script.ops) && script.ops.length > 0;
 const hasTable = (model, t) => !!model?.timeline?.[t]?.table?.length;
@@ -362,7 +363,7 @@ const homeZ = (model) => homeLine(model);
  *     when its own clip 9 names one.
  * The op-word signs are the disc's: the decoder negates y and z (battle-action-opcodes.ts op6Handler).
  */
-function projectileOps(model, donorOps, table, element, launch = {}) {
+function projectileOps(model, donorOps, table, element, launch: LaunchSpec = {}) {
   const src = (donorOps ?? []).find((o) => o.op === 6 && (o.words?.[0] | 0) === 0 && (o.words?.length ?? 0) >= 8);
   const sprite = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? (src ? (src.words[1] | 0) : null);
   if (sprite == null) return src ? [cloneOp(src)] : [];
@@ -384,7 +385,7 @@ function projectileOps(model, donorOps, table, element, launch = {}) {
  * carried none gets them where its strike lands. Used by the borrowed-twin path, whose script is the donor's
  * own and therefore launches from the DONOR's weapon, not this model's emitter bones.
  */
-function reprojectLaunch(model, ops, element, launch = {}) {
+function reprojectLaunch(model, ops, element, launch: LaunchSpec = {}) {
   const src = ops.find((o) => o.op === 6 && (o.words?.[0] | 0) === 0 && (o.words?.length ?? 0) >= 8);
   const sprite = ownProjectile(model) ?? PROJECTILE_BY_ELEMENT[element] ?? (src ? (src.words[1] | 0) : null);
   const launchPlan = launchPointsFor(model, { tech: launch.tech ?? null, volley: !!launch.volley, tables: launch.tables ?? null });
@@ -877,7 +878,7 @@ function builtPresentation(model, script) {
  * Tick arithmetic: a playlist entry is one action tick, and op11 waits count ticks, so the release lands on
  * the tick the plan says and the strike on launch+flight (A16's rule, from the disc's own gap).
  */
-function solvedCastScript(model, clip, solved, { turn, element, hits, launch = {} }) {
+function solvedCastScript(model, clip, solved, { turn, element, hits, launch = {} }: { turn: any; element: any; hits: any; launch?: LaunchSpec }) {
   const table = solved.table;
   // K19f: the shot leaves from where the SOLVED pose holds the emitter at the release frame, not from
   // whichever frame of the table reaches furthest forward (which for a generated table is its first).
@@ -904,7 +905,7 @@ function solvedCastScript(model, clip, solved, { turn, element, hits, launch = {
   };
 }
 
-function buildEnemyScript(model, clip, row, gap, element, hits, planted, turn, launch = {}) {
+function buildEnemyScript(model, clip, row, gap, element, hits, planted, turn, launch: LaunchSpec = {}) {
   // the model's own body tables for this row, the ones that actually MOVE first (tableMotion)
   const body = byMotion(model, (row.t || []).filter((t) => hasTable(model, t)));
   // A12: an ENEMY-targeted technique may never be presented with a SELF-shaped script. The disc writes the

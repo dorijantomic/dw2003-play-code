@@ -17,6 +17,7 @@
 // Pure functions + a tiny DOM renderer; the wiring lives in anim-viewer.html (tests/anim-viewer-generic.test.js).
 import { MODEL_ANIM, MODEL_TEXTURE } from "./anim-viewer-bake.js";
 import { TimelinePlayer } from "./fight/timeline-player.js";
+import type { AnimGenericQuery, GenericFetch } from "./types/anim-viewer-generic.js";
 
 export const VERDICTS = ["works", "broken", "unsure"];
 export const VERDICT_MARK = { works: "✓", broken: "✗", unsure: "?" };
@@ -65,7 +66,7 @@ export function createGenericStore(limit = 24) {
 export function installGenericFetch(store, target = globalThis) {
   const orig = target.fetch;
   if (typeof orig !== "function") return null;
-  if (orig.__genericShim) return orig;
+  if ((orig as GenericFetch).__genericShim) return orig;
   const shim = (input, init) => {
     const url = typeof input === "string" ? input : input?.url || "";
     const hit = store.resolve(url);
@@ -114,7 +115,7 @@ export function previewPlan(model, motionTable, { full = true, postIdle = 45 } =
   };
 }
 
-export const genericQuery = ({ motion, folder } = {}) => {
+export const genericQuery = ({ motion, folder }: AnimGenericQuery = {}) => {
   if (!motion) return "";
   const q = new URLSearchParams();
   q.set("generic", motion);

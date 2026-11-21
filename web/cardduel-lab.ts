@@ -26,7 +26,7 @@ import {
   ENERGY_COLOURS,
 } from "./vendor/engine.js";
 
-const canvas = document.getElementById("c");
+const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
 

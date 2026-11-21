@@ -14,6 +14,7 @@
 //
 // Pure parts (index building, glTF parsing, clip sampling, bounds) are importable in node so
 // tests/anim-viewer-dw2.test.js can prove them without a browser. Only createDw2Renderer touches WebGL.
+import type { Dw2LoadedModel, Dw2Pose, PoseBounds } from "./types/anim-viewer-dw2.js";
 
 export const DW2_DEFAULT_ROOT = "dw2-models";
 
@@ -279,7 +280,7 @@ const point = (m, x, y, z) => [
 /** The bind pose (no clip): every node's own TRS from the file. */
 export function bindPose(model) {
   const n = model.json.nodes.length;
-  const pose = { model, t: new Float32Array(n * 3), r: new Float32Array(n * 4), s: new Float32Array(n * 3), n };
+  const pose = { model, t: new Float32Array(n * 3), r: new Float32Array(n * 4), s: new Float32Array(n * 3), n } as Dw2Pose;
   model.json.nodes.forEach((node, i) => {
     const t = node.translation || [0, 0, 0];
     const r = node.rotation || [0, 0, 0, 1];
@@ -298,7 +299,7 @@ function applyChannel(pose, ch, time) {
   if (!n) return;
   const dst = ch.path === "rotation" ? pose.r : ch.path === "translation" ? pose.t : pose.s;
   const off = ch.node * comps;
-  const put = (i, a) => {
+  const put = (i?: number, a?: number) => {
     if (interp === "CUBICSPLINE") {
       const base = i * comps * 3 + comps;                    // (inTangent, value, outTangent)
       for (let c = 0; c < comps; c++) dst[off + c] = values[base + c];
@@ -364,7 +365,7 @@ export function samplePose(model, clipIndex, timeSec) {
 }
 
 /** World-space AABB of a pose (mesh-local boxes through each mesh node's world matrix). */
-export function poseBounds(model, pose, out = {}) {
+export function poseBounds(model, pose, out: PoseBounds = {}) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   model.json.nodes.forEach((node, i) => {
     if (node.mesh == null) return;
@@ -526,7 +527,7 @@ export function createDw2Renderer(canvas, { flat = 0.62 } = {}) {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
       const json = await res.json();
-      const model = parseGltf(json);
+      const model = parseGltf(json) as Dw2LoadedModel;
       model.url = url;
       model.stats = modelStats(model);
       model.textures = [];

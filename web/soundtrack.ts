@@ -70,13 +70,13 @@ export function soundtrackRows({ stems, mapArchives, maps, battleMusic }) {
 
     // Which bank each archive number names, straight from the stage table.
     const archiveToBank = {};
-    for (const entry of Object.values(mapArchives || {})) {
+    for (const entry of Object.values(mapArchives || {}) as any[]) {
         if (entry && entry.archive != null && entry.bank) archiveToBank[entry.archive] = entry.bank;
     }
 
     // Field themes: one row per stem, stages in the order the stage table lists them.
     const field = new Map();
-    for (const [stage, entry] of Object.entries(mapArchives || {})) {
+    for (const [stage, entry] of Object.entries(mapArchives || {}) as [string, any][]) {
         if (!entry) continue;
         const track = stemOfPlayId(entry.play_id, archiveToBank);
         if (!track || !index.has(track)) continue;
@@ -86,7 +86,7 @@ export function soundtrackRows({ stems, mapArchives, maps, battleMusic }) {
 
     // Battle themes: one row per bank, every trigger screen kept with its stage.
     const battle = new Map();
-    for (const [stage, records] of Object.entries(battleMusic || {})) {
+    for (const [stage, records] of Object.entries(battleMusic || {}) as [string, any[]][]) {
         for (const rec of records || []) {
             if (!rec || !index.has(rec.bank)) continue;
             let row = battle.get(rec.bank);

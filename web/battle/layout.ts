@@ -1,5 +1,6 @@
 import { shuffleJokeMenu, RAND_U16 } from "../vendor/engine.js";
 import { BATTLE_UI_LAYOUT } from "../battle.js";
+import type { BattleDnaPresentation } from "./core/types.js";
 
 // Atlas source rects = PGFGTC00.BIN frame u,v,w,h (LBA 1109/1110). Cel 0xA is
 // the 104×64 face bezel (frame 4); cel 0x22 is the command row (frames 1+2).
@@ -36,9 +37,19 @@ export const COLS = 1;
 //
 // (FIGHTSTG_F0x80094f08's ctx+0xd4 list is a DIFFERENT list — the Digivolve
 // panel's — and it keeps the current form's flags; the TECH menu never reads it.)
+// What battleTechWords() is handed: the partner's form ledger (one record per equipped form),
+// the active form's id and the two signature words the TECH list marks.
+export interface BattleTechWordsArgs {
+  ledger?: any;
+  currentId?: number;
+  equippedForms?: any;
+  signatureTech?: number;
+  blastSignature?: number;
+}
+
 export function battleTechWords({
   ledger, currentId = 0, equippedForms, signatureTech = 0, blastSignature = 0,
-} = {}) {
+}: BattleTechWordsArgs = {}) {
   const records = ledger ?? [];
   const current = records.find((record) => Number(record?.id) === Number(currentId));
   const words = current
@@ -105,7 +116,7 @@ export const TAG_PRESENTATION = Object.freeze({
 // the whole result reveal pose and Desperado volley, and it plays the SAME actor the chunk
 // before it staged at the world origin with `op2 [3,3,0,0,0,0]`. So the slot's staged position
 // has to survive the boundary — see ActorAnimator._move.
-export function dnaClip12Chunks(segs, dna) {
+export function dnaClip12Chunks(segs, dna: BattleDnaPresentation) {
   if (!Array.isArray(segs) || segs.length !== 5) return null;
   const s2 = segs[2];
   const cut = s2.findIndex((r) => r.op === 2 && (r.words?.[0] | 0) === 2 && (r.words?.[1] | 0) === 2);

@@ -13,6 +13,8 @@
 //
 // Pure: no DOM, no storage, no fs, no clock beyond the `at` stamp shelfAdd() writes.
 
+import type { QuestSnapshot } from "./types/quest-shelf.js";
+
 const isObject = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const isName = (v) => typeof v === "string" && v.trim().length > 0;
@@ -26,7 +28,7 @@ const byName = (shelf, name) => listOf(shelf).find((x) => x?.name === name) ?? n
  * (a time, or an object with a numeric `at`) and the optional picks ({ pick, at } each). The first structural
  * problem ends the walk, so a state with a wrong version is one problem, not five.
  */
-export function validateSnapshot(s) {
+export function validateSnapshot(s: QuestSnapshot) {
     if (!isObject(s)) return ["the state is not an object"];
     if (s.v !== 1) return [`state version ${JSON.stringify(s.v)} is not 1`];
     const problems = [];

@@ -1,4 +1,5 @@
 import { BASE_GAIN, scaleGain, clampLevel } from "../volume-levels.js";
+import type { AudioPlayer, RoutedAudio } from "./types.js";
 
 // Browser autoplay policy: playback may only start after a user gesture,
 // so play() failures before first input are expected and retried on gesture.
@@ -52,11 +53,11 @@ export function createExclusiveRegister() {
 }
 
 export function createBgmPlayer(register = createExclusiveRegister()) {
-  const el = new Audio();
+  const el: RoutedAudio = new Audio();
   el.loop = true;
   el.volume = BASE_GAIN.music;
   let musicLevel = 1;                       // the OPTIONS music volume (web/volume-levels.js); 1 = the game's own 0.6
-  const player = { muted: false, current: null, el };
+  const player = { muted: false, current: null, el } as AudioPlayer;
 
   // This track's own stop entry, handed to the register: the exclusive
   // replacement stops a registered track through it (and clears `current`,

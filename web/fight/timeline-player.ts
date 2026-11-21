@@ -16,6 +16,16 @@
 import { frameTableFromEntries, newSamplerState, readPhase, sampleTick, SAMPLE_BIT, LOOP_MARKER, END_MARKER, BLEND_TARGET } from "../vendor/engine.js";
 
 export class TimelinePlayer {
+  declare _frames: { length: any; values: any; loopTargets: any; aux: any; };
+  declare _prevFrame: any;
+  declare _s: any;
+  declare blend: { from: any; t: number; };
+  declare ended: boolean;
+  declare frame: any;
+  declare justLooped: any;
+  declare length: any;
+  declare looped: boolean;
+  declare table: any;
   // `prevFrame` (optional) seeds the "from" for a LEADING aux=0xffff ease-in blend.
   constructor(table, prevFrame = null) {
     this.table = table;
@@ -105,6 +115,13 @@ export class TimelinePlayer {
 // when the last ends, the whole playlist is ended. Single-element playlists behave
 // like a bare TimelinePlayer.
 export class PlaylistPlayer {
+  declare blend: any;
+  declare cur: TimelinePlayer;
+  declare ended: boolean;
+  declare frame: any;
+  declare idx: number;
+  declare justLooped: any;
+  declare tables: any;
   constructor(tables) {
     this.tables = (tables || []).filter((t) => t && t.length);
     this.idx = 0;

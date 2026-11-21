@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
 import { mergeGeometries } from "./vendor/BufferGeometryUtils.js";
 import { toonify, normaliseGeo, tris, GRADE_PHOTO } from "./toolkit.js";
+import type { ToonGrade, ToonLoadOpts } from "./types.js";
 
 const loader = new GLTFLoader();
 const cache = new Map();
@@ -36,7 +37,7 @@ export function loadRaw(url, color = false) {   // color = keep COLOR_0 (opt-in,
  * Toon parts from a loaded GLB. o: { wind (0..1), flutter, fade, grade (true=photo grade), scale (uniform pre-scale), tint, trans, ground (sit on y=0) }
  * Foliage / MASK materials get alpha-to-coverage + double side.
  */
-export async function loadToon(url, o = {}) {
+export async function loadToon(url, o: ToonLoadOpts = {}) {
   const raw = await loadRaw(url, !!o.vertexColors);
   const k = o.h ? o.h / raw.size.y : (o.scale || 1), h = raw.size.y * k;
   const lift = o.ground === false ? 0 : -raw.box.min.y * k;
@@ -47,7 +48,7 @@ export async function loadToon(url, o = {}) {
       alphaTest: mask ? 0.5 : 0, vertexColors: !!(o.vertexColors && p.geo.attributes.color) });
     if (mask) m.alphaToCoverage = true;
     if (s.map) { s.map.anisotropy = 4; }
-    toonify(m, { wind: o.wind || 0, height: h, flutter: mask ? (o.flutter || 0) : 0, fade: o.fade || null, grade: o.grade ? (o.grade === true ? GRADE_PHOTO : o.grade) : null, tint: o.tint || null, trans: mask ? (o.trans || 0) : 0, shadeK: o.shadeK ?? 0.72, rim: o.rim ?? 0.28 });
+    toonify(m, { wind: o.wind || 0, height: h, flutter: mask ? (o.flutter || 0) : 0, fade: o.fade || null, grade: o.grade ? (o.grade === true ? GRADE_PHOTO : o.grade as ToonGrade) : null, tint: o.tint || null, trans: mask ? (o.trans || 0) : 0, shadeK: o.shadeK ?? 0.72, rim: o.rim ?? 0.28 });
     return { geo, mat: m };
   });
   return { parts, height: h, size: raw.size.clone().multiplyScalar(k), tris: parts.reduce((a, p) => a + tris(p.geo), 0), draws: parts.length, url };

@@ -21,6 +21,7 @@ import { shotsFor, emitters, armEquip } from "./digimon-anatomy.js";
 import { BONEMAP, armChains, sideConfidence } from "./digimon-bonemap.js";
 import { restPose } from "./anim-retarget.js";
 import { authoredSide } from "./side-mirror.js";
+import type { LaunchOpsSpec } from "./types.js";
 
 /** The furthest a shot's spawn point may sit from its emitter's bone tip, as a share of body height. */
 export const LAUNCH_SPREAD = 0.03;
@@ -82,7 +83,7 @@ export function emitterBone(folder, id) {
   const part = String(id).replace(/-\d+$/, "");
   const sided = part === "left-arm" || part === "right-arm" || part === "both-arms";
   if (sided && sideConfidence(folder) === "low") return centreBone(m);
-  const site = /^(left-arm|right-arm)-(\d+)$/.exec(String(id));
+  const site = /^(left-arm|right-arm)-(\d+)$/.exec(String(id)) as RegExpExecArray & { [n: number]: any };
   if (site) {
     const side = site[1] === "left-arm" ? "left" : "right";
     const chains = armChains(folder, side);
@@ -416,7 +417,7 @@ function modelHeight(model, window) {
  * per-pack rule moved Minotarumon's shot from 1 unit off the victim line to 459 (C12 visClose). The
  * script's frame, not the pack's, is what these words are written in.
  */
-export function launchOps(plan, { sprite, homeZ = 0, flight = null, lane = 0, side = "player" } = {}) {
+export function launchOps(plan, { sprite, homeZ = 0, flight = null, lane = 0, side = "player" }: LaunchOpsSpec = {}) {
   const yaw = side === "enemy" ? 0 : 2048;
   const out = [];
   for (const p of plan.points) {

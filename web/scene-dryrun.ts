@@ -59,6 +59,7 @@ import { createCutscene } from "../engine/systems/cutscene-manager.ts";
 import { FIELD_TICK_RATE, FIELD_WALK_MAGNITUDE } from "../engine/systems/field-movement.ts";
 import { castOf, compileScene } from "./quest-scenes.js";
 import { questGrid, questStandFree, questWalkLegs } from "./quest-walk.js";
+import type { SceneDryRunOpts, SceneDryrunRecord } from "./types/scene-dryrun.js";
 
 /** One stall: the same pc and the same wait mode for this many step() calls (the spec's fixed rule). */
 export const STALL_FRAMES = 600;
@@ -146,7 +147,7 @@ function stepSpans(steps, compileOpts) {
     return spans;
 }
 
-export function dryRun(steps, opts = {}) {
+export function dryRun(steps, opts: SceneDryRunOpts = {}) {
     const sceneSteps = Array.isArray(steps) ? steps : [];
     const stepSeconds = num(opts.stepSeconds, DEFAULT_STEP_SECONDS) > 0 ? num(opts.stepSeconds, DEFAULT_STEP_SECONDS) : DEFAULT_STEP_SECONDS;
     const maxSeconds = num(opts.maxSeconds, DEFAULT_MAX_SECONDS);
@@ -236,7 +237,7 @@ export function dryRun(steps, opts = {}) {
         // The clock time is written after the spread: a warp's own spec carries `at` (its destination point), and that
         // must not turn the record's `at` into a coordinate pair — the timeline reads it as a time. The destination is
         // kept as x/y for the report.
-        const record = { ...spec, index, step: stepOfEvent(index), at };
+        const record = { ...spec, index, step: stepOfEvent(index), at } as SceneDryrunRecord;
         if (spec.kind === "warp" && Array.isArray(spec.at)) {
             record.x = spec.at[0];
             record.y = spec.at[1];

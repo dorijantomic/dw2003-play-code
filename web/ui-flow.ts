@@ -1,7 +1,7 @@
 import { UI_FLOWS, classifyFlowNode } from "./ui-flow-data.js";
 
 const tabs = document.getElementById("tabs");
-const search = document.getElementById("search");
+const search = document.getElementById("search") as HTMLInputElement;
 const intro = document.getElementById("flowIntro");
 const graph = document.getElementById("graph");
 const columns = document.getElementById("columns");
@@ -10,7 +10,7 @@ const details = document.getElementById("details");
 const empty = document.getElementById("empty");
 const graphScroller = document.getElementById("graphScroller");
 const query = new URLSearchParams(location.search);
-let flow = UI_FLOWS.find((item) => item.id === query.get("flow")) ?? UI_FLOWS[0];
+let flow: any = UI_FLOWS.find((item) => item.id === query.get("flow")) ?? UI_FLOWS[0];
 let selected = flow.nodes.find((item) => item.id === query.get("screen"))?.id ?? flow.nodes[0].id;
 
 const nodeById = (id) => flow.nodes.find((node) => node.id === id);
@@ -23,10 +23,10 @@ const researchText = {
   mapped: "Research notes describe this route; this step has not been fully checked in the browser.",
   partial: "Some behavior is documented, but gaps remain for this step or its route.",
 };
-const nodeElement = (id) => [...columns.querySelectorAll(".node")].find((el) => el.dataset.node === id);
+const nodeElement = (id) => [...columns.querySelectorAll<HTMLElement>(".node")].find((el) => el.dataset.node === id);
 const incoming = (id) => flow.edges.filter((edge) => edge[1] === id);
 const outgoing = (id) => flow.edges.filter((edge) => edge[0] === id);
-const el = (tag, className, value) => {
+const el = (tag: string, className?: string, value?: any): any => {
   const result = document.createElement(tag);
   if (className) result.className = className;
   if (value != null) result.textContent = value;
@@ -34,7 +34,7 @@ const el = (tag, className, value) => {
 };
 
 function levels() {
-  const depth = new Map([[flow.nodes[0].id, 0]]);
+  const depth = new Map<any, any>([[flow.nodes[0].id, 0]]);
   for (let pass = 0; pass < flow.nodes.length; pass++) {
     let changed = false;
     for (const [from, to] of flow.edges) {
@@ -51,7 +51,7 @@ function levels() {
     const level = depth.get(node.id) ?? last;
     (groups[level] ??= []).push(node);
     return groups;
-  }, []);
+  }, [] as any[]);
 }
 
 function drawWires() {
@@ -59,8 +59,8 @@ function drawWires() {
   const width = graph.scrollWidth;
   const height = Math.max(graph.scrollHeight, 430);
   wires.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  wires.setAttribute("width", width);
-  wires.setAttribute("height", height);
+  wires.setAttribute("width", width as any);
+  wires.setAttribute("height", height as any);
   wires.replaceChildren();
   const ns = "http://www.w3.org/2000/svg";
   const defs = document.createElementNS(ns, "defs");
@@ -103,7 +103,7 @@ function drawWires() {
 
 function select(id) {
   selected = id;
-  for (const button of columns.querySelectorAll(".node")) {
+  for (const button of columns.querySelectorAll<HTMLElement>(".node")) {
     button.classList.toggle("active", button.dataset.node === id);
     button.setAttribute("aria-pressed", button.dataset.node === id ? "true" : "false");
   }
@@ -202,7 +202,7 @@ function render() {
 function filter() {
   const needle = search.value.trim().toLowerCase();
   let matches = 0;
-  for (const button of columns.querySelectorAll(".node")) {
+  for (const button of columns.querySelectorAll<HTMLElement>(".node")) {
     const node = nodeById(button.dataset.node);
     const actions = [...incoming(node.id), ...outgoing(node.id)].map((edge) => edge[2]).join(" ");
     const hit = !needle || `${node.name} ${node.detail} ${actions}`.toLowerCase().includes(needle);

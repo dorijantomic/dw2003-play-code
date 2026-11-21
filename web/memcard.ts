@@ -116,7 +116,16 @@ export function buildDirectoryBlock(records, slot = 0, encodeName = encodeNative
  * image. The adapter owns what a write means; this module only supplies the
  * device contract engine/native/stubs.ts declares.
  */
-export function createWalkerMemcard({ slots, onStore = null } = {}) {
+/** A saved slot as the game hands it over: the card record and its picture. */
+interface WalkerSlot { record: any; image: any }
+
+/** What the card is handed: the walker's three slots, and where a written block goes. */
+interface WalkerMemcardArgs {
+    slots?: WalkerSlot[] | (() => (WalkerSlot | null)[]);
+    onStore?: (slot: number, bytes: any, kind: string) => void;
+}
+
+export function createWalkerMemcard({ slots, onStore = null }: WalkerMemcardArgs = {} as WalkerMemcardArgs) {
     const read = () => (typeof slots === "function" ? slots() : slots) ?? [];
     const images = new Map(); // slot -> 0x26C4 image handed back by `block`
     return {

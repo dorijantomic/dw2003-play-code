@@ -4,7 +4,7 @@
 // hand-written; no slot without a card image is ever decoded.
 import { SECTION_TABLE, SLOT_COUNT, slotKey, decodeSlots, diffSlots } from "./save-xray.js";
 
-const $ = (id) => document.getElementById(id);
+const $ = (id: string): any => document.getElementById(id);
 const slotsEl = $("slots");
 const viewEl = $("view");
 const metaEl = $("meta");
@@ -79,7 +79,7 @@ function sectionValue(name, x) {
     case "roster": return rosterBody(x.roster);
     case "pack": return `<b>${["A", "B", "C"][x.packId] ?? x.packId}</b> (raw ${x.packId})`;
     case "flags":
-      return Object.values(x.flags).map((row) =>
+      return Object.values(x.flags as Record<string, any>).map((row) =>
         `<div>bank ${row.bank} <code>+${hex4(row.offset)}</code> · ${row.length} bytes · ${esc(hexBytes(row.bytes))}</div>`).join("");
     default: return "";
   }

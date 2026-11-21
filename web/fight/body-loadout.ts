@@ -33,6 +33,8 @@
 // CORPUS_FACTS carries the numbers this module's own test computes over every pack, and the
 // test fails if the packs stop agreeing — the page never invents its own total.
 
+import type { LoadoutQuery } from "./types.js";
+
 /** The disc's eight technique elements (engine/dw3/battle-formulas.ts ELEMENT_ID; the
  *  skills table spells every one of the 426 techniques' own element this way). */
 export const ELEMENT_NAMES = {
@@ -303,7 +305,7 @@ const effectName = (type) => (type === 9999 ? "9999 the technique's own effect" 
  * `clips` one block per authored clip it owns, `odd` the two corpus lines (and this body's
  * own shared-mesh case, when it has one).
  */
-export function loadoutReport({ folder, names = [], species = [], anim = null, techTable = null, skills = null, sounds = null } = {}) {
+export function loadoutReport({ folder, names = [], species = [], anim = null, techTable = null, skills = null, sounds = null }: LoadoutQuery = {}) {
   const title = names.length ? `${names.join(" / ")}  ${folder}` : String(folder ?? "");
   const clips = anim?.clips ?? [];
   const acts = anim?.actions ?? [];

@@ -7,6 +7,7 @@
 // Nothing here reads or writes game state; it only sees what the draw functions are asked to draw.
 import { claimFor } from "./claims.js";
 import { relative } from "./geometry.js";
+import type { UiCapturePart } from "./types.js";
 
 let cur = null;
 
@@ -29,7 +30,7 @@ export function clipBounds(p, id) {
  * scope also takes the plain drawText() calls (web/uifont.js) as runs -- the battle HUD writes its names and numbers that way, not as
  * text widgets.
  */
-export function begin(key, ctx, m0, getArt, o = {}) {
+export function begin(key, ctx, m0, getArt, o: { texts?: boolean; } = {}) {
     cur = { key, ctx, m0, getArt, parts: [], runs: [], unclaimed: [], claimed: [], arts: 0, inArt: false, domText: 0, texts: !!o.texts };
 }
 
@@ -56,7 +57,7 @@ export function clipHook(ctx, p, id, x, y, draw, drawW = null) {
     if (claim && !listedArt) {
         const [base, row = "0"] = String(id).split("#");
         // x, y = the game's draw position; bx, by, w, h = where the clip's pixels sit relative to it (read from the loaded sheet, never stored)
-        const part = { ...claim, rows: claim.rows ?? 0, pack: p.name, id: String(id), base: Number(base), row: Number(row) || 0, x, y, bx: b?.x ?? 0, by: b?.y ?? 0, w: b?.w ?? 0, h: b?.h ?? 0, rel };
+        const part = { ...claim, rows: claim.rows ?? 0, pack: p.name, id: String(id), base: Number(base), row: Number(row) || 0, x, y, bx: b?.x ?? 0, by: b?.y ?? 0, w: b?.w ?? 0, h: b?.h ?? 0, rel } as UiCapturePart;
         if (drawW != null) part.drawW = drawW;     // drawClipWidth: the width the game reveals (a gauge fill)
         // a claim that asks for them gets the clip's sheet layers (piece rects relative to the draw position), read at run time
         if (claim.layers) part.layers = (p.ids?.[String(id)]?.layers ?? []).map((l) => ({ x: l.dx | 0, y: l.dy | 0, w: l.w | 0, h: l.h | 0 }));

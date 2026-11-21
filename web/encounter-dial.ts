@@ -11,6 +11,7 @@
 //
 // Authority: docs/research/field/encounter-step-counter-decoded-2026-07-25.md
 // (walker), engine/dw3/encounters.ts resetEncounterCounter / encounterStepTick.
+import type { AmbienceSettings } from "./types/ambience.js";
 
 /** The four settings of the dial, in panel order. "normal" is the game's own rate. */
 export const DIAL_MODES = ["none", "rare", "normal", "lure"];
@@ -36,7 +37,7 @@ export function dialReset(decoded, mode) {
  * (today's game), and a stored value that is not one of the four also reads
  * "normal" rather than inventing a fifth setting.
  */
-export function dialModeFromFx(fx) {
+export function dialModeFromFx(fx: AmbienceSettings) {
     if (!fx || fx.encounterdial !== true) return "normal";
     return DIAL_MODES.includes(fx.encounterDialMode) ? fx.encounterDialMode : "normal";
 }

@@ -6,6 +6,7 @@
 // (up to one plant height, 10 steps) and dropped if it still fails; bushes on the bank are never moved.
 // The assets (web/built/foliage.js speciesAsset, registry ids mod.broadleaf / mod.pine / mod.bush) know nothing of this.
 import { rng, itemsFrom, composeYaw } from "../slots.js";
+import type { BuiltFoliageStats, BuiltSlotRef } from "./types.js";
 
 const SPECIES = [
   ["broadleaf", "Broadleaf trees", "tree"],
@@ -56,11 +57,11 @@ export function plan(pctx) {
     }
   }
 
-  const stats = { round: -1 };
+  const stats = { round: -1 } as BuiltFoliageStats;
   const resetStats = () => Object.assign(stats, { candidates: 0, accepted: 0, rejectedAtRecipeSpot: 0, moved: 0, dropped: 0, noGround: 0, byReason: { fight: 0, cone: 0 }, list: [] });
   resetStats();
   const shapes = {};
-  const slots = SPECIES.map(([name, label, kind]) => ({
+  const slots: BuiltSlotRef[] = SPECIES.map(([name, label, kind]) => ({
     id: "foliage." + name, label, kind, layer: name, parent: pctx.foliageGroup, default: "mod." + name,
     items: itemsFrom([]), native: null, wantsShape: true, windShare: 0.04, placeOrder: 1,
     meshName: (g) => `${name}_s${g}`,

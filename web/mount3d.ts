@@ -266,7 +266,7 @@ const point = (m, x, y, z) => [
 ];
 
 /** World-space AABB of a pose (each mesh's local box through its node's world matrix). */
-export function poseBounds(model, pose, out = {}) {
+export function poseBounds(model, pose, out: { min?: number[]; max?: number[]; center?: number[]; size?: number[] } = {}) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   model.nodes.forEach((node, i) => {
     if (node.mesh == null) return;
@@ -644,7 +644,7 @@ async function loadMountAssetOnce(key, url) {
     const boneGroups = new Map();
     const groupOf = (node) => {
       if (boneGroups.has(node)) return boneGroups.get(node);
-      const obj = new THREE.Object3D();
+      const obj: any = new THREE.Object3D();
       obj.matrixAutoUpdate = false;
       obj.__node = node;
       boneGroups.set(node, obj);
@@ -811,7 +811,7 @@ function splitAtSeat(asset, pix, seat) {
     d[i] = s[i]; d[i + 1] = s[i + 1]; d[i + 2] = s[i + 2]; d[i + 3] = s[i + 3];
   }
   for (const [k, img] of [["front", front], ["back", back]]) {
-    const c = splitCanvases[k];
+    const c = splitCanvases[k as string];
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     c.getContext("2d", { willReadFrequently: true }).putImageData(img, 0, 0);
   }
@@ -822,7 +822,7 @@ function splitAtSeat(asset, pix, seat) {
 /** Render the mount's own scene and the same group in a fresh scene: narrows down an empty render. */
 export function sceneProbe() {
   if (!ensureRenderer()) return null;
-  const cam = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
+  const cam: any = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
   cam.rotation.x = -PITCH;
   cam.updateMatrixWorld(true);
   renderer.render(scene, cam);
@@ -845,10 +845,10 @@ export function sceneProbe() {
 export function renderSelfTest() {
   if (!ensureRenderer()) return null;
   const s = new THREE.Scene();
-  const m = new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), new THREE.MeshBasicMaterial({ color: 0xff00ff }));
+  const m: any = new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), new THREE.MeshBasicMaterial({ color: 0xff00ff }));
   m.position.set(56, 0, 60);
   s.add(m);
-  const cam = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
+  const cam: any = new THREE.OrthographicCamera(0, MOUNT_VIEW.w, 0, -MOUNT_VIEW.h, -1e5, 1e5);
   cam.rotation.x = -PITCH;
   renderer.render(s, cam);
   const gl = renderer.getContext();

@@ -25,13 +25,13 @@ const CSS = `
 export function buildAssetGroup(asset, name = "asset", tag = null) {
   const parts = asset.variants?.[0] || asset.parts;
   if (!parts?.length) throw new Error(`${asset.id}: no mesh parts (a procedural / surface asset, cannot stand as an object)`);
-  const g = new THREE.Group(); g.name = name;
+  const g = new THREE.Group() as any; g.name = name;   // vendored three (lib3d is outside the tsconfig): add/position are attached at runtime
   const id = new THREE.Matrix4();
   parts.forEach((part, i) => {
     let geo = part.geo;
     if (part.attrs) {   // constant per-instance attributes some module shaders need
       geo = geo.clone();
-      for (const [nm, [size, fill]] of Object.entries(part.attrs)) {
+      for (const [nm, [size, fill]] of Object.entries(part.attrs as Record<string, [number, number | number[]]>)) {
         if (geo.attributes[nm]) continue;
         const arr = new Float32Array(size);
         for (let c = 0; c < size; c++) arr[c] = Array.isArray(fill) ? fill[c] : fill;
@@ -56,7 +56,7 @@ export function createAddPicker({ getBuilt, onPick }) {
     <select id="addKind"><option value="">all kinds</option></select><select id="addSrc"><option value="">all sources</option></select>
     <span id="addCount"></span><span id="addMsg" style="color:#e88"></span><span style="flex:1"></span><button id="addClose">close</button></header><div class="grid" id="addGrid">loading ...</div>`;
   document.body.appendChild(gal);
-  const $ = (id) => gal.querySelector("#" + id);
+  const $ = <T extends HTMLElement = HTMLElement>(id) => gal.querySelector<T>("#" + id);
   let entries = null, io = null;
   const cache = new Map();      // asset id -> dataURL | "fail"
   const queue = [];             // card elements waiting for a preview (one at a time)
@@ -68,7 +68,7 @@ export function createAddPicker({ getBuilt, onPick }) {
     rend.setSize(SIZE, SIZE, false); rend.setPixelRatio(1);
     scene = new THREE.Scene();
     scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-    const d = new THREE.DirectionalLight(0xffffff, 2.2); d.position.set(2, 3, 2); scene.add(d);
+    const d = new THREE.DirectionalLight(0xffffff, 2.2) as any; d.position.set(2, 3, 2); scene.add(d);
     cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
   }
   async function previewOf(id) {
@@ -111,7 +111,7 @@ export function createAddPicker({ getBuilt, onPick }) {
     io.observe(card);
   }
   function draw() {
-    const q = $("addSearch").value.toLowerCase().trim(), kind = $("addKind").value, src = $("addSrc").value;
+    const q = $<HTMLInputElement>("addSearch").value.toLowerCase().trim(), kind = $<HTMLSelectElement>("addKind").value, src = $<HTMLSelectElement>("addSrc").value;
     const hit = entries.filter((a) => (!kind || a.kinds.includes(kind)) && (!src || a.source === src)
       && (!q || `${a.name} ${a.source} ${a.licence} ${a.kinds.join(" ")} ${a.id}`.toLowerCase().includes(q)));
     $("addCount").textContent = `${hit.length} of ${entries.length}`;
@@ -119,7 +119,7 @@ export function createAddPicker({ getBuilt, onPick }) {
     for (const a of hit.slice(0, 400)) {
       const c = document.createElement("div"); c.className = "card"; c.dataset.asset = a.id;
       c.innerHTML = `<div class="pv">...</div><b></b><i></i><i></i>`;
-      c.children[1].textContent = a.name; c.children[1].title = a.id; c.children[2].textContent = `${a.source}, ${a.licence}`; c.children[3].textContent = a.kinds.join(", ");
+      c.children[1].textContent = a.name; (c.children[1] as HTMLElement).title = a.id; c.children[2].textContent = `${a.source}, ${a.licence}`; c.children[3].textContent = a.kinds.join(", ");
       const done = cache.get(a.id);
       if (done && done !== "fail") { c.querySelector(".pv").textContent = ""; const im = new Image(); im.src = done; c.querySelector(".pv").appendChild(im); }
       else if (done === "fail") c.querySelector(".pv").textContent = "no preview";
@@ -134,8 +134,8 @@ export function createAddPicker({ getBuilt, onPick }) {
     if (!entries) {
       $("addGrid").textContent = "loading assets ...";
       entries = pickerEntries(await listAllAssets());
-      for (const k of [...new Set(entries.flatMap((a) => a.kinds))].sort()) $("addKind").add(new Option(k, k));
-      for (const s of [...new Set(entries.map((a) => a.source))].sort()) $("addSrc").add(new Option(s, s));
+      for (const k of [...new Set<string>(entries.flatMap((a) => a.kinds))].sort()) $<HTMLSelectElement>("addKind").add(new Option(k, k));
+      for (const s of [...new Set<string>(entries.map((a) => a.source))].sort()) $<HTMLSelectElement>("addSrc").add(new Option(s, s));
     }
     draw();
   }

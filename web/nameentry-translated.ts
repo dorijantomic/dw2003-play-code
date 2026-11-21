@@ -9,6 +9,7 @@ import { paintNativeSession } from "./native-session.js";
 import { composeName } from "./ui-c/screens.js";
 import { partyRosterView } from "./party.js";
 import { fetchBytes, loadResidentResources } from "./resident-data.js";
+import type { NameEntryScreen } from "./types/nameentry-translated.js";
 
 // The picture handles the screen asks for: the keyboard art and the chooser art.
 const PACKS = { 1904: "namedt", 648: "stdgnm" };
@@ -55,11 +56,11 @@ export function decodeGameName(bytes) {
  *  (the engine helper's own miss value; the call site filters null out). */
 const rosterSlotFor = (charId) => rosterSlotOfCharId(String(charId));
 
-export function createNameEntryTranslated(sfx = null, options = {}) {
+export function createNameEntryTranslated(sfx = null, options: { digimonDB?: () => Record<string, any> } = {}) {
     const n = {
         _open: false, _session: null, _state: null, _clock: null, _error: null,
         _request: 0, _members: [], _initial: "", _results: [], _lastValue: "",
-    };
+    } as NameEntryScreen;
     const renderer = createNativeScreenRenderer({ pack: "namedt", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
 
@@ -80,7 +81,7 @@ export function createNameEntryTranslated(sfx = null, options = {}) {
         })).filter((member) => member.rosterSlot !== null);
     }
 
-    n.open = (opts = {}) => {
+    n.open = (opts: { state?: any; initial?: string } = {}) => {
         n._open = true;
         n._state = opts.state ?? n._state;
         n._initial = typeof opts.initial === "string" ? opts.initial : "";
@@ -100,7 +101,7 @@ export function createNameEntryTranslated(sfx = null, options = {}) {
             const language = Number.isInteger(selected) ? selected : 2;
             if (language < 0 || language > 6) throw new Error("Naming language index is invalid");
             const banks = new Map(await Promise.all(NAME_BANKS.map(async (offset) =>
-                [offset + language, await fetchBytes(`name/${offset + language}.bin`, DATA_LABEL)])));
+                [offset + language, await fetchBytes(`name/${offset + language}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
             if (!n._open || request !== n._request) return;
             const limit = language === 0 ? 5 : 8;
             n._session = new ui.NameRootSession(language,

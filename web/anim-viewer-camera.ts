@@ -16,6 +16,7 @@
 // The eye is pivot + dist * (sin(yaw)cos(pitch), sin(pitch), cos(yaw)cos(pitch)). The basis is
 // derived from yaw, NOT from a cross product with world up, so it stays finite at the poles
 // (straight above/below) where a lookAt(up=+Y) is degenerate — that is the "no gimbal flip" rule.
+import type { AnimViewerCamera, FreeCameraOptions } from "./types/anim-viewer-camera.js";
 
 export const DEG = Math.PI / 180;
 const EPS = 1e-9;
@@ -41,7 +42,7 @@ export const PRESETS = {
 
 export const VIEW_KEYS = ["yaw", "pitch", "dist", "px", "py", "pz", "fov", "ortho", "lock"];
 
-export function createFreeCamera(opts = {}) {
+export function createFreeCamera(opts: FreeCameraOptions = {}) {
   const cam = {
     // current (what is drawn) and target (what damping moves toward)
     pivot: [0, 0, 0],
@@ -68,7 +69,7 @@ export function createFreeCamera(opts = {}) {
     // Largest bounds seen this frame, for F "frame all" / "frame attack".
     lastBounds: null,
     _lastAzimuthDelta: 0,
-  };
+  } as AnimViewerCamera;
   cam.targetYaw = cam.yaw;
   cam.targetPitch = cam.pitch;
   cam.targetDist = cam.dist;
@@ -94,7 +95,7 @@ export function createFreeCamera(opts = {}) {
     return { forward, right, up };
   }
 
-  function eye(out) {
+  function eye(out?: number[]) {
     const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     const p = out || [0, 0, 0];
     p[0] = cam.pivot[0] + cam.dist * Math.sin(cam.yaw) * cp;

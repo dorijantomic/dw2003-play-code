@@ -31,7 +31,7 @@ export function createSlotsUI({ getBuilt, container }) {
     <select id="galKind"><option value="">all kinds</option></select><select id="galSrc"><option value="">all sources</option></select>
     <span id="galCount"></span><span style="flex:1"></span><button id="galClose">close</button></header><div class="grid" id="galGrid">loading ...</div>`;
   document.body.appendChild(gal);
-  const $ = (id) => gal.querySelector("#" + id);
+  const $ = <T extends HTMLElement = HTMLElement>(id) => gal.querySelector<T>("#" + id);
   let assets = null, curSlot = null, status = "";
   const label = (id) => (id === "default" || !id ? "default (module's own)" : (assets || listAssets()).find((a) => a.id === id)?.name || id);
 
@@ -42,8 +42,8 @@ export function createSlotsUI({ getBuilt, container }) {
       const row = document.createElement("div"); row.className = "slotRow"; row.dataset.slot = s.id;
       row.innerHTML = `<span class="n" title="${s.id}">${s.label} <small>(${s.count})</small></span><span class="cur ${s.error ? "err" : ""}">${s.error ? "error" : s.bound ? label(s.bound) : "default"}</span>
         <button class="replace">Replace...</button><button class="reset">reset</button>`;
-      row.querySelector(".replace").onclick = () => open(s.id);
-      row.querySelector(".reset").onclick = () => { b.slots.reset(s.id); renderList(); };
+      row.querySelector<HTMLElement>(".replace").onclick = () => open(s.id);
+      row.querySelector<HTMLElement>(".reset").onclick = () => { b.slots.reset(s.id); renderList(); };
       list.appendChild(row);
     }
   }
@@ -53,15 +53,15 @@ export function createSlotsUI({ getBuilt, container }) {
     $("galGrid").textContent = "loading assets ...";
     assets ||= await listAllAssets();
     if (!$("galKind").dataset.done) {
-      const kinds = [...new Set(assets.flatMap((a) => a.kinds))].sort(), srcs = [...new Set(assets.map((a) => a.sourceGroup || a.source))].sort();
-      for (const k of kinds) $("galKind").add(new Option(k, k));
-      for (const s of srcs) $("galSrc").add(new Option(s, s));
+      const kinds = [...new Set<string>(assets.flatMap((a) => a.kinds))].sort(), srcs = [...new Set<string>(assets.map((a) => a.sourceGroup || a.source))].sort();
+      for (const k of kinds) $<HTMLSelectElement>("galKind").add(new Option(k, k));
+      for (const s of srcs) $<HTMLSelectElement>("galSrc").add(new Option(s, s));
       $("galKind").dataset.done = "1";
     }
     draw();
   }
   function draw() {
-    const q = $("galSearch").value.toLowerCase().trim(), kind = $("galKind").value, src = $("galSrc").value;
+    const q = $<HTMLInputElement>("galSearch").value.toLowerCase().trim(), kind = $<HTMLSelectElement>("galKind").value, src = $<HTMLSelectElement>("galSrc").value;
     const hit = [{ id: "default", name: "Default (the module's own)", kinds: ["default"], source: "Built", licence: "-" }, ...assets]
       .filter((a) => (!kind || a.kinds.includes(kind) || a.id === "default") && (!src || (a.sourceGroup || a.source) === src || a.id === "default")
         && (!q || `${a.name} ${a.source} ${a.licence} ${a.kinds.join(" ")} ${a.id}`.toLowerCase().includes(q)));

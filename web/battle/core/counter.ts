@@ -13,9 +13,10 @@ import { MSG_KIND, MSG } from "../messages.js";
 import { battleStatusEventAdvance } from "../status.js";
 import { noteHit } from "../hit-results.js";
 import { battleAilmentByte } from "../../battlecmd-translated.js";
+import type { BattleContext } from "../../types/battle.js";
 
 // moved by tools/rewrite/split-closure.mjs
-export function makeCounter(B) {
+export function makeCounter(B: BattleContext) {
 /**
    * Arm a technique's result so it lands when the ACTION is over, not only on a contact.
    *

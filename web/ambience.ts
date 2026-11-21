@@ -32,10 +32,11 @@ import { createRuleOverride } from "./host-rules.js";   // multiplayer: the host
 
 // The field view width is live: 320, or wider with F2 -> Screen -> Wide overworld (web/field-view.js).
 import { FIELD_VIEW_W as VIEW_W } from "./field-view.js";
+import type { AmbienceConditions, AmbienceMode, AmbienceSettings } from "./types/ambience.js";
 const VIEW_H = 240;
 
 // ---------------------------------------------------------------- settings
-export const FX_GROUPS = [
+export const FX_GROUPS: [string, [string, string][]][] = [
     ["Terrain", [["sway", "Swaying trees"], ["grass", "Grass"], ["grasspush", "Grass parts around feet"], ["water", "Water"], ["reflect", "Water reflections"], ["mirror", "Characters reflect in water"], ["wetlook", "Wet / dusty look on characters"], ["seam", "Seam fixes"]]],
     ["Weather", [["rain", "Rain"], ["rainwater", "Rain on water"], ["snow", "Snow & blizzards"], ["sand", "Sandstorm"], ["lightning", "Lightning"], ["gusts", "Wind gusts"], ["breath", "Cold breath"], ["frost", "Frost edges"], ["screenfx", "Screen rain & storm feel"]]],
     ["Atmosphere", [["tod", "Time of day"], ["nightlight", "Night lighting (lit circles)"], ["clouds", "Cloud shadows"], ["lamps", "Lamp glow"], ["lightpool", "Light pools around lamps"], ["lightreveal", "Lamps restore true colours"], ["indoor", "Indoor mood lighting"], ["hd2d", "HD-2D look (tilt-shift, bloom, grade)"], ["battleatmos", "Battle sky & weather: night, fog, snow, rain follow where you are (new)"], ["fog", "Fog & mist"], ["shafts", "Light shafts"], ["heat", "Heat shimmer"], ["sparkle", "Ice sparkle"], ["pollen", "Pollen"]]],
@@ -56,7 +57,7 @@ const QUALITY = { low: 0.4, medium: 0.7, high: 1 };
 // "Time" setting: pins the time-of-day phase (0 = daylight, 0.77 = deepest dusk); auto = the slow cycle
 const TODMODES = { auto: undefined, day: 0, golden: 0.55, dusk: 0.7, night: 0.77 };
 const STORE_KEY = "dw.fx.v1";
-export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" };   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
+export const fx = { weatherMode: "auto", quality: "high", todMode: "auto", spriteFilter: "off" } as AmbienceSettings;   // spriteFilter: gpu-pixel-filter.js (all art), a test, off by default
 for (const [k] of FX_DEFS) fx[k] = true;
 const EXPERIMENTAL = ["showfps", "villagers", "hd2d", "mountseat", "widefield", "battlewide", "practice2v2", "cutcontent", "smartcam", "battleatmos", "battlepano", "toonoutline", "toonshade", "softalpha", "fusionbosses", "bossphases", "bossmusic", "bossgrows", "giantmode", "stageselect", "battlespeed", "movetheatre", "showfps", "soundtest", "soundtrack", "cinema", "blastladder", "planner", "questtriggers", "questemotes", "questplacecard", "omen", "encounterdial", "serverchamp", "langdesk", "damagelab", "itemsource", "gymmap", "silence", "itemrulebook", "cursorbook", "chatqueue", "weaponlab", "enemytells", "aishift", "questsecondjob", "bitledger", "savexray", "saveverify", "replay", "mpbubbles", "redirectview", "arrivallab", "mpcredit", "anglermap", "glossary", "options"];     // off until you switch them on by hand; the presets leave them alone ("All on" and "All off" do tick or untick them)
 const BATTLE = ["ownclips", "dw2motion", "smoothanim"];              // the Battle group: same rule, never switched on by a preset
@@ -468,7 +469,7 @@ const RAINY = [
     /^East Sector — (West Wire Forest|East Wire Forest|Protocol Forest|Divermon's Lake|Duel Island|Wind Prairie|Kicking Forest)/,
     /^South Sector — (Bulk Swamp|Bios Swamp|Tranquil Swamp|Jungle Grave|Phoenix Bay|Ether Jungle|South Cape)/,
 ];
-const WEIGHTS = {
+const WEIGHTS: Record<string, [string, number][]> = {
     snowy: [["snow", 4], ["blizzard", 2], ["clear", 1]],
     sandy: [["sand", 3], ["clear", 2]],
     rainy: [["rain", 2], ["clear", 3]],
@@ -551,7 +552,7 @@ const sceneEase = (k) => { const v = clamp01(k); return v * v * (3 - 2 * v); };
 function sceneProfile(p) {
     const sc = sceneFx;
     if (!sc) return p;
-    const q = { ...p };
+    const q = { ...p } as AmbienceConditions;
     const w = sc.weather;
     if (w === "clear") {
         q.rainy = q.snowy = q.sandy = q.leaves = q.fireflies = q.fog = false;
@@ -576,7 +577,7 @@ function sceneProfile(p) {
 function sceneFxFlags() {
     const sc = sceneFx;
     if (!sc?.force) return fx;
-    const o = { ...fx };
+    const o = { ...fx } as AmbienceSettings;
     const w = sc.weather;
     if (w === "fog") o.fog = true;
     if (w === "rain" || w === "storm") o.rain = true;
@@ -934,7 +935,8 @@ function bodyFxTick(map, p, L, now) {
     if (fx.mirror && !window.__noWaterRefl && isWaterStage(map.id)) {
         reflect = (x, y) => {
             if (!isWaterAt(map.id, x, y + 8)) return 0;
-            const cover = (isWaterAt(map.id, x, y + 8) + isWaterAt(map.id, x, y + 18) + isWaterAt(map.id, x, y + 28)) / 3;
+            // + coerces these booleans to 0/1, which is the cover the water reflection wants
+            const cover = ((isWaterAt(map.id, x, y + 8) as unknown as number) + (isWaterAt(map.id, x, y + 18) as unknown as number) + (isWaterAt(map.id, x, y + 28) as unknown as number)) / 3;
             return 0.58 * cover;
         };
     }
@@ -998,7 +1000,7 @@ export function applyScene(sc) {
 }
 const PROFILE_KEY = "dw.fx.profiles";
 function snapshot() {
-    const o = {};
+    const o = {} as AmbienceMode;
     for (const [k] of FX_DEFS) o[k] = !!fx[k];
     o.weatherMode = fx.weatherMode; o.todMode = fx.todMode; o.quality = fx.quality;
     return o;
@@ -1020,9 +1022,9 @@ function profileAct(kind, slot) {
 // F8 hides the chrome (header, effects button and panel) and goes fullscreen; F9 saves a
 // PNG of the game picture; F10 starts and stops a clip of the game canvas (a .webm).
 // The recording is of the canvas alone, so no window, panel or label is ever in it.
-let photoOn = false, recorder = null, recChunks = [], toastEl = null, toastTimer = 0, recDot = null;
+let photoOn = false, recorder = null, recChunks = [], toastEl = null, toastTimer: number | ReturnType<typeof setTimeout> = 0, recDot = null;
 function gameCanvas() {
-    return [...document.querySelectorAll("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null && !isBattleLayer(c)) || null;
+    return [...document.querySelectorAll<HTMLCanvasElement>("#stage canvas")].find((c) => c.width > 0 && c.offsetParent !== null && !isBattleLayer(c)) || null;
 }
 function toast(msg, ms = 2600) {
     if (!toastEl) return;

@@ -28,7 +28,19 @@ export const oddsText = (n) => `${Math.round((n / 1024) * 1000) / 10}%`;
  * `stats` = battlecmd/enemy_stats.json, `nameBank` = the decoded lines of name bank 0x4e (array of strings) or null.
  * Returns { enemyName(enemyId), groups: Map<display, enemyId[]>, shopName(id), obtainName(itemId), shopIds(itemId), droppers(itemId) }.
  */
-export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null } = {}) {
+/**
+ * The game's own tables the item page is built from: the obtain index, the shops, the enemies, the
+ * enemy stats, and the decoded name bank (or null).
+ */
+interface ItemTables {
+    obtain?: any;
+    shops?: any;
+    enemies?: any;
+    stats?: { records?: any[] } | null;
+    nameBank?: string[] | null;
+}
+
+export function buildItemsData({ obtain, shops, enemies, stats, nameBank = null }: ItemTables = {}) {
     const list = Array.isArray(enemies) ? enemies : Array.isArray(enemies?.enemies) ? enemies.enemies : [];
     const records = Array.isArray(stats?.records) ? stats.records : [];
     const display = new Map(), groups = new Map();

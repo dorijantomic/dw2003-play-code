@@ -10,6 +10,7 @@ import { paintNativeSession } from "./native-session.js";
 import { composeWizard } from "./ui-c/screens.js";
 import { decodeGameName, encodeGameName } from "./nameentry-translated.js";
 import { fetchBytes, fetchJson, loadResidentResources } from "./resident-data.js";
+import type { PackSelectScreen } from "./types/packselect-translated.js";
 
 // The picture handles the wizard asks for: the window art, the intro background
 // and the portrait / keyboard art.
@@ -35,7 +36,7 @@ export function createPackSelectTranslated(sfx = null) {
         _open: false, _done: false, _session: null, _state: null, _clock: null, _error: null,
         _request: 0, _sel: 0, _partners: [], _accountName: "",
         _queue: [], _hold: 0, _press: null,
-    };
+    } as PackSelectScreen;
     const renderer = createNativeScreenRenderer({ pack: "stnmet", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
 
@@ -52,7 +53,7 @@ export function createPackSelectTranslated(sfx = null) {
     p.accountName = () => p._accountName;
     p.partners = () => p._partners.slice();
 
-    p.open = (opts = {}) => {
+    p.open = (opts: { state?: any } = {}) => {
         p._open = true;
         p._done = false;
         p._sel = 0;
@@ -71,7 +72,7 @@ export function createPackSelectTranslated(sfx = null) {
             const language = Number.isInteger(selected) ? selected : 2;
             if (language < 0 || language > 6) throw new Error("Wizard language index is invalid");
             const banks = new Map(await Promise.all(BANKS.map(async (offset) =>
-                [offset + language, await fetchBytes(`wizard/${offset + language}.bin`, DATA_LABEL)])));
+                [offset + language, await fetchBytes(`wizard/${offset + language}.bin`, DATA_LABEL)])) as [number, Uint8Array][]);
             if (!p._open || request !== p._request) return;
             p._session = new ui.WizardRootSession(language,
                 encodeGameName(p._accountName, language === 0 ? 5 : 8),

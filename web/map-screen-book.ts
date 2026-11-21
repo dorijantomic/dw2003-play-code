@@ -9,6 +9,7 @@ import { WORD } from "./ui-kit-input.js";
 import { drawHeader, drawHelpBox, drawPanel, withFold } from "./ui-kit.js";
 import { drawCursor, drawText, textWidth } from "./uifont.js";
 import { createMapScreenModel } from "./map-screen-model.js";
+import type { MapScreenData } from "./map-screen-model.js";
 import { partHook } from "./ui-c/capture.js";
 
 /** The panel (7 columns of 40 px = 280 px, 7 bands) and, inside it, the box the areas are placed in. */
@@ -17,8 +18,14 @@ export const MAP_BOX = Object.freeze({ x: 34, y: 64, w: 252, h: 94 });
 const NODE = 8;
 const COL = Object.freeze({ link: "rgb(104, 104, 208)", linkDim: "rgb(52, 52, 112)", seen: "rgb(104, 104, 208)", edge: "rgb(232, 232, 255)", unseen: "rgb(0, 0, 32)", here: "rgb(255, 208, 64)" });
 
+/** What the book is handed: the sound kit, and `data()` for the maps, scenes, seen flags and the map you are on. */
+interface MapScreenBookArgs {
+    sfx?: { play?: (name: string) => void } | null;
+    data: () => MapScreenData;
+}
+
 /** `data()` = { maps, scenes, seen(id), currentId } read when the book opens (web/game.js). */
-export function createMapScreenBook({ sfx = null, data } = {}) {
+export function createMapScreenBook({ sfx = null, data }: MapScreenBookArgs = {} as MapScreenBookArgs) {
     const model = createMapScreenModel({ ...data(), box: { w: MAP_BOX.w, h: MAP_BOX.h } });
     const cue = (result) => { if (result) sfx?.play?.("system02"); };
     const dirs = ["up", "down", "left", "right"];

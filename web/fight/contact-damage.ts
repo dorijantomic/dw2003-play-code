@@ -28,6 +28,8 @@
  * hits pays the remainder on the strike, exactly as a 1-hit row on a 3-beat clip does.
  */
 
+import type { ContactDamageSpec } from "./types.js";
+
 /**
  * The per-contact payment plan: `hits` entries summing exactly to `total`.
  * `hp` is the victim's HP at the start of the action (only used to keep it above 0 on the
@@ -60,7 +62,7 @@ export function contactPlan(total, perHit, hits, hp = null) {
  * page there. `remaining()` is what the final commit still has to subtract (the whole total
  * when the script fires no contact at all, e.g. clip 15's field moves).
  */
-export function contactDamager({ total, perHit, hits, hp = null, pay = null } = {}) {
+export function contactDamager({ total, perHit, hits, hp = null, pay = null }: ContactDamageSpec = {}) {
   const t = Math.max(0, total | 0);
   const shares = contactPlan(t, perHit, hits, hp);
   let taken = 0;

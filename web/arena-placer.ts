@@ -21,6 +21,7 @@ import { TransformControls } from "./lib3d/addons/TransformControls.js";
 import { getAsset } from "./built/registry.js";
 import { buildAssetGroup, createAddPicker } from "./arena-add-picker.js";
 import { normaliseData, isAssetEntry, newAssetEntry, groundPoint } from "./placer-format.js";
+import type { ArenaPlacements, PickedDirectory } from "./types/arena-placer.js";
 
 // big surfaces: not picked unless "pick ground too" is ticked (else every click lands on the floor or the water)
 const SURFACE = new Set(["grass", "soil", "sand", "shore", "water", "sea", "mirror", "bank", "hills", "clouds", "grassBlades"]);
@@ -51,12 +52,12 @@ export function findByPath(root, path) {
 }
 
 // ---------------------------------------------------------------- remembered folder handle (Chrome)
-const idb = () => new Promise((ok, no) => {
+const idb = () => new Promise<IDBDatabase>((ok, no) => {
   const r = indexedDB.open("arenaPlacer", 1);
   r.onupgradeneeded = () => r.result.createObjectStore("kv");
   r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
 });
-async function idbGet(k) { try { const d = await idb(); return await new Promise((ok) => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); }); } catch { return null; } }
+async function idbGet(k) { try { const d = await idb(); return await new Promise<FileSystemDirectoryHandle>((ok) => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => ok(q.result); q.onerror = () => ok(null); }); } catch { return null; } }
 async function idbSet(k, v) { try { const d = await idb(); await new Promise((ok) => { const t = d.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = ok; t.onerror = ok; }); } catch {} }
 
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -68,11 +69,11 @@ const tmpM = new THREE.Matrix4();
  * returns { tick() after each built.render, setUI(on, container), data(), destroy() }
  */
 export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
-  let built = null, world = null, pack = null, data = null, rebuilds = null, loading = null;
+  let built = null, world = null, pack = null, data: ArenaPlacements = null, rebuilds = null, loading = null;
   let orig = new Map();          // "<path>|inst" -> the matrix before any edit (to reset / un-hide)
   let addedObjs = new Map();     // added id -> its mesh
   let ui = null, tc = null, sel = null, pickGround = false, gen = 0, picker = null;
-  const ray = new THREE.Raycaster();
+  const ray = new (THREE.Raycaster as any)();   // vendored three (lib3d is outside the tsconfig): its members are attached at runtime, so they do not type
 
   const empty = () => ({ version: 1, pack, savedAt: 0, edits: {}, added: [] });
   const draftSave = () => { try { localStorage.setItem(DRAFT(pack), JSON.stringify({ ...data, draftAt: Date.now() })); } catch {} ; status(); };
@@ -89,7 +90,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   function apply() {
     orig = new Map();
     for (const [key, e] of Object.entries(data.edits)) {
-      const [path, i] = key.split("|"), inst = +i, o = findByPath(built.scene, path);
+      const [path, i] = key.split("|"), inst = +i, o = findByPath(built.scene, path) as any;
       if (!o) continue;
       if (inst >= 0 && o.isInstancedMesh) {
         if (inst >= o.count) continue;
@@ -111,7 +112,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   // put every touched thing back as the world made it, and take the copies away
   function restoreAll() {
     for (const [key, was] of orig) {
-      const [path, i] = key.split("|"), inst = +i, o = findByPath(built.scene, path);
+      const [path, i] = key.split("|"), inst = +i, o = findByPath(built.scene, path) as any;
       if (!o) continue;
       if (inst >= 0 && o.isInstancedMesh) { o.setMatrixAt(inst, was); o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere(); }
       else { was.m.decompose(o.position, o.quaternion, o.scale); o.visible = was.visible; o.updateMatrix(); }
@@ -130,7 +131,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
   async function makeAsset(a) {
     const b = built, asset = await getAsset(a.asset, b.slots.env, `${pack}:placer${gen}`, null);
     if (built !== b || !data.added.includes(a) || addedObjs.has(a.id)) return null;
-    const g = buildAssetGroup(asset, `placed_${a.id}`, a.id);
+    const g = buildAssetGroup(asset, `placed_${a.id}`, a.id) as any;
     tmpM.fromArray(a.m).decompose(g.position, g.quaternion, g.scale);
     addedGroup().add(g); g.updateMatrixWorld(true);
     addedObjs.set(a.id, g);
@@ -188,7 +189,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     const added = o.userData?.placed != null ? data.added.find((a) => a.id === o.userData.placed) : null;
     if (added) { sel = { obj: o, added }; tc?.attach(o); status(); return; }
     if (o.isInstancedMesh && inst != null) {
-      const proxy = new THREE.Object3D(); o.add(proxy);
+      const proxy = new THREE.Object3D() as any; o.add(proxy);
       o.getMatrixAt(inst, tmpM); tmpM.decompose(proxy.position, proxy.quaternion, proxy.scale);
       sel = { obj: o, inst, proxy, key: keyOf(o, inst) };
       tc?.attach(proxy);
@@ -230,7 +231,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
       if (sel.proxy) { o.setMatrixAt(sel.inst, was); o.instanceMatrix.needsUpdate = true; o.computeBoundingSphere(); }
       else { was.m.decompose(o.position, o.quaternion, o.scale); o.visible = was.visible; o.updateMatrix(); }
     }
-    data.unsaved = true; const s = [sel.obj, sel.inst]; deselect(); select(...s); draftSave();
+    data.unsaved = true; const s: [any, any] = [sel.obj, sel.inst]; deselect(); select(...s); draftSave();
   }
   // world-group-local matrix of the selected thing (an instance: through its mesh)
   function localMatrixOf(o, inst) {
@@ -279,7 +280,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     ray.setFromCamera(ndc, built.camera);
     const cands = [];
     world.traverseVisible((o) => { if (o.isMesh && (pickGround || !SURFACE.has(o.userData?.kind))) cands.push(o); });
-    const hit = ray.intersectObjects(cands, false).find((h) => !(h.object.isInstancedMesh && h.instanceId == null));
+    const hit = (ray.intersectObjects(cands, false) as any[]).find((h) => !(h.object.isInstancedMesh && h.instanceId == null));
     if (!hit) { deselect(); return; }
     const tgt = hit.object.parent?.userData?.assetGroup ? hit.object.parent : hit.object;   // an added asset is picked as its whole group
     select(tgt, tgt.isInstancedMesh && tgt.userData?.placed == null ? hit.instanceId : null);
@@ -311,7 +312,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     if (!ui || !sel || !built || e.button !== 0 || tc?.dragging || tc?.axis || (tc && tc.mode !== "translate")) return;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), built.camera);
-    if (!ray.intersectObject(sel.obj, true).some((h) => !sel.proxy || (h.object === sel.obj && h.instanceId === sel.inst))) return;
+    if (!(ray.intersectObject(sel.obj, true) as any[]).some((h) => !sel.proxy || (h.object === sel.obj && h.instanceId === sel.inst))) return;
     const obj = sel.proxy || sel.obj;
     obj.updateWorldMatrix(true, false);
     const cur = obj.getWorldPosition(new THREE.Vector3()), gp = groundAt(e, cur.y); if (!gp) return;
@@ -371,7 +372,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     let ok = false;
     if (window.showDirectoryPicker) {
       try {
-        let dir = await idbGet("dir");
+        let dir = await idbGet("dir") as PickedDirectory;
         if (dir && (await dir.queryPermission({ mode: "readwrite" })) !== "granted" && (await dir.requestPermission({ mode: "readwrite" })) !== "granted") dir = null;
         if (!dir) { dir = await window.showDirectoryPicker({ id: "arenaPlacements", mode: "readwrite" }); await idbSet("dir", dir); }
         const fh = await dir.getFileHandle(`${pack}.json`, { create: true }), w = await fh.createWritable();
@@ -386,7 +387,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     try { localStorage.removeItem(DRAFT(pack)); } catch {}
     status();
   }
-  function setUI(on, container) {
+  function setUI(on, container?) {
     if (!on) { picker?.close(); deselect(); tc?.getHelper().removeFromParent(); tc?.dispose(); tc = null; ui?.el.remove(); ui = null; return; }
     if (ui) return;
     const el = document.createElement("div");
@@ -404,7 +405,7 @@ export function createPlacer({ canvas, getBuilt, getFreeCam = () => null }) {
     container.appendChild(el);
     ui = { el, q: (s) => el.querySelector(s) };
     el.onclick = (e) => {
-      const a = e.target.dataset?.a; if (!a) return;
+      const a = (e.target as HTMLElement).dataset?.a; if (!a) return;
       if (a === "t") tc?.setMode("translate"); else if (a === "r") tc?.setMode("rotate"); else if (a === "s") tc?.setMode("scale");
       else if (a === "sp") tc?.setSpace(tc.space === "local" ? "world" : "local");
       else if (a === "c" && sel) copyOf(sel.obj, sel.inst);

@@ -28,6 +28,7 @@ import { authoredSide, mirrorHooks } from "./side-mirror.js";
 // (`resetAnimSlotLiveToHome`). This file consumes those instead of hand-writing them.
 import { animSlotMoveDelta, resetAnimSlotLiveToHome, basicAttackHitCount } from "../vendor/engine.js";
 import { smoothAnimEnabled } from "./smooth-anim.js";
+import type { FightActionHooks } from "./types.js";
 
 // Max forward per-tick frame delta still treated as "continuous" (interpolatable) by renderSample.
 // Real motion advances ~1–4 frames/tick (the vsync delta); phase cuts jump by hundreds. 16 cleanly
@@ -116,7 +117,7 @@ function ownClipShowsPart(model, clip, bone) {
   if (!Array.isArray(ops)) return false;
   const ch3 = model.bones?.[bone]?.anim?.ch3;
   if (!ch3) return false;
-  const tables = new Set();
+  const tables = new Set<number>();
   for (const o of ops) if (o.op === 2 && o.words?.[0] === 0 && (o.words[2] | 0) > 1) tables.add(o.words[2] | 0);
   for (const t of tables) {
     const tab = model.timeline?.[t]?.table;
@@ -140,6 +141,31 @@ export function hiddenPartsFor(model, clip) {
 }
 
 export class ActorAnimator {
+  declare _camFromDonor: boolean;
+  declare _clip: any;
+  declare _cut: { from: any; k: number; };
+  declare _dbgLoop: any;
+  declare _handoffFrom: any;
+  declare _handoffT: number;
+  declare _heldPose: boolean;
+  declare _hidden: any;
+  declare _hold: { frame: any; next: any; run: any; k: number; };
+  declare _holdFinalPose: boolean;
+  declare _move: { cur: number[]; from: any; target: any; t: number; ticks: number; };
+  declare _prevBlend: any;
+  declare _prevFrame: any;
+  declare _rotation: number[] | any[];
+  declare _snap: boolean;
+  declare _timelineCycleComplete: boolean;
+  declare _timelineTable: number;
+  declare baseTable: number;
+  declare blend: any;
+  declare frame: any;
+  declare homeSlot: any;
+  declare idle: (TimelinePlayer | PlaylistPlayer) & { looped?: boolean };
+  declare model: any;
+  declare rotationBase: number;
+  declare vm: ActionVM;
   constructor(model) {
     this.model = model;
     this.vm = null;                          // active ActionVM, or null while idle
@@ -357,7 +383,7 @@ export class ActorAnimator {
 
   // Start an action script for a clip index. Returns true if a VM was created, false if it
   // fell back to idle (no script / empty script). hooks = { onHit, onCamera, setLunge }.
-  setAction(clip, hooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
+  setAction(clip, hooks: FightActionHooks = {}, { currentEffect = null, currentMotion = null, holdFinalPose = false, element = 1, target = "enemy", hits = null, planted = false, tech = null } = {}) {
     // a model with no such clip (an enemy-only species using a spell) gets one built from a donor's (clip-fallback.js);
     // a heal/support technique or an item use (target "self") gets the calm self-cast build instead of an attack body
     const script = (clip != null) ? resolveClipScript(this.model, clip, { element, target, hits, planted, tech }) : null;
@@ -404,7 +430,7 @@ export class ActorAnimator {
   /** Run a verified external action stream against this model.  DNA/Jogress
    *  result clip 12 is supplied by the battle presentation actor rather than
    *  the result model's own action directory; op4 motion 30 selects table 30. */
-  setScript(script, hooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
+  setScript(script, hooks: FightActionHooks = {}, { currentEffect = null, initialTable = null, motionTables = {} } = {}) {
     if (!script || !Array.isArray(script.ops) || !script.ops.length) return false;
     this._clip = -1;
     this._hidden = null;

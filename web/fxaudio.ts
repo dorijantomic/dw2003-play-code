@@ -121,7 +121,7 @@ export function footstep(on, type, vol = 1) {
 // ---------------------------------------------------------- place ambience
 // Water lapping, forest rustle, city hum and daytime birdsong, each eased in and out by
 // how much of it the current map has (levels 0..1). Built lazily on first use.
-let pa = null, birdTimer = 0, birdLevel = 0, birdPan = 0;
+let pa = null, birdTimer: number | ReturnType<typeof setTimeout> = 0, birdLevel = 0, birdPan = 0;
 function buildPlace() {
     if (pa || !ac) return !!pa;
     const buf = noiseBuffer(ac, 3);

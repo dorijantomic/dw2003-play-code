@@ -32,11 +32,23 @@ import { composeReport } from "./ui-c/screens.js";
 import { CLOSE_NOTIFY, DISPOSE_UNLESS_FINISHED, createTranslatedScreenHost } from "./translated-screen-host.js";
 import { fitNativeScreen } from "./canvas-resolution.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources } from "./resident-data.js";
+import type { FightReportScreen } from "./types/fightreport-translated.js";
 
 /** The report art: 0x079F0000 is disc index 1951 (STFRPT), 0x02860000 is 646 (CMFONT, the banner). */
 const PACKS = { 1951: "stfrpt", 646: "cmfont" };
 /** Text families by offset and the data directory that ships them (language added). */
 const BANKS = [[0x55, "report"], [0x4e, "wizard"], [0x6a, "shop-banks"], [0xa2, "pause"]];
+
+/** What the fight report is handed when it opens: the fight it reports on, the party in it, and what to call on the way out. */
+interface FightReportOpts {
+    onClose?: (() => void) | null;
+    gameState?: any;
+    participants?: { pos?: number; name?: string; level?: number; preExp?: any; participated?: boolean }[];
+    dropItemId?: number;
+    battleId?: number;
+    activePos?: number;
+    view?: { progress?: any[]; reward?: any };
+}
 
 const DATA_LABEL = "Fight report data";
 
@@ -66,7 +78,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         _state: null, _onClose: null, _opts: null, _clock: null, _ticks: 0, _request: 0,
         _summary: null, _lastDiagnostic: null,
         _seedBits: null, _seedHeld: null,
-    };
+    } as FightReportScreen;
     const renderer = createNativeScreenRenderer({ pack: "stfrpt", packs: PACKS },
         (directory) => PACKS[directory >>> 16] ?? null);
 
@@ -191,7 +203,7 @@ export function createFightReportTranslated(sfx = null, options = {}) {
         },
     });
 
-    r.open = (opts = {}) => {
+    r.open = (opts: FightReportOpts = {} as FightReportOpts) => {
         const request = host.begin({ onClose: opts.onClose ?? null });
         r._failed = false;
         r._error = null;

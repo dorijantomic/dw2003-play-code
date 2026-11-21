@@ -1,5 +1,6 @@
 // Dev-only Canvas2D benchmark (nothing in the game loads this). Measures real rAF cadence on a big canvas per Canvas2D operation.
 // Open canvas-bench.html#auto,close ; results go to tools/perf-receiver.mjs (POST http://<host>:20032/results).
+import type { CanvasBenchOutput, CanvasBenchResults, CanvasBenchResultsMeta } from "./types/canvas-bench.js";
 "use strict";
 const AUTO = /(^|[#&,])auto($|[&,=])/.test(location.hash);
 const CLOSE = /(^|[#&,])close($|[&,=])/.test(location.hash);
@@ -16,7 +17,7 @@ function browserName(ua) {
     return "browser";
 }
 function glInfo() {
-    const out = { renderer: null, unmaskedRenderer: null, unmaskedVendor: null };
+    const out = { renderer: null, unmaskedRenderer: null, unmaskedVendor: null } as CanvasBenchOutput;
     try {
         const c = document.createElement("canvas");
         const gl = c.getContext("webgl2") || c.getContext("webgl");
@@ -294,7 +295,7 @@ async function main() {
         window: { innerW: innerWidth, innerH: innerHeight }, nativeCanvas: { w: nativeW, h: nativeH }, gl: glInfo(),
         startedAt: new Date().toISOString(), timing: { warmMs: WARM_MS, measureMs: MEASURE_MS }, page: location.href,
         visibilityAtStart: document.visibilityState,
-    }, groups: [], notes: [] };
+    } as CanvasBenchResultsMeta, groups: [], notes: [] } as CanvasBenchResults;
     const cases = [];
     results.groups.push({ id: "canvas-bench", name: "Canvas2D operations on a big canvas", cases });
     results.notes.push("fps = measured rAF cadence over " + MEASURE_MS + " ms after " + WARM_MS + " ms warm-up; gaps in ms; jsMs = mean JS time of the draw calls per frame (not GPU / other-process time).");

@@ -174,7 +174,7 @@ export function broadleafGeometry(seed, pal) {
   const leafPart = fluffyPart(clumps, Math.floor((TREE_TRIS - branchTris) / 2), seed * 7 + 1, pal.crownMid);
   let H = 0; for (let i = 1; i < bp.length; i += 3) H = Math.max(H, bp[i]); for (let i = 1; i < leafPart.pos.length; i += 3) H = Math.max(H, leafPart.pos[i]);
   const k = 1 / H;
-  const bpos = Float32Array.from(bp, (x) => x * k);
+  const bpos = Float32Array.from(bp, (x: number) => x * k);
   for (let i = 1; i < bpos.length; i += 3) if (bpos[i] < 1e-6) bpos[i] = -0.02;   // trunk foot a little into the ground
   leafPart.pos = leafPart.pos.map((x) => x * k);
   leafPart.clump = leafPart.clump.map((x) => x * k);

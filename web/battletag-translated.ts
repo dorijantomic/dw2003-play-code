@@ -14,6 +14,7 @@ import { createNativeScreenRenderer } from "./native-screen-render.js";
 import { createBattleMenuAdapter } from "./battle-menu-adapter.js";
 import { encodeNativeScreenText } from "./native-screen.js";
 import { fetchBytes, fetchJson, loadProfileRecords, loadResidentResources, RESIDENT_PACK_NAMES, RESIDENT_PACKS } from "./resident-data.js";
+import type { BattleTagOptions, BattleTagSeed } from "./types/battletag-translated.js";
 
 // The chrome is 0x00455000 (PGFGTC00, disc 1109) and the blinking hand is
 // 0x00286000 (CMFONT, the resident UI glyphs). The original builds both handles
@@ -45,7 +46,7 @@ function loadData() {
 }
 
 /** The name string the species service hands a row's plate. */
-export function createBattleTagTranslated(sfx = null, options = {}) {
+export function createBattleTagTranslated(sfx = null, options: BattleTagOptions = {}) {
     return createBattleMenuAdapter({
         renderer: createNativeScreenRenderer({ packs: RESIDENT_PACKS, pack: "pgfgc00" },
             (directory) => RESIDENT_PACK_NAMES[directory >>> 0] ?? null),
@@ -59,7 +60,7 @@ export function createBattleTagTranslated(sfx = null, options = {}) {
         state: { _row: null },
 
         /** Open on the two partners that are not the acting member. */
-        seed: (r, seed = {}) => {
+        seed: (r, seed: BattleTagSeed = {}) => {
             const state = options.getState?.() ?? {};
             const party = Array.isArray(state.party) ? state.party : [];
             return {

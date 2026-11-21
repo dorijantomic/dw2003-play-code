@@ -1,3 +1,4 @@
+import type { BattlefieldsInput, TechniqueTableEntry } from "./types/battlefields.js";
 // web/battlefields.js — the Battlefields table: where a stage fights and
 // which technique changes the world. Pure: no DOM, no fetch, no state.
 //
@@ -66,7 +67,7 @@ function nameByMapId(maps) {
  *
  * The stages come out in numeric order, so the book's pages are stable.
  */
-export function stageRows({ arenas, maps } = {}) {
+export function stageRows({ arenas, maps }: BattlefieldsInput = {}) {
   const byStage = stageTable(arenas);
   const names = nameByMapId(maps);
   return Object.keys(byStage)
@@ -99,7 +100,7 @@ export function stageRows({ arenas, maps } = {}) {
  * order. Pure. There is no arena to show, so each row says so and carries no
  * arena id. Row = {stage: "s013", name, arena: null, label: "no ordinary arena"}.
  */
-export function noFightRows({ arenas, maps } = {}) {
+export function noFightRows({ arenas, maps }: BattlefieldsInput = {}) {
   const byStage = stageTable(arenas);
   const rows = [];
   for (const map of mapList(maps)) {
@@ -122,7 +123,7 @@ export function noFightRows({ arenas, maps } = {}) {
  * folder fightstg loads, the arena's own background colour, and how many CLUT
  * textures the pack carries.
  */
-export function arenaRows({ arenas } = {}) {
+export function arenaRows({ arenas }: BattlefieldsInput = {}) {
   const byArena = arenas && typeof arenas === "object" && !Array.isArray(arenas) ? arenas.byArena ?? {} : {};
   return Object.keys(byArena)
     .map(Number)
@@ -162,7 +163,7 @@ function skillList(skills) {
  * it is the pack the battle draws when a special's technique carries no element world.
  * ordinaryCount() covers the moves that land there.
  */
-export function backdropRows({ backdrops, techTable, skills } = {}) {
+export function backdropRows({ backdrops, techTable, skills }: BattlefieldsInput = {}) {
   const bySig = backdrops && typeof backdrops === "object" && !Array.isArray(backdrops) ? backdrops.bySig ?? {} : {};
   const fallbackSig = Number(backdrops?.fallbackSig) || 0;
   const names = new Map(skillList(skills).filter((s) => s && s.id != null).map((s) => [Number(s.id), s.name]));
@@ -219,7 +220,7 @@ export function techBackdrop(backdrops, techTable, id) {
 }
 
 /** How many of fight_tech_table.json's techniques fight in the ordinary arena (391 of 443). */
-export function ordinaryCount(techTable) {
+export function ordinaryCount(techTable: Record<string, TechniqueTableEntry>) {
   const table = techTable && typeof techTable === "object" && !Array.isArray(techTable) ? techTable : {};
   let count = 0;
   for (const row of Object.values(table)) if (!Number(row?.sigEffect)) count += 1;
@@ -236,7 +237,7 @@ export function ordinaryCount(techTable) {
  * byTech) and `zeroListed` 130 (how many of those 182 point at sig 0, the ordinary
  * arena).
  */
-export function backdropFacts({ backdrops, techTable } = {}) {
+export function backdropFacts({ backdrops, techTable }: BattlefieldsInput = {}) {
   const bySig = backdrops && typeof backdrops === "object" && !Array.isArray(backdrops) ? backdrops.bySig ?? {} : {};
   const byTech = backdrops && typeof backdrops === "object" && !Array.isArray(backdrops) ? backdrops.byTech ?? {} : {};
   const packs = Object.keys(bySig);
@@ -260,7 +261,7 @@ export function backdropFacts({ backdrops, techTable } = {}) {
  * Pure. Each row keeps its own fields and gains `kind` ("stage", "map", "arena" or
  * "world") so the page can draw and label it.
  */
-export function battlefieldRows({ arenas, backdrops, techTable, skills, maps } = {}) {
+export function battlefieldRows({ arenas, backdrops, techTable, skills, maps }: BattlefieldsInput = {}) {
   return [
     ...stageRows({ arenas, maps }).map((row) => ({ kind: "stage", ...row })),
     ...noFightRows({ arenas, maps }).map((row) => ({ kind: "map", ...row })),

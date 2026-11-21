@@ -23,7 +23,7 @@ export function createPause({ now = real.now, setT = real.setT, clearT = real.cl
         /** Mark `id` away. onExpire(id) runs after awayMs; onExpire null = held until remove() (the referee's own link). False if already away. */
         add(id, onExpire) {
             if (away.has(id)) return false;
-            const e = { at: now(), timer: 0 };
+            const e = { at: now(), timer: 0 as number | ReturnType<typeof setTimeout> };
             if (onExpire) e.timer = setT(() => { if (away.get(id) !== e) return; away.delete(id); onExpire(id); }, awayMs);
             away.set(id, e);
             return true;
@@ -60,10 +60,10 @@ export function pzText(pz, players = []) {
     return `Waiting for ${names.join(", ")} (${pz.s}s)`;
 }
 
-export function createLink({ onEnd, setT = real.setT, clearT = real.clearT } = {}) {
+export function createLink({ onEnd, setT = real.setT, clearT = real.clearT }: { onEnd?: () => void; setT?: typeof real.setT; clearT?: typeof real.clearT } = {}) {
     let cur = null;
     const stop = () => { if (cur) clearT(cur.timer); cur = null; };
-    const start = (text, ms) => { stop(); const me = { text, timer: 0 }; me.timer = setT(() => { if (cur !== me) return; cur = null; onEnd(); }, ms); cur = me; };
+    const start = (text, ms) => { stop(); const me = { text, timer: 0 as number | ReturnType<typeof setTimeout> }; me.timer = setT(() => { if (cur !== me) return; cur = null; onEnd(); }, ms); cur = me; };
     return {
         get text() { return cur ? cur.text : null; },
         get active() { return !!cur; },

@@ -23,6 +23,7 @@
 // Pure functions only; the DOM wiring lives in anim-viewer.html (tests/anim-viewer-compare.test.js).
 
 /** Roles the table shows, in order. */
+import type { AnimRoleBones, CompareQuery } from "./types/anim-viewer-compare.js";
 export const ROLE_ORDER = ["torso", "head", "footL", "footR", "wingL", "wingR"];
 export const ROLE_LABELS = {
   torso: "torso", head: "head", footL: "left foot", footR: "right foot", wingL: "left wing", wingR: "right wing",
@@ -45,7 +46,7 @@ const firstOf = (v) => (Array.isArray(v) && v.length ? v[0] : Number.isInteger(v
  * Bone indices for the six roles out of a short-key bone map (`t`,`h`,`lL`,`lR`,`wL`,`wR`, where the
  * leg/wing keys are CHAINS and the role is the chain's tip — the foot / the wing tip).
  */
-export function roleBones(map) {
+export function roleBones(map): AnimRoleBones {
   if (!map) return {};
   const out = {
     torso: firstOf(map.t),
@@ -185,7 +186,7 @@ export function roleBonesRow(dw2Bones, dw3Bones, torsoNote = null) {
 }
 
 /** The deep link of a compare view: `?compare=<bake id>[&t=<tick>]`. */
-export function compareQuery({ id, tick = null } = {}) {
+export function compareQuery({ id, tick = null }: CompareQuery = {}) {
   const q = new URLSearchParams();
   if (!id) return "";
   q.set("compare", id);

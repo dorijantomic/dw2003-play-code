@@ -3,6 +3,7 @@
 // text, and an unclaimed clip is art (drawn by the capture scope on the art canvas, never dropped). Pure: parts + runs in, descriptors out.
 import { applyRel } from "./geometry.js";
 import { N, ID, textPart, plate, stripes, typeWord, badgeText, tokenLine } from "./base.js";
+import type { GenericOpts, UiTextOpts } from "./types.js";
 
 /** The native rect of a claimed clip through the matrix of its draw call. */
 export const clipRect = (p) => applyRel({ x: p.x + (p.bx ?? 0), y: p.y + (p.by ?? 0), w: p.w ?? 0, h: p.h ?? 0 }, p.rel);
@@ -13,7 +14,7 @@ const KIND_ROLE = (r) => (r.kind === 3 ? (r.right != null ? "number" : "label") 
  * One run -> a text descriptor. `o` may carry { role, sizeDp, color, rect } to override the defaults (kind 1 = label 24 dp, kind 3 =
  * small label 16 dp / right-anchored number 22 dp). Native text rows are 9 high; the DOM line is centred on them.
  */
-export function runText(r, key, rel, o = {}) {
+export function runText(r, key, rel, o: UiTextOpts = {}) {
     const role = o.role ?? KIND_ROLE(r);
     const small = r.kind === 3 && o.sizeDp === undefined;
     const sizeDp = o.sizeDp ?? (role === "number" ? 22 : small ? 16 : role === "body" ? 26 : 24);
@@ -26,7 +27,7 @@ export function runText(r, key, rel, o = {}) {
 }
 
 /** Every run not in `used` as a text part. */
-export function restOfRuns(runs, used, rel, out, prefix = "t", pick = () => ({})) {
+export function restOfRuns(runs, used, rel, out, prefix = "t", pick: (r: any) => any = () => ({})) {
     const seen = new Map();
     runs.forEach((r) => {
         if (used?.has(r)) return;
@@ -48,7 +49,7 @@ export function platePart(p, i) {
 /**
  * The generic screen: claimed plates, the backdrop when the game draws one, all text. `cfg` = { wash, word, roles(run) }.
  */
-export function composeGeneric({ parts, runs }, cfg = {}) {
+export function composeGeneric({ parts, runs }, cfg: GenericOpts = {}) {
     const out = [];
     if (cfg.wash) out.push({ key: "wash", kind: "wash", part: "wash", layer: "under", full: true });
     let i = 0;
@@ -62,7 +63,7 @@ export function composeGeneric({ parts, runs }, cfg = {}) {
 }
 
 /** The scrolling diamond field of the status-style pages: stripes over the whole limit, the game's own scroll offset (the call's x = y). */
-export function composeBackdrop(p, cfg, out) {
+export function composeBackdrop(p, cfg: GenericOpts, out) {
     out.push(stripes(p.x));
     if (cfg.word) { const wx = cfg.wordX ?? 80; out.push(typeWord("backdrop.type", cfg.word, { x: wx, y: cfg.wordY ?? 133, w: Math.max(40, 320 - wx), h: 140 / 3 }, ID, 140, null, false, true)); }
 }
